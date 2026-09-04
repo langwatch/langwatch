@@ -88,7 +88,12 @@ describe("worker job registry", () => {
     it("attributes every pipeline to a declared feature", () => {
       const owners = [...new Set(jobRegistry.pipelines.map((pipeline) => pipeline.feature))];
 
-      expect(owners.sort()).toEqual([...catalogue.features].sort());
+      // Containment rather than equality: a feature may install work that is
+      // not a pipeline at all — `scenario-execution` starts the executor a
+      // queued run is submitted to and claims no routing key — so a catalogue
+      // entry with no pipeline is a real shape, while a pipeline attributed to
+      // a feature nobody declares is the drift this guards.
+      expect(owners.filter((owner) => !catalogue.features.includes(owner))).toEqual([]);
     });
 
     it("names the one queue every pipeline shares", () => {

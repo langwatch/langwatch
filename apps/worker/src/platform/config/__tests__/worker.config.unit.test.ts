@@ -81,6 +81,18 @@ describe("resolveWorkerConfig", () => {
       stripe: { secretKey: undefined },
       // Both absent is the application's own behaviour with `POSTHOG_KEY`
       // unset: this deployment chose not to run product analytics.
+      // The operational loops. Anonymous usage reporting is ON for a
+      // self-hosted install that opted out of nothing, and the backup gauges
+      // are collected unless a deployment deliberately turns them off.
+      ops: {
+        usageStats: {
+          disabled: false,
+          installMethod: "self-hosted",
+          hostname: undefined,
+          environment: "development",
+        },
+        collectClickHouseBackupMetrics: true,
+      },
       productAnalytics: { key: undefined, host: undefined },
       gateway: { spendSettlementGraceMs: undefined },
       // Both unsafe opt-ins default OFF, and both are read at the App's own
@@ -143,6 +155,14 @@ describe("resolveWorkerConfig", () => {
           },
         },
         outboundProxy: { https: undefined, http: undefined, noProxy: undefined },
+        // What a prepared scenario child is booted with. The endpoint is this
+        // process's own telemetry destination, absent here because the source
+        // names none; the model is the registry flagship, since a deployment
+        // that named no default still has to hand the child a real model.
+        execution: {
+          langwatchEndpoint: undefined,
+          defaultModel: expect.any(String),
+        },
         // The fence a model-provider credential probe is judged by. An unset
         // allowlist is an EMPTY one rather than a wildcard, and the
         // environment bag a system provider's credential is read from is
@@ -339,6 +359,10 @@ describe("resolveWorkerConfig", () => {
         http: undefined,
         noProxy: "internal.example.test",
       },
+      execution: {
+        langwatchEndpoint: undefined,
+        defaultModel: expect.any(String),
+      },
       // The environment bag is the source itself, unfiltered: WHICH variable
       // carries a provider's key is the provider registry's business, and a
       // schema here that enumerated them would drop the custom providers whose
@@ -349,6 +373,23 @@ describe("resolveWorkerConfig", () => {
         environment: source,
       },
     });
+  });
+
+  /**
+   * What a prepared scenario child is booted with.
+   *
+   * A blank override is not a model: an operator who exported the variable
+   * empty has chosen nothing, and an empty string reaching the child would be
+   * carried to the provider as a model named "".
+   */
+  it("hands a scenario child a real model whether or not a default was named", () => {
+    expect(
+      resolveWorkerConfig({ LANGWATCH_DEFAULT_MODEL: "openai/gpt-5-mini" }).infrastructure.execution
+        .defaultModel,
+    ).toBe("openai/gpt-5-mini");
+    expect(
+      resolveWorkerConfig({ LANGWATCH_DEFAULT_MODEL: "   " }).infrastructure.execution.defaultModel,
+    ).not.toBe("");
   });
 
   /**

@@ -8,6 +8,11 @@ import {
   type ChildProcessJobData,
   type ScenarioExecutionResult,
 } from "@langwatch/scenario-contract";
+import {
+  encodeScenarioEgressPolicy,
+  SCENARIO_EGRESS_POLICY_ENV,
+  type ScenarioEgressPolicy,
+} from "./child-egress-policy.adapter";
 import { encodeScenarioLogContext, SCENARIO_LOG_CONTEXT_ENV } from "./child-logger.adapter";
 import { resolveChildProcessSpawn } from "./child-process-spawn.adapter";
 import { resolveChildTlsEnv } from "./child-tls-env.adapter";
@@ -39,6 +44,14 @@ export interface ScenarioChildProcessConfig {
   sourceRoots: string[];
   nodeEnv: string;
   isSaas: boolean;
+  /**
+   * The deployment's outbound fence, as the composing process resolved it.
+   *
+   * Required rather than optional: a child with no stated policy refuses the
+   * run, and a field that could be left out here is how that refusal would
+   * turn back into a silently permissive default.
+   */
+  egress: ScenarioEgressPolicy;
   parentEnvironment: ScenarioChildParentEnvironment;
 }
 
@@ -300,6 +313,7 @@ function buildChildEnvironmentValue(input: {
     LANGWATCH_ENDPOINT: input.telemetry.endpoint,
     SCENARIO_HEADLESS: "true",
     OTEL_RESOURCE_ATTRIBUTES: buildOtelResourceAttributesValue(input.labels),
+    [SCENARIO_EGRESS_POLICY_ENV]: encodeScenarioEgressPolicy(input.config.egress),
     [SCENARIO_LOG_CONTEXT_ENV]: encodeScenarioLogContext({
       scenarioRunId: input.jobData.scenarioRunId,
       batchRunId: input.jobData.batchRunId,

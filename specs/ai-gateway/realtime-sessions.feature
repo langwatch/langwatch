@@ -372,3 +372,23 @@ Feature: Brokered realtime voice sessions on the AI Gateway
       # The tools of a hosted agent live at the vendor, and an OpenAI session
       # declares its own. Enforcing either needs the relay, which stays behind
       # its four gates.
+
+  Rule: The reconciler runs on the worker, not only in principle
+
+    # It was built and never started, which is indistinguishable from working
+    # for any workspace whose post-call webhook does arrive — and silent for
+    # every workspace whose does not, where nothing is ever billed.
+
+    @unit
+    Scenario: The worker starts the voice reconciler when it boots
+      Given a worker holding the database and the stored-credential key
+      When its feature installers run
+      Then the reconciler sweeps stale sessions on its first tick
+      And stopping the worker stops the loop
+
+    @unit
+    Scenario: A worker without the stored-credential key composes no reconciler
+      Given a worker whose deployment named no credentials key
+      When it composes the voice reconciler
+      Then it composes none and names the missing input
+

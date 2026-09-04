@@ -4,6 +4,8 @@ import {
   createWorkerScenarioProcessing,
   WorkerScenarioAbsenceReportPort,
 } from "../worker-scenario-processing.composition";
+import type { ExecuteRunIntent } from "@langwatch/scenario-server";
+import { resolveWorkerScenarioExecutionPrerequisites } from "../worker-scenario-execution.composition";
 
 /**
  * Spec: specs/scenarios/worker-simulation-pipeline-conversion.feature
@@ -37,8 +39,9 @@ class RecordingAbsence extends WorkerScenarioAbsenceReportPort {
   }
 }
 
-function compose() {
+function compose(overrides: { executionPool?: { submit(job: unknown): void } } = {}) {
   return createWorkerScenarioProcessing({
+    ...(overrides.executionPool ? { executionPool: overrides.executionPool as never } : {}),
     resolveClickHouseClient: (async () => ({
       insert: async () => undefined,
       query: async () => ({ json: async () => [] }),
@@ -88,7 +91,17 @@ type BuiltDefinition = {
   foldSubscribers: Map<string, unknown>;
   mapSubscribers: Map<string, unknown>;
   eventSubscribers: Map<string, { handle: (event: never, ctx: never) => Promise<void> }>;
-  processManagers: Map<string, { config: { eventTypes: readonly string[] } }>;
+  processManagers: Map<
+    string,
+    {
+      config: {
+        eventTypes: readonly string[];
+        // Only the execute intent is driven here, so the map is typed against
+        // its own payload rather than against a union nothing would narrow.
+        intents: Record<string, { run(payload: ExecuteRunIntent): Promise<void> } | undefined>;
+      };
+    }
+  >;
 };
 
 function registeredKeys(definition: BuiltDefinition): Set<string> {
@@ -196,6 +209,74 @@ describe("given the simulation pipeline this process composes for itself", () =>
       compose();
 
       expect(RECORDED.absences).toEqual(["executionPool"]);
+    });
+  });
+
+  describe("when this process composes an execution pool", () => {
+    /** @scenario "A worker holding an execution pool starts a queued run" */
+    it("submits the queued run to that pool and reports no absence", async () => {
+      reset();
+      const submitted: Array<{ scenarioRunId: string }> = [];
+      const definition = compose({
+        executionPool: {
+          submit: (job) => submitted.push(job as { scenarioRunId: string }),
+        },
+      }).buildProcessing() as unknown as BuiltDefinition;
+
+      const process = definition.processManagers.get("simulation_run_execution");
+      if (!process) throw new Error("the pipeline registered no simulation_run_execution");
+      const execute = process.config.intents.execute;
+      if (!execute) throw new Error("the process manager declared no execute intent");
+
+      await execute.run({
+        projectId: "project-1",
+        scenarioId: "scenario-1",
+        scenarioRunId: "run-1",
+        batchRunId: "batch-1",
+        scenarioSetId: "set-1",
+        target: { type: "http", referenceId: "agent-1" },
+      });
+
+      expect(submitted.map((job) => job.scenarioRunId)).toEqual(["run-1"]);
+      expect(RECORDED.absences).toEqual([]);
+    });
+  });
+});
+
+describe("given a worker deciding whether it can execute simulations", () => {
+  describe("when one execution input is missing", () => {
+    /** @scenario "A worker missing one execution input composes no executor" */
+    it("composes no executor and names the missing input", () => {
+      const named: string[] = [];
+
+      const prerequisites = resolveWorkerScenarioExecutionPrerequisites({
+        config: {
+          serviceName: "worker",
+          nodeEnvironment: "test",
+          deployment: { saas: false },
+          automation: { credentialsEncryptionKey: "a".repeat(64) },
+          infrastructure: {
+            execution: { langwatchEndpoint: undefined, defaultModel: "openai/gpt-5-mini" },
+            modelProvider: {
+              nlpServiceUrl: "http://nlp.test",
+              blockLocalHttpCalls: true,
+              allowedProxyHosts: [],
+            },
+          },
+        } as never,
+        connection: { client: {} } as never,
+        modelProviders: {} as never,
+        projects: {} as never,
+        redis: {} as never,
+        resolveClickHouseClient: (async () => ({})) as never,
+        defaultRetentionDays: 90,
+        absence: {
+          withoutExecutor: (reason: string) => named.push(reason),
+        } as never,
+      });
+
+      expect(prerequisites).toBeUndefined();
+      expect(named).toEqual(["no-telemetry-endpoint"]);
     });
   });
 });

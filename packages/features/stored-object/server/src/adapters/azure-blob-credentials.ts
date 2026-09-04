@@ -75,14 +75,14 @@ export type AzureInjectedIdentity = Readonly<{
  * process may set it, and a production process must answer `false`.
  */
 export type AzureBlobCredentialsConfig = Readonly<{
-  authMode: string | undefined;
-  accountName: string | undefined;
-  accountKey: string | undefined;
-  container: string | undefined;
-  endpoint: string | undefined;
-  authorityHost: string | undefined;
-  tokenAudience: string | undefined;
-  backend: "s3" | "azure" | undefined;
+  authMode?: string | undefined;
+  accountName?: string | undefined;
+  accountKey?: string | undefined;
+  container?: string | undefined;
+  endpoint?: string | undefined;
+  authorityHost?: string | undefined;
+  tokenAudience?: string | undefined;
+  backend?: "s3" | "azure" | undefined;
   allowInsecureTokenEndpointForTests?: boolean | undefined;
 }>;
 

@@ -50,3 +50,18 @@ Feature: The worker mounts the simulation processing pipeline
       When it composes the simulation pipeline
       Then the absence is reported by name
       And a queued run is refused into the outbox rather than dropped
+
+  Rule: A worker that composed an executor runs the run itself
+
+    @unit
+    Scenario: A worker holding an execution pool starts a queued run
+      Given a worker that composed a scenario execution pool
+      When the run-execution process manager dispatches its execute intent
+      Then the run is submitted to this process's own pool
+      And no absence is reported at boot
+
+    @unit
+    Scenario: A worker missing one execution input composes no executor
+      Given a worker whose deployment states no ingestion endpoint for a child
+      When it resolves whether it can execute simulations
+      Then it composes no executor and names the missing input

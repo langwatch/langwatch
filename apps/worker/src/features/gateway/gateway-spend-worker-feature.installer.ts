@@ -1,3 +1,8 @@
+import { Deferred, type CommandDispatcher } from "@langwatch/eventing";
+import {
+  GatewaySpendConfirmationPort,
+  type ConfirmSpendCommandData,
+} from "@langwatch/gateway-server";
 import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime";
 
@@ -41,6 +46,24 @@ export class GatewaySpendWorkerFeatureInstaller implements WorkerFeatureInstalle
   }
 
   readonly name = "gateway-spend";
+
+  private readonly confirmSpend = new Deferred<CommandDispatcher<ConfirmSpendCommandData>>(
+    "gatewaySpend.confirmSpend",
+  );
+
+  /**
+   * The pipeline's own `confirmSpend`, safe to hand over before this installer
+   * runs.
+   *
+   * The realtime voice reconciler confirms a settled call through it, and the
+   * reconciler is composed before any pipeline is registered. A callable proxy
+   * is what lets the two be wired in composition order without the confirmation
+   * being silently dropped by a sender that does not exist yet.
+   */
+  readonly spendConfirmation: GatewaySpendConfirmationPort = new DeferredGatewaySpendConfirmation(
+    this.confirmSpend.fn,
+  );
+
   private installed = false;
 
   private constructor(
@@ -56,9 +79,25 @@ export class GatewaySpendWorkerFeatureInstaller implements WorkerFeatureInstalle
       if (!settleSpend) {
         throw new Error("Gateway spend pipeline must register a settleSpend command.");
       }
+      const confirmSpend = commands.confirmSpend;
+      if (!confirmSpend) {
+        throw new Error("Gateway spend pipeline must register a confirmSpend command.");
+      }
+      this.confirmSpend.resolve((data) => confirmSpend.send(data));
       this.installer.connectSettlement((data) => settleSpend.send(data));
       this.installed = true;
     }
     return undefined;
+  }
+}
+
+/** The pipeline's `confirmSpend`, behind the port a voice settlement asks for. */
+class DeferredGatewaySpendConfirmation extends GatewaySpendConfirmationPort {
+  constructor(private readonly send: CommandDispatcher<ConfirmSpendCommandData>) {
+    super();
+  }
+
+  confirmSpend(data: ConfirmSpendCommandData): Promise<void> {
+    return this.send(data);
   }
 }

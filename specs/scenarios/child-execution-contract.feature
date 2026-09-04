@@ -33,3 +33,25 @@ Feature: Scenario child execution contract stays private to the child
     Given a suite target carrying a source mapping and a literal mapping
     When the child's job data schema parses the same mappings
     Then both schemas accept them
+
+  # ---------------------------------------------------------------------------
+  # The fence the child dials a target through
+  # ---------------------------------------------------------------------------
+
+  # A child inherits an allowlisted handful of the operator's environment and
+  # runs under SKIP_ENV_VALIDATION, so a fence it resolved for itself would be
+  # the library default rather than the deployment's: an install that blocks
+  # local addresses everywhere else would stop blocking them the moment the
+  # call moved into a child.
+
+  @unit
+  Scenario: The child is handed the deployment's own egress policy
+    Given a deployment that blocks local addresses and allowlists one host
+    When the parent builds a child's environment
+    Then the child is handed that exact policy
+
+  @unit
+  Scenario: A child handed no egress policy refuses rather than assuming one
+    Given a child process started without a stated egress policy
+    When it reads the policy an HTTP target would be dialled through
+    Then it fails by naming the variable instead of defaulting the fence open

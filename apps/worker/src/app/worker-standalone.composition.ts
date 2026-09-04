@@ -93,6 +93,11 @@ export class WorkerStandaloneComposition extends WorkerExecutableCompositionPort
         // the one sweep that is nobody's tenant — settling admissions whose
         // confirmation never arrived, on every configured endpoint at once.
         resolveClickHouseInstances: clickhouse.resolveInstances,
+        // The third question the same connection answers: one organization's
+        // endpoint, for the anonymous usage report that already holds the
+        // organization and would otherwise route through a project id to get
+        // back to it.
+        resolveClickHouseOrganizationClient: clickhouse.resolveOrganizationClient,
         retention: createEventingRetentionConfiguration({
           defaultRetentionDays: config.retention.defaultDays,
         }),

@@ -31,12 +31,15 @@ import {
 } from "@langwatch/clickhouse-client";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "@langwatch/data-retention-contract";
 import { resolveFeatureFlagConfig, type FeatureFlagConfig } from "@langwatch/feature-flag-contract";
+import { getLatestOpenAIChatFlagship } from "@langwatch/model-provider-contract";
 import { resolveGroupQueuePolicyFromEnv, type GroupQueuePolicy } from "@langwatch/group-queue";
 import { EmailProviderService, type MailerConfiguration } from "@langwatch/notification-server";
 import { RedisConfigService, type RedisConfigResolution } from "@langwatch/redis-client";
 import { z } from "zod";
 
 const DEFAULT_LOCAL_STORAGE_ROOT = "/var/lib/langwatch/objects";
+/** The model a scenario target that names none falls back to. */
+const REGISTRY_FLAGSHIP_MODEL = getLatestOpenAIChatFlagship() ?? "openai/gpt-5";
 const DEFAULT_PRODUCTION_QUEUE_DRAIN_MS = 25_000;
 const DEFAULT_DEVELOPMENT_QUEUE_DRAIN_MS = 5_000;
 const APP_CLOSE_SLACK_MS = 5_000;
@@ -154,6 +157,23 @@ export const workerConfigDefinition = RuntimeConfig.define({
    * means the vendor's own default on both sides. Inventing one here would be
    * a second answer to which region the events land in.
    */
+  /**
+   * What the operational loops this process owns are told about the install.
+   *
+   * `INSTALL_METHOD` and `DISABLE_USAGE_STATS` are the two the anonymous daily
+   * telemetry reads, at the same spelling and the same one-or-true rule the
+   * application read them with — a self-hosted operator who turned the report
+   * off on one tier must not find it back on from another.
+   */
+  ops: {
+    disableUsageStats: Config.value(environmentOneOrTrueSchema, {
+      env: "DISABLE_USAGE_STATS",
+    }),
+    installMethod: Config.value(optionalEnvironmentString, { env: "INSTALL_METHOD" }),
+    clickhouseBackupMetrics: Config.value(optionalEnvironmentString, {
+      env: "CLICKHOUSE_BACKUP_METRICS_ENABLED",
+    }),
+  },
   productAnalytics: {
     key: Config.value(optionalEnvironmentString, { env: "POSTHOG_KEY" }),
     host: Config.value(optionalEnvironmentString, { env: "POSTHOG_HOST" }),
@@ -526,6 +546,19 @@ export const workerConfigDefinition = RuntimeConfig.define({
      * them, because a probe answered differently by the two tiers is a
      * credential that saves on one screen and fails on the other.
      */
+    /**
+     * What a prepared simulation child is booted with.
+     *
+     * One leaf only: the endpoint the child reports its own run events to is
+     * `observability.endpoint`, already read once for this process's own
+     * exporter, and a second leaf over one variable is how two answers to
+     * "where does this deployment collect telemetry" get into one process.
+     */
+    execution: {
+      defaultModel: Config.value(optionalEnvironmentString, {
+        env: "LANGWATCH_DEFAULT_MODEL",
+      }),
+    },
     modelProvider: {
       ...egressConfigDefinition,
       // Where the OpenAI-compatible execution proxy answers. The SAME variable
@@ -608,8 +641,39 @@ export type WorkerStorageConfig = Readonly<{
   dataplaneS3: ReadonlyMap<string, WorkerDataplaneS3Config>;
 }>;
 
+/**
+ * The two deployment facts a prepared scenario run carries into its child.
+ *
+ * `langwatchEndpoint` is where the child reports its own scenario events —
+ * this deployment's ingestion origin rather than the SDK default, which is
+ * somebody else's deployment.
+ */
+export type WorkerExecutionConfig = Readonly<{
+  langwatchEndpoint: string | undefined;
+  defaultModel: string;
+}>;
+
+/**
+ * The operational loops' own configuration.
+ *
+ * `usageStats.disabled` folds `IS_SAAS` in, because the hosted product reports
+ * its own usage through a different path entirely and a second sender there
+ * would double-count every organization.
+ */
+export type WorkerOpsConfig = Readonly<{
+  usageStats: Readonly<{
+    disabled: boolean;
+    installMethod: string;
+    hostname: string | undefined;
+    environment: string | undefined;
+  }>;
+  /** Whether `system.backup_log` is read at all; ON unless deliberately off. */
+  collectClickHouseBackupMetrics: boolean;
+}>;
+
 export type WorkerInfrastructureConfig = Readonly<{
   database: WorkerDatabaseConfig;
+  execution: WorkerExecutionConfig;
   clickhouse: WorkerClickHouseConfig;
   redis: RedisConfigResolution;
   groupQueue: GroupQueuePolicy;
@@ -901,6 +965,7 @@ export type WorkerConfig = Readonly<{
   langevals: Readonly<{ endpoint: string | undefined }>;
   tokenizer: WorkerTraceTokenizerConfig;
   stripe: WorkerStripeConfig;
+  ops: WorkerOpsConfig;
   productAnalytics: WorkerProductAnalyticsConfig;
   gateway: WorkerGatewayConfig;
   webhooks: WorkerWebhookConfig;
@@ -975,6 +1040,21 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
     langevals: { endpoint: value.tracePrivacy.langevalsEndpoint },
     tokenizer: resolveWorkerTraceTokenizerConfig(value.tokenizer),
     stripe: value.stripe,
+    ops: {
+      usageStats: {
+        // Two switches, one meaning: an operator who opted out and the hosted
+        // product, which reports its own usage by another path.
+        disabled: value.ops.disableUsageStats || value.deployment.saas,
+        // Self-hosted is the default because a deployment that named no method
+        // installed itself, which is what the receiver records it as.
+        installMethod: value.ops.installMethod?.trim() || "self-hosted",
+        hostname: value.mail.baseHost?.trim() || undefined,
+        environment: value.nodeEnvironment,
+      },
+      collectClickHouseBackupMetrics: collectsClickHouseBackupMetrics(
+        value.ops.clickhouseBackupMetrics,
+      ),
+    },
     productAnalytics: value.productAnalytics,
     gateway: value.gateway,
     webhooks: {
@@ -992,6 +1072,17 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
     eventing: value.eventing,
     infrastructure: {
       database: { url: value.infrastructure.database.url },
+      execution: {
+        // The SAME variable this process's own telemetry is exported to, read
+        // once and projected here: a prepared scenario child reports its run
+        // events to the deployment's own collector.
+        langwatchEndpoint: value.observability.endpoint?.trim() || undefined,
+        // A blank override is not a model. It resolves to the registry
+        // flagship rather than to an empty string, which a child would carry
+        // to the provider as a model named "".
+        defaultModel:
+          value.infrastructure.execution.defaultModel?.trim() || REGISTRY_FLAGSHIP_MODEL,
+      },
       clickhouse: {
         url: value.infrastructure.clickhouse.url?.trim() || undefined,
         privateRoutes: resolveWorkerPrivateClickHouseRoutes(source),
@@ -1378,4 +1469,22 @@ function resolveWorkerRetentionDays(value: string | undefined): number {
   if (value === undefined || value === "") return PLATFORM_DEFAULT_RETENTION_DAYS;
   const days = Number.parseInt(value, 10);
   return Number.isFinite(days) && days > 0 ? days : PLATFORM_DEFAULT_RETENTION_DAYS;
+}
+
+/** Values of `CLICKHOUSE_BACKUP_METRICS_ENABLED` that turn backup collection off. */
+const BACKUP_METRICS_OFF_VALUES = new Set(["false", "0", "no", "off"]);
+
+/**
+ * Whether this deployment reads `system.backup_log`.
+ *
+ * ON unless explicitly disabled, and only a deliberate opt-OUT stops it: the
+ * gauges predate the flag and the production alerts built on them already
+ * depend on them, while the deployments that emit them set nothing. Defaulting
+ * to off would silently disarm live backup monitoring on the next deploy.
+ */
+function collectsClickHouseBackupMetrics(raw: string | undefined): boolean {
+  if (typeof raw !== "string") return true;
+  const normalized = raw.trim().toLowerCase();
+  if (normalized === "") return true;
+  return !BACKUP_METRICS_OFF_VALUES.has(normalized);
 }

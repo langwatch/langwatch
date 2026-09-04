@@ -195,6 +195,18 @@ export class WorkerClickHouseInfrastructure {
    * connection itself for the original reason — a caller still cannot reach
    * `shared()` and write one organization's rows on another's endpoint.
    */
+  /**
+   * The endpoint one ORGANIZATION's rows live on, with no directory lookup.
+   *
+   * The tenant resolver above answers "the client for this project", and the
+   * anonymous usage report counts an organization's projects together — it
+   * already knows the organization, so routing through a project id would be a
+   * lookup to arrive back where it started. A deployment with no private route
+   * for that organization gets the shared endpoint, which is where its rows are.
+   */
+  readonly resolveOrganizationClient = (organizationId: string): ClickHouseClient =>
+    this.connection.resolveOrganization(organizationId);
+
   readonly resolveInstances = async (): Promise<{ target: string; client: ClickHouseClient }[]> => [
     ...this.connection.instances(),
   ];

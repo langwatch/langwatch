@@ -122,6 +122,12 @@ import {
 } from "../features/governance/governance-ingestion-worker-feature.installer";
 import { LogWorkerFeatureInstaller } from "../features/log/log-worker-feature.installer";
 import { MetricWorkerFeatureInstaller } from "../features/metric/metric-worker-feature.installer";
+import { ScenarioExecutionPoolService } from "@langwatch/scenario-server";
+import { SCENARIO_WORKER } from "@langwatch/scenario-contract";
+import type { UsageStatsWorkerDatabase } from "@langwatch/ops-server";
+import { OpsWorkerFeatureInstaller } from "../features/ops/ops-worker-feature.installer";
+import { GatewayRealtimeSessionWorkerFeatureInstaller } from "../features/gateway/gateway-realtime-session-worker-feature.installer";
+import { ScenarioExecutionWorkerFeatureInstaller } from "../features/scenario/scenario-execution-worker-feature.installer";
 import { ScenarioWorkerFeatureInstaller } from "../features/scenario/scenario-worker-feature.installer";
 import { SuiteWorkerFeatureInstaller } from "../features/suite/suite-worker-feature.installer";
 import { IdentityWorkerFeatureInstaller } from "../features/identity/identity-worker-feature.installer";
@@ -242,6 +248,22 @@ import {
   WorkerScenarioAbsenceReportPort,
 } from "./worker-scenario-processing.composition";
 import {
+  createWorkerOps,
+  LoggedWorkerOpsAbsence,
+  type WorkerOpsAbsenceReportPort,
+} from "./worker-ops.composition";
+import {
+  LoggedWorkerRealtimeSessionAbsence,
+  tryCreateWorkerRealtimeSessionPoller,
+  type WorkerRealtimeSessionAbsenceReportPort,
+} from "./worker-realtime-session.composition";
+import {
+  createWorkerScenarioExecution,
+  LoggedWorkerScenarioExecutionAbsence,
+  resolveWorkerScenarioExecutionPrerequisites,
+  type WorkerScenarioExecutionAbsenceReportPort,
+} from "./worker-scenario-execution.composition";
+import {
   createWorkerGatewaySpend,
   WorkerGatewaySpendAbsenceReportPort,
   type WorkerGatewaySpendCompositionInput,
@@ -297,6 +319,7 @@ export type WorkerDatabaseCompositionOptions = AgentSandboxKeyReapDatabase &
   IngestionPullLifecycleDatabase &
   SsoConnectionPipelineDatabase &
   TopicClusteringDatabase &
+  UsageStatsWorkerDatabase &
   AuthzGrantPipelineDatabase &
   AutomationGraphActivityDatabase &
   AutomationTraceTriggerCatalogueDatabase &
@@ -372,6 +395,15 @@ type WorkerEventingConsumerCompositionOptions = {
    * already-built persistence ports does not, and the sweep says so by name.
    */
   resolveClickHouseInstances?: WorkerGatewaySpendCompositionInput["resolveClickHouseInstances"];
+  /**
+   * One ORGANIZATION's endpoint, with no directory lookup.
+   *
+   * The anonymous usage report counts an organization's projects together and
+   * already holds the organization, so routing through a project id would be a
+   * lookup to arrive back where it started. Absent leaves the ClickHouse half
+   * of that report at zero, which the collector answers rather than throws.
+   */
+  resolveClickHouseOrganizationClient?: (organizationId: string) => unknown;
 };
 
 type WorkerProductionCompositionBaseOptions = {
@@ -734,6 +766,20 @@ export class WorkerProductionComposition {
       installer: gatewaySpendGraph.spend,
       eventing,
     });
+    // Brokered voice, settled without the customer's webhook. Composed beside
+    // the spend pipeline because it confirms through that pipeline's own
+    // `confirmSpend`, and installed after it for the same reason.
+    const realtimeSessionPoller = tryCreateWorkerRealtimeSessionPoller({
+      database: options.connection?.client,
+      encryptionKey: options.config.automation.credentialsEncryptionKey,
+      spendConfirmation: gatewaySpend.spendConfirmation,
+      ...(WorkerProductionComposition.realtimeSessionAbsence(options)
+        ? { absence: WorkerProductionComposition.realtimeSessionAbsence(options)! }
+        : {}),
+    });
+    const gatewayRealtimeSession = realtimeSessionPoller
+      ? GatewayRealtimeSessionWorkerFeatureInstaller.create({ poller: realtimeSessionPoller })
+      : undefined;
     // Unconditional, on the same footing as the sweeps above: both pipelines
     // are composed from their own feature package over the tenant-keyed
     // ClickHouse client this graph already resolves its event store through,
@@ -963,24 +1009,76 @@ export class WorkerProductionComposition {
     // Scenario because the simulation process reports item starts and
     // completions into a suite run.
     const scenarioAbsence = WorkerProductionComposition.scenarioAbsence(options);
+    // Whether this pod can RUN a simulation, decided before the pipeline is
+    // built so the pool and the boot report cannot disagree. The pool is the
+    // only piece created here: everything it needs is built after the pipeline
+    // publishes the simulation service its failure handler finishes runs
+    // through.
+    const scenarioExecutionPrerequisites = resolveWorkerScenarioExecutionPrerequisites({
+      config: options.config,
+      connection: options.connection,
+      modelProviders: modelProviders?.modelProviders,
+      projects: tenancy?.projects,
+      redis: eventingOptions.groupQueue.redis,
+      resolveClickHouseClient: options.eventing.resolveClickHouseClient,
+      defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
+      ...(WorkerProductionComposition.scenarioExecutionAbsence(options)
+        ? { absence: WorkerProductionComposition.scenarioExecutionAbsence(options)! }
+        : {}),
+    });
+    const scenarioExecutionPool = scenarioExecutionPrerequisites
+      ? ScenarioExecutionPoolService.create({ concurrency: SCENARIO_WORKER.CONCURRENCY })
+      : undefined;
+    const scenarioProcessing = createWorkerScenarioProcessing({
+      resolveClickHouseClient: options.eventing.resolveClickHouseClient,
+      defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
+      redis: eventingOptions.groupQueue.redis,
+      ...(options.config.eventing.foldCacheTtlSeconds === undefined
+        ? {}
+        : { foldCacheTtlSeconds: options.config.eventing.foldCacheTtlSeconds }),
+      traceSummaryStore: traceStores.traceSummaryStore,
+      eventStore: eventing.eventStore,
+      ...(tenantBroadcast ? { broadcast: tenantBroadcast } : {}),
+      suiteRuns: {
+        recordSuiteRunItemStarted: (data) => suite.commands.recordSuiteRunItemStarted(data),
+        completeSuiteRunItem: (data) => suite.commands.completeSuiteRunItem(data),
+      },
+      ...(scenarioExecutionPool ? { executionPool: scenarioExecutionPool } : {}),
+      ...(scenarioAbsence ? { absence: scenarioAbsence } : {}),
+    });
     const scenario = ScenarioWorkerFeatureInstaller.create({
-      installer: createWorkerScenarioProcessing({
-        resolveClickHouseClient: options.eventing.resolveClickHouseClient,
-        defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
-        redis: eventingOptions.groupQueue.redis,
-        ...(options.config.eventing.foldCacheTtlSeconds === undefined
-          ? {}
-          : { foldCacheTtlSeconds: options.config.eventing.foldCacheTtlSeconds }),
-        traceSummaryStore: traceStores.traceSummaryStore,
-        eventStore: eventing.eventStore,
-        ...(tenantBroadcast ? { broadcast: tenantBroadcast } : {}),
-        suiteRuns: {
-          recordSuiteRunItemStarted: (data) => suite.commands.recordSuiteRunItemStarted(data),
-          completeSuiteRunItem: (data) => suite.commands.completeSuiteRunItem(data),
-        },
-        ...(scenarioAbsence ? { absence: scenarioAbsence } : {}),
-      }),
+      installer: scenarioProcessing,
       eventing,
+    });
+    const scenarioExecution =
+      scenarioExecutionPrerequisites && scenarioExecutionPool
+        ? ScenarioExecutionWorkerFeatureInstaller.create({
+            processor: createWorkerScenarioExecution({
+              prerequisites: scenarioExecutionPrerequisites,
+              pool: scenarioExecutionPool,
+              simulations: scenarioProcessing.simulations,
+            }),
+          })
+        : undefined;
+    // The three operational loops: the enqueue-rate tick, the anonymous daily
+    // usage report and the ClickHouse storage gauges. Composed here because
+    // all three read substrates this graph already holds, and installed as one
+    // feature because a process either owns the operational surface or does
+    // not.
+    const ops = createWorkerOps({
+      config: options.config,
+      database: options.database,
+      redis: processRedis,
+      featureFlags: traceFeatureFlags,
+      resolveOrganizationClient: options.eventing.resolveClickHouseOrganizationClient as never,
+      resolveClickHouseInstances: options.eventing.resolveClickHouseInstances as never,
+      ...(WorkerProductionComposition.opsAbsence(options)
+        ? { absence: WorkerProductionComposition.opsAbsence(options)! }
+        : {}),
+    });
+    const opsWorkers = OpsWorkerFeatureInstaller.create({
+      workers: ops.workers,
+      storageStats: ops.storageStats,
     });
     // Automation's two halves, sharing one set of transports and one set of
     // ceilings. Absent exactly when this deployment named no `BASE_HOST`: every
@@ -1542,15 +1640,18 @@ export class WorkerProductionComposition {
       codingAgent,
       governanceEvents,
       gatewaySpend,
+      gatewayRealtimeSession,
       metric,
       log,
       topic,
       trace,
       suite,
       scenario,
+      scenarioExecution,
       experiment,
       governanceIngestion,
       billingReporting,
+      opsWorkers,
       authz,
       identity,
       ssoConnection,
@@ -1695,6 +1796,33 @@ export class WorkerProductionComposition {
       : undefined;
   }
 
+  /** The boot logger, as the one place the operational loops' absences are declared. */
+  private static opsAbsence(
+    options: WorkerProductionCompositionOptions,
+  ): WorkerOpsAbsenceReportPort | undefined {
+    return options.observability
+      ? LoggedWorkerOpsAbsence.create(options.observability.logger)
+      : undefined;
+  }
+
+  /** The boot logger, as the one place the voice reconciler's absence is declared. */
+  private static realtimeSessionAbsence(
+    options: WorkerProductionCompositionOptions,
+  ): WorkerRealtimeSessionAbsenceReportPort | undefined {
+    return options.observability
+      ? LoggedWorkerRealtimeSessionAbsence.create(options.observability.logger)
+      : undefined;
+  }
+
+  /** The boot logger, as the one place the scenario EXECUTOR's absence is declared. */
+  private static scenarioExecutionAbsence(
+    options: WorkerProductionCompositionOptions,
+  ): WorkerScenarioExecutionAbsenceReportPort | undefined {
+    return options.observability
+      ? LoggedWorkerScenarioExecutionAbsence.create(options.config.serviceName)
+      : undefined;
+  }
+
   /** The boot logger, as the one place Automation settlement's absences are declared. */
   private static automationAbsence(
     options: WorkerProductionCompositionOptions,
@@ -1786,12 +1914,15 @@ export class WorkerProductionComposition {
     codingAgent?: CodingAgentWorkerFeatureInstaller;
     governanceEvents?: GovernanceEventsWorkerFeatureInstaller;
     gatewaySpend?: GatewaySpendWorkerFeatureInstaller;
+    gatewayRealtimeSession?: GatewayRealtimeSessionWorkerFeatureInstaller;
     metric?: MetricWorkerFeatureInstaller;
     log?: LogWorkerFeatureInstaller;
     topic: TopicWorkerFeatureInstaller;
     trace: TraceWorkerFeatureInstaller;
     suite?: SuiteWorkerFeatureInstaller;
     scenario?: ScenarioWorkerFeatureInstaller;
+    scenarioExecution?: ScenarioExecutionWorkerFeatureInstaller;
+    opsWorkers?: OpsWorkerFeatureInstaller;
     experiment?: ExperimentWorkerFeatureInstaller;
     governanceIngestion?: GovernanceIngestionWorkerFeatureInstaller;
     billingReporting?: BillingReportingWorkerFeatureInstaller;
@@ -1944,6 +2075,9 @@ export class WorkerProductionComposition {
  *   gateway-spend        spend's debit adapter delivers through governance's
  *                        commands, and governance's webhook delivery process
  *                        has no producer without spend
+ *   gateway-realtime-session
+ *                        after spend, whose `confirmSpend` a reconciled voice
+ *                        call settles through
  *   metric, log          before trace, because their coding-agent dispatch
  *                        subscribers feed the same contribution commands
  *   trace                before topic: Topic dispatches assignments through
@@ -1951,6 +2085,9 @@ export class WorkerProductionComposition {
  *   suite                before scenario, whose simulation process manager
  *                        reports item starts and completions into it
  *   scenario
+ *   scenario-execution   after scenario, because starting a run means finishing
+ *                        one, and a terminal event has nowhere to land until
+ *                        the pipeline above it is registered
  *   experiment           after trace, which reaches it through the
  *                        computeExperimentRunMetrics proxy rather than the
  *                        other way round
@@ -1959,6 +2096,10 @@ export class WorkerProductionComposition {
  *   topic
  *   governance-ingestion Enterprise pulled-usage and ingestion-pull
  *   billing-reporting
+ *   ops                  the three timers: the enqueue-rate tick, the daily
+ *                        usage report and the ClickHouse storage gauges. Last
+ *                        of the non-ledger group because it claims no routing
+ *                        key and nothing waits on it
  *   authz                the grants ledger, registered after every pipeline
  *                        that can emit a grant change
  *   identity             the four ADR-101 ledgers, after AuthZ exactly as the
@@ -1984,16 +2125,19 @@ function orderedFeatureInstallers(
     options.codingAgent,
     options.governanceEvents,
     options.gatewaySpend,
+    options.gatewayRealtimeSession,
     options.metric,
     options.log,
     options.trace,
     options.suite,
     options.scenario,
+    options.scenarioExecution,
     options.experiment,
     options.langyConversation,
     options.topic,
     options.governanceIngestion,
     options.billingReporting,
+    options.opsWorkers,
     options.authz,
     options.identity,
     options.ssoConnection,

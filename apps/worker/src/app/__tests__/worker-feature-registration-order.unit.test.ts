@@ -153,6 +153,7 @@ function createEventing(registered: string[]) {
       "recordVkLifecycle",
       "recordBudgetCrossing",
       "settleSpend",
+      "confirmSpend",
       "recordSuiteRunItemStarted",
       "completeSuiteRunItem",
       "computeRunMetrics",

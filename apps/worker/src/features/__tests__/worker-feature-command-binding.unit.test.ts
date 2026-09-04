@@ -171,7 +171,7 @@ describe("worker feature installers", () => {
     });
 
     it("hands Gateway spend its own settleSpend sender for the settlement sweep", async () => {
-      const eventing = eventingStub(["settleSpend"]);
+      const eventing = eventingStub(["settleSpend", "confirmSpend"]);
       const connectSettlement = vi.fn();
       const gateway = GatewaySpendWorkerFeatureInstaller.create({
         installer: { buildProcessing: () => definition, connectSettlement },
@@ -182,6 +182,22 @@ describe("worker feature installers", () => {
       await connectSettlement.mock.calls[0]?.[0]({ requestId: "req-1" });
 
       expect(eventing.sent.get("settleSpend")).toEqual([{ requestId: "req-1" }]);
+    });
+
+    // The voice reconciler settles a call through the SAME pipeline the data
+    // plane's own drainer sends to, and it is composed before any pipeline is
+    // registered — so the sender it holds is a proxy this installer resolves.
+    it("resolves Gateway spend's confirmSpend proxy for the voice reconciler", async () => {
+      const eventing = eventingStub(["settleSpend", "confirmSpend"]);
+      const gateway = GatewaySpendWorkerFeatureInstaller.create({
+        installer: { buildProcessing: () => definition, connectSettlement: vi.fn() },
+        eventing: eventing.runtime,
+      });
+
+      await gateway.install();
+      await gateway.spendConfirmation.confirmSpend({ requestId: "req-2" } as never);
+
+      expect(eventing.sent.get("confirmSpend")).toEqual([{ requestId: "req-2" }]);
     });
 
     it("hands Billing reporting its own month sender for the self-dispatch walk", async () => {

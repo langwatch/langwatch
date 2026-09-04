@@ -20,8 +20,9 @@ import {
   SimulationRunStateStoreAdapter,
   simulationRunExecutionPM,
   UnavailableCancellationPublisherAdapter,
+  type ScenarioExecutionPoolPort,
 } from "@langwatch/scenario-server";
-import { ScenarioExecutionService } from "@langwatch/scenario-contract";
+import { ScenarioExecutionService, type SimulationService } from "@langwatch/scenario-contract";
 import type {
   ComputeRunMetricsCommandData,
   ScenarioExecutionJob,
@@ -80,8 +81,32 @@ export type WorkerScenarioCompositionInput = Readonly<{
     recordSuiteRunItemStarted: CommandDispatcher<Record<string, unknown>>;
     completeSuiteRunItem: CommandDispatcher<Record<string, unknown>>;
   };
+  /**
+   * The in-process pool a queued run is started on, where this process
+   * composed one.
+   *
+   * Absent is a real deployment shape rather than a gap: the execute intent
+   * then refuses into the outbox and a pod that holds a pool takes the run.
+   * The decision is made BEFORE this composition rather than here, because a
+   * pool that exists but is connected to no runner refuses with a different
+   * sentence and would make the boot report say the opposite of the truth.
+   */
+  executionPool?: ScenarioExecutionPoolPort;
   absence?: WorkerScenarioAbsenceReportPort;
 }>;
+
+/**
+ * What the installer registers, plus the ONE service the executor shares.
+ *
+ * The simulation write surface is published rather than rebuilt because the
+ * executor's failure handler finishes a run by appending into the very
+ * pipeline this composition mounts; a second service would write a terminal
+ * event nobody folds.
+ */
+export type WorkerScenarioProcessing = ScenarioWorkerCapability<
+  ComputeRunMetricsCommandData,
+  SimulationProcessingEvent
+> & { simulations: SimulationService };
 
 /**
  * The simulation-run pipeline, composed and mounted in this process out of
@@ -122,7 +147,7 @@ export type WorkerScenarioCompositionInput = Readonly<{
  */
 export function createWorkerScenarioProcessing(
   options: WorkerScenarioCompositionInput,
-): ScenarioWorkerCapability<ComputeRunMetricsCommandData, SimulationProcessingEvent> {
+): WorkerScenarioProcessing {
   const scheduleRetry = new Deferred<(payload: ComputeRunMetricsCommandData) => Promise<void>>(
     "scenario.scheduleComputeRunMetricsRetry",
   );
@@ -138,7 +163,8 @@ export function createWorkerScenarioProcessing(
     spanCosts: SpanCostService.create({ modelCosts: ModelCatalogTraceModelCostAdapter.create() }),
   });
 
-  options.absence?.withoutExecutionPool();
+  if (!options.executionPool) options.absence?.withoutExecutionPool();
+  const simulations = SimulationClickHouseAdapter.createNull({ execution });
 
   const definition = () =>
     SimulationProcessingPipelineAdapter.create({
@@ -167,11 +193,12 @@ export function createWorkerScenarioProcessing(
             options.redis
               ? RedisCancellationPublisherAdapter.create(options.redis)
               : UnavailableCancellationPublisherAdapter.create(),
+            options.executionPool,
           ),
-          SimulationClickHouseAdapter.createNull({ execution }),
+          simulations,
         ),
       },
-      simulations: SimulationClickHouseAdapter.createNull({ execution }),
+      simulations,
       snapshotUpdateBroadcast: {
         broadcastUpdate: async ({ tenantId, payload }) => {
           await options.broadcast?.broadcastToTenant({
@@ -191,6 +218,7 @@ export function createWorkerScenarioProcessing(
     });
 
   return {
+    simulations,
     buildProcessing: definition,
     connect: (bindings) => {
       selfComputeRunMetrics.resolve(bindings.computeRunMetrics);
@@ -219,41 +247,38 @@ function cachedRunStore(
 }
 
 /**
- * How a simulation run reaches this pod's executor, and why it does not.
+ * How a simulation run reaches this pod's executor, and what happens when
+ * there is none.
  *
- * `cancel` is real: it publishes on the same Redis channel a running child
- * listens on, so a cancel issued while another process holds the run still
- * stops it. `submit` REFUSES BY NAME, which is what the intent's own contract
- * asks for — a throw puts the run back on the outbox with backoff, so a run
- * queued while no executor is up is dispatched when one is, and the stall wake
- * is the backstop if none ever is.
+ * `cancel` is real either way: it publishes on the same Redis channel a
+ * running child listens on, so a cancel issued while another process holds the
+ * run still stops it.
  *
- * The refusal rather than a pool is the honest shape today, and the scope is
- * wider than this process: NO process in the repository composes
- * `ScenarioExecutionPoolService`. Two things are missing rather than parked
- * with a sibling. The pool spawns a scenario CHILD ENTRYPOINT that left the
- * tree with the platform application and has not been rebuilt anywhere. And
- * the prefetcher that feeds it takes eleven collaborators — agents, prompts,
- * suites, secrets, traces, workflows and projects among them — of which the
- * agent and prompt servers are not dependencies of this process at all. A pool
- * wired to a prefetcher that could not answer would fail every run at
- * execution time instead of at boot.
+ * `submit` hands the run to this process's own pool where one was composed
+ * (`worker-scenario-execution.composition.ts`), and otherwise REFUSES BY NAME,
+ * which is what the intent's own contract asks for — a throw puts the run back
+ * on the outbox with backoff, so a run queued while no executor is up is
+ * dispatched when one is, and the stall wake is the backstop if none ever is.
  *
  * The three prefetch methods are not reachable from the process manager at all;
  * they belong to the tRPC validation path, and they refuse by name so that a
  * caller that finds its way here gets a sentence rather than a null.
  */
 class WorkerScenarioExecutionAdapter extends ScenarioExecutionService {
-  constructor(private readonly cancellations: { publish(input: unknown): Promise<void> }) {
+  constructor(
+    private readonly cancellations: { publish(input: unknown): Promise<void> },
+    private readonly pool: ScenarioExecutionPoolPort | undefined,
+  ) {
     super();
   }
 
-  submit(input: ScenarioExecutionJob): Promise<never> {
-    return Promise.reject(
-      new Error(
+  async submit(input: ScenarioExecutionJob): Promise<void> {
+    if (!this.pool) {
+      throw new Error(
         `No execution pool in this process; the outbox will retry execute for scenarioRunId=${input.scenarioRunId}`,
-      ),
-    );
+      );
+    }
+    this.pool.submit(input);
   }
 
   async cancel(input: { projectId: string; scenarioRunId: string }): Promise<void> {
