@@ -7,7 +7,7 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import type { LiveInstance } from "./instance.registry";
+import type { InstanceRegistry, LiveInstance } from "./instance.registry";
 import { getConnectedAgentRuntime } from "./runtime";
 
 const logger = createLogger("langwatch:connected-agents:presence");
@@ -34,6 +34,19 @@ export interface AgentPresence {
 
 /** Presence for an agent that can never be connected: offline, nothing. */
 export const NO_PRESENCE: AgentPresence = { status: "offline", instances: [] };
+
+/** The presence read a run makes before it schedules: the registry in the app, a fixture in a test. */
+export type PresenceReads = Pick<InstanceRegistry, "listLive">;
+
+/**
+ * The presence read of this process's runtime.
+ *
+ * The runtime is reached at call time rather than when a service is built,
+ * so a service built before the App exists still reads the App's Redis.
+ */
+export const runtimePresence: PresenceReads = {
+  listLive: (params) => getConnectedAgentRuntime().registry.listLive(params),
+};
 
 /** The owner of an agent, as every surface reports it. */
 export interface AgentOwnerView {
