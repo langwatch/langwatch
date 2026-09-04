@@ -37,6 +37,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { createTrpcRoot } from "../../api.application";
+import { composeGatewayFeature } from "../../features/gateway/gateway.composition";
 import { createAppTrpcFeatures, type AppTrpcFeaturePorts } from "../app-trpc.features";
 
 import type { TracesTrpcPorts } from "@langwatch/trace-server";
@@ -322,12 +323,20 @@ function buildFeatures() {
   // something other than what the process mounts.
   const trpc = createTrpcRoot();
 
+  const mount = {
+    root: trpc,
+    protectedProcedure: trpc.procedure,
+    publicProcedure: trpc.procedure,
+    middlewares,
+  };
+
   return createAppTrpcFeatures({
-    mount: {
-      root: trpc,
-      protectedProcedure: trpc.procedure,
-      publicProcedure: trpc.procedure,
-      middlewares,
+    mount,
+    // The features whose doors are not only tRPC, composed before the mount
+    // existed. The gateway's application refuses like every port below; its
+    // PARSERS are real, because a procedure cannot be built without them.
+    composed: {
+      gateway: composeGatewayFeature({ infrastructure: undefined, peers: undefined, clickhouse: null, virtualKeyPepper: undefined }),
     },
     // The features that compose themselves take this rather than a ports
     // entry; every member refuses, for the same reason the ports do.

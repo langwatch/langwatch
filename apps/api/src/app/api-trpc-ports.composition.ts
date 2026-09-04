@@ -361,7 +361,6 @@ export function createApiTrpcPorts<
     ops: collaborators.ops,
     opsCheck: collaborators.opsCheck,
 
-    gateway: collaborators.gateway,
 
     /**
      * The user rows this connection answers, and the four it deliberately

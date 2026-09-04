@@ -16,6 +16,7 @@
  */
 import type { ApiTrpcFeatureMount } from "../api.application";
 import type { ApiTrpcInfrastructure } from "./app-trpc.infrastructure";
+import type { ComposedApiFeatures } from "./app-trpc.composed";
 import type { AnalyticsReadInput, AnalyticsTimeseriesInput } from "@langwatch/analytics-contract";
 import type { AnalyticsTrpcPorts, LangWatchQLTrpcPorts } from "@langwatch/analytics-server";
 import type { AnnotationTrpcPorts } from "@langwatch/annotation-server";
@@ -164,10 +165,6 @@ import {
 import { createEnterpriseGovernanceTrpcRouters } from "../features/enterprise/enterprise-governance-trpc.mount";
 import { composeGovernanceHomeTrpcRouter } from "../features/enterprise/governance-home.composition";
 import {
-  createGatewayTrpcRouters,
-  type GatewayTrpcPorts,
-} from "../features/gateway/gateway-trpc.mount";
-import {
   createLangyEgressTrpcRouter,
   createLangyTrpcRouter,
   type LangyTrpcGates,
@@ -246,8 +243,6 @@ export interface AppTrpcFeaturePorts<
   TRetentionSnapshot = unknown,
   TStorageScopeUsage = unknown,
 > {
-  /** The virtual-key budget parser — fixed when the router is BUILT, so it cannot live on the per-request application. */
-  gateway: GatewayTrpcPorts;
   /**
    * The retention policy: who may write an override at a scope, which values
    * that scope's plan may persist, who may switch retention off, and the two
@@ -562,6 +557,13 @@ export function createAppTrpcFeatures<
    * yet.
    */
   infrastructure: ApiTrpcInfrastructure;
+  /**
+   * The features the process composed BEFORE the mount existed, because their
+   * doors are not only tRPC: the gateway's application is read by `ctx.app` and
+   * by two REST families, so the process composes it once and hands the router
+   * half here.
+   */
+  composed: ComposedApiFeatures;
   ports: AppTrpcFeaturePorts<
     TAnnotationPorts,
     TBugReport,
@@ -596,8 +598,8 @@ export function createAppTrpcFeatures<
     TStorageScopeUsage
   >;
 }) {
-  const { mount, infrastructure, ports } = options;
-  const gateway = createGatewayTrpcRouters({ ...mount, ports: ports.gateway });
+  const { mount, composed, infrastructure, ports } = options;
+  const gateway = composed.gateway.router(mount);
   const governance = createEnterpriseGovernanceTrpcRouters(mount);
   const enterprise = createEnterpriseTrpcRouters({ ...mount, ports: ports.enterprise });
   const billing = createEnterpriseBillingTrpcRouters({

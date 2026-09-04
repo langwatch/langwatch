@@ -45,10 +45,10 @@ import {
 import type { WorkflowEvaluationOutcome } from "@langwatch/workflow-server";
 import type { MiddlewareHandler } from "hono";
 
+import type { EnterpriseGovernanceApplication } from "../features/enterprise/enterprise-governance.composition";
 import type { ApiAgentGroupCollaborators } from "./api-trpc-collaborators.agent-group.composition";
 import type { ApiAnalyticsCollaborators } from "./api-trpc-collaborators.analytics.composition";
 import type { ApiExecutionCollaborators } from "./api-trpc-collaborators.execution.composition";
-import type { ApiGatewayGroupCollaborators } from "./api-trpc-collaborators.gateway-group.composition";
 import type { ApiIdentityCollaborators } from "./api-trpc-collaborators.identity.composition";
 import type { ApiOrgGroupCollaborators } from "./api-trpc-collaborators.org-group.composition";
 import type { ApiProductGroupCollaborators } from "./api-trpc-collaborators.product-group.composition";
@@ -98,7 +98,13 @@ export type ApiPackagedRestCompositionOptions = Readonly<{
   credentials: ApiHandlerManagedCredentials;
   encryption: SecretEncryptionPort | undefined;
   execution: ApiExecutionCollaborators | undefined;
-  gatewayGroup: ApiGatewayGroupCollaborators | undefined;
+  /**
+   * The Enterprise governance slices the `/api/governance` and
+   * `/api/webhooks/v1` families are handed. Taken rather than reached for
+   * through a group: the same two slices `ctx.app` carries, so the REST door
+   * and the browser's cannot answer differently.
+   */
+  enterpriseGovernance: EnterpriseGovernanceApplication;
   identity: ApiIdentityCollaborators | undefined;
   orgGroup: ApiOrgGroupCollaborators | undefined;
   productGroup: ApiProductGroupCollaborators | undefined;
@@ -206,12 +212,8 @@ export function composeApiPackagedRest(
           }
         : {}),
       ...(options.execution ? { experiments: () => options.execution!.experiments } : {}),
-      ...(options.gatewayGroup
-        ? {
-            governance: () => options.gatewayGroup!.application.governanceApp,
-            webhooks: () => options.gatewayGroup!.application.webhooks,
-          }
-        : {}),
+      governance: () => options.enterpriseGovernance.governanceApp,
+      webhooks: () => options.enterpriseGovernance.webhooks,
       ...(options.identity
         ? {
             broadcast: () => options.identity!.broadcast,

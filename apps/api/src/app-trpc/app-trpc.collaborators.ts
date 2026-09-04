@@ -52,7 +52,6 @@ import type { WorkflowOptimizationTrpcPorts, WorkflowTrpcPorts } from "@langwatc
 import type { ZodTypeAny } from "zod";
 import type { EvaluationMountPorts } from "../features/evaluation/evaluation-trpc.mount";
 import type { ApiTrpcFeatureApplication } from "./app-trpc.context";
-import type { GatewayTrpcPorts } from "../features/gateway/gateway-trpc.mount";
 import type { DataRetentionTrpcPolicy } from "@langwatch/data-retention-server";
 import type { MonitorTrpcPorts } from "@langwatch/monitor-server";
 import type { CodingAgentTrpcPorts } from "@langwatch/coding-agent-server";
@@ -324,22 +323,6 @@ export type ApiTrpcCollaborators<
   ops: OpsTrpcPorts;
   /** The operator gate, already built. */
   opsCheck(input: { permission: AuthzPermission; throwOnDeny?: boolean }): AppTrpcDeclaredCheck;
-
-  /**
-   * The twenty-one AI Gateway and governance-console surfaces' ports, as one
-   * entry.
-   *
-   * Like the three groups above, this is not a leftover: the API composes the
-   * gateway application itself — the virtual-key operations service, the
-   * ClickHouse budget ledger, the per-key spend rollup and the spend-event feed
-   * all run on its own Prisma and ClickHouse connections. What it cannot
-   * compose is named INSIDE the group — the Enterprise governance application,
-   * whose event-sourcing command registrations have not moved — so a deployment
-   * reads one absence per capability rather than one absence for twenty-one
-   * namespaces.
-   */
-  /** The virtual-key budget parser — fixed when the router is BUILT. */
-  gateway: GatewayTrpcPorts;
 
   /**
    * The retention policy: who may write an override at a scope, which values

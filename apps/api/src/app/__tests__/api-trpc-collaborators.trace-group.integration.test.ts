@@ -40,7 +40,7 @@ import {
   type ApiTraceGroupPorts,
   type ApiTraceReadStackPort,
 } from "../api-trpc-collaborators.trace-group.composition";
-import { stubInfrastructureEntitlements, testHalves } from "./api-trpc-collaborators.test-halves";
+import { stubApplicationSlices, stubComposedFeatures, stubInfrastructureEntitlements, testHalves } from "./api-trpc-collaborators.test-halves";
 import { ApiRateLimitInfrastructure } from "../../platform/infrastructure/api-rate-limit.infrastructure";
 import { resolveDataPrivacy } from "@langwatch/data-privacy-contract";
 import { composeApiModelProviderHost } from "../api-model-provider-host.composition";
@@ -258,9 +258,11 @@ function subscriptionSecurity() {
 function composeApplication() {
   const { broadcast, emitterFor } = testBroadcast();
   const features = ApiTrpcFeaturesComposition.tryCompose({
+      composed: stubComposedFeatures(),
     infrastructure: { ...stubInfrastructureEntitlements(), prisma: {} as unknown as PrismaClient, authz: testAuthz(), audit: undefined },
     collaborators: composeApiTrpcCollaborators(
       testHalves({ traceGroup: testTraceGroupHalf(broadcast) }, broadcast),
+      stubApplicationSlices(),
     ),
   });
   if (!features) throw new Error("the record refused to compose against its test collaborators");
@@ -734,9 +736,10 @@ describe("given an API process that composed the real observability collaborator
   function composeRealApplication(clickHouse: ReturnType<typeof testClickHouse>) {
     const { broadcast } = testBroadcast();
     const group = composeRealGroup(clickHouse);
-    const collaborators = composeApiTrpcCollaborators(testHalves({ traceGroup: group }, broadcast));
+    const collaborators = composeApiTrpcCollaborators(testHalves({ traceGroup: group }, broadcast), stubApplicationSlices());
 
     const features = ApiTrpcFeaturesComposition.tryCompose({
+      composed: stubComposedFeatures(),
       infrastructure: { ...stubInfrastructureEntitlements(), prisma: {} as unknown as PrismaClient, authz: testAuthz(), audit: undefined },
       collaborators,
     });
@@ -1086,9 +1089,10 @@ describe("given the anonymous share read composed on this process", () => {
       readCachedSharePayload: async () => sharedTracePayload(),
     });
 
-    const collaborators = composeApiTrpcCollaborators(testHalves({ traceGroup: group }, broadcast));
+    const collaborators = composeApiTrpcCollaborators(testHalves({ traceGroup: group }, broadcast), stubApplicationSlices());
 
     const features = ApiTrpcFeaturesComposition.tryCompose({
+      composed: stubComposedFeatures(),
       infrastructure: { ...stubInfrastructureEntitlements(), prisma: {} as unknown as PrismaClient, authz: testAuthz(), audit: undefined },
       collaborators,
     });

@@ -14,11 +14,15 @@
 import { EventEmitter } from "node:events";
 import { z } from "zod";
 import type { ApiTrpcInfrastructure } from "../../app-trpc/app-trpc.infrastructure";
-import type { ApiTrpcCollaboratorHalves } from "../api-trpc-features.composition";
+import type {
+  ApiTrpcCollaboratorHalves,
+  ApiTrpcFeatureApplicationSlices,
+} from "../api-trpc-features.composition";
 import type { ApiAgentGroupCollaborators } from "../api-trpc-collaborators.agent-group.composition";
 import type { ApiAnalyticsCollaborators } from "../api-trpc-collaborators.analytics.composition";
 import type { ApiExecutionCollaborators } from "../api-trpc-collaborators.execution.composition";
-import type { ApiGatewayGroupCollaborators } from "../api-trpc-collaborators.gateway-group.composition";
+import { createGatewayTrpcRouters } from "../../features/gateway/gateway-trpc.mount";
+import type { ComposedApiFeatures } from "../../app-trpc/app-trpc.composed";
 import type { ApiIdentityCollaborators } from "../api-trpc-collaborators.identity.composition";
 import type { ApiOrgGroupCollaborators } from "../api-trpc-collaborators.org-group.composition";
 import type { ApiProductGroupCollaborators } from "../api-trpc-collaborators.product-group.composition";
@@ -281,20 +285,38 @@ export function stubProductInfraHalf(): ApiProductInfraCollaborators {
   });
 }
 
-export function stubGatewayGroupHalf(): ApiGatewayGroupCollaborators {
-  return stub<ApiGatewayGroupCollaborators>("gatewayGroup", {
-    application: {
-      gateway: stub("app.gateway"),
-      github: stub("app.github"),
-      governance: stub("app.governance"),
-      governanceApp: stub("app.governanceApp"),
-      sessionPolicy: stub("app.sessionPolicy"),
-      webhooks: stub("app.webhooks"),
+/**
+ * The `ctx.app` slices no half owns any more, as a suite that drives none of
+ * them supplies them: the gateway's application, the GitHub directory and the
+ * four Enterprise governance slices, each refusing by name if a call reaches it.
+ */
+export function stubApplicationSlices(): ApiTrpcFeatureApplicationSlices {
+  return {
+    gateway: stub("app.gateway"),
+    github: stub("app.github"),
+    governance: stub("app.governance"),
+    governanceApp: stub("app.governanceApp"),
+    sessionPolicy: stub("app.sessionPolicy"),
+    webhooks: stub("app.webhooks"),
+  };
+}
+
+/**
+ * The gateway feature, as a suite that drives another one supplies it: the six
+ * namespaces build on the real parsers and every call refuses.
+ */
+export function stubComposedFeatures(): ComposedApiFeatures {
+  return {
+    gateway: {
+      app: stub("app.gateway", { schemas: { virtualKeyBudgetInput: anySchema } }),
+      composition: undefined,
+      router: (mount) =>
+        createGatewayTrpcRouters({
+          ...mount,
+          ports: { virtualKeys: { virtualKeyBudgetInput: anySchema } },
+        }),
     },
-    gateway: { virtualKeys: { virtualKeyBudgetInput: anySchema } },
-    gatewayApp: stub("gatewayGroup.gatewayApp"),
-    composition: stub("gatewayGroup.composition"),
-  });
+  };
 }
 
 /**
@@ -317,7 +339,6 @@ export function testHalves(
     agentGroup: stubAgentGroupHalf(),
     orgGroup: stubOrgGroupHalf(),
     productInfra: stubProductInfraHalf(),
-    gatewayGroup: stubGatewayGroupHalf(),
     ...overrides,
   };
 }

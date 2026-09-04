@@ -45,7 +45,10 @@ import {
   ApiTrpcFeaturesComposition,
   LoggedApiTrpcFeaturesAbsence,
 } from "../api-trpc-features.composition";
-import { stubInfrastructureEntitlements } from "./api-trpc-collaborators.test-halves";
+import {
+  stubComposedFeatures,
+  stubInfrastructureEntitlements,
+} from "./api-trpc-collaborators.test-halves";
 
 /**
  * The namespaces `createAppTrpcFeatures` mounts, as the wire names them.
@@ -352,6 +355,7 @@ function composeApplication(
   const prisma = testPrisma();
   const audit = new RecordingAudit();
   const features = ApiTrpcFeaturesComposition.tryCompose({
+      composed: stubComposedFeatures(),
     infrastructure: { ...stubInfrastructureEntitlements(), prisma: prisma.client, authz: testAuthz(), audit },
     collaborators: testCollaborators(),
   });
@@ -474,6 +478,7 @@ describe("given an API process with no collaborators for the record", () => {
     const warn = vi.fn();
 
     const features = ApiTrpcFeaturesComposition.tryCompose({
+      composed: stubComposedFeatures(),
       infrastructure: { ...stubInfrastructureEntitlements(), prisma: {} as unknown as PrismaClient, authz: testAuthz(), audit: undefined },
       collaborators: undefined,
       report: LoggedApiTrpcFeaturesAbsence.create({ warn }),
@@ -518,6 +523,7 @@ describe("given a process that opened no infrastructure for the record", () => {
     const warn = vi.fn();
 
     const features = ApiTrpcFeaturesComposition.tryCompose({
+      composed: stubComposedFeatures(),
       infrastructure: undefined,
       collaborators: testCollaborators(),
       report: LoggedApiTrpcFeaturesAbsence.create({ warn }),
@@ -605,6 +611,7 @@ function composeSessionApplication(options: {
   session?: BrowserSession;
 }) {
   const features = ApiTrpcFeaturesComposition.tryCompose({
+      composed: stubComposedFeatures(),
     infrastructure: {
       ...stubInfrastructureEntitlements(),
       prisma: testPrisma().client,

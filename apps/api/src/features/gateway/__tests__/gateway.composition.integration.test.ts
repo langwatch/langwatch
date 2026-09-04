@@ -1,11 +1,11 @@
 /**
- * The gateway-group half of the packaged tRPC record, served by the API
+ * The gateway feature's six namespaces, served by the API
  * process.
  *
- * What this pins is one call per family this half mounts, each of them made
+ * What this pins is one call per family the feature mounts, each of them made
  * over the REAL `/api/trpc` handler on THIS process's root, through THIS
  * process's policy chain, against the collaborator set
- * `composeApiGatewayGroupCollaborators` produced. Nothing here reaches a stub
+ * `composeGatewayFeature` produced. Nothing here reaches a stub
  * through a proxy for the surfaces under test: the fakes are at the PORTS — a
  * Prisma double, an AuthZ service, a project directory, a plan provider, a
  * GitHub service — and everything between the HTTP request and them is the real
@@ -20,8 +20,8 @@
  *                            what `spendAvailable: false` states rather than a
  *                            $0.00 nobody can tell from a key that spent nothing
  *   governance.resolveHome   the `/` landing decision, MOVED off the retired
- *                            router root and now gathered from this half's own
- *                            six ports
+ *                            router root and now composed by the enterprise
+ *                            feature off the shared infrastructure
  *   github.getConnectionStatus
  *                            the GitHub App, through the one service both this
  *                            surface and the coding-agent reads are given
@@ -46,13 +46,14 @@ import type { MonitorService } from "@langwatch/monitor-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
-import { ApiApplication, MissingAgentService, MissingSecretService } from "../../api.application";
+import { ApiApplication, MissingAgentService, MissingSecretService } from "../../../api.application";
 import {
   ApiTrpcFeaturesComposition,
   composeApiTrpcCollaborators,
-} from "../api-trpc-features.composition";
-import { composeApiGatewayGroupCollaborators } from "../api-trpc-collaborators.gateway-group.composition";
-import { stub, stubInfrastructureEntitlements, testHalves } from "./api-trpc-collaborators.test-halves";
+} from "../../../app/api-trpc-features.composition";
+import { composeEnterpriseGovernanceApplication } from "../../enterprise/enterprise-governance.composition";
+import { composeGatewayFeature } from "../gateway.composition";
+import { stub, stubApplicationSlices, stubInfrastructureEntitlements, testHalves } from "../../../app/__tests__/api-trpc-collaborators.test-halves";
 
 const SESSION_USER = { id: "user-1", name: "Sam Rivers", email: "sam@acme.test", role: "ADMIN" };
 const PROJECT_ID = "project-1";
@@ -171,33 +172,43 @@ function composeApplication(overrides: { saasBilling?: boolean; enterprise?: unk
     listNamesByIds: vi.fn(async () => []),
   } as unknown as ProjectService;
 
-  const group = composeApiGatewayGroupCollaborators({
+  const infrastructure = {
+    ...stubInfrastructureEntitlements(),
     prisma: prisma.client,
     authz,
-    projects,
-    apiKeys: {} as unknown as ApiKeyService,
-    evaluators: {} as unknown as EvaluatorService,
-    monitors: {} as unknown as MonitorService,
-    github,
+    // The two Enterprise billing namespaces mount either way; what this
+    // decides is whether they carry procedures.
+    saasBilling: overrides.saasBilling ?? false,
+    audit: undefined,
+  };
+
+  const gateway = composeGatewayFeature({
+    infrastructure,
+    peers: {
+      projects,
+      evaluators: {} as unknown as EvaluatorService,
+      monitors: {} as unknown as MonitorService,
+    },
     // No ClickHouse: the gateway ledger is a projection there, so the spend
     // source is off by name rather than answering a zero nobody can read.
     clickhouse: null,
     virtualKeyPepper: "0".repeat(64),
-    ...(overrides.enterprise ? { enterprise: overrides.enterprise as never } : {}),
-    processName: "langwatch-api-test",
   });
 
   const features = ApiTrpcFeaturesComposition.tryCompose({
-    infrastructure: {
-      ...stubInfrastructureEntitlements(),
-      prisma: prisma.client,
-      authz,
-      // The two Enterprise billing namespaces mount either way; what this
-      // decides is whether they carry procedures.
-      saasBilling: overrides.saasBilling ?? false,
-      audit: undefined,
-    },
-    collaborators: composeApiTrpcCollaborators(testHalves({ gatewayGroup: group })),
+    composed: { gateway },
+    infrastructure,
+    collaborators: composeApiTrpcCollaborators(testHalves(), {
+      ...stubApplicationSlices(),
+      gateway: gateway.app,
+      github,
+      // The four Enterprise slices as the process composes them: the host's
+      // where it supplied one, and this feature's own named refusals where it
+      // did not — which is the absence three of the tests below drive.
+      ...composeEnterpriseGovernanceApplication(
+        overrides.enterprise as Parameters<typeof composeEnterpriseGovernanceApplication>[0],
+      ),
+    }),
   });
   if (!features) throw new Error("the record refused to compose against its collaborators");
 
@@ -215,7 +226,7 @@ function composeApplication(overrides: { saasBilling?: boolean; enterprise?: unk
     },
   });
 
-  return { application, prisma, authz, github, group };
+  return { application, prisma, authz, github, gateway };
 }
 
 async function callTrpc(
@@ -244,7 +255,7 @@ function refusal(body: unknown): string {
   return JSON.stringify(body);
 }
 
-describe("given an API process composed with the gateway-group half of the record", () => {
+describe("given an API process composed with the gateway feature", () => {
   describe("when the record is built", () => {
     it("mounts all twenty-one gateway and governance namespaces beside `github`", () => {
       const { application } = composeApplication();
@@ -308,10 +319,14 @@ describe("given an API process composed with the gateway-group half of the recor
       ]);
     });
 
-    it("names the one port group the half still fills", () => {
-      const { group } = composeApplication();
+    it("hands each of the gateway's three kinds of door what it needs", () => {
+      const { gateway } = composeApplication();
 
-      expect(group).toMatchObject({ gateway: expect.anything() });
+      // The application `ctx.app` and the two REST families read, and the
+      // stores the spend and internal families walk directly. The six routers
+      // are pinned by the record's own list, which is where they mount.
+      expect(gateway.app.spendSourceAvailable).toBe(false);
+      expect(gateway.composition?.app).toBe(gateway.app);
     });
   });
 
@@ -352,9 +367,9 @@ describe("given an API process composed with the gateway-group half of the recor
      * would make it vacuously true.
      */
     it("composes the gateway application with its spend source switched off by name", () => {
-      const { group } = composeApplication();
+      const { gateway } = composeApplication();
 
-      expect(group.gatewayApp.spendSourceAvailable).toBe(false);
+      expect(gateway.app.spendSourceAvailable).toBe(false);
     });
 
     it("still answers the budget list, through the ledger this half composed", async () => {

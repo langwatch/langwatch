@@ -15,6 +15,8 @@
  * The REST half of this feature is composed the same way one file over, in
  * {@link composeApiGithubRest} — a feature owns both its doors.
  */
+import type { GithubService } from "@langwatch/github-contract";
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 
 import type { ApiTrpcFeatureMount } from "../../api.application";
@@ -53,4 +55,40 @@ function githubPorts(infrastructure: ApiTrpcInfrastructure): GithubTrpcMountPort
       logger.debug({ action: entry.action }, "recorded a GitHub connection command");
     },
   };
+}
+
+/** A capability this deployment did not compose, refused by name. */
+class ApiCapabilityUnavailableError extends HandledError {
+  declare readonly code: "service_unavailable";
+
+  constructor(capability: string) {
+    super("service_unavailable", `This deployment has no ${capability}.`, {
+      httpStatus: 503,
+      fault: "platform",
+    });
+    this.name = "ApiCapabilityUnavailableError";
+  }
+}
+
+/**
+ * The `ctx.app.github` slice on a process that opened no database.
+ *
+ * A refusing directory rather than an absent one, for the reason every other
+ * refusal on this migration gives: `github.*` mounts either way, and a caller
+ * asking whether an organization has connected the App must be told this
+ * deployment cannot answer rather than have the call disappear.
+ */
+export function refusingGithubService(): GithubService {
+  logger.info(
+    {},
+    "API composed no GitHub directory: the connection status, the repositories and the pull-request reads all mount and refuse by name",
+  );
+  return new Proxy({} as GithubService, {
+    get: () => () => {
+      throw new ApiCapabilityUnavailableError(
+        "GitHub App registration, so it can neither read a connection nor list a pull request",
+      );
+    },
+    has: () => true,
+  });
 }

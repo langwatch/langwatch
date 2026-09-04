@@ -54,7 +54,7 @@ import {
   ApiTrpcFeaturesComposition,
   composeApiTrpcCollaborators,
 } from "../api-trpc-features.composition";
-import { stubInfrastructureEntitlements, testHalves } from "./api-trpc-collaborators.test-halves";
+import { stubApplicationSlices, stubComposedFeatures, stubInfrastructureEntitlements, testHalves } from "./api-trpc-collaborators.test-halves";
 
 const NLP_SERVICE_URL = "http://127.0.0.1:5561";
 const PUBLIC_BASE_URL = "https://app.example.test";
@@ -326,6 +326,7 @@ function composeApplication(options: { redis?: RedisConnection | null } = {}) {
   });
 
   const features = ApiTrpcFeaturesComposition.tryCompose({
+      composed: stubComposedFeatures(),
     infrastructure: {
       ...stubInfrastructureEntitlements(),
       prisma: prisma.client,
@@ -334,7 +335,7 @@ function composeApplication(options: { redis?: RedisConnection | null } = {}) {
         async record(): Promise<void> {}
       })(),
     },
-    collaborators: composeApiTrpcCollaborators(testHalves({ execution })),
+    collaborators: composeApiTrpcCollaborators(testHalves({ execution }), stubApplicationSlices()),
   });
   if (!features) throw new Error("the record refused to compose against its collaborators");
 

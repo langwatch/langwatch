@@ -62,7 +62,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
 
-import type { ApiGatewayGroupCollaborators } from "./api-trpc-collaborators.gateway-group.composition";
+import type { ApiGatewayComposition } from "./api-gateway.composition";
 
 /**
  * The Codex OAuth refresh, as the gateway's recovery road reads it.
@@ -83,7 +83,7 @@ export type ApiGatewayInternalRestOptions = Readonly<{
   /** The one guarded connection every row read below runs on. */
   prisma: PrismaClient;
   /** Everything the gateway composition opened, so both doors read one graph. */
-  gateway: ApiGatewayGroupCollaborators["composition"];
+  gateway: ApiGatewayComposition;
   /** The project directory a key's trace destination is resolved through. */
   projects: ProjectService;
   /** The HMAC secret the data plane signs its calls with, where configured. */

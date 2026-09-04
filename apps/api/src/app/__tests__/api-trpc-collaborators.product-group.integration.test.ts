@@ -62,7 +62,7 @@ import {
   composeApiTrpcCollaborators,
 } from "../api-trpc-features.composition";
 import { composeApiProductGroupCollaborators } from "../api-trpc-collaborators.product-group.composition";
-import { stubIdentityHalf, stubInfrastructureEntitlements, stubOrgGroupHalf, testHalves } from "./api-trpc-collaborators.test-halves";
+import { stubApplicationSlices, stubComposedFeatures, stubIdentityHalf, stubInfrastructureEntitlements, stubOrgGroupHalf, testHalves } from "./api-trpc-collaborators.test-halves";
 
 const SESSION_USER = { id: "user-1", name: "Sam Rivers", email: "sam@acme.test", role: "ADMIN" };
 const PROJECT_ID = "project-1";
@@ -244,6 +244,7 @@ function composeApplication(options: { customRolePlan?: undefined } = {}) {
   });
 
   const features = ApiTrpcFeaturesComposition.tryCompose({
+      composed: stubComposedFeatures(),
     infrastructure: { ...stubInfrastructureEntitlements(), prisma: prisma.client, authz, audit: undefined },
     collaborators: composeApiTrpcCollaborators(
       testHalves({
@@ -262,6 +263,7 @@ function composeApplication(options: { customRolePlan?: undefined } = {}) {
           application: { ...stubOrgGroupHalf().application, projects },
         } as never,
       }),
+      stubApplicationSlices(),
     ),
   });
   if (!features) throw new Error("the record refused to compose against its collaborators");

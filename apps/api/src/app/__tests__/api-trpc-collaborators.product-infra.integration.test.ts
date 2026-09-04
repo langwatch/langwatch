@@ -59,7 +59,7 @@ import {
   composeApiTrpcCollaborators,
 } from "../api-trpc-features.composition";
 import { composeApiProductInfraCollaborators } from "../api-trpc-collaborators.product-infra.composition";
-import { stubInfrastructureEntitlements, testHalves } from "./api-trpc-collaborators.test-halves";
+import { stubApplicationSlices, stubComposedFeatures, stubInfrastructureEntitlements, testHalves } from "./api-trpc-collaborators.test-halves";
 
 const SESSION_USER = { id: "user-1", name: "Sam Rivers", email: "sam@acme.test", role: "ADMIN" };
 const PROJECT_ID = "project-1";
@@ -433,8 +433,9 @@ function composeApplication(
   const composed = composeHalf(options);
 
   const features = ApiTrpcFeaturesComposition.tryCompose({
+      composed: stubComposedFeatures(),
     infrastructure: { ...stubInfrastructureEntitlements(), prisma: composed.prisma.client, authz: composed.authz, audit: undefined },
-    collaborators: composeApiTrpcCollaborators(testHalves({ productInfra: composed.half })),
+    collaborators: composeApiTrpcCollaborators(testHalves({ productInfra: composed.half }), stubApplicationSlices()),
   });
   if (!features) throw new Error("the record refused to compose against its collaborators");
 
@@ -718,7 +719,7 @@ describe("given an API process composed with the product-infrastructure half", (
 
   describe("when the half did not compose", () => {
     it("composes no record rather than mounting three namespaces over the gap", () => {
-      const composed = composeApiTrpcCollaborators(testHalves({ productInfra: undefined }));
+      const composed = composeApiTrpcCollaborators(testHalves({ productInfra: undefined }), stubApplicationSlices());
 
       expect(composed).toBeUndefined();
     });

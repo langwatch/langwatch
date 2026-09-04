@@ -43,15 +43,15 @@ export {
   type ApiTraceGroupPorts,
 } from "./app/api-trpc-collaborators.trace-group.composition";
 /**
- * The AI Gateway and governance half: the gateway application every one of its
- * doors is given, and the collaborator set the record's twenty-one gateway and
- * governance namespaces arrive through.
+ * The AI Gateway, composed as its own feature: one application for its six
+ * tRPC namespaces, its `ctx.app` slice and its two REST families.
  */
 export {
-  composeApiGatewayGroupCollaborators,
-  type ApiGatewayGroupCollaborators,
-  type ApiGatewayGroupCollaboratorsOptions,
-} from "./app/api-trpc-collaborators.gateway-group.composition";
+  composeGatewayFeature,
+  type ComposedGatewayFeature,
+  type GatewayFeatureOptions,
+  type GatewayPeers,
+} from "./features/gateway/gateway.composition";
 export {
   ApiGatewayIdempotencyPort,
   composeApiGateway,

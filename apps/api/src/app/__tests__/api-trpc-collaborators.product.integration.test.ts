@@ -51,7 +51,7 @@ import {
   composeApiProductCollaborators,
   type ApiModelProviderEvidencePort,
 } from "../api-trpc-collaborators.product.composition";
-import { stub, stubInfrastructureEntitlements, testHalves } from "./api-trpc-collaborators.test-halves";
+import { stub, stubApplicationSlices, stubComposedFeatures, stubInfrastructureEntitlements, testHalves } from "./api-trpc-collaborators.test-halves";
 
 const SESSION_USER = { id: "user-1", name: "Sam Rivers", email: "sam@acme.test", role: "ADMIN" };
 const PROJECT_ID = "project-1";
@@ -405,10 +405,12 @@ function composeApplication() {
       { product: composeProductHalf(prisma.client, clickHouse, providers.port) },
       broadcast,
     ),
+    stubApplicationSlices(),
   );
   if (!collaborators) throw new Error("the collaborator set was incomplete");
 
   const features = ApiTrpcFeaturesComposition.tryCompose({
+      composed: stubComposedFeatures(),
     infrastructure: { ...stubInfrastructureEntitlements(), prisma: prisma.client, authz: testAuthz(), audit },
     collaborators,
   });
@@ -714,6 +716,7 @@ describe("given an API process composed with the product half of the record", ()
           ),
           execution: undefined,
         }),
+        stubApplicationSlices(),
         report,
       );
 

@@ -49,7 +49,7 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { MiddlewareHandler } from "hono";
 
-import type { ApiGatewayGroupCollaborators } from "./api-trpc-collaborators.gateway-group.composition";
+import type { ApiGatewayComposition } from "./api-gateway.composition";
 
 /**
  * The Enterprise webhook platform, as the replay route reads it.
@@ -69,7 +69,7 @@ export type ApiGatewaySpendRestOptions = Readonly<{
   /** The one guarded connection the scope resolution and the caps read run on. */
   prisma: PrismaClient;
   /** The gateway half's own ledger reads, so both doors price one spend. */
-  gateway: Pick<ApiGatewayGroupCollaborators["composition"], "spendEvents" | "budgetSpend">;
+  gateway: Pick<ApiGatewayComposition, "spendEvents" | "budgetSpend">;
   /** The deployment's plan lookup, for the gate ADR-072 names. */
   plans: PlanProvider;
   /** How long after a request an outcome may still arrive, in milliseconds. */

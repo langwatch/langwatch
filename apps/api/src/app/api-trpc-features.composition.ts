@@ -22,6 +22,7 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import type { ZodTypeAny } from "zod";
 import { ApiTrpcFeaturesPort, type ApiTrpcFeatureMount } from "../api.application";
 import type { ApiTrpcInfrastructure } from "../app-trpc/app-trpc.infrastructure";
+import type { ComposedApiFeatures } from "../app-trpc/app-trpc.composed";
 import {
   ApiTrpcCollaboratorsAbsence,
   type ApiTrpcCollaborators,
@@ -32,7 +33,6 @@ import { createApiTrpcPorts } from "./api-trpc-ports.composition";
 import type { ApiAgentGroupCollaborators } from "./api-trpc-collaborators.agent-group.composition";
 import type { ApiAnalyticsCollaborators } from "./api-trpc-collaborators.analytics.composition";
 import type { ApiExecutionCollaborators } from "./api-trpc-collaborators.execution.composition";
-import type { ApiGatewayGroupCollaborators } from "./api-trpc-collaborators.gateway-group.composition";
 import type { ApiIdentityCollaborators } from "./api-trpc-collaborators.identity.composition";
 import type { ApiOrgGroupCollaborators } from "./api-trpc-collaborators.org-group.composition";
 import type { ApiProductGroupCollaborators } from "./api-trpc-collaborators.product-group.composition";
@@ -69,6 +69,8 @@ export type ApiTrpcFeaturesCompositionOptions<
   TReadInputWire,
 > = Readonly<{
   infrastructure: ApiTrpcInfrastructure | undefined;
+  /** The features the process composed before it had a mount; see the type. */
+  composed: ComposedApiFeatures;
   collaborators:
     | ApiTrpcCollaborators<
         TBugReport,
@@ -200,7 +202,7 @@ export class ApiTrpcFeaturesComposition<
       options.report?.absent("no-collaborators");
       return undefined;
     }
-    return new ApiTrpcFeaturesComposition(infrastructure, collaborators);
+    return new ApiTrpcFeaturesComposition(infrastructure, options.composed, collaborators);
   }
 
   readonly application: ApiTrpcFeatureApplication;
@@ -210,6 +212,7 @@ export class ApiTrpcFeaturesComposition<
 
   private constructor(
     private readonly infrastructure: ApiTrpcInfrastructure,
+    private readonly composed: ComposedApiFeatures,
     private readonly collaborators: ApiTrpcCollaborators<
       TBugReport,
       TBugReportPage,
@@ -270,7 +273,12 @@ export class ApiTrpcFeaturesComposition<
       mount,
       collaborators: this.collaborators,
     });
-    return createAppTrpcFeatures({ mount, infrastructure: this.infrastructure, ports });
+    return createAppTrpcFeatures({
+      mount,
+      composed: this.composed,
+      infrastructure: this.infrastructure,
+      ports,
+    });
   }
 
   private readonly logger: Pick<Logger, "error"> = createLogger("langwatch:api:trpc");
@@ -299,13 +307,13 @@ export class LoggedApiTrpcFeaturesAbsence extends ApiTrpcCollaboratorsAbsence {
 }
 
 /**
- * The ten halves {@link composeApiTrpcCollaborators} reads into one flat
+ * The nine halves {@link composeApiTrpcCollaborators} reads into one flat
  * {@link ApiTrpcCollaborators} record. Each is `undefined` exactly when the
  * process composed nothing for it — see that half's own composing function
  * for why it can be missing.
  */
 /**
- * The same ten once every one of them is present.
+ * The same nine once every one of them is present.
  *
  * `Required<>` is not this: it strips the `?` a member does not have and leaves
  * the `| undefined` a member does, so the whole record read below stayed
@@ -325,8 +333,21 @@ export type ApiTrpcCollaboratorHalves = Readonly<{
   agentGroup: ApiAgentGroupCollaborators | undefined;
   orgGroup: ApiOrgGroupCollaborators | undefined;
   productInfra: ApiProductInfraCollaborators | undefined;
-  gatewayGroup: ApiGatewayGroupCollaborators | undefined;
 }>;
+
+/**
+ * The `ctx.app` slices no half owns any more, contributed by the features that
+ * compose themselves.
+ *
+ * Passed beside the halves rather than folded into one of them: a feature that
+ * composes itself has no half to put its slice on, and a half that carried
+ * another feature's slice is exactly what this migration is unpicking. It grows
+ * as features move and the halves shrink.
+ */
+export type ApiTrpcFeatureApplicationSlices = Pick<
+  ApiTrpcFeatureApplication,
+  "gateway" | "github" | "governance" | "governanceApp" | "sessionPolicy" | "webhooks"
+>;
 
 /**
  * Reads all ten collaborator halves into ONE flat {@link ApiTrpcCollaborators}
@@ -348,6 +369,7 @@ export type ApiTrpcCollaboratorHalves = Readonly<{
  */
 export function composeApiTrpcCollaborators(
   halves: ApiTrpcCollaboratorHalves,
+  application: ApiTrpcFeatureApplicationSlices,
   report?: ApiTrpcCollaboratorGapReport,
 ) {
   const missing = (Object.keys(halves) as (keyof ApiTrpcCollaboratorHalves)[]).filter(
@@ -367,7 +389,6 @@ export function composeApiTrpcCollaborators(
     agentGroup,
     orgGroup,
     productInfra,
-    gatewayGroup,
   } = halves as ComposedApiTrpcCollaboratorHalves;
 
   return {
@@ -405,7 +426,7 @@ export function composeApiTrpcCollaborators(
       ...orgGroup.application,
       monitors: productInfra.monitorApp,
       storedObjectApp: productInfra.storedObjectApp,
-      ...gatewayGroup.application,
+      ...application,
     },
 
     annotation: product.annotationPorts,
@@ -468,6 +489,5 @@ export function composeApiTrpcCollaborators(
     dataRetention: productInfra.dataRetention,
     monitors: productInfra.monitors,
 
-    gateway: gatewayGroup.gateway,
   };
 }

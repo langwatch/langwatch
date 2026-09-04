@@ -14,6 +14,7 @@
 import { Hono, type MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
+import { composeEnterpriseGovernanceApplication } from "../../features/enterprise/enterprise-governance.composition";
 import { composeApiPackagedRest } from "../api-packaged-rest.composition";
 import type { ApiPackagedRestCompositionOptions } from "../api-packaged-rest.composition";
 import type { ApiTraceIngestComposition } from "../api-trace-ingest.composition";
@@ -45,7 +46,7 @@ function composeGuard(usageLimit: ApiTraceIngestComposition["usageLimit"] | unde
     credentials: { authenticate: async () => null } as never,
     encryption: undefined,
     execution: undefined,
-    gatewayGroup: undefined,
+    enterpriseGovernance: composeEnterpriseGovernanceApplication(undefined),
     identity: undefined,
     orgGroup: undefined,
     productGroup: undefined,

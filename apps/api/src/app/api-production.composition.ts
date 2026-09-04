@@ -143,9 +143,11 @@ import {
   type ApiOrganizationInvites,
 } from "./api-organization-invites.composition";
 import {
-  composeApiGatewayGroupCollaborators,
-  type ApiGatewayGroupCollaborators,
-} from "./api-trpc-collaborators.gateway-group.composition";
+  composeGatewayFeature,
+  type ComposedGatewayFeature,
+} from "../features/gateway/gateway.composition";
+import { composeEnterpriseGovernanceApplication } from "../features/enterprise/enterprise-governance.composition";
+import type { ApiTrpcInfrastructure } from "../app-trpc/app-trpc.infrastructure";
 import type { ApiGatewayIdempotencyPort } from "./api-gateway.composition";
 import {
   composeApiIdempotency,
@@ -272,6 +274,7 @@ import {
   type ApiLangyRestComposition,
 } from "../features/langy/langy-rest.mount";
 import { composeApiGithubRest } from "../features/github/github-rest.mount";
+import { refusingGithubService } from "../features/github/github.composition";
 import { composeApiAdminRest } from "../features/ops/admin-rest.mount";
 import { composeApiAuthCliDeviceFlow } from "../features/auth/auth-cli-device-flow-rest.mount";
 import { composeApiAuthRest } from "../features/auth/auth-rest.mount";
@@ -583,7 +586,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    */
   private composedOrganizationInvites: ApiOrganizationInvites | undefined;
   private resolvedOrganizationInvites = false;
-  private composedGatewayGroup: ApiGatewayGroupCollaborators | undefined;
+  private composedGateway!: ComposedGatewayFeature;
   /**
    * The process's ONE `Idempotency-Key` receipt ledger, or none.
    *
@@ -905,51 +908,56 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // their monitor service, evaluator service and evaluator replication —
     // one graph per answer, rather than a second one that could disagree.
     this.composedProductInfra = this.composeProductInfra(options, authz);
-    // The gateway-group half: the twenty-one surfaces the AI Gateway and the
-    // governance console that steers it are administered through, plus the
-    // GitHub App beside them. It composes LAST because it reads what the
-    // execution and trace halves opened — this process's evaluator service,
-    // its monitor directory and its ClickHouse — and because the gateway
-    // application it builds is also what the public REST door is given.
     // The `Idempotency-Key` receipt ledger, over the SAME database every keyed
     // create writes its resource to and the SAME cipher every other at-rest
-    // secret is written under. Composed before the gateway group because that
-    // half's three keyed REST creates dispatch through it.
+    // secret is written under. Composed before the gateway because its three
+    // keyed REST creates dispatch through it.
     this.composedIdempotency = composeApiIdempotency({
       database: this.composedDatabase?.connection.client,
       encryption,
     });
-    this.composedGatewayGroup = this.composeGatewayGroup(options, authz, queueInfrastructure);
     const database = this.composedDatabase?.connection;
     // Present whenever the record is: the flag store is the product-group
     // half's, and a process without that half composes no collaborators at all.
     const featureFlags = this.composedProductGroup?.featureFlagService;
+    const infrastructure =
+      database && featureFlags
+        ? {
+            prisma: database.client,
+            authz,
+            // The SAME plan provider every allowance banner reads, and the
+            // SAME flag store `featureFlag.*` answers from. Both are the
+            // process's, not any one feature's, so a gate and the surface
+            // beside it cannot disagree.
+            plans: this.resolvePlanProvider(options),
+            featureFlags,
+            // One variable, one meaning: `IS_SAAS` is what decides whether
+            // this installation bills through Stripe, read from the one leaf
+            // that already carries it rather than from a second of its own.
+            saasBilling: options.config.infrastructure.modelProvider.isSaas,
+            audit: this.options.audit,
+          }
+        : undefined;
+    // The AI Gateway, composed HERE rather than inside the record: its
+    // application is read by `ctx.app`, by the two public REST families and by
+    // the six tRPC namespaces, so the process composes it once and hands each
+    // door the part it needs. It composes LAST of the product graph because
+    // its peers are what the execution half opened.
+    const github =
+      database && tenancy
+        ? this.resolveGithub(options, database.client, queueInfrastructure, tenancy)
+        : refusingGithubService();
+    this.composedGateway = this.composeGateway(options, infrastructure);
     const features = ApiTrpcFeaturesComposition.tryCompose({
-      // What a feature composes ITSELF out of, built once here and handed to
-      // every `compose<Feature>()` the record's literal names. The AuthZ
-      // service is the SAME one the REST doors authorize through: a permission
-      // probe inside a resolver must answer what the declared check on the
-      // same procedure would have.
-      infrastructure:
-        database && featureFlags
-          ? {
-              prisma: database.client,
-              authz,
-              // The SAME plan provider every allowance banner reads, and the
-              // SAME flag store `featureFlag.*` answers from. Both are the
-              // process's, not any one feature's, so a gate and the surface
-              // beside it cannot disagree.
-              plans: this.resolvePlanProvider(options),
-              featureFlags,
-              // One variable, one meaning: `IS_SAAS` is what decides whether
-              // this installation bills through Stripe, read from the one leaf
-              // that already carries it rather than from a second of its own.
-              saasBilling: options.config.infrastructure.modelProvider.isSaas,
-              audit: this.options.audit,
-            }
-          : undefined,
+      // What a feature composes ITSELF out of, built once above and handed to
+      // every `compose<Feature>()` the record's literal names.
+      infrastructure,
+      // The features whose doors are not only tRPC, composed before the mount
+      // existed. Absent infrastructure there is no record either, so the
+      // refusing gateway stands in rather than a second condition here.
+      composed: { gateway: this.composedGateway },
       // One literal, checked against the real type each half returns. A
-      // process missing any of the ten composes none of the record — see
+      // process missing any of the nine composes none of the record — see
       // {@link composeApiTrpcCollaborators}.
       collaborators: composeApiTrpcCollaborators(
         {
@@ -962,7 +970,15 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
           agentGroup: this.composedAgentGroup,
           orgGroup: this.composedOrgGroup,
           productInfra: this.composedProductInfra,
-          gatewayGroup: this.composedGatewayGroup,
+        },
+        // The `ctx.app` slices no half owns: the gateway's own application, the
+        // GitHub App the coding-agent reads resolve through, and the four
+        // Enterprise governance slices — each contributed by the feature that
+        // composes it, or by that feature's named refusal.
+        {
+          gateway: this.composedGateway.app,
+          github,
+          ...composeEnterpriseGovernanceApplication(this.options.enterprise),
         },
         LoggedApiCollaboratorGap.create(createLogger(options.config.serviceName)),
       ),
@@ -1276,7 +1292,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     gatewayJwtSecret: string | undefined,
   ): { rest: Hono; subscriptions: ApiSubscriptionMount } {
     const secrets = this.secrets;
-    const gatewayApp = this.composedGatewayGroup?.gatewayApp;
+    const gatewayApp = this.composedGateway.app;
     // One credential resolution for both doors: the framework-shaped
     // `AppRestSecurity` every packaged REST family is built from, and the
     // four-callable projection the additive public-REST builder takes. Both
@@ -1798,7 +1814,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       credentials: handlerManagedCredentials,
       encryption: this.composedEncryption,
       execution,
-      gatewayGroup: this.composedGatewayGroup,
+      // The two Enterprise governance slices the REST families are handed —
+      // the SAME ones `ctx.app` carries, so the two doors cannot answer
+      // differently.
+      enterpriseGovernance: composeEnterpriseGovernanceApplication(this.options.enterprise),
       identity: this.composedIdentity,
       orgGroup: this.composedOrgGroup,
       productGroup: this.composedProductGroup,
@@ -2159,10 +2178,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     internalSecret: string | undefined,
     jwtSecret: string | undefined,
   ): Hono | undefined {
-    const gateway = this.composedGatewayGroup;
+    const composition = this.composedGateway.composition;
     const database = this.composedDatabase?.connection;
     const projects = this.composedTenancy?.projects;
-    if (!gateway || !database || !projects) return undefined;
+    if (!composition || !database || !projects) return undefined;
 
     const modelProviders = this.composedModelProviders;
     const monitors = this.composedMonitors;
@@ -2175,7 +2194,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     return composeApiGatewayInternalRest({
       security,
       prisma: database.client,
-      gateway: gateway.composition,
+      gateway: composition,
       projects,
       internalSecret,
       jwtSecret,
@@ -2200,10 +2219,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     spendSettlementGrace: string | undefined,
     security: AppRestSecurity,
   ): Hono | undefined {
-    const gateway = this.composedGatewayGroup;
+    const composition = this.composedGateway.composition;
     const database = this.composedDatabase?.connection;
     const plans = this.composedPlanProvider;
-    if (!gateway || !database || !plans) return undefined;
+    if (!composition || !database || !plans) return undefined;
 
     // The Enterprise webhook platform, where this deployment has one. The
     // replay route is the only one of the four that reads it, so its absence
@@ -2218,7 +2237,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     });
     const spend = composeApiGatewaySpendRest({
       prisma: database.client,
-      gateway: gateway.composition,
+      gateway: composition,
       // The SAME plan lookup every allowance banner on this process reads, so
       // one organization cannot be entitled on one surface and refused here.
       plans,
@@ -2468,7 +2487,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private composeGithubRest(authz: AuthzService): GithubRestPorts | undefined {
     const auth = this.composedAuth?.compose();
     return composeApiGithubRest({
-      github: this.composedGatewayGroup?.application.github,
+      github: this.composedGithub,
       session: auth
         ? (request) => AuthSessionApiAuthenticationAdapter.create(auth).authenticate(request)
         : undefined,
@@ -3185,15 +3204,13 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * read the governance rollout from it. That decision composes itself now, so
    * a process with no flag store still administers its gateway.
    */
-  private composeGatewayGroup(
+  private composeGateway(
     options: ApiRuntimeCompositionOptions,
-    authz: AuthzService,
-    queueInfrastructure: ApiQueueInfrastructure | undefined,
-  ): ApiGatewayGroupCollaborators | undefined {
+    infrastructure: ApiTrpcInfrastructure | undefined,
+  ): ComposedGatewayFeature {
     const database = this.composedDatabase?.connection;
     const tenancy = this.composedTenancy;
     const evaluators = this.composedExecution?.evaluators;
-    if (!database || !tenancy || !evaluators) return undefined;
 
     // A host's ledger wins: a process handed the product graph already holds
     // one, and a second over the same receipt table would be a second takeover
@@ -3202,28 +3219,28 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // three keyed creates refuse by name rather than executing unguarded.
     const idempotency = this.options.gatewayIdempotency ?? this.composedIdempotency?.gateway;
 
-    return composeApiGatewayGroupCollaborators({
-      prisma: database.client,
-      authz,
-      projects: tenancy.projects,
-      apiKeys: tenancy.apiKeys,
-      evaluators,
-      // The SAME monitor directory the automation application and the monitor
-      // surface read: a guardrail attachment and the monitor page it points at
-      // must agree about what one runs.
-      monitors: this.resolveMonitors(database.client, evaluators),
-      github: this.resolveGithub(options, database.client, queueInfrastructure, tenancy),
+    return composeGatewayFeature({
+      infrastructure,
+      // The three other features the gateway reaches, named one by one. Absent
+      // together: a process holding none of them composes a refusing gateway,
+      // and only the gateway's own six namespaces are affected.
+      peers:
+        database && tenancy && evaluators
+          ? {
+              projects: tenancy.projects,
+              evaluators,
+              // The SAME monitor directory the automation application and the
+              // monitor surface read: a guardrail attachment and the monitor
+              // page it points at must agree about what one runs.
+              monitors: this.resolveMonitors(database.client, evaluators),
+            }
+          : undefined,
       // The SAME ClickHouse the charted reads and the traces run on: the
       // gateway ledger is a projection in that instance, and a second
       // connection would be a second pool.
       clickhouse: this.resolveGatewayClickHouse(),
       virtualKeyPepper: options.config.virtualKeyPepper,
-      // A host's ledger wins: a process handed the product graph already holds
-      // one, and a second over the same table would be a second takeover clock
-      // racing the first one's claims. Otherwise this process's own.
       ...(idempotency ? { idempotency } : {}),
-      ...(this.options.enterprise ? { enterprise: this.options.enterprise } : {}),
-      processName: options.config.serviceName,
     });
   }
 

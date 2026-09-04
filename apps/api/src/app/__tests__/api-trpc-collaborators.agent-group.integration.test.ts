@@ -66,7 +66,7 @@ import {
   composeApiTrpcCollaborators,
 } from "../api-trpc-features.composition";
 import { composeApiAgentGroupCollaborators } from "../api-trpc-collaborators.agent-group.composition";
-import { stub, stubInfrastructureEntitlements, testHalves } from "./api-trpc-collaborators.test-halves";
+import { stub, stubApplicationSlices, stubComposedFeatures, stubInfrastructureEntitlements, testHalves } from "./api-trpc-collaborators.test-halves";
 
 const SESSION_USER = {
   id: "user-1",
@@ -310,8 +310,9 @@ function composeApplication(
   });
 
   const features = ApiTrpcFeaturesComposition.tryCompose({
+      composed: stubComposedFeatures(),
     infrastructure: { ...stubInfrastructureEntitlements(), prisma: prisma.client, authz, audit: undefined },
-    collaborators: composeApiTrpcCollaborators(testHalves({ agentGroup: group })),
+    collaborators: composeApiTrpcCollaborators(testHalves({ agentGroup: group }), stubApplicationSlices()),
   });
   if (!features) throw new Error("the record refused to compose against its collaborators");
 

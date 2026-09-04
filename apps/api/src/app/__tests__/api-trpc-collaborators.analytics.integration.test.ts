@@ -45,7 +45,7 @@ import {
   ApiTrpcFeaturesComposition,
   composeApiTrpcCollaborators,
 } from "../api-trpc-features.composition";
-import { stub, stubInfrastructureEntitlements, testHalves } from "./api-trpc-collaborators.test-halves";
+import { stub, stubApplicationSlices, stubComposedFeatures, stubInfrastructureEntitlements, testHalves } from "./api-trpc-collaborators.test-halves";
 
 const dashboardRow = {
   id: "dashboard-1",
@@ -179,6 +179,7 @@ function composeApplication(options: { clickhouse?: boolean; workbenchEnabled?: 
   });
 
   const features = ApiTrpcFeaturesComposition.tryCompose({
+      composed: stubComposedFeatures(),
     infrastructure: {
       ...stubInfrastructureEntitlements(),
       prisma: prisma.client,
@@ -187,7 +188,7 @@ function composeApplication(options: { clickhouse?: boolean; workbenchEnabled?: 
         async record(): Promise<void> {}
       })(),
     },
-    collaborators: composeApiTrpcCollaborators(testHalves({ analytics })),
+    collaborators: composeApiTrpcCollaborators(testHalves({ analytics }), stubApplicationSlices()),
   });
   if (!features) throw new Error("the record refused to compose against its collaborators");
 
