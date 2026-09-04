@@ -1,6 +1,7 @@
 /** @vitest-environment node */
 
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
+import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
 import { context as otelContext, trace } from "@opentelemetry/api";
 import { BasicTracerProvider } from "@opentelemetry/sdk-trace-base";
 import { StackContextManager } from "@opentelemetry/sdk-trace-web";
@@ -194,6 +195,35 @@ describe("tRPC error response boundary", () => {
           code: "export_failed",
           httpStatus: 500,
           fault: "platform",
+        });
+      });
+    });
+  });
+
+  describe("given a ModelNotConfiguredError", () => {
+    describe("when it is formatted for the wire", () => {
+      /** @scenario A tRPC procedure forwards ModelNotConfiguredError as a typed TRPCError */
+      it("serialises the typed error into data.cause for the frontend interceptor", () => {
+        const cause = new ModelNotConfiguredError(
+          "traces.ai_search",
+          "FAST",
+          "AI search",
+          "proj_abc",
+        );
+        const error = new TRPCError({
+          code: "BAD_REQUEST",
+          message: cause.message,
+          cause,
+        });
+
+        const formatted = format(error);
+
+        expect(formatted.data.cause).toEqual({
+          code: "MODEL_NOT_CONFIGURED",
+          featureKey: "traces.ai_search",
+          featureDisplayName: "AI search",
+          role: "FAST",
+          projectId: "proj_abc",
         });
       });
     });

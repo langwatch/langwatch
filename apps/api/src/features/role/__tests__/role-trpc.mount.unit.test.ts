@@ -9,7 +9,10 @@
  * where it is pinned.
  */
 import { declareAuthzMiddleware, type AuthzDeclaration } from "@langwatch/authz-contract";
-import { assertEnterprisePlanType, ENTERPRISE_FEATURE_ERRORS } from "@langwatch/enterprise-plan-gate";
+import {
+  assertEnterprisePlanType,
+  ENTERPRISE_FEATURE_ERRORS,
+} from "@langwatch/enterprise-plan-gate";
 import type { AppTrpcPolicyMiddlewares } from "@langwatch/api/trpc";
 import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
 import type { Role, RoleService } from "@langwatch/role-contract";

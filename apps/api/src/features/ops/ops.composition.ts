@@ -371,7 +371,7 @@ function composeOpsPorts(): OpsTrpcPorts {
  *  - `throwOnDeny: false` REPORTS "no access" instead of refusing, which is
  *    what lets the global menu poll the scope on every page load.
  */
-function composeOpsCheck(ops: OpsApp) {
+export function composeOpsCheck(ops: Pick<OpsApp, "isAdmin">) {
   return ({
     permission,
     throwOnDeny = true,

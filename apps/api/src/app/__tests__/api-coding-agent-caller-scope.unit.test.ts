@@ -24,7 +24,10 @@ import {
 } from "@langwatch/coding-agent-server";
 import { describe, expect, it, vi } from "vitest";
 
-import { ApiCodingAgentScopePermissions } from "../api-trpc-collaborators.org-group.composition";
+import {
+  ApiCodingAgentScopeDirectory,
+  ApiCodingAgentScopePermissions,
+} from "../api-trpc-collaborators.org-group.composition";
 
 const ORGANIZATION = "organization-1";
 const KEY = "key-1";
@@ -187,6 +190,34 @@ describe("given an organization service key, which acts as nobody", () => {
 
       expect(scope.permittedProjectIds).toEqual([BOUND.id]);
       expect(Object.keys(scope.projects)).toEqual([BOUND.id]);
+    });
+  });
+});
+
+describe("given personal-workspace membership rows read from Postgres", () => {
+  describe("when a member has no display name set", () => {
+    /** @scenario "A person with no display name is named by their email address" */
+    it("names them by their email address", async () => {
+      const findMany = vi.fn().mockResolvedValue([
+        { teamId: "team-1", user: { name: null, email: "ada@example.com" } },
+      ]);
+      const directory = new ApiCodingAgentScopeDirectory({ teamUser: { findMany } } as never);
+
+      const names = await directory.listPersonalTeamOwnerNames({ teamIds: ["team-1"] });
+
+      expect(names.get("team-1")).toBe("ada@example.com");
+    });
+  });
+
+  describe("when a membership row's user has since been deleted", () => {
+    /** @scenario "A membership row that outlives its user still resolves the scope" */
+    it("names nothing for that row rather than failing the read", async () => {
+      const findMany = vi.fn().mockResolvedValue([{ teamId: "team-1", user: null }]);
+      const directory = new ApiCodingAgentScopeDirectory({ teamUser: { findMany } } as never);
+
+      const names = await directory.listPersonalTeamOwnerNames({ teamIds: ["team-1"] });
+
+      expect(names.has("team-1")).toBe(false);
     });
   });
 });
