@@ -19,6 +19,11 @@
  * window too narrow even for the actions alone the line breaks, and the
  * actions stay at its right end.
  *
+ * The evaluators of the run read after the pass block, one pill each, at the
+ * size of the pass block: the run's verdict and how each check scored are
+ * peers. A pass or fail evaluator reads its pass rate over the run; a score
+ * reads its mean with no colour.
+ *
  * How long ago the run started is not on this line. The runs rail beside it
  * already says that for every run, and the settings block says it again with
  * the date, so a third copy on the line the results start from says nothing
@@ -44,9 +49,11 @@ import { RunMetricsSummary } from "~/components/suites/RunMetricsSummary";
 import type { RunGroupSummary } from "~/components/suites/run-history-transforms";
 import { Menu } from "~/components/ui/menu";
 import { FG_MUTED } from "../shared/design";
+import { EvaluatorPill, readingOfSummary } from "../shared/EvaluatorPill";
 import { SmallButton } from "../shared/SmallButton";
 import { ToggleButton } from "../shared/ToggleButton";
 import type { AgentTestingViewMode } from "../useAgentTestingStore";
+import type { EvaluatorSummary } from "./evaluation-summaries";
 import type { RunPlan } from "./run-plans";
 import { ViewModeToggle } from "./ViewModeToggle";
 
@@ -63,6 +70,8 @@ export type RunPlanDetailRun = {
   title: string;
   note: string | null;
   summary: RunGroupSummary | null;
+  /** One entry per evaluator that ran on the run; empty when none did. */
+  evaluators: EvaluatorSummary[];
 };
 
 export type RunPlanDetailHeaderProps = {
@@ -103,6 +112,19 @@ function RunSummary({ run }: { run: RunPlanDetailRun }) {
         <Box flexShrink={0}>
           <RunMetricsSummary summary={run.summary} size="md" />
         </Box>
+      ) : null}
+      {run.summary && run.evaluators.length > 0 ? (
+        <HStack gap={1.5} flexShrink={0} data-testid="run-summary-evaluators">
+          {run.evaluators.map((evaluator) => (
+            <EvaluatorPill
+              key={evaluator.evaluatorId}
+              evaluatorId={evaluator.evaluatorId}
+              name={evaluator.name}
+              reading={readingOfSummary(evaluator)}
+              size="md"
+            />
+          ))}
+        </HStack>
       ) : null}
       {run.note ? (
         <Text

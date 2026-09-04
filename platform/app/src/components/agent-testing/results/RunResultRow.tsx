@@ -19,8 +19,10 @@ import { Menu } from "~/components/ui/menu";
 import { isTerminalStatus } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { ROW_HOVER_BG } from "../shared/design";
+import { EvaluatorPill, readingOfEvaluation } from "../shared/EvaluatorPill";
 import { LastResultLabel } from "../shared/LastResultLabel";
 import { ResultMetricsInline } from "../shared/ResultMetricsInline";
+import { evaluationsOf } from "./evaluation-summaries";
 import type { RunResultsTableProps } from "./RunResultsTable";
 
 export type RunResultRowProps = Pick<
@@ -137,6 +139,29 @@ function StopRunButton({
   );
 }
 
+/**
+ * One pill per evaluator that ran on the scenario, or nothing while none
+ * reported. A skipped evaluator keeps its pill, muted, so a row that skipped
+ * a check reads differently from a row on which the check never ran.
+ */
+function RowEvaluators({ scenarioRun }: { scenarioRun: ScenarioRunData }) {
+  const evaluations = evaluationsOf(scenarioRun);
+  if (evaluations.length === 0) return null;
+
+  return (
+    <HStack gap={1} flexWrap="wrap" data-testid="run-result-evaluators">
+      {evaluations.map((evaluation, at) => (
+        <EvaluatorPill
+          key={`${evaluation.evaluatorId}-${at}`}
+          evaluatorId={evaluation.evaluatorId}
+          name={evaluation.name}
+          reading={readingOfEvaluation(evaluation)}
+        />
+      ))}
+    </HStack>
+  );
+}
+
 /** The time and the cost, which only a settled run carries. */
 function RowMetrics({ scenarioRun }: { scenarioRun: ScenarioRunData }) {
   // A run that is still going has no duration and no cost to read: the
@@ -209,7 +234,9 @@ export function RunResultRow({
         </chakra.button>
       </HStack>
 
-      <Box />
+      <Box minWidth={0}>
+        <RowEvaluators scenarioRun={scenarioRun} />
+      </Box>
 
       <Box paddingTop="1px" textAlign="right">
         <RowMetrics scenarioRun={scenarioRun} />
