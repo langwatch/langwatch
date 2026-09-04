@@ -258,10 +258,24 @@ test.describe("browser product journey", () => {
 
     await page.getByRole("button", { name: /select evaluator/i }).click();
     await page.getByText(EVALUATOR_NAME).first().click();
-    await page.getByTestId("save-code-evaluator").click();
+
+    // Picking one lands on a Configure step that maps its variables, and the
+    // footer there confirms the choice under the same name as the trigger.
+    await expect(page.getByRole("heading", { name: /configure evaluator/i })).toBeVisible({
+      timeout: 20000,
+    });
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Select Evaluator", exact: true })
+      .click();
 
     const nameField = page.getByPlaceholder("Enter evaluation name");
-    await expect(nameField).toBeVisible({ timeout: 20000 });
+    await expect(
+      nameField,
+      "confirming the evaluator never returned to the online evaluation (defect D10 in " +
+        "dev/docs/plans/e2e-journey-2026-09-04.md: a code evaluator carries no evaluatorType, " +
+        "so the shared editor's save returns without doing anything)",
+    ).toBeVisible({ timeout: 20000 });
     await nameField.fill(MONITOR_NAME);
 
     await expect(page.getByText(/this evaluation will run on every/i).first()).toBeVisible();

@@ -40,6 +40,7 @@ import {
   evaluatorsSchema,
 } from "@langwatch/evaluator-contract";
 import { getEvaluatorDefaultSettings } from "@langwatch/evaluator-contract";
+import { isPersistedEvaluatorType } from "../../../model/persisted-evaluator-type";
 import { api } from "@langwatch/workflow-web/studio-host/api";
 import { DEFAULT_EMBEDDINGS_MODEL, DEFAULT_MODEL } from "@langwatch/workflow-web/utils/constants";
 
@@ -236,6 +237,7 @@ export function useEvaluatorEditorController(
   );
 
   const isWorkflowEvaluator = evaluatorQuery.data?.type === "workflow";
+  const isPersistedEvaluator = isPersistedEvaluatorType(evaluatorQuery.data?.type);
 
   const loadedEvaluatorType = (evaluatorQuery.data?.config as { evaluatorType?: string } | null)
     ?.evaluatorType;
@@ -483,7 +485,7 @@ export function useEvaluatorEditorController(
     if (!project?.id || !isValid) return;
 
     // For existing workflow evaluators, persist name changes via mutation
-    if (evaluatorId && isWorkflowEvaluator) {
+    if (evaluatorId && isPersistedEvaluator) {
       const formValues = form.getValues();
       const newName = formValues.name.trim();
       const nameChanged = newName !== (evaluatorQuery.data?.name?.trim() ?? "");
@@ -602,7 +604,7 @@ export function useEvaluatorEditorController(
   const hasSettings =
     settingsSchema instanceof z.ZodObject && Object.keys(settingsSchema.shape).length > 0;
 
-  const title = evaluatorDef?.name ?? "Configure Evaluator";
+  const title = evaluatorDef?.name ?? evaluatorQuery.data?.name ?? "Configure Evaluator";
 
   const workflowCard = evaluatorQuery.data?.workflowId
     ? {

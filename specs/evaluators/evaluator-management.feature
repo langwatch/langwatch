@@ -353,3 +353,12 @@ Feature: Evaluator management
     When I configure the input mapping: output -> agent.response
     Then this mapping is stored in the evaluation's workbench state
     And the evaluator database record remains unchanged
+
+  # A code evaluator has no settings schema, so the shared editor derived no
+  # type for it and its Select Evaluator button did nothing, silently.
+  @unit
+  Scenario: Selecting a code evaluator for an online evaluation hands it on by id
+    Given a saved code evaluator picked from the evaluator list
+    When the shared editor saves with no settings to configure
+    Then the evaluator is handed on by id and name, the same as a workflow evaluator
+    And the step is headed with the evaluator's own name
