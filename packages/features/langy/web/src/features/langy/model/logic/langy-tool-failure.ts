@@ -288,8 +288,8 @@ function describeFailure(domain: CliHandledError): {
     // That is usually the caller genuinely lacking the permission, but it is
     // also what a key whose candidate list omits a permission the caller DOES
     // hold looks like — a bug on our side, and one we have shipped. The wire
-    // carries `{ permission, apiKeyId, userId, projectId }` and nothing that
-    // separates the two, so the card states the consequence, which is true
+    // carries `{ permission }` and nothing that separates the two, so the
+    // card states the consequence, which is true
     // either way, rather than a cause it cannot substantiate.
     const needed = humanPermission(domain.meta.permission);
     return {

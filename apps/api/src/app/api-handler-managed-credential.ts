@@ -19,17 +19,13 @@
  * invented: changing one is a wire change and belongs in a deliberate
  * deprecation, not in a refactor.
  */
-import {
-  ApiKeyPermissionDeniedError,
-  ApiKeyPermissionNotDelegableError,
-  type ApiKeyService,
-  type ResolvedApiKeyToken,
-} from "@langwatch/api-key-contract";
+import { type ApiKeyService, type ResolvedApiKeyToken } from "@langwatch/api-key-contract";
 import type { AuthzPermission, AuthzService } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
-import { classifyForLangy } from "@langwatch/langy-contract";
+import { createLogger, type Logger } from "@langwatch/observability";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
+import { apiKeyCeilingRefusal } from "./api-key-ceiling-refusal";
 import { extractApiKeyRequestCredentials } from "./api-key-request-credentials";
 
 /** What a resolved credential gives a handler, or what a refused one answers. */
@@ -57,13 +53,19 @@ export class ApiHandlerManagedCredentials {
   static create(options: {
     apiKeys: ApiKeyService;
     authz: AuthzService;
+    logger?: Pick<Logger, "error">;
   }): ApiHandlerManagedCredentials {
-    return new ApiHandlerManagedCredentials(options.apiKeys, options.authz);
+    return new ApiHandlerManagedCredentials(
+      options.apiKeys,
+      options.authz,
+      options.logger ?? createLogger("langwatch:api:handler-managed-credential"),
+    );
   }
 
   private constructor(
     private readonly apiKeys: ApiKeyService,
     private readonly authz: AuthzService,
+    private readonly logger: Pick<Logger, "error">,
   ) {}
 
   /**
@@ -94,7 +96,7 @@ export class ApiHandlerManagedCredentials {
         permission: input.permission,
       });
       if (!allowed) {
-        const refusal = ceilingRefusal(resolved, input.permission);
+        const refusal = apiKeyCeilingRefusal(resolved, input.permission, this.logger);
         return {
           ok: false,
           status: refusal.httpStatus as ContentfulStatusCode,
@@ -142,7 +144,7 @@ export class ApiHandlerManagedCredentials {
       resolved: input.resolved,
       permission: input.permission,
     });
-    if (!allowed) throw ceilingRefusal(input.resolved, input.permission);
+    if (!allowed) throw apiKeyCeilingRefusal(input.resolved, input.permission, this.logger);
   }
 
   private isWithinCeiling(input: {
@@ -162,30 +164,6 @@ export class ApiHandlerManagedCredentials {
       permission,
     });
   }
-}
-
-/**
- * Which refusal a scoped key gets when it lacks a permission.
- *
- * A Langy session key that asks for something Langy may never delegate is a
- * DIFFERENT refusal from an ordinary key that simply lacks the grant — the
- * first can never be fixed by widening the key, and saying so is the point.
- * Identical to the framework chain's own choice, deliberately.
- */
-function ceilingRefusal(
-  resolved: Extract<ResolvedApiKeyToken, { type: "apiKey" }>,
-  permission: AuthzPermission,
-): HandledError {
-  const meta = {
-    apiKeyId: resolved.apiKeyId,
-    userId: resolved.userId ?? null,
-    projectId: resolved.project.id,
-  };
-  const langy = resolved.isLangySessionKey ? classifyForLangy(permission) : null;
-  if (langy && langy.disposition !== "granted") {
-    return new ApiKeyPermissionNotDelegableError(permission, { subject: "Langy", meta });
-  }
-  return new ApiKeyPermissionDeniedError(permission, { meta });
 }
 
 /**

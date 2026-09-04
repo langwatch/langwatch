@@ -1,9 +1,4 @@
-import {
-  ApiKeyPermissionDeniedError,
-  ApiKeyPermissionNotDelegableError,
-  type ApiKeyService,
-  type ResolvedApiKeyToken,
-} from "@langwatch/api-key-contract";
+import { type ApiKeyService, type ResolvedApiKeyToken } from "@langwatch/api-key-contract";
 import type { AuthzPermission, AuthzService } from "@langwatch/authz-contract";
 import { AuthenticatedActorRequiredError } from "@langwatch/api";
 import {
@@ -14,13 +9,13 @@ import {
   type RequestActor,
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
-import { classifyForLangy } from "@langwatch/langy-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import {
   OrganizationNotFoundError,
   type OrganizationService,
 } from "@langwatch/organization-contract";
 import type { Context, ErrorHandler, MiddlewareHandler } from "hono";
+import { apiKeyCeilingRefusal } from "./app/api-key-ceiling-refusal";
 import { extractApiKeyRequestCredentials } from "./app/api-key-request-credentials";
 import { legacyErrorBody } from "./app/api-rest-observability.composition";
 import type { ApiAuditPort } from "./api-request.policy";
@@ -370,7 +365,11 @@ export class ApiRestSecurity {
         permission,
       });
       if (!allowed) {
-        return this.refuse(context, apiKeyCeilingRefusal(resolved, permission), envelope);
+        return this.refuse(
+          context,
+          apiKeyCeilingRefusal(resolved, permission, this.logger),
+          envelope,
+        );
       }
       return next();
     };
@@ -647,29 +646,6 @@ function installOrganizationVariables(
   context.set("apiKeyUserId", resolved.userId);
   context.set("apiKeyOrganizationId", resolved.organizationId);
   context.set("orgResolvedToken", resolved);
-}
-
-/**
- * Which refusal a scoped key gets when it lacks a permission.
- *
- * A Langy session key that asks for something Langy may never delegate is a
- * DIFFERENT refusal from an ordinary key that simply lacks the grant — the
- * first can never be fixed by widening the key, and saying so is the point.
- */
-function apiKeyCeilingRefusal(
-  resolved: Extract<ResolvedApiKeyToken, { type: "apiKey" }>,
-  permission: AuthzPermission,
-): HandledError {
-  const meta = {
-    apiKeyId: resolved.apiKeyId,
-    userId: resolved.userId ?? null,
-    projectId: resolved.project.id,
-  };
-  const langy = resolved.isLangySessionKey ? classifyForLangy(permission) : null;
-  if (langy && langy.disposition !== "granted") {
-    return new ApiKeyPermissionNotDelegableError(permission, { subject: "Langy", meta });
-  }
-  return new ApiKeyPermissionDeniedError(permission, { meta });
 }
 
 function isMutation(method: string): boolean {

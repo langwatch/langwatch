@@ -11,8 +11,9 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import { ApiRestSecurity, type ApiRestProjectPolicy } from "../api-rest.security";
-import { ApiRestObservabilityComposition } from "../app/api-rest-observability.composition";
 import { ApiAuditPort } from "../api-request.policy";
+import { ApiHandlerManagedCredentials } from "../app/api-handler-managed-credential";
+import { ApiRestObservabilityComposition } from "../app/api-rest-observability.composition";
 
 const currentKey: ResolvedApiKeyToken = {
   type: "apiKey",
@@ -221,13 +222,68 @@ describe("ApiRestSecurity", () => {
         const boundary = new Hono();
         boundary.onError(ApiRestObservabilityComposition.create().legacyErrorHandler);
         boundary.get("/", () => {
-          throw new ApiKeyPermissionDeniedError("secrets:manage", {
-            meta: { apiKeyId: "key-1", userId: "user-1", projectId: "project-1" },
-          });
+          throw new ApiKeyPermissionDeniedError("secrets:manage");
         });
         const fromBoundary = await (await boundary.request("/")).json();
 
         expect(fromMiddleware).toEqual(fromBoundary);
+      });
+
+      /** @scenario "One refusal renders one body whichever half answers it" */
+      it("carries the same denial and no identifiers from the handler-managed-credential door", async () => {
+        const apiKeys = apiKeyService();
+        apiKeys.tryResolveToken.mockResolvedValue(currentKey);
+        const authz = authzService();
+        authz.hasApiKeyPermission.mockResolvedValue(false);
+        const app = projectApp(policyOver({ apiKeys, authz }), { permission: "secrets:manage" });
+
+        const fromMiddleware = (await (
+          await app.request("/api/secret", {
+            headers: { authorization: "Bearer current-token", "X-Project-Id": "project-1" },
+          })
+        ).json()) as Record<string, unknown>;
+
+        const credentials = ApiHandlerManagedCredentials.create({
+          apiKeys: apiKeys.service,
+          authz: authz.service,
+        });
+        const resolution = await credentials.authenticate({
+          request: new Request("http://localhost/api/secret", {
+            headers: { authorization: "Bearer current-token", "X-Project-Id": "project-1" },
+          }),
+          permission: "secrets:manage",
+        });
+        const fromDoor = (resolution.ok ? {} : resolution.body) as Record<string, unknown>;
+
+        // `retryable` is a door-only field the legacy envelope has never
+        // carried; everything else on the wire is the same refusal.
+        const { retryable: _retryable, ...fromDoorCore } = fromDoor;
+        expect(fromDoorCore).toEqual(fromMiddleware);
+        for (const body of [fromMiddleware, fromDoor]) {
+          expect(body.apiKeyId).toBeUndefined();
+          expect(body.userId).toBeUndefined();
+          expect(body.projectId).toBeUndefined();
+        }
+      });
+    });
+
+    describe("and the denial reaches the caller", () => {
+      /** @scenario "An API-key ceiling denial carries no identifier fields" */
+      it("carries no apiKeyId, userId or projectId in the body", async () => {
+        const apiKeys = apiKeyService();
+        apiKeys.tryResolveToken.mockResolvedValue(currentKey);
+        const authz = authzService();
+        authz.hasApiKeyPermission.mockResolvedValue(false);
+        const app = projectApp(policyOver({ apiKeys, authz }), { permission: "secrets:manage" });
+
+        const response = await app.request("/api/secret", {
+          headers: { authorization: "Bearer current-token", "X-Project-Id": "project-1" },
+        });
+
+        const body = (await response.json()) as Record<string, unknown>;
+        expect(body.apiKeyId).toBeUndefined();
+        expect(body.userId).toBeUndefined();
+        expect(body.projectId).toBeUndefined();
       });
     });
   });

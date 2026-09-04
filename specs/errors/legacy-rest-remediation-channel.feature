@@ -55,6 +55,12 @@ Feature: The legacy REST families keep the remediation channel
     Then the two bodies are identical
 
   @unit
+  Scenario: An API-key ceiling denial carries no identifier fields
+    Given an API key that does not grant the permission a route requires
+    When a caller reaches that route
+    Then the denial body carries no apiKeyId, userId or projectId field
+
+  @unit
   Scenario: An unanticipated cause behind a handled refusal stays masked
     Given a legacy REST family whose route raises a handled refusal caused by a dropped database connection
     When a caller reaches that route
