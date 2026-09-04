@@ -8,7 +8,8 @@
  * would pass this file while leaving the constraint absent, which is the
  * failure this exists to catch.
  *
- * Requires the `btree_gist` extension and the triggers the migration installs.
+ * Requires the triggers and the one-open-bill index the migration installs.
+ * Plain Postgres - deliberately no extension is needed.
  *
  * Spec: specs/governance/governance-cost-coverage.feature
  * Decision: ADR-128 §7
@@ -24,13 +25,22 @@ import {
   GatewayKeyAlreadyCoveredError,
 } from "../services/costCoverage.errors";
 import { CostCoverageService } from "../services/costCoverage.service";
+import { isUniqueViolation } from "../services/logic/postgresConstraintErrors";
 
 const ns = `gov-coverage-${nanoid(8)}`;
 const organizationId = `org_${ns}`;
 const otherOrganizationId = `org_other_${ns}`;
 
-/** Postgres' exclusion-constraint violation. Asserted by code, never by prose. */
-const EXCLUSION_VIOLATION = "23P01";
+/**
+ * How Prisma reports the one-open-bill index refusing a second open row.
+ *
+ * Like the foreign-key case below, Prisma has a mapping of its own for a
+ * unique violation and replaces the raw 23505 entirely, so the Prisma code is
+ * the thing there is to assert on.
+ */
+const PRISMA_UNIQUE_VIOLATION = "P2002";
+/** Postgres' own unique-violation code, seen when a write bypasses Prisma. */
+const UNIQUE_VIOLATION = "23505";
 /** Postgres' check-constraint violation. */
 const CHECK_VIOLATION = "23514";
 /**
@@ -74,7 +84,7 @@ const sqlState = (error: unknown): string | undefined => {
       record.cause ?? (meta as Record<string, unknown> | undefined)?.cause;
   }
   const message = String((error as { message?: string })?.message ?? "");
-  return /\b(23P01|23514|23503)\b/.exec(message)?.[1];
+  return /\b(23505|23514|23503)\b/.exec(message)?.[1];
 };
 
 const makeKey = async (params: { id: string; organizationId: string }) => {
@@ -134,7 +144,11 @@ describe("Feature: every dollar has one home", () => {
         })
         .catch((error: unknown) => error);
 
-      expect(sqlState(refused)).toBe(EXCLUSION_VIOLATION);
+      // Prisma wraps the 23505 as P2002 and keeps the SQLSTATE to itself, so
+      // the second assertion is the application's own predicate — the exact
+      // contract the service's catch site relies on.
+      expect((refused as { code?: string }).code).toBe(PRISMA_UNIQUE_VIOLATION);
+      expect(isUniqueViolation(refused)).toBe(true);
     });
 
     /** @scenario "A bill may cover a key another bill has finished covering" */
@@ -174,6 +188,87 @@ describe("Feature: every dollar has one home", () => {
     });
   });
 
+  describe("when a second open bill is written straight to the database", () => {
+    it("is refused by the database itself, not by application code", async () => {
+      const rawKey = `vk_${ns}_raw`;
+      await makeKey({ id: rawKey, organizationId });
+      await repo.open(prisma, {
+        organizationId,
+        ingestionSourceId: `bill_1_${ns}`,
+        virtualKeyId: rawKey,
+        validFrom: utc("2026-03-01"),
+      });
+
+      let caught: unknown;
+      try {
+        // Raw SQL on purpose: this proves the rule holds for a writer that
+        // skips Prisma and the service layer entirely.
+        await prisma.$executeRawUnsafe(
+          `
+          -- @tenancy: single fixed test row; the rule under test is per-key,
+          -- not per-tenant.
+          INSERT INTO "IngestionSourceKeyCoverage"
+            ("id", "organizationId", "ingestionSourceId", "virtualKeyId", "validFrom", "validTo")
+          VALUES ($1, $2, $3, $4, '2026-04-01T00:00:00Z', NULL)
+          `,
+          `cov_raw_${ns}`,
+          organizationId,
+          `bill_2_${ns}`,
+          rawKey,
+        );
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(sqlState(caught)).toBe(UNIQUE_VIOLATION);
+
+      // And the invariant itself: no key holds two open bills.
+      const doubled = await prisma.$queryRawUnsafe<unknown[]>(`
+        -- @tenancy: invariant sweep across the whole test database; a second
+        -- open bill anywhere is a failure regardless of tenant.
+        SELECT "virtualKeyId", count(*)
+        FROM "IngestionSourceKeyCoverage"
+        WHERE "validTo" IS NULL
+        GROUP BY 1
+        HAVING count(*) > 1
+      `);
+      expect(doubled).toHaveLength(0);
+    });
+  });
+
+  describe("when a closed period overlapping an open one is written", () => {
+    it("is accepted: the rule only counts open bills", async () => {
+      // Boundary made explicit: this is the guarantee traded away with the
+      // gist exclusion constraint. Closed history stays non-overlapping only
+      // because every closed row is written by the service transaction that
+      // holds the open row FOR UPDATE — a writer bypassing the service, like
+      // this one, is not refused. The trade and its reasoning live in the
+      // migration's header comment.
+      const tradedKey = `vk_${ns}_traded`;
+      await makeKey({ id: tradedKey, organizationId });
+      await repo.open(prisma, {
+        organizationId,
+        ingestionSourceId: `bill_1_${ns}`,
+        virtualKeyId: tradedKey,
+        validFrom: utc("2026-01-01"),
+      });
+
+      await prisma.ingestionSourceKeyCoverage.create({
+        data: {
+          id: `cov_traded_${ns}`,
+          organizationId,
+          ingestionSourceId: `bill_2_${ns}`,
+          virtualKeyId: tradedKey,
+          validFrom: utc("2025-12-01"),
+          validTo: utc("2026-02-01"),
+        },
+      });
+
+      const rows = await repo.findAllByOrganization(prisma, { organizationId });
+      expect(rows.map((row) => row.id)).toContain(`cov_traded_${ns}`);
+    });
+  });
+
   describe("when coverage describes no time at all", () => {
     /** @scenario "Coverage that starts and ends at the same moment is refused" */
     it("refuses a period that ends the instant it begins", async () => {
@@ -192,8 +287,9 @@ describe("Feature: every dollar has one home", () => {
         })
         .catch((error: unknown) => error);
 
-      // An empty range overlaps nothing, not even itself, so the exclusion
-      // constraint never sees it — the CHECK is the only thing that does.
+      // A zero-width period is closed the instant it begins, so the
+      // one-open-bill index never sees it — the CHECK is the only thing that
+      // does.
       expect(sqlState(refused)).toBe(CHECK_VIOLATION);
     });
 
@@ -360,7 +456,7 @@ describe("Feature: every dollar has one home", () => {
       });
 
       // The service's own read would find the open row and close it, so the
-      // constraint is reached by a writer that never saw it — which is what a
+      // index is reached by a writer that never saw it — which is what a
       // racing second administrator is.
       const refused = await repo
         .open(prisma, {
@@ -371,7 +467,8 @@ describe("Feature: every dollar has one home", () => {
         })
         .catch((error: unknown) => error);
 
-      expect(sqlState(refused)).toBe(EXCLUSION_VIOLATION);
+      expect((refused as { code?: string }).code).toBe(PRISMA_UNIQUE_VIOLATION);
+      expect(isUniqueViolation(refused)).toBe(true);
     });
 
     /**
@@ -443,9 +540,8 @@ describe("Feature: every dollar has one home", () => {
       // Here the winner moved the key to a period beginning at the very instant
       // this transaction is moving it from. The stale read is of the row as it
       // was BEFORE that, so the service's own "after the current start" check
-      // passes; the close it then makes leaves a period covering no time, and an
-      // empty range overlaps nothing, so the CHECK is the only thing that sees
-      // it.
+      // passes; the close it then makes leaves a period covering no time, and
+      // the CHECK is the only thing that sees it.
       const readsStale = Object.create(
         repo,
       ) as IngestionSourceKeyCoverageRepository;

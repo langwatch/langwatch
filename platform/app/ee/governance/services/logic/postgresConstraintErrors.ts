@@ -18,13 +18,13 @@ const UNIQUE_VIOLATION = "23505";
  * Prisma's own code for the same refusal: the client wraps a unique violation
  * as a `PrismaClientKnownRequestError` with `code: "P2002"` and buries the
  * SQLSTATE underneath. Which unique rule tripped is the caller's knowledge —
- * the one-open-link index for `IdentityMatch` writes, the (organization,
- * provider, actor) key for discovered-person writes.
+ * the one-open-row indexes for `IdentityMatch` and `IngestionSourceKeyCoverage`
+ * writes, the (organization, provider, actor) key for discovered-person writes.
+ * No caller's table holds a second unique rule a write could trip (their
+ * primary keys are fresh nanoids), so `P2002` means that table's own rule and
+ * nothing else.
  */
 const PRISMA_UNIQUE_VIOLATION = "P2002";
-
-/** Postgres' exclusion-violation code: two rows overlap where none may. */
-const EXCLUSION_VIOLATION = "23P01";
 
 /** Postgres' check-violation code: a row a named CHECK refuses. */
 const CHECK_VIOLATION = "23514";
@@ -51,31 +51,18 @@ function hasSqlState(error: unknown, sqlState: string): boolean {
 }
 
 /**
- * Whether a thrown value is Postgres refusing a duplicate under any unique
- * rule.
+ * Whether a thrown value is a unique index refusing a duplicate.
  *
  * Prisma's `P2002` wrapper is checked alongside the raw SQLSTATE because the
- * client catches this one itself before the driver's code can surface.
+ * client catches this one itself before the driver's code can surface. Each
+ * caller's table holds exactly one unique rule a write can trip, which is what
+ * lets a callsite read this as its own index and nothing else.
  */
 export function isUniqueViolation(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
   if ((error as { code?: unknown }).code === PRISMA_UNIQUE_VIOLATION)
     return true;
   return hasSqlState(error, UNIQUE_VIOLATION);
-}
-
-/**
- * Whether a thrown value is the one-open-link index refusing a second open
- * link. The same refusal shape as any unique violation; the name records
- * which rule the caller believes it tripped (`IdentityMatch` has no other).
- */
-export function isOpenLinkViolation(error: unknown): boolean {
-  return isUniqueViolation(error);
-}
-
-/** Whether a thrown value is an exclusion constraint refusing an overlap. */
-export function isExclusionViolation(error: unknown): boolean {
-  return hasSqlState(error, EXCLUSION_VIOLATION);
 }
 
 /**

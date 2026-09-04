@@ -67,9 +67,9 @@ export class IngestionSourceKeyCoverageRepository {
    * lets a second administrator interleave between the two writes — closing the
    * open row and opening a successor an hour later, leaving an hour of that
    * key's spend covered by no bill, with nothing raised and nothing to find it
-   * afterwards. The exclusion constraint cannot see that gap; it can only see
-   * an overlap. Holding the row for the length of the transaction is what makes
-   * the gap unrepresentable.
+   * afterwards. No database rule sees that gap — the one-open-bill index only
+   * counts open rows. Holding the row for the length of the transaction is
+   * what makes the gap unrepresentable.
    *
    * Must be called inside a transaction. Outside one the lock is released the
    * instant the statement returns, which is a lock that proves nothing.

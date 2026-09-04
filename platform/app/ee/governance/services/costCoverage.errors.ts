@@ -15,13 +15,13 @@
 import { HandledError } from "@langwatch/handled-error";
 
 /**
- * Another bill already covers this key over the period being claimed.
+ * Another bill already covers this key.
  *
- * Raised from SQLSTATE 23P01, which is where the rule actually lives — the
- * exclusion constraint on `IngestionSourceKeyCoverage`. There is deliberately
- * no read-then-write check in front of it that could report this sooner: two
- * administrators saving in the same instant both pass such a read, and only the
- * database sees the collision.
+ * Raised from the one-open-bill unique index on `IngestionSourceKeyCoverage`
+ * (SQLSTATE 23505, wrapped by Prisma as `P2002`), which is where the rule
+ * actually lives. There is deliberately no read-then-write check in front of
+ * it that could report this sooner: two administrators saving in the same
+ * instant both pass such a read, and only the database sees the collision.
  */
 export class GatewayKeyAlreadyCoveredError extends HandledError {
   declare readonly code: "ingestion_source_key_already_covered";
@@ -70,8 +70,8 @@ export class CoverageStartNotMidnightError extends HandledError {
  * began.
  *
  * Closing the current row at that instant would leave a range covering no time
- * at all, which an exclusion constraint cannot see — so this is refused before
- * the write, and by the `CHECK` behind it if a race gets past.
+ * at all — refused before the write, and by the `CHECK` behind it if a race
+ * gets past.
  */
 export class CoverageStartNotAfterCurrentError extends HandledError {
   declare readonly code: "ingestion_source_coverage_not_after_start";
