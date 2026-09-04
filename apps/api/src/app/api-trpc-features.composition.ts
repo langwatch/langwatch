@@ -72,7 +72,7 @@ export type ApiTrpcFeaturesCompositionOptions<
         TPrivacyRule,
         TPrivacySnapshot,
         TSignUpDataSchema,
-        TWorkbenchState,
+        TWorkbenchState
       >
     | undefined;
   report?: ApiTrpcCollaboratorsAbsence;
@@ -144,7 +144,7 @@ export class ApiTrpcFeaturesComposition<
       TPrivacyRule,
       TPrivacySnapshot,
       TSignUpDataSchema,
-      TWorkbenchState,
+      TWorkbenchState
     >,
   ):
     | ApiTrpcFeaturesComposition<
@@ -156,7 +156,7 @@ export class ApiTrpcFeaturesComposition<
         TPrivacyRule,
         TPrivacySnapshot,
         TSignUpDataSchema,
-        TWorkbenchState,
+        TWorkbenchState
       >
     | undefined {
     const { infrastructure, collaborators } = options;
@@ -188,7 +188,7 @@ export class ApiTrpcFeaturesComposition<
       TPrivacyRule,
       TPrivacySnapshot,
       TSignUpDataSchema,
-      TWorkbenchState,
+      TWorkbenchState
     >,
   ) {
     super();
