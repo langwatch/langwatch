@@ -76,7 +76,7 @@ function makeNotifier() {
 function makeService(notifier: TriggerNotifier) {
   const deps = { baseHost: BASE_HOST, notifier };
   return {
-    testFire: (input: TestFireTriggerInput) => testFireTrigger(deps, input),
+    testFire: (input: TestFireTriggerInput) => testFireTrigger({ deps, input }),
   };
 }
 
@@ -242,6 +242,36 @@ describe("testFireTrigger", () => {
       });
       // The gated block survived — proof the gate was opened for bot delivery.
       expect(JSON.stringify(sentSlackBot[0]?.payload)).toContain("data_table");
+    });
+
+    /** @scenario "A bot-token delivery posts Block Kit" */
+    it("posts the framework default as Block Kit blocks when no template is configured", async () => {
+      const { notifier, sentSlackBot } = makeNotifier();
+      const service = makeService(notifier);
+
+      const result = await service.testFire({
+        channel: "slack",
+        trigger: TRIGGER,
+        project: PROJECT,
+        // Neither slackTemplateType nor slackTemplate set — the author never
+        // customised the message, so the connection's own default applies.
+        draft: {},
+        recipients: [],
+        webhook: null,
+        botDestination: { token: "xoxb-live", channel: "C1" },
+      });
+
+      expect(result.errors).toEqual([]);
+      expect(sentSlackBot).toHaveLength(1);
+      const payload = sentSlackBot[0]?.payload as
+        | { text: string }
+        | { blocks: unknown[] };
+      // Bot connections must never fall back to the plain-text builder
+      // (ADR-041) — a missing discriminator still resolves to Block Kit,
+      // and the default render carries real blocks, not an empty shell.
+      expect(payload).toMatchObject({
+        blocks: expect.arrayContaining([expect.any(Object)]),
+      });
     });
   });
 

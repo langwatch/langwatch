@@ -25,6 +25,35 @@ export interface SlackRenderDefaults {
 
 export type SlackTemplateType = "string" | "block_kit";
 
+/**
+ * Resolves the `templateType` a Slack send actually renders with, given the
+ * author's saved discriminator (`configured` — null means "using the
+ * framework default") and how the message reaches Slack.
+ *
+ * ADR-041: a bot connection posts through the Web API, which renders the
+ * modern Block Kit layouts (charts, tables, alert banners); webhook delivery
+ * defaults to plain text but honors an explicit "block_kit" pick.
+ * Every bot-connection call site used to compute this inline as
+ * `configured === "block_kit" ? "block_kit" : "string"`, which reads a
+ * missing discriminator as "string" regardless of delivery method. That
+ * silently sent the legacy plain-text default over a bot connection any time
+ * the author had not explicitly picked Block Kit — exactly the send ADR-041
+ * says a bot connection must never make. A webhook's unconfigured default
+ * stays "string".
+ */
+export function resolveSlackTemplateType({
+  configured,
+  deliveryMethod,
+}: {
+  configured: string | null | undefined;
+  deliveryMethod: "bot" | "webhook";
+}): SlackTemplateType {
+  const normalized: SlackTemplateType | null =
+    configured === "block_kit" || configured === "string" ? configured : null;
+  if (normalized != null) return normalized;
+  return deliveryMethod === "bot" ? "block_kit" : "string";
+}
+
 export type SlackPayload =
   | { text: string }
   | { blocks: Record<string, unknown>[] };

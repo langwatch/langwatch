@@ -91,6 +91,7 @@ describe("sendWebhook dispatch orchestration", () => {
       expect(mockedRateLimit).not.toHaveBeenCalled();
     });
 
+    /** @scenario "A project cannot flood an endpoint" */
     it("throws retryable with a Retry-After when the cap is exceeded", async () => {
       const resetAt = Date.now() + 120_000;
       mockedRateLimit.mockResolvedValue({
@@ -113,6 +114,7 @@ describe("sendWebhook dispatch orchestration", () => {
   });
 
   describe("Retry-After from the receiver", () => {
+    /** @scenario "A receiver's Retry-After is carried onto the failure" */
     it("threads it onto the retryable DispatchError on a 429", () => {
       let caught: unknown;
       try {

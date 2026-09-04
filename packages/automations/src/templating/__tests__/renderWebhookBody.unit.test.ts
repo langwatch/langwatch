@@ -23,16 +23,20 @@ describe("renderWebhookBody", () => {
       const parsed = JSON.parse(rendered.body) as {
         event: string;
         trigger: { id: string; name: string };
-        matches: { traceId: string; input: string }[];
+        matches: { traceId: string; input: string; output: string }[];
       };
       expect(parsed.event).toBe("trigger.matched");
       expect(parsed.trigger).toMatchObject({
         id: "trg_1",
         name: "High latency",
       });
+      // #6716 P0: the envelope carries the trace's input AND output, not just
+      // its id — a receiver (or an author reading a test-fire payload) needs
+      // to see what happened, not just an identifier to look up.
       expect(parsed.matches[0]).toMatchObject({
         traceId: "trace_1",
         input: "what is the weather",
+        output: "it is sunny",
       });
     });
 
@@ -117,6 +121,7 @@ describe("renderWebhookBody", () => {
   });
 
   describe("when the custom template renders invalid JSON", () => {
+    /** @scenario "A JSON body that does not parse falls back to the framework default" */
     it("falls back to the default envelope and surfaces the error", async () => {
       const rendered = await renderWebhookBody({
         template: "not json at all {{ trigger.name }}",
@@ -138,6 +143,82 @@ describe("renderWebhookBody", () => {
       expect(rendered.usedDefault).toBe(true);
       expect(rendered.errors.length).toBeGreaterThan(0);
       expect(() => JSON.parse(rendered.body)).not.toThrow();
+    });
+  });
+
+  describe("given the body format is text", () => {
+    it("sends the render output verbatim, without JSON normalising it", async () => {
+      const rendered = await renderWebhookBody({
+        template: "Trigger {{ trigger.name }} matched  {{ digest.count }}\n",
+        context: makeContext(),
+        contentType: "text/plain; charset=utf-8",
+      });
+
+      expect(rendered.body).toBe("Trigger High latency matched  1\n");
+      expect(rendered.usedDefault).toBe(false);
+      expect(rendered.errors).toEqual([]);
+    });
+
+    it("keeps content that would break a JSON template intact", async () => {
+      const rendered = await renderWebhookBody({
+        template: "{{ matches[0].trace.input }}",
+        context: makeContext({
+          matches: [
+            makeMatch({
+              trace: {
+                id: "trace_1",
+                input: JSON_BREAKOUT,
+                output: JSON_BREAKOUT,
+                url: "https://app.langwatch.ai/acme/traces/trace_1",
+                metadata: {},
+              },
+            }),
+          ],
+        }),
+        contentType: "text/plain; charset=utf-8",
+      });
+
+      expect(rendered.body).toBe(JSON_BREAKOUT);
+    });
+
+    it("reports the author's missing variables without failing the render", async () => {
+      const rendered = await renderWebhookBody({
+        template: "value: {{ trigger.nmae }}",
+        context: makeContext(),
+        contentType: "text/plain; charset=utf-8",
+      });
+
+      expect(rendered.missingVariables.length).toBeGreaterThan(0);
+      expect(rendered.errors).toEqual([]);
+    });
+
+    describe("when no template is written", () => {
+      it("sends an empty body rather than a JSON envelope the endpoint cannot read", async () => {
+        const rendered = await renderWebhookBody({
+          template: null,
+          context: makeContext(),
+          contentType: "text/plain; charset=utf-8",
+        });
+
+        expect(rendered.body).toBe("");
+        expect(rendered.usedDefault).toBe(false);
+        expect(rendered.errors).toEqual([]);
+      });
+    });
+
+    describe("when the template throws at render", () => {
+      /** @scenario "A plain-text body that fails to render sends nothing" */
+      it("sends an empty body and surfaces the error", async () => {
+        const rendered = await renderWebhookBody({
+          template: "{% unknown_tag %}",
+          context: makeContext(),
+          contentType: "text/plain; charset=utf-8",
+        });
+
+        expect(rendered.body).toBe("");
+        expect(rendered.usedDefault).toBe(false);
+        expect(rendered.errors.length).toBeGreaterThan(0);
+      });
     });
   });
 });

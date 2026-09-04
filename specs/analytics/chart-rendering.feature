@@ -45,6 +45,18 @@ Feature: Analytics Chart Rendering
     When the chart renders the Y-axis and tooltips
     Then values display as percentages like "85%" not decimals like "0.85"
 
+  # Distinct from the scenario above: this is the per-series "show as
+  # percentage (%)" toggle (`asPercent`), which applies to ANY metric, not
+  # just the one metric (`evaluation_pass_rate`) that already ships its own
+  # percent format. Before this fix `asPercent` flowed all the way to the
+  # query but the render path never consulted it, so a percentage series
+  # plotted its raw value (e.g. "40") on a count-formatted axis with no "%".
+  @unit
+  Scenario: A percentage series formats its values as a percentage
+    Given a chart series configured to show as a percentage
+    When the chart renders the Y-axis and tooltip
+    Then values display as percentages like "40%" not raw numbers like "40"
+
   # ---------------------------------------------------------------------------
   # Semantic color tokens
   # ---------------------------------------------------------------------------

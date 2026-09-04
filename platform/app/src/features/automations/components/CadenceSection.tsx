@@ -1,5 +1,4 @@
 import {
-  Box,
   Field,
   HStack,
   Input,
@@ -7,7 +6,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { CADENCE_LABELS } from "@langwatch/automations/cadences";
+import { CADENCE_CHOICE_LABELS } from "@langwatch/automations/cadences";
 import { useEffect, useState } from "react";
 import {
   GRAPH_ALERT_TIME_PERIODS,
@@ -17,14 +16,16 @@ import {
 import {
   type AutomationDraft,
   cadenceIsSet,
+  isNotifyAction,
   OPERATOR_LABELS,
   TIME_PERIOD_LABELS,
 } from "../logic/draftReducer";
 import { describeCron } from "../logic/reportSchedule";
+import { CLIENT_PROVIDERS } from "../providers/registry";
 import { useAutomationStore } from "../state/automationStore";
 import { useDraft } from "../state/selectors";
-import { CadenceField } from "./CadenceField";
 import { type FacetAccordionProps, FacetSection } from "./FacetSection";
+import { ReceiveCadenceField } from "./ReceiveCadenceField";
 import { ReportScheduleField } from "./ReportScheduleField";
 import { TraceDebounceField } from "./TraceDebounceField";
 
@@ -41,35 +42,52 @@ function cadenceSummary(draft: AutomationDraft): string {
       : "Set a schedule";
   }
   const settle = Math.round(draft.traceDebounceMs / 1000);
-  return `${CADENCE_LABELS[draft.notificationCadence]}, ${settle}s settle`;
+  // A persist action writes per match — the router coerces its cadence to
+  // immediate — so the summary must not echo a digest the server discards.
+  if (!isNotifyAction(draft)) {
+    return `Per matching trace, ${settle}s settle window`;
+  }
+  return `${CADENCE_CHOICE_LABELS[draft.notificationCadence]}, ${settle}s settle window`;
 }
 
 const CADENCE_HELP = {
   trace:
-    "How often notifications go out — one per matching trace, or batched into a digest — plus how long to wait for late spans before evaluating.",
+    "Whether each matching trace sends its own message or matches are batched into one, plus how long a trace must be quiet before it counts as settled and can send.",
   customGraph:
-    "What makes the alert fire: the watched metric crosses this threshold over the chosen window.",
+    "What makes it fire: the watched metric crosses this threshold over the chosen window.",
   report: "When it's sent, as a recurring schedule in the timezone you pick.",
 } as const;
 
 /**
  * The Cadence facet (ADR-043 facet 4) — "what makes it run, and how often?".
- * Owns all timing: an automation's digest cadence + settle window, an
- * alert's threshold rule, a report's schedule. Reads and writes the draft
- * through the store.
+ * Owns all timing: a trace automation's digest cadence + settle window, a
+ * graph automation's threshold rule, a schedule's cron. Reads and writes the
+ * draft through the store.
  */
 export function CadenceSection({
   isEdit = false,
   accordion,
+  title = "Cadence",
 }: {
   isEdit?: boolean;
   accordion?: FacetAccordionProps;
+  /** The wizard splits this facet across two steps and names it after what
+   *  it decides there — the firing rule in Watch, the sending timing in
+   *  Delivery (ADR-093 §4). The facet itself is unchanged. */
+  title?: string;
 }) {
   const draft = useDraft();
+  const dispatch = useAutomationStore((s) => s.dispatch);
+  // A channel whose templates depend on the receive choice hosts the chooser
+  // itself, beside the templates it filters — rendering it here too would put
+  // two controls for the same decision on one step.
+  const isChooserHostedByChannel =
+    draft.action !== null &&
+    CLIENT_PROVIDERS[draft.action].client.hasOwnReceiveChooser === true;
 
   return (
     <FacetSection
-      title="Cadence"
+      title={title}
       help={CADENCE_HELP[draft.source]}
       accordion={accordion}
       complete={cadenceIsSet(draft)}
@@ -80,20 +98,25 @@ export function CadenceSection({
       ) : draft.source === "report" ? (
         <ReportCadence isEdit={isEdit} />
       ) : (
-        <HStack align="start" gap={4}>
-          <Box flex="1" minWidth="0">
-            <CadenceField />
-          </Box>
-          <Box flex="1" minWidth="0">
-            <TraceDebounceField />
-          </Box>
-        </HStack>
+        <VStack align="stretch" gap={4}>
+          {/* Notify actions only: a persist action (dataset, annotation
+              queue) always writes per match — the router coerces its cadence
+              to immediate — so offering batch windows would promise behavior
+              the server discards. */}
+          {isChooserHostedByChannel || !isNotifyAction(draft) ? null : (
+            <ReceiveCadenceField
+              value={draft.notificationCadence}
+              onChange={(value) => dispatch({ type: "SET_CADENCE", value })}
+            />
+          )}
+          <TraceDebounceField />
+        </VStack>
       )}
     </FacetSection>
   );
 }
 
-/** Alert cadence: the threshold rule that fires it. */
+/** Graph-watching cadence: the threshold rule that fires it. */
 function GraphCadence() {
   const draft = useDraft();
   const dispatch = useAutomationStore((s) => s.dispatch);

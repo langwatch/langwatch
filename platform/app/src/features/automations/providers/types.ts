@@ -92,6 +92,12 @@ export interface ClientDef<S = unknown, TPreview = unknown> {
   /** Icon rendered in the type picker. Lucide / react-icons component. */
   readonly Icon: ComponentType<{ size?: number }>;
 
+  /** True when this provider's `ConfigForm` hosts the receive-cadence chooser
+   *  itself — because its templates depend on the choice, so the chooser sits
+   *  beside the template list it filters. The cadence facet reads this and
+   *  offers only the settle window, never a competing second control. */
+  readonly hasOwnReceiveChooser?: boolean;
+
   /** Initial empty slice for this provider. */
   initialSlice(): S;
 
@@ -118,6 +124,13 @@ export interface ConfigFormProps<S, TPreview = unknown> {
   slice: S;
   onChange: (next: S) => void;
   ctx: ConfigFormCtx<TPreview>;
+}
+
+/** Project-level facts a preview needs that the draft slice cannot hold. */
+export interface PreviewDeliveryContext {
+  /** ADR-093 §5: the project has a Slack integration, so a Slack delivery has
+   *  a token even when the automation stores none of its own. */
+  hasProjectSlackIntegration: boolean;
 }
 
 /** Notify-specific client additions. Generic over slice and preview. */
@@ -148,10 +161,14 @@ export interface NotifyClientDef<S = unknown, TPreview = unknown>
   templatesFromSlice(slice: S): TemplateDraft;
   /** Render options the PREVIEW must mirror so it shows what will really be
    *  delivered. Slack only renders the modern blocks (charts, tables, alert
-   *  banners) over a bot connection — without this the preview would show a
-   *  chart that the webhook is going to strip, or hide one the bot will send.
-   *  Omit when the provider's preview needs no delivery-specific options. */
-  previewOptions?(slice: S): { allowGatedBlocks?: boolean };
+   *  banners) over a bot connection with a token behind it — without this the
+   *  preview would show a chart that the webhook is going to strip, or one that
+   *  a project with no Slack integration cannot send at all. `context` carries
+   *  the project-level facts the slice does not hold. Omit when the provider's
+   *  preview needs no delivery-specific options. */
+  previewOptions?(params: { slice: S; context: PreviewDeliveryContext }): {
+    allowGatedBlocks?: boolean;
+  };
 }
 
 // ---- Registry entries ---------------------------------------------------

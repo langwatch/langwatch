@@ -666,6 +666,11 @@ describe("explainHandledError", () => {
         // recipients to test-fire to."), and it names WHICH piece is missing.
         // Authored in `trigger-template.service.ts`, never relayed.
         test_fire_unavailable: new Set(["reason"]),
+        // Same shape: `reason` is the sentence naming WHICH piece of the alert
+        // is missing ("State the severity this alert fires at."), which the
+        // generic line cannot do. Authored in the automations app layer, never
+        // relayed.
+        graph_alert_incomplete: new Set(["reason"]),
         // `reason` is the sentence the agent test prefetch or the type check
         // wrote for this exact agent ("Only HTTP, code, workflow and connected
         // agents can be tested"). Authored in `agent-test-run.ts` and

@@ -164,6 +164,7 @@ describe("the shared webhook delivery log", () => {
   });
 
   describe("the retention sweep", () => {
+    /** @scenario "The delivery log is pruned after 30 days" */
     it("clears expired rows of BOTH channels in one pass", async () => {
       const now = new Date();
       const expired = new Date(

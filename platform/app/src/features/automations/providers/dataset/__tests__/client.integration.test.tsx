@@ -98,6 +98,7 @@ describe("dataset automation configuration", () => {
 
   describe("given the project has no dataset yet", () => {
     /** @scenario "Creating a dataset from the automation is offered and works" */
+    /** @scenario "Creating a dataset inline from a zero-dataset project" */
     it("navigates to the dataset drawer and keeps the automation draft", async () => {
       renderForm();
 
@@ -124,6 +125,7 @@ describe("dataset automation configuration", () => {
     });
 
     /** @scenario "Creating a dataset from the automation is offered and works" */
+    /** @scenario "Creating a dataset inline from a zero-dataset project" */
     it("selects the created dataset with a derived mapping and returns", async () => {
       const onChange = renderForm();
 

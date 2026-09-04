@@ -6,6 +6,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ViewAutomationDrawer } from "../ViewAutomationDrawer";
+import { fakeQuery } from "./viewDrawerTestKit";
 
 const HOUR_MS = 60 * 60 * 1000;
 const MINUTE_MS = 60 * 1000;
@@ -15,6 +16,11 @@ let mockRecentFires: Array<Record<string, unknown>> = [];
 const mockGraphRow: Record<string, unknown> | null = null;
 const mockDatasets: Array<Record<string, unknown>> = [];
 let mockWebhookDeliveries: Array<Record<string, unknown>> = [];
+let mockLatestEvaluation: Record<string, unknown> | null = null;
+let mockNextFiring: Record<string, unknown> | null = null;
+let mockMatchingTraces: Record<string, unknown> | undefined;
+let mockHasNextFirePage = false;
+const mockFetchNextFirePage = vi.fn();
 
 const { mockOpenDrawer, mockCloseDrawer } = vi.hoisted(() => ({
   mockOpenDrawer: vi.fn(),
@@ -46,47 +52,58 @@ vi.mock("~/components/automations/FilterDisplay", () => ({
   ),
 }));
 
+// The react-query stand-in contract lives once in the kit; the closures
+// below read it at render time, after every import has initialized.
 vi.mock("~/utils/api", () => ({
   api: {
     automation: {
       getTriggerById: {
-        useQuery: () => ({
-          data: mockTriggerRow,
-          isLoading: false,
-          error: null,
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery(mockTriggerRow, options),
+      },
+      getFireHistory: {
+        useInfiniteQuery: (
+          _input: unknown,
+          options?: { enabled?: boolean },
+        ) => ({
+          ...fakeQuery(
+            { pages: [{ fires: mockRecentFires, nextCursor: null }] },
+            options,
+          ),
+          hasNextPage: mockHasNextFirePage,
+          isFetchingNextPage: false,
+          fetchNextPage: mockFetchNextFirePage,
         }),
       },
-      getRecentFires: {
-        useQuery: () => ({
-          data: mockRecentFires,
-          isLoading: false,
-          error: null,
-        }),
+      getLatestEvaluation: {
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery(mockLatestEvaluation, options),
+      },
+      getNextFiring: {
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery(mockNextFiring, options),
       },
       getWebhookDeliveries: {
-        useQuery: () => ({
-          data: mockWebhookDeliveries,
-          isLoading: false,
-          error: null,
-        }),
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery(mockWebhookDeliveries, options),
       },
     },
     graphs: {
       getById: {
-        useQuery: () => ({
-          data: mockGraphRow,
-          isLoading: false,
-          error: null,
-        }),
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery(mockGraphRow, options),
       },
     },
     dataset: {
       getAll: {
-        useQuery: () => ({
-          data: mockDatasets,
-          isLoading: false,
-          error: null,
-        }),
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery(mockDatasets, options),
+      },
+    },
+    tracesV2: {
+      list: {
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) =>
+          fakeQuery(mockMatchingTraces, options),
       },
     },
   },
@@ -104,6 +121,10 @@ describe("ViewAutomationDrawer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockWebhookDeliveries = [];
+    mockLatestEvaluation = null;
+    mockNextFiring = { kind: "immediate", traceDebounceMs: 30_000 };
+    mockMatchingTraces = undefined;
+    mockHasNextFirePage = false;
   });
 
   afterEach(() => {
@@ -150,7 +171,10 @@ describe("ViewAutomationDrawer", () => {
         renderDrawer();
 
         expect(screen.getByText("p95 latency alert")).toBeDefined();
-        expect(screen.getByText("Alert")).toBeDefined();
+        // One noun for both subjects, so the badge says what it watches
+        // rather than naming a kind that no longer exists (ADR-093 §1).
+        expect(screen.getByText("Watches a graph")).toBeDefined();
+        expect(screen.queryByText("Alert")).toBeNull();
       });
 
       it("lists recent fires with resolution durations", () => {
@@ -158,7 +182,7 @@ describe("ViewAutomationDrawer", () => {
 
         // A resolved incident shows when it fired and how long it lasted.
         expect(
-          screen.getByText(/about 5 hours ago · lasted 15m/),
+          screen.getByText(/about 5 hours ago · lasted 15 minutes/),
         ).toBeDefined();
       });
 
@@ -242,6 +266,7 @@ describe("ViewAutomationDrawer", () => {
     });
 
     describe("when the user expands the attempt", () => {
+      /** @scenario "The recent deliveries list shows what the endpoint answered" */
       it("renders the response body and headers as literal text, not markup", async () => {
         renderDrawer();
 
@@ -290,7 +315,7 @@ describe("ViewAutomationDrawer", () => {
 
         renderDrawer();
 
-        expect(screen.getByText(/lasted 1h 30m/)).toBeDefined();
+        expect(screen.getByText(/lasted 1 hour 30 minutes/)).toBeDefined();
       });
     });
 
@@ -309,8 +334,118 @@ describe("ViewAutomationDrawer", () => {
 
         renderDrawer();
 
-        expect(screen.getByText(/lasted 2h$/)).toBeDefined();
+        expect(screen.getByText(/lasted 2 hours$/)).toBeDefined();
       });
+    });
+  });
+
+  describe("given a bot-delivery Slack automation with a channel", () => {
+    /** @scenario The automation view names its Slack destination */
+    it("names the delivery method and shows the destination channel", () => {
+      mockTriggerRow = {
+        id: "trigger_1",
+        name: "Errors to #ops",
+        action: "SEND_SLACK_MESSAGE",
+        customGraphId: null,
+        filters: "{}",
+        actionParams: {
+          slackDelivery: "bot",
+          slackChannelId: "C0123456",
+          slackBotTokenSet: true,
+        },
+      };
+      mockRecentFires = [];
+
+      renderDrawer();
+
+      // #6244: this used to read "Slack webhook" for every Slack
+      // automation, including bot deliveries that never carry a webhook at
+      // all.
+      expect(screen.getByText("Slack app · channel C0123456")).toBeDefined();
+      expect(screen.queryByText("Slack webhook")).toBeNull();
+    });
+  });
+
+  describe("given a bot-delivery Slack automation with no channel chosen yet", () => {
+    it("names the delivery method without inventing a channel", () => {
+      mockTriggerRow = {
+        id: "trigger_1",
+        name: "Draft Slack app automation",
+        action: "SEND_SLACK_MESSAGE",
+        customGraphId: null,
+        filters: "{}",
+        actionParams: {
+          slackDelivery: "bot",
+          slackBotTokenSet: true,
+        },
+      };
+      mockRecentFires = [];
+
+      renderDrawer();
+
+      expect(screen.getByText("Slack app")).toBeDefined();
+      expect(screen.queryByText(/channel/)).toBeNull();
+    });
+  });
+
+  describe("given a legacy Slack row saved before delivery method existed", () => {
+    it("falls back to webhook delivery and shows the masked URL on hover", async () => {
+      mockTriggerRow = {
+        id: "trigger_1",
+        name: "Old-style Slack automation",
+        action: "SEND_SLACK_MESSAGE",
+        customGraphId: null,
+        filters: "{}",
+        // No `slackDelivery` key at all — the shape every row saved before
+        // bot delivery existed actually has.
+        actionParams: {
+          slackWebhook: "https://hooks.slack.com/services/legacy",
+        },
+      };
+      mockRecentFires = [];
+
+      renderDrawer();
+
+      expect(screen.getByText("Slack webhook")).toBeDefined();
+      expect(screen.queryByText("Slack app")).toBeNull();
+      // The full URL genuinely shows on hover — asserted by hovering and
+      // reading the URL text, not by the shape of tooltip markup.
+      await userEvent.hover(screen.getByText("Slack webhook"));
+      expect(
+        await screen.findByText(
+          "https://hooks.slack.com/services/legacy",
+          undefined,
+          { timeout: 3000 },
+        ),
+      ).toBeDefined();
+    });
+  });
+
+  describe("given a Slack webhook row read through a redacting boundary", () => {
+    it("shows the masked label without rendering the placeholder as a URL", async () => {
+      mockTriggerRow = {
+        id: "trigger_1",
+        name: "Redacted webhook automation",
+        action: "SEND_SLACK_MESSAGE",
+        customGraphId: null,
+        filters: "{}",
+        actionParams: {
+          slackDelivery: "webhook",
+          // Not a real `https://hooks.slack.com/...` URL — stands in for
+          // whatever a redacting boundary substitutes for the secret.
+          slackWebhook: "[redacted]",
+        },
+      };
+      mockRecentFires = [];
+
+      renderDrawer();
+
+      expect(screen.getByText("Slack webhook")).toBeDefined();
+      // Never rendered as though `[redacted]` were a real, hoverable URL —
+      // hovering shows nothing, asserted on the text itself.
+      await userEvent.hover(screen.getByText("Slack webhook"));
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      expect(screen.queryByText("[redacted]")).toBeNull();
     });
   });
 
@@ -330,12 +465,12 @@ describe("ViewAutomationDrawer", () => {
     });
 
     describe("when the drawer renders", () => {
-      it("shows the automation kind badge and an empty fires state", () => {
+      it("shows what it watches and an empty history state", () => {
         renderDrawer();
 
-        expect(screen.getByText("Automation")).toBeDefined();
+        expect(screen.getByText("Watches a trace filter")).toBeDefined();
         expect(
-          screen.getByText("This automation has not fired yet."),
+          screen.getByText(/This automation has not fired yet\./),
         ).toBeDefined();
       });
     });

@@ -468,6 +468,7 @@ describe("filterBlockKit", () => {
   });
 
   describe("when a template's gated hero is filtered but a fallback follows", () => {
+    /** @scenario "An automation delivers through an incoming webhook" */
     it("degrades to the allowlisted fallback so the message is never empty", () => {
       const blocks = filterBlockKit([
         {

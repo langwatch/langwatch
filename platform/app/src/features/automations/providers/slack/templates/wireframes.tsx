@@ -1,4 +1,4 @@
-import { Box, HStack, Stack } from "@chakra-ui/react";
+import { Box, HStack, Stack, Text } from "@chakra-ui/react";
 
 type WireKind =
   | "header"
@@ -38,14 +38,39 @@ function AlertBanner({ palette }: { palette: "green" | "orange" | "red" }) {
   );
 }
 
+// Short, representative example strings so a wireframe reads as "a message
+// about a trace/alert" rather than a set of unlabeled bars. Real content
+// varies by template; these are illustrative filler, not any one template's
+// actual copy — the "structure, not final look" caption still applies.
+const EXAMPLE_HEADER = "🔴 High error rate";
+const EXAMPLE_CONTEXT = "12 traces · Answer Relevancy";
+const EXAMPLE_SECTION = "Input: What is the capital of France?";
+const EXAMPLE_BULLET = "trace_2x9f — score 0.42";
+const EXAMPLE_MD = "Score dropped to 0.42";
+const EXAMPLE_QUOTE = "The capital of France is Paris.";
+const EXAMPLE_FIELD_LABEL = "p95 latency";
+const EXAMPLE_FIELD_VALUE = "842 ms";
+
 function Wire({ kind }: { kind: WireKind }) {
   switch (kind) {
     case "header":
-      return <Box h="3" bg="fg" borderRadius="xs" w="80%" />;
+      return (
+        <Text textStyle="2xs" fontWeight="semibold" color="fg" truncate>
+          {EXAMPLE_HEADER}
+        </Text>
+      );
     case "context":
-      return <Box h="1.5" bg="fg.muted" borderRadius="xs" w="60%" />;
+      return (
+        <Text textStyle="2xs" color="fg.muted" truncate>
+          {EXAMPLE_CONTEXT}
+        </Text>
+      );
     case "section":
-      return <Box h="2.5" bg="fg.muted" borderRadius="xs" w="90%" />;
+      return (
+        <Text textStyle="2xs" color="fg.muted" truncate>
+          {EXAMPLE_SECTION}
+        </Text>
+      );
     case "bullet":
       // One matched trace inside a digest — dot + line so the repeated
       // rows read as a list of traces, not paragraphs of one message.
@@ -58,27 +83,37 @@ function Wire({ kind }: { kind: WireKind }) {
             borderRadius="full"
             flexShrink={0}
           />
-          <Box h="2" bg="fg.muted" borderRadius="xs" flex="1" />
+          <Text textStyle="2xs" color="fg.muted" truncate flex="1">
+            {EXAMPLE_BULLET}
+          </Text>
         </HStack>
       );
     case "md":
       return (
         <Box
-          h="4"
           bg="blue.subtle"
           borderLeftWidth="2px"
           borderLeftColor="blue.fg"
           borderRadius="xs"
           w="full"
-        />
+          px="1"
+        >
+          <Text textStyle="2xs" color="blue.fg" fontWeight="medium" truncate>
+            {EXAMPLE_MD}
+          </Text>
+        </Box>
       );
     case "fields":
       // A two-column section (Slack `fields`) — label/value pairs sitting
       // side by side, as the alert templates use for Metric / Condition.
       return (
         <HStack gap="2" w="full">
-          <Box h="2.5" bg="fg.muted" borderRadius="xs" flex="1" />
-          <Box h="2.5" bg="fg.muted" borderRadius="xs" flex="1" />
+          <Text textStyle="2xs" color="fg.muted" truncate flex="1">
+            {EXAMPLE_FIELD_LABEL}
+          </Text>
+          <Text textStyle="2xs" color="fg.muted" truncate flex="1">
+            {EXAMPLE_FIELD_VALUE}
+          </Text>
         </HStack>
       );
     case "spark":
@@ -101,7 +136,9 @@ function Wire({ kind }: { kind: WireKind }) {
           pl="1.5"
           w="full"
         >
-          <Box h="3" bg="fg.muted" borderRadius="xs" w="85%" />
+          <Text textStyle="2xs" color="fg.muted" truncate>
+            {EXAMPLE_QUOTE}
+          </Text>
         </Box>
       );
     case "table":
@@ -190,7 +227,9 @@ function Wire({ kind }: { kind: WireKind }) {
 
 function WireStack({ rows }: { rows: WireKind[] }) {
   return (
-    <Stack gap="1.5" align="stretch">
+    // Illustrative filler, not content — hidden from assistive technology so
+    // a screen reader hears the layout's name and description, not fake data.
+    <Stack gap="1.5" align="stretch" aria-hidden="true">
       {rows.map((kind, i) => (
         <Wire key={i} kind={kind} />
       ))}

@@ -1,6 +1,7 @@
 import {
   CADENCE_WINDOW_MS,
   NOTIFICATION_CADENCES,
+  type NotificationCadence,
 } from "@langwatch/automations/cadences";
 import { describe, expect, it, vi } from "vitest";
 import { TriggerAction, TriggerKind } from "~/generated/prisma/client";
@@ -139,6 +140,18 @@ describe("computeScheduledFor", () => {
         computeScheduledFor({
           action: TriggerAction.SEND_SLACK_MESSAGE,
           cadence: "immediate",
+          now,
+        }),
+      ).toEqual(now);
+    });
+  });
+
+  describe("when the stored cadence is one this build does not know", () => {
+    it("degrades to immediate rather than scheduling for NaN", () => {
+      expect(
+        computeScheduledFor({
+          action: TriggerAction.SEND_SLACK_MESSAGE,
+          cadence: "someday_digest" as NotificationCadence,
           now,
         }),
       ).toEqual(now);

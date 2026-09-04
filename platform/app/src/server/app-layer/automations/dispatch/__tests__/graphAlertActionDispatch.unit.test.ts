@@ -603,6 +603,32 @@ describe("dispatchGraphAlertAction", () => {
       expect(call.token).toBe("xoxb-1");
       expect(call.channel).toBe("C123");
     });
+
+    /** @scenario "A bot-token delivery posts Block Kit" */
+    it("renders the payload as Block Kit blocks when no template type is configured", async () => {
+      const { deps, sendSlackBot } = makeDeps();
+      // `makeTrigger`'s default `slackTemplateType` is null — the author never
+      // customised the message. A bot connection must still resolve to the
+      // Block Kit default (ADR-041), never the legacy plain-text builder.
+      await dispatchGraphAlertAction({
+        deps,
+        input: {
+          trigger: makeTrigger({
+            action: TriggerAction.SEND_SLACK_MESSAGE,
+            slackTemplateType: null,
+          }),
+          project: makeProject(),
+          context: makeContext(),
+          recipients: [],
+          slackWebhook: null,
+          botDestination: { token: "xoxb-1", channel: "C123" },
+          fireDigest: FIRE_DIGEST,
+        },
+      });
+
+      const call = sendSlackBot.mock.calls[0]?.[0] as { payload: unknown };
+      expect(call.payload).toHaveProperty("blocks");
+    });
   });
 
   // Regression (dispatch5015-P1, Finding 4): the graph-alert incident row is
@@ -720,6 +746,7 @@ describe("dispatchGraphAlertAction", () => {
         actionParams: { url: "https://example.com/hook", method: "POST" },
       });
 
+    /** @scenario "A JSON body is checked and sent as JSON" */
     it("renders the alert body and sends it to the configured URL", async () => {
       const { deps, sendWebhook, sendEmail, sendSlack } = makeDeps();
       const result = await dispatchGraphAlertAction({
@@ -742,10 +769,48 @@ describe("dispatchGraphAlertAction", () => {
       const call = sendWebhook.mock.calls[0]?.[0] as {
         url: string;
         body: string;
+        contentType?: string;
       };
       expect(call.url).toBe("https://example.com/hook");
       const body = JSON.parse(call.body) as { event: string };
       expect(body.event).toBe("alert.fired");
+      // A row saved before content types existed states none, and still sends
+      // JSON, announced as JSON.
+      expect(call.contentType).toBe("application/json");
+    });
+
+    describe("when the alert declares a plain-text Content-Type", () => {
+      /** @scenario "A plain-text body is sent exactly as it renders" */
+      it("sends the rendered template verbatim, announced as text", async () => {
+        const { deps, sendWebhook } = makeDeps();
+
+        await dispatchGraphAlertAction({
+          deps,
+          input: {
+            trigger: makeTrigger({
+              action: TriggerAction.SEND_WEBHOOK,
+              actionParams: {
+                url: "https://example.com/hook",
+                method: "POST",
+                contentType: "text/plain; charset=utf-8",
+                bodyTemplate: "ALERT {{ trigger.name }}",
+              },
+            }),
+            project: makeProject(),
+            context: makeContext(),
+            recipients: [],
+            slackWebhook: null,
+            fireDigest: FIRE_DIGEST,
+          },
+        });
+
+        const call = sendWebhook.mock.calls[0]?.[0] as {
+          body: string;
+          contentType?: string;
+        };
+        expect(call.body).toBe("ALERT High latency");
+        expect(call.contentType).toBe("text/plain; charset=utf-8");
+      });
     });
 
     describe("when header secrets are stored encrypted", () => {
@@ -821,6 +886,7 @@ describe("dispatchGraphAlertAction", () => {
     });
 
     describe("when the same fire is retried after a successful post", () => {
+      /** @scenario "A retry of a graph alert does not re-send to an endpoint already reached" */
       it("does not re-post to an endpoint already reached", async () => {
         const { deps, sendWebhook } = makeDeps();
         const input = {

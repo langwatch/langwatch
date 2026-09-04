@@ -39,17 +39,21 @@ export const liveTriggerNotifier: TriggerNotifier = {
     headers,
     signingSecrets,
     body,
+    contentType,
     triggerName,
   }) {
     // The full SSRF-fenced sender — same path a real fire takes — with the
     // non-suppressible test-fire marker header (ADR-040 §1). Non-2xx throws
     // the classified DispatchError so the author sees what the endpoint said.
+    // `contentType` travels with the body: a test fire that announced JSON for
+    // a plain-text automation would answer a question the author did not ask.
     const result = await sendWebhook({
       url,
       method,
       headers,
       signingSecrets,
       body,
+      contentType,
       triggerName,
       testFire: true,
     });

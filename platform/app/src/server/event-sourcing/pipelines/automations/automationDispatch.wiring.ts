@@ -1,3 +1,4 @@
+import type { SlackActionParams } from "@langwatch/automations/providers/slack";
 import { Cluster, type Redis } from "ioredis";
 import { env } from "~/env.mjs";
 import type { PrismaClient } from "~/generated/prisma/client";
@@ -32,7 +33,12 @@ import {
 import { PrismaGraphTriggerSentRepository } from "~/server/app-layer/automations/repositories/trigger.prisma.repository";
 import { defaultRunawayContainmentDeps } from "~/server/app-layer/automations/runaway-containment.deps";
 import { handlePersistCapBreach } from "~/server/app-layer/automations/runaway-containment.service";
+import {
+  findSlackBotToken,
+  slackProjectTokenReader,
+} from "~/server/app-layer/automations/slack-integration/slack-token-resolver";
 import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
+import { createTriggerLatestEvaluationService } from "~/server/app-layer/automations/trigger-latest-evaluation.wiring";
 import { WebhookDeliveryService } from "~/server/app-layer/automations/webhook-delivery.service";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
@@ -152,6 +158,19 @@ export function buildAutomationDispatchPorts({
   // prisma — same query shape, service/repository layering (no direct
   // prisma in composition-root closures).
   const customGraphs = AutomationCustomGraphService.create(prisma);
+  // ADR-093 §5: one resolver in front of every Slack dispatch — the
+  // automation's own stored token first, the project's Slack integration
+  // second. Built once here so the digest path and the graph-alert path can
+  // never disagree about which token a delivery uses.
+  const slackIntegration = slackProjectTokenReader(prisma);
+  const resolveSlackToken = (params: {
+    projectId: string;
+    actionParams: Pick<SlackActionParams, "slackBotToken">;
+  }) => findSlackBotToken({ ...params, projectIntegration: slackIntegration });
+  // What each check observed, so the automation's view can explain a quiet
+  // alert. The service swallows its own write failures — an alert must never
+  // go unsent because its observation could not be recorded.
+  const latestEvaluations = createTriggerLatestEvaluationService(prisma);
   const graphTriggerEvalDeps: GraphTriggerEvaluationDeps = {
     loadTrigger: async ({ triggerId, projectId }) =>
       triggers.getById({ triggerId, projectId }),
@@ -163,6 +182,8 @@ export function buildAutomationDispatchPorts({
     triggerSent: graphTriggerSentRepo,
     updateLastRunAt: async ({ triggerId, projectId }) =>
       triggers.updateLastRunAt(triggerId, projectId),
+    recordEvaluation: async (input) => latestEvaluations.record(input),
+    resolveSlackToken,
     notifier: {
       dispatch: async (input) =>
         dispatchGraphAlertAction({
@@ -287,6 +308,7 @@ export function buildAutomationDispatchPorts({
       await createManyDatasetRecords(params);
     },
     recordWebhookDelivery,
+    resolveSlackToken,
     resolvePersistDailyCap: (projectId) => resolvePersistDailyCap(projectId),
     consumePersistCapSlot: (params) =>
       consumePersistCapSlot({ ...params, redis }),

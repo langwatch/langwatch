@@ -18,10 +18,12 @@ const BASE = {
   url: "https://example.com/hook",
   method: "POST" as const,
   bodyTemplate: null,
+  contentType: "application/json",
 };
 
 describe("persistWebhookActionParams", () => {
   describe("when all header values are freshly typed", () => {
+    /** @scenario "Header values are stored encrypted at rest" */
     it("encrypts the record and drops the plaintext", () => {
       const stored = persistWebhookActionParams({
         incoming: { ...BASE, headers: { Authorization: "Bearer secret" } },
@@ -57,6 +59,7 @@ describe("persistWebhookActionParams", () => {
       });
     });
 
+    /** @scenario "Renaming a saved header requires re-entering its value" */
     it("drops a kept value whose name has no stored counterpart", () => {
       const stored = persistWebhookActionParams({
         incoming: {

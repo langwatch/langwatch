@@ -1,8 +1,16 @@
+import { describe, expect, it, vi } from "vitest";
+
+// Fake cipher so a bot-connection fixture can carry a "decryptable" token
+// without exercising AES — mirrors providers/slack/__tests__/secret.unit.test.ts.
+vi.mock("~/utils/encryption", () => ({
+  encrypt: (s: string) => `enc(${s})`,
+  decrypt: (s: string) => s.replace(/^enc\(/, "").replace(/\)$/, ""),
+}));
+
 import type {
   ReportChart,
   ReportTraceRow,
 } from "@langwatch/automations/templating/templateContext";
-import { describe, expect, it, vi } from "vitest";
 import type { Project, Trigger } from "~/generated/prisma/client";
 import { TriggerAction, TriggerKind } from "~/generated/prisma/client";
 import type { ScheduledJobFire } from "~/server/app-layer/scheduler/scheduler.types";
@@ -115,6 +123,16 @@ function makeDeps(
       sendSlack: sendSlack as unknown as ReportDispatchDeps["sendSlack"],
       sendSlackBot:
         sendSlackBot as unknown as ReportDispatchDeps["sendSlackBot"],
+      // The production resolver's own-token-first shape over the fake
+      // cipher: a stored ciphertext resolves, nothing else does.
+      resolveSlackToken: vi.fn(async ({ actionParams }) => {
+        const stored = actionParams.slackBotToken;
+        if (!stored) return null;
+        return {
+          token: stored.replace(/^enc\(/, "").replace(/\)$/, ""),
+          source: "automation" as const,
+        };
+      }),
       filterSuppressedRecipients: vi.fn(async ({ emails }) => emails),
       listReportTraces:
         listReportTraces as unknown as ReportDispatchDeps["listReportTraces"],
@@ -213,6 +231,75 @@ describe("dispatchScheduledReport", () => {
       const payload = JSON.stringify(sendSlack.mock.calls[0]![0].payload);
       expect(payload).toContain("Weekly errors");
       expect(payload).toContain("/acme/traces");
+    });
+
+    // A bot connection posts via the Web API — same ADR-041 rule the trace
+    // and graph-alert dispatch paths follow: an author who never customised
+    // the message still gets the rich layout, never the plain-text builder.
+    it("posts the framework default as Block Kit blocks over a bot connection", async () => {
+      const { deps, sendSlack, sendSlackBot } = makeDeps(
+        makeReportTrigger({
+          actionParams: {
+            source: { kind: "traceQuery", filters: {}, topN: 5 },
+            schedule: { cron: "0 9 * * 1", timezone: "UTC" },
+            slackDelivery: "bot",
+            slackChannelId: "C123",
+            slackBotToken: "enc(xoxb-live)",
+          },
+        }),
+      );
+      await dispatchScheduledReport({ deps, fire });
+      expect(sendSlack).not.toHaveBeenCalled();
+      expect(sendSlackBot).toHaveBeenCalledTimes(1);
+      const call = sendSlackBot.mock.calls[0]![0] as {
+        token: string;
+        channel: string;
+        payload: { text: string } | { blocks: unknown[] };
+      };
+      expect(call.token).toBe("xoxb-live");
+      expect(call.channel).toBe("C123");
+      expect("blocks" in call.payload).toBe(true);
+    });
+
+    it("sends nothing and records no fire when no token resolves", async () => {
+      const { deps, sendSlack, sendSlackBot, recordFire } = makeDeps(
+        makeReportTrigger({
+          actionParams: {
+            source: { kind: "traceQuery", filters: {}, topN: 5 },
+            schedule: { cron: "0 9 * * 1", timezone: "UTC" },
+            slackDelivery: "bot",
+            slackChannelId: "C123",
+          },
+        }),
+      );
+
+      await dispatchScheduledReport({ deps, fire });
+
+      expect(sendSlackBot).not.toHaveBeenCalled();
+      expect(sendSlack).not.toHaveBeenCalled();
+      expect(recordFire).not.toHaveBeenCalled();
+    });
+
+    it("sends nothing and records no fire when the channel is blank", async () => {
+      const { deps, sendSlack, sendSlackBot, recordFire } = makeDeps(
+        makeReportTrigger({
+          actionParams: {
+            source: { kind: "traceQuery", filters: {}, topN: 5 },
+            schedule: { cron: "0 9 * * 1", timezone: "UTC" },
+            slackDelivery: "bot",
+            slackBotToken: "enc(xoxb-live)",
+            // Whitespace, not absent: an omitted field is falsy on its own,
+            // so only this pins the `.trim()` the guard is written around.
+            slackChannelId: "   ",
+          },
+        }),
+      );
+
+      await dispatchScheduledReport({ deps, fire });
+
+      expect(sendSlackBot).not.toHaveBeenCalled();
+      expect(sendSlack).not.toHaveBeenCalled();
+      expect(recordFire).not.toHaveBeenCalled();
     });
   });
 
@@ -350,6 +437,24 @@ describe("dispatchScheduledReport", () => {
       });
       expect(sendSlack).toHaveBeenCalledTimes(1);
     });
+
+    it("links to the graph itself, not the generic analytics page", async () => {
+      const { deps, sendSlack } = makeDeps(
+        makeReportTrigger({
+          actionParams: {
+            source: { kind: "customGraph", customGraphId: "graph-9" },
+            schedule: { cron: "0 7 * * *", timezone: "UTC" },
+            slackWebhook: "https://hooks.slack.com/services/x",
+          },
+        } as Partial<Trigger>),
+        { charts: [makeChart()] },
+      );
+
+      await dispatchScheduledReport({ deps, fire });
+
+      const payload = JSON.stringify(sendSlack.mock.calls[0]![0].payload);
+      expect(payload).toContain("/acme/analytics/custom/graph-9");
+    });
   });
 
   describe("given a dashboard report is due", () => {
@@ -371,6 +476,28 @@ describe("dispatchScheduledReport", () => {
         kind: "dashboard",
         dashboardId: "dash-1",
       });
+    });
+
+    // B5.1 regression: the dashboard branch used to drop `source.dashboardId`
+    // entirely and link to the generic, dashboard-less `/analytics` route.
+    /** @scenario "The delivered report links to its own dashboard" */
+    it("links to its own dashboard, not the generic analytics page", async () => {
+      const { deps, sendSlack } = makeDeps(
+        makeReportTrigger({
+          actionParams: {
+            source: { kind: "dashboard", dashboardId: "dash-1" },
+            schedule: { cron: "0 7 * * *", timezone: "UTC" },
+            slackWebhook: "https://hooks.slack.com/services/x",
+          },
+        } as Partial<Trigger>),
+        { charts: [makeChart()] },
+      );
+
+      await dispatchScheduledReport({ deps, fire });
+
+      const payload = JSON.stringify(sendSlack.mock.calls[0]![0].payload);
+      expect(payload).toContain("/acme/analytics/reports?dashboard=dash-1");
+      expect(payload).not.toMatch(/"[^"]*\/acme\/analytics"/);
     });
   });
 

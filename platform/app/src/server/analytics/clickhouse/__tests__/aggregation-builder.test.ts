@@ -849,6 +849,277 @@ describe("aggregation-builder", () => {
       });
     });
 
+    // @regression issue #6718: two series differing only by their `filters`
+    // compiled to byte-identical SQL, because the per-series loop passed only
+    // metric/aggregation/key/subkey on and the only filter translation was the
+    // graph-wide one. An "errors" series and a "no errors" series therefore
+    // drew the same line, and every alert on a filtered series watched the
+    // wrong number.
+    describe("when a series carries its own filters", () => {
+      const errorSeries = ({
+        values,
+        isPercent,
+      }: {
+        values: string[];
+        isPercent?: boolean;
+      }) => ({
+        metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
+        aggregation: "cardinality" as const,
+        filters: { "traces.error": values },
+        ...(isPercent === undefined ? {} : { asPercent: isPercent }),
+      });
+
+      // @scenario "Two series that differ only by their filters produce different queries"
+      it("compiles opposite error filters to different aggregate expressions", () => {
+        const result = buildTimeseriesQuery({
+          ...baseInput,
+          series: [
+            errorSeries({ values: ["true"] }),
+            errorSeries({ values: ["false"] }),
+          ],
+        });
+
+        expect(result.sql).toContain(
+          "uniqIf(ts.TraceId, ((ts.ContainsErrorStatus = 1)))",
+        );
+        expect(result.sql).toContain(
+          "uniqIf(ts.TraceId, (((ts.ContainsErrorStatus = 0 OR ts.ContainsErrorStatus IS NULL))))",
+        );
+      });
+
+      it("keeps the graph-wide WHERE free of the per-series predicate", () => {
+        const result = buildTimeseriesQuery({
+          ...baseInput,
+          series: [errorSeries({ values: ["true"] })],
+        });
+
+        // The predicate belongs to one series; putting it in the WHERE would
+        // narrow every other series in the same graph. Slice every WHERE
+        // clause (up to its GROUP BY) rather than matching one formatting of
+        // the predicate, so a re-parenthesised or re-wrapped leak still fails.
+        const whereClauses = [
+          ...result.sql.matchAll(/WHERE([\s\S]*?)GROUP BY/g),
+        ].map((match) => match[1]);
+        expect(whereClauses.length).toBeGreaterThan(0);
+        for (const clause of whereClauses) {
+          expect(clause).not.toContain("ContainsErrorStatus");
+        }
+      });
+
+      it("keeps the column the predicate reads in the deduped trace subquery", () => {
+        const result = buildTimeseriesQuery({
+          ...baseInput,
+          series: [errorSeries({ values: ["true"] })],
+        });
+
+        expect(result.sql).toMatch(
+          /SELECT [^\n]*ContainsErrorStatus[^\n]*FROM trace_summaries/,
+        );
+      });
+
+      it("parameterizes a span filter and scopes it to its own series", () => {
+        const result = buildTimeseriesQuery({
+          ...baseInput,
+          series: [
+            {
+              metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
+              aggregation: "cardinality" as const,
+              filters: { "spans.type": ["llm"] },
+            },
+            {
+              metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
+              aggregation: "cardinality" as const,
+            },
+          ],
+        });
+
+        expect(result.sql).toMatch(
+          /uniqIf\(ts\.TraceId, \(\(ts\.TraceId IN \(\s*SELECT TraceId FROM stored_spans/,
+        );
+        expect(result.sql).toContain("uniq(ts.TraceId) AS 1__");
+        expect(Object.keys(result.params)).toContain("spanTypes_0");
+      });
+
+      it("hoists the predicate into the CTE on the grouped path", () => {
+        const result = buildTimeseriesQuery({
+          ...baseInput,
+          groupBy: "metadata.labels" as const,
+          series: [errorSeries({ values: ["true"] })],
+        });
+
+        expect(result.sql).toContain(
+          "ts.ContainsErrorStatus = 1) AS series_filter_0",
+        );
+        expect(result.sql).toContain(
+          "uniqExactIf(trace_id, (series_filter_0))",
+        );
+      });
+
+      it("narrows a per-entity series inside its own subquery instead", () => {
+        const result = buildTimeseriesQuery({
+          ...baseInput,
+          timeScale: "full" as const,
+          series: [
+            {
+              metric: "performance.total_cost" as FlattenAnalyticsMetricsEnum,
+              aggregation: "sum" as const,
+              pipeline: {
+                field: "user_id" as const,
+                aggregation: "avg" as const,
+              },
+              filters: { "traces.error": ["true"] },
+            },
+          ],
+        });
+
+        // A per-entity average has to lose the non-matching entities entirely,
+        // not keep them as zeros — so the filter goes in that metric's own scan.
+        expect(result.sql).toContain("AND ((ts.ContainsErrorStatus = 1))");
+      });
+
+      // ClickHouse's `-If` combinators do NOT return NULL for an empty match
+      // set when the source column is non-nullable — `minIf` returns 0. A
+      // filtered latency floor would then draw a real-looking 0ms line for
+      // every bucket the filter excluded, where the row parser and ES both
+      // leave a non-additive series absent.
+      describe("when the aggregation is not additive", () => {
+        it("reports no value instead of zero for a bucket nothing matched", () => {
+          const result = buildTimeseriesQuery({
+            ...baseInput,
+            series: [
+              {
+                metric:
+                  "performance.completion_time" as FlattenAnalyticsMetricsEnum,
+                aggregation: "min" as const,
+                filters: { "traces.error": ["true"] },
+              },
+            ],
+          });
+
+          expect(result.sql).toContain(
+            "if(countIf((ts.ContainsErrorStatus = 1)) > 0, min",
+          );
+          expect(result.sql).toContain(", NULL) AS 0__");
+        });
+
+        it("leaves an additive aggregation unguarded, because zero is the truth there", () => {
+          const result = buildTimeseriesQuery({
+            ...baseInput,
+            series: [errorSeries({ values: ["true"] })],
+          });
+
+          expect(result.sql).not.toContain("NULL) AS 0__");
+        });
+      });
+
+      describe("when the series is also shown as a percentage", () => {
+        // @scenario "Percentage mode on an unfiltered series leaves the series unchanged"
+        it("leaves an unfiltered series exactly as it was", () => {
+          const withPercent = buildTimeseriesQuery({
+            ...baseInput,
+            series: [
+              {
+                metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
+                aggregation: "cardinality" as const,
+                asPercent: true,
+              },
+            ],
+          });
+          resetParamCounter();
+          const without = buildTimeseriesQuery(baseInput);
+
+          expect(withPercent.sql).toBe(without.sql);
+        });
+
+        it("divides the filtered aggregate by the unfiltered one", () => {
+          const result = buildTimeseriesQuery({
+            ...baseInput,
+            series: [errorSeries({ values: ["true"], isPercent: true })],
+          });
+
+          expect(result.sql).toContain(
+            "if(uniq(ts.TraceId) > 0, (uniqIf(ts.TraceId, ((ts.ContainsErrorStatus = 1)))) / (uniq(ts.TraceId)) * 100, 0)",
+          );
+        });
+
+        it("guards a non-additive percentage the same way as its plain series", () => {
+          const result = buildTimeseriesQuery({
+            ...baseInput,
+            series: [
+              {
+                metric:
+                  "performance.completion_time" as FlattenAnalyticsMetricsEnum,
+                aggregation: "min" as const,
+                filters: { "traces.error": ["true"] },
+                asPercent: true,
+              },
+            ],
+          });
+
+          // `minIf` over an empty match set returns 0 on a non-nullable
+          // column, so the unguarded ratio would report a real-looking 0%
+          // for a bucket the filter excluded.
+          expect(result.sql).toContain(
+            "if(countIf((ts.ContainsErrorStatus = 1)) > 0, if(min",
+          );
+          expect(result.sql).toContain(", NULL) AS 0__");
+        });
+
+        // @scenario "A percentage on a per-entity average is refused rather than answered wrongly"
+        it("refuses a percentage on a per-entity series", () => {
+          expect(() =>
+            buildTimeseriesQuery({
+              ...baseInput,
+              series: [
+                {
+                  metric:
+                    "performance.total_cost" as FlattenAnalyticsMetricsEnum,
+                  aggregation: "sum" as const,
+                  pipeline: {
+                    field: "user_id" as const,
+                    aggregation: "avg" as const,
+                  },
+                  filters: { "traces.error": ["true"] },
+                  asPercent: true,
+                },
+              ],
+            }),
+          ).toThrowError(
+            expect.objectContaining({
+              code: "analytics_series_percentage_unsupported",
+            }),
+          );
+        });
+      });
+    });
+
+    // @regression issue #6718: grouping by error status read the SPAN-level
+    // StatusCode through a stored_spans JOIN, so a trace with one failing span
+    // and several healthy ones landed in BOTH buckets and the buckets could not
+    // add up to the total. Error status is a trace-level fact.
+    describe("when grouping by error status", () => {
+      it("groups on the trace-level error column", () => {
+        const result = buildTimeseriesQuery({
+          ...baseInput,
+          groupBy: "error.has_error" as const,
+        });
+
+        expect(result.sql).toContain(
+          "if(ifNull(ts.ContainsErrorStatus, 0) = 1, 'with error', 'without error')",
+        );
+        expect(result.sql).not.toContain("StatusCode");
+      });
+
+      it("stops joining stored_spans for a column the trace already carries", () => {
+        const result = buildTimeseriesQuery({
+          ...baseInput,
+          groupBy: "error.has_error" as const,
+        });
+
+        expect(result.sql).not.toContain("FROM stored_spans");
+      });
+    });
+
     describe("when timeScale is full with groupBy", () => {
       // @regression issue #2644: Summary charts with groupBy render blank because
       // buildSubqueryTimeseriesQuery never includes group_key in SELECT, GROUP BY,

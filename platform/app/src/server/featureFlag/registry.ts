@@ -382,13 +382,9 @@ export const FEATURE_FLAGS = [
     description:
       "Lets somebody with a verified company address find the organization their colleagues are already in and ask to join it, and lets an administrator turn that into automatic joining for a domain they name (spec: specs/identity/join-requests.feature, join-matching-and-privacy.feature, domain-auto-join.feature, join-before-create.feature). Off = the sign-up interstitial never renders, the members area shows no requests section, the lookup answers nothing to everyone, and no join command is ever dispatched. This is the whole of the rollback. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=join_requests, or set JOIN_REQUESTS=1 on a deployment.",
   },
-  {
-    key: "release_webhook_automations",
-    scope: "PRODUCT",
-    defaultValue: false,
-    description:
-      "Offers the Webhook (generic HTTP request) delivery channel for automations (ADR-040). Gates the delivery-picker card, the save route accepting SEND_WEBHOOK, and the test-fire path. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_webhook_automations.",
-  },
+  // NOTE: `release_webhook_automations` (ADR-040) was retired — the webhook
+  // delivery channel is offered to every project, so there is no picker card,
+  // save route, or test-fire path left to gate.
 ] as const satisfies readonly FeatureFlagDefinition[];
 
 export const FEATURE_FLAG_FAMILIES = [

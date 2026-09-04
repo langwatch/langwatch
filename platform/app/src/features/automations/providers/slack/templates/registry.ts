@@ -120,7 +120,7 @@ export interface SlackBlockKitTemplateOption {
 export const SLACK_BLOCK_KIT_TEMPLATES: SlackBlockKitTemplateOption[] = [
   {
     id: "trace_alert_compact",
-    displayName: "Compact alert",
+    displayName: "Compact notice",
     emoji: "🔔",
     tagline:
       "Header and evaluation, then the trace's input and output as quoted text.",
@@ -233,11 +233,11 @@ export const SLACK_BLOCK_KIT_TEMPLATES: SlackBlockKitTemplateOption[] = [
   },
   {
     id: "graph_alert_compact",
-    displayName: "Alert — compact",
+    displayName: "Metric — compact",
     emoji: "🚨",
     tagline:
       "Metric, condition, and current value as fields, with a trend line.",
-    deliveryNote: "1 message per alert",
+    deliveryNote: "1 message per firing",
     cadenceFit: "immediate",
     kind: "graphAlert",
     source: graphAlertCompactSource,
@@ -245,11 +245,11 @@ export const SLACK_BLOCK_KIT_TEMPLATES: SlackBlockKitTemplateOption[] = [
   },
   {
     id: "graph_alert_detailed",
-    displayName: "Alert — detailed",
+    displayName: "Metric — detailed",
     emoji: "📈",
     tagline:
       "A chart of the metric's recent values with the breach in context.",
-    deliveryNote: "1 message per alert",
+    deliveryNote: "1 message per firing",
     cadenceFit: "immediate",
     kind: "graphAlert",
     gatedBlock: "data_visualization",
@@ -261,7 +261,7 @@ export const SLACK_BLOCK_KIT_TEMPLATES: SlackBlockKitTemplateOption[] = [
     displayName: "One-liner",
     emoji: "⚡",
     tagline: "A single line: severity, metric, threshold, current value, link.",
-    deliveryNote: "1 message per alert",
+    deliveryNote: "1 message per firing",
     cadenceFit: "immediate",
     kind: "graphAlert",
     source: graphAlertOneLinerSource,
@@ -273,7 +273,7 @@ export const SLACK_BLOCK_KIT_TEMPLATES: SlackBlockKitTemplateOption[] = [
     emoji: "✅",
     tagline:
       "A recovery banner when the metric is back within threshold, with a was to now value.",
-    deliveryNote: "1 message per alert",
+    deliveryNote: "1 message per firing",
     cadenceFit: "immediate",
     kind: "graphAlert",
     gatedBlock: "alert",
@@ -286,7 +286,7 @@ export const SLACK_BLOCK_KIT_TEMPLATES: SlackBlockKitTemplateOption[] = [
     emoji: "🔇",
     tagline:
       "A no-data banner for heartbeat monitors, framing a silent metric as missing data.",
-    deliveryNote: "1 message per alert",
+    deliveryNote: "1 message per firing",
     cadenceFit: "immediate",
     kind: "graphAlert",
     gatedBlock: "alert",
@@ -299,7 +299,7 @@ export const SLACK_BLOCK_KIT_TEMPLATES: SlackBlockKitTemplateOption[] = [
     emoji: "🗓️",
     tagline:
       "The metric's recent values as a Time and Value grid instead of a sparkline.",
-    deliveryNote: "1 message per alert",
+    deliveryNote: "1 message per firing",
     cadenceFit: "immediate",
     kind: "graphAlert",
     gatedBlock: "data_table",

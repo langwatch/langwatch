@@ -77,6 +77,7 @@ import { secretsRouter } from "./routers/secrets";
 import { setupSkillsRouter } from "./routers/setupSkills";
 import { shareRouter } from "./routers/share";
 import { sharedTraceRouter } from "./routers/sharedTrace";
+import { slackIntegrationRouter } from "./routers/slackIntegration";
 import { spansRouter } from "./routers/spans";
 import { ssoConnectionsRouter } from "./routers/ssoConnections";
 import { storedObjectsRouter } from "./routers/stored-objects.router";
@@ -183,6 +184,7 @@ const coreRouters = {
   gatewaySpendEvents: gatewaySpendEventsRouter,
   webhookEndpoints: webhookEndpointsRouter,
   github: githubRouter,
+  slackIntegration: slackIntegrationRouter,
   langyEgress: langyEgressRouter,
   langy: langyRouter,
 };

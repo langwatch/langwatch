@@ -63,6 +63,10 @@ vi.mock("~/utils/api", () => ({
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
     organization: { id: "org-1", name: "Acme Corp" },
+    // The page reads permissions per card now (the Slack card is
+    // project-scoped); with no session project the Slack card renders its
+    // pick-a-project state and issues no queries.
+    hasPermission: () => true,
   }),
 }));
 

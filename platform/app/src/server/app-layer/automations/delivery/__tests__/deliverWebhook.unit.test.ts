@@ -31,6 +31,7 @@ function sendResolvingWith(
 
 describe("deliverWebhook", () => {
   describe("when the endpoint answers 2xx", () => {
+    /** @scenario "Each attempt is recorded with its outcome" */
     it("records a success row with the eventId as dispatchId", async () => {
       const rows: WebhookDeliveryInput[] = [];
       await deliverWebhook({
@@ -51,6 +52,7 @@ describe("deliverWebhook", () => {
       expect(rows[0]!.latencyMs).toBeGreaterThanOrEqual(0);
     });
 
+    /** @scenario "The delivery log never stores request content" */
     it("stores no request content — URL, headers, and body never persist", async () => {
       const rows: WebhookDeliveryInput[] = [];
       await deliverWebhook({
@@ -92,6 +94,7 @@ describe("deliverWebhook", () => {
       expect(JSON.stringify(rows[0])).not.toContain("Bearer secret");
     });
 
+    /** @scenario "A failed attempt keeps the receiver's response for debugging" */
     it("stores the receiver's response verbatim, even when it echoes a configured header value", async () => {
       const rows: WebhookDeliveryInput[] = [];
       await expect(
@@ -107,9 +110,11 @@ describe("deliverWebhook", () => {
           },
         }),
       ).rejects.toBeInstanceOf(DispatchError);
-      // ADR-040 §6: no redaction of the receiver's output — what they echo
-      // is their own response, stored as-is (truncated) so operators see
-      // exactly what the endpoint said. Only our REQUEST is never stored.
+      // ADR-040 §6: what the receiver ECHOES is their own response, stored
+      // as-is (truncated) so operators see exactly what the endpoint said —
+      // only our REQUEST is never stored, and only the standard
+      // credential-bearing response headers (set-cookie, www-authenticate…)
+      // are masked at capture, a layer below this one.
       expect(rows[0]!.response?.body).toBe('auth failed for "Bearer secret"');
       expect(rows[0]!.response?.headers).toEqual({
         "x-echo": "Bearer secret",
@@ -139,6 +144,7 @@ describe("deliverWebhook", () => {
   });
 
   describe("when the sender throws before responding", () => {
+    /** @scenario "An attempt that never reached the endpoint is recorded too" */
     it("records a classified row with the error message and no status", async () => {
       const rows: WebhookDeliveryInput[] = [];
       const send = (async () => {
@@ -162,6 +168,9 @@ describe("deliverWebhook", () => {
         response: null,
         outcome: "terminal",
       });
+      // The row is still an attempt, so it still says how long it took —
+      // otherwise a transport failure reads as a gap in the log.
+      expect(rows[0]!.latencyMs).toBeGreaterThanOrEqual(0);
     });
   });
 

@@ -26,10 +26,18 @@ Feature: Liquid templates for trigger notifications
       Then the subject names the trigger and its alert type
       And the body lists each matched trace with a link
 
+    @unit
+    Scenario: The default trace layout includes input and output excerpts
+      Given the trigger has no custom subject or body template
+      When the email notification is rendered
+      Then the body shows each matched trace's input and output, not only its identifier and a link
+
+    @unit
     Scenario: Default Slack message is rendered when no Slack template is set
       Given the trigger has no custom Slack template
       When the Slack notification is rendered
       Then the message names the trigger and links to each matched trace
+      And the message shows each matched trace's input and output
 
   Rule: A customer Liquid template controls the rendered output
 

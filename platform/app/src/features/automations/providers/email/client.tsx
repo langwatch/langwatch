@@ -277,14 +277,6 @@ function EmailConfigForm({
         ) : null}
       </Box>
 
-      {/* Try the real message straight from the recipients section. */}
-      <TestFireButton
-        onTestFire={ctx.onTestFire}
-        loading={ctx.testFireLoading}
-        disabled={!isComplete(slice)}
-        hint={isComplete(slice) ? undefined : "Add a recipient first"}
-      />
-
       <VStack align="stretch" gap={2}>
         <Text textStyle="sm" fontWeight="semibold">
           Message
@@ -342,6 +334,14 @@ function EmailConfigForm({
           previewHeight="520px"
         />
       ) : null}
+      {/* Sits after the message section — a test fire renders whatever is
+          configured above, so it belongs after there is something to try. */}
+      <TestFireButton
+        onTestFire={ctx.onTestFire}
+        loading={ctx.testFireLoading}
+        disabled={!isComplete(slice)}
+        hint={isComplete(slice) ? undefined : "Add a recipient first"}
+      />
     </VStack>
   );
 }
