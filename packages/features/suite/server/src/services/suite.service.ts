@@ -2,6 +2,7 @@ import {
   AllScenariosArchivedError,
   AllTargetsArchivedError,
   createSuiteCommandSchema,
+  declaredDefaults,
   derivePlanName,
   InvalidScenarioReferencesError,
   InvalidTargetReferencesError,
@@ -28,6 +29,7 @@ import {
   SuiteService as SuiteServiceContract,
   targetLabels,
   updateSuiteCommandSchema,
+  withCanonicalOverrides,
   type CreateSuiteCommand,
   type Suite,
   type SuiteArchivedNamesInput,
@@ -49,6 +51,7 @@ import type { AgentService } from "@langwatch/agent-contract";
 import type { PromptService } from "@langwatch/prompt-contract";
 import {
   jsonValueSchema,
+  parseScenarioParameterDefinitions,
   ScenarioTestSuiteNotFoundError,
   type ScenarioTestSuite,
   type ScenarioService,
@@ -329,10 +332,8 @@ export class SuiteService extends SuiteServiceContract {
       actor: parsed.actor,
       agents,
     });
-    const targets = sortSuiteTargets(namedTargets);
-
     const targetResolution = await this.resolveTargetReferences({
-      targets,
+      targets: sortSuiteTargets(namedTargets),
       projectId: parsed.projectId,
       organizationId: parsed.organizationId,
       agents,
@@ -364,6 +365,16 @@ export class SuiteService extends SuiteServiceContract {
       values: parsed.parameters,
     });
 
+    // A value equal to a declared default is no override: the key, the sort,
+    // the name and the stored targets all read the canonical set.
+    const defaults = declaredDefaults(
+      scenarioConfigs.flatMap((scenario) => parseScenarioParameterDefinitions(scenario.parameters)),
+    );
+    const targets = sortSuiteTargets(withCanonicalOverrides({ targets: namedTargets, defaults }));
+    const activeTargets = sortSuiteTargets(
+      withCanonicalOverrides({ targets: targetResolution.active, defaults }),
+    );
+
     // Derived only once the run holds up, so a refused run reads no name it
     // will not use.
     const name =
@@ -393,7 +404,7 @@ export class SuiteService extends SuiteServiceContract {
       scenarioNames: new Map(scenarioConfigs.map((scenario) => [scenario.id, scenario.name])),
       scenarioVersions: new Map(scenarioConfigs.map((scenario) => [scenario.id, scenario.version])),
       scenarioConfigs,
-      activeTargets: targetResolution.active,
+      activeTargets,
       repeatCount: suite.repeatCount,
       skippedArchived: {
         scenarios: scenarioResolution.archived,

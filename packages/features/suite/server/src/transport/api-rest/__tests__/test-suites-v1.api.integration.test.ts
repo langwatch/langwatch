@@ -59,6 +59,7 @@ describe("given a name for a new test suite", () => {
 
 describe("given a test suite holds two scenarios", () => {
   // @scenario "Reading a test suite names the scenarios filed in it"
+  // @scenario "A test suite reads back with the scenarios filed in it"
   it("names both scenarios in the response", async () => {
     const { api, world } = mountSuiteFamilies();
     const { testSuite, cases } = world.addTestSuiteWithCases("Refunds", 2);
@@ -124,6 +125,7 @@ describe("given a test suite holds one scenario and the project holds one agent"
     expect(commands.queued).toHaveLength(1);
   });
 
+  // @scenario "The target chosen for a test suite run is offered again from the last run plan of that suite"
   // @scenario "Running a test suite twice joins the run plan the first run resolved"
   it("reports the plan as not created the second time", async () => {
     const { api, world } = mountSuiteFamilies();
@@ -143,6 +145,54 @@ describe("given a test suite holds one scenario and the project holds one agent"
       created: false,
       runPlanId: first.runPlanId,
     });
+  });
+});
+
+describe("given a test suite holds active and archived scenarios", () => {
+  // @scenario "Running a test suite schedules its active scenarios against the chosen targets"
+  it("schedules active scenarios against every target and leaves archived ones out", async () => {
+    const { api, world, commands } = mountSuiteFamilies();
+    const active = [
+      world.addScenario({ name: "One" }),
+      world.addScenario({ name: "Two" }),
+    ];
+    const archived = world.addScenario({ name: "Old", archivedAt: new Date() });
+    const testSuite = world.addTestSuite({
+      name: "Refunds",
+      scenarioIds: [active[0]!.id, active[1]!.id, archived.id],
+    });
+    const first = world.addAgent({ name: "first-agent" });
+    const second = world.addAgent({ name: "second-agent" });
+
+    const response = await api.post(`${BASE}/${testSuite.id}/run`, {
+      targets: [
+        { type: "http", referenceId: first.id },
+        { type: "http", referenceId: second.id },
+      ],
+    });
+
+    expect(response.status).toBe(200);
+    expect(commands.queued).toHaveLength(4);
+    const scheduledScenarioIds = new Set(commands.queued.map((call) => call.scenarioId));
+    expect(scheduledScenarioIds).toEqual(new Set(active.map((one) => one.id)));
+  });
+});
+
+describe("given a test suite whose only scenario is archived", () => {
+  // @scenario "Running a test suite whose scenarios are all archived is refused with suite_scope_empty"
+  it("refuses the run with suite_scope_empty and schedules nothing", async () => {
+    const { api, world, commands } = mountSuiteFamilies();
+    const archived = world.addScenario({ name: "Old", archivedAt: new Date() });
+    const testSuite = world.addTestSuite({ name: "Refunds", scenarioIds: [archived.id] });
+    const agent = world.addAgent({ name: "dev-agent" });
+
+    const response = await api.post(`${BASE}/${testSuite.id}/run`, {
+      targets: [{ type: "http", referenceId: agent.id }],
+    });
+
+    expect(response.status).toBe(422);
+    await expect(errorCodeOf(response)).resolves.toBe("suite_scope_empty");
+    expect(commands.queued).toHaveLength(0);
   });
 });
 

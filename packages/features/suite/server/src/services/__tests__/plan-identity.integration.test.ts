@@ -199,7 +199,11 @@ function buildService() {
   });
 }
 
-async function createCase(name: string, testSuiteId?: string) {
+async function createCase(
+  name: string,
+  testSuiteId?: string,
+  parameters?: { name: string; defaultValue?: string; secret?: boolean }[],
+) {
   return database().scenario.create({
     data: {
       projectId,
@@ -208,6 +212,7 @@ async function createCase(name: string, testSuiteId?: string) {
       criteria: ["The agent helps"],
       labels: [],
       ...(testSuiteId !== undefined && { testSuiteId }),
+      ...(parameters !== undefined && { parameters }),
     },
   });
 }
@@ -529,8 +534,13 @@ describe.skipIf(!databaseUrl)("Run plan identity by name", () => {
       it("labels a repeated agent with its parameters when the run sends no name", async () => {
         const refunds = await createTestSuite("Refunds");
         await createTestSuite("Checkout");
-        await createCase("One", refunds.id);
+        await createCase("One", refunds.id, [
+          { name: "model", defaultValue: "gpt-5" },
+          { name: "locale", defaultValue: "en" },
+        ]);
         const agent = createHttpAgent();
+        // The first target spells the declared default of "model" out, which
+        // is no override: it is stored, keyed and named as "locale=de" alone.
         const targets: SuiteTarget[] = [
           { type: "http", referenceId: agent.id, runParameters: { locale: "de", model: "gpt-5-mini" } },
           { type: "http", referenceId: agent.id, runParameters: { locale: "de", model: "gpt-5" } },

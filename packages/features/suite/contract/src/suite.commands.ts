@@ -23,16 +23,6 @@ export const createSuiteCommandSchema = suiteDefinitionFieldsSchema
     targets: suiteDefinitionFieldsSchema.shape.targets.default([]),
     repeatCount: suiteDefinitionFieldsSchema.shape.repeatCount.default(1),
     labels: suiteDefinitionFieldsSchema.shape.labels.default([]),
-  })
-  .superRefine((input, context) => {
-    const usesStoredCases = input.scope === void 0 || input.scope.mode === "scenarios";
-    if (usesStoredCases && input.scenarioIds.length === 0) {
-      context.addIssue({
-        code: "custom",
-        path: ["scenarioIds"],
-        message: "At least one scenario is required",
-      });
-    }
   });
 export type CreateSuiteCommand = z.input<typeof createSuiteCommandSchema>;
 

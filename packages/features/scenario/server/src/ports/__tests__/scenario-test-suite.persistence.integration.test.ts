@@ -218,6 +218,19 @@ describe.skipIf(!databaseUrl)("Scenario test suite persistence", () => {
     await expect(testSuites.listTestSuites({ projectId })).resolves.toEqual([created]);
   });
 
+  /** @scenario "Renaming a test suite in another project is refused with suite_not_found" */
+  it("refuses to rename a test suite that belongs to another project", async () => {
+    const testSuites = service();
+    const foreign = await testSuites.createTestSuite({ projectId: otherProjectId, name: "Foreign" });
+
+    await expect(
+      testSuites.renameTestSuite({ projectId, testSuiteId: foreign.id, name: "Taken over" }),
+    ).rejects.toMatchObject({ code: "scenario_test_suite_not_found" });
+    await expect(
+      testSuites.tryGetTestSuite({ projectId: otherProjectId, testSuiteId: foreign.id }),
+    ).resolves.toMatchObject({ name: "Foreign" });
+  });
+
   /** @scenario "A test suite created with a name another suite already uses keeps both names readable" */
   it("keeps a colliding name readable under a distinct slug", async () => {
     const testSuites = service();
@@ -270,6 +283,7 @@ describe.skipIf(!databaseUrl)("Scenario test suite persistence", () => {
     expect(await invariantBreaks()).toEqual([]);
   });
 
+  /** @scenario "Creating a scenario inside a test suite puts it on both sides at once" */
   it("creates filed and unfiled cases while reconciling test suite membership", async () => {
     const testSuites = service();
     const refunds = await testSuites.createTestSuite({ projectId, name: "Refunds" });
@@ -282,6 +296,7 @@ describe.skipIf(!databaseUrl)("Scenario test suite persistence", () => {
     expect(await invariantBreaks()).toEqual([]);
   });
 
+  /** @scenario "Moving a scenario between test suites updates both test suites" */
   it("moves a case between test suites and then unfiles it", async () => {
     const testSuites = service();
     const refunds = await testSuites.createTestSuite({ projectId, name: "Refunds" });
@@ -306,6 +321,7 @@ describe.skipIf(!databaseUrl)("Scenario test suite persistence", () => {
     expect(await invariantBreaks()).toEqual([]);
   });
 
+  /** @scenario "Archiving one scenario drops it from its test suite" */
   it("drops an archived case from its test suite", async () => {
     const testSuites = service();
     const testSuite = await testSuites.createTestSuite({ projectId, name: "Refunds" });
@@ -320,6 +336,7 @@ describe.skipIf(!databaseUrl)("Scenario test suite persistence", () => {
     expect(await invariantBreaks()).toEqual([]);
   });
 
+  /** @scenario "Archiving many scenarios at once drops all of them from their test suites" */
   it("preserves input order, duplicates, retry success, and exact failures in a batch archive", async () => {
     const firstArchiveTime = new Date("2026-01-01T00:00:00.000Z");
     const batchArchiveTime = new Date("2026-01-02T00:00:00.000Z");
@@ -370,6 +387,7 @@ describe.skipIf(!databaseUrl)("Scenario test suite persistence", () => {
 
   /** @scenario "A scenario cannot be filed into a run plan that is not a test suite" */
   /** @scenario "A refused move leaves the scenario in the test suite it was in" */
+  /** @scenario "A move that fails leaves both sides untouched" */
   it("rejects archived, non-testSuite, and cross-project destinations without moving the case", async () => {
     const testSuites = service();
     const active = await testSuites.createTestSuite({ projectId, name: "Active" });
@@ -410,6 +428,7 @@ describe.skipIf(!databaseUrl)("Scenario test suite persistence", () => {
 
   /** @scenario "Archiving a test suite archives the scenarios in it" */
   /** @scenario "Archiving a test suite that is already archived changes nothing" */
+  /** @scenario "An archived test suite keeps the membership it had" */
   it("archives a test suite and its active cases while preserving the final member snapshot", async () => {
     const testSuites = service();
     const testSuite = await testSuites.createTestSuite({ projectId, name: "Refunds" });
@@ -441,6 +460,7 @@ describe.skipIf(!databaseUrl)("Scenario test suite persistence", () => {
     );
   });
 
+  /** @scenario "Two scenarios filed into one test suite at the same time both land in it" */
   it("keeps both simultaneous filings in one test suite", async () => {
     const testSuites = service();
     const testSuite = await testSuites.createTestSuite({ projectId, name: "Refunds" });
@@ -537,5 +557,83 @@ describe.skipIf(!databaseUrl)("Scenario test suite persistence", () => {
     expect(storedTestSuite.archivedAt).toEqual(first.archivedAt);
     expect(storedScenario.archivedAt).toEqual(first.archivedAt);
     expect([firstTime, secondTime]).toContainEqual(first.archivedAt);
+  });
+
+  /** @scenario "Restoring an archived scenario puts it back in its test suite" */
+  it("puts a restored scenario back into its test suite once membership is recomputed", async () => {
+    const testSuites = service();
+    const refunds = await testSuites.createTestSuite({ projectId, name: "Refunds" });
+    const scenario = await createScenario({ name: "Refund", testSuiteId: refunds.id });
+    await testSuites.archive({ id: scenario.id, projectId });
+    expect(await testSuiteScenarioIds(refunds.id)).toEqual([]);
+
+    await database().scenario.update({
+      where: { id: scenario.id, projectId },
+      data: { archivedAt: null },
+    });
+    await testSuites.update({ id: scenario.id, projectId, testSuiteId: refunds.id });
+
+    expect(await testSuiteScenarioIds(refunds.id)).toEqual([scenario.id]);
+    expect(await invariantBreaks()).toEqual([]);
+  });
+
+  /** @scenario "The two sides agree after a full create, move, archive and batch-archive walk" */
+  it("holds the invariant after every step of a create, move, archive and batch-archive walk", async () => {
+    const testSuites = service();
+    const refunds = await testSuites.createTestSuite({ projectId, name: "Refunds" });
+    const checkout = await testSuites.createTestSuite({ projectId, name: "Checkout" });
+
+    const cases = [];
+    for (let i = 0; i < 5; i++) {
+      cases.push(
+        await createScenario({
+          name: `Scenario ${i}`,
+          testSuiteId: i < 3 ? refunds.id : checkout.id,
+        }),
+      );
+    }
+    expect(await invariantBreaks()).toEqual([]);
+
+    await testSuites.update({ id: cases[0]!.id, projectId, testSuiteId: checkout.id });
+    expect(await invariantBreaks()).toEqual([]);
+
+    await testSuites.archive({ id: cases[3]!.id, projectId });
+    expect(await invariantBreaks()).toEqual([]);
+
+    await testSuites.batchArchive({ ids: [cases[1]!.id, cases[4]!.id], projectId });
+    expect(await invariantBreaks()).toEqual([]);
+
+    expect(await testSuiteScenarioIds(refunds.id)).toEqual([cases[2]!.id]);
+    expect(await testSuiteScenarioIds(checkout.id)).toEqual([cases[0]!.id]);
+  });
+
+  /** @scenario "A scenario created with a suite named is filed there, not in Default" */
+  it("files a scenario created with a suite named there, creating no Default suite", async () => {
+    const testSuites = service();
+    const refunds = await testSuites.createTestSuite({ projectId, name: "Refunds" });
+
+    const scenario = await createScenario({ name: "Refund", testSuiteId: refunds.id });
+
+    expect(scenario.testSuiteId).toBe(refunds.id);
+    await expect(
+      database().simulationSuite.findFirst({ where: { projectId, name: "Default" } }),
+    ).resolves.toBeNull();
+  });
+
+  /** @scenario "Filing a scenario out of Default updates both suites" */
+  it("updates both suites when a scenario is moved out of an existing Default suite", async () => {
+    const testSuites = service();
+    const defaultSuite = await testSuites.createTestSuite({ projectId, name: "Default" });
+    const refunds = await testSuites.createTestSuite({ projectId, name: "Refunds" });
+    const [stays, moves] = await Promise.all([
+      createScenario({ name: "Stays", testSuiteId: defaultSuite.id }),
+      createScenario({ name: "Moves", testSuiteId: defaultSuite.id }),
+    ]);
+
+    await testSuites.update({ id: moves.id, projectId, testSuiteId: refunds.id });
+
+    expect(await testSuiteScenarioIds(defaultSuite.id)).toEqual([stays.id]);
+    expect(await testSuiteScenarioIds(refunds.id)).toEqual([moves.id]);
+    expect(await invariantBreaks()).toEqual([]);
   });
 });
