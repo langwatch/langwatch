@@ -165,9 +165,14 @@ export class TraceListClickHouseRepository implements TraceListRepository {
 
     const client = await this.resolveClient(query.tenantId);
 
-    // Latest-version dedup, shared by the page, the heavy read, and the count.
+    // Latest-version dedup, shared by the page's inner stage and the count.
     // Decided on the base predicates alone, so the filter chooses among current
     // traces rather than deciding which version is current.
+    //
+    // It is a whole-window aggregate: it groups every row this tenant has in
+    // the time range, so each place it appears is another pass over that set.
+    // State it once per read — see the outer stage below, which reuses the
+    // inner stage's result instead of deriving the same thing again.
     const dedupFilter = `(TenantId, TraceId, UpdatedAt) IN (
           SELECT TenantId, TraceId, max(UpdatedAt)
           FROM ${TABLE_NAME}
@@ -175,13 +180,33 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           GROUP BY TenantId, TraceId
         )`;
 
-    // Page the matching TraceIds first (key + sort columns only), then read
-    // the heavy columns (ComputedInput/ComputedOutput and the rest) for that
+    // Page the matching rows first (key + sort columns only), then read the
+    // heavy columns (ComputedInput/ComputedOutput and the rest) for that
     // bounded page alone. The previous single query materialized those
     // payloads for every deduped trace in the window before ORDER BY ... LIMIT
     // trimmed it, and `count() OVER ()` forced the whole deduped set to buffer
     // — together the dominant read-bytes cost on this list. The total is now a
     // separate light count that never touches the payload columns.
+    //
+    // The inner stage hands the outer stage the winning rows' full identity
+    // (TenantId, TraceId, UpdatedAt), not just their TraceIds. That identity
+    // IS the dedup result, so the outer stage does not restate `dedupFilter`:
+    // re-stating it made ClickHouse build the whole-window aggregate a second
+    // time to reach rows the inner stage had already named. On a tenant with
+    // ~1.3M traces in the window, dropping that second pass measured 4.45M ->
+    // 2.98M rows read and 4.6s -> 2.3s.
+    //
+    // The outer WHERE does keep the full `whereClause`, not just the base
+    // predicates. `trace_summaries` is a ReplacingMergeTree, so until a merge
+    // runs, two physical rows can share one (TenantId, TraceId, UpdatedAt) and
+    // disagree on everything else — a re-publish at the same version lands in
+    // its own part. Identity alone cannot tell those apart, so the outer stage
+    // has to re-apply the user's filter to pick the version that actually
+    // matches it; without that, a filtered page returns the version that does
+    // not match and disagrees with its own total. Re-applying the filter is
+    // cheap next to the dedup (it is the same predicate over an already
+    // identity-bounded set, and it costs nothing at all on the unfiltered
+    // default view, where `whereClause` IS `baseWhereClause`).
     //
     // The inner subquery keeps WHERE/ORDER BY on raw DateTime columns —
     // aliasing DateTime to millis in the same scope shadows the column and
@@ -306,8 +331,8 @@ export class TraceListClickHouseRepository implements TraceListRepository {
             LastEventOccurredAt
           FROM ${TABLE_NAME}
           WHERE ${whereClause}
-            AND TraceId IN (
-              SELECT TraceId
+            AND (TenantId, TraceId, UpdatedAt) IN (
+              SELECT TenantId, TraceId, UpdatedAt
               FROM ${TABLE_NAME}
               WHERE ${whereClause}
                 AND ${dedupFilter}
@@ -321,7 +346,6 @@ export class TraceListClickHouseRepository implements TraceListRepository {
               LIMIT {limit:UInt32}
               OFFSET {offset:UInt32}
             )
-            AND ${dedupFilter}
           ORDER BY ${sortExpression} ${sortDir}, TraceId ASC
           LIMIT {limit:UInt32}
         )

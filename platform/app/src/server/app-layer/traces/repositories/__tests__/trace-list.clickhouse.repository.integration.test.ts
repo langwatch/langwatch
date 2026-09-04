@@ -39,16 +39,44 @@ function traceIdFor(i: number): string {
   return `tr-${String(i).padStart(4, "0")}`;
 }
 
-/** system.query_log only exists on a server started with log_queries enabled. */
+/**
+ * Whether this server actually RECORDS queries, which is what the read-cost
+ * assertions need.
+ *
+ * Table existence alone does not answer that: `log_queries = 0` stops the
+ * recording but leaves `system.query_log` in place, so a guard that only
+ * checks the table passes and then the assertions fail on an empty result.
+ * Run a query under a known id and look for its own row instead.
+ */
 async function hasQueryLog(client: ClickHouseClient): Promise<boolean> {
-  const rows = (await (
+  const tables = (await (
     await client.query({
       query: `SELECT count() AS n FROM system.tables
               WHERE database = 'system' AND name = 'query_log'`,
       format: "JSONEachRow",
     })
   ).json()) as Array<{ n: string }>;
-  return Number(rows[0]?.n ?? 0) > 0;
+  if (Number(tables[0]?.n ?? 0) === 0) return false;
+
+  const probeId = `query-log-probe-${nanoid()}`;
+  await (
+    await client.query({
+      query: "SELECT 1 AS probe",
+      query_id: probeId,
+      format: "JSONEachRow",
+    })
+  ).json();
+  await client.exec({ query: "SYSTEM FLUSH LOGS" });
+
+  const logged = (await (
+    await client.query({
+      query: `SELECT count() AS n FROM system.query_log
+              WHERE query_id = {probeId:String} AND type = 'QueryFinish'`,
+      query_params: { probeId },
+      format: "JSONEachRow",
+    })
+  ).json()) as Array<{ n: string }>;
+  return Number(logged[0]?.n ?? 0) > 0;
 }
 
 function makeTraceSummaryRow(
@@ -142,6 +170,35 @@ async function insertRows(rows: ReturnType<typeof makeTraceSummaryRow>[]) {
       clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
     });
   }
+}
+
+/**
+ * Run `findAll` against the real client while recording the SQL it issues, so
+ * a test can re-run the repository's own query under a known `query_id` and
+ * read its cost back out of `system.query_log`.
+ */
+async function captureFindAllQueries(
+  query: TraceListQuery,
+): Promise<{ query: string; query_params: Record<string, unknown> }[]> {
+  const captured: { query: string; query_params: Record<string, unknown> }[] =
+    [];
+  const recordingClient = new Proxy(ch, {
+    get(target, prop, receiver) {
+      if (prop !== "query") return Reflect.get(target, prop, receiver);
+      return (args: Parameters<ClickHouseClient["query"]>[0]) => {
+        captured.push({
+          query: args.query,
+          query_params: (args.query_params ?? {}) as Record<string, unknown>,
+        });
+        return target.query(args);
+      };
+    },
+  }) as ClickHouseClient;
+
+  await new TraceListClickHouseRepository(async () => recordingClient).findAll(
+    query,
+  );
+  return captured;
 }
 
 function baseQuery(): TraceListQuery {
@@ -316,6 +373,96 @@ describe("TraceListClickHouseRepository.findAll (integration)", () => {
       expect(naiveMem).toBeGreaterThan(0);
       expect(pagedMem).toBeGreaterThan(0);
       expect(pagedMem).toBeLessThan(naiveMem);
+    });
+
+    it("does not re-derive the version dedup in the outer stage of its own page read", async ({
+      skip,
+    }) => {
+      if (!(await hasQueryLog(ch))) {
+        skip(
+          "ClickHouse runs with log_queries=0, so system.query_log is absent",
+        );
+      }
+
+      // The dedup is a whole-window aggregate. Stating it in the outer stage
+      // as well makes ClickHouse build it a second time to reach rows the
+      // inner stage already named. Asserted against the SQL the repository
+      // really emits, not a hand-written stand-in.
+      const emitted = await captureFindAllQueries(baseQuery());
+      const pageRead = emitted.find((q) => q.query.includes("ComputedInput"));
+      expect(pageRead).toBeDefined();
+
+      const params = { tenantId, from: base - 60_000, limit: PAGE_LIMIT };
+      const where = `TenantId = {tenantId:String}
+        AND OccurredAt >= fromUnixTimestamp64Milli({from:Int64})`;
+      const dedup = `(TenantId, TraceId, UpdatedAt) IN (
+        SELECT TenantId, TraceId, max(UpdatedAt)
+        FROM trace_summaries
+        WHERE ${where}
+        GROUP BY TenantId, TraceId
+      )`;
+
+      const currentId = `handover-${nanoid()}`;
+      const rederivedId = `rederived-${nanoid()}`;
+
+      await ch
+        .query({
+          query: pageRead!.query,
+          query_params: pageRead!.query_params,
+          query_id: currentId,
+          format: "JSONEachRow",
+        })
+        .then((r) => r.json());
+
+      // The shape this replaced: the outer stage takes only TraceIds from the
+      // inner stage and re-states both the dedup and the user filter.
+      await ch
+        .query({
+          query: `
+            SELECT TraceId, ComputedInput, ComputedOutput
+            FROM trace_summaries
+            WHERE ${where}
+              AND TraceId IN (
+                SELECT TraceId
+                FROM trace_summaries
+                WHERE ${where} AND ${dedup}
+                ORDER BY OccurredAt DESC
+                LIMIT {limit:UInt32}
+              )
+              AND ${dedup}
+            ORDER BY OccurredAt DESC
+            LIMIT {limit:UInt32}
+          `,
+          query_params: params,
+          query_id: rederivedId,
+          format: "JSONEachRow",
+        })
+        .then((r) => r.json());
+
+      await ch.exec({ query: "SYSTEM FLUSH LOGS" });
+
+      const rowRows = (await (
+        await ch.query({
+          query: `
+            SELECT query_id, max(read_rows) AS rows_read
+            FROM system.query_log
+            WHERE query_id IN ({currentId:String}, {rederivedId:String})
+              AND type = 'QueryFinish'
+            GROUP BY query_id
+          `,
+          query_params: { currentId, rederivedId },
+          format: "JSONEachRow",
+        })
+      ).json()) as Array<{ query_id: string; rows_read: string }>;
+
+      const rowsOf = (id: string) =>
+        Number(rowRows.find((r) => r.query_id === id)?.rows_read ?? 0);
+      const currentRows = rowsOf(currentId);
+      const rederivedRows = rowsOf(rederivedId);
+
+      expect(currentRows).toBeGreaterThan(0);
+      expect(rederivedRows).toBeGreaterThan(0);
+      expect(currentRows).toBeLessThan(rederivedRows);
     });
   });
 
@@ -607,6 +754,85 @@ describe("TraceListClickHouseRepository filtering across row versions", () => {
       });
 
       expect(counts.values).toEqual({});
+    });
+  });
+});
+
+describe("TraceListClickHouseRepository.findAll across unmerged same-version rows", () => {
+  describe("when two unmerged rows share one version identity", () => {
+    // `trace_summaries` is a ReplacingMergeTree, so a re-publish at the same
+    // `UpdatedAt` lives in its own part until a merge collapses it. Both rows
+    // then answer to the same (TenantId, TraceId, UpdatedAt), and identity
+    // alone cannot say which one the user's filter meant. The page read has to
+    // re-apply the filter after the identity handover to pick the right one.
+    const dupTenant = `test-trace-list-dup-${nanoid()}`;
+    const dupAt = new Date(base + 500);
+
+    beforeAll(async () => {
+      // The fixture IS the unmerged state, so a background merge landing
+      // between the inserts and the read would collapse the two rows and the
+      // assertion below would stop testing anything — passing or failing on
+      // whichever version happened to survive. Hold merges off the table for
+      // the duration.
+      await ch.command({ query: "SYSTEM STOP MERGES trace_summaries" });
+
+      // Separate inserts on purpose: two rows with the same sorting key in one
+      // block are collapsed at part formation, which is not the case here.
+      for (const traceName of ["keep", "drop"]) {
+        await ch.insert({
+          table: "trace_summaries",
+          values: [
+            makeTraceSummaryRow(9001, {
+              TenantId: dupTenant,
+              TraceId: "dup-1",
+              OccurredAt: dupAt,
+              UpdatedAt: dupAt,
+              TraceName: traceName,
+            }),
+          ],
+          format: "JSONEachRow",
+          clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
+        });
+      }
+    });
+
+    afterAll(async () => {
+      await ch.command({ query: "SYSTEM START MERGES trace_summaries" });
+      await ch.exec({
+        query:
+          "ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}",
+        query_params: { tenantId: dupTenant },
+      });
+    });
+
+    it("keeps both rows unmerged, so the assertion below is not vacuous", async () => {
+      const rows = (await (
+        await ch.query({
+          query: `SELECT TraceName FROM trace_summaries
+                  WHERE TenantId = {tenantId:String} ORDER BY TraceName`,
+          query_params: { tenantId: dupTenant },
+          format: "JSONEachRow",
+        })
+      ).json()) as Array<{ TraceName: string }>;
+
+      expect(rows.map((r) => r.TraceName)).toEqual(["drop", "keep"]);
+    });
+
+    it("returns only the version the filter matches, and agrees with its own total", async () => {
+      const page = await repo.findAll({
+        tenantId: dupTenant,
+        timeRange: { from: base - 60_000, to: base + 3_600_000 },
+        sort: { column: "OccurredAt", direction: "desc" },
+        limit: 25,
+        offset: 0,
+        filterWhere: {
+          sql: "TraceName = {dupName:String}",
+          params: { dupName: "keep" },
+        },
+      });
+
+      expect(page.rows.map((r) => r.traceName)).toEqual(["keep"]);
+      expect(page.rows).toHaveLength(page.totalHits);
     });
   });
 });
