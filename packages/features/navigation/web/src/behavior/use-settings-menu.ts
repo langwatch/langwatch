@@ -20,10 +20,11 @@ export function useSettingsMenu(): SettingsMenuGroup[] {
   return settingsMenu({
     hasPermission: (permission) => host.hasPermission(permission),
     isSaaS: host.deployment().isSaaS,
-    // Deliberately not `isEnterprise`: the enterprise entries are shown WHILE
-    // the plan is still arriving, so a reader on that plan never watches four
-    // links appear a beat after the page.
-    showEnterpriseNav: plan.isLoading || plan.isEnterprise,
+    // Fail closed: an unlicensed or still-loading plan must never show the
+    // enterprise entries. Showing them while the plan is in flight let a
+    // self-hosted install with no license key see them permanently whenever
+    // the plan query never settled.
+    showEnterpriseNav: plan.isEnterprise,
     isLiteMember: plan.isLiteMember,
     hasOpsAccess: opsAccess.hasAccess,
     isPlatformAdmin: opsAccess.isAdmin,

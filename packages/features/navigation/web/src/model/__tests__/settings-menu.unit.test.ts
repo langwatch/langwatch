@@ -73,13 +73,8 @@ describe("given a lite member", () => {
   });
 });
 
-describe("given a plan that has not answered yet", () => {
+describe("given an enterprise plan", () => {
   describe("when the menu is built with the enterprise entries shown", () => {
-    /**
-     * `showEnterpriseNav` is deliberately not `isEnterprise`: the entries are
-     * shown WHILE the plan is arriving, so a reader on that plan never watches
-     * four links appear a beat after the page.
-     */
     it("offers the enterprise access entries", () => {
       const hrefs = hrefsIn({ showEnterpriseNav: true });
       expect(hrefs).toContain("/settings/groups");

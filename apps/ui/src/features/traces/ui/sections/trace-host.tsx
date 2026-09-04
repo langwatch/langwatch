@@ -14,6 +14,8 @@ import { useEffect, useMemo, type ReactNode } from "react";
 import { useLocation } from "react-router";
 
 import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
+import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
 import { mergeTraceQuery } from "../../behavior/trace-merge-query";
 
 export function TraceHost({ children }: { children: ReactNode }) {
@@ -26,6 +28,16 @@ export function TraceHost({ children }: { children: ReactNode }) {
     { isDemo: false },
     { enabled: !!actor },
   );
+
+  // A refused graph is a state, not an empty one: `placement` below reads the
+  // project, team and organization off this query, so a failed read left the
+  // trace page with no placement forever — `isLoading` stayed the only signal
+  // and it goes false on a settled error, stranding the page on a spinner
+  // that never becomes an error. Same pattern as `OrganizationHost`.
+  const failure = useUiShellFailure({
+    error: organizations.error,
+    fallbackTitle: "Couldn't load your traces",
+  });
 
   /** The project, team and organization the address is about — from the one graph read rather than three queries. */
   const placement = useMemo(() => {
@@ -124,6 +136,9 @@ export function TraceHost({ children }: { children: ReactNode }) {
     setTraceErrorHost(host);
     return () => setTraceErrorHost(void 0);
   }, [host]);
+
+  if (failure.departing) return <UiPageLoading />;
+  if (failure.copy) return <UiPageFailure copy={failure.copy} />;
 
   return <TraceHostProvider value={host}>{children}</TraceHostProvider>;
 }
