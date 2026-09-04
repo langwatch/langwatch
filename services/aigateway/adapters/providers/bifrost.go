@@ -1207,6 +1207,12 @@ type account struct {
 	// logger is passed to credentialToBifrostKey for the dropped
 	// api_version warning. May be nil.
 	logger *zap.Logger
+	// warnedAzureAPIVersionIDs tracks credential IDs that have already
+	// logged the dropped-api_version warning, so a long-lived account
+	// (dispatched to concurrently by bifrost's worker pool) warns at most
+	// once per credential rather than once per dispatch. Bounded by the
+	// number of configured Azure credentials, not by request volume.
+	warnedAzureAPIVersionIDs sync.Map
 }
 
 func (a *account) GetConfiguredProviders() ([]bfschemas.ModelProvider, error) {
@@ -1218,7 +1224,16 @@ func (a *account) GetKeysForProvider(ctx context.Context, provider bfschemas.Mod
 	if cred.ID == "" {
 		return nil, fmt.Errorf("no credential on context for provider %s", provider)
 	}
-	key := credentialToBifrostKey(cred, provider, a.logger)
+	logger := a.logger
+	if cred.Extra["api_version"] != "" {
+		// LoadOrStore is the atomic check-and-set: only the dispatch that
+		// wins the race to store the ID keeps its logger, so concurrent
+		// dispatches for the same credential still warn exactly once.
+		if _, alreadyWarned := a.warnedAzureAPIVersionIDs.LoadOrStore(cred.ID, struct{}{}); alreadyWarned {
+			logger = nil
+		}
+	}
+	key := credentialToBifrostKey(cred, provider, logger)
 	return []bfschemas.Key{key}, nil
 }
 
