@@ -61,4 +61,55 @@ describe("the code-changes skill", () => {
       expect(rendered).toContain("code_access");
     });
   });
+
+  // The rules below come from a filmed dogfood where Langy probed for facts it
+  // had been handed, reached for the sandbox shell while a folder was
+  // connected, never asked a question the customer had explicitly offered,
+  // claimed a registration it had read the opposite of, and titled a pull
+  // request "Add comprehensive LangWatch tracing". Each is one sentence in the
+  // skill, and a sentence with no test is a sentence that comes back out.
+  describe("given a folder is connected", () => {
+    /** @scenario "The workspace facts are the answer, not something to probe" */
+    it("says the workspace facts are the answer rather than something to probe", () => {
+      const rendered = codeChangesSkill();
+      expect(rendered).toContain("workspace facts from `code_access` ARE the answer");
+      expect(rendered).toContain("ghAuthenticated");
+      expect(rendered).toContain("Do not probe for any of them");
+      expect(rendered).toContain("gh auth status");
+    });
+
+    /** @scenario "The sandbox tools are not for the customer's project" */
+    it("keeps the sandbox shell off the customer's project and off invented flags", () => {
+      const rendered = codeChangesSkill();
+      expect(rendered).toContain("The project lives only in the shared folder");
+      expect(rendered).toContain("which holds none of the user's code");
+      expect(rendered).toContain("a flag that does not exist");
+      expect(rendered).toContain("takes no `--output`, `--json`, `--jq` or `--format`");
+    });
+
+    /** @scenario "A change to a connect call is restarted and read back" */
+    it("restarts the server and reads the registration back before saying anything", () => {
+      const rendered = codeChangesSkill();
+      expect(rendered).toContain("`local_bash` and `background: true`");
+      expect(rendered).toContain("until the new parameter is in that list");
+      expect(rendered).toContain("Never claim a registration the read does not show");
+    });
+
+    /** @scenario "The user's own offer of a choice is a question" */
+    it("asks when the choice was offered or picks what gets tested, and decides otherwise", () => {
+      const rendered = codeChangesSkill();
+      expect(rendered).toContain("The user offered you the choice");
+      expect(rendered).toContain("The choice picks what gets tested");
+      expect(rendered).toContain("Decide routine things yourself");
+    });
+
+    /** @scenario "The pull request title is the commit subject" */
+    it("takes the pull request title from the commit subject and bans adjectives", () => {
+      const rendered = codeChangesSkill();
+      expect(rendered).toContain(
+        "The title is the commit subject with the type prefix removed",
+      );
+      expect(rendered).toContain("comprehensive");
+    });
+  });
 });

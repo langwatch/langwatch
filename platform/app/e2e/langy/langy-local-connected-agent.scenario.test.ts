@@ -99,6 +99,11 @@ describe("Langy changes a connected agent through the shared folder", () => {
                 criteria: [
                   "Langy changes the connect call so the agent takes the account, or the plan, as a run parameter with the possible values as options.",
                   "Langy restarts the agent itself and confirms it registered again; it does not ask the developer to restart anything.",
+                  // The filmed run said "confirmed the connected agent
+                  // registered both account_id options" against a read that
+                  // listed only `model`. A restart it did not do, reported as
+                  // one it did, is worse than saying the restart is pending.
+                  "Langy claims the agent registered the new parameter only if it read that parameter back from the platform; if the read does not show it, Langy says the registration has not landed rather than claiming it has.",
                   "Langy says what it changed and how the case is run now.",
                   ...LANGY_CORE_RULE_CRITERIA,
                 ],

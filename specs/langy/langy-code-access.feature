@@ -101,6 +101,53 @@ Feature: Langy asks how to reach the customer's code, once
       Then instrumenting tracing, wiring the SDK, fixing the agent behind a failing scenario and adding a run parameter to a connected agent need code access
       And creating a scenario, an evaluation, a prompt version and reading traces do not
 
+  Rule: The skill says how to work in a folder that is connected
+
+    @unit
+    Scenario: The workspace facts are the answer, not something to probe
+      Given the code changes skill
+      When its exploration step is read
+      Then it says the facts the code access tool returned are the answer
+      And it names the GitHub sign-in fact as one of them
+      And it says not to probe for a fact that was already handed over
+
+    @unit
+    Scenario: The sandbox tools are not for the customer's project
+      Given the code changes skill
+      When its exploration step is read
+      Then it says the project lives only in the shared folder
+      And it says the sandbox shell holds none of the project
+      And it says a flag the CLI calls unknown is not retried under another spelling
+
+    @unit
+    Scenario: A change to a connect call is restarted and read back
+      Given the code changes skill
+      When its restart step is read
+      Then it says to restart the process through the local shell in the background
+      And it says to read the agent back until the new parameter is listed
+      And it says never to claim a registration the read does not show
+
+    @unit
+    Scenario: The user's own offer of a choice is a question
+      Given the code changes skill
+      When its asking guidance is read
+      Then it says an explicit offer of the choice is asked with the question tool
+      And it says a choice that picks what gets tested is asked too
+      And it still says to decide routine things without asking
+
+    @unit
+    Scenario: The pull request title is the commit subject
+      Given the code changes skill
+      When its pull request step is read
+      Then it says the title is the commit subject with the type prefix removed
+      And it bans adjectives such as comprehensive
+
+    @unit
+    Scenario: Every documentation page a skill names exists
+      Given the set of skills Langy ships with
+      When each documentation path they tell the agent to fetch is resolved
+      Then every one of them is a page in the documentation tree
+
   Rule: A remembered choice skips the question and stays visible
 
     @integration
