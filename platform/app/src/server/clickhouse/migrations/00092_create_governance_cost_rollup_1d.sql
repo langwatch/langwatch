@@ -163,6 +163,12 @@ SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 -- +goose StatementEnd
 
 -- +goose Down
+
+-- Down migrations are intentionally commented out to prevent accidental data
+-- loss. To roll back, uncomment and run manually. The rows are pulled from
+-- providers with a 30-day lookback, so anything older than that window is
+-- gone for good once the table drops.
+
 -- +goose StatementBegin
-DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.governance_cost_rollup_1d;
+-- DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.governance_cost_rollup_1d;
 -- +goose StatementEnd
