@@ -10,6 +10,7 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  callKeepaliveKey,
   callKey,
   callResultKey,
   controlRequestClaimKey,
@@ -36,6 +37,7 @@ describe("given the local control key family", () => {
         sessionKeyBindingKey("key_1"),
         callKey("lcall_1"),
         callResultKey("lcall_1"),
+        callKeepaliveKey("lcall_1"),
         pendingCallsKey("conv_1"),
         waitKey("lwait_1"),
         turnWaitsKey("conv_1", "turn_1"),

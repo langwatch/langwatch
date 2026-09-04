@@ -186,6 +186,14 @@ Feature: Langy works in a folder shared from the developer's machine
       And Langy asks for code access instead of retrying
 
     @integration
+    Scenario: A long command keeps its turn alive
+      Given a connected folder
+      And Langy is running a command that takes several minutes
+      When the command runs for longer than the turn stall window
+      Then the turn is still in flight and its answer is not lost
+      And the panel says what is running and on which machine
+
+    @integration
     Scenario: The live stream stays alive during a long wait
       Given a connected folder
       When a local call waits more than three minutes for an answer

@@ -17,7 +17,7 @@ import {
   createRedisStateStore,
 } from "~/server/connected-agents/state-store";
 import { prisma as defaultPrisma } from "~/server/db";
-import { LocalCallDispatcher } from "./call.dispatcher";
+import { type LocalCallBuffer, LocalCallDispatcher } from "./call.dispatcher";
 import { LocalControlLongPoll } from "./control.long-poll";
 import { ControlRequestService } from "./control-request.service";
 import { LocalWorkspacePresence } from "./presence";
@@ -52,7 +52,7 @@ export function createLocalControlRuntime({
   store: AgentStateStore;
   prisma?: PrismaClient;
   events: UserWaitEvents;
-  buffer: UserWaitBuffer;
+  buffer: UserWaitBuffer & LocalCallBuffer;
   offlineWaitMs?: number;
   pollIntervalMs?: number;
   now?: () => number;
@@ -64,6 +64,7 @@ export function createLocalControlRuntime({
   const dispatcher = new LocalCallDispatcher({
     store,
     presence,
+    buffer,
     ...(now ? { now } : {}),
     ...(offlineWaitMs !== undefined ? { offlineWaitMs } : {}),
     ...(pollIntervalMs !== undefined ? { pollIntervalMs } : {}),
@@ -183,10 +184,11 @@ function langyWaitEvents(): UserWaitEvents {
 }
 
 /** Stands in for the live edge on a process with no Redis: the record still lands. */
-function nullBuffer(): UserWaitBuffer {
+function nullBuffer(): UserWaitBuffer & LocalCallBuffer {
   return {
     appendLocalPermission: async () => undefined,
     appendQuestion: async () => undefined,
     appendStatus: async () => undefined,
+    heartbeat: async () => undefined,
   };
 }

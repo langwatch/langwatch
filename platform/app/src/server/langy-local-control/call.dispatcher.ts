@@ -23,17 +23,25 @@
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import { LANGY_LIVENESS } from "~/server/app-layer/langy/streaming/langy.streaming.constants";
+import type { LangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
 import type { AgentStateStore } from "~/server/connected-agents/state-store";
 import {
   CALL_ENVELOPE_SLACK_MS,
   CALL_OFFLINE_WAIT_MS,
   CALL_POLL_HOLD_MS,
   CALL_RESULT_TTL_MS,
+  LIVE_STREAM_KEEPALIVE_MS,
   POLL_INTERVAL_MS,
 } from "./constants";
 import { LangyLocalWorkspaceOfflineError } from "./errors";
 import { CALL_STATES, type CallState, type PollCallResponse } from "./http";
-import { callKey, pendingCallsKey, workspaceChannel } from "./keys";
+import {
+  callKeepaliveKey,
+  callKey,
+  pendingCallsKey,
+  workspaceChannel,
+} from "./keys";
 import type { LocalWorkspacePresence } from "./presence";
 import {
   bashOutputSchema,
@@ -83,9 +91,19 @@ export const workspaceNudgeSchema = z.union([
 ]);
 export type WorkspaceNudge = z.infer<typeof workspaceNudgeSchema>;
 
+/**
+ * The live edge of the turn a call belongs to: the liveness key that says the
+ * turn is still being worked on, and the activity line the panel reads.
+ */
+export type LocalCallBuffer = Pick<
+  LangyTokenBuffer,
+  "appendStatus" | "heartbeat"
+>;
+
 export interface LocalCallDispatcherOptions {
   store: AgentStateStore;
   presence: LocalWorkspacePresence;
+  buffer?: LocalCallBuffer;
   now?: () => number;
   /** Test knob: how long a first call waits for the folder to appear. */
   offlineWaitMs?: number;
@@ -95,6 +113,7 @@ export interface LocalCallDispatcherOptions {
 export class LocalCallDispatcher {
   private readonly store: AgentStateStore;
   private readonly presence: LocalWorkspacePresence;
+  private readonly buffer: LocalCallBuffer | null;
   private readonly offlineWaitMs: number;
   private readonly pollIntervalMs: number;
   readonly now: () => number;
@@ -102,6 +121,7 @@ export class LocalCallDispatcher {
   constructor(options: LocalCallDispatcherOptions) {
     this.store = options.store;
     this.presence = options.presence;
+    this.buffer = options.buffer ?? null;
     this.now = options.now ?? (() => Date.now());
     this.offlineWaitMs = options.offlineWaitMs ?? CALL_OFFLINE_WAIT_MS;
     this.pollIntervalMs = options.pollIntervalMs ?? POLL_INTERVAL_MS;
@@ -160,6 +180,14 @@ export class LocalCallDispatcher {
    * Waits for the call to leave `pending`/`running`, up to the hold, then
    * answers with whatever state it is in. A worker that gets a non-terminal
    * answer simply asks again, so a hold that ends early costs one request.
+   *
+   * The hold is also what keeps the turn alive. A command that takes minutes
+   * writes nothing on the turn while it runs, and the liveness subscriber ends
+   * a turn whose heartbeat has been gone for three grace windows, which lost
+   * the answer while the machine was still working. The poll request is itself
+   * the evidence that the worker is alive, so the refresh belongs here rather
+   * than on a timer: a worker that died stops polling and the turn ends as it
+   * should.
    */
   async poll({
     callId,
@@ -171,13 +199,66 @@ export class LocalCallDispatcher {
     signal?: AbortSignal;
   }): Promise<PollCallResponse | null> {
     const until = this.now() + holdMs;
+    const beat = this.beater();
     for (;;) {
       const call = await this.read(callId);
       if (!call) return null;
       if (call.state === "done") return toPollResponse(call);
+      await beat(call);
       if (this.now() >= until || signal?.aborted) return toPollResponse(call);
       await sleep(this.pollIntervalMs, signal);
     }
+  }
+
+  /**
+   * The keepalive gate of one poll request: it refreshes on the first pass,
+   * then once per heartbeat interval for as long as the request holds.
+   */
+  private beater(): (call: StoredLocalCall) => Promise<void> {
+    let lastBeatAt: number | null = null;
+    return async (call) => {
+      const now = this.now();
+      const due =
+        lastBeatAt === null ||
+        now - lastBeatAt >= LANGY_LIVENESS.HEARTBEAT_INTERVAL_MS;
+      if (!due) return;
+      lastBeatAt = now;
+      await this.keepTurnAlive(call);
+    };
+  }
+
+  /**
+   * Holds the turn open for another heartbeat window, and says on the panel
+   * what the machine is doing, at most once per keepalive window.
+   *
+   * The activity line is gated on a key of its own rather than on the call
+   * record. Two replicas polling one call would otherwise write a line each,
+   * and a write onto the record could put a call that has just answered back
+   * in flight.
+   */
+  private async keepTurnAlive(call: StoredLocalCall): Promise<void> {
+    const buffer = this.buffer;
+    if (!buffer) return;
+    await buffer.heartbeat({
+      conversationId: call.conversationId,
+      turnId: call.turnId,
+      now: this.now(),
+    });
+    const firstOfWindow = await this.store.setIfAbsent(
+      callKeepaliveKey(call.callId),
+      String(this.now()),
+      Math.ceil(LIVE_STREAM_KEEPALIVE_MS / 1000),
+    );
+    if (!firstOfWindow) return;
+    const workspace = await this.presence.read(call.conversationId);
+    await buffer.appendStatus({
+      conversationId: call.conversationId,
+      turnId: call.turnId,
+      status: callActivityLine({
+        call,
+        machine: workspace?.hostname ?? "your machine",
+      }),
+    });
   }
 
   /** The command line started the call. */
@@ -376,6 +457,31 @@ export class LocalCallDispatcher {
     const remaining = call.deadlineAt - this.now() + CALL_ENVELOPE_SLACK_MS;
     return Math.max(1, Math.ceil(remaining / 1000));
   }
+}
+
+/** The longest command the activity line shows before it trails off. */
+const ACTIVITY_COMMAND_CAP = 120;
+
+/** What the panel says while one call runs on the developer's machine. */
+export function callActivityLine({
+  call,
+  machine,
+}: {
+  call: Pick<StoredLocalCall, "tool" | "params">;
+  machine: string;
+}): string {
+  if (call.tool === "local_bash") {
+    const command = call.params.command.replace(/\s+/g, " ").trim();
+    const shown =
+      command.length > ACTIVITY_COMMAND_CAP
+        ? `${command.slice(0, ACTIVITY_COMMAND_CAP)}...`
+        : command;
+    return `Running on ${machine}: ${shown}`;
+  }
+  if (call.tool === "local_write" || call.tool === "local_edit") {
+    return `Editing on ${machine}`;
+  }
+  return `Reading on ${machine}`;
 }
 
 function toEnvelope(call: StoredLocalCall): CallEnvelope {

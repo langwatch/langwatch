@@ -61,6 +61,15 @@ export function callResultKey(callId: string): string {
   return `${PREFIX}:call_result:${callId}`;
 }
 
+/**
+ * Held while one call's activity line is fresh. The key is set once per
+ * keepalive window and lives exactly that long, so two replicas polling the
+ * same call write one line between them instead of one each.
+ */
+export function callKeepaliveKey(callId: string): string {
+  return `${PREFIX}:call_keepalive:${callId}`;
+}
+
 /** ZSET of the calls pending on one conversation, scored by deadline. */
 export function pendingCallsKey(conversationId: string): string {
   return `${PREFIX}:pending:${conversationId}`;

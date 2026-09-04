@@ -135,6 +135,9 @@ function testPorts(store: AgentStateStore) {
       async appendStatus({ status }) {
         liveEntries.push({ kind: "status", payload: { status } });
       },
+      async heartbeat() {
+        // The turn's liveness key; these pods assert on the calls, not on it.
+      },
     },
   });
   const core = new LocalControlSessionCore({
