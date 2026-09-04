@@ -393,6 +393,28 @@ describe("VariablesSection", () => {
       expect(screen.getByRole("textbox")).toBeInTheDocument();
     });
 
+    /** @scenario "A variable value opens two lines tall and grows with its text" */
+    it("renders the value as a two-line text area that grows with its text", () => {
+      const variables: Variable[] = [{ identifier: "question", type: "str" }];
+      renderComponent({
+        variables,
+        onChange: vi.fn(),
+        values: { question: "line one\nline two\nline three" },
+        showMappings: false,
+      });
+
+      const valueInput = screen.getByTestId("variable-value-input-question");
+      expect(valueInput.tagName).toBe("TEXTAREA");
+      expect(valueInput).toHaveAttribute("rows", "2");
+      expect(valueInput).toHaveValue("line one\nline two\nline three");
+      // Growing is the browser's job once the field asks for it; what the row
+      // owns is the ask, the height it stops growing at, and the mono type.
+      const style = window.getComputedStyle(valueInput);
+      expect(style.resize).toBe("none");
+      expect(style.maxHeight).toBe("240px");
+      expect(style.fontFamily).toContain("mono");
+    });
+
     it("displays mapping value when mapped", () => {
       const variables: Variable[] = [{ identifier: "question", type: "str" }];
       const mappings: Record<string, FieldMapping> = {
