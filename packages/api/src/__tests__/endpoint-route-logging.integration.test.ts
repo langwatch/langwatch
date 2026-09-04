@@ -92,6 +92,40 @@ describe("the endpoint a request matched", () => {
     });
   });
 
+  describe("given a request from an identified client", () => {
+    describe("when the request is logged", () => {
+      /** @scenario The request log line carries the attribution fields */
+      it("carries the endpoint class and the client attribution", async () => {
+        const app = createService({ name: "things", basePath: "/api/things" })
+          .version("2026-08-07", (v) => {
+            v.get(
+              "/widgets",
+              { noPermission: { reason: "framework test endpoint" }, output: z.array(z.string()) },
+              async () => [],
+            );
+          })
+          .build();
+
+        await app.request("/api/things/widgets", {
+          headers: {
+            "user-agent": "langwatch-sdk-node/3.1.0",
+            "x-langwatch-sdk-name": "langwatch-observability-sdk",
+            "x-langwatch-sdk-language": "typescript",
+            "x-langwatch-sdk-version": "3.1.0",
+          },
+        });
+
+        expect(requestRecords()[0]?.payload).toMatchObject({
+          endpointClass: "api",
+          clientSource: "sdk",
+          clientSdkName: "langwatch-observability-sdk",
+          clientSdkLanguage: "typescript",
+          clientSdkVersion: "3.1.0",
+        });
+      });
+    });
+  });
+
   describe("given a dated version of an endpoint", () => {
     describe("when the dated mount is called", () => {
       it("reports the same route as the bare alias", async () => {

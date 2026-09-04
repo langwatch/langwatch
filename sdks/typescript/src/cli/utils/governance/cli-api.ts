@@ -24,10 +24,7 @@ import {
   refreshSessionIfExpired,
   type SessionRefreshDeps,
 } from "./session-refresh";
-import {
-  CLI_SURFACE_HEADER,
-  CLI_SURFACE_VALUE,
-} from "./surface";
+import { CLI_SURFACE_HEADER, CLI_SURFACE_VALUE } from "@/internal/surface";
 
 export interface IngestionSourceSummary {
   id: string;
