@@ -57,6 +57,28 @@ func TestSignatureOf_DetectsModelAndCapabilityChanges(t *testing.T) {
 	}
 }
 
+// Flag-gating a skill off (or on) must recycle the worker so the model is never
+// offered a skill the caller may no longer use; the fingerprint is
+// order-independent so a mere reorder does not needlessly kill the worker.
+func TestSignatureOf_DisabledSkillIdsRecycleWorker(t *testing.T) {
+	base := SignatureOf("project-1", "user-1", "m", nil, nil, nil, "", "")
+
+	// Gating a skill off changes the signature so the worker re-warms without it.
+	if SignatureOf("project-1", "user-1", "m", nil, nil, []string{"playground-widgets"}, "", "") == base {
+		t.Errorf("disabling a skill must alter the signature")
+	}
+
+	// Different disabled sets → different signatures.
+	if SignatureOf("project-1", "user-1", "m", nil, nil, []string{"a"}, "", "") == SignatureOf("project-1", "user-1", "m", nil, nil, []string{"b"}, "", "") {
+		t.Errorf("different disabled skill sets must produce different signatures")
+	}
+
+	// The fingerprint is canonical — key order is irrelevant.
+	if SignatureOf("project-1", "user-1", "m", nil, nil, []string{"a", "b"}, "", "") != SignatureOf("project-1", "user-1", "m", nil, nil, []string{"b", "a"}, "", "") {
+		t.Errorf("disabled skill id order must not affect the signature")
+	}
+}
+
 func TestSignatureOf_BindsWorkerToProjectAndActor(t *testing.T) {
 	base := SignatureOf("project-1", "user-a", "model", nil, nil, nil, "", "")
 	if SignatureOf("project-2", "user-a", "model", nil, nil, nil, "", "") == base {

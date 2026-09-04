@@ -47,10 +47,10 @@ interface DashboardWidgetInPlaceEditorProps {
   timeWindow: { start: number; end: number };
   isSaving: boolean;
   onClose: () => void;
-  onSave: (
-    draft: DashboardWidgetDraft,
-    options: { onSuccess: () => void },
-  ) => void;
+  onSave: (args: {
+    draft: DashboardWidgetDraft;
+    onSuccess: () => void;
+  }) => void;
 }
 
 export function DashboardWidgetInPlaceEditor({

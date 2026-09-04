@@ -16,9 +16,17 @@ import { buildShimScript } from "./bridge/shimSource";
 
 /**
  * Pinned versions so a CDN release never silently changes what a saved
- * widget compiles against. React 18's UMD build is the one that added
- * `ReactDOM.createRoot`, and Recharts' UMD reads `window.PropTypes` as a
- * plain global rather than requiring it — hence prop-types loading first.
+ * widget compiles against. Exact versions (not major-only ranges), so UNPKG
+ * can never resolve a newer release out from under a saved widget.
+ *
+ * These majors are pinned lower than this app's own React/Recharts
+ * dependency on purpose: React 19 dropped the UMD build these `<script>`
+ * tags need (no `umd/` directory in the published package), so the sandbox
+ * stays on the last UMD-shipping majors — react/react-dom 18, recharts 2 —
+ * independent of what the app itself resolves. React 18's UMD build is the
+ * one that added `ReactDOM.createRoot`, and Recharts' UMD reads
+ * `window.PropTypes` as a plain global rather than requiring it — hence
+ * prop-types loading first.
  *
  * Split around the `@langwatch/charts` library script: it needs
  * `window.React`/`window.Recharts` already loaded (hence after Recharts) but
@@ -27,13 +35,13 @@ import { buildShimScript } from "./bridge/shimSource";
  * spare.
  */
 const CDN_SCRIPTS_BEFORE_CHARTS_LIB = [
-  "https://unpkg.com/react@18/umd/react.production.min.js",
-  "https://unpkg.com/prop-types@15/prop-types.min.js",
-  "https://unpkg.com/react-dom@18/umd/react-dom.production.min.js",
-  "https://unpkg.com/recharts@2/umd/Recharts.js",
+  "https://unpkg.com/react@18.3.1/umd/react.production.min.js",
+  "https://unpkg.com/prop-types@15.8.1/prop-types.min.js",
+  "https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js",
+  "https://unpkg.com/recharts@2.15.4/umd/Recharts.js",
 ];
 const CDN_SCRIPTS_AFTER_CHARTS_LIB = [
-  "https://unpkg.com/@babel/standalone@7/babel.min.js",
+  "https://unpkg.com/@babel/standalone@7.29.8/babel.min.js",
 ];
 
 /**

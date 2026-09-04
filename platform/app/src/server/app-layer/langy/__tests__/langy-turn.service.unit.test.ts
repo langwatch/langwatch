@@ -6,6 +6,7 @@ import {
   LangyConversationNotOwnedError,
   LangyModelNotAllowedError,
   LangyModelNotConfiguredError,
+  LangySkillNotAvailableError,
   LangyTurnInProgressError,
   LangyTurnNotStoppableError,
 } from "../errors";
@@ -1286,6 +1287,34 @@ describe("when the harness flag resolves for the turn", () => {
       harness?: string;
     };
     expect(probeArgs.harness).toBeUndefined();
+  });
+});
+
+describe("when a turn requests a skill gated off for the caller", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("rejects with LangySkillNotAvailableError and never dispatches the turn", async () => {
+    // Flag off => the `dashboard-widgets` skill (its `featureFlag`) is gated
+    // off; a turn that explicitly asks for it is refused.
+    vi.spyOn(featureFlagService, "isEnabled").mockResolvedValue(false);
+    const { deps, mocks } = makeDeps();
+
+    await expect(
+      LangyTurnService.create(deps).startConversationTurn(
+        input({
+          turnContext: {
+            pageContext: undefined,
+            skills: [{ id: "dashboard-widgets" }],
+          } as StartConversationTurnInput["turnContext"],
+        }),
+      ),
+    ).rejects.toBeInstanceOf(LangySkillNotAvailableError);
+
+    // The rejected turn is classified once — as `rejected` in the outer catch,
+    // never also as an `error` — and it must not reach dispatch.
+    expect(mocks.dispatch).not.toHaveBeenCalled();
   });
 });
 

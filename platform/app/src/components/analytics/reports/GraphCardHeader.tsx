@@ -14,6 +14,149 @@ import { GraphFilterIndicator } from "./GraphFilterIndicator";
 const stripPackPrefix = (n: string) =>
   n.replace(/^(North-star|Legacy):\s*/, "");
 
+// Generate fallback title from graph series if name is missing
+function deriveDisplayName(name: string, graph: unknown): string {
+  if (name?.trim()) {
+    return name;
+  }
+
+  if (graph && typeof graph === "object" && "series" in graph) {
+    const graphInput = graph as CustomGraphInput;
+    if (graphInput.series && graphInput.series.length > 0) {
+      const seriesNames = graphInput.series
+        .map((s) => s.name)
+        .filter(Boolean)
+        .join(", ");
+      if (seriesNames) {
+        return seriesNames.replace(/,([^,]*)$/, " and$1");
+      }
+    }
+  }
+
+  return "Untitled Graph";
+}
+
+interface GraphCardAlertButtonProps {
+  graphId: string;
+  trigger?: {
+    id: string;
+    active: boolean;
+    alertType: string | null;
+  } | null;
+  defaultSeriesName: string;
+}
+
+// Add-alert / edit-alert entry points for a graph.
+//
+// Both buttons open the automations drawer (the unified alert-authoring
+// flow introduced in Phase 5.1 of ADR-034) pre-filled with this chart's
+// graphId + series; the bell additionally passes `automationId` so the
+// drawer hydrates the existing trigger row in edit mode. The legacy
+// `customGraphAlert` drawer and its registry entry were removed in this
+// PR — the automations drawer is the only alert-authoring path.
+function GraphCardAlertButton({
+  graphId,
+  trigger,
+  defaultSeriesName,
+}: GraphCardAlertButtonProps) {
+  const { openDrawer } = useDrawer();
+
+  const openEditAlert = () => {
+    if (!trigger) return;
+    openDrawer("automation", {
+      automationId: trigger.id,
+      prefilledGraphId: graphId,
+      prefilledSeriesName: defaultSeriesName,
+    });
+  };
+
+  if (trigger?.active) {
+    return (
+      <Tooltip
+        content="Edit alert"
+        positioning={{ placement: "top" }}
+        showArrow
+      >
+        <Box
+          role="button"
+          aria-label="Edit alert"
+          tabIndex={0}
+          padding={1}
+          cursor="pointer"
+          color="fg"
+          onClick={(e) => {
+            e.stopPropagation();
+            openEditAlert();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              e.stopPropagation();
+              openEditAlert();
+            }
+          }}
+        >
+          <Bell width={18} />
+        </Box>
+      </Tooltip>
+    );
+  }
+
+  return (
+    <Button
+      variant="outline"
+      colorPalette="gray"
+      size="sm"
+      onClick={(e) => {
+        e.stopPropagation();
+        openDrawer("automation", {
+          prefilledGraphId: graphId,
+          prefilledSeriesName: defaultSeriesName,
+        });
+      }}
+    >
+      <Bell width={16} />
+      Add alert
+    </Button>
+  );
+}
+
+interface GraphCardTitleProps {
+  graphId: string;
+  displayName: string;
+  isDashboardWidget: boolean;
+  onRename?: (name: string) => void;
+}
+
+// Renders the widget name as an inline-editable field when this card is a
+// dashboard widget the caller wants renameable; plain static text otherwise.
+function GraphCardTitle({
+  graphId,
+  displayName,
+  isDashboardWidget,
+  onRename,
+}: GraphCardTitleProps) {
+  if (isDashboardWidget && onRename) {
+    return (
+      <EditableWidgetName
+        name={displayName}
+        displayText={stripPackPrefix(displayName)}
+        id={graphId}
+        onRename={onRename}
+        fontSize="13px"
+        fontWeight="500"
+        shouldTruncate
+      />
+    );
+  }
+
+  return (
+    <Text fontSize="13px" fontWeight="500" lineClamp={1} title={displayName}>
+      {stripPackPrefix(displayName)}
+    </Text>
+  );
+}
+
 interface GraphCardHeaderProps {
   graphId: string;
   name: string;
@@ -66,30 +209,10 @@ export function GraphCardHeader({
   onDelete,
   isDeleting,
 }: GraphCardHeaderProps) {
-  const { openDrawer } = useDrawer();
-
-  // Generate fallback title from graph series if name is missing
-  const displayName = useMemo(() => {
-    if (name?.trim()) {
-      return name;
-    }
-
-    // Try to generate a title from the graph data
-    if (graph && typeof graph === "object" && "series" in graph) {
-      const graphInput = graph as CustomGraphInput;
-      if (graphInput.series && graphInput.series.length > 0) {
-        const seriesNames = graphInput.series
-          .map((s) => s.name)
-          .filter(Boolean)
-          .join(", ");
-        if (seriesNames) {
-          return seriesNames.replace(/,([^,]*)$/, " and$1");
-        }
-      }
-    }
-
-    return "Untitled Graph";
-  }, [name, graph]);
+  const displayName = useMemo(
+    () => deriveDisplayName(name, graph),
+    [name, graph],
+  );
 
   // The dashboard chart doesn't expose an interactive "currently selected
   // series" — every series is rendered together. Default the alert author
@@ -123,18 +246,6 @@ export function GraphCardHeader({
     !isDashboardWidget &&
     !!(graphId && graphId !== "custom" && graph);
 
-  // Opens the automations drawer in edit mode for this graph's existing
-  // trigger. Shared by the bell's click and keyboard handlers so both entry
-  // points stay identical.
-  const openEditAlert = () => {
-    if (!trigger) return;
-    openDrawer("automation", {
-      automationId: trigger.id,
-      prefilledGraphId: graphId,
-      prefilledSeriesName: defaultSeriesName,
-    });
-  };
-
   return (
     // The header is the card's drag handle — the grid only starts a move
     // from this class, so the chart body below never does.
@@ -145,87 +256,20 @@ export function GraphCardHeader({
       cursor="grab"
       _active={{ cursor: "grabbing" }}
     >
-      {isDashboardWidget && onRename ? (
-        <EditableWidgetName
-          name={displayName}
-          displayText={stripPackPrefix(displayName)}
-          id={graphId}
-          onRename={onRename}
-          fontSize="13px"
-          fontWeight="500"
-          truncate
-        />
-      ) : (
-        <Text
-          fontSize="13px"
-          fontWeight="500"
-          lineClamp={1}
-          title={displayName}
-        >
-          {stripPackPrefix(displayName)}
-        </Text>
-      )}
+      <GraphCardTitle
+        graphId={graphId}
+        displayName={displayName}
+        isDashboardWidget={isDashboardWidget}
+        {...(onRename ? { onRename } : {})}
+      />
       <Spacer />
 
       {isSavedGraph && (
-        <>
-          {/*
-           * Add-alert / edit-alert entry points for this graph.
-           *
-           * Both buttons open the automations drawer (the unified alert-
-           * authoring flow introduced in Phase 5.1 of ADR-034) pre-filled
-           * with this chart's graphId + series; the bell additionally
-           * passes `automationId` so the drawer hydrates the existing
-           * trigger row in edit mode. The legacy `customGraphAlert`
-           * drawer and its registry entry were removed in this PR — the
-           * automations drawer is the only alert-authoring path.
-           */}
-          {trigger?.active ? (
-            <Tooltip
-              content="Edit alert"
-              positioning={{ placement: "top" }}
-              showArrow
-            >
-              <Box
-                role="button"
-                aria-label="Edit alert"
-                tabIndex={0}
-                padding={1}
-                cursor="pointer"
-                color="fg"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openEditAlert();
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    openEditAlert();
-                  }
-                }}
-              >
-                <Bell width={18} />
-              </Box>
-            </Tooltip>
-          ) : (
-            <Button
-              variant="outline"
-              colorPalette="gray"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                openDrawer("automation", {
-                  prefilledGraphId: graphId,
-                  prefilledSeriesName: defaultSeriesName,
-                });
-              }}
-            >
-              <Bell width={16} />
-              Add alert
-            </Button>
-          )}
-        </>
+        <GraphCardAlertButton
+          graphId={graphId}
+          trigger={trigger}
+          defaultSeriesName={defaultSeriesName}
+        />
       )}
 
       {hasFilters && (

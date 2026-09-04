@@ -138,7 +138,9 @@ export function disabledSkillIds(
 ): string[] {
   return ids.filter((id) => {
     const gate = SKILL_GATES.get(id);
-    return gate !== undefined && !isSkillAvailable(gate, isFlagEnabled);
+    return (
+      gate !== undefined && !isSkillAvailable({ skill: gate, isFlagEnabled })
+    );
   });
 }
 

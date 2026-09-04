@@ -3,6 +3,7 @@ import { createSpinner } from "../../utils/spinner";
 import { DashboardWidgetsApiService } from "@/client-sdk/services/dashboard-widgets/dashboard-widgets-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
+import { sanitizeTerminalText } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
 import {
   WidgetInputError,
@@ -46,19 +47,21 @@ export const updateDashboardWidgetCommand = async (
   const spinner = createSpinner(`Updating widget "${id}"...`).start();
 
   try {
-    const widget = await service.update(id, {
+    const widget = await service.update({
+      id,
       ...(options.name === undefined ? {} : { name: options.name }),
       ...(definition === undefined ? {} : { definition }),
     });
 
-    spinner.succeed(`Updated widget "${widget.name}"`);
+    const safeName = sanitizeTerminalText(widget.name);
+    spinner.succeed(`Updated widget "${safeName}"`);
 
     return {
       data: widget,
       table: () => {
         console.log();
         console.log(`  ${chalk.gray("ID:")}   ${chalk.green(widget.id)}`);
-        console.log(`  ${chalk.gray("Name:")} ${chalk.cyan(widget.name)}`);
+        console.log(`  ${chalk.gray("Name:")} ${chalk.cyan(safeName)}`);
         console.log();
       },
     };

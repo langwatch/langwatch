@@ -85,10 +85,13 @@ const skillParams = Type.Object({
   ),
 });
 
-export function createSkillExtension(
-  skillsDir: string | undefined,
-  disabledSkills?: string[],
-): InlineExtension {
+export function createSkillExtension({
+  skillsDir,
+  disabledSkills,
+}: {
+  skillsDir: string | undefined;
+  disabledSkills?: string[];
+}): InlineExtension {
   const disabled = new Set(disabledSkills);
   // Filtered before the inventory line and the execute closure both read
   // `skills`, so a flag-gated-off id is absent from what the model is told

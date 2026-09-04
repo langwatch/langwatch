@@ -200,11 +200,22 @@ function QueryNameField({
   }
   return (
     <Span
+      role="button"
+      tabIndex={0}
+      aria-label={`Rename query ${queryName || "(unnamed query)"}`}
       fontFamily="mono"
       fontSize="13px"
       truncate
       cursor="pointer"
       onClick={edit.startEditing}
+      onKeyDown={(e) => {
+        // A focusable span is not a real button; activate Enter/Space by hand
+        // so the rename stays reachable without a pointer.
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          edit.startEditing();
+        }
+      }}
     >
       {queryName || "(unnamed query)"}
     </Span>

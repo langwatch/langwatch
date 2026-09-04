@@ -26,6 +26,7 @@ import {
   nextQueryName,
   queryNamesAreValid,
 } from "./DashboardWidgetQueriesPanel";
+import { declaredParamsAreValid } from "./DashboardWidgetQueryParamsEditor";
 import { EditableWidgetName } from "./EditableWidgetName";
 import type { QueryLastRun } from "./useDashboardWidgetExecutor";
 
@@ -70,7 +71,8 @@ export function DashboardWidgetEditDrawer({
   activeTab,
   onTabChange,
 }: DashboardWidgetEditDrawerProps) {
-  const canSave = isDirty && queryNamesAreValid(queries);
+  const canSave =
+    isDirty && queryNamesAreValid(queries) && declaredParamsAreValid(queries);
 
   return (
     <Drawer.Root

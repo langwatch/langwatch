@@ -2,7 +2,11 @@ import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import { DashboardWidgetsApiService } from "@/client-sdk/services/dashboard-widgets/dashboard-widgets-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
-import { formatTable, formatRelativeTime } from "../../utils/formatting";
+import {
+  formatTable,
+  formatRelativeTime,
+  sanitizeTerminalText,
+} from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 
@@ -44,7 +48,7 @@ export const listDashboardWidgetsCommand = async (options?: {
         console.log();
 
         const tableData = widgets.map((w) => ({
-          Name: w.name,
+          Name: sanitizeTerminalText(w.name),
           ID: w.id,
           Updated: formatRelativeTime(w.updatedAt),
         }));

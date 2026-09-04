@@ -43,8 +43,34 @@ export function buildAuthorRuntimeScript(): string {
       panel.style.display = "block";
     }
     if (window.LW && typeof window.LW.error === "function") {
-      window.LW.error(title);
+      // Forward the detail too, not just the title — otherwise the parent's
+      // log panel gets "Compile error" with no Babel message, "Render error"
+      // with no stack text, and the useful part stays trapped in the iframe.
+      window.LW.error(detail ? title + ": " + detail : title);
     }
+  }
+
+  // A class error boundary: render-phase throws in author code do NOT surface
+  // through the try/catch around createRoot().render() — React 18 defers the
+  // render and reports the failure to the root, not the caller — so the boundary
+  // is what turns a widget crash into the same readable panel a compile error
+  // gets, instead of a blank frame plus a console rethrow.
+  function makeErrorBoundary(React) {
+    function ErrorBoundary(props) {
+      React.Component.call(this, props);
+      this.state = { crashed: false };
+    }
+    ErrorBoundary.prototype = Object.create(React.Component.prototype);
+    ErrorBoundary.getDerivedStateFromError = function () {
+      return { crashed: true };
+    };
+    ErrorBoundary.prototype.componentDidCatch = function (error) {
+      showError("Widget crashed while rendering", error && error.message);
+    };
+    ErrorBoundary.prototype.render = function () {
+      return this.state.crashed ? null : this.props.children;
+    };
+    return ErrorBoundary;
   }
 
   window.__lwActivateAuthor = function () {
@@ -107,7 +133,14 @@ export function buildAuthorRuntimeScript(): string {
 
     var root = document.getElementById("lw-root");
     try {
-      window.ReactDOM.createRoot(root).render(window.React.createElement(Component));
+      var ErrorBoundary = makeErrorBoundary(window.React);
+      window.ReactDOM.createRoot(root).render(
+        window.React.createElement(
+          ErrorBoundary,
+          null,
+          window.React.createElement(Component)
+        )
+      );
     } catch (renderError) {
       showError("Render error", renderError.message);
     }

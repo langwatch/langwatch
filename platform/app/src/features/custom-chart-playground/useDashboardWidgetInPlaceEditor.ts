@@ -25,13 +25,13 @@ export function useDashboardWidgetInPlaceEditor({
   projectSlug: string;
   timeWindow: { start: number; end: number };
   onClose: () => void;
-  onSave: (
-    draft: DashboardWidgetDraft,
-    options: { onSuccess: () => void },
-  ) => void;
+  onSave: (args: {
+    draft: DashboardWidgetDraft;
+    onSuccess: () => void;
+  }) => void;
 }) {
   const [activeTab, setActiveTab] = useState<"code" | "queries">("code");
-  const draft = useWidgetDraft(widget);
+  const draft = useWidgetDraft({ widget });
   const preview = useWidgetPreview({
     code: draft.draftCode,
     queries: draft.draftQueries,
@@ -43,18 +43,21 @@ export function useDashboardWidgetInPlaceEditor({
 
   const handleClose = () => {
     draft.resetToWidget();
+    // Flush the preview back to the persisted widget synchronously, so a
+    // discarded edit can't linger for one debounce into the next open.
+    preview.resetPreview(widget.code, widget.queries);
     onClose();
   };
 
   const handleSave = () => {
-    onSave(
-      {
+    onSave({
+      draft: {
         name: draft.draftName,
         code: draft.draftCode,
         queries: draft.draftQueries,
       },
-      { onSuccess: onClose },
-    );
+      onSuccess: onClose,
+    });
   };
 
   return {

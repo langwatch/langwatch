@@ -170,7 +170,7 @@ function CardHeader({
           onRename={vm.handleRename}
           fontSize="sm"
           fontWeight="bold"
-          truncate
+          shouldTruncate
         />
       </Box>
 

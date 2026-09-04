@@ -47,6 +47,24 @@ export function queryNamesAreValid(queries: DashboardWidgetQuery[]): boolean {
   );
 }
 
+/**
+ * Realigns the index-keyed open-accordion values after the row at
+ * `removedIndex` is removed: drop that row's value and shift every value above
+ * it down by one, so an open row below the deleted one keeps its open state
+ * instead of being read against a now-shifted (or missing) index.
+ */
+export function remapOpenValuesAfterRemoval(
+  openValues: string[],
+  removedIndex: number,
+): string[] {
+  return openValues
+    .filter((value) => Number(value) !== removedIndex)
+    .map((value) => {
+      const openIndex = Number(value);
+      return openIndex > removedIndex ? String(openIndex - 1) : value;
+    });
+}
+
 interface DashboardWidgetQueriesPanelProps {
   queries: DashboardWidgetQuery[];
   onChange: (queries: DashboardWidgetQuery[]) => void;
@@ -79,6 +97,16 @@ export function DashboardWidgetQueriesPanel({
   // The row's own value in the accordion — index-based, matching the key
   // below: a name mid-rename must not detach a row from its open/closed state.
   const valueOf = (index: number) => String(index);
+
+  // Removing a row shifts every later row's index down by one, so the
+  // index-keyed openValues must be remapped in the same beat — otherwise an
+  // open row below the deleted one would be read against the wrong (or a
+  // now-missing) index and lose its open state. Drop the deleted value and
+  // decrement every value above it.
+  const handleRemove = (index: number) => {
+    onChange(queries.filter((_, i) => i !== index));
+    setOpenValues((prev) => remapOpenValuesAfterRemoval(prev, index));
+  };
 
   // Opens the first query by default — a drawer landing on this tab with
   // every row collapsed makes a member click through before they see any
@@ -137,7 +165,7 @@ export function DashboardWidgetQueriesPanel({
               updated[index] = next;
               onChange(updated);
             }}
-            onRemove={() => onChange(queries.filter((_, i) => i !== index))}
+            onRemove={() => handleRemove(index)}
             canRemove={queries.length > 1}
             onRun={() => void handleRun(query)}
             isRunning={runningNames.has(query.name)}

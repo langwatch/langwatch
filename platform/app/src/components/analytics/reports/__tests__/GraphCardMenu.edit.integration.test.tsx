@@ -87,6 +87,29 @@ describe("a card's Edit menu item", () => {
     });
   });
 
+  describe("given a dashboard widget whose payload failed to parse", () => {
+    /** @scenario "Edit opens the widget editor in place" */
+    it("offers no Edit item when onEdit is absent — the builder can't edit it", async () => {
+      const user = userEvent.setup();
+      render(
+        <GraphCardMenu
+          graphId="graph_1"
+          projectId="project_test"
+          projectSlug="proj"
+          isDashboardWidget
+          onDelete={vi.fn()}
+          isDeleting={false}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      await user.click(screen.getByRole("button"));
+
+      expect(screen.queryByText(/^Edit$/)).not.toBeInTheDocument();
+      expect(push).not.toHaveBeenCalled();
+    });
+  });
+
   describe("given a workbench chart", () => {
     it("offers no Edit item — a saved LangWatchQL chart has no editor surface anymore", async () => {
       const user = userEvent.setup();

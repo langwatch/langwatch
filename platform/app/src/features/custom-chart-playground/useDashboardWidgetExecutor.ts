@@ -5,7 +5,7 @@
  * one underlying `execute` call, so a query can never validate or run
  * differently depending on which one invoked it:
  *
- *  - `executeQuery` — the bridge-facing `(queryName, params, signal)` the live
+ *  - `executeQuery` — the bridge-facing `({ queryName, params, signal })` the live
  *    Chart view calls on `LW.query`. Resolves `queryName` against whatever
  *    `queries` the card passes in — the card's own debounced preview of the
  *    drawer's draft, so a query edit reaches the running chart the same
@@ -117,7 +117,7 @@ export function useDashboardWidgetExecutor(
   );
 
   const executeQuery: ChartFrameExecuteQuery = useCallback(
-    async (queryName, params, signal) => {
+    async ({ queryName, params, signal }) => {
       const query = queries.find((q) => q.name === queryName);
       if (!query) {
         const error: ChartQueryError = {

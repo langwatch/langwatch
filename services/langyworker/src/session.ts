@@ -144,7 +144,10 @@ export async function createLangySession({
     extensionFactories: [
       createSystemPromptExtension(systemPrompt),
       createTodowriteExtension(),
-      createSkillExtension(config.skillsDir, config.disabledSkills),
+      createSkillExtension({
+        skillsDir: config.skillsDir,
+        disabledSkills: config.disabledSkills,
+      }),
     ],
   });
   await resourceLoader.reload();

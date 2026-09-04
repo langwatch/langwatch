@@ -45,10 +45,10 @@ export interface SandboxedChartFrameProps {
    * router to navigate with (or that hasn't wired one up yet) can simply
    * omit this — frameBridge no-ops safely when it's absent.
    */
-  onNavigate?: (
-    target: string,
-    params: Readonly<Record<string, unknown>>,
-  ) => void;
+  onNavigate?: (args: {
+    target: string;
+    params: Readonly<Record<string, unknown>>;
+  }) => void;
   /**
    * Upper bound on the frame's rendered height, in px. Defaults to the
    * protocol ceiling. A widget passes its card's row-span height so a taller
@@ -104,14 +104,12 @@ export function SandboxedChartFrame({
     if (!iframe) return;
     const bridge = createFrameBridge({
       iframe,
-      executeQuery: (queryName, params, signal) =>
-        executeQueryRef.current(queryName, params, signal),
+      executeQuery: (args) => executeQueryRef.current(args),
       dashboardContext: initialDashboardContextRef.current,
       params: paramsRef.current,
       onLog: (entry) => onLogRef.current(entry),
       onHeightChange: setHeight,
-      onNavigate: (target, navParams) =>
-        onNavigateRef.current?.(target, navParams),
+      onNavigate: (args) => onNavigateRef.current?.(args),
       onTeardown: noteTornDown,
     });
     bridgeRef.current = bridge;

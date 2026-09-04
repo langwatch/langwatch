@@ -993,16 +993,39 @@ export interface HeatmapProps {
   height?: number;
 }
 
-function interpolateColor(from: string, to: string, t: number): string {
-  const parse = (hex: string) => {
-    const n = hex.replace("#", "");
-    return [0, 2, 4].map((i) => parseInt(n.slice(i, i + 2), 16));
-  };
-  const [r1, g1, b1] = parse(from);
-  const [r2, g2, b2] = parse(to);
-  const mix = (a: number, b: number) =>
-    Math.round((a as number) + ((b as number) - (a as number)) * t);
-  return `rgb(${mix(r1 as number, r2 as number)}, ${mix(g1 as number, g2 as number)}, ${mix(b1 as number, b2 as number)})`;
+/** The default heatmap scale, also the fallback for an unparsable colorScale. */
+const HEATMAP_FALLBACK_SCALE: [string, string] = ["#eef2ff", "#4338ca"];
+
+/**
+ * Parses `#rgb` or `#rrggbb` to an [r, g, b] triple, or null for anything
+ * else. Author `colorScale` is compiled by Babel with no type checking, so a
+ * 3-digit shorthand (`#abc`) reaches here as ordinary CSS — expand it rather
+ * than let `parseInt("", 16)` produce NaN and blank every cell.
+ */
+export function parseHexRgb(hex: string): [number, number, number] | null {
+  const body = hex.trim().replace("#", "");
+  const full =
+    body.length === 3
+      ? body
+          .split("")
+          .map((char) => char + char)
+          .join("")
+      : body;
+  if (!/^[0-9a-f]{6}$/i.test(full)) return null;
+  return [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16)) as [
+    number,
+    number,
+    number,
+  ];
+}
+
+export function interpolateColor(from: string, to: string, t: number): string {
+  const [r1, g1, b1] =
+    parseHexRgb(from) ?? parseHexRgb(HEATMAP_FALLBACK_SCALE[0])!;
+  const [r2, g2, b2] =
+    parseHexRgb(to) ?? parseHexRgb(HEATMAP_FALLBACK_SCALE[1])!;
+  const mix = (a: number, b: number) => Math.round(a + (b - a) * t);
+  return `rgb(${mix(r1, r2)}, ${mix(g1, g2)}, ${mix(b1, b2)})`;
 }
 
 export function Heatmap({

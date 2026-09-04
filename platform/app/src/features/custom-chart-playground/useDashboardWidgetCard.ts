@@ -49,6 +49,7 @@ export function useDashboardWidgetCard({
   onSave: SaveWidget;
 }) {
   const [rangeKey, setRangeKey] = useState<RangeKey>("24h");
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   // Memo on rangeKey only — a fresh {start, end} identity every render would
   // loop the executor's refetch.
   const timeWindow = useMemo(() => {
@@ -56,7 +57,9 @@ export function useDashboardWidgetCard({
     return { start: end - RANGE_MS[rangeKey], end };
   }, [rangeKey]);
 
-  const draft = useWidgetDraft(widget);
+  // Frozen while the drawer edits: the drawer previews the live draft, so a
+  // background refetch must not reseed and overwrite an in-progress edit.
+  const draft = useWidgetDraft({ widget, isFrozen: isDrawerOpen });
   const preview = useWidgetPreview({
     code: draft.draftCode,
     queries: draft.draftQueries,
@@ -73,7 +76,14 @@ export function useDashboardWidgetCard({
     resetKey: preview.previewCode,
   });
 
-  const drawer = useDashboardWidgetCardDrawer({ widget, draft, onSave });
+  const drawer = useDashboardWidgetCardDrawer({
+    widget,
+    draft,
+    preview,
+    onSave,
+    isDrawerOpen,
+    setIsDrawerOpen,
+  });
 
   return {
     ...preview,
@@ -93,13 +103,18 @@ export function useDashboardWidgetCard({
 function useDashboardWidgetCardDrawer({
   widget,
   draft,
+  preview,
   onSave,
+  isDrawerOpen,
+  setIsDrawerOpen,
 }: {
   widget: DashboardWidget;
   draft: ReturnType<typeof useWidgetDraft>;
+  preview: ReturnType<typeof useWidgetPreview>;
   onSave: SaveWidget;
+  isDrawerOpen: boolean;
+  setIsDrawerOpen: (open: boolean) => void;
 }) {
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [drawerTab, setDrawerTab] = useState<"code" | "queries">("code");
 
   const handleSave = () => {
@@ -134,9 +149,12 @@ function useDashboardWidgetCardDrawer({
 
   // Reverts the draft AND closes — covers Cancel, the drawer's own close
   // trigger, and clicking outside it, so none of the three can leave a
-  // discarded edit sitting in the draft for the next open to reveal.
+  // discarded edit sitting in the draft for the next open to reveal. The
+  // preview is flushed with it so the next open can't flash the discarded
+  // edit for one debounce.
   const handleClose = () => {
     draft.resetToWidget();
+    preview.resetPreview(widget.code, widget.queries);
     setIsDrawerOpen(false);
   };
 

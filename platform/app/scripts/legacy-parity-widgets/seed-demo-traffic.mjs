@@ -38,8 +38,24 @@ if (!apiKey) {
   console.error("Missing required env var LW_API_KEY");
   process.exit(1);
 }
-const DAYS = Number(process.env.DAYS ?? 30);
-const PER_DAY = Number(process.env.PER_DAY ?? 40);
+// Both drive unbounded `for` loops below, so a non-finite, non-integer,
+// negative or absurdly large value would spin forever or exhaust memory.
+// Validate and cap before generating anything.
+function positiveIntEnv(name, fallback, max) {
+  const raw = process.env[name];
+  if (raw === undefined) return fallback;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 1 || value > max) {
+    console.error(
+      `Invalid ${name}=${raw}: expected an integer between 1 and ${max}.`,
+    );
+    process.exit(1);
+  }
+  return value;
+}
+
+const DAYS = positiveIntEnv("DAYS", 30, 3650);
+const PER_DAY = positiveIntEnv("PER_DAY", 40, 100000);
 
 // Locality guard: this script POSTs an ingestion key to LW_ENDPOINT. Refuse
 // anything but a local host so a stray env var can't leak the key or spam a
@@ -167,19 +183,26 @@ const CUSTOMERS = Array.from(
 );
 
 // pre-build a pool of threads (some multi-trace) to feed avg-traces/thread
-const THREAD_POOL = Array.from({ length: 120 }, (_, i) => ({
-  threadId: `demo-thread-${i + 1}`,
-  userId: pick(USERS),
-  customerId: pick(CUSTOMERS),
-  size: weightedPick([
-    { value: 1, weight: 60 },
-    { value: 2, weight: 20 },
-    { value: 3, weight: 10 },
-    { value: 4, weight: 6 },
-    { value: 5, weight: 4 },
-  ]),
-  used: 0,
-}));
+let threadCounter = 0;
+
+function makeThread() {
+  threadCounter++;
+  return {
+    threadId: `demo-thread-${threadCounter}`,
+    userId: pick(USERS),
+    customerId: pick(CUSTOMERS),
+    size: weightedPick([
+      { value: 1, weight: 60 },
+      { value: 2, weight: 20 },
+      { value: 3, weight: 10 },
+      { value: 4, weight: 6 },
+      { value: 5, weight: 4 },
+    ]),
+    used: 0,
+  };
+}
+
+const THREAD_POOL = Array.from({ length: 120 }, makeThread);
 
 function nextThread() {
   // reuse a thread with remaining capacity ~40% of the time, else start fresh
@@ -189,8 +212,13 @@ function nextThread() {
     t.used++;
     return t;
   }
-  const t = pick(THREAD_POOL);
+  // Start fresh: a brand-new thread, never an already-exhausted one from the
+  // pool. Picking an exhausted thread would push its `used` past `size` and
+  // inflate avg_traces_per_thread — the default run emits far more traces than
+  // the pool's capacity, so the pool is routinely exhausted here.
+  const t = makeThread();
   t.used++;
+  THREAD_POOL.push(t);
   return t;
 }
 

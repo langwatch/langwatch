@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useColorMode } from "~/components/ui/color-mode";
 import type { DashboardWidgetQuery } from "~/server/analytics/dashboardWidgetDefinition";
@@ -49,6 +49,18 @@ export function useWidgetPreview({
     return () => clearTimeout(timer);
   }, [code, queries]);
 
+  // Immediately seed the preview, bypassing the debounce. A drawer open/close
+  // resets the draft, but the debounced preview would keep showing the just-
+  // discarded edit for PREVIEW_DEBOUNCE_MS on the next open — a stale frame the
+  // caller flushes past by seeding the reset values synchronously.
+  const resetPreview = useCallback(
+    (nextCode: string, nextQueries: DashboardWidgetQuery[]) => {
+      setPreviewCode(nextCode);
+      setPreviewQueries(nextQueries);
+    },
+    [],
+  );
+
   const {
     executeQuery,
     runStandalone,
@@ -87,6 +99,7 @@ export function useWidgetPreview({
   return {
     previewCode,
     previewQueries,
+    resetPreview,
     executeQuery,
     runStandalone,
     lastRuns,

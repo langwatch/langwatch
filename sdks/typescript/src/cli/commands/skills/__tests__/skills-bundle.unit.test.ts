@@ -16,9 +16,20 @@ import {
 const REPO_ROOT = path.join(__dirname, "../../../../../../../");
 const SKILLS_ROOT = path.join(REPO_ROOT, "skills");
 
+/**
+ * Whether a skill's opening YAML frontmatter declares a `feature-flag:` key.
+ * Scoped to the frontmatter block ONLY: matching anywhere in the file would let
+ * a `feature-flag:` line inside a fenced body example wrongly exclude a
+ * publishable skill from the bundle.
+ */
+const frontmatterIsFlagGated = (source: string): boolean => {
+  const frontmatter = /^---\n([\s\S]*?)\n---/.exec(source)?.[1] ?? "";
+  return /^feature-flag:\s*\S+/m.test(frontmatter);
+};
+
 /** A skill's own SKILL.mdx frontmatter says whether it's gated by a feature flag. */
 const isFlagGated = (src: string): boolean =>
-  /^feature-flag:\s*\S+/m.test(fs.readFileSync(src, "utf8"));
+  frontmatterIsFlagGated(fs.readFileSync(src, "utf8"));
 
 /**
  * The published set, read from the same sources the codegen reads. Skills
@@ -60,6 +71,33 @@ const skill = (slug: string): BundledSkill => {
   if (!found) throw new Error(`test setup: no bundled skill ${slug}`);
   return found;
 };
+
+describe("frontmatterIsFlagGated", () => {
+  describe("given a feature-flag key in the opening frontmatter", () => {
+    it("reports the skill as gated", () => {
+      const source = ["---", "feature-flag: release_x", "---", "# Body"].join(
+        "\n",
+      );
+      expect(frontmatterIsFlagGated(source)).toBe(true);
+    });
+  });
+
+  describe("given feature-flag only inside a body example", () => {
+    it("does not report the skill as gated", () => {
+      const source = [
+        "---",
+        "name: my-skill",
+        "---",
+        "# Body",
+        "",
+        "```yaml",
+        "feature-flag: release_x",
+        "```",
+      ].join("\n");
+      expect(frontmatterIsFlagGated(source)).toBe(false);
+    });
+  });
+});
 
 describe("the embedded skills bundle", () => {
   it("matches skills/version.txt", () => {

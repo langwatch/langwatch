@@ -1,12 +1,16 @@
 import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
-import { DashboardWidgetsApiService } from "@/client-sdk/services/dashboard-widgets/dashboard-widgets-api.service";
+import {
+  DashboardWidgetsApiError,
+  DashboardWidgetsApiService,
+} from "@/client-sdk/services/dashboard-widgets/dashboard-widgets-api.service";
 import {
   DashboardsApiService,
   type DashboardSummary,
 } from "@/client-sdk/services/dashboards/dashboards-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
+import { sanitizeTerminalText } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
 
 /**
@@ -15,14 +19,26 @@ import type { CommandResult } from "../../utils/output";
  * Tries it as an id first — the common case, and the cheapest — then falls
  * back to a name match across the project's widgets.
  */
-async function resolveWidgetRef(
-  widgets: DashboardWidgetsApiService,
-  ref: string,
-) {
+async function resolveWidgetRef({
+  widgets,
+  ref,
+}: {
+  widgets: DashboardWidgetsApiService;
+  ref: string;
+}) {
   try {
     return await widgets.get(ref);
-  } catch {
-    // Not an id (or not found by id) — fall back to a name match.
+  } catch (error) {
+    // Only a genuine "no widget with this id" (404) may fall through to a name
+    // match. Auth, network, and 5xx failures are real and must reach the
+    // caller — swallowing them would silently reinterpret the ref as a name
+    // and hide the actual problem.
+    if (
+      !(error instanceof DashboardWidgetsApiError) ||
+      error.status !== 404
+    ) {
+      throw error;
+    }
   }
 
   const { data } = await widgets.list();
@@ -37,10 +53,13 @@ async function resolveWidgetRef(
 }
 
 /** Resolves a dashboard reference (id or name) to the dashboard it names. */
-async function resolveDashboardRef(
-  dashboards: DashboardsApiService,
-  ref: string,
-): Promise<DashboardSummary> {
+async function resolveDashboardRef({
+  dashboards,
+  ref,
+}: {
+  dashboards: DashboardsApiService;
+  ref: string;
+}): Promise<DashboardSummary> {
   const { data } = await dashboards.list();
   const byId = data.find((d) => d.id === ref);
   if (byId) return byId;
@@ -75,23 +94,33 @@ export const pinDashboardWidgetCommand = async (
   const spinner = createSpinner(`Adding "${widgetRef}" to dashboard...`).start();
 
   try {
-    const widgetBefore = await resolveWidgetRef(widgets, widgetRef);
-    const dashboard = await resolveDashboardRef(dashboards, options.dashboard);
+    const widgetBefore = await resolveWidgetRef({ widgets, ref: widgetRef });
+    const dashboard = await resolveDashboardRef({
+      dashboards,
+      ref: options.dashboard,
+    });
 
-    const widget = await widgets.assignDashboard(widgetBefore.id, {
+    const widget = await widgets.assignDashboard({
+      id: widgetBefore.id,
       dashboardId: dashboard.id,
     });
 
+    const safeWidgetName = sanitizeTerminalText(widget.name);
+    const safeDashboardName = sanitizeTerminalText(dashboard.name);
     spinner.succeed(
-      `Added "${widget.name}" to dashboard "${dashboard.name}"`,
+      `Added "${safeWidgetName}" to dashboard "${safeDashboardName}"`,
     );
 
     return {
       data: { widget, dashboard },
       table: () => {
         console.log();
-        console.log(`  ${chalk.gray("Widget:")}    ${chalk.cyan(widget.name)}`);
-        console.log(`  ${chalk.gray("Dashboard:")} ${chalk.cyan(dashboard.name)}`);
+        console.log(
+          `  ${chalk.gray("Widget:")}    ${chalk.cyan(safeWidgetName)}`,
+        );
+        console.log(
+          `  ${chalk.gray("Dashboard:")} ${chalk.cyan(safeDashboardName)}`,
+        );
         console.log();
       },
     };

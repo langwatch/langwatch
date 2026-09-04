@@ -249,10 +249,10 @@ export function buildShimScript(): string {
   };
 
   /**
-   * Live view of LW.params — author-declared parameters and their current
-   * values. Re-renders on change via the same subscription mechanism as
-   * useDashboardContext; there is no dashboard-side UI to change params yet,
-   * so today this only ever reflects the widget's declared defaults.
+   * Snapshot of LW.params — author-declared parameters and their values as
+   * delivered on lw:init. Unlike useDashboardContext there is no params-change
+   * message in the protocol, so params are fixed for the frame's lifetime and
+   * this does NOT re-render on change; it returns the same defaults every call.
    */
   LW.useParams = function () {
     var React = window.React;

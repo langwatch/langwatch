@@ -49,6 +49,18 @@ const MAX_CODE_LENGTH = 200_000;
 export const DASHBOARD_CONTEXT_PARAMETER_PREFIX = "dashboard_context_";
 
 /**
+ * Property names that must never become a parameter: assigning to one on a
+ * plain object mutates the prototype chain rather than adding an own key, so
+ * the bound value would be silently lost (and, for `__proto__`, is a
+ * prototype-pollution vector). Rejected at the declaration schema.
+ */
+const FORBIDDEN_PARAMETER_NAMES = new Set([
+  "__proto__",
+  "constructor",
+  "prototype",
+]);
+
+/**
  * Bound automatically by the executor from the page's window/granularity —
  * never an author-declared parameter. A query names one of these the same way
  * the `lwql-charts` skill's SQL does; declaring a parameter under one of
@@ -101,6 +113,17 @@ const queryParameterDeclarationSchema = z
       .refine(
         (name) => !name.startsWith(DASHBOARD_CONTEXT_PARAMETER_PREFIX),
         `The "${DASHBOARD_CONTEXT_PARAMETER_PREFIX}" prefix is reserved for the dashboard context — pick a different parameter name`,
+      )
+      // `QUERY_NAME_PATTERN` admits `__proto__`, `constructor` and
+      // `prototype`, but binding one is a footgun: `validated[name] = value`
+      // on a plain object would mutate the prototype (or a builtin) instead of
+      // adding an own key, so the value is silently dropped. Refuse the name
+      // at the schema rather than lose the value at bind time.
+      .refine(
+        (name) => !FORBIDDEN_PARAMETER_NAMES.has(name),
+        (name) => ({
+          message: `"${name}" is a reserved JavaScript property name — pick a different parameter name`,
+        }),
       ),
     type: queryParameterTypeSchema,
     /**
@@ -224,12 +247,15 @@ export function validateDashboardWidgetQueryParams(
     };
   }
 
-  const validated: Record<string, DashboardWidgetQueryParamValue> = {};
+  // Null-prototype so a declared name that slipped past the schema still can
+  // never reach `Object.prototype`; the assign below adds only own keys.
+  const validated: Record<string, DashboardWidgetQueryParamValue> =
+    Object.create(null);
   for (const declaration of declared) {
-    const resolved = resolveDeclaredParam(
+    const resolved = resolveDeclaredParam({
       declaration,
-      params[declaration.name],
-    );
+      value: params[declaration.name],
+    });
     if (!resolved.ok) return resolved;
     validated[declaration.name] = resolved.value;
   }
@@ -238,10 +264,13 @@ export function validateDashboardWidgetQueryParams(
 }
 
 /** One declared parameter's value: from `params`, its default, or a rejection. */
-function resolveDeclaredParam(
-  declaration: DashboardWidgetQueryParameterDeclaration,
-  value: unknown,
-):
+function resolveDeclaredParam({
+  declaration,
+  value,
+}: {
+  declaration: DashboardWidgetQueryParameterDeclaration;
+  value: unknown;
+}):
   | { ok: true; value: DashboardWidgetQueryParamValue }
   | { ok: false; error: DashboardWidgetQueryParamError } {
   if (value === undefined) {
@@ -267,9 +296,20 @@ function resolveDeclaredParam(
       },
     };
   }
-  // `typeof value !== declaration.type` above already proved `value` is one
-  // of the three JS primitives `DashboardWidgetQueryParamValue` allows — the
-  // `declaration.type` union isn't a literal, so TS can't narrow `unknown`
-  // through it on its own.
-  return { ok: true, value: value as DashboardWidgetQueryParamValue };
+  // Right JS type, but the value still has to satisfy the same bounds a
+  // *declared default* does (string length, finite number) — the endpoint
+  // binds it verbatim, so an over-long string or a non-finite number is
+  // refused here rather than handed to ClickHouse.
+  const bounded = queryParameterValueSchema.safeParse(value);
+  if (!bounded.success) {
+    return {
+      ok: false,
+      error: {
+        code: "dashboard_widget_query_invalid_param",
+        title: "Invalid query parameter value",
+        message: `"${declaration.name}" is out of the allowed range for a ${declaration.type}.`,
+      },
+    };
+  }
+  return { ok: true, value: bounded.data };
 }

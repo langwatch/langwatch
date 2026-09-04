@@ -29,6 +29,9 @@ import type {
 } from "./bridgeProtocol";
 import { CHART_FRAME_HEARTBEAT_TIMEOUT_MS } from "./bridgeProtocol";
 
+/** Upper bound on simultaneously in-flight `lw:query` requests per frame. */
+const MAX_CONCURRENT_QUERIES = 8;
+
 /**
  * Runs one of the widget's declared queries for the frame, by name, with the
  * frame's param values. The parent resolves the name to SQL, validates the
@@ -36,11 +39,11 @@ import { CHART_FRAME_HEARTBEAT_TIMEOUT_MS } from "./bridgeProtocol";
  * {@link ChartQueryError} before rejecting — the bridge forwards whatever it
  * is given and never reads `error.message` itself.
  */
-export type ChartFrameExecuteQuery = (
-  queryName: string,
-  params: Readonly<Record<string, ChartQueryParamValue>>,
-  signal: AbortSignal,
-) => Promise<ChartQueryResult>;
+export type ChartFrameExecuteQuery = (args: {
+  queryName: string;
+  params: Readonly<Record<string, ChartQueryParamValue>>;
+  signal: AbortSignal;
+}) => Promise<ChartQueryResult>;
 
 export interface ChartFrameLogEntry {
   readonly level: LwLogMessage["level"];
@@ -63,10 +66,10 @@ export interface CreateFrameBridgeOptions {
    * message is silently dropped (a no-op is the correct behavior when a
    * widget host has no router to navigate with).
    */
-  readonly onNavigate?: (
-    target: string,
-    params: Readonly<Record<string, unknown>>,
-  ) => void;
+  readonly onNavigate?: (args: {
+    target: string;
+    params: Readonly<Record<string, unknown>>;
+  }) => void;
   /** Called once when the watchdog kills the frame. */
   readonly onTeardown: () => void;
 }
@@ -140,11 +143,28 @@ export function createFrameBridge(
     queryName: string,
     params: Readonly<Record<string, ChartQueryParamValue>>,
   ) => {
+    // Bound in-flight queries: author code can fire an unbounded fan-out
+    // (a render loop calling LW.query, a large Promise.all), and each one is
+    // a real backend request. Past the cap, reject immediately rather than
+    // pile onto the executor. Settled requests are dropped from activeAborts
+    // below, so the slot frees as soon as one resolves.
+    if (activeAborts.size >= MAX_CONCURRENT_QUERIES && port) {
+      port.postMessage({
+        type: "lw:query-error",
+        requestId,
+        error: {
+          code: "dashboard_widget_query_overloaded",
+          title: "Too many queries at once",
+          message: `A widget may run at most ${MAX_CONCURRENT_QUERIES} queries at a time. This one was not started.`,
+        },
+      });
+      return;
+    }
     // Each request gets its own abort controller, so concurrent queries
     // (e.g. Promise.all of two LW.query calls) don't cancel one another.
     const abort = new AbortController();
     activeAborts.set(requestId, abort);
-    executeQuery(queryName, params, abort.signal).then(
+    executeQuery({ queryName, params, signal: abort.signal }).then(
       (result) => {
         // A reply for a request we've already forgotten (torn down, or this
         // exact requestId already settled) is dropped.
@@ -178,7 +198,7 @@ export function createFrameBridge(
         onHeightChange(message.px);
         return;
       case "lw:navigate":
-        onNavigate?.(message.target, message.params ?? {});
+        onNavigate?.({ target: message.target, params: message.params ?? {} });
         return;
       case "lw:log":
         onLog({

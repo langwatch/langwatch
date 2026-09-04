@@ -24,6 +24,73 @@ import { useRouter } from "~/utils/compat/next-router";
 const granularityLabel = (seconds: number): string =>
   describeLangWatchQLGranularityStep(seconds, "noun");
 
+interface AddToDashboardHandlerProps {
+  projectId: string;
+  graphId: string;
+  dashboardId?: string;
+  showAddToDashboard: boolean;
+  isDashboardWidget: boolean;
+}
+
+// Resolves the "every project has exactly one dashboard" lookup lazily
+// (only when the menu item can actually be shown) and wraps the pin
+// mutation with its already-pinned / success / error toasts.
+function useAddToDashboardHandler({
+  projectId,
+  graphId,
+  dashboardId,
+  showAddToDashboard,
+  isDashboardWidget,
+}: AddToDashboardHandlerProps) {
+  const utils = api.useUtils();
+  const dashboard = api.dashboards.getOrCreateFirst.useQuery(
+    { projectId },
+    { enabled: showAddToDashboard && isDashboardWidget },
+  );
+  const assignDashboard = api.dashboardWidgets.assignDashboard.useMutation();
+  const alreadyOnDashboard =
+    !!dashboard.data && dashboardId === dashboard.data.id;
+
+  const handleAddToDashboard = () => {
+    if (!dashboard.data) return;
+    if (alreadyOnDashboard) {
+      toaster.create({
+        title: "Already on the dashboard",
+        type: "info",
+        duration: 3000,
+      });
+      return;
+    }
+    assignDashboard.mutate(
+      { projectId, id: graphId, dashboardId: dashboard.data.id },
+      {
+        onSuccess: () => {
+          toaster.create({
+            title: `Added to ${dashboard.data!.name}`,
+            type: "success",
+            duration: 3000,
+          });
+          void utils.dashboardWidgets.list.invalidate({ projectId });
+          void utils.graphs.getAll.invalidate();
+        },
+        onError: () => {
+          toaster.create({
+            title: "Error adding to dashboard",
+            type: "error",
+            duration: 3000,
+          });
+        },
+      },
+    );
+  };
+
+  return {
+    hasDashboard: !!dashboard.data,
+    isAssigning: assignDashboard.isPending,
+    handleAddToDashboard,
+  };
+}
+
 interface GraphCardMenuProps {
   graphId: string;
   projectId: string;
@@ -73,50 +140,14 @@ export function GraphCardMenu({
   isDeleting,
 }: GraphCardMenuProps) {
   const router = useRouter();
-  const utils = api.useUtils();
-
-  // Resolved lazily (only when the item can actually be shown): the
-  // "every project has exactly one dashboard" lookup.
-  const dashboard = api.dashboards.getOrCreateFirst.useQuery(
-    { projectId },
-    { enabled: showAddToDashboard && isDashboardWidget },
-  );
-  const assignDashboard = api.dashboardWidgets.assignDashboard.useMutation();
-  const alreadyOnDashboard =
-    !!dashboard.data && dashboardId === dashboard.data.id;
-
-  const handleAddToDashboard = () => {
-    if (!dashboard.data) return;
-    if (alreadyOnDashboard) {
-      toaster.create({
-        title: "Already on the dashboard",
-        type: "info",
-        duration: 3000,
-      });
-      return;
-    }
-    assignDashboard.mutate(
-      { projectId, id: graphId, dashboardId: dashboard.data.id },
-      {
-        onSuccess: () => {
-          toaster.create({
-            title: `Added to ${dashboard.data!.name}`,
-            type: "success",
-            duration: 3000,
-          });
-          void utils.dashboardWidgets.list.invalidate({ projectId });
-          void utils.graphs.getAll.invalidate();
-        },
-        onError: () => {
-          toaster.create({
-            title: "Error adding to dashboard",
-            type: "error",
-            duration: 3000,
-          });
-        },
-      },
-    );
-  };
+  const { hasDashboard, isAssigning, handleAddToDashboard } =
+    useAddToDashboardHandler({
+      projectId,
+      graphId,
+      dashboardId,
+      showAddToDashboard,
+      isDashboardWidget,
+    });
 
   // Only a builder graph navigates away to edit. A dashboard widget edits in
   // place through `onEdit` (the builder can't read its sandboxed author-code
@@ -135,7 +166,11 @@ export function GraphCardMenu({
         {/* A saved LangWatchQL chart placed on a dashboard has no editor
             surface anymore (the workbench page was removed) — it stays
             read-only here, rendered via `getById`/`run` same as before. */}
-        {!isWorkbenchChart && (
+        {/* A dashboard widget whose payload failed schema parsing arrives with
+            no `onEdit` (the builder can't edit a sandbox widget's author code),
+            so it stays read-only rather than falling through to the builder
+            route. */}
+        {!isWorkbenchChart && (!isDashboardWidget || onEdit) && (
           <Menu.Item
             value="edit"
             onClick={() => {
@@ -180,7 +215,7 @@ export function GraphCardMenu({
           <Menu.Item
             value="add-to-dashboard"
             onClick={handleAddToDashboard}
-            disabled={!dashboard.data || assignDashboard.isPending}
+            disabled={!hasDashboard || isAssigning}
           >
             <LayoutDashboard /> Add to dashboard
           </Menu.Item>

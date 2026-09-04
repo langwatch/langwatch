@@ -20,17 +20,28 @@ function queriesEqual(
  * in-place editor). Reseeds whenever the persisted record changes underneath
  * it — a save from this surface, or a refetch — and exposes `resetToWidget`
  * for a discarded edit and `isDirty` for the Save gate.
+ *
+ * `isFrozen` suspends reseeding: while the edit drawer is open the chart
+ * previews the LIVE draft, so a background refetch that remaps `widget.queries`
+ * must not fire the reseed and clobber an in-progress edit.
  */
-export function useWidgetDraft(widget: WidgetDraftSeed) {
+export function useWidgetDraft({
+  widget,
+  isFrozen = false,
+}: {
+  widget: WidgetDraftSeed;
+  isFrozen?: boolean;
+}) {
   const [draftName, setDraftName] = useState(widget.name);
   const [draftCode, setDraftCode] = useState(widget.code);
   const [draftQueries, setDraftQueries] = useState(widget.queries);
 
   useEffect(() => {
+    if (isFrozen) return;
     setDraftName(widget.name);
     setDraftCode(widget.code);
     setDraftQueries(widget.queries);
-  }, [widget.name, widget.code, widget.queries]);
+  }, [widget.name, widget.code, widget.queries, isFrozen]);
 
   const resetToWidget = () => {
     setDraftName(widget.name);

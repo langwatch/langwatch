@@ -102,7 +102,13 @@ function resolveLiqeField(key: string): string | undefined {
 }
 
 /** One liqe clause for a field, OR-ing multiple values in parens. */
-function buildClause(field: string, value: string | string[]): string | null {
+function buildClause({
+  field,
+  value,
+}: {
+  field: string;
+  value: string | string[];
+}): string | null {
   const values = (Array.isArray(value) ? value : [value]).filter(
     (v) => v !== "",
   );
@@ -138,7 +144,7 @@ function buildLiqeQuery(params: Readonly<Record<string, unknown>>): string {
       continue;
     }
 
-    const clause = buildClause(field, value as string | string[]);
+    const clause = buildClause({ field, value: value as string | string[] });
     if (clause) clauses.push(clause);
   }
   return clauses.join(" AND ");
@@ -196,11 +202,20 @@ function isNavigableTarget(target: string): target is NavigableTarget {
 
 export function useDashboardWidgetChartNavigate(
   projectSlug: string,
-): (target: string, params: Readonly<Record<string, unknown>>) => void {
+): (args: {
+  target: string;
+  params: Readonly<Record<string, unknown>>;
+}) => void {
   const router = useRouter();
 
   return useCallback(
-    (target: string, params: Readonly<Record<string, unknown>>) => {
+    ({
+      target,
+      params,
+    }: {
+      target: string;
+      params: Readonly<Record<string, unknown>>;
+    }) => {
       if (!isNavigableTarget(target)) {
         console.warn("[playground] blocked navigate target: " + target);
         return;

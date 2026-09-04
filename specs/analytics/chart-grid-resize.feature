@@ -2,15 +2,14 @@ Feature: Drag-to-resize chart cards on a finer grid
 
   Today a card's size is one of four fixed presets (a small square, a wide
   rectangle, a tall rectangle, a large square), chosen from the card's
-  overflow menu — never dragged. Both grids this covers (the analytics
-  dashboard and the custom-chart-playground page) are laid out on exactly two
-  fluid columns, so those four presets are the only two widths that exist at
-  all: half the grid or the whole thing. This feature replaces the picker
-  with a drag handle and switches both grids to a finer unit — a column is a
-  fraction of the container's width (an eighth, so a card can span anywhere
-  from one eighth to the full row) and a row is a fixed 100px — so a member
-  drags a card to the size they want and it snaps to that grid instead of
-  landing on one of four preset shapes.
+  overflow menu — never dragged. The analytics dashboard grid this covers is
+  laid out on exactly two fluid columns, so those four presets are the only
+  two widths that exist at all: half the grid or the whole thing. This feature
+  replaces the picker with a drag handle and switches the grid to a finer unit
+  — a column is a fraction of the container's width (an eighth, so a card can
+  span anywhere from one eighth to the full row) and a row is a fixed 100px —
+  so a member drags a card to the size they want and it snaps to that grid
+  instead of landing on one of four preset shapes.
 
   Existing cards are not repositioned or reflowed the moment this ships: each
   one's current size is converted once, to whichever new size renders at the
@@ -18,8 +17,7 @@ Feature: Drag-to-resize chart cards on a finer grid
   itself under them on the first load after this feature deploys.
 
   Background:
-    Given a grid of chart cards, on either the analytics dashboard or the
-    custom-chart-playground page
+    Given a grid of chart cards on the analytics dashboard
 
   @unit
   Scenario: A drag lands on the nearest grid cell, not an arbitrary pixel
@@ -63,7 +61,7 @@ Feature: Drag-to-resize chart cards on a finer grid
 
   @integration
   Scenario: Every pre-existing card converts once, to the same size it already rendered at
-    Given a dashboard or playground page whose cards were all sized before
+    Given a dashboard whose cards were all sized before
       this feature shipped, using the old small/wide/tall/large presets
     When the page is opened for the first time after this feature ships
     Then every card renders at the same width and height it rendered at

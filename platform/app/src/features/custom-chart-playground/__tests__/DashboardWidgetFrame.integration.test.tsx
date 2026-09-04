@@ -59,7 +59,7 @@ const GRAPH = {
   queries: [{ name: "main", sql: "SELECT 1" }],
 };
 
-const period = (startMs: number, endMs: number) => ({
+const period = ({ startMs, endMs }: { startMs: number; endMs: number }) => ({
   period: { startDate: new Date(startMs), endDate: new Date(endMs) },
 });
 
@@ -68,73 +68,81 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe("a placed dashboard widget", () => {
-  /** @scenario "A placed dashboard widget follows the dashboard's period control" */
-  it("hands the executor the dashboard's own period as its time window", () => {
-    periodMock.mockReturnValue(period(1_000, 2_000));
-    executorMock.mockReturnValue({
-      executeQuery: vi.fn(),
-      params: {
+describe("given a placed dashboard widget", () => {
+  describe("when it mounts", () => {
+    /** @scenario "A placed dashboard widget follows the dashboard's period control" */
+    it("hands the executor the dashboard's own period as its time window", () => {
+      periodMock.mockReturnValue(period({ startMs: 1_000, endMs: 2_000 }));
+      executorMock.mockReturnValue({
+        executeQuery: vi.fn(),
+        params: {
+          timeWindow: { start: 1_000, end: 2_000 },
+          granularitySeconds: 3600,
+        },
+      });
+
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <DashboardWidgetFrame
+            id="graph_1"
+            graph={GRAPH}
+            projectId="project_1"
+            projectSlug="project"
+            maxHeight={300}
+          />
+        </ChakraProvider>,
+      );
+
+      expect(executorMock).toHaveBeenCalledWith("project_1", GRAPH.queries, {
         timeWindow: { start: 1_000, end: 2_000 },
-        granularitySeconds: 3600,
-      },
-    });
-
-    render(
-      <ChakraProvider value={defaultSystem}>
-        <DashboardWidgetFrame
-          id="graph_1"
-          graph={GRAPH}
-          projectId="project_1"
-          projectSlug="project"
-          maxHeight={300}
-        />
-      </ChakraProvider>,
-    );
-
-    expect(executorMock).toHaveBeenCalledWith("project_1", GRAPH.queries, {
-      timeWindow: { start: 1_000, end: 2_000 },
+      });
     });
   });
 
-  /** @scenario "A placed dashboard widget follows the dashboard's period control" */
-  it("re-derives the window when the dashboard's period changes", () => {
-    periodMock.mockReturnValue(period(1_000, 2_000));
-    executorMock.mockReturnValue({
-      executeQuery: vi.fn(),
-      params: {
-        timeWindow: { start: 1_000, end: 2_000 },
-        granularitySeconds: 3600,
-      },
-    });
+  describe("when the dashboard's period changes", () => {
+    /** @scenario "A placed dashboard widget follows the dashboard's period control" */
+    it("re-derives the window from the new period", () => {
+      periodMock.mockReturnValue(period({ startMs: 1_000, endMs: 2_000 }));
+      executorMock.mockReturnValue({
+        executeQuery: vi.fn(),
+        params: {
+          timeWindow: { start: 1_000, end: 2_000 },
+          granularitySeconds: 3600,
+        },
+      });
 
-    const { rerender } = render(
-      <ChakraProvider value={defaultSystem}>
-        <DashboardWidgetFrame
-          id="graph_1"
-          graph={GRAPH}
-          projectId="project_1"
-          projectSlug="project"
-          maxHeight={300}
-        />
-      </ChakraProvider>,
-    );
+      const { rerender } = render(
+        <ChakraProvider value={defaultSystem}>
+          <DashboardWidgetFrame
+            id="graph_1"
+            graph={GRAPH}
+            projectId="project_1"
+            projectSlug="project"
+            maxHeight={300}
+          />
+        </ChakraProvider>,
+      );
 
-    periodMock.mockReturnValue(period(5_000, 9_000));
-    rerender(
-      <ChakraProvider value={defaultSystem}>
-        <DashboardWidgetFrame
-          id="graph_1"
-          graph={GRAPH}
-          projectId="project_1"
-          projectSlug="project"
-          maxHeight={300}
-        />
-      </ChakraProvider>,
-    );
+      periodMock.mockReturnValue(period({ startMs: 5_000, endMs: 9_000 }));
+      rerender(
+        <ChakraProvider value={defaultSystem}>
+          <DashboardWidgetFrame
+            id="graph_1"
+            graph={GRAPH}
+            projectId="project_1"
+            projectSlug="project"
+            maxHeight={300}
+          />
+        </ChakraProvider>,
+      );
 
-    expect(executorMock).toHaveBeenLastCalledWith("project_1", GRAPH.queries, {
-      timeWindow: { start: 5_000, end: 9_000 },
+      expect(executorMock).toHaveBeenLastCalledWith(
+        "project_1",
+        GRAPH.queries,
+        {
+          timeWindow: { start: 5_000, end: 9_000 },
+        },
+      );
     });
   });
 });
@@ -142,7 +150,7 @@ describe("a placed dashboard widget", () => {
 describe("a dashboard that refreshes on a schedule", () => {
   /** @scenario "Every chart on the dashboard refreshes on a schedule" */
   it("hands each refresh tick to the frame as a dashboard context change", () => {
-    periodMock.mockReturnValue(period(1_000, 2_000));
+    periodMock.mockReturnValue(period({ startMs: 1_000, endMs: 2_000 }));
     executorMock.mockReturnValue({
       executeQuery: vi.fn(),
       params: {
@@ -179,7 +187,7 @@ describe("a dashboard that refreshes on a schedule", () => {
 describe("a widget whose code reports an error", () => {
   /** @scenario "A widget's own error is shown, not dropped" */
   it("shows a warning on the card instead of dropping the report", () => {
-    periodMock.mockReturnValue(period(1_000, 2_000));
+    periodMock.mockReturnValue(period({ startMs: 1_000, endMs: 2_000 }));
     executorMock.mockReturnValue({
       executeQuery: vi.fn(),
       params: {

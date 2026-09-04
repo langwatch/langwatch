@@ -40,14 +40,30 @@ const layoutSchema = chartGridPlacementSchema.refine(fitsChartGridWidth, {
 export const graphsRouter = createTRPCRouter({
   create: protectedProcedure
     .input(
-      z.object({
-        projectId: z.string(),
-        name: z.string(),
-        graph: z.string(),
-        filterParams: z.any().optional(),
-        dashboardId: z.string().optional(),
-        ...chartGridPlacementSchema.partial().shape,
-      }),
+      z
+        .object({
+          projectId: z.string(),
+          name: z.string(),
+          graph: z.string(),
+          filterParams: z.any().optional(),
+          dashboardId: z.string().optional(),
+          ...chartGridPlacementSchema.partial().shape,
+        })
+        // A card's column and span pass their own bounds and still overflow
+        // the grid together. `create` persists the defaults below when either
+        // is omitted, so the refine validates the SAME effective placement the
+        // row will carry — the identical rule `layoutSchema` enforces.
+        .refine(
+          (value) =>
+            fitsChartGridWidth({
+              gridColumn: value.gridColumn ?? 0,
+              colSpan: value.colSpan ?? CHART_GRID_DEFAULT_COL_SPAN,
+            }),
+          {
+            message: "gridColumn + colSpan must not exceed the grid's columns",
+            path: ["colSpan"],
+          },
+        ),
     )
     .permission("analytics:create")
     .mutation(async ({ ctx, input }) => {

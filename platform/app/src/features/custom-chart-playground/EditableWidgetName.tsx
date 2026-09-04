@@ -24,75 +24,70 @@ import { useEffect, useRef, useState } from "react";
 
 import { Tooltip } from "~/components/ui/tooltip";
 
-export interface EditableWidgetNameProps {
-  /** The full underlying name — what editing reads from and writes to. */
-  name: string;
-  /** What to show while not editing. Defaults to `name` (e.g. the drawer,
-   *  which never strips anything) — a card passes its own stripped text. */
-  displayText?: string;
-  /** Omitted for a widget that doesn't exist yet (the create-chart drawer,
-   *  before the first Save) — the tooltip has nothing to show then. */
-  id?: string;
-  onRename: (name: string) => void;
-  fontSize?: string;
-  fontWeight?: string;
-  /** Card titles truncate to one line; the drawer's own heading doesn't need to. */
-  truncate?: boolean;
+interface EditableWidgetNameInputProps {
+  draft: string;
+  setDraft: (value: string) => void;
+  finishEdit: () => void;
+  cancelEdit: () => void;
+  fontSize: string;
+  fontWeight: string;
 }
 
-export function EditableWidgetName({
-  name,
-  displayText,
-  id,
-  onRename,
-  fontSize = "md",
-  fontWeight = "500",
-  truncate = false,
-}: EditableWidgetNameProps) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [draft, setDraft] = useState("");
+function EditableWidgetNameInput({
+  draft,
+  setDraft,
+  finishEdit,
+  cancelEdit,
+  fontSize,
+  fontWeight,
+}: EditableWidgetNameInputProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (isEditing && inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
-    }
-  }, [isEditing]);
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, []);
 
-  const startEdit = () => {
-    setDraft(name);
-    setIsEditing(true);
-  };
+  return (
+    <Input
+      ref={inputRef}
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={finishEdit}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === "Enter") finishEdit();
+        if (e.key === "Escape") cancelEdit();
+      }}
+      onClick={(e) => e.stopPropagation()}
+      fontSize={fontSize}
+      fontWeight={fontWeight}
+      variant="flushed"
+      width="auto"
+      minWidth="160px"
+    />
+  );
+}
 
-  const finishEdit = () => {
-    const trimmed = draft.trim();
-    if (trimmed && trimmed !== name) onRename(trimmed);
-    setIsEditing(false);
-  };
+interface EditableWidgetNameDisplayProps {
+  name: string;
+  displayText?: string;
+  id?: string;
+  startEdit: () => void;
+  fontSize: string;
+  fontWeight: string;
+  shouldTruncate: boolean;
+}
 
-  if (isEditing) {
-    return (
-      <Input
-        ref={inputRef}
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={finishEdit}
-        onKeyDown={(e) => {
-          e.stopPropagation();
-          if (e.key === "Enter") finishEdit();
-          if (e.key === "Escape") setIsEditing(false);
-        }}
-        onClick={(e) => e.stopPropagation()}
-        fontSize={fontSize}
-        fontWeight={fontWeight}
-        variant="flushed"
-        width="auto"
-        minWidth="160px"
-      />
-    );
-  }
-
+function EditableWidgetNameDisplay({
+  name,
+  displayText,
+  id,
+  startEdit,
+  fontSize,
+  fontWeight,
+  shouldTruncate,
+}: EditableWidgetNameDisplayProps) {
   return (
     <Tooltip
       content={id ? `ID: ${id}` : "Not saved yet"}
@@ -100,18 +95,32 @@ export function EditableWidgetName({
       showArrow
     >
       <HStack
+        role="button"
+        tabIndex={0}
+        aria-label={`Rename ${name}`}
         cursor="pointer"
         minWidth={0}
         onClick={(e) => {
           e.stopPropagation();
           startEdit();
         }}
+        onKeyDown={(e) => {
+          // A focusable div is not a real button, so Enter/Space do not fire
+          // click on their own — activate them by hand to keep the rename
+          // reachable without a pointer (WCAG 2.1.1).
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            e.stopPropagation();
+            startEdit();
+          }
+        }}
         _hover={{ "& .edit-icon": { opacity: 1 } }}
+        _focusVisible={{ "& .edit-icon": { opacity: 1 } }}
       >
         <Text
           fontSize={fontSize}
           fontWeight={fontWeight}
-          {...(truncate ? { truncate: true, minWidth: 0 } : {})}
+          {...(shouldTruncate ? { truncate: true, minWidth: 0 } : {})}
         >
           {displayText ?? name}
         </Text>
@@ -126,5 +135,70 @@ export function EditableWidgetName({
         </Box>
       </HStack>
     </Tooltip>
+  );
+}
+
+export interface EditableWidgetNameProps {
+  /** The full underlying name — what editing reads from and writes to. */
+  name: string;
+  /** What to show while not editing. Defaults to `name` (e.g. the drawer,
+   *  which never strips anything) — a card passes its own stripped text. */
+  displayText?: string;
+  /** Omitted for a widget that doesn't exist yet (the create-chart drawer,
+   *  before the first Save) — the tooltip has nothing to show then. */
+  id?: string;
+  onRename: (name: string) => void;
+  fontSize?: string;
+  fontWeight?: string;
+  /** Card titles truncate to one line; the drawer's own heading doesn't need to. */
+  shouldTruncate?: boolean;
+}
+
+export function EditableWidgetName({
+  name,
+  displayText,
+  id,
+  onRename,
+  fontSize = "md",
+  fontWeight = "500",
+  shouldTruncate = false,
+}: EditableWidgetNameProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+
+  const startEdit = () => {
+    setDraft(name);
+    setIsEditing(true);
+  };
+
+  const finishEdit = () => {
+    const trimmed = draft.trim();
+    if (trimmed && trimmed !== name) onRename(trimmed);
+    setIsEditing(false);
+  };
+
+  if (isEditing) {
+    return (
+      <EditableWidgetNameInput
+        draft={draft}
+        setDraft={setDraft}
+        finishEdit={finishEdit}
+        cancelEdit={() => setIsEditing(false)}
+        fontSize={fontSize}
+        fontWeight={fontWeight}
+      />
+    );
+  }
+
+  return (
+    <EditableWidgetNameDisplay
+      name={name}
+      {...(displayText === undefined ? {} : { displayText })}
+      {...(id === undefined ? {} : { id })}
+      startEdit={startEdit}
+      fontSize={fontSize}
+      fontWeight={fontWeight}
+      shouldTruncate={shouldTruncate}
+    />
   );
 }

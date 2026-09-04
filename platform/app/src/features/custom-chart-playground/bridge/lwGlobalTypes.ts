@@ -175,8 +175,9 @@ interface LwApi {
   useDashboardContext: () => LwDashboardContext;
 
   /**
-   * React hook returning the live \`LW.params\` — the widget's author-declared
-   * parameter values, re-rendering on change.
+   * React hook returning \`LW.params\` — the widget's author-declared parameter
+   * values. A snapshot fixed for the frame's lifetime (there is no params-change
+   * message), so it does not re-render on change.
    */
   useParams: () => LwParams;
 

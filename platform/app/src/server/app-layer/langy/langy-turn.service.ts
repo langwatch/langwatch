@@ -1294,7 +1294,9 @@ export class LangyTurnService {
       );
       if (disabledSkillId !== undefined) {
         const flag = skillGateFlagFor(disabledSkillId);
-        getLangyTurnsCounter("rejected").inc();
+        // Counted exactly once: the outer catch classifies
+        // `LangySkillNotAvailableError` as `rejected`, so this path must not
+        // also increment a counter of its own.
         // `flag` is always defined here: `disabledSkillIds` only returns ids
         // `SKILL_GATES` (and therefore `skillGateFlagFor`) has an entry for.
         throw new LangySkillNotAvailableError(disabledSkillId, flag ?? "");
@@ -1459,7 +1461,8 @@ export class LangyTurnService {
       getLangyTurnsCounter(
         error instanceof LangyTurnInProgressError
           ? "busy"
-          : error instanceof LangyAgentUnavailableError
+          : error instanceof LangyAgentUnavailableError ||
+              error instanceof LangySkillNotAvailableError
             ? "rejected"
             : "error",
       ).inc();

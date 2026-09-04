@@ -35,24 +35,27 @@ export function useCreateDashboardWidgetDrawer({
     STARTER_WIDGET_QUERIES,
   );
 
-  // A fresh starter draft every time the drawer opens — otherwise a second
-  // "+ Add chart" would resume whatever was left over from an abandoned
-  // first attempt.
-  useEffect(() => {
-    if (open) {
-      setDrawerTab("code");
-      setDraftName("New widget");
-      setDraftCode(STARTER_WIDGET_CODE);
-      setDraftQueries(STARTER_WIDGET_QUERIES);
-    }
-  }, [open]);
-
   const preview = useWidgetPreview({
     code: draftCode,
     queries: draftQueries,
     projectId,
     projectSlug,
   });
+
+  // A fresh starter draft every time the drawer opens — otherwise a second
+  // "+ Add chart" would resume whatever was left over from an abandoned
+  // first attempt. The preview is seeded synchronously alongside the draft so
+  // the reopened frame never flashes the discarded attempt for one debounce.
+  const { resetPreview } = preview;
+  useEffect(() => {
+    if (open) {
+      setDrawerTab("code");
+      setDraftName("New widget");
+      setDraftCode(STARTER_WIDGET_CODE);
+      setDraftQueries(STARTER_WIDGET_QUERIES);
+      resetPreview(STARTER_WIDGET_CODE, STARTER_WIDGET_QUERIES);
+    }
+  }, [open, resetPreview]);
 
   const handleSave = () => {
     createWidget.mutate(

@@ -92,69 +92,75 @@ beforeEach(() => {
 });
 
 describe("the dashboard's card read", () => {
-  /** @scenario "The dashboard's card procedures admit dashboard-widget rows only when the flag is on" */
-  it("admits playground rows when the flag is on", async () => {
-    lwqlEnabledMock.mockResolvedValue(false);
-    customChartPlaygroundEnabledMock.mockResolvedValue(true);
+  describe("when only the dashboard-widget flag is on", () => {
+    /** @scenario "The dashboard's card procedures admit dashboard-widget rows only when the flag is on" */
+    it("admits playground rows", async () => {
+      lwqlEnabledMock.mockResolvedValue(false);
+      customChartPlaygroundEnabledMock.mockResolvedValue(true);
 
-    await createCaller().getAll({
-      projectId: "project_1",
-      dashboardId: "dashboard_1",
+      await createCaller().getAll({
+        projectId: "project_1",
+        dashboardId: "dashboard_1",
+      });
+
+      expect(kindClauseOf(findMany)).toEqual({
+        in: [BUILDER_CHART_KIND, DASHBOARD_SRCDOC_CHART_KIND],
+      });
     });
 
-    expect(kindClauseOf(findMany)).toEqual({
-      in: [BUILDER_CHART_KIND, DASHBOARD_SRCDOC_CHART_KIND],
-    });
-  });
+    /** @scenario "The dashboard-widget flag does not change workbench visibility, or the reverse" */
+    it("admits playground but not workbench", async () => {
+      lwqlEnabledMock.mockResolvedValue(false);
+      customChartPlaygroundEnabledMock.mockResolvedValue(true);
 
-  /** @scenario "The dashboard's card procedures admit dashboard-widget rows only when the flag is on" */
-  it("scopes the read to builder rows with both flags off, exactly the old grid", async () => {
-    lwqlEnabledMock.mockResolvedValue(false);
-    customChartPlaygroundEnabledMock.mockResolvedValue(false);
+      await createCaller().getAll({
+        projectId: "project_1",
+        dashboardId: "dashboard_1",
+      });
 
-    await createCaller().getAll({
-      projectId: "project_1",
-      dashboardId: "dashboard_1",
-    });
-
-    expect(kindClauseOf(findMany)).toBe(BUILDER_CHART_KIND);
-  });
-
-  /** @scenario "Workbench and dashboard-widget rows are both admitted when both flags are on" */
-  it("admits builder, workbench and playground together when both flags are on", async () => {
-    lwqlEnabledMock.mockResolvedValue(true);
-    customChartPlaygroundEnabledMock.mockResolvedValue(true);
-
-    await createCaller().getAll({
-      projectId: "project_1",
-      dashboardId: "dashboard_1",
-    });
-
-    expect(kindClauseOf(findMany)).toEqual({
-      in: [
-        BUILDER_CHART_KIND,
-        WORKBENCH_SQL_CHART_KIND,
-        DASHBOARD_SRCDOC_CHART_KIND,
-      ],
+      // "Placement isn't mutually exclusive" does not mean "either flag admits
+      // everything" — each kind is still gated on its OWN flag alone. The
+      // playground flag being on never admits a workbench_sql row; only the
+      // workbench flag does that, unchanged from before this feature existed.
+      const clause = kindClauseOf(findMany) as { in: string[] };
+      expect(clause.in).not.toContain(WORKBENCH_SQL_CHART_KIND);
+      expect(clause.in).toContain(DASHBOARD_SRCDOC_CHART_KIND);
     });
   });
 
-  /** @scenario "The dashboard-widget flag does not change workbench visibility, or the reverse" */
-  it("admits playground but not workbench when only the playground flag is on", async () => {
-    lwqlEnabledMock.mockResolvedValue(false);
-    customChartPlaygroundEnabledMock.mockResolvedValue(true);
+  describe("when both flags are off", () => {
+    /** @scenario "The dashboard's card procedures admit dashboard-widget rows only when the flag is on" */
+    it("scopes the read to builder rows, exactly the old grid", async () => {
+      lwqlEnabledMock.mockResolvedValue(false);
+      customChartPlaygroundEnabledMock.mockResolvedValue(false);
 
-    await createCaller().getAll({
-      projectId: "project_1",
-      dashboardId: "dashboard_1",
+      await createCaller().getAll({
+        projectId: "project_1",
+        dashboardId: "dashboard_1",
+      });
+
+      expect(kindClauseOf(findMany)).toBe(BUILDER_CHART_KIND);
     });
+  });
 
-    // "Placement isn't mutually exclusive" does not mean "either flag admits
-    // everything" — each kind is still gated on its OWN flag alone. The
-    // playground flag being on never admits a workbench_sql row; only the
-    // workbench flag does that, unchanged from before this feature existed.
-    const clause = kindClauseOf(findMany) as { in: string[] };
-    expect(clause.in).not.toContain(WORKBENCH_SQL_CHART_KIND);
-    expect(clause.in).toContain(DASHBOARD_SRCDOC_CHART_KIND);
+  describe("when both flags are on", () => {
+    /** @scenario "Workbench and dashboard-widget rows are both admitted when both flags are on" */
+    it("admits builder, workbench and playground together", async () => {
+      lwqlEnabledMock.mockResolvedValue(true);
+      customChartPlaygroundEnabledMock.mockResolvedValue(true);
+
+      await createCaller().getAll({
+        projectId: "project_1",
+        dashboardId: "dashboard_1",
+      });
+
+      expect(kindClauseOf(findMany)).toEqual({
+        in: [
+          BUILDER_CHART_KIND,
+          WORKBENCH_SQL_CHART_KIND,
+          DASHBOARD_SRCDOC_CHART_KIND,
+        ],
+      });
+    });
   });
 });

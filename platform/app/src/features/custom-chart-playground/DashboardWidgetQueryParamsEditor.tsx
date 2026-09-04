@@ -11,6 +11,7 @@ import {
   reservedPrefixProblem,
 } from "~/components/analytics/QueryParametersPanel";
 import {
+  type DashboardWidgetQuery,
   type DashboardWidgetQueryParameterDeclaration,
   RESERVED_PARAMETERS,
 } from "~/server/analytics/dashboardWidgetDefinition";
@@ -45,6 +46,22 @@ function defaultInputValue(
 function nameProblem(name: string): string | undefined {
   if (name.trim().length === 0) return undefined;
   return reservedPrefixProblem(name);
+}
+
+/**
+ * Whether every declared parameter across all queries clears the reserved-
+ * prefix contract — the same `nameProblem` a row shows inline. The drawer's
+ * Save gate reuses this so a `dashboard_context_`-prefixed declared name (which
+ * the persisted definition rejects) can't be submitted, not just flagged.
+ */
+export function declaredParamsAreValid(
+  queries: DashboardWidgetQuery[],
+): boolean {
+  return queries.every((query) =>
+    (query.parameters ?? []).every(
+      (param) => nameProblem(param.name) === undefined,
+    ),
+  );
 }
 
 /** Builds one row's view model for the shared {@link QueryParametersPanel}. */

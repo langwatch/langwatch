@@ -134,7 +134,10 @@ function buildItems({
 }): PaletteItem[] {
   if (mode === "skills") {
     return LANGY_SKILLS.filter((skill) =>
-      isSkillAvailable(skill, (flag) => enabledFlags.has(flag)),
+      isSkillAvailable({
+        skill,
+        isFlagEnabled: (flag) => enabledFlags.has(flag),
+      }),
     ).map((skill) => ({
       value: `skill:${skill.id}`,
       label: skill.label,

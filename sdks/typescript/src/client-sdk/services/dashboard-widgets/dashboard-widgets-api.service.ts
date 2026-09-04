@@ -64,11 +64,15 @@ export class DashboardWidgetsApiService {
     this.configuredProjectId = config?.projectId;
   }
 
-  private handleApiError(
-    operation: string,
-    error: unknown,
-    response?: Response,
-  ): never {
+  private handleApiError({
+    operation,
+    error,
+    response,
+  }: {
+    operation: string;
+    error: unknown;
+    response?: Response;
+  }): never {
     const status = response?.status ?? extractStatusFromResponse(error);
     const message = formatApiErrorForOperation({
       operation: operation,
@@ -99,7 +103,7 @@ export class DashboardWidgetsApiService {
       "/api/v1/projects/{projectId}/analytics/dashboard-widgets",
       { params: { path: { projectId } } },
     );
-    if (error) this.handleApiError("list dashboard widgets", error, response);
+    if (error) this.handleApiError({ operation: "list dashboard widgets", error, response });
     return data as unknown as { data: DashboardWidget[] };
   }
 
@@ -110,7 +114,7 @@ export class DashboardWidgetsApiService {
       { params: { path: { projectId, widgetId: id } } },
     );
     if (error)
-      this.handleApiError(`get dashboard widget "${id}"`, error, response);
+      this.handleApiError({ operation: `get dashboard widget "${id}"`, error, response });
     return data as unknown as DashboardWidget;
   }
 
@@ -131,50 +135,58 @@ export class DashboardWidgetsApiService {
       },
     );
     if (error)
-      this.handleApiError("create dashboard widget", error, response);
+      this.handleApiError({ operation: "create dashboard widget", error, response });
     return data as unknown as DashboardWidget;
   }
 
-  async update(
-    id: string,
-    params: { name?: string; definition?: DashboardWidgetDefinitionInput },
-  ): Promise<DashboardWidget> {
+  async update({
+    id,
+    name,
+    definition,
+  }: {
+    id: string;
+    name?: string;
+    definition?: DashboardWidgetDefinitionInput;
+  }): Promise<DashboardWidget> {
     const projectId = this.projectId(`update dashboard widget "${id}"`);
     const { data, error, response } = await this.apiClient.PATCH(
       "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}",
       {
         params: { path: { projectId, widgetId: id } },
         body: {
-          ...(params.name === undefined ? {} : { name: params.name }),
-          ...(params.definition === undefined
+          ...(name === undefined ? {} : { name }),
+          ...(definition === undefined
             ? {}
             : {
-                code: params.definition.code,
-                queries: params.definition.queries,
+                code: definition.code,
+                queries: definition.queries,
               }),
         },
       },
     );
     if (error)
-      this.handleApiError(`update dashboard widget "${id}"`, error, response);
+      this.handleApiError({ operation: `update dashboard widget "${id}"`, error, response });
     return data as unknown as DashboardWidget;
   }
 
   /** Adds a widget to a dashboard at the next free row, keeping its size. */
-  async assignDashboard(
-    id: string,
-    params: { dashboardId: string },
-  ): Promise<DashboardWidget> {
+  async assignDashboard({
+    id,
+    dashboardId,
+  }: {
+    id: string;
+    dashboardId: string;
+  }): Promise<DashboardWidget> {
     const projectId = this.projectId(`pin dashboard widget "${id}"`);
     const { data, error, response } = await this.apiClient.POST(
-      "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}/dashboard" as any,
+      "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}/dashboard",
       {
         params: { path: { projectId, widgetId: id } },
-        body: { dashboardId: params.dashboardId },
-      } as any,
+        body: { dashboardId },
+      },
     );
     if (error)
-      this.handleApiError(`pin dashboard widget "${id}"`, error, response);
+      this.handleApiError({ operation: `pin dashboard widget "${id}"`, error, response });
     return data as unknown as DashboardWidget;
   }
 
@@ -186,6 +198,6 @@ export class DashboardWidgetsApiService {
       { params: { path: { projectId, widgetId: id } } },
     );
     if (error)
-      this.handleApiError(`delete dashboard widget "${id}"`, error, response);
+      this.handleApiError({ operation: `delete dashboard widget "${id}"`, error, response });
   }
 }

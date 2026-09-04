@@ -87,25 +87,27 @@ describe("given auto-refresh is set to every minute", () => {
 });
 
 describe("given the member changes the interval", () => {
-  /** @scenario "The auto-refresh choice is remembered" */
-  it("remembers the choice across mounts and stops when set to off", () => {
-    const onTick = vi.fn();
-    const first = renderHook(() => useDashboardAutoRefresh({ onTick }));
-    act(() => first.result.current.setOption("5m"));
-    expect(
-      window.localStorage.getItem(DASHBOARD_AUTO_REFRESH_STORAGE_KEY),
-    ).toBe("5m");
-    first.unmount();
+  describe("when the choice is made and the widget remounts", () => {
+    /** @scenario "The auto-refresh choice is remembered" */
+    it("remembers the choice across mounts and stops when set to off", () => {
+      const onTick = vi.fn();
+      const first = renderHook(() => useDashboardAutoRefresh({ onTick }));
+      act(() => first.result.current.setOption("5m"));
+      expect(
+        window.localStorage.getItem(DASHBOARD_AUTO_REFRESH_STORAGE_KEY),
+      ).toBe("5m");
+      first.unmount();
 
-    const second = renderHook(() => useDashboardAutoRefresh({ onTick }));
-    expect(second.result.current.option).toBe("5m");
-    act(() => vi.advanceTimersByTime(MINUTE));
-    expect(onTick).not.toHaveBeenCalled();
-    act(() => vi.advanceTimersByTime(MINUTE * 4));
-    expect(onTick).toHaveBeenCalledTimes(1);
+      const second = renderHook(() => useDashboardAutoRefresh({ onTick }));
+      expect(second.result.current.option).toBe("5m");
+      act(() => vi.advanceTimersByTime(MINUTE));
+      expect(onTick).not.toHaveBeenCalled();
+      act(() => vi.advanceTimersByTime(MINUTE * 4));
+      expect(onTick).toHaveBeenCalledTimes(1);
 
-    act(() => second.result.current.setOption("off"));
-    act(() => vi.advanceTimersByTime(MINUTE * 10));
-    expect(onTick).toHaveBeenCalledTimes(1);
+      act(() => second.result.current.setOption("off"));
+      act(() => vi.advanceTimersByTime(MINUTE * 10));
+      expect(onTick).toHaveBeenCalledTimes(1);
+    });
   });
 });

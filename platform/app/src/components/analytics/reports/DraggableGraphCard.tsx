@@ -105,7 +105,7 @@ export function DraggableGraphCard({
           timeWindow={timeWindow}
           isSaving={isSaving}
           onClose={closeEditor}
-          onSave={saveWidget}
+          onSave={({ draft, onSuccess }) => saveWidget(draft, { onSuccess })}
         />
       )}
     </Box>

@@ -33,11 +33,17 @@ Feature: LangWatchQL Vega-Lite charts — the shared rendering and governance en
   # ---------------------------------------------------------------------------
 
   @unit
-  Scenario: The feature ships no polling, browser-side persistence, export, or agent surface
-    Given the feature's source
+  Scenario: The chart engine ships no polling, browser-side persistence, export, or agent surface
+    # Scoped to the shared LangWatchQL chart engine's OWN source (the
+    # `analytics-query` surface), not to the dashboards that embed it: a
+    # dashboard may schedule its own periodic refresh
+    # (specs/analytics/dashboard-widget-resilience.feature), and that is a
+    # separate surface this promise does not speak to. The bound test scans the
+    # analytics-query engine only, exactly this boundary.
+    Given the shared LangWatchQL chart engine's own source
     When it is inspected for schedules, refresh intervals, browser storage,
       sharing links, export, source display, Langy, MCP, or external connectors
-    Then none is present
+    Then none is present in the engine itself
     And the specification the member is editing is never written anywhere by the
       chart surface itself
 
@@ -482,11 +488,15 @@ Feature: LangWatchQL Vega-Lite charts — the shared rendering and governance en
 #   → Scenario: The frontend does not implement a second SQL validator
 # AC "existing Recharts charts are not migrated" → process AC, verified by the
 #    PR diff leaving Recharts components untouched.
-# AC "polling, schedules, dashboards, persistence, sharing, export, Langy, MCP,
-#    coding-agent tools, external connectors not added"
-#   → Scenario: The feature ships no polling, browser-side persistence, export, or agent surface
+# AC "polling, schedules, persistence, sharing, export, Langy, MCP,
+#    coding-agent tools, external connectors not added to the chart engine"
+#   → Scenario: The chart engine ships no polling, browser-side persistence, export, or agent surface
 #     (the persistence half of this AC was superseded by #6582 slice 2, which
-#     added saving deliberately; the scenario now guards the rest)
+#     added saving deliberately; the scenario now guards the rest. "schedules"
+#     here means the chart engine's own source: a dashboard embedding it may
+#     still schedule its own refresh — see
+#     specs/analytics/dashboard-widget-resilience.feature — which is a separate
+#     surface this AC does not constrain.)
 #
 # Vega dependencies and loading:
 # AC "compatible pinned versions recorded in the PR"

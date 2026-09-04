@@ -3,6 +3,7 @@ import { createSpinner } from "../../utils/spinner";
 import { DashboardWidgetsApiService } from "@/client-sdk/services/dashboard-widgets/dashboard-widgets-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
+import { sanitizeTerminalText } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
 import {
   WidgetInputError,
@@ -50,7 +51,7 @@ export const createDashboardWidgetCommand = async (
     const widget = await service.create({ name: options.name, definition });
 
     spinner.succeed(
-      `Created widget "${chalk.cyan(widget.name)}" ${chalk.gray(`(id: ${widget.id})`)}`,
+      `Created widget "${chalk.cyan(sanitizeTerminalText(widget.name))}" ${chalk.gray(`(id: ${widget.id})`)}`,
     );
 
     return {

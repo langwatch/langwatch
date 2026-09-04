@@ -3,6 +3,7 @@ import { createSpinner } from "../../utils/spinner";
 import { DashboardWidgetsApiService } from "@/client-sdk/services/dashboard-widgets/dashboard-widgets-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
+import { sanitizeTerminalText } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
 
 /**
@@ -21,14 +22,15 @@ export const getDashboardWidgetCommand = async (
   try {
     const widget = await service.get(id);
 
-    spinner.succeed(`Found widget "${widget.name}"`);
+    const safeName = sanitizeTerminalText(widget.name);
+    spinner.succeed(`Found widget "${safeName}"`);
 
     return {
       data: widget,
       table: () => {
         console.log();
         console.log(`  ${chalk.gray("ID:")}   ${chalk.green(widget.id)}`);
-        console.log(`  ${chalk.gray("Name:")} ${chalk.cyan(widget.name)}`);
+        console.log(`  ${chalk.gray("Name:")} ${chalk.cyan(safeName)}`);
         console.log();
         console.log(`  ${chalk.gray("Code:")}`);
         for (const line of widget.definition.code.split("\n")) {
@@ -38,7 +40,7 @@ export const getDashboardWidgetCommand = async (
           console.log();
           console.log(`  ${chalk.gray("Queries:")}`);
           for (const query of widget.definition.queries) {
-            console.log(`    ${chalk.cyan(query.name)}:`);
+            console.log(`    ${chalk.cyan(sanitizeTerminalText(query.name))}:`);
             for (const line of query.sql.split("\n")) {
               console.log(`      ${line}`);
             }

@@ -217,10 +217,13 @@ export function findSkill(id: string): LangySkill | undefined {
  * picks exactly one, never both, never neither, so the agent is never
  * handed a choice between them to get wrong.
  */
-export function isSkillAvailable(
-  skill: Pick<LangySkill, "featureFlag" | "excludedByFlag">,
-  isFlagEnabled: (flag: string) => boolean,
-): boolean {
+export function isSkillAvailable({
+  skill,
+  isFlagEnabled,
+}: {
+  skill: Pick<LangySkill, "featureFlag" | "excludedByFlag">;
+  isFlagEnabled: (flag: string) => boolean;
+}): boolean {
   if (skill.featureFlag && !isFlagEnabled(skill.featureFlag)) return false;
   if (skill.excludedByFlag && isFlagEnabled(skill.excludedByFlag)) {
     return false;

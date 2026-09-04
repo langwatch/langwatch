@@ -128,7 +128,7 @@ function offencesIn(files: readonly string[]): string[] {
 
 describe("the feature's source", () => {
   describe("given it is inspected for schedules, background refreshes and persistence", () => {
-    /** @scenario "The feature ships no polling, browser-side persistence, export, or agent surface" */
+    /** @scenario "The chart engine ships no polling, browser-side persistence, export, or agent surface" */
     it("contains none of them", () => {
       const files = sourceFiles(FEATURE_ROOT);
 
