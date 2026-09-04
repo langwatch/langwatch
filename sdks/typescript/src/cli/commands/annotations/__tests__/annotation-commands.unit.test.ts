@@ -199,11 +199,13 @@ describe("createAnnotationCommand()", () => {
     });
   });
 
-  // The server rejects either omission with a 400 (routes/annotations.ts), so
-  // the command refuses before spending a round trip — through the shared
-  // error port, so `--format json` still gets a document on stdout rather
+  // The server answers the two omissions with a 400 (routes/annotations.ts),
+  // so the command refuses before spending a round trip. The flag conflict
+  // never reaches it — `CreateAnnotationBody` carries a single `isThumbsUp`,
+  // so the pair cannot be expressed on the wire. All three refuse through the
+  // shared error port, so `--format json` gets a document on stdout rather
   // than a bare exit code and an ANSI sentence on stderr.
-  describe("when a required flag is missing under --format json", () => {
+  describe("given --format json is active", () => {
     const stdoutDocument = () =>
       JSON.parse(
         vi
@@ -220,43 +222,50 @@ describe("createAnnotationCommand()", () => {
       setOutputFormat("text");
     });
 
-    it("refuses --comment omission without calling the API", async () => {
-      await expect(
-        createAnnotationCommand("trace_abc", { thumbsUp: true }),
-      ).rejects.toThrow(ProcessExitError);
+    describe("when --comment is omitted", () => {
+      it("refuses without calling the API", async () => {
+        await expect(
+          createAnnotationCommand("trace_abc", { thumbsUp: true }),
+        ).rejects.toThrow(ProcessExitError);
 
-      expect(mockCreate).not.toHaveBeenCalled();
-      const document = stdoutDocument();
-      expect(document.ok).toBe(false);
-      expect(document.error.code).toBe("validation_error");
-      expect(document.error.message).toContain("--comment is required");
+        expect(mockCreate).not.toHaveBeenCalled();
+        const document = stdoutDocument();
+        expect(document.ok).toBe(false);
+        expect(document.error.code).toBe("validation_error");
+        expect(document.error.message).toContain("--comment is required");
+      });
     });
 
-    it("refuses a missing rating without calling the API", async () => {
-      await expect(
-        createAnnotationCommand("trace_abc", { comment: "No rating" }),
-      ).rejects.toThrow(ProcessExitError);
+    describe("when neither rating flag is given", () => {
+      it("refuses without calling the API", async () => {
+        await expect(
+          createAnnotationCommand("trace_abc", { comment: "No rating" }),
+        ).rejects.toThrow(ProcessExitError);
 
-      expect(mockCreate).not.toHaveBeenCalled();
-      const document = stdoutDocument();
-      expect(document.ok).toBe(false);
-      expect(document.error.code).toBe("validation_error");
-      expect(document.error.message).toContain("--thumbs-up");
+        expect(mockCreate).not.toHaveBeenCalled();
+        const document = stdoutDocument();
+        expect(document.ok).toBe(false);
+        expect(document.error.code).toBe("validation_error");
+        expect(document.error.message).toContain("--thumbs-up");
+      });
     });
 
-    it("refuses both rating flags rather than silently picking one", async () => {
-      await expect(
-        createAnnotationCommand("trace_abc", {
-          comment: "Cannot be both",
-          thumbsUp: true,
-          thumbsDown: true,
-        }),
-      ).rejects.toThrow(ProcessExitError);
+    describe("when both rating flags are given", () => {
+      it("refuses rather than silently picking one", async () => {
+        await expect(
+          createAnnotationCommand("trace_abc", {
+            comment: "Cannot be both",
+            thumbsUp: true,
+            thumbsDown: true,
+          }),
+        ).rejects.toThrow(ProcessExitError);
 
-      expect(mockCreate).not.toHaveBeenCalled();
-      const document = stdoutDocument();
-      expect(document.error.code).toBe("validation_error");
-      expect(document.error.message).toContain("cannot be combined");
+        expect(mockCreate).not.toHaveBeenCalled();
+        const document = stdoutDocument();
+        expect(document.ok).toBe(false);
+        expect(document.error.code).toBe("validation_error");
+        expect(document.error.message).toContain("cannot be combined");
+      });
     });
   });
 });
