@@ -362,8 +362,6 @@ export function createApiTrpcPorts<
     opsCheck: collaborators.opsCheck,
 
     gateway: collaborators.gateway,
-    governanceHome: collaborators.governanceHome,
-    saasBilling: collaborators.saasBilling,
 
     /**
      * The user rows this connection answers, and the four it deliberately

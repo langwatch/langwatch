@@ -14,9 +14,12 @@
  *   subscription.* / currency.*
  *                            what it pays, and in which currency
  *
- * `github.*` used to be here too. It composes itself now, in
- * `features/github/github.composition.ts`, and this half supplies only the
- * `ctx.app.github` slice every request context carries.
+ * `github.*` used to be here too, and so did the `/` landing decision merged
+ * into `governance.*`. Both compose themselves now — in
+ * `features/github/github.composition.ts` and
+ * `features/enterprise/governance-home.composition.ts` — off the shared
+ * infrastructure. This half supplies only the `ctx.app.github` slice every
+ * request context carries.
  *
  * ## This half OVERLAYS
  *
@@ -49,9 +52,7 @@
  */
 import type { ApiKeyService } from "@langwatch/api-key-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
-import type { PlanProvider } from "@langwatch/entitlement-contract";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
-import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import type { GithubService } from "@langwatch/github-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { MonitorService } from "@langwatch/monitor-contract";
@@ -60,7 +61,6 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { ApiTrpcFeatureApplication } from "../app-trpc/app-trpc.context";
 import type { GatewayTrpcPorts } from "../features/gateway/gateway-trpc.mount";
-import type { GovernanceHomeTrpcPorts } from "../features/enterprise/governance-home.mount";
 import {
   composeApiGateway,
   type ApiGatewayComposition,
@@ -82,17 +82,6 @@ class ApiCapabilityUnavailableError extends HandledError {
   }
 }
 
-/**
- * The rollout gate the governance console and the /me page are both behind.
- *
- * Stated here under the key the flag registry publishes it by, because the
- * landing decision reads it and the flag store this process composed is what
- * answers. Without it `/me` and `/governance` both 404, so the auto-detected
- * destination is gated on it too — a non-governance organization never lands
- * on `/me`.
- */
-const GOVERNANCE_UI_FLAG = "release_ui_ai_governance_enabled";
-
 export type ApiGatewayGroupCollaboratorsOptions = Readonly<{
   /** The one guarded connection every row read below runs on. */
   prisma: PrismaClient;
@@ -106,10 +95,6 @@ export type ApiGatewayGroupCollaboratorsOptions = Readonly<{
   evaluators: EvaluatorService;
   /** The monitors a guardrail attachment names. */
   monitors: MonitorService;
-  /** This deployment's flag store, for the console's own rollout gate. */
-  featureFlags: FeatureFlagService;
-  /** Which plan an organization is on: the landing decision's Enterprise test. */
-  plans: Pick<PlanProvider, "getActivePlan">;
   /** The GitHub App this deployment registered, blank where it registered none. */
   github: GithubService;
   /**
@@ -119,8 +104,6 @@ export type ApiGatewayGroupCollaboratorsOptions = Readonly<{
   clickhouse: ApiGatewayClickHousePort | null;
   /** The HMAC key a virtual key's stored secret is hashed under. */
   virtualKeyPepper: string | undefined;
-  /** Whether this installation bills through Stripe. */
-  saasBilling: boolean;
   /** The receipt ledger the keyed gateway REST creates run through. */
   idempotency?: ApiGatewayIdempotencyPort | undefined;
   /** The Enterprise application, where the deployment composed one. */
@@ -138,10 +121,6 @@ export type ApiGatewayGroupCollaborators = Readonly<{
   >;
   /** The virtual-key budget parser — fixed when the router is BUILT. */
   gateway: GatewayTrpcPorts;
-  /** The six answers the `/` landing decision is gathered from. */
-  governanceHome: GovernanceHomeTrpcPorts;
-  /** Whether this installation bills through Stripe. */
-  saasBilling: boolean;
   /**
    * The gateway application, for the two REST families that take it directly.
    *
@@ -190,84 +169,8 @@ export function composeApiGatewayGroupCollaborators(
     // The one member that could not follow the rest onto `GatewayApp`: a tRPC
     // input parser is fixed when the router is BUILT.
     gateway: { virtualKeys: gateway.app.schemas },
-    governanceHome: governanceHomePorts(options),
-    saasBilling: options.saasBilling,
     gatewayApp: gateway.app,
     composition: gateway,
-  };
-}
-
-/**
- * The six answers the `/` landing decision is gathered from.
- *
- * Every one of them runs on this process's own graph rather than on a service
- * locator the way the retired router's version did — which is what makes the
- * decision composable twice (a test, a second deployment shape) instead of
- * reachable only from a booted application.
- */
-function governanceHomePorts(
-  options: ApiGatewayGroupCollaboratorsOptions,
-): GovernanceHomeTrpcPorts {
-  const { prisma } = options;
-  return {
-    tryFindFirstProjectSlugForMember: async ({ organizationId, userId }) => {
-      const project = await prisma.project.findFirst({
-        where: {
-          team: {
-            organizationId,
-            members: { some: { userId } },
-            // Personal workspaces are the governance data home, never a
-            // navigable organization project (ADR-038 v6).
-            isPersonal: false,
-          },
-          archivedAt: null,
-        },
-        orderBy: { createdAt: "asc" },
-        select: { slug: true },
-      });
-      return project?.slug ?? null;
-    },
-
-    tryFindFirstProjectSlug: async ({ organizationId }) => {
-      const project = await prisma.project.findFirst({
-        where: { team: { organizationId, isPersonal: false }, archivedAt: null },
-        orderBy: { createdAt: "asc" },
-        select: { slug: true },
-      });
-      return project?.slug ?? null;
-    },
-
-    isEnterprisePlan: async ({ organizationId }) =>
-      (await options.plans.getActivePlan({ organizationId })).type === "ENTERPRISE",
-
-    canManageOrganization: ({ organizationId, userId }) =>
-      options.authz.hasPermission({ userId, permission: "organization:manage", organizationId }),
-
-    tryGetPinnedHomePath: async ({ userId }) => {
-      const row = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { lastHomePath: true },
-      });
-      return row?.lastHomePath ?? null;
-    },
-
-    governanceUiEnabled: ({ organizationId, userId }) =>
-      options.featureFlags.isEnabled(
-        GOVERNANCE_UI_FLAG as never,
-        {
-          kind: "organization",
-          userId,
-          organizationId,
-        } as never,
-      ),
-
-    tryGetPrimaryIntent: async ({ organizationId }) => {
-      const organization = await prisma.organization.findUnique({
-        where: { id: organizationId },
-        select: { primaryIntent: true },
-      });
-      return organization?.primaryIntent ?? null;
-    },
   };
 }
 

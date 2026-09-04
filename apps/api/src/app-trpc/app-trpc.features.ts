@@ -162,10 +162,7 @@ import {
   type EnterpriseTrpcMountPorts,
 } from "../features/enterprise/enterprise-trpc.mount";
 import { createEnterpriseGovernanceTrpcRouters } from "../features/enterprise/enterprise-governance-trpc.mount";
-import {
-  createGovernanceHomeTrpcRouter,
-  type GovernanceHomeTrpcPorts,
-} from "../features/enterprise/governance-home.mount";
+import { composeGovernanceHomeTrpcRouter } from "../features/enterprise/governance-home.composition";
 import {
   createGatewayTrpcRouters,
   type GatewayTrpcPorts,
@@ -251,10 +248,6 @@ export interface AppTrpcFeaturePorts<
 > {
   /** The virtual-key budget parser — fixed when the router is BUILT, so it cannot live on the per-request application. */
   gateway: GatewayTrpcPorts;
-  /** The six answers the `/` landing decision is gathered from. */
-  governanceHome: GovernanceHomeTrpcPorts;
-  /** Whether this installation bills through Stripe. */
-  saasBilling: boolean;
   /**
    * The retention policy: who may write an override at a scope, which values
    * that scope's plan may persist, who may switch retention off, and the two
@@ -609,7 +602,7 @@ export function createAppTrpcFeatures<
   const enterprise = createEnterpriseTrpcRouters({ ...mount, ports: ports.enterprise });
   const billing = createEnterpriseBillingTrpcRouters({
     ...mount,
-    saasBilling: ports.saasBilling,
+    saasBilling: infrastructure.saasBilling,
   });
   // `personalDashboard` is not a namespace of its own: `user:` below merges
   // it into `user.*`, which is the name the /me page and the CLI call it by.
@@ -739,7 +732,7 @@ export function createAppTrpcFeatures<
     // add a third door onto the same name.
     governance: mount.root.mergeRouters(
       governance.governance,
-      createGovernanceHomeTrpcRouter({ ...mount, ports: ports.governanceHome }),
+      composeGovernanceHomeTrpcRouter({ mount, infrastructure }),
     ),
     // The two Enterprise billing surfaces — one entry per namespace, straight
     // off `createEnterpriseBillingTrpcRouters`. Both are mounted either way:

@@ -13,6 +13,7 @@
  */
 import { EventEmitter } from "node:events";
 import { z } from "zod";
+import type { ApiTrpcInfrastructure } from "../../app-trpc/app-trpc.infrastructure";
 import type { ApiTrpcCollaboratorHalves } from "../api-trpc-features.composition";
 import type { ApiAgentGroupCollaborators } from "../api-trpc-collaborators.agent-group.composition";
 import type { ApiAnalyticsCollaborators } from "../api-trpc-collaborators.analytics.composition";
@@ -45,6 +46,25 @@ export function stub<T>(group: string, buildTime: Record<string, unknown> = {}):
     },
     has: () => true,
   }) as T;
+}
+
+/**
+ * The plan lookup and the flag store the record's own compositions read, as a
+ * suite that drives neither supplies them: every organization is on the free
+ * plan and inside every rollout, so a feature gated on either still MOUNTS and
+ * a suite asserting on the gate itself overrides them.
+ */
+export function stubInfrastructureEntitlements(): Pick<
+  ApiTrpcInfrastructure,
+  "plans" | "featureFlags" | "saasBilling"
+> {
+  return {
+    plans: { getActivePlan: async () => ({ type: "FREE" }) as never },
+    featureFlags: stub("featureFlags", { isEnabled: async () => true }),
+    // Self-hosted, so the two Enterprise billing namespaces mount as the empty
+    // routers of the same served type. A suite asserting on billing overrides it.
+    saasBilling: false,
+  };
 }
 
 export function stubProductHalf(): ApiProductCollaborators {
@@ -272,8 +292,6 @@ export function stubGatewayGroupHalf(): ApiGatewayGroupCollaborators {
       webhooks: stub("app.webhooks"),
     },
     gateway: { virtualKeys: { virtualKeyBudgetInput: anySchema } },
-    governanceHome: stub("governanceHome"),
-    saasBilling: false,
     gatewayApp: stub("gatewayGroup.gatewayApp"),
     composition: stub("gatewayGroup.composition"),
   });

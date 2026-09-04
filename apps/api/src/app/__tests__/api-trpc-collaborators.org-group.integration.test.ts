@@ -51,7 +51,7 @@ import {
   composeApiTrpcCollaborators,
 } from "../api-trpc-features.composition";
 import { composeApiOrgGroupCollaborators } from "../api-trpc-collaborators.org-group.composition";
-import { stubIdentityHalf, testHalves } from "./api-trpc-collaborators.test-halves";
+import { stubIdentityHalf, stubInfrastructureEntitlements, testHalves } from "./api-trpc-collaborators.test-halves";
 
 const SESSION_USER = { id: "user-1", name: "Sam Rivers", email: "sam@acme.test", role: "ADMIN" };
 const PROJECT_ID = "project-1";
@@ -185,7 +185,7 @@ function composeApplication(options: { withInvitations?: boolean } = {}) {
   });
 
   const features = ApiTrpcFeaturesComposition.tryCompose({
-    infrastructure: { prisma: prisma.client, authz, audit: undefined },
+    infrastructure: { ...stubInfrastructureEntitlements(), prisma: prisma.client, authz, audit: undefined },
     collaborators: composeApiTrpcCollaborators(
       testHalves({
         orgGroup: group,

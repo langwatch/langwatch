@@ -53,7 +53,6 @@ import type { ZodTypeAny } from "zod";
 import type { EvaluationMountPorts } from "../features/evaluation/evaluation-trpc.mount";
 import type { ApiTrpcFeatureApplication } from "./app-trpc.context";
 import type { GatewayTrpcPorts } from "../features/gateway/gateway-trpc.mount";
-import type { GovernanceHomeTrpcPorts } from "../features/enterprise/governance-home.mount";
 import type { DataRetentionTrpcPolicy } from "@langwatch/data-retention-server";
 import type { MonitorTrpcPorts } from "@langwatch/monitor-server";
 import type { CodingAgentTrpcPorts } from "@langwatch/coding-agent-server";
@@ -341,10 +340,6 @@ export type ApiTrpcCollaborators<
    */
   /** The virtual-key budget parser — fixed when the router is BUILT. */
   gateway: GatewayTrpcPorts;
-  /** The six answers the `/` landing decision is gathered from. */
-  governanceHome: GovernanceHomeTrpcPorts;
-  /** Whether this installation bills through Stripe. */
-  saasBilling: boolean;
 
   /**
    * The retention policy: who may write an override at a scope, which values

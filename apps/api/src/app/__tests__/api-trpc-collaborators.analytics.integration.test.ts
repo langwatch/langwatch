@@ -45,7 +45,7 @@ import {
   ApiTrpcFeaturesComposition,
   composeApiTrpcCollaborators,
 } from "../api-trpc-features.composition";
-import { stub, testHalves } from "./api-trpc-collaborators.test-halves";
+import { stub, stubInfrastructureEntitlements, testHalves } from "./api-trpc-collaborators.test-halves";
 
 const dashboardRow = {
   id: "dashboard-1",
@@ -180,6 +180,7 @@ function composeApplication(options: { clickhouse?: boolean; workbenchEnabled?: 
 
   const features = ApiTrpcFeaturesComposition.tryCompose({
     infrastructure: {
+      ...stubInfrastructureEntitlements(),
       prisma: prisma.client,
       authz: testAuthz(),
       audit: new (class extends ApiAuditPort {

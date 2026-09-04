@@ -40,7 +40,7 @@ import {
   type ApiTraceGroupPorts,
   type ApiTraceReadStackPort,
 } from "../api-trpc-collaborators.trace-group.composition";
-import { testHalves } from "./api-trpc-collaborators.test-halves";
+import { stubInfrastructureEntitlements, testHalves } from "./api-trpc-collaborators.test-halves";
 import { ApiRateLimitInfrastructure } from "../../platform/infrastructure/api-rate-limit.infrastructure";
 import { resolveDataPrivacy } from "@langwatch/data-privacy-contract";
 import { composeApiModelProviderHost } from "../api-model-provider-host.composition";
@@ -258,7 +258,7 @@ function subscriptionSecurity() {
 function composeApplication() {
   const { broadcast, emitterFor } = testBroadcast();
   const features = ApiTrpcFeaturesComposition.tryCompose({
-    infrastructure: { prisma: {} as unknown as PrismaClient, authz: testAuthz(), audit: undefined },
+    infrastructure: { ...stubInfrastructureEntitlements(), prisma: {} as unknown as PrismaClient, authz: testAuthz(), audit: undefined },
     collaborators: composeApiTrpcCollaborators(
       testHalves({ traceGroup: testTraceGroupHalf(broadcast) }, broadcast),
     ),
@@ -737,7 +737,7 @@ describe("given an API process that composed the real observability collaborator
     const collaborators = composeApiTrpcCollaborators(testHalves({ traceGroup: group }, broadcast));
 
     const features = ApiTrpcFeaturesComposition.tryCompose({
-      infrastructure: { prisma: {} as unknown as PrismaClient, authz: testAuthz(), audit: undefined },
+      infrastructure: { ...stubInfrastructureEntitlements(), prisma: {} as unknown as PrismaClient, authz: testAuthz(), audit: undefined },
       collaborators,
     });
     if (!features) throw new Error("the record refused to compose against its real collaborators");
@@ -1089,7 +1089,7 @@ describe("given the anonymous share read composed on this process", () => {
     const collaborators = composeApiTrpcCollaborators(testHalves({ traceGroup: group }, broadcast));
 
     const features = ApiTrpcFeaturesComposition.tryCompose({
-      infrastructure: { prisma: {} as unknown as PrismaClient, authz: testAuthz(), audit: undefined },
+      infrastructure: { ...stubInfrastructureEntitlements(), prisma: {} as unknown as PrismaClient, authz: testAuthz(), audit: undefined },
       collaborators,
     });
     if (!features) throw new Error("the record refused to compose against its collaborators");

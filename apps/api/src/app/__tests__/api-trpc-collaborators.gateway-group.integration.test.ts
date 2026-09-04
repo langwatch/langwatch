@@ -52,7 +52,7 @@ import {
   composeApiTrpcCollaborators,
 } from "../api-trpc-features.composition";
 import { composeApiGatewayGroupCollaborators } from "../api-trpc-collaborators.gateway-group.composition";
-import { stub, testHalves } from "./api-trpc-collaborators.test-halves";
+import { stub, stubInfrastructureEntitlements, testHalves } from "./api-trpc-collaborators.test-halves";
 
 const SESSION_USER = { id: "user-1", name: "Sam Rivers", email: "sam@acme.test", role: "ADMIN" };
 const PROJECT_ID = "project-1";
@@ -178,20 +178,25 @@ function composeApplication(overrides: { saasBilling?: boolean; enterprise?: unk
     apiKeys: {} as unknown as ApiKeyService,
     evaluators: {} as unknown as EvaluatorService,
     monitors: {} as unknown as MonitorService,
-    featureFlags: { isEnabled: vi.fn(async () => true) } as never,
-    plans: { getActivePlan: vi.fn(async () => ({ type: "FREE", free: true })) } as never,
     github,
     // No ClickHouse: the gateway ledger is a projection there, so the spend
     // source is off by name rather than answering a zero nobody can read.
     clickhouse: null,
     virtualKeyPepper: "0".repeat(64),
-    saasBilling: overrides.saasBilling ?? false,
     ...(overrides.enterprise ? { enterprise: overrides.enterprise as never } : {}),
     processName: "langwatch-api-test",
   });
 
   const features = ApiTrpcFeaturesComposition.tryCompose({
-    infrastructure: { prisma: prisma.client, authz, audit: undefined },
+    infrastructure: {
+      ...stubInfrastructureEntitlements(),
+      prisma: prisma.client,
+      authz,
+      // The two Enterprise billing namespaces mount either way; what this
+      // decides is whether they carry procedures.
+      saasBilling: overrides.saasBilling ?? false,
+      audit: undefined,
+    },
     collaborators: composeApiTrpcCollaborators(testHalves({ gatewayGroup: group })),
   });
   if (!features) throw new Error("the record refused to compose against its collaborators");
@@ -303,14 +308,10 @@ describe("given an API process composed with the gateway-group half of the recor
       ]);
     });
 
-    it("names the three port groups the half fills", () => {
+    it("names the one port group the half still fills", () => {
       const { group } = composeApplication();
 
-      expect(group).toMatchObject({
-        gateway: expect.anything(),
-        governanceHome: expect.anything(),
-        saasBilling: expect.any(Boolean),
-      });
+      expect(group).toMatchObject({ gateway: expect.anything() });
     });
   });
 

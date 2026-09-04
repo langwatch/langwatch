@@ -54,7 +54,7 @@ import {
   ApiTrpcFeaturesComposition,
   composeApiTrpcCollaborators,
 } from "../api-trpc-features.composition";
-import { testHalves } from "./api-trpc-collaborators.test-halves";
+import { stubInfrastructureEntitlements, testHalves } from "./api-trpc-collaborators.test-halves";
 
 const NLP_SERVICE_URL = "http://127.0.0.1:5561";
 const PUBLIC_BASE_URL = "https://app.example.test";
@@ -327,6 +327,7 @@ function composeApplication(options: { redis?: RedisConnection | null } = {}) {
 
   const features = ApiTrpcFeaturesComposition.tryCompose({
     infrastructure: {
+      ...stubInfrastructureEntitlements(),
       prisma: prisma.client,
       authz: testAuthz(),
       audit: new (class extends ApiAuditPort {

@@ -302,7 +302,6 @@ function refusingPorts(): AppTrpcFeaturePorts<
     // The virtual-key budget parser, fixed when the router is BUILT because a
     // tRPC input parser is.
     gateway: { virtualKeys: { virtualKeyBudgetInput: z.object({}) } } as never,
-    governanceHome: refuseEvery("governanceHome"),
     // The SaaS shape, because this suite's last assertion is that no
     // namespace mounts without procedures: `false` is the self-hosted answer,
     // and it deliberately serves `subscription` and `currency` as empty
@@ -332,7 +331,16 @@ function buildFeatures() {
     },
     // The features that compose themselves take this rather than a ports
     // entry; every member refuses, for the same reason the ports do.
-    infrastructure: { prisma: refuseEveryMember("infrastructure.prisma"), audit: undefined },
+    infrastructure: {
+      prisma: refuseEveryMember("infrastructure.prisma"),
+      authz: refuseEveryMember("infrastructure.authz"),
+      plans: refuseEveryMember("infrastructure.plans"),
+      featureFlags: refuseEveryMember("infrastructure.featureFlags"),
+      // The hosted product, so both Enterprise billing namespaces carry their
+      // procedures — which is what the lists below read them for.
+      saasBilling: true,
+      audit: undefined,
+    },
     ports: refusingPorts(),
   });
 }

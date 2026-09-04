@@ -51,7 +51,7 @@ import {
   composeApiProductCollaborators,
   type ApiModelProviderEvidencePort,
 } from "../api-trpc-collaborators.product.composition";
-import { stub, testHalves } from "./api-trpc-collaborators.test-halves";
+import { stub, stubInfrastructureEntitlements, testHalves } from "./api-trpc-collaborators.test-halves";
 
 const SESSION_USER = { id: "user-1", name: "Sam Rivers", email: "sam@acme.test", role: "ADMIN" };
 const PROJECT_ID = "project-1";
@@ -409,7 +409,7 @@ function composeApplication() {
   if (!collaborators) throw new Error("the collaborator set was incomplete");
 
   const features = ApiTrpcFeaturesComposition.tryCompose({
-    infrastructure: { prisma: prisma.client, authz: testAuthz(), audit },
+    infrastructure: { ...stubInfrastructureEntitlements(), prisma: prisma.client, authz: testAuthz(), audit },
     collaborators,
   });
   if (!features) throw new Error("the record refused to compose against its collaborators");

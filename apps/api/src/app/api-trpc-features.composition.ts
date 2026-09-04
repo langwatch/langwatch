@@ -469,7 +469,5 @@ export function composeApiTrpcCollaborators(
     monitors: productInfra.monitors,
 
     gateway: gatewayGroup.gateway,
-    governanceHome: gatewayGroup.governanceHome,
-    saasBilling: gatewayGroup.saasBilling,
   };
 }
