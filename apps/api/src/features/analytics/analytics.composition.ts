@@ -444,11 +444,21 @@ export function refusingAnalyticsFeature(): ComposedAnalyticsFeature {
       filterFieldRequiresSubkey,
     } as ApiAnalyticsReadPorts,
     workbench,
+    // Written out rather than spread from the workbench beside it: the two
+    // surfaces name DIFFERENT request contexts, so the shared members are not
+    // the same functions — one taking the workbench's context could not be
+    // handed a saved chart's.
     savedCharts: {
-      ...workbench,
+      // Applied while the procedure is built; it refuses when one is CALLED.
+      requireWorkbenchEnabled: <TProcedure,>(procedure: TProcedure): TProcedure =>
+        (procedure as ChainableProcedure).use(refuse) as TProcedure,
+      timeWindowSchema: lwqlTimeWindowSchema,
+      granularityStepSchema: lwqlGranularityStepSchema,
+      resolveProtections: refuseAsync,
+      resolveRunCaller: refuseAsync,
       admitDefinition: refuseAsync,
       mapError: mapDashboardSavedWorkbenchChartError,
-    } as SavedWorkbenchChartTrpcPorts,
+    },
   };
 
   const refusingApplication = <T,>(): T =>

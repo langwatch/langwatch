@@ -30,7 +30,11 @@ function publicApiKey(row: StoredApiKey): ApiKey {
  * in the same organization.
  */
 function bindingsReachProject(
-  bindings: readonly ApiKeyBinding[],
+  // The two fields the answer turns on, rather than the whole binding: the
+  // verified key carries the schema's own rows, whose optional `customRoleId`
+  // is not the narrowed one `ApiKeyBinding` states, and neither field below is
+  // that one.
+  bindings: readonly Pick<ApiKeyBinding, "scopeType" | "scopeId">[],
   project: ProjectIdentity,
 ): boolean {
   return bindings.some((binding) => {

@@ -12,7 +12,10 @@ import { createLogger } from "@langwatch/observability";
 import type { Evaluation, Trace } from "@langwatch/trace-contract";
 import { enrichTracesWithEvaluations } from "./trace-evaluation-enrichment.rules";
 import type { Protections } from "./trace-viewer-protections.service";
-import type { TraceService } from "./trace-legacy-read.service";
+// The PORT rather than the concrete legacy service: the export reads one
+// method, and typing it at the port lets a process hand over whatever it
+// composed its legacy read as.
+import type { TraceLegacyReadPort } from "../ports/trace-legacy-read.port";
 import {
   CSV_NEWLINE,
   serializeTracesToFullCsv,
@@ -38,14 +41,14 @@ const logger = createLogger("langwatch:export");
  * ```
  */
 export class TraceExportService {
-  private readonly traceService: TraceService;
+  private readonly traceService: TraceLegacyReadPort;
 
-  private constructor({ traceService }: { traceService: TraceService }) {
+  private constructor({ traceService }: { traceService: TraceLegacyReadPort }) {
     this.traceService = traceService;
   }
 
   /** Creates the process-owned export facade over the composed trace reader. */
-  static create({ traceService }: { traceService: TraceService }): TraceExportService {
+  static create({ traceService }: { traceService: TraceLegacyReadPort }): TraceExportService {
     return new TraceExportService({ traceService });
   }
 

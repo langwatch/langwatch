@@ -159,6 +159,14 @@ export type TraceLegacyFilterInput = {
 
 /** The same, plus the paging and ordering the list/search read understands. */
 export type TraceLegacyListInput = TraceLegacyFilterInput & {
+  /**
+   * The deployment's own filter schema, carried through untouched. Opaque
+   * here because the application owns its shape and the read hands it
+   * straight to its repository.
+   */
+  filters?: unknown;
+  /** Narrows the read to named traces, when the caller already has ids. */
+  traceIds?: string[];
   query?: string;
   pageSize?: number;
   groupBy?: string;

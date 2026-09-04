@@ -27,7 +27,6 @@
  * from them — the studio reads a stored version with the shape the row has,
  * and a port that answered `unknown` would hand the pages `unknown`.
  */
-import type { AnalyticsReadInput, AnalyticsTimeseriesInput } from "@langwatch/analytics-contract";
 import type { AuthzPermission, AuthzService } from "@langwatch/authz-contract";
 import { pMapLimited } from "@langwatch/eventing";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -110,27 +109,17 @@ export type ApiTrpcPortsCompositionOptions = Readonly<{
  * what this connection returns.
  */
 export function createApiTrpcPorts<
-  TFilterField extends string,
   TMappingsIn,
   TMappingsOut,
-  TReadInput extends AnalyticsReadInput,
   TSignUpDataSchema extends ZodTypeAny,
-  TTimeseriesInput extends AnalyticsTimeseriesInput,
   TWorkbenchState,
-  TTimeseriesInputWire,
-  TReadInputWire,
 >(
   options: ApiTrpcPortsCompositionOptions & {
     collaborators: ApiTrpcCollaborators<
-      TFilterField,
       TMappingsIn,
       TMappingsOut,
-      TReadInput,
       TSignUpDataSchema,
-      TTimeseriesInput,
-      TWorkbenchState,
-      TTimeseriesInputWire,
-      TReadInputWire
+      TWorkbenchState
     >;
   },
 ) {

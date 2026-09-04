@@ -65,7 +65,9 @@ class TraceExportFailedError extends HandledError {
     super("internal_error", "The trace export could not be produced", {
       httpStatus: 500,
       fault: "platform",
-      cause,
+      // The reason chain is where a handled error carries what went wrong: the
+      // log line keeps it, and the caller still reads the registry's copy.
+      reasons: [cause instanceof Error ? cause : new Error(String(cause))],
     });
     this.name = "TraceExportFailedError";
   }
@@ -98,7 +100,10 @@ export function mountApiTraceExportRest(options: ApiTraceExportRestOptions): Mou
         reads.getViewerProtections({ session: { user: { id: resolved.user.id } } }, input),
       // Resolved per request, never at mount: the port says so, and mounting a
       // family must not force the read stack behind it to be constructed.
-      exports: () => TraceExportService.create({ traceService: reads.readers().tree }),
+      // The LEGACY read, which is the one that answers `getAllTracesForProject`
+      // — the export's whole loop. `tree` is the contract-shaped reader beside
+      // it and carries no such method.
+      exports: () => TraceExportService.create({ traceService: reads.readers().read }),
       broadcast: options.broadcast,
       unauthenticatedError: () => new TraceExportUnauthenticatedError(),
       exportFailedError: (cause) => new TraceExportFailedError(cause),

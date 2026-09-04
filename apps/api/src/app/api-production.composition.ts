@@ -1127,9 +1127,13 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // the six tRPC namespaces, so the process composes it once and hands each
     // door the part it needs. It composes LAST of the product graph because
     // its peers are what the execution half opened.
+    // The tenancy graph THIS process composed, which is the only one carrying
+    // the project directory: `tenancy` above is the api-key and organization
+    // PAIR, which a host may inject on its own and which names no projects.
+    const directory = this.composedTenancy;
     const github =
-      database && tenancy
-        ? this.resolveGithub(options, database.client, queueInfrastructure, tenancy)
+      database && directory
+        ? this.resolveGithub(options, database.client, queueInfrastructure, directory)
         : refusingGithubService();
     this.composedGateway = this.composeGateway(options, infrastructure);
     // The back office, composed from the shared infrastructure plus the three
@@ -1168,11 +1172,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
           })
         : refusingEvaluatorFeature();
     this.composedPrompt =
-      infrastructure && tenancy
+      infrastructure && directory
         ? composePromptFeature({
             infrastructure,
             peers: {
-              projects: tenancy.projects,
+              projects: directory.projects,
               ...(this.composedModelProviders
                 ? { modelProviders: this.composedModelProviders }
                 : {}),
@@ -1182,7 +1186,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // After the evaluator feature, whose replication ports a monitor copy
     // carries: one answer to what copying an evaluator does to the graph.
     this.composedMonitor = this.composeMonitor(options);
-    this.composedOps = this.composeOps(options, infrastructure, tenancy);
+    this.composedOps = this.composeOps(options, infrastructure, directory);
     // The support inbox the back office reads. It used to ride inside the
     // product half, so a process missing any one of that half's six
     // collaborators lost the inbox with them.
@@ -1192,7 +1196,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // A project's scoped privacy rules, over the SAME project and organization
     // directories every other tenant-resolving surface reads. It used to ride
     // inside the product half beside the inbox and the annotations.
-    const directory = this.composedTenancy;
     this.composedDataPrivacy =
       infrastructure && directory
         ? composeDataPrivacyFeature({
@@ -1254,7 +1257,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // The conversation panel and the egress allow-list beside it. It used to
     // ride inside the agent half, so a process missing any scenario
     // collaborator lost both Langy surfaces with it.
-    this.composedLangy = this.composeLangy(options, infrastructure, tenancy, queueInfrastructure);
+    this.composedLangy = this.composeLangy(options, infrastructure, directory, queueInfrastructure);
     const features = ApiTrpcFeaturesComposition.tryCompose({
       // What a feature composes ITSELF out of, built once above and handed to
       // every `compose<Feature>()` the record's literal names.
@@ -2452,15 +2455,14 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // session through this process clears the entry the other tier reads.
       redis: queueInfrastructure?.redis ?? null,
       // Where an uploaded avatar's bytes land: the content-addressed store the
-      // product-infrastructure half opens, read at the UPLOAD rather than here.
-      // That half composes further down — it stands on the execution, product
-      // and trace halves, all of which stand on the session this graph
-      // verifies — so a store read at this line would always be absent and
-      // every upload would refuse on a process that can serve it. The thunk is
-      // what lets the two orders coexist; the adapter names the refusal when a
-      // process genuinely composed no store.
+      // stored-object feature opens, read at the UPLOAD rather than here. That
+      // feature composes further down — it stands on services that stand on the
+      // session this graph verifies — so a store read at this line would always
+      // be absent and every upload would refuse on a process that can serve it.
+      // The thunk is what lets the two orders coexist; the feature's own
+      // refusing composition names the gap when a process composed no store.
       avatarStorage: ApiUserAvatarStorageAdapter.create({
-        storedObjects: () => this.composedProductInfra?.storedObjectBytes,
+        storedObjects: () => this.composedStoredObject?.bytes,
         processName: options.config.serviceName,
       }),
       processName: options.config.serviceName,
@@ -2704,8 +2706,13 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     return composeApiAuthCliDeviceFlow({
       redis: this.composedQueueRedis,
       prisma: this.composedDatabase?.connection.client,
+      // The signed-in PERSON rather than the whole session: both doors bind
+      // their flow to who is acting, and the session carries a profile neither
+      // reads.
       session: auth
-        ? (request) => AuthSessionApiAuthenticationAdapter.create(auth).authenticate(request)
+        ? async (request) =>
+            (await AuthSessionApiAuthenticationAdapter.create(auth).authenticate(request))?.user ??
+            null
         : undefined,
       apiKeys: tenancy.apiKeys,
       organizations: this.composedIdentity?.application.organizations,
@@ -2842,8 +2849,13 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     const auth = this.composedAuth?.compose();
     return composeApiGithubRest({
       github: this.composedGithub,
+      // The signed-in PERSON rather than the whole session: both doors bind
+      // their flow to who is acting, and the session carries a profile neither
+      // reads.
       session: auth
-        ? (request) => AuthSessionApiAuthenticationAdapter.create(auth).authenticate(request)
+        ? async (request) =>
+            (await AuthSessionApiAuthenticationAdapter.create(auth).authenticate(request))?.user ??
+            null
         : undefined,
       authz,
       audit: this.options.audit,

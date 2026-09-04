@@ -325,7 +325,7 @@ export function composeScenarioFeature(
     ids: new KsuidScenarioId(),
     testSuiteIds: new NanoidScenarioTestSuiteId(),
     clock: new SystemScenarioClock(),
-    secretCipher: new ApiScenarioSecretCipher(options.encryption),
+    secretCipher: composeScenarioSecretCipher(options),
   });
 
   const scenarioTabs = ScenarioTabRegistryService.create({

@@ -75,6 +75,7 @@ import { ExperimentRunStorageService } from "./experiment-run-storage.service";
 import {
   comparisonSkipMessage as processComparisonSkipMessage,
   formatList as processFormatList,
+  type ComparisonSkipReason,
 } from "../processes/experiment-comparison-skip.process";
 
 const logger = createLogger("langwatch:experiment:run-orchestrator");

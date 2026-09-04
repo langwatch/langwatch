@@ -52,8 +52,6 @@ import type {
 } from "../features/project/project-trpc.mount";
 import type { SavedViewTrpcPorts } from "@langwatch/dashboard-server";
 import type { CostTrpcPorts, LimitsTrpcPorts } from "@langwatch/entitlement-server";
-import type { TraceEditOverlayVisibilityWindow } from "@langwatch/trace-server";
-import type { TraceLegacyFilterInput, TraceLegacyListInput } from "@langwatch/trace-contract";
 
 /**
  * The `user.*` entries this process answers from its own Prisma connection:
@@ -109,18 +107,6 @@ export type ApiTrpcCollaborators<
   TMappingsOut,
   TSignUpDataSchema extends ZodTypeAny,
   TWorkbenchState,
-  TListInput extends TraceLegacyListInput = TraceLegacyListInput,
-  TListInputRaw = unknown,
-  TFilterInput extends TraceLegacyFilterInput = TraceLegacyFilterInput,
-  TFilterInputRaw = unknown,
-  TPrecondition = unknown,
-  TProtections extends TraceEditOverlayVisibilityWindow = TraceEditOverlayVisibilityWindow,
-  TMetadata = unknown,
-  TMetadataRaw = unknown,
-  TSavedView = unknown,
-  TSpendRollup = unknown,
-  TApiKeyValidation = unknown,
-  TStoredKeyValidation = unknown,
 > = Readonly<{
   /**
    * The application slices every packaged surface reads off `ctx.app`.

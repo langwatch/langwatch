@@ -200,7 +200,8 @@ function traceExportCollaborators(overrides: {
   return {
     reads: {
       readers: () => ({
-        tree: {
+        // The LEGACY read: the one that answers `getAllTracesForProject`.
+        read: {
           getAllTracesForProject:
             overrides.readTraces ?? (async () => ({ totalHits: 0, traces: [] })),
         },

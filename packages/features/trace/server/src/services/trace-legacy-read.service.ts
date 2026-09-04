@@ -196,9 +196,11 @@ export class TraceService {
       resolveClient?: ((tenantId: string) => Promise<ClickHouseClient>) | undefined;
       filterConditions?: TraceLegacyFilterConditions | undefined;
     },
+    // Required, so it comes before the optional tail: every single-trace read
+    // resolves the evaluations behind it.
+    private readonly evaluationService: EvaluationService,
     private readonly blobResolutionDeps?: BlobResolutionDeps,
     logRecordStorage?: TraceLogRecordReader,
-    private readonly evaluationService: EvaluationService,
     private readonly retentionResolver?: DataRetentionService,
     private readonly annotationService?: AnnotationService,
   ) {
@@ -362,9 +364,9 @@ export class TraceService {
       prisma,
       traceCanonicalisation,
       { resolveClient: resolveClickHouseClient, filterConditions },
+      evaluationService,
       blobResolutionDeps,
       logRecordStorage,
-      evaluationService,
       retentionResolver,
       annotationService,
     );

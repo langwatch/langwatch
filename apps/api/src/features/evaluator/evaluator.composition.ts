@@ -23,6 +23,7 @@ import type { WorkflowApp } from "@langwatch/workflow-server";
 import { TRPCError } from "@trpc/server";
 
 import type { ApiTrpcFeatureMount } from "../../api.application";
+import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context";
 import type { ApiTrpcInfrastructure } from "../../app-trpc/app-trpc.infrastructure";
 import { createEvaluatorTrpcRouter } from "./evaluator-trpc.mount";
 
