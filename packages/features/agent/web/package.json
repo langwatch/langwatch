@@ -26,6 +26,7 @@
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/platform-api-client": "workspace:*",
+    "@langwatch/ui-host": "workspace:*",
     "date-fns": "^4.4.0",
     "lucide-react": "^1.22.0"
   },

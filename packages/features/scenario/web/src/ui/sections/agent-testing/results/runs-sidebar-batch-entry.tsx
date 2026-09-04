@@ -7,7 +7,7 @@
 
 import { type BatchRun, computeBatchRunSummary } from "@langwatch/suite-web";
 import { useNow } from "../../../../behavior/use-now";
-import { formatTimeAgoCompact } from "@langwatch/workflow-web/utils/formatTimeAgo";
+import { formatTimeAgoCompact } from "@langwatch/ui-host/format-time-ago";
 import {
   RunsSidebarEntry,
   type SidebarTargetRate,

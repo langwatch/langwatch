@@ -1,6 +1,5 @@
 export * from "./batch-section";
 export * from "./format-run-status-label";
-export * from "./format-time-ago";
 export * from "./formatters";
 export * from "./get-adaptive-polling-interval";
 export * from "./group-row";

@@ -20,7 +20,14 @@
  * splat the route table hands it.
  */
 
-import { createContext, useContext } from "react";
+import { createContext, createElement, useContext, useMemo } from "react";
+import type { ReactNode } from "react";
+
+import {
+  createUiScopeHost,
+  UiScopeHostProvider,
+  type UiScopeHostPort,
+} from "@langwatch/ui-host/use-organization-team-project";
 
 /** The project every scenario read is scoped to. */
 export type ScenarioHostProject = {
@@ -138,7 +145,42 @@ export abstract class ScenarioHostPort {
 
 const ScenarioHostContext = createContext<ScenarioHostPort | undefined>(void 0);
 
-export const ScenarioHostProvider = ScenarioHostContext.Provider;
+/**
+ * Publishes the host, and the CANONICAL SCOPE READING alongside it.
+ *
+ * A component this family owns can be rendered by another family — the trace
+ * hover preview inside the simulations timeline is the case that broke — and
+ * `useOrganizationTeamProject` may not be gated on which family's provider is
+ * mounted. The scope this host already resolved is republished on the shared
+ * port so any screen above it reads the same answer.
+ */
+export function ScenarioHostProvider({
+  value,
+  children,
+}: {
+  value: ScenarioHostPort | undefined;
+  children: ReactNode;
+}) {
+  const scope = useMemo<UiScopeHostPort | undefined>(
+    () =>
+      value
+        ? createUiScopeHost({
+            project: () => value.project(),
+            organization: () => value.organization(),
+            team: () => value.team(),
+            organizationRole: () => value.organizationRole(),
+            hasPermission: (permission) => value.hasPermission(permission),
+            isLoading: () => value.isLoading(),
+          })
+        : void 0,
+    [value],
+  );
+  return createElement(
+    ScenarioHostContext.Provider,
+    { value },
+    createElement(UiScopeHostProvider, { value: scope }, children),
+  );
+}
 
 /** The host the composing application mounted above this screen. */
 export function useScenarioHost(): ScenarioHostPort {

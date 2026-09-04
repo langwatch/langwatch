@@ -30,7 +30,7 @@ import {
   type AgentCopyDialogInput,
   type AgentPushDialogInput,
 } from "../../features/management/ui/sections/agent-management-page";
-import { formatTimeAgo } from "../../model/format-time-ago";
+import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import {
   useAgentManagementHost,
   type AgentManagementHostPort,
@@ -170,7 +170,7 @@ class ScreenCard extends AgentManagementCardPort {
     return (
       <AgentCard
         agent={agent}
-        updatedAtLabel={formatTimeAgo(agent.updatedAt.getTime())}
+        updatedAtLabel={formatTimeAgo(agent.updatedAt.getTime()) ?? ""}
         {...callbacks}
       />
     );
@@ -380,7 +380,7 @@ export function AgentManagementScreen() {
           projectId={project.id}
           agents={agents}
           onClose={closeHistory}
-          formatCreatedAt={(createdAt) => formatTimeAgo(createdAt.getTime())}
+          formatCreatedAt={(createdAt) => formatTimeAgo(createdAt.getTime()) ?? ""}
         />
       )}
     </>

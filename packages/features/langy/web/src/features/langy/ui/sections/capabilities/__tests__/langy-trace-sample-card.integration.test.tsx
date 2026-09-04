@@ -29,7 +29,10 @@ vi.mock("../../../../behavior/use-capability-data", () => ({
   }),
 }));
 
+import { resolveCapability } from "../../../../../../model/langy-capability-registry";
 import { LangyTraceSampleCard } from "../langy-trace-sample-card";
+
+const descriptor = resolveCapability("langwatch.trace.search")!;
 
 /**
  * A minimal host: the deep-link chip and the row links both resolve through
@@ -94,6 +97,7 @@ function renderCard({ totalHits, count }: { totalHits: number; count: number }) 
     <ChakraProvider value={defaultSystem}>
       <LangyHostProvider value={host}>
         <LangyTraceSampleCard
+          descriptor={descriptor}
           input={{ command }}
           output={{ traces, pagination: { totalHits } }}
           projectSlug="acme"

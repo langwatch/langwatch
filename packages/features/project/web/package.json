@@ -36,6 +36,7 @@
     "@langwatch/organization-web": "workspace:*",
     "@langwatch/platform-api-client": "workspace:*",
     "@langwatch/trace-web": "workspace:*",
+    "@langwatch/ui-host": "workspace:*",
     "@paper-design/shaders-react": "^0.0.76",
     "@tanstack/react-query": "5.101.4",
     "date-fns": "^4.1.0",

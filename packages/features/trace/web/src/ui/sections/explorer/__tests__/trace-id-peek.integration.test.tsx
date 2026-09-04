@@ -7,7 +7,12 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { TraceIdPeek } from "../trace-id-peek";
+import {
+  createUiScopeHost,
+  UiScopeHostProvider,
+} from "@langwatch/ui-host/use-organization-team-project";
+
+import { TraceIdPeek, TracePreviewHoverCard } from "../trace-id-peek";
 
 type HeaderInput = {
   projectId: string;
@@ -24,10 +29,6 @@ vi.mock("../../../../behavior/use-drawer", () => ({
   useDrawer: () => ({ openDrawer: openDrawerMock }),
 }));
 
-vi.mock("../../../../behavior/use-organization-team-project", () => ({
-  useOrganizationTeamProject: () => ({ project: { id: "p1" } }),
-}));
-
 // The popover's body and its `tracesV2.header` read now live in
 // `@langwatch/trace-web` as `TracePeekSummary`. This file still owns the
 // partition-pruning hint, so capture what the hover hands the summary; that the
@@ -41,7 +42,25 @@ vi.mock("../../../../index", async (importOriginal) => ({
   },
 }));
 
+/**
+ * The scope arrives from the shared host, not from a trace-only provider —
+ * which is what lets this card render inside another family's screens.
+ */
+const scopeHost = createUiScopeHost({
+  project: () => ({ id: "p1", name: "Checkout", slug: "checkout" }),
+  organization: () => ({ id: "o1" }),
+  team: () => ({ id: "t1" }),
+  hasPermission: () => true,
+});
+
 const Wrapper = ({ children }: { children: ReactNode }) => (
+  <ChakraProvider value={defaultSystem}>
+    <UiScopeHostProvider value={scopeHost}>{children}</UiScopeHostProvider>
+  </ChakraProvider>
+);
+
+/** A screen that mounts no scope host at all, as the simulations timeline did. */
+const BareWrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
@@ -115,6 +134,21 @@ describe("TraceIdPeek", () => {
         await waitFor(() => expect(capturedHeaderInputs.length).toBeGreaterThan(0));
         expect(lastHeaderInput().occurredAtMs).toBeUndefined();
       });
+    });
+  });
+});
+
+describe("TracePreviewHoverCard", () => {
+  describe("when it is rendered by a family that mounts no scope host", () => {
+    it("renders its trigger instead of taking the page down (D20)", () => {
+      render(
+        <TracePreviewHoverCard traceId="trace-1">
+          <span>turn separator</span>
+        </TracePreviewHoverCard>,
+        { wrapper: BareWrapper },
+      );
+
+      expect(screen.getByText("turn separator")).toBeInTheDocument();
     });
   });
 });

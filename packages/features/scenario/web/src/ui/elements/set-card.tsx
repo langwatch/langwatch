@@ -2,7 +2,7 @@ import { Box, Card, HStack, Text, VStack } from "@chakra-ui/react";
 import { Settings } from "lucide-react";
 import { isOnPlatformSet, ON_PLATFORM_DISPLAY_NAME } from "@langwatch/scenario-contract";
 import type { ScenarioSetData } from "@langwatch/scenario-contract";
-import { formatTimeAgo } from "../../model/format-time-ago";
+import { formatTimeAgoCompact } from "@langwatch/ui-host/format-time-ago";
 
 export interface SetCardProps extends ScenarioSetData {
   onClick: () => void;
@@ -54,7 +54,7 @@ export function SetCard({ scenarioSetId, scenarioCount, lastRunAt, onClick }: Se
         {/* Scenarios count and last run in a row */}
         <HStack justify="space-between" align="center" color="fg.subtle" fontSize="sm">
           <Text>{scenarioCount} scenarios</Text>
-          <Text>Last run: {formatTimeAgo(lastRunAt)}</Text>
+          <Text>Last run: {formatTimeAgoCompact(lastRunAt)}</Text>
         </HStack>
       </VStack>
     </Card.Root>

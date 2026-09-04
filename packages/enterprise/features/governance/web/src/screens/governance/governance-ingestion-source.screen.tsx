@@ -49,7 +49,7 @@ import { readHandledError } from "../../model/handled-error";
 import { useGovernanceScope } from "../../behavior/governance-session";
 import { api, type RouterOutputs } from "../../behavior/governance-api";
 import { useGovernanceRouter } from "../../behavior/governance-router";
-import { formatTimeAgo } from "../../model/format-time-ago";
+import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import {
   needsIngestSecret,
   type SourceType,

@@ -16,7 +16,7 @@
 import type { Evaluator } from "@langwatch/evaluator-contract";
 import { useState } from "react";
 
-import { formatTimeAgo } from "../../model/format-time-ago";
+import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import { EvaluatorApiUsageDialog } from "./evaluator-api-usage-dialog";
 import { EvaluatorCard, type EvaluatorCardProps } from "./evaluator-card";
 

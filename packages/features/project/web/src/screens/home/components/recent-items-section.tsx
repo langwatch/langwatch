@@ -6,7 +6,7 @@ import type { RecentItem, RecentItemType } from "../../../behavior/home-api";
 import { homeApi } from "../../../behavior/home-api";
 import NextLink from "../../../ui/elements/app-link";
 import { featureIcons, recentItemTypeToFeature } from "@langwatch/navigation-web/command-bar";
-import { formatTimeAgo } from "../../../model/format-time-ago";
+import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import { HomeCard } from "./home-card";
 import { HOME_SECTION_GAP, HomeSectionHeader } from "./home-section-header";
 import { useProjectHomeHost } from "../../../model/project-home-host";

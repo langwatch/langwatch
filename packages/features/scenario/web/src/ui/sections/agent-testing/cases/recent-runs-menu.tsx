@@ -24,7 +24,7 @@ import type { Period } from "@langwatch/analytics-web/components/PeriodSelector"
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useNow } from "../../../../behavior/use-now";
-import { formatTimeAgoCompact } from "@langwatch/workflow-web/utils/formatTimeAgo";
+import { formatTimeAgoCompact } from "@langwatch/ui-host/format-time-ago";
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design";
 import {
   formatPassRate,

@@ -26,7 +26,7 @@ import { FormatMoney } from "@langwatch/workflow-web/optimization_studio/compone
 import { VersionBox } from "@langwatch/workflow-web/optimization_studio/components/History";
 import type { AppRouter } from "@langwatch/workflow-web/studio-host/api";
 import { api } from "@langwatch/workflow-web/studio-host/api";
-import { formatTimeAgo } from "@langwatch/workflow-web/utils/formatTimeAgo";
+import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import { getColorForString } from "@langwatch/design-system/rotating-colors";
 import { getRunDisplayName } from "@langwatch/experiment-web";
 import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";

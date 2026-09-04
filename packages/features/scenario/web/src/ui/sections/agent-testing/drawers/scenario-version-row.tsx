@@ -9,7 +9,7 @@
 import { Badge, Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import { api } from "../../../../behavior/scenario-api";
-import { formatTimeAgo } from "@langwatch/workflow-web/utils/formatTimeAgo";
+import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import {
   authorOf,
   changeLineOf,

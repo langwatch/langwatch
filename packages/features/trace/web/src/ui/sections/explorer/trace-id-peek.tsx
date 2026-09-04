@@ -3,7 +3,7 @@ import { Eye } from "lucide-react";
 import type React from "react";
 import { type ReactNode, useState } from "react";
 import { useDrawer } from "../../../behavior/use-drawer";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
+import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { TracePeekSummary } from "../../../index";
 
 interface TracePreviewHoverCardProps {

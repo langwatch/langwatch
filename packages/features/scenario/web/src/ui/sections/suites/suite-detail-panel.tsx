@@ -22,7 +22,7 @@ import { SetupWithAgentButton } from "@langwatch/trace-web/components/SetupWithA
 import type { SimulationSuite } from "../../../model/prisma-types";
 import { useNow } from "../../../behavior/use-now";
 import { getSuiteSetId, parseSuiteTargets } from "@langwatch/suite-contract";
-import { formatTimeAgoCompact } from "@langwatch/workflow-web/utils/formatTimeAgo";
+import { formatTimeAgoCompact } from "@langwatch/ui-host/format-time-ago";
 import { RunHistoryPanel, type RunHistoryStats } from "./run-history-panel";
 
 type SuiteDetailPanelProps = {

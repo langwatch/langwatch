@@ -11,7 +11,7 @@ import { toaster } from "@langwatch/workflow-web/studio-host/toaster";
 import { showErrorToast } from "@langwatch/workflow-web/studio-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
 import { api } from "@langwatch/workflow-web/studio-host/api";
-import { formatTimeAgo } from "@langwatch/workflow-web/utils/formatTimeAgo";
+import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store";
 
 interface VersionEntry {

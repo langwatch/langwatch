@@ -14,7 +14,7 @@ import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useNow } from "../../../../behavior/use-now";
 import type { ResultGroup } from "@langwatch/scenario-contract";
-import { formatTimeAgoCompact } from "@langwatch/workflow-web/utils/formatTimeAgo";
+import { formatTimeAgoCompact } from "@langwatch/ui-host/format-time-ago";
 import {
   FG_MUTED,
   GROUP_HEADER_BG,

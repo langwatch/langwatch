@@ -20,7 +20,7 @@
 import { Box, chakra, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { ChevronDown } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { formatTimeAgoCompact } from "@langwatch/workflow-web/utils/formatTimeAgo";
+import { formatTimeAgoCompact } from "@langwatch/ui-host/format-time-ago";
 import {
   DIALOG_FIELD_STYLE,
   FieldLabel,

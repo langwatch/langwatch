@@ -32,7 +32,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useOrganizationTeamProject } from "../../behavior/gateway-session";
 import { api } from "../../behavior/gateway-api";
 import { useGatewayRouter } from "../../behavior/gateway-router";
-import { formatTimeAgo } from "../../model/format-time-ago";
+import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import { useShowErrorToast } from "../../behavior/gateway-feedback";
 
 type BudgetListRow = ReturnType<typeof useBudgetRows>["rows"][number];

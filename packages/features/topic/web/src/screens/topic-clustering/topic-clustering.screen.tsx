@@ -32,7 +32,7 @@ import type {
 } from "@langwatch/topic-contract";
 import { useState } from "react";
 import { topicApi } from "../../behavior/topic-api";
-import { formatTimeAgo } from "../../model/format-time-ago";
+import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import { useTopicHost } from "../../model/topic-host";
 
 /**
@@ -257,7 +257,7 @@ function ClusteringStatusCard({
               <Text fontWeight="medium">Last run</Text>
               {outcomeBadge(status.data.lastRunOutcome, status.data.isRunInFlight)}
               {status.data.lastRunAt && (
-                <Text color="fg.muted">{formatTimeAgo(status.data.lastRunAt)}</Text>
+                <Text color="fg.muted">{formatTimeAgo(status.data.lastRunAt) ?? ""}</Text>
               )}
             </HStack>
             {status.data.lastRunOutcome === "completed" && (
@@ -301,7 +301,9 @@ function ClusteringStatusCard({
             <HStack gap={3}>
               <Text fontWeight="medium">Next scheduled run</Text>
               <Text color="fg.muted">
-                {status.data.nextRunAt ? formatTimeAgo(status.data.nextRunAt) : "Not scheduled yet"}
+                {status.data.nextRunAt
+                  ? (formatTimeAgo(status.data.nextRunAt) ?? "")
+                  : "Not scheduled yet"}
               </Text>
             </HStack>
           </VStack>
@@ -386,7 +388,7 @@ function RunHistoryCard({ projectId }: { projectId: string }) {
             <Table.Body>
               {history.data.map((run) => (
                 <Table.Row key={run.runId}>
-                  <Table.Cell whiteSpace="nowrap">{formatTimeAgo(run.startedAt)}</Table.Cell>
+                  <Table.Cell whiteSpace="nowrap">{formatTimeAgo(run.startedAt) ?? ""}</Table.Cell>
                   <Table.Cell whiteSpace="nowrap">
                     {run.trigger === "manual" ? "You" : "Schedule"}
                   </Table.Cell>

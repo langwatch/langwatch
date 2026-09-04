@@ -10,7 +10,7 @@ import { useExportScenarioRuns } from "../../../../behavior/suites/use-export-sc
 import { useCan } from "../../../../behavior/use-can";
 import { useNow } from "../../../../behavior/use-now";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
-import { formatTimeAgoCompact } from "@langwatch/workflow-web/utils/formatTimeAgo";
+import { formatTimeAgoCompact } from "@langwatch/ui-host/format-time-ago";
 import type { PeriodControls } from "./period-controls";
 import type { RunPlanDetailRun } from "./run-plan-detail-header";
 import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans";

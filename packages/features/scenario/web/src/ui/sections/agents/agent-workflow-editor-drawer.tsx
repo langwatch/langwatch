@@ -23,7 +23,7 @@ import { showErrorToast } from "../../../behavior/errors";
 import { useDrawer, useDrawerParams } from "@langwatch/ui-drawer";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
 import { WorkflowCardDisplay } from "@langwatch/workflow-web";
-import { formatTimeAgo } from "@langwatch/workflow-web/utils/formatTimeAgo";
+import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import type {
   CustomComponentConfig,
   Field as DSLField,

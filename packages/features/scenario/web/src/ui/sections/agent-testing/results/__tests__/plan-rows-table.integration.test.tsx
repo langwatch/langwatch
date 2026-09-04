@@ -31,7 +31,7 @@ vi.mock("../../../../../behavior/next-router", () => ({
   useRouter: () => ({ query: {}, push: vi.fn(), isReady: true }),
 }));
 
-vi.mock("@langwatch/workflow-web/utils/formatTimeAgo", () => ({
+vi.mock("@langwatch/ui-host/format-time-ago", () => ({
   formatTimeAgoCompact: () => "2h ago",
 }));
 

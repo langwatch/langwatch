@@ -13,7 +13,7 @@ import { ChevronDown, ChevronRight, Square } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNow } from "./now-provider";
 import type { SimulationRunData as ScenarioRunData } from "@langwatch/scenario-contract";
-import { formatTimeAgoCompact } from "./format-time-ago";
+import { formatTimeAgoCompact } from "@langwatch/ui-host/format-time-ago";
 import { RunMetricsSummary } from "./run-metrics-summary";
 import { Dialog } from "@langwatch/design-system/dialog";
 import type { BatchRun, BatchRunSummary } from "./run-history-transforms";

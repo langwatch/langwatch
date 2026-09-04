@@ -4,7 +4,7 @@ import { Radio, Trash2 } from "lucide-react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { ApiKeyListEntry } from "@langwatch/api-key-contract";
 import { apiKeyRowAnchorId } from "../../model/api-key-anchor";
-import { formatTimeAgo } from "../../model/format-time-ago";
+import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 
 type IngestionKeyRow = ApiKeyListEntry;
 
@@ -112,7 +112,7 @@ export function IngestionKeysSection({
                           tabIndex={0}
                           aria-label={`Last used at ${new Date(apiKey.lastUsedAt).toISOString()}`}
                         >
-                          {formatTimeAgo(new Date(apiKey.lastUsedAt).getTime())}
+                          {formatTimeAgo(new Date(apiKey.lastUsedAt).getTime()) ?? ""}
                         </Text>
                       </Tooltip>
                     ) : (

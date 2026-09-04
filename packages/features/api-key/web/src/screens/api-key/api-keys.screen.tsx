@@ -63,7 +63,7 @@ import {
   scopeHierarchyOf,
   type ScopeFilterValue,
 } from "../../model/api-key-scope-filter";
-import { formatTimeAgo } from "../../model/format-time-ago";
+import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import { ProviderScopeChips, ScopeFilter } from "../../ui/elements/scope-picker";
 import { IngestionKeysSection } from "../../ui/blocks/ingestion-keys-section";
 import { RevokeConfirmDialog } from "../../ui/blocks/revoke-confirm-dialog";
@@ -569,7 +569,7 @@ export default function ApiKeysScreen() {
                               tabIndex={0}
                               aria-label={`Last used at ${new Date(apiKey.lastUsedAt).toISOString()}`}
                             >
-                              {formatTimeAgo(new Date(apiKey.lastUsedAt).getTime())}
+                              {formatTimeAgo(new Date(apiKey.lastUsedAt).getTime()) ?? ""}
                             </Text>
                           </Tooltip>
                         ) : (

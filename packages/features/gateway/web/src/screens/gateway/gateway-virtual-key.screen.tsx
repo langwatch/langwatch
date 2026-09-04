@@ -65,7 +65,7 @@ import { useOrganizationTeamProject } from "../../behavior/gateway-session";
 import { useRollingWindow } from "../../behavior/use-rolling-window";
 import { api } from "../../behavior/gateway-api";
 import { useGatewayRouter } from "../../behavior/gateway-router";
-import { formatTimeAgo } from "../../model/format-time-ago";
+import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import { useShowErrorToast } from "../../behavior/gateway-feedback";
 
 function VirtualKeyDetailPage() {

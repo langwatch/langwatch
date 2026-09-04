@@ -25,6 +25,14 @@
     "./upgrade-modal-store": {
       "types": "./src/upgrade-modal-store.ts",
       "default": "./src/upgrade-modal-store.ts"
+    },
+    "./use-organization-team-project": {
+      "types": "./src/use-organization-team-project.ts",
+      "default": "./src/use-organization-team-project.ts"
+    },
+    "./format-time-ago": {
+      "types": "./src/format-time-ago.ts",
+      "default": "./src/format-time-ago.ts"
     }
   },
   "scripts": {
@@ -35,6 +43,7 @@
   "dependencies": {
     "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/ui-drawer": "workspace:*",
+    "date-fns": "^4.4.0",
     "zustand": "^4.5.7"
   },
   "devDependencies": {

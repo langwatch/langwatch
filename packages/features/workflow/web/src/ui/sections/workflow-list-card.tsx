@@ -22,7 +22,7 @@
 import { useCallback, useState, type ComponentProps, type ReactNode } from "react";
 
 import { workflowApi, type WorkflowListRow } from "../../behavior/workflow-api";
-import { formatTimeAgo } from "../../model/format-time-ago";
+import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import { useWorkflowHost } from "../../model/workflow-host";
 import {
   WorkflowCardActions,

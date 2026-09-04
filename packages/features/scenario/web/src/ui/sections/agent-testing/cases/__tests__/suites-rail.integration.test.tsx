@@ -39,7 +39,7 @@ vi.mock("../../../../../behavior/use-organization-team-project", () => ({
   }),
 }));
 
-vi.mock("@langwatch/workflow-web/utils/formatTimeAgo", () => ({
+vi.mock("@langwatch/ui-host/format-time-ago", () => ({
   formatTimeAgoCompact: () => "2h ago",
   formatTimeAgo: () => "2 hours ago",
 }));

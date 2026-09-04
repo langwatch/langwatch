@@ -38,7 +38,7 @@ import type { SimulationSuite } from "../../../model/prisma-types";
 import { useNow } from "../../../behavior/use-now";
 import type { ExternalSetSummary, SuiteRunSummary } from "@langwatch/scenario-contract";
 import { firstGrapheme } from "@langwatch/design-system/first-grapheme";
-import { formatTimeAgoCompact } from "@langwatch/workflow-web/utils/formatTimeAgo";
+import { formatTimeAgoCompact } from "@langwatch/ui-host/format-time-ago";
 import { SearchInput } from "@langwatch/design-system/search-input";
 import { ALL_RUNS_ID, toExternalSetSelection } from "../../../behavior/suites/use-suite-routing";
 

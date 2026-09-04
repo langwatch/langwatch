@@ -49,7 +49,7 @@ import type {
 } from "@langwatch/experiment-contract";
 import { api } from "@langwatch/workflow-web/studio-host/api";
 import { formatMoney } from "@langwatch/design-system/format-money";
-import { formatTimeAgo } from "@langwatch/workflow-web/utils/formatTimeAgo";
+import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import { getColorForString } from "@langwatch/design-system/rotating-colors";
 import { titleCase } from "@langwatch/design-system/string-casing";
 import { getRunDisplayName } from "../../../index";

@@ -181,10 +181,6 @@
     "./utils/workflow-api": {
       "types": "./src/behavior/workflow-api.ts",
       "default": "./src/behavior/workflow-api.ts"
-    },
-    "./utils/formatTimeAgo": {
-      "types": "./src/model/utils/format-time-ago.ts",
-      "default": "./src/model/utils/format-time-ago.ts"
     }
   },
   "scripts": {

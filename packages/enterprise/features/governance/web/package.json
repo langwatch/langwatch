@@ -32,6 +32,7 @@
     "@langwatch/design-system": "workspace:*",
     "@langwatch/enterprise-governance-contract": "workspace:*",
     "@langwatch/platform-api-client": "workspace:*",
+    "@langwatch/ui-host": "workspace:*",
     "date-fns": "^4.4.0",
     "lucide-react": "^1.22.0",
     "motion": "^12.42.2",

@@ -199,6 +199,7 @@
     "@langwatch/share-web": "workspace:*",
     "@langwatch/suite-web": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/ui-host": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "@langwatch/workflow-web": "workspace:*",
     "@microlink/react-json-view": "^1.31.21",

@@ -33,7 +33,7 @@ import {
 } from "@langwatch/ui-host/use-drawer";
 import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-host/use-organization-team-project";
 import { WorkflowCardDisplay } from "@langwatch/workflow-web";
-import { formatTimeAgo } from "@langwatch/workflow-web/utils/formatTimeAgo";
+import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,

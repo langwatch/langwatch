@@ -40,6 +40,7 @@
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/platform-api-client": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/ui-host": "workspace:*",
     "date-fns": "^4.4.0",
     "lucide-react": "^1.22.0",
     "papaparse": "^5.5.3",
