@@ -101,6 +101,29 @@ else
   check "the annotation points at the first line of the long paragraph" no
 fi
 
+# A four-backtick fence that quotes three-backtick fences is one code block,
+# so the prose inside it is never counted.
+NESTED_PAGE="$WORK/docs/nested.mdx"
+{
+  printf -- '---\ntitle: Nested\n---\n\n'
+  printf '````text\n'
+  printf 'one two three four five six seven eight nine ten eleven twelve\n\n'
+  printf '```python\nprint(1)\n```\n\n'
+  printf 'one two three four five six seven eight nine ten eleven twelve\n'
+  printf '````\n\n'
+  printf 'one two three\n'
+} > "$NESTED_PAGE"
+rm -f "$LONG_PAGE"
+
+NESTED_OUTPUT="$(DOCS_PROSE_MAX_PARAGRAPH_WORDS=10 bash "$WORK/docs/scripts/check-docs-prose.sh" --all 2>&1)"
+
+if printf '%s\n' "$NESTED_OUTPUT" | grep -q 'words, the limit is 10'; then
+  check "a four-backtick fence that quotes three-backtick fences stays one code block" no
+  echo "Output: $NESTED_OUTPUT"
+else
+  check "a four-backtick fence that quotes three-backtick fences stays one code block" yes
+fi
+
 if [[ $FAILURES -gt 0 ]]; then
   echo ""
   echo "Annotation: $ANNOTATION"

@@ -99,9 +99,32 @@ for file in "${FILES[@]}"; do
 
   # Blank out code fences (including indented ones, up to 3 spaces per the
   # CommonMark spec) and founder-decision exemptions. Print blank lines for
-  # skipped records so grep -n reports the real source line number.
+  # skipped records so grep -n reports the real source line number. A fence
+  # closes only on a fence of the same character at least as long as the one
+  # that opened it, so a four-backtick block that quotes three-backtick fences
+  # stays one block.
   cleaned=$(awk '
-    /^ {0,3}(`{3,}|~{3,})/ { in_code = !in_code; print ""; next }
+    function fence_length(line,    m) {
+      m = line
+      sub(/^ {0,3}/, "", m)
+      match(m, /^(`+|~+)/)
+      return RLENGTH
+    }
+    function fence_char(line,    m) {
+      m = line
+      sub(/^ {0,3}/, "", m)
+      return substr(m, 1, 1)
+    }
+    /^ {0,3}(`{3,}|~{3,})/ {
+      if (!in_code) {
+        in_code = 1
+        open_char = fence_char($0)
+        open_length = fence_length($0)
+      } else if (fence_char($0) == open_char && fence_length($0) >= open_length) {
+        in_code = 0
+      }
+      print ""; next
+    }
     in_code                 { print ""; next }
     /\{\/\* Founder decision:/  { print ""; next }
     { print }
