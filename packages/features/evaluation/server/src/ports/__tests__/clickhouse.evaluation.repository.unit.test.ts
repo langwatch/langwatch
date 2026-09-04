@@ -241,7 +241,7 @@ describe("ClickHouseEvaluationRepository", () => {
       since: 1_600_000_000_000,
     });
     expect(summaries.trace_1).toHaveLength(2);
-    expect(client.queries[0]).toContain("ORDER BY UpdatedAt DESC");
+    expect(client.queries[0]).toContain("ORDER BY runs.UpdatedAt DESC");
     expect(client.queries[0]).toContain("max(UpdatedAt)");
     expect(client.queries[1]).toContain("TraceId IN");
     expect(client.queries[1]).toContain("max(UpdatedAt)");

@@ -43,7 +43,7 @@ describe("EvaluationRunClickHouseReadRepository.findTraceEvaluations", () => {
 
       const sql = String((query.mock.calls[0]?.[0] as { query: string }).query);
       for (const column of ["ScheduledAt", "StartedAt", "CompletedAt"]) {
-        expect(sql).toContain(`toUnixTimestamp64Milli(${column}) AS ${column}`);
+        expect(sql).toContain(`toUnixTimestamp64Milli(runs.${column}) AS ${column}`);
       }
       expect(result.trace_1?.[0]?.timestamps).toEqual({
         scheduledAt: 1_757_000_000_000,

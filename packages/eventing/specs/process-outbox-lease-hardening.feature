@@ -55,3 +55,11 @@ Feature: Process outbox lease hardening
     When the lease lapses and another dispatcher leases the message
     Then the new delivery carries a higher attempt number
     And first-attempt dispatch lag is observed exactly once per message
+
+  @unit @claim-connection
+  Scenario: Claiming due messages does not hold an interactive transaction open
+    Given a process running one outbox worker per process manager on a shared connection pool
+    When a worker claims its due messages
+    Then the claim is issued as a single locking statement
+    And no interactive transaction is opened for it
+    And a poll cannot fail for want of a transaction slot while the pool has connections

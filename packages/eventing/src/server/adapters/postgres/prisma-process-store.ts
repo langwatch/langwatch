@@ -440,8 +440,12 @@ export class PrismaProcessStore implements ProcessStore {
     const processNameFilter = params.processNames
       ? Prisma.sql`AND "processName" IN (${Prisma.join([...params.processNames])})`
       : Prisma.empty;
-    const rows = await this.#prisma.$transaction(async (tx) => {
-      return await tx.$queryRaw<ProcessManagerOutbox[]>(Prisma.sql`
+    // Deliberately NOT an interactive transaction: the claim is one statement,
+    // already atomic, its row locks held to the UPDATE. Wrapping it took a
+    // pooled connection per poll, once a second per process manager, and the
+    // pool ran out — "Unable to start a transaction in the given time" on
+    // every claim, which stalls every pipeline the outbox feeds.
+    const rows = await this.#prisma.$queryRaw<ProcessManagerOutbox[]>(Prisma.sql`
         -- @tenancy: outbox claim is cross-project worker infrastructure by design
         WITH candidates AS (
           SELECT "id"
@@ -462,8 +466,7 @@ export class PrismaProcessStore implements ProcessStore {
         FROM candidates
         WHERE outbox."id" = candidates."id"
         RETURNING outbox.*
-      `);
-    });
+    `);
     return rows.map(toLeasedMessage);
   }
 

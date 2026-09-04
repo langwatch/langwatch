@@ -14,3 +14,16 @@ Feature: A trace reads back with the evaluations recorded on it
     When the trace's evaluations are read
     Then the query selects each time as milliseconds
     And the evaluation reads back with numeric timestamps
+
+  The same read then answered 200 with no evaluations at all. It projects
+  each DateTime onto an alias of the column's own name, and ClickHouse
+  resolves an unqualified name in WHERE to the select-list alias — so the
+  dedup predicate compared milliseconds against `max(UpdatedAt)` and matched
+  nothing. Every read qualifies its predicate with the table.
+
+  @integration
+  Scenario: A rewritten evaluation is not hidden by the read's own column aliases
+    Given an evaluation row written when it was scheduled and rewritten when it completed
+    When the trace's evaluations are read
+    Then the completed version of the evaluation is returned
+    And reading the trace's evaluation runs directly returns the same version

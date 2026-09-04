@@ -19,6 +19,14 @@ import type { ClickHouseEvaluationRunRecord } from "./evaluation-run-write.repos
 const TABLE_NAME = "evaluation_runs" as const;
 const RESOLVER_RECENT_WINDOW_MS = 35 * 24 * 60 * 60 * 1000;
 const DEFAULT_SCHEDULED_AT_SLACK_MS = 7 * 24 * 60 * 60 * 1000;
+/**
+ * Load-bearing. These reads alias a DateTime onto the column's own name, and
+ * ClickHouse resolves an unqualified WHERE name to the select-list alias — so
+ * the dedup predicate compared milliseconds against `max(UpdatedAt)`, matched
+ * nothing, and every trace read answered with no evaluations. Qualifying the
+ * predicate with this alias binds it to the column.
+ */
+const RUNS = "runs" as const;
 const TRACE_EVALUATION_COLUMNS_LIGHT = [
   "ProjectionId",
   "TenantId",
@@ -35,11 +43,11 @@ const TRACE_EVALUATION_COLUMNS_LIGHT = [
   "Label",
   "Details",
   "Error",
-  "toUnixTimestamp64Milli(ScheduledAt) AS ScheduledAt",
-  "toUnixTimestamp64Milli(StartedAt) AS StartedAt",
-  "toUnixTimestamp64Milli(CompletedAt) AS CompletedAt",
+  `toUnixTimestamp64Milli(${RUNS}.ScheduledAt) AS ScheduledAt`,
+  `toUnixTimestamp64Milli(${RUNS}.StartedAt) AS StartedAt`,
+  `toUnixTimestamp64Milli(${RUNS}.CompletedAt) AS CompletedAt`,
   "LastProcessedEventId",
-  "toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt",
+  `toUnixTimestamp64Milli(${RUNS}.UpdatedAt) AS UpdatedAt`,
 ].join(", ");
 const TRACE_EVALUATION_COLUMNS_WITH_INPUTS = `${TRACE_EVALUATION_COLUMNS_LIGHT}, Inputs`;
 const logger = createLogger("langwatch:evaluation:clickhouse.evaluation-run-read");
@@ -156,19 +164,19 @@ export class EvaluationRunClickHouseReadRepository {
           SELECT ProjectionId, TenantId, EvaluationId, Version, EvaluatorId,
             EvaluatorType, EvaluatorName, TraceId, IsGuardrail, Status, Score,
             Passed, Label, Details, Inputs, Error, ErrorDetails,
-            toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
-            toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
-            toUnixTimestamp64Milli(ArchivedAt) AS ArchivedAt,
-            toUnixTimestamp64Milli(ScheduledAt) AS ScheduledAt,
-            toUnixTimestamp64Milli(StartedAt) AS StartedAt,
-            toUnixTimestamp64Milli(CompletedAt) AS CompletedAt, CostId,
+            toUnixTimestamp64Milli(${RUNS}.CreatedAt) AS CreatedAt,
+            toUnixTimestamp64Milli(${RUNS}.UpdatedAt) AS UpdatedAt,
+            toUnixTimestamp64Milli(${RUNS}.ArchivedAt) AS ArchivedAt,
+            toUnixTimestamp64Milli(${RUNS}.ScheduledAt) AS ScheduledAt,
+            toUnixTimestamp64Milli(${RUNS}.StartedAt) AS StartedAt,
+            toUnixTimestamp64Milli(${RUNS}.CompletedAt) AS CompletedAt, CostId,
             LastProcessedEventId,
-            toUnixTimestamp64Milli(LastEventOccurredAt) AS LastEventOccurredAt
-          FROM ${TABLE_NAME}
-          WHERE TenantId = {tenantId:String}
-            AND ScheduledAt >= now() - INTERVAL 7 DAY
-            AND TraceId = {traceId:String}
-            AND (TenantId, EvaluationId, UpdatedAt) IN (
+            toUnixTimestamp64Milli(${RUNS}.LastEventOccurredAt) AS LastEventOccurredAt
+          FROM ${TABLE_NAME} AS ${RUNS}
+          WHERE ${RUNS}.TenantId = {tenantId:String}
+            AND ${RUNS}.ScheduledAt >= now() - INTERVAL 7 DAY
+            AND ${RUNS}.TraceId = {traceId:String}
+            AND (${RUNS}.TenantId, ${RUNS}.EvaluationId, ${RUNS}.UpdatedAt) IN (
               SELECT TenantId, EvaluationId, max(UpdatedAt)
               FROM ${TABLE_NAME}
               WHERE TenantId = {tenantId:String}
@@ -176,7 +184,7 @@ export class EvaluationRunClickHouseReadRepository {
                 AND TraceId = {traceId:String}
               GROUP BY TenantId, EvaluationId
             )
-          ORDER BY UpdatedAt DESC
+          ORDER BY ${RUNS}.UpdatedAt DESC
         `,
         query_params: { tenantId: input.tenantId, traceId: input.traceId },
         format: "JSONEachRow",
@@ -342,10 +350,10 @@ export class EvaluationRunClickHouseReadRepository {
     const result = await input.client.query({
       query: `
         SELECT ${input.columns}
-        FROM ${TABLE_NAME}
-        WHERE TenantId = {tenantId:String}
-          AND TraceId IN ({traceIds:Array(String)})
-          AND (TenantId, EvaluationId, UpdatedAt) IN (
+        FROM ${TABLE_NAME} AS ${RUNS}
+        WHERE ${RUNS}.TenantId = {tenantId:String}
+          AND ${RUNS}.TraceId IN ({traceIds:Array(String)})
+          AND (${RUNS}.TenantId, ${RUNS}.EvaluationId, ${RUNS}.UpdatedAt) IN (
             SELECT TenantId, EvaluationId, max(UpdatedAt)
             FROM ${TABLE_NAME}
             WHERE TenantId = {tenantId:String}
