@@ -9,6 +9,7 @@ from attrs import field as _attrs_field
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
+    from ..models.patch_api_scenarios_by_id_body_fields import PatchApiScenariosByIdBodyFields
     from ..models.patch_api_scenarios_by_id_body_parameters_item import PatchApiScenariosByIdBodyParametersItem
 
 
@@ -35,6 +36,10 @@ class PatchApiScenariosByIdBody:
             default.
         test_suite_id (None | str | Unset): The test suite to file this scenario in. It must name a non-archived test
             suite of the same project. null files the scenario into the project's Default test suite.
+        fields (PatchApiScenariosByIdBodyFields | Unset): The value for each field the test suite declares, keyed by
+            field identifier: text, a number or a boolean, in the field's own type. A field the suite does not declare
+            answers 422 scenario_field_unknown; a value of the wrong type answers 422 scenario_field_type_invalid. An empty
+            value clears the field. Send the full record; an empty record clears every value.
     """
 
     name: str | Unset = UNSET
@@ -47,6 +52,7 @@ class PatchApiScenariosByIdBody:
     max_turns: int | None | Unset = UNSET
     min_turns: int | None | Unset = UNSET
     test_suite_id: None | str | Unset = UNSET
+    fields: PatchApiScenariosByIdBodyFields | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -99,6 +105,10 @@ class PatchApiScenariosByIdBody:
         else:
             test_suite_id = self.test_suite_id
 
+        fields: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.fields, Unset):
+            fields = self.fields.to_dict()
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update({})
@@ -122,11 +132,14 @@ class PatchApiScenariosByIdBody:
             field_dict["minTurns"] = min_turns
         if test_suite_id is not UNSET:
             field_dict["testSuiteId"] = test_suite_id
+        if fields is not UNSET:
+            field_dict["fields"] = fields
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.patch_api_scenarios_by_id_body_fields import PatchApiScenariosByIdBodyFields
         from ..models.patch_api_scenarios_by_id_body_parameters_item import PatchApiScenariosByIdBodyParametersItem
 
         d = dict(src_dict)
@@ -192,6 +205,13 @@ class PatchApiScenariosByIdBody:
 
         test_suite_id = _parse_test_suite_id(d.pop("testSuiteId", UNSET))
 
+        _fields = d.pop("fields", UNSET)
+        fields: PatchApiScenariosByIdBodyFields | Unset
+        if isinstance(_fields, Unset):
+            fields = UNSET
+        else:
+            fields = PatchApiScenariosByIdBodyFields.from_dict(_fields)
+
         patch_api_scenarios_by_id_body = cls(
             name=name,
             situation=situation,
@@ -203,6 +223,7 @@ class PatchApiScenariosByIdBody:
             max_turns=max_turns,
             min_turns=min_turns,
             test_suite_id=test_suite_id,
+            fields=fields,
         )
 
         patch_api_scenarios_by_id_body.additional_properties = d

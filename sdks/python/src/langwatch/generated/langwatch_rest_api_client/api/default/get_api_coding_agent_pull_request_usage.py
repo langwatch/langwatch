@@ -120,7 +120,9 @@ def sync_detailed(
     already covers, and the list-price total of both. Per-model totals carry the list price only. Cost
     is calculated from the tokens the agent reported and LangWatch's model prices, so it estimates spend
     rather than restating a provider invoice. Requires a personal-project API key; rows appear only for
-    projects the calling user may view, and cost only for those they may price.
+    projects the calling user may view, and cost only for those they may price. Prefer `GET
+    /api/v1/coding-agent/pull-request-usage`, which answers the same question with an organization API
+    key alone and needs no X-Project-Id header.
 
     Args:
         repository (str):
@@ -170,7 +172,9 @@ def sync(
     already covers, and the list-price total of both. Per-model totals carry the list price only. Cost
     is calculated from the tokens the agent reported and LangWatch's model prices, so it estimates spend
     rather than restating a provider invoice. Requires a personal-project API key; rows appear only for
-    projects the calling user may view, and cost only for those they may price.
+    projects the calling user may view, and cost only for those they may price. Prefer `GET
+    /api/v1/coding-agent/pull-request-usage`, which answers the same question with an organization API
+    key alone and needs no X-Project-Id header.
 
     Args:
         repository (str):
@@ -214,7 +218,9 @@ async def asyncio_detailed(
     already covers, and the list-price total of both. Per-model totals carry the list price only. Cost
     is calculated from the tokens the agent reported and LangWatch's model prices, so it estimates spend
     rather than restating a provider invoice. Requires a personal-project API key; rows appear only for
-    projects the calling user may view, and cost only for those they may price.
+    projects the calling user may view, and cost only for those they may price. Prefer `GET
+    /api/v1/coding-agent/pull-request-usage`, which answers the same question with an organization API
+    key alone and needs no X-Project-Id header.
 
     Args:
         repository (str):
@@ -262,7 +268,9 @@ async def asyncio(
     already covers, and the list-price total of both. Per-model totals carry the list price only. Cost
     is calculated from the tokens the agent reported and LangWatch's model prices, so it estimates spend
     rather than restating a provider invoice. Requires a personal-project API key; rows appear only for
-    projects the calling user may view, and cost only for those they may price.
+    projects the calling user may view, and cost only for those they may price. Prefer `GET
+    /api/v1/coding-agent/pull-request-usage`, which answers the same question with an organization API
+    key alone and needs no X-Project-Id header.
 
     Args:
         repository (str):
