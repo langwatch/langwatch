@@ -199,3 +199,25 @@ Feature: Langy works in a folder shared from the developer's machine
       When I disconnect from the panel header chip
       Then the CLI exits with a message that the folder was disconnected from LangWatch
       And the session key no longer connects
+
+  Rule: The link the command line prints opens the conversation
+
+    @unit
+    Scenario: The follow-along link opens the panel on that conversation
+      Given the command line printed a follow-along link for my conversation
+      When I open that link
+      Then the panel opens on that conversation
+      And the address bar no longer carries the conversation parameter
+
+    @unit
+    Scenario: A link to a conversation I cannot see is refused silently
+      Given a follow-along link for a conversation I have no access to
+      When I open that link
+      Then the panel does not switch conversation
+      And the address bar no longer carries the conversation parameter
+
+    @unit
+    Scenario: The conversation parameter survives the home redirect
+      Given a follow-along link, whose path is the site root
+      When the root resolves my home page
+      Then the conversation parameter travels to the page it lands on
