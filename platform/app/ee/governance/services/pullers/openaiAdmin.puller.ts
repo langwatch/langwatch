@@ -385,8 +385,18 @@ const costResultSchema = z
     }),
     line_item: z.string().nullable().default(null),
     project_id: z.string().nullable().default(null),
+    /**
+     * The ONLY thing on a cost row that names a person, and an opaque id
+     * ("user-…") rather than an address. The report has no email field: the
+     * result object is amount / line_item / project_id / user_id / api_key_id /
+     * quantity and nothing else. An earlier version of this file read a
+     * `user_email` that the endpoint never sends, so every row named nobody and
+     * person discovery — which skips a blank actor — found nobody at all.
+     *
+     * Null whenever the row was not grouped by user, so it is read through
+     * `dimension()` like every other coordinate.
+     */
     user_id: z.string().nullable().default(null),
-    user_email: z.string().nullable().default(null),
     api_key_id: z.string().nullable().default(null),
   })
   .passthrough();
@@ -817,8 +827,25 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
     return {
       source_event_id: `cost:${startingAt}:${dimensionPath(dimensions)}`,
       event_timestamp: startingAt,
-      // The provider names the person on every row, so no directory is asked.
-      actor: dimension(result.user_email),
+      /**
+       * The person the row is billed to, as the provider's own opaque user id.
+       * No directory is asked — the report already names them.
+       *
+       * Identity-safe by construction. `source_event_id` above and the
+       * restatement key downstream are built from `dimensions`, which ALREADY
+       * carries this exact value as `userId`; `actor` is in neither. So filling
+       * it in re-keys nothing, lands no second row beside an existing one, and
+       * cannot double-count a day's spend — a re-read of an old bucket restates
+       * it in place and simply starts naming somebody.
+       *
+       * An id, not an address, and the erasure suppression list is keyed on
+       * exactly this string (`partitionSuppressedEvents` reads `event.actor`,
+       * and a discovered person's `rawActorId` is where the digest comes from),
+       * so the two agree: erasing this person suppresses this id. The address
+       * is never on the row, so matching an id to an account is the identity
+       * engine's job, not this adapter's.
+       */
+      actor: dimension(result.user_id),
       action: "cost_report",
       target: dimension(result.line_item),
       cost_usd: amountUsd,

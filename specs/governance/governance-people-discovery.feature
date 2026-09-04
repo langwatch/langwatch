@@ -106,6 +106,36 @@ Feature: Provider rows become discovered people
     # A Copilot transcript knows people only as GUIDs. The directory is the
     # one source that knows what the GUID is called.
 
+  @integration
+  Scenario: A directory row records the department it names on the person
+    Given the directory names a person and the department they are filed under
+    When the pull is recorded
+    Then the discovered person carries that department
+    # The department the directory asserts is the only department fact that
+    # exists for somebody holding no LangWatch account, which on a fresh
+    # tenant is nearly everybody. Kept on the person, not on a Department row:
+    # see the department scenarios below for the entity the org actually
+    # attributes spend by.
+
+  @integration
+  Scenario: A later directory row naming no department keeps the recorded one
+    Given a discovered person whose recorded department came from the directory
+    When a later directory row for them names no department
+    Then the recorded department is unchanged
+    # Same widen-only posture as the display text. The read is idempotent and
+    # daily, and the pullers spell a missing field as blank, so a blanking
+    # write would erase a real department every morning for anyone the tenant
+    # filed under nothing.
+
+  @integration
+  Scenario: Erasing a person removes the department the directory gave them
+    Given a discovered person carrying a directory department
+    When their identity is erased
+    Then the row keeps its spend but carries no department
+    # The department describes the person, not the money. Nothing rolls up by
+    # it, so keeping it buys the surviving row nothing and leaves a personal
+    # detail on somebody we were asked to forget.
+
   # ── Departments ride the directory row ────────────────────────────────────
   # The directory's department field lands on the SAME entities the SCIM
   # costCenter push writes: resolve the department by name (creating it if

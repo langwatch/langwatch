@@ -10,6 +10,10 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { MATCH_EVIDENCE_KIND } from "@ee/governance/services/logic/identityEvidence";
+import {
+  departmentLabelFor,
+  groupObservedDepartments,
+} from "@ee/governance/services/logic/observedDepartments";
 import { Archive, ExternalLink, MoreVertical, Pencil } from "lucide-react";
 import { useState } from "react";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
@@ -254,6 +258,8 @@ function DiscoveredPeoplePanel({
         )}
       </VStack>
 
+      <ObservedDepartmentsPanel people={people} />
+
       {suggestions.length > 0 && (
         <SuggestionsPanel
           orgId={orgId}
@@ -301,17 +307,103 @@ function DiscoveredPersonRow({ person }: { person: DiscoveredPerson }) {
   );
 }
 
-/** The right-hand column: who the person is linked to, or that they are not. */
+/**
+ * The departments the connected providers actually name, with how many people
+ * each one covers.
+ *
+ * A separate panel from "Departments" below, not a merge into it, and the
+ * separation is the honest shape rather than a shortcut. That panel is the
+ * organization's own `Department` list: every row was created by an
+ * administrator, spend rolls up by it, and each row can be renamed and
+ * archived. These names are free text a provider asserted, mostly about people
+ * who hold no LangWatch account. Listing them together would offer Rename and
+ * Archive on rows that are not records at all, and quietly redefine what the
+ * spend list means.
+ *
+ * What it is for: an administrator opening this screen on a fresh tenant can
+ * see the departments their directory already contains, and create the ones
+ * they want to attribute spend by, instead of guessing at names.
+ *
+ * Hidden when the providers name none — an empty panel would suggest the
+ * directory was read and came back blank, which is the same picture as a
+ * directory that was never switched on.
+ */
+function ObservedDepartmentsPanel({ people }: { people: DiscoveredPerson[] }) {
+  const observed = groupObservedDepartments(people);
+  if (observed.length === 0) return null;
+
+  return (
+    <VStack
+      align="stretch"
+      gap={0}
+      borderWidth="1px"
+      borderColor="border.muted"
+      borderRadius="md"
+      overflow="hidden"
+    >
+      <Box
+        paddingY={2}
+        paddingX={3}
+        borderBottomWidth="1px"
+        borderColor="border.muted"
+        backgroundColor="bg.subtle"
+      >
+        <Text
+          fontSize="xs"
+          fontWeight="semibold"
+          color="fg.muted"
+          textTransform="uppercase"
+          letterSpacing="wider"
+        >
+          Departments the providers see
+        </Text>
+        <Text fontSize="xs" color="fg.subtle" marginTop={1}>
+          What the connected directories call these people. Create the ones you
+          want to attribute spend by below — spend rolls up by your own
+          departments, not by these.
+        </Text>
+      </Box>
+      {observed.map((department) => (
+        <HStack
+          key={department.name}
+          paddingY={2}
+          paddingX={3}
+          borderBottomWidth="1px"
+          borderColor="border.muted"
+          fontSize="sm"
+          justifyContent="space-between"
+        >
+          <Text fontWeight="medium">{department.name}</Text>
+          <Text fontSize="xs" color="fg.muted">
+            {department.peopleCount === 1
+              ? "1 person"
+              : `${department.peopleCount} people`}
+          </Text>
+        </HStack>
+      ))}
+    </VStack>
+  );
+}
+
+/**
+ * The right-hand column: who the person is linked to, or that they are not,
+ * and the department either half of the pair knows about.
+ *
+ * An unlinked person gets the department too, which is the whole point of
+ * carrying it on the row: on a tenant where nobody is linked yet, the
+ * directory is the only thing that knows where anybody works.
+ */
 function PersonLinkCell({ person }: { person: DiscoveredPerson }) {
+  // Null for an erased person: erasure removes the stored department, and the
+  // label helper refuses to describe one regardless.
+  const department = departmentLabelFor(person);
   return (
     <VStack align="end" gap={0} flexShrink={0}>
       {person.link ? (
         <>
           <Text fontSize="sm">
             {person.link.memberName ?? person.link.userId}
-            {person.link.departmentName
-              ? ` · ${person.link.departmentName}`
-              : ""}
+            {department ? ` · ${department}` : ""}
           </Text>
           <Text fontSize="xs" color="fg.muted">
             linked ·{" "}
@@ -320,9 +412,12 @@ function PersonLinkCell({ person }: { person: DiscoveredPerson }) {
           </Text>
         </>
       ) : (
-        <Text fontSize="xs" color="fg.subtle">
-          {person.erasedAt ? "" : "not linked"}
-        </Text>
+        <>
+          {department && <Text fontSize="sm">{department}</Text>}
+          <Text fontSize="xs" color="fg.subtle">
+            {person.erasedAt ? "" : "not linked"}
+          </Text>
+        </>
       )}
     </VStack>
   );

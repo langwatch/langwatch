@@ -195,6 +195,26 @@ export interface GovernanceCostStaleSourcesDto {
   sourceNames: string[];
 }
 
+/**
+ * The window that was pulled while this organization was not recording pulled
+ * cost, so its spend was never priced (ADR-088).
+ *
+ * A sibling of the notice above and the same kind of statement: those days
+ * have audit rows and no money, which draws as zero and means unknown. The
+ * difference is the cause — nothing broke, the organization had pulled cost
+ * recording switched off — and so is the repair: turning it on stops the loss
+ * but recovers nothing already read, because the cursor moved on. Re-reading
+ * the window is what fills it in.
+ */
+export interface GovernanceCostUnpricedWindowDto {
+  /** First day whose spend was dropped, across every affected source. */
+  sinceIso: string;
+  /** Last such day. Equal to `sinceIso` when only one day was lost. */
+  throughIso: string;
+  /** Names of the affected sources, alphabetical, so the notice can say which. */
+  sourceNames: string[];
+}
+
 export interface GovernanceCostSummaryDto {
   /**
    * Null when the screen has figures to show. Non-null means every lane is
@@ -219,6 +239,8 @@ export interface GovernanceCostSummaryDto {
   windowDays: number;
   /** Null when every source is still pulling. */
   staleSources: GovernanceCostStaleSourcesDto | null;
+  /** Null when no source has read a day it was not allowed to price. */
+  unpricedWindow: GovernanceCostUnpricedWindowDto | null;
 }
 
 /** A lane nobody has a figure for. Null, never zero — see the file header. */
@@ -246,8 +268,9 @@ function unavailable({
     series: [],
     windowDays,
     // An unavailable screen has no lanes to caveat. The reason it prints
-    // already outranks "a source stopped pulling".
+    // already outranks "a source stopped pulling" and "a day went unpriced".
     staleSources: null,
+    unpricedWindow: null,
   };
 }
 
@@ -327,12 +350,14 @@ export class GovernanceCostService {
     // still fails the whole summary: this screen is about money, and a money
     // lane that swallowed its own failure would render an absence as a
     // measurement.
-    const [rows, seats, staleSources, azureBilling] = await Promise.all([
-      costRollup.sumDaysByLane({ tenantId, fromDay, toDay }),
-      this.readSeats({ tenantId }),
-      this.readStaleSources({ organizationId }),
-      this.readAzureBillingNote({ organizationId, tenantId, fromDay, toDay }),
-    ]);
+    const [rows, seats, staleSources, azureBilling, unpricedWindow] =
+      await Promise.all([
+        costRollup.sumDaysByLane({ tenantId, fromDay, toDay }),
+        this.readSeats({ tenantId }),
+        this.readStaleSources({ organizationId }),
+        this.readAzureBillingNote({ organizationId, tenantId, fromDay, toDay }),
+        this.readUnpricedWindow({ organizationId }),
+      ]);
 
     return {
       unavailableReason: null,
@@ -343,6 +368,59 @@ export class GovernanceCostService {
       series: seriesFrom(rows, now),
       windowDays,
       staleSources,
+      unpricedWindow,
+    };
+  }
+
+  /**
+   * The span of days that were pulled but never priced, across every source.
+   *
+   * Reported for the whole organization rather than clipped to the drawn
+   * window, for the same reason `readStaleSources` counts sources that
+   * produced no rows: a gap that predates the window is exactly the one a
+   * reader is least likely to find on their own, and clipping it would hide
+   * the worst case. The screen says which days, so a gap outside the window
+   * reads as history rather than as a caveat on the figures on screen.
+   */
+  private async readUnpricedWindow({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<GovernanceCostUnpricedWindowDto | null> {
+    const sources = await this.deps.prisma.ingestionSource.findMany({
+      where: {
+        organizationId,
+        archivedAt: null,
+        unpricedUsageSince: { not: null },
+      },
+      select: {
+        name: true,
+        unpricedUsageSince: true,
+        unpricedUsageThrough: true,
+      },
+    });
+    // Re-checked here rather than trusted from the query. A source with no
+    // recorded loss has nothing to say, and reducing an empty list — or one
+    // holding an absent date — would throw on a screen whose whole job is to
+    // keep working when a figure is missing.
+    const lost = sources.flatMap((source) => {
+      const since = source.unpricedUsageSince;
+      if (!since) return [];
+      return [{ name: source.name, since, through: source.unpricedUsageThrough ?? since }];
+    });
+    if (lost.length === 0) return null;
+
+    const since = lost.reduce((earliest, source) =>
+      source.since < earliest.since ? source : earliest,
+    ).since;
+    const through = lost.reduce((latest, source) =>
+      source.through > latest.through ? source : latest,
+    ).through;
+
+    return {
+      sinceIso: since.toISOString(),
+      throughIso: through.toISOString(),
+      sourceNames: lost.map((source) => source.name).sort(),
     };
   }
 

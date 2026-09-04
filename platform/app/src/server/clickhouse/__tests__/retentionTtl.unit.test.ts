@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { RETENTION_MANAGED_TABLES } from "../../data-retention/retentionPolicy.schema";
@@ -7,6 +7,22 @@ import {
   hasRetentionTTL,
   TABLE_TTL_CONFIG,
 } from "../ttlReconciler";
+
+const MIGRATIONS_DIR = join(process.cwd(), "src/server/clickhouse/migrations");
+
+/**
+ * Migration numbers move whenever a branch rebases past someone else's, so
+ * these assertions match on the descriptive half of the filename instead.
+ */
+const migrationEndingIn = (suffix: string): string => {
+  const matches = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith(suffix));
+  if (matches.length !== 1) {
+    throw new Error(
+      `expected exactly one migration ending in ${suffix}, found ${matches.length}`,
+    );
+  }
+  return join(MIGRATIONS_DIR, matches[0]!);
+};
 
 describe("buildRetentionTTLExpression", () => {
   // The IF(_retention_days > 0, ...) guard is a safety net, not a normal path:
@@ -143,9 +159,7 @@ describe("gateway_spend retention exemption", () => {
     ).toBeUndefined();
   });
 
-  it("declares its fixed 13-month delete in the migration itself", async () => {
-    const { readFileSync } = await import("node:fs");
-    const { join } = await import("node:path");
+  it("declares its fixed 13-month delete in the migration itself", () => {
     const migration = readFileSync(
       join(
         process.cwd(),
@@ -174,10 +188,7 @@ describe("governance_cost_rollup_1d retention exemption", () => {
 
   it("declares its fixed 13-month delete in the migration itself", () => {
     const migration = readFileSync(
-      join(
-        process.cwd(),
-        "src/server/clickhouse/migrations/00089_create_governance_cost_rollup_1d.sql",
-      ),
+      migrationEndingIn("_create_governance_cost_rollup_1d.sql"),
       "utf8",
     );
     expect(migration).toContain(

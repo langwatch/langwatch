@@ -22,7 +22,7 @@ import {
   resolveGovOrganizationId,
   resolveGovTenantIds,
 } from "../services/governanceTenantHistory.service";
-import { isOpenLinkViolation } from "../services/identityMatch.errors";
+import { isUniqueViolation } from "../services/logic/postgresConstraintErrors";
 
 const ns = `gov-identity-${nanoid(8)}`;
 const organizationId = `org_${ns}`;
@@ -144,7 +144,7 @@ describe("Feature: the identity tables hold their own rules", () => {
         // SQLSTATE to itself, so the assertion is the application's own
         // predicate — the exact contract the service's catch sites rely on.
         expect((caught as { code?: string }).code).toBe("P2002");
-        expect(isOpenLinkViolation(caught)).toBe(true);
+        expect(isUniqueViolation(caught)).toBe(true);
       });
     });
 

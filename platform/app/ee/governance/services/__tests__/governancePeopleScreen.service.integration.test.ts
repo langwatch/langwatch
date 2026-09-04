@@ -71,6 +71,9 @@ describe("Feature: the People screen shows who the providers named", () => {
 
     await person("linked", {});
     await person("stranger", {});
+    // Nobody's account, and the directory is the only thing that knows where
+    // they work — the common case on a tenant where nothing is linked yet.
+    await person("unlinked_with_department", { department: "GTM" });
     await person("gone", {
       rawActorId: "pseudonym_xyz",
       displayText: "pseudonym_xyz",
@@ -131,6 +134,25 @@ describe("Feature: the People screen shows who the providers named", () => {
         memberName: "Maria Silva",
         departmentName: "Engineering",
       });
+    });
+
+    /** @scenario "An unlinked person shows the department their directory named" */
+    it("carries the directory's department on a person linked to nobody", async () => {
+      const people = await service().listPeople({ organizationId });
+
+      const unlinked = people.find(
+        (p) => p.id === `unlinked_with_department_${ns}`,
+      );
+      expect(unlinked?.link).toBeNull();
+      expect(unlinked?.directoryDepartment).toBe("GTM");
+    });
+
+    it("carries no directory department for a person no directory has named", async () => {
+      const people = await service().listPeople({ organizationId });
+
+      expect(
+        people.find((p) => p.id === `stranger_${ns}`)?.directoryDepartment,
+      ).toBeNull();
     });
 
     /** @scenario "An erased person shows a stand-in, never the identifier" */

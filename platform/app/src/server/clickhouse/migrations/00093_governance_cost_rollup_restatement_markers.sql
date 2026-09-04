@@ -13,7 +13,7 @@
 --                   provisional test exists to see.
 --
 -- The prior amount is NOT added here. `PreviousAmountNanoUsd` and
--- `RevisionCount` already shipped with the table in 00087; a second
+-- `RevisionCount` already shipped with the table in 00092; a second
 -- prior-amount money column would leave a reader guessing which one is
 -- authoritative. §15's "was $X" reads the shipped one.
 --

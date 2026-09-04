@@ -37,7 +37,6 @@ import {
   IdentityAlreadyLinkedError,
   IdentityErasedError,
   IdentityMatchSuggestionNotFoundError,
-  isOpenLinkViolation,
 } from "./identityMatch.errors";
 import {
   decideMatch,
@@ -45,6 +44,7 @@ import {
   normalizeEmail,
   type OrganizationAccountIndex,
 } from "./logic/identityEvidence";
+import { isUniqueViolation } from "./logic/postgresConstraintErrors";
 
 const logger = createLogger("langwatch:governance:identity-match");
 
@@ -295,7 +295,7 @@ export class IdentityMatchService {
       });
       return 1;
     } catch (error) {
-      if (!isOpenLinkViolation(error)) throw error;
+      if (!isUniqueViolation(error)) throw error;
       logger.info(
         { organizationId, discoveredPersonId },
         "A concurrent pass had already opened this link; leaving it as it is",
@@ -382,7 +382,7 @@ export class IdentityMatchService {
       // Two reviewers confirming at once: the read above passed for both and
       // the one-open-link index refused the second. Same sentence either way —
       // the check and the index hold one rule between them.
-      if (isOpenLinkViolation(error)) {
+      if (isUniqueViolation(error)) {
         throw new IdentityAlreadyLinkedError(suggestion.discoveredPersonId);
       }
       throw error;
