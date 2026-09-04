@@ -880,6 +880,7 @@ describe("authz engine explain()", () => {
       expect(decision.denialReason).toBe("membership-disabled");
     });
 
+    /** @scenario "A disabled member cannot act through any permission path" */
     it("denies even where a stale binding survived on the scope chain", () => {
       // Belt and braces: the reader already withholds these rows. If one ever
       // reaches the engine, membership still decides before bindings do.

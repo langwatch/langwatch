@@ -4,6 +4,7 @@ import { runPayloadSchema } from "../schemas";
 
 describe("scopeFromRunPayload", () => {
   describe("when the payload names both targets and rows", () => {
+    /** @scenario "A run scoped to a target and a row subset covers only those cells" */
     it("keeps both filters instead of letting one win", () => {
       expect(scopeFromRunPayload({ targetIds: ["t2"], rowIndices: [0, 1, 2] })).toEqual({
         type: "target-rows",

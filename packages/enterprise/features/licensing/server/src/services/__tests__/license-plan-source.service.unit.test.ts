@@ -47,6 +47,7 @@ function planSourceFor(licenseKey: string | null): LicensePlanSourceService {
 describe("given the plan a signed licence entitles an organization to", () => {
   describe("when the organization activated no licence", () => {
     /** @scenario "A deployment that never had a license stays uncapped" */
+    /** @scenario "An unlicensed deployment runs on the Open Source plan" */
     it("answers the unlimited baseline on both readings, so nothing narrows an unlicensed deployment", async () => {
       const plans = planSourceFor(null);
 
@@ -57,6 +58,7 @@ describe("given the plan a signed licence entitles an organization to", () => {
 
   describe("when the stored licence was tampered with", () => {
     /** @scenario "A license we did not sign is still not a license" */
+    /** @scenario "An unreadable license leaves the deployment on the Open Source plan" */
     it("answers the unlimited baseline rather than the plan the payload claims", async () => {
       const plans = planSourceFor(TAMPERED_LICENSE_KEY);
 
@@ -122,6 +124,7 @@ describe("given the licence leg a deployment composes", () => {
      * them in the other.
      */
     /** @scenario "A lapsed license keeps metering the seats it sold" */
+    /** @scenario "An expired license keeps the seats it sold" */
     it("reads the licence on the self-hosted terms and floors it at the open-source baseline", async () => {
       const source = LicensingEntitlementSource.forDeployment({
         licenses: StoredLicense.of(EXPIRED_ENTERPRISE_LICENSE_KEY),

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getStaticModelCostRates } from "../catalog/static-model-costs";
+import { getStaticModelCostRates, resolveCacheWrite1hRate } from "../catalog/static-model-costs";
 import type { ModelCostRate } from "../model-provider";
 import {
   estimateCost as estimateCostUnderOneRate,
@@ -771,6 +771,71 @@ describe("cache write TTL pricing", () => {
           }),
         ).toBeCloseTo(1000 * 0.000005, 10);
       });
+    });
+  });
+});
+
+describe("resolveCacheWrite1hRate", () => {
+  const ANTHROPIC = "anthropic/claude-opus-5";
+
+  describe("given the catalog carries its own hour-long price", () => {
+    /** @scenario "A catalog that learns the real rate overrides the derived one" */
+    it("uses the catalog price rather than deriving one", () => {
+      expect(
+        resolveCacheWrite1hRate(ANTHROPIC, {
+          inputCostPerToken: 0.000005,
+          inputCacheWritePerToken: 0.00000625,
+          inputCacheWrite1hPerToken: 0.000009,
+        }),
+      ).toBe(0.000009);
+    });
+
+    /** @scenario "A catalog that learns the real rate overrides the derived one" */
+    it("uses it for a provider that would otherwise get nothing", () => {
+      expect(
+        resolveCacheWrite1hRate("openai/gpt-5", {
+          inputCostPerToken: 0.000001,
+          inputCacheWritePerToken: 0.00000125,
+          inputCacheWrite1hPerToken: 0.000002,
+        }),
+      ).toBe(0.000002);
+    });
+  });
+
+  describe("given the catalog carries no hour-long price", () => {
+    /** @scenario "An hour-long cache write rate is derived for Anthropic models" */
+    it("derives twice the input rate for an Anthropic model", () => {
+      expect(
+        resolveCacheWrite1hRate(ANTHROPIC, {
+          inputCostPerToken: 0.000005,
+          inputCacheWritePerToken: 0.00000625,
+        }),
+      ).toBe(0.00001);
+    });
+
+    /** @scenario "An hour-long cache write rate is derived for Anthropic models" */
+    it("derives it for a tilde-prefixed Anthropic alias", () => {
+      expect(
+        resolveCacheWrite1hRate("~anthropic/claude-opus-5-latest", {
+          inputCostPerToken: 0.000005,
+          inputCacheWritePerToken: 0.00000625,
+        }),
+      ).toBe(0.00001);
+    });
+
+    /** @scenario "An hour-long cache write rate is derived for Anthropic models" */
+    it("derives nothing for another provider", () => {
+      expect(
+        resolveCacheWrite1hRate("openai/gpt-5", {
+          inputCostPerToken: 0.000001,
+          inputCacheWritePerToken: 0.00000125,
+        }),
+      ).toBeUndefined();
+    });
+
+    /** @scenario "An hour-long cache write rate is derived for Anthropic models" */
+    it("derives nothing for a model that is not cache-priced at all", () => {
+      expect(resolveCacheWrite1hRate(ANTHROPIC, { inputCostPerToken: 0.000005 })).toBeUndefined();
     });
   });
 });

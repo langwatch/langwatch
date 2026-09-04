@@ -118,6 +118,21 @@ describe("PrismaUsageMembershipRepository", () => {
       expect(result).toBe(0);
     });
 
+    /** @scenario "Disabled members are not counted against the license" */
+    it("reads only members whose disabledAt is null", async () => {
+      mockPrisma.organizationUser.findMany.mockResolvedValue([
+        { userId: "u1", role: OrganizationUserRole.ADMIN },
+      ]);
+      mockPrisma.team.findMany.mockResolvedValue([]);
+      mockPrisma.organizationInvite.findMany.mockResolvedValue([]);
+
+      await repository.getMemberCount(organizationId);
+
+      expect(mockPrisma.organizationUser.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { organizationId, disabledAt: null } }),
+      );
+    });
+
     /** @scenario Pending invites count toward total member limit */
     it("counts pending invites with ADMIN role as full members", async () => {
       mockPrisma.organizationUser.findMany.mockResolvedValue([]);
