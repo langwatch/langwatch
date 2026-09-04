@@ -40,7 +40,7 @@ export const listAnnotationsCommand = async (options: {
           console.log(chalk.gray("Create one with:"));
           console.log(
             chalk.cyan(
-              '  langwatch annotation create <traceId> --comment "Great response!"',
+              '  langwatch annotation create <traceId> --comment "Great response!" --thumbs-up',
             ),
           );
           return;
