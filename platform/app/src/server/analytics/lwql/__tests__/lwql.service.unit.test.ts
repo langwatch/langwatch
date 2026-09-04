@@ -643,8 +643,8 @@ describe("given the LangWatchQL service", () => {
         sql,
       });
       expect(saved.awaitingTimeWindow).toEqual([
-        "dashboard_context_period_end",
         "dashboard_context_granularity_seconds",
+        "dashboard_context_period_end",
         "dashboard_context_period_start",
       ]);
     });
@@ -741,8 +741,8 @@ describe("given the LangWatchQL service", () => {
         sql: GRANULARITY_SQL,
       });
       expect(validated.awaitingTimeWindow).toEqual([
-        "dashboard_context_period_end",
         "dashboard_context_granularity_seconds",
+        "dashboard_context_period_end",
         "dashboard_context_period_start",
       ]);
     });
