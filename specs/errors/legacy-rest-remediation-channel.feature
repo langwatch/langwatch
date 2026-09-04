@@ -32,6 +32,28 @@ Feature: The legacy REST families keep the remediation channel
     When a caller reaches that route
     Then the body carries a reason for each rejected field
 
+  # The boundary's `onError` is not the only place a handled error becomes a
+  # legacy body: the credential and API-key-ceiling refusals are answered by
+  # the security middleware itself, which had its own copy of the shape. So a
+  # denial arrived with a code and a sentence while every refusal rendered by
+  # the boundary also carried its fault, remediation and reasons — and the
+  # API-key ceiling is precisely the refusal that has tips and a docs link.
+
+  @unit
+  Scenario: A denial answered by the security middleware carries the same channel
+    Given an API key that does not grant the permission a route requires
+    When a caller reaches that route
+    Then the denial carries the tips for re-scoping the key
+    And it carries the documentation link for creating one
+    And it says who can act on it
+
+  @unit
+  Scenario: One refusal renders one body whichever half answers it
+    Given a refusal the security middleware answers itself
+    And the same refusal raised into the boundary's error handler
+    When both are rendered
+    Then the two bodies are identical
+
   @unit
   Scenario: An unanticipated cause behind a handled refusal stays masked
     Given a legacy REST family whose route raises a handled refusal caused by a dropped database connection

@@ -49,39 +49,49 @@ const passThrough: MiddlewareHandler = async (_context, next) => {
 };
 
 /**
- * The flat body: `{ error: "<label>", message }` plus whatever `meta` the
- * error carried. Everything unhandled collapses to a generic 500 — an
- * unanticipated failure must never put its own message in front of a caller.
+ * The flat body, built by {@link legacyErrorBody}. Everything unhandled
+ * collapses to a generic 500 — an unanticipated failure must never put its
+ * own message in front of a caller.
  */
 const renderLegacy: ErrorHandler = (error, context) => {
   const status = statusOf(error);
   log(error, context, status);
 
   if (HandledError.isHandled(error)) {
-    const label = "legacyError" in error ? error.legacyError : error.code;
-    const { tips, docsUrl, fault, reasons } = error.serialize();
-    return context.json(
-      {
-        error: label,
-        message: error.message,
-        ...error.meta,
-        // The remediation channel an agent or CLI reads when it has no
-        // presentation registry, and the cause chain a multi-fact refusal IS —
-        // a schema failure's whole payload is one reason per offending field.
-        // `serialize` masks a non-handled cause, so nothing internal rides out.
-        ...(tips?.length ? { tips } : {}),
-        ...(docsUrl ? { docsUrl } : {}),
-        fault,
-        ...(reasons.length > 0 ? { reasons } : {}),
-      },
-      status,
-    );
+    return context.json(legacyErrorBody(error), status);
   }
   return context.json(
     { error: "Internal Server Error", message: "An unknown error occurred" },
     500,
   );
 };
+
+/**
+ * A handled refusal as the flat legacy body, WITHOUT writing a response.
+ *
+ * Exported because `onError` is not the only place a handled error becomes a
+ * legacy body: a middleware that answers a denial itself — the credential and
+ * API-key-ceiling refusals on the security spine — must produce the SAME body,
+ * or the caller gets a code and a sentence with no remediation, no fault and
+ * no reasons, which is a refusal an agent or a CLI cannot act on.
+ */
+export function legacyErrorBody(error: HandledError): Record<string, unknown> {
+  const label = "legacyError" in error ? (error.legacyError as string) : error.code;
+  const { tips, docsUrl, fault, reasons } = error.serialize();
+  return {
+    error: label,
+    message: error.message,
+    ...error.meta,
+    // The remediation channel an agent or CLI reads when it has no
+    // presentation registry, and the cause chain a multi-fact refusal IS — a
+    // schema failure's whole payload is one reason per offending field.
+    // `serialize` masks a non-handled cause, so nothing internal rides out.
+    ...(tips?.length ? { tips } : {}),
+    ...(docsUrl ? { docsUrl } : {}),
+    fault,
+    ...(reasons.length > 0 ? { reasons } : {}),
+  };
+}
 
 /**
  * The canonical envelope, built by the package's own `apiErrorBody` so `type`

@@ -19,8 +19,8 @@ import {
   S3Client,
   type S3ClientConfig,
 } from "@aws-sdk/client-s3";
-import { getStoredObjectStorageScheme } from "@langwatch/stored-object-contract";
-import { ObjectNotFoundError, UnsupportedStorageSchemeError } from "../errors";
+import { ObjectNotFoundError } from "../errors";
+import { parseS3Uri } from "../rules/s3-uri.rules";
 import type {
   StoredObjectS3Target,
   StoredObjectS3TargetPort,
@@ -42,41 +42,6 @@ export type StoredObjectS3ClientPolicy = Readonly<{
     staticCredentials?: StoredObjectS3Target["credentials"];
   }): S3ClientConfig;
 }>;
-
-/**
- * Decomposes an `s3://<bucket>/<key>` URI into its bucket and key parts.
- *
- * @throws if the URI scheme is not "s3".
- */
-function parseS3Uri(uri: string): { bucket: string; key: string } {
-  // Recognising the scheme is not accepting it: every scheme the platform
-  // knows passes the parse, and the slice below assumes "s3://" exactly — so
-  // an azure-blob address used to yield a bucket built from its own host.
-  const scheme = getStoredObjectStorageScheme(uri);
-  if (scheme !== "s3") {
-    throw new UnsupportedStorageSchemeError({ uri, scheme, expectedScheme: "s3" });
-  }
-
-  // s3://bucket/key  → strip "s3://"
-  const withoutScheme = uri.slice("s3://".length);
-  const slashIndex = withoutScheme.indexOf("/");
-
-  if (slashIndex === -1) {
-    throw new Error(`Invalid S3 URI (no key): "${uri}"`);
-  }
-
-  const bucket = withoutScheme.slice(0, slashIndex);
-  const key = withoutScheme.slice(slashIndex + 1);
-
-  if (!bucket) {
-    throw new Error(`Invalid S3 URI (empty bucket): "${uri}"`);
-  }
-  if (!key) {
-    throw new Error(`Invalid S3 URI (empty key): "${uri}"`);
-  }
-
-  return { bucket, key };
-}
 
 /** Storage driver for S3-compatible object storage, scoped to one project. */
 export class S3StoredObjectDriver implements StoredObjectStorageDriver {

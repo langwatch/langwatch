@@ -8,6 +8,7 @@ import {
 } from "@aws-sdk/client-s3";
 import type { AwsClientProcessRuntime } from "@langwatch/aws-client";
 import { ObjectNotFoundError } from "#errors";
+import { parseS3Uri } from "#rules/s3-uri.rules";
 import type { StoredObjectStorageDriver } from "#adapters/stored-object-storage.registry";
 
 export type MigrationS3Configuration = {
@@ -122,14 +123,6 @@ function isAwsS3Endpoint(endpoint: string): boolean {
   } catch {
     return false;
   }
-}
-
-function parseS3Uri(uri: string): { bucket: string; key: string } {
-  const parsed = new URL(uri);
-  if (parsed.protocol !== "s3:" || !parsed.hostname || parsed.pathname === "/") {
-    throw new Error(`Invalid S3 migration URI: ${uri}`);
-  }
-  return { bucket: parsed.hostname, key: parsed.pathname.slice(1) };
 }
 
 function isS3Missing(error: unknown): boolean {

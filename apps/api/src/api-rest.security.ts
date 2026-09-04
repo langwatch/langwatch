@@ -22,6 +22,7 @@ import {
 } from "@langwatch/organization-contract";
 import type { Context, ErrorHandler, MiddlewareHandler } from "hono";
 import { extractApiKeyRequestCredentials } from "./app/api-key-request-credentials";
+import { legacyErrorBody } from "./app/api-rest-observability.composition";
 import type { ApiAuditPort } from "./api-request.policy";
 
 /**
@@ -574,11 +575,11 @@ export class ApiRestSecurity {
       throw error;
     }
     if (envelope === "legacy") {
-      const legacyError = "legacyError" in error ? error.legacyError : error.code;
-      return context.json(
-        { error: legacyError, message: error.message, ...error.meta },
-        error.httpStatus as 401 | 403 | 404 | 500,
-      );
+      // The one legacy body, shared with the process's `onError`. A second
+      // implementation here is how a denial came to publish a code and a
+      // sentence while every refusal rendered by the boundary also carried
+      // its fault, remediation and reasons.
+      return context.json(legacyErrorBody(error), error.httpStatus as 401 | 403 | 404 | 500);
     }
     throw error;
   }

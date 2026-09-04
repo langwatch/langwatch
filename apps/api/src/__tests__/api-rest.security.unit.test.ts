@@ -1,5 +1,9 @@
 import { requires } from "@langwatch/api";
-import { ApiKeyService, type ResolvedApiKeyToken } from "@langwatch/api-key-contract";
+import {
+  ApiKeyPermissionDeniedError,
+  ApiKeyService,
+  type ResolvedApiKeyToken,
+} from "@langwatch/api-key-contract";
 import { AuthzService, type AuthzPermission } from "@langwatch/authz-contract";
 import type { Logger } from "@langwatch/observability";
 import { OrganizationNotFoundError, OrganizationService } from "@langwatch/organization-contract";
@@ -155,6 +159,75 @@ describe("ApiRestSecurity", () => {
       expect(response.status).toBe(403);
       await expect(response.json()).resolves.toMatchObject({
         error: "api_key_permission_not_delegable",
+      });
+    });
+  });
+
+  describe("when the security middleware answers a denial itself", () => {
+    describe("and the refusal carries remediation copy", () => {
+      /** @scenario "A denial answered by the security middleware carries the same channel" */
+      it("ships the tips and documentation link for re-scoping the key", async () => {
+        const apiKeys = apiKeyService();
+        apiKeys.tryResolveToken.mockResolvedValue(currentKey);
+        const authz = authzService();
+        authz.hasApiKeyPermission.mockResolvedValue(false);
+        const app = projectApp(policyOver({ apiKeys, authz }), { permission: "secrets:manage" });
+
+        const response = await app.request("/api/secret", {
+          headers: { authorization: "Bearer current-token", "X-Project-Id": "project-1" },
+        });
+
+        const body = (await response.json()) as Record<string, unknown>;
+        expect(body.tips).toEqual([
+          "Re-create the API key with the required scope, or ask an admin to raise your role",
+        ]);
+        expect(body.docsUrl).toBe(
+          "https://docs.langwatch.ai/api-reference/api-keys/create-api-key",
+        );
+      });
+
+      /** @scenario "A denial answered by the security middleware carries the same channel" */
+      it("says who can act on it", async () => {
+        const apiKeys = apiKeyService();
+        apiKeys.tryResolveToken.mockResolvedValue(currentKey);
+        const authz = authzService();
+        authz.hasApiKeyPermission.mockResolvedValue(false);
+        const app = projectApp(policyOver({ apiKeys, authz }), { permission: "secrets:manage" });
+
+        const response = await app.request("/api/secret", {
+          headers: { authorization: "Bearer current-token", "X-Project-Id": "project-1" },
+        });
+
+        const body = (await response.json()) as Record<string, unknown>;
+        expect(body.fault).toBe("customer");
+      });
+    });
+
+    describe("and the boundary renders the same refusal", () => {
+      /** @scenario "One refusal renders one body whichever half answers it" */
+      it("produces a body identical to the middleware's", async () => {
+        const apiKeys = apiKeyService();
+        apiKeys.tryResolveToken.mockResolvedValue(currentKey);
+        const authz = authzService();
+        authz.hasApiKeyPermission.mockResolvedValue(false);
+        const app = projectApp(policyOver({ apiKeys, authz }), { permission: "secrets:manage" });
+
+        const fromMiddleware = await (
+          await app.request("/api/secret", {
+            headers: { authorization: "Bearer current-token", "X-Project-Id": "project-1" },
+          })
+        ).json();
+
+        const boundary = new Hono();
+        boundary.onError(ApiRestObservabilityComposition.create().legacyErrorHandler);
+        boundary.get("/", () => {
+          throw new ApiKeyPermissionDeniedError("secrets:manage", {
+            meta: { apiKeyId: "key-1", userId: "user-1", projectId: "project-1" },
+          });
+        });
+        const fromBoundary = await (await boundary.request("/")).json();
+
+        expect(fromMiddleware).toEqual(fromBoundary);
       });
     });
   });
