@@ -58,7 +58,7 @@ function queuedEvent(): SimulationProcessingEvent {
       batchRunId: "batch-1",
       scenarioSetId: "set-1",
     },
-  } as SimulationProcessingEvent;
+  } as unknown as SimulationProcessingEvent;
 }
 
 function startedEvent(): SimulationProcessingEvent {
@@ -70,7 +70,7 @@ function startedEvent(): SimulationProcessingEvent {
       batchRunId: "batch-1",
       scenarioSetId: "set-1",
     },
-  } as SimulationProcessingEvent;
+  } as unknown as SimulationProcessingEvent;
 }
 
 function finishedEvent(
@@ -88,7 +88,7 @@ function finishedEvent(
       },
       ...overrides,
     },
-  } as SimulationProcessingEvent;
+  } as unknown as SimulationProcessingEvent;
 }
 
 function evaluatedEvent(
@@ -105,7 +105,7 @@ function evaluatedEvent(
       previousStatus: "SUCCESS",
       ...overrides,
     },
-  } as SimulationProcessingEvent;
+  } as unknown as SimulationProcessingEvent;
 }
 
 describe("RecordEvaluationsCommand", () => {
