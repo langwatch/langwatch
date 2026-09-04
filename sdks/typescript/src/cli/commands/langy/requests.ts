@@ -22,7 +22,7 @@ import { LANGWATCH_SDK_VERSION } from "../../../internal/constants";
 import { resolveCredentials } from "../../utils/apiKey";
 import { isLoggedIn, loadConfig } from "../../utils/governance/config";
 import { LocalCallFailure } from "./errors";
-import { askedAgo } from "./ui";
+import { askedAgo, terminalWidth, wrapWords } from "./ui";
 
 /** How often the CLI looks again while it waits for a request. */
 export const REQUEST_POLL_INTERVAL_MS = 5_000;
@@ -349,7 +349,14 @@ export async function chooseRequest({
   if (!request) return { action: "quit" };
 
   console.log("");
-  console.log(requestTitle(request, root, now));
+  // The question is the one thing the developer has to read before they
+  // answer, so it wraps where the words end rather than where the column does.
+  for (const line of wrapWords(
+    requestTitle(request, root, now),
+    terminalWidth(),
+  )) {
+    console.log(line);
+  }
   const answer = await ask({
     type: "select",
     name: "action",

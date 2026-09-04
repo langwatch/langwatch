@@ -10,11 +10,14 @@ import type {
   LocalCall,
 } from "../../../../agent/local-control-protocol";
 import {
+  answerLine,
   callLine,
   conversationLink,
   createUi,
   shortReason,
   shorten,
+  terminalWidth,
+  wrapWords,
 } from "../ui";
 
 /** A writer that keeps the lines, with the colours stripped. */
@@ -181,6 +184,57 @@ describe("the terminal lines one call produces", () => {
     it("cuts it back", () => {
       expect(callLine(bashCall(`echo ${"word ".repeat(40)}`)).length)
         .toBeLessThanOrEqual(66);
+    });
+  });
+
+  describe("when a line is wider than the terminal", () => {
+    /** @scenario "The approval question wraps on word boundaries" */
+    it("breaks it where the words end, never inside one", () => {
+      const text =
+        'Langy session "instrument my traces" (project acme, asked 2 min ago) is requesting control over /Users/dev/acme';
+      const lines = wrapWords(text, 40);
+
+      for (const line of lines) {
+        expect(line.length).toBeLessThanOrEqual(40);
+        expect(line).toBe(line.trim());
+      }
+      expect(lines.join(" ")).toBe(text);
+      expect(lines.length).toBeGreaterThan(2);
+    });
+
+    it("keeps a word that is wider than the terminal on its own line", () => {
+      const path = "/Users/dev/" + "very-long-folder-name-".repeat(4);
+      expect(wrapWords(`control over ${path}`, 20)).toEqual([
+        "control over",
+        path,
+      ]);
+    });
+
+    it("falls back to eighty columns when the terminal does not report one", () => {
+      expect(terminalWidth(undefined)).toBe(80);
+      expect(terminalWidth(10)).toBe(80);
+      expect(terminalWidth(132)).toBe(132);
+    });
+  });
+
+  describe("when an answer arrives for a long command", () => {
+    /** @scenario "A long command is printed once" */
+    it("names the patterns rather than repeating the command", () => {
+      expect(
+        answerLine({
+          summary: 'git add . && git commit -m "feat: add tracing" && git push',
+          patterns: ["git add", "git commit", "git push"],
+          decision: "allow_pattern",
+        }),
+      ).toBe("Allowed for this session: git add, git commit, git push.");
+
+      expect(
+        answerLine({
+          summary: "pnpm typecheck",
+          patterns: ["pnpm typecheck"],
+          decision: "deny",
+        }),
+      ).toBe("pnpm typecheck: denied.");
     });
   });
 });

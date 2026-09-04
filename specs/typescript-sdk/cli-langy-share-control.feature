@@ -98,6 +98,19 @@ Feature: `langwatch langy --share-control` shares this folder with a Langy sessi
       And prints the outcome when the answer arrives
 
     @unit
+    Scenario: The approval question wraps on word boundaries
+      Given a request whose conversation title and folder are wider than the terminal
+      When the terminal asks whether to share the folder
+      Then the question is broken at the terminal width on spaces, with no word cut in half
+
+    @unit
+    Scenario: A long command is printed once
+      Given a connected folder
+      When Langy asks for permission to run a long chain and I allow the pattern
+      Then the ask prints the chain in full, wrapped at the terminal width
+      And the answer prints as one short line naming the patterns that were granted
+
+    @unit
     Scenario: Turning permission checks off is printed in red
       Given a connected folder
       When I turn permission checks off from the panel
