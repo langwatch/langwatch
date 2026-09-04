@@ -498,6 +498,7 @@ export function LangyCardGallery() {
       <Section title="GitHub">
         <LangyGitHubConnectCard organizationId="gallery" />
         <LangyGitHubProgressCard
+          live
           events={[
             { stage: "cloning", detail: "acme/checkout" },
             { stage: "branched", detail: "langy/fix-retriever" },

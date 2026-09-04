@@ -96,6 +96,31 @@ Feature: Langy opens GitHub PRs via the installed GitHub App
     And the steps card shows the opened step when the PR URL arrives
     And no raw "[langy:progress:" markers appear in my chat history
 
+  @unit
+  Scenario: One command that commits, pushes and opens the PR ticks all three steps
+    Given Langy ran "git add . && git commit -m x && git push -u origin HEAD && gh pr create --base main"
+    When the steps card reads that turn's tool parts
+    Then the committed, pushed and opened steps are all reached
+
+  @unit
+  Scenario: A step whose command errored is not reached
+    Given Langy ran a command that commits and then pushes, and the command failed
+    When the steps card reads that turn's tool parts
+    Then no step of that command is reached
+
+  @integration
+  Scenario: The steps card stops calling the turn work in progress once it ends
+    Given a finished turn whose steps card reached the opened step
+    When I read that turn back
+    Then the steps card says the pull request was opened
+    And the card does not say Langy is working on it
+
+  @integration
+  Scenario: A finished turn that never opened a pull request says so plainly
+    Given a finished turn whose steps card reached the pushed step only
+    When I read that turn back
+    Then the card does not say Langy is working on it
+
   @integration
   Scenario: Per-user daily PR cap stops runaway loops
     Given I have already opened 20 PRs via Langy today

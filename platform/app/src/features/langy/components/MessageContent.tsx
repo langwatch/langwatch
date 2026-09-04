@@ -413,7 +413,10 @@ function MessageContentImpl({
         )}
         {progressEvents.length > 0 && (
           <LangyCardBoundary scope="the progress card">
-            <LangyGitHubProgressCard events={progressEvents} />
+            <LangyGitHubProgressCard
+              events={progressEvents}
+              live={isStreaming}
+            />
           </LangyCardBoundary>
         )}
         {prs.map((pr) => (

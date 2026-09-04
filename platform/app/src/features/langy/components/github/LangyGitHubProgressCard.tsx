@@ -38,21 +38,42 @@ const TRACK: Step[] = [
   { stage: "opened", label: "PR" },
 ];
 
+/**
+ * What a settled turn reached, furthest step first. A finished turn is never
+ * "working on it" — it either opened the pull request or it stopped somewhere,
+ * and the card says which.
+ */
+const SETTLED_LABELS: { stage: GithubProgressStage; label: string }[] = [
+  { stage: "opened", label: "Opened" },
+  { stage: "pushed", label: "Pushed" },
+  { stage: "committed", label: "Committed" },
+  { stage: "branched", label: "Branched" },
+  { stage: "cloned", label: "Cloned" },
+  { stage: "cloning", label: "Cloned" },
+];
+
 export function LangyGitHubProgressCard({
   events,
+  live = false,
 }: {
   events: GithubProgressEvent[];
+  /** The turn is still running. A settled turn stops saying "working on it". */
+  live?: boolean;
 }) {
   if (events.length === 0) return null;
   const reached = new Set(events.map((e) => e.stage));
   const latest = events[events.length - 1]?.detail;
   const opened = reached.has("opened");
-  // Single mono label line, e.g. "WORKING ON IT · PUSHING BRANCH…".
+  // Single mono label line, e.g. "WORKING ON IT · PUSHING BRANCH…" while the
+  // turn runs, and the furthest step reached once it has ended.
   const label = opened
     ? "Opened"
-    : latest
-      ? `Working on it · ${latest}`
-      : "Working on it";
+    : !live
+      ? (SETTLED_LABELS.find((entry) => reached.has(entry.stage))?.label ??
+        "Finished")
+      : latest
+        ? `Working on it · ${latest}`
+        : "Working on it";
 
   return (
     <Box

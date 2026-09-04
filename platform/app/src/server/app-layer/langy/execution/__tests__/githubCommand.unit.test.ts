@@ -15,7 +15,7 @@
  * The local-git cases below are therefore the important half of this file.
  */
 import { describe, expect, it } from "vitest";
-import { needsGithubAuth } from "../githubCommand";
+import { githubProgressFromToolParts, needsGithubAuth } from "../githubCommand";
 
 describe("needsGithubAuth", () => {
   describe("given the GitHub CLI", () => {
@@ -113,6 +113,67 @@ describe("needsGithubAuth", () => {
       expect(needsGithubAuth("")).toBe(false);
       expect(needsGithubAuth("   ")).toBe(false);
       expect(needsGithubAuth("&&")).toBe(false);
+    });
+  });
+});
+
+/**
+ * The steps card's own recogniser. An agent working in a developer's own folder
+ * runs the whole tail of the flow as one call, so the card is only correct if a
+ * chained command contributes every step it ran.
+ *
+ * @see specs/langy/langy-github-prs.feature
+ */
+describe("githubProgressFromToolParts", () => {
+  const chain =
+    'git add app/agent.py README.md && git commit -m "feat: add LangWatch tracing" && git push -u origin HEAD && gh pr create --base main --title "Add tracing"';
+
+  describe("given one settled command that commits, pushes and opens the PR", () => {
+    /** @scenario "One command that commits, pushes and opens the PR ticks all three steps" */
+    it("reaches the committed, pushed and opened steps", () => {
+      const events = githubProgressFromToolParts([
+        {
+          type: "tool-local_bash",
+          input: { command: chain },
+          state: "output-available",
+        },
+      ]);
+
+      expect(events.map((event) => event.stage)).toEqual([
+        "committed",
+        "pushed",
+        "opened",
+      ]);
+      expect(events[0]?.detail).toBe("feat: add LangWatch tracing");
+    });
+  });
+
+  describe("when that command failed", () => {
+    /** @scenario "A step whose command errored is not reached" */
+    it("reaches no step at all", () => {
+      expect(
+        githubProgressFromToolParts([
+          {
+            type: "tool-local_bash",
+            input: { command: chain },
+            state: "output-error",
+          },
+        ]),
+      ).toEqual([]);
+    });
+  });
+
+  describe("when the chain is still running", () => {
+    it("shows only the first step as under way", () => {
+      const events = githubProgressFromToolParts([
+        {
+          type: "tool-bash",
+          input: { command: "git clone https://github.com/acme/foo && cd foo" },
+          state: "input-available",
+        },
+      ]);
+
+      expect(events).toEqual([{ stage: "cloning", detail: "acme/foo" }]);
     });
   });
 });
