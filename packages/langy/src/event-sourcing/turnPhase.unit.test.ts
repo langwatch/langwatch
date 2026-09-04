@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  abandonSend,
   abandonStop,
+  beginSend,
   beginTurn,
   initialTurnPhaseState,
   observeBackendTurn,
   requestStop,
   settleTurn,
+  stopDispatched,
   type TurnPhaseState,
 } from "./turnPhase";
 
@@ -27,6 +30,7 @@ describe("langyTurnPhase machine", () => {
         activeTurnId: "old",
         settledTurnId: "old",
         backendSawTurnInFlight: true,
+        stopPending: false,
       };
       const state = beginTurn(settledPrior, "t2");
       expect(state.turnPhase).toBe("active");
@@ -36,9 +40,64 @@ describe("langyTurnPhase machine", () => {
     });
   });
 
+  describe("when the user sends a message", () => {
+    /** @scenario Stop is available the moment I send */
+    it("goes active before any turn id exists, so Stop is available at once", () => {
+      const state = beginSend(initialTurnPhaseState);
+      expect(state.turnPhase).toBe("active");
+      expect(state.activeTurnId).toBeNull();
+      expect(state.stopPending).toBe(false);
+    });
+  });
+
+  describe("given the user stopped a send that has no turn id yet", () => {
+    const pending = requestStop(beginSend(initialTurnPhaseState), {
+      dispatched: false,
+    });
+
+    /** @scenario Stop during startup is kept and dispatched when the turn is identified */
+    it("shows it is stopping and remembers the stop", () => {
+      expect(pending.turnPhase).toBe("stopping");
+      expect(pending.stopPending).toBe(true);
+    });
+
+    describe("when the turn is identified", () => {
+      /** @scenario Stop during startup is kept and dispatched when the turn is identified */
+      it("keeps the stopping phase and exposes the turn to dispatch against", () => {
+        const identified = beginTurn(pending, "t9");
+        expect(identified.turnPhase).toBe("stopping");
+        expect(identified.activeTurnId).toBe("t9");
+        expect(identified.stopPending).toBe(true);
+        const sent = stopDispatched(identified);
+        expect(sent.turnPhase).toBe("stopping");
+        expect(sent.stopPending).toBe(false);
+      });
+    });
+
+    describe("when the send fails before any turn id exists", () => {
+      /** @scenario A send that fails before the turn is identified hands the control back */
+      it("returns to idle and drops the stop, since there is nothing to stop", () => {
+        const state = abandonSend(pending);
+        expect(state.turnPhase).toBe("idle");
+        expect(state.stopPending).toBe(false);
+      });
+    });
+
+    describe("when the turn is already identified", () => {
+      it("leaves a failure to the turn's own terminal", () => {
+        expect(abandonSend(active("t3")).turnPhase).toBe("active");
+        expect(abandonSend(initialTurnPhaseState).turnPhase).toBe("idle");
+      });
+    });
+  });
+
   describe("when the user requests a stop", () => {
     it("moves active → stopping", () => {
       expect(requestStop(active()).turnPhase).toBe("stopping");
+    });
+
+    it("remembers nothing when the caller dispatched the stop itself", () => {
+      expect(requestStop(active()).stopPending).toBe(false);
     });
 
     it("is a no-op when not active", () => {
@@ -100,6 +159,7 @@ describe("langyTurnPhase machine", () => {
       const state = settleTurn(active("t1"), "t1");
       expect(state.turnPhase).toBe("idle");
       expect(state.settledTurnId).toBe("t1");
+      expect(state.stopPending).toBe(false);
     });
 
     it("ignores a stale end frame for a superseded turn", () => {

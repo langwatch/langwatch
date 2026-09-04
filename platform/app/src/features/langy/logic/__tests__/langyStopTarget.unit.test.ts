@@ -71,6 +71,23 @@ describe("resolveLangyStopTarget", () => {
     });
   });
 
+  describe("given this tab sent a message the server has not answered yet", () => {
+    /** @scenario Stop during startup is kept and dispatched when the turn is identified */
+    it("names no turn, so the caller keeps the stop rather than stopping a stale one", () => {
+      const target = resolveLangyStopTarget({
+        ...base,
+        localSendPending: true,
+        // A turn the record still reports, which cannot be the one just sent.
+        durableTurnId: "turn-previous",
+      });
+
+      expect(target).toEqual({
+        kind: "unavailable",
+        reason: "turn-not-identified",
+      });
+    });
+  });
+
   describe("given no turn can be named", () => {
     it("reports it cannot dispatch, so the caller cannot claim a stop", () => {
       expect(resolveLangyStopTarget(base)).toEqual({

@@ -79,6 +79,10 @@ function handoffKey(conversationId: string, turnId: string): string {
   return `langy:handoff:{${conversationId}}:${turnId}`;
 }
 
+function stoppedKey(conversationId: string, turnId: string): string {
+  return `langy:stopped:{${conversationId}}:${turnId}`;
+}
+
 export class LangyTurnHandoffStore {
   constructor(private readonly redis: LangyHandoffRedis) {}
 
@@ -116,6 +120,43 @@ export class LangyTurnHandoffStore {
       LANGY_HANDOFF_TTL_SECONDS,
     );
     return extended === 1;
+  }
+
+  /**
+   * Record that this turn was stopped, so nothing dispatches it afterwards.
+   *
+   * A turn is admitted, and its handoff stashed, before any worker is running
+   * it: the fast-path dispatch is fire-and-forget and the process outbox
+   * re-drives the same handoff for as long as it lives. A stop writes the
+   * durable terminal, which the record honours, but the handoff on its own
+   * still reads as work to do. This marker is what a dispatch checks before
+   * spending a worker on an answer nobody is waiting for. Same TTL as the
+   * handoff it guards: once that has aged out there is nothing left to redrive.
+   */
+  async markStopped({
+    conversationId,
+    turnId,
+  }: {
+    conversationId: string;
+    turnId: string;
+  }): Promise<void> {
+    await this.redis.set(
+      stoppedKey(conversationId, turnId),
+      "1",
+      "EX",
+      LANGY_HANDOFF_TTL_SECONDS,
+    );
+  }
+
+  /** Whether a stop was recorded for this turn (see `markStopped`). */
+  async isStopped({
+    conversationId,
+    turnId,
+  }: {
+    conversationId: string;
+    turnId: string;
+  }): Promise<boolean> {
+    return (await this.redis.get(stoppedKey(conversationId, turnId))) !== null;
   }
 
   /**

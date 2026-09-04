@@ -512,7 +512,8 @@ export class LangyTurnService {
     turnId: string;
     userId: string;
   }): Promise<void> {
-    const { tokenBuffer, worker, conversations, accessStore } = this.deps;
+    const { tokenBuffer, worker, conversations, accessStore, handoffStore } =
+      this.deps;
 
     const isActor = accessStore
       ? await accessStore.isTurnActor({
@@ -544,6 +545,20 @@ export class LangyTurnService {
         throw new LangyTurnNotStoppableError(turnId);
       }
     }
+
+    // Before the terminal, so a dispatch racing this stop reads the marker
+    // rather than the handoff alone: a turn can be admitted (and its handoff
+    // stashed) seconds before any worker runs it, and the outbox re-drives that
+    // handoff on its own schedule. Best-effort — the durable terminal below is
+    // what makes the stop true, and a Redis blip may not hold it up.
+    await handoffStore
+      ?.markStopped({ conversationId, turnId })
+      .catch((error: unknown) => {
+        logger.warn(
+          { error, projectId, conversationId, turnId },
+          "could not record the langy stop marker; a redrive may still dispatch this turn",
+        );
+      });
 
     const partialText = tokenBuffer
       ? await reconstructPartialAnswer(tokenBuffer, { conversationId, turnId })

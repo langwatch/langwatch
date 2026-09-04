@@ -8,6 +8,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import {
+  isSendUnanswered,
   LANGY_CHOICE_SELECTION_PART_TYPE,
   type LangyChoiceSelection,
   type LangyDerivedCard,
@@ -1317,68 +1318,104 @@ function LangyPanel({
   // long before the backend has actually stopped.
   const stopTurn = api.langy.stopTurn.useMutation();
 
-  const handleStop = useCallback(() => {
-    // WHICH turn to stop is resolved first, and everything else hangs off it:
-    // this tab's own live turn if it has one, otherwise the turn the durable
-    // record names (`inFlightTurnId`) — which is the only way a tab that did not
-    // start the turn, or that rejoined it after a refresh, can stop it at all.
-    // Read the live ids at click time from the store to dodge a stale closure.
+  // Which turn a stop would name right now: this tab's own live turn if it has
+  // one, otherwise the turn the durable record names (`inFlightTurnId`) — the
+  // only way a tab that did not start the turn, or that rejoined it after a
+  // reload, can stop it at all. Read from the store at call time to dodge a
+  // stale closure.
+  const resolveStopTarget = useCallback(() => {
     const store = useLangyStore.getState();
-    const target = resolveLangyStopTarget({
+    return resolveLangyStopTarget({
       projectId,
       conversationId: store.activeConversationId,
       localTurnId: store.activeTurnId,
       localSettledTurnId: store.settledTurnId,
+      localSendPending: isSendUnanswered(store),
       durableTurnId: foldInFlightTurnId,
     });
+  }, [projectId, foldInFlightTurnId]);
 
-    // Tape the ask itself, dispatched or not — the inspector's outbound lane
-    // shows what this client TRIED, and a refused stop is exactly the kind of
-    // moment it exists for.
-    const targetTurnId =
-      target.kind === "dispatch" ? target.turnId : store.activeTurnId;
-    useLangyDevLog
-      .getState()
-      .recordOutbound("stop", `stop turn ${targetTurnId ?? "?"}`, {
-        conversationId: store.activeConversationId,
-        turnId: targetTurnId,
-        resolution: target.kind === "dispatch" ? "dispatch" : target.reason,
-      });
+  const dispatchStop = useCallback(
+    (target: { projectId: string; conversationId: string; turnId: string }) => {
+      // Abort this browser's own subscription (snappy) alongside the real
+      // backend stop. Only ONCE THE TURN IS NAMED, never during the send: the
+      // abort would kill the very request that is about to answer with the ids
+      // this stop needs, and the admitted turn would run on with nothing left
+      // to stop it.
+      void stop();
+      useLangyDevLog
+        .getState()
+        .recordOutbound("stop", `stop turn ${target.turnId}`, {
+          conversationId: target.conversationId,
+          turnId: target.turnId,
+          resolution: "dispatch",
+        });
+      void stopTurn
+        .mutateAsync({
+          projectId: target.projectId,
+          conversationId: target.conversationId,
+          turnId: target.turnId,
+        })
+        .catch(() => {
+          // The request did not land, so the promise the spinner makes is not
+          // one we can keep: hand the control back. If the turn really did end
+          // (a stop a beat too late), the fold settles it to idle on its next
+          // read.
+          useLangyStore.getState().abandonStop();
+        });
+    },
+    [stop, stopTurn],
+  );
+
+  const handleStop = useCallback(() => {
+    const store = useLangyStore.getState();
+    const target = resolveStopTarget();
 
     if (target.kind !== "dispatch") {
-      // Nothing to dispatch — so nothing may claim to be stopping. The old code
-      // moved the phase to `stopping` BEFORE this check, which is exactly how
-      // Stop became a lie: a disabled spinner, no request, an agent still
-      // burning tokens. Say the true thing instead and leave Stop clickable.
-      toaster.create({
-        title: "Langy",
-        description:
-          target.reason === "no-conversation"
-            ? "There's no answer in progress to stop."
-            : "This answer is still starting up — try stopping it again in a moment.",
-        type: "info",
-        duration: 5000,
-      });
+      // Tape the ask that could not go out yet — the inspector's outbound lane
+      // shows what this client TRIED, and a kept stop is exactly the kind of
+      // moment it exists for.
+      useLangyDevLog
+        .getState()
+        .recordOutbound("stop", `stop turn ${store.activeTurnId ?? "?"}`, {
+          conversationId: store.activeConversationId,
+          turnId: store.activeTurnId,
+          resolution: target.reason,
+        });
+      if (store.turnPhase === "idle") {
+        // Nothing was sent and nothing is running: a stale click.
+        toaster.create({
+          title: "Langy",
+          description: "There's no answer in progress to stop.",
+          type: "info",
+          duration: 5000,
+        });
+        return;
+      }
+      // The message is on its way and the server has not named the turn yet.
+      // The stop is KEPT: the phase moves to `stopping` and the effect below
+      // sends it the moment an id exists. Nothing is claimed that will not
+      // happen — a send that fails before any id hands the control back
+      // (`abandonSend`).
+      store.requestStop({ dispatched: false });
       return;
     }
 
-    // Only now: abort this browser's own subscription (snappy), enter the
-    // stopping phase, and stop the turn on the backend for real.
-    void stop();
-    store.requestStop();
-    void stopTurn
-      .mutateAsync({
-        projectId: target.projectId,
-        conversationId: target.conversationId,
-        turnId: target.turnId,
-      })
-      .catch(() => {
-        // The request did not land, so the promise the spinner makes is not one
-        // we can keep: hand the control back. If the turn really did end (a stop
-        // a beat too late), the fold settles it to idle on its next read.
-        useLangyStore.getState().abandonStop();
-      });
-  }, [stop, projectId, stopTurn, foldInFlightTurnId]);
+    store.requestStop({ dispatched: true });
+    dispatchStop(target);
+  }, [resolveStopTarget, dispatchStop]);
+
+  // The kept stop, sent as soon as the turn has a name: from this tab's own
+  // send (the transport's `onIds`) or from the durable record catching up.
+  const stopPending = useLangyStore((s) => s.stopPending);
+  const localTurnId = useLangyStore((s) => s.activeTurnId);
+  useEffect(() => {
+    if (!stopPending) return;
+    const target = resolveStopTarget();
+    if (target.kind !== "dispatch") return;
+    useLangyStore.getState().stopDispatched();
+    dispatchStop(target);
+  }, [stopPending, localTurnId, resolveStopTarget, dispatchStop]);
 
   // Seed the LOCAL turn projection from the snapshot (ADR-059): its cursor is
   // where the durable-tail fold starts, and an in-flight turn id is what a
@@ -1797,6 +1834,12 @@ function LangyPanel({
     // their behalf (the code access re-ask) is not theirs to get back, and
     // restoring it left them staring at a sentence they never wrote.
     lastSentTextRef.current = keepOnFailure ? text : null;
+    // The turn is in flight from HERE, not from the ids the mutation answers
+    // with: on a cold worker those are seconds away, and the composer showing
+    // Send for that whole window is what left a message sent by accident with
+    // nothing to click. Stop is available at once; a click before the turn is
+    // named is kept and dispatched as soon as it is.
+    useLangyStore.getState().beginSend();
     try {
       // No per-send body: the custom transport sources projectId + conversation
       // + model + page-context + skills from `turnContextRef` (getContext) at
@@ -1833,6 +1876,10 @@ function LangyPanel({
     });
     lastSentTextRef.current = null;
     if (text) setDraft(text);
+    // A send that never reached a turn id leaves nothing running, so the
+    // composer goes back to Send along with the words. A failure after the
+    // turn was named is left alone: that turn's own terminal settles it.
+    useLangyStore.getState().abandonSend();
   }, [setDraft]);
   /**
    * Walking away from the current conversation — New chat, switching, deleting

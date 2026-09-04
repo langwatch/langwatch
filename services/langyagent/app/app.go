@@ -68,6 +68,7 @@ type App struct {
 	telemetry  *telemetry.Telemetry
 	finalizer  TurnFinalizer
 	frameRelay FrameRelay
+	stopped    *stoppedTurns
 }
 
 // finalizeTimeout bounds the durable final POST (across its internal retries).
@@ -78,7 +79,7 @@ type Option func(*App)
 
 // New constructs an App with the given options.
 func New(opts ...Option) *App {
-	a := &App{}
+	a := &App{stopped: newStoppedTurns()}
 	for _, o := range opts {
 		o(a)
 	}
@@ -197,6 +198,10 @@ func (a *App) CancelTurn(ctx context.Context, conversationID, turnID string) {
 		zap.String("conversation_id", conversationID),
 		zap.String("turn_id", turnID),
 	)
+	// Remembered first, because the abort below can only reach a worker that is
+	// already running the turn. A stop during the cold start finds no worker at
+	// all, and StartTurn is where it is honored instead.
+	a.stopped.record(turnID)
 	a.pool.CancelTurn(conversationID, turnID)
 }
 
@@ -227,6 +232,17 @@ func (a *App) HasLiveWorker(conversationID string, sig domain.CredentialSignatur
 // detached, panic-guarded goroutine — the client is not held open for the turn,
 // whose output flows out-of-band as signed frames to the relay.
 func (a *App) StartTurn(ctx context.Context, req ChatRequest) (func(context.Context), error) {
+	// The user stopped this turn before it ever started running. Its terminal is
+	// already on the durable record, so there is nothing for the answer to land
+	// on: acquire no worker, claim nothing, and answer 202 so the caller retires
+	// the dispatch instead of re-driving it.
+	if a.stopped.has(req.TurnID) {
+		clog.Get(ctx).Info("turn was stopped before it started; not running it",
+			zap.String("conversation_id", req.ConversationID),
+			zap.String("turn_id", req.TurnID),
+		)
+		return func(context.Context) {}, nil
+	}
 	worker, err := a.pool.Acquire(ctx, req.ConversationID, req.Credentials)
 	if err != nil {
 		if errors.Is(err, domain.ErrMaxWorkers) {

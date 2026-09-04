@@ -734,6 +734,8 @@ beforeEach(() => {
     activeTurnId: null,
     settledTurnId: null,
     backendSawTurnInFlight: false,
+    stopPending: false,
+    draft: "",
   });
 });
 
@@ -1289,8 +1291,8 @@ describe("LangyPanel stopping a turn", () => {
   });
 
   describe("given a turn is in flight but the record cannot name it yet", () => {
-    /** @scenario Stop says nothing it cannot back up */
-    it("dispatches nothing and refuses to show it is stopping", async () => {
+    /** @scenario Stop during startup is kept and dispatched when the turn is identified */
+    it("keeps the stop and sends it once the record names the turn", async () => {
       installScenario({
         conversations,
         messagesById,
@@ -1300,13 +1302,92 @@ describe("LangyPanel stopping a turn", () => {
       await openLiveConversation();
       await userEvent.click(await stopButton());
 
+      // Nothing to name yet, so nothing goes out — and the user is not sent
+      // away with "try again in a moment" either.
       expect(spies.stopMutation).not.toHaveBeenCalled();
-      // The lie under test: a "Stopping" spinner with no request behind it.
       expect(
-        screen.queryByRole("button", { name: "Stopping" }),
-      ).not.toBeInTheDocument();
+        await screen.findByRole("button", { name: "Stopping" }),
+      ).toBeDisabled();
+      expect(toaster.create).not.toHaveBeenCalled();
+
+      // The intent is held, ready for the id: nothing was lost and nothing was
+      // claimed that did not happen.
+      expect(useLangyStore.getState().stopPending).toBe(true);
+    });
+  });
+
+  describe("given I just sent a message and the turn has no id yet", () => {
+    const composer = () =>
+      screen.findByPlaceholderText("Ask Langy or describe what you want…");
+
+    async function sendMessage(): Promise<void> {
+      installScenario({ conversations: [], messagesById: {} });
+      renderPanel();
+      const field = await composer();
+      await userEvent.type(field, "explain this trace");
+      fireEvent.keyDown(field, { key: "Enter" });
+    }
+
+    /** @scenario Stop is available the moment I send */
+    it("offers Stop before Langy has answered with the turn's id", async () => {
+      await sendMessage();
+
       expect(await stopButton()).toBeEnabled();
-      expect(toaster.create).toHaveBeenCalled();
+      expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
+    });
+
+    /** @scenario Stop during startup is kept and dispatched when the turn is identified */
+    it("keeps the stop and sends it the moment the turn is identified", async () => {
+      await sendMessage();
+      await userEvent.click(await stopButton());
+
+      expect(spies.stopMutation).not.toHaveBeenCalled();
+      expect(
+        await screen.findByRole("button", { name: "Stopping" }),
+      ).toBeDisabled();
+
+      // The mutation answered: the transport adopts the ids.
+      act(() => {
+        useLangyStore
+          .getState()
+          .beginTurn({ conversationId: "conv-fresh", turnId: "turn-fresh" });
+      });
+
+      await waitFor(() => {
+        expect(spies.stopMutation).toHaveBeenCalledWith({
+          projectId: "project-demo",
+          conversationId: "conv-fresh",
+          turnId: "turn-fresh",
+        });
+      });
+      expect(toaster.create).not.toHaveBeenCalled();
+    });
+
+    /** @scenario A send that fails before the turn is identified hands the control back */
+    it("hands the control and the words back when the send fails", async () => {
+      let failSend: (error: Error) => void = () => undefined;
+      chatRef.sendMessage.mockReturnValue(
+        new Promise((_resolve, reject) => {
+          failSend = reject;
+        }),
+      );
+
+      await sendMessage();
+      await userEvent.click(await stopButton());
+      expect(
+        await screen.findByRole("button", { name: "Stopping" }),
+      ).toBeDisabled();
+
+      await act(async () => {
+        failSend(new Error("the send never landed"));
+        await Promise.resolve();
+      });
+
+      // Nothing ever ran, so nothing is stopped — and the question is back in
+      // the field rather than lost.
+      expect(spies.stopMutation).not.toHaveBeenCalled();
+      expect(await screen.findByRole("button", { name: "Send" })).toBeTruthy();
+      expect(useLangyStore.getState().draft).toBe("explain this trace");
     });
   });
 
