@@ -2,9 +2,9 @@ import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseCli
 import { isStorageAnchoredVersion } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import type { FacetQuery } from "../facet-registry";
+import { EVENT_METRIC_SEP } from "../facets/events";
 import type { TraceSummaryData } from "../types";
 import type { TraceSummaryFieldsBase } from "./_summary-fields.types";
-import { EVENT_METRIC_SEP } from "../facets/events";
 import type {
   BatchedFacetResult,
   CategoricalFacetResult,
