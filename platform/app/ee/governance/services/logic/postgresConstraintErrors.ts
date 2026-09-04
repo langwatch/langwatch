@@ -7,8 +7,8 @@
  * The repo maps Prisma's own `P2002` and, before ADR-128, no raw SQLSTATE
  * anywhere — so a violation raised by the database arrived as a generic unknown
  * error with a trace id, for situations the customer can act on in one click.
- * Both the identity links (§11) and the key-to-bill coverage mapping (§7) hold
- * their rules as database constraints, so both need to read the code back.
+ * The identity links (§11) hold their rules as database constraints, so they
+ * need to read the code back.
  */
 
 /** Postgres' unique-violation code. */
@@ -18,8 +18,8 @@ const UNIQUE_VIOLATION = "23505";
  * Prisma's own code for the same refusal: the client wraps a unique violation
  * as a `PrismaClientKnownRequestError` with `code: "P2002"` and buries the
  * SQLSTATE underneath. Which unique rule tripped is the caller's knowledge —
- * the one-open-row indexes for `IdentityMatch` and `IngestionSourceKeyCoverage`
- * writes, the (organization, provider, actor) key for discovered-person writes.
+ * the one-open-row index for `IdentityMatch` writes, the (organization,
+ * provider, actor) key for discovered-person writes.
  * No caller's table holds a second unique rule a write could trip (their
  * primary keys are fresh nanoids), so `P2002` means that table's own rule and
  * nothing else.
@@ -28,16 +28,6 @@ const PRISMA_UNIQUE_VIOLATION = "P2002";
 
 /** Postgres' check-violation code: a row a named CHECK refuses. */
 const CHECK_VIOLATION = "23514";
-
-/**
- * Postgres' foreign-key-violation code, and Prisma's wrapper for it.
- *
- * `relationMode = "prisma"` means governance has no real foreign keys, so this
- * arrives from a trigger raising it deliberately rather than from a constraint —
- * the coverage mapping's row-to-key organization check is the one that does.
- */
-const FOREIGN_KEY_VIOLATION = "23503";
-const PRISMA_FOREIGN_KEY_VIOLATION = "P2003";
 
 /**
  * The driver's SQLSTATE, read off whichever shape carried it.
@@ -83,20 +73,4 @@ export function isUniqueViolation(error: unknown): boolean {
  */
 export function isCheckViolation(error: unknown): boolean {
   return hasSqlState(error, CHECK_VIOLATION);
-}
-
-/**
- * Whether a thrown value is a row refused for naming something that is not
- * there, or not the caller's.
- *
- * The coverage mapping's trigger raises this for both readings — a gateway key
- * that does not exist, and one belonging to another organization — and the two
- * are deliberately not told apart downstream: saying which would confirm that
- * somebody else's key exists.
- */
-export function isForeignKeyViolation(error: unknown): boolean {
-  if (typeof error !== "object" || error === null) return false;
-  if ((error as { code?: unknown }).code === PRISMA_FOREIGN_KEY_VIOLATION)
-    return true;
-  return hasSqlState(error, FOREIGN_KEY_VIOLATION);
 }

@@ -29,7 +29,7 @@
  *
  * Pure. No clock, no database, no rounding.
  *
- * Spec: specs/governance/governance-cost-coverage.feature
+ * Spec: specs/governance/governance-cost-screen.feature
  */
 
 /** Why a bill and the keys mapped to it could not be combined. */

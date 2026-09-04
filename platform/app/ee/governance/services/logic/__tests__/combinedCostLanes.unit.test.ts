@@ -10,7 +10,7 @@
  * missing. Binding without parking would report a screen as delivered on the
  * strength of tests that render nothing.
  *
- * Spec: specs/governance/governance-cost-coverage.feature
+ * Spec: specs/governance/governance-cost-screen.feature
  */
 import { describe, expect, it } from "vitest";
 
