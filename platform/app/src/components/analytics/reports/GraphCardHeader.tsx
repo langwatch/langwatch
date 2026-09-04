@@ -43,7 +43,7 @@ interface GraphCardAlertButtonProps {
     active: boolean;
     alertType: string | null;
   } | null;
-  defaultSeriesName: string;
+  defaultSeriesName?: string;
 }
 
 // Add-alert / edit-alert entry points for a graph.
