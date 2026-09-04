@@ -145,12 +145,16 @@ optimizer = dspy.GEPA(
     reflection_lm=dspy.LM("openai/gpt-5", temperature=1.0, max_tokens=16000),
     track_stats=True,
 )
+langwatch.dspy.init(experiment="returns-agent-scenarios", optimizer=optimizer)
+
 optimized = optimizer.compile(program, trainset=trainset, valset=trainset)
 optimized.save("optimized_agent.json")
 print(optimized.agent.react.signature.instructions)
 ```
 
 `max_metric_calls=48` gave four iterations on the example: the first full pass costs six calls, and each accepted candidate costs a minibatch of three for the parent, three for the candidate and a full pass of six. GEPA's `auto="light"` budget plans hundreds of metric calls, which is too many when every call is a full simulation.
+
+`langwatch.dspy.init` records the seed program and every candidate that reaches a full validation pass as one step each, with the candidate's instructions per predictor and the score of every scenario in that pass. A candidate that loses on its minibatch never reaches the validation set, so it has no step.
   </Tab>
   <Tab title="MIPROv2">
 ```python
@@ -192,7 +196,7 @@ uv run optimize_mipro.py
 
 ## Step 5: Read the result in LangWatch
 
-- **Experiments** shows the optimization run as a score chart, one point per trial, with the instructions of each predictor at that step. A MIPROv2 run appears through `langwatch.dspy.init`, and the GEPA example logs each candidate through a callback in `optimize_gepa.py`. See [DSPy visualization](/dspy-visualization/quickstart).
+- **Experiments** shows the optimization run as a score chart, one point per trial, with the instructions of each predictor at that step. Both scripts register the run through `langwatch.dspy.init`: MIPROv2 logs one step per trial, and GEPA logs one step for the seed program and one for every candidate it evaluates on the validation set. See [DSPy visualization](/dspy-visualization/quickstart).
 - **Agent Testing** shows every simulation the optimizer ran, as runs of the `dspy-optimization` set. The example puts the baseline pass and the final pass in their own batches, named `<run id>-baseline` and `<run id>-best`, so they appear as two runs of six next to the larger runs from inside the optimizer, and the scripts print both names.
 
 <Frame caption="The MIPROv2 run in Experiments: one point per trial, the best trial marked, and the instructions of the selected step below the chart.">

@@ -41944,7 +41944,7 @@ sidebarTitle: Custom Optimizer Tracking
 description: Track custom DSPy optimizer logic in LangWatch to visualize optimization steps and improve AI agent testing workflows.
 ---
 
-LangWatch does not track a custom DSPy optimizer out of the box. The three steps below add tracking to any custom optimizer.
+`langwatch.dspy.init` tracks `BootstrapFewShot`, `BootstrapFewShotWithRandomSearch`, `COPRO`, `MIPROv2` and `GEPA` out of the box. The three steps below add tracking to any other optimizer.
 
 ## 1. Initialize LangWatch DSPy with optimizer=None
 
@@ -42044,6 +42044,8 @@ langwatch.dspy.init(experiment="my-awesome-experiment", optimizer=optimizer)
 
 compiled_rag = optimizer.compile(RAG(), trainset=trainset)
 ```
+
+`init` tracks `BootstrapFewShot`, `BootstrapFewShotWithRandomSearch`, `COPRO`, `MIPROv2` and `GEPA`, and a `dspy.Evaluate` through the `evaluator` parameter. A GEPA run gets one step for the seed program and one for every candidate evaluated on the validation set, with the candidate's instructions and the score of each validation example. For any other optimizer, see [Custom optimizer tracking](/dspy-visualization/custom-optimizer).
 
 ## Follow your experiment
 
