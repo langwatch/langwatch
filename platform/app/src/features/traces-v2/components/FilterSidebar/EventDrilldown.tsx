@@ -17,11 +17,15 @@ interface EventDrilldownProps {
   item: FacetItem;
   ast: LiqeQuery;
   /**
-   * Toggle a single top-level `event.attribute.<metric key>` clause. Plain
-   * facet toggle, no group mutation: the emitted predicate is trace-scoped,
-   * so ANDed event filters may match different events within one trace —
-   * a documented, accepted limitation (same-event pairing would need a
-   * grammar extension).
+   * Toggle a single top-level facet clause — used both for
+   * `event.attribute.<metric key>` and, when the row is inactive, for the
+   * `event:<type>` anchor added ahead of it (see the `eventActive` gate
+   * below). Plain facet toggles, no group mutation: once two DIFFERENT
+   * events are both active, their ANDed attribute filters may still match
+   * different events within one trace — a documented, accepted limitation
+   * (same-event pairing would need a grammar extension). What this fixes
+   * is only the unscoped case: a metric click no longer lands without its
+   * own event's anchor.
    */
   toggleFacet: ({ field, value }: { field: string; value: string }) => void;
 }
@@ -45,6 +49,15 @@ export const EventDrilldown: React.FC<EventDrilldownProps> = ({
   const metrics = item.eventMetrics ?? [];
   if (metrics.length === 0) return null;
 
+  // Whether `event:<item.value>` is already an active top-level clause.
+  // For an ACTIVE row this is always true (that's what "active" means).
+  // For an INACTIVE row expanded via the chevron it's false, and a metric
+  // click below adds the event anchor first — otherwise the emitted
+  // `event.attribute.<key>:<value>` alone would match traces carrying that
+  // metric under a completely different event type. See MetricGroup.
+  const eventActive =
+    getFacetValueState(ast, "event", item.value) === "include";
+
   return (
     // Same visual attachment as EvaluatorDrilldown: indented under the row
     // with a hairline guide, no card chrome.
@@ -62,6 +75,7 @@ export const EventDrilldown: React.FC<EventDrilldownProps> = ({
           <MetricGroup
             key={metric.key}
             eventType={item.value}
+            eventActive={eventActive}
             metric={metric}
             ast={ast}
             toggleFacet={toggleFacet}
@@ -74,10 +88,13 @@ export const EventDrilldown: React.FC<EventDrilldownProps> = ({
 
 const MetricGroup: React.FC<{
   eventType: string;
+  /** True when `event:<eventType>` is already an active clause — see
+   *  {@link EventDrilldown}. */
+  eventActive: boolean;
   metric: EventMetricValues;
   ast: LiqeQuery;
   toggleFacet: EventDrilldownProps["toggleFacet"];
-}> = ({ eventType, metric, ast, toggleFacet }) => {
+}> = ({ eventType, eventActive, metric, ast, toggleFacet }) => {
   const field = `event.attribute.${metric.key}`;
   const displayKey = metric.key.startsWith(EVENT_METRICS_PREFIX)
     ? metric.key.slice(EVENT_METRICS_PREFIX.length)
@@ -110,7 +127,15 @@ const MetricGroup: React.FC<{
             count={v.count}
             maxCount={maxCount}
             state={state}
-            onClick={() => toggleFacet({ field, value: v.value })}
+            onClick={() => {
+              // Scope the metric to its event BEFORE the metric clause
+              // lands, so the pair always reads as one predicate rather
+              // than a metric value floating unscoped at the top level.
+              if (!eventActive) {
+                toggleFacet({ field: "event", value: eventType });
+              }
+              toggleFacet({ field, value: v.value });
+            }}
           />
         );
       })}

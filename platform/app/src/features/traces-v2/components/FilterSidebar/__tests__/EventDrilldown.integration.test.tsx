@@ -7,9 +7,12 @@
  *   with their counts — the component fires no query of its own;
  * - metric-group headers strip the `event.metrics.` storage prefix for
  *   display while clicks keep the full key;
- * - clicking a value emits exactly one top-level
- *   `event.attribute.event.metrics.<key>` toggle — never a group mutation
- *   (the cross-event AND collision is a documented, accepted limitation);
+ * - clicking a value on an ALREADY-ACTIVE event row emits exactly one
+ *   top-level `event.attribute.event.metrics.<key>` toggle — never a group
+ *   mutation (the cross-event AND collision, once two different events are
+ *   both active, is a documented, accepted limitation);
+ * - clicking a value on an INACTIVE event row adds the `event:<type>`
+ *   anchor first, so the metric clause never lands unscoped;
  * - a predefined event's opaque codes read as words ("-1" shows as "thumbs
  *   down") while the click still emits the stored string; every metric
  *   without a human name shows exactly what ingest wrote;
@@ -83,16 +86,37 @@ describe("EventDrilldown", () => {
       expect(screen.queryByText("event.metrics.vote")).not.toBeInTheDocument();
     });
 
-    describe("when the user clicks a metric value", () => {
-      /** @scenario "Clicking a vote value applies a single event-attribute filter" */
+    describe("when the row is already an active filter and the user clicks a metric value", () => {
+      /** @scenario "Clicking a vote value on an already-active event row applies a single event-attribute filter" */
       it("toggles a single top-level event.attribute field with the verbatim value", () => {
-        const { toggleFacet } = renderDrilldown();
+        const { toggleFacet } = renderDrilldown({
+          ast: parse("event:thumbs_up_down"),
+        });
 
         // Reads "thumbs down", filters on the stored "-1".
         fireEvent.click(screen.getByText("thumbs down"));
 
         expect(toggleFacet).toHaveBeenCalledTimes(1);
         expect(toggleFacet).toHaveBeenCalledWith({
+          field: "event.attribute.event.metrics.vote",
+          value: "-1",
+        });
+      });
+    });
+
+    describe("when the row is NOT yet an active filter and the user clicks a metric value", () => {
+      /** @scenario "Clicking a vote value on an inactive event row scopes the filter to that event first" */
+      it("adds the event anchor before the metric clause", () => {
+        const { toggleFacet } = renderDrilldown({ ast: EMPTY_AST });
+
+        fireEvent.click(screen.getByText("thumbs down"));
+
+        expect(toggleFacet).toHaveBeenCalledTimes(2);
+        expect(toggleFacet).toHaveBeenNthCalledWith(1, {
+          field: "event",
+          value: "thumbs_up_down",
+        });
+        expect(toggleFacet).toHaveBeenNthCalledWith(2, {
           field: "event.attribute.event.metrics.vote",
           value: "-1",
         });

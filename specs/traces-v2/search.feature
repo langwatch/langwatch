@@ -1986,16 +1986,26 @@ Rule: Event rows drill down into their metric values
     When the user expands the "checkout_survey" row in the Event name section
     Then the drilldown lists that value as "4"
 
-  Scenario: Clicking a vote value applies a single event-attribute filter
+  Scenario: Clicking a vote value on an already-active event row applies a single event-attribute filter
+    Given "@event:thumbs_up_down" is already an active filter
     When the user clicks the vote value shown as "thumbs down" in the thumbs_up_down drilldown
-    Then the search bar shows "@event.attribute.event.metrics.vote:-1"
-    And no other clause is added to the query
+    Then the search bar shows "@event:thumbs_up_down @event.attribute.event.metrics.vote:-1"
+    And no additional "@event" clause is added to the query
 
-  # Known limitation, accepted: the emitted clause matches the metric on ANY
-  # event in the trace. Combining it with "@event:thumbs_up_down" ANDs two
-  # independent trace-scoped subqueries — they may match different events in
-  # the same trace. Same-event pairing would need new filter grammar and is
-  # out of scope here.
+  # Without the event anchor, "@event.attribute.event.metrics.vote:-1" alone
+  # would match a trace carrying that value under a completely different
+  # event type — a metric that never happened on "thumbs_up_down" would still
+  # pass. Adding the anchor keeps the picked value scoped to the row the user
+  # actually expanded.
+  Scenario: Clicking a vote value on an inactive event row scopes the filter to that event first
+    Given the "thumbs_up_down" row is not yet an active filter
+    When the user expands the row and clicks the vote value shown as "thumbs down"
+    Then the search bar shows "@event:thumbs_up_down @event.attribute.event.metrics.vote:-1"
+
+  # Known limitation, accepted: once TWO DIFFERENT events are both active,
+  # each one's attribute clause still ANDs as an independent trace-scoped
+  # subquery — they may match different events in the same trace. Same-event
+  # pairing would need new filter grammar and is out of scope here.
   @integration @unimplemented
   Scenario: The drilldown filter is trace-scoped, not same-event-scoped
     Given a trace has a "thumbs_up_down" event with vote "1" and another event with vote "-1"
