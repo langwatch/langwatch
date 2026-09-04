@@ -31,13 +31,13 @@ const MIGRATIONS_DIR = join(__dirname, "..", "migrations");
  * restoring only some of it hands later suites a rollup the reader cannot
  * read. 00069 re-derives the rows and declares the sorting key; 00070 adds
  * the nano-USD aggregate every spend read now sums; 00082 stops the view
- * folding pulled provider cost into those totals (ADR-088); 00087 gives
+ * folding pulled provider cost into those totals (ADR-088); 00088 gives
  * UpdatedAt the merge rule the rollup carries from then on. Append to this
  * list whenever another lands.
  *
  * 00082 alters the view 00070 creates rather than creating its own, so it
  * only replays correctly after 00070 — which is the order this list is read
- * in, and the reason it is a list rather than a set. 00087 comes last for the
+ * in, and the reason it is a list rather than a set. 00088 comes last for the
  * same reason: 00069 recreates the table with the column it converts.
  */
 export const CURRENT_ROLLUP_REBUILD_MIGRATIONS = [

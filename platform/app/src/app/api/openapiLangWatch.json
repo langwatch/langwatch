@@ -544,9 +544,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Annotation"
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Annotation"
+                      }
+                    }
                   }
                 }
               }
@@ -598,9 +606,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Annotation"
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Annotation"
+                      }
+                    }
                   }
                 }
               }
@@ -648,7 +664,11 @@
                   "email": {
                     "type": "string"
                   }
-                }
+                },
+                "required": [
+                  "comment",
+                  "isThumbsUp"
+                ]
               }
             }
           }
@@ -659,7 +679,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Annotation"
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Annotation"
+                    }
+                  }
                 }
               }
             }
@@ -697,7 +725,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Annotation"
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Annotation"
+                    }
+                  }
                 }
               }
             }
@@ -787,7 +823,11 @@
                   "email": {
                     "type": "string"
                   }
-                }
+                },
+                "required": [
+                  "comment",
+                  "isThumbsUp"
+                ]
               }
             }
           }
@@ -799,12 +839,12 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "required": [
+                    "data"
+                  ],
                   "properties": {
-                    "status": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
+                    "data": {
+                      "$ref": "#/components/schemas/Annotation"
                     }
                   }
                 }
@@ -73400,7 +73440,15 @@
     "schemas": {
       "Annotation": {
         "required": [
-          "name"
+          "id",
+          "projectId",
+          "traceId",
+          "createdAt",
+          "updatedAt",
+          "comment",
+          "isThumbsUp",
+          "userId",
+          "email"
         ],
         "type": "object",
         "properties": {
@@ -73418,15 +73466,24 @@
           },
           "comment": {
             "description": "The comment of the annotation",
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "isThumbsUp": {
             "description": "The thumbs up status of the annotation",
-            "type": "boolean"
+            "type": [
+              "boolean",
+              "null"
+            ]
           },
           "userId": {
             "description": "The ID of the user",
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "createdAt": {
             "description": "The created at of the annotation",
@@ -73438,7 +73495,10 @@
           },
           "email": {
             "description": "The email of the user",
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },

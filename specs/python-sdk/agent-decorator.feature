@@ -124,6 +124,13 @@ Feature: Python SDK connect_agent decorator
     When the scenario library calls .call(input) with messages, new_messages and thread_id
     Then the function runs with those turn fields and the reply is returned
 
+  @unit
+  Scenario: The decorated function is accepted as the agent under test
+    Given a decorated function passed to scenario.run as the agent under test
+    When the scenario executor picks the agent for the agent role
+    Then it finds the decorated function under that role
+    And the role is resolved without importing the scenario package at module load
+
   # --- Run parameters from the signature ---
 
   @unit
