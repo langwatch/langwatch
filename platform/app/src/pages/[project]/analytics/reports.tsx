@@ -20,15 +20,17 @@ import GraphsLayout from "~/components/GraphsLayout";
 import { toaster } from "~/components/ui/toaster";
 import { useWidgetGranularity } from "~/features/analytics-query/hooks/useWidgetGranularity";
 import { CreateDashboardWidgetDrawer } from "~/features/custom-chart-playground/CreateDashboardWidgetDrawer";
+import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import type { ChartGridPlacement } from "~/server/analytics/chartGrid";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { ReportGrid } from "../../../components/analytics/reports";
+import { Link } from "../../../components/ui/link";
 import { withPermissionGuard } from "../../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 
 function ReportsContent() {
-  const { project } = useOrganizationTeamProject();
+  const { project, organization } = useOrganizationTeamProject();
   const { showFilters } = useFilterToggle();
   const router = useRouter();
   const projectId = project?.id ?? "";
@@ -45,6 +47,22 @@ function ReportsContent() {
   const activeDashboardId = urlDashboardId ?? getOrCreateFirst.data?.id;
 
   const [isAddChartOpen, setIsAddChartOpen] = useState(false);
+
+  // Gates the new dashboard-widget "Add chart" flow client-side to match the
+  // server-side enforcement in the dashboardWidgets tRPC router
+  // (enforceCustomChartPlaygroundEnabled) — without this, a user with the
+  // flag off would get a drawer whose Save always fails. `enabled` defaults
+  // to false while the query is loading, so the button starts as the legacy
+  // link and (for flagged-in accounts) swaps to the drawer once resolved,
+  // rather than flashing the drawer open state first.
+  const { enabled: customChartPlaygroundEnabled } = useFeatureFlag(
+    "release_custom_chart_playground",
+    {
+      projectId: project?.id,
+      organizationId: organization?.id,
+      enabled: !!project?.id && !!organization?.id,
+    },
+  );
 
   // Scheduled refresh: widgets follow refreshedAt through their dashboard
   // context; builder graphs and placed charts re-fetch through tRPC.
@@ -161,6 +179,12 @@ function ReportsContent() {
   });
   const hasNoGraphs = graphs.length === 0 && !graphsQuery.isLoading;
 
+  // Legacy builder route — used when the playground flag is off (or still
+  // loading), matching main's Add-chart handler.
+  const addChartUrl = activeDashboardId
+    ? `/${project?.slug}/analytics/custom?dashboard=${activeDashboardId}`
+    : `/${project?.slug}/analytics/custom`;
+
   return (
     <GraphsLayout
       title={dashboardTitle}
@@ -175,13 +199,21 @@ function ReportsContent() {
             onChange={autoRefresh.setOption}
           />
           {project ? (
-            <Button
-              colorPalette="orange"
-              size="sm"
-              onClick={() => setIsAddChartOpen(true)}
-            >
-              <Plus /> Add chart
-            </Button>
+            customChartPlaygroundEnabled ? (
+              <Button
+                colorPalette="orange"
+                size="sm"
+                onClick={() => setIsAddChartOpen(true)}
+              >
+                <Plus /> Add chart
+              </Button>
+            ) : (
+              <Link href={addChartUrl} asChild>
+                <Button colorPalette="orange" size="sm">
+                  <Plus /> Add chart
+                </Button>
+              </Link>
+            )
           ) : null}
         </>
       }
@@ -192,7 +224,7 @@ function ReportsContent() {
           there would hit a Save button that always fails. This drawer is
           the one "create a new chart" path that still works, and it lands
           the new widget on this dashboard directly. */}
-      {project && (
+      {project && customChartPlaygroundEnabled && (
         <CreateDashboardWidgetDrawer
           open={isAddChartOpen}
           onClose={() => setIsAddChartOpen(false)}
