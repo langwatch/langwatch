@@ -1,5 +1,5 @@
 /**
- * The `/api/scim-tokens` management family: the bearer tokens an identity
+ * The `/api/v1/scim-tokens` management family: the bearer tokens an identity
  * provider holds to reach `/api/scim/v2`.
  *
  * The token value exists in the create response and nowhere else; listing
@@ -55,14 +55,14 @@ export class ScimTokensApiService {
   async list(): Promise<{ tokens: ScimTokenSummary[] }> {
     return this.#request({
       operation: "list SCIM tokens",
-      path: managementPath("/api/scim-tokens"),
+      path: managementPath("/api/v1/scim-tokens"),
     });
   }
 
   async create(input: { description?: string } = {}): Promise<CreatedScimToken> {
     return this.#request({
       operation: "create SCIM token",
-      path: managementPath("/api/scim-tokens"),
+      path: managementPath("/api/v1/scim-tokens"),
       method: "POST",
       body: input,
     });
@@ -71,7 +71,7 @@ export class ScimTokensApiService {
   async revoke(id: string): Promise<{ success: true }> {
     return this.#request({
       operation: `revoke SCIM token "${id}"`,
-      path: managementPath(`/api/scim-tokens/${encodeURIComponent(id)}`),
+      path: managementPath(`/api/v1/scim-tokens/${encodeURIComponent(id)}`),
       method: "DELETE",
     });
   }

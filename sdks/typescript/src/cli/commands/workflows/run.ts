@@ -47,7 +47,7 @@ export const runWorkflowCommand = async ({
     const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
     const endpoint = resolveControlPlaneUrl();
 
-    const response = await fetch(`${endpoint}/api/workflows/${encodeURIComponent(id)}/run`, {
+    const response = await fetch(`${endpoint}/api/v1/workflows/${encodeURIComponent(id)}/run`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

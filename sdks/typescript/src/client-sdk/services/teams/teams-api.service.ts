@@ -1,5 +1,5 @@
 /**
- * The `/api/teams` REST family, which shipped without a CLI.
+ * The `/api/v1/teams` REST family, which shipped without a CLI.
  *
  * Teams group projects and members; membership is a team-scoped role binding,
  * which is why adding a member takes the role they get on the team.
@@ -70,7 +70,7 @@ export class TeamsApiService {
   async list(options: { page?: number; limit?: number } = {}): Promise<ListTeamsResponse> {
     return this.#request({
       operation: "list teams",
-      path: "/api/teams",
+      path: "/api/v1/teams",
       query: { ...options },
     });
   }
@@ -78,14 +78,14 @@ export class TeamsApiService {
   async get(id: string): Promise<Team> {
     return this.#request({
       operation: `fetch team "${id}"`,
-      path: `/api/teams/${encodeURIComponent(id)}`,
+      path: `/api/v1/teams/${encodeURIComponent(id)}`,
     });
   }
 
   async create(input: { name: string }): Promise<Team> {
     return this.#request({
       operation: "create team",
-      path: "/api/teams",
+      path: "/api/v1/teams",
       method: "POST",
       body: input,
     });
@@ -94,7 +94,7 @@ export class TeamsApiService {
   async update({ id, input }: { id: string; input: { name?: string } }): Promise<Team> {
     return this.#request({
       operation: `update team "${id}"`,
-      path: `/api/teams/${encodeURIComponent(id)}`,
+      path: `/api/v1/teams/${encodeURIComponent(id)}`,
       method: "PATCH",
       body: input,
     });
@@ -103,7 +103,7 @@ export class TeamsApiService {
   async archive(id: string): Promise<ArchivedTeam> {
     return this.#request({
       operation: `archive team "${id}"`,
-      path: `/api/teams/${encodeURIComponent(id)}`,
+      path: `/api/v1/teams/${encodeURIComponent(id)}`,
       method: "DELETE",
     });
   }
@@ -111,7 +111,7 @@ export class TeamsApiService {
   async listMembers(teamId: string): Promise<{ data: TeamMember[] }> {
     return this.#request({
       operation: `list members of team "${teamId}"`,
-      path: `/api/teams/${encodeURIComponent(teamId)}/members`,
+      path: `/api/v1/teams/${encodeURIComponent(teamId)}/members`,
     });
   }
 
@@ -124,7 +124,7 @@ export class TeamsApiService {
   }): Promise<{ success: boolean }> {
     return this.#request({
       operation: `add a member to team "${teamId}"`,
-      path: `/api/teams/${encodeURIComponent(teamId)}/members`,
+      path: `/api/v1/teams/${encodeURIComponent(teamId)}/members`,
       method: "POST",
       body: input,
     });
@@ -139,7 +139,7 @@ export class TeamsApiService {
   }): Promise<{ success: boolean }> {
     return this.#request({
       operation: `remove member "${userId}" from team "${teamId}"`,
-      path: `/api/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(userId)}`,
+      path: `/api/v1/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(userId)}`,
       method: "DELETE",
     });
   }

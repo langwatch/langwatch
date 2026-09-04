@@ -28,7 +28,7 @@
  *   - Never breaks a command: any failure in here is swallowed.
  *
  * The api-key line needs the project's name, which the credential alone does
- * not carry. It is fetched once from `GET /api/me/project` (a project-key
+ * not carry. It is fetched once from `GET /api/v1/me/project` (a project-key
  * authenticated identity read), cached in the same state file under the
  * credential hash, and seeded directly at `langwatch login --project` time
  * where the server already told us the name.
@@ -126,7 +126,7 @@ async function fetchProjectName(
   fetchImpl: typeof fetch,
 ): Promise<string | undefined> {
   try {
-    const res = await fetchImpl(`${normalizeEndpoint(endpoint)}/api/me/project`, {
+    const res = await fetchImpl(`${normalizeEndpoint(endpoint)}/api/v1/me/project`, {
       headers: {
         Authorization: `Bearer ${apiKey}`,
         Accept: "application/json",

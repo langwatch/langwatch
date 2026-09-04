@@ -23,7 +23,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/api/agent-cache/{name}/claim".format(
+        "url": "/api/v1/agent-cache/{name}/claim".format(
             name=quote(str(name), safe=""),
         ),
     }

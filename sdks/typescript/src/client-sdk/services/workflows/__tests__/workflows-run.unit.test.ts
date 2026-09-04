@@ -103,7 +103,7 @@ describe("WorkflowsApiService.run", () => {
         // 1) evaluate
         const startReq = requestAt(0);
         expect(startReq.method).toBe("POST");
-        expect(startReq.url).toBe(`${ENDPOINT}/api/workflows/workflow_123/evaluate`);
+        expect(startReq.url).toBe(`${ENDPOINT}/api/v1/workflows/workflow_123/evaluate`);
         expect(await startReq.clone().json()).toEqual({
           data: [{ input: "ping" }],
         });

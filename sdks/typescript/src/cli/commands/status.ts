@@ -121,7 +121,7 @@ export interface BudgetAtRisk {
  * `errors`, and never breaks the rest of status.
  *
  * Monitors are deliberately absent: the monitors REST surface
- * (`GET /api/monitors`) exposes configuration only — no firing/health state —
+ * (`GET /api/v1/monitors`) exposes configuration only — no firing/health state —
  * so there is nothing cheap and honest to report here. (Firing state lives in
  * ClickHouse evaluation results, which the API does not expose as a count.)
  */
@@ -246,7 +246,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
     // "nothing needs your attention".
     const failedChecks = checks.filter((check) => check.status === "rejected").length;
     const gaps: string[] = [];
-    // `GET /api/experiments` is ordered by `updatedAt desc`, NOT by `lastRunAt`
+    // `GET /api/v1/experiments` is ordered by `updatedAt desc`, NOT by `lastRunAt`
     // — so a running experiment whose row has a stale `updatedAt` can sit past
     // the page boundary and never be seen at all. An unread page is the single
     // biggest hole in this scan; it goes on the record first.
@@ -402,15 +402,15 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
       response?: { status?: number };
     }>;
   }[] = [
-    { key: "evaluators", fn: () => apiClient.GET("/api/evaluators") },
-    { key: "scenarios", fn: () => apiClient.GET("/api/scenarios") },
-    { key: "suites", fn: () => fetchCount("/api/suites") },
-    { key: "datasets", fn: () => apiClient.GET("/api/dataset") },
+    { key: "evaluators", fn: () => apiClient.GET("/api/v1/evaluators") },
+    { key: "scenarios", fn: () => apiClient.GET("/api/v1/scenarios") },
+    { key: "suites", fn: () => fetchCount("/api/v1/suites") },
+    { key: "datasets", fn: () => apiClient.GET("/api/v1/dataset") },
     { key: "agents", fn: () => apiClient.GET("/api/v1/agents") },
-    { key: "workflows", fn: () => apiClient.GET("/api/workflows") },
-    { key: "dashboards", fn: () => apiClient.GET("/api/dashboards") },
-    { key: "triggers", fn: () => fetchCount("/api/triggers") },
-    { key: "monitors", fn: () => fetchCount("/api/monitors") },
+    { key: "workflows", fn: () => apiClient.GET("/api/v1/workflows") },
+    { key: "dashboards", fn: () => apiClient.GET("/api/v1/dashboards") },
+    { key: "triggers", fn: () => fetchCount("/api/v1/triggers") },
+    { key: "monitors", fn: () => fetchCount("/api/v1/monitors") },
     {
       key: "secrets",
       fn: () =>

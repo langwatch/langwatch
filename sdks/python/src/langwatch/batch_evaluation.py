@@ -139,7 +139,7 @@ class BatchEvaluation:
         print("Starting batch evaluation...")
         with httpx.Client(timeout=60) as client:
             response = client.post(
-                f"{langwatch.get_endpoint()}/api/experiment/init",
+                f"{langwatch.get_endpoint()}/api/v1/experiment/init",
                 headers=build_auth_headers(langwatch.get_api_key() or ""),
                 json={
                     "experiment_name": self.experiment,
@@ -365,7 +365,7 @@ class BatchEvaluation:
     )
     def post_results(cls, api_key: str, body: dict):
         response = httpx.post(
-            f"{langwatch.get_endpoint()}/api/evaluations/batch/log_results",
+            f"{langwatch.get_endpoint()}/api/v1/evaluations/batch/log_results",
             headers=build_auth_headers(api_key),
             json=body,
             timeout=60,
@@ -407,7 +407,7 @@ async def run_evaluation(
             json_data["settings"] = settings
 
         request_params = {
-            "url": langwatch.get_endpoint() + f"/api/evaluations/{evaluation}/evaluate",
+            "url": langwatch.get_endpoint() + f"/api/v1/evaluations/{evaluation}/evaluate",
             "headers": build_auth_headers(langwatch.get_api_key() or ""),
             "json": json_data,
         }
@@ -458,7 +458,7 @@ def get_dataset(
     slug: str,
 ) -> list[DatasetRecord]:
     request_params = {
-        "url": langwatch.get_endpoint() + f"/api/dataset/{slug}",
+        "url": langwatch.get_endpoint() + f"/api/v1/dataset/{slug}",
         "headers": build_auth_headers(str(langwatch.get_api_key() or "")),
     }
 

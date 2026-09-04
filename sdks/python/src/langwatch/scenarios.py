@@ -101,7 +101,7 @@ class ScenariosFacade:
         Returns:
             Dictionary with scenario data.
         """
-        response = self._http().get("/api/scenarios")
+        response = self._http().get("/api/v1/scenarios")
         _raise_for_status(response, operation="list")
         return response.json()
 
@@ -115,7 +115,7 @@ class ScenariosFacade:
         Returns:
             Dictionary containing the scenario data.
         """
-        response = self._http().get(f"/api/scenarios/{_quote(scenario_id)}")
+        response = self._http().get(f"/api/v1/scenarios/{_quote(scenario_id)}")
         _raise_for_status(response, operation="get")
         return response.json()
 
@@ -148,7 +148,7 @@ class ScenariosFacade:
             body["testSuiteId"] = test_suite_id
         body.update(kwargs)
 
-        response = self._http().post("/api/scenarios", json=body)
+        response = self._http().post("/api/v1/scenarios", json=body)
         _raise_for_status(response, operation="create")
         return response.json()
 
@@ -176,7 +176,7 @@ class ScenariosFacade:
         if not isinstance(test_suite_id, _Unset):
             body["testSuiteId"] = test_suite_id
         response = self._http().put(
-            f"/api/scenarios/{_quote(scenario_id)}", json=body
+            f"/api/v1/scenarios/{_quote(scenario_id)}", json=body
         )
         _raise_for_status(response, operation="update")
         return response.json()
@@ -191,6 +191,6 @@ class ScenariosFacade:
         Returns:
             Dictionary with deletion result.
         """
-        response = self._http().delete(f"/api/scenarios/{_quote(scenario_id)}")
+        response = self._http().delete(f"/api/v1/scenarios/{_quote(scenario_id)}")
         _raise_for_status(response, operation="delete")
         return response.json()

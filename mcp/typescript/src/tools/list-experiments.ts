@@ -48,7 +48,7 @@ export async function handleExperimentList(params: { limit?: number }): Promise<
 
   const result = (await makeRequest(
     "GET",
-    `/api/experiments?${search.toString()}`,
+    `/api/v1/experiments?${search.toString()}`,
   )) as ExperimentListResponse;
 
   if (result.experiments.length === 0) {

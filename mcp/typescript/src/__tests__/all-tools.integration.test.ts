@@ -485,7 +485,7 @@ function createMockServer(): Server {
       lastRequests[routeKey] = { method, url, body };
 
       // --- Trace endpoints ---
-      if (url === "/api/traces/search" && method === "POST") {
+      if (url === "/api/v1/traces/search" && method === "POST") {
         const parsed = JSON.parse(body);
         // Return empty results when a special query is used
         if (parsed.query === "__empty__") {
@@ -498,29 +498,29 @@ function createMockServer(): Server {
           res.writeHead(200);
           res.end(JSON.stringify(CANNED_TRACES_SEARCH));
         }
-      } else if (url.match(/^\/api\/traces\/trace-nonexistent(\?|$)/) && method === "GET") {
+      } else if (url.match(/^\/api\/v1\/traces\/trace-nonexistent(\?|$)/) && method === "GET") {
         res.writeHead(404);
         res.end(JSON.stringify({ message: "Trace not found" }));
-      } else if (url.match(/^\/api\/traces\/[^/]+(\?|$)/) && method === "GET") {
+      } else if (url.match(/^\/api\/v1\/traces\/[^/]+(\?|$)/) && method === "GET") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_TRACE_DETAIL));
       }
       // --- Analytics endpoint ---
-      else if (url === "/api/analytics/timeseries" && method === "POST") {
+      else if (url === "/api/v1/analytics/timeseries" && method === "POST") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_ANALYTICS));
       }
       // --- Prompt endpoints ---
-      else if (url === "/api/prompts" && method === "GET") {
+      else if (url === "/api/v1/prompts" && method === "GET") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_PROMPTS_LIST));
-      } else if (url === "/api/prompts" && method === "POST") {
+      } else if (url === "/api/v1/prompts" && method === "POST") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_PROMPT_CREATED));
-      } else if (url.match(/^\/api\/prompts\/[^/]+$/) && method === "GET") {
+      } else if (url.match(/^\/api\/v1\/prompts\/[^/]+$/) && method === "GET") {
         res.writeHead(200);
         res.end(JSON.stringify(promptDetailState));
-      } else if (url.match(/^\/api\/prompts\/[^/]+$/) && method === "PUT") {
+      } else if (url.match(/^\/api\/v1\/prompts\/[^/]+$/) && method === "PUT") {
         const parsed = JSON.parse(body) as {
           commitMessage?: string;
           model?: string;
@@ -551,47 +551,50 @@ function createMockServer(): Server {
         res.end(JSON.stringify(CANNED_PROMPT_UPDATED));
       }
       // --- Scenario endpoints ---
-      else if (url === "/api/scenarios" && method === "GET") {
+      else if (url === "/api/v1/scenarios" && method === "GET") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_SCENARIOS_LIST));
-      } else if (url === "/api/scenarios" && method === "POST") {
+      } else if (url === "/api/v1/scenarios" && method === "POST") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_SCENARIO_CREATED));
-      } else if (url.match(/^\/api\/scenarios\/scen_nonexistent(\?|$)/) && method === "GET") {
+      } else if (url.match(/^\/api\/v1\/scenarios\/scen_nonexistent(\?|$)/) && method === "GET") {
         res.writeHead(404);
         res.end(JSON.stringify({ message: "Scenario not found" }));
-      } else if (url.match(/^\/api\/scenarios\/[^/]+$/) && method === "GET") {
+      } else if (url.match(/^\/api\/v1\/scenarios\/[^/]+$/) && method === "GET") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_SCENARIO_DETAIL));
-      } else if (url.match(/^\/api\/scenarios\/[^/]+$/) && method === "PUT") {
+      } else if (url.match(/^\/api\/v1\/scenarios\/[^/]+$/) && method === "PUT") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_SCENARIO_UPDATED));
-      } else if (url.match(/^\/api\/scenarios\/[^/]+$/) && method === "DELETE") {
+      } else if (url.match(/^\/api\/v1\/scenarios\/[^/]+$/) && method === "DELETE") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_SCENARIO_ARCHIVED));
       }
       // --- Evaluator endpoints ---
-      else if (url === "/api/evaluators" && method === "GET") {
+      else if (url === "/api/v1/evaluators" && method === "GET") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_EVALUATORS_LIST));
-      } else if (url === "/api/evaluators" && method === "POST") {
+      } else if (url === "/api/v1/evaluators" && method === "POST") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_EVALUATOR_CREATED));
-      } else if (url.match(/^\/api\/evaluators\/evaluator_nonexistent(\?|$)/) && method === "GET") {
+      } else if (
+        url.match(/^\/api\/v1\/evaluators\/evaluator_nonexistent(\?|$)/) &&
+        method === "GET"
+      ) {
         res.writeHead(404);
         res.end(JSON.stringify({ message: "Evaluator not found" }));
-      } else if (url.match(/^\/api\/evaluators\/[^/]+$/) && method === "GET") {
+      } else if (url.match(/^\/api\/v1\/evaluators\/[^/]+$/) && method === "GET") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_EVALUATOR_DETAIL));
-      } else if (url.match(/^\/api\/evaluators\/[^/]+$/) && method === "PUT") {
+      } else if (url.match(/^\/api\/v1\/evaluators\/[^/]+$/) && method === "PUT") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_EVALUATOR_UPDATED));
       }
       // --- Model Provider endpoints ---
-      else if (url === "/api/model-providers" && method === "GET") {
+      else if (url === "/api/v1/model-providers" && method === "GET") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_MODEL_PROVIDERS_LIST));
-      } else if (url.match(/^\/api\/model-providers\/[^/]+$/) && method === "PUT") {
+      } else if (url.match(/^\/api\/v1\/model-providers\/[^/]+$/) && method === "PUT") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_MODEL_PROVIDER_SET));
       }
@@ -650,43 +653,43 @@ function createMockServer(): Server {
         res.end(JSON.stringify({ id: "suite_abc", archived: true }));
       }
       // --- Simulation Run endpoints ---
-      else if (url?.match(/^\/api\/simulation-runs\/[^/]+$/) && method === "GET") {
+      else if (url?.match(/^\/api\/v1\/simulation-runs\/[^/]+$/) && method === "GET") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_SIMULATION_RUN_DETAIL));
-      } else if (url?.match(/^\/api\/simulation-runs/) && method === "GET") {
+      } else if (url?.match(/^\/api\/v1\/simulation-runs/) && method === "GET") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_SIMULATION_RUNS));
       }
       // --- Dashboard endpoints ---
-      else if (url === "/api/dashboards" && method === "GET") {
+      else if (url === "/api/v1/dashboards" && method === "GET") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_DASHBOARDS_LIST));
-      } else if (url === "/api/dashboards" && method === "POST") {
+      } else if (url === "/api/v1/dashboards" && method === "POST") {
         res.writeHead(201);
         res.end(JSON.stringify({ id: "dash_new", name: "New Dashboard" }));
-      } else if (url?.match(/^\/api\/dashboards\/[^/]+$/) && method === "GET") {
+      } else if (url?.match(/^\/api\/v1\/dashboards\/[^/]+$/) && method === "GET") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_DASHBOARDS_LIST.data[0]));
-      } else if (url?.match(/^\/api\/dashboards\/[^/]+$/) && method === "DELETE") {
+      } else if (url?.match(/^\/api\/v1\/dashboards\/[^/]+$/) && method === "DELETE") {
         res.writeHead(200);
         res.end(JSON.stringify({ id: "dash_abc", name: "Main Dashboard" }));
       }
       // --- Workflow endpoints ---
-      else if (url === "/api/workflows" && method === "GET") {
+      else if (url === "/api/v1/workflows" && method === "GET") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_WORKFLOWS_LIST));
-      } else if (url?.match(/^\/api\/workflows\/[^/]+\/run$/) && method === "POST") {
+      } else if (url?.match(/^\/api\/v1\/workflows\/[^/]+\/run$/) && method === "POST") {
         res.writeHead(200);
         res.end(JSON.stringify({ output: "workflow result" }));
-      } else if (url?.match(/^\/api\/workflows\/[^/]+$/) && method === "GET") {
+      } else if (url?.match(/^\/api\/v1\/workflows\/[^/]+$/) && method === "GET") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_WORKFLOWS_LIST[0]));
-      } else if (url?.match(/^\/api\/workflows\/[^/]+$/) && method === "DELETE") {
+      } else if (url?.match(/^\/api\/v1\/workflows\/[^/]+$/) && method === "DELETE") {
         res.writeHead(200);
         res.end(JSON.stringify({ id: "wf_abc", archived: true }));
       }
       // --- Monitor endpoints ---
-      else if (url === "/api/monitors" && method === "GET") {
+      else if (url === "/api/v1/monitors" && method === "GET") {
         res.writeHead(200);
         res.end(
           JSON.stringify([
@@ -709,7 +712,7 @@ function createMockServer(): Server {
             },
           ]),
         );
-      } else if (url === "/api/monitors" && method === "POST") {
+      } else if (url === "/api/v1/monitors" && method === "POST") {
         res.writeHead(201);
         res.end(
           JSON.stringify({
@@ -730,11 +733,11 @@ function createMockServer(): Server {
             updatedAt: "2026-01-01T00:00:00Z",
           }),
         );
-      } else if (url?.match(/^\/api\/monitors\/[^/]+\/toggle$/) && method === "POST") {
+      } else if (url?.match(/^\/api\/v1\/monitors\/[^/]+\/toggle$/) && method === "POST") {
         const monitorId = url?.split("/")[3];
         res.writeHead(200);
         res.end(JSON.stringify({ id: monitorId, enabled: true }));
-      } else if (url?.match(/^\/api\/monitors\/[^/]+$/) && method === "GET") {
+      } else if (url?.match(/^\/api\/v1\/monitors\/[^/]+$/) && method === "GET") {
         res.writeHead(200);
         res.end(
           JSON.stringify({
@@ -755,7 +758,7 @@ function createMockServer(): Server {
             updatedAt: "2026-01-01T00:00:00Z",
           }),
         );
-      } else if (url?.match(/^\/api\/monitors\/[^/]+$/) && method === "PATCH") {
+      } else if (url?.match(/^\/api\/v1\/monitors\/[^/]+$/) && method === "PATCH") {
         res.writeHead(200);
         res.end(
           JSON.stringify({
@@ -776,7 +779,7 @@ function createMockServer(): Server {
             updatedAt: "2026-01-02T00:00:00Z",
           }),
         );
-      } else if (url?.match(/^\/api\/monitors\/[^/]+$/) && method === "DELETE") {
+      } else if (url?.match(/^\/api\/v1\/monitors\/[^/]+$/) && method === "DELETE") {
         const monitorId = url?.split("/").pop();
         res.writeHead(200);
         res.end(JSON.stringify({ id: monitorId, deleted: true }));
@@ -1080,7 +1083,7 @@ describe("All MCP tools integration", () => {
           filters: { "metadata.user_id": ["user-42"] },
         });
 
-        const req = lastRequests["POST /api/traces/search"];
+        const req = lastRequests["POST /api/v1/traces/search"];
         expect(req).toBeDefined();
         const parsed = JSON.parse(req!.body);
         expect(parsed.filters).toEqual({
@@ -1175,7 +1178,7 @@ describe("All MCP tools integration", () => {
           aggregation: "sum",
         });
 
-        const req = lastRequests["POST /api/analytics/timeseries"];
+        const req = lastRequests["POST /api/v1/analytics/timeseries"];
         expect(req).toBeDefined();
         const parsed = JSON.parse(req!.body);
         expect(parsed.series[0].metric).toBe("performance.total_cost");
@@ -1274,7 +1277,7 @@ describe("All MCP tools integration", () => {
           commitMessage: "Only messages changed",
         });
 
-        const req = lastRequests["PUT /api/prompts/greeting-bot"];
+        const req = lastRequests["PUT /api/v1/prompts/greeting-bot"];
         expect(req).toBeDefined();
         const parsed = JSON.parse(req!.body);
         expect(parsed).not.toHaveProperty("parameters");
@@ -1295,7 +1298,7 @@ describe("All MCP tools integration", () => {
           commitMessage: "No tag change requested",
         });
 
-        const req = lastRequests["PUT /api/prompts/greeting-bot"];
+        const req = lastRequests["PUT /api/v1/prompts/greeting-bot"];
         expect(req).toBeDefined();
         const parsed = JSON.parse(req!.body);
         expect(parsed).not.toHaveProperty("tags");
@@ -1313,7 +1316,7 @@ describe("All MCP tools integration", () => {
           tags: ["production"],
         });
 
-        const req = lastRequests["PUT /api/prompts/greeting-bot"];
+        const req = lastRequests["PUT /api/v1/prompts/greeting-bot"];
         expect(req).toBeDefined();
         const parsed = JSON.parse(req!.body);
         expect(parsed.tags).toEqual(["production"]);

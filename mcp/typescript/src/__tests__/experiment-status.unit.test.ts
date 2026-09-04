@@ -67,7 +67,7 @@ describe("handleExperimentStatus()", () => {
 
       const out = await handleExperimentStatus({ runId: "run_1" });
 
-      expect(mockMakeRequest).toHaveBeenCalledWith("GET", "/api/experiments/runs/run_1");
+      expect(mockMakeRequest).toHaveBeenCalledWith("GET", "/api/v1/experiments/runs/run_1");
       expect(out).toContain("**Status**: completed");
       expect(out).toContain("3/3 cells");
     });
@@ -94,11 +94,11 @@ describe("handleExperimentStatus()", () => {
         experimentSlug: "doc-qa",
       });
 
-      expect(mockMakeRequest).toHaveBeenNthCalledWith(1, "GET", "/api/experiments/runs/sdk_run");
+      expect(mockMakeRequest).toHaveBeenNthCalledWith(1, "GET", "/api/v1/experiments/runs/sdk_run");
       expect(mockMakeRequest).toHaveBeenNthCalledWith(
         2,
         "GET",
-        "/api/experiments/runs/sdk_run/results?experimentSlug=doc-qa",
+        "/api/v1/experiments/runs/sdk_run/results?experimentSlug=doc-qa",
       );
       expect(out).toContain("**Status**: completed");
       expect(out).toContain("5/5 cells");

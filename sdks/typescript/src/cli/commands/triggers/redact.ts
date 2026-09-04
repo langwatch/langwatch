@@ -1,6 +1,6 @@
 /**
  * `actionParams` carries the trigger's delivery credentials — Slack webhook
- * URLs, custom-endpoint URLs and their headers — and `/api/triggers` returns
+ * URLs, custom-endpoint URLs and their headers — and `/api/v1/triggers` returns
  * them in PLAINTEXT, unredacted. The human "Trigger Details" block has always
  * deliberately omitted them.
  *

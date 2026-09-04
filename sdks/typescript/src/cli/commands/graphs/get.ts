@@ -21,7 +21,7 @@ export const getGraphCommand = async (id: string): Promise<CommandResult | void>
   const spinner = createSpinner(`Fetching graph "${id}"...`).start();
 
   try {
-    const response = await fetch(`${endpoint}/api/graphs/${id}`, {
+    const response = await fetch(`${endpoint}/api/v1/graphs/${id}`, {
       headers: buildAuthHeaders({ apiKey }),
     });
 

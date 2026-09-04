@@ -102,7 +102,7 @@ describe("sessionEventsCommand()", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
     const firstUrl = String(fetchMock.mock.calls[0]![0]);
     expect(firstUrl).toContain(
-      "https://langwatch.test/api/coding-agent/sessions/session-abc/events",
+      "https://langwatch.test/api/v1/coding-agent/sessions/session-abc/events",
     );
     const secondUrl = String(fetchMock.mock.calls[1]![0]);
     expect(secondUrl).toContain("cursor=cursor-1");

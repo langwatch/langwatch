@@ -11,7 +11,7 @@ def _get_kwargs() -> dict[str, Any]:
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/api/dataset/direct-upload",
+        "url": "/api/v1/dataset/direct-upload",
     }
 
     return _kwargs

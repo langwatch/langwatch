@@ -26,7 +26,7 @@ export const promptRestoreCommand = async (
 
   try {
     const response = await fetch(
-      `${endpoint}/api/prompts/${encodeURIComponent(handle)}/versions/${encodeURIComponent(versionId)}/restore`,
+      `${endpoint}/api/v1/prompts/${encodeURIComponent(handle)}/versions/${encodeURIComponent(versionId)}/restore`,
       {
         method: "POST",
         headers: {

@@ -133,7 +133,7 @@ export const uiCallCommand = async (
 
   let response: Response;
   try {
-    response = await fetch(`${endpoint}/api/langy/ui/actions`, {
+    response = await fetch(`${endpoint}/api/v1/langy/ui/actions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

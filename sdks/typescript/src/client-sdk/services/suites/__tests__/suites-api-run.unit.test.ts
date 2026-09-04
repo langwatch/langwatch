@@ -62,7 +62,7 @@ describe("SuitesApiService.run()", () => {
         parameters: { account_tier: "gold", seats: 12, beta: true },
       });
       expect((mockFetch.mock.calls[0]![0] as Request).url).toBe(
-        "https://api.langwatch.test/api/suites/suite_1/run",
+        "https://api.langwatch.test/api/v1/suites/suite_1/run",
       );
     });
   });

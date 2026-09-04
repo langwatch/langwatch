@@ -35,7 +35,7 @@ export const updateWorkflowCommand = async (
       process.exit(1);
     }
 
-    const response = await fetch(`${endpoint}/api/workflows/${encodeURIComponent(id)}`, {
+    const response = await fetch(`${endpoint}/api/v1/workflows/${encodeURIComponent(id)}`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",

@@ -84,7 +84,7 @@ describe("listSimulationRunsCommand()", () => {
       await listSimulationRunsCommand({});
 
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining("/api/simulation-runs"),
+        expect.stringContaining("/api/v1/simulation-runs"),
         expect.objectContaining({ method: "GET" }),
       );
     });
@@ -269,7 +269,7 @@ describe("getSimulationRunCommand()", () => {
       await getSimulationRunCommand("run_abc123");
 
       expect(mockFetch).toHaveBeenCalledWith(
-        "http://localhost:5560/api/simulation-runs/run_abc123",
+        "http://localhost:5560/api/v1/simulation-runs/run_abc123",
         expect.objectContaining({ method: "GET" }),
       );
     });

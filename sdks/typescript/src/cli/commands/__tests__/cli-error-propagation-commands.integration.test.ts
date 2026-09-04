@@ -188,7 +188,7 @@ describe("CLI error propagation across commands", () => {
 
   describe("dataset get", () => {
     it("maps a 404 to a specific 'not found' message with the id", async () => {
-      pushResponse("GET", "/api/dataset/:slugOrId", {
+      pushResponse("GET", "/api/v1/dataset/:slugOrId", {
         status: 404,
         body: { error: "NotFoundError", message: "Dataset not found" },
       });
@@ -203,7 +203,7 @@ describe("CLI error propagation across commands", () => {
 
   describe("monitor create", () => {
     it("forwards a 422 validation error from the API", async () => {
-      pushResponse("POST", "/api/monitors", {
+      pushResponse("POST", "/api/v1/monitors", {
         status: 422,
         body: {
           error: "ValidationError",
@@ -251,7 +251,7 @@ describe("CLI error propagation across commands", () => {
 
   describe("workflow run", () => {
     it("shows the specific error body, not a generic 500", async () => {
-      pushResponse("POST", "/api/workflows/:id/run", {
+      pushResponse("POST", "/api/v1/workflows/:id/run", {
         status: 500,
         body: {
           error: "Internal server error",
@@ -268,7 +268,7 @@ describe("CLI error propagation across commands", () => {
 
   describe("scenario get", () => {
     it("includes the scenario id in the 'not found' message", async () => {
-      pushResponse("GET", "/api/scenarios/:id", {
+      pushResponse("GET", "/api/v1/scenarios/:id", {
         status: 404,
         body: { error: "NotFoundError", message: "Scenario not found" },
       });

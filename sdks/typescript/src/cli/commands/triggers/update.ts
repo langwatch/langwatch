@@ -47,7 +47,7 @@ export const updateTriggerCommand = async (
       process.exit(1);
     }
 
-    const response = await fetch(`${endpoint}/api/triggers/${encodeURIComponent(id)}`, {
+    const response = await fetch(`${endpoint}/api/v1/triggers/${encodeURIComponent(id)}`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",

@@ -221,7 +221,7 @@ export const runAgentCommand = async (
     const runSpinner = createSpinner(`Running agent via workflow ${workflowId}...`).start();
     try {
       const response = await fetch(
-        `${endpoint}/api/workflows/${encodeURIComponent(workflowId)}/run`,
+        `${endpoint}/api/v1/workflows/${encodeURIComponent(workflowId)}/run`,
         {
           method: "POST",
           headers: {

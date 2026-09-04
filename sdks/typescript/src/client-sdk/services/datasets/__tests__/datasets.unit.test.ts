@@ -83,7 +83,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
           await service.listDatasets({ page: 2, limit: 10 });
 
           expect(mockClient.GET).toHaveBeenCalledWith(
-            "/api/dataset",
+            "/api/v1/dataset",
             expect.objectContaining({
               params: expect.objectContaining({
                 query: { page: 2, limit: 10 },
@@ -122,7 +122,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
           await service.createDataset({ name: "bare-dataset" });
 
           expect(mockClient.POST).toHaveBeenCalledWith(
-            "/api/dataset",
+            "/api/v1/dataset",
             expect.objectContaining({
               body: {
                 name: "bare-dataset",
@@ -164,7 +164,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
           });
 
           expect(mockClient.PATCH).toHaveBeenCalledWith(
-            "/api/dataset/{slugOrId}",
+            "/api/v1/dataset/{slugOrId}",
             expect.objectContaining({
               body: {
                 columnTypes: [{ name: "question", type: "string" }],

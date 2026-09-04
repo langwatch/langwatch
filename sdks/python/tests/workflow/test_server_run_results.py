@@ -1,7 +1,7 @@
 """Unit tests for server-side ``langwatch.workflow.run`` with per-row results.
 
 These mock the HTTP boundary (``httpx.Client``) so we assert the SDK posts to
-``/api/workflows/{workflow_id}/evaluate`` and that ``result.results`` builds the
+``/api/v1/workflows/{workflow_id}/evaluate`` and that ``result.results`` builds the
 SAME per-row DataFrame shape an experiment run returns.
 
 Specs: specs/workflow/server_run_results.feature
@@ -167,7 +167,7 @@ class TestWorkflowRunWithInlineData:
             evaluate_post = next(
                 p for p in _FakeClient.captured_posts if "/evaluate" in p["url"]
             )
-            assert "/api/workflows/workflow_abc/evaluate" in evaluate_post["url"]
+            assert "/api/v1/workflows/workflow_abc/evaluate" in evaluate_post["url"]
             assert evaluate_post["json"] == {"data": rows}
 
             # run_url points at the workflow's experiment results page.

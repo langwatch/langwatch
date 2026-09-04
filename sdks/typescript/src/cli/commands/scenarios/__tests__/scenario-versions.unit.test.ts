@@ -155,7 +155,7 @@ describe("the scenario version commands", () => {
       mockGetVersion.mockRejectedValue(
         new ScenariosApiError(
           "scenario_version_not_found",
-          "GET /api/scenarios/scenario_abc123/versions/9",
+          "GET /api/v1/scenarios/scenario_abc123/versions/9",
         ),
       );
 

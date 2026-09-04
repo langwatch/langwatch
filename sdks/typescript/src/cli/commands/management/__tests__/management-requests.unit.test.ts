@@ -112,7 +112,7 @@ describe("role-bindings list", () => {
       });
 
       const url = new URL(lastRequest().url);
-      expect(url.pathname).toBe("/api/role-bindings/latest/");
+      expect(url.pathname).toBe("/api/v1/role-bindings/latest/");
       expect(url.searchParams.get("apiKeyId")).toBe("key_1");
       expect(url.searchParams.get("scopeType")).toBe("PROJECT");
       expect(url.searchParams.get("scopeId")).toBe("project_1");
@@ -126,7 +126,7 @@ describe("role-bindings list", () => {
       mockFetch.mockClear();
       respondWith({ bindings: [], totalCount: 0 });
       await listRoleBindingsCommand({});
-      expect(lastRequest().url).toBe("https://app.langwatch.ai/api/role-bindings/latest/");
+      expect(lastRequest().url).toBe("https://app.langwatch.ai/api/v1/role-bindings/latest/");
     });
   });
 });
@@ -144,7 +144,7 @@ describe("role-bindings update", () => {
       });
 
       const { url, body, init } = lastRequest();
-      expect(url).toBe("https://app.langwatch.ai/api/role-bindings/latest/rb_1");
+      expect(url).toBe("https://app.langwatch.ai/api/v1/role-bindings/latest/rb_1");
       expect(init.method).toBe("PATCH");
       expect(body).toEqual({ role: "CUSTOM", customRoleId: "crole_1" });
       expect(result?.data).toEqual({
@@ -200,7 +200,7 @@ describe("api-keys update", () => {
       });
 
       const request = lastRequest();
-      expect(request.url).toBe("https://app.langwatch.ai/api/api-keys/key_1");
+      expect(request.url).toBe("https://app.langwatch.ai/api/v1/api-keys/key_1");
       expect(request.init.method).toBe("PATCH");
       expect(request.body).toEqual({
         permissionMode: "restricted",
@@ -311,7 +311,7 @@ describe("invites create", () => {
       });
       const fromFlags = lastRequest();
 
-      expect(fromFlags.url).toBe("https://app.langwatch.ai/api/organization/latest/invites");
+      expect(fromFlags.url).toBe("https://app.langwatch.ai/api/v1/organization/latest/invites");
       expect(fromFlags.init.method).toBe("POST");
       expect(fromFlags.body).toEqual({
         invites: [

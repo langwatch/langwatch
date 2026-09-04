@@ -253,6 +253,7 @@ describe("runScenarioCommand()", () => {
 
   describe("when --note is given", () => {
     /** @scenario "Run a scenario with a note" */
+    /** @scenario "A note given on the command line is stored with the batch" */
     it("schedules the run with that note", async () => {
       await runScenarioCommand("scenario_1", {
         target: ["http:agent_abc123"],

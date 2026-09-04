@@ -7,10 +7,10 @@ import {
 } from "@/client-sdk/services/_shared/format-api-error";
 
 export type ModelProvidersListResponse =
-  paths["/api/model-providers"]["get"]["responses"]["200"]["content"]["application/json"];
+  paths["/api/v1/model-providers"]["get"]["responses"]["200"]["content"]["application/json"];
 
 export type UpdateModelProviderBody = NonNullable<
-  paths["/api/model-providers/{provider}"]["put"]["requestBody"]
+  paths["/api/v1/model-providers/{provider}"]["put"]["requestBody"]
 >["content"]["application/json"];
 
 export class ModelProvidersApiError extends Error {
@@ -43,7 +43,7 @@ export class ModelProvidersApiService {
   }
 
   async list(): Promise<ModelProvidersListResponse> {
-    const { data, error } = await this.apiClient.GET("/api/model-providers");
+    const { data, error } = await this.apiClient.GET("/api/v1/model-providers");
     if (error) this.handleApiError("list model providers", error);
     return data;
   }
@@ -52,7 +52,7 @@ export class ModelProvidersApiService {
     provider: string,
     params: UpdateModelProviderBody,
   ): Promise<ModelProvidersListResponse> {
-    const { data, error } = await this.apiClient.PUT("/api/model-providers/{provider}", {
+    const { data, error } = await this.apiClient.PUT("/api/v1/model-providers/{provider}", {
       params: { path: { provider } },
       body: params,
     });

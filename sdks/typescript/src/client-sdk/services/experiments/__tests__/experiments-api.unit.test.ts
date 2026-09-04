@@ -52,7 +52,7 @@ describe("ExperimentsApiService.getRunResults()", () => {
 
         expect(result).toEqual(payload);
         expect(fetchedRequest().url).toBe(
-          "https://api.langwatch.test/api/experiments/runs/run_1/results",
+          "https://api.langwatch.test/api/v1/experiments/runs/run_1/results",
         );
         expect(fetchedRequest().method).toBe("GET");
       });

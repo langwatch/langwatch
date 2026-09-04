@@ -1,5 +1,5 @@
 /**
- * The `/api/role-bindings` management family: who holds which role, where.
+ * The `/api/v1/role-bindings` management family: who holds which role, where.
  *
  * CLI-only, and deliberately not exported from the client SDK's public index.
  */
@@ -103,7 +103,7 @@ export class RoleBindingsApiService {
   async list(options: ListRoleBindingsOptions = {}): Promise<ListRoleBindingsResponse> {
     return this.#request({
       operation: "list role bindings",
-      path: managementPath("/api/role-bindings"),
+      path: managementPath("/api/v1/role-bindings"),
       query: { ...options },
     });
   }
@@ -111,7 +111,7 @@ export class RoleBindingsApiService {
   async create(input: CreateRoleBindingInput): Promise<CreatedRoleBinding> {
     return this.#request({
       operation: "create role binding",
-      path: managementPath("/api/role-bindings"),
+      path: managementPath("/api/v1/role-bindings"),
       method: "POST",
       body: input,
     });
@@ -120,7 +120,7 @@ export class RoleBindingsApiService {
   async update({ id, input }: { id: string; input: UpdateRoleBindingInput }): Promise<RoleBinding> {
     return this.#request({
       operation: `update role binding "${id}"`,
-      path: managementPath(`/api/role-bindings/${encodeURIComponent(id)}`),
+      path: managementPath(`/api/v1/role-bindings/${encodeURIComponent(id)}`),
       method: "PATCH",
       body: input,
     });
@@ -129,7 +129,7 @@ export class RoleBindingsApiService {
   async delete(id: string): Promise<{ success: true }> {
     return this.#request({
       operation: `delete role binding "${id}"`,
-      path: managementPath(`/api/role-bindings/${encodeURIComponent(id)}`),
+      path: managementPath(`/api/v1/role-bindings/${encodeURIComponent(id)}`),
       method: "DELETE",
     });
   }

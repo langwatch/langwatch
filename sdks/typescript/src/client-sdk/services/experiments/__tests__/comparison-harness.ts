@@ -96,7 +96,7 @@ export const createHarness = () => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
     const body = typeof init?.body === "string" ? JSON.parse(init.body) : {};
 
-    if (url.includes("/api/experiment/init")) {
+    if (url.includes("/api/v1/experiment/init")) {
       return new Response(
         JSON.stringify({
           slug: "comparison-test",

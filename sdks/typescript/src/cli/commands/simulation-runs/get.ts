@@ -71,10 +71,13 @@ export const getSimulationRunCommand = async (
   const spinner = createSpinner(`Fetching simulation run "${runId}"...`).start();
 
   try {
-    const response = await fetch(`${endpoint}/api/simulation-runs/${encodeURIComponent(runId)}`, {
-      method: "GET",
-      headers: buildAuthHeaders({ apiKey }),
-    });
+    const response = await fetch(
+      `${endpoint}/api/v1/simulation-runs/${encodeURIComponent(runId)}`,
+      {
+        method: "GET",
+        headers: buildAuthHeaders({ apiKey }),
+      },
+    );
 
     if (!response.ok) {
       failSpinner({

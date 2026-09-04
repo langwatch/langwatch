@@ -29,7 +29,7 @@ export const listGraphsCommand = async (options: {
     if (options.dashboardId) params.set("dashboardId", options.dashboardId);
     const qs = params.toString() ? `?${params}` : "";
 
-    const response = await fetch(`${endpoint}/api/graphs${qs}`, {
+    const response = await fetch(`${endpoint}/api/v1/graphs${qs}`, {
       headers: buildAuthHeaders({ apiKey }),
     });
 

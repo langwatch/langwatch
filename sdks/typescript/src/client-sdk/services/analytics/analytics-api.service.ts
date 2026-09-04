@@ -7,11 +7,11 @@ import {
 } from "@/client-sdk/services/_shared/format-api-error";
 
 export type AnalyticsTimeseriesBody = NonNullable<
-  paths["/api/analytics/timeseries"]["post"]["requestBody"]
+  paths["/api/v1/analytics/timeseries"]["post"]["requestBody"]
 >["content"]["application/json"];
 
 export type AnalyticsTimeseriesResponse =
-  paths["/api/analytics/timeseries"]["post"]["responses"]["200"]["content"]["application/json"];
+  paths["/api/v1/analytics/timeseries"]["post"]["responses"]["200"]["content"]["application/json"];
 
 export class AnalyticsApiError extends Error {
   constructor(
@@ -43,7 +43,7 @@ export class AnalyticsApiService {
   }
 
   async timeseries(params: AnalyticsTimeseriesBody): Promise<AnalyticsTimeseriesResponse> {
-    const { data, error } = await this.apiClient.POST("/api/analytics/timeseries", {
+    const { data, error } = await this.apiClient.POST("/api/v1/analytics/timeseries", {
       body: params,
     });
     if (error) this.handleApiError("query analytics", error);

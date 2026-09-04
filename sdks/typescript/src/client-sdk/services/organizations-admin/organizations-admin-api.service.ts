@@ -1,5 +1,5 @@
 /**
- * The `/api/organizations` instance-provisioning family: self-hosted only.
+ * The `/api/v1/organizations` instance-provisioning family: self-hosted only.
  *
  * The one management surface that exists before any organization does, so it
  * authenticates with the instance administrator credential
@@ -84,7 +84,7 @@ export class OrganizationsAdminApiService {
   async create(input: CreateOrganizationInput): Promise<CreatedOrganization> {
     return this.#request({
       operation: "create organization",
-      path: "/api/organizations",
+      path: "/api/v1/organizations",
       method: "POST",
       body: input,
     });
@@ -95,14 +95,14 @@ export class OrganizationsAdminApiService {
   }> {
     return this.#request({
       operation: "list organizations",
-      path: "/api/organizations",
+      path: "/api/v1/organizations",
     });
   }
 
   async get(id: string): Promise<{ organization: ProvisionedOrganizationSummary }> {
     return this.#request({
       operation: `fetch organization "${id}"`,
-      path: `/api/organizations/${encodeURIComponent(id)}`,
+      path: `/api/v1/organizations/${encodeURIComponent(id)}`,
     });
   }
 }

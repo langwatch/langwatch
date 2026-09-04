@@ -48,7 +48,7 @@ const surfaceHeaderOf = (call: unknown): string | null => {
   const middleware = call as {
     onRequest: (arg: { request: Request }) => Request;
   };
-  const request = new Request("https://app.langwatch.ai/api/scenarios/scenario_abc123", {
+  const request = new Request("https://app.langwatch.ai/api/v1/scenarios/scenario_abc123", {
     method: "PUT",
   });
   return middleware.onRequest({ request }).headers.get(CLI_SURFACE_HEADER);
@@ -87,7 +87,7 @@ describe("the scenarios service the command line writes through", () => {
       name: "Updated Login Flow",
     });
 
-    expect(putSpy).toHaveBeenCalledWith("/api/scenarios/{id}", {
+    expect(putSpy).toHaveBeenCalledWith("/api/v1/scenarios/{id}", {
       params: { path: { id: "scenario_abc123" } },
       body: { name: "Updated Login Flow" },
     });

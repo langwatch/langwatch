@@ -81,7 +81,7 @@ export async function handleExperimentListRuns(params: {
   try {
     result = (await makeRequest(
       "GET",
-      `/api/experiments/runs?${search.toString()}`,
+      `/api/v1/experiments/runs?${search.toString()}`,
     )) as ExperimentRunsListResponse;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

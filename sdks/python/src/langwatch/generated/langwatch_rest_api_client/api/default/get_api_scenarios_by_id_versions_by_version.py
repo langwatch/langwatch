@@ -33,7 +33,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/api/scenarios/{id}/versions/{version}".format(
+        "url": "/api/v1/scenarios/{id}/versions/{version}".format(
             id=quote(str(id), safe=""),
             version=quote(str(version), safe=""),
         ),

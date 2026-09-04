@@ -7,19 +7,19 @@ import {
 } from "@/client-sdk/services/_shared/format-api-error";
 
 export type GraphResponse = NonNullable<
-  paths["/api/graphs"]["get"]["responses"]["200"]["content"]["application/json"]
+  paths["/api/v1/graphs"]["get"]["responses"]["200"]["content"]["application/json"]
 >[number];
 
 export type CreateGraphBody = NonNullable<
-  paths["/api/graphs"]["post"]["requestBody"]
+  paths["/api/v1/graphs"]["post"]["requestBody"]
 >["content"]["application/json"];
 
 export type UpdateGraphBody = NonNullable<
-  paths["/api/graphs/{id}"]["patch"]["requestBody"]
+  paths["/api/v1/graphs/{id}"]["patch"]["requestBody"]
 >["content"]["application/json"];
 
 export type GraphDeleteResponse =
-  paths["/api/graphs/{id}"]["delete"]["responses"]["200"]["content"]["application/json"];
+  paths["/api/v1/graphs/{id}"]["delete"]["responses"]["200"]["content"]["application/json"];
 
 export class GraphsApiError extends Error {
   constructor(
@@ -51,7 +51,7 @@ export class GraphsApiService {
   }
 
   async getAll(dashboardId?: string): Promise<GraphResponse[]> {
-    const { data, error } = await this.apiClient.GET("/api/graphs", {
+    const { data, error } = await this.apiClient.GET("/api/v1/graphs", {
       params: { query: { dashboardId } },
     });
     if (error) this.handleApiError("list graphs", error);
@@ -59,7 +59,7 @@ export class GraphsApiService {
   }
 
   async get(id: string): Promise<GraphResponse> {
-    const { data, error } = await this.apiClient.GET("/api/graphs/{id}", {
+    const { data, error } = await this.apiClient.GET("/api/v1/graphs/{id}", {
       params: { path: { id } },
     });
     if (error) this.handleApiError(`get graph "${id}"`, error);
@@ -67,7 +67,7 @@ export class GraphsApiService {
   }
 
   async create(params: CreateGraphBody): Promise<GraphResponse> {
-    const { data, error } = await this.apiClient.POST("/api/graphs", {
+    const { data, error } = await this.apiClient.POST("/api/v1/graphs", {
       body: params,
     });
     if (error) this.handleApiError("create graph", error);
@@ -75,7 +75,7 @@ export class GraphsApiService {
   }
 
   async update(id: string, params: UpdateGraphBody): Promise<GraphResponse> {
-    const { data, error } = await this.apiClient.PATCH("/api/graphs/{id}", {
+    const { data, error } = await this.apiClient.PATCH("/api/v1/graphs/{id}", {
       params: { path: { id } },
       body: params,
     });
@@ -84,7 +84,7 @@ export class GraphsApiService {
   }
 
   async delete(id: string): Promise<GraphDeleteResponse> {
-    const { data, error } = await this.apiClient.DELETE("/api/graphs/{id}", {
+    const { data, error } = await this.apiClient.DELETE("/api/v1/graphs/{id}", {
       params: { path: { id } },
     });
     if (error) this.handleApiError(`delete graph "${id}"`, error);

@@ -53,7 +53,7 @@ const handledError = ({
       docUrl,
     },
     body: { error: code, message, ...meta },
-    operation: "GET /api/dataset/sales-q3",
+    operation: "GET /api/v1/dataset/sales-q3",
     message,
   });
 

@@ -31,7 +31,7 @@ export const listMonitorsCommand = async (): Promise<CommandResult | void> => {
     sample: number;
   }>;
   try {
-    const response = await fetch(`${endpoint}/api/monitors`, {
+    const response = await fetch(`${endpoint}/api/v1/monitors`, {
       headers: buildAuthHeaders({ apiKey }),
     });
 

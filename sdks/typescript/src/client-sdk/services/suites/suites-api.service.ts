@@ -7,29 +7,29 @@ import {
 } from "@/client-sdk/services/_shared/format-api-error";
 
 export type SuiteResponse = NonNullable<
-  paths["/api/suites"]["get"]["responses"]["200"]["content"]["application/json"]
+  paths["/api/v1/suites"]["get"]["responses"]["200"]["content"]["application/json"]
 >[number] & {
   /** URL to view this suite on the LangWatch platform */
   platformUrl?: string;
 };
 
 export type CreateSuiteBody = NonNullable<
-  paths["/api/suites"]["post"]["requestBody"]
+  paths["/api/v1/suites"]["post"]["requestBody"]
 >["content"]["application/json"];
 
 export type UpdateSuiteBody = NonNullable<
-  paths["/api/suites/{id}"]["patch"]["requestBody"]
+  paths["/api/v1/suites/{id}"]["patch"]["requestBody"]
 >["content"]["application/json"];
 
 export type SuiteRunResult =
-  paths["/api/suites/{id}/run"]["post"]["responses"]["200"]["content"]["application/json"];
+  paths["/api/v1/suites/{id}/run"]["post"]["responses"]["200"]["content"]["application/json"];
 
 export interface SuiteTarget {
   type: "prompt" | "http" | "code" | "workflow";
   referenceId: string;
 }
 
-/** Options for `POST /api/suites/{id}/run`. */
+/** Options for `POST /api/v1/suites/{id}/run`. */
 export interface SuiteRunOptions {
   /**
    * Key that makes the request safe to retry. Generated per call when omitted,
@@ -66,7 +66,7 @@ export class SuitesApiError extends Error {
 }
 
 /**
- * @deprecated Use runPlans and testSuites; /api/suites is a frozen alias.
+ * @deprecated Use runPlans and testSuites; /api/v1/suites is a frozen alias.
  */
 export class SuitesApiService {
   private readonly apiClient: LangwatchApiClient;
@@ -87,7 +87,7 @@ export class SuitesApiService {
   }
 
   async getAll(options?: { kind?: SuiteKind }): Promise<SuiteResponse[]> {
-    const { data, error } = await this.apiClient.GET("/api/suites", {
+    const { data, error } = await this.apiClient.GET("/api/v1/suites", {
       ...(options?.kind !== undefined && {
         params: { query: { kind: options.kind } },
       }),
@@ -97,7 +97,7 @@ export class SuitesApiService {
   }
 
   async get(id: string): Promise<SuiteResponse> {
-    const { data, error } = await this.apiClient.GET("/api/suites/{id}", {
+    const { data, error } = await this.apiClient.GET("/api/v1/suites/{id}", {
       params: { path: { id } },
     });
     if (error) this.handleApiError(`get suite "${id}"`, error);
@@ -105,7 +105,7 @@ export class SuitesApiService {
   }
 
   async create(params: CreateSuiteBody): Promise<SuiteResponse> {
-    const { data, error } = await this.apiClient.POST("/api/suites", {
+    const { data, error } = await this.apiClient.POST("/api/v1/suites", {
       body: params,
     });
     if (error) this.handleApiError("create suite", error);
@@ -113,7 +113,7 @@ export class SuitesApiService {
   }
 
   async update(id: string, params: UpdateSuiteBody): Promise<SuiteResponse> {
-    const { data, error } = await this.apiClient.PATCH("/api/suites/{id}", {
+    const { data, error } = await this.apiClient.PATCH("/api/v1/suites/{id}", {
       params: { path: { id } },
       body: params,
     });
@@ -122,7 +122,7 @@ export class SuitesApiService {
   }
 
   async duplicate(id: string): Promise<SuiteResponse> {
-    const { data, error } = await this.apiClient.POST("/api/suites/{id}/duplicate", {
+    const { data, error } = await this.apiClient.POST("/api/v1/suites/{id}/duplicate", {
       params: { path: { id } },
     });
     if (error) this.handleApiError(`duplicate suite "${id}"`, error);
@@ -158,7 +158,7 @@ export class SuitesApiService {
     const note = options.note?.trim();
     if (note) body.note = note;
 
-    const { data, error } = await this.apiClient.POST("/api/suites/{id}/run", {
+    const { data, error } = await this.apiClient.POST("/api/v1/suites/{id}/run", {
       params: { path: { id } },
       body,
     });
@@ -167,7 +167,7 @@ export class SuitesApiService {
   }
 
   async delete(id: string): Promise<{ id: string; archived: boolean }> {
-    const { data, error } = await this.apiClient.DELETE("/api/suites/{id}", {
+    const { data, error } = await this.apiClient.DELETE("/api/v1/suites/{id}", {
       params: { path: { id } },
     });
     if (error) this.handleApiError(`delete suite "${id}"`, error);

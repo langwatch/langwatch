@@ -154,7 +154,7 @@ def _evaluate_workflow(
     """Kick off a workflow evaluation run."""
     with httpx.Client(timeout=60) as client:
         response = client.post(
-            f"{endpoint}/api/workflows/{workflow_id}/evaluate",
+            f"{endpoint}/api/v1/workflows/{workflow_id}/evaluate",
             headers=build_auth_headers(api_key),
             json=body or None,
         )

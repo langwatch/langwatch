@@ -46,7 +46,7 @@ describe("langwatch-api", () => {
   }
 
   describe("searchTraces()", () => {
-    it("sends POST to /api/traces/search with format digest by default", async () => {
+    it("sends POST to /api/v1/traces/search with format digest by default", async () => {
       const { searchTraces } = await import("../langwatch-api.js");
       const responseData = { traces: [] };
       mockJsonResponse(responseData);
@@ -58,7 +58,7 @@ describe("langwatch-api", () => {
       });
 
       const [calledUrl, calledOptions] = mockFetch.mock.calls[0]!;
-      expect(calledUrl).toBe(`${TEST_ENDPOINT}/api/traces/search`);
+      expect(calledUrl).toBe(`${TEST_ENDPOINT}/api/v1/traces/search`);
       expect(calledOptions.method).toBe("POST");
       expect(calledOptions.headers["X-Auth-Token"]).toBe(TEST_API_KEY);
       expect(calledOptions.headers["Content-Type"]).toBe("application/json");
@@ -98,7 +98,7 @@ describe("langwatch-api", () => {
   });
 
   describe("getTraceById()", () => {
-    it("sends GET to /api/traces/{id}?format=digest by default", async () => {
+    it("sends GET to /api/v1/traces/{id}?format=digest by default", async () => {
       const { getTraceById } = await import("../langwatch-api.js");
       const responseData = { trace: { id: "abc" } };
       mockJsonResponse(responseData);
@@ -106,7 +106,7 @@ describe("langwatch-api", () => {
       const result = await getTraceById("abc");
 
       expect(mockFetch).toHaveBeenCalledWith(
-        `${TEST_ENDPOINT}/api/traces/abc?format=digest`,
+        `${TEST_ENDPOINT}/api/v1/traces/abc?format=digest`,
         expect.objectContaining({
           method: "GET",
           headers: expect.objectContaining({
@@ -124,7 +124,7 @@ describe("langwatch-api", () => {
       await getTraceById("abc", "json");
 
       expect(mockFetch).toHaveBeenCalledWith(
-        `${TEST_ENDPOINT}/api/traces/abc?format=json`,
+        `${TEST_ENDPOINT}/api/v1/traces/abc?format=json`,
         expect.anything(),
       );
     });
@@ -141,7 +141,7 @@ describe("langwatch-api", () => {
   });
 
   describe("getAnalyticsTimeseries()", () => {
-    it("sends POST to /api/analytics/timeseries", async () => {
+    it("sends POST to /api/v1/analytics/timeseries", async () => {
       const { getAnalyticsTimeseries } = await import("../langwatch-api.js");
       const params = {
         series: [{ metric: "performance.completion_time", aggregation: "avg" }],
@@ -154,7 +154,7 @@ describe("langwatch-api", () => {
       const result = await getAnalyticsTimeseries(params);
 
       expect(mockFetch).toHaveBeenCalledWith(
-        `${TEST_ENDPOINT}/api/analytics/timeseries`,
+        `${TEST_ENDPOINT}/api/v1/analytics/timeseries`,
         expect.objectContaining({
           method: "POST",
           headers: expect.objectContaining({
@@ -169,7 +169,7 @@ describe("langwatch-api", () => {
   });
 
   describe("listPrompts()", () => {
-    it("sends GET to /api/prompts", async () => {
+    it("sends GET to /api/v1/prompts", async () => {
       const { listPrompts } = await import("../langwatch-api.js");
       const responseData = [{ id: "1", name: "test" }];
       mockJsonResponse(responseData);
@@ -177,7 +177,7 @@ describe("langwatch-api", () => {
       const result = await listPrompts();
 
       expect(mockFetch).toHaveBeenCalledWith(
-        `${TEST_ENDPOINT}/api/prompts`,
+        `${TEST_ENDPOINT}/api/v1/prompts`,
         expect.objectContaining({
           method: "GET",
           headers: expect.objectContaining({
@@ -190,7 +190,7 @@ describe("langwatch-api", () => {
   });
 
   describe("getPrompt()", () => {
-    it("sends GET to /api/prompts/{id} with encoded ID", async () => {
+    it("sends GET to /api/v1/prompts/{id} with encoded ID", async () => {
       const { getPrompt } = await import("../langwatch-api.js");
       const responseData = { id: "1", name: "test" };
       mockJsonResponse(responseData);
@@ -198,7 +198,7 @@ describe("langwatch-api", () => {
       const result = await getPrompt("my prompt/v1");
 
       expect(mockFetch).toHaveBeenCalledWith(
-        `${TEST_ENDPOINT}/api/prompts/${encodeURIComponent("my prompt/v1")}`,
+        `${TEST_ENDPOINT}/api/v1/prompts/${encodeURIComponent("my prompt/v1")}`,
         expect.objectContaining({
           method: "GET",
           headers: expect.objectContaining({
@@ -211,7 +211,7 @@ describe("langwatch-api", () => {
   });
 
   describe("createPrompt()", () => {
-    it("sends POST to /api/prompts with body", async () => {
+    it("sends POST to /api/v1/prompts with body", async () => {
       const { createPrompt } = await import("../langwatch-api.js");
       const data = {
         handle: "test-prompt",
@@ -224,7 +224,7 @@ describe("langwatch-api", () => {
       const result = await createPrompt(data);
 
       expect(mockFetch).toHaveBeenCalledWith(
-        `${TEST_ENDPOINT}/api/prompts`,
+        `${TEST_ENDPOINT}/api/v1/prompts`,
         expect.objectContaining({
           method: "POST",
           headers: expect.objectContaining({
@@ -239,7 +239,7 @@ describe("langwatch-api", () => {
   });
 
   describe("updatePrompt()", () => {
-    it("sends PUT to /api/prompts/{id} with body", async () => {
+    it("sends PUT to /api/v1/prompts/{id} with body", async () => {
       const { updatePrompt } = await import("../langwatch-api.js");
       const data = {
         messages: [{ role: "system", content: "Updated" }],
@@ -251,7 +251,7 @@ describe("langwatch-api", () => {
       const result = await updatePrompt("p1", data);
 
       expect(mockFetch).toHaveBeenCalledWith(
-        `${TEST_ENDPOINT}/api/prompts/${encodeURIComponent("p1")}`,
+        `${TEST_ENDPOINT}/api/v1/prompts/${encodeURIComponent("p1")}`,
         expect.objectContaining({
           method: "PUT",
           headers: expect.objectContaining({
@@ -274,7 +274,7 @@ describe("langwatch-api", () => {
         await getPrompt("pizza-prompt", { tag: "production" });
 
         expect(mockFetch).toHaveBeenCalledWith(
-          `${TEST_ENDPOINT}/api/prompts/${encodeURIComponent("pizza-prompt")}?tag=production`,
+          `${TEST_ENDPOINT}/api/v1/prompts/${encodeURIComponent("pizza-prompt")}?tag=production`,
           expect.objectContaining({ method: "GET" }),
         );
       });
@@ -288,7 +288,7 @@ describe("langwatch-api", () => {
         await getPrompt("pizza-prompt", { version: 2 });
 
         expect(mockFetch).toHaveBeenCalledWith(
-          `${TEST_ENDPOINT}/api/prompts/${encodeURIComponent("pizza-prompt")}?version=2`,
+          `${TEST_ENDPOINT}/api/v1/prompts/${encodeURIComponent("pizza-prompt")}?version=2`,
           expect.objectContaining({ method: "GET" }),
         );
       });
@@ -302,7 +302,7 @@ describe("langwatch-api", () => {
         await getPrompt("pizza-prompt");
 
         expect(mockFetch).toHaveBeenCalledWith(
-          `${TEST_ENDPOINT}/api/prompts/${encodeURIComponent("pizza-prompt")}`,
+          `${TEST_ENDPOINT}/api/v1/prompts/${encodeURIComponent("pizza-prompt")}`,
           expect.objectContaining({ method: "GET" }),
         );
       });
@@ -347,7 +347,7 @@ describe("langwatch-api", () => {
   });
 
   describe("assignPromptTag()", () => {
-    it("sends PUT to /api/prompts/{id}/tags/{tag} with versionId", async () => {
+    it("sends PUT to /api/v1/prompts/{id}/tags/{tag} with versionId", async () => {
       const { assignPromptTag } = await import("../langwatch-api.js");
       mockJsonResponse({ success: true });
 
@@ -358,14 +358,14 @@ describe("langwatch-api", () => {
       });
 
       const [url, opts] = mockFetch.mock.calls[0]!;
-      expect(url).toBe(`${TEST_ENDPOINT}/api/prompts/pizza-prompt/tags/production`);
+      expect(url).toBe(`${TEST_ENDPOINT}/api/v1/prompts/pizza-prompt/tags/production`);
       expect(opts.method).toBe("PUT");
       expect(JSON.parse(opts.body as string)).toEqual({ versionId: "v123" });
     });
   });
 
   describe("listPromptTags()", () => {
-    it("sends GET to /api/prompts/tags", async () => {
+    it("sends GET to /api/v1/prompts/tags", async () => {
       const { listPromptTags } = await import("../langwatch-api.js");
       const tags = [{ id: "1", name: "production" }];
       mockJsonResponse(tags);
@@ -373,7 +373,7 @@ describe("langwatch-api", () => {
       const result = await listPromptTags();
 
       expect(mockFetch).toHaveBeenCalledWith(
-        `${TEST_ENDPOINT}/api/prompts/tags`,
+        `${TEST_ENDPOINT}/api/v1/prompts/tags`,
         expect.objectContaining({ method: "GET" }),
       );
       expect(result).toEqual(tags);
@@ -381,42 +381,42 @@ describe("langwatch-api", () => {
   });
 
   describe("createPromptTag()", () => {
-    it("sends POST to /api/prompts/tags with name", async () => {
+    it("sends POST to /api/v1/prompts/tags with name", async () => {
       const { createPromptTag } = await import("../langwatch-api.js");
       mockJsonResponse({ id: "t1", name: "canary" });
 
       await createPromptTag("canary");
 
       const [url, opts] = mockFetch.mock.calls[0]!;
-      expect(url).toBe(`${TEST_ENDPOINT}/api/prompts/tags`);
+      expect(url).toBe(`${TEST_ENDPOINT}/api/v1/prompts/tags`);
       expect(opts.method).toBe("POST");
       expect(JSON.parse(opts.body as string)).toEqual({ name: "canary" });
     });
   });
 
   describe("renamePromptTag()", () => {
-    it("sends PUT to /api/prompts/tags/{tag} with new name", async () => {
+    it("sends PUT to /api/v1/prompts/tags/{tag} with new name", async () => {
       const { renamePromptTag } = await import("../langwatch-api.js");
       mockJsonResponse({ id: "t1", name: "preview" });
 
       await renamePromptTag({ tag: "canary", name: "preview" });
 
       const [url, opts] = mockFetch.mock.calls[0]!;
-      expect(url).toBe(`${TEST_ENDPOINT}/api/prompts/tags/canary`);
+      expect(url).toBe(`${TEST_ENDPOINT}/api/v1/prompts/tags/canary`);
       expect(opts.method).toBe("PUT");
       expect(JSON.parse(opts.body as string)).toEqual({ name: "preview" });
     });
   });
 
   describe("deletePromptTag()", () => {
-    it("sends DELETE to /api/prompts/tags/{tag}", async () => {
+    it("sends DELETE to /api/v1/prompts/tags/{tag}", async () => {
       const { deletePromptTag } = await import("../langwatch-api.js");
       mock204Response();
 
       const result = await deletePromptTag("canary");
 
       const [url, opts] = mockFetch.mock.calls[0]!;
-      expect(url).toBe(`${TEST_ENDPOINT}/api/prompts/tags/canary`);
+      expect(url).toBe(`${TEST_ENDPOINT}/api/v1/prompts/tags/canary`);
       expect(opts.method).toBe("DELETE");
       expect(result).toBeNull();
     });

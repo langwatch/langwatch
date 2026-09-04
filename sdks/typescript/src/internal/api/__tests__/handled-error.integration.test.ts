@@ -37,7 +37,7 @@ describe("given the API returns a handled domain error", () => {
   describe("when the body is the flattened shape the shared error handler emits", () => {
     beforeEach(() => {
       server.use(
-        http.get(`${TEST_ENDPOINT}/api/traces/:traceId`, () =>
+        http.get(`${TEST_ENDPOINT}/api/v1/traces/:traceId`, () =>
           HttpResponse.json(
             {
               error: "trace_not_found",
@@ -89,7 +89,7 @@ describe("given the API returns a handled domain error", () => {
   describe("when the route forwards the serialised HandledError verbatim", () => {
     beforeEach(() => {
       server.use(
-        http.get(`${TEST_ENDPOINT}/api/traces/:traceId`, () =>
+        http.get(`${TEST_ENDPOINT}/api/v1/traces/:traceId`, () =>
           HttpResponse.json(
             {
               error: "Could not reach the model gateway",
@@ -142,7 +142,7 @@ describe("given the API fails WITHOUT naming a domain error", () => {
   describe("when the platform falls over with a 500", () => {
     beforeEach(() => {
       server.use(
-        http.get(`${TEST_ENDPOINT}/api/traces/:traceId`, () =>
+        http.get(`${TEST_ENDPOINT}/api/v1/traces/:traceId`, () =>
           HttpResponse.json({ error: "Internal server error", message: "boom" }, { status: 500 }),
         ),
       );
@@ -162,7 +162,7 @@ describe("given the API fails WITHOUT naming a domain error", () => {
   describe("when the body is not the platform's shape at all", () => {
     beforeEach(() => {
       server.use(
-        http.get(`${TEST_ENDPOINT}/api/traces/:traceId`, () =>
+        http.get(`${TEST_ENDPOINT}/api/v1/traces/:traceId`, () =>
           HttpResponse.json({ message: "no error field here" }, { status: 404 }),
         ),
       );
@@ -180,7 +180,7 @@ describe("given the API fails WITHOUT naming a domain error", () => {
     beforeEach(() => {
       server.use(
         http.get(
-          `${TEST_ENDPOINT}/api/traces/:traceId`,
+          `${TEST_ENDPOINT}/api/v1/traces/:traceId`,
           () =>
             new HttpResponse("<html><body>502 Bad Gateway</body></html>", {
               status: 502,
@@ -202,7 +202,7 @@ describe("given the API fails WITHOUT naming a domain error", () => {
     beforeEach(() => {
       server.use(
         http.get(
-          `${TEST_ENDPOINT}/api/traces/:traceId`,
+          `${TEST_ENDPOINT}/api/v1/traces/:traceId`,
           () =>
             new HttpResponse('{"error": "trace_not_f', {
               status: 404,

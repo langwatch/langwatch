@@ -85,7 +85,7 @@ describe("createApiKeyVerifier", () => {
     await expect(verifier.verify("sk-real")).resolves.toBe(true);
 
     expect(fetchImpl).toHaveBeenCalledWith(
-      "https://app.langwatch.ai/api/me/project",
+      "https://app.langwatch.ai/api/v1/me/project",
       expect.objectContaining({
         method: "GET",
         headers: { "X-Auth-Token": "sk-real" },

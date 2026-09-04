@@ -20,7 +20,7 @@ export const uiActionsCommand = async (): Promise<CommandResult | void> => {
 
   let response: Response;
   try {
-    response = await fetch(`${endpoint}/api/langy/ui/actions`, {
+    response = await fetch(`${endpoint}/api/v1/langy/ui/actions`, {
       method: "GET",
       headers: { "X-Auth-Token": apiKey },
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),

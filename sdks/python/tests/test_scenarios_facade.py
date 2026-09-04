@@ -50,7 +50,7 @@ def test_create_sends_the_test_suite_id_the_caller_named():
 
     method, url, body = calls[0]
     assert method == "POST"
-    assert url.path == "/api/scenarios"
+    assert url.path == "/api/v1/scenarios"
     assert (body or {})["testSuiteId"] == "suite_1"
 
 
@@ -71,7 +71,7 @@ def test_update_sends_the_test_suite_id_the_caller_named():
 
     method, url, body = calls[0]
     assert method == "PUT"
-    assert url.path == "/api/scenarios/scenario_1"
+    assert url.path == "/api/v1/scenarios/scenario_1"
     assert (body or {})["testSuiteId"] == "suite_2"
 
 

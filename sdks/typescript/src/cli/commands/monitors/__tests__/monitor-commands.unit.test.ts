@@ -76,7 +76,7 @@ describe("listMonitorsCommand()", () => {
 
     await listMonitorsCommand();
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/api/monitors"),
+      expect.stringContaining("/api/v1/monitors"),
       expect.any(Object),
     );
   });
@@ -124,7 +124,7 @@ describe("getMonitorCommand()", () => {
 
     await getMonitorCommand("mon_abc");
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/api/monitors/mon_abc"),
+      expect.stringContaining("/api/v1/monitors/mon_abc"),
       expect.any(Object),
     );
   });
@@ -162,7 +162,7 @@ describe("createMonitorCommand()", () => {
       evaluatorId: "eval_abc",
     });
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/api/monitors"),
+      expect.stringContaining("/api/v1/monitors"),
       expect.objectContaining({
         method: "POST",
         body: expect.stringContaining("ragas/toxicity"),
@@ -220,7 +220,7 @@ describe("updateMonitorCommand()", () => {
 
     await updateMonitorCommand("mon_abc", { enabled: "false" });
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/api/monitors/mon_abc"),
+      expect.stringContaining("/api/v1/monitors/mon_abc"),
       expect.objectContaining({ method: "PATCH" }),
     );
   });
@@ -257,7 +257,7 @@ describe("deleteMonitorCommand()", () => {
 
     await deleteMonitorCommand("mon_abc");
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/api/monitors/mon_abc"),
+      expect.stringContaining("/api/v1/monitors/mon_abc"),
       expect.objectContaining({ method: "DELETE" }),
     );
   });

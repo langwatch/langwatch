@@ -65,7 +65,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
     describe("when the API returns a paginated list of 3 datasets", () => {
       beforeEach(() => {
         server.use(
-          http.get(`${TEST_ENDPOINT}/api/dataset`, () => {
+          http.get(`${TEST_ENDPOINT}/api/v1/dataset`, () => {
             return HttpResponse.json({
               data: [
                 datasetMetadata({
@@ -119,7 +119,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
       beforeEach(() => {
         capturedBody = null;
         server.use(
-          http.post(`${TEST_ENDPOINT}/api/dataset`, async ({ request }) => {
+          http.post(`${TEST_ENDPOINT}/api/v1/dataset`, async ({ request }) => {
             capturedBody = (await request.json()) as Record<string, unknown>;
             return HttpResponse.json(datasetMetadata({ name: capturedBody?.name ?? "my-data" }), {
               status: 201,
@@ -129,7 +129,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
       });
 
       /** @scenario "Create a dataset with name and column types" */
-      it("sends POST /api/dataset with name and columnTypes and returns dataset metadata", async () => {
+      it("sends POST /api/v1/dataset with name and columnTypes and returns dataset metadata", async () => {
         const result = await langwatch.datasets.create({
           name: "my-data",
           columnTypes: [{ name: "input", type: "string" }],
@@ -150,7 +150,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
     describe("when the API responds with 409 Conflict for a duplicate slug", () => {
       beforeEach(() => {
         server.use(
-          http.post(`${TEST_ENDPOINT}/api/dataset`, () => {
+          http.post(`${TEST_ENDPOINT}/api/v1/dataset`, () => {
             return HttpResponse.json(
               { error: "Conflict", message: "A dataset with this slug already exists" },
               { status: 409 },
@@ -178,7 +178,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
         const records = Array.from({ length: 5 }, (_, i) => recordFixture({ id: `rec-${i}` }));
 
         server.use(
-          http.get(`${TEST_ENDPOINT}/api/dataset/:slugOrId`, () => {
+          http.get(`${TEST_ENDPOINT}/api/v1/dataset/:slugOrId`, () => {
             return HttpResponse.json({
               ...datasetMetadata(),
               data: records,
@@ -202,7 +202,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
     describe("when the API responds with 404", () => {
       beforeEach(() => {
         server.use(
-          http.get(`${TEST_ENDPOINT}/api/dataset/:slugOrId`, () => {
+          http.get(`${TEST_ENDPOINT}/api/v1/dataset/:slugOrId`, () => {
             return HttpResponse.json(
               { error: "Not Found", message: "Dataset not found" },
               { status: 404 },
@@ -231,7 +231,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
         capturedBody = null;
         capturedPath = null;
         server.use(
-          http.patch(`${TEST_ENDPOINT}/api/dataset/:slugOrId`, async ({ request, params }) => {
+          http.patch(`${TEST_ENDPOINT}/api/v1/dataset/:slugOrId`, async ({ request, params }) => {
             capturedBody = (await request.json()) as Record<string, unknown>;
             capturedPath = params.slugOrId as string;
             return HttpResponse.json(datasetMetadata({ name: "new-name", slug: "new-name" }));
@@ -240,7 +240,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
       });
 
       /** @scenario "Update a dataset name" */
-      it("sends PATCH /api/dataset/my-data with name and returns updated dataset", async () => {
+      it("sends PATCH /api/v1/dataset/my-data with name and returns updated dataset", async () => {
         const result = await langwatch.datasets.update("my-data", { name: "new-name" });
 
         expect(capturedPath).toBe("my-data");
@@ -253,7 +253,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
     describe("when the API responds with 404", () => {
       beforeEach(() => {
         server.use(
-          http.patch(`${TEST_ENDPOINT}/api/dataset/:slugOrId`, () => {
+          http.patch(`${TEST_ENDPOINT}/api/v1/dataset/:slugOrId`, () => {
             return HttpResponse.json(
               { error: "Not Found", message: "Dataset not found" },
               { status: 404 },
@@ -280,7 +280,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
       beforeEach(() => {
         capturedPath = null;
         server.use(
-          http.delete(`${TEST_ENDPOINT}/api/dataset/:slugOrId`, ({ params }) => {
+          http.delete(`${TEST_ENDPOINT}/api/v1/dataset/:slugOrId`, ({ params }) => {
             capturedPath = params.slugOrId as string;
             return HttpResponse.json(datasetMetadata({ archivedAt: "2025-06-01T00:00:00Z" }));
           }),
@@ -288,7 +288,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
       });
 
       /** @scenario "Delete dataset sends DELETE and returns archived result" */
-      it("sends DELETE /api/dataset/my-data and returns the archived dataset", async () => {
+      it("sends DELETE /api/v1/dataset/my-data and returns the archived dataset", async () => {
         const result = await langwatch.datasets.delete("my-data");
 
         expect(capturedPath).toBe("my-data");
@@ -300,7 +300,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
     describe("when the API responds with 404", () => {
       beforeEach(() => {
         server.use(
-          http.delete(`${TEST_ENDPOINT}/api/dataset/:slugOrId`, () => {
+          http.delete(`${TEST_ENDPOINT}/api/v1/dataset/:slugOrId`, () => {
             return HttpResponse.json(
               { error: "Not Found", message: "Dataset not found" },
               { status: 404 },
@@ -328,7 +328,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
         capturedPath = null;
         server.use(
           http.post(
-            `${TEST_ENDPOINT}/api/dataset/:slugOrId/records`,
+            `${TEST_ENDPOINT}/api/v1/dataset/:slugOrId/records`,
             async ({ request, params }) => {
               capturedBody = (await request.json()) as Record<string, unknown>;
               capturedPath = params.slugOrId as string;
@@ -339,7 +339,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
       });
 
       /** @scenario "Batch create records in a dataset" */
-      it("sends POST /api/dataset/my-data/records with entries and returns created records", async () => {
+      it("sends POST /api/v1/dataset/my-data/records with entries and returns created records", async () => {
         const result = await langwatch.datasets.createRecords("my-data", [
           { input: "hello", output: "world" },
         ]);
@@ -356,7 +356,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
     describe("when the API responds with 404", () => {
       beforeEach(() => {
         server.use(
-          http.post(`${TEST_ENDPOINT}/api/dataset/:slugOrId/records`, () => {
+          http.post(`${TEST_ENDPOINT}/api/v1/dataset/:slugOrId/records`, () => {
             return HttpResponse.json(
               { error: "Not Found", message: "Dataset not found" },
               { status: 404 },
@@ -388,7 +388,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
         capturedRecordId = null;
         server.use(
           http.patch(
-            `${TEST_ENDPOINT}/api/dataset/:slugOrId/records/:recordId`,
+            `${TEST_ENDPOINT}/api/v1/dataset/:slugOrId/records/:recordId`,
             async ({ request, params }) => {
               capturedBody = (await request.json()) as Record<string, unknown>;
               capturedSlug = params.slugOrId as string;
@@ -400,7 +400,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
       });
 
       /** @scenario "Update a single record" */
-      it("sends PATCH /api/dataset/my-data/records/rec-1 and returns updated record", async () => {
+      it("sends PATCH /api/v1/dataset/my-data/records/rec-1 and returns updated record", async () => {
         const result = await langwatch.datasets.updateRecord("my-data", "rec-1", {
           input: "updated",
         });
@@ -415,7 +415,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
     describe("when the API responds with 404", () => {
       beforeEach(() => {
         server.use(
-          http.patch(`${TEST_ENDPOINT}/api/dataset/:slugOrId/records/:recordId`, () => {
+          http.patch(`${TEST_ENDPOINT}/api/v1/dataset/:slugOrId/records/:recordId`, () => {
             return HttpResponse.json(
               { error: "Not Found", message: "Dataset not found" },
               { status: 404 },
@@ -445,7 +445,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
         capturedPath = null;
         server.use(
           http.delete(
-            `${TEST_ENDPOINT}/api/dataset/:slugOrId/records`,
+            `${TEST_ENDPOINT}/api/v1/dataset/:slugOrId/records`,
             async ({ request, params }) => {
               capturedBody = (await request.json()) as Record<string, unknown>;
               capturedPath = params.slugOrId as string;
@@ -456,7 +456,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
       });
 
       /** @scenario "Delete records by IDs" */
-      it("sends DELETE /api/dataset/my-data/records with recordIds and returns deletedCount", async () => {
+      it("sends DELETE /api/v1/dataset/my-data/records with recordIds and returns deletedCount", async () => {
         const result = await langwatch.datasets.deleteRecords("my-data", ["rec-1", "rec-2"]);
 
         expect(capturedPath).toBe("my-data");
@@ -468,7 +468,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
     describe("when the API responds with 404", () => {
       beforeEach(() => {
         server.use(
-          http.delete(`${TEST_ENDPOINT}/api/dataset/:slugOrId/records`, () => {
+          http.delete(`${TEST_ENDPOINT}/api/v1/dataset/:slugOrId/records`, () => {
             return HttpResponse.json(
               { error: "Not Found", message: "Dataset not found" },
               { status: 404 },
@@ -492,7 +492,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
     describe("when the API returns paginated records", () => {
       beforeEach(() => {
         server.use(
-          http.get(`${TEST_ENDPOINT}/api/dataset/:slugOrId/records`, () => {
+          http.get(`${TEST_ENDPOINT}/api/v1/dataset/:slugOrId/records`, () => {
             return HttpResponse.json({
               data: [recordFixture({ id: "rec-0" }), recordFixture({ id: "rec-1" })],
               pagination: {
@@ -525,7 +525,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
     describe("when the API responds with 404", () => {
       beforeEach(() => {
         server.use(
-          http.get(`${TEST_ENDPOINT}/api/dataset/:slugOrId/records`, () => {
+          http.get(`${TEST_ENDPOINT}/api/v1/dataset/:slugOrId/records`, () => {
             return HttpResponse.json(
               { error: "Not Found", message: "Dataset not found" },
               { status: 404 },
@@ -548,7 +548,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
       beforeEach(() => {
         capturedUrl = undefined;
         server.use(
-          http.get(`${TEST_ENDPOINT}/api/dataset/:slugOrId/records`, ({ request }) => {
+          http.get(`${TEST_ENDPOINT}/api/v1/dataset/:slugOrId/records`, ({ request }) => {
             capturedUrl = new URL(request.url);
             return HttpResponse.json({
               data: [],
@@ -583,7 +583,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
           capturedContentType = null;
           capturedFormData = null;
           server.use(
-            http.post(`${TEST_ENDPOINT}/api/dataset/:slugOrId/upload`, async ({ request }) => {
+            http.post(`${TEST_ENDPOINT}/api/v1/dataset/:slugOrId/upload`, async ({ request }) => {
               capturedContentType = request.headers.get("content-type");
               capturedFormData = await request.formData();
               return HttpResponse.json({
@@ -611,13 +611,13 @@ describe("Feature: Dataset TypeScript SDK", () => {
       describe("when the API responds with 404 for upload, then accepts create-from-file", () => {
         beforeEach(() => {
           server.use(
-            http.post(`${TEST_ENDPOINT}/api/dataset/:slugOrId/upload`, () => {
+            http.post(`${TEST_ENDPOINT}/api/v1/dataset/:slugOrId/upload`, () => {
               return HttpResponse.json(
                 { error: "Not Found", message: "Dataset not found" },
                 { status: 404 },
               );
             }),
-            http.post(`${TEST_ENDPOINT}/api/dataset/upload`, async () => {
+            http.post(`${TEST_ENDPOINT}/api/v1/dataset/upload`, async () => {
               return HttpResponse.json({
                 id: "dataset_new",
                 name: "new-data",
@@ -656,14 +656,14 @@ describe("Feature: Dataset TypeScript SDK", () => {
 
           server.use(
             // getDataset returns the dataset
-            http.get(`${TEST_ENDPOINT}/api/dataset/:slugOrId`, () => {
+            http.get(`${TEST_ENDPOINT}/api/v1/dataset/:slugOrId`, () => {
               return HttpResponse.json({
                 ...datasetMetadata(),
                 data: [],
               });
             }),
             // First listRecords call returns records; second returns empty
-            http.get(`${TEST_ENDPOINT}/api/dataset/:slugOrId/records`, () => {
+            http.get(`${TEST_ENDPOINT}/api/v1/dataset/:slugOrId/records`, () => {
               if (deleteCallCount === 0) {
                 return HttpResponse.json({
                   data: [recordFixture({ id: "rec-0" }), recordFixture({ id: "rec-1" })],
@@ -676,12 +676,12 @@ describe("Feature: Dataset TypeScript SDK", () => {
               });
             }),
             // deleteRecords
-            http.delete(`${TEST_ENDPOINT}/api/dataset/:slugOrId/records`, () => {
+            http.delete(`${TEST_ENDPOINT}/api/v1/dataset/:slugOrId/records`, () => {
               deleteCallCount++;
               return HttpResponse.json({ deletedCount: 2 });
             }),
             // uploadFile after deletion
-            http.post(`${TEST_ENDPOINT}/api/dataset/:slugOrId/upload`, async () => {
+            http.post(`${TEST_ENDPOINT}/api/v1/dataset/:slugOrId/upload`, async () => {
               return HttpResponse.json({
                 records: [recordFixture({ id: "rec-new" })],
               });
@@ -709,7 +709,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
       describe("when the dataset exists", () => {
         beforeEach(() => {
           server.use(
-            http.get(`${TEST_ENDPOINT}/api/dataset/:slugOrId`, () => {
+            http.get(`${TEST_ENDPOINT}/api/v1/dataset/:slugOrId`, () => {
               return HttpResponse.json({
                 ...datasetMetadata(),
                 data: [],
@@ -733,13 +733,13 @@ describe("Feature: Dataset TypeScript SDK", () => {
       describe("when the dataset does not exist", () => {
         beforeEach(() => {
           server.use(
-            http.get(`${TEST_ENDPOINT}/api/dataset/:slugOrId`, () => {
+            http.get(`${TEST_ENDPOINT}/api/v1/dataset/:slugOrId`, () => {
               return HttpResponse.json(
                 { error: "Not Found", message: "Dataset not found" },
                 { status: 404 },
               );
             }),
-            http.post(`${TEST_ENDPOINT}/api/dataset/upload`, async () => {
+            http.post(`${TEST_ENDPOINT}/api/v1/dataset/upload`, async () => {
               return HttpResponse.json({
                 id: "dataset_created",
                 name: "new-data",

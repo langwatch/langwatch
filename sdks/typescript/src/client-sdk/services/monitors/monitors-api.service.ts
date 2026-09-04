@@ -107,36 +107,36 @@ export class MonitorsApiService {
   }
 
   async getAll(): Promise<MonitorResponse[]> {
-    return this.request<MonitorResponse[]>("/api/monitors");
+    return this.request<MonitorResponse[]>("/api/v1/monitors");
   }
 
   async get(id: string): Promise<MonitorResponse> {
-    return this.request<MonitorResponse>(`/api/monitors/${encodeURIComponent(id)}`);
+    return this.request<MonitorResponse>(`/api/v1/monitors/${encodeURIComponent(id)}`);
   }
 
   async create(body: CreateMonitorBody): Promise<MonitorResponse> {
-    return this.request<MonitorResponse>("/api/monitors", {
+    return this.request<MonitorResponse>("/api/v1/monitors", {
       method: "POST",
       body: JSON.stringify(body),
     });
   }
 
   async update(id: string, body: UpdateMonitorBody): Promise<MonitorResponse> {
-    return this.request<MonitorResponse>(`/api/monitors/${encodeURIComponent(id)}`, {
+    return this.request<MonitorResponse>(`/api/v1/monitors/${encodeURIComponent(id)}`, {
       method: "PATCH",
       body: JSON.stringify(body),
     });
   }
 
   async toggle(id: string, enabled: boolean): Promise<MonitorResponse> {
-    return this.request<MonitorResponse>(`/api/monitors/${encodeURIComponent(id)}/toggle`, {
+    return this.request<MonitorResponse>(`/api/v1/monitors/${encodeURIComponent(id)}/toggle`, {
       method: "POST",
       body: JSON.stringify({ enabled }),
     });
   }
 
   async delete(id: string): Promise<MonitorDeleteResponse> {
-    return this.request<MonitorDeleteResponse>(`/api/monitors/${encodeURIComponent(id)}`, {
+    return this.request<MonitorDeleteResponse>(`/api/v1/monitors/${encodeURIComponent(id)}`, {
       method: "DELETE",
     });
   }

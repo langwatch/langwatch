@@ -65,7 +65,7 @@ export const createMonitorCommand = async (
       parameters = JSON.parse(options.parameters) as Record<string, unknown>;
     }
 
-    const response = await fetch(`${endpoint}/api/monitors`, {
+    const response = await fetch(`${endpoint}/api/v1/monitors`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

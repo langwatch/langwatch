@@ -179,7 +179,7 @@ class LangWatchDSPy:
 
         try:
             response = httpx.post(
-                f"{langwatch.get_endpoint()}/api/experiment/init",
+                f"{langwatch.get_endpoint()}/api/v1/experiment/init",
                 headers=build_auth_headers(langwatch.get_api_key() or ""),
                 json={
                     "experiment_slug": slug or experiment,
@@ -381,7 +381,7 @@ class LangWatchDSPy:
             for item in data_list
         ]
         response = httpx.post(
-            f"{langwatch.get_endpoint()}/api/dspy/log_steps",
+            f"{langwatch.get_endpoint()}/api/v1/dspy/log_steps",
             headers={
                 **build_auth_headers(langwatch.get_api_key() or ""),
                 "Content-Type": "application/json",

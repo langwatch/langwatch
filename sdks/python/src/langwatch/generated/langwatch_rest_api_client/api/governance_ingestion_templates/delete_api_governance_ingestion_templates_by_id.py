@@ -35,7 +35,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "delete",
-        "url": "/api/governance/ingestion-templates/{id}".format(
+        "url": "/api/v1/governance/ingestion-templates/{id}".format(
             id=quote(str(id), safe=""),
         ),
     }

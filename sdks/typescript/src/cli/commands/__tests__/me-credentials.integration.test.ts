@@ -173,7 +173,7 @@ beforeAll(async () => {
         return;
       }
 
-      if (url.startsWith("/api/me/project")) {
+      if (url.startsWith("/api/v1/me/project")) {
         json(200, {
           id: "proj_x",
           name: "Env Project",
@@ -183,7 +183,7 @@ beforeAll(async () => {
         return;
       }
 
-      if (url.startsWith("/api/traces/search")) {
+      if (url.startsWith("/api/v1/traces/search")) {
         lastSearchAuth = auth;
         json(200, {
           traces: [],
@@ -192,7 +192,7 @@ beforeAll(async () => {
         return;
       }
 
-      if (url.startsWith("/api/monitors")) {
+      if (url.startsWith("/api/v1/monitors")) {
         // A command that reads process.env.LANGWATCH_API_KEY directly (not via
         // the client-factory default) — the sweep must feed it the scoped key.
         lastMonitorsAuth = auth;

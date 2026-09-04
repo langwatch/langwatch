@@ -7,14 +7,14 @@ import {
 } from "@/client-sdk/services/_shared/format-api-error";
 
 export type TraceSearchBody = NonNullable<
-  paths["/api/traces/search"]["post"]["requestBody"]
+  paths["/api/v1/traces/search"]["post"]["requestBody"]
 >["content"]["application/json"];
 
 export type TraceSearchResponse =
-  paths["/api/traces/search"]["post"]["responses"]["200"]["content"]["application/json"];
+  paths["/api/v1/traces/search"]["post"]["responses"]["200"]["content"]["application/json"];
 
 type TraceGetResponseRaw =
-  paths["/api/traces/{traceId}"]["get"]["responses"]["200"]["content"]["application/json"];
+  paths["/api/v1/traces/{traceId}"]["get"]["responses"]["200"]["content"]["application/json"];
 
 export type TraceGetResponse = TraceGetResponseRaw extends string
   ? TraceGetResponseRaw
@@ -66,7 +66,7 @@ export class TracesApiService {
   }
 
   async search(params: TraceSearchBody): Promise<TraceSearchResponse> {
-    const { data, error, response } = await this.apiClient.POST("/api/traces/search", {
+    const { data, error, response } = await this.apiClient.POST("/api/v1/traces/search", {
       body: params,
     });
     if (error) this.handleApiError("search traces", error, response);
@@ -74,7 +74,7 @@ export class TracesApiService {
   }
 
   async get(traceId: string, options?: { format?: "digest" | "json" }): Promise<TraceGetResponse> {
-    const { data, error, response } = await this.apiClient.GET("/api/traces/{traceId}", {
+    const { data, error, response } = await this.apiClient.GET("/api/v1/traces/{traceId}", {
       params: {
         path: { traceId },
         query: options,

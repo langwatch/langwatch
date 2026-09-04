@@ -28,28 +28,28 @@ export type PromptData = z.infer<typeof promptDataSchema>;
 
 // Extract API types from OpenAPI schema for backwards compatibility
 export type CreatePromptBody = NonNullable<
-  paths["/api/prompts"]["post"]["requestBody"]
+  paths["/api/v1/prompts"]["post"]["requestBody"]
 >["content"]["application/json"];
 
 export type UpdatePromptBody = NonNullable<
-  paths["/api/prompts/{id}"]["put"]["requestBody"]
+  paths["/api/v1/prompts/{id}"]["put"]["requestBody"]
 >["content"]["application/json"];
 
 export type PromptResponse = NonNullable<
-  paths["/api/prompts/{id}"]["get"]["responses"]["200"]["content"]["application/json"]
+  paths["/api/v1/prompts/{id}"]["get"]["responses"]["200"]["content"]["application/json"]
 >;
 
 // Extract the PromptScope type from the API client
 export type PromptScope =
-  paths["/api/prompts"]["post"]["responses"]["200"]["content"]["application/json"]["scope"];
+  paths["/api/v1/prompts"]["post"]["responses"]["200"]["content"]["application/json"]["scope"];
 
 // Extract tag definition types from the OpenAPI schema
 export type TagDefinition = NonNullable<
-  paths["/api/prompts/tags"]["get"]["responses"]["200"]["content"]["application/json"]
+  paths["/api/v1/prompts/tags"]["get"]["responses"]["200"]["content"]["application/json"]
 >[number];
 
 export type CreatedTag = NonNullable<
-  paths["/api/prompts/tags"]["post"]["responses"]["201"]["content"]["application/json"]
+  paths["/api/v1/prompts/tags"]["post"]["responses"]["201"]["content"]["application/json"]
 >;
 
 /**

@@ -142,7 +142,7 @@ class TestDatasetApiService:
             result = svc.list_datasets()
             assert len(result["data"]) == 3
             assert result["pagination"]["total"] == 3
-            mock_httpx.get.assert_called_once_with("/api/dataset", params={})
+            mock_httpx.get.assert_called_once_with("/api/v1/dataset", params={})
 
         def test_passes_pagination_params(self):
             """@integration Scenario: List datasets with explicit pagination"""
@@ -153,7 +153,7 @@ class TestDatasetApiService:
             svc = DatasetApiService(_make_mock_client(mock_httpx))
             svc.list_datasets(page=2, limit=5)
             mock_httpx.get.assert_called_once_with(
-                "/api/dataset", params={"page": 2, "limit": 5}
+                "/api/v1/dataset", params={"page": 2, "limit": 5}
             )
 
         def test_returns_empty_result_when_no_datasets(self):
@@ -265,7 +265,7 @@ class TestDatasetApiService:
             svc = DatasetApiService(_make_mock_client(mock_httpx))
             result = svc.get_dataset("dataset_xyz")
             assert result["slug"] == "my-data"
-            mock_httpx.get.assert_called_once_with("/api/dataset/dataset_xyz")
+            mock_httpx.get.assert_called_once_with("/api/v1/dataset/dataset_xyz")
 
         def test_raises_dataset_not_found_error(self):
             """@integration Scenario: Get non-existent dataset raises an error"""
@@ -367,7 +367,7 @@ class TestDatasetApiService:
             assert len(result["data"]) == 10
             assert result["pagination"]["total"] == 10
             mock_httpx.get.assert_called_once_with(
-                "/api/dataset/my-dataset/records", params={}
+                "/api/v1/dataset/my-dataset/records", params={}
             )
 
         def test_passes_pagination_params(self):
@@ -391,7 +391,7 @@ class TestDatasetApiService:
             svc = DatasetApiService(_make_mock_client(mock_httpx))
             svc.list_records("my-dataset", page=2, limit=20)
             mock_httpx.get.assert_called_once_with(
-                "/api/dataset/my-dataset/records", params={"page": 2, "limit": 20}
+                "/api/v1/dataset/my-dataset/records", params={"page": 2, "limit": 20}
             )
 
         def test_raises_dataset_not_found_error(self):
@@ -467,7 +467,7 @@ class TestDatasetApiService:
             assert result["id"] == "rec-new"
             assert result["entry"] == {"input": "new"}
             mock_httpx.patch.assert_called_once_with(
-                "/api/dataset/my-dataset/records/rec-new",
+                "/api/v1/dataset/my-dataset/records/rec-new",
                 json={"entry": {"input": "new"}},
             )
 

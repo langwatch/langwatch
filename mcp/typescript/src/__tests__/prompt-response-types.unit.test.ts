@@ -6,7 +6,7 @@ describe("Prompt response type interfaces", () => {
     /** @scenario Declaring every rendered field on the typed response interfaces */
     it("declares every field the prompt tools render, with no `as` cast needed", () => {
       // Mirrors apiResponsePromptWithVersionDataSchema (the real GET
-      // /api/prompts/:id contract): version data flattened to the top level,
+      // /api/v1/prompts/:id contract): version data flattened to the top level,
       // parameters as an object map, tags as { name, versionId } objects,
       // and no nested versions array.
       const detail: PromptDetailResponse = {

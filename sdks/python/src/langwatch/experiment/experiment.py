@@ -367,7 +367,7 @@ class Experiment:
 
         with httpx.Client(timeout=60) as client:
             response = client.post(
-                f"{langwatch.get_endpoint()}/api/experiment/init",
+                f"{langwatch.get_endpoint()}/api/v1/experiment/init",
                 headers=build_auth_headers(langwatch.get_api_key() or ""),
                 json={
                     "experiment_name": self.name,
@@ -1132,7 +1132,7 @@ class Experiment:
     )
     def _log_results(cls, api_key: str, body: Dict[str, Any]):
         response = httpx.post(
-            f"{langwatch.get_endpoint()}/api/evaluations/batch/log_results",
+            f"{langwatch.get_endpoint()}/api/v1/evaluations/batch/log_results",
             headers={
                 **build_auth_headers(api_key),
                 "Content-Type": "application/json",

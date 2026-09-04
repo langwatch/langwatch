@@ -92,9 +92,12 @@ describe("formatApiErrorMessage", () => {
       const cause = Object.assign(new Error("Invalid URL"), {
         code: "ERR_INVALID_URL",
       });
-      const err = Object.assign(new TypeError("Failed to parse URL from not a url/api/prompts"), {
-        cause,
-      });
+      const err = Object.assign(
+        new TypeError("Failed to parse URL from not a url/api/v1/prompts"),
+        {
+          cause,
+        },
+      );
       const out = formatApiErrorMessage({ error: err });
       expect(out).toContain("LANGWATCH_ENDPOINT");
       expect(out).toContain("http://");
@@ -168,7 +171,7 @@ describe("formatApiErrorMessage", () => {
     });
 
     it("formats ZodError envelopes wrapped in { success: false, error: {...} }", () => {
-      // Real-world shape from `/api/traces/search` on bad input.
+      // Real-world shape from `/api/v1/traces/search` on bad input.
       const body = {
         success: false,
         error: {

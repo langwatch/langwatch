@@ -33,13 +33,13 @@ export class ScenariosApiService {
   }
 
   async getAll(): Promise<ScenarioResponse[]> {
-    const { data, error } = await this.apiClient.GET("/api/scenarios");
+    const { data, error } = await this.apiClient.GET("/api/v1/scenarios");
     if (error) this.handleApiError("fetch all scenarios", error);
     return data;
   }
 
   async get(id: string): Promise<ScenarioResponse> {
-    const { data, error } = await this.apiClient.GET("/api/scenarios/{id}", {
+    const { data, error } = await this.apiClient.GET("/api/v1/scenarios/{id}", {
       params: { path: { id } },
     });
     if (error) this.handleApiError(`fetch scenario with ID "${id}"`, error);
@@ -47,7 +47,7 @@ export class ScenariosApiService {
   }
 
   async create(params: CreateScenarioBody): Promise<ScenarioResponse> {
-    const { data, error } = await this.apiClient.POST("/api/scenarios", {
+    const { data, error } = await this.apiClient.POST("/api/v1/scenarios", {
       body: params,
     });
     if (error) this.handleApiError("create scenario", error);
@@ -55,7 +55,7 @@ export class ScenariosApiService {
   }
 
   async update(id: string, params: UpdateScenarioBody): Promise<ScenarioResponse> {
-    const { data, error } = await this.apiClient.PUT("/api/scenarios/{id}", {
+    const { data, error } = await this.apiClient.PUT("/api/v1/scenarios/{id}", {
       params: { path: { id } },
       body: params,
     });
@@ -72,7 +72,7 @@ export class ScenariosApiService {
       ...(options?.limit !== undefined && { limit: options.limit }),
       ...(options?.cursor !== undefined && { cursor: options.cursor }),
     };
-    const { data, error } = await this.apiClient.GET("/api/scenarios/{id}/versions", {
+    const { data, error } = await this.apiClient.GET("/api/v1/scenarios/{id}/versions", {
       params: { path: { id }, query },
     });
     if (error) this.handleApiError(`list versions of scenario "${id}"`, error);
@@ -81,7 +81,7 @@ export class ScenariosApiService {
 
   /** One saved version of a scenario, with the content it saved. */
   async getVersion(id: string, version: number): Promise<ScenarioVersionDetail> {
-    const { data, error } = await this.apiClient.GET("/api/scenarios/{id}/versions/{version}", {
+    const { data, error } = await this.apiClient.GET("/api/v1/scenarios/{id}/versions/{version}", {
       params: { path: { id, version } },
     });
     if (error) this.handleApiError(`get version ${version} of scenario "${id}"`, error);
@@ -89,7 +89,7 @@ export class ScenariosApiService {
   }
 
   async delete(id: string): Promise<DeleteScenarioResponse> {
-    const { data, error } = await this.apiClient.DELETE("/api/scenarios/{id}", {
+    const { data, error } = await this.apiClient.DELETE("/api/v1/scenarios/{id}", {
       params: { path: { id } },
     });
     if (error) this.handleApiError(`delete scenario with ID "${id}"`, error);

@@ -72,7 +72,7 @@ async function deliverReport(report: RedactedReport, params: ReportIssueParams):
   const config = getConfig();
   const endpoint = config.endpoint.replace(/\/+$/, "");
 
-  const response = await fetch(`${endpoint}/api/bug-reports`, {
+  const response = await fetch(`${endpoint}/api/v1/bug-reports`, {
     method: "POST",
     headers: {
       "content-type": "application/json",

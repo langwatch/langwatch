@@ -36,7 +36,7 @@ export const createGraphCommand = async (
       graphDef = JSON.parse(options.graph) as Record<string, unknown>;
     }
 
-    const response = await fetch(`${endpoint}/api/graphs`, {
+    const response = await fetch(`${endpoint}/api/v1/graphs`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

@@ -25,7 +25,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "put",
-        "url": "/api/prompts/{id}/tags/{tag}".format(
+        "url": "/api/v1/prompts/{id}/tags/{tag}".format(
             id=quote(str(id), safe=""),
             tag=quote(str(tag), safe=""),
         ),

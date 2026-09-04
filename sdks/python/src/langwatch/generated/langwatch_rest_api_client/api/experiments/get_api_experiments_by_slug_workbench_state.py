@@ -42,7 +42,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/api/experiments/{slug}/workbench-state".format(
+        "url": "/api/v1/experiments/{slug}/workbench-state".format(
             slug=quote(str(slug), safe=""),
         ),
         "params": params,

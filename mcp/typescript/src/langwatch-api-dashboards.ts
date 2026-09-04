@@ -18,18 +18,18 @@ export interface DashboardListResponse {
 }
 
 export async function listDashboards(): Promise<DashboardListResponse> {
-  return makeRequest("GET", "/api/dashboards") as Promise<DashboardListResponse>;
+  return makeRequest("GET", "/api/v1/dashboards") as Promise<DashboardListResponse>;
 }
 
 export async function getDashboard(id: string): Promise<DashboardDetail> {
   return makeRequest(
     "GET",
-    `/api/dashboards/${encodeURIComponent(id)}`,
+    `/api/v1/dashboards/${encodeURIComponent(id)}`,
   ) as Promise<DashboardDetail>;
 }
 
 export async function createDashboard(data: { name: string }): Promise<DashboardDetail> {
-  return makeRequest("POST", "/api/dashboards", data) as Promise<DashboardDetail>;
+  return makeRequest("POST", "/api/v1/dashboards", data) as Promise<DashboardDetail>;
 }
 
 export async function renameDashboard(
@@ -38,13 +38,13 @@ export async function renameDashboard(
 ): Promise<DashboardDetail> {
   return makeRequest(
     "PATCH",
-    `/api/dashboards/${encodeURIComponent(id)}`,
+    `/api/v1/dashboards/${encodeURIComponent(id)}`,
     data,
   ) as Promise<DashboardDetail>;
 }
 
 export async function deleteDashboard(id: string): Promise<{ id: string; name: string }> {
-  return makeRequest("DELETE", `/api/dashboards/${encodeURIComponent(id)}`) as Promise<{
+  return makeRequest("DELETE", `/api/v1/dashboards/${encodeURIComponent(id)}`) as Promise<{
     id: string;
     name: string;
   }>;

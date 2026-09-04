@@ -49,7 +49,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/api/coding-agent/sessions/{session_id}/events".format(
+        "url": "/api/v1/coding-agent/sessions/{session_id}/events".format(
             session_id=quote(str(session_id), safe=""),
         ),
         "params": params,

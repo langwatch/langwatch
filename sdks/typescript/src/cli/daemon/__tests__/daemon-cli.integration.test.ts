@@ -114,7 +114,7 @@ describe("the CLI served by a daemon", () => {
       req.on("data", (chunk) => (body += chunk));
       req.on("end", () => {
         res.setHeader("content-type", "application/json");
-        if (req.url?.startsWith("/api/traces/search")) {
+        if (req.url?.startsWith("/api/v1/traces/search")) {
           res.end(
             JSON.stringify({
               traces: [],

@@ -87,9 +87,9 @@ export interface PromptTag {
 export type PromptFieldList = Array<{ identifier: string; type: string }>;
 
 /**
- * A single versioned prompt payload. `GET /api/prompts/:id` returns the
+ * A single versioned prompt payload. `GET /api/v1/prompts/:id` returns the
  * requested version's data flattened to the top level (merged with the base
- * prompt data), and `GET /api/prompts/:id/versions` returns an array of
+ * prompt data), and `GET /api/v1/prompts/:id/versions` returns an array of
  * entries in this same shape — there is no nested `versions` array on the
  * detail response.
  */
@@ -336,7 +336,7 @@ export async function searchTraces(params: {
   format?: "digest" | "json";
 }): Promise<SearchTracesResponse> {
   const { format = "digest", ...rest } = params;
-  return makeRequest("POST", "/api/traces/search", {
+  return makeRequest("POST", "/api/v1/traces/search", {
     ...rest,
     format,
   }) as Promise<SearchTracesResponse>;
@@ -349,7 +349,7 @@ export async function getTraceById(
 ): Promise<TraceDetailResponse> {
   return makeRequest(
     "GET",
-    `/api/traces/${encodeURIComponent(traceId)}?format=${format}`,
+    `/api/v1/traces/${encodeURIComponent(traceId)}?format=${format}`,
   ) as Promise<TraceDetailResponse>;
 }
 
@@ -370,14 +370,14 @@ export async function getAnalyticsTimeseries(params: {
 }): Promise<AnalyticsTimeseriesResponse> {
   return makeRequest(
     "POST",
-    "/api/analytics/timeseries",
+    "/api/v1/analytics/timeseries",
     params,
   ) as Promise<AnalyticsTimeseriesResponse>;
 }
 
 /** Lists all prompts in the project. */
 export async function listPrompts(): Promise<PromptSummary[]> {
-  return makeRequest("GET", "/api/prompts") as Promise<PromptSummary[]>;
+  return makeRequest("GET", "/api/v1/prompts") as Promise<PromptSummary[]>;
 }
 
 /** Retrieves a single prompt by ID or handle. */
@@ -391,15 +391,16 @@ export async function getPrompt(
   const query = params.toString() ? `?${params}` : "";
   return makeRequest(
     "GET",
-    `/api/prompts/${encodeURIComponent(idOrHandle)}${query}`,
+    `/api/v1/prompts/${encodeURIComponent(idOrHandle)}${query}`,
   ) as Promise<PromptDetailResponse>;
 }
 
 /** Lists all versions of a prompt (versioned data only). */
 export async function getPromptVersions(idOrHandle: string): Promise<PromptVersion[]> {
-  return makeRequest("GET", `/api/prompts/${encodeURIComponent(idOrHandle)}/versions`) as Promise<
-    PromptVersion[]
-  >;
+  return makeRequest(
+    "GET",
+    `/api/v1/prompts/${encodeURIComponent(idOrHandle)}/versions`,
+  ) as Promise<PromptVersion[]>;
 }
 
 /** Creates a new prompt. */
@@ -409,7 +410,7 @@ export async function createPrompt(data: {
   model: string;
   tags?: string[];
 }): Promise<PromptMutationResponse> {
-  return makeRequest("POST", "/api/prompts", data) as Promise<PromptMutationResponse>;
+  return makeRequest("POST", "/api/v1/prompts", data) as Promise<PromptMutationResponse>;
 }
 
 /** Updates an existing prompt by ID or handle. */
@@ -424,7 +425,7 @@ export async function updatePrompt(
 ): Promise<PromptMutationResponse> {
   return makeRequest(
     "PUT",
-    `/api/prompts/${encodeURIComponent(idOrHandle)}`,
+    `/api/v1/prompts/${encodeURIComponent(idOrHandle)}`,
     data,
   ) as Promise<PromptMutationResponse>;
 }
@@ -441,19 +442,19 @@ export async function assignPromptTag({
 }): Promise<unknown> {
   return makeRequest(
     "PUT",
-    `/api/prompts/${encodeURIComponent(idOrHandle)}/tags/${encodeURIComponent(tag)}`,
+    `/api/v1/prompts/${encodeURIComponent(idOrHandle)}/tags/${encodeURIComponent(tag)}`,
     { versionId },
   );
 }
 
 /** Lists all prompt tag definitions for the organization. */
 export async function listPromptTags(): Promise<unknown> {
-  return makeRequest("GET", "/api/prompts/tags");
+  return makeRequest("GET", "/api/v1/prompts/tags");
 }
 
 /** Creates a custom prompt tag definition. */
 export async function createPromptTag(name: string): Promise<unknown> {
-  return makeRequest("POST", "/api/prompts/tags", { name });
+  return makeRequest("POST", "/api/v1/prompts/tags", { name });
 }
 
 /** Renames an existing prompt tag. */
@@ -464,10 +465,10 @@ export async function renamePromptTag({
   tag: string;
   name: string;
 }): Promise<unknown> {
-  return makeRequest("PUT", `/api/prompts/tags/${encodeURIComponent(tag)}`, { name });
+  return makeRequest("PUT", `/api/v1/prompts/tags/${encodeURIComponent(tag)}`, { name });
 }
 
 /** Deletes a prompt tag and all its assignments. */
 export async function deletePromptTag(tag: string): Promise<unknown> {
-  return makeRequest("DELETE", `/api/prompts/tags/${encodeURIComponent(tag)}`);
+  return makeRequest("DELETE", `/api/v1/prompts/tags/${encodeURIComponent(tag)}`);
 }

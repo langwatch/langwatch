@@ -174,7 +174,7 @@ export class DatasetService {
     this.config.logger.debug(`Fetching dataset: ${slugOrId}`);
 
     const response = await this.asResponseEnvelope(
-      this.config.langwatchApiClient.GET("/api/dataset/{slugOrId}", {
+      this.config.langwatchApiClient.GET("/api/v1/dataset/{slugOrId}", {
         params: {
           path: {
             slugOrId,
@@ -217,7 +217,7 @@ export class DatasetService {
   async listDatasets(options?: ListDatasetsOptions): Promise<ListDatasetsApiResponse> {
     this.config.logger.debug("Listing datasets");
 
-    const response = await this.untypedRequest("GET", "/api/dataset", {
+    const response = await this.untypedRequest("GET", "/api/v1/dataset", {
       params: {
         query: {
           page: options?.page,
@@ -235,7 +235,7 @@ export class DatasetService {
   async createDataset(options: CreateDatasetOptions): Promise<DatasetMetadata> {
     this.config.logger.debug(`Creating dataset: ${options.name}`);
 
-    const response = await this.untypedRequest("POST", "/api/dataset", {
+    const response = await this.untypedRequest("POST", "/api/v1/dataset", {
       body: {
         name: options.name,
         columnTypes: options.columnTypes ?? [],
@@ -251,7 +251,7 @@ export class DatasetService {
   async updateDataset(slugOrId: string, options: UpdateDatasetOptions): Promise<DatasetMetadata> {
     this.config.logger.debug(`Updating dataset: ${slugOrId}`);
 
-    const response = await this.untypedRequest("PATCH", "/api/dataset/{slugOrId}", {
+    const response = await this.untypedRequest("PATCH", "/api/v1/dataset/{slugOrId}", {
       params: {
         path: { slugOrId },
       },
@@ -267,7 +267,7 @@ export class DatasetService {
   async deleteDataset(slugOrId: string): Promise<DatasetMetadata> {
     this.config.logger.debug(`Deleting dataset: ${slugOrId}`);
 
-    const response = await this.untypedRequest("DELETE", "/api/dataset/{slugOrId}", {
+    const response = await this.untypedRequest("DELETE", "/api/v1/dataset/{slugOrId}", {
       params: {
         path: { slugOrId },
       },
@@ -285,7 +285,7 @@ export class DatasetService {
   ): Promise<BatchCreateRecordsResponse> {
     this.config.logger.debug(`Creating ${entries.length} records in dataset: ${slugOrId}`);
 
-    const response = await this.untypedRequest("POST", "/api/dataset/{slugOrId}/records", {
+    const response = await this.untypedRequest("POST", "/api/v1/dataset/{slugOrId}/records", {
       params: {
         path: { slugOrId },
       },
@@ -311,7 +311,7 @@ export class DatasetService {
 
     const response = await this.untypedRequest(
       "PATCH",
-      "/api/dataset/{slugOrId}/records/{recordId}",
+      "/api/v1/dataset/{slugOrId}/records/{recordId}",
       {
         params: {
           path: { slugOrId, recordId },
@@ -333,7 +333,7 @@ export class DatasetService {
   async deleteRecords(slugOrId: string, recordIds: string[]): Promise<DeleteRecordsResponse> {
     this.config.logger.debug(`Deleting ${recordIds.length} records from dataset: ${slugOrId}`);
 
-    const response = await this.untypedRequest("DELETE", "/api/dataset/{slugOrId}/records", {
+    const response = await this.untypedRequest("DELETE", "/api/v1/dataset/{slugOrId}/records", {
       params: {
         path: { slugOrId },
       },
@@ -360,7 +360,7 @@ export class DatasetService {
   ): Promise<ListRecordsApiResponse> {
     this.config.logger.debug(`Listing records for dataset: ${slugOrId}`);
 
-    const response = await this.untypedRequest("GET", "/api/dataset/{slugOrId}/records", {
+    const response = await this.untypedRequest("GET", "/api/v1/dataset/{slugOrId}/records", {
       params: {
         path: { slugOrId },
         query: {
@@ -436,7 +436,7 @@ export class DatasetService {
     formData.append("file", options.file);
 
     return this.fetchMultipart<CreateFromUploadResponse>(
-      "/api/dataset/upload",
+      "/api/v1/dataset/upload",
       formData,
       `create dataset from upload "${options.name}"`,
     );
@@ -572,7 +572,7 @@ export class DatasetService {
     formData.append("file", file);
 
     return this.fetchMultipart<UploadResponse>(
-      `/api/dataset/${encodeURIComponent(slugOrId)}/upload`,
+      `/api/v1/dataset/${encodeURIComponent(slugOrId)}/upload`,
       formData,
       `upload file to dataset "${slugOrId}"`,
       slugOrId,

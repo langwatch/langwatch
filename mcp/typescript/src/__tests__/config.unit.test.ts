@@ -72,8 +72,8 @@ describe("config", () => {
 
     it("keeps the built request path free of a double slash", () => {
       initConfig({ endpoint: "https://app.langwatch.ai/" });
-      expect(`${getConfig().endpoint}/api/bug-reports`).toBe(
-        "https://app.langwatch.ai/api/bug-reports",
+      expect(`${getConfig().endpoint}/api/v1/bug-reports`).toBe(
+        "https://app.langwatch.ai/api/v1/bug-reports",
       );
     });
   });

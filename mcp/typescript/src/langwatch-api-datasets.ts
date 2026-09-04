@@ -85,7 +85,7 @@ export async function listDatasets(params?: {
   if (params?.page != null) query.set("page", String(params.page));
   if (params?.limit != null) query.set("limit", String(params.limit));
   const qs = query.toString();
-  const path = qs ? `/api/dataset?${qs}` : "/api/dataset";
+  const path = qs ? `/api/v1/dataset?${qs}` : "/api/v1/dataset";
   return makeRequest("GET", path) as Promise<DatasetListResponse>;
 }
 
@@ -93,7 +93,7 @@ export async function listDatasets(params?: {
 export async function getDataset(slugOrId: string): Promise<DatasetDetailResponse> {
   return makeRequest(
     "GET",
-    `/api/dataset/${encodeURIComponent(slugOrId)}`,
+    `/api/v1/dataset/${encodeURIComponent(slugOrId)}`,
   ) as Promise<DatasetDetailResponse>;
 }
 
@@ -102,7 +102,7 @@ export async function createDataset(data: {
   name: string;
   columnTypes?: DatasetColumnType[];
 }): Promise<DatasetMutationResponse> {
-  return makeRequest("POST", "/api/dataset", data) as Promise<DatasetMutationResponse>;
+  return makeRequest("POST", "/api/v1/dataset", data) as Promise<DatasetMutationResponse>;
 }
 
 /** Updates an existing dataset by slug or ID. */
@@ -114,7 +114,7 @@ export async function updateDataset(params: {
   const { slugOrId, ...data } = params;
   return makeRequest(
     "PATCH",
-    `/api/dataset/${encodeURIComponent(slugOrId)}`,
+    `/api/v1/dataset/${encodeURIComponent(slugOrId)}`,
     data,
   ) as Promise<DatasetMutationResponse>;
 }
@@ -123,7 +123,7 @@ export async function updateDataset(params: {
 export async function deleteDataset(slugOrId: string): Promise<DatasetArchiveResponse> {
   return makeRequest(
     "DELETE",
-    `/api/dataset/${encodeURIComponent(slugOrId)}`,
+    `/api/v1/dataset/${encodeURIComponent(slugOrId)}`,
   ) as Promise<DatasetArchiveResponse>;
 }
 
@@ -133,7 +133,7 @@ export async function createDatasetRecords(params: {
   entries: Record<string, unknown>[];
 }): Promise<BatchCreateRecordsResponse> {
   const { slugOrId, entries } = params;
-  return makeRequest("POST", `/api/dataset/${encodeURIComponent(slugOrId)}/records`, {
+  return makeRequest("POST", `/api/v1/dataset/${encodeURIComponent(slugOrId)}/records`, {
     entries,
   }) as Promise<BatchCreateRecordsResponse>;
 }
@@ -147,7 +147,7 @@ export async function updateDatasetRecord(params: {
   const { slugOrId, recordId, entry } = params;
   return makeRequest(
     "PATCH",
-    `/api/dataset/${encodeURIComponent(slugOrId)}/records/${encodeURIComponent(recordId)}`,
+    `/api/v1/dataset/${encodeURIComponent(slugOrId)}/records/${encodeURIComponent(recordId)}`,
     { entry },
   ) as Promise<DatasetRecord>;
 }
@@ -158,7 +158,7 @@ export async function deleteDatasetRecords(params: {
   recordIds: string[];
 }): Promise<DeleteRecordsResponse> {
   const { slugOrId, recordIds } = params;
-  return makeRequest("DELETE", `/api/dataset/${encodeURIComponent(slugOrId)}/records`, {
+  return makeRequest("DELETE", `/api/v1/dataset/${encodeURIComponent(slugOrId)}/records`, {
     recordIds,
   }) as Promise<DeleteRecordsResponse>;
 }
@@ -174,6 +174,6 @@ export async function listDatasetRecords(params: {
   if (params.page != null) query.set("page", String(params.page));
   if (params.limit != null) query.set("limit", String(params.limit));
   const qs = query.toString();
-  const path = `/api/dataset/${encodeURIComponent(slugOrId)}/records${qs ? `?${qs}` : ""}`;
+  const path = `/api/v1/dataset/${encodeURIComponent(slugOrId)}/records${qs ? `?${qs}` : ""}`;
   return makeRequest("GET", path) as Promise<DatasetRecordListResponse>;
 }

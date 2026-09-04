@@ -9,7 +9,7 @@ import {
 export type AnnotationResponse = components["schemas"]["Annotation"];
 
 export type CreateAnnotationBody = NonNullable<
-  paths["/api/annotations/trace/{id}"]["post"]["requestBody"]
+  paths["/api/v1/annotations/trace/{id}"]["post"]["requestBody"]
 >["content"]["application/json"];
 
 export class AnnotationsApiError extends Error {
@@ -42,13 +42,13 @@ export class AnnotationsApiService {
   }
 
   async getAll(): Promise<AnnotationResponse[]> {
-    const { data, error } = await this.apiClient.GET("/api/annotations");
+    const { data, error } = await this.apiClient.GET("/api/v1/annotations");
     if (error) this.handleApiError("fetch all annotations", error);
     return data;
   }
 
   async get(id: string): Promise<AnnotationResponse> {
-    const { data, error } = await this.apiClient.GET("/api/annotations/{id}", {
+    const { data, error } = await this.apiClient.GET("/api/v1/annotations/{id}", {
       params: { path: { id } },
     });
     if (error) this.handleApiError(`fetch annotation with ID "${id}"`, error);
@@ -56,7 +56,7 @@ export class AnnotationsApiService {
   }
 
   async getByTrace(traceId: string): Promise<AnnotationResponse[]> {
-    const { data, error } = await this.apiClient.GET("/api/annotations/trace/{id}", {
+    const { data, error } = await this.apiClient.GET("/api/v1/annotations/trace/{id}", {
       params: { path: { id: traceId } },
     });
     if (error) this.handleApiError(`fetch annotations for trace "${traceId}"`, error);
@@ -64,7 +64,7 @@ export class AnnotationsApiService {
   }
 
   async create(traceId: string, params: CreateAnnotationBody): Promise<AnnotationResponse> {
-    const { data, error } = await this.apiClient.POST("/api/annotations/trace/{id}", {
+    const { data, error } = await this.apiClient.POST("/api/v1/annotations/trace/{id}", {
       params: { path: { id: traceId } },
       body: params,
     });
@@ -73,7 +73,7 @@ export class AnnotationsApiService {
   }
 
   async delete(id: string): Promise<{ status?: string; message?: string }> {
-    const { data, error } = await this.apiClient.DELETE("/api/annotations/{id}", {
+    const { data, error } = await this.apiClient.DELETE("/api/v1/annotations/{id}", {
       params: { path: { id } },
     });
     if (error) this.handleApiError(`delete annotation with ID "${id}"`, error);

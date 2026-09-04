@@ -104,25 +104,25 @@ function createMockServer(): Server {
       const url = req.url ?? "";
       res.setHeader("Content-Type", "application/json");
 
-      if (url === "/api/traces/search" && req.method === "POST") {
+      if (url === "/api/v1/traces/search" && req.method === "POST") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_TRACES_SEARCH));
-      } else if (url.match(/^\/api\/traces\/[^/]+(\?|$)/) && req.method === "GET") {
+      } else if (url.match(/^\/api\/v1\/traces\/[^/]+(\?|$)/) && req.method === "GET") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_TRACE_DETAIL));
-      } else if (url === "/api/analytics/timeseries" && req.method === "POST") {
+      } else if (url === "/api/v1/analytics/timeseries" && req.method === "POST") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_ANALYTICS));
-      } else if (url === "/api/prompts" && req.method === "GET") {
+      } else if (url === "/api/v1/prompts" && req.method === "GET") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_PROMPTS_LIST));
-      } else if (url.match(/^\/api\/prompts\/[^/]+$/) && req.method === "GET") {
+      } else if (url.match(/^\/api\/v1\/prompts\/[^/]+$/) && req.method === "GET") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_PROMPT_DETAIL));
-      } else if (url === "/api/prompts" && req.method === "POST") {
+      } else if (url === "/api/v1/prompts" && req.method === "POST") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_PROMPT_CREATED));
-      } else if (url.match(/^\/api\/prompts\/[^/]+$/) && req.method === "PUT") {
+      } else if (url.match(/^\/api\/v1\/prompts\/[^/]+$/) && req.method === "PUT") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_PROMPT_UPDATED));
       } else {

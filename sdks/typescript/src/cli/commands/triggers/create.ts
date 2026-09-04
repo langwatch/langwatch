@@ -54,7 +54,7 @@ export const createTriggerCommand = async (
     const actionParams: Record<string, unknown> = {};
     if (options.slackWebhook) actionParams.slackWebhook = options.slackWebhook;
 
-    const response = await fetch(`${endpoint}/api/triggers`, {
+    const response = await fetch(`${endpoint}/api/v1/triggers`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

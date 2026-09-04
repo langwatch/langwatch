@@ -7,20 +7,20 @@ import {
 } from "@/client-sdk/services/_shared/format-api-error";
 
 export type SimulationRunsListResponse =
-  paths["/api/simulation-runs"]["get"]["responses"]["200"]["content"]["application/json"];
+  paths["/api/v1/simulation-runs"]["get"]["responses"]["200"]["content"]["application/json"];
 
 export type SimulationRunResponse =
-  paths["/api/simulation-runs/{scenarioRunId}"]["get"]["responses"]["200"]["content"]["application/json"];
+  paths["/api/v1/simulation-runs/{scenarioRunId}"]["get"]["responses"]["200"]["content"]["application/json"];
 
 export type SimulationRunsBatchesListResponse =
-  paths["/api/simulation-runs/batches/list"]["get"]["responses"]["200"]["content"]["application/json"];
+  paths["/api/v1/simulation-runs/batches/list"]["get"]["responses"]["200"]["content"]["application/json"];
 
 export type SimulationRunsListParams = NonNullable<
-  paths["/api/simulation-runs"]["get"]["parameters"]["query"]
+  paths["/api/v1/simulation-runs"]["get"]["parameters"]["query"]
 >;
 
 export type SimulationRunsBatchesListParams =
-  paths["/api/simulation-runs/batches/list"]["get"]["parameters"]["query"];
+  paths["/api/v1/simulation-runs/batches/list"]["get"]["parameters"]["query"];
 
 export class SimulationRunsApiError extends Error {
   constructor(
@@ -52,7 +52,7 @@ export class SimulationRunsApiService {
   }
 
   async getAll(params?: SimulationRunsListParams): Promise<SimulationRunsListResponse> {
-    const { data, error } = await this.apiClient.GET("/api/simulation-runs", {
+    const { data, error } = await this.apiClient.GET("/api/v1/simulation-runs", {
       params: { query: params },
     });
     if (error) this.handleApiError("list simulation runs", error);
@@ -60,7 +60,7 @@ export class SimulationRunsApiService {
   }
 
   async get(scenarioRunId: string): Promise<SimulationRunResponse> {
-    const { data, error } = await this.apiClient.GET("/api/simulation-runs/{scenarioRunId}", {
+    const { data, error } = await this.apiClient.GET("/api/v1/simulation-runs/{scenarioRunId}", {
       params: { path: { scenarioRunId } },
     });
     if (error) this.handleApiError(`get simulation run "${scenarioRunId}"`, error);
@@ -70,7 +70,7 @@ export class SimulationRunsApiService {
   async listBatches(
     params: SimulationRunsBatchesListParams,
   ): Promise<SimulationRunsBatchesListResponse> {
-    const { data, error } = await this.apiClient.GET("/api/simulation-runs/batches/list", {
+    const { data, error } = await this.apiClient.GET("/api/v1/simulation-runs/batches/list", {
       params: { query: params },
     });
     if (error) this.handleApiError("list simulation run batches", error);

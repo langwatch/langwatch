@@ -49,7 +49,10 @@ describe("handleExperimentResults()", () => {
       it("hits the v3 results endpoint with the run id", async () => {
         mockMakeRequest.mockResolvedValueOnce(sample);
         await handleExperimentResults({ runId: "run_1" });
-        expect(mockMakeRequest).toHaveBeenCalledWith("GET", "/api/experiments/runs/run_1/results");
+        expect(mockMakeRequest).toHaveBeenCalledWith(
+          "GET",
+          "/api/v1/experiments/runs/run_1/results",
+        );
       });
 
       it("renders evaluator averages and per-row sections in markdown", async () => {

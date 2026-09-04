@@ -12,7 +12,7 @@ def _get_kwargs() -> dict[str, Any]:
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/api/scim-tokens",
+        "url": "/api/v1/scim-tokens",
     }
 
     return _kwargs

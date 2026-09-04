@@ -304,7 +304,7 @@ def _prepare_data(
     client = get_instance()
 
     return {
-        "url": get_endpoint() + f"/api/evaluations/{slug}/evaluate",
+        "url": get_endpoint() + f"/api/v1/evaluations/{slug}/evaluate",
         "json": {
             "trace_id": (
                 None

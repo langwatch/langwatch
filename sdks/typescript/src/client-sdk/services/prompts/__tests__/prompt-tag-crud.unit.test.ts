@@ -33,8 +33,8 @@ describe("Tag CRUD", () => {
 
     describe("listTags()", () => {
       describe("when listing tags succeeds", () => {
-        /** @scenario List tags calls GET /api/prompts/tags */
-        it("calls GET /api/prompts/tags", async () => {
+        /** @scenario List tags calls GET /api/v1/prompts/tags */
+        it("calls GET /api/v1/prompts/tags", async () => {
           mockGet.mockResolvedValue({
             data: [
               {
@@ -50,7 +50,7 @@ describe("Tag CRUD", () => {
 
           await service.listTags();
 
-          expect(mockGet).toHaveBeenCalledWith("/api/prompts/tags");
+          expect(mockGet).toHaveBeenCalledWith("/api/v1/prompts/tags");
         });
 
         /** @scenario List tags returns built-in and custom tags */
@@ -87,7 +87,7 @@ describe("Tag CRUD", () => {
     describe("createTag()", () => {
       describe("when creating a tag succeeds", () => {
         /** @scenario Create custom tag via SDK */
-        it("calls POST /api/prompts/tags with the tag name", async () => {
+        it("calls POST /api/v1/prompts/tags with the tag name", async () => {
           mockPost.mockResolvedValue({
             data: {
               id: "ptag_abc",
@@ -100,7 +100,7 @@ describe("Tag CRUD", () => {
           await service.createTag({ name: "canary" });
 
           expect(mockPost).toHaveBeenCalledWith(
-            "/api/prompts/tags",
+            "/api/v1/prompts/tags",
             expect.objectContaining({ body: { name: "canary" } }),
           );
         });
@@ -134,13 +134,13 @@ describe("Tag CRUD", () => {
     describe("deleteTag()", () => {
       describe("when deleting a tag succeeds", () => {
         /** @scenario Delete custom tag via SDK */
-        it("calls DELETE /api/prompts/tags/:tag", async () => {
+        it("calls DELETE /api/v1/prompts/tags/:tag", async () => {
           mockDelete.mockResolvedValue({ data: undefined, error: undefined });
 
           await service.deleteTag("my-tag");
 
           expect(mockDelete).toHaveBeenCalledWith(
-            "/api/prompts/tags/{tag}",
+            "/api/v1/prompts/tags/{tag}",
             expect.objectContaining({ params: { path: { tag: "my-tag" } } }),
           );
         });

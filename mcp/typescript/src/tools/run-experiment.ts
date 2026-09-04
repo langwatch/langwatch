@@ -27,7 +27,7 @@ interface EvaluationStatusResponse {
 export async function handleRunExperiment(params: { slug: string }): Promise<string> {
   const result = (await makeRequest(
     "POST",
-    `/api/experiments/${encodeURIComponent(params.slug)}/run`,
+    `/api/v1/experiments/${encodeURIComponent(params.slug)}/run`,
   )) as EvaluationRunResponse;
 
   const lines: string[] = [];
@@ -73,7 +73,7 @@ async function statusFromResults(params: {
   try {
     results = (await makeRequest(
       "GET",
-      `/api/experiments/runs/${encodeURIComponent(params.runId)}/results${qs}`,
+      `/api/v1/experiments/runs/${encodeURIComponent(params.runId)}/results${qs}`,
     )) as ResultsForStatus;
   } catch (error) {
     // Only a genuine "no such run" is a fallback miss (-> guidance). Real
@@ -118,7 +118,7 @@ export async function handleExperimentStatus(params: {
   try {
     status = (await makeRequest(
       "GET",
-      `/api/experiments/runs/${encodeURIComponent(params.runId)}`,
+      `/api/v1/experiments/runs/${encodeURIComponent(params.runId)}`,
     )) as EvaluationStatusResponse;
   } catch (error) {
     const code = error instanceof LangWatchApiError ? error.status : undefined;

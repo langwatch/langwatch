@@ -67,7 +67,7 @@ export const listSimulationRunsCommand = async (options: {
       if (limit) params.set("limit", limit);
       if (cursor) params.set("cursor", cursor);
 
-      const response = await fetch(`${endpoint}/api/simulation-runs?${params.toString()}`, {
+      const response = await fetch(`${endpoint}/api/v1/simulation-runs?${params.toString()}`, {
         method: "GET",
         headers: buildAuthHeaders({ apiKey }),
       });

@@ -225,7 +225,7 @@ describe("updateWorkflowCommand()", () => {
       await updateWorkflowCommand("workflow_abc123", { name: "New Name" });
 
       expect(mockFetch).toHaveBeenCalledWith(
-        "http://localhost:5560/api/workflows/workflow_abc123",
+        "http://localhost:5560/api/v1/workflows/workflow_abc123",
         expect.objectContaining({
           method: "PATCH",
           body: JSON.stringify({ name: "New Name" }),

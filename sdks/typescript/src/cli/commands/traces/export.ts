@@ -118,7 +118,7 @@ export const exportTracesCommand = async (options: {
         options.includeSpans ? SPANS_PAGE_CAP : SERVER_PAGE_CAP,
       );
 
-      const response = await fetch(`${endpoint}/api/traces/search`, {
+      const response = await fetch(`${endpoint}/api/v1/traces/search`, {
         method: "POST",
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         headers: {

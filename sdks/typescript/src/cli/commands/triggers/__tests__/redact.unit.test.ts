@@ -1,7 +1,7 @@
 /**
  * `actionParams` must never reach machine output.
  *
- * `/api/triggers` returns delivery credentials — Slack webhook URLs, custom
+ * `/api/v1/triggers` returns delivery credentials — Slack webhook URLs, custom
  * endpoint URLs and their headers — in plaintext, and the human "Trigger
  * Details" block has always omitted them. Machine output is the MORE exposed
  * surface (it gets logged, piped, and pasted into agent context, and agent mode

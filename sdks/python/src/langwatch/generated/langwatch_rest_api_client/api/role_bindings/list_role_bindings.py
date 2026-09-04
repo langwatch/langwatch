@@ -44,7 +44,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/api/role-bindings",
+        "url": "/api/v1/role-bindings",
         "params": params,
     }
 

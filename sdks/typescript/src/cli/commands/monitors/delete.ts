@@ -24,7 +24,7 @@ export const deleteMonitorCommand = async (id: string): Promise<CommandResult | 
     deleted: boolean;
   };
   try {
-    const response = await fetch(`${endpoint}/api/monitors/${id}`, {
+    const response = await fetch(`${endpoint}/api/v1/monitors/${id}`, {
       method: "DELETE",
       headers: buildAuthHeaders({ apiKey }),
     });

@@ -49,7 +49,7 @@ export class TracesService {
    * @throws {TracesError} If the API call fails.
    */
   async get(traceId: string, params?: GetTraceParams): Promise<GetTraceResponse> {
-    const { data, error } = await this.config.langwatchApiClient.GET("/api/trace/{id}", {
+    const { data, error } = await this.config.langwatchApiClient.GET("/api/v1/trace/{id}", {
       params: {
         path: {
           id: traceId,

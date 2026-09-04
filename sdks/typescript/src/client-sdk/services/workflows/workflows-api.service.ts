@@ -19,14 +19,14 @@ import type {
 import { resolveEndpoint } from "@/internal/endpoint";
 
 export type WorkflowResponse = NonNullable<
-  paths["/api/workflows"]["get"]["responses"]["200"]["content"]["application/json"]
+  paths["/api/v1/workflows"]["get"]["responses"]["200"]["content"]["application/json"]
 >[number];
 
 export type WorkflowDeleteResponse =
-  paths["/api/workflows/{id}"]["delete"]["responses"]["200"]["content"]["application/json"];
+  paths["/api/v1/workflows/{id}"]["delete"]["responses"]["200"]["content"]["application/json"];
 
 /**
- * Body for `POST /api/workflows/{workflowId}/evaluate`. `data` and `dataset_id`
+ * Body for `POST /api/v1/workflows/{workflowId}/evaluate`. `data` and `dataset_id`
  * are mutually exclusive on the server (400 if both are sent).
  */
 interface WorkflowEvaluateRequest {
@@ -38,7 +38,7 @@ interface WorkflowEvaluateRequest {
 }
 
 /**
- * Response from `POST /api/workflows/{workflowId}/evaluate`. Hand-written
+ * Response from `POST /api/v1/workflows/{workflowId}/evaluate`. Hand-written
  * because the route is not yet exposed via the generated OpenAPI types.
  */
 interface WorkflowEvaluateResponse {
@@ -118,13 +118,13 @@ export class WorkflowsApiService {
   }
 
   async getAll(): Promise<WorkflowResponse[]> {
-    const { data, error } = await this.apiClient.GET("/api/workflows");
+    const { data, error } = await this.apiClient.GET("/api/v1/workflows");
     if (error) this.handleApiError("list workflows", error);
     return data;
   }
 
   async get(id: string): Promise<WorkflowResponse> {
-    const { data, error } = await this.apiClient.GET("/api/workflows/{id}", {
+    const { data, error } = await this.apiClient.GET("/api/v1/workflows/{id}", {
       params: { path: { id } },
     });
     if (error) this.handleApiError(`get workflow "${id}"`, error);
@@ -132,7 +132,7 @@ export class WorkflowsApiService {
   }
 
   async delete(id: string): Promise<WorkflowDeleteResponse> {
-    const { data, error } = await this.apiClient.DELETE("/api/workflows/{id}", {
+    const { data, error } = await this.apiClient.DELETE("/api/v1/workflows/{id}", {
       params: { path: { id } },
     });
     if (error) this.handleApiError(`delete workflow "${id}"`, error);
@@ -143,7 +143,7 @@ export class WorkflowsApiService {
    * Run a studio workflow evaluation and return per-row structured results.
    *
    * Starts the evaluation through the unified evaluations-v3 backend
-   * (`POST /api/workflows/{workflowId}/evaluate`), polls to completion, fetches
+   * (`POST /api/v1/workflows/{workflowId}/evaluate`), polls to completion, fetches
    * the per-row results, and maps them to the same row structure as the python
    * SDK's results DataFrame.
    *
@@ -173,7 +173,7 @@ export class WorkflowsApiService {
     if (options.rowIndices !== undefined) body.row_indices = options.rowIndices;
 
     const startResponse = await this.postUndeclaredEndpoint<WorkflowEvaluateResponse>({
-      path: `/api/workflows/${encodeURIComponent(workflowId)}/evaluate`,
+      path: `/api/v1/workflows/${encodeURIComponent(workflowId)}/evaluate`,
       body,
       operation: `run workflow evaluation for "${workflowId}"`,
     });

@@ -50,13 +50,13 @@ export const toRunStartRequest = ({
 };
 
 export type ExperimentRunStatusResponse =
-  paths["/api/experiments/runs/{runId}"]["get"]["responses"]["200"]["content"]["application/json"];
+  paths["/api/v1/experiments/runs/{runId}"]["get"]["responses"]["200"]["content"]["application/json"];
 
 /**
  * Status payload for `GET /api/evaluations/v3/runs/{runId}` (polling).
  *
  * Hand-written because the v3 path is served via a legacy-alias that rewrites
- * to `/api/experiments/...`, so only the legacy path is declared in the
+ * to `/api/v1/experiments/...`, so only the legacy path is declared in the
  * generated OpenAPI types. Kept structurally aligned with that legacy schema.
  */
 export interface ExperimentV3RunStatusResponse {
@@ -86,7 +86,7 @@ export interface ExperimentV3RunStatusResponse {
 }
 
 /**
- * Summary entry returned by `GET /api/experiments`. Mirrors
+ * Summary entry returned by `GET /api/v1/experiments`. Mirrors
  * `experimentSummarySchema` from the control-plane Hono route. Hand-written
  * because the route is not yet exposed via the generated OpenAPI types.
  */
@@ -115,7 +115,7 @@ export interface ExperimentListResponse {
 }
 
 /**
- * Per-run entry returned by `GET /api/experiments/runs?experimentSlug=...`.
+ * Per-run entry returned by `GET /api/v1/experiments/runs?experimentSlug=...`.
  * Mirrors `ExperimentRun` from the control plane.
  */
 export interface ExperimentRunSummaryEntry {
@@ -221,10 +221,10 @@ export interface ExperimentRunResultsResponse {
  * every write, so this stays open rather than restating it here.
  */
 export type ExperimentWorkbenchState =
-  paths["/api/experiments/{slug}/workbench-state"]["put"]["requestBody"]["content"]["application/json"]["state"];
+  paths["/api/v1/experiments/{slug}/workbench-state"]["put"]["requestBody"]["content"]["application/json"]["state"];
 
 export type ExperimentCreateResponse =
-  paths["/api/experiments"]["post"]["responses"]["200"]["content"]["application/json"];
+  paths["/api/v1/experiments"]["post"]["responses"]["200"]["content"]["application/json"];
 
 /**
  * The read answers one of two documents, chosen by the `fields` query. The
@@ -232,7 +232,7 @@ export type ExperimentCreateResponse =
  * union into the two shapes the overloads promise.
  */
 type WorkbenchStateReadResponse =
-  paths["/api/experiments/{slug}/workbench-state"]["get"]["responses"]["200"]["content"]["application/json"];
+  paths["/api/v1/experiments/{slug}/workbench-state"]["get"]["responses"]["200"]["content"]["application/json"];
 
 export type ExperimentWorkbenchStateResponse = Extract<
   WorkbenchStateReadResponse,
@@ -246,13 +246,13 @@ export type ExperimentWorkbenchVersionProbe = Exclude<
 >;
 
 export type ExperimentSaveWorkbenchStateResponse =
-  paths["/api/experiments/{slug}/workbench-state"]["put"]["responses"]["200"]["content"]["application/json"];
+  paths["/api/v1/experiments/{slug}/workbench-state"]["put"]["responses"]["200"]["content"]["application/json"];
 
 export type ExperimentRestoreVersionResponse =
-  paths["/api/experiments/{slug}/versions/{version}/restore"]["post"]["responses"]["200"]["content"]["application/json"];
+  paths["/api/v1/experiments/{slug}/versions/{version}/restore"]["post"]["responses"]["200"]["content"]["application/json"];
 
 export type ExperimentVersionsResponse =
-  paths["/api/experiments/{slug}/versions"]["get"]["responses"]["200"]["content"]["application/json"];
+  paths["/api/v1/experiments/{slug}/versions"]["get"]["responses"]["200"]["content"]["application/json"];
 
 export type ExperimentVersionSummary = ExperimentVersionsResponse["versions"][number];
 
@@ -355,7 +355,7 @@ export class ExperimentsApiService {
     } = {},
   ): Promise<ExperimentRunStartResponse> {
     const body = toRunStartRequest({ parameters: options.parameters });
-    const { data, error } = await this.apiClient.POST("/api/experiments/{slug}/run", {
+    const { data, error } = await this.apiClient.POST("/api/v1/experiments/{slug}/run", {
       params: { path: { slug } },
       ...(body !== undefined ? { body } : {}),
     });
@@ -377,7 +377,7 @@ export class ExperimentsApiService {
     name?: string;
     state?: ExperimentWorkbenchState;
   } = {}): Promise<ExperimentCreateResponse> {
-    const { data, error } = await this.apiClient.POST("/api/experiments", {
+    const { data, error } = await this.apiClient.POST("/api/v1/experiments", {
       body: {
         ...(name !== undefined ? { name } : {}),
         ...(state !== undefined ? { state } : {}),
@@ -409,7 +409,7 @@ export class ExperimentsApiService {
     slug: string;
     fields?: "version";
   }): Promise<ExperimentWorkbenchStateResponse | ExperimentWorkbenchVersionProbe> {
-    const { data, error } = await this.apiClient.GET("/api/experiments/{slug}/workbench-state", {
+    const { data, error } = await this.apiClient.GET("/api/v1/experiments/{slug}/workbench-state", {
       params: {
         path: { slug },
         ...(fields !== undefined ? { query: { fields } } : {}),
@@ -439,7 +439,7 @@ export class ExperimentsApiService {
     expectedVersion?: number;
     commitMessage?: string;
   }): Promise<ExperimentSaveWorkbenchStateResponse> {
-    const { data, error } = await this.apiClient.PUT("/api/experiments/{slug}/workbench-state", {
+    const { data, error } = await this.apiClient.PUT("/api/v1/experiments/{slug}/workbench-state", {
       params: { path: { slug } },
       body: {
         state,
@@ -463,7 +463,7 @@ export class ExperimentsApiService {
     limit?: number;
     cursor?: number;
   }): Promise<ExperimentVersionsResponse> {
-    const { data, error } = await this.apiClient.GET("/api/experiments/{slug}/versions", {
+    const { data, error } = await this.apiClient.GET("/api/v1/experiments/{slug}/versions", {
       params: {
         path: { slug },
         query: {
@@ -490,7 +490,7 @@ export class ExperimentsApiService {
     version: number;
   }): Promise<ExperimentRestoreVersionResponse> {
     const { data, error } = await this.apiClient.POST(
-      "/api/experiments/{slug}/versions/{version}/restore",
+      "/api/v1/experiments/{slug}/versions/{version}/restore",
       { params: { path: { slug, version } } },
     );
     if (error) {
@@ -500,7 +500,7 @@ export class ExperimentsApiService {
   }
 
   async getRunStatus(runId: string): Promise<ExperimentRunStatusResponse> {
-    const { data, error } = await this.apiClient.GET("/api/experiments/runs/{runId}", {
+    const { data, error } = await this.apiClient.GET("/api/v1/experiments/runs/{runId}", {
       params: { path: { runId } },
     });
     if (error) this.handleApiError(`get run status for "${runId}"`, error);
@@ -510,7 +510,7 @@ export class ExperimentsApiService {
   /**
    * List experiments for the current project.
    *
-   * Hits `GET /api/experiments` through the configured API client transport.
+   * Hits `GET /api/v1/experiments` through the configured API client transport.
    * The route is not yet declared in generated OpenAPI types, so the path is
    * dispatched through a narrow untyped helper.
    */
@@ -526,7 +526,7 @@ export class ExperimentsApiService {
     if (page !== undefined) search.set("page", String(page));
     const qs = search.toString();
     return this.getUndeclaredEndpoint<ExperimentListResponse>({
-      path: `/api/experiments${qs ? `?${qs}` : ""}`,
+      path: `/api/v1/experiments${qs ? `?${qs}` : ""}`,
       operation: "list experiments",
     });
   }
@@ -534,7 +534,7 @@ export class ExperimentsApiService {
   /**
    * List experiment runs for an experiment slug.
    *
-   * Hits `GET /api/experiments/runs?experimentSlug=...` through the
+   * Hits `GET /api/v1/experiments/runs?experimentSlug=...` through the
    * configured API client transport because the route is not yet declared in
    * the generated OpenAPI.
    */
@@ -552,7 +552,7 @@ export class ExperimentsApiService {
     if (pageSize !== undefined) search.set("pageSize", String(pageSize));
     if (page !== undefined) search.set("page", String(page));
     return this.getUndeclaredEndpoint<ExperimentRunsListResponse>({
-      path: `/api/experiments/runs?${search.toString()}`,
+      path: `/api/v1/experiments/runs?${search.toString()}`,
       operation: `list runs for experiment "${experimentSlug}"`,
     });
   }
@@ -560,7 +560,7 @@ export class ExperimentsApiService {
   /**
    * Fetch per-row results for a completed experiment run.
    *
-   * Hits `GET /api/experiments/runs/{runId}/results` through the
+   * Hits `GET /api/v1/experiments/runs/{runId}/results` through the
    * configured API client transport because the route is not yet declared in
    * the generated OpenAPI `paths`.
    */
@@ -575,7 +575,7 @@ export class ExperimentsApiService {
     if (experimentSlug) search.set("experimentSlug", experimentSlug);
     const qs = search.toString() ? `?${search.toString()}` : "";
     const body = await this.getUndeclaredEndpoint<ExperimentRunResultsResponse | null>({
-      path: `/api/experiments/runs/${encodeURIComponent(runId)}/results${qs}`,
+      path: `/api/v1/experiments/runs/${encodeURIComponent(runId)}/results${qs}`,
       operation: `get run results for "${runId}"`,
     });
     if (body === null) {

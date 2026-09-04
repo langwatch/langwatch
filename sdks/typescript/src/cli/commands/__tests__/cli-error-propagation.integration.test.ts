@@ -148,12 +148,12 @@ describe("CLI surfaces meaningful error messages from the API", () => {
       await runCli(["prompt", "create", "my-prompt"], testDir);
 
       // Pull (push.ts fetches existing prompts before pushing) returns empty
-      pushResponse("GET", "/api/prompts/:id", {
+      pushResponse("GET", "/api/v1/prompts/:id", {
         status: 404,
         body: { error: "NotFoundError", message: "Prompt not found" },
       });
       // Sync returns 409 conflict
-      pushResponse("POST", "/api/prompts/:id/sync", {
+      pushResponse("POST", "/api/v1/prompts/:id/sync", {
         status: 409,
         body: {
           error: "Conflict",
@@ -177,11 +177,11 @@ describe("CLI surfaces meaningful error messages from the API", () => {
       await runCli(["prompt", "init"], testDir);
       await runCli(["prompt", "create", "my-prompt"], testDir);
 
-      pushResponse("GET", "/api/prompts/:id", {
+      pushResponse("GET", "/api/v1/prompts/:id", {
         status: 404,
         body: { error: "NotFoundError", message: "Prompt not found" },
       });
-      pushResponse("POST", "/api/prompts/:id/sync", {
+      pushResponse("POST", "/api/v1/prompts/:id/sync", {
         status: 500,
         body: {
           error: "Internal server error",
@@ -202,11 +202,11 @@ describe("CLI surfaces meaningful error messages from the API", () => {
       await runCli(["prompt", "init"], testDir);
       await runCli(["prompt", "create", "my-prompt"], testDir);
 
-      pushResponse("GET", "/api/prompts/:id", {
+      pushResponse("GET", "/api/v1/prompts/:id", {
         status: 404,
         body: { error: "NotFoundError", message: "Prompt not found" },
       });
-      pushResponse("POST", "/api/prompts/:id/sync", {
+      pushResponse("POST", "/api/v1/prompts/:id/sync", {
         status: 500,
         body: { code: "MYSTERY_CODE", details: { traceId: "tr_123" } },
       });

@@ -199,7 +199,7 @@ export class LangWatch {
   readonly evaluators: EvaluatorsApiService;
   readonly scenarios: ScenariosApiService;
   /**
-   * @deprecated Use runPlans and testSuites; /api/suites is a frozen alias.
+   * @deprecated Use runPlans and testSuites; /api/v1/suites is a frozen alias.
    */
   readonly suites: SuitesApiService;
   readonly runPlans: RunPlansApiService;

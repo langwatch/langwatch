@@ -36,7 +36,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/api/workflows/{workflow_id}/{version_id}/run".format(
+        "url": "/api/v1/workflows/{workflow_id}/{version_id}/run".format(
             workflow_id=quote(str(workflow_id), safe=""),
             version_id=quote(str(version_id), safe=""),
         ),

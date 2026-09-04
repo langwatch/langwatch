@@ -25,7 +25,7 @@ export const getTriggerCommand = async (id: string): Promise<CommandResult | voi
   const spinner = createSpinner(`Fetching trigger "${id}"...`).start();
 
   try {
-    const response = await fetch(`${endpoint}/api/triggers/${encodeURIComponent(id)}`, {
+    const response = await fetch(`${endpoint}/api/v1/triggers/${encodeURIComponent(id)}`, {
       headers: buildAuthHeaders({ apiKey }),
     });
 

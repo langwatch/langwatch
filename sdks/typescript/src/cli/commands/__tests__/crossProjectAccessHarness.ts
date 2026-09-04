@@ -148,25 +148,25 @@ export function installCrossProjectHarness(): CrossProjectHarness {
           return;
         }
 
-        if (url.startsWith("/api/traces/search")) {
+        if (url.startsWith("/api/v1/traces/search")) {
           recorded.searchAuth = auth;
           json(200, { traces: [], pagination: { totalHits: 0 } });
           return;
         }
 
-        if (url.startsWith("/api/coding-agent/sessions/")) {
+        if (url.startsWith("/api/v1/coding-agent/sessions/")) {
           recorded.sessionEventsAuth = auth;
           json(200, { events: [], nextCursor: null });
           return;
         }
 
-        if (url.startsWith("/api/traces/")) {
+        if (url.startsWith("/api/v1/traces/")) {
           recorded.traceGetAuth = auth;
           json(200, { trace_id: "abc123" });
           return;
         }
 
-        if (url.startsWith("/api/me/project")) {
+        if (url.startsWith("/api/v1/me/project")) {
           json(200, {
             id: PERSONAL_PROJECT.id,
             name: PERSONAL_PROJECT.name,

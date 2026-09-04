@@ -20,7 +20,7 @@ export const deleteGraphCommand = async (id: string): Promise<CommandResult | vo
   const spinner = createSpinner(`Deleting graph "${id}"...`).start();
 
   try {
-    const response = await fetch(`${endpoint}/api/graphs/${encodeURIComponent(id)}`, {
+    const response = await fetch(`${endpoint}/api/v1/graphs/${encodeURIComponent(id)}`, {
       method: "DELETE",
       headers: buildAuthHeaders({ apiKey }),
     });

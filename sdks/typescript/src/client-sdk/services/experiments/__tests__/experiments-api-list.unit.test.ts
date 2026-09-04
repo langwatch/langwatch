@@ -41,7 +41,7 @@ describe("ExperimentsApiService list endpoints", () => {
   describe("listExperiments", () => {
     describe("given the API returns a valid payload", () => {
       describe("when called without arguments", () => {
-        it("hits /api/experiments with no query string", async () => {
+        it("hits /api/v1/experiments with no query string", async () => {
           const payload: ExperimentListResponse = {
             experiments: [],
             pagination: {
@@ -57,7 +57,7 @@ describe("ExperimentsApiService list endpoints", () => {
           const result = await service.listExperiments();
 
           expect(result).toEqual(payload);
-          expect(fetchedUrl()).toBe("https://api.langwatch.test/api/experiments");
+          expect(fetchedUrl()).toBe("https://api.langwatch.test/api/v1/experiments");
         });
       });
 
@@ -114,7 +114,7 @@ describe("ExperimentsApiService list endpoints", () => {
           });
 
           expect(result).toEqual(payload);
-          expect(fetchedUrl()).toContain("/api/experiments/runs?experimentSlug=checkout-flow");
+          expect(fetchedUrl()).toContain("/api/v1/experiments/runs?experimentSlug=checkout-flow");
         });
       });
     });

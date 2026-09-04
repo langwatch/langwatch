@@ -367,7 +367,7 @@ class LangWatchTrace:
         def _do_share() -> str:
             with httpx.Client() as client:
                 response = client.post(
-                    f"{endpoint}/api/trace/{trace_id}/share",
+                    f"{endpoint}/api/v1/trace/{trace_id}/share",
                     headers=build_auth_headers(get_api_key()),
                     timeout=30,
                 )
@@ -389,7 +389,7 @@ class LangWatchTrace:
         def _do_unshare() -> None:
             with httpx.Client() as client:
                 response = client.post(
-                    f"{endpoint}/api/trace/{trace_id}/unshare",
+                    f"{endpoint}/api/v1/trace/{trace_id}/unshare",
                     headers=build_auth_headers(get_api_key()),
                     timeout=30,
                 )

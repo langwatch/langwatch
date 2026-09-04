@@ -67,23 +67,23 @@ function createMockServer(): Server {
       const url = req.url ?? "";
       res.setHeader("Content-Type", "application/json");
 
-      // GET /api/scenarios - list all scenarios
-      if (url === "/api/scenarios" && req.method === "GET") {
+      // GET /api/v1/scenarios - list all scenarios
+      if (url === "/api/v1/scenarios" && req.method === "GET") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_SCENARIOS_LIST));
       }
-      // GET /api/scenarios/:id - get scenario detail
-      else if (url.match(/^\/api\/scenarios\/scen_abc123(\?|$)/) && req.method === "GET") {
+      // GET /api/v1/scenarios/:id - get scenario detail
+      else if (url.match(/^\/api\/v1\/scenarios\/scen_abc123(\?|$)/) && req.method === "GET") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_SCENARIO_DETAIL));
       }
-      // GET /api/scenarios/:id - not found
-      else if (url.match(/^\/api\/scenarios\/scen_nonexistent(\?|$)/) && req.method === "GET") {
+      // GET /api/v1/scenarios/:id - not found
+      else if (url.match(/^\/api\/v1\/scenarios\/scen_nonexistent(\?|$)/) && req.method === "GET") {
         res.writeHead(404);
         res.end(JSON.stringify({ message: "Scenario not found" }));
       }
-      // POST /api/scenarios - create scenario
-      else if (url === "/api/scenarios" && req.method === "POST") {
+      // POST /api/v1/scenarios - create scenario
+      else if (url === "/api/v1/scenarios" && req.method === "POST") {
         const parsed = JSON.parse(body);
         if (!parsed.name) {
           res.writeHead(400);
@@ -93,18 +93,18 @@ function createMockServer(): Server {
           res.end(JSON.stringify(CANNED_SCENARIO_CREATED));
         }
       }
-      // PUT /api/scenarios/:id - update scenario
-      else if (url.match(/^\/api\/scenarios\/scen_abc123$/) && req.method === "PUT") {
+      // PUT /api/v1/scenarios/:id - update scenario
+      else if (url.match(/^\/api\/v1\/scenarios\/scen_abc123$/) && req.method === "PUT") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_SCENARIO_UPDATED));
       }
-      // PUT /api/scenarios/:id - not found
-      else if (url.match(/^\/api\/scenarios\/scen_nonexistent$/) && req.method === "PUT") {
+      // PUT /api/v1/scenarios/:id - not found
+      else if (url.match(/^\/api\/v1\/scenarios\/scen_nonexistent$/) && req.method === "PUT") {
         res.writeHead(404);
         res.end(JSON.stringify({ message: "Scenario not found" }));
       }
-      // DELETE /api/scenarios/:id - archive scenario
-      else if (url.match(/^\/api\/scenarios\/scen_abc123$/) && req.method === "DELETE") {
+      // DELETE /api/v1/scenarios/:id - archive scenario
+      else if (url.match(/^\/api\/v1\/scenarios\/scen_abc123$/) && req.method === "DELETE") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_SCENARIO_ARCHIVED));
       } else {

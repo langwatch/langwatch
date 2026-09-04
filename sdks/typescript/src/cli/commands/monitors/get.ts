@@ -35,7 +35,7 @@ export const getMonitorCommand = async (id: string): Promise<CommandResult | voi
     platformUrl?: string;
   };
   try {
-    const response = await fetch(`${endpoint}/api/monitors/${id}`, {
+    const response = await fetch(`${endpoint}/api/v1/monitors/${id}`, {
       headers: buildAuthHeaders({ apiKey }),
     });
 

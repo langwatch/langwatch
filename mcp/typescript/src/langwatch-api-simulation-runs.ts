@@ -39,13 +39,13 @@ export async function listSimulationRuns(params?: {
   if (params?.batchRunId) query.set("batchRunId", params.batchRunId);
   if (params?.limit) query.set("limit", String(params.limit));
   const qs = query.toString() ? `?${query}` : "";
-  return makeRequest("GET", `/api/simulation-runs${qs}`) as Promise<SimulationRunListResponse>;
+  return makeRequest("GET", `/api/v1/simulation-runs${qs}`) as Promise<SimulationRunListResponse>;
 }
 
 /** Gets a single simulation run by its ID. */
 export async function getSimulationRun(scenarioRunId: string): Promise<SimulationRunSummary> {
   return makeRequest(
     "GET",
-    `/api/simulation-runs/${encodeURIComponent(scenarioRunId)}`,
+    `/api/v1/simulation-runs/${encodeURIComponent(scenarioRunId)}`,
   ) as Promise<SimulationRunSummary>;
 }

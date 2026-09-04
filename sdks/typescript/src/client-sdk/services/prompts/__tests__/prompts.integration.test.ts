@@ -17,7 +17,7 @@ const http = createOpenApiHttp<paths>({
 });
 
 const handlers = [
-  http.get("/api/prompts/{id}", ({ params, request, response }) => {
+  http.get("/api/v1/prompts/{id}", ({ params, request, response }) => {
     const url = new URL(request.url);
     const versionParam = url.searchParams.get("version");
     const prompt = promptResponseFactory.build({
@@ -26,7 +26,7 @@ const handlers = [
     });
     return response(200).json(prompt);
   }),
-  http.post("/api/prompts", async ({ request, response }) => {
+  http.post("/api/v1/prompts", async ({ request, response }) => {
     const body = await request.json();
     const prompt = promptResponseFactory.build({
       handle: body?.handle,
@@ -38,7 +38,7 @@ const handlers = [
       projectId: "123",
     });
   }),
-  http.put("/api/prompts/{id}", async ({ params, request, response }) => {
+  http.put("/api/v1/prompts/{id}", async ({ params, request, response }) => {
     const body = (await request.json()) as Record<string, unknown> | undefined;
     const { tags: _inputTags, ...rest } = body ?? {};
     const prompt = promptResponseFactory.build({
@@ -48,7 +48,7 @@ const handlers = [
     });
     return response(200).json(prompt);
   }),
-  http.delete("/api/prompts/{id}", async ({ response }) => {
+  http.delete("/api/v1/prompts/{id}", async ({ response }) => {
     return response(200).json({ success: true });
   }),
 ];

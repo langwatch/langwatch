@@ -134,8 +134,8 @@ function createMockServer(): Server {
       const url = req.url ?? "";
       res.setHeader("Content-Type", "application/json");
 
-      // GET /api/dataset - list datasets
-      if (url.match(/^\/api\/dataset(\?|$)/) && req.method === "GET") {
+      // GET /api/v1/dataset - list datasets
+      if (url.match(/^\/api\/v1\/dataset(\?|$)/) && req.method === "GET") {
         if (emptyListMode) {
           res.writeHead(200);
           res.end(JSON.stringify(CANNED_DATASETS_EMPTY));
@@ -144,18 +144,18 @@ function createMockServer(): Server {
           res.end(JSON.stringify(CANNED_DATASETS_LIST));
         }
       }
-      // GET /api/dataset/my-dataset - get dataset detail
-      else if (url.match(/^\/api\/dataset\/my-dataset(\?|$)/) && req.method === "GET") {
+      // GET /api/v1/dataset/my-dataset - get dataset detail
+      else if (url.match(/^\/api\/v1\/dataset\/my-dataset(\?|$)/) && req.method === "GET") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_DATASET_DETAIL));
       }
-      // GET /api/dataset/does-not-exist - not found
-      else if (url.match(/^\/api\/dataset\/does-not-exist(\?|$)/) && req.method === "GET") {
+      // GET /api/v1/dataset/does-not-exist - not found
+      else if (url.match(/^\/api\/v1\/dataset\/does-not-exist(\?|$)/) && req.method === "GET") {
         res.writeHead(404);
         res.end(JSON.stringify({ message: "Dataset not found" }));
       }
-      // POST /api/dataset - create dataset
-      else if (url === "/api/dataset" && req.method === "POST") {
+      // POST /api/v1/dataset - create dataset
+      else if (url === "/api/v1/dataset" && req.method === "POST") {
         const parsed = JSON.parse(body);
         if (
           parsed.columnTypes &&
@@ -169,61 +169,61 @@ function createMockServer(): Server {
           res.end(JSON.stringify(CANNED_DATASET_CREATED_EMPTY));
         }
       }
-      // PATCH /api/dataset/old-name - update dataset name
-      else if (url.match(/^\/api\/dataset\/old-name$/) && req.method === "PATCH") {
+      // PATCH /api/v1/dataset/old-name - update dataset name
+      else if (url.match(/^\/api\/v1\/dataset\/old-name$/) && req.method === "PATCH") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_DATASET_UPDATED));
       }
-      // PATCH /api/dataset/my-dataset - update dataset columns
-      else if (url.match(/^\/api\/dataset\/my-dataset$/) && req.method === "PATCH") {
+      // PATCH /api/v1/dataset/my-dataset - update dataset columns
+      else if (url.match(/^\/api\/v1\/dataset\/my-dataset$/) && req.method === "PATCH") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_DATASET_UPDATED_COLUMNS));
       }
-      // PATCH /api/dataset/ghost - not found
-      else if (url.match(/^\/api\/dataset\/ghost$/) && req.method === "PATCH") {
+      // PATCH /api/v1/dataset/ghost - not found
+      else if (url.match(/^\/api\/v1\/dataset\/ghost$/) && req.method === "PATCH") {
         res.writeHead(404);
         res.end(JSON.stringify({ message: "Dataset not found" }));
       }
-      // DELETE /api/dataset/to-delete - archive dataset
-      else if (url.match(/^\/api\/dataset\/to-delete$/) && req.method === "DELETE") {
+      // DELETE /api/v1/dataset/to-delete - archive dataset
+      else if (url.match(/^\/api\/v1\/dataset\/to-delete$/) && req.method === "DELETE") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_DATASET_ARCHIVED));
       }
-      // DELETE /api/dataset/ghost - not found
-      else if (url.match(/^\/api\/dataset\/ghost$/) && req.method === "DELETE") {
+      // DELETE /api/v1/dataset/ghost - not found
+      else if (url.match(/^\/api\/v1\/dataset\/ghost$/) && req.method === "DELETE") {
         res.writeHead(404);
         res.end(JSON.stringify({ message: "Dataset not found" }));
       }
-      // POST /api/dataset/my-dataset/records - create records
-      else if (url.match(/^\/api\/dataset\/my-dataset\/records$/) && req.method === "POST") {
+      // POST /api/v1/dataset/my-dataset/records - create records
+      else if (url.match(/^\/api\/v1\/dataset\/my-dataset\/records$/) && req.method === "POST") {
         res.writeHead(201);
         res.end(JSON.stringify(CANNED_RECORDS_CREATED));
       }
-      // POST /api/dataset/ghost/records - not found
-      else if (url.match(/^\/api\/dataset\/ghost\/records$/) && req.method === "POST") {
+      // POST /api/v1/dataset/ghost/records - not found
+      else if (url.match(/^\/api\/v1\/dataset\/ghost\/records$/) && req.method === "POST") {
         res.writeHead(404);
         res.end(JSON.stringify({ message: "Dataset not found" }));
       }
-      // PATCH /api/dataset/my-dataset/records/rec-123 - update record
+      // PATCH /api/v1/dataset/my-dataset/records/rec-123 - update record
       else if (
-        url.match(/^\/api\/dataset\/my-dataset\/records\/rec-123$/) &&
+        url.match(/^\/api\/v1\/dataset\/my-dataset\/records\/rec-123$/) &&
         req.method === "PATCH"
       ) {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_RECORD_UPDATED));
       }
-      // PATCH /api/dataset/ghost/records/rec-1 - not found
-      else if (url.match(/^\/api\/dataset\/ghost\/records\//) && req.method === "PATCH") {
+      // PATCH /api/v1/dataset/ghost/records/rec-1 - not found
+      else if (url.match(/^\/api\/v1\/dataset\/ghost\/records\//) && req.method === "PATCH") {
         res.writeHead(404);
         res.end(JSON.stringify({ message: "Dataset not found" }));
       }
-      // DELETE /api/dataset/my-dataset/records - delete records
-      else if (url.match(/^\/api\/dataset\/my-dataset\/records$/) && req.method === "DELETE") {
+      // DELETE /api/v1/dataset/my-dataset/records - delete records
+      else if (url.match(/^\/api\/v1\/dataset\/my-dataset\/records$/) && req.method === "DELETE") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_RECORDS_DELETED));
       }
-      // DELETE /api/dataset/ghost/records - not found
-      else if (url.match(/^\/api\/dataset\/ghost\/records$/) && req.method === "DELETE") {
+      // DELETE /api/v1/dataset/ghost/records - not found
+      else if (url.match(/^\/api\/v1\/dataset\/ghost\/records$/) && req.method === "DELETE") {
         res.writeHead(404);
         res.end(JSON.stringify({ message: "Dataset not found" }));
       } else {

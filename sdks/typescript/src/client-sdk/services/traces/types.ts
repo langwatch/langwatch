@@ -5,7 +5,7 @@ export interface GetTraceParams {
 }
 
 export type GetTraceResponse = NonNullable<
-  paths["/api/trace/{id}"]["get"]["responses"]["200"]["content"]["application/json"]
+  paths["/api/v1/trace/{id}"]["get"]["responses"]["200"]["content"]["application/json"]
 >;
 
 /**

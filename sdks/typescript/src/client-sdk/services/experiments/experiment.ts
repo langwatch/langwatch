@@ -226,7 +226,7 @@ export class Experiment {
     }
 
     try {
-      const response = await fetch(`${this.endpoint}/api/experiment/init`, {
+      const response = await fetch(`${this.endpoint}/api/v1/experiment/init`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -673,7 +673,7 @@ export class Experiment {
     spanId?: string | null;
     asGuardrail?: boolean;
   }): Promise<RunEvaluatorResponse> {
-    const response = await fetch(`${this.endpoint}/api/evaluations/${evaluatorSlug}/evaluate`, {
+    const response = await fetch(`${this.endpoint}/api/v1/evaluations/${evaluatorSlug}/evaluate`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -1385,7 +1385,7 @@ export class Experiment {
     };
 
     // Fire and forget (with error logging)
-    this.pendingFlush = fetch(`${this.endpoint}/api/evaluations/batch/log_results`, {
+    this.pendingFlush = fetch(`${this.endpoint}/api/v1/evaluations/batch/log_results`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

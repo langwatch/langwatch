@@ -74,7 +74,7 @@
               "skill": "analytics",
               "docs": "https://langwatch.ai/docs/features/embedded-analytics.md"
             },
-            "api": "/api/analytics",
+            "api": "/api/v1/analytics",
             "docs": "https://langwatch.ai/docs/features/embedded-analytics.md"
           },
           "sync": null,
@@ -137,7 +137,7 @@
               "skill": null,
               "docs": "https://langwatch.ai/docs/features/annotations.md"
             },
-            "api": "/api/annotations",
+            "api": "/api/v1/annotations",
             "docs": "https://langwatch.ai/docs/features/annotations.md"
           },
           "sync": null,
@@ -203,7 +203,7 @@
               "skill": null,
               "docs": "https://langwatch.ai/docs/evaluations/experiments/overview.md"
             },
-            "api": "/api/experiment",
+            "api": "/api/v1/experiment",
             "docs": "https://langwatch.ai/docs/evaluations/experiments/overview.md"
           },
           "sync": "code-to-platform",
@@ -250,7 +250,7 @@
               "skill": null,
               "docs": "https://langwatch.ai/docs/evaluations/online-evaluation/overview.md"
             },
-            "api": "/api/monitors",
+            "api": "/api/v1/monitors",
             "docs": "https://langwatch.ai/docs/evaluations/online-evaluation/overview.md"
           },
           "sync": null,
@@ -314,7 +314,7 @@
               "skill": "scenarios",
               "docs": "https://langwatch.ai/scenario/basics/no-code-scenario.md"
             },
-            "api": "/api/scenarios",
+            "api": "/api/v1/scenarios",
             "docs": "https://langwatch.ai/docs/agent-testing/introduction.md"
           },
           "sync": null,
@@ -347,7 +347,7 @@
               "skill": null,
               "docs": "https://langwatch.ai/docs/agent-testing/individual-run.md"
             },
-            "api": "/api/simulation-runs",
+            "api": "/api/v1/simulation-runs",
             "docs": "https://langwatch.ai/docs/agent-testing/individual-run.md"
           },
           "sync": null,
@@ -508,7 +508,7 @@
               "skill": null,
               "docs": "https://langwatch.ai/docs/prompt-management/getting-started.md"
             },
-            "api": "/api/prompts",
+            "api": "/api/v1/prompts",
             "docs": "https://langwatch.ai/docs/prompt-management/overview.md"
           },
           "sync": "bidirectional",
@@ -532,7 +532,7 @@
               "skill": null,
               "docs": "https://langwatch.ai/docs/prompt-management/prompt-playground.md"
             },
-            "api": "/api/playground",
+            "api": "/api/v1/playground",
             "docs": "https://langwatch.ai/docs/prompt-management/prompt-playground.md"
           },
           "sync": null
@@ -619,7 +619,7 @@
               "skill": null,
               "docs": "https://langwatch.ai/docs/optimization-studio/overview.md"
             },
-            "api": "/api/workflows",
+            "api": "/api/v1/workflows",
             "docs": "https://langwatch.ai/docs/optimization-studio/overview.md"
           },
           "sync": null,
@@ -667,7 +667,7 @@
               "skill": "evaluations",
               "docs": "https://langwatch.ai/docs/evaluations/evaluators/overview.md"
             },
-            "api": "/api/evaluations",
+            "api": "/api/v1/evaluations",
             "docs": "https://langwatch.ai/docs/evaluations/evaluators/overview.md"
           },
           "sync": null,
@@ -726,7 +726,7 @@
               "skill": null,
               "docs": "https://langwatch.ai/docs/datasets/overview.md"
             },
-            "api": "/api/dataset",
+            "api": "/api/v1/dataset",
             "docs": "https://langwatch.ai/docs/datasets/overview.md"
           },
           "sync": null,
@@ -789,7 +789,7 @@
           "skill": null,
           "docs": null
         },
-        "api": "/api/dashboards",
+        "api": "/api/v1/dashboards",
         "docs": null
       },
       "sync": null,
@@ -828,7 +828,7 @@
           "skill": null,
           "docs": null
         },
-        "api": "/api/triggers",
+        "api": "/api/v1/triggers",
         "docs": null
       },
       "sync": null,
@@ -1014,7 +1014,7 @@
               "skill": null,
               "docs": null
             },
-            "api": "/api/governance",
+            "api": "/api/v1/governance",
             "docs": "https://langwatch.ai/docs/ai-gateway/governance/overview.md"
           },
           "sync": null,
@@ -1047,7 +1047,7 @@
               "skill": null,
               "docs": null
             },
-            "api": "/api/governance",
+            "api": "/api/v1/governance",
             "docs": "https://langwatch.ai/docs/ai-gateway/governance/overview.md"
           },
           "sync": null,
@@ -1131,7 +1131,7 @@
               "skill": null,
               "docs": null
             },
-            "api": "/api/api-keys",
+            "api": "/api/v1/api-keys",
             "docs": null
           },
           "sync": null,
@@ -1164,7 +1164,7 @@
               "skill": null,
               "docs": null
             },
-            "api": "/api/organization",
+            "api": "/api/v1/organization",
             "docs": null
           },
           "sync": null,
@@ -1202,7 +1202,7 @@
               "skill": null,
               "docs": null
             },
-            "api": "/api/organization/members",
+            "api": "/api/v1/organization/members",
             "docs": null
           },
           "sync": null,
@@ -1238,7 +1238,7 @@
               "skill": null,
               "docs": null
             },
-            "api": "/api/teams",
+            "api": "/api/v1/teams",
             "docs": null
           },
           "sync": null,
@@ -1277,7 +1277,7 @@
               "skill": null,
               "docs": null
             },
-            "api": "/api/groups",
+            "api": "/api/v1/groups",
             "docs": null
           },
           "sync": null,
@@ -1311,7 +1311,7 @@
               "skill": null,
               "docs": null
             },
-            "api": "/api/roles",
+            "api": "/api/v1/roles",
             "docs": null
           },
           "sync": null,
@@ -1343,7 +1343,7 @@
               "skill": null,
               "docs": null
             },
-            "api": "/api/role-bindings",
+            "api": "/api/v1/role-bindings",
             "docs": null
           },
           "sync": null,
@@ -1370,7 +1370,7 @@
               "skill": null,
               "docs": null
             },
-            "api": "/api/scim-tokens",
+            "api": "/api/v1/scim-tokens",
             "docs": null
           },
           "sync": null,
@@ -1397,7 +1397,7 @@
               "skill": null,
               "docs": "https://langwatch.ai/docs/integration/custom-models.md"
             },
-            "api": "/api/model-providers",
+            "api": "/api/v1/model-providers",
             "docs": "https://langwatch.ai/docs/integration/custom-models.md"
           },
           "sync": null,
@@ -1462,7 +1462,7 @@
               "skill": null,
               "docs": "https://langwatch.ai/docs/api-reference/agent-cache/overview.md"
             },
-            "api": "/api/agent-cache",
+            "api": "/api/v1/agent-cache",
             "docs": "https://langwatch.ai/docs/agent-testing/authenticated-agents.md"
           },
           "sync": null,
@@ -1489,7 +1489,7 @@
               "skill": null,
               "docs": null
             },
-            "api": "/api/model-defaults",
+            "api": "/api/v1/model-defaults",
             "docs": null
           },
           "sync": null,
@@ -1566,7 +1566,7 @@
               "skill": null,
               "docs": null
             },
-            "api": "/api/bug-reports",
+            "api": "/api/v1/bug-reports",
             "docs": "https://langwatch.ai/docs/support.md"
           },
           "sync": null,

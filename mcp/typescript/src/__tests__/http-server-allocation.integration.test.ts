@@ -240,13 +240,13 @@ describe("Verification against the LangWatch API", () => {
     await new Promise<void>((resolve) => upstream.close(() => resolve()));
   });
 
-  it("checks a key against GET /api/me/project with the key in a header", async () => {
+  it("checks a key against GET /api/v1/me/project with the key in a header", async () => {
     const verifier = createApiKeyVerifier({ endpoint: upstreamUrl });
 
     await expect(verifier.verify(VALID_KEY)).resolves.toBe(true);
     await expect(verifier.verify("sk-lw-fake")).resolves.toBe(false);
 
-    expect(seenUrls).toEqual(["/api/me/project", "/api/me/project"]);
+    expect(seenUrls).toEqual(["/api/v1/me/project", "/api/v1/me/project"]);
     expect(seenAuthHeaders).toEqual([VALID_KEY, "sk-lw-fake"]);
   });
 

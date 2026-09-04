@@ -55,13 +55,13 @@ export class DashboardsApiService {
   }
 
   async list(): Promise<{ data: DashboardSummary[] }> {
-    const { data, error } = await this.apiClient.GET("/api/dashboards");
+    const { data, error } = await this.apiClient.GET("/api/v1/dashboards");
     if (error) this.handleApiError("list dashboards", error);
     return data as unknown as { data: DashboardSummary[] };
   }
 
   async get(id: string): Promise<DashboardDetail> {
-    const { data, error } = await this.apiClient.GET("/api/dashboards/{id}", {
+    const { data, error } = await this.apiClient.GET("/api/v1/dashboards/{id}", {
       params: { path: { id } },
     });
     if (error) this.handleApiError(`get dashboard "${id}"`, error);
@@ -69,7 +69,7 @@ export class DashboardsApiService {
   }
 
   async create(params: { name: string }): Promise<DashboardDetail> {
-    const { data, error } = await this.apiClient.POST("/api/dashboards", {
+    const { data, error } = await this.apiClient.POST("/api/v1/dashboards", {
       body: params,
     });
     if (error) this.handleApiError("create dashboard", error);
@@ -77,7 +77,7 @@ export class DashboardsApiService {
   }
 
   async rename(id: string, params: { name: string }): Promise<DashboardDetail> {
-    const { data, error } = await this.apiClient.PATCH("/api/dashboards/{id}", {
+    const { data, error } = await this.apiClient.PATCH("/api/v1/dashboards/{id}", {
       params: { path: { id } },
       body: params,
     });
@@ -86,7 +86,7 @@ export class DashboardsApiService {
   }
 
   async delete(id: string): Promise<{ id: string; name: string }> {
-    const { data, error } = await this.apiClient.DELETE("/api/dashboards/{id}", {
+    const { data, error } = await this.apiClient.DELETE("/api/v1/dashboards/{id}", {
       params: { path: { id } },
     });
     if (error) this.handleApiError(`delete dashboard "${id}"`, error);

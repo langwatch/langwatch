@@ -1,10 +1,10 @@
 /**
  * How far along a batch of simulation runs is.
  *
- * `--wait` used to poll `GET /api/scenario-events?batchRunId=`, which no route
+ * `--wait` used to poll `GET /api/v1/scenario-events?batchRunId=`, which no route
  * serves: that app registers two POSTs and a DELETE. Every poll 404'd, the
  * failure counter ran out, and the wait ended by reporting the status endpoint
- * as down. `GET /api/simulation-runs?batchRunId=` is the endpoint that answers.
+ * as down. `GET /api/v1/simulation-runs?batchRunId=` is the endpoint that answers.
  *
  * It returns the runs rather than a tally, so the counting happens here. One
  * place, because two commands need the same answer and a batch that is "done"
@@ -80,7 +80,7 @@ export async function fetchBatchRuns({
   let cursor: string | undefined;
 
   do {
-    const url = new URL("/api/simulation-runs", endpoint);
+    const url = new URL("/api/v1/simulation-runs", endpoint);
     url.searchParams.set("batchRunId", batchRunId);
     url.searchParams.set("limit", "100");
     if (cursor) url.searchParams.set("cursor", cursor);

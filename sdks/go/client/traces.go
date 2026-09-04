@@ -33,7 +33,7 @@ type (
 // TraceSearchResponse is the paginated result of [TracesService.Search].
 //
 // It is written out here rather than aliased to the shared openapi.SearchResponse,
-// which describes a page/limit/total envelope that /api/traces/search does not
+// which describes a page/limit/total envelope that /api/v1/traces/search does not
 // send. Decoding into it silently dropped the scroll cursor, so ScrollID could
 // be sent but never received and a manual scroll was impossible to drive.
 type TraceSearchResponse struct {
@@ -69,7 +69,7 @@ type TraceSearchParams struct {
 }
 
 // Search runs a trace search and returns matching traces plus pagination
-// metadata. It targets the current /api/traces/search endpoint.
+// metadata. It targets the current /api/v1/traces/search endpoint.
 //
 // To walk more than one page, either use [TracesService.All], or feed each
 // response's Pagination.ScrollID back in as the next request's ScrollID and

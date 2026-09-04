@@ -144,7 +144,7 @@ const mockPagedGatewayFetch = (pages: unknown[][]) =>
  * zero errored traces, no experiments, no budgets. */
 const mockAllSuccess = (): void => {
   mockGET.mockImplementation(async (path: string) => {
-    if (path.startsWith("/api/experiments")) {
+    if (path.startsWith("/api/v1/experiments")) {
       return { data: noExperiments, error: undefined, response: { status: 200 } };
     }
     return { data: [{ id: "1" }, { id: "2" }], error: undefined };
@@ -333,7 +333,7 @@ describe("statusCommand", () => {
   describe("attention sections", () => {
     it("flags errored traces, a running experiment and an at-risk budget", async () => {
       mockGET.mockImplementation(async (path: string) => {
-        if (path.startsWith("/api/experiments/runs")) {
+        if (path.startsWith("/api/v1/experiments/runs")) {
           return {
             data: {
               runs: [
@@ -359,7 +359,7 @@ describe("statusCommand", () => {
             response: { status: 200 },
           };
         }
-        if (path.startsWith("/api/experiments")) {
+        if (path.startsWith("/api/v1/experiments")) {
           return {
             data: {
               experiments: [
@@ -433,10 +433,10 @@ describe("statusCommand", () => {
 
     it("marks the running-experiments scan incomplete when a candidate check fails", async () => {
       mockGET.mockImplementation(async (path: string) => {
-        if (path.startsWith("/api/experiments/runs")) {
+        if (path.startsWith("/api/v1/experiments/runs")) {
           throw new Error("runs endpoint down");
         }
-        if (path.startsWith("/api/experiments")) {
+        if (path.startsWith("/api/v1/experiments")) {
           return {
             data: {
               experiments: [
@@ -556,10 +556,10 @@ describe("statusCommand", () => {
       runs?: unknown;
     }): void => {
       mockGET.mockImplementation(async (path: string) => {
-        if (path.startsWith("/api/experiments/runs")) {
+        if (path.startsWith("/api/v1/experiments/runs")) {
           return { data: runs, error: undefined, response: { status: 200 } };
         }
-        if (path.startsWith("/api/experiments")) {
+        if (path.startsWith("/api/v1/experiments")) {
           return {
             data: { experiments, pagination },
             error: undefined,
@@ -578,7 +578,7 @@ describe("statusCommand", () => {
 
     describe("when the experiment list is truncated by pagination", () => {
       it("records the unread experiments as a gap and withholds the all-clear", async () => {
-        // `GET /api/experiments` sorts by updatedAt, not lastRunAt — so a
+        // `GET /api/v1/experiments` sorts by updatedAt, not lastRunAt — so a
         // running experiment can sit past the page boundary and never be seen.
         mockExperiments({
           experiments: [experimentFixture()],

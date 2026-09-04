@@ -39,7 +39,7 @@ export class EvaluatorsApiService {
    * Fetches all evaluators for the project.
    */
   async getAll(): Promise<EvaluatorResponse[]> {
-    const { data, error } = await this.apiClient.GET("/api/evaluators");
+    const { data, error } = await this.apiClient.GET("/api/v1/evaluators");
     if (error) this.handleApiError("fetch all evaluators", error);
     return data;
   }
@@ -48,7 +48,7 @@ export class EvaluatorsApiService {
    * Fetches a single evaluator by its ID or slug.
    */
   async get(idOrSlug: string): Promise<EvaluatorResponse> {
-    const { data, error } = await this.apiClient.GET("/api/evaluators/{idOrSlug}", {
+    const { data, error } = await this.apiClient.GET("/api/v1/evaluators/{idOrSlug}", {
       params: { path: { idOrSlug } },
     });
     if (error) this.handleApiError(`fetch evaluator with ID or slug "${idOrSlug}"`, error);
@@ -59,7 +59,7 @@ export class EvaluatorsApiService {
    * Creates a new evaluator.
    */
   async create(params: CreateEvaluatorBody): Promise<EvaluatorResponse> {
-    const { data, error } = await this.apiClient.POST("/api/evaluators", {
+    const { data, error } = await this.apiClient.POST("/api/v1/evaluators", {
       body: params,
     });
     if (error) this.handleApiError("create evaluator", error);
@@ -70,7 +70,7 @@ export class EvaluatorsApiService {
    * Updates an evaluator by its ID.
    */
   async update(id: string, params: UpdateEvaluatorBody): Promise<EvaluatorResponse> {
-    const { data, error } = await this.apiClient.PUT("/api/evaluators/{id}", {
+    const { data, error } = await this.apiClient.PUT("/api/v1/evaluators/{id}", {
       params: { path: { id } },
       body: params,
     });
@@ -82,7 +82,7 @@ export class EvaluatorsApiService {
    * Deletes (archives) an evaluator by its ID.
    */
   async delete(id: string): Promise<DeleteEvaluatorResponse> {
-    const { data, error } = await this.apiClient.DELETE("/api/evaluators/{id}", {
+    const { data, error } = await this.apiClient.DELETE("/api/v1/evaluators/{id}", {
       params: { path: { id } },
     });
     if (error) this.handleApiError(`delete evaluator with ID "${id}"`, error);

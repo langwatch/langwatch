@@ -140,7 +140,7 @@ describe("CLI error edge cases", () => {
   describe("when the API returns 401 unauthorized", () => {
     /** @scenario Invalid API key returns a clear authentication error, not a generic one */
     it("tells the user the API key is invalid", async () => {
-      pushResponse("GET", "/api/prompts", {
+      pushResponse("GET", "/api/v1/prompts", {
         status: 401,
         body: { error: "Unauthorized", message: "Invalid API key" },
       });
@@ -154,7 +154,7 @@ describe("CLI error edge cases", () => {
 
   describe("when the API returns 403 plan limit reached", () => {
     it("surfaces the plan-limit message to the user", async () => {
-      pushResponse("POST", "/api/dataset", {
+      pushResponse("POST", "/api/v1/dataset", {
         status: 403,
         body: {
           error: "PlanLimitReached",
@@ -185,7 +185,7 @@ describe("CLI error edge cases", () => {
 
   describe("when the API returns 429 rate limit", () => {
     it("shows the rate-limit message with the retry hint if provided", async () => {
-      pushResponse("GET", "/api/prompts", {
+      pushResponse("GET", "/api/v1/prompts", {
         status: 429,
         body: {
           error: "RateLimited",

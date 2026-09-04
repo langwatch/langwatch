@@ -195,7 +195,7 @@ export function createRateLimiter({
  * project API key and returns only the identity of the project behind it, so
  * it answers "is this key real" without granting or costing anything else.
  */
-const VERIFY_PATH = "/api/me/project";
+const VERIFY_PATH = "/api/v1/me/project";
 
 export interface ApiKeyVerifier {
   /** True when the LangWatch API recognises this key. */

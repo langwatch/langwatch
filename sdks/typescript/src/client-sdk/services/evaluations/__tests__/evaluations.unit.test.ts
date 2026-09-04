@@ -107,7 +107,7 @@ describe("EvaluationsFacade", () => {
       });
 
       expect(mockFetch).toHaveBeenCalledWith(
-        "https://api.langwatch.ai/api/evaluations/presidio/pii_detection/evaluate",
+        "https://api.langwatch.ai/api/v1/evaluations/presidio/pii_detection/evaluate",
         expect.objectContaining({
           method: "POST",
           headers: expect.objectContaining({

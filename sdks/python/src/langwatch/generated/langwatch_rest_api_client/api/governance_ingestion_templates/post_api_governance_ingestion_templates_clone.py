@@ -29,7 +29,7 @@ def _get_kwargs() -> dict[str, Any]:
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/api/governance/ingestion-templates/clone",
+        "url": "/api/v1/governance/ingestion-templates/clone",
     }
 
     return _kwargs

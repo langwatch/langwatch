@@ -33,14 +33,14 @@ export function getEvaluatorType(evaluator: Pick<EvaluatorSummary, "config">): s
 
 /** Lists all evaluators in the project. */
 export async function listEvaluators(): Promise<EvaluatorSummary[]> {
-  return makeRequest("GET", "/api/evaluators") as Promise<EvaluatorSummary[]>;
+  return makeRequest("GET", "/api/v1/evaluators") as Promise<EvaluatorSummary[]>;
 }
 
 /** Retrieves a single evaluator by ID or slug. */
 export async function getEvaluator(idOrSlug: string): Promise<EvaluatorSummary> {
   return makeRequest(
     "GET",
-    `/api/evaluators/${encodeURIComponent(idOrSlug)}`,
+    `/api/v1/evaluators/${encodeURIComponent(idOrSlug)}`,
   ) as Promise<EvaluatorSummary>;
 }
 
@@ -49,7 +49,7 @@ export async function createEvaluator(data: {
   name: string;
   config: Record<string, unknown>;
 }): Promise<EvaluatorSummary> {
-  return makeRequest("POST", "/api/evaluators", data) as Promise<EvaluatorSummary>;
+  return makeRequest("POST", "/api/v1/evaluators", data) as Promise<EvaluatorSummary>;
 }
 
 /** Updates an existing evaluator. */
@@ -61,7 +61,7 @@ export async function updateEvaluator(params: {
   const { id, ...data } = params;
   return makeRequest(
     "PUT",
-    `/api/evaluators/${encodeURIComponent(id)}`,
+    `/api/v1/evaluators/${encodeURIComponent(id)}`,
     data,
   ) as Promise<EvaluatorSummary>;
 }
@@ -70,7 +70,7 @@ export async function updateEvaluator(params: {
 export async function deleteEvaluator(
   idOrSlug: string,
 ): Promise<{ id: string; archived: boolean }> {
-  return makeRequest("DELETE", `/api/evaluators/${encodeURIComponent(idOrSlug)}`) as Promise<{
+  return makeRequest("DELETE", `/api/v1/evaluators/${encodeURIComponent(idOrSlug)}`) as Promise<{
     id: string;
     archived: boolean;
   }>;

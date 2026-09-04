@@ -37,7 +37,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/api/scenario-events",
+        "url": "/api/v1/scenario-events",
     }
 
     if isinstance(body, PostApiScenarioEventsBodyType0):

@@ -128,7 +128,7 @@ export class EvaluationsFacade {
       };
 
       // Call the evaluation API
-      const url = `${this.#endpoint}/api/evaluations/${slug}/evaluate`;
+      const url = `${this.#endpoint}/api/v1/evaluations/${slug}/evaluate`;
 
       this.#logger.debug(`Calling evaluation API: ${url}`);
 

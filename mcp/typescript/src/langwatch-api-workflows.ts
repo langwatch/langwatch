@@ -12,11 +12,14 @@ export interface WorkflowSummary {
 }
 
 export async function listWorkflows(): Promise<WorkflowSummary[]> {
-  return makeRequest("GET", "/api/workflows") as Promise<WorkflowSummary[]>;
+  return makeRequest("GET", "/api/v1/workflows") as Promise<WorkflowSummary[]>;
 }
 
 export async function getWorkflow(id: string): Promise<WorkflowSummary> {
-  return makeRequest("GET", `/api/workflows/${encodeURIComponent(id)}`) as Promise<WorkflowSummary>;
+  return makeRequest(
+    "GET",
+    `/api/v1/workflows/${encodeURIComponent(id)}`,
+  ) as Promise<WorkflowSummary>;
 }
 
 export async function runWorkflow(
@@ -25,13 +28,13 @@ export async function runWorkflow(
 ): Promise<Record<string, unknown>> {
   return makeRequest(
     "POST",
-    `/api/workflows/${encodeURIComponent(id)}/run`,
+    `/api/v1/workflows/${encodeURIComponent(id)}/run`,
     input ?? {},
   ) as Promise<Record<string, unknown>>;
 }
 
 export async function deleteWorkflow(id: string): Promise<{ id: string; archived: boolean }> {
-  return makeRequest("DELETE", `/api/workflows/${encodeURIComponent(id)}`) as Promise<{
+  return makeRequest("DELETE", `/api/v1/workflows/${encodeURIComponent(id)}`) as Promise<{
     id: string;
     archived: boolean;
   }>;

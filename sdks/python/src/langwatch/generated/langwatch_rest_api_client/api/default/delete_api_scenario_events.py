@@ -30,7 +30,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "delete",
-        "url": "/api/scenario-events",
+        "url": "/api/v1/scenario-events",
         "params": params,
     }
 

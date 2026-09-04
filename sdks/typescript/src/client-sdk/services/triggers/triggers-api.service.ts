@@ -7,19 +7,19 @@ import {
 } from "@/client-sdk/services/_shared/format-api-error";
 
 export type TriggerResponse = NonNullable<
-  paths["/api/triggers"]["get"]["responses"]["200"]["content"]["application/json"]
+  paths["/api/v1/triggers"]["get"]["responses"]["200"]["content"]["application/json"]
 >[number];
 
 export type CreateTriggerBody = NonNullable<
-  paths["/api/triggers"]["post"]["requestBody"]
+  paths["/api/v1/triggers"]["post"]["requestBody"]
 >["content"]["application/json"];
 
 export type UpdateTriggerBody = NonNullable<
-  paths["/api/triggers/{id}"]["patch"]["requestBody"]
+  paths["/api/v1/triggers/{id}"]["patch"]["requestBody"]
 >["content"]["application/json"];
 
 export type TriggerDeleteResponse =
-  paths["/api/triggers/{id}"]["delete"]["responses"]["200"]["content"]["application/json"];
+  paths["/api/v1/triggers/{id}"]["delete"]["responses"]["200"]["content"]["application/json"];
 
 export class TriggersApiError extends Error {
   constructor(
@@ -51,13 +51,13 @@ export class TriggersApiService {
   }
 
   async getAll(): Promise<TriggerResponse[]> {
-    const { data, error } = await this.apiClient.GET("/api/triggers");
+    const { data, error } = await this.apiClient.GET("/api/v1/triggers");
     if (error) this.handleApiError("list triggers", error);
     return data;
   }
 
   async get(id: string): Promise<TriggerResponse> {
-    const { data, error } = await this.apiClient.GET("/api/triggers/{id}", {
+    const { data, error } = await this.apiClient.GET("/api/v1/triggers/{id}", {
       params: { path: { id } },
     });
     if (error) this.handleApiError(`get trigger "${id}"`, error);
@@ -65,7 +65,7 @@ export class TriggersApiService {
   }
 
   async create(params: CreateTriggerBody): Promise<TriggerResponse> {
-    const { data, error } = await this.apiClient.POST("/api/triggers", {
+    const { data, error } = await this.apiClient.POST("/api/v1/triggers", {
       body: params,
     });
     if (error) this.handleApiError("create trigger", error);
@@ -73,7 +73,7 @@ export class TriggersApiService {
   }
 
   async update(id: string, params: UpdateTriggerBody): Promise<TriggerResponse> {
-    const { data, error } = await this.apiClient.PATCH("/api/triggers/{id}", {
+    const { data, error } = await this.apiClient.PATCH("/api/v1/triggers/{id}", {
       params: { path: { id } },
       body: params,
     });
@@ -82,7 +82,7 @@ export class TriggersApiService {
   }
 
   async delete(id: string): Promise<TriggerDeleteResponse> {
-    const { data, error } = await this.apiClient.DELETE("/api/triggers/{id}", {
+    const { data, error } = await this.apiClient.DELETE("/api/v1/triggers/{id}", {
       params: { path: { id } },
     });
     if (error) this.handleApiError(`delete trigger "${id}"`, error);

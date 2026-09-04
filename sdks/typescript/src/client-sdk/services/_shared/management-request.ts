@@ -59,7 +59,7 @@ export interface ManagementRequestConfig {
 export interface ManagementRequestParams {
   /** What was being attempted, e.g. `list custom roles`. */
   operation: string;
-  /** Path from the endpoint root, e.g. `/api/roles`. */
+  /** Path from the endpoint root, e.g. `/api/v1/roles`. */
   path: string;
   method?: "GET" | "POST" | "PATCH" | "DELETE";
   /** JSON request body; omitted for reads. */
@@ -148,10 +148,10 @@ export type ManagementRequest = ReturnType<typeof createManagementRequest>;
 
 /**
  * The version namespace every management call addresses, spelled into the
- * path. The bare alias is gone (packages/api/adrs/002): the framework
- * families serve dated namespaces and `latest`, and the SDK tracks `latest`.
- * A collection root mounts at the trailing slash — `/api/roles/latest/` —
- * because the family root route is `/`.
+ * path, under the canonical `/api/v1` prefix (packages/api/adrs/002 §1): the
+ * framework families serve dated namespaces and `latest`, and the SDK tracks
+ * `latest`. A collection root mounts at the trailing slash —
+ * `/api/v1/roles/latest/` — because the family root route is `/`.
  *
  * Only the four framework families (roles, role-bindings, scim-tokens,
  * organization) take this; the instance-admin family is not on the framework
@@ -159,6 +159,6 @@ export type ManagementRequest = ReturnType<typeof createManagementRequest>;
  */
 export const managementPath = (path: string): string =>
   path.replace(
-    /^(\/api\/[^/]+)(\/.*)?$/,
+    /^(\/api\/v1\/[^/]+)(\/.*)?$/,
     (_match, base: string, rest?: string) => `${base}/latest${rest ?? "/"}`,
   );

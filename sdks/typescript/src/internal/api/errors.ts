@@ -141,7 +141,7 @@ export const handledErrorFrom = ({
   status,
   message,
 }: {
-  /** What was being attempted — `GET /api/traces/{id}`, or a service's phrasing. */
+  /** What was being attempted — `GET /api/v1/traces/{id}`, or a service's phrasing. */
   operation?: string;
   /** The parsed error body, as the HTTP client handed it back. */
   body: unknown;

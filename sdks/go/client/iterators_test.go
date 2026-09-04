@@ -241,7 +241,7 @@ func TestTracesAll(t *testing.T) {
 			var mu sync.Mutex
 			var cursors []string
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-				assert.Equal(t, "/api/traces/search", r.URL.Path)
+				assert.Equal(t, "/api/v1/traces/search", r.URL.Path)
 				var body map[string]any
 				raw, _ := io.ReadAll(r.Body)
 				_ = json.Unmarshal(raw, &body)

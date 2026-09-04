@@ -45,7 +45,7 @@ export const updateMonitorCommand = async (
       body.parameters = JSON.parse(options.parameters) as Record<string, unknown>;
     }
 
-    const response = await fetch(`${endpoint}/api/monitors/${id}`, {
+    const response = await fetch(`${endpoint}/api/v1/monitors/${id}`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",

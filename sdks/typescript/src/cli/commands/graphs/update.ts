@@ -45,7 +45,7 @@ export const updateGraphCommand = async (
       body.filters = JSON.parse(options.filters) as Record<string, unknown>;
     }
 
-    const response = await fetch(`${endpoint}/api/graphs/${id}`, {
+    const response = await fetch(`${endpoint}/api/v1/graphs/${id}`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",

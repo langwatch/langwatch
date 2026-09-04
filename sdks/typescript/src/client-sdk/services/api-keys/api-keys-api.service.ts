@@ -144,19 +144,22 @@ export class ApiKeysApiService {
   }
 
   async list(): Promise<ApiKeyInfo[]> {
-    const { data } = await this.request<{ data: ApiKeyInfo[] }>("list API keys", "/api/api-keys");
+    const { data } = await this.request<{ data: ApiKeyInfo[] }>(
+      "list API keys",
+      "/api/v1/api-keys",
+    );
     return data;
   }
 
   async get(id: string): Promise<ApiKeyDetail> {
     return this.request<ApiKeyDetail>(
       `fetch API key "${id}"`,
-      `/api/api-keys/${encodeURIComponent(id)}`,
+      `/api/v1/api-keys/${encodeURIComponent(id)}`,
     );
   }
 
   async create(input: CreateApiKeyInput): Promise<CreatedApiKey> {
-    return this.request<CreatedApiKey>("create API key", "/api/api-keys", {
+    return this.request<CreatedApiKey>("create API key", "/api/v1/api-keys", {
       method: "POST",
       body: JSON.stringify(input),
     });
@@ -165,7 +168,7 @@ export class ApiKeysApiService {
   async update({ id, input }: { id: string; input: UpdateApiKeyInput }): Promise<ApiKeyDetail> {
     return this.request<ApiKeyDetail>(
       `update API key "${id}"`,
-      `/api/api-keys/${encodeURIComponent(id)}`,
+      `/api/v1/api-keys/${encodeURIComponent(id)}`,
       { method: "PATCH", body: JSON.stringify(input) },
     );
   }
@@ -173,7 +176,7 @@ export class ApiKeysApiService {
   async revoke(id: string): Promise<{ success: boolean }> {
     return this.request<{ success: boolean }>(
       `revoke API key "${id}"`,
-      `/api/api-keys/${encodeURIComponent(id)}`,
+      `/api/v1/api-keys/${encodeURIComponent(id)}`,
       { method: "DELETE" },
     );
   }

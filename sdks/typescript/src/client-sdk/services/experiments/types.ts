@@ -109,7 +109,7 @@ export type Batch = {
 // ============================================================================
 
 /**
- * Response from /api/experiment/init
+ * Response from /api/v1/experiment/init
  */
 export type ExperimentInitResponse = {
   path: string;
@@ -118,7 +118,7 @@ export type ExperimentInitResponse = {
 };
 
 /**
- * Request body for /api/evaluations/batch/log_results
+ * Request body for /api/v1/evaluations/batch/log_results
  */
 export type LogResultsRequest = {
   experiment_slug: string;
@@ -160,7 +160,7 @@ export type LogResultsRequest = {
 };
 
 /**
- * Request body for /api/evaluations/:slug/evaluate
+ * Request body for /api/v1/evaluations/:slug/evaluate
  */
 export type RunEvaluatorRequest = {
   trace_id?: string | null;
@@ -172,7 +172,7 @@ export type RunEvaluatorRequest = {
 };
 
 /**
- * Response from /api/evaluations/:slug/evaluate
+ * Response from /api/v1/evaluations/:slug/evaluate
  */
 export type RunEvaluatorResponse = {
   status: EvaluationStatus;

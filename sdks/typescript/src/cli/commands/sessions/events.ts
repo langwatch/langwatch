@@ -111,7 +111,7 @@ const fetchAllSessionEvents = async ({
     if (cursor) params.set("cursor", cursor);
 
     const response = await fetch(
-      `${endpoint}/api/coding-agent/sessions/${encodeURIComponent(sessionId)}/events?${params}`,
+      `${endpoint}/api/v1/coding-agent/sessions/${encodeURIComponent(sessionId)}/events?${params}`,
       {
         headers: cliAuthHeaders({ apiKey }),
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),

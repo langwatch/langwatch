@@ -447,9 +447,9 @@ describe("cli-api — request shape", () => {
      * reaching for one fails here the way it failed in production.
      */
     const REGISTERED_TEMPLATE_PATHS = new Set([
-      "/api/governance/ingestion-templates",
-      "/api/governance/ingestion-templates/admin",
-      "/api/governance/ingestion-templates/clone",
+      "/api/v1/governance/ingestion-templates",
+      "/api/v1/governance/ingestion-templates/admin",
+      "/api/v1/governance/ingestion-templates/clone",
     ]);
 
     const onlyRealRoutes = (): {
@@ -482,7 +482,7 @@ describe("cli-api — request shape", () => {
         fetchImpl,
       });
 
-      expect(seen[0]!.url).toBe("http://app.example/api/governance/ingestion-templates/clone");
+      expect(seen[0]!.url).toBe("http://app.example/api/v1/governance/ingestion-templates/clone");
       expect(out).toEqual({ id: "tpl_new" });
     });
   });

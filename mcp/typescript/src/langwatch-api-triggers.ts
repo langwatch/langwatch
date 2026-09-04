@@ -14,11 +14,14 @@ export interface TriggerSummary {
 }
 
 export async function listTriggers(): Promise<TriggerSummary[]> {
-  return makeRequest("GET", "/api/triggers") as Promise<TriggerSummary[]>;
+  return makeRequest("GET", "/api/v1/triggers") as Promise<TriggerSummary[]>;
 }
 
 export async function getTrigger(id: string): Promise<TriggerSummary> {
-  return makeRequest("GET", `/api/triggers/${encodeURIComponent(id)}`) as Promise<TriggerSummary>;
+  return makeRequest(
+    "GET",
+    `/api/v1/triggers/${encodeURIComponent(id)}`,
+  ) as Promise<TriggerSummary>;
 }
 
 export async function createTrigger(data: {
@@ -29,7 +32,7 @@ export async function createTrigger(data: {
   message?: string;
   alertType?: string;
 }): Promise<TriggerSummary> {
-  return makeRequest("POST", "/api/triggers", data) as Promise<TriggerSummary>;
+  return makeRequest("POST", "/api/v1/triggers", data) as Promise<TriggerSummary>;
 }
 
 export async function updateTrigger(params: {
@@ -42,13 +45,13 @@ export async function updateTrigger(params: {
   const { id, ...data } = params;
   return makeRequest(
     "PATCH",
-    `/api/triggers/${encodeURIComponent(id)}`,
+    `/api/v1/triggers/${encodeURIComponent(id)}`,
     data,
   ) as Promise<TriggerSummary>;
 }
 
 export async function deleteTrigger(id: string): Promise<{ id: string; deleted: boolean }> {
-  return makeRequest("DELETE", `/api/triggers/${encodeURIComponent(id)}`) as Promise<{
+  return makeRequest("DELETE", `/api/v1/triggers/${encodeURIComponent(id)}`) as Promise<{
     id: string;
     deleted: boolean;
   }>;

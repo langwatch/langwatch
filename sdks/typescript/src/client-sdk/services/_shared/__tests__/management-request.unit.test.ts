@@ -41,7 +41,7 @@ describe("createManagementRequest", () => {
       await expect(
         request({
           operation: "revoke SCIM token",
-          path: "/api/scim-tokens/scim_1",
+          path: "/api/v1/scim-tokens/scim_1",
           method: "DELETE",
         }),
       ).resolves.toBeUndefined();
@@ -57,7 +57,7 @@ describe("createManagementRequest", () => {
       });
 
       await expect(
-        request({ operation: "list custom roles", path: "/api/roles" }),
+        request({ operation: "list custom roles", path: "/api/v1/roles" }),
       ).resolves.toEqual({ success: true });
     });
   });
@@ -105,10 +105,10 @@ describe("managementPath", () => {
   it("addresses the latest namespace explicitly, with the collection root at its trailing slash", () => {
     // The bare alias is gone (packages/api/adrs/002): a bare call 404s, and a
     // family root mounts at `/{version}/` because its route path is `/`.
-    expect(managementPath("/api/roles")).toBe("/api/roles/latest/");
-    expect(managementPath("/api/roles/permissions")).toBe("/api/roles/latest/permissions");
-    expect(managementPath("/api/organization/invites/invite_1")).toBe(
-      "/api/organization/latest/invites/invite_1",
+    expect(managementPath("/api/v1/roles")).toBe("/api/v1/roles/latest/");
+    expect(managementPath("/api/v1/roles/permissions")).toBe("/api/v1/roles/latest/permissions");
+    expect(managementPath("/api/v1/organization/invites/invite_1")).toBe(
+      "/api/v1/organization/latest/invites/invite_1",
     );
   });
 });

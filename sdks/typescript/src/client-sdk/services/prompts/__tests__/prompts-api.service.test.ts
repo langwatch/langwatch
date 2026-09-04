@@ -21,12 +21,12 @@ describe("PromptsApiService.renameTag", () => {
     } as InternalConfig);
   });
 
-  /** @scenario renameTag calls PUT /api/prompts/tags/{tag} with new name */
-  it("calls PUT /api/prompts/tags/{tag} with new name", async () => {
+  /** @scenario renameTag calls PUT /api/v1/prompts/tags/{tag} with new name */
+  it("calls PUT /api/v1/prompts/tags/{tag} with new name", async () => {
     mockPut.mockResolvedValue({ data: undefined, error: undefined });
     await service.renameTag({ tag: "old-name", name: "new-name" });
     expect(mockPut).toHaveBeenCalledWith(
-      "/api/prompts/tags/{tag}",
+      "/api/v1/prompts/tags/{tag}",
       expect.objectContaining({
         params: expect.objectContaining({ path: { tag: "old-name" } }),
         body: { name: "new-name" },
@@ -68,7 +68,7 @@ describe("PromptsApiService.get", () => {
       await service.get("pizza-prompt", { tag: "production" });
 
       expect(mockGet).toHaveBeenCalledWith(
-        "/api/prompts/{id}",
+        "/api/v1/prompts/{id}",
         expect.objectContaining({
           params: expect.objectContaining({
             path: { id: "pizza-prompt" },
@@ -85,7 +85,7 @@ describe("PromptsApiService.get", () => {
       await service.get("pizza-prompt", { tag: "production", version: "3" });
 
       expect(mockGet).toHaveBeenCalledWith(
-        "/api/prompts/{id}",
+        "/api/v1/prompts/{id}",
         expect.objectContaining({
           params: expect.objectContaining({
             path: { id: "pizza-prompt" },

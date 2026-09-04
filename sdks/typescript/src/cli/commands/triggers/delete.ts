@@ -21,7 +21,7 @@ export const deleteTriggerCommand = async (id: string): Promise<CommandResult | 
   const spinner = createSpinner(`Deleting trigger "${id}"...`).start();
 
   try {
-    const response = await fetch(`${endpoint}/api/triggers/${encodeURIComponent(id)}`, {
+    const response = await fetch(`${endpoint}/api/v1/triggers/${encodeURIComponent(id)}`, {
       method: "DELETE",
       headers: buildAuthHeaders({ apiKey }),
     });

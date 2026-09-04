@@ -7,7 +7,7 @@
  *   1. `/api/auth/cli/governance/*` — CLI-specific read proxies for
  *      activity monitor + status that pre-date the public REST
  *      surface. Read-only.
- *   2. `/api/governance/*` — the public REST contract for
+ *   2. `/api/v1/governance/*` — the public REST contract for
  *      IngestionTemplate CRUD plus the device-session ingestion-key
  *      mint route. The CLI sends `X-LangWatch-Surface: cli` so audit
  *      rows land with `metadata.surface = 'cli'` per @audit-uniform.
@@ -476,7 +476,7 @@ export async function getBudgetOverview(
   }
 }
 
-// ── Public REST: /api/governance/* ─────────────────────────────────────────
+// ── Public REST: /api/v1/governance/* ─────────────────────────────────────────
 //
 // IngestionTemplate CRUD Hono routes. Wire shape is snake_case in/out.
 // All mutating calls send X-LangWatch-Surface: cli per @audit-uniform.
@@ -700,7 +700,7 @@ export async function adminListIngestionTemplates(
   const body = await requestREST<{ ingestion_templates: IngestionTemplateRow[] }>(
     cfg,
     "GET",
-    "/api/governance/ingestion-templates/admin",
+    "/api/v1/governance/ingestion-templates/admin",
     options,
   );
   return body.ingestion_templates;
@@ -714,7 +714,7 @@ export async function getIngestionTemplate(
   const body = await requestREST<{ ingestion_template: IngestionTemplateRow }>(
     cfg,
     "GET",
-    `/api/governance/ingestion-templates/${encodeURIComponent(id)}`,
+    `/api/v1/governance/ingestion-templates/${encodeURIComponent(id)}`,
     options,
   );
   return body.ingestion_template;
@@ -735,7 +735,7 @@ export async function createIngestionTemplate(
   const body = await requestREST<{ ingestion_template: IngestionTemplateRow }>(
     cfg,
     "POST",
-    "/api/governance/ingestion-templates",
+    "/api/v1/governance/ingestion-templates",
     { ...options, body: input, mutating: true },
   );
   return body.ingestion_template;
@@ -750,7 +750,7 @@ export async function updateIngestionTemplateOttlRules(
   const body = await requestREST<{ ingestion_template: IngestionTemplateRow }>(
     cfg,
     "PATCH",
-    `/api/governance/ingestion-templates/${encodeURIComponent(id)}/ottl-rules`,
+    `/api/v1/governance/ingestion-templates/${encodeURIComponent(id)}/ottl-rules`,
     { ...options, body: { ottl_rules: ottlRules }, mutating: true },
   );
   return body.ingestion_template;
@@ -764,7 +764,7 @@ export async function archiveIngestionTemplate(
   return requestREST<{ ok: true }>(
     cfg,
     "DELETE",
-    `/api/governance/ingestion-templates/${encodeURIComponent(id)}`,
+    `/api/v1/governance/ingestion-templates/${encodeURIComponent(id)}`,
     { ...options, mutating: true },
   );
 }
@@ -777,7 +777,7 @@ export async function cloneIngestionTemplateFromPlatform(
   const body = await requestREST<{ ingestion_template: IngestionTemplateRow }>(
     cfg,
     "POST",
-    "/api/governance/ingestion-templates/clone",
+    "/api/v1/governance/ingestion-templates/clone",
     {
       ...options,
       body: { source_template_id: sourceTemplateId },

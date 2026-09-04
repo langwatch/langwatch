@@ -35,7 +35,7 @@ beforeEach(() => {
 });
 
 /**
- * Fixtures below mirror the real `GET /api/prompts/:id` contract
+ * Fixtures below mirror the real `GET /api/v1/prompts/:id` contract
  * (apiResponsePromptWithVersionDataSchema in
  * packages/features/prompt/server/src/transport/api-rest/prompt.api.ts):
  * the returned version's data is flattened to the top level, `parameters`

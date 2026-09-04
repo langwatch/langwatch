@@ -20,7 +20,7 @@ const fetchedUrl = (): string => {
 
 /**
  * A trailing slash on the endpoint used to append onto paths that already carry
- * their own leading slash, producing `//api/experiment/init`. The router does
+ * their own leading slash, producing `//api/v1/experiment/init`. The router does
  * not match that, so the SDK surfaced the server's opaque `{"error":"Not
  * Found"}` with nothing pointing at the endpoint as the cause.
  */
@@ -54,8 +54,8 @@ describe("Experiment.init endpoint handling", () => {
 
         await langwatch.experiments.init("trailing-slash-eval");
 
-        expect(fetchedUrl()).toBe("https://app.langwatch.ai/api/experiment/init");
-        expect(new URL(fetchedUrl()).pathname).toBe("/api/experiment/init");
+        expect(fetchedUrl()).toBe("https://app.langwatch.ai/api/v1/experiment/init");
+        expect(new URL(fetchedUrl()).pathname).toBe("/api/v1/experiment/init");
       });
     });
   });
@@ -71,7 +71,7 @@ describe("Experiment.init endpoint handling", () => {
 
         await langwatch.experiments.init("trailing-slash-eval");
 
-        expect(fetchedUrl()).toBe("http://localhost:5560/api/experiment/init");
+        expect(fetchedUrl()).toBe("http://localhost:5560/api/v1/experiment/init");
       });
     });
   });
@@ -86,7 +86,7 @@ describe("Experiment.init endpoint handling", () => {
 
         await langwatch.experiments.init("trailing-slash-eval");
 
-        expect(fetchedUrl()).toBe("https://app.langwatch.ai/api/experiment/init");
+        expect(fetchedUrl()).toBe("https://app.langwatch.ai/api/v1/experiment/init");
       });
     });
   });

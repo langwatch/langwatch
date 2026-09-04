@@ -19,7 +19,7 @@ import { handledErrorFrom } from "./errors";
  * This lives in the transport rather than in each service because it is a
  * property of the WIRE, not of any one resource: the platform answers a declined
  * request with a `HandledError` — a `kind`, a status, a `meta` bag — and that is
- * true of `/api/traces` and `/api/prompts` alike. Reading it here means no
+ * true of `/api/v1/traces` and `/api/v1/prompts` alike. Reading it here means no
  * service has to remember to, and a service added tomorrow gets it for free.
  *
  * WHAT IT DOES NOT DO is just as load-bearing: a response whose body is not a

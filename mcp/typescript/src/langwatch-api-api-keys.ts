@@ -28,7 +28,7 @@ export interface ApiKeyCreateResponse {
 }
 
 export async function listApiKeys(): Promise<{ data: ApiKeySummary[] }> {
-  return makeRequest("GET", "/api/api-keys") as Promise<{ data: ApiKeySummary[] }>;
+  return makeRequest("GET", "/api/v1/api-keys") as Promise<{ data: ApiKeySummary[] }>;
 }
 
 export async function createApiKey(data: {
@@ -43,11 +43,11 @@ export async function createApiKey(data: {
   }>;
   projectIds?: string[];
 }): Promise<ApiKeyCreateResponse> {
-  return makeRequest("POST", "/api/api-keys", data) as Promise<ApiKeyCreateResponse>;
+  return makeRequest("POST", "/api/v1/api-keys", data) as Promise<ApiKeyCreateResponse>;
 }
 
 export async function revokeApiKey(id: string): Promise<{ success: boolean }> {
-  return makeRequest("DELETE", `/api/api-keys/${encodeURIComponent(id)}`) as Promise<{
+  return makeRequest("DELETE", `/api/v1/api-keys/${encodeURIComponent(id)}`) as Promise<{
     success: boolean;
   }>;
 }

@@ -4,7 +4,7 @@ import { fetchBatchRuns, tallyBatchRuns } from "../batchRunProgress";
 /**
  * `--wait` polls for the state of a batch of simulation runs.
  *
- * It used to poll `GET /api/scenario-events?batchRunId=`, which no route
+ * It used to poll `GET /api/v1/scenario-events?batchRunId=`, which no route
  * serves: that app registers two POSTs and a DELETE and nothing else. So the
  * flag never worked — every poll 404'd, the failure budget ran out, and the
  * wait ended by blaming the status endpoint for being down.
@@ -19,10 +19,10 @@ const mockFetch = vi.fn();
 
 /** Only what `apps/api`'s REST mounts actually register. */
 const REGISTERED = new Set([
-  "POST /api/scenario-events",
-  "POST /api/scenario-events/browser-tab",
-  "DELETE /api/scenario-events",
-  "GET /api/simulation-runs",
+  "POST /api/v1/scenario-events",
+  "POST /api/v1/scenario-events/browser-tab",
+  "DELETE /api/v1/scenario-events",
+  "GET /api/v1/simulation-runs",
 ]);
 
 const json = (body: unknown, status = 200): Response =>
@@ -96,7 +96,7 @@ describe("batch run progress", () => {
       });
 
       const [requested] = mockFetch.mock.calls[0] as [URL];
-      expect(requested.pathname).toBe("/api/simulation-runs");
+      expect(requested.pathname).toBe("/api/v1/simulation-runs");
       expect(requested.searchParams.get("batchRunId")).toBe("batch_1");
     });
   });

@@ -89,7 +89,7 @@ export async function handleExperimentResults(params: {
   try {
     results = (await makeRequest(
       "GET",
-      `/api/experiments/runs/${encodeURIComponent(params.runId)}/results${qs}`,
+      `/api/v1/experiments/runs/${encodeURIComponent(params.runId)}/results${qs}`,
     )) as EvaluationRunResults;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
