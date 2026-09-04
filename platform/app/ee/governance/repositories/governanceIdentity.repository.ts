@@ -15,6 +15,8 @@
  */
 import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 
+import { isUniqueViolation } from "../services/identityMatch.errors";
+
 type Client = Prisma.TransactionClient | PrismaClient;
 
 /** Every `TenantId` an organization has ever written governance rows under. */
@@ -176,6 +178,130 @@ export class DiscoveredPersonRepository {
     });
   }
 
+  /** The identity screen's read: an organization's people, newest-seen first. */
+  listByOrganization(client: Client, params: { organizationId: string }) {
+    return client.discoveredPerson.findMany({
+      where: { organizationId: params.organizationId },
+      orderBy: { lastSeenAt: "desc" },
+    });
+  }
+
+  /**
+   * Records that a provider row named this identity at `seenAt` — creating the
+   * person on first sight, and only ever widening the seen range after that.
+   *
+   * Widening, not stamping: a September run backfilling July must move
+   * `firstSeenAt` back without dragging `lastSeenAt` forward, and the
+   * conditional WHEREs are what make replaying a window a no-op rather than a
+   * rewrite. Nothing else on an existing row is touched — display text belongs
+   * to the first sighting (or the directory), and `kind` to the rule that
+   * classified it.
+   *
+   * An erased person cannot be resurrected through here by accident — their
+   * plaintext identifier no longer matches any row's `rawActorId` — but the
+   * caller must still never offer one: that is the suppression list's job,
+   * upstream, on the whole event.
+   */
+  async recordActivitySighting(
+    client: Client,
+    params: {
+      organizationId: string;
+      provider: string;
+      rawActorId: string;
+      displayText: string;
+      kind: string;
+      /** The batch's earliest and latest event times for this actor. */
+      earliestAt: Date;
+      latestAt: Date;
+    },
+  ): Promise<void> {
+    const key = {
+      organizationId: params.organizationId,
+      provider: params.provider,
+      rawActorId: params.rawActorId,
+    };
+    try {
+      await client.discoveredPerson.create({
+        data: {
+          ...key,
+          displayText: params.displayText,
+          kind: params.kind,
+          firstSeenAt: params.earliestAt,
+          lastSeenAt: params.latestAt,
+        },
+      });
+      return;
+    } catch (error) {
+      // The row already exists — from an earlier run, or from a concurrent
+      // source racing this one to the same actor. Both fall through to the
+      // widen below.
+      if (!isUniqueViolation(error)) throw error;
+    }
+    await client.discoveredPerson.updateMany({
+      where: { ...key, lastSeenAt: { lt: params.latestAt } },
+      data: { lastSeenAt: params.latestAt },
+    });
+    await client.discoveredPerson.updateMany({
+      where: { ...key, firstSeenAt: { gt: params.earliestAt } },
+      data: { firstSeenAt: params.earliestAt },
+    });
+  }
+
+  /**
+   * Records that the directory listed this identity — creating the person on
+   * first sight, and upgrading the display text of one already known.
+   *
+   * Deliberately narrower than an activity sighting: a directory lists
+   * presence, not activity, so it never widens the seen range — a person
+   * refreshed daily by the directory must not read as "active today" on a
+   * screen whose seen dates otherwise mean spend. The display text upgrade is
+   * the read direction: a transcript knows people only as directory ids, and
+   * the directory is the one source that knows what the id is called.
+   *
+   * `erasedAt: null` on the update is belt and braces — an erased row's key is
+   * a pseudonym and cannot match — kept because "never rewrite an erased
+   * row's text" should not depend on a hashing detail two files away.
+   */
+  async recordDirectorySighting(
+    client: Client,
+    params: {
+      organizationId: string;
+      provider: string;
+      rawActorId: string;
+      displayText: string;
+      seenAt: Date;
+    },
+  ): Promise<void> {
+    const key = {
+      organizationId: params.organizationId,
+      provider: params.provider,
+      rawActorId: params.rawActorId,
+    };
+    try {
+      await client.discoveredPerson.create({
+        data: {
+          ...key,
+          displayText: params.displayText,
+          kind: DISCOVERED_PERSON_KIND.PERSON,
+          firstSeenAt: params.seenAt,
+          lastSeenAt: params.seenAt,
+        },
+      });
+      return;
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+    }
+    if (params.displayText === "") return;
+    await client.discoveredPerson.updateMany({
+      where: {
+        ...key,
+        erasedAt: null,
+        displayText: { not: params.displayText },
+      },
+      data: { displayText: params.displayText },
+    });
+  }
+
   /**
    * Stops automatic linking for one person, and says why.
    *
@@ -313,7 +439,9 @@ export class IdentityMatchRepository {
         validTo: null,
         userId: { not: null },
       },
-      select: { discoveredPersonId: true, userId: true },
+      // `evidenceKind` rides along for the People screen's "by what proof"
+      // column; the match engine reads only the first two.
+      select: { discoveredPersonId: true, userId: true, evidenceKind: true },
     });
   }
 

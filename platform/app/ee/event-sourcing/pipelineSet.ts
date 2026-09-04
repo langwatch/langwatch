@@ -5,6 +5,7 @@ import type { PulledUsageLedgerProcessDeps } from "@ee/governance/process-manage
 import type { GovernanceCostRollupState } from "@ee/governance/projections/governanceCostRollup.foldProjection";
 import { reconcileIngestionPullProcesses } from "@ee/governance/services/pullers/ingestionPullLifecycle";
 import {
+  type DiscoveredPeopleMatcher,
   type PulledUsageDispatcher,
   runIngestionPull,
 } from "@ee/governance/services/pullers/pullerWorker";
@@ -31,6 +32,15 @@ export interface EnterprisePipelineSetConfig {
    * pipeline still records every observation, only the summary is skipped.
    */
   governanceCostRollupStore?: FoldProjectionStore<GovernanceCostRollupState>;
+  /**
+   * ADR-128 §12's identity-match engine, composed by the root on the worker
+   * role only. A type, never an import: this module is statically reachable
+   * from request routers, and the scorer behind the engine is gated off every
+   * request path by the engine's import-graph guard. Absent on request-serving
+   * roles — discovery still records people, the review queue just waits for a
+   * process that composes the engine.
+   */
+  identityMatch?: DiscoveredPeopleMatcher;
 }
 
 type EnterprisePipelineRuntimeDeps = EnterprisePipelineSetConfig & {
@@ -54,7 +64,11 @@ function registerIngestionPullPipeline(
       dispatch: {
         runPort: {
           run: (params) =>
-            runIngestionPull({ ...params, pulledUsage: deps.pulledUsage }),
+            runIngestionPull({
+              ...params,
+              pulledUsage: deps.pulledUsage,
+              identityMatch: deps.identityMatch,
+            }),
         },
         commands: () => {
           if (!outcomeCommands) {

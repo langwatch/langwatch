@@ -17,10 +17,11 @@ Feature: Deciding which provider-named person is which LangWatch account
   Scenario: The matcher keeps no standing appointment of its own
     When the background workers start
     Then no recurring matcher run is booked for that organization
-    # Nothing fills the provider-named people table yet, so a pass on a timer
-    # would sweep an empty list every night forever, on every tenant. The
-    # engine itself stays and runs whenever something asks it to; the trigger
-    # arrives with the feed that discovers people.
+    # A pass on a timer would re-sweep every tenant nightly whether or not
+    # anything changed. The engine runs whenever something asks it to, and
+    # the feed that discovers people is that trigger: the pull run hands the
+    # organization to the worker-composed matcher when a delivery names
+    # someone (governance-people-screen.feature).
 
   # ── Proof links by itself ─────────────────────────────────────────────────
 

@@ -2,9 +2,10 @@
 
 /**
  * What the match engine refuses to do, said in words the reviewer can act on
- * (ADR-128 §12).
+ * (ADR-128 §12) — plus the domain's shared reading of Postgres refusing a
+ * duplicate, which the discovery repository leans on too.
  *
- * Both of these are races rather than mistakes: a review queue is read by
+ * The error classes are races rather than mistakes: a review queue is read by
  * people, and between reading it and clicking, the world moves. The whole point
  * of naming them is that the loser of such a race should be told what happened,
  * not handed a trace id.
@@ -85,21 +86,21 @@ export class IdentityErasedError extends HandledError {
   }
 }
 
-/** Postgres' unique-violation code, raised by the one-open-link index. */
+/** Postgres' unique-violation code. */
 const UNIQUE_VIOLATION = "23505";
 
 /**
  * Prisma's own code for the same refusal: the client wraps a unique violation
  * as a `PrismaClientKnownRequestError` with `code: "P2002"` and buries the
- * SQLSTATE underneath. `IdentityMatch` has no other unique rule a write could
- * trip (the primary key is a fresh nanoid), so `P2002` on these writes means
- * the one-open-link index and nothing else.
+ * SQLSTATE underneath. Which unique rule tripped is the caller's knowledge —
+ * the one-open-link index for `IdentityMatch` writes, the (organization,
+ * provider, actor) key for discovered-person writes.
  */
 const PRISMA_UNIQUE_VIOLATION = "P2002";
 
 /**
- * Whether a thrown value is the one-open-link index refusing a second open
- * link.
+ * Whether a thrown value is Postgres refusing a duplicate under any unique
+ * rule.
  *
  * Reads the code off whichever shape carried it: Prisma's `P2002` wrapper, a
  * raw driver error's SQLSTATE in `code` or `meta.code`, or — for the wrapper
@@ -107,7 +108,7 @@ const PRISMA_UNIQUE_VIOLATION = "P2002";
  * the message. Never a `String(err).includes` over the whole message: that
  * would also match an error whose *payload* happened to contain the digits.
  */
-export function isOpenLinkViolation(error: unknown): boolean {
+export function isUniqueViolation(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
   const code = (error as { code?: unknown }).code;
   if (code === UNIQUE_VIOLATION || code === PRISMA_UNIQUE_VIOLATION)
@@ -119,4 +120,13 @@ export function isOpenLinkViolation(error: unknown): boolean {
     typeof message === "string" &&
     new RegExp(`\\b${UNIQUE_VIOLATION}\\b`).test(message)
   );
+}
+
+/**
+ * Whether a thrown value is the one-open-link index refusing a second open
+ * link. The same refusal shape as any unique violation; the name records
+ * which rule the caller believes it tripped (`IdentityMatch` has no other).
+ */
+export function isOpenLinkViolation(error: unknown): boolean {
+  return isUniqueViolation(error);
 }
