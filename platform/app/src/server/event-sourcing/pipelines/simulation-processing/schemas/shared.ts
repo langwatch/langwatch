@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { scenarioEvaluationResultSchema } from "~/server/scenarios/schemas/event-schemas";
 
 /**
  * Status values stored in ClickHouse.
@@ -39,5 +40,11 @@ export const simulationResultsSchema = z.object({
   metCriteria: z.array(z.string()).default([]),
   unmetCriteria: z.array(z.string()).default([]),
   error: z.string().optional(),
+  /**
+   * The evaluator results a scenario run from code sends with its finished
+   * event. The platform stores them as sent and runs no evaluator of its own
+   * on that run.
+   */
+  evaluations: z.array(scenarioEvaluationResultSchema).optional(),
 });
 export type SimulationResults = z.infer<typeof simulationResultsSchema>;
