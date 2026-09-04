@@ -28,6 +28,7 @@ import { createGovernanceRollupReplayPort } from "@ee/governance/services/govern
 import { GovernanceTraceActivityClickHouseRepository } from "@ee/governance/services/governanceTraceActivity.clickhouse.repository";
 import { IdentityErasureService } from "@ee/governance/services/identityErasure.service";
 import { IdentityMatchService } from "@ee/governance/services/identityMatch.service";
+import { IdentityMatchSuggestionService } from "@ee/governance/services/identityMatchSuggestion.service";
 import { PersonalUsageClickHouseRepository } from "@ee/governance/services/personalUsage.clickhouse.repository";
 import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
 import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
@@ -1119,8 +1120,8 @@ export function initializeDefaultApp(options?: {
   // still has people to match.
   //
   // NOT the suggestion half. That one scores names, and it is composed only
-  // inside the worker-role block below so no request path can reach the scorer
-  // through this bag.
+  // behind the worker-role gate in `enterprisePipelines.identityMatch` below,
+  // so no request path can reach the scorer through this bag.
   const governanceIdentityMatch = new IdentityMatchService({ prisma });
 
   // Governance's OCSF SIEM-export sink. One instance for the whole App: the
@@ -1292,13 +1293,6 @@ export function initializeDefaultApp(options?: {
         );
       });
   }
-
-  // ADR-128 §12: the match engine gets no calendar entry, deliberately —
-  // nothing writes `DiscoveredPerson` yet, so a standing appointment would read
-  // an empty table on every tenant for ever. Its trigger arrives with the feed
-  // that discovers people and is a call site, not a schedule. Compose that
-  // caller on the worker role: the name scorer measured 2.9 seconds of blocked
-  // event loop at the ADR's example size.
 
   // ADR-044 Phase 3c: register the report handler so a due report ScheduledJob
   // renders + dispatches on schedule (worker-only, same notify pipeline as
@@ -1498,6 +1492,25 @@ export function initializeDefaultApp(options?: {
           }
         : undefined,
       governanceCostRollupStore,
+      // ADR-128 §12: the suggestion half's ONLY runtime composition, and the
+      // engine's only trigger — the feed that discovers people, a call site
+      // rather than a calendar entry. Worker role only (the name scorer
+      // measured 2.9 seconds of blocked event loop at the ADR's example size)
+      // and proof before guesses, the order the engine spec fixes. This import
+      // is what the scorer's import-graph guard names as the one allowed
+      // caller.
+      identityMatch: roleRunsWorkers(config.processRole)
+        ? {
+            runFor: async ({ organizationId }) => {
+              await IdentityMatchService.create(prisma).linkProvenMatches({
+                organizationId,
+              });
+              await IdentityMatchSuggestionService.create(prisma).recompute({
+                organizationId,
+              });
+            },
+          }
+        : undefined,
     },
     projects,
     monitors,

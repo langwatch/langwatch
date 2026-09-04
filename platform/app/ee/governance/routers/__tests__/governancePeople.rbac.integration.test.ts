@@ -206,16 +206,18 @@ describe("governancePeople router — RBAC enforcement", () => {
   });
 
   describe("given an org ADMIN", () => {
-    /** @scenario "The match button runs the proven pass and the suggestion pass" */
-    it("runs both passes and answers with the counts", async () => {
+    /** @scenario "The match button runs the proof pass" */
+    it("runs the proof pass and answers with its counts", async () => {
       const caller = callerFor(adminUserId);
+      // No suggestion count in the answer, and that is the point: the
+      // suggestion pass scores names, which ADR-128 §12 gates off every
+      // request path. It rides the discovery feed on the worker role.
       await expect(
         caller.governancePeople.runMatch({ organizationId }),
       ).resolves.toEqual({
         linked: 0,
         suspended: 0,
         unproven: 0,
-        suggestionsWritten: 0,
       });
     });
 

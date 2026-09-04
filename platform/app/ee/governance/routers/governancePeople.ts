@@ -6,18 +6,18 @@
  * Reads gate on `governance:view`, the two writes on `governance:manage` —
  * the viewer grant reads, linking writes identity rows.
  *
- * The engine keeps no standing appointment of its own
- * (governance-identity-match-engine.feature); `runMatch` is the trigger the
- * engine spec left to the screen. One button runs both passes — proof, then
- * suggestions — because splitting them asks the user to know the engine's
- * internal seam between proof and guess.
+ * `runMatch` runs the PROOF pass only. The suggestion half scores names —
+ * quadratic, and gated off every request path by the engine's import-graph
+ * guard (ADR-128 §12) — so it rides the discovery feed on the worker role
+ * instead; the composition root is its one caller. The button still gives a
+ * reviewer fresh proof links on demand, and the suggestions list fills as
+ * pulls deliver people.
  *
  * Spec: specs/governance/governance-people-screen.feature
  */
 
 import { GovernancePeopleScreenService } from "@ee/governance/services/governancePeopleScreen.service";
 import { IdentityMatchService } from "@ee/governance/services/identityMatch.service";
-import { IdentityMatchSuggestionService } from "@ee/governance/services/identityMatchSuggestion.service";
 import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
@@ -48,14 +48,10 @@ export const governancePeopleRouter = createTRPCRouter({
       const linked = await IdentityMatchService.create(
         ctx.prisma,
       ).linkProvenMatches({ organizationId: input.organizationId });
-      const suggested = await IdentityMatchSuggestionService.create(
-        ctx.prisma,
-      ).recompute({ organizationId: input.organizationId });
       return {
         linked: linked.linked,
         suspended: linked.suspended,
         unproven: linked.unproven,
-        suggestionsWritten: suggested.suggestionsWritten,
       };
     }),
 

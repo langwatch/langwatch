@@ -4,8 +4,8 @@ Feature: The People screen shows who the providers named
   everyone a provider has named, whether they hold a LangWatch account or
   not, with the match engine's verdicts beside them and its button in front
   of them. The engine keeps no standing appointment
-  (governance-identity-match-engine.feature) — this screen is where a person
-  asks it to run.
+  (governance-identity-match-engine.feature) — this screen asks for the proof
+  pass on demand, and the feed that discovers people triggers the rest.
   Decision: ADR-128 sections 11 and 12.
 
   Background:
@@ -45,13 +45,23 @@ Feature: The People screen shows who the providers named
   # ── Running the engine ────────────────────────────────────────────────────
 
   @integration
-  Scenario: The match button runs the proven pass and the suggestion pass
+  Scenario: The match button runs the proof pass
     When a governance manager presses the match button
     Then proven identities are linked
-    And suggestions are recomputed
-    And the answer says how many were linked and how many suggested
-    # One button, both passes. Splitting them asks the user to know the
-    # engine's internal seam between proof and guess.
+    And the answer says how many were linked and how many remain unproven
+    # Proof only, and the absence is the design: the suggestion pass scores
+    # names, which the engine's import-graph gate keeps off every request
+    # path (ADR-128 section 12). The button gives fresh proof links on
+    # demand; guesses arrive with the feed, below.
+
+  @unit
+  Scenario: Suggestions are recomputed when the feed discovers people
+    When a pull delivers rows that discover at least one person
+    Then the suggestion pass runs on the worker, after the delivery's own writes
+    # The trigger the engine spec promised: a call site on the feed, composed
+    # by the root on the worker role. A pull that discovers nobody is not a
+    # trigger — an empty feed re-scoring an unchanged queue is the nightly
+    # timer this design replaced.
 
   @integration
   Scenario: Running the engine requires the governance manage grant

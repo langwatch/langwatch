@@ -143,7 +143,7 @@ function useDiscoveredPeople(orgId: string) {
     onSuccess: async (outcome) => {
       toaster.create({
         title: "Match pass finished",
-        description: `${outcome.linked} linked, ${outcome.suggestionsWritten} suggested, ${outcome.unproven} unproven.`,
+        description: `${outcome.linked} linked, ${outcome.unproven} unproven. Suggestions refresh as pull sources deliver people.`,
         type: "success",
       });
       await refreshIdentity();
