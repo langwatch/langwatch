@@ -33,6 +33,10 @@ import {
   createCustomerIoSimulationSyncSubscriber,
 } from "./subscribers/customerIoSimulationSync.subscriber";
 import {
+  createScenarioEvaluationsSubscriber,
+  type ScenarioEvaluationsSubscriberDeps,
+} from "./subscribers/scenarioEvaluations.subscriber";
+import {
   createSnapshotUpdateBroadcastSubscriber,
   type SnapshotUpdateBroadcastSubscriberDeps,
 } from "./subscribers/snapshotUpdateBroadcast.subscriber";
@@ -59,6 +63,8 @@ export interface SimulationProcessingPipelineDeps {
   snapshotUpdateBroadcast: SnapshotUpdateBroadcastSubscriberDeps;
   suiteRunSync: SuiteRunSyncSubscriberDeps;
   traceMetricsSync: TraceMetricsSyncSubscriberDeps;
+  /** Queues the evaluators attached to a finished run's suite and plan. */
+  scenarioEvaluations: ScenarioEvaluationsSubscriberDeps;
   customerIoSimulationSync?: CustomerIoSimulationSyncSubscriberDeps;
 }
 
@@ -124,6 +130,10 @@ export function createSimulationProcessingPipeline(
     .withSubscriber(
       "traceMetricsSync",
       createTraceMetricsSyncSubscriber(deps.traceMetricsSync),
+    )
+    .withSubscriber(
+      "scenarioEvaluations",
+      createScenarioEvaluationsSubscriber(deps.scenarioEvaluations),
     )
     .withProcessManager(
       SIMULATION_RUN_EXECUTION_PROCESS_NAME,
