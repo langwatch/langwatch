@@ -36,12 +36,18 @@ import {
 } from "~/utils/posthogErrorCapture";
 import { decryptCredentials } from "../activity-monitor/ingestionCredentials";
 import type { SourceType } from "../activity-monitor/ingestionSource.service";
+import { DirectoryDepartmentSyncService } from "../directoryDepartmentSync.service";
+import {
+  loadErasureSuppression,
+  partitionSuppressedEvents,
+} from "../erasureSuppression.service";
 import {
   type GovernanceOcsfEventInput,
   OCSF_ACTIVITY,
   OCSF_SEVERITY,
 } from "../governanceOcsfEvents.clickhouse.repository";
 import { ensureHiddenGovernanceProject } from "../governanceProject.service";
+import { PersonDiscoveryService } from "../personDiscovery.service";
 import type {
   ConversationRoutingProfile,
   RoutingOrigin,
@@ -136,6 +142,22 @@ export interface PulledUsageDispatcher {
       occurredAt: number;
     },
   ): Promise<void>;
+}
+
+/**
+ * The identity-match engine, as the pull run is allowed to know it (ADR-128
+ * §12). A port rather than an import: the suggestion half scores names —
+ * quadratic, gated off every request path by the import-graph guard next to
+ * the engine — and this worker is statically reachable from the ops router
+ * through the pipeline registry. The composition root builds the
+ * implementation on the worker role and hands it in; this file never names
+ * the scorer.
+ *
+ * Optional. Without it discovery still records people; the review queue just
+ * waits for a process that composes the engine.
+ */
+export interface DiscoveredPeopleMatcher {
+  runFor(args: { organizationId: string }): Promise<void>;
 }
 
 /**
@@ -292,6 +314,7 @@ export async function runIngestionPull(params: {
   sourceId: string;
   cursor: string | null;
   pulledUsage?: PulledUsageDispatcher;
+  identityMatch?: DiscoveredPeopleMatcher;
 }): Promise<{
   nextCursor: string | null;
   eventCount: number;
@@ -351,6 +374,7 @@ export async function runIngestionPull(params: {
       events: result.events,
       source,
       pulledUsage: params.pulledUsage,
+      identityMatch: params.identityMatch,
     });
     logger.info(
       {
@@ -410,10 +434,12 @@ async function writePulledEvents({
   events,
   source,
   pulledUsage,
+  identityMatch,
 }: {
   events: NormalizedPullEvent[];
   source: PullingSource;
   pulledUsage?: PulledUsageDispatcher;
+  identityMatch?: DiscoveredPeopleMatcher;
 }): Promise<void> {
   const govProject = await ensureHiddenGovernanceProject(
     prisma,
@@ -441,7 +467,25 @@ async function writePulledEvents({
   // from the same pull disagreeing about when they were observed could order a
   // corrected figure behind the one it corrects.
   const observedAt = new Date();
-  for (const event of events) {
+  // The do-not-reimport list, resolved once per run for the same reason the
+  // cost flag above is. Without this check the pullers undo every erasure on
+  // their next pass: they look thirty days back, so an actor erased today is
+  // re-read and re-written tomorrow (ADR-128 §9 step 1). `event.actor` is what
+  // becomes `ActorEmail` and rides inside the raw OCSF payload, and it is the
+  // actor id the cost record carries — one check covers both writes because a
+  // suppressed event is not written at all rather than written and erased
+  // again later.
+  const suppression = await loadErasureSuppression({
+    prisma,
+    organizationId: source.organizationId,
+    provider: source.sourceType,
+  });
+  const { kept, suppressedCount } = partitionSuppressedEvents({
+    events,
+    actorOf: (event) => event.actor,
+    suppression,
+  });
+  for (const event of kept) {
     await ocsfRepo.insertEvent(
       mapToOcsfRow({
         event,
@@ -458,7 +502,84 @@ async function writePulledEvents({
       pulledUsage: costRecordingEnabled ? pulledUsage : undefined,
     });
   }
-  await routeConversationsToTraceDestination({ events, source });
+  if (suppressedCount > 0) {
+    // Worth a line: these are real provider rows this run deliberately did not
+    // store, so a total that looks short has an explanation here rather than
+    // looking like a pull that lost data.
+    logger.info(
+      { ingestionSourceId: source.id, suppressedCount },
+      "skipped pulled events naming an erased identifier",
+    );
+  }
+  const { discovered } = await syncPeopleFactsFromPull({
+    source,
+    events: kept,
+  });
+  // `kept`, not `events`. This is the export that leaves our storage entirely
+  // — it writes the conversation into the customer's own trace project, with
+  // the provider's user id on it and the question and answer in the spans. A
+  // suppressed person is suppressed here most of all.
+  await routeConversationsToTraceDestination({ events: kept, source });
+  // ADR-128 §12: the feed that discovers people is the engine's trigger.
+  // After routing, so a slow or failing pass never delays the export above.
+  if (discovered > 0 && identityMatch) {
+    try {
+      await identityMatch.runFor({ organizationId: source.organizationId });
+    } catch (error) {
+      logger.error(
+        { error: toError(error), ingestionSourceId: source.id },
+        "identity match pass failed; the discovered people are kept and the next pull retries",
+      );
+    }
+  }
+}
+
+/**
+ * People and department facts, off one delivery's events.
+ *
+ * `events` must be the post-partition list — the caller's `kept`, never the
+ * raw pull: discovery running on the pre-partition list would re-create a
+ * plaintext person row for an erased identifier on the next thirty-day
+ * re-read (ADR-128 §9 step 1). And a discovery failure never costs the run
+ * its events — the next run sees the same actors again, while audit rows
+ * missed would be gone for good. Department facts ride the same directory
+ * events, behind the same partition, with the same isolation: the directory
+ * read runs again tomorrow, so a failed sync costs a day, never the run.
+ */
+async function syncPeopleFactsFromPull({
+  source,
+  events,
+}: {
+  source: PullingSource;
+  events: NormalizedPullEvent[];
+}): Promise<{ discovered: number }> {
+  let discovered = 0;
+  try {
+    ({ discovered } = await PersonDiscoveryService.create(
+      prisma,
+    ).recordFromPulledEvents({
+      organizationId: source.organizationId,
+      provider: source.sourceType,
+      events,
+    }));
+  } catch (error) {
+    logger.error(
+      { error: toError(error), ingestionSourceId: source.id },
+      "could not record discovered people; the pulled events are still delivered",
+    );
+  }
+  try {
+    await DirectoryDepartmentSyncService.create(prisma).applyDirectoryEvents({
+      organizationId: source.organizationId,
+      events,
+    });
+  } catch (error) {
+    logger.error(
+      { error: toError(error), ingestionSourceId: source.id },
+      "could not apply directory departments; the pulled events are still delivered",
+    );
+  }
+  return { discovered };
 }
 
 /**

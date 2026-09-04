@@ -1099,6 +1099,16 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- include "langwatch.secretOrValue" (dict "envName" "LANGWATCH_LICENSE_KEY" "fieldValues" .Values.app.license.key) }}
 {{- include "langwatch.secretOrValue" (dict "envName" "LANGWATCH_LICENSE_PUBLIC_KEY" "fieldValues" .Values.app.license.publicKey) }}
 
+# The key deriving the stand-in that replaces an erased identifier. Optional
+# until somebody is erased; required in every process afterwards.
+#
+# In sharedEnv rather than the app Deployment because the workers are what
+# rebuild the daily cost rows after an erasure. A worker holding a different
+# value than the app would write a different stand-in for the same person, and
+# a worker holding none refuses to write those rows at all rather than putting
+# the erased address back into the money table.
+{{- include "langwatch.secretOrValue" (dict "envName" "GOVERNANCE_ERASURE_PSEUDONYM_SECRET" "fieldValues" .Values.app.governance.erasurePseudonymSecret) }}
+
 # Email gateway. Naming a provider is what turns email on. In sharedEnv rather
 # than the app Deployment because scheduled reports and alert notifications are
 # dispatched by the workers, so a workers pod without a gateway configured

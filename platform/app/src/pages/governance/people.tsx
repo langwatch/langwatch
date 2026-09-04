@@ -1,4 +1,5 @@
 import {
+  Badge,
   Box,
   Button,
   Heading,
@@ -8,6 +9,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { MATCH_EVIDENCE_KIND } from "@ee/governance/services/logic/identityEvidence";
 import { Archive, ExternalLink, MoreVertical, Pencil } from "lucide-react";
 import { useState } from "react";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
@@ -24,6 +26,8 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
 
 type Department = RouterOutputs["departments"]["list"][number];
+type DiscoveredPerson = RouterOutputs["governancePeople"]["list"][number];
+type MatchSuggestion = RouterOutputs["governancePeople"]["suggestions"][number];
 
 /**
  * The People page (nee Departments — the page identity renamed, the
@@ -64,6 +68,8 @@ function PeoplePage() {
           fallbackTitle="Couldn't load departments"
         />
 
+        <DiscoveredPeoplePanel orgId={orgId} canManage={canManage} />
+
         {canManage && <CreateDepartmentBox orgId={orgId} onCreated={refresh} />}
 
         <DepartmentList
@@ -84,6 +90,342 @@ function PeoplePage() {
         {hasDepartments && <AssignmentGuide />}
       </VStack>
     </GovernanceLayout>
+  );
+}
+
+/**
+ * The proof column's words, for humans rather than for the enum — keyed off
+ * the engine's own vocabulary so a kind added there fails the build here
+ * instead of silently rendering its slug.
+ */
+const EVIDENCE_LABEL: Record<string, string> = {
+  [MATCH_EVIDENCE_KIND.VERIFIED_EMAIL]: "confirmed address",
+  [MATCH_EVIDENCE_KIND.VERIFIED_EMAIL_AND_DIRECTORY_ID]:
+    "confirmed address + directory",
+  [MATCH_EVIDENCE_KIND.DIRECTORY_ID]: "directory identifier",
+  [MATCH_EVIDENCE_KIND.HUMAN_CONFIRMED]: "confirmed by a person",
+} satisfies Record<
+  (typeof MATCH_EVIDENCE_KIND)[keyof typeof MATCH_EVIDENCE_KIND],
+  string
+>;
+
+const fmtDay = (d: Date | string) => {
+  const date = typeof d === "string" ? new Date(d) : d;
+  return Number.isNaN(date.getTime()) ? "—" : date.toISOString().slice(0, 10);
+};
+
+/**
+ * Everyone the providers named, with the match engine's verdicts beside them
+ * and its button in front of them. The engine keeps no standing appointment
+ * of its own — this button is the trigger its spec left to the screen.
+ *
+ * Spec: specs/governance/governance-people-screen.feature
+ */
+function useDiscoveredPeople(orgId: string) {
+  const utils = api.useUtils();
+  const peopleQuery = api.governancePeople.list.useQuery(
+    { organizationId: orgId },
+    { enabled: !!orgId, refetchOnWindowFocus: false },
+  );
+  const suggestionsQuery = api.governancePeople.suggestions.useQuery(
+    { organizationId: orgId },
+    { enabled: !!orgId, refetchOnWindowFocus: false },
+  );
+
+  const refreshIdentity = async () => {
+    await Promise.all([
+      utils.governancePeople.list.invalidate({ organizationId: orgId }),
+      utils.governancePeople.suggestions.invalidate({ organizationId: orgId }),
+    ]);
+  };
+
+  const runMatch = api.governancePeople.runMatch.useMutation({
+    onSuccess: async (outcome) => {
+      toaster.create({
+        title: "Match pass finished",
+        description: `${outcome.linked} linked, ${outcome.unproven} unproven. Suggestions refresh as pull sources deliver people.`,
+        type: "success",
+      });
+      await refreshIdentity();
+    },
+    onError: (e) =>
+      showErrorToast({
+        error: e,
+        fallbackTitle: "Couldn't run the match pass",
+      }),
+  });
+
+  return { peopleQuery, suggestionsQuery, refreshIdentity, runMatch };
+}
+
+function DiscoveredPeopleHeader({
+  canManage,
+  running,
+  onRun,
+}: {
+  canManage: boolean;
+  running: boolean;
+  onRun: () => void;
+}) {
+  return (
+    <HStack
+      paddingY={2}
+      paddingX={3}
+      borderBottomWidth="1px"
+      borderColor="border.muted"
+      backgroundColor="bg.subtle"
+      justifyContent="space-between"
+    >
+      <VStack align="start" gap={0}>
+        <Text
+          fontSize="xs"
+          fontWeight="semibold"
+          color="fg.muted"
+          textTransform="uppercase"
+          letterSpacing="wider"
+        >
+          People the providers see
+        </Text>
+        <Text fontSize="xs" color="fg.subtle">
+          Everyone named on pulled rows, most of whom hold no LangWatch account.
+          Run the match pass to link the ones something proves.
+        </Text>
+      </VStack>
+      {canManage && (
+        <Button
+          size="xs"
+          colorPalette="orange"
+          loading={running}
+          onClick={onRun}
+        >
+          Run match pass
+        </Button>
+      )}
+    </HStack>
+  );
+}
+
+function DiscoveredPeoplePanel({
+  orgId,
+  canManage,
+}: {
+  orgId: string;
+  canManage: boolean;
+}) {
+  const { peopleQuery, suggestionsQuery, refreshIdentity, runMatch } =
+    useDiscoveredPeople(orgId);
+  const people = peopleQuery.data ?? [];
+  const suggestions = suggestionsQuery.data ?? [];
+
+  return (
+    <>
+      <VStack
+        align="stretch"
+        gap={0}
+        borderWidth="1px"
+        borderColor="border.muted"
+        borderRadius="md"
+        overflow="hidden"
+      >
+        <DiscoveredPeopleHeader
+          canManage={canManage}
+          running={runMatch.isPending}
+          onRun={() => runMatch.mutate({ organizationId: orgId })}
+        />
+
+        <HandledErrorAlert
+          error={peopleQuery.error}
+          fallbackTitle="Couldn't load discovered people"
+        />
+
+        {peopleQuery.isLoading ? (
+          <Box padding={4}>
+            <Spinner />
+          </Box>
+        ) : people.length === 0 ? (
+          <Box padding={4} color="fg.muted" fontSize="sm">
+            Nobody discovered yet. People appear here as pull sources deliver
+            rows that name them.
+          </Box>
+        ) : (
+          people.map((person) => (
+            <DiscoveredPersonRow key={person.id} person={person} />
+          ))
+        )}
+      </VStack>
+
+      {suggestions.length > 0 && (
+        <SuggestionsPanel
+          orgId={orgId}
+          suggestions={suggestions}
+          canManage={canManage}
+          onChanged={refreshIdentity}
+        />
+      )}
+    </>
+  );
+}
+
+function DiscoveredPersonRow({ person }: { person: DiscoveredPerson }) {
+  const isMachine = person.kind !== "person";
+  return (
+    <HStack
+      paddingY={2}
+      paddingX={3}
+      borderBottomWidth="1px"
+      borderColor="border.muted"
+      fontSize="sm"
+      justifyContent="space-between"
+      gap={4}
+    >
+      <VStack align="start" gap={0} minW={0}>
+        <HStack gap={2}>
+          <Text fontWeight="medium" truncate>
+            {person.displayText}
+          </Text>
+          {person.erasedAt && <Badge colorPalette="purple">erased</Badge>}
+          {isMachine && <Badge colorPalette="gray">machine login</Badge>}
+          {person.suspendedAt && (
+            <Badge colorPalette="yellow" title={person.suspendedReason ?? ""}>
+              needs review
+            </Badge>
+          )}
+        </HStack>
+        <Text fontSize="xs" color="fg.muted">
+          {person.provider} · seen {fmtDay(person.firstSeenAt)} –{" "}
+          {fmtDay(person.lastSeenAt)}
+        </Text>
+      </VStack>
+      <PersonLinkCell person={person} />
+    </HStack>
+  );
+}
+
+/** The right-hand column: who the person is linked to, or that they are not. */
+function PersonLinkCell({ person }: { person: DiscoveredPerson }) {
+  return (
+    <VStack align="end" gap={0} flexShrink={0}>
+      {person.link ? (
+        <>
+          <Text fontSize="sm">
+            {person.link.memberName ?? person.link.userId}
+            {person.link.departmentName
+              ? ` · ${person.link.departmentName}`
+              : ""}
+          </Text>
+          <Text fontSize="xs" color="fg.muted">
+            linked ·{" "}
+            {EVIDENCE_LABEL[person.link.evidenceKind] ??
+              person.link.evidenceKind}
+          </Text>
+        </>
+      ) : (
+        <Text fontSize="xs" color="fg.subtle">
+          {person.erasedAt ? "" : "not linked"}
+        </Text>
+      )}
+    </VStack>
+  );
+}
+
+/**
+ * The review queue: what the engine would not decide on its own. Confirming
+ * is the engine spec's contract — the link it opens, the refusals for people
+ * since linked or erased — this panel only reaches it.
+ */
+function SuggestionsPanel({
+  orgId,
+  suggestions,
+  canManage,
+  onChanged,
+}: {
+  orgId: string;
+  suggestions: MatchSuggestion[];
+  canManage: boolean;
+  onChanged: () => Promise<void>;
+}) {
+  const confirmMutation = api.governancePeople.confirmSuggestion.useMutation({
+    onSuccess: async () => {
+      toaster.create({ title: "Link confirmed", type: "success" });
+      await onChanged();
+    },
+    onError: (e) =>
+      showErrorToast({ error: e, fallbackTitle: "Couldn't confirm the link" }),
+  });
+
+  return (
+    <VStack
+      align="stretch"
+      gap={0}
+      borderWidth="1px"
+      borderColor="border.muted"
+      borderRadius="md"
+      overflow="hidden"
+    >
+      <Box
+        paddingY={2}
+        paddingX={3}
+        borderBottomWidth="1px"
+        borderColor="border.muted"
+        backgroundColor="bg.subtle"
+      >
+        <Text
+          fontSize="xs"
+          fontWeight="semibold"
+          color="fg.muted"
+          textTransform="uppercase"
+          letterSpacing="wider"
+        >
+          Suggested matches
+        </Text>
+        <Text fontSize="xs" color="fg.subtle" marginTop={1}>
+          Names that merely resemble a member. Nothing links until a person
+          confirms it.
+        </Text>
+      </Box>
+      {suggestions.map((suggestion) => (
+        <HStack
+          key={suggestion.id}
+          paddingY={2}
+          paddingX={3}
+          borderBottomWidth="1px"
+          borderColor="border.muted"
+          fontSize="sm"
+          justifyContent="space-between"
+        >
+          <Text minW={0} truncate>
+            <Text as="span" fontWeight="medium">
+              {suggestion.personDisplayText}
+            </Text>{" "}
+            <Text as="span" color="fg.muted">
+              ({suggestion.personProvider})
+            </Text>{" "}
+            ≈{" "}
+            <Text as="span" fontWeight="medium">
+              {suggestion.memberName ?? suggestion.userId}
+            </Text>
+          </Text>
+          {canManage && (
+            <Button
+              size="xs"
+              variant="outline"
+              loading={
+                confirmMutation.isPending &&
+                confirmMutation.variables?.suggestionId === suggestion.id
+              }
+              onClick={() =>
+                confirmMutation.mutate({
+                  organizationId: orgId,
+                  suggestionId: suggestion.id,
+                })
+              }
+            >
+              Confirm
+            </Button>
+          )}
+        </HStack>
+      ))}
+    </VStack>
   );
 }
 
