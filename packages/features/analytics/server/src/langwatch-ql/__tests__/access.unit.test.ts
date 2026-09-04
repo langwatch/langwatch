@@ -28,6 +28,7 @@ describe("LangWatchQL feature access", () => {
 
   describe("given a project belonging to an organization", () => {
     describe("when the gate is asked", () => {
+      /** @scenario "The switch is decided for the project's organization, not for the project alone" */
       it("evaluates the flag for both the project and its organization", async () => {
         const isEnabled = vi.spyOn(featureFlags, "isEnabled");
 

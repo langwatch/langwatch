@@ -67,3 +67,24 @@ workbench and archive, dashboard saved-view persistence, group-queue
 record-span dedup identity, scenario simulation-run-state readback and model
 selection, prompts runtime-parameters, list-copy-counts and tags, media
 rendering. Run `pnpm test:integration` with the variables set, or under CI.
+
+## LangWatchQL analytics (84 scenarios, all need test infrastructure, none need production changes)
+
+Every one of these has a live binding on `origin/main`; the branch carries the
+behaviour unchanged. Two harnesses never made the port:
+
+- **Migrated ClickHouse mode.** `packages/features/analytics/server/src/langwatch-ql/__tests__/lwql-clickhouse-harness.ts`
+  only offers the two-table `"fixture"` mode. Main's harness also ran the real
+  `trace_summaries` / `stored_spans` / `evaluation_runs` migrations. On this
+  branch `ClickHouseMigrateTask` in `packages/clickhouse-client/src/tasks/clickhouse-migrate.task.ts`
+  is a public seam that can drive them. Blocks: `lwql-api.feature` views/REST
+  answerable-questions (24), `clickhouse-memory-safety` (4),
+  `evaluation-pass-rate-consistency` (5), `evaluation-runs-join-time-bounds` (5).
+- **Postgres engine mapping.** Main's `startLangWatchQLPostgres` /
+  `mapPostgresIntoClickHouse` named-collection setup was not ported. Blocks the
+  17 `postgresEngineIsolation` scenarios in `lwql-api.feature`.
+- **Dashboard REST/tRPC harness with real auth.** `packages/features/dashboard/server`
+  has fakes-only unit tests and Postgres persistence tests, no transport tests
+  with real project/API-key auth. Blocks `lwql-saved-charts` (17),
+  `lwql-langy-authoring` (11), `dashboard-rest-api` (2). Achievable without
+  ClickHouse; the suite-family harness is the model to follow.
