@@ -38,8 +38,17 @@ Write criteria about outcomes and actions, not wording. A criterion about an int
 | **Situation** | Who the user is and what they are trying to do. |
 | **Criteria** | One criterion per line. Blank lines are dropped. |
 | **Labels** | Free text tags, any number. A run plan can scope by labels across test suites. |
+| **Fields** | One control per field the test suite declares, after the criteria: a growing text box for a text field, a number input for a number, a switch for a boolean. See [Field values](#field-values). |
 
 **Save** stores the scenario. **Save & Run** stores it and opens the [run dialog](/agent-testing/run-plans#the-run-dialog). **Open recent run** opens the latest run of this scenario.
+
+## Field values
+
+When the test suite declares [fields](/agent-testing/test-suites#fields), the editor shows one control per field after the criteria, and the value is stored on the scenario. An [evaluator](/agent-testing/evaluators) attached to the suite reads the value through its mapping, for example `expected_output` from `golden_sql`.
+
+A blank value is no value: the evaluators that read the field are skipped for this scenario, with the reason `no golden_sql on this scenario`. A scenario moved to another suite keeps the values it holds; the editor lists the ones the new suite does not declare under **Not in this suite**, each with a remove action.
+
+From the CLI, `langwatch scenario create` and `langwatch scenario update` take `--field identifier=value`, repeated once per field. A number field reads a number and a boolean field reads `true` or `false`; a field the suite does not declare is refused with the list it does. On `update` the flags together replace the values the scenario holds. The API takes the same values as `fields` on `POST /api/scenarios` and `PUT /api/scenarios/{id}`, an empty object clearing them, and the SDKs and the MCP tools take `fields` on create and update.
 
 ## Customize scenario
 
@@ -86,6 +95,8 @@ Through the [LangWatch MCP integration](/integration/mcp), a coding assistant su
 | Limit | Value |
 |---|---|
 | Parameters declared on one scenario | 20 |
+| Fields declared on a test suite | 30 |
+| A text field value | 65536 characters |
 | Max turns without a value | 10 |
 | Versions kept | All |
 

@@ -2,7 +2,7 @@
 title: Test Suites
 sidebarTitle: Test suites
 keywords: langwatch, agent testing, test suite, scenarios, default test suite, from code, labels, archive
-description: A test suite is a named group of scenarios that you run together. The targets, the models and the repeat count are set on the run plan, not on the test suite.
+description: A test suite is a named group of scenarios that you run together, with the fields every scenario carries a value for and the evaluators that run after every scenario run. The targets, the models and the repeat count are set on the run plan.
 ---
 
 ## The rail
@@ -19,11 +19,30 @@ The row menu of a test suite offers:
 |---|---|
 | **New scenario** | Opens the editor with this test suite preselected. |
 | **Run suite** | Opens the run dialog with every scenario of the test suite in scope. |
-| **Rename** | Changes the name. Past runs keep the old name. |
+| **Edit** | Opens the suite editor: the name, the fields and the evaluators. Past runs keep the old name. |
 | **Open recent runs** | Lists the latest runs of this test suite. |
 | **Archive suite** | Archives the test suite and the scenarios in it. Test runs are preserved. |
 
 Every project has a **Default** test suite. A scenario saved with **No test suite** goes there.
+
+Under the suite name, the header shows a chip per field and a chip per evaluator, and the count line `N scenarios · N fields · N evaluators`.
+
+## Fields
+
+A test suite reads like a dataset. Beyond the situation and the criteria, it declares typed fields, and every scenario in it carries one value per field. A field holds what an [evaluator](/agent-testing/evaluators) compares against: the golden SQL query, the reference answer, the tables the answer had to be written against.
+
+**Edit suite** opens the suite editor. Under **Customize test suite**, **Add fields** opens the field rows: an identifier and a type each, with **Add field** for the next one and the arrows to reorder them.
+
+| Setting | Rule |
+|---|---|
+| **Identifier** | Lowercase letters, digits and underscores, starting with a letter, up to 64 characters, for example `golden_sql`. `situation`, `criteria`, `name`, `input` and `output` are reserved. |
+| **Type** | `text`, `number` or `boolean`. A text value is a growing text box on the scenario; a number a number input; a boolean a switch. |
+
+A suite declares up to 30 fields. A field an attached evaluator still reads cannot be removed: detach the evaluator or change its mapping first. Removing a field keeps the values scenarios hold for it; the scenario editor lists them under **Not in this suite** until they are removed.
+
+## Evaluators
+
+The evaluators attached to a suite run after every scenario run and report beside the judge's verdict. A required one that fails fails the scenario. See [Evaluators](/agent-testing/evaluators) for the mappings, the gate and what each run reports.
 
 ## Run a test suite
 
@@ -49,4 +68,14 @@ Scenarios written with the Scenario SDK and run from your own test runner report
 <img className="block" src="/images/agent-testing/from-code-suite.png" alt="A From Code test suite, with its scenarios and their last runs" />
 </Frame>
 
-Also check: [Write scenarios in code](/agent-testing/scenarios-in-code), [Scenarios](/agent-testing/scenarios), [Run plans](/agent-testing/run-plans).
+## From the CLI and the API
+
+```bash
+langwatch test-suite create "Case lookups" --field golden_sql:text --field table_schema:text
+langwatch test-suite update "Case lookups" --field golden_sql:text --field table_schema:text --field row_limit:number
+langwatch test-suite get "Case lookups" --format json
+```
+
+`--field identifier:type` repeats, and on `update` the flags together replace the list the suite declares. The same list travels as `fields` on `POST /api/v1/test-suites` and `PATCH /api/v1/test-suites/{id}`; see the [Test Suites API reference](/api-reference/test-suites/overview). The Python and TypeScript SDKs take `fields` on `test_suites.create` / `testSuites.create` and `test_suites.update` / `testSuites.update`; the MCP tools `platform_create_test_suite` and `platform_update_test_suite` take the same.
+
+Also check: [Write scenarios in code](/agent-testing/scenarios-in-code), [Scenarios](/agent-testing/scenarios), [Evaluators](/agent-testing/evaluators), [Run plans](/agent-testing/run-plans).
