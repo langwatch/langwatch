@@ -30,6 +30,7 @@ export function gatedVerdict({
   evaluations: ScenarioEvaluationResult[];
   judgeVerdict: GatedVerdict | undefined;
 }): GatedVerdict | undefined {
+  if (judgeVerdict === undefined) return undefined;
   if (evaluations.some(evaluationFailsRun)) return "failure";
   return judgeVerdict;
 }

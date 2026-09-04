@@ -449,137 +449,185 @@ describe("running a test suite", () => {
 });
 
 describe("evaluators on a run", () => {
-  async function createExactMatchEvaluator() {
-    return prisma.evaluator.create({
-      data: {
-        projectId,
-        name: "Exact match",
-        slug: `exact-match-${nanoid(6)}`,
-        type: "evaluator",
-        config: { evaluatorType: "langevals/exact_match", settings: {} },
-      },
-    });
-  }
-
-  const outputMapping = {
-    type: "source" as const,
-    sourceId: "conversation" as const,
-    path: ["last_agent_message"],
-  };
-
-  describe("when a suite evaluator has a required input with no mapping", () => {
-    /** @scenario "A run is refused while a suite evaluator has a missing required mapping" */
-    it("refuses with suite_evaluator_mappings_missing and queues nothing", async () => {
-      const evaluator = await createExactMatchEvaluator();
-      const testSuite = await suiteService.createTestSuite({
-        projectId,
-        name: "Refunds",
-        evaluators: [
-          {
-            id: "att_1",
-            evaluatorId: evaluator.id,
-            required: true,
-            mappings: { output: outputMapping },
-          },
-        ],
+  describe("given evaluator attachments on the suite and the run plan", () => {
+    async function createExactMatchEvaluator() {
+      return prisma.evaluator.create({
+        data: {
+          projectId,
+          name: "Exact match",
+          slug: `exact-match-${nanoid(6)}`,
+          type: "evaluator",
+          config: { evaluatorType: "langevals/exact_match", settings: {} },
+        },
       });
-      await suiteService.createTestSuite({ projectId, name: "Checkout" });
-      await createCase({ name: "One", testSuiteId: testSuite.id });
-      const agent = await createHttpAgent();
+    }
 
-      await expect(
-        suiteService.runTestSuite({
+    const outputMapping = {
+      type: "source" as const,
+      sourceId: "conversation" as const,
+      path: ["last_agent_message"],
+    };
+
+    describe("when a suite evaluator has a required input with no mapping", () => {
+      /** @scenario "A run is refused while a suite evaluator has a missing required mapping" */
+      it("refuses with suite_evaluator_mappings_missing and queues nothing", async () => {
+        const evaluator = await createExactMatchEvaluator();
+        const testSuite = await suiteService.createTestSuite({
+          projectId,
+          name: "Refunds",
+          evaluators: [
+            {
+              id: "att_1",
+              evaluatorId: evaluator.id,
+              required: true,
+              mappings: { output: outputMapping },
+            },
+          ],
+        });
+        await suiteService.createTestSuite({ projectId, name: "Checkout" });
+        await createCase({ name: "One", testSuiteId: testSuite.id });
+        const agent = await createHttpAgent();
+
+        await expect(
+          suiteService.runTestSuite({
+            projectId,
+            organizationId,
+            testSuiteId: testSuite.id,
+            targets: [{ type: "http", referenceId: agent.id }],
+            idempotencyKey: "missing-mappings",
+          }),
+        ).rejects.toMatchObject({
+          code: "suite_evaluator_mappings_missing",
+          meta: {
+            evaluatorId: evaluator.id,
+            suiteId: testSuite.id,
+            inputs: ["expected_output"],
+          },
+        });
+        expect(startSuiteRun).not.toHaveBeenCalled();
+        expect(queueSimulationRun).not.toHaveBeenCalled();
+        expect(
+          await prisma.simulationSuite.count({
+            where: { projectId, kind: "run_plan" },
+          }),
+        ).toBe(0);
+      });
+    });
+
+    describe("when a test suite and a run plan both attach evaluators", () => {
+      /** @scenario "A run plan carries its own evaluators beside the suites' ones" */
+      it("lists the suite's attachment first and an evaluator on both sides once", async () => {
+        const shared = await createExactMatchEvaluator();
+        const planOnly = await createExactMatchEvaluator();
+        const suiteAttachment = {
+          id: "att_suite",
+          evaluatorId: shared.id,
+          required: true,
+          mappings: {
+            output: outputMapping,
+            expected_output: {
+              type: "source" as const,
+              sourceId: "scenario" as const,
+              path: ["fields", "golden_sql"],
+            },
+          },
+        };
+        const testSuite = await suiteService.createTestSuite({
+          projectId,
+          name: "Refunds",
+          fields: [{ identifier: "golden_sql", type: "text" }],
+          evaluators: [suiteAttachment],
+        });
+        await suiteService.createTestSuite({ projectId, name: "Checkout" });
+        await createCase({ name: "One", testSuiteId: testSuite.id });
+        const agent = await createHttpAgent();
+        const planAttachments = [
+          {
+            id: "att_plan_shared",
+            evaluatorId: shared.id,
+            required: false,
+            mappings: {
+              output: outputMapping,
+              expected_output: { type: "value" as const, value: "42" },
+            },
+          },
+          {
+            id: "att_plan_only",
+            evaluatorId: planOnly.id,
+            required: false,
+            mappings: {
+              output: outputMapping,
+              expected_output: { type: "value" as const, value: "42" },
+            },
+          },
+        ];
+
+        const result = await suiteService.runTestSuite({
           projectId,
           organizationId,
           testSuiteId: testSuite.id,
           targets: [{ type: "http", referenceId: agent.id }],
-          idempotencyKey: "missing-mappings",
-        }),
-      ).rejects.toMatchObject({
-        code: "suite_evaluator_mappings_missing",
-        meta: {
-          evaluatorId: evaluator.id,
+          idempotencyKey: "plan-extras",
+          evaluators: planAttachments,
+        });
+
+        const attachments = await suiteService.getRunAttachments({
+          projectId,
           suiteId: testSuite.id,
-          inputs: ["expected_output"],
-        },
+          planId: result.suiteId,
+        });
+        expect(attachments.map((entry) => entry.id)).toEqual([
+          "att_suite",
+          "att_plan_only",
+        ]);
+        expect(result.planSlug).toBeTruthy();
       });
-      expect(startSuiteRun).not.toHaveBeenCalled();
-      expect(queueSimulationRun).not.toHaveBeenCalled();
-      expect(
-        await prisma.simulationSuite.count({
-          where: { projectId, kind: "run_plan" },
-        }),
-      ).toBe(0);
     });
-  });
 
-  describe("when a test suite and a run plan both attach evaluators", () => {
-    /** @scenario "A run plan carries its own evaluators beside the suites' ones" */
-    it("lists the suite's attachment first and an evaluator on both sides once", async () => {
-      const shared = await createExactMatchEvaluator();
-      const planOnly = await createExactMatchEvaluator();
-      const suiteAttachment = {
-        id: "att_suite",
-        evaluatorId: shared.id,
-        required: true,
-        mappings: {
-          output: outputMapping,
-          expected_output: {
-            type: "source" as const,
-            sourceId: "scenario" as const,
-            path: ["fields", "golden_sql"],
+    describe("when the plan's copy of a suite's evaluator has a missing required mapping", () => {
+      /** @scenario "A duplicated plan attachment with a missing mapping does not refuse a run the suite's own attachment fully maps" */
+      it("runs, because the suite's attachment is the one that executes", async () => {
+        const shared = await createExactMatchEvaluator();
+        const testSuite = await suiteService.createTestSuite({
+          projectId,
+          name: "Refunds",
+          evaluators: [
+            {
+              id: "att_suite",
+              evaluatorId: shared.id,
+              required: true,
+              mappings: {
+                output: outputMapping,
+                expected_output: { type: "value" as const, value: "42" },
+              },
+            },
+          ],
+        });
+        await createCase({ name: "One", testSuiteId: testSuite.id });
+        const agent = await createHttpAgent();
+        const planAttachments = [
+          {
+            id: "att_plan_shared",
+            evaluatorId: shared.id,
+            required: true,
+            // expected_output is unmapped: the suite's copy of this
+            // evaluator wins at run time, so this would never execute.
+            mappings: { output: outputMapping },
           },
-        },
-      };
-      const testSuite = await suiteService.createTestSuite({
-        projectId,
-        name: "Refunds",
-        fields: [{ identifier: "golden_sql", type: "text" }],
-        evaluators: [suiteAttachment],
-      });
-      await suiteService.createTestSuite({ projectId, name: "Checkout" });
-      await createCase({ name: "One", testSuiteId: testSuite.id });
-      const agent = await createHttpAgent();
-      const planAttachments = [
-        {
-          id: "att_plan_shared",
-          evaluatorId: shared.id,
-          required: false,
-          mappings: {
-            output: outputMapping,
-            expected_output: { type: "value" as const, value: "42" },
-          },
-        },
-        {
-          id: "att_plan_only",
-          evaluatorId: planOnly.id,
-          required: false,
-          mappings: {
-            output: outputMapping,
-            expected_output: { type: "value" as const, value: "42" },
-          },
-        },
-      ];
+        ];
 
-      const result = await suiteService.runTestSuite({
-        projectId,
-        organizationId,
-        testSuiteId: testSuite.id,
-        targets: [{ type: "http", referenceId: agent.id }],
-        idempotencyKey: "plan-extras",
-        evaluators: planAttachments,
-      });
+        const result = await suiteService.runTestSuite({
+          projectId,
+          organizationId,
+          testSuiteId: testSuite.id,
+          targets: [{ type: "http", referenceId: agent.id }],
+          idempotencyKey: "plan-duplicate-missing-mapping",
+          evaluators: planAttachments,
+        });
 
-      const attachments = await suiteService.getRunAttachments({
-        projectId,
-        suiteId: testSuite.id,
-        planId: result.suiteId,
+        expect(result.planSlug).toBeTruthy();
+        expect(startSuiteRun).toHaveBeenCalledTimes(1);
       });
-      expect(attachments.map((entry) => entry.id)).toEqual([
-        "att_suite",
-        "att_plan_only",
-      ]);
-      expect(result.planSlug).toBeTruthy();
     });
   });
 });

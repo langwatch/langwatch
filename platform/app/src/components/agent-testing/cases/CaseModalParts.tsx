@@ -229,7 +229,11 @@ function fieldText(value: ScenarioFieldValue | undefined): string {
 
 /** What a stored value reads as in a switch. */
 function fieldChecked(value: ScenarioFieldValue | undefined): boolean {
-  return value === true || value === "true";
+  return (
+    value === true ||
+    (typeof value === "string" &&
+      ["true", "yes"].includes(value.trim().toLowerCase()))
+  );
 }
 
 /** The height a text field opens at, and the height it stops growing at. */

@@ -26,6 +26,10 @@ import {
   AgentRepository,
 } from "../agents/agent.repository";
 import {
+  type PresenceReads,
+  runtimePresence,
+} from "../connected-agents/presence.read";
+import {
   EvaluatorService,
   type EvaluatorWithFields,
 } from "../evaluators/evaluator.service";
@@ -484,6 +488,8 @@ export class SuiteService {
     private readonly evaluatorService: EvaluatorService = EvaluatorService.create(
       prisma,
     ),
+    /** Whether a process is holding a connected agent right now. */
+    private readonly presence: PresenceReads = runtimePresence,
   ) {}
 
   /**
@@ -607,7 +613,7 @@ export class SuiteService {
                 projectId: params.projectId,
                 attachments: params.evaluators,
                 fields,
-                planLevel: false,
+                isPlanLevel: false,
               });
         assertFieldsNotInUse({ fields, attachments: evaluators });
         const initialSlug = await this.generateUniqueSlug({
@@ -806,7 +812,7 @@ export class SuiteService {
     const ids = [params.suiteId, params.planId].filter(
       (id): id is string => !!id,
     );
-    const rows = await this.repository.findManyByIdsIncludingArchived({
+    const rows = await this.repository.findAllByIdsIncludingArchived({
       ids,
       projectId: params.projectId,
     });
@@ -853,7 +859,7 @@ export class SuiteService {
     projectId: string;
     attachments: EvaluatorAttachment[];
     fields: SuiteFieldDefinition[];
-    planLevel: boolean;
+    isPlanLevel: boolean;
   }): Promise<EvaluatorAttachment[]> {
     const evaluatorsById = await this.getAttachedEvaluators({
       projectId: params.projectId,
@@ -862,7 +868,7 @@ export class SuiteService {
     return readEvaluatorAttachments({
       attachments: params.attachments,
       fields: params.fields,
-      planLevel: params.planLevel,
+      isPlanLevel: params.isPlanLevel,
       evaluatorsById,
     });
   }
@@ -891,17 +897,26 @@ export class SuiteService {
     ];
     if (suiteIds.length === 0 && params.planAttachments.length === 0) return;
     const suites = (
-      await this.repository.findManyByIdsIncludingArchived({
+      await this.repository.findAllByIdsIncludingArchived({
         ids: suiteIds,
         projectId: params.projectId,
       })
     ).filter((suite) => suite.kind === "test_suite");
+    // A scenario not filed in any suite runs the plan's attachments as-is, so
+    // that combination is validated on its own. A scenario filed in a suite
+    // never runs the plan's raw copy of a duplicated evaluator: the suite's
+    // own attachment takes precedence at run time, so it must here too.
+    const hasUnfiledScenario =
+      suiteIds.length === 0 || filed.some((row) => !row.testSuiteId);
     const scoped: { suiteId: string; attachments: EvaluatorAttachment[] }[] = [
       ...suites.map((suite) => ({
         suiteId: suite.id,
-        attachments: parseEvaluatorAttachments(suite.evaluators),
+        attachments: mergeRunAttachments({
+          suiteAttachments: parseEvaluatorAttachments(suite.evaluators),
+          planAttachments: params.planAttachments,
+        }),
       })),
-      ...(params.planAttachments.length > 0
+      ...(hasUnfiledScenario && params.planAttachments.length > 0
         ? [
             {
               suiteId: params.planId ?? "",
@@ -1125,7 +1140,7 @@ export class SuiteService {
             projectId: params.projectId,
             attachments: params.evaluators,
             fields: nextFields,
-            planLevel: params.existing.kind !== "test_suite",
+            isPlanLevel: params.existing.kind !== "test_suite",
           });
     assertFieldsNotInUse({ fields: nextFields, attachments: nextAttachments });
     if (params.fields !== undefined) {
@@ -1366,6 +1381,8 @@ export class SuiteService {
    * @throws {AllTargetsArchivedError} if all targets are archived
    * @throws {AgentOwnerOnlyError} if a target is a personal development agent
    *   of someone other than the actor
+   * @throws {AgentOfflineError} if a target is a connected agent no process
+   *   is holding
    * @throws {ScenarioParameterUnknownError} if a supplied parameter name is
    *   declared by no scenario in the run and by no target's agent
    * @throws {ScenarioParameterOptionInvalidError} if a supplied value is
@@ -1416,6 +1433,8 @@ export class SuiteService {
       agents: [...resolved.agentsById.values()],
       actor: params.actor,
       users: this.prisma,
+      projectId: params.projectId,
+      presence: this.presence,
     });
 
     // The identity of a target is its overrides, and a value equal to the
@@ -1694,10 +1713,20 @@ export class SuiteService {
         span.setAttribute("suite.target_count", targets.length);
         span.setAttribute("suite.scenario_count", prepared.scenarioIds.length);
 
+        const planName =
+          requestedName ??
+          (await this.defaultPlanName({
+            projectId: params.projectId,
+            organizationId: params.organizationId,
+            scope,
+            scenarioIds: params.config.scenarioIds ?? [],
+            targets: prepared.targets,
+          }));
+
         const { evaluators, existingPlan } = await this.resolvePlanEvaluators({
           projectId: params.projectId,
           config: params.config,
-          requestedName,
+          name: planName,
         });
         await this.assertRunMappings({
           projectId: params.projectId,
@@ -1713,7 +1742,7 @@ export class SuiteService {
           config: params.config,
           scope,
           prepared,
-          requestedName,
+          name: planName,
           evaluators,
         });
         span.setAttribute("suite.id", suite.id);
@@ -1784,15 +1813,18 @@ export class SuiteService {
   }
 
   /**
-   * The plan's own evaluators, checked, and the plan the requested name
+   * The plan's own evaluators, checked, and the plan the run's resolved name
    * already resolves to when the run sends no evaluators of its own. Read
    * together because a run whose evaluators the caller sent takes over the
-   * name it resolves to; it does not read a plan by that name first.
+   * name it resolves to; it does not read a plan by that name first. The
+   * name is always the one the run will actually join, whether the caller
+   * requested it or it was derived from the scope and targets, so a plan
+   * found here is the plan whose stored attachments the run retains.
    */
   private async resolvePlanEvaluators(params: {
     projectId: string;
     config: RunPlanConfigInput;
-    requestedName: string | undefined;
+    name: string;
   }): Promise<{
     evaluators: EvaluatorAttachment[] | undefined;
     existingPlan: SimulationSuite | null;
@@ -1804,25 +1836,25 @@ export class SuiteService {
             projectId: params.projectId,
             attachments: params.config.evaluators,
             fields: [],
-            planLevel: true,
+            isPlanLevel: true,
           });
     const existingPlan =
-      evaluators === undefined && params.requestedName !== undefined
+      evaluators === undefined
         ? await this.repository.findPlanByName({
             projectId: params.projectId,
-            name: params.requestedName,
+            name: params.name,
           })
         : null;
     return { evaluators, existingPlan };
   }
 
   /**
-   * The name a run resolves to, then the plan row that name resolves to.
+   * The plan row a run's resolved name resolves to.
    *
-   * Derived only once the run holds up, so a refused run reads no names it
-   * will not use. The prepared targets carry the canonical overrides, so the
-   * name and the stored config read the same target the run was stamped
-   * with.
+   * The name is resolved by the caller, before this runs, so that the
+   * evaluator mappings validated against it are the plan this run actually
+   * joins. The prepared targets carry the canonical overrides, so the name
+   * and the stored config read the same target the run was stamped with.
    */
   private async resolveNamedPlan(params: {
     projectId: string;
@@ -1830,22 +1862,12 @@ export class SuiteService {
     config: RunPlanConfigInput;
     scope: SuiteScope;
     prepared: PreparedRun;
-    requestedName: string | undefined;
+    name: string;
     evaluators: EvaluatorAttachment[] | undefined;
   }): Promise<{ suite: SimulationSuite; created: boolean }> {
-    const name =
-      params.requestedName ??
-      (await this.defaultPlanName({
-        projectId: params.projectId,
-        organizationId: params.organizationId,
-        scope: params.scope,
-        scenarioIds: params.config.scenarioIds ?? [],
-        targets: params.prepared.targets,
-      }));
-
     return await this.resolvePlanByName({
       projectId: params.projectId,
-      name,
+      name: params.name,
       config: params.config,
       scope: params.scope,
       targets: params.prepared.targets,

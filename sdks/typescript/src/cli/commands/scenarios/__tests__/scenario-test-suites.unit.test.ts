@@ -119,7 +119,7 @@ describe("filing a scenario into a test suite from the command line", () => {
     });
   });
 
-  describe("createScenarioCommand() with --field", () => {
+  describe("when creating a scenario with --field", () => {
     /** @scenario "Create a scenario with field values coerced by the suite" */
     it("coerces each value by the type the suite declares", async () => {
       mockSuitesList.mockResolvedValue([
@@ -162,7 +162,7 @@ describe("filing a scenario into a test suite from the command line", () => {
     });
   });
 
-  describe("updateScenarioCommand() with --field", () => {
+  describe("when updating a scenario with --field", () => {
     /** @scenario "Update the field values of a scenario in place" */
     it("reads the suite the scenario is in for its field types", async () => {
       const mockScenarioGet = vi

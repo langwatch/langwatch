@@ -161,7 +161,7 @@ describe("resolveEvaluatorAttachments", () => {
       const [resolved] = await resolveEvaluatorAttachments({
         refs: [{ reference: "sql-query-equivalence" }],
         fields: [goldenSql],
-        planLevel: true,
+        isPlanLevel: true,
         service: serviceWith([sqlEquivalence]),
       });
 

@@ -150,7 +150,7 @@ describe("runScenarioEvaluations", () => {
     it("runs the evaluator with the resolved inputs and records a passed result", async () => {
       const deps = makeDeps();
 
-      await runScenarioEvaluations({ deps, payload, finalAttempt: false });
+      await runScenarioEvaluations({ deps, payload, isFinalAttempt: false });
 
       expect(deps.runEvaluation).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -200,7 +200,7 @@ describe("runScenarioEvaluations", () => {
     it("does not run the evaluator and records a skipped result", async () => {
       const deps = makeDeps({ fields: {} });
 
-      await runScenarioEvaluations({ deps, payload, finalAttempt: false });
+      await runScenarioEvaluations({ deps, payload, isFinalAttempt: false });
 
       expect(deps.runEvaluation).not.toHaveBeenCalled();
       expect(deps.reportEvaluation).not.toHaveBeenCalled();
@@ -235,7 +235,7 @@ describe("runScenarioEvaluations", () => {
         spans: [otherSpan],
       });
 
-      await runScenarioEvaluations({ deps, payload, finalAttempt: true });
+      await runScenarioEvaluations({ deps, payload, isFinalAttempt: true });
 
       expect(deps.runEvaluation).not.toHaveBeenCalled();
       expect(recorded(deps)?.evaluations).toEqual([
@@ -252,7 +252,7 @@ describe("runScenarioEvaluations", () => {
       const deps = makeDeps({ attachments: [toolAttachment], spans: [] });
 
       await expect(
-        runScenarioEvaluations({ deps, payload, finalAttempt: false }),
+        runScenarioEvaluations({ deps, payload, isFinalAttempt: false }),
       ).rejects.toBeInstanceOf(TraceDataPendingError);
       expect(deps.recordEvaluations).not.toHaveBeenCalled();
     });
@@ -260,7 +260,7 @@ describe("runScenarioEvaluations", () => {
     it("records the missing call as failed once the attempts are used up", async () => {
       const deps = makeDeps({ attachments: [toolAttachment], spans: [] });
 
-      await runScenarioEvaluations({ deps, payload, finalAttempt: true });
+      await runScenarioEvaluations({ deps, payload, isFinalAttempt: true });
 
       expect(recorded(deps)?.evaluations[0]).toEqual(
         expect.objectContaining({
@@ -276,7 +276,7 @@ describe("runScenarioEvaluations", () => {
         traceIds: ["trace-1", "trace-2"],
       });
 
-      await runScenarioEvaluations({ deps, payload, finalAttempt: true });
+      await runScenarioEvaluations({ deps, payload, isFinalAttempt: true });
 
       expect(deps.spans.getSpansByTraceId).toHaveBeenCalledTimes(2);
       expect(deps.spans.getSpansByTraceId).toHaveBeenCalledWith({
@@ -306,7 +306,7 @@ describe("runScenarioEvaluations", () => {
         })
         .mockResolvedValueOnce(processed({ passed: true }));
 
-      await runScenarioEvaluations({ deps, payload, finalAttempt: false });
+      await runScenarioEvaluations({ deps, payload, isFinalAttempt: false });
 
       expect(recorded(deps)?.evaluations).toEqual([
         expect.objectContaining({
@@ -331,7 +331,7 @@ describe("runScenarioEvaluations", () => {
     it("records a thrown runner error as an error result", async () => {
       const deps = makeDeps({ result: new Error("langevals unreachable") });
 
-      await runScenarioEvaluations({ deps, payload, finalAttempt: false });
+      await runScenarioEvaluations({ deps, payload, isFinalAttempt: false });
 
       expect(recorded(deps)?.evaluations[0]).toEqual(
         expect.objectContaining({
@@ -347,7 +347,7 @@ describe("runScenarioEvaluations", () => {
     it("records an error result that says so", async () => {
       const deps = makeDeps({ evaluators: [] });
 
-      await runScenarioEvaluations({ deps, payload, finalAttempt: false });
+      await runScenarioEvaluations({ deps, payload, isFinalAttempt: false });
 
       expect(deps.runEvaluation).not.toHaveBeenCalled();
       expect(recorded(deps)?.evaluations).toEqual([
@@ -368,7 +368,7 @@ describe("runScenarioEvaluations", () => {
       const long = "y".repeat(MAX_STORED_INPUT_LENGTH + 100);
       const deps = makeDeps({ fields: { golden_sql: long } });
 
-      await runScenarioEvaluations({ deps, payload, finalAttempt: false });
+      await runScenarioEvaluations({ deps, payload, isFinalAttempt: false });
 
       expect(
         vi.mocked(deps.runEvaluation).mock.calls[0]?.[0].data.data
@@ -387,7 +387,7 @@ describe("runScenarioEvaluations", () => {
       await runScenarioEvaluations({
         deps,
         payload: { ...payload, traceIds: [] },
-        finalAttempt: false,
+        isFinalAttempt: false,
       });
 
       expect(deps.runEvaluation).toHaveBeenCalledWith(
@@ -395,6 +395,25 @@ describe("runScenarioEvaluations", () => {
       );
       expect(deps.reportEvaluation).not.toHaveBeenCalled();
       expect(recorded(deps)?.evaluations[0]?.status).toBe("passed");
+    });
+  });
+
+  describe("when writing the evaluation on the trace fails", () => {
+    /** @scenario "A trace report failure does not lose a graded result" */
+    it("still records the result instead of failing the whole run", async () => {
+      const deps = makeDeps();
+      vi.mocked(deps.reportEvaluation).mockRejectedValueOnce(
+        new Error("clickhouse unavailable"),
+      );
+
+      await expect(
+        runScenarioEvaluations({ deps, payload, isFinalAttempt: false }),
+      ).resolves.toBeDefined();
+
+      expect(deps.recordEvaluations).toHaveBeenCalledTimes(1);
+      expect(recorded(deps)?.evaluations[0]).toEqual(
+        expect.objectContaining({ evaluatorId: "eval-exact", status: "passed" }),
+      );
     });
   });
 });

@@ -89,6 +89,21 @@ describe("evaluator attachments", () => {
       });
     });
 
+    describe("when an input is named messages", () => {
+      /** @scenario "A messages input is mapped to the message list, not the transcript" */
+      it("infers the conversation's messages list, not the transcript string", () => {
+        const mappings = inferScenarioMappings({
+          inputs: [input("messages")],
+          ctx,
+        });
+        expect(mappings.messages).toEqual({
+          type: "source",
+          sourceId: "conversation",
+          path: ["messages"],
+        });
+      });
+    });
+
     describe("when an input has the exact identifier of a field", () => {
       it("maps to that field", () => {
         const mappings = inferScenarioMappings({
@@ -109,7 +124,7 @@ describe("evaluator attachments", () => {
         const mappings = inferScenarioMappings({
           inputs: [input("output"), input("expected_output")],
           ctx,
-          planLevel: true,
+          isPlanLevel: true,
         });
         expect(mappings.output).toBeDefined();
         expect(mappings.expected_output).toBeUndefined();
@@ -310,7 +325,7 @@ describe("evaluator attachments", () => {
               path: ["fields", "golden_sql"],
             },
             ctx,
-            planLevel: true,
+            isPlanLevel: true,
           }),
         ).not.toBeNull();
       });
@@ -381,7 +396,7 @@ describe("evaluator attachments", () => {
       it("offers the scenario without its fields", () => {
         const sources = scenarioMappingSources(
           { fields: ctx.fields, toolNames: [] },
-          { planLevel: true },
+          { isPlanLevel: true },
         );
         const scenario = sources.find((source) => source.id === "scenario");
         expect(scenario?.fields.map((field) => field.name)).toEqual([

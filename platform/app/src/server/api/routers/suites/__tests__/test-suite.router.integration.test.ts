@@ -399,7 +399,7 @@ describe("suites.test suites integration", () => {
     });
   });
 
-  describe("fields and evaluators on a test suite", () => {
+  describe("given a test suite", () => {
     async function createExactMatchEvaluator() {
       return prisma.evaluator.create({
         data: {
@@ -412,7 +412,7 @@ describe("suites.test suites integration", () => {
       });
     }
 
-    const attachmentFor = (evaluatorId: string) => ({
+    const attachmentFor = ({ evaluatorId }: { evaluatorId: string }) => ({
       id: "att_1",
       evaluatorId,
       required: true,
@@ -430,122 +430,136 @@ describe("suites.test suites integration", () => {
       },
     });
 
-    /** @scenario "A test suite declares fields and reads them back" */
-    it("saves fields through the suite editor and reads them back in order", async () => {
-      const testSuite = await caller.suites.testSuites.create({
-        projectId,
-        name: "Case lookups",
-      });
+    describe("when fields are saved through the suite editor", () => {
+      /** @scenario "A test suite declares fields and reads them back" */
+      it("saves fields through the suite editor and reads them back in order", async () => {
+        const testSuite = await caller.suites.testSuites.create({
+          projectId,
+          name: "Case lookups",
+        });
 
-      await caller.suites.testSuites.update({
-        projectId,
-        testSuiteId: testSuite.id,
-        fields: [
+        await caller.suites.testSuites.update({
+          projectId,
+          testSuiteId: testSuite.id,
+          fields: [
+            { identifier: "golden_sql", type: "text" },
+            { identifier: "table_schema", type: "text" },
+          ],
+        });
+
+        const read = await caller.suites.getById({
+          projectId,
+          id: testSuite.id,
+        });
+        expect(read.fields).toEqual([
           { identifier: "golden_sql", type: "text" },
           { identifier: "table_schema", type: "text" },
-        ],
+        ]);
       });
-
-      const read = await caller.suites.getById({
-        projectId,
-        id: testSuite.id,
-      });
-      expect(read.fields).toEqual([
-        { identifier: "golden_sql", type: "text" },
-        { identifier: "table_schema", type: "text" },
-      ]);
     });
 
-    /** @scenario "An evaluator is attached to a test suite with its mappings" */
-    it("saves an attachment with its mappings and reads it back", async () => {
-      const evaluator = await createExactMatchEvaluator();
-      const testSuite = await caller.suites.testSuites.create({
-        projectId,
-        name: "Case lookups",
-        fields: [{ identifier: "golden_sql", type: "text" }],
-      });
+    describe("when an evaluator is attached with its mappings", () => {
+      /** @scenario "An evaluator is attached to a test suite with its mappings" */
+      it("saves an attachment with its mappings and reads it back", async () => {
+        const evaluator = await createExactMatchEvaluator();
+        const testSuite = await caller.suites.testSuites.create({
+          projectId,
+          name: "Case lookups",
+          fields: [{ identifier: "golden_sql", type: "text" }],
+        });
 
-      await caller.suites.testSuites.update({
-        projectId,
-        testSuiteId: testSuite.id,
-        evaluators: [attachmentFor(evaluator.id)],
-      });
-
-      const read = await caller.suites.getById({
-        projectId,
-        id: testSuite.id,
-      });
-      expect(read.evaluators).toEqual([attachmentFor(evaluator.id)]);
-    });
-
-    /** @scenario "A field an evaluator reads cannot be removed" */
-    it("refuses to remove a field an attachment still reads", async () => {
-      const evaluator = await createExactMatchEvaluator();
-      const testSuite = await caller.suites.testSuites.create({
-        projectId,
-        name: "Case lookups",
-        fields: [{ identifier: "golden_sql", type: "text" }],
-        evaluators: [attachmentFor(evaluator.id)],
-      });
-
-      await expect(
-        caller.suites.testSuites.update({
+        await caller.suites.testSuites.update({
           projectId,
           testSuiteId: testSuite.id,
-          fields: [],
-        }),
-      ).rejects.toMatchObject({
-        cause: expect.objectContaining({
-          code: "suite_field_in_use",
-          meta: { identifier: "golden_sql", evaluatorIds: [evaluator.id] },
-        }),
-      });
+          evaluators: [attachmentFor({ evaluatorId: evaluator.id })],
+        });
 
-      const kept = await prisma.simulationSuite.findFirst({
-        where: { id: testSuite.id, projectId },
-      });
-      expect(kept?.fields).toEqual([
-        { identifier: "golden_sql", type: "text" },
-      ]);
-      expect(kept?.evaluators).toEqual([attachmentFor(evaluator.id)]);
-    });
-
-    /** @scenario "An attachment naming an evaluator the project does not have is refused" */
-    it("refuses an attachment naming an evaluator the project does not hold", async () => {
-      const testSuite = await caller.suites.testSuites.create({
-        projectId,
-        name: "Case lookups",
-        fields: [{ identifier: "golden_sql", type: "text" }],
-      });
-
-      await expect(
-        caller.suites.testSuites.update({
+        const read = await caller.suites.getById({
           projectId,
-          testSuiteId: testSuite.id,
-          evaluators: [attachmentFor("evaluator_missing")],
-        }),
-      ).rejects.toMatchObject({
-        cause: expect.objectContaining({ code: "suite_evaluator_not_found" }),
+          id: testSuite.id,
+        });
+        expect(read.evaluators).toEqual([
+          attachmentFor({ evaluatorId: evaluator.id }),
+        ]);
       });
     });
 
-    it("refuses a mapping to a field the suite does not declare", async () => {
-      const evaluator = await createExactMatchEvaluator();
-      const testSuite = await caller.suites.testSuites.create({
-        projectId,
-        name: "Case lookups",
-      });
-
-      await expect(
-        caller.suites.testSuites.update({
+    describe("when a field an attachment still reads is removed", () => {
+      /** @scenario "A field an evaluator reads cannot be removed" */
+      it("refuses to remove a field an attachment still reads", async () => {
+        const evaluator = await createExactMatchEvaluator();
+        const testSuite = await caller.suites.testSuites.create({
           projectId,
-          testSuiteId: testSuite.id,
-          evaluators: [attachmentFor(evaluator.id)],
-        }),
-      ).rejects.toMatchObject({
-        cause: expect.objectContaining({
-          code: "suite_evaluator_mapping_invalid",
-        }),
+          name: "Case lookups",
+          fields: [{ identifier: "golden_sql", type: "text" }],
+          evaluators: [attachmentFor({ evaluatorId: evaluator.id })],
+        });
+
+        await expect(
+          caller.suites.testSuites.update({
+            projectId,
+            testSuiteId: testSuite.id,
+            fields: [],
+          }),
+        ).rejects.toMatchObject({
+          cause: expect.objectContaining({
+            code: "suite_field_in_use",
+            meta: { identifier: "golden_sql", evaluatorIds: [evaluator.id] },
+          }),
+        });
+
+        const kept = await prisma.simulationSuite.findFirst({
+          where: { id: testSuite.id, projectId },
+        });
+        expect(kept?.fields).toEqual([
+          { identifier: "golden_sql", type: "text" },
+        ]);
+        expect(kept?.evaluators).toEqual([
+          attachmentFor({ evaluatorId: evaluator.id }),
+        ]);
+      });
+    });
+
+    describe("when an attachment names an evaluator the project does not hold", () => {
+      /** @scenario "An attachment naming an evaluator the project does not have is refused" */
+      it("refuses an attachment naming an evaluator the project does not hold", async () => {
+        const testSuite = await caller.suites.testSuites.create({
+          projectId,
+          name: "Case lookups",
+          fields: [{ identifier: "golden_sql", type: "text" }],
+        });
+
+        await expect(
+          caller.suites.testSuites.update({
+            projectId,
+            testSuiteId: testSuite.id,
+            evaluators: [attachmentFor({ evaluatorId: "evaluator_missing" })],
+          }),
+        ).rejects.toMatchObject({
+          cause: expect.objectContaining({ code: "suite_evaluator_not_found" }),
+        });
+      });
+    });
+
+    describe("when an attachment maps to a field the suite does not declare", () => {
+      it("refuses a mapping to a field the suite does not declare", async () => {
+        const evaluator = await createExactMatchEvaluator();
+        const testSuite = await caller.suites.testSuites.create({
+          projectId,
+          name: "Case lookups",
+        });
+
+        await expect(
+          caller.suites.testSuites.update({
+            projectId,
+            testSuiteId: testSuite.id,
+            evaluators: [attachmentFor({ evaluatorId: evaluator.id })],
+          }),
+        ).rejects.toMatchObject({
+          cause: expect.objectContaining({
+            code: "suite_evaluator_mapping_invalid",
+          }),
+        });
       });
     });
   });

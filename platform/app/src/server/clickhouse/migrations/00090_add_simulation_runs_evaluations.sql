@@ -108,7 +108,26 @@ ALTER TABLE ${CLICKHOUSE_DATABASE}.simulation_runs
 -- +goose StatementEnd
 
 -- +goose Down
--- To roll back, uncomment and run manually.
+-- To roll back, uncomment and run manually. The _size_bytes expression must
+-- be restored to its pre-migration form first: it still references the
+-- Evaluations.* columns below, and dropping a column it reads would fail.
+
+-- +goose StatementBegin
+-- ALTER TABLE ${CLICKHOUSE_DATABASE}.simulation_runs
+--   MODIFY COLUMN `_size_bytes` UInt32
+--     MATERIALIZED byteSize(
+--       Status, Name, Description,
+--       `Messages.Id`, `Messages.Role`, `Messages.Content`,
+--       `Messages.TraceId`, `Messages.Rest`,
+--       TraceIds, Verdict, Reasoning,
+--       MetCriteria, UnmetCriteria,
+--       Error, Metadata,
+--       RoleCosts, RoleLatencies,
+--       TraceMetricsJson
+--     )
+--     CODEC(Delta(4), ZSTD(1))
+--   SETTINGS alter_sync = 1, mutations_sync = 0;
+-- +goose StatementEnd
 
 -- +goose StatementBegin
 -- ALTER TABLE ${CLICKHOUSE_DATABASE}.simulation_runs DROP COLUMN IF EXISTS `Evaluations.EvaluatorId`;

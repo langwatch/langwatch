@@ -2,7 +2,7 @@
 title: Test Suites
 sidebarTitle: Test suites
 keywords: langwatch, agent testing, test suite, scenarios, default test suite, from code, labels, archive
-description: A test suite is a named group of scenarios that you run together, with the fields every scenario carries a value for and the evaluators that run after every scenario run. The targets, the models and the repeat count are set on the run plan.
+description: A test suite is a named group of scenarios that you run together, with the fields a scenario may carry a value for and the evaluators that run after every scenario run. The targets, the models and the repeat count are set on the run plan.
 ---
 
 ## The rail
@@ -29,7 +29,7 @@ Under the suite name, the header shows a chip per field and a chip per evaluator
 
 ## Fields
 
-A test suite reads like a dataset. Beyond the situation and the criteria, it declares typed fields, and every scenario in it carries one value per field. A field holds what an [evaluator](/agent-testing/evaluators) compares against: the golden SQL query, the reference answer, the tables the answer had to be written against.
+A test suite reads like a dataset. Beyond the situation and the criteria, it declares typed fields, and a scenario in it may carry a value for each. A blank value skips the evaluators that read it. A field holds what an [evaluator](/agent-testing/evaluators) compares against: the golden SQL query, the reference answer, the tables the answer had to be written against.
 
 **Edit suite** opens the suite editor. Under **Customize test suite**, **Add fields** opens the field rows: an identifier and a type each, with **Add field** for the next one and the arrows to reorder them.
 

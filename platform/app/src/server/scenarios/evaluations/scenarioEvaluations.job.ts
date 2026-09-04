@@ -20,7 +20,7 @@ export interface ScenarioEvaluationsJobDeps {
   /** Grades the run; throws `TraceDataPendingError` to ask for a retry. */
   run(params: {
     payload: ScenarioEvaluationsJobPayload;
-    finalAttempt: boolean;
+    isFinalAttempt: boolean;
   }): Promise<unknown>;
   /** Queues the payload again after the delay. */
   reschedule(params: {
@@ -48,11 +48,11 @@ export function createScenarioEvaluationsJobHandler(
   deps: ScenarioEvaluationsJobDeps,
 ): (payload: ScenarioEvaluationsJobPayload) => Promise<void> {
   return async (payload) => {
-    const finalAttempt = isFinalAttempt(payload.attempt);
+    const isFinal = isFinalAttempt(payload.attempt);
     try {
-      await deps.run({ payload, finalAttempt });
+      await deps.run({ payload, isFinalAttempt: isFinal });
     } catch (error) {
-      if (!(error instanceof TraceDataPendingError) || finalAttempt) {
+      if (!(error instanceof TraceDataPendingError) || isFinal) {
         throw error;
       }
       const delayMs = backoffDelayMs(payload.attempt);

@@ -432,7 +432,7 @@ Feature: The Results tab
   Scenario: A score evaluator carries no threshold and no colour
     Given a run whose evaluators are one pass or fail check and one score
     When the evaluator pills are read
-    Then the pass or fail pill is coloured by its verdict
+    Then the pass or fail pill is coloured by its pass rate
     And the score pill reads its number with no colour
     And no threshold is shown for the score
 

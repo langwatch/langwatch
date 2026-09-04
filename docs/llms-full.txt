@@ -37283,7 +37283,7 @@ description: An evaluator attached to a test suite runs after every scenario run
 
 The judge grades behavior from the criteria. An evaluator compares against a known answer or runs a check an existing evaluator already does well: a SQL query against the golden one, a reply against a reference answer, a transcript through a PII scanner, retrieved contexts through a faithfulness check. Any evaluator of the project's [library](/evaluations/evaluators/overview) can be attached, LLM judges included.
 
-A test suite declares [fields](/agent-testing/test-suites#fields) for the values an evaluator compares against, and every scenario in the suite carries one value per field.
+A test suite declares [fields](/agent-testing/test-suites#fields) for the values an evaluator compares against. A scenario may carry a value for each field; a blank value skips the evaluators that read it.
 
 ## Attach an evaluator
 
@@ -37349,6 +37349,7 @@ langwatch simulation-run get <scenarioRunId> --format json   # results.evaluatio
 
 ```json
 [{
+  "id": "attachment_abc123",
   "evaluatorId": "evaluator_abc123",
   "required": true,
   "mappings": {
@@ -39516,7 +39517,7 @@ Also check: [Scenarios](/agent-testing/scenarios), [Test suites](/agent-testing/
 title: Test Suites
 sidebarTitle: Test suites
 keywords: langwatch, agent testing, test suite, scenarios, default test suite, from code, labels, archive
-description: A test suite is a named group of scenarios that you run together, with the fields every scenario carries a value for and the evaluators that run after every scenario run. The targets, the models and the repeat count are set on the run plan.
+description: A test suite is a named group of scenarios that you run together, with the fields a scenario may carry a value for and the evaluators that run after every scenario run. The targets, the models and the repeat count are set on the run plan.
 ---
 
 ## The rail
@@ -39543,7 +39544,7 @@ Under the suite name, the header shows a chip per field and a chip per evaluator
 
 ## Fields
 
-A test suite reads like a dataset. Beyond the situation and the criteria, it declares typed fields, and every scenario in it carries one value per field. A field holds what an [evaluator](/agent-testing/evaluators) compares against: the golden SQL query, the reference answer, the tables the answer had to be written against.
+A test suite reads like a dataset. Beyond the situation and the criteria, it declares typed fields, and a scenario in it may carry a value for each. A blank value skips the evaluators that read it. A field holds what an [evaluator](/agent-testing/evaluators) compares against: the golden SQL query, the reference answer, the tables the answer had to be written against.
 
 **Edit suite** opens the suite editor. Under **Customize test suite**, **Add fields** opens the field rows: an identifier and a type each, with **Add field** for the next one and the arrows to reorder them.
 

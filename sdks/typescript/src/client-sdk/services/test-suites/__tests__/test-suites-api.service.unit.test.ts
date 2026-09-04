@@ -24,7 +24,6 @@ const nestedUnauthorized = {
   },
 };
 
-/** A required SQL equivalence evaluator reading a tool call and a field. */
 const sqlEvaluator: EvaluatorAttachment = {
   id: "att_sql",
   evaluatorId: "evaluator_sql",

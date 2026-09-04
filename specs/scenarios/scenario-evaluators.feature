@@ -114,10 +114,9 @@ Feature: Evaluators run on scenario runs
   Scenario: Trace data that has not arrived yet is retried with a growing delay
     Given an evaluator that reads the trace
     And the run's spans have not arrived
-    When the evaluation job runs on its first attempt
-    Then nothing is recorded and the job is queued again after 3 seconds
-    And the delay doubles on every later attempt
-    And the sixth attempt records the failed result instead of queueing again
+    When the evaluation job runs
+    Then nothing is recorded while the trace is still arriving
+    And a failed result is recorded once the retries run out
 
   @unit
   Scenario: An evaluator error is recorded as an error result
@@ -131,6 +130,12 @@ Feature: Evaluators run on scenario runs
     Given an attachment naming an evaluator id the project does not have
     When the run is evaluated
     Then the run records an error result that says the evaluator was not found
+
+  @unit
+  Scenario: A trace report failure does not lose a graded result
+    Given an evaluator that passes and a trace that fails to record the result
+    When the run is evaluated
+    Then the run still records the passed result
 
   @unit
   Scenario: A run that carries its own evaluations is not evaluated again

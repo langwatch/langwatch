@@ -405,7 +405,7 @@ describe("resolveAttachmentInputs with an optional trace input", () => {
           inputs,
           run,
           scenario,
-          finalAttempt: true,
+          isFinalAttempt: true,
         }),
       ).toEqual({
         kind: "ready",

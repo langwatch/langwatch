@@ -360,7 +360,7 @@ interface RunContext {
   /** The run's last trace, the one the evaluations are written on. */
   lastTraceId: string | undefined;
   trace: Trace | undefined;
-  finalAttempt: boolean;
+  isFinalAttempt: boolean;
 }
 
 /** Runs one evaluator through the runner; a thrown error becomes an error result. */
@@ -435,9 +435,9 @@ async function evaluateAttachment({
     inputs: evaluatorInputSpecsOf(evaluator),
     run: context.run,
     scenario: context.scenario,
-    finalAttempt: context.finalAttempt,
+    isFinalAttempt: context.isFinalAttempt,
   });
-  if (resolved.kind === "pending" && !context.finalAttempt) {
+  if (resolved.kind === "pending" && !context.isFinalAttempt) {
     throw new TraceDataPendingError(resolved.details);
   }
   if (resolved.kind === "skipped") {
@@ -460,18 +460,30 @@ async function evaluateAttachment({
     data: resolved.data,
   });
   if (context.lastTraceId) {
-    await deps.reportEvaluation(
-      traceReportOf({
-        tenantId: context.projectId,
-        traceId: context.lastTraceId,
-        attachment,
-        evaluatorType: checkType,
-        evaluatorName: evaluator.name,
-        result,
-        inputs: resolved.data,
-        occurredAt,
-      }),
-    );
+    try {
+      await deps.reportEvaluation(
+        traceReportOf({
+          tenantId: context.projectId,
+          traceId: context.lastTraceId,
+          attachment,
+          evaluatorType: checkType,
+          evaluatorName: evaluator.name,
+          result,
+          inputs: resolved.data,
+          occurredAt,
+        }),
+      );
+    } catch (error) {
+      logger.warn(
+        {
+          projectId: context.projectId,
+          scenarioRunId: context.scenarioRunId,
+          evaluatorId: evaluator.id,
+          error,
+        },
+        "Could not write the evaluation on the trace; the result is still recorded",
+      );
+    }
   }
   return record(result, storedInputsOf(resolved.data));
 }
@@ -487,11 +499,11 @@ async function evaluateAttachment({
 export async function runScenarioEvaluations({
   deps,
   payload,
-  finalAttempt,
+  isFinalAttempt,
 }: {
   deps: RunScenarioEvaluationsDeps;
   payload: ScenarioEvaluationsJobPayload;
-  finalAttempt: boolean;
+  isFinalAttempt: boolean;
 }): Promise<ScenarioEvaluationResult[]> {
   const { tenantId: projectId, scenarioRunId, scenarioId, planId } = payload;
 
@@ -537,7 +549,7 @@ export async function runScenarioEvaluations({
     },
     lastTraceId,
     trace: traceForEvaluation({ projectId, traceId: lastTraceId, spans }),
-    finalAttempt,
+    isFinalAttempt,
   };
 
   const evaluations: ScenarioEvaluationResult[] = [];

@@ -74,10 +74,13 @@ export function evaluationsFingerprint(
  * A run that has not finished cannot take evaluations, so its absence is a
  * validation error the queue does not retry.
  */
-function getFinishedEventOrThrow(
-  priorEvents: readonly SimulationProcessingEvent[],
-  scenarioRunId: string,
-): SimulationRunFinishedEvent {
+function getFinishedEventOrThrow({
+  priorEvents,
+  scenarioRunId,
+}: {
+  priorEvents: readonly SimulationProcessingEvent[];
+  scenarioRunId: string;
+}): SimulationRunFinishedEvent {
   const finished = priorEvents.find(isSimulationRunFinishedEvent);
   if (!finished) {
     throw new ValidationError(
@@ -205,7 +208,7 @@ export class RecordEvaluationsCommand
       scenarioRunId,
     });
 
-    const finished = getFinishedEventOrThrow(priorEvents, scenarioRunId);
+    const finished = getFinishedEventOrThrow({ priorEvents, scenarioRunId });
     const queued = priorEvents.find(isSimulationRunQueuedEvent);
     const lastEvaluated = priorEvents
       .filter(isSimulationRunEvaluatedEvent)

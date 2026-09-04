@@ -298,8 +298,6 @@ describe("Feature: Test Suites REST API", () => {
     });
   });
 
-  // ── fields and evaluators ──────────────────────────────────────────────────
-
   describe("given a test suite that declares fields and attaches an evaluator", () => {
     async function createExactMatchEvaluator() {
       return prisma.evaluator.create({

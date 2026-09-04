@@ -66,29 +66,31 @@ describe("where a queued run lands", () => {
   afterEach(cleanup);
 
   describe("given a run of several scenarios was queued", () => {
-    /** @scenario "A run of several scenarios opens the results of the run it started" */
-    it("opens the Results tab on the plan and the run, with no toast", async () => {
-      const user = userEvent.setup();
-      render(<StartRun info={SUITE_RUN} />, { wrapper: Wrapper });
+    describe("when Start is selected", () => {
+      /** @scenario "A run of several scenarios opens the results of the run it started" */
+      it("opens the Results tab on the plan and the run, with no toast", async () => {
+        const user = userEvent.setup();
+        render(<StartRun info={SUITE_RUN} />, { wrapper: Wrapper });
 
-      await user.click(screen.getByRole("button", { name: "Start" }));
+        await user.click(screen.getByRole("button", { name: "Start" }));
 
-      expect(mockRouterPush).toHaveBeenCalledTimes(1);
-      const [route, address] = mockRouterPush.mock.calls[0]!;
-      expect(address).toBe(
-        "/test-project/agent-testing/results/refunds-prod-agent/batch_new",
-      );
-      expect(route).toMatchObject({
-        query: {
-          project: "test-project",
-          path: ["results", "refunds-prod-agent", "batch_new"],
-        },
-      });
-      expect(mockToast).not.toHaveBeenCalled();
-      expect(mockOpenDrawer).not.toHaveBeenCalled();
-      expect(useAgentTestingStore.getState().pendingRun).toEqual({
-        batchRunId: "batch_new",
-        scenarioSetId: "__internal__plan_1__suite",
+        expect(mockRouterPush).toHaveBeenCalledTimes(1);
+        const [route, address] = mockRouterPush.mock.calls[0]!;
+        expect(address).toBe(
+          "/test-project/agent-testing/results/refunds-prod-agent/batch_new",
+        );
+        expect(route).toMatchObject({
+          query: {
+            project: "test-project",
+            path: ["results", "refunds-prod-agent", "batch_new"],
+          },
+        });
+        expect(mockToast).not.toHaveBeenCalled();
+        expect(mockOpenDrawer).not.toHaveBeenCalled();
+        expect(useAgentTestingStore.getState().pendingRun).toEqual({
+          batchRunId: "batch_new",
+          scenarioSetId: "__internal__plan_1__suite",
+        });
       });
     });
   });

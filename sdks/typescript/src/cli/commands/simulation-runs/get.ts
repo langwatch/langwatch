@@ -6,6 +6,7 @@ import { readFetchFailure } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 import { buildAuthHeaders } from "@/internal/api/auth";
+import type { SimulationRunEvaluation } from "@/client-sdk/services/simulation-runs";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 /**
@@ -54,17 +55,6 @@ function renderContent(raw: unknown): string {
   if (typeof raw === "number" || typeof raw === "boolean") return String(raw);
   return "";
 }
-
-type SimulationRunEvaluation = {
-  evaluatorId: string;
-  name: string;
-  status: "passed" | "failed" | "scored" | "skipped" | "error";
-  required: boolean;
-  passed?: boolean;
-  score?: number;
-  label?: string;
-  details?: string;
-};
 
 const EVALUATION_STATUS_COLOR: Record<
   SimulationRunEvaluation["status"],

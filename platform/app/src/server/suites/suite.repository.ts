@@ -269,7 +269,7 @@ export class SuiteRepository {
    * suites of the scenarios it covers and the plan it is filed under, and a
    * plan archived after the run was queued still says what it attached.
    */
-  async findManyByIdsIncludingArchived(params: {
+  async findAllByIdsIncludingArchived(params: {
     ids: string[];
     projectId: string;
   }): Promise<SimulationSuite[]> {

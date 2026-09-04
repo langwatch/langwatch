@@ -187,19 +187,21 @@ describe("formatScenarioSchema()", () => {
   });
 });
 
-describe("formatScenarioSchema(), the fields and evaluators sections", () => {
-  /** @scenario "Agent discovers the suite fields and the evaluator attachments" */
-  it("documents the field rules and every mapping path", () => {
-    const result = formatScenarioSchema();
+describe("formatScenarioSchema()", () => {
+  describe("when documenting the fields and evaluators sections", () => {
+    /** @scenario "Agent discovers the suite fields and the evaluator attachments" */
+    it("documents the field rules and every mapping path", () => {
+      const result = formatScenarioSchema();
 
-    expect(result).toContain("## Test Suite Fields");
-    expect(result).toContain("text, number or boolean");
-    expect(result).toContain("## Evaluator Attachments");
-    expect(result).toContain("first_user_message");
-    expect(result).toContain("last_agent_message");
-    expect(result).toContain('["fields", "<identifier>"]');
-    expect(result).toContain('["tool_calls", "<toolName>", "input" | "output"]');
-    expect(result).toContain('["contexts"]');
-    expect(result).toContain("platform_get_simulation_run");
+      expect(result).toContain("## Test Suite Fields");
+      expect(result).toContain("text, number or boolean");
+      expect(result).toContain("## Evaluator Attachments");
+      expect(result).toContain("first_user_message");
+      expect(result).toContain("last_agent_message");
+      expect(result).toContain('["fields", "<identifier>"]');
+      expect(result).toContain('["tool_calls", "<toolName>", "input" | "output"]');
+      expect(result).toContain('["contexts"]');
+      expect(result).toContain("platform_get_simulation_run");
+    });
   });
 });

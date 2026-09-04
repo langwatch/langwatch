@@ -711,8 +711,6 @@ describe("the scenarios table", () => {
     expect(screen.queryByText("Late refund")).not.toBeInTheDocument();
   });
 
-  // --- Editing the open suite ---
-
   describe("given the suite Refunds is open", () => {
     /** @scenario "Edit suite sits between New scenario and Run suite above the table" */
     it("offers Edit suite between New scenario and Run suite, which opens the suite editor", async () => {

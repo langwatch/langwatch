@@ -34,7 +34,7 @@ export type OpenScenarioEvaluatorEditorParams = {
   evaluator: AttachableEvaluator;
   ctx: ScenarioMappingContext;
   /** True for a run plan, which offers no scenario field to map to. */
-  planLevel?: boolean;
+  isPlanLevel?: boolean;
   /**
    * How the editor joins the drawer stack. Replacing the current entry is
    * what a pick from the evaluator list asks for, so back from the editor
@@ -73,14 +73,14 @@ export function useOpenScenarioEvaluatorEditor(): (
       attachment,
       evaluator,
       ctx,
-      planLevel,
+      isPlanLevel,
       navigation,
       onMappingChange,
       onRequiredChange,
       onRemove,
     }: OpenScenarioEvaluatorEditorParams) => {
       const mappingsConfig = {
-        availableSources: scenarioMappingSources(ctx, { planLevel }),
+        availableSources: scenarioMappingSources(ctx, { isPlanLevel }),
         initialMappings: attachment.mappings,
       };
       const handleMappingChange = (
@@ -89,16 +89,27 @@ export function useOpenScenarioEvaluatorEditor(): (
       ) => onMappingChange(input, toScenarioMapping(mapping));
 
       // A code evaluator has its own editor, which holds its inputs beside
-      // the code; the generic editor could only show the mappings.
+      // the code; the generic editor could only show the mappings. It still
+      // carries the same gate switch and remove action as any other
+      // attachment.
       if (evaluator.type === "code") {
         setFlowCallbacks("codeEvaluatorEditor", {
           ...createEvaluatorEditorCallbacks({
             onMappingChange: handleMappingChange,
           }),
+          onRequiredChange,
+          onRemove,
         });
         openDrawer(
           "codeEvaluatorEditor",
-          { evaluatorId: evaluator.id, mappingsConfig },
+          {
+            evaluatorId: evaluator.id,
+            mappingsConfig,
+            gate: {
+              required: attachment.required,
+              canRequire: evaluatorCanRequire(evaluator),
+            },
+          },
           navigation,
         );
         return;

@@ -24,7 +24,6 @@ export type RunWithEvaluations = {
   results?: { evaluations?: RunEvaluation[] | null } | null;
 };
 
-/** The evaluations a run carries, or none. */
 export function evaluationsOf(run: RunWithEvaluations): RunEvaluation[] {
   return run.results?.evaluations ?? [];
 }
@@ -93,7 +92,6 @@ interface EvaluatorTally {
   skipped: number;
 }
 
-/** Adds one result to the tally of its evaluator. */
 function tallyEvaluation({
   tally,
   evaluation,
@@ -114,7 +112,6 @@ function tallyEvaluation({
   }
 }
 
-/** What a tally adds up to. */
 function summaryOfTally({
   evaluatorId,
   tally,

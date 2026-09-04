@@ -111,8 +111,7 @@ export async function givenTheScenariosPanelHasSettled(page: Page) {
     .waitFor({ state: "visible", timeout: 30000 });
   await page
     .getByTestId("agent-testing-cases-skeleton")
-    .waitFor({ state: "detached", timeout: 30000 })
-    .catch(() => undefined);
+    .waitFor({ state: "detached", timeout: 30000 });
 }
 
 /**

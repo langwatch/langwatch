@@ -36,6 +36,52 @@ export type RunEvaluatorsSectionProps = {
   onRemove?: () => void;
 };
 
+/** The pills of one inherited suite's evaluators, under its own label. */
+function InheritedSuiteEvaluators({
+  suite,
+  evaluatorsById,
+  missingOf,
+  onOpenInherited,
+}: {
+  suite: InheritedSuite;
+  evaluatorsById: ReadonlyMap<string, AttachableEvaluator>;
+  missingOf: (attachment: EvaluatorAttachment) => EvaluatorInputSpec[];
+  onOpenInherited: (input: { suiteId: string; attachmentId: string }) => void;
+}) {
+  return (
+    <VStack
+      align="stretch"
+      gap={1}
+      data-testid={`run-dialog-inherited-${suite.suiteId}`}
+    >
+      <Text fontSize="11px" color={FG_MUTED}>
+        {inheritedLabel(suite.suiteName)}
+      </Text>
+      <EvaluatorPillRow>
+        {suite.attachments.map((attachment) => (
+          <EvaluatorPill
+            key={attachment.id}
+            attachmentId={attachment.id}
+            name={
+              evaluatorsById.get(attachment.evaluatorId)?.name ??
+              attachment.evaluatorId
+            }
+            required={attachment.required}
+            missingInputs={missingOf(attachment)}
+            inherited
+            onClick={() =>
+              onOpenInherited({
+                suiteId: suite.suiteId,
+                attachmentId: attachment.id,
+              })
+            }
+          />
+        ))}
+      </EvaluatorPillRow>
+    </VStack>
+  );
+}
+
 export function RunEvaluatorsSection({
   inherited,
   extras,
@@ -64,37 +110,13 @@ export function RunEvaluatorsSection({
         paddingY={2.5}
       >
         {inherited.map((suite) => (
-          <VStack
+          <InheritedSuiteEvaluators
             key={suite.suiteId}
-            align="stretch"
-            gap={1}
-            data-testid={`run-dialog-inherited-${suite.suiteId}`}
-          >
-            <Text fontSize="11px" color={FG_MUTED}>
-              {inheritedLabel(suite.suiteName)}
-            </Text>
-            <EvaluatorPillRow>
-              {suite.attachments.map((attachment) => (
-                <EvaluatorPill
-                  key={attachment.id}
-                  attachmentId={attachment.id}
-                  name={
-                    evaluatorsById.get(attachment.evaluatorId)?.name ??
-                    attachment.evaluatorId
-                  }
-                  required={attachment.required}
-                  missingInputs={missingOf(attachment)}
-                  inherited
-                  onClick={() =>
-                    onOpenInherited({
-                      suiteId: suite.suiteId,
-                      attachmentId: attachment.id,
-                    })
-                  }
-                />
-              ))}
-            </EvaluatorPillRow>
-          </VStack>
+            suite={suite}
+            evaluatorsById={evaluatorsById}
+            missingOf={missingOf}
+            onOpenInherited={onOpenInherited}
+          />
         ))}
         <VStack align="stretch" gap={1}>
           {inherited.length > 0 && (

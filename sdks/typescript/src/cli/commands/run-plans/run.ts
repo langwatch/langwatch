@@ -64,7 +64,7 @@ export const runRunPlanCommand = async (
   const evaluators = await readEvaluators({
     options,
     fields: [],
-    planLevel: true,
+    isPlanLevel: true,
   });
 
   const service = createCliRunPlansService();

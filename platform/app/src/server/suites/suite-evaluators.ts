@@ -77,12 +77,12 @@ export function evaluatorInputSpecsOf(
 export function readEvaluatorAttachments({
   attachments,
   fields,
-  planLevel,
+  isPlanLevel,
   evaluatorsById,
 }: {
   attachments: EvaluatorAttachment[];
   fields: SuiteFieldDefinition[];
-  planLevel: boolean;
+  isPlanLevel: boolean;
   evaluatorsById: ReadonlyMap<string, Pick<EvaluatorWithFields, "fields">>;
 }): EvaluatorAttachment[] {
   for (const attachment of attachments) {
@@ -95,7 +95,7 @@ export function readEvaluatorAttachments({
       const reason = scenarioMappingPathIssue({
         mapping,
         ctx: { fields },
-        planLevel,
+        isPlanLevel,
       });
       if (reason !== null) {
         throw new SuiteEvaluatorMappingInvalidError({

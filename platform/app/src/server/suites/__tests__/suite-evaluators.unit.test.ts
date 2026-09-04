@@ -115,7 +115,7 @@ describe("evaluator attachments on a write", () => {
         readEvaluatorAttachments({
           attachments: [attachment({ evaluatorId: "eval_gone" })],
           fields: [{ identifier: "golden_sql", type: "text" }],
-          planLevel: false,
+          isPlanLevel: false,
           evaluatorsById,
         }),
       ).toThrow(SuiteEvaluatorNotFoundError);
@@ -130,7 +130,7 @@ describe("evaluator attachments on a write", () => {
         readEvaluatorAttachments({
           attachments: [attachment()],
           fields: [{ identifier: "table_schema", type: "text" }],
-          planLevel: false,
+          isPlanLevel: false,
           evaluatorsById,
         });
       } catch (error) {
@@ -151,7 +151,7 @@ describe("evaluator attachments on a write", () => {
         readEvaluatorAttachments({
           attachments: [attachment()],
           fields: [{ identifier: "golden_sql", type: "text" }],
-          planLevel: true,
+          isPlanLevel: true,
           evaluatorsById,
         }),
       ).toThrow(SuiteEvaluatorMappingInvalidError);
@@ -165,7 +165,7 @@ describe("evaluator attachments on a write", () => {
         readEvaluatorAttachments({
           attachments,
           fields: [{ identifier: "golden_sql", type: "text" }],
-          planLevel: false,
+          isPlanLevel: false,
           evaluatorsById,
         }),
       ).toBe(attachments);
@@ -274,11 +274,13 @@ describe("the mappings a run still misses", () => {
     });
   });
 
-  it("reads required from the evaluator's optional flag", () => {
-    expect(evaluatorInputSpecsOf(evaluatorsById.get("eval_1")!)).toEqual([
-      { id: "output", required: true },
-      { id: "expected_output", required: true },
-      { id: "input", required: false },
-    ]);
+  describe("when computing an evaluator's input specs", () => {
+    it("reads required from the evaluator's optional flag", () => {
+      expect(evaluatorInputSpecsOf(evaluatorsById.get("eval_1")!)).toEqual([
+        { id: "output", required: true },
+        { id: "expected_output", required: true },
+        { id: "input", required: false },
+      ]);
+    });
   });
 });

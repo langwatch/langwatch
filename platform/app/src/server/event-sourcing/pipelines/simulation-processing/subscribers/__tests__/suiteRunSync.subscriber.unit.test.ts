@@ -208,10 +208,14 @@ describe("suiteRunSync subscriber", () => {
 });
 
 describe("suiteRunSync subscriber, evaluated events", () => {
-  it("subscribes to the evaluated event", () => {
-    const subscriber = createSuiteRunSyncSubscriber(makeDeps());
+  describe("when the subscriber is created", () => {
+    it("subscribes to the evaluated event", () => {
+      const subscriber = createSuiteRunSyncSubscriber(makeDeps());
 
-    expect(subscriber.events).toContain(SIMULATION_RUN_EVENT_TYPES.EVALUATED);
+      expect(subscriber.events).toContain(
+        SIMULATION_RUN_EVENT_TYPES.EVALUATED,
+      );
+    });
   });
 
   describe("when an evaluated event changes the verdict of a suite run item", () => {

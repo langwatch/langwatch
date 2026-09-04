@@ -60,12 +60,10 @@ export const suiteTargetSchema = z.object({
     ),
 });
 
-/** One field a test suite declares, on the wire. */
 export const suiteFieldWireSchema = suiteFieldDefinitionSchema.describe(
   "One field the test suite declares beyond situation and criteria. Every scenario filed in the suite carries a value for it.",
 );
 
-/** The fields a test suite declares, on the wire. */
 export const suiteFieldsWireSchema = z
   .array(suiteFieldWireSchema)
   .max(MAX_SUITE_FIELDS)
@@ -73,12 +71,10 @@ export const suiteFieldsWireSchema = z
     `The fields the test suite declares, in the order the platform shows them. Up to ${MAX_SUITE_FIELDS}. An identifier is lowercase letters, digits and underscores, starting with a letter; the type is text, number or boolean.`,
   );
 
-/** One evaluator input mapping, on the wire. */
 export const scenarioMappingWireSchema = scenarioMappingSchema.describe(
   "Where one evaluator input reads its value. A source mapping names conversation (first_user_message, last_agent_message, transcript, messages), scenario (situation, criteria, or fields followed by a field identifier) or trace (contexts, or tool_calls followed by a tool name and input or output). A value mapping is a literal.",
 );
 
-/** One evaluator attachment, on the wire. */
 export const evaluatorAttachmentWireSchema = evaluatorAttachmentSchema
   .extend({
     mappings: z
@@ -91,7 +87,6 @@ export const evaluatorAttachmentWireSchema = evaluatorAttachmentSchema
     "One evaluator that runs after every scenario run, with where each of its inputs reads from.",
   );
 
-/** The evaluator attachments of a suite or a plan, on the wire. */
 export const evaluatorAttachmentsWireSchema = z
   .array(evaluatorAttachmentWireSchema)
   .max(MAX_EVALUATOR_ATTACHMENTS)
@@ -399,7 +394,6 @@ export const testSuiteDetailSchema = testSuiteSchema.extend({
     ),
 });
 
-/** Creating a test suite: a name, and what it declares. */
 export const testSuiteCreateInputSchema = z.object({
   name: z
     .string()
@@ -411,7 +405,6 @@ export const testSuiteCreateInputSchema = z.object({
   evaluators: evaluatorAttachmentsWireSchema.optional(),
 });
 
-/** Editing a test suite: any of its name, its fields and its evaluators. */
 export const testSuiteUpdateInputSchema = z.object({
   name: z
     .string()

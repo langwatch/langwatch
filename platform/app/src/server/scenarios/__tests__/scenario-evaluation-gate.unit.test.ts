@@ -76,6 +76,18 @@ describe("gatedVerdict", () => {
       expect(evaluationFailsRun(evaluations[0]!)).toBe(false);
     });
   });
+
+  describe("given a required evaluation that failed but the judge produced no verdict", () => {
+    /** @scenario "A run the judge never graded stays ungraded even with a required failure" */
+    it("stays ungraded instead of reading as a failure", () => {
+      expect(
+        gatedVerdict({
+          evaluations: [evaluation({ status: "failed", passed: false })],
+          judgeVerdict: undefined,
+        }),
+      ).toBeUndefined();
+    });
+  });
 });
 
 describe("gatedStatus", () => {

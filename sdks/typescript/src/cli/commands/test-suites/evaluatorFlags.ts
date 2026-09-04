@@ -78,12 +78,12 @@ export interface ResolvedEvaluatorAttachment {
 export async function resolveEvaluatorAttachments({
   refs,
   fields,
-  planLevel,
+  isPlanLevel,
   service,
 }: {
   refs: EvaluatorFlagRef[];
   fields: SuiteFieldDefinition[];
-  planLevel?: boolean;
+  isPlanLevel?: boolean;
   service?: EvaluatorsApiService;
 }): Promise<ResolvedEvaluatorAttachment[]> {
   const evaluators = service ?? new EvaluatorsApiService();
@@ -108,7 +108,7 @@ export async function resolveEvaluatorAttachments({
       mappings: inferScenarioMappings({
         inputs,
         ctx: { fields, toolNames: [] },
-        planLevel,
+        isPlanLevel,
       }),
     };
     resolved.push({
@@ -145,24 +145,24 @@ export function warnMissingMappings(
 export async function readEvaluators({
   options,
   fields,
-  planLevel,
+  isPlanLevel,
   service,
 }: {
   options: { evaluators?: EvaluatorFlagRef[]; evaluatorsJson?: string };
   fields: SuiteFieldDefinition[];
-  planLevel?: boolean;
+  isPlanLevel?: boolean;
   service?: EvaluatorsApiService;
 }): Promise<EvaluatorAttachment[] | undefined> {
   const fromJson =
     options.evaluatorsJson !== undefined
-      ? readEvaluatorsJson({ value: options.evaluatorsJson, fields, planLevel })
+      ? readEvaluatorsJson({ value: options.evaluatorsJson, fields, isPlanLevel })
       : undefined;
   const fromRefs =
     options.evaluators !== undefined && options.evaluators.length > 0
       ? await resolveEvaluatorAttachments({
           refs: options.evaluators,
           fields,
-          planLevel,
+          isPlanLevel,
           service,
         })
       : undefined;
@@ -184,11 +184,11 @@ export async function readEvaluators({
 export function readEvaluatorsJson({
   value,
   fields,
-  planLevel,
+  isPlanLevel,
 }: {
   value: string;
   fields: SuiteFieldDefinition[];
-  planLevel?: boolean;
+  isPlanLevel?: boolean;
 }): EvaluatorAttachment[] {
   const text = existsSync(value) ? readFileSync(value, "utf8") : value;
   let raw: unknown;
@@ -222,7 +222,7 @@ export function readEvaluatorsJson({
       const issue = scenarioMappingPathIssue({
         mapping,
         ctx: { fields },
-        planLevel,
+        isPlanLevel,
       });
       if (issue) {
         return rejectFlag(

@@ -65,12 +65,15 @@ describe("scenarioEvaluationResultSchema", () => {
   });
 
   describe("given every status the schema names", () => {
-    it("accepts each one and refuses any other", () => {
+    it("accepts each one, with a passed value that agrees with it, and refuses any other status", () => {
       for (const status of SCENARIO_EVALUATION_STATUSES) {
+        const passed =
+          status === "passed" ? true : status === "failed" ? false : undefined;
         expect(
           scenarioEvaluationResultSchema.safeParse({
             ...MINIMAL_EVALUATION_RESULT_JSON,
             status,
+            ...(passed !== undefined && { passed }),
           }).success,
         ).toBe(true);
       }
@@ -89,6 +92,47 @@ describe("scenarioEvaluationResultSchema", () => {
         MINIMAL_EVALUATION_RESULT_JSON;
       expect(
         scenarioEvaluationResultSchema.safeParse(withoutRequired).success,
+      ).toBe(false);
+    });
+  });
+
+  describe("given a status that contradicts passed", () => {
+    /** @scenario "The evaluation result schema refuses a status that contradicts passed" */
+    it("refuses a passed status with passed: false", () => {
+      expect(
+        scenarioEvaluationResultSchema.safeParse({
+          ...MINIMAL_EVALUATION_RESULT_JSON,
+          status: "passed",
+          passed: false,
+        }).success,
+      ).toBe(false);
+    });
+
+    it("refuses a passed status with no passed value", () => {
+      expect(
+        scenarioEvaluationResultSchema.safeParse({
+          ...MINIMAL_EVALUATION_RESULT_JSON,
+          status: "passed",
+        }).success,
+      ).toBe(false);
+    });
+
+    it("refuses a failed status with passed: true", () => {
+      expect(
+        scenarioEvaluationResultSchema.safeParse({
+          ...MINIMAL_EVALUATION_RESULT_JSON,
+          status: "failed",
+          passed: true,
+        }).success,
+      ).toBe(false);
+    });
+
+    it("refuses a failed status with no passed value", () => {
+      expect(
+        scenarioEvaluationResultSchema.safeParse({
+          ...MINIMAL_EVALUATION_RESULT_JSON,
+          status: "failed",
+        }).success,
       ).toBe(false);
     });
   });

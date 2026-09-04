@@ -150,16 +150,16 @@ function conversationSource(): AvailableSource {
 /** The scenario source: situation, criteria and the suite's fields. */
 function scenarioSource({
   fields,
-  planLevel,
+  isPlanLevel,
 }: {
   fields: SuiteFieldDefinition[];
-  planLevel: boolean;
+  isPlanLevel: boolean;
 }): AvailableSource {
   const scenarioFields: NestedField[] = [
     { name: "situation", label: "Situation", type: "str" },
     { name: "criteria", label: "Criteria", type: "str" },
   ];
-  if (!planLevel && fields.length > 0) {
+  if (!isPlanLevel && fields.length > 0) {
     scenarioFields.push({
       name: "fields",
       label: "Fields",
@@ -212,19 +212,19 @@ function traceSource({ toolNames }: { toolNames: string[] }): AvailableSource {
  */
 export function scenarioMappingSources(
   ctx: ScenarioMappingContext,
-  options?: { planLevel?: boolean },
+  options?: { isPlanLevel?: boolean },
 ): AvailableSource[] {
-  const planLevel = options?.planLevel ?? false;
+  const isPlanLevel = options?.isPlanLevel ?? false;
   return [
     conversationSource(),
-    scenarioSource({ fields: ctx.fields, planLevel }),
+    scenarioSource({ fields: ctx.fields, isPlanLevel }),
     traceSource({ toolNames: ctx.toolNames }),
   ];
 }
 
 const INPUT_LIKE = new Set(["input", "question", "user_input", "query"]);
 const OUTPUT_LIKE = new Set(["output", "response", "answer", "result"]);
-const TRANSCRIPT_LIKE = new Set(["transcript", "conversation", "messages"]);
+const TRANSCRIPT_LIKE = new Set(["transcript", "conversation"]);
 const CONTEXTS_LIKE = new Set(["contexts", "retrieved_contexts", "context"]);
 const EXPECTED_LIKE = new Set(["golden", "reference", "ground_truth"]);
 
@@ -316,6 +316,9 @@ function inferMappingFromInputName(lower: string): ScenarioMapping | undefined {
   if (OUTPUT_LIKE.has(lower)) {
     return source("conversation", ["last_agent_message"]);
   }
+  if (lower === "messages") {
+    return source("conversation", ["messages"]);
+  }
   if (TRANSCRIPT_LIKE.has(lower)) {
     return source("conversation", ["transcript"]);
   }
@@ -332,13 +335,13 @@ function inferMappingFromInputName(lower: string): ScenarioMapping | undefined {
 function inferScenarioFieldMapping({
   lower,
   ctx,
-  planLevel,
+  isPlanLevel,
 }: {
   lower: string;
   ctx: ScenarioMappingContext;
-  planLevel: boolean | undefined;
+  isPlanLevel: boolean | undefined;
 }): ScenarioMapping | undefined {
-  if (planLevel) return undefined;
+  if (isPlanLevel) return undefined;
   const field = isExpectedLikeInput(lower)
     ? inferExpectedField({ inputId: lower, fields: ctx.fields })
     : ctx.fields.find((candidate) => candidate.identifier === lower);
@@ -352,16 +355,16 @@ function inferScenarioFieldMapping({
 export function inferScenarioMapping({
   inputId,
   ctx,
-  planLevel,
+  isPlanLevel,
 }: {
   inputId: string;
   ctx: ScenarioMappingContext;
-  planLevel?: boolean;
+  isPlanLevel?: boolean;
 }): ScenarioMapping | undefined {
   const lower = inputId.toLowerCase();
   return (
     inferMappingFromInputName(lower) ??
-    inferScenarioFieldMapping({ lower, ctx, planLevel })
+    inferScenarioFieldMapping({ lower, ctx, isPlanLevel })
   );
 }
 
@@ -373,15 +376,15 @@ export function inferScenarioMapping({
 export function inferScenarioMappings({
   inputs,
   ctx,
-  planLevel,
+  isPlanLevel,
 }: {
   inputs: EvaluatorInputSpec[];
   ctx: ScenarioMappingContext;
-  planLevel?: boolean;
+  isPlanLevel?: boolean;
 }): Record<string, ScenarioMapping> {
   const mappings: Record<string, ScenarioMapping> = {};
   for (const input of inputs) {
-    const mapping = inferScenarioMapping({ inputId: input.id, ctx, planLevel });
+    const mapping = inferScenarioMapping({ inputId: input.id, ctx, isPlanLevel });
     if (mapping) mappings[input.id] = mapping;
   }
   return mappings;
@@ -436,11 +439,11 @@ function conversationPathIssue(path: readonly string[]): string | null {
 function scenarioPathIssue({
   path,
   ctx,
-  planLevel,
+  isPlanLevel,
 }: {
   path: readonly string[];
   ctx: Pick<ScenarioMappingContext, "fields">;
-  planLevel: boolean;
+  isPlanLevel: boolean;
 }): string | null {
   const [head, second] = path;
   if (
@@ -452,7 +455,7 @@ function scenarioPathIssue({
   if (head !== "fields" || path.length !== 2 || !second) {
     return `The scenario has no ${pathText(path)}`;
   }
-  if (planLevel) return "A run plan evaluator cannot read a scenario field";
+  if (isPlanLevel) return "A run plan evaluator cannot read a scenario field";
   return ctx.fields.some((field) => field.identifier === second)
     ? null
     : `The suite declares no field named ${second}`;
@@ -479,11 +482,11 @@ function tracePathIssue(path: readonly string[]): string | null {
 export function scenarioMappingPathIssue({
   mapping,
   ctx,
-  planLevel,
+  isPlanLevel,
 }: {
   mapping: ScenarioMapping;
   ctx: Pick<ScenarioMappingContext, "fields">;
-  planLevel?: boolean;
+  isPlanLevel?: boolean;
 }): string | null {
   if (mapping.type === "value") return null;
   switch (mapping.sourceId) {
@@ -493,7 +496,7 @@ export function scenarioMappingPathIssue({
       return scenarioPathIssue({
         path: mapping.path,
         ctx,
-        planLevel: planLevel ?? false,
+        isPlanLevel: isPlanLevel ?? false,
       });
     case "trace":
       return tracePathIssue(mapping.path);

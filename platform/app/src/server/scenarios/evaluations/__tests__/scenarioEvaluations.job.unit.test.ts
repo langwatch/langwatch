@@ -45,7 +45,7 @@ describe("scenario evaluations job", () => {
       await handler({ ...payload, attempt: 2 });
       await handler({ ...payload, attempt: 3 });
 
-      expect(run).toHaveBeenCalledWith({ payload, finalAttempt: false });
+      expect(run).toHaveBeenCalledWith({ payload, isFinalAttempt: false });
       expect(reschedule.mock.calls.map(([call]) => call)).toEqual([
         {
           payload: expect.objectContaining({ attempt: 2 }),
@@ -77,7 +77,7 @@ describe("scenario evaluations job", () => {
 
       await expect(handler(last)).rejects.toBeInstanceOf(TraceDataPendingError);
 
-      expect(run).toHaveBeenCalledWith({ payload: last, finalAttempt: true });
+      expect(run).toHaveBeenCalledWith({ payload: last, isFinalAttempt: true });
       expect(reschedule).not.toHaveBeenCalled();
       expect(isFinalAttempt(5)).toBe(false);
       expect(isFinalAttempt(6)).toBe(true);

@@ -25,6 +25,12 @@ Feature: Evaluator results on scenario runs
     And a result that carries only the required fields also parses
 
   @unit
+  Scenario: The evaluation result schema refuses a status that contradicts passed
+    Given an evaluation result whose status is "passed" and whose passed flag is false
+    When it is parsed by the scenario evaluation result schema
+    Then the result is refused
+
+  @unit
   Scenario: Finished results carry evaluations
     Given a finished event whose results carry two evaluations
     When the event is folded
@@ -51,6 +57,11 @@ Feature: Evaluator results on scenario runs
     Given evaluations that are skipped, scored and passed
     Then the gated verdict is the judge's verdict
     And a required evaluation with the status "error" turns the gated verdict to failure
+
+  @unit
+  Scenario: A run the judge never graded stays ungraded even with a required failure
+    Given a required evaluation that failed and a judge that produced no verdict
+    Then the gated verdict stays ungraded instead of reading as a failure
 
   @unit
   Scenario: Recording evaluations on a run that has not finished is refused

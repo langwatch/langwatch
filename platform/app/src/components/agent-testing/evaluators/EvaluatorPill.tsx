@@ -21,7 +21,6 @@ const pulse = keyframes`
   50% { transform: scale(1.2); }
 `;
 
-/** The border, background, text color and hover styling of one pill. */
 function pillStyle({
   isMissing,
   inherited,
@@ -72,32 +71,31 @@ export function EvaluatorPill({
 }: EvaluatorPillProps) {
   const isMissing = missingInputs.length > 0;
   const style = pillStyle({ isMissing, inherited, onClick, selected });
-  const pill = (
-    <chakra.button
-      type="button"
-      display="inline-flex"
-      alignItems="center"
-      gap={1.5}
-      height="24px"
-      paddingX="10px"
-      borderRadius="full"
-      borderWidth="1px"
-      borderColor={style.borderColor}
-      background={style.background}
-      color={style.color}
-      fontSize="11px"
-      fontWeight="medium"
-      cursor={style.cursor}
-      outline={style.outline}
-      outlineColor={style.outlineColor}
-      _hover={style.hoverStyle}
-      onClick={onClick}
-      title={isMissing ? undefined : title}
-      aria-label={name}
-      data-testid={`evaluator-pill-${attachmentId}`}
-      data-missing={isMissing ? "true" : undefined}
-      data-inherited={inherited ? "true" : undefined}
-    >
+  const pillProps = {
+    display: "inline-flex" as const,
+    alignItems: "center" as const,
+    gap: 1.5,
+    height: "24px",
+    paddingX: "10px",
+    borderRadius: "full",
+    borderWidth: "1px",
+    borderColor: style.borderColor,
+    background: style.background,
+    color: style.color,
+    fontSize: "11px",
+    fontWeight: "medium" as const,
+    cursor: style.cursor,
+    outline: style.outline,
+    outlineColor: style.outlineColor,
+    _hover: style.hoverStyle,
+    title: isMissing ? undefined : title,
+    "aria-label": name,
+    "data-testid": `evaluator-pill-${attachmentId}`,
+    "data-missing": isMissing ? "true" : undefined,
+    "data-inherited": inherited ? "true" : undefined,
+  };
+  const pillChildren = (
+    <>
       {required && (
         <Circle
           size="6px"
@@ -119,7 +117,17 @@ export function EvaluatorPill({
           data-testid={`evaluator-pill-alert-${attachmentId}`}
         />
       )}
+    </>
+  );
+  // A pill with nothing to click on is static content, not a control, so it
+  // never renders as a button: a screen reader would announce a control that
+  // does nothing when activated.
+  const pill = onClick ? (
+    <chakra.button type="button" onClick={onClick} {...pillProps}>
+      {pillChildren}
     </chakra.button>
+  ) : (
+    <chakra.div {...pillProps}>{pillChildren}</chakra.div>
   );
 
   if (!isMissing) return pill;

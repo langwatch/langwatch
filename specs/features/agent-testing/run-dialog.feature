@@ -498,7 +498,7 @@ Feature: The run dialog
   # the trace, since a plan may cover scenarios from several suites.
 
   @integration
-  Scenario: The evaluators of the suites in scope read as inherited chips
+  Scenario: The evaluators of the suites in scope read as inherited pills
     Given a test suite that attaches an evaluator
     When the run dialog is opened on that suite
     Then an Evaluators block stands open, with no chip needed to open it
@@ -507,7 +507,7 @@ Feature: The run dialog
     And the block cannot be removed while a suite in scope holds it
 
   @integration
-  Scenario: An inherited chip opens the suite editor on that evaluator
+  Scenario: An inherited pill opens the suite editor on that evaluator
     Given the run dialog with an inherited evaluator
     When its pill is chosen
     Then the suite editor opens on that suite, at that evaluator

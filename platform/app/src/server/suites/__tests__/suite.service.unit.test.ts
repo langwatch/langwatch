@@ -56,7 +56,7 @@ function makeMockRepository(
     findSlugsByPrefix: vi.fn().mockResolvedValue([]),
     findFirstByLabel: vi.fn().mockResolvedValue(null),
     findNamesByIds: vi.fn(async () => []),
-    findManyByIdsIncludingArchived: vi.fn(async () => []),
+    findAllByIdsIncludingArchived: vi.fn(async () => []),
     // No plan answers to a name unless a scenario says one does.
     findPlanByName: vi.fn().mockResolvedValue(null),
     update: vi.fn(),

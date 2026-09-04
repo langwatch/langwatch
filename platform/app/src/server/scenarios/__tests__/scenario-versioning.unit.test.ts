@@ -139,4 +139,42 @@ describe("the snapshot envelope", () => {
     expect(parsed.fields.name).toBe("Refund flow");
     expect(parsed.fields.parameters).toEqual([{ name: "tier" }]);
   });
+
+  describe("when a scenario's field values are empty", () => {
+    it("normalizes an empty object to null", () => {
+      const scenarioRow = {
+        ...fields(),
+        id: "scenario_1",
+        projectId: "project_1",
+        testSuiteId: "suite_1",
+        version: 4,
+        fields: {},
+      };
+
+      expect(snapshotFieldsOf(scenarioRow).fields).toBeNull();
+    });
+
+    it("does not diff a cleared scenario against one that never had values", () => {
+      const neverHadValuesRow = {
+        ...fields(),
+        id: "scenario_1",
+        projectId: "project_1",
+        testSuiteId: "suite_1",
+        version: 1,
+        fields: null,
+      };
+      const clearedRow = {
+        ...fields(),
+        id: "scenario_1",
+        projectId: "project_1",
+        testSuiteId: "suite_1",
+        version: 2,
+        fields: {},
+      };
+      const neverHadValues = snapshotFieldsOf(neverHadValuesRow);
+      const cleared = snapshotFieldsOf(clearedRow);
+
+      expect(diffSnapshotFields(neverHadValues, cleared)).toEqual([]);
+    });
+  });
 });

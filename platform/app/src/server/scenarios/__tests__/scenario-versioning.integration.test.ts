@@ -86,7 +86,7 @@ beforeEach(async () => {
 });
 
 describe("scenario versioning", () => {
-  describe("field values", () => {
+  describe("when a save changes a field value", () => {
     /** @scenario "A save that changes a field value records a version naming fields" */
     it("records a version naming fields and snapshots the value", async () => {
       const testSuite = await createTestSuite("Case lookups");

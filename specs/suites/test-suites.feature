@@ -186,8 +186,9 @@ Feature: A test suite groups scenarios
 
   # --- Fields on a test suite ---
 
-  # A test suite declares typed fields beyond situation and criteria, and every
-  # scenario filed in it carries one value per field. The identifier grammar
+  # A test suite declares typed fields beyond situation and criteria, and a
+  # scenario filed in it may carry a value for each field. A blank value
+  # skips the evaluators that read it, with a reason. The identifier grammar
   # and the value rules are in specs/scenarios/scenario-fields.feature.
 
   @integration
@@ -261,6 +262,12 @@ Feature: A test suite groups scenarios
     And expected_contexts maps to the scenario field table_schema
 
   @unit
+  Scenario: A messages input is mapped to the message list, not the transcript
+    Given a test suite
+    When an evaluator with the input messages is attached
+    Then messages maps to the conversation's list of messages, not the transcript text
+
+  @unit
   Scenario: A tool call is never inferred
     Given a target whose traces show a run_sql tool call
     When an evaluator with the input output is attached
@@ -305,3 +312,10 @@ Feature: A test suite groups scenarios
     Then the run is refused with "suite_evaluator_mappings_missing"
     And the refusal names the evaluator, the suite and the input
     And nothing is queued
+
+  @integration
+  Scenario: A duplicated plan attachment with a missing mapping does not refuse a run the suite's own attachment fully maps
+    Given a test suite whose own attachment of an evaluator maps every required input
+    And a run plan carrying its own copy of that same evaluator with a required input left unmapped
+    When a run of that suite is started with that plan
+    Then the run is not refused, because the suite's attachment is the one that executes

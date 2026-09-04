@@ -162,18 +162,20 @@ describe("failedRequiredEvaluatorName", () => {
 });
 
 describe("evaluationKind", () => {
-  it("reads a verdict, a number, or nothing", () => {
-    expect(evaluationKind(evaluation())).toBe("passfail");
-    expect(
-      evaluationKind(
-        evaluation({ status: "scored", passed: undefined, score: 1 }),
-      ),
-    ).toBe("score");
-    expect(
-      evaluationKind(evaluation({ status: "skipped", passed: undefined })),
-    ).toBeNull();
-    expect(
-      evaluationKind(evaluation({ status: "error", passed: undefined })),
-    ).toBeNull();
+  describe("given an evaluation's status and score", () => {
+    it("reads a verdict, a number, or nothing", () => {
+      expect(evaluationKind(evaluation())).toBe("passfail");
+      expect(
+        evaluationKind(
+          evaluation({ status: "scored", passed: undefined, score: 1 }),
+        ),
+      ).toBe("score");
+      expect(
+        evaluationKind(evaluation({ status: "skipped", passed: undefined })),
+      ).toBeNull();
+      expect(
+        evaluationKind(evaluation({ status: "error", passed: undefined })),
+      ).toBeNull();
+    });
   });
 });

@@ -14,6 +14,8 @@ import type {
   AgentRepository,
 } from "../../agents/agent.repository";
 import type { SuiteRunService } from "../../app-layer/suites/suite-run.service";
+import type { LiveInstance } from "../../connected-agents/instance.registry";
+import type { PresenceReads } from "../../connected-agents/presence.read";
 import type { LlmConfigRepository } from "../../prompt-config/repositories/llm-config.repository";
 import type { ScenarioParameterDefinition } from "../../scenarios/parameters";
 import type { ScenarioRepository } from "../../scenarios/scenario.repository";
@@ -53,6 +55,33 @@ function connectedAgent({
   };
 }
 
+/** One live instance holding an agent, as the registry lists it. */
+function liveInstance(agentId: string): LiveInstance {
+  return {
+    instanceId: `inst_${agentId}`,
+    projectId,
+    hostname: "dev-box",
+    username: "dev",
+    pid: 1,
+    sdk: { name: "langwatch", version: "1.0.0", language: "python" },
+    label: null,
+    podId: "pod_a",
+    connectedAt: Date.now(),
+    maxConcurrency: 1,
+    inflight: 0,
+    lastSeenAt: Date.now(),
+  };
+}
+
+/** A presence read where every agent is online except the ones named. */
+function presenceWith(offlineIds: string[] = []) {
+  return {
+    listLive: vi.fn(async ({ agentId }: { agentId: string }) =>
+      offlineIds.includes(agentId) ? [] : [liveInstance(agentId)],
+    ),
+  };
+}
+
 function suiteWith(targets: SuiteTarget[]): SimulationSuite {
   return {
     id: "suite_1",
@@ -80,10 +109,13 @@ function serviceWith({
   agents,
   scenarioParameters,
   users = [],
+  offlineIds = [],
 }: {
   agents: AgentIdentityRow[];
   scenarioParameters: ScenarioParameterDefinition[] | null;
   users?: { id: string; name: string | null }[];
+  /** The agents no process is holding; every other one is online. */
+  offlineIds?: string[];
 }) {
   const startRun = vi.fn(async () => ({
     batchRunId: "batch_1",
@@ -130,6 +162,8 @@ function serviceWith({
     { findExistingIds: vi.fn() } as unknown as LlmConfigRepository,
     { startRun } as unknown as SuiteRunService,
     prisma as unknown as PrismaClient,
+    undefined,
+    presenceWith(offlineIds) as PresenceReads,
   );
   return { service, startRun };
 }
@@ -312,6 +346,29 @@ describe("SuiteService.run with a connected target", () => {
       expect(startRun).not.toHaveBeenCalled();
     });
   });
+
+  describe("when no process is holding the target", () => {
+    it("refuses the run as offline and schedules nothing", async () => {
+      const { service, startRun } = serviceWith({
+        agents: [connectedAgent({ id: "agent_1", parameters: [] })],
+        scenarioParameters: null,
+        offlineIds: ["agent_1"],
+      });
+
+      const failure = await service
+        .run({
+          ...runDefaults,
+          suite: suiteWith([{ type: "connected", referenceId: "agent_1" }]),
+        })
+        .catch((error: unknown) => error);
+
+      expect(failure).toMatchObject({
+        code: "agent_offline",
+        meta: { agentName: "support-agent", environment: "production" },
+      });
+      expect(startRun).not.toHaveBeenCalled();
+    });
+  });
 });
 
 describe("targetLabels", () => {
@@ -414,7 +471,7 @@ describe("assertConnectedAgentsRunnable", () => {
     user: { findMany: vi.fn(async () => [{ id: "u_2", name: "Ana" }]) },
   } as unknown as Pick<PrismaClient, "user">;
 
-  describe("when every agent is shared or the actor's own", () => {
+  describe("when every agent is shared or the actor's own, and online", () => {
     it("lets the run through", async () => {
       await expect(
         assertConnectedAgentsRunnable({
@@ -424,6 +481,8 @@ describe("assertConnectedAgentsRunnable", () => {
           ],
           actor: { id: "u_1", label: "user" },
           users,
+          projectId,
+          presence: presenceWith(),
         }),
       ).resolves.toBeUndefined();
     });
@@ -438,11 +497,79 @@ describe("assertConnectedAgentsRunnable", () => {
           ],
           actor: undefined,
           users,
+          projectId,
+          presence: presenceWith(),
         }),
       ).rejects.toMatchObject({
         code: "agent_owner_only",
         meta: { ownerName: "Ana" },
       });
+    });
+  });
+
+  describe("when a connected agent has no live instance", () => {
+    it("refuses the run as offline, naming the agent and its environment", async () => {
+      await expect(
+        assertConnectedAgentsRunnable({
+          agents: [
+            connectedAgent({ id: "a", parameters: [] }),
+            connectedAgent({ id: "b", parameters: [] }),
+          ],
+          actor: { id: "u_1", label: "user" },
+          users,
+          projectId,
+          presence: presenceWith(["b"]),
+        }),
+      ).rejects.toMatchObject({
+        code: "agent_offline",
+        meta: { agentName: "support-agent", environment: "production" },
+      });
+    });
+  });
+
+  describe("when the run targets an HTTP agent", () => {
+    /** @scenario "An HTTP agent target is never offline" */
+    it("reads no presence and lets the run through", async () => {
+      const presence = presenceWith(["http_1"]);
+
+      await expect(
+        assertConnectedAgentsRunnable({
+          agents: [
+            {
+              id: "http_1",
+              name: "Support API",
+              type: "http",
+              environment: null,
+              ownerUserId: null,
+            },
+          ],
+          actor: { id: "u_1", label: "user" },
+          users,
+          projectId,
+          presence,
+        }),
+      ).resolves.toBeUndefined();
+      expect(presence.listLive).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when someone else's personal agent is offline too", () => {
+    /** @scenario "The owner-only refusal comes before the offline one" */
+    it("refuses as owner only without reading presence", async () => {
+      const presence = presenceWith(["b"]);
+
+      await expect(
+        assertConnectedAgentsRunnable({
+          agents: [
+            connectedAgent({ id: "b", parameters: [], ownerUserId: "u_2" }),
+          ],
+          actor: { id: "u_1", label: "user" },
+          users,
+          projectId,
+          presence,
+        }),
+      ).rejects.toMatchObject({ code: "agent_owner_only" });
+      expect(presence.listLive).not.toHaveBeenCalled();
     });
   });
 });

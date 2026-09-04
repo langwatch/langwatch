@@ -144,15 +144,17 @@ describe("VariableMappingInput", () => {
       });
     });
 
-    /** @scenario "The mapping dropdown stays clickable over a modal dialog" */
-    it("keeps pointer events on the dropdown, since a modal dialog turns them off around itself", async () => {
-      const user = userEvent.setup();
-      renderComponent();
+    describe("when the mapping dropdown is opened over a modal", () => {
+      /** @scenario "The mapping dropdown stays clickable over a modal dialog" */
+      it("keeps pointer events on the dropdown, since a modal dialog turns them off around itself", async () => {
+        const user = userEvent.setup();
+        renderComponent();
 
-      await user.click(screen.getByRole("textbox"));
+        await user.click(screen.getByRole("textbox"));
 
-      const dropdown = await screen.findByTestId("mapping-dropdown");
-      expect(dropdown).toHaveStyle({ pointerEvents: "auto" });
+        const dropdown = await screen.findByTestId("mapping-dropdown");
+        expect(dropdown).toHaveStyle({ pointerEvents: "auto" });
+      });
     });
 
     it("shows fields grouped by source", async () => {

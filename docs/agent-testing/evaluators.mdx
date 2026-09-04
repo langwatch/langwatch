@@ -9,7 +9,7 @@ description: An evaluator attached to a test suite runs after every scenario run
 
 The judge grades behavior from the criteria. An evaluator compares against a known answer or runs a check an existing evaluator already does well: a SQL query against the golden one, a reply against a reference answer, a transcript through a PII scanner, retrieved contexts through a faithfulness check. Any evaluator of the project's [library](/evaluations/evaluators/overview) can be attached, LLM judges included.
 
-A test suite declares [fields](/agent-testing/test-suites#fields) for the values an evaluator compares against, and every scenario in the suite carries one value per field.
+A test suite declares [fields](/agent-testing/test-suites#fields) for the values an evaluator compares against. A scenario may carry a value for each field; a blank value skips the evaluators that read it.
 
 ## Attach an evaluator
 
@@ -75,6 +75,7 @@ langwatch simulation-run get <scenarioRunId> --format json   # results.evaluatio
 
 ```json
 [{
+  "id": "attachment_abc123",
   "evaluatorId": "evaluator_abc123",
   "required": true,
   "mappings": {

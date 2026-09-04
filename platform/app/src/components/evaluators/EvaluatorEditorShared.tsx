@@ -770,7 +770,7 @@ export function useEvaluatorEditorController(
  * the editor is open on an attachment, so the gate is set where the inputs
  * are, and a score only evaluator says why it cannot gate.
  */
-function EvaluatorGateSection({
+export function EvaluatorGateSection({
   gate,
   required,
   onRequiredChange,
@@ -1062,12 +1062,12 @@ function isApplyDisabled({
  * The button that takes the attachment off, when the editor is open on one,
  * and the spacer that pins it to its own side of the footer.
  */
-function FooterRemoveArea({
+export function FooterRemoveArea({
   onRemove,
-  withSpacer,
+  hasSpacer,
 }: {
   onRemove: (() => void) | undefined;
-  withSpacer: boolean;
+  hasSpacer: boolean;
 }) {
   if (!onRemove) return null;
   return (
@@ -1081,7 +1081,7 @@ function FooterRemoveArea({
       >
         {REMOVE_EVALUATOR_LABEL}
       </Button>
-      {withSpacer && <Spacer />}
+      {hasSpacer && <Spacer />}
     </>
   );
 }
@@ -1116,7 +1116,7 @@ export function EvaluatorEditorFooter({
   if (onLocalConfigChange) {
     return (
       <HStack width="full">
-        <FooterRemoveArea onRemove={onRemove} withSpacer={false} />
+        <FooterRemoveArea onRemove={onRemove} hasSpacer={false} />
         {hasUnsavedChanges && (
           <Button
             variant="outline"
@@ -1153,7 +1153,7 @@ export function EvaluatorEditorFooter({
 
   return (
     <HStack gap={3} width={onRemove ? "full" : undefined}>
-      <FooterRemoveArea onRemove={onRemove} withSpacer={true} />
+      <FooterRemoveArea onRemove={onRemove} hasSpacer={true} />
       <Button variant="outline" onClick={onCancel ?? handleClose}>
         Cancel
       </Button>

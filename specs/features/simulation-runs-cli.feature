@@ -41,9 +41,10 @@ Feature: Simulation Run CLI Commands
     When I run "langwatch simulation-run get <run-id>"
     Then I see the verdict as "failed" with unmet criteria listed
 
+  @unit
   Scenario: Get simulation run shows its evaluator results
     Given a simulation run whose results carry two evaluations
-    When I run "langwatch simulation-run get <runId>"
+    When I run "langwatch simulation-run get <run-id>"
     Then I see one line per evaluator with its status, its score when it has one, and whether it is required
     And the reason of a skipped or failed evaluator is shown under it
 

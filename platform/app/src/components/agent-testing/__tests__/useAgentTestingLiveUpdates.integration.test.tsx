@@ -62,21 +62,23 @@ describe("the Agent Testing live updates", () => {
     vi.clearAllMocks();
   });
 
-  describe("when a simulation update arrives", () => {
-    /** @scenario "A simulation update makes the results read again" */
-    it("reads the results overview and the result atoms again", () => {
-      const { result } = renderHook(() =>
-        useAgentTestingLiveUpdates("project_1"),
-      );
-      expect(result.current.isSseConnected).toBe(true);
-      expect(listenerOptions.enabled).toBe(true);
+  describe("given the live-update subscription is connected", () => {
+    describe("when a simulation update arrives", () => {
+      /** @scenario "A simulation update makes the results read again" */
+      it("reads the results overview and the result atoms again", () => {
+        const { result } = renderHook(() =>
+          useAgentTestingLiveUpdates("project_1"),
+        );
+        expect(result.current.isSseConnected).toBe(true);
+        expect(listenerOptions.enabled).toBe(true);
 
-      listenerOptions.refetch?.();
+        listenerOptions.refetch?.();
 
-      expect(invalidations.resultsOverview).toHaveBeenCalledTimes(1);
-      expect(invalidations.resultAtoms).toHaveBeenCalledTimes(1);
-      expect(invalidations.suiteSummaries).toHaveBeenCalledTimes(1);
-      expect(invalidations.batchRunCount).toHaveBeenCalledTimes(1);
+        expect(invalidations.resultsOverview).toHaveBeenCalledTimes(1);
+        expect(invalidations.resultAtoms).toHaveBeenCalledTimes(1);
+        expect(invalidations.suiteSummaries).toHaveBeenCalledTimes(1);
+        expect(invalidations.batchRunCount).toHaveBeenCalledTimes(1);
+      });
     });
   });
 });

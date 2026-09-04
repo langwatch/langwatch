@@ -322,8 +322,8 @@
               "hints": {
                 "scenario list": "langwatch scenario list -o json",
                 "scenario get": "langwatch scenario get <id> -o json",
-                "scenario create": "langwatch scenario create \"angry user\" --situation \"User is frustrated with billing\" --test-suite \"Billing\" --field golden_sql=\"SELECT 1\"",
-                "scenario update": "langwatch scenario update <id> --test-suite \"Billing\" --field golden_sql=\"SELECT 1\"",
+                "scenario create": "langwatch scenario create \"angry user\" --situation \"User is frustrated with billing\" --test-suite \"Case lookups\" --field golden_sql=\"SELECT 1\"",
+                "scenario update": "langwatch scenario update <id> --test-suite \"Case lookups\" --field golden_sql=\"SELECT 1\"",
                 "scenario run": "langwatch scenario run <id> --target http:<agent-id> --note \"after the timeout fix\"",
                 "scenario delete": "langwatch scenario delete <id>",
                 "scenario version list": "langwatch scenario version list <id> -o json",

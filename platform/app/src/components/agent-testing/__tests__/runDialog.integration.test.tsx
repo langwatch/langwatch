@@ -2863,6 +2863,7 @@ describe("the evaluators of a run", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
     for (const key of Object.keys(flowCallbacksStore)) {
       delete flowCallbacksStore[key];
     }
@@ -2893,7 +2894,7 @@ describe("the evaluators of a run", () => {
 
   afterEach(cleanup);
 
-  /** @scenario "The evaluators of the suites in scope read as inherited chips" */
+  /** @scenario "The evaluators of the suites in scope read as inherited pills" */
   it("opens the Evaluators block on the suite's evaluators, inherited and not removable", () => {
     renderDialog(suiteSubject());
 
@@ -2914,7 +2915,7 @@ describe("the evaluators of a run", () => {
     ).not.toBeInTheDocument();
   });
 
-  /** @scenario "An inherited chip opens the suite editor on that evaluator" */
+  /** @scenario "An inherited pill opens the suite editor on that evaluator" */
   it("opens the suite editor on the evaluator behind an inherited pill", async () => {
     const user = userEvent.setup();
     renderDialog(suiteSubject());

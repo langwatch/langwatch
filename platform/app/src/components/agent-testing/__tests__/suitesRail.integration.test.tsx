@@ -569,8 +569,6 @@ describe("the test suites rail", () => {
     ).not.toBeInTheDocument();
   });
 
-  // --- The new suite dialog ---
-
   describe("when the new suite dialog is opened", () => {
     function renderEditor(
       overrides: Partial<React.ComponentProps<typeof SuiteNameDialog>> = {},

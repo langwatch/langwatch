@@ -173,10 +173,10 @@ Feature: Variables section UI
 
   @integration
   Scenario: The mapping dropdown stays clickable over a modal dialog
-    Given the evaluator drawer opened on top of the run dialog
-    When the mapping dropdown opens
-    Then its options take pointer events even though the dialog turned them off around itself
-    And a click on an option selects it
+    Given showMappings is true
+    And a variable "question" exists
+    When I open the mapping dropdown
+    Then its options keep pointer events enabled even though a surrounding modal turns them off around itself
 
   @unimplemented
   Scenario: Select mapping from dropdown

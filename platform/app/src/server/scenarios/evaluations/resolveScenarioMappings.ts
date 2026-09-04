@@ -300,13 +300,13 @@ function resolveAttachmentInput({
   attachment,
   run,
   scenario,
-  finalAttempt,
+  isFinalAttempt,
 }: {
   input: EvaluatorInputSpec;
   attachment: Pick<EvaluatorAttachment, "mappings">;
   run: RunInputs;
   scenario: ScenarioInputs;
-  finalAttempt: boolean;
+  isFinalAttempt: boolean;
 }): InputResolutionOutcome {
   const mapping = attachment.mappings[input.id];
   if (!mapping) {
@@ -327,7 +327,7 @@ function resolveAttachmentInput({
         result: { kind: "skipped", details: resolved.details },
       };
     case "pending":
-      if (!input.required && finalAttempt) return { action: "skip" };
+      if (!input.required && isFinalAttempt) return { action: "skip" };
       return { action: "pending", details: resolved.details };
     case "failed":
       if (!input.required) return { action: "skip" };
@@ -352,14 +352,14 @@ export function resolveAttachmentInputs({
   inputs,
   run,
   scenario,
-  finalAttempt = false,
+  isFinalAttempt = false,
 }: {
   attachment: Pick<EvaluatorAttachment, "mappings">;
   inputs: EvaluatorInputSpec[];
   run: RunInputs;
   scenario: ScenarioInputs;
   /** True when no later attempt will wait for the trace. */
-  finalAttempt?: boolean;
+  isFinalAttempt?: boolean;
 }): ResolvedAttachmentInputs {
   const data: Record<string, ResolvedValue> = {};
   let firstPending: string | undefined;
@@ -371,7 +371,7 @@ export function resolveAttachmentInputs({
       attachment,
       run,
       scenario,
-      finalAttempt,
+      isFinalAttempt,
     });
     switch (outcome.action) {
       case "return":

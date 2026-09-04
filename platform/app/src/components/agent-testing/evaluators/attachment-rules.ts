@@ -66,11 +66,11 @@ export function evaluatorFitsPlanLevel(
 export function newAttachment({
   evaluator,
   ctx,
-  planLevel,
+  isPlanLevel,
 }: {
   evaluator: AttachableEvaluator;
   ctx: ScenarioMappingContext;
-  planLevel?: boolean;
+  isPlanLevel?: boolean;
 }): EvaluatorAttachment {
   return {
     id: nanoid(),
@@ -79,7 +79,7 @@ export function newAttachment({
     mappings: inferScenarioMappings({
       inputs: evaluatorInputSpecsOf(evaluator),
       ctx,
-      planLevel,
+      isPlanLevel,
     }),
   };
 }

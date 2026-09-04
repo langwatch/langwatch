@@ -101,7 +101,7 @@ Feature: The test suite editor
     Given the suite "Case lookups" declares two fields and one evaluator
     When the suite editor is opened on it
     Then the fields section is open with its two rows
-    And the evaluators section is open with its one chip
+    And the evaluators section is open with its one pill
     And the customize block offers no chip
 
   # --- Evaluators ---
@@ -120,6 +120,18 @@ Feature: The test suite editor
     Then each evaluator reads as a pill carrying its name
     And an "Add evaluator" button follows the pills
     And that button is not a dashed chip
+
+  @integration
+  Scenario: A static pill is not exposed as a button
+    Given a pill with nothing to click
+    When it is read by assistive technology
+    Then it is not exposed as a button, only as its name
+
+  @integration
+  Scenario: An interactive pill stays a button
+    Given a pill that opens the evaluator editor when chosen
+    When it is chosen
+    Then it is exposed as a button and the choice is carried out
 
   @integration
   Scenario: Picking an evaluator attaches it with inferred mappings
@@ -322,6 +334,12 @@ Feature: The test suite editor
     Given a scenario of the suite carries golden_sql "SELECT 1"
     When the scenario editor is opened on it
     Then golden_sql reads "SELECT 1"
+
+  @integration
+  Scenario: A boolean field stored as yes or no shows checked or unchecked
+    Given a scenario carries the word "yes" for the boolean field strict
+    When the scenario editor is opened on it
+    Then the strict switch shows checked
 
   @integration
   Scenario: Values of fields the suite no longer declares are listed and can be removed

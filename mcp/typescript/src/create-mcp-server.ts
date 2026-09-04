@@ -23,6 +23,7 @@ import { handleExperimentListRuns } from "./tools/list-experiment-runs.js";
 import { handleExperimentList } from "./tools/list-experiments.js";
 import { handleRunExperiment, handleExperimentStatus } from "./tools/run-experiment.js";
 import { handleTestAgent } from "./tools/test-agent.js";
+import { handleUpdateTestSuite } from "./tools/update-test-suite.js";
 
 const modelSchema = z
   .string()
@@ -901,9 +902,6 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     },
     withToolLogging("platform_update_test_suite", async (params) => {
       requireApiKey();
-      const { handleUpdateTestSuite } = await import(
-        "./tools/update-test-suite.js"
-      );
       return {
         content: [{ type: "text", text: await handleUpdateTestSuite(params) }],
       };
