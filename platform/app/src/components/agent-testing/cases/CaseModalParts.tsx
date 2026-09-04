@@ -9,6 +9,7 @@
 import {
   Box,
   Button,
+  chakra,
   Grid,
   HStack,
   Input,
@@ -18,24 +19,37 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { Play } from "lucide-react";
+import { Play, X } from "lucide-react";
 import { UNFILED_OPTION_LABEL } from "~/components/scenarios/ScenarioForm";
 import { SimulationModelSelect } from "~/components/scenarios/SimulationModelSelect";
 import { Drawer } from "~/components/ui/drawer";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
+import { Switch } from "~/components/ui/switch";
 import { TagList } from "~/components/ui/TagList";
+import type {
+  ScenarioFieldValue,
+  SuiteFieldDefinition,
+} from "~/server/scenarios/suite-fields";
 import { ParameterLineField } from "../run/ParameterLineField";
 import { parameterPlaceholder } from "../run/parameter-suggestions";
 import { useAgentDeclaredParameters } from "../run/useAgentDeclaredParameters";
 import { CustomizeChips } from "../shared/CustomizeChips";
-import { DIALOG_FIELD_STYLE, FieldLabel } from "../shared/DialogFields";
-import { FG_MUTED } from "../shared/design";
+import {
+  DIALOG_FIELD_STYLE,
+  FieldError,
+  FieldLabel,
+} from "../shared/DialogFields";
+import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../shared/design";
 import { RemoveBlockButton } from "../shared/RemoveBlockButton";
 import { SmallButton } from "../shared/SmallButton";
 import { CaseRecentRunsButton } from "./CaseRecentRunsButton";
 import { CaseVersionHistoryPopover } from "./CaseVersionHistoryPopover";
 import type { TestSuiteEntry } from "./test-cases";
-import type { CaseDraft, CaseEditorState } from "./useCaseEditor";
+import {
+  type CaseDraft,
+  type CaseEditorState,
+  strayFieldValues,
+} from "./useCaseEditor";
 
 const CASE_MODAL_SUBTITLE = "Test your agent on a critical path or edge case";
 
@@ -207,6 +221,177 @@ function SituationAndCriteria({
   );
 }
 
+/** What a stored value reads as in a text or number control. */
+function fieldText(value: ScenarioFieldValue | undefined): string {
+  if (value === undefined) return "";
+  return String(value);
+}
+
+/** What a stored value reads as in a switch. */
+function fieldChecked(value: ScenarioFieldValue | undefined): boolean {
+  return value === true || value === "true";
+}
+
+/** The height a text field opens at, and the height it stops growing at. */
+const FIELD_HEIGHT = { min: "52px", max: "156px" } as const;
+
+/**
+ * One field the suite declares: a text field grows with its content, a
+ * number is a number, a boolean is a switch.
+ */
+function SuiteFieldControl({
+  definition,
+  value,
+  onChange,
+}: {
+  definition: SuiteFieldDefinition;
+  value: ScenarioFieldValue | undefined;
+  onChange: (value: ScenarioFieldValue) => void;
+}) {
+  const { identifier, type } = definition;
+  const testId = `case-field-${identifier}`;
+
+  if (type === "boolean") {
+    return (
+      <HStack gap={2} data-testid={testId}>
+        <Switch
+          size="sm"
+          checked={fieldChecked(value)}
+          onCheckedChange={({ checked }) => onChange(checked)}
+          aria-label={identifier}
+          inputProps={{ "data-testid": `${testId}-switch` }}
+        />
+        <Text fontSize="12.5px" fontWeight="medium" fontFamily="mono">
+          {identifier}
+        </Text>
+      </HStack>
+    );
+  }
+
+  return (
+    <Box data-testid={testId}>
+      <FieldLabel>{identifier}</FieldLabel>
+      {type === "number" ? (
+        <Input
+          {...DIALOG_FIELD_STYLE}
+          type="number"
+          aria-label={identifier}
+          value={fieldText(value)}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      ) : (
+        <Textarea
+          {...DIALOG_FIELD_STYLE}
+          {...GROWING_FIELD}
+          rows={2}
+          minHeight={FIELD_HEIGHT.min}
+          maxHeight={FIELD_HEIGHT.max}
+          fontFamily="mono"
+          fontSize="12px"
+          aria-label={identifier}
+          value={fieldText(value)}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      )}
+    </Box>
+  );
+}
+
+/**
+ * The values of fields the suite no longer declares. They are listed rather
+ * than dropped, so a value is only taken away by hand, and the save is
+ * refused while one is left.
+ */
+function StrayFieldsBlock({
+  values,
+  onRemove,
+}: {
+  values: Record<string, ScenarioFieldValue>;
+  onRemove: (identifier: string) => void;
+}) {
+  return (
+    <Box data-testid="case-stray-fields">
+      <FieldLabel>Not in this suite</FieldLabel>
+      <VStack
+        align="stretch"
+        gap={1}
+        borderWidth="1px"
+        borderColor="border"
+        borderRadius="lg"
+        paddingX={3}
+        paddingY={2}
+      >
+        {Object.entries(values).map(([identifier, value]) => (
+          <HStack key={identifier} gap={2} fontSize="12px">
+            <Text fontFamily="mono" color={FG_MUTED} flexShrink={0}>
+              {identifier}
+            </Text>
+            <Text flex={1} minWidth={0} truncate color="fg.subtle">
+              {String(value)}
+            </Text>
+            <chakra.button
+              type="button"
+              display="flex"
+              alignItems="center"
+              cursor="pointer"
+              color={FG_MUTED}
+              boxShadow={QUIET_BUTTON_SHADOW}
+              _hover={{ color: "red.fg" }}
+              title="Remove"
+              aria-label={`Remove ${identifier}`}
+              onClick={() => onRemove(identifier)}
+            >
+              <X size={12} />
+            </chakra.button>
+          </HStack>
+        ))}
+      </VStack>
+    </Box>
+  );
+}
+
+/**
+ * The fields the suite of the draft declares, one control each, and under
+ * them the values of fields it no longer declares.
+ */
+function SuiteFieldsBlock({ editor }: { editor: CaseEditorState }) {
+  const { draft, setDraft, fieldDefinitions, fieldsError } = editor;
+  const strays = strayFieldValues({
+    values: draft.fields,
+    definitions: fieldDefinitions,
+  });
+  const hasStrays = Object.keys(strays).length > 0;
+
+  if (fieldDefinitions.length === 0 && !hasStrays && !fieldsError) return null;
+
+  return (
+    <VStack align="stretch" gap={4} data-testid="case-suite-fields">
+      {fieldDefinitions.map((definition) => (
+        <SuiteFieldControl
+          key={definition.identifier}
+          definition={definition}
+          value={draft.fields[definition.identifier]}
+          onChange={(value) =>
+            setDraft({
+              fields: { ...draft.fields, [definition.identifier]: value },
+            })
+          }
+        />
+      ))}
+      {hasStrays && (
+        <StrayFieldsBlock
+          values={strays}
+          onRemove={(identifier) => {
+            const { [identifier]: _removed, ...rest } = draft.fields;
+            setDraft({ fields: rest });
+          }}
+        />
+      )}
+      <FieldError message={fieldsError ?? undefined} />
+    </VStack>
+  );
+}
+
 /**
  * The declared parameters of the scenario, as one `name=value` line.
  *
@@ -272,6 +457,7 @@ export function CaseModalFields({
       )}
       <TitleAndSuiteRow draft={draft} setDraft={setDraft} suites={suites} />
       <SituationAndCriteria draft={draft} setDraft={setDraft} />
+      <SuiteFieldsBlock editor={editor} />
       {/* A block a chip opened reads where the reader was looking when they
           opened it: straight under the criteria, in the order the chips sit
           in. Pinned to the foot with the chip row, it left a hole under a

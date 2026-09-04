@@ -17,17 +17,28 @@ import {
   useRef,
   useState,
 } from "react";
-import { readHandledError, showErrorToast } from "~/features/errors";
+import {
+  describeError,
+  readHandledError,
+  showErrorToast,
+} from "~/features/errors";
 import type { Scenario } from "~/generated/prisma/client";
 import {
   parseScenarioParameterDefinitions,
   type ScenarioParameterDefinition,
 } from "~/server/scenarios/parameters";
+import {
+  coerceFieldValue,
+  parseScenarioFieldValues,
+  type ScenarioFieldValues,
+  type SuiteFieldDefinition,
+} from "~/server/scenarios/suite-fields";
 import { api } from "~/utils/api";
 import {
   formatParameterLine,
   toParameterDefinitions,
 } from "../run/parameter-line";
+import type { TestSuiteEntry } from "./test-cases";
 import {
   type CaseCustomizeBlocks,
   useCaseCustomizeBlocks,
@@ -42,6 +53,11 @@ export type CaseDraft = {
   labels: string[];
   /** The declared parameters as one `name=value` line. */
   parameters: string;
+  /**
+   * The values of the suite's fields, keyed by identifier, as typed. A value
+   * for a field the suite no longer declares stays until it is removed.
+   */
+  fields: ScenarioFieldValues;
   testSuiteId: string | null;
   simulatorModel: string | null;
   judgeModel: string | null;
@@ -55,6 +71,7 @@ const EMPTY_DRAFT: CaseDraft = {
   criteria: "",
   labels: [],
   parameters: "",
+  fields: {},
   testSuiteId: null,
   simulatorModel: null,
   judgeModel: null,
@@ -72,6 +89,7 @@ function draftFromScenario(scenario: Scenario): CaseDraft {
     parameters: formatParameterLine(
       parseScenarioParameterDefinitions(scenario.parameters),
     ),
+    fields: parseScenarioFieldValues(scenario.fields),
     testSuiteId: scenario.testSuiteId,
     simulatorModel: scenario.simulatorModel,
     judgeModel: scenario.judgeModel,
@@ -88,9 +106,54 @@ export function criteriaOf(draft: CaseDraft): string[] {
     .filter(Boolean);
 }
 
+/**
+ * The values the save sends: each declared field read as its own type, with
+ * blanks dropped, and every value of a field the suite no longer declares
+ * left as it is, so the server can refuse it by name.
+ */
+export function fieldValuesForSave({
+  values,
+  definitions,
+}: {
+  values: ScenarioFieldValues;
+  definitions: readonly SuiteFieldDefinition[];
+}): ScenarioFieldValues {
+  const declared = new Set(definitions.map((field) => field.identifier));
+  const saved: ScenarioFieldValues = {};
+  for (const definition of definitions) {
+    const value = coerceFieldValue({
+      definition,
+      raw: values[definition.identifier],
+    });
+    if (value !== undefined) saved[definition.identifier] = value;
+  }
+  for (const [identifier, value] of Object.entries(values)) {
+    if (!declared.has(identifier)) saved[identifier] = value;
+  }
+  return saved;
+}
+
+/** The values of fields the suite does not declare, keyed by identifier. */
+export function strayFieldValues({
+  values,
+  definitions,
+}: {
+  values: ScenarioFieldValues;
+  definitions: readonly SuiteFieldDefinition[];
+}): ScenarioFieldValues {
+  const declared = new Set(definitions.map((field) => field.identifier));
+  return Object.fromEntries(
+    Object.entries(values).filter(([identifier]) => !declared.has(identifier)),
+  );
+}
+
 export type CaseEditorState = {
   draft: CaseDraft;
   setDraft: (update: Partial<CaseDraft>) => void;
+  /** The fields the suite of the draft declares, one control each. */
+  fieldDefinitions: SuiteFieldDefinition[];
+  /** What the server refused about the field values, if anything. */
+  fieldsError: string | null;
   /** True while the stored scenario is being read. */
   isLoading: boolean;
   isSaving: boolean;
@@ -176,6 +239,20 @@ function useCaseWrites({
 }) {
   const utils = api.useUtils();
   const [staleVersion, setStaleVersion] = useState<number | null>(null);
+  const [fieldsError, setFieldsError] = useState<string | null>(null);
+
+  /** A refusal about the field values reads under them; anything else toasts. */
+  const surfaceError = useCallback((error: unknown, fallbackTitle: string) => {
+    const handled = readHandledError(error);
+    if (
+      handled?.code === "scenario_field_unknown" ||
+      handled?.code === "scenario_field_type_invalid"
+    ) {
+      setFieldsError(describeError({ error }));
+      return;
+    }
+    showErrorToast({ error, fallbackTitle });
+  }, []);
 
   const invalidate = useCallback(() => {
     void utils.scenarios.getAll.invalidate({ projectId });
@@ -187,8 +264,7 @@ function useCaseWrites({
       invalidate();
       onSaved(saved, { shouldRunAfterSave: runAfterSave.current });
     },
-    onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't create the scenario" }),
+    onError: (error) => surfaceError(error, "Couldn't create the scenario"),
   });
 
   const updateMutation = api.scenarios.update.useMutation({
@@ -205,11 +281,18 @@ function useCaseWrites({
         setStaleVersion(typeof current === "number" ? current : 0);
         return;
       }
-      showErrorToast({ error, fallbackTitle: "Couldn't save the scenario" });
+      surfaceError(error, "Couldn't save the scenario");
     },
   });
 
-  return { createMutation, updateMutation, staleVersion, setStaleVersion };
+  return {
+    createMutation,
+    updateMutation,
+    staleVersion,
+    setStaleVersion,
+    fieldsError,
+    setFieldsError,
+  };
 }
 
 type SavePayload = ReturnType<typeof savePayload>;
@@ -219,10 +302,12 @@ function savePayload({
   projectId,
   draft,
   existingParameters,
+  fieldDefinitions,
 }: {
   projectId: string;
   draft: CaseDraft;
   existingParameters: ScenarioParameterDefinition[];
+  fieldDefinitions: SuiteFieldDefinition[];
 }) {
   return {
     projectId,
@@ -233,6 +318,10 @@ function savePayload({
     parameters: toParameterDefinitions({
       line: draft.parameters,
       existing: existingParameters,
+    }),
+    fields: fieldValuesForSave({
+      values: draft.fields,
+      definitions: fieldDefinitions,
     }),
     testSuiteId: draft.testSuiteId,
     simulatorModel: draft.simulatorModel,
@@ -258,6 +347,7 @@ function useCaseSave({
   projectId,
   draft,
   existingParameters,
+  fieldDefinitions,
   scenarioId,
   version,
   runAfterSave,
@@ -268,6 +358,7 @@ function useCaseSave({
   projectId: string;
   draft: CaseDraft;
   existingParameters: ScenarioParameterDefinition[];
+  fieldDefinitions: SuiteFieldDefinition[];
   scenarioId: string | null;
   version: number | null;
   runAfterSave: MutableRefObject<boolean>;
@@ -282,7 +373,12 @@ function useCaseSave({
     ({ shouldRunAfterSave }: { shouldRunAfterSave: boolean }) => {
       if (problem) return;
       runAfterSave.current = shouldRunAfterSave;
-      const payload = savePayload({ projectId, draft, existingParameters });
+      const payload = savePayload({
+        projectId,
+        draft,
+        existingParameters,
+        fieldDefinitions,
+      });
 
       if (scenarioId && version !== null) {
         updateMutation.mutate({
@@ -299,6 +395,7 @@ function useCaseSave({
       projectId,
       draft,
       existingParameters,
+      fieldDefinitions,
       scenarioId,
       version,
       runAfterSave,
@@ -313,6 +410,7 @@ export function useCaseEditor({
   projectId,
   scenarioId,
   testSuiteId,
+  suites,
   onSaved,
 }: {
   open: boolean;
@@ -321,6 +419,8 @@ export function useCaseEditor({
   scenarioId: string | null;
   /** The suite a new scenario starts in. */
   testSuiteId: string | null;
+  /** The test suites of the project, for the fields the draft's suite declares. */
+  suites: TestSuiteEntry[];
   onSaved: (saved: Scenario, options: { shouldRunAfterSave: boolean }) => void;
 }): CaseEditorState {
   // Which button started the save. The answer of the mutation is read by a
@@ -345,12 +445,28 @@ export function useCaseEditor({
 
   const customize = useCaseCustomizeBlocks({ seedCount, draft, setDraft });
 
-  const { createMutation, updateMutation, staleVersion, setStaleVersion } =
-    useCaseWrites({ projectId, onSaved, runAfterSave });
+  const {
+    createMutation,
+    updateMutation,
+    staleVersion,
+    setStaleVersion,
+    fieldsError,
+    setFieldsError,
+  } = useCaseWrites({ projectId, onSaved, runAfterSave });
 
   useEffect(() => {
-    if (open) setStaleVersion(null);
-  }, [open, scenarioId, setStaleVersion]);
+    if (open) {
+      setStaleVersion(null);
+      setFieldsError(null);
+    }
+  }, [open, scenarioId, setStaleVersion, setFieldsError]);
+
+  // The fields follow the suite the draft is filed in, so moving the scenario
+  // to another suite asks for that suite's fields.
+  const fieldDefinitions = useMemo(
+    () => suites.find((suite) => suite.id === draft.testSuiteId)?.fields ?? [],
+    [suites, draft.testSuiteId],
+  );
 
   const existingParameters: ScenarioParameterDefinition[] = useMemo(
     () => parseScenarioParameterDefinitions(scenario?.parameters),
@@ -364,6 +480,7 @@ export function useCaseEditor({
     projectId,
     draft,
     existingParameters,
+    fieldDefinitions,
     scenarioId,
     version,
     runAfterSave,
@@ -382,6 +499,8 @@ export function useCaseEditor({
   return {
     draft,
     setDraft,
+    fieldDefinitions,
+    fieldsError,
     isLoading: open && !!scenarioId && (isScenarioLoading || !scenario),
     isSaving: createMutation.isPending || updateMutation.isPending,
     version,

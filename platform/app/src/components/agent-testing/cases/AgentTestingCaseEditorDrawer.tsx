@@ -103,6 +103,7 @@ export function AgentTestingCaseEditorDrawer(
     projectId,
     scenarioId,
     testSuiteId,
+    suites,
     onSaved,
   });
 

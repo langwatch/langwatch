@@ -588,4 +588,160 @@ describe("the scenario dialog", () => {
       expect(mockOpenDrawer).not.toHaveBeenCalled();
     });
   });
+  // --- The fields of the suite ---
+
+  describe("given the suite declares fields", () => {
+    const CASE_LOOKUPS = {
+      id: "suite_lookups",
+      name: "Case lookups",
+      slug: "case-lookups",
+      fields: [
+        { identifier: "golden_sql", type: "text" },
+        { identifier: "attempts", type: "number" },
+        { identifier: "strict", type: "boolean" },
+      ],
+    };
+
+    beforeEach(() => {
+      mockTestSuitesGetAll.mockReturnValue({
+        data: [REFUNDS, CASE_LOOKUPS],
+        isLoading: false,
+      });
+    });
+
+    const openInLookups = () => {
+      openDrawerAs({ testSuiteId: CASE_LOOKUPS.id });
+      render(
+        <>
+          <AgentTestingCaseEditor />
+          <AgentTestingCaseEditorDrawer />
+        </>,
+        { wrapper: Wrapper },
+      );
+    };
+
+    /** @scenario "The scenario editor asks for each suite field after the criteria" */
+    it("asks for each field after the criteria, with the control its type takes", async () => {
+      openInLookups();
+      await screen.findByTestId("case-modal");
+
+      const criteria = screen.getByLabelText("Criteria");
+      const golden = screen.getByLabelText("golden_sql");
+      expect(golden.tagName).toBe("TEXTAREA");
+      expect(golden).toHaveAttribute("rows", "2");
+      expect(window.getComputedStyle(golden).resize).toBe("none");
+      expect(
+        criteria.compareDocumentPosition(golden) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+
+      const attempts = screen.getByLabelText("attempts");
+      expect(attempts).toHaveAttribute("type", "number");
+
+      expect(screen.getByTestId("case-field-strict-switch")).toHaveAttribute(
+        "type",
+        "checkbox",
+      );
+      // The fields read before the chips, as part of the scenario.
+      const chips = screen.getByTestId("customize-case-chips");
+      expect(
+        attempts.compareDocumentPosition(chips) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    /** @scenario "The field values are saved with the scenario" */
+    it("saves the values typed, each as its own type, and a blank one as no value", async () => {
+      const user = userEvent.setup();
+      openInLookups();
+      await screen.findByTestId("case-modal");
+
+      await user.type(screen.getByLabelText("Title"), "Chargeback totals");
+      await user.type(screen.getByLabelText("Criteria"), "Sums per quarter");
+      await user.type(screen.getByLabelText("golden_sql"), "SELECT 1");
+      await user.type(screen.getByLabelText("attempts"), "3");
+      await user.click(screen.getByTestId("case-field-strict-switch"));
+      await user.click(screen.getByTestId("case-modal-save"));
+
+      expect(mockCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          testSuiteId: CASE_LOOKUPS.id,
+          fields: { golden_sql: "SELECT 1", attempts: 3, strict: true },
+        }),
+      );
+    });
+
+    it("saves no key for a field left blank", async () => {
+      const user = userEvent.setup();
+      openInLookups();
+      await screen.findByTestId("case-modal");
+
+      await user.type(screen.getByLabelText("Title"), "Chargeback totals");
+      await user.type(screen.getByLabelText("Criteria"), "Sums per quarter");
+      await user.click(screen.getByTestId("case-modal-save"));
+
+      expect(mockCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ fields: {} }),
+      );
+    });
+
+    /** @scenario "Editing a scenario shows the values it already carries" */
+    /** @scenario "Values of fields the suite no longer declares are listed and can be removed" */
+    it("shows the stored values, lists a value of a field the suite dropped, and drops it on remove", async () => {
+      const user = userEvent.setup();
+      mockGetById.mockReturnValue({
+        data: storedCase({
+          testSuiteId: CASE_LOOKUPS.id,
+          fields: { golden_sql: "SELECT 1", legacy_note: "kept from before" },
+        }),
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+      openDrawerAs({ scenarioId: "case_1" });
+      render(
+        <>
+          <AgentTestingCaseEditor />
+          <AgentTestingCaseEditorDrawer />
+        </>,
+        { wrapper: Wrapper },
+      );
+
+      expect(await screen.findByLabelText("golden_sql")).toHaveValue(
+        "SELECT 1",
+      );
+      const strays = screen.getByTestId("case-stray-fields");
+      expect(strays).toHaveTextContent("Not in this suite");
+      expect(strays).toHaveTextContent("legacy_note");
+      expect(strays).toHaveTextContent("kept from before");
+
+      await user.click(
+        within(strays).getByRole("button", { name: "Remove legacy_note" }),
+      );
+      expect(screen.queryByTestId("case-stray-fields")).not.toBeInTheDocument();
+
+      await user.click(screen.getByTestId("case-modal-save"));
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: "case_1",
+          fields: { golden_sql: "SELECT 1" },
+        }),
+      );
+    });
+
+    /** @scenario "Moving a scenario to another suite asks for that suite's fields" */
+    it("asks for the fields of the suite the scenario is moved to", async () => {
+      const user = userEvent.setup();
+      openNew();
+      await screen.findByTestId("case-modal");
+      expect(screen.queryByLabelText("golden_sql")).not.toBeInTheDocument();
+
+      await user.selectOptions(
+        screen.getByLabelText("Test suite"),
+        CASE_LOOKUPS.id,
+      );
+
+      expect(screen.getByLabelText("golden_sql")).toBeInTheDocument();
+      expect(screen.getByLabelText("attempts")).toBeInTheDocument();
+    });
+  });
 });
