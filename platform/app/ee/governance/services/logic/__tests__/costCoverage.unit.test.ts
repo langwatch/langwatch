@@ -8,7 +8,12 @@
 import { describe, expect, it } from "vitest";
 
 import type { CoveragePeriod } from "../../../repositories/ingestionSourceKeyCoverage.repository";
-import { coverageOnDay, isUtcMidnight } from "../costCoverage";
+import {
+  coverageOnDay,
+  isCalendarDay,
+  isUtcMidnight,
+  startOfUtcDay,
+} from "../costCoverage";
 
 const period = (overrides: {
   ingestionSourceId: string;
@@ -132,5 +137,58 @@ describe("Feature: coverage starts on a date", () => {
   it("refuses any instant inside a day", () => {
     expect(isUtcMidnight(new Date("2026-06-01T12:00:00.000Z"))).toBe(false);
     expect(isUtcMidnight(new Date("2026-06-01T00:00:00.001Z"))).toBe(false);
+  });
+});
+
+describe("Feature: a day is read as of a calendar day", () => {
+  describe("when the day is a real one", () => {
+    it("accepts it and resolves its UTC midnight", () => {
+      expect(isCalendarDay("2026-06-01")).toBe(true);
+      expect(startOfUtcDay("2026-06-01").toISOString()).toBe(
+        "2026-06-01T00:00:00.000Z",
+      );
+    });
+  });
+
+  describe("when the day is not a day", () => {
+    it("refuses text a Date constructor would turn into an Invalid Date", () => {
+      expect(isCalendarDay("last tuesday")).toBe(false);
+      expect(isCalendarDay("")).toBe(false);
+      expect(() => startOfUtcDay("last tuesday")).toThrow(/not a day/);
+    });
+
+    it("refuses a well-shaped day the calendar does not have", () => {
+      // `2026-06-31` parses and rolls forward to July the 1st.
+      expect(isCalendarDay("2026-06-31")).toBe(false);
+      expect(isCalendarDay("2026-13-01")).toBe(false);
+      expect(() => startOfUtcDay("2026-06-31")).toThrow(/not a day/);
+    });
+
+    it("refuses a timestamp offered where a day belongs", () => {
+      expect(isCalendarDay("2026-06-01T12:00:00.000Z")).toBe(false);
+    });
+  });
+
+  describe("when an unchecked day reaches the resolution", () => {
+    // The reason the guard exists: every comparison against an Invalid Date is
+    // false, so both of `coverageOnDay`'s skip guards fall through and every
+    // period in the organization's history reads as covering the day.
+    it("is refused there too rather than answering for every period at once", () => {
+      const periods = [
+        period({
+          ingestionSourceId: "bill_1",
+          validFrom: "2026-01-01T00:00:00.000Z",
+          validTo: "2026-06-01T00:00:00.000Z",
+        }),
+        period({
+          ingestionSourceId: "bill_2",
+          validFrom: "2026-06-01T00:00:00.000Z",
+        }),
+      ];
+
+      expect(() => coverageOnDay({ periods, day: "nonsense" })).toThrow(
+        /not a day/,
+      );
+    });
   });
 });

@@ -45,6 +45,14 @@ Feature: Every dollar has one home
       Then the record is refused
       # Nothing else would stop it: these are not real foreign keys.
 
+    @unit
+    Scenario: Coverage naming a key that is not there is refused in words
+      When an administrator records coverage for a gateway key that no longer exists
+      Then the record is refused
+      And the administrator is told that key does not exist
+      # The same refusal covers a key belonging to another organization. Saying
+      # which of the two it was would confirm that somebody else's key exists.
+
   Rule: Re-pointing a key is one movement, so no day is left uncovered
 
     @integration
@@ -59,6 +67,17 @@ Feature: Every dollar has one home
       Given a bill covering a gateway key
       When moving that key to another bill fails partway
       Then the key is still covered by the original bill
+
+    @unit
+    Scenario: Stopping coverage that another administrator just moved still stops it
+      Given a bill covering a gateway key
+      When one administrator moves the key to another bill
+      And a second administrator stops covering that key at the same moment
+      Then the key ends up covered by nobody
+      # The second administrator's locked read wakes to find the row it waited
+      # for closed and the successor outside its snapshot, so it comes back
+      # empty. Taking that as "nothing to stop" would report success and leave
+      # the key covered.
 
     @unit
     Scenario: Coverage may only start at midnight
@@ -90,6 +109,15 @@ Feature: Every dollar has one home
       Given a key whose coverage began in June
       When May is drawn
       Then May's gateway spend belongs to no bill
+
+    @unit
+    Scenario: A day that is not a date is refused rather than answered
+      When coverage is read as of something that is not a calendar day
+      Then the read is refused
+      And the administrator is told to give a date
+      # Not pedantry: an unparseable day compares false against every period,
+      # so every period would read as covering it and the answer would be a
+      # mapping nobody recorded.
 
   Rule: The total shown is the bill; gateway detail splits it
 

@@ -26,8 +26,36 @@ export function isUtcMidnight(at: Date): boolean {
   return at.getTime() % MS_PER_DAY === 0;
 }
 
-/** The UTC midnight that begins a `YYYY-MM-DD` day. */
+/** A calendar day, and nothing a `Date` constructor would rescue into one. */
+const CALENDAR_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Whether a string names a real calendar day.
+ *
+ * Both halves are load-bearing. The shape check rejects text `Date` would turn
+ * into an Invalid Date, and the round-trip rejects a well-shaped day that does
+ * not exist — `2026-06-31` parses happily and rolls forward to July the 1st, so
+ * a chart asked for the 31st of June would quietly answer for a different day.
+ */
+export function isCalendarDay(day: string): boolean {
+  if (!CALENDAR_DAY.test(day)) return false;
+  const at = new Date(`${day}T00:00:00.000Z`);
+  return !Number.isNaN(at.getTime()) && at.toISOString().startsWith(day);
+}
+
+/**
+ * The UTC midnight that begins a `YYYY-MM-DD` day.
+ *
+ * Throws on anything else rather than returning an Invalid Date. Every
+ * comparison against `NaN` is false, so an unchecked one would fall through
+ * `coverageOnDay`'s two guards and read as *every* period covering the day —
+ * a mapping nobody recorded, reported without a word. The caller-facing refusal
+ * is `CoverageDayNotADateError`; this is the backstop under it.
+ */
 export function startOfUtcDay(day: string): Date {
+  if (!isCalendarDay(day)) {
+    throw new Error(`Coverage was asked for as of ${day}, which is not a day`);
+  }
   return new Date(`${day}T00:00:00.000Z`);
 }
 
@@ -42,12 +70,16 @@ export function startOfUtcDay(day: string): Date {
  * A key absent from the returned map is *unmapped* on that day: its gateway
  * spend stands alone as metered, which is a different statement from zero.
  *
- * Throws when two bills both claim a key on one day. The exclusion constraint
- * makes that unreachable, so reaching it means the constraint is missing or
- * something wrote around it — and the alternative, keeping whichever period was
- * read last, is exactly the silent last-writer-wins attribution the constraint
- * exists to prevent. A plain error rather than a named one: nobody reading a
- * chart can act on it.
+ * Throws when two bills both claim a key on one day. Nothing in the database
+ * rules that out for a PAST day: the one-open-bill index counts only rows still
+ * open, so overlapping CLOSED history is held off by the service's transaction
+ * alone — it closes the open row and opens the successor at the same instant,
+ * and never inserts a closed row directly. That makes this the check on that
+ * transaction, not a formality, and the reason it is not a silent resolution:
+ * keeping whichever period was read last is exactly the last-writer-wins
+ * attribution the design exists to prevent. A plain error rather than a named
+ * one — it means our own invariant broke, and nobody reading a chart can act on
+ * it.
  */
 export function coverageOnDay(params: {
   periods: readonly CoveragePeriod[];

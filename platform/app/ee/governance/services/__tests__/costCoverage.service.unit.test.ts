@@ -159,6 +159,66 @@ describe("Feature: a bill takes over a key on a date", () => {
       expect(repo.close).not.toHaveBeenCalled();
     });
   });
+
+  describe("when the key named was deleted since the page was opened", () => {
+    // The row-to-key organization trigger raises `foreign_key_violation` for
+    // this and for a key belonging to another organization alike. Without the
+    // mapping the administrator gets a trace id for a typo.
+    /** @scenario "Coverage naming a key that is not there is refused in words" */
+    it("says the key does not exist rather than failing with a trace id", async () => {
+      const { service, repo } = serviceWith(null);
+      (repo.open as ReturnType<typeof vi.fn>).mockRejectedValue(
+        Object.assign(
+          new Error(
+            'Gateway key vk_1 does not exist, so no bill can be recorded as covering it. code: "23503"',
+          ),
+          { code: "P2003" },
+        ),
+      );
+
+      await expect(
+        service.pointKeyAtSource({
+          organizationId,
+          virtualKeyId,
+          ingestionSourceId: "bill_2",
+          effectiveFrom: new Date("2026-06-01T00:00:00.000Z"),
+        }),
+      ).rejects.toMatchObject({
+        code: "ingestion_source_coverage_key_not_found",
+        meta: { virtualKeyId },
+      });
+    });
+  });
+});
+
+describe("Feature: which bill covered a key on a day", () => {
+  describe("when the day asked for is not a calendar day", () => {
+    /** @scenario "A day that is not a date is refused rather than answered" */
+    it("refuses rather than reading every period as covering it", async () => {
+      const { service, repo } = serviceWith(null);
+
+      await expect(
+        service.getCoverageOnDay({ organizationId, day: "last tuesday" }),
+      ).rejects.toMatchObject({
+        code: "ingestion_source_coverage_day_invalid",
+        meta: { day: "last tuesday" },
+      });
+      // Refused before the read, so a bad day costs nothing.
+      expect(repo.findAllByOrganization).not.toHaveBeenCalled();
+    });
+
+    it("refuses a well-shaped day that does not exist", async () => {
+      // `2026-06-31` parses and rolls forward to July the 1st, so an unchecked
+      // one answers confidently for a different day than the one asked about.
+      const { service } = serviceWith(null);
+
+      await expect(
+        service.getCoverageOnDay({ organizationId, day: "2026-06-31" }),
+      ).rejects.toMatchObject({
+        code: "ingestion_source_coverage_day_invalid",
+      });
+    });
+  });
 });
 
 describe("Feature: a bill stops covering a key", () => {
@@ -172,6 +232,68 @@ describe("Feature: a bill stops covering a key", () => {
         effectiveFrom: new Date("2026-06-01T00:00:00.000Z"),
       });
 
+      expect(repo.close).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when another administrator re-points the key at the same moment", () => {
+    /** @scenario "Stopping coverage that another administrator just moved still stops it" */
+    it("stops the successor rather than reporting success having done nothing", async () => {
+      // What the database does to the locked read: it blocks on the row the
+      // winner is closing, wakes to find that row no longer matches
+      // `validTo IS NULL`, and cannot see the successor the winner inserted
+      // because that row is outside this statement's snapshot. So the first
+      // read comes back empty while the key is still very much covered.
+      const successor: CoveragePeriod = {
+        id: "cov_2",
+        ingestionSourceId: "bill_2",
+        virtualKeyId,
+        validFrom: new Date("2026-03-01T00:00:00.000Z"),
+        validTo: null,
+      };
+      const { service, repo } = serviceWith(null);
+      (repo.findOpenForUpdate as ReturnType<typeof vi.fn>)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(successor);
+
+      await service.stopCoveringKey({
+        organizationId,
+        virtualKeyId,
+        effectiveFrom: new Date("2026-06-01T00:00:00.000Z"),
+      });
+
+      expect(repo.close).toHaveBeenCalledWith(expect.anything(), {
+        organizationId,
+        id: "cov_2",
+        validTo: new Date("2026-06-01T00:00:00.000Z"),
+      });
+    });
+
+    it("refuses when the successor starts on or after the day coverage was to end", async () => {
+      // Re-reading routes the loser into the ordinary guard rather than a
+      // silent no-op: closing the successor at an instant it had not begun
+      // would leave a period covering no time.
+      const successor: CoveragePeriod = {
+        id: "cov_2",
+        ingestionSourceId: "bill_2",
+        virtualKeyId,
+        validFrom: new Date("2026-06-01T00:00:00.000Z"),
+        validTo: null,
+      };
+      const { service, repo } = serviceWith(null);
+      (repo.findOpenForUpdate as ReturnType<typeof vi.fn>)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(successor);
+
+      await expect(
+        service.stopCoveringKey({
+          organizationId,
+          virtualKeyId,
+          effectiveFrom: new Date("2026-06-01T00:00:00.000Z"),
+        }),
+      ).rejects.toMatchObject({
+        code: "ingestion_source_coverage_not_after_start",
+      });
       expect(repo.close).not.toHaveBeenCalled();
     });
   });

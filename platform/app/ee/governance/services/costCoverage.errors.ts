@@ -4,11 +4,12 @@
  * What the key-to-bill mapping refuses, said in words an administrator can act
  * on (ADR-128 §7).
  *
- * All three are ordinary things for a person editing a small list to do — claim
- * a key somebody else just claimed, pick today when today is already the start,
- * hand an API a timestamp where the screen offers a date. None is an incident,
- * so all three are `fault: "customer"`, and none of them may reach the
- * administrator as a trace id.
+ * All of them are ordinary things for a person editing a small list to do —
+ * claim a key somebody else just claimed, pick today when today is already the
+ * start, hand an API a timestamp where the screen offers a date, name a key
+ * that has since been deleted. None is an incident, so all are
+ * `fault: "customer"`, and none of them may reach the administrator as a trace
+ * id.
  *
  * Spec: specs/governance/governance-cost-coverage.feature
  */
@@ -90,5 +91,59 @@ export class CoverageStartNotAfterCurrentError extends HandledError {
       },
     );
     this.name = "CoverageStartNotAfterCurrentError";
+  }
+}
+
+/**
+ * Coverage named a gateway key this organization cannot map.
+ *
+ * Raised from the row-to-key organization trigger on
+ * `IngestionSourceKeyCoverage`, which refuses a key that does not exist and a
+ * key belonging to another organization with the same SQLSTATE. The two are
+ * reported identically on purpose: distinguishing them would confirm to one
+ * organization that another's key exists.
+ *
+ * 404 rather than 409, because from where the administrator stands there is no
+ * such key to map.
+ */
+export class GatewayKeyNotMappableError extends HandledError {
+  declare readonly code: "ingestion_source_coverage_key_not_found";
+
+  constructor(virtualKeyId: string) {
+    super(
+      "ingestion_source_coverage_key_not_found",
+      "That gateway key does not exist",
+      {
+        httpStatus: 404,
+        fault: "customer",
+        meta: { virtualKeyId },
+      },
+    );
+    this.name = "GatewayKeyNotMappableError";
+  }
+}
+
+/**
+ * A day was asked for that is not a date.
+ *
+ * The read side resolves coverage as of a `YYYY-MM-DD` day. An unparseable one
+ * has to be refused rather than carried: `new Date("…")` yields an Invalid Date
+ * whose every comparison is false, which would silently read as *every* period
+ * covering the day and report a mapping nobody recorded.
+ */
+export class CoverageDayNotADateError extends HandledError {
+  declare readonly code: "ingestion_source_coverage_day_invalid";
+
+  constructor(day: string) {
+    super(
+      "ingestion_source_coverage_day_invalid",
+      "Coverage is read as of a calendar day",
+      {
+        httpStatus: 400,
+        fault: "customer",
+        meta: { day },
+      },
+    );
+    this.name = "CoverageDayNotADateError";
   }
 }

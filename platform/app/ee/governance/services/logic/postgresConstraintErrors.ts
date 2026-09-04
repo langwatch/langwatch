@@ -30,6 +30,16 @@ const PRISMA_UNIQUE_VIOLATION = "P2002";
 const CHECK_VIOLATION = "23514";
 
 /**
+ * Postgres' foreign-key-violation code, and Prisma's wrapper for it.
+ *
+ * `relationMode = "prisma"` means governance has no real foreign keys, so this
+ * arrives from a trigger raising it deliberately rather than from a constraint —
+ * the coverage mapping's row-to-key organization check is the one that does.
+ */
+const FOREIGN_KEY_VIOLATION = "23503";
+const PRISMA_FOREIGN_KEY_VIOLATION = "P2003";
+
+/**
  * The driver's SQLSTATE, read off whichever shape carried it.
  *
  * Prisma surfaces a raw constraint violation as a `PrismaClientUnknownRequestError`
@@ -73,4 +83,20 @@ export function isUniqueViolation(error: unknown): boolean {
  */
 export function isCheckViolation(error: unknown): boolean {
   return hasSqlState(error, CHECK_VIOLATION);
+}
+
+/**
+ * Whether a thrown value is a row refused for naming something that is not
+ * there, or not the caller's.
+ *
+ * The coverage mapping's trigger raises this for both readings — a gateway key
+ * that does not exist, and one belonging to another organization — and the two
+ * are deliberately not told apart downstream: saying which would confirm that
+ * somebody else's key exists.
+ */
+export function isForeignKeyViolation(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  if ((error as { code?: unknown }).code === PRISMA_FOREIGN_KEY_VIOLATION)
+    return true;
+  return hasSqlState(error, FOREIGN_KEY_VIOLATION);
 }

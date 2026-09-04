@@ -156,6 +156,8 @@ export const APP_ERROR_CODES = [
   "identity_verification_expired",
   "identity_verification_invalid",
   "ingestion_source_cap_reached",
+  "ingestion_source_coverage_day_invalid",
+  "ingestion_source_coverage_key_not_found",
   "ingestion_source_coverage_not_after_start",
   "ingestion_source_coverage_not_midnight",
   "ingestion_source_key_already_covered",

@@ -25,13 +25,20 @@ import {
   IngestionSourceKeyCoverageRepository,
 } from "../repositories/ingestionSourceKeyCoverage.repository";
 import {
+  CoverageDayNotADateError,
   CoverageStartNotAfterCurrentError,
   CoverageStartNotMidnightError,
   GatewayKeyAlreadyCoveredError,
+  GatewayKeyNotMappableError,
 } from "./costCoverage.errors";
-import { coverageOnDay, isUtcMidnight } from "./logic/costCoverage";
+import {
+  coverageOnDay,
+  isCalendarDay,
+  isUtcMidnight,
+} from "./logic/costCoverage";
 import {
   isCheckViolation,
+  isForeignKeyViolation,
   isUniqueViolation,
 } from "./logic/postgresConstraintErrors";
 
@@ -64,14 +71,19 @@ export class CostCoverageService {
    * its gateway spend stands alone as metered.
    *
    * Reads the whole history and resolves in memory rather than filtering the
-   * day in SQL. The mapping is a small administrator-curated list — tens of rows
-   * for an organization with a lot of keys — and the caller draws a window of
-   * days, so one read serves all of them where a per-day query would repeat.
+   * day in SQL: the mapping is a small administrator-curated list — tens of rows
+   * for an organization with a lot of keys — so the day costs nothing to
+   * resolve here and the query stays one the index already serves. Drawing a
+   * window of days through this method reads that list once per day; a caller
+   * doing so should read the periods once and call `coverageOnDay` itself.
    */
   async getCoverageOnDay(params: {
     organizationId: string;
     day: string;
   }): Promise<Map<string, string>> {
+    if (!isCalendarDay(params.day)) {
+      throw new CoverageDayNotADateError(params.day);
+    }
     const periods = await this.repo.findAllByOrganization(this.prisma, {
       organizationId: params.organizationId,
     });
@@ -84,8 +96,10 @@ export class CostCoverageService {
    *
    * One transaction, and the ordering inside it is what makes a gap
    * unrepresentable: the open row is taken `FOR UPDATE` first, so a second
-   * administrator's re-point of the same key waits rather than interleaving.
-   * Both writes land or neither does.
+   * administrator's re-point of the same key waits rather than interleaving —
+   * and is then refused rather than applied on top, because by the time it wakes
+   * the row it locked is closed and its own insert meets the one-open-bill
+   * index. Both writes land or neither does.
    *
    * Re-pointing a key to the bill already covering it is a no-op rather than an
    * error: an administrator confirming what is already true has not made a
@@ -143,7 +157,7 @@ export class CostCoverageService {
     this.assertMidnight(params.effectiveFrom);
     await this.mappingConstraints(params, () =>
       this.prisma.$transaction(async (tx) => {
-        const open = await this.repo.findOpenForUpdate(tx, {
+        const open = await this.findOpenAfterAnyRepoint(tx, {
           organizationId: params.organizationId,
           virtualKeyId: params.virtualKeyId,
         });
@@ -160,6 +174,36 @@ export class CostCoverageService {
         });
       }),
     );
+  }
+
+  /**
+   * The key's open period, looked for a second time when the first attempt
+   * found none.
+   *
+   * Not defensive repetition — it closes a hole that reports success while
+   * doing nothing. Under READ COMMITTED a `SELECT … WHERE "validTo" IS NULL FOR
+   * UPDATE` that blocks on a concurrent re-point wakes to re-check the row it
+   * waited for, finds the winner has just closed it, and skips it; the
+   * successor the winner inserted is not in this statement's snapshot either.
+   * So the read comes back empty although the key is very much still covered,
+   * and an unguarded caller would commit nothing and tell the administrator the
+   * coverage was stopped.
+   *
+   * The second read is a new statement and so takes a new snapshot, which does
+   * see the successor. One retry is enough: it only runs when the first read
+   * found nothing, and by then the transaction it lost to has committed.
+   *
+   * `pointKeyAtSource` needs no such retry — its insert meets the one-open-bill
+   * index and is refused in words. Only the path that writes nothing on an
+   * empty read can fail silently.
+   */
+  private async findOpenAfterAnyRepoint(
+    tx: Parameters<typeof this.repo.findOpenForUpdate>[0],
+    params: { organizationId: string; virtualKeyId: string },
+  ): Promise<CoveragePeriod | null> {
+    const first = await this.repo.findOpenForUpdate(tx, params);
+    if (first) return first;
+    return await this.repo.findOpenForUpdate(tx, params);
   }
 
   private assertMidnight(effectiveFrom: Date): void {
@@ -188,21 +232,26 @@ export class CostCoverageService {
   }
 
   /**
-   * Turns the two constraint violations this mapping can raise into words an
-   * administrator can act on. Both are losing sides of a race, which is why
-   * neither is caught by the checks above: those run against the state this
-   * transaction read, and a racing writer moves it afterwards.
+   * Turns the constraint violations this mapping can raise into words an
+   * administrator can act on. None of them is caught by the checks above: those
+   * run against the state this transaction read, and either a racing writer
+   * moves it afterwards or the rule lives somewhere only the database can see.
    *
-   * The unique violation is the ordinary one. The `FOR UPDATE` serialises
+   * The unique violation is the ordinary race. The `FOR UPDATE` serialises
    * re-points of the SAME key, but two administrators claiming a so-far
    * uncovered key from two different bills each find no open row to lock, so
    * the one-open-bill index is the only thing that sees them collide.
    *
    * The check violation is narrower: the winner of such a race opened its
    * period at the very instant this one is closing at, so the close leaves a
-   * period covering no time. The instant this transaction was given is
-   * therefore also the instant the coverage it lost to begins, which is what
-   * the reported date names.
+   * period covering no time.
+   *
+   * The foreign-key violation is not a race at all — it is the row-to-key
+   * organization trigger refusing a key that is not this organization's to map,
+   * whether because it belongs to another organization or because it no longer
+   * exists. Without this branch the commonest real mistake there is, naming a
+   * key that has since been deleted, would reach the administrator as a trace
+   * id.
    */
   private async mappingConstraints<T>(
     context: { virtualKeyId: string; effectiveFrom: Date },
@@ -219,6 +268,9 @@ export class CostCoverageService {
           virtualKeyId: context.virtualKeyId,
           currentStartedAt: context.effectiveFrom,
         });
+      }
+      if (isForeignKeyViolation(error)) {
+        throw new GatewayKeyNotMappableError(context.virtualKeyId);
       }
       throw error;
     }
