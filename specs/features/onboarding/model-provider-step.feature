@@ -12,7 +12,7 @@ Feature: Model provider step in product onboarding
   #
   # Tests:
   #   packages/features/onboarding/web/src/behavior/__tests__/use-product-flow.unit.test.tsx
-  #   [gone] src/features/onboarding/components/sections/__tests__/ModelProviderStepScreen.integration.test.tsx
+  #   packages/features/onboarding/web/src/ui/sections/__tests__/model-provider-step-screen.integration.test.tsx
 
   Background:
     Given I finished the welcome questions and reached the flavour selection

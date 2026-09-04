@@ -1,7 +1,7 @@
 /**
  * The browser entry: what `index.html` loads, the only module that runs on
- * import. Unfilled slots (attribution, graphics quality, command bar,
- * footer) are honest pass-throughs — named in `core-application-feature-extraction-plan.md`.
+ * import. Unfilled slots (graphics quality, command bar, footer) are honest
+ * pass-throughs — named in `core-application-feature-extraction-plan.md`.
  */
 
 import type { ReactNode } from "react";
@@ -12,6 +12,7 @@ import { toPublicEnvironment } from "./behavior/public-environment";
 import { UiShellPort } from "./behavior/ui-runtime.port";
 import { UiRuntime } from "./behavior/ui.runtime";
 import { createUiApplication } from "./features/installed-ui-features.composition";
+import { OnboardingAttributionProvider } from "./features/onboarding/ui/sections/onboarding-attribution-provider";
 import type { PublicEnvironment } from "./model/public-environment";
 import { UiErrorToaster } from "./ui/elements/ui-error-toaster";
 import { UiApplicationShell } from "./ui/sections/ui-application-shell";
@@ -69,7 +70,7 @@ class BrowserUiShell extends UiShellPort {
     return new BrowserUiShell(
       createUiApplication({
         providers: {
-          attribution: UiPendingProvider,
+          attribution: OnboardingAttributionProvider,
           session: UiPendingProvider,
           transport: UiPendingProvider,
           graphicsQuality: UiPendingProvider,

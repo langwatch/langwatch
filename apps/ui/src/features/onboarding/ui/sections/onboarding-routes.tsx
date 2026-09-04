@@ -5,10 +5,24 @@
  */
 
 import { onboardingScreens } from "@langwatch/onboarding-web/screens/onboarding";
-import type { ComponentType } from "react";
+import type { ComponentType, ReactNode } from "react";
 import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
 import { uiPage } from "../../../../ui/sections/ui-page";
+import { ModelProviderHost } from "../../../model-provider/ui/sections/model-provider-host";
 import { OnboardingHost } from "./onboarding-host";
+
+/**
+ * The product flavour page also carries the model provider step, and that step
+ * mounts the model-provider family's own credential form — which reads its
+ * scope, grants and feedback off that family's host port.
+ */
+function OnboardingProductHost({ children }: { children: ReactNode }) {
+  return (
+    <OnboardingHost>
+      <ModelProviderHost>{children}</ModelProviderHost>
+    </OnboardingHost>
+  );
+}
 
 export const onboardingPageLoaders: UiPageLoaderRegistry = {
   "pages/onboarding": uiPage({
@@ -21,7 +35,7 @@ export const onboardingPageLoaders: UiPageLoaderRegistry = {
   }),
   "pages/onboarding/product/index": uiPage({
     screen: onboardingScreens.product,
-    host: OnboardingHost,
+    host: OnboardingProductHost,
   }),
   "pages/onboarding/[team]/project": uiPage({
     screen: onboardingScreens.project,

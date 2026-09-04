@@ -8,6 +8,10 @@
   ],
   "type": "module",
   "exports": {
+    "./components/EditModelProviderForm": {
+      "types": "./src/ui/sections/model-provider-form.tsx",
+      "default": "./src/ui/sections/model-provider-form.tsx"
+    },
     "./components/ModelSelector": {
       "types": "./src/ui/elements/model-selector.tsx",
       "default": "./src/ui/elements/model-selector.tsx"

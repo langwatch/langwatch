@@ -51,6 +51,12 @@ export type EditModelProviderFormProps = {
   organizationId?: string | undefined;
   modelProviderId?: string;
   providerKey: string;
+  /**
+   * What "the credential is saved" means to a surface that is not a drawer.
+   * The onboarding step passes its advance here; without it the form closes
+   * the drawer it was written for.
+   */
+  onSaved?: () => void;
 };
 
 export const EditModelProviderForm = ({
@@ -58,6 +64,7 @@ export const EditModelProviderForm = ({
   organizationId,
   modelProviderId,
   providerKey,
+  onSaved,
 }: EditModelProviderFormProps) => {
   const { providers } = useModelProvidersSettings({
     projectId: projectId,
@@ -249,6 +256,10 @@ export const EditModelProviderForm = ({
     canManageTeam,
     getAdvancedPayload,
     onSuccess: () => {
+      if (onSaved) {
+        onSaved();
+        return;
+      }
       closeDrawer();
     },
   });
@@ -471,6 +482,10 @@ export const EditModelProviderForm = ({
                 description: account.email ? `Signed in as ${account.email}` : undefined,
                 type: "success",
               });
+              if (onSaved) {
+                onSaved();
+                return;
+              }
               closeDrawer();
             }}
           />

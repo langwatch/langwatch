@@ -1,18 +1,14 @@
 /**
  * The screens each product flavour walks through.
  *
- * ONE SCREEN DID NOT TRAVEL: the model-provider setup step. It mounts
- * `platform/app`'s model-provider credential form, which reaches four
- * `components/settings/*` modules, `~/server/api/rbac` and `utils/modelProviderSync`
- * — the model-provider family's own closure, moving in a different slice — so
- * taking it here would have been a copy of another family's page. It was
- * SKIPPABLE by design and only the "via the platform" flavour reached it, so
- * that flavour now goes straight to its setup screen; `use-product-flow` records
- * the same thing at the routing table. The enum value and the screen entry stay
- * so reinstating it is one import and one component.
+ * The model-provider step mounts the model-provider family's own credential
+ * form through `model-provider/model-provider-setup` rather than a copy of it,
+ * and only the "via the platform" flavour reaches it. It is skippable by
+ * design, so nothing here may make it required.
  */
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useAnalytics } from "react-contextual-analytics";
+import { ModelProviderStepScreen } from "./model-provider-step-screen";
 import { ObservabilityScreen } from "./observability-screen";
 import { ProductSelectionScreen } from "./product-selection-screen";
 import { ViaClaudeCodeScreen } from "./via-claude-code-screen";
@@ -63,6 +59,22 @@ export const useCreateProductScreens = ({
     [onSelectProduct],
   );
 
+  // The step keeps credential fields and a pending Codex sign-in mounted across
+  // the parent's re-renders, so its component identity has to stay stable: the
+  // flow rebuilds `onContinue` every render, and a new identity here would
+  // remount the form mid-typing.
+  const onContinueRef = useRef(onContinue);
+  useEffect(() => {
+    onContinueRef.current = onContinue;
+  }, [onContinue]);
+  const BoundModelProviderStepScreen = useMemo<React.FC>(
+    () =>
+      function BoundModelProviderStepScreen() {
+        return <ModelProviderStepScreen onContinue={() => onContinueRef.current()} />;
+      },
+    [],
+  );
+
   const screensBase: Record<ProductScreenIndex, OnboardingScreen> = useMemo(
     () => ({
       [ProductScreenIndex.SELECTION]: {
@@ -104,18 +116,15 @@ export const useCreateProductScreens = ({
         widthVariant: "full",
         component: ObservabilityScreen,
       },
-      // MODEL_PROVIDER IS NOT SERVED HERE — see the module docblock. The index
-      // stays in the enum so the URL vocabulary is unchanged and reinstating it
-      // is one entry.
       [ProductScreenIndex.MODEL_PROVIDER]: {
         id: "model-provider",
         required: false,
         heading: "Set up a model provider",
         subHeading: "Connect the model that powers LangWatch's AI features",
-        component: ViaPlatformScreen,
+        component: BoundModelProviderStepScreen,
       },
     }),
-    [BoundProductSelectionScreen],
+    [BoundProductSelectionScreen, BoundModelProviderStepScreen],
   );
 
   return flow.visibleScreens.map((idx) => screensBase[idx]);

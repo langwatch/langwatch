@@ -6,9 +6,10 @@
  * a structured `Attribution` object for downstream consumers (signup
  * mutation, Customer.io identify/track).
  *
- * Pure module — no React. The mount-time write effect is the application's:
- * `~/hooks/useAttributionCapture.ts` stayed with the signup reader that also
- * uses it, and this module is the READER the onboarding form needs.
+ * Pure module — no React. The mount-time write effect is `./use-attribution-capture`,
+ * which the application mounts at its outermost provider position; this module is
+ * both the storage rule that effect writes through and the READER the onboarding
+ * form needs.
  *
  * A STORAGE REFUSAL IS NO LONGER REPORTED, and that is deliberate rather than
  * an oversight. It used to reach `~/utils/posthogErrorCapture`, which is the

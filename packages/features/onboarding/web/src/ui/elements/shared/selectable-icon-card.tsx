@@ -10,6 +10,8 @@ interface SelectableIconCardProps {
   label: string;
   size?: "sm" | "md";
   icon?: IconData;
+  /** An already-rendered glyph, for callers whose icons are components. */
+  iconNode?: React.ReactNode;
   iconSize?: IconProps["size"];
   selected: boolean;
   onClick: () => void;
@@ -19,7 +21,8 @@ interface SelectableIconCardProps {
 }
 
 export function SelectableIconCard(props: SelectableIconCardProps): React.ReactElement {
-  const { label, size = "md", icon, iconSize, selected, onClick, ariaLabel, badge } = props;
+  const { label, size = "md", icon, iconNode, iconSize, selected, onClick, ariaLabel, badge } =
+    props;
 
   const actualIcon = icon?.type === "with-label" ? icon.icon : icon;
   const iconLabel = icon?.type === "with-label" ? icon.label : undefined;
@@ -125,7 +128,11 @@ export function SelectableIconCard(props: SelectableIconCardProps): React.ReactE
             transition: "filter 0.2s ease",
           }}
         >
-          {icon ? (
+          {iconNode ? (
+            <Box w={resolvedSize} h={resolvedSize} display="flex" alignItems="center" justifyContent="center">
+              {iconNode}
+            </Box>
+          ) : icon ? (
             <>
               {iconSrc ? (
                 /* eslint-disable-next-line @next/next/no-img-element */

@@ -25,10 +25,7 @@ const VALID_PRODUCTS: ProductSelection[] = [
 const PRODUCT_TO_SCREENS: Record<ProductSelection, [ProductScreenIndex, ...ProductScreenIndex[]]> =
   {
     "via-claude-code": [ProductScreenIndex.VIA_CLAUDE_CODE],
-    // MODEL_PROVIDER is not served in this package — see
-    // `create-product-screens`. It was a skippable pre-step in front of this
-    // flavour and nothing else reached it.
-    "via-platform": [ProductScreenIndex.VIA_PLATFORM],
+    "via-platform": [ProductScreenIndex.MODEL_PROVIDER, ProductScreenIndex.VIA_PLATFORM],
     "via-claude-desktop": [ProductScreenIndex.VIA_CLAUDE_DESKTOP],
     manually: [ProductScreenIndex.MANUALLY],
   };

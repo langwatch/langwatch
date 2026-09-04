@@ -8,6 +8,10 @@
   ],
   "type": "module",
   "exports": {
+    "./hooks/useAttributionCapture": {
+      "types": "./src/behavior/use-attribution-capture.ts",
+      "default": "./src/behavior/use-attribution-capture.ts"
+    },
     "./screens/onboarding": {
       "types": "./src/screens/onboarding/index.ts",
       "default": "./src/screens/onboarding/index.ts"
@@ -81,6 +85,8 @@
   "dependencies": {
     "@langwatch/design-system": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/model-provider-web": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/platform-api-client": "workspace:*",
     "@langwatch/project-web": "workspace:*",

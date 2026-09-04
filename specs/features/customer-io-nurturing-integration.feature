@@ -12,7 +12,7 @@ Feature: Customer.io nurturing integration
   #   [gone] ee/billing/nurturing/hooks/productInterest.unit.test.ts
   #   [gone] ee/billing/nurturing/hooks/promptCreation.unit.test.ts
   #   [gone] ee/billing/nurturing/hooks/promptCreation.integration.test.ts
-  #   [gone] src/hooks/__tests__/useAttributionCapture.unit.test.ts
+  #   packages/features/onboarding/web/src/behavior/__tests__/use-attribution-capture.unit.test.ts
 
   All scheduling, sequencing, and email delivery is owned by Customer.io.
   LangWatch nurturing hooks fire-and-forget data through the Pipelines API.
