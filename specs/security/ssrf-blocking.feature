@@ -174,6 +174,44 @@ Feature: SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS + Go parity)
         | TS     |
         | Go     |
 
+  Rule: The metadata refusal reads the address, not the spelling of the host
+    A hostname match is not a metadata check: a name an attacker controls can
+    answer with the metadata address, and a bracketed IPv6 literal is a spelling
+    no name list contains. The refusal is decided on the address the connection
+    would actually be made to, and it is never conditioned on
+    BLOCK_LOCAL_HTTP_CALLS.
+
+    @unit
+    Scenario: A hostname that resolves to the metadata address is refused with local calls allowed
+      Given BLOCK_LOCAL_HTTP_CALLS is "false"
+      And the hostname "imds.attacker.example" resolves to the cloud metadata address
+      When the TS validator processes "http://imds.attacker.example/latest/meta-data/"
+      Then the validation fails with a metadata security error
+
+    @unit
+    Scenario: A bracketed IPv6 metadata literal is refused with local calls allowed
+      Given BLOCK_LOCAL_HTTP_CALLS is "false"
+      When the TS validator processes a URL whose host is a bracketed IPv6 spelling
+        of a metadata address
+      Then the validation fails with a metadata security error
+
+    @unit
+    Scenario: A bracketed IPv6 private literal is judged as the address it is
+      Given BLOCK_LOCAL_HTTP_CALLS is "true"
+      When the TS validator processes a URL whose host is a bracketed IPv6
+        loopback, unique-local or link-local literal
+      Then the validation fails with an SSRF block error naming a private address
+      And no DNS lookup was attempted for it
+
+    @unit
+    Scenario: An admitted bracketed IPv6 host keeps its brackets for the request
+      Given BLOCK_LOCAL_HTTP_CALLS is "true"
+      When the TS validator processes a URL whose host is a bracketed public IPv6
+        literal
+      Then the validation passes
+      And the destination is pinned to that address with the brackets kept for the
+        request line and Host header
+
   # ============================================================================
   # Migration — IS_SAAS no longer drives SSRF blocking
   # ============================================================================

@@ -1,6 +1,6 @@
 /** Shared Liquid rendering for both persisted and serialised HTTP agents. */
 
-import { Liquid } from "liquidjs";
+import { createSandboxedLiquid } from "@langwatch/automation-contract";
 import type { FieldMapping } from "./field-mapping";
 import { resolveFieldMappings, sessionAsText, sourceFieldOf } from "./resolve-field-mappings";
 import type { ScenarioInput } from "./resolve-field-mappings";
@@ -41,18 +41,20 @@ export class TemplateRenderError extends Error {
 
 const identity = <T>(v: T): T => v;
 
-const urlLiquid = new Liquid({
+// Sandboxed engines: a customer body template must not be able to inline a
+// file from the worker's working directory into the request it sends.
+const urlLiquid = createSandboxedLiquid({
   outputEscape: (value) => encodeURIComponent(String(value ?? "")),
 });
 urlLiquid.registerFilter("raw", { handler: identity, raw: true });
 
-const bodyLiquid = new Liquid({
+const bodyLiquid = createSandboxedLiquid({
   outputEscape: (value) =>
     value instanceof RawJson ? value.toString() : escapeForJsonStringLiteral(value),
 });
 bodyLiquid.registerFilter("raw", { handler: identity, raw: true });
 
-const headerLiquid = new Liquid();
+const headerLiquid = createSandboxedLiquid();
 headerLiquid.registerFilter("raw", { handler: identity, raw: true });
 
 /** An object or an array: a value a body template injects as raw JSON. */

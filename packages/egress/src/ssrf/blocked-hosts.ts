@@ -48,4 +48,7 @@ export const BLOCKED_METADATA_HOSTS = [
   "169.254.170.2",
   // Generic metadata hostname (some systems use this)
   "metadata",
+  // GCP instance metadata server, by both of the names it answers to
+  "metadata.google.internal",
+  "metadata.goog",
 ] as const;

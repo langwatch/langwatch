@@ -1,4 +1,5 @@
-import { Liquid, type Template } from "liquidjs";
+import type { Liquid, Template } from "liquidjs";
+import { createSandboxedLiquid } from "./sandboxed-liquid";
 
 /**
  * Per-template wall-clock budget. A render that exceeds it is abandoned and
@@ -24,6 +25,8 @@ let engine: Liquid | undefined;
 /**
  * Shared Liquid engine for customer-authored notification templates.
  *
+ * - `createSandboxedLiquid` refuses file inclusion, so `{% render %}` cannot
+ *   read a file under the process working directory.
  * - `strictFilters` rejects unknown filters (caught upstream, falls back to default).
  * - `strictVariables: false` renders missing variables as empty rather than throwing,
  *   so a customer typo degrades gracefully instead of breaking dispatch.
@@ -35,7 +38,7 @@ let engine: Liquid | undefined;
  */
 export function getLiquidEngine(): Liquid {
   if (!engine) {
-    engine = new Liquid({
+    engine = createSandboxedLiquid({
       strictFilters: true,
       strictVariables: false,
       // Hide prototype chains from customer-authored templates so accesses like

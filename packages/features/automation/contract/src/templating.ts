@@ -9,5 +9,6 @@ export type { SlackPayload, SlackRenderDefaults, RenderedSlack } from "./templat
 export { renderTriggerSlack } from "./templating/render-slack";
 export * from "./templating/render-webhook-body";
 export * from "./templating/render-with-fallback";
+export * from "./templating/sandboxed-liquid";
 export * from "./templating/template-context";
 export * from "./templating/validate";

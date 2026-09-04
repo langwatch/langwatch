@@ -5,12 +5,12 @@
  * database access. Designed to run in isolated worker threads.
  */
 
+import { createSandboxedLiquid } from "@langwatch/automation-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentRole } from "@langwatch/scenario";
 import { trace } from "@opentelemetry/api";
 import { generateText } from "ai";
-import { Liquid } from "liquidjs";
 import type {
   LiteLLMParams,
   PromptConfigData,
@@ -20,8 +20,10 @@ import { createModelFromParams } from "./litellm-model.adapter";
 import { PromptTemplateAdapter } from "./prompt-template.adapter";
 import { SerializedAgentAdapter } from "./serialized-agent.adapter";
 
-// Shared Liquid engine instance for template interpolation
-const liquid = new Liquid();
+// Shared Liquid engine for template interpolation. Sandboxed: a customer
+// prompt template must not be able to inline a file from the worker's working
+// directory into the transcript.
+const liquid = createSandboxedLiquid();
 
 /**
  * Serialized prompt config adapter that uses pre-fetched configuration.

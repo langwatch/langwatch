@@ -16,8 +16,14 @@ import { BLOCKED_CLOUD_DOMAINS, BLOCKED_METADATA_HOSTS } from "./blocked-hosts";
  * works from one pod and fails from the next.
  *
  * ## What is refused, always
- * - Cloud metadata endpoints (`BLOCKED_METADATA_HOSTS`)
+ * - Cloud metadata endpoints: by name (`BLOCKED_METADATA_HOSTS`), by address
+ *   whatever its spelling, and by the addresses a name RESOLVES to. None of
+ *   those three depend on `blockLocal`.
  * - Cloud provider internal domains (`BLOCKED_CLOUD_DOMAINS`, suffix match)
+ *
+ * An IPv6 literal arrives from `URL` in brackets. They come off before anything
+ * judges the host, so `[::ffff:169.254.169.254]` is classified as the IMDS
+ * address it is; the brackets go back on for the request line and `Host`.
  *
  * ## What is refused when `blockLocal` is set
  * Every non-globally-routable address, as classified by `./address` — one
@@ -93,9 +99,21 @@ export type SsrfUrlValidator = (url: string) => Promise<SsrfValidationResult>;
 interface ValidationContext {
   url: string;
   parsedUrl: URL;
+  /** The host as judged: lowercased, and an IPv6 literal with its brackets off. */
   hostname: string;
+  /**
+   * The host as it must be written back into a request line and a `Host`
+   * header, which for an IPv6 literal means the brackets are still on.
+   */
+  requestHost: string;
   port: number;
   path: string;
+}
+
+/** The host a URL was judged by: lowercased, and unbracketed if it is an IPv6 literal. */
+function bareHostname(parsedUrl: URL): string {
+  const host = parsedUrl.hostname.toLowerCase();
+  return host.startsWith("[") && host.endsWith("]") ? host.slice(1, -1) : host;
 }
 
 function isBareLocalhostOrLocal(hostname: string): boolean {
@@ -133,13 +151,50 @@ export function isPrivateOrLocalhostIP(ip: string): boolean {
   return classifyEgressAddress(ip) !== "global";
 }
 
+/**
+ * Whether an IP literal is a cloud metadata endpoint, by address rather than by
+ * spelling: the classifier unmaps `::ffff:169.254.169.254` first, so no
+ * alternate rendering of the address escapes this.
+ */
+function isMetadataAddress(host: string): boolean {
+  return isIP(host) !== 0 && classifyEgressAddress(host) === "metadata";
+}
+
 function validateNotMetadataEndpoint(ctx: ValidationContext): void {
-  if (BLOCKED_METADATA_HOSTS.some((host) => host === ctx.hostname)) {
+  const byName = BLOCKED_METADATA_HOSTS.some((host) => host === ctx.hostname);
+  if (byName || isMetadataAddress(ctx.hostname)) {
     logger.error(
       { url: ctx.url, hostname: ctx.hostname, reason: "metadata_endpoint" },
       "SSRF attempt blocked: cloud metadata endpoint",
     );
     throw new Error("Access to cloud metadata endpoints is not allowed for security reasons");
+  }
+}
+
+/**
+ * The metadata refusal on the addresses a name actually resolved to.
+ *
+ * Deliberately outside the `blockLocal` gate: a name whose A record is the IMDS
+ * address is the same request as naming the address, and an operator relaxing
+ * the local-address policy has not asked for instance credentials to be
+ * reachable.
+ */
+function validateAddressesNotMetadata(ctx: ValidationContext, addresses: string[]): void {
+  const metadataAddresses = addresses.filter(isMetadataAddress);
+  if (metadataAddresses.length > 0) {
+    logger.error(
+      {
+        url: ctx.url,
+        hostname: ctx.hostname,
+        resolvedAddresses: addresses,
+        metadataAddresses,
+        reason: "resolves_to_metadata_endpoint",
+      },
+      "SSRF attempt blocked: hostname resolves to a cloud metadata endpoint",
+    );
+    throw new Error(
+      "This hostname resolves to a cloud metadata endpoint, which is not allowed for security reasons",
+    );
   }
 }
 
@@ -173,6 +228,7 @@ function validateResolvedAddresses(
   addresses: string[],
   blockLocal: boolean,
 ): void {
+  validateAddressesNotMetadata(ctx, addresses);
   if (!blockLocal) return;
 
   const privateAddresses = addresses.filter(isPrivateOrLocalhostIP);
@@ -206,7 +262,9 @@ async function resolveHostname(hostname: string): Promise<string[]> {
 function buildResultBase(ctx: ValidationContext): SsrfResultBase {
   return {
     originalUrl: ctx.url,
-    hostname: ctx.hostname,
+    // The bracketed spelling, because a caller writes this straight back into a
+    // request URL and a `Host` header, where a bare IPv6 literal is invalid.
+    hostname: ctx.requestHost,
     port: ctx.port,
     protocol: ctx.parsedUrl.protocol,
     path: ctx.path,
@@ -247,7 +305,8 @@ export function createSsrfUrlValidator(policy: SsrfPolicy): SsrfUrlValidator {
       );
     }
 
-    const hostname = parsedUrl.hostname.toLowerCase();
+    const hostname = bareHostname(parsedUrl);
+    const requestHost = parsedUrl.hostname.toLowerCase();
     const port = parsedUrl.port
       ? parseInt(parsedUrl.port, 10)
       : parsedUrl.protocol === "https:"
@@ -255,7 +314,7 @@ export function createSsrfUrlValidator(policy: SsrfPolicy): SsrfUrlValidator {
         : 80;
     const path = parsedUrl.pathname + parsedUrl.search;
 
-    const ctx: ValidationContext = { url, parsedUrl, hostname, port, path };
+    const ctx: ValidationContext = { url, parsedUrl, hostname, requestHost, port, path };
 
     // Always refused, before anything an operator can relax is consulted.
     validateNotMetadataEndpoint(ctx);

@@ -588,3 +588,33 @@ describe("buildTemplateContext session", () => {
     });
   });
 });
+
+/** Covers specs/security/template-file-inclusion.feature. */
+describe("template file inclusion", () => {
+  describe("given a template that names a file in the working directory", () => {
+    /** @scenario "An HTTP agent body template cannot inline a file" */
+    it.each(["{% render 'package.json' %}", "{% include 'package.json' %}"])(
+      "refuses to inline it from a body template with %s",
+      (tag) => {
+        const context = buildTemplateContext({ input: inputWith("hi") });
+
+        expect(() => renderBodyTemplate({ template: tag, context })).toThrow(TemplateRenderError);
+      },
+    );
+
+    /** @scenario "An HTTP agent body template cannot inline a file" */
+    it("refuses to inline it from a url or a header template as well", () => {
+      const context = buildTemplateContext({ input: inputWith("hi") });
+      const template = "https://agent.example/{% render 'package.json' %}";
+
+      expect(() => renderUrlTemplate({ template, context })).toThrow(TemplateRenderError);
+      expect(() =>
+        renderHeaderTemplate({
+          template: "{% render 'package.json' %}",
+          context,
+          headerKey: "x-leak",
+        }),
+      ).toThrow(TemplateRenderError);
+    });
+  });
+});
