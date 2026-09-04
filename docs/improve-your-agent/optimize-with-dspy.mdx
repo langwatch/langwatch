@@ -76,9 +76,9 @@ trainset = [
 ]
 ```
 
-## Step 3: The program runs the scenario, the metric scores it
+## Step 3: Run the scenario inside the program
 
-The optimizer calls the program on each example and then the metric on the result, so the outer program runs the scenario with the candidate agent inside it and returns the verdict, and the metric only has to score:
+The optimizer calls the program on every example and then the metric on what the program returned. So the program wraps the whole scenario: it runs the conversation with the candidate agent inside it and returns the verdict, the steps and the judge's reasoning, and the metric turns those into a score:
 
 ```python
 class ScenarioProgram(dspy.Module):
@@ -122,7 +122,7 @@ def scenario_metric(gold, pred, trace=None, pred_name=None, pred_trace=None):
     return dspy.Prediction(score=score, feedback=feedback)  # GEPA reads the text
 ```
 
-A failed scenario scores zero, and a passed scenario scores one minus half a point per budget of extra steps, so the pass gate comes first and the step budget is the objective under it. When a tool rejected its arguments during the conversation, the example's feedback adds one line that says so, which is the hint GEPA needs to rewrite that tool's description.
+A failed scenario scores zero, and a passed scenario scores one minus half a point per budget of extra steps, so the pass gate comes first and the step budget is the objective under it. When a tool rejected its arguments during the conversation, the example adds one line to the feedback that says so, which is the hint GEPA needs to rewrite that tool's description.
 
 `scenario.run` executes the conversation on its own thread, and GEPA reads the trace of the thread that called the program, so the example's `forward` copies the DSPy trace of the scenario thread back into the calling thread.
 
@@ -150,7 +150,7 @@ optimized.save("optimized_agent.json")
 print(optimized.agent.react.signature.instructions)
 ```
 
-`max_metric_calls=48` bought four iterations on the example: the first full pass costs six calls, and each accepted candidate costs a minibatch of three for the parent, three for the candidate and a full pass of six. GEPA's `auto="light"` budget plans hundreds of metric calls, which is too many when every call is a full simulation.
+`max_metric_calls=48` gave four iterations on the example: the first full pass costs six calls, and each accepted candidate costs a minibatch of three for the parent, three for the candidate and a full pass of six. GEPA's `auto="light"` budget plans hundreds of metric calls, which is too many when every call is a full simulation.
   </Tab>
   <Tab title="MIPROv2">
 ```python
@@ -247,7 +247,7 @@ GEPA, from the judge's reasoning and the tool errors in the feedback, on its fir
 
 That is the same tool description fix as in [Fix tool calls](/improve-your-agent/fix-tool-calls), found by search. On both runs the damaged blender return went from failed to passed and from 5 steps to 4.
 
-The scenario where the customer asks for a recipe failed on every pass, and the cause was in the example rather than in the agent: its criterion said the agent calls no tool, and the judge counts ReAct's internal `finish` step as a tool call. The criterion now names the tools it means.
+The scenario where the customer asks for a recipe failed on every pass, and the cause was in the example rather than in the agent: its criterion said the agent calls no tool, and the judge counts ReAct's internal `finish` step as a tool call. The criterion now lists the three tools it means instead.
 
 On the MIPROv2 run the angry customer passed before and failed after, and the 83% of the best trial did not repeat on the final pass, which is the non-determinism described in the Limits below.
 
@@ -256,6 +256,6 @@ On the MIPROv2 run the angry customer passed before and failed after, and the 83
 - The optimizer changes text, meaning the instructions and the tool descriptions. A tool that needs a different schema, a missing tool or a harness cap stays a code change: see [Fix tool calls](/improve-your-agent/fix-tool-calls).
 - A scenario is not deterministic: the simulated user words the situation differently on every run, and a candidate can pass once and fail once. Evaluate the baseline and the final program twice before you compare them, and use `--repeat` on the platform for the same reason.
 - The score counts the agent's steps, so the cost of the simulated user and the judge is not in it.
-- DSPy is Python. A TypeScript agent runs the guided loop instead: see [Reduce turns](/improve-your-agent/reduce-turns).
+- DSPy is Python. For a TypeScript agent, use the guided loop instead: see [Reduce turns](/improve-your-agent/reduce-turns).
 
 <Info>**Also check:** [Optimization algorithms](/improve-your-agent/algorithms) (which optimizer to pick), [Scenarios in code](/agent-testing/scenarios-in-code), [DSPy visualization](/dspy-visualization/quickstart) (how a run appears in Experiments).</Info>

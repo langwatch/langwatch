@@ -7,7 +7,7 @@ description: What each optimization algorithm changes, what it needs, how many s
 
 Every algorithm below takes a program, a set of examples and a metric, and returns the program with better text in it. With a scenario suite as the metric, one metric call is one simulated conversation, which is why the number of metric calls is the cost that matters in the table. The guided loop is listed first because it is the one to start with: it changes code and tools, and no algorithm does that.
 
-## The table
+## Algorithms side by side
 
 | Algorithm | Changes | Needs | Metric calls on 6 scenarios | Tracked in LangWatch | Use when |
 |---|---|---|---|---|---|
@@ -21,7 +21,7 @@ Every algorithm below takes a program, a set of examples and a metric, and retur
 
 The instruction optimizers above (COPRO, MIPROv2, GEPA, SIMBA) rewrite the instructions of every predictor in the program, and on a `dspy.ReAct` program the instructions contain the tool descriptions, so those optimizers change the tools as well. `BootstrapFewShot` and `BootstrapFewShotWithRandomSearch` leave the instructions alone and only add demonstrations. See [Optimize with DSPy](/improve-your-agent/optimize-with-dspy).
 
-## Which one
+## Which algorithm to pick
 
 - **Start with the guided loop.** Most of the turns in a long conversation come from a tool contract or a harness setting, and an algorithm cannot change either, while one hypothesis in the guided loop costs one suite run.
 - **GEPA when the metric returns text feedback.** A scenario judge writes why a candidate failed, and GEPA's reflection reads that text and proposes the next candidate from it, without you reviewing each step.
