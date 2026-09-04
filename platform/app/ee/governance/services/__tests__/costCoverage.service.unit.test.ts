@@ -117,6 +117,33 @@ describe("Feature: a bill takes over a key on a date", () => {
     });
   });
 
+  describe("when two administrators claim an uncovered key at once", () => {
+    // Both find no open row to lock, so the one-open-bill unique index is the
+    // only thing that sees them collide. Prisma reports it as P2002 with the
+    // SQLSTATE underneath; the loser must be told in words, not a trace id.
+    it("tells the loser another bill already covers the key", async () => {
+      const { service, repo } = serviceWith(null);
+      (repo.open as ReturnType<typeof vi.fn>).mockRejectedValue(
+        Object.assign(new Error("Unique constraint failed"), {
+          code: "P2002",
+          meta: { code: "23505" },
+        }),
+      );
+
+      await expect(
+        service.pointKeyAtSource({
+          organizationId,
+          virtualKeyId,
+          ingestionSourceId: "bill_2",
+          effectiveFrom: new Date("2026-06-01T00:00:00.000Z"),
+        }),
+      ).rejects.toMatchObject({
+        code: "ingestion_source_key_already_covered",
+        meta: { virtualKeyId },
+      });
+    });
+  });
+
   describe("when no bill covers the key yet", () => {
     it("opens coverage without closing anything", async () => {
       const { service, repo } = serviceWith(null);

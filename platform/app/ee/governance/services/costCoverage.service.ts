@@ -4,13 +4,15 @@
  * Which gateway keys a connected provider bill pays for, and moving one key
  * from one bill to another without leaving a moment uncovered (ADR-128 §7).
  *
- * The database holds the rule that a key belongs to one bill at a time. What it
- * cannot hold is CONTINUITY: a non-overlap constraint structurally cannot see a
- * gap. Two administrators editing through independent updates could close a
- * key's coverage and open its successor an hour later, leaving an hour of that
+ * The database holds the rule that a key has at most one OPEN bill at a time.
+ * What it cannot hold is CONTINUITY: no uniqueness rule can see a gap. Two
+ * administrators editing through independent updates could close a key's
+ * coverage and open its successor an hour later, leaving an hour of that
  * key's spend covered by no bill, with nothing raised and nothing to find it
  * afterwards. So re-pointing is never two writes — it is one transaction that
  * locks the open row, closes it and opens the successor at the same instant.
+ * That same shape is what keeps CLOSED history non-overlapping: a closed row
+ * is only ever written by closing the open row, never inserted directly.
  * Continuity is the transaction's job; the constraints cover only the errors a
  * correct transaction can still make.
  *
@@ -30,7 +32,7 @@ import {
 import { coverageOnDay, isUtcMidnight } from "./logic/costCoverage";
 import {
   isCheckViolation,
-  isExclusionViolation,
+  isUniqueViolation,
 } from "./logic/postgresConstraintErrors";
 
 export class CostCoverageService {
@@ -169,10 +171,8 @@ export class CostCoverageService {
   /**
    * Refuses a change that would close the open period at or before it began.
    *
-   * At the same instant the period covers no time at all, which an exclusion
-   * constraint cannot see — an empty range overlaps nothing, not even itself —
-   * so this is checked before the write and the `CHECK` behind it catches a
-   * race.
+   * At the same instant the period covers no time at all — checked here before
+   * the write, and by the `CHECK` behind it if a race gets past.
    */
   private assertAfter(params: {
     open: CoveragePeriod;
@@ -193,10 +193,10 @@ export class CostCoverageService {
    * neither is caught by the checks above: those run against the state this
    * transaction read, and a racing writer moves it afterwards.
    *
-   * The exclusion violation is the ordinary one. The `FOR UPDATE` serialises
+   * The unique violation is the ordinary one. The `FOR UPDATE` serialises
    * re-points of the SAME key, but two administrators claiming a so-far
    * uncovered key from two different bills each find no open row to lock, so
-   * the constraint is the only thing that sees them collide.
+   * the one-open-bill index is the only thing that sees them collide.
    *
    * The check violation is narrower: the winner of such a race opened its
    * period at the very instant this one is closing at, so the close leaves a
@@ -211,7 +211,7 @@ export class CostCoverageService {
     try {
       return await write();
     } catch (error) {
-      if (isExclusionViolation(error)) {
+      if (isUniqueViolation(error)) {
         throw new GatewayKeyAlreadyCoveredError(context.virtualKeyId);
       }
       if (isCheckViolation(error)) {

@@ -5248,12 +5248,12 @@ model IdentityMatchSuggestion {
 /// chart was drawn.
 ///
 /// A separate table rather than a list column on `IngestionSource`, because
-/// that is what lets the DATABASE hold "every dollar has one home" - an
-/// exclusion constraint refuses a second bill claiming an already-covered key
+/// that is what lets the DATABASE hold "every dollar has one home" - a partial
+/// unique index refuses a second OPEN bill claiming an already-covered key
 /// instead of letting the last administrator to hit Save win.
 ///
 /// None of its rules are expressible here, so all of them live in the
-/// migration: an exclusion constraint over the validity range, a CHECK that the
+/// migration: a one-open-bill partial unique index, a CHECK that the validity
 /// range is non-empty, and a trigger tying the row to its key's own
 /// organization (`relationMode = "prisma"` means there are no real foreign keys
 /// to do it).

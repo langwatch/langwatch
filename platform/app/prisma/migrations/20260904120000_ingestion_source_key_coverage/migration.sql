@@ -13,28 +13,17 @@
 -- drawn - history edited by a present-tense edit.
 --
 -- A SEPARATE TABLE, because that is what lets the database hold the rule. The
--- exclusion constraint below refuses a second bill claiming an already-covered
+-- one-open-bill index below refuses a second bill claiming an already-covered
 -- key, rather than letting the last administrator to hit Save win.
 --
--- Uses btree_gist, installed by 20260902120000_governance_identity_and_erasure.
--- The availability guard is repeated rather than assumed: this migration must
--- fail with an actionable message on a server where the extension is missing,
--- not half-apply and leave the overlap rule off. A missing overlap guard is
--- invisible until two bills claim one key and the read picks one.
-
--- +-------------------------------------------------------------------------+
--- | btree_gist availability guard                                            |
--- +-------------------------------------------------------------------------+
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_available_extensions WHERE name = 'btree_gist') THEN
-    RAISE EXCEPTION
-      'btree_gist is not available on this PostgreSQL server, so the gateway-key coverage table cannot be created. It ships with the standard contrib package. Install the server''s contrib/extension package (postgresql-contrib on Debian/Ubuntu, postgresqlNN-contrib on RHEL), or enable btree_gist in your managed provider''s allowed-extensions list, then re-run the migration.';
-  END IF;
-END
-$$;
-
-CREATE EXTENSION IF NOT EXISTS btree_gist;
+-- PLAIN POSTGRES ONLY, deliberately. An exclusion constraint over the validity
+-- range would also refuse an overlap against closed history, but it needs the
+-- btree_gist extension - a contrib package a self-hosted server or a managed
+-- provider's allow-list may not have. The identity tables made the same trade
+-- (see 20260902120000_governance_identity_and_erasure): a partial unique index
+-- on the open row catches the race that actually happens, and closed history is
+-- kept non-overlapping by the service, which only ever writes a closed row by
+-- closing the open one inside a transaction that holds it FOR UPDATE.
 
 -- +-------------------------------------------------------------------------+
 -- | IngestionSourceKeyCoverage - the key-to-bill mapping                     |
@@ -63,25 +52,24 @@ CREATE INDEX "IngestionSourceKeyCoverage_organizationId_sourceId_idx" ON "Ingest
 -- Resolving which bill covered a key on the day being drawn.
 CREATE INDEX "IngestionSourceKeyCoverage_organizationId_key_validFrom_idx" ON "IngestionSourceKeyCoverage"("organizationId", "virtualKeyId", "validFrom");
 
--- A zero-width range (validFrom = validTo) is EMPTY, and an empty range
--- overlaps nothing - not even itself - so it slips past the exclusion
--- constraint below entirely and files a bill against no time at all. An
--- inverted range raises a raw type error (SQLSTATE 22000) that no layer maps.
--- One named CHECK rejects both, in the database.
+-- A zero-width range (validFrom = validTo) is closed the instant it begins, so
+-- the one-open-bill index below never sees it - and it would still be read
+-- back as history, filing a bill against no time at all. An inverted range is
+-- the same mistake with a sign error. One named CHECK rejects both, in the
+-- database.
 ALTER TABLE "IngestionSourceKeyCoverage" ADD CONSTRAINT "IngestionSourceKeyCoverage_valid_range_check"
     CHECK ("validTo" IS NULL OR "validTo" > "validFrom");
 
--- At most one bill may cover a key at any given instant. Two OPEN rows both
--- range to infinity, so this rejects the second with SQLSTATE 23P01; a closed
--- row overlapping an open one is rejected the same way. NO partial unique index
--- is added on top: it would be strictly redundant, and would make the common
--- race surface as 23505 instead - two error codes for one rule, and the
--- application would have to handle both to say one sentence.
-ALTER TABLE "IngestionSourceKeyCoverage" ADD CONSTRAINT "IngestionSourceKeyCoverage_no_overlap"
-    EXCLUDE USING gist (
-        "virtualKeyId" WITH =,
-        tsrange("validFrom", COALESCE("validTo", 'infinity')) WITH &&
-    );
+-- At most one OPEN bill per key. The race this exists for: two administrators
+-- claim a so-far uncovered key at once, each finds no open row to lock, and
+-- this index is the only thing that sees them collide - SQLSTATE 23505,
+-- surfaced by Prisma as P2002. It deliberately says nothing about CLOSED
+-- history: rows are only ever closed, never inserted closed, by a service
+-- transaction that holds the open row FOR UPDATE (see the header above for why
+-- that trade is taken over an exclusion constraint).
+CREATE UNIQUE INDEX "IngestionSourceKeyCoverage_one_open_bill_key"
+    ON "IngestionSourceKeyCoverage"("virtualKeyId")
+    WHERE "validTo" IS NULL;
 
 -- +-------------------------------------------------------------------------+
 -- | The row's organization must be its key's organization                    |
@@ -153,4 +141,3 @@ CREATE TRIGGER "VirtualKey_drop_coverage_on_delete"
 --   DROP TRIGGER "IngestionSourceKeyCoverage_key_org_check" ON "IngestionSourceKeyCoverage";
 --   DROP FUNCTION "ingestion_source_key_coverage_key_org_check"();
 --   DROP TABLE "IngestionSourceKeyCoverage";
---   -- btree_gist is left installed: the identity tables depend on it.
