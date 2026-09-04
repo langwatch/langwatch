@@ -5,6 +5,8 @@
 
 import asyncio
 import logging
+import subprocess
+import sys
 import threading
 from typing import Any, Literal
 
@@ -249,6 +251,56 @@ def test_call_reads_the_scenario_input_shape():
         "new_messages": ScenarioInput.new_messages,
         "thread_id": "thread-9",
     }
+
+
+# @scenario "The decorated function is accepted as the agent under test"
+def test_scenario_executor_picks_the_connected_agent_for_the_agent_role():
+    from scenario.scenario_executor import ScenarioExecutor
+    from scenario.types import AgentRole
+
+    @connect_agent(name="under-test")
+    def agent(messages) -> str:
+        return "reply"
+
+    executor = ScenarioExecutor(
+        name="connected agent under test",
+        description="the decorated function answers the user simulator",
+        agents=[agent],
+    )
+    executor._pending_agents_on_turn = set(executor.agents)
+    executor._pending_roles_on_turn = [
+        AgentRole.USER,
+        AgentRole.AGENT,
+        AgentRole.JUDGE,
+    ]
+
+    assert executor._next_agent_for_role(AgentRole.AGENT) == (0, agent)
+    assert executor._next_agent_for_role(AgentRole.USER) == (-1, None)
+
+
+def test_role_is_the_scenario_enum_member():
+    from scenario.types import AgentRole
+
+    @connect_agent(name="enum-identity")
+    def agent(messages) -> str:
+        return "reply"
+
+    # The executor compares enum members, so the string value never matches.
+    assert agent.role is AgentRole.AGENT
+    assert agent.role != AgentRole.AGENT.value
+
+
+def test_importing_the_sdk_never_imports_the_scenario_package():
+    """The scenario package is optional, so the role resolves it lazily."""
+    probe = (
+        "import sys, langwatch;"
+        " from langwatch.agent import decorator;"
+        " assert 'scenario' not in sys.modules, sorted("
+        "     m for m in sys.modules if m.startswith('scenario'))"
+    )
+    done = subprocess.run([sys.executable, "-c", probe], capture_output=True, text=True)
+
+    assert done.returncode == 0, done.stderr
 
 
 def test_call_accepts_a_dict_input():
