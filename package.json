@@ -43,6 +43,8 @@
     "start:prepare:files": "pnpm run ensure:ai-gateway-secrets && cp services/langevals/ts-integration/evaluators.generated.ts packages/features/evaluator/contract/src/evaluators.generated.ts && pnpm --filter @langwatch/prisma-client prisma:generate && pnpm --filter langwatch build && pnpm --filter @langwatch/mcp-server build && pnpm --filter @langwatch/langy-web generate:langy-skills && pnpm --filter @langwatch/langy-server generate:setup-skill-bodies",
     "prisma:migrate": "pnpm --filter @langwatch/tasks task prisma-migrate",
     "clickhouse:migrate": "pnpm --filter @langwatch/tasks task clickhouse-migrate",
+    "lwql:provision": "pnpm --filter @langwatch/tasks task lwql-provision",
+    "start:prepare:db": "pnpm run prisma:migrate && pnpm run clickhouse:migrate && pnpm run lwql:provision",
     "prisma:seed": "pnpm --filter @langwatch/prisma-client db:seed",
     "pack:npm": "bash dev/scripts/pack-npm.sh",
     "release:dry-run": "bash dev/scripts/pack-npm.sh && tar -tzf langwatch-server-*.tgz | head -50",

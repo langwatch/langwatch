@@ -30,6 +30,7 @@
     "@langwatch/config": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/stored-object-contract": "workspace:*",
+    "@langwatch/task": "workspace:*",
     "@opentelemetry/api": "^1.9.1",
     "fastq": "^1.20.1",
     "ioredis": "5.10.1",

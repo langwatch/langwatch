@@ -225,6 +225,18 @@ export { withTierFallthrough } from "./adapters/gateway-model-tier-fallthrough.a
 export { declaredModelsForProvider } from "./adapters/gateway-provider-model-catalog.adapter";
 export { recordRealtimeSessionSpan } from "./adapters/gateway-realtime-session-span.adapter";
 export {
+  elevenLabsConversationReportSchema,
+  GatewayRealtimeSessionReconciliationWorker,
+  realtimeSessionReconciliationConfig,
+} from "./adapters/realtime-session-reconciliation.adapter";
+export type {
+  ElevenLabsConversationReader,
+  ElevenLabsConversationReport,
+  ElevenLabsCredentialReader,
+  RealtimeSessionPollerHandle,
+  RealtimeSessionReconciliationRepository,
+} from "./adapters/realtime-session-reconciliation.adapter";
+export {
   GatewayGovernanceSignalsPort,
   type GatewayVirtualKeyLifecycleSignal,
 } from "./ports/gateway-governance-signals.port";
@@ -249,3 +261,26 @@ export {
   verifyElevenLabsSignature,
   type ElevenLabsWebhookRestPorts,
 } from "./transport/api-rest/elevenlabs-webhook.api";
+
+// The R3 config walk, main's `scripts/migrations/backfill-vk-config-to-rp.ts`.
+export {
+  backfillVirtualKeyConfig,
+  VirtualKeyConfigBackfillTask,
+  type LegacyVirtualKeyConfig,
+  type VirtualKeyConfigBackfillDatabase,
+  type VirtualKeyConfigBackfillOutcome,
+  type VirtualKeyRow,
+  type VirtualKeyScopeRow,
+} from "./tasks/virtual-key-config-backfill.task";
+
+// The pre-migration gate report, main's `report-trace-destination-backfill.ts`.
+export {
+  reportTraceDestinationBackfill,
+  TRACE_DESTINATION_RESOLUTIONS,
+  TraceDestinationReportTask,
+  type TraceDestinationKeyRow,
+  type TraceDestinationProjectRow,
+  type TraceDestinationReport,
+  type TraceDestinationReportDatabase,
+  type TraceDestinationResolution,
+} from "./tasks/trace-destination-report.task";

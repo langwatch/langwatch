@@ -40,6 +40,7 @@
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/redaction": "workspace:*",
     "@langwatch/system-migrations": "workspace:*",
+    "@langwatch/task": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
     "@trpc/server": "^11.18.0",
     "hono": "^4.12.27",

@@ -209,3 +209,10 @@ export {
   syncStripePrices,
   type SyncStripePricesResult,
 } from "./tasks/stripe-prices-sync.task";
+export {
+  DuplicateSubscriptionsReportTask,
+  reportDuplicateSubscriptions,
+  type DuplicateSubscriptionsDatabase,
+  type DuplicateSubscriptionsReport,
+  type SubscriptionReportRow,
+} from "./tasks/duplicate-subscriptions-report.task";

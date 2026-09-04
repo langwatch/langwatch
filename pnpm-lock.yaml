@@ -1117,6 +1117,12 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../packages/observability
+      '@langwatch/ops-contract':
+        specifier: workspace:*
+        version: link:../../packages/features/ops/contract
+      '@langwatch/ops-server':
+        specifier: workspace:*
+        version: link:../../packages/features/ops/server
       '@langwatch/organization-contract':
         specifier: workspace:*
         version: link:../../packages/features/organization/contract

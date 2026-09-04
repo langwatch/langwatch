@@ -100,6 +100,16 @@ Feature: Running system migrations across organizations
     Then the run stops
     And it says how many passes it gave up after
 
+  # Main drove this loop in the background of every worker boot, so how fast a
+  # fleet converged was a function of the deploy cadence. It is an ordered step
+  # of the boot chain now — a task the image runs before the process starts.
+  @unit
+  Scenario: The boot chain drives the migrations to convergence before the process starts
+    Given the boot chain runs the system-migrations pass task
+    When the fleet stops advancing
+    Then the task returns and the boot chain continues to the process it was going to start
+    And a pass that fails outright ends the task without failing the boot chain
+
   @unit
   Scenario: A failed pass ends the loop rather than retrying it
     Given a pass that fails outright

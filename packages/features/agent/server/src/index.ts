@@ -147,3 +147,11 @@ export {
   ConnectGateway,
   type ConnectGatewayOptions,
 } from "./transport/api-ws/connected-agent-connect.api";
+
+// The pre-fix audit-log repair, main's `scripts/backfill-agent-audit-log-ids.ts`.
+export {
+  AgentAuditLogIdsBackfillTask,
+  backfillAgentAuditLogIds,
+  type AgentAuditLogBackfillDatabase,
+  type AgentAuditLogBackfillOutcome,
+} from "./tasks/agent-audit-log-ids-backfill.task";

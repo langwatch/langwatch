@@ -225,7 +225,10 @@ export async function runGdprUserDataErase({
     async (tx) => {
       await tx.annotation.updateMany({ where: { userId }, data: { userId: null } });
       await tx.shareLink.updateMany({ where: { userId }, data: { userId: null } });
-      await tx.workflow.updateMany({ where: { publishedById: userId }, data: { publishedById: null } });
+      await tx.workflow.updateMany({
+        where: { publishedById: userId },
+        data: { publishedById: null },
+      });
       await tx.workflowVersion.deleteMany({ where: { authorId: userId } });
       await tx.llmPromptConfigVersion.updateMany({
         where: { authorId: userId },
@@ -270,8 +273,12 @@ export async function runGdprUserDataErase({
           })
         ).map((queue) => queue.id);
         await tx.annotationQueueItem.deleteMany({ where: { projectId: { in: projectIds } } });
-        await tx.annotationQueueScores.deleteMany({ where: { annotationQueueId: { in: queueIds } } });
-        await tx.annotationQueueMembers.deleteMany({ where: { annotationQueueId: { in: queueIds } } });
+        await tx.annotationQueueScores.deleteMany({
+          where: { annotationQueueId: { in: queueIds } },
+        });
+        await tx.annotationQueueMembers.deleteMany({
+          where: { annotationQueueId: { in: queueIds } },
+        });
         await tx.annotationQueue.deleteMany({ where: { projectId: { in: projectIds } } });
 
         await tx.datasetRecord.deleteMany({ where: { projectId: { in: projectIds } } });
@@ -284,7 +291,9 @@ export async function runGdprUserDataErase({
         await tx.shareLink.deleteMany({ where: { projectId: { in: projectIds } } });
         await tx.topic.deleteMany({ where: { projectId: { in: projectIds } } });
         await tx.cost.deleteMany({ where: { projectId: { in: projectIds } } });
-        await tx.modelProviderScope.deleteMany({ where: { scopeType: "PROJECT", scopeId: { in: projectIds } } });
+        await tx.modelProviderScope.deleteMany({
+          where: { scopeType: "PROJECT", scopeId: { in: projectIds } },
+        });
 
         await tx.project.deleteMany({ where: { id: { in: projectIds } } });
       }
@@ -295,7 +304,9 @@ export async function runGdprUserDataErase({
       }
 
       if (soleOwnedOrgIds.length > 0) {
-        await tx.organizationUser.deleteMany({ where: { organizationId: { in: soleOwnedOrgIds } } });
+        await tx.organizationUser.deleteMany({
+          where: { organizationId: { in: soleOwnedOrgIds } },
+        });
         await tx.organization.deleteMany({ where: { id: { in: soleOwnedOrgIds } } });
       }
 

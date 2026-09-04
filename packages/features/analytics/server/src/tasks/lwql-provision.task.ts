@@ -283,7 +283,10 @@ export class LwqlProvisionTask extends Task {
   readonly description =
     "Provisions LangWatchQL's ClickHouse and PostgreSQL objects and backfills the key-map table.";
 
-  private constructor(private readonly database: () => LwqlProvisioningDatabase) {
+  private constructor(
+    private readonly database: () => LwqlProvisioningDatabase,
+    private readonly skipped: boolean,
+  ) {
     super();
   }
 
@@ -295,11 +298,26 @@ export class LwqlProvisionTask extends Task {
    * throwing `TaskInfrastructureUnavailableError`) is deferred to `run()`,
    * which only happens once this task was actually the one selected by name.
    */
-  static create({ database }: { database: () => LwqlProvisioningDatabase }): LwqlProvisionTask {
-    return new LwqlProvisionTask(database);
+  /**
+   * `skipped` is the boot chain's `SKIP_LWQL_PROVISION=true` opt-out, resolved
+   * by the catalogue so the environment dependency is visible at the one call
+   * site that builds this. Exactly `"true"`, like the sibling migrate tasks.
+   */
+  static create({
+    database,
+    skipped = false,
+  }: {
+    database: () => LwqlProvisioningDatabase;
+    skipped?: boolean;
+  }): LwqlProvisionTask {
+    return new LwqlProvisionTask(database, skipped);
   }
 
   async run(_input: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
+    if (this.skipped) {
+      logger.info("SKIP_LWQL_PROVISION=true — skipping LangWatchQL provisioning");
+      return;
+    }
     await runLwqlProvisioningTask({ database: this.database() });
   }
 }

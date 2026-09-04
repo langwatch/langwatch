@@ -463,6 +463,13 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     And every view statement the provisioner emits creates a view under that prefix
     And a view named outside it would be created without a grant, and so read as empty rather than fail
 
+  @unit
+  Scenario: The operator opt-out skips LangWatchQL provisioning in the boot chain
+    Given the deploy sets SKIP_LWQL_PROVISION to true
+    When the boot chain runs the lwql-provision task
+    Then the task provisions nothing and reads no project rows
+    And the boot chain continues to the process it was going to start
+
   @integration
   Scenario: PG connection credentials are not exposed to the restricted identity
     Given a PG-resident table is mapped into ClickHouse through the server-side named collection

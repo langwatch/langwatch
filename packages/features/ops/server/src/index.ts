@@ -57,6 +57,15 @@ export * from "./ops.error-normalizer";
 export * from "./ops.redis-engine-cpu";
 export { OpsWorkerAdapter, type OpsWorkerAdapterOptions } from "./adapters/ops-worker.adapter";
 export { AnomalyHardTierAlertPort } from "./ports/anomaly-hard-tier-alert.port";
+export { StorageStatsMetricsPort } from "./ports/storage-stats-metrics.port";
+export { OtelStorageStatsMetricsAdapter } from "./adapters/otel.storage-stats-metrics.adapter";
+export {
+  StorageStatsCollectionService,
+  type StorageStatsClickHouseClient,
+  type StorageStatsCollectionHandle,
+  type StorageStatsCollectionOptions,
+  type StorageStatsInstance,
+} from "./services/storage-stats-collection.service";
 export { QueuePayloadDecoderPort } from "./ports/queue-payload-decoder.port";
 export {
   UsageStatsErrorReporter,
@@ -147,6 +156,18 @@ export {
   migrationRunsOnThisInstallation,
   organizationMigrates,
 } from "./ops.system-migration-cohort";
+export {
+  PostgresSystemMigrationsAdapter,
+  type PostgresSystemMigrationsAdapterOptions,
+} from "./adapters/postgres.system-migrations.adapter";
+export { SystemMigrationsPassTask } from "./tasks/system-migrations-pass.task";
+export {
+  ProcessManagerPurgeTask,
+  purgeProcessManagerTables,
+  type ProcessManagerPurgeDatabase,
+  type ProcessManagerPurgeOptions,
+  type ProcessManagerPurgeReport,
+} from "./tasks/process-manager-purge.task";
 
 // The back-office REST transport: impersonation, and the React Admin resource
 // operations. Its two session reads are ports, because who is acting and which

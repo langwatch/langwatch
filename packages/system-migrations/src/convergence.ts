@@ -74,7 +74,7 @@ export function startSystemMigrations(args: { runPass: SystemMigrationPass }): {
   stop: () => Promise<void>;
 } {
   const controller = new AbortController();
-  const loop = driveUntilConverged({
+  const loop = driveSystemMigrationsToConvergence({
     signal: controller.signal,
     runPass: args.runPass,
   })
@@ -92,7 +92,12 @@ export function startSystemMigrations(args: { runPass: SystemMigrationPass }): {
   };
 }
 
-async function driveUntilConverged({
+/**
+ * The same loop, awaited rather than backgrounded: the boot-chain shape, for
+ * a caller that must not return before the fleet stopped moving. Same
+ * convergence rule, abort handling and never-throws contract.
+ */
+export async function driveSystemMigrationsToConvergence({
   signal,
   runPass,
 }: {

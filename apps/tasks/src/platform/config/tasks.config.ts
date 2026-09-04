@@ -1,6 +1,7 @@
 import {
   Config,
   type ConfigValue,
+  environmentOneOrTrueSchema,
   objectStorageConfigDefinition,
   runtimeIdentityConfigDefinition,
   RuntimeConfig,
@@ -31,6 +32,15 @@ export const tasksConfigDefinition = RuntimeConfig.define({
   /** Consumed by `ModelProviderCredentialsMigrateTask`; absent means that
    * task refuses at run time rather than at catalogue construction. */
   credentialsSecret: Config.secret({ optional: true, env: "CREDENTIALS_SECRET" }),
+  /**
+   * Whether this is the managed cloud. The system-migration pass reads it to
+   * decide pacing: cloud is paced per organization by enrollment rows, a
+   * self-hosted installation admits every organization for every migration
+   * already released for self-hosting. Read through the shared
+   * `environmentOneOrTrueSchema` so this process spells the variable exactly
+   * the way the API and worker do.
+   */
+  isSaaS: Config.value(environmentOneOrTrueSchema, { env: "IS_SAAS" }),
   /** Comma-separated module specifiers loaded at boot; see task-modules-loader.ts. */
   taskModules: Config.value(z.string().optional(), { env: "LANGWATCH_TASK_MODULES" }),
   nodeEnvironment: runtimeIdentityConfigDefinition.nodeEnvironment,
