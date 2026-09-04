@@ -407,11 +407,25 @@ def test_registration_frame_carries_the_agent_options():
             "type": "object",
             "properties": {"plan": {"type": "string", "default": "free"}},
         },
-        "concurrency": 4,
+        "concurrency": 10,
         "timeoutMs": 300000,
         "sticky": True,
     }
-    assert ConnectedAgent(agent, name="dev", environment="development").concurrency == 1
+
+
+# @scenario "A connected agent takes ten calls at once unless told otherwise"
+def test_concurrency_defaults_to_ten_in_every_environment():
+    def agent(messages):
+        return "ok"
+
+    assert (
+        ConnectedAgent(agent, name="dev", environment="development").concurrency == 10
+    )
+    assert (
+        ConnectedAgent(agent, name="prod", environment="production").concurrency == 10
+    )
+    assert ConnectedAgent(agent, name="dev", concurrency=3).concurrency == 3
+    assert ConnectedAgent(agent, name="dev", concurrency=0).concurrency == 10
 
 
 def test_langwatch_exports_the_decorator_surface():
