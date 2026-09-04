@@ -31,6 +31,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   collectGoBindings,
+  collectMalformedJsdocAnnotations,
   discoverFeatureFiles,
   findScenarioAnnotations,
   formatFailureBanner,
@@ -259,6 +260,111 @@ describe("discoverFeatureFiles", () => {
         expect(discoverFeatureFiles([specs]).length).toBe(1);
       });
     });
+  });
+});
+
+describe("collectMalformedJsdocAnnotations", () => {
+  it("reports a scenario tag embedded in a multi-line JSDoc block", () => {
+    const tests = join(root, "tests");
+    mkdirSync(tests);
+    writeFileSync(
+      join(tests, "parity.test.ts"),
+      [
+        "/**",
+        " * Explains the case.",
+        ' * @scenario "A scenario in a JSDoc body"',
+        " */",
+        'it("covers the case", () => {});',
+      ].join("\n"),
+      "utf8",
+    );
+
+    expect(collectMalformedJsdocAnnotations({ testRoots: [tests] })).toEqual([
+      expect.objectContaining({
+        title: "A scenario in a JSDoc body",
+        ref: expect.objectContaining({
+          file: expect.stringContaining("parity.test.ts"),
+          line: 3,
+        }),
+        reason: expect.stringContaining("put it on its own annotation line"),
+      }),
+    ]);
+  });
+
+  it("reports an unquoted scenario tag embedded in a multi-line JSDoc block", () => {
+    const tests = join(root, "tests");
+    mkdirSync(tests);
+    writeFileSync(
+      join(tests, "parity.test.ts"),
+      [
+        "/**",
+        " * @scenario A bare scenario title",
+        " */",
+        'it("covers the case", () => {});',
+      ].join("\n"),
+      "utf8",
+    );
+
+    expect(collectMalformedJsdocAnnotations({ testRoots: [tests] })).toEqual([
+      expect.objectContaining({
+        title: "A bare scenario title",
+        ref: expect.objectContaining({ line: 2 }),
+      }),
+    ]);
+  });
+
+  it("reports a titleless scenario tag embedded in a multi-line JSDoc block", () => {
+    const tests = join(root, "tests");
+    mkdirSync(tests);
+    writeFileSync(
+      join(tests, "parity.test.ts"),
+      [
+        "/**",
+        " * @scenario",
+        " */",
+        'it("covers the case", () => {});',
+      ].join("\n"),
+      "utf8",
+    );
+
+    expect(collectMalformedJsdocAnnotations({ testRoots: [tests] })).toEqual([
+      expect.objectContaining({
+        title: "",
+        ref: expect.objectContaining({ line: 2 }),
+        reason: expect.stringContaining(
+          "put it on its own annotation line directly above the test",
+        ),
+      }),
+    ]);
+  });
+
+  it("ignores JSDoc examples inside template strings", () => {
+    const tests = join(root, "tests");
+    mkdirSync(tests);
+    writeFileSync(
+      join(tests, "parity.test.ts"),
+      [
+        "const example = `/**",
+        " * @scenario \\\"not a real annotation\\\"",
+        " */`;",
+        'it("covers the case", () => {});',
+      ].join("\n"),
+      "utf8",
+    );
+
+    expect(collectMalformedJsdocAnnotations({ testRoots: [tests] })).toEqual([]);
+  });
+
+  it("does not report the supported single-line JSDoc form", () => {
+    const tests = join(root, "tests");
+    mkdirSync(tests);
+    writeFileSync(
+      join(tests, "parity.test.ts"),
+      '/** @scenario "A supported annotation" */\nit("covers the case", () => {});',
+      "utf8",
+    );
+
+    expect(collectMalformedJsdocAnnotations({ testRoots: [tests] })).toEqual([]);
   });
 });
 

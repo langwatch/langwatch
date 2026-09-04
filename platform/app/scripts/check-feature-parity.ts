@@ -700,6 +700,12 @@ interface UnknownAnnotation {
   ref: BindingRef;
 }
 
+export interface MalformedAnnotation {
+  title: string;
+  ref: BindingRef;
+  reason: string;
+}
+
 export interface CollectedBinding {
   title: string;
   ref: BindingRef;
@@ -945,6 +951,52 @@ export function findScenarioAnnotations(
   return found;
 }
 
+const JSDOC_ANNOTATION_LINE_RE =
+  /^[ \t]*\*[ \t]*@scenario(?:[ \t]+(?:"([^"\r\n]+)"|'([^'\r\n]+)'|([^*\r\n]+?)))?[ \t]*(?:\r)?$/;
+
+function collectJsdocBlocks({
+  src,
+}: {
+  src: string;
+}): Array<{ text: string; index: number }> {
+  const blocks: Array<{ text: string; index: number }> = [];
+  let i = 0;
+  while (i < src.length) {
+    const ch = src[i];
+    if (ch === "'" || ch === '"' || ch === "`") {
+      const quote = ch;
+      i++;
+      while (i < src.length) {
+        if (src[i] === "\\") {
+          i += 2;
+        } else if (src[i] === quote) {
+          i++;
+          break;
+        } else {
+          i++;
+        }
+      }
+      continue;
+    }
+    if (ch === "/" && src[i + 1] === "/") {
+      const newline = src.indexOf("\n", i + 2);
+      i = newline === -1 ? src.length : newline + 1;
+      continue;
+    }
+    if (ch === "/" && src[i + 1] === "*") {
+      const end = src.indexOf("*/", i + 2);
+      if (end === -1) break;
+      if (src[i + 2] === "*") {
+        blocks.push({ text: src.slice(i, end + 2), index: i });
+      }
+      i = end + 2;
+      continue;
+    }
+    i++;
+  }
+  return blocks;
+}
+
 function isFollowedByTestCall(src: string, start: number): boolean {
   const len = src.length;
   let i = start;
@@ -971,6 +1023,44 @@ function isFollowedByTestCall(src: string, start: number): boolean {
     return m !== null;
   }
   return false;
+}
+
+export function collectMalformedJsdocAnnotations({
+  testRoots,
+}: {
+  testRoots: string[];
+}): MalformedAnnotation[] {
+  const malformed: MalformedAnnotation[] = [];
+  const files: string[] = [];
+  for (const r of testRoots) {
+    files.push(
+      ...walkFiles(resolve(REPO_ROOT, r), (n) => TEST_FILE_RE.test(n)),
+    );
+  }
+
+  for (const file of files) {
+    const src = readFileSync(file, "utf8");
+    for (const block of collectJsdocBlocks({ src })) {
+      const blockStartLine = src.slice(0, block.index).split("\n").length;
+      const lines = block.text.split("\n");
+      for (const [lineIndex, lineText] of lines.entries()) {
+        const match = lineText.match(JSDOC_ANNOTATION_LINE_RE);
+        if (!match) continue;
+        const title = (match[1] ?? match[2] ?? match[3] ?? "").trim();
+        malformed.push({
+          title,
+          ref: {
+            file: relative(REPO_ROOT, file),
+            line: blockStartLine + lineIndex,
+          },
+          reason:
+            "@scenario is inside a multi-line JSDoc block; put it on its own annotation line directly above the test",
+        });
+      }
+    }
+  }
+
+  return malformed;
 }
 
 function collectAllBindings(testRoots: string[]): CollectedBinding[] {
@@ -1626,6 +1716,16 @@ function printUnknownAnnotations(unknown: UnknownAnnotation[]): void {
   for (const line of formatUnknownAnnotations(unknown)) console.log(line);
 }
 
+function printMalformedAnnotations(malformed: MalformedAnnotation[]): void {
+  if (malformed.length === 0) return;
+  console.log(`\nMalformed @scenario annotations:`);
+  for (const a of malformed) {
+    console.log(`  ✗ @scenario "${a.title}"`);
+    console.log(`    ${a.ref.file}:${a.ref.line}`);
+    console.log(`    ${a.reason}`);
+  }
+}
+
 function validateExemptionList({
   name,
   entries,
@@ -1677,6 +1777,7 @@ interface ParityAnalysis {
   staleLegacy: LegacyReport[];
   staleInert: string[];
   unknownAnnotations: UnknownAnnotation[];
+  malformedAnnotations: MalformedAnnotation[];
   listErrors: string[];
 }
 
@@ -1714,6 +1815,9 @@ function analyzeParity(): ParityAnalysis {
   const unknownAnnotations: UnknownAnnotation[] = bindings
     .filter((b) => !allKnownTitles.has(b.title))
     .map((b) => ({ title: b.title, ref: b.ref }));
+  const malformedAnnotations = collectMalformedJsdocAnnotations({
+    testRoots: [...DEFAULT_TEST_ROOTS],
+  });
 
   const legacySet = new Set(LEGACY_UNBOUND);
   const enforced: Report[] = [];
@@ -1749,6 +1853,7 @@ function analyzeParity(): ParityAnalysis {
       (f) => allFeatures.includes(f) && !inertFeatures.has(f),
     ),
     unknownAnnotations,
+    malformedAnnotations,
     listErrors,
   };
 }
@@ -1773,6 +1878,7 @@ function printParityReport(a: ParityAnalysis): void {
   printInertSummary(a.exemptInert);
   printNewInert(a.newInert);
   printUnknownAnnotations(a.unknownAnnotations);
+  printMalformedAnnotations(a.malformedAnnotations);
 }
 
 /**
@@ -1789,6 +1895,11 @@ function fatalReasons(a: ParityAnalysis): string[] {
   }
   if (a.unknownAnnotations.length > 0) {
     reasons.push(`${a.unknownAnnotations.length} unknown annotation(s)`);
+  }
+  if (a.malformedAnnotations.length > 0) {
+    reasons.push(
+      `${a.malformedAnnotations.length} malformed annotation(s) inside multi-line JSDoc blocks`,
+    );
   }
   if (a.staleLegacy.length > 0) {
     reasons.push(
@@ -1846,6 +1957,7 @@ function main(): void {
           enforced: analysis.enforced,
           legacy: analysis.legacy,
           unknownAnnotations: analysis.unknownAnnotations,
+          malformedAnnotations: analysis.malformedAnnotations,
           listErrors: analysis.listErrors,
           staleLegacy: analysis.staleLegacy.map((r) => r.feature),
           inert: analysis.exemptInert,
