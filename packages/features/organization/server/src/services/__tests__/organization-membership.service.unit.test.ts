@@ -599,6 +599,31 @@ describe("OrganizationMembershipService", () => {
     });
   });
 
+  describe("when listing members of an organization over a lapsed license's seats", () => {
+    /** @scenario "Nobody loses their seat on the day a license lapses" */
+    it("returns every member still active without ever consulting the seat license", async () => {
+      const members = [
+        { userId: "user-1", role: OrganizationUserRole.MEMBER, disabledAt: null },
+        { userId: "user-2", role: OrganizationUserRole.MEMBER, disabledAt: null },
+      ];
+      vi.mocked(mockRepo.findAllMembers).mockResolvedValue({
+        members: members as never,
+        totalCount: members.length,
+      });
+      // Over-seats: a lapsed license for fewer members than the organization
+      // already holds. A read must not consult this at all.
+      mockCheckLimit.mockResolvedValue({ allowed: false });
+
+      const result = await service.listMembers({ organizationId: "org-123" });
+
+      expect(result.members.every((member) => (member as { disabledAt: null }).disabledAt === null)).toBe(
+        true,
+      );
+      expect(mockCheckLimit).not.toHaveBeenCalled();
+      expect(mockRepo.setMemberDisabled).not.toHaveBeenCalled();
+    });
+  });
+
   describe("updateTeamMemberRole", () => {
     beforeEach(() => {
       vi.mocked(mockRepo.updateTeamMemberRole).mockResolvedValue(undefined);

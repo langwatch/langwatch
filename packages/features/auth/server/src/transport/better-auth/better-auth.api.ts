@@ -193,7 +193,7 @@ function refusesCredentialRoute({
  * construction. Factor plugins are selected for that instance so importing
  * this module cannot register process behavior.
  */
-const createAuthOptions = ({
+export const createAuthOptions = ({
   prisma,
   deployment,
   storage,
