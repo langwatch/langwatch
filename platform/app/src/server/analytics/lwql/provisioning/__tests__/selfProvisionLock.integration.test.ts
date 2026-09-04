@@ -52,13 +52,13 @@ describe("Feature: LangWatchQL self-provision boot lock", () => {
       // pg_advisory_xact_lock until the first commits and releases.
       expect(maxInFlight).toBe(1);
       // One body fully finishes before the other starts — no interleaving.
-      expect(order).toEqual([
-        order[0],
-        order[0]?.replace("enter", "exit"),
-        order[2],
-        order[2]?.replace("enter", "exit"),
-      ]);
-      expect(order[0]).not.toBe(order[2]);
+      // Which of "a"/"b" wins the lock race is nondeterministic, so either
+      // fully-serialized order is legal; anything interleaved is not.
+      expect(order).toEqual(
+        order[0] === "enter:a"
+          ? ["enter:a", "exit:a", "enter:b", "exit:b"]
+          : ["enter:b", "exit:b", "enter:a", "exit:a"],
+      );
     });
   });
 

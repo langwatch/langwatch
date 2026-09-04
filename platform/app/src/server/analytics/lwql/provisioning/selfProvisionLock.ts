@@ -47,16 +47,23 @@ export const LWQL_SELF_PROVISION_LOCK_KEY = "lwql:self-provision";
 
 /**
  * Max wall-clock the locked transaction may run before Prisma aborts it with
- * P2028 — the wait for the lock included. Sized larger than the dataset lock's
- * 120s: the body under the lock spans a queue of PostgreSQL DDL statements AND
- * a full round of ClickHouse access-model DDL (drop/recreate user, mapped
- * PostgreSQL-engine tables, grants, row policies) plus a key-map backfill over
- * every project, each a network round-trip to a possibly-external ClickHouse.
- * When N pods boot together the tail pod waits through (N-1) full convergences
- * before its own, so the budget must cover the queue, not just one pass. Prisma's
- * 5s interactive-txn default would P2028 the moment two pods contend. 300s
- * bounds a genuinely wedged transaction while giving a slow external ClickHouse
- * ample headroom.
+ * P2028 — the wait for the lock included. Sized larger than the dataset
+ * lock's 120s: the body under the lock spans a queue of PostgreSQL DDL
+ * statements AND a full round of ClickHouse access-model DDL (drop/recreate
+ * user, mapped PostgreSQL-engine tables, grants, row policies) plus a
+ * key-map backfill over every project, each a network round-trip to a
+ * possibly-external ClickHouse.
+ *
+ * This budget bounds ONE pod's own wait-plus-run; it does NOT need to cover
+ * an unbounded queue of other pods' convergences. If N pods boot together, a
+ * tail pod that P2028s while still waiting for the lock is harmless: the
+ * pod already holding the lock (or one ahead of it) completes the
+ * convergence, every generator's DDL is idempotent, so that run alone
+ * leaves the system fully converged. The timed-out pod simply skips running
+ * it itself — nothing is lost, and the next boot (or the next self-provision
+ * trigger) retries cheaply against already-converged state. The timeout
+ * exists to bound an individual pod's wait, not to guarantee every pod gets
+ * to run the convergence.
  */
 export const LWQL_SELF_PROVISION_TXN_TIMEOUT_MS = 300_000;
 
@@ -80,12 +87,24 @@ export const LWQL_SELF_PROVISION_TXN_MAX_WAIT_MS = 30_000;
  * doc-comment). Whatever `fn` throws propagates out of the `$transaction` and
  * must be caught by the caller's existing non-fatal handler so a provisioning
  * failure never crashes the boot.
+ *
+ * REQUIRES a connection pool of at least 2 (`?connection_limit=2` or higher
+ * on DATABASE_URL, or the driver's default — Prisma's classic engine
+ * defaults to `cpus * 2 + 1`, well above 2). With `connection_limit=1`, `tx`
+ * pins the pool's one connection for the lock's whole lifetime, and `fn`'s
+ * work on the global `prisma` client then has no connection left to borrow —
+ * it waits on the same pool the lock is holding, a self-deadlock that only
+ * resolves when this transaction times out (P2028) at
+ * `LWQL_SELF_PROVISION_TXN_TIMEOUT_MS`. `checkPoolSizeForSelfProvisionLock`
+ * below fails fast with a clear error instead of that 300s hang whenever
+ * DATABASE_URL's `connection_limit` is explicitly set to 1.
  */
 export const withLwqlSelfProvisionLock = async <T>(
   { prisma }: { prisma: PrismaClient },
   fn: () => Promise<T>,
-): Promise<T> =>
-  prisma.$transaction(
+): Promise<T> => {
+  checkPoolSizeForSelfProvisionLock(process.env.DATABASE_URL);
+  return prisma.$transaction(
     async (tx) => {
       // `$executeRaw`, not `$queryRaw`: pg_advisory_xact_lock returns `void`,
       // which $queryRaw cannot deserialize. $executeRaw runs the statement and
@@ -94,6 +113,18 @@ export const withLwqlSelfProvisionLock = async <T>(
       // as in dataset-lock.ts.
       await tx.$executeRaw`-- @tenancy: global self-provision boot lock, no tenant scope
 SELECT pg_advisory_xact_lock(hashtextextended(${LWQL_SELF_PROVISION_LOCK_KEY}, 0))`;
+      // The lock session would otherwise sit `idle in transaction` for the
+      // whole (possibly minutes-long) convergence in `fn` below — it does
+      // real work on OTHER connections (the global `prisma` client, a
+      // separate ClickHouse client), not on `tx`. An operator-set
+      // `idle_in_transaction_session_timeout` measures exactly that idle
+      // time and would kill this session mid-convergence, silently
+      // releasing the advisory lock and letting a second pod race in while
+      // the first is still mutating the ClickHouse access model. `SET
+      // LOCAL` scopes the override to this transaction only, so it never
+      // weakens the setting anywhere else.
+      await tx.$executeRaw`-- @tenancy: global self-provision boot lock session setting, no tenant scope
+SET LOCAL idle_in_transaction_session_timeout = 0`;
       return fn();
     },
     {
@@ -101,3 +132,35 @@ SELECT pg_advisory_xact_lock(hashtextextended(${LWQL_SELF_PROVISION_LOCK_KEY}, 0
       maxWait: LWQL_SELF_PROVISION_TXN_MAX_WAIT_MS,
     },
   );
+};
+
+/**
+ * Fails fast when DATABASE_URL explicitly caps the pool at 1 connection —
+ * see the `REQUIRES a connection pool of at least 2` note above. Only acts
+ * on an explicit `connection_limit=1`; an absent or unparsable param is left
+ * alone (the driver's own default is never 1). Cheap and dependency-free: a
+ * bare `URL`/`URLSearchParams` parse, no new import.
+ */
+export function checkPoolSizeForSelfProvisionLock(
+  databaseUrl: string | undefined,
+): void {
+  if (!databaseUrl) return;
+  let connectionLimit: string | null;
+  try {
+    connectionLimit = new URL(databaseUrl).searchParams.get(
+      "connection_limit",
+    );
+  } catch {
+    return;
+  }
+  if (connectionLimit === "1") {
+    throw new Error(
+      "LWQL self-provision lock requires a connection pool of at least 2 " +
+        "(DATABASE_URL has connection_limit=1). With a pool of 1, the " +
+        "advisory-lock transaction pins the only connection and the " +
+        "convergence body — which runs on a separate pool checkout — can " +
+        "never acquire one, self-deadlocking until the transaction times " +
+        "out. Raise connection_limit to 2 or more.",
+    );
+  }
+}

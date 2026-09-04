@@ -25,17 +25,17 @@
 import { describe, expect, it } from "vitest";
 import { LWQL_VIEW_CATALOG } from "../../catalog/lwqlViews";
 import { lwqlPostgresViews } from "../../catalog/types";
-import { productionLangWatchQLNames } from "../productionProvisioning";
+import { lwqlDerivedConnectionFromEnv } from "../../connection";
 import { qualified } from "../accessModel";
+import { lwqlSourceTables } from "../catalogStatements";
+import { productionLangWatchQLNames } from "../productionProvisioning";
 import {
   LWQL_SELF_PROVISION_DEFAULTS,
-  lwqlDerivedConnectionFromEnv,
   lwqlPostgresEndpointFromDatabaseUrl,
   lwqlSelfProvisionFromEnv,
   selfHostedClickHouseProvisioningStatements,
   selfHostedPostgresReaderStatements,
 } from "../selfProvisioning";
-import { lwqlSourceTables } from "../catalogStatements";
 
 // Single character class, reused rather than interpolated into a pattern:
 // building a RegExp out of an identifier means escaping it, and a hand-rolled

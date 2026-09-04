@@ -25,7 +25,7 @@
  * much of it is handed back — and never about relaxing what the database will
  * do.
  *
- * @see ./provisioning.ts — the identity, the profile, and the key map
+ * @see ./provisioning/accessModel.ts — the identity, the profile, and the key map
  * @see ./capability.ts — the value sent as the tenant setting
  * @see specs/analytics/lwql-api.feature
  */
@@ -40,13 +40,15 @@ import {
   unknownIdentifierFromError,
 } from "~/server/app-layer/clients/clickhouse/translate-query-error";
 import { toError } from "~/utils/posthogErrorCapture";
-
+import {
+  type LangWatchQLConnection,
+  lwqlDerivedConnectionFromEnv,
+} from "./connection";
 import {
   LangWatchQLUnavailableError,
   LangWatchQLUnknownIdentifierError,
 } from "./errors";
-import { DEFAULT_LWQL_RESOURCE_LIMITS } from "./provisioning/accessModel";
-import { lwqlDerivedConnectionFromEnv } from "./provisioning/selfProvisioning";
+import { DEFAULT_LWQL_RESOURCE_LIMITS } from "./limits";
 
 const logger = createLogger("langwatch:analytics:lwql:executor");
 
@@ -133,19 +135,6 @@ export interface LangWatchQLExecutor {
    * same server for the lifetime of the process.
    */
   close?(): Promise<void>;
-}
-
-/** How to reach the LangWatchQL schema as the restricted identity. */
-export interface LangWatchQLConnection {
-  /** ClickHouse HTTP endpoint. */
-  readonly url: string;
-  /** The restricted identity — never an administrative account. */
-  readonly username: string;
-  readonly password: string;
-  /** Database an unqualified table name resolves to, i.e. the LangWatchQL one. */
-  readonly database: string;
-  /** Custom setting carrying the tenant capability, per the settings profile. */
-  readonly tenantSetting: string;
 }
 
 /**

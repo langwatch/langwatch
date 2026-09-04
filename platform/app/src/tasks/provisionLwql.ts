@@ -35,28 +35,24 @@ import { createLogger } from "@langwatch/observability";
 import { lwqlConnectionFromEnv } from "../server/analytics/lwql/executor";
 import { LWQL_KEY_MAP_INSERT_SETTINGS } from "../server/analytics/lwql/lwqlKeyMap.repository";
 import {
+  KEY_MAP_COLUMNS,
+  type LangWatchQLNames,
   type LwqlKeyMapBackfillPlan,
+  type LwqlSelfProvisionEnv,
   lwqlKeyMapTableQualifiedName,
+  lwqlPostgresEndpointFromDatabaseUrl,
   lwqlPostgresSchemaFromDatabaseUrl,
+  lwqlSelfProvisionFromEnv,
   planLwqlKeyMapBackfill,
   productionClickHouseObjectStatements,
   productionLangWatchQLNames,
   productionPostgresApprovedViewStatements,
   productionPostgresReaderGrantStatements,
-  withTenancyOptOut,
-} from "../server/analytics/lwql/provisioning/productionProvisioning";
-import {
-  KEY_MAP_COLUMNS,
-  type LangWatchQLNames,
-} from "../server/analytics/lwql/provisioning/accessModel";
-import {
-  type LwqlSelfProvisionEnv,
-  lwqlPostgresEndpointFromDatabaseUrl,
-  lwqlSelfProvisionFromEnv,
   selfHostedClickHouseProvisioningStatements,
   selfHostedPostgresReaderStatements,
-} from "../server/analytics/lwql/provisioning/selfProvisioning";
-import { withLwqlSelfProvisionLock } from "../server/analytics/lwql/provisioning/selfProvisionLock";
+  withLwqlSelfProvisionLock,
+  withTenancyOptOut,
+} from "../server/analytics/lwql/provisioning";
 import { parseConnectionUrl } from "../server/clickhouse/goose";
 import { prisma } from "../server/db";
 

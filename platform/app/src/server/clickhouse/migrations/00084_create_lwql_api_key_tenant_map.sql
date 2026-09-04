@@ -17,7 +17,7 @@
 -- queried directly and bypasses row policies entirely, which would turn this
 -- mapping into a cross-tenant oracle. A restricted LangWatchQL identity is
 -- never granted anything beyond SELECT on its own row-filtered view of this
--- table (see ../analytics/lwql/provisioning.ts).
+-- table (see ../analytics/lwql/provisioning/accessModel.ts).
 --
 -- Uniqueness is enforced at READ time, not by this table or its engine: a
 -- row filter checks `HAVING uniqExact(TenantId) = 1` for the hash in scope,

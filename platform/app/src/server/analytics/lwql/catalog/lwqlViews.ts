@@ -66,7 +66,7 @@
  * one key are summed rather than superseded — which their entries declare,
  * because reading one as if it had versions would expose each unmerged partial
  * row as its own answer. Their measures declare `summed` and the cast back to a
- * plain type is derived from it. See `../views.ts` for how, and for the
+ * plain type is derived from it. See `../provisioning/catalogStatements.ts` for how, and for the
  * measurement behind the default.
  *
  * @see ./types.ts — the shapes, and the derivations the validator reads
@@ -1678,8 +1678,8 @@ const EVALUATION_METRICS_BY_MINUTE: LangWatchQLViewDefinition = {
  * One catalog rather than two, because residence is a property of a dataset and
  * not a property of the schema. Every consumer — the schema endpoint, the
  * validator, the diagnostics — reads this list and needs no idea which half an
- * entry came from; only the provisioning generators in `../views.ts` and
- * `../provisioning.ts` ask, and they ask the entry
+ * entry came from; only the provisioning generators in `../provisioning/catalogStatements.ts` and
+ * `../provisioning/accessModel.ts` ask, and they ask the entry
  * ({@link isPostgresResident}) rather than being told.
  *
  * Generations and sessions remain unexposed: both are derivable from `spans`

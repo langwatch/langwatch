@@ -33,12 +33,12 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { LWQL_VIEW_CATALOG } from "../catalog/lwqlViews";
 import { lwqlPostgresViews } from "../catalog/types";
-import { DEFAULT_POSTGRES_ENGINE_POOL_SIZE } from "../provisioning/postgresMapping";
 import {
   lwqlPostgresReaderConnectionLimit,
   lwqlViewSetupStatements,
   SHIPPED_LWQL_DEDUP,
 } from "../provisioning/catalogStatements";
+import { DEFAULT_POSTGRES_ENGINE_POOL_SIZE } from "../provisioning/postgresMapping";
 import {
   CLICKHOUSE_ERROR_CODE,
   expectClickHouseError,
@@ -682,7 +682,7 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
      * The bug this pins: the key map is `ORDER BY KeyHash` with no uniqueness
      * enforced, so a retried provisioning step or a re-issued key can leave two
      * rows the key map's own self-policy admits for the same hash. The LangWatchQL
-     * view's tenant predicate (`postgresTenantPredicate` in `../views.ts`) is a
+     * view's tenant predicate (`postgresTenantPredicate` in `../provisioning/catalogStatements.ts`) is a
      * scalar subquery over exactly that self-policed read — before its
      * `LIMIT 1`, two admitted rows made the subquery return two rows and
      * ClickHouse rejected the whole read with

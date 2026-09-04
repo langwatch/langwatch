@@ -26,7 +26,7 @@ import {
 } from "../../../data-privacy/dataPrivacy.types";
 import { CONTENT_KEY_CATALOG } from "../../../data-privacy/dropKeyCatalog";
 import type { FieldProtection } from "../../../traces/projection/catalog";
-import { clickHouseLiteral } from "../provisioning/sqlText";
+import { clickHouseLiteral } from "../sqlText";
 
 /**
  * Which read-time gate governs each data-privacy content category.

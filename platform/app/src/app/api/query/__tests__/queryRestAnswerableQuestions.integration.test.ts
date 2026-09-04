@@ -58,7 +58,7 @@ import {
 import {
   lwqlViewSetupStatements,
   SHIPPED_LWQL_DEDUP,
-} from "~/server/analytics/lwql/provisioning/catalogStatements";
+} from "~/server/analytics/lwql/provisioning";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import {

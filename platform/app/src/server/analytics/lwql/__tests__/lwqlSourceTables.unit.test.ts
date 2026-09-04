@@ -9,8 +9,8 @@
  * dedup key can be wrong and every one of them stays green. This file varies
  * the one input that exposes it.
  *
- * @see ../views.ts — the function under test
- * @see ../provisioning.ts — LangWatchQLTable, and the policy built from it
+ * @see ../provisioning/catalogStatements.ts — the function under test
+ * @see ../provisioning/accessModel.ts — LangWatchQLTable, and the policy built from it
  */
 
 import { describe, expect, it } from "vitest";

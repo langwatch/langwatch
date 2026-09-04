@@ -12,26 +12,9 @@
  * everywhere. One implementation means one place a reviewer has to look and one
  * place a test can pin.
  *
- * @see ./accessModel.ts — the access model, as statements
- * @see ./catalogStatements.ts — the `analytics.*` views, as statements
+ * @see ./provisioning/accessModel.ts — the access model, as statements
+ * @see ./provisioning/catalogStatements.ts — the `analytics.*` views, as statements
  */
-
-/**
- * Longest statement any LangWatchQL surface accepts.
- *
- * A shape ceiling rather than a cost one — the cost ceilings are pinned
- * server-side by the settings profile. It exists so that pathological input is
- * refused before it reaches a parser fed attacker-controlled text, and it sits
- * far above any query the LangWatchQL catalog's analytical shapes produce.
- *
- * One constant rather than one per surface, because the surfaces are not
- * independent: a statement the workbench will run has to be one the workbench
- * can save, and a saved chart has to be one the query endpoint will accept. Two
- * numbers that agree today are two numbers that can disagree later, and the
- * failure that produces — a query that runs but cannot be stored — surfaces to
- * a member as the product losing their work.
- */
-export const MAX_LWQL_LENGTH = 50_000;
 
 /**
  * Identifier shape both ClickHouse and PostgreSQL accept unquoted.

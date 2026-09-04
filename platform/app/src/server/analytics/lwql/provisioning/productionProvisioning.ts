@@ -27,13 +27,13 @@ import { lwqlTenantCapability } from "../capability";
 import { LWQL_VIEW_CATALOG } from "../catalog/lwqlViews";
 import type { LangWatchQLViewDefinition } from "../catalog/types";
 import { isPostgresResident } from "../catalog/types";
-import type { LangWatchQLConnection } from "../executor";
+import type { LangWatchQLConnection } from "../connection";
+import { postgresLiteral, postgresQuoted } from "../sqlText";
 import {
   KEY_MAP_COLUMNS,
   type LangWatchQLNames,
   qualified,
 } from "./accessModel";
-import { postgresLiteral, postgresQuoted } from "./sqlText";
 import {
   lwqlApprovedPostgresViewNames,
   lwqlPostgresApprovedViewStatements,

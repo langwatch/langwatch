@@ -19,7 +19,7 @@
  *    of turning the schema endpoint into a liar.
  *
  * @see specs/analytics/lwql-api.feature
- * @see ../views.ts — the statements under proof
+ * @see ../catalogStatements.ts — the statements under proof
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
@@ -27,29 +27,6 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { CONTENT_CATEGORIES } from "../../../../data-privacy/dataPrivacy.types";
 import { CONTENT_KEY_CATALOG } from "../../../../data-privacy/dropKeyCatalog";
-import { LWQL_VIEW_CATALOG } from "../../catalog/lwqlViews";
-import {
-  isContentGated,
-  isPostgresResident,
-  type LangWatchQLDedupStrategy,
-  lwqlAllowedTables,
-  lwqlGatedColumns,
-  lwqlGrainColumns,
-} from "../../catalog/types";
-import {
-  definerViewAuditQuery,
-  dropLangWatchQLRowPolicyStatement,
-  lwqlPolicyCoverageQuery,
-  lwqlRowPolicyStatement,
-} from "../accessModel";
-import { validateLangWatchQL } from "../../validation/validate";
-import {
-  lwqlGrantedSourceColumns,
-  lwqlSourceTables,
-  lwqlViewSetupStatements,
-  lwqlViewStatement,
-  SHIPPED_LWQL_DEDUP,
-} from "../catalogStatements";
 import {
   CLICKHOUSE_ERROR_CODE,
   DEDUP_FIXTURE,
@@ -75,6 +52,29 @@ import {
   startLangWatchQLClickHouse,
   startLangWatchQLPostgres,
 } from "../../__tests__/lwqlClickHouseHarness";
+import { LWQL_VIEW_CATALOG } from "../../catalog/lwqlViews";
+import {
+  isContentGated,
+  isPostgresResident,
+  type LangWatchQLDedupStrategy,
+  lwqlAllowedTables,
+  lwqlGatedColumns,
+  lwqlGrainColumns,
+} from "../../catalog/types";
+import { validateLangWatchQL } from "../../validation/validate";
+import {
+  definerViewAuditQuery,
+  dropLangWatchQLRowPolicyStatement,
+  lwqlPolicyCoverageQuery,
+  lwqlRowPolicyStatement,
+} from "../accessModel";
+import {
+  lwqlGrantedSourceColumns,
+  lwqlSourceTables,
+  lwqlViewSetupStatements,
+  lwqlViewStatement,
+  SHIPPED_LWQL_DEDUP,
+} from "../catalogStatements";
 
 /** A column no view exposes, so the grant must make it unreachable. */
 const OFF_CATALOG_COLUMN = "ProjectionId";

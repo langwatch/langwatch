@@ -43,7 +43,7 @@
  * reaching one.
  *
  * @see ./types.ts — the shapes
- * @see ../provisioning.ts — the approved views, the engine tables and the role
+ * @see ../provisioning/accessModel.ts — the approved views, the engine tables and the role
  * @see specs/analytics/lwql-api.feature
  */
 

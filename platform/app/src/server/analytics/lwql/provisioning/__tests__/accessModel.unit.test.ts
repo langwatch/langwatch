@@ -9,15 +9,15 @@
  * a ceiling stops being pinned, which is the change that would otherwise ship
  * silently.
  *
- * @see ../provisioning.ts — the statements under test
+ * @see ../accessModel.ts — the statements under test
  * @see specs/analytics/lwql-api.feature
  */
 
 import { describe, expect, it } from "vitest";
 
+import { DEFAULT_LWQL_RESOURCE_LIMITS } from "../../limits";
 import {
   clickHouseAccessManagementConfigXml,
-  DEFAULT_LWQL_RESOURCE_LIMITS,
   type LangWatchQLNames,
   lwqlKeyMapTableStatement,
   lwqlRowPolicyStatement,

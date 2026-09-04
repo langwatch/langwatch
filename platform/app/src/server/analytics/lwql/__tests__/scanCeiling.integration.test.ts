@@ -21,7 +21,7 @@
  *    different limits, not by a hand-written `CREATE SETTINGS PROFILE` — a
  *    proof that transcribes the thing it guards proves the transcription.
  *
- * @see ../provisioning.ts — the profile that pins the ceilings
+ * @see ../provisioning/accessModel.ts — the profile that pins the ceilings
  * @see specs/analytics/lwql-api.feature
  */
 
@@ -35,8 +35,8 @@ import {
 import {
   DEFAULT_LWQL_RESOURCE_LIMITS,
   type LangWatchQLResourceLimits,
-  lwqlClickHouseSetupStatements,
-} from "../provisioning/accessModel";
+} from "../limits";
+import { lwqlClickHouseSetupStatements } from "../provisioning/accessModel";
 import {
   type LangWatchQLClickHouseHarness,
   recordSeedControl,

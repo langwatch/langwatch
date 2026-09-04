@@ -32,7 +32,7 @@
  * statement here fails with UNKNOWN_SETTING (115).
  *
  * Every name emitted below is interpolated into SQL text, so it goes through
- * `./sqlText.ts`: `assertIdentifier` for identifiers and the literal escapers
+ * `../sqlText.ts`: `assertIdentifier` for identifiers and the literal escapers
  * for values.
  *
  * Some LangWatchQL datasets live in PostgreSQL rather than ClickHouse. The access
@@ -40,11 +40,15 @@
  * `./postgresMapping.ts`.
  *
  * @see ./postgresMapping.ts — the PostgreSQL-resident datasets this model covers
- * @see ./sqlText.ts — the escaping and identifier rules these statements obey
+ * @see ../sqlText.ts — the escaping and identifier rules these statements obey
  * @see specs/analytics/lwql-api.feature
  */
 
-import { assertIdentifier, clickHouseLiteral } from "./sqlText";
+import {
+  DEFAULT_LWQL_RESOURCE_LIMITS,
+  type LangWatchQLResourceLimits,
+} from "../limits";
+import { assertIdentifier, clickHouseLiteral } from "../sqlText";
 
 /**
  * Server-level ClickHouse config declaring the `custom_` settings prefix.
@@ -156,62 +160,6 @@ export interface LangWatchQLTable {
    */
   database?: string;
 }
-
-/**
- * Ceilings pinned `CONST` by the profile.
- *
- * Belt and braces rather than the load-bearing control: `readonly = 1` already
- * rejects *every* setting change except the tenant capability, including
- * settings the profile never mentions. The `CONST` pins survive any future
- * relaxation of `readonly`.
- */
-export interface LangWatchQLResourceLimits {
-  maxExecutionTimeSeconds: number;
-  maxMemoryUsageBytes: number;
-  /** Per-query thread ceiling, so one LangWatchQL query cannot saturate the server's cores. */
-  maxThreads: number;
-  /**
-   * How many LangWatchQL queries the shared restricted identity may run at once.
-   *
-   * The only ceiling here that is not per-query, and the reason it exists: every
-   * other bound in this interface constrains a single statement and says nothing
-   * about N of them arriving together. Because one identity is shared by every
-   * LangWatchQL query, this is an aggregate bound on the whole API's load — the
-   * N+1th concurrent query is refused rather than admitted alongside the others.
-   */
-  maxConcurrentQueriesForUser: number;
-  /**
-   * Scan ceilings, enforced with `read_overflow_mode = 'throw'`: a query that
-   * would read past either bound fails instead of silently returning a partial
-   * result — partial data that looks complete is the worse failure for an
-   * analytics caller. The breach reaches the caller as a coded
-   * `query_scan_limit_exceeded`, mapped from TOO_MANY_ROWS (158) /
-   * TOO_MANY_BYTES (307) by
-   * `~/server/app-layer/clients/clickhouse/translate-query-error`.
-   */
-  maxRowsToRead: number;
-  maxBytesToRead: number;
-}
-
-/**
- * The shipped ceilings.
- *
- * `maxExecutionTimeSeconds` and `maxMemoryUsageBytes` were measured working
- * against `clickhouse/clickhouse-server:25.10.2.65`. The rest — the thread,
- * scan and concurrency ceilings — are conservative order-of-magnitude choices
- * rather than measurements: nothing has profiled where they should sit, and
- * they are set where a runaway query is refused without a realistic analytical
- * one noticing. That every one of them is *accepted* by that server version is
- * proven, by the integration suites provisioning this profile into a container.
- */
-export const DEFAULT_LWQL_RESOURCE_LIMITS: LangWatchQLResourceLimits = {
-  maxExecutionTimeSeconds: 10,
-  maxMemoryUsageBytes: 1_000_000_000,
-  maxThreads: 4,
-  maxConcurrentQueriesForUser: 10,
-  maxRowsToRead: 1_000_000_000,
-  maxBytesToRead: 10_000_000_000,
-};
 
 /**
  * Validates every configured name, and that the tenant setting carries the
