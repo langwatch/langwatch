@@ -4,20 +4,17 @@
  *
  * @see specs/traces-v2/sessions-lens.feature
  */
+import { VisibilityWindowService } from "../trace-visibility-window.service";
+import { TraceSessionGroupsCursorService } from "../trace-session-groups-cursor.service";
 import { describe, expect, it } from "vitest";
 import type {
   SessionGroupRow,
   SessionGroupsQuery,
   SessionGroupsRepository,
 } from "../../repositories/session-groups.repository";
-import {
-  decodeSessionGroupsCursor,
-  encodeSessionGroupsCursor,
-} from "../trace-session-groups-cursor.service";
 import type { CodingAgentSession } from "@langwatch/coding-agent-contract";
 import { codingAgentSessionFixture } from "@langwatch/coding-agent-contract/testing";
 import { SessionGroupsService } from "../trace-session-groups.service";
-import { teaserOf } from "../trace-visibility-window.service";
 import type { CodingAgentService } from "@langwatch/coding-agent-contract";
 
 /**
@@ -156,13 +153,19 @@ describe("session groups cursor codec", () => {
         conversationId: "s-1",
         ...CURSOR_SORT,
       };
-      expect(decodeSessionGroupsCursor(encodeSessionGroupsCursor(cursor))).toEqual(cursor);
+      expect(
+        TraceSessionGroupsCursorService.decodeSessionGroupsCursor(
+          TraceSessionGroupsCursorService.encodeSessionGroupsCursor(cursor),
+        ),
+      ).toEqual(cursor);
     });
 
     it("rejects malformed cursors", () => {
-      expect(() => decodeSessionGroupsCursor("not base64 json")).toThrow("Invalid sessions cursor");
       expect(() =>
-        decodeSessionGroupsCursor(
+        TraceSessionGroupsCursorService.decodeSessionGroupsCursor("not base64 json"),
+      ).toThrow("Invalid sessions cursor");
+      expect(() =>
+        TraceSessionGroupsCursorService.decodeSessionGroupsCursor(
           Buffer.from(JSON.stringify({ sortValue: "high" }), "utf8").toString("base64url"),
         ),
       ).toThrow("Invalid sessions cursor");
@@ -170,7 +173,7 @@ describe("session groups cursor codec", () => {
 
     it("rejects a cursor missing the sort it was minted under", () => {
       expect(() =>
-        decodeSessionGroupsCursor(
+        TraceSessionGroupsCursorService.decodeSessionGroupsCursor(
           Buffer.from(JSON.stringify({ sortValue: 1, conversationId: "s-1" }), "utf8").toString(
             "base64url",
           ),
@@ -412,11 +415,13 @@ describe("SessionGroupsService", () => {
 
       expect(result.sessions.map((s) => s.conversationId)).toEqual(["s-1", "s-2"]);
       expect(result.nextCursor).not.toBeNull();
-      expect(decodeSessionGroupsCursor(result.nextCursor!)).toEqual({
-        sortValue: 200,
-        conversationId: "s-2",
-        ...CURSOR_SORT,
-      });
+      expect(TraceSessionGroupsCursorService.decodeSessionGroupsCursor(result.nextCursor!)).toEqual(
+        {
+          sortValue: 200,
+          conversationId: "s-2",
+          ...CURSOR_SORT,
+        },
+      );
     });
 
     it("keys the cursor off the active sort dimension", async () => {
@@ -442,12 +447,14 @@ describe("SessionGroupsService", () => {
         column: "cost",
         direction: "desc",
       });
-      expect(decodeSessionGroupsCursor(result.nextCursor!)).toEqual({
-        sortValue: 5,
-        conversationId: "s-2",
-        sortColumn: "cost",
-        sortDirection: "desc",
-      });
+      expect(TraceSessionGroupsCursorService.decodeSessionGroupsCursor(result.nextCursor!)).toEqual(
+        {
+          sortValue: 5,
+          conversationId: "s-2",
+          sortColumn: "cost",
+          sortDirection: "desc",
+        },
+      );
     });
   });
 
@@ -481,7 +488,7 @@ describe("SessionGroupsService", () => {
         repository,
         codingAgentSessions: lookupReturning({}),
       });
-      const cursor = encodeSessionGroupsCursor({
+      const cursor = TraceSessionGroupsCursorService.encodeSessionGroupsCursor({
         sortValue: 5,
         conversationId: "s-2",
         sortColumn: "cost",
@@ -508,7 +515,7 @@ describe("SessionGroupsService", () => {
         repository,
         codingAgentSessions: lookupReturning({}),
       });
-      const cursor = encodeSessionGroupsCursor({
+      const cursor = TraceSessionGroupsCursorService.encodeSessionGroupsCursor({
         sortValue: 5,
         conversationId: "s-2",
         sortColumn: "cost",
@@ -578,7 +585,7 @@ describe("SessionGroupsService", () => {
       });
 
       const codingAgent = result.sessions[0]!.codingAgent!;
-      expect(codingAgent.title).toBe(teaserOf(title));
+      expect(codingAgent.title).toBe(VisibilityWindowService.teaserOf(title));
       expect(codingAgent.title).not.toBe(title);
       // Where the session ran is operational metadata, not conversation
       // content, so the window does not touch it.

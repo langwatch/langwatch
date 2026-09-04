@@ -1,3 +1,4 @@
+import { ClickHouseTraceQuerySubqueryAdapter } from "./trace-query-subquery.clickhouse.adapter";
 import {
   FilterFieldUnknownError,
   FilterParseError,
@@ -8,9 +9,8 @@ import {
   type TagToken,
   type UnaryOperatorToken,
 } from "@langwatch/trace-contract";
-import type { TranslationContext } from "./trace-query-evaluation.adapter";
+import type { TranslationContext } from "./trace-query-evaluation.types";
 import { FIELD_DEF_BY_NAME, KNOWN_FIELDS } from "./trace-query-fields.clickhouse.adapter";
-import { boundedSubquery } from "./trace-query-subquery.clickhouse.adapter";
 import {
   EVENT_ATTRIBUTE_PREFIX,
   EVENT_ATTRIBUTE_PREFIX_LEGACY,
@@ -18,7 +18,7 @@ import {
   SPAN_ATTRIBUTE_PREFIX,
   TRACE_ATTRIBUTE_PREFIX,
   TRACE_ATTRIBUTE_PREFIX_LEGACY,
-  TraceQueryValues,
+  TraceQueryValuesAdapter,
 } from "./trace-query-values.clickhouse.adapter";
 
 export const MAX_NODE_COUNT = 20;
@@ -35,8 +35,8 @@ const MAX_CONTENT_TERMS = 8;
  * A trace filter as ClickHouse SQL.
  *
  * The top of the query translator: it walks the filter tree and hands each
- * leaf to {@link TraceQueryTranslators}, which turns it into a predicate, with
- * {@link TraceQueryValues} binding whatever values ride along. Free text is
+ * leaf to {@link TraceQueryTranslatorsAdapter}, which turns it into a predicate, with
+ * {@link TraceQueryValuesAdapter} binding whatever values ride along. Free text is
  * pulled out separately because it is not a predicate on a field — it is a
  * search across several, and the terms have to be known before the SQL is
  * built.
@@ -44,7 +44,11 @@ const MAX_CONTENT_TERMS = 8;
  * Nine of the twelve steps here are the tree walk itself and were exported for
  * no reason; only the three entry points are anybody else's business.
  */
-export class TraceQueryClickHouse {
+export class TraceQueryClickHouseAdapter {
+  static create(): TraceQueryClickHouseAdapter {
+    return new TraceQueryClickHouseAdapter();
+  }
+
   /** Whether an OR joins any two branches of the query, at any depth. */
   private static containsOrOperator(node: LiqeQuery): boolean {
     switch (node.type) {
@@ -52,14 +56,14 @@ export class TraceQueryClickHouse {
         const logExpr = node as LogicalExpressionToken;
         return (
           logExpr.operator.operator === "OR" ||
-          TraceQueryClickHouse.containsOrOperator(logExpr.left) ||
-          TraceQueryClickHouse.containsOrOperator(logExpr.right)
+          TraceQueryClickHouseAdapter.containsOrOperator(logExpr.left) ||
+          TraceQueryClickHouseAdapter.containsOrOperator(logExpr.right)
         );
       }
       case "UnaryOperator":
-        return TraceQueryClickHouse.containsOrOperator((node as UnaryOperatorToken).operand);
+        return TraceQueryClickHouseAdapter.containsOrOperator((node as UnaryOperatorToken).operand);
       case "ParenthesizedExpression":
-        return TraceQueryClickHouse.containsOrOperator(
+        return TraceQueryClickHouseAdapter.containsOrOperator(
           (node as ParenthesizedExpressionToken).expression,
         );
       default:
@@ -75,24 +79,24 @@ export class TraceQueryClickHouse {
   private static collectFreeTextTerms(node: LiqeQuery, negated: boolean, terms: string[]): void {
     switch (node.type) {
       case "Tag": {
-        const value = TraceQueryClickHouse.freeTextTermOf(node as TagToken, negated);
+        const value = TraceQueryClickHouseAdapter.freeTextTermOf(node as TagToken, negated);
         if (value !== null) terms.push(value);
         return;
       }
       case "LogicalExpression": {
         const logExpr = node as LogicalExpressionToken;
-        TraceQueryClickHouse.collectFreeTextTerms(logExpr.left, negated, terms);
-        TraceQueryClickHouse.collectFreeTextTerms(logExpr.right, negated, terms);
+        TraceQueryClickHouseAdapter.collectFreeTextTerms(logExpr.left, negated, terms);
+        TraceQueryClickHouseAdapter.collectFreeTextTerms(logExpr.right, negated, terms);
         return;
       }
       case "UnaryOperator": {
         const unary = node as UnaryOperatorToken;
         const isNeg = unary.operator === "NOT" || unary.operator === "-";
-        TraceQueryClickHouse.collectFreeTextTerms(unary.operand, negated !== isNeg, terms);
+        TraceQueryClickHouseAdapter.collectFreeTextTerms(unary.operand, negated !== isNeg, terms);
         return;
       }
       case "ParenthesizedExpression":
-        TraceQueryClickHouse.collectFreeTextTerms(
+        TraceQueryClickHouseAdapter.collectFreeTextTerms(
           (node as ParenthesizedExpressionToken).expression,
           negated,
           terms,
@@ -112,7 +116,7 @@ export class TraceQueryClickHouse {
   private static freeTextTermOf(tag: TagToken, negated: boolean): string | null {
     if (negated || tag.field.type !== "ImplicitField") return null;
     if (tag.expression.type !== "LiteralExpression") return null;
-    const value = TraceQueryValues.extractStringValue(tag);
+    const value = TraceQueryValuesAdapter.extractStringValue(tag);
     return value.length > 0 ? value : null;
   }
 
@@ -127,12 +131,12 @@ export class TraceQueryClickHouse {
         return "1 = 1";
 
       case "Tag":
-        return TraceQueryClickHouse.translateTag(node as TagToken, negated, ctx);
+        return TraceQueryClickHouseAdapter.translateTag(node as TagToken, negated, ctx);
 
       case "LogicalExpression": {
         const logExpr = node as LogicalExpressionToken;
-        const left = TraceQueryClickHouse.translateNode(logExpr.left, negated, ctx);
-        const right = TraceQueryClickHouse.translateNode(logExpr.right, negated, ctx);
+        const left = TraceQueryClickHouseAdapter.translateNode(logExpr.left, negated, ctx);
+        const right = TraceQueryClickHouseAdapter.translateNode(logExpr.right, negated, ctx);
         const op = logExpr.operator.operator === "OR" ? "OR" : "AND";
         return `(${left} ${op} ${right})`;
       }
@@ -140,12 +144,12 @@ export class TraceQueryClickHouse {
       case "UnaryOperator": {
         const unary = node as UnaryOperatorToken;
         const isNeg = unary.operator === "NOT" || unary.operator === "-";
-        return TraceQueryClickHouse.translateNode(unary.operand, negated !== isNeg, ctx);
+        return TraceQueryClickHouseAdapter.translateNode(unary.operand, negated !== isNeg, ctx);
       }
 
       case "ParenthesizedExpression": {
         const paren = node as ParenthesizedExpressionToken;
-        return `(${TraceQueryClickHouse.translateNode(paren.expression, negated, ctx)})`;
+        return `(${TraceQueryClickHouseAdapter.translateNode(paren.expression, negated, ctx)})`;
       }
 
       default:
@@ -155,7 +159,7 @@ export class TraceQueryClickHouse {
 
   private static translateTag(tag: TagToken, negated: boolean, ctx: TranslationContext): string {
     if (tag.field.type === "ImplicitField") {
-      return TraceQueryClickHouse.translateFreeText(tag, negated, ctx);
+      return TraceQueryClickHouseAdapter.translateFreeText(tag, negated, ctx);
     }
 
     const fieldName = tag.field.name;
@@ -166,26 +170,26 @@ export class TraceQueryClickHouse {
     // so saved queries from the previous schema still translate cleanly.
     if (fieldName.startsWith(TRACE_ATTRIBUTE_PREFIX)) {
       const key = fieldName.slice(TRACE_ATTRIBUTE_PREFIX.length);
-      return TraceQueryClickHouse.translateTraceAttribute(key, tag, negated, ctx);
+      return TraceQueryClickHouseAdapter.translateTraceAttribute(key, tag, negated, ctx);
     }
     if (fieldName.startsWith(SPAN_ATTRIBUTE_PREFIX)) {
       const key = fieldName.slice(SPAN_ATTRIBUTE_PREFIX.length);
-      return TraceQueryClickHouse.translateSpanAttribute(key, tag, negated, ctx);
+      return TraceQueryClickHouseAdapter.translateSpanAttribute(key, tag, negated, ctx);
     }
     if (fieldName.startsWith(EVENT_ATTRIBUTE_PREFIX)) {
       const key = fieldName.slice(EVENT_ATTRIBUTE_PREFIX.length);
-      return TraceQueryClickHouse.translateEventAttribute(key, tag, negated, ctx);
+      return TraceQueryClickHouseAdapter.translateEventAttribute(key, tag, negated, ctx);
     }
     // Legacy alias — `attribute.<k>`. Identical SQL to `trace.attribute.<k>`.
     if (fieldName.startsWith(TRACE_ATTRIBUTE_PREFIX_LEGACY)) {
       const key = fieldName.slice(TRACE_ATTRIBUTE_PREFIX_LEGACY.length);
-      return TraceQueryClickHouse.translateTraceAttribute(key, tag, negated, ctx);
+      return TraceQueryClickHouseAdapter.translateTraceAttribute(key, tag, negated, ctx);
     }
     // Legacy alias — `event.<k>` (single-dot form). Skips the bare `event`
     // field so `event:<name>` still routes to the static handler map.
     if (fieldName.startsWith(EVENT_ATTRIBUTE_PREFIX_LEGACY) && fieldName !== "event") {
       const key = fieldName.slice(EVENT_ATTRIBUTE_PREFIX_LEGACY.length);
-      return TraceQueryClickHouse.translateEventAttribute(key, tag, negated, ctx);
+      return TraceQueryClickHouseAdapter.translateEventAttribute(key, tag, negated, ctx);
     }
 
     // `.get()` — own keys only. A plain-object index would resolve a field named
@@ -209,14 +213,14 @@ export class TraceQueryClickHouse {
     if (!attrKey) {
       throw new FilterParseError("trace.attribute.<key> requires a key after the dot");
     }
-    TraceQueryValues.validateAttributeKey(attrKey);
-    const value = TraceQueryValues.extractStringValue(tag);
-    TraceQueryValues.validateValueLength(value);
-    const pKey = TraceQueryValues.nextParam(ctx, "attrKey");
-    const pVal = TraceQueryValues.nextParam(ctx, "attrValue");
+    TraceQueryValuesAdapter.validateAttributeKey(attrKey);
+    const value = TraceQueryValuesAdapter.extractStringValue(tag);
+    TraceQueryValuesAdapter.validateValueLength(value);
+    const pKey = TraceQueryValuesAdapter.nextParam(ctx, "attrKey");
+    const pVal = TraceQueryValuesAdapter.nextParam(ctx, "attrValue");
     ctx.params[pKey] = attrKey;
     ctx.params[pVal] = value;
-    return TraceQueryValues.wrap(`Attributes[{${pKey}:String}] = {${pVal}:String}`, negated);
+    return TraceQueryValuesAdapter.wrap(`Attributes[{${pKey}:String}] = {${pVal}:String}`, negated);
   }
 
   /**
@@ -236,15 +240,15 @@ export class TraceQueryClickHouse {
     if (!attrKey) {
       throw new FilterParseError("event.attribute.<key> requires a key after the dot");
     }
-    TraceQueryValues.validateAttributeKey(attrKey);
-    const value = TraceQueryValues.extractStringValue(tag);
-    TraceQueryValues.validateValueLength(value);
-    const pKey = TraceQueryValues.nextParam(ctx, "eventAttrKey");
-    const pVal = TraceQueryValues.nextParam(ctx, "eventAttrValue");
+    TraceQueryValuesAdapter.validateAttributeKey(attrKey);
+    const value = TraceQueryValuesAdapter.extractStringValue(tag);
+    TraceQueryValuesAdapter.validateValueLength(value);
+    const pKey = TraceQueryValuesAdapter.nextParam(ctx, "eventAttrKey");
+    const pVal = TraceQueryValuesAdapter.nextParam(ctx, "eventAttrValue");
     ctx.params[pKey] = attrKey;
     ctx.params[pVal] = value;
-    return TraceQueryValues.wrap(
-      boundedSubquery(
+    return TraceQueryValuesAdapter.wrap(
+      ClickHouseTraceQuerySubqueryAdapter.boundedSubquery(
         "stored_spans",
         "StartTime",
         `arrayExists(attrs -> attrs[{${pKey}:String}] = {${pVal}:String}, \`Events.Attributes\`)`,
@@ -270,15 +274,15 @@ export class TraceQueryClickHouse {
     if (!attrKey) {
       throw new FilterParseError("span.attribute.<key> requires a key after the dot");
     }
-    TraceQueryValues.validateAttributeKey(attrKey);
-    const value = TraceQueryValues.extractStringValue(tag);
-    TraceQueryValues.validateValueLength(value);
-    const pKey = TraceQueryValues.nextParam(ctx, "spanAttrKey");
-    const pVal = TraceQueryValues.nextParam(ctx, "spanAttrValue");
+    TraceQueryValuesAdapter.validateAttributeKey(attrKey);
+    const value = TraceQueryValuesAdapter.extractStringValue(tag);
+    TraceQueryValuesAdapter.validateValueLength(value);
+    const pKey = TraceQueryValuesAdapter.nextParam(ctx, "spanAttrKey");
+    const pVal = TraceQueryValuesAdapter.nextParam(ctx, "spanAttrValue");
     ctx.params[pKey] = attrKey;
     ctx.params[pVal] = value;
-    return TraceQueryValues.wrap(
-      boundedSubquery(
+    return TraceQueryValuesAdapter.wrap(
+      ClickHouseTraceQuerySubqueryAdapter.boundedSubquery(
         "stored_spans",
         "StartTime",
         `SpanAttributes[{${pKey}:String}] = {${pVal}:String}`,
@@ -292,9 +296,9 @@ export class TraceQueryClickHouse {
     negated: boolean,
     ctx: TranslationContext,
   ): string {
-    const value = TraceQueryValues.extractStringValue(tag);
-    TraceQueryValues.validateValueLength(value);
-    const paramName = TraceQueryValues.nextParam(ctx, "freeText");
+    const value = TraceQueryValuesAdapter.extractStringValue(tag);
+    TraceQueryValuesAdapter.validateValueLength(value);
+    const paramName = TraceQueryValuesAdapter.nextParam(ctx, "freeText");
     ctx.params[paramName] = `%${value}%`;
     const p = `{${paramName}:String}`;
 
@@ -310,8 +314,8 @@ export class TraceQueryClickHouse {
     // definite true/false, never a NULL, so the clause's three-valued logic when a
     // computed I/O column is NULL stays exactly as it was. The parity suite pins
     // that. The span subquery is tenant-scoped and time-bounded by
-    // `boundedSubquery`.
-    const clause = `(ComputedInput ILIKE ${p} OR ComputedOutput ILIKE ${p} OR ifNull(TraceName, '') ILIKE ${p} OR ${boundedSubquery(
+    // `ClickHouseTraceQuerySubqueryAdapter.boundedSubquery`.
+    const clause = `(ComputedInput ILIKE ${p} OR ComputedOutput ILIKE ${p} OR ifNull(TraceName, '') ILIKE ${p} OR ${ClickHouseTraceQuerySubqueryAdapter.boundedSubquery(
       "stored_spans",
       "StartTime",
       `SpanName ILIKE ${p}`,
@@ -341,7 +345,7 @@ export class TraceQueryClickHouse {
    * and for any query carrying an OR.
    */
   static extractFreeTextTerms(queryText: string): string[] {
-    const trimmed = TraceQueryClickHouse.normalizeQuery(queryText);
+    const trimmed = TraceQueryClickHouseAdapter.normalizeQuery(queryText);
     if (!trimmed) return [];
 
     let ast: LiqeQuery;
@@ -357,10 +361,10 @@ export class TraceQueryClickHouse {
     // to the trace-level filter, which does translate OR correctly. Fewer
     // matches beats wrong ones, `checkout OR refund` must never be answered as
     // `checkout AND refund`.
-    if (TraceQueryClickHouse.containsOrOperator(ast)) return [];
+    if (TraceQueryClickHouseAdapter.containsOrOperator(ast)) return [];
 
     const terms: string[] = [];
-    TraceQueryClickHouse.collectFreeTextTerms(ast, false, terms);
+    TraceQueryClickHouseAdapter.collectFreeTextTerms(ast, false, terms);
     // Each term becomes its own `positionCaseInsensitive` over the transcript
     // bodies, so the count and the width of each term decide how much work that
     // subquery does. Past either bound the content branch is dropped whole
@@ -383,7 +387,7 @@ export class TraceQueryClickHouse {
     tenantId: string,
     timeRange: { from: number; to: number },
   ): { sql: string; params: Record<string, unknown> } | null {
-    const trimmed = TraceQueryClickHouse.normalizeQuery(queryText);
+    const trimmed = TraceQueryClickHouseAdapter.normalizeQuery(queryText);
     if (!trimmed) return null;
 
     let ast: LiqeQuery;
@@ -407,7 +411,7 @@ export class TraceQueryClickHouse {
       timeRange,
     };
 
-    const sql = TraceQueryClickHouse.translateNode(ast, false, ctx);
+    const sql = TraceQueryClickHouseAdapter.translateNode(ast, false, ctx);
 
     if (Object.keys(ctx.params).length > MAX_PARAM_COUNT) {
       throw new FilterParseError("Too many filter conditions");

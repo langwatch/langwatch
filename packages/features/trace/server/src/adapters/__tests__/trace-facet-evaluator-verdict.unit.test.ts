@@ -1,5 +1,5 @@
+import { ClickHouseFacetRegistryAdapter } from "../trace-facet-registry.clickhouse.adapter";
 import { describe, expect, it } from "vitest";
-import { FACET_REGISTRY } from "../trace-facet-registry.clickhouse.adapter";
 import { FIELD_VALUES } from "@langwatch/trace-contract";
 
 /**
@@ -12,7 +12,9 @@ import { FIELD_VALUES } from "@langwatch/trace-contract";
  * Passed-is-null-but-not-errored bucket.
  */
 describe("evaluatorVerdict facet", () => {
-  const def = FACET_REGISTRY.find((d) => d.key === "evaluatorVerdict");
+  const def = ClickHouseFacetRegistryAdapter.FACET_REGISTRY.find(
+    (d) => d.key === "evaluatorVerdict",
+  );
 
   describe("when mapping evaluation rows to verdict values", () => {
     it("routes Status='error' to 'error' before consulting Passed", () => {

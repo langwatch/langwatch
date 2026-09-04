@@ -1,5 +1,5 @@
 import { FilterParseError, type TagToken } from "@langwatch/trace-contract";
-import type { TranslationContext } from "./trace-query-evaluation.adapter";
+import type { TranslationContext } from "./trace-query-evaluation.types";
 
 export const MAX_VALUE_LENGTH = 500;
 export const MAX_ATTRIBUTE_KEY_LENGTH = 256;
@@ -46,7 +46,11 @@ export const SPAN_ATTRIBUTE_PREFIX = "span.attribute.";
  * placeholder names so a value is never interpolated into SQL, and
  * `validateValueLength` and `validateAttributeKey` refuse before that happens.
  */
-export class TraceQueryValues {
+export class TraceQueryValuesAdapter {
+  static create(): TraceQueryValuesAdapter {
+    return new TraceQueryValuesAdapter();
+  }
+
   private static escapeRegExp(s: string): string {
     return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
@@ -135,7 +139,7 @@ export class TraceQueryValues {
   static likeMatch(actual: string, pattern: string): boolean {
     const regex = pattern
       .split("*")
-      .map((part) => TraceQueryValues.escapeRegExp(part))
+      .map((part) => TraceQueryValuesAdapter.escapeRegExp(part))
       .join(".*");
     return new RegExp(`^${regex}$`).test(actual);
   }

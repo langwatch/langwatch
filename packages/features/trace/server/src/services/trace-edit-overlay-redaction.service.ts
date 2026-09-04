@@ -1,4 +1,4 @@
-import { TraceAttributeRedactor, type Protections } from "@langwatch/trace-server";
+import { TraceAttributeRedactionService, type Protections } from "@langwatch/trace-server";
 import {
   TRACE_EDIT_SPAN_FIELDS,
   TRACE_EDIT_TRACE_FIELDS,
@@ -70,7 +70,7 @@ function readableFieldValue({
   }
 
   if (field === "params") {
-    return TraceAttributeRedactor.for(hiddenAttributes).redact(spanPatch.params);
+    return TraceAttributeRedactionService.create(hiddenAttributes).redact(spanPatch.params);
   }
 
   return value;
@@ -155,7 +155,7 @@ function redactMetadataEdits({
     byAttributeKey[traceAttributeKeyForMetadata(key)] = value;
   }
 
-  const redacted = TraceAttributeRedactor.for(hiddenAttributes).redact(byAttributeKey);
+  const redacted = TraceAttributeRedactionService.create(hiddenAttributes).redact(byAttributeKey);
   if (redacted === byAttributeKey) {
     return metadata;
   }
@@ -246,71 +246,77 @@ function redactTraceEdits({
   return { value: carriesEdit ? next : void 0, isChanged: true };
 }
 
-/**
- * The correction as this viewer is allowed to read it.
- *
- * A correction quotes the trace it corrects, so handing one out unfiltered
- * would hand out captured content the privacy policy or the plan's visibility
- * window withholds. Content edits (trace input/output, span input/output/params)
- * drop out when the viewer may not read that category or the trace is beyond
- * the visibility window; corrected `params` that survive still go through the
- * restricted-attribute rules. Structural edits (renames, type changes, cleared
- * errors, deleted spans) always stay: they say what the trace should have
- * looked like without quoting any of it.
- *
- * Pure, and returns the very same patch when the viewer may read all of it, so
- * the common case allocates nothing.
- */
-export function redactPatchForViewer({
-  patch,
-  protections,
-  isWindowRedacted,
-}: {
-  patch: TraceEditOverlayPatch;
-  protections: Protections;
-  isWindowRedacted?: boolean;
-}): TraceEditOverlayPatch {
-  const isDeniedByCategory = deniedCategoriesFor({
+export class TraceEditOverlayRedactionService {
+  static create(): TraceEditOverlayRedactionService {
+    return new TraceEditOverlayRedactionService();
+  }
+
+  /**
+   * The correction as this viewer is allowed to read it.
+   *
+   * A correction quotes the trace it corrects, so handing one out unfiltered
+   * would hand out captured content the privacy policy or the plan's visibility
+   * window withholds. Content edits (trace input/output, span input/output/params)
+   * drop out when the viewer may not read that category or the trace is beyond
+   * the visibility window; corrected `params` that survive still go through the
+   * restricted-attribute rules. Structural edits (renames, type changes, cleared
+   * errors, deleted spans) always stay: they say what the trace should have
+   * looked like without quoting any of it.
+   *
+   * Pure, and returns the very same patch when the viewer may read all of it, so
+   * the common case allocates nothing.
+   */
+  static redactPatchForViewer({
+    patch,
     protections,
     isWindowRedacted,
-  });
-  const hiddenAttributes = isDeniedByCategory.input ? void 0 : protections.hiddenAttributes;
+  }: {
+    patch: TraceEditOverlayPatch;
+    protections: Protections;
+    isWindowRedacted?: boolean;
+  }): TraceEditOverlayPatch {
+    const isDeniedByCategory = deniedCategoriesFor({
+      protections,
+      isWindowRedacted,
+    });
+    const hiddenAttributes = isDeniedByCategory.input ? void 0 : protections.hiddenAttributes;
 
-  const traceEdits = redactTraceEdits({
-    traceEdits: patch.trace,
-    isDeniedByCategory,
-    hiddenAttributes,
-  });
-  let isChanged = traceEdits.isChanged;
-
-  const spans: TraceEditSpanPatch[] = [];
-  for (const spanPatch of patch.spans) {
-    const redacted = redactSpanPatch({
-      spanPatch,
+    const traceEdits = redactTraceEdits({
+      traceEdits: patch.trace,
       isDeniedByCategory,
       hiddenAttributes,
     });
-    if (redacted !== spanPatch) {
-      isChanged = true;
+    let isChanged = traceEdits.isChanged;
+
+    const spans: TraceEditSpanPatch[] = [];
+    for (const spanPatch of patch.spans) {
+      const redacted = redactSpanPatch({
+        spanPatch,
+        isDeniedByCategory,
+        hiddenAttributes,
+      });
+      if (redacted !== spanPatch) {
+        isChanged = true;
+      }
+
+      if (redacted) {
+        spans.push(redacted);
+      }
     }
 
-    if (redacted) {
-      spans.push(redacted);
+    if (!isChanged) {
+      return patch;
     }
-  }
 
-  if (!isChanged) {
-    return patch;
-  }
+    const next: TraceEditOverlayPatch = {
+      version: patch.version,
+      spans,
+      deletedSpanIds: patch.deletedSpanIds,
+    };
+    if (traceEdits.value) {
+      next.trace = traceEdits.value;
+    }
 
-  const next: TraceEditOverlayPatch = {
-    version: patch.version,
-    spans,
-    deletedSpanIds: patch.deletedSpanIds,
-  };
-  if (traceEdits.value) {
-    next.trace = traceEdits.value;
+    return next;
   }
-
-  return next;
 }

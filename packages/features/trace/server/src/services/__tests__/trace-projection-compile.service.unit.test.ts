@@ -1,7 +1,7 @@
+import { TraceProjectionCompileService } from "../trace-projection-compile.service";
 import { describe, expect, it } from "vitest";
 import type { Trace } from "@langwatch/trace-contract";
 import type { Protections } from "../trace-viewer-protections.service";
-import { compileProjection } from "../trace-projection-compile.service";
 import type { ProjectableTrace } from "../trace-projection.types";
 import { ProjectionValidationError } from "../trace-projection.types";
 
@@ -69,11 +69,11 @@ function sampleTrace(): ProjectableTrace {
   };
 }
 
-describe("compileProjection", () => {
+describe("TraceProjectionCompileService.compileProjection", () => {
   describe("given a select with no from", () => {
     describe("when compiling", () => {
       it("defaults from to 'traces'", () => {
-        const compiled = compileProjection({
+        const compiled = TraceProjectionCompileService.compileProjection({
           select: ["trace_id"],
           protections: fullAccess,
         });
@@ -85,7 +85,7 @@ describe("compileProjection", () => {
   describe("given trace-level scalar paths", () => {
     describe("when building the schema", () => {
       it("lists the requested columns with their types", () => {
-        const compiled = compileProjection({
+        const compiled = TraceProjectionCompileService.compileProjection({
           select: ["trace_id", "started_at"],
           protections: fullAccess,
         });
@@ -99,7 +99,7 @@ describe("compileProjection", () => {
     describe("when projecting a trace", () => {
       /** @scenario Select trace-level scalar fields */
       it("emits only the requested scalars, nothing else", () => {
-        const compiled = compileProjection({
+        const compiled = TraceProjectionCompileService.compileProjection({
           select: ["trace_id", "started_at"],
           protections: fullAccess,
         });
@@ -112,7 +112,7 @@ describe("compileProjection", () => {
 
     describe("when no io path is selected", () => {
       it("does not flag the heavy io columns", () => {
-        const compiled = compileProjection({
+        const compiled = TraceProjectionCompileService.compileProjection({
           select: ["trace_id", "metrics.total_cost"],
           protections: fullAccess,
         });
@@ -123,7 +123,7 @@ describe("compileProjection", () => {
 
     describe("when only output is selected", () => {
       it("flags ComputedOutput but not ComputedInput", () => {
-        const compiled = compileProjection({
+        const compiled = TraceProjectionCompileService.compileProjection({
           select: ["trace_id", "output"],
           protections: fullAccess,
         });
@@ -134,7 +134,7 @@ describe("compileProjection", () => {
 
     describe("when gated annotation text is selected without io", () => {
       it("does not flag the heavy io columns despite the shared protection", () => {
-        const compiled = compileProjection({
+        const compiled = TraceProjectionCompileService.compileProjection({
           select: ["annotations.comment"],
           protections: fullAccess,
         });
@@ -148,7 +148,7 @@ describe("compileProjection", () => {
     describe("when projecting a trace", () => {
       /** @scenario Select metadata fields grouped into a metadata object */
       it("groups them under a metadata object", () => {
-        const compiled = compileProjection({
+        const compiled = TraceProjectionCompileService.compileProjection({
           select: ["trace_id", "metadata.user_id", "metadata.custom_key"],
           protections: fullAccess,
         });
@@ -161,7 +161,7 @@ describe("compileProjection", () => {
 
     describe("when the metadata key is an arbitrary custom name", () => {
       it("accepts it into the schema", () => {
-        const compiled = compileProjection({
+        const compiled = TraceProjectionCompileService.compileProjection({
           select: ["metadata.anything_goes"],
           protections: fullAccess,
         });
@@ -178,7 +178,7 @@ describe("compileProjection", () => {
     describe("when projecting a trace", () => {
       /** @scenario Select metrics fields */
       it("groups them under a metrics object", () => {
-        const compiled = compileProjection({
+        const compiled = TraceProjectionCompileService.compileProjection({
           select: ["metrics.total_cost", "metrics.prompt_tokens"],
           protections: fullAccess,
         });
@@ -192,7 +192,7 @@ describe("compileProjection", () => {
   describe("given evaluation paths", () => {
     describe("when projecting a trace", () => {
       it("returns evaluations as a nested array of only the selected fields", () => {
-        const compiled = compileProjection({
+        const compiled = TraceProjectionCompileService.compileProjection({
           select: ["trace_id", "evaluations.name", "evaluations.score"],
           protections: fullAccess,
         });
@@ -209,7 +209,7 @@ describe("compileProjection", () => {
   describe("given event paths", () => {
     describe("when projecting a trace", () => {
       it("flags the bounded events fetch and projects the events array", () => {
-        const compiled = compileProjection({
+        const compiled = TraceProjectionCompileService.compileProjection({
           select: ["events.type", "events.metrics.vote", "events.timestamp"],
           protections: fullAccess,
         });
@@ -224,7 +224,7 @@ describe("compileProjection", () => {
   describe("given annotation paths", () => {
     describe("when projecting a trace", () => {
       it("flags the cross-store annotations fetch and projects the array", () => {
-        const compiled = compileProjection({
+        const compiled = TraceProjectionCompileService.compileProjection({
           select: ["annotations.is_thumbs_up", "annotations.scores.quality"],
           protections: fullAccess,
         });
@@ -246,7 +246,7 @@ describe("compileProjection", () => {
 
       /** @scenario Projected io fields are dropped when user lacks captured-input permission */
       it("keeps the column but projects null and does not fetch heavy io", () => {
-        const compiled = compileProjection({
+        const compiled = TraceProjectionCompileService.compileProjection({
           select: ["trace_id", "input", "output"],
           protections: noIO,
         });
@@ -263,7 +263,7 @@ describe("compileProjection", () => {
     describe("when capture visibility is granted", () => {
       /** @scenario Projected io fields are included when user has full permissions */
       it("fetches io and projects the values", () => {
-        const compiled = compileProjection({
+        const compiled = TraceProjectionCompileService.compileProjection({
           select: ["input", "output"],
           protections: fullAccess,
         });
@@ -281,7 +281,7 @@ describe("compileProjection", () => {
     describe("when compiling", () => {
       it("throws ProjectionValidationError", () => {
         expect(() =>
-          compileProjection({
+          TraceProjectionCompileService.compileProjection({
             select: ["trace_id", "nonexistent_field"],
             protections: fullAccess,
           }),
@@ -291,7 +291,7 @@ describe("compileProjection", () => {
       it("names every offending path (and only those)", () => {
         let error: unknown;
         try {
-          compileProjection({
+          TraceProjectionCompileService.compileProjection({
             select: ["nonexistent_field", "trace_id", "evaluations.bogus"],
             protections: fullAccess,
           });
@@ -317,9 +317,12 @@ describe("compileProjection", () => {
           "events.metrics.__proto__",
           "annotations.scores.prototype",
         ]) {
-          expect(() => compileProjection({ select: [path], protections: fullAccess })).toThrowError(
-            ProjectionValidationError,
-          );
+          expect(() =>
+            TraceProjectionCompileService.compileProjection({
+              select: [path],
+              protections: fullAccess,
+            }),
+          ).toThrowError(ProjectionValidationError);
         }
       });
     });
@@ -328,7 +331,7 @@ describe("compileProjection", () => {
   describe("given duplicate select paths", () => {
     describe("when compiling", () => {
       it("dedupes while preserving first-seen order", () => {
-        const compiled = compileProjection({
+        const compiled = TraceProjectionCompileService.compileProjection({
           select: ["trace_id", "started_at", "trace_id"],
           protections: fullAccess,
         });
@@ -340,7 +343,7 @@ describe("compileProjection", () => {
   describe("given a mix of all sources", () => {
     describe("when projecting a trace", () => {
       it("emits scalar groups as objects and child collections as arrays", () => {
-        const compiled = compileProjection({
+        const compiled = TraceProjectionCompileService.compileProjection({
           select: [
             "trace_id",
             "metadata.user_id",
@@ -379,7 +382,7 @@ describe("collection-path RBAC redaction", () => {
     describe("when captured-output visibility is denied", () => {
       /** @scenario "Annotation comments and expected output respect captured-output visibility" */
       it("nulls comment and expected_output but keeps the annotation row", () => {
-        const { project } = compileProjection({
+        const { project } = TraceProjectionCompileService.compileProjection({
           select: annotationSelect,
           protections: {
             canSeeCosts: true,
@@ -395,7 +398,7 @@ describe("collection-path RBAC redaction", () => {
 
     describe("when captured-output visibility is granted", () => {
       it("emits the comment and expected_output values", () => {
-        const { project } = compileProjection({
+        const { project } = TraceProjectionCompileService.compileProjection({
           select: annotationSelect,
           protections: fullAccess,
         });

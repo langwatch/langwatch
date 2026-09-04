@@ -6,11 +6,11 @@
  *
  * Feature: specs/traces/trace-summary-storage-anchor.feature
  */
+import { TraceListService } from "../trace-list-read.service";
 import { describe, expect, it } from "vitest";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 
 import { mapTraceSummaryToHeader } from "../../transport/api-trpc/trace-read-mappers.api";
-import { mapToTraceListItem } from "../trace-list-read.service";
 
 const ANCHOR_MS = 1_787_122_009_599;
 
@@ -45,7 +45,9 @@ describe("the trace times a reader sees", () => {
   describe("given a trace whose only signal is a log record", () => {
     /** @scenario The trace list shows the same fallback time, not the epoch */
     it("the list row falls back to the storage anchor", () => {
-      const item = mapToTraceListItem(summary({ occurredAt: 0, storageAnchorMs: ANCHOR_MS }));
+      const item = TraceListService.mapToTraceListItem(
+        summary({ occurredAt: 0, storageAnchorMs: ANCHOR_MS }),
+      );
 
       expect(item.timestamp).toBe(ANCHOR_MS);
     });
@@ -68,7 +70,7 @@ describe("the trace times a reader sees", () => {
         storageAnchorMs: ANCHOR_MS,
       });
 
-      expect(mapToTraceListItem(withSpans).timestamp).toBe(ANCHOR_MS + 250);
+      expect(TraceListService.mapToTraceListItem(withSpans).timestamp).toBe(ANCHOR_MS + 250);
       expect(mapTraceSummaryToHeader(withSpans).timestamp).toBe(ANCHOR_MS + 250);
     });
   });

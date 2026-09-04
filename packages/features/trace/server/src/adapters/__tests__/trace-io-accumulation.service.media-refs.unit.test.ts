@@ -10,14 +10,14 @@
  */
 import type { NormalizedSpan, TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
-import { TraceMediaReferenceAdapter } from "../../adapters/trace-media-reference.adapter";
+import { TraceMediaReferenceAdapter } from "../trace-media-reference.adapter";
 import {
   TraceIoExtractionPort,
   type TraceIoSide,
   type TraceIoValue,
 } from "../../ports/trace-io-extraction.port";
-import { TraceCanonicalisationService } from "../trace-canonicalisation.service";
-import { TraceIOAccumulationService } from "../trace-io-accumulation.service";
+import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service";
+import { TraceIOAccumulationService } from "../../services/trace-io-accumulation.service";
 
 type Rich = { raw: unknown; text: string; source: "gen_ai" | "langwatch" };
 

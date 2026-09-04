@@ -70,40 +70,6 @@ interface DerivedToolCall {
   name: string;
 }
 
-/**
- * Attributes to merge onto a log record at ingest. Empty for any record we have
- * no derivation for — the caller merges unconditionally and pays nothing.
- */
-export function deriveLogContentAttributes({
-  scopeName,
-  attributes,
-  traceCanonicalisation,
-}: {
-  scopeName: string;
-  attributes: Record<string, string>;
-  traceCanonicalisation: TraceCanonicalisationService;
-}): Record<string, string> {
-  if (scopeName !== CLAUDE_CODE_EVENTS_SCOPE) {
-    return {};
-  }
-
-  const eventName = attributes["event.name"];
-  const body = attributes.body;
-  if (typeof body !== "string" || body.length === 0) {
-    return {};
-  }
-
-  if (eventName === RESPONSE_BODY_EVENT) {
-    return deriveFromResponseBody(body, traceCanonicalisation);
-  }
-
-  if (eventName === REQUEST_BODY_EVENT) {
-    return deriveFromRequestBody(body, traceCanonicalisation);
-  }
-
-  return {};
-}
-
 function deriveFromResponseBody(
   body: string,
   traceCanonicalisation: TraceCanonicalisationService,
@@ -204,3 +170,43 @@ function parseJsonObject(raw: string): Record<string, unknown> | null {
 }
 
 export type { DerivedToolCall };
+
+export class TraceLogContentDerivationService {
+  static create(): TraceLogContentDerivationService {
+    return new TraceLogContentDerivationService();
+  }
+
+  /**
+   * Attributes to merge onto a log record at ingest. Empty for any record we have
+   * no derivation for — the caller merges unconditionally and pays nothing.
+   */
+  static deriveLogContentAttributes({
+    scopeName,
+    attributes,
+    traceCanonicalisation,
+  }: {
+    scopeName: string;
+    attributes: Record<string, string>;
+    traceCanonicalisation: TraceCanonicalisationService;
+  }): Record<string, string> {
+    if (scopeName !== CLAUDE_CODE_EVENTS_SCOPE) {
+      return {};
+    }
+
+    const eventName = attributes["event.name"];
+    const body = attributes.body;
+    if (typeof body !== "string" || body.length === 0) {
+      return {};
+    }
+
+    if (eventName === RESPONSE_BODY_EVENT) {
+      return deriveFromResponseBody(body, traceCanonicalisation);
+    }
+
+    if (eventName === REQUEST_BODY_EVENT) {
+      return deriveFromRequestBody(body, traceCanonicalisation);
+    }
+
+    return {};
+  }
+}

@@ -21,21 +21,6 @@ import type { SpanInsertData } from "@langwatch/trace-contract";
 export const MAX_DERIVATION_SPANS = 512;
 
 /**
- * Clamps a requested span-read limit to the `[1, max]` range (default ceiling
- * `MAX_DERIVATION_SPANS`). The ceiling is hard — a caller can only lower it,
- * never raise it — so every span read is bounded even for a leaked trace_id.
- * A missing or non-finite limit (undefined, NaN, Infinity) defaults to the
- * ceiling so the value never propagates into a ClickHouse `UInt32` param.
- */
-export function clampSpanReadLimit(
-  limit?: number,
-  { max = MAX_DERIVATION_SPANS }: { max?: number } = {},
-): number {
-  const requested = Number.isFinite(limit) ? (limit as number) : max;
-  return Math.min(Math.max(1, Math.trunc(requested)), max);
-}
-
-/**
  * Per-query safety ceiling for the light single-shot per-trace projections
  * (span summaries, signal keys, resource info, trace events, summary deltas).
  * These rows are slim — no SpanAttributes values, input/output, or Events
@@ -151,15 +136,15 @@ export interface ModelSpanSampleRow {
   startTimeMs: number;
 }
 
-export interface SpanStorageRepository {
-  insertSpan(span: SpanInsertData): Promise<void>;
-  insertSpans(spans: SpanInsertData[]): Promise<void>;
+export abstract class SpanStorageRepository {
+  abstract insertSpan(span: SpanInsertData): Promise<void>;
+  abstract insertSpans(spans: SpanInsertData[]): Promise<void>;
   /**
    * Full spans for a trace. Bounded by `MAX_DERIVATION_SPANS` (hard ceiling,
    * always applied) so no caller can make this read unbounded on a leaked
    * trace_id. `limit` may only lower the bound.
    */
-  getSpansByTraceId(
+  abstract getSpansByTraceId(
     params: {
       tenantId: string;
       traceId: string;
@@ -172,14 +157,14 @@ export interface SpanStorageRepository {
    * and parent links. Bounded by `MAX_DERIVATION_SPANS` so a pathological
    * trace can't make the derivation read unbounded.
    */
-  getNormalizedSpansByTraceId(
+  abstract getNormalizedSpansByTraceId(
     params: {
       tenantId: string;
       traceId: string;
       limit?: number;
     } & OccurredAtHint,
   ): Promise<NormalizedSpan[]>;
-  tryGetSpanByIds(
+  abstract tryGetSpanByIds(
     params: {
       tenantId: string;
       traceId: string;
@@ -195,7 +180,9 @@ export interface SpanStorageRepository {
    * Consumers of this read lift scalar span/resource attributes; a caller that
    * needs a whole span wants `tryGetSpanByIds`.
    */
-  tryFindNormalizedSpanById(params: NormalizedSpanByIdParams): Promise<NormalizedSpan | null>;
+  abstract tryFindNormalizedSpanById(
+    params: NormalizedSpanByIdParams,
+  ): Promise<NormalizedSpan | null>;
   /**
    * Trace-level events ({spanId, timestamp, name, attributes}) for the
    * trace-detail read, derived from the spans' OTel events. Events-only
@@ -203,7 +190,7 @@ export interface SpanStorageRepository {
    * so it is far cheaper than fetching whole spans. Includes exception events
    * for parity with the list the fold used to carry.
    */
-  getTraceEventsByTraceId(
+  abstract getTraceEventsByTraceId(
     params: { tenantId: string; traceId: string } & OccurredAtHint,
   ): Promise<DerivedTraceEvent[]>;
   /**
@@ -214,20 +201,20 @@ export interface SpanStorageRepository {
    * of one per row. Attributes are not read: a badge needs a name and a count,
    * and the attribute map is the expensive part of an event.
    */
-  getTraceEventRollupsByTraceIds(
+  abstract getTraceEventRollupsByTraceIds(
     params: TraceEventRollupParams,
   ): Promise<Record<string, TraceEventRollup>>;
-  getEventsByTraceId(
+  abstract getEventsByTraceId(
     params: { tenantId: string; traceId: string } & OccurredAtHint,
   ): Promise<ElasticSearchEvent[]>;
-  getSpanEvents(
+  abstract getSpanEvents(
     params: {
       tenantId: string;
       traceId: string;
       spanId: string;
     } & OccurredAtHint,
   ): Promise<ElasticSearchEvent[]>;
-  getSpanSummaryByTraceId(
+  abstract getSpanSummaryByTraceId(
     params: { tenantId: string; traceId: string } & OccurredAtHint,
   ): Promise<SpanSummaryRow[]>;
   /**
@@ -235,13 +222,13 @@ export interface SpanStorageRepository {
    * the main span tree so the cheap waterfall/list payload doesn't pay for
    * the attribute scan. Callers fire this in parallel and merge in the UI.
    */
-  findLangwatchSignalsByTraceId(
+  abstract findLangwatchSignalsByTraceId(
     params: { tenantId: string; traceId: string } & OccurredAtHint,
   ): Promise<SpanLangwatchSignalsRow[]>;
-  findSpanResourcesByTraceId(
+  abstract findSpanResourcesByTraceId(
     params: { tenantId: string; traceId: string } & OccurredAtHint,
   ): Promise<SpanResourceInfo[]>;
-  findSpansPaginated(
+  abstract findSpansPaginated(
     params: {
       tenantId: string;
       traceId: string;
@@ -249,7 +236,7 @@ export interface SpanStorageRepository {
       offset: number;
     } & OccurredAtHint,
   ): Promise<{ spans: Span[]; total: number }>;
-  findSpansSince(
+  abstract findSpansSince(
     params: {
       tenantId: string;
       traceId: string;
@@ -261,7 +248,7 @@ export interface SpanStorageRepository {
    * span counts, ordered by traffic. Cross-trace by design (no traceId),
    * the model cost rule preview needs the project-wide model inventory.
    */
-  findModelUsageStats(params: {
+  abstract findModelUsageStats(params: {
     tenantId: string;
     fromMs: number;
     limit: number;
@@ -271,13 +258,27 @@ export interface SpanStorageRepository {
    * single chatty model can't crowd the sample list. Spans carrying token
    * usage are preferred over token-less ones.
    */
-  findRecentSpansByModels(params: {
+  abstract findRecentSpansByModels(params: {
     tenantId: string;
     models: string[];
     fromMs: number;
     perModelLimit: number;
     limit: number;
   }): Promise<ModelSpanSampleRow[]>;
+  /**
+   * Clamps a requested span-read limit to the `[1, max]` range (default ceiling
+   * `MAX_DERIVATION_SPANS`). The ceiling is hard — a caller can only lower it,
+   * never raise it — so every span read is bounded even for a leaked trace_id.
+   * A missing or non-finite limit (undefined, NaN, Infinity) defaults to the
+   * ceiling so the value never propagates into a ClickHouse `UInt32` param.
+   */
+  static clampSpanReadLimit(
+    limit?: number,
+    { max = MAX_DERIVATION_SPANS }: { max?: number } = {},
+  ): number {
+    const requested = Number.isFinite(limit) ? (limit as number) : max;
+    return Math.min(Math.max(1, Math.trunc(requested)), max);
+  }
 }
 
 export class NullSpanStorageRepository implements SpanStorageRepository {

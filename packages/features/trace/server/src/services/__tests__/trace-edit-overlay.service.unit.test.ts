@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 import type {
   TraceEditOverlayRepository,
   TraceEditOverlayRow,
-} from "../../repositories/prisma/prisma.trace-edit-overlay.repository";
+} from "../../repositories/trace-edit-overlay.repository";
 import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
 import { TraceEditOverlayService } from "../trace-edit-overlay.service";
 
@@ -673,9 +673,7 @@ describe("TraceEditOverlayService", () => {
     it("returns no correction", async () => {
       const { service } = buildService(null);
 
-      expect(
-        await service.getByTraceId({ projectId: "project-1", traceId: "trace-1" }),
-      ).toBeNull();
+      expect(await service.getByTraceId({ projectId: "project-1", traceId: "trace-1" })).toBeNull();
     });
   });
 
@@ -687,7 +685,11 @@ describe("TraceEditOverlayService", () => {
       const saved = await service.upsert({
         projectId: "project-1",
         traceId: "trace-1",
-        patch: { version: 1, spans: [{ spanId: "span-1", name: "cleaned up" }], deletedSpanIds: [] },
+        patch: {
+          version: 1,
+          spans: [{ spanId: "span-1", name: "cleaned up" }],
+          deletedSpanIds: [],
+        },
         userId: "user-1",
       });
 
@@ -700,22 +702,24 @@ describe("TraceEditOverlayService", () => {
     /** @scenario "Saving again replaces the correction and records the last editor" */
     it("replaces the patch and records the last editor", async () => {
       const rows: unknown[] = [];
-      const upsert = vi.fn(async ({ patch, userId }: { patch: TraceEditOverlayPatch; userId: string | null }) => {
-        const created = rows.length === 0 ? userId : "user-1";
-        rows.push(patch);
-        return {
-          id: "traceedit_1",
-          projectId: "project-1",
-          traceId: "trace-1",
-          patch,
-          createdById: created,
-          updatedById: userId,
-          createdAt: new Date("2026-08-04T00:00:00.000Z"),
-          updatedAt: new Date("2026-08-04T00:00:01.000Z"),
-          createdBy: { id: created, name: "First Reviewer", image: null },
-          updatedBy: { id: userId, name: "Second Reviewer", image: null },
-        } as TraceEditOverlayRow;
-      });
+      const upsert = vi.fn(
+        async ({ patch, userId }: { patch: TraceEditOverlayPatch; userId: string | null }) => {
+          const created = rows.length === 0 ? userId : "user-1";
+          rows.push(patch);
+          return {
+            id: "traceedit_1",
+            projectId: "project-1",
+            traceId: "trace-1",
+            patch,
+            createdById: created,
+            updatedById: userId,
+            createdAt: new Date("2026-08-04T00:00:00.000Z"),
+            updatedAt: new Date("2026-08-04T00:00:01.000Z"),
+            createdBy: { id: created, name: "First Reviewer", image: null },
+            updatedBy: { id: userId, name: "Second Reviewer", image: null },
+          } as TraceEditOverlayRow;
+        },
+      );
       const repository = {
         tryFindByProjectAndTrace: vi.fn(async () => null),
         upsert,
@@ -726,7 +730,11 @@ describe("TraceEditOverlayService", () => {
       await service.upsert({
         projectId: "project-1",
         traceId: "trace-1",
-        patch: { version: 1, spans: [{ spanId: "span-1", name: "cleaned up" }], deletedSpanIds: [] },
+        patch: {
+          version: 1,
+          spans: [{ spanId: "span-1", name: "cleaned up" }],
+          deletedSpanIds: [],
+        },
         userId: "user-1",
       });
       const replaced = await service.upsert({
@@ -775,16 +783,16 @@ describe("TraceEditOverlayService", () => {
       await service.delete({ projectId: "project-1", traceId: "trace-1" });
 
       expect(deleteRow).toHaveBeenCalledTimes(2);
-      expect(
-        await service.getByTraceId({ projectId: "project-1", traceId: "trace-1" }),
-      ).toBeNull();
+      expect(await service.getByTraceId({ projectId: "project-1", traceId: "trace-1" })).toBeNull();
     });
   });
 
   describe("given a page of traces, some corrected and some not", () => {
     /** @scenario "A page of traces fetches its corrections in one read" */
     it("returns a map keyed by trace id with only the corrected traces present", async () => {
-      const findAllByProjectAndTraces = vi.fn(async () => [row({ version: 1, spans: [{ spanId: "span-1", name: "renamed" }], deletedSpanIds: [] })]);
+      const findAllByProjectAndTraces = vi.fn(async () => [
+        row({ version: 1, spans: [{ spanId: "span-1", name: "renamed" }], deletedSpanIds: [] }),
+      ]);
       const repository = {
         findAllByProjectAndTraces,
         tryFindByProjectAndTrace: vi.fn(async () => null),

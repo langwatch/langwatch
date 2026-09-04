@@ -1,6 +1,6 @@
+import { ClickHouseEvaluatorFacetAdapter } from "../trace-facet-evaluator.clickhouse.adapter";
 import { describe, expect, it } from "vitest";
 import type { FacetQueryContext } from "../trace-facet-registry.clickhouse.adapter";
-import { buildEvaluatorFacetQuery } from "../trace-facet-evaluator.clickhouse.adapter";
 
 function ctx(overrides: Partial<FacetQueryContext> = {}): FacetQueryContext {
   return {
@@ -12,12 +12,12 @@ function ctx(overrides: Partial<FacetQueryContext> = {}): FacetQueryContext {
   };
 }
 
-describe("buildEvaluatorFacetQuery", () => {
+describe("ClickHouseEvaluatorFacetAdapter.buildEvaluatorFacetQuery", () => {
   describe("given an evaluator facet request", () => {
     describe("when the label projection is built", () => {
       /** @scenario Evaluator facet labels drop the type prefix */
       it("labels rows by name (or id) without the evaluator-type prefix", () => {
-        const { sql } = buildEvaluatorFacetQuery(ctx());
+        const { sql } = ClickHouseEvaluatorFacetAdapter.buildEvaluatorFacetQuery(ctx());
         // The label is name-or-id only: a bracketed `[type]` prefix repeats
         // across rows and eats the room the name needs to disambiguate.
         expect(sql).not.toMatch(/concat\('\[',\s*EvaluatorType/);
@@ -27,7 +27,7 @@ describe("buildEvaluatorFacetQuery", () => {
       });
 
       it("still keys the facet value off the evaluator id for query round-trips", () => {
-        const { sql } = buildEvaluatorFacetQuery(ctx());
+        const { sql } = ClickHouseEvaluatorFacetAdapter.buildEvaluatorFacetQuery(ctx());
         expect(sql).toMatch(/EvaluatorId AS facet_value/);
       });
     });
@@ -35,7 +35,7 @@ describe("buildEvaluatorFacetQuery", () => {
     describe("when the result aggregates are built", () => {
       /** @scenario Binary 0/1 score hides the score slider */
       it("counts distinct non-null scores capped at 3 so the drilldown can suppress a binary score slider", () => {
-        const { sql } = buildEvaluatorFacetQuery(ctx());
+        const { sql } = ClickHouseEvaluatorFacetAdapter.buildEvaluatorFacetQuery(ctx());
         expect(sql).toMatch(
           /uniqUpTo\(2\)\(IF\(isNotNull\(Score\), Score, NULL\)\) AS distinct_scores/,
         );
@@ -43,7 +43,7 @@ describe("buildEvaluatorFacetQuery", () => {
 
       /** @scenario Evaluator label values are filterable */
       it("aggregates top emitted-label values + counts as label_values", () => {
-        const { sql } = buildEvaluatorFacetQuery(ctx());
+        const { sql } = ClickHouseEvaluatorFacetAdapter.buildEvaluatorFacetQuery(ctx());
         // sumMap tallies Label -> count in one pass; the empty bucket is
         // filtered, ranked by count desc, and capped (top-10) so the discover
         // payload can't balloon for a label-happy evaluator.

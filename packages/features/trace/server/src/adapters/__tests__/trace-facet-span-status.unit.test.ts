@@ -1,22 +1,24 @@
+import { ClickHouseFacetRegistryAdapter } from "../trace-facet-registry.clickhouse.adapter";
+import { ClickHouseSpanStatusFacetAdapter } from "../trace-facet-span-status.clickhouse.adapter";
 import { describe, expect, it } from "vitest";
-import { FACET_REGISTRY } from "../trace-facet-registry.clickhouse.adapter";
-import { SPAN_STATUS_FACET } from "../trace-facet-span-status.clickhouse.adapter";
 
-describe("SPAN_STATUS_FACET", () => {
+describe("ClickHouseSpanStatusFacetAdapter.SPAN_STATUS_FACET", () => {
   it("is a categorical cross-table facet against stored_spans", () => {
-    expect(SPAN_STATUS_FACET.kind).toBe("categorical");
-    expect(SPAN_STATUS_FACET.table).toBe("stored_spans");
-    expect(SPAN_STATUS_FACET.group).toBe("span");
-    expect(SPAN_STATUS_FACET.key).toBe("spanStatus");
+    expect(ClickHouseSpanStatusFacetAdapter.SPAN_STATUS_FACET.kind).toBe("categorical");
+    expect(ClickHouseSpanStatusFacetAdapter.SPAN_STATUS_FACET.table).toBe("stored_spans");
+    expect(ClickHouseSpanStatusFacetAdapter.SPAN_STATUS_FACET.group).toBe("span");
+    expect(ClickHouseSpanStatusFacetAdapter.SPAN_STATUS_FACET.key).toBe("spanStatus");
   });
 
   describe("status code expression", () => {
     it("maps OTel status code 2 to 'error'", () => {
-      expect(SPAN_STATUS_FACET.expression).toContain("= 2, 'error'");
+      expect(ClickHouseSpanStatusFacetAdapter.SPAN_STATUS_FACET.expression).toContain(
+        "= 2, 'error'",
+      );
     });
 
     it("maps OTel status code 1 to 'ok'", () => {
-      expect(SPAN_STATUS_FACET.expression).toContain("= 1, 'ok'");
+      expect(ClickHouseSpanStatusFacetAdapter.SPAN_STATUS_FACET.expression).toContain("= 1, 'ok'");
     });
 
     it("coalesces a NULL status before comparing it", () => {
@@ -26,28 +28,34 @@ describe("SPAN_STATUS_FACET", () => {
       // dropping the span out of the filter entirely. Every read of the
       // column must therefore be NULL-coalesced before it is compared.
       const bareComparisons =
-        SPAN_STATUS_FACET.expression.match(/(?<!ifNull\()StatusCode\s*=/g) ?? [];
+        ClickHouseSpanStatusFacetAdapter.SPAN_STATUS_FACET.expression.match(
+          /(?<!ifNull\()StatusCode\s*=/g,
+        ) ?? [];
 
       expect(bareComparisons).toEqual([]);
-      expect(SPAN_STATUS_FACET.expression).toContain("ifNull(StatusCode, 0)");
+      expect(ClickHouseSpanStatusFacetAdapter.SPAN_STATUS_FACET.expression).toContain(
+        "ifNull(StatusCode, 0)",
+      );
     });
 
     it("treats a coalesced-to-zero status as 'unset'", () => {
-      expect(SPAN_STATUS_FACET.expression).toContain("'unset'");
+      expect(ClickHouseSpanStatusFacetAdapter.SPAN_STATUS_FACET.expression).toContain("'unset'");
     });
 
     it("doesn't accidentally swap the OK / ERROR codes (regression guard)", () => {
       // Anchors against the literal expression so a future copy/paste edit
       // that flips the code → label mapping fails loudly.
-      expect(SPAN_STATUS_FACET.expression).toBe(
+      expect(ClickHouseSpanStatusFacetAdapter.SPAN_STATUS_FACET.expression).toBe(
         "if(ifNull(StatusCode, 0) = 2, 'error', if(ifNull(StatusCode, 0) = 1, 'ok', 'unset'))",
       );
     });
   });
 
-  it("registers the spanStatus key into FACET_REGISTRY exactly once", () => {
-    const matches = FACET_REGISTRY.filter((d) => d.key === "spanStatus");
+  it("registers the spanStatus key into ClickHouseFacetRegistryAdapter.FACET_REGISTRY exactly once", () => {
+    const matches = ClickHouseFacetRegistryAdapter.FACET_REGISTRY.filter(
+      (d) => d.key === "spanStatus",
+    );
     expect(matches).toHaveLength(1);
-    expect(matches[0]).toBe(SPAN_STATUS_FACET);
+    expect(matches[0]).toBe(ClickHouseSpanStatusFacetAdapter.SPAN_STATUS_FACET);
   });
 });

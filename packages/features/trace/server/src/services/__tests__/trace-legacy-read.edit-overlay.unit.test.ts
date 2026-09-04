@@ -12,31 +12,12 @@ import type { EvaluationService } from "@langwatch/evaluation-contract";
 import type { Trace } from "@langwatch/trace-contract";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 
-const {
-  mockGetTracesWithSpans,
-  mockGetTracesWithSpansByThreadIds,
-  mockGetPatchesByTraceIds,
-} = vi.hoisted(() => ({
-  mockGetTracesWithSpans: vi.fn(),
-  mockGetTracesWithSpansByThreadIds: vi.fn(),
-  mockGetPatchesByTraceIds: vi.fn(),
-}));
-
-vi.mock("../../repositories/clickhouse/trace-legacy-read.repository", () => ({
-  ClickHouseTraceService: {
-    create: () => ({
-      getTracesWithSpans: mockGetTracesWithSpans,
-      getTracesWithSpansByThreadIds: mockGetTracesWithSpansByThreadIds,
-      resolveTraceIdByPrefix: vi.fn().mockResolvedValue([]),
-    }),
-  },
-}));
-
-vi.mock("../trace-edit-overlay.service", () => ({
-  TraceEditOverlayService: {
-    create: () => ({ getPatchesByTraceIds: mockGetPatchesByTraceIds }),
-  },
-}));
+const { mockGetTracesWithSpans, mockGetTracesWithSpansByThreadIds, mockGetPatchesByTraceIds } =
+  vi.hoisted(() => ({
+    mockGetTracesWithSpans: vi.fn(),
+    mockGetTracesWithSpansByThreadIds: vi.fn(),
+    mockGetPatchesByTraceIds: vi.fn(),
+  }));
 
 vi.mock("langwatch", () => ({
   getLangWatchTracer: () => ({
@@ -49,6 +30,8 @@ vi.mock("langwatch", () => ({
 }));
 
 import { TraceService } from "../trace-legacy-read.service";
+import type { TraceLegacyReadRepository } from "../../repositories/trace-legacy-read.repository";
+import type { TraceEditOverlayService } from "../trace-edit-overlay.service";
 
 const PROJECT_ID = "project_test";
 
@@ -75,7 +58,11 @@ function trace(traceId: string, output = "captured output"): Trace {
     trace_id: traceId,
     project_id: PROJECT_ID,
     metadata: {},
-    timestamps: { started_at: 1_700_000_000_000, inserted_at: 1_700_000_000_000, updated_at: 1_700_000_001_000 },
+    timestamps: {
+      started_at: 1_700_000_000_000,
+      inserted_at: 1_700_000_000_000,
+      updated_at: 1_700_000_001_000,
+    },
     output: { value: output },
     spans: [],
   } as unknown as Trace;
@@ -87,8 +74,15 @@ function traceOutputPatch(value: string) {
 
 function makeService(): TraceService {
   return TraceService.create({
-    prisma: {} as never,
     traceCanonicalisation: {} as TraceCanonicalisationService,
+    traceRead: {
+      getTracesWithSpans: mockGetTracesWithSpans,
+      getTracesWithSpansByThreadIds: mockGetTracesWithSpansByThreadIds,
+      resolveTraceIdByPrefix: vi.fn().mockResolvedValue([]),
+    } as unknown as TraceLegacyReadRepository,
+    editOverlay: {
+      getPatchesByTraceIds: mockGetPatchesByTraceIds,
+    } as unknown as TraceEditOverlayService,
     evaluationService: refusingEvaluations(),
   });
 }

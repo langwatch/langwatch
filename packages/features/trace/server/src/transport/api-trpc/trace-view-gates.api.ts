@@ -1,10 +1,8 @@
+import { TraceViewerProtectionsService } from "../../services/trace-viewer-protections.service";
 import type { Evaluation } from "@langwatch/trace-contract";
 import { NON_BILLABLE_ATTR } from "@langwatch/trace-contract";
-import { TraceAttributeRedactor } from "../../services/trace-attribute-redaction.service";
-import {
-  canReadCapturedContent,
-  type Protections,
-} from "../../services/trace-viewer-protections.service";
+import { TraceAttributeRedactionService } from "../../services/trace-attribute-redaction.service";
+import { type Protections } from "../../services/trace-viewer-protections.service";
 
 import type { SpanTreeNode, TraceHeader, TraceResourceInfoDto } from "@langwatch/trace-contract";
 
@@ -77,7 +75,7 @@ export function gateSessionCost<T extends { totalCost: number }>({
  *
  * The title is written BY the model FROM the conversation, a one-line summary
  * of what the human asked for, so it follows content visibility
- * (`canReadCapturedContent`) rather than the cost permission. The git identity
+ * (`TraceViewerProtectionsService.canReadCapturedContent`) rather than the cost permission. The git identity
  * on the same object is operational metadata about where the session ran and
  * is deliberately untouched.
  *
@@ -96,7 +94,7 @@ export function gateSessionTitle<T extends { codingAgent: { title: string | null
     codingAgent: (NonNullable<T["codingAgent"]> & SessionTitleRedactionFlag) | null;
   }
 > {
-  const contentVisible = canReadCapturedContent(protections);
+  const contentVisible = TraceViewerProtectionsService.canReadCapturedContent(protections);
   return sessions.map((session) => {
     const codingAgent = session.codingAgent as NonNullable<T["codingAgent"]> | null;
     return {
@@ -128,7 +126,7 @@ export function gateResources({
   protections: Protections;
 }): TraceResourceInfoDto {
   const redact = (attrs: Record<string, string>): Record<string, string> =>
-    TraceAttributeRedactor.for(protections.hiddenAttributes).redact(attrs) ?? attrs;
+    TraceAttributeRedactionService.create(protections.hiddenAttributes).redact(attrs) ?? attrs;
   return {
     ...resources,
     resourceAttributes: redact(resources.resourceAttributes),

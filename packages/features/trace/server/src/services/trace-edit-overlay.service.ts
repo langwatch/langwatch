@@ -1,9 +1,8 @@
 import { ValidationError } from "@langwatch/handled-error";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   TraceEditOverlayRepository,
   type TraceEditOverlayRow,
-} from "../repositories/prisma/prisma.trace-edit-overlay.repository";
+} from "../repositories/trace-edit-overlay.repository";
 import {
   emptyTraceEditOverlayPatch,
   encodeSpanIOFromEditedText,
@@ -32,8 +31,8 @@ export type TraceEditIOField = "input" | "output";
 export class TraceEditOverlayService {
   constructor(private readonly repository: TraceEditOverlayRepository) {}
 
-  static create(prisma: PrismaClient): TraceEditOverlayService {
-    return new TraceEditOverlayService(new TraceEditOverlayRepository(prisma));
+  static create(repository: TraceEditOverlayRepository): TraceEditOverlayService {
+    return new TraceEditOverlayService(repository);
   }
 
   async getByTraceId({

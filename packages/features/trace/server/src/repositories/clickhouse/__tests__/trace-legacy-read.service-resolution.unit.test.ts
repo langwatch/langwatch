@@ -1,22 +1,22 @@
 /**
- * Unit tests for the ClickHouseTraceService → blob-resolution seam (ADR-022).
+ * Unit tests for the TraceLegacyReadClickHouseRepository → blob-resolution seam (ADR-022).
  *
  * Mocks only the lowest-level CH driver (getClickHouseClientForTenant) and
- * wires a real BlobStore (via getFromEventLog stub) + real TraceIOExtractionService
+ * wires a real TraceBlobStoreService (via getFromEventLog stub) + real TraceIOExtractionService
  * so the full resolution + recomputed-IO pipeline fires end-to-end.
  *
  * BDD structure: given/when nested describes, action-based it() names.
  */
 
+import { TraceOffloadResolutionService } from "../../../services/trace-offload-resolution.service";
 import { createLogger } from "@langwatch/observability";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { BlobStore } from "../../../services/trace-blob-store.service";
+import type { TraceBlobStoreService } from "../../../services/trace-blob-store.service";
 import { BlobNotFoundError } from "../../../services/trace-blob-store.service";
 import { EVENTREF_ATTR_PREFIX } from "@langwatch/trace-contract";
 import { TraceIOExtractionService } from "../../../services/trace-io-extraction.service";
 import type { Protections } from "@langwatch/trace-server";
-import { resolveOffloadedTraces } from "../../../services/trace-offload-resolution.service";
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks — mock only the CH SQL boundary
@@ -138,9 +138,9 @@ function makeSpanRowWithEventRef(traceId: string, spanId: string) {
 }
 
 /**
- * Builds a fake BlobStore whose getFromEventLog resolves from a static map.
+ * Builds a fake TraceBlobStoreService whose getFromEventLog resolves from a static map.
  */
-function makeEventRefBlobStore(contents: Record<string, string>): BlobStore {
+function makeEventRefBlobStore(contents: Record<string, string>): TraceBlobStoreService {
   return {
     getFromEventLog: vi.fn(
       async ({
@@ -159,7 +159,7 @@ function makeEventRefBlobStore(contents: Record<string, string>): BlobStore {
     putSpool: vi.fn(),
     getSpool: vi.fn(),
     deleteSpool: vi.fn(),
-  } as unknown as BlobStore;
+  } as unknown as TraceBlobStoreService;
 }
 
 /**
@@ -186,9 +186,9 @@ function setupGetTracesWithSpansMocks(traceId: string, spanId: string) {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("ClickHouseTraceService — eventref resolution seam (ADR-022)", () => {
-  let ClickHouseTraceService: typeof import("../trace-legacy-read.repository").ClickHouseTraceService;
-  let blobStore: BlobStore;
+describe("TraceLegacyReadClickHouseRepository — eventref resolution seam (ADR-022)", () => {
+  let TraceLegacyReadClickHouseRepository: typeof import("../trace-legacy-read.repository").TraceLegacyReadClickHouseRepository;
+  let blobStore: TraceBlobStoreService;
   let resolveTraceSpansFn: import("../trace-legacy-read.repository").ResolveTraceSpansFn;
   let traceCanonicalisation: TraceCanonicalisationService;
 
@@ -196,7 +196,7 @@ describe("ClickHouseTraceService — eventref resolution seam (ADR-022)", () => 
     vi.clearAllMocks();
 
     const mod = await import("../trace-legacy-read.repository");
-    ClickHouseTraceService = mod.ClickHouseTraceService;
+    TraceLegacyReadClickHouseRepository = mod.TraceLegacyReadClickHouseRepository;
 
     blobStore = makeEventRefBlobStore({ "langwatch.output": fullOutput });
     traceCanonicalisation = TraceCanonicalisationService.create();
@@ -204,7 +204,7 @@ describe("ClickHouseTraceService — eventref resolution seam (ADR-022)", () => 
     const logger = createLogger("test");
 
     resolveTraceSpansFn = (projectId, normalizedSpans) =>
-      resolveOffloadedTraces({
+      TraceOffloadResolutionService.resolveOffloadedTraces({
         projectId,
         normalizedSpans,
         blobStore,
@@ -226,7 +226,7 @@ describe("ClickHouseTraceService — eventref resolution seam (ADR-022)", () => 
         it("strips the reserved eventref attr from the returned span", async () => {
           setupGetTracesWithSpansMocks("trace-1", "span-1");
 
-          const service = new ClickHouseTraceService({
+          const service = new TraceLegacyReadClickHouseRepository({
             resolveClickHouseClient: testResolveClickHouseClient,
             prisma: { project: { findUnique: vi.fn() } } as never,
             resolveTraceSpans: resolveTraceSpansFn,

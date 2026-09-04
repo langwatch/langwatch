@@ -5,10 +5,7 @@ import { SpanDataBag } from "../../../stores/canonical-span.bag";
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 import type { ExtractorContext } from "../../../ports/canonical-attributes.port";
 import { LogfireCanonicaliser } from "../logfire.canonicaliser";
-import {
-  createExtractorContext,
-  parseJsonStringAttrs,
-} from "../../../stores/__tests__/canonicalisation/adapters/test-helpers";
+import { createExtractorContext, parseJsonStringAttrs } from "./test-helpers";
 
 function createLogfireContext(
   attrs: Record<string, unknown>,

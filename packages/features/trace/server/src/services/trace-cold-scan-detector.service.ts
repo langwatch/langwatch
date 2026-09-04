@@ -43,38 +43,44 @@ function hasTimePredicate(sql: string, column: string): boolean {
   return colThenOp.test(sql) || opThenCol.test(sql);
 }
 
-/**
- * Returns the name of a time-partitioned table that the query reads without any
- * filter predicate on its partition time column, or null if the query is fine
- * (or not a SELECT against a tracked table).
- *
- * Errs toward flagging: a projection or ORDER BY mention of the time column does
- * NOT clear the flag, because those do not enable partition pruning. A false
- * positive is a cheap advisory log line; a false negative misses real S3 cost.
- */
-export function detectColdScan(query: string): string | null {
-  if (typeof query !== "string" || query.length === 0) {
-    return null;
+export class TraceColdScanDetectorService {
+  static create(): TraceColdScanDetectorService {
+    return new TraceColdScanDetectorService();
   }
 
-  const sql = stripComments(query);
-  const trimmed = sql.trimStart().toUpperCase();
-  if (!trimmed.startsWith("SELECT") && !trimmed.startsWith("WITH")) {
-    return null;
-  }
-
-  for (const [table, timeColumns] of Object.entries(TIME_PARTITIONED_TABLES)) {
-    // Word-boundary match so `stored_spans` doesn't match `stored_spans_v2`.
-    const tableRef = new RegExp(`\\b${table}\\b`, "i");
-    if (!tableRef.test(sql)) {
-      continue;
+  /**
+   * Returns the name of a time-partitioned table that the query reads without any
+   * filter predicate on its partition time column, or null if the query is fine
+   * (or not a SELECT against a tracked table).
+   *
+   * Errs toward flagging: a projection or ORDER BY mention of the time column does
+   * NOT clear the flag, because those do not enable partition pruning. A false
+   * positive is a cheap advisory log line; a false negative misses real S3 cost.
+   */
+  static detectColdScan(query: string): string | null {
+    if (typeof query !== "string" || query.length === 0) {
+      return null;
     }
 
-    const hasPredicate = timeColumns.some((col) => hasTimePredicate(sql, col));
-    if (!hasPredicate) {
-      return table;
+    const sql = stripComments(query);
+    const trimmed = sql.trimStart().toUpperCase();
+    if (!trimmed.startsWith("SELECT") && !trimmed.startsWith("WITH")) {
+      return null;
     }
-  }
 
-  return null;
+    for (const [table, timeColumns] of Object.entries(TIME_PARTITIONED_TABLES)) {
+      // Word-boundary match so `stored_spans` doesn't match `stored_spans_v2`.
+      const tableRef = new RegExp(`\\b${table}\\b`, "i");
+      if (!tableRef.test(sql)) {
+        continue;
+      }
+
+      const hasPredicate = timeColumns.some((col) => hasTimePredicate(sql, col));
+      if (!hasPredicate) {
+        return table;
+      }
+    }
+
+    return null;
+  }
 }

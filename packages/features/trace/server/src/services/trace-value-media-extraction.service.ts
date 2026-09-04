@@ -22,7 +22,7 @@
  *     An object is a candidate when the shared `visitContentPart` dispatcher
  *     recognizes it AND it carries inline bytes; url-only parts are already
  *     externalized and skipped. No I/O.
- *  2. STORE — externalize candidates through the same `processContentPart`
+ *  2. STORE — externalize candidates through the same `TraceContentExtractionService.processContentPart`
  *     the scenario extractor uses, in bounded-concurrency waves, respecting
  *     the caller's `ExtractionBudget`: a per-span part cap and a deadline.
  *     A part whose store fails (or that falls past the cap/deadline) simply
@@ -44,10 +44,11 @@
  * `media-walk-parity.unit.test.ts` pins the agreement.
  */
 
+import { TraceContentExtractionService } from "./trace-content-extraction.service";
 import { containsMediaMarkers } from "@langwatch/trace-contract";
 import { parseBase64DataUri, visitContentPart } from "@langwatch/trace-contract";
 import { MAX_MEDIA_WALK_DEPTH } from "@langwatch/trace-contract";
-import { type ExtractedRef, processContentPart } from "./trace-content-extraction.service";
+import { type ExtractedRef } from "./trace-content-extraction.service";
 import type { TraceMediaStorePort } from "../ports/trace-media-store.port";
 
 /** Upper bound for parsing a nested JSON string (sanity guard, not a policy). */
@@ -75,7 +76,7 @@ const CONCURRENT_STORES = 4;
 
 /**
  * Mutable cost budget threaded through one span's extraction. Create with
- * `createExtractionBudget()` and share across every attribute value of the
+ * `TraceValueMediaExtractionService.createExtractionBudget()` and share across every attribute value of the
  * span so the cap and deadline are per-span, not per-attribute.
  */
 export interface ExtractionBudget {
@@ -84,16 +85,6 @@ export interface ExtractionBudget {
   droppedByCap: number;
   droppedByDeadline: number;
   failedParts: number;
-}
-
-export function createExtractionBudget(now: number = Date.now()): ExtractionBudget {
-  return {
-    deadlineAt: now + EXTRACTION_DEADLINE_MS,
-    remainingParts: MAX_MEDIA_PARTS_PER_SPAN,
-    droppedByCap: 0,
-    droppedByDeadline: 0,
-    failedParts: 0,
-  };
 }
 
 interface WalkParams {
@@ -118,37 +109,6 @@ interface CandidateSite {
   path: PathSeg[];
   node: unknown;
   kind: "part" | "bareDataUri";
-}
-
-/**
- * True when the object IS a media part carrying inline bytes — i.e. the
- * shapes `processContentPart` would externalize. Url-only parts (already
- * externalized) and non-part objects return false. Uses the same
- * `visitContentPart` dispatcher as the store phase, so the two cannot
- * disagree on shape vocabulary — only on the payload-presence checks below,
- * which the parity test pins against `processContentPart`'s behavior.
- */
-export function isExtractableMediaPart(part: unknown): boolean {
-  if (typeof part !== "object" || part === null) {
-    return false;
-  }
-
-  return (
-    visitContentPart<boolean>(part, {
-      text: () => false,
-      toolCall: () => false,
-      toolResult: () => false,
-      media: (p) =>
-        p.source.type === "data" &&
-        typeof p.source.value === "string" &&
-        typeof p.source.mimeType === "string",
-      binary: (p) => p.data !== undefined && p.url === undefined && p.id === undefined,
-      imageUrl: (url) => parseBase64DataUri(url) !== null,
-      bareImage: (src) => parseBase64DataUri(src) !== null,
-      inputAudio: (p) => typeof p.data === "string",
-      unknown: () => false,
-    }) ?? false
-  );
 }
 
 /** A string whose ENTIRE value is one base64 `data:` URI. */
@@ -204,7 +164,7 @@ function collectCandidates(
   if (typeof value === "object") {
     // Part-first: a media part is a leaf — the rewritten reference has
     // nothing left to extract inside it, so we never descend into parts.
-    if (isExtractableMediaPart(value)) {
+    if (TraceValueMediaExtractionService.isExtractableMediaPart(value)) {
       sites.push({ path, node: value, kind: "part" });
 
       return;
@@ -251,7 +211,10 @@ async function processSite(
             mimeType: parsed.mimeType,
             data: parsed.base64,
           };
-    const { ref } = await processContentPart({ part: asPart, ...params });
+    const { ref } = await TraceContentExtractionService.processContentPart({
+      part: asPart,
+      ...params,
+    });
     if (ref === null) {
       return null;
     }
@@ -267,7 +230,7 @@ async function processSite(
     };
   }
 
-  const { part, ref } = await processContentPart({
+  const { part, ref } = await TraceContentExtractionService.processContentPart({
     part: site.node,
     ...params,
   });
@@ -394,50 +357,97 @@ function rebuild(value: unknown, sites: StoredSite[], segIndex: number): unknown
 // Public API
 // ---------------------------------------------------------------------------
 
-/**
- * Walks `value` (any JSON-compatible value, or a JSON string) and
- * externalizes inline media parts found at any depth, including through
- * media-marker-gated nested JSON strings and whole-string `data:` URIs.
- *
- * Storage runs in bounded-concurrency waves under `budget` (a per-span cap
- * and deadline shared across a span's attribute values — pass the same
- * budget object to every call for one span). Per-part store failures are
- * fail-open: the failed part stays inline, `budget.failedParts` is
- * incremented, and every part stored before the failure keeps its reference.
- *
- * Returns the original `value` reference when nothing was rewritten.
- */
-export async function extractInlineMediaFromValue({
-  value,
-  projectId,
-  purpose,
-  ownerKind,
-  ownerId,
-  service,
-  budget,
-}: WalkParams & {
-  value: unknown;
-  budget?: ExtractionBudget;
-}): Promise<{
-  value: unknown;
-  refs: ExtractedRef[];
-}> {
-  const sites: CandidateSite[] = [];
-  collectCandidates(value, 0, [], sites);
-  if (sites.length === 0) {
-    return { value, refs: [] };
+export class TraceValueMediaExtractionService {
+  static create(): TraceValueMediaExtractionService {
+    return new TraceValueMediaExtractionService();
   }
 
-  const refs: ExtractedRef[] = [];
-  const stored = await storeCandidates(
-    sites,
-    { projectId, purpose, ownerKind, ownerId, service },
-    budget ?? createExtractionBudget(),
-    refs,
-  );
-  if (stored.length === 0) {
-    return { value, refs };
+  static createExtractionBudget(now: number = Date.now()): ExtractionBudget {
+    return {
+      deadlineAt: now + EXTRACTION_DEADLINE_MS,
+      remainingParts: MAX_MEDIA_PARTS_PER_SPAN,
+      droppedByCap: 0,
+      droppedByDeadline: 0,
+      failedParts: 0,
+    };
   }
 
-  return { value: rebuild(value, stored, 0), refs };
+  /**
+   * True when the object IS a media part carrying inline bytes — i.e. the
+   * shapes `TraceContentExtractionService.processContentPart` would externalize. Url-only parts (already
+   * externalized) and non-part objects return false. Uses the same
+   * `visitContentPart` dispatcher as the store phase, so the two cannot
+   * disagree on shape vocabulary — only on the payload-presence checks below,
+   * which the parity test pins against `TraceContentExtractionService.processContentPart`'s behavior.
+   */
+  static isExtractableMediaPart(part: unknown): boolean {
+    if (typeof part !== "object" || part === null) {
+      return false;
+    }
+
+    return (
+      visitContentPart<boolean>(part, {
+        text: () => false,
+        toolCall: () => false,
+        toolResult: () => false,
+        media: (p) =>
+          p.source.type === "data" &&
+          typeof p.source.value === "string" &&
+          typeof p.source.mimeType === "string",
+        binary: (p) => p.data !== undefined && p.url === undefined && p.id === undefined,
+        imageUrl: (url) => parseBase64DataUri(url) !== null,
+        bareImage: (src) => parseBase64DataUri(src) !== null,
+        inputAudio: (p) => typeof p.data === "string",
+        unknown: () => false,
+      }) ?? false
+    );
+  }
+
+  /**
+   * Walks `value` (any JSON-compatible value, or a JSON string) and
+   * externalizes inline media parts found at any depth, including through
+   * media-marker-gated nested JSON strings and whole-string `data:` URIs.
+   *
+   * Storage runs in bounded-concurrency waves under `budget` (a per-span cap
+   * and deadline shared across a span's attribute values — pass the same
+   * budget object to every call for one span). Per-part store failures are
+   * fail-open: the failed part stays inline, `budget.failedParts` is
+   * incremented, and every part stored before the failure keeps its reference.
+   *
+   * Returns the original `value` reference when nothing was rewritten.
+   */
+  static async extractInlineMediaFromValue({
+    value,
+    projectId,
+    purpose,
+    ownerKind,
+    ownerId,
+    service,
+    budget,
+  }: WalkParams & {
+    value: unknown;
+    budget?: ExtractionBudget;
+  }): Promise<{
+    value: unknown;
+    refs: ExtractedRef[];
+  }> {
+    const sites: CandidateSite[] = [];
+    collectCandidates(value, 0, [], sites);
+    if (sites.length === 0) {
+      return { value, refs: [] };
+    }
+
+    const refs: ExtractedRef[] = [];
+    const stored = await storeCandidates(
+      sites,
+      { projectId, purpose, ownerKind, ownerId, service },
+      budget ?? TraceValueMediaExtractionService.createExtractionBudget(),
+      refs,
+    );
+    if (stored.length === 0) {
+      return { value, refs };
+    }
+
+    return { value: rebuild(value, stored, 0), refs };
+  }
 }

@@ -1,8 +1,8 @@
+import { TraceProjectionLeanEventingAdapter } from "../eventing.trace-projection-lean.adapter";
 import { describe, expect, it } from "vitest";
 import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 import type { ClickHouseEventRow } from "@langwatch/eventing/server";
 import { rowToEvent } from "@langwatch/eventing/server";
-import { leanReplayEvent } from "../eventing.trace-projection-lean.adapter";
 
 function makeRow(overrides: Partial<ClickHouseEventRow>): ClickHouseEventRow {
   return {
@@ -37,7 +37,7 @@ describe("rowToEvent", () => {
             },
           }),
         }),
-        leanReplayEvent,
+        TraceProjectionLeanEventingAdapter.leanReplayEvent,
       );
 
       const attrs = (event.data as any)?.span?.attributes ?? [];
@@ -49,7 +49,10 @@ describe("rowToEvent", () => {
 
   describe("when a row has no occurred-at value", () => {
     it("falls back to the event timestamp", () => {
-      const event = rowToEvent(makeRow({ EventOccurredAt: 0 }), leanReplayEvent);
+      const event = rowToEvent(
+        makeRow({ EventOccurredAt: 0 }),
+        TraceProjectionLeanEventingAdapter.leanReplayEvent,
+      );
       expect(event.occurredAt).toBe(1_700_000_000_000);
     });
   });

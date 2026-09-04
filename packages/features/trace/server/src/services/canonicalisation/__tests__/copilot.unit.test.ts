@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { canonicalisation } from "../../__tests__/canonicalisation/test-helpers";
 import { CopilotCanonicaliser } from "../copilot.canonicaliser";
-import { createExtractorContext } from "../../../stores/__tests__/canonicalisation/adapters/test-helpers";
+import { createExtractorContext } from "./test-helpers";
 
 describe("CopilotCanonicaliser", () => {
   describe("when the span carries copilot-specific attributes", () => {

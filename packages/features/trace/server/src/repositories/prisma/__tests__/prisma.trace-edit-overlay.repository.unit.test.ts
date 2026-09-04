@@ -8,7 +8,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { TraceEditOverlayRepository } from "../prisma.trace-edit-overlay.repository";
+import { PrismaTraceEditOverlayRepository } from "../prisma.trace-edit-overlay.repository";
 import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
 
 const patch: TraceEditOverlayPatch = {
@@ -28,7 +28,7 @@ describe("saving a correction", () => {
     it("retries the losing insert as an update", async () => {
       const upsert = vi.fn().mockRejectedValueOnce(uniqueViolation());
       const update = vi.fn().mockResolvedValue(row);
-      const repository = new TraceEditOverlayRepository({
+      const repository = PrismaTraceEditOverlayRepository.create({
         traceEditOverlay: { upsert, update },
       } as unknown as PrismaClient);
 
@@ -56,7 +56,7 @@ describe("saving a correction", () => {
     it("surfaces the failure instead of retrying", async () => {
       const upsert = vi.fn().mockRejectedValue(new Error("connection lost"));
       const update = vi.fn();
-      const repository = new TraceEditOverlayRepository({
+      const repository = PrismaTraceEditOverlayRepository.create({
         traceEditOverlay: { upsert, update },
       } as unknown as PrismaClient);
 

@@ -34,7 +34,7 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
-import type { BlobStore } from "../trace-blob-store.service";
+import type { TraceBlobStoreService } from "../trace-blob-store.service";
 import { BlobNotFoundError } from "../trace-blob-store.service";
 import { EVENTREF_ATTR_PREFIX } from "@langwatch/trace-contract";
 import type { SpanStorageRepository } from "../../repositories/span-storage.repository";
@@ -106,7 +106,7 @@ function makeStubRepository(normalizedSpans: NormalizedSpan[]): SpanStorageRepos
   } as unknown as SpanStorageRepository;
 }
 
-function makeBlobStore(resolvedValues: Record<string, string>): BlobStore {
+function makeBlobStore(resolvedValues: Record<string, string>): TraceBlobStoreService {
   return {
     getFromEventLog: vi.fn(async ({ field }: { field: string }) => {
       if (field in resolvedValues) return resolvedValues[field]!;
@@ -115,7 +115,7 @@ function makeBlobStore(resolvedValues: Record<string, string>): BlobStore {
     putSpool: vi.fn(),
     getSpool: vi.fn(),
     deleteSpool: vi.fn(),
-  } as unknown as BlobStore;
+  } as unknown as TraceBlobStoreService;
 }
 
 // ---------------------------------------------------------------------------
@@ -244,7 +244,7 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
           putSpool: vi.fn(),
           getSpool: vi.fn(),
           deleteSpool: vi.fn(),
-        } as unknown as BlobStore;
+        } as unknown as TraceBlobStoreService;
         const service = new SpanStorageService(repo, {
           blobStore,
           ioExtractionService: new TraceIOExtractionService(TraceCanonicalisationService.create()),
@@ -261,7 +261,7 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
         const outputStr =
           outputValue?.type === "text" ? outputValue.value : JSON.stringify(outputValue);
         expect(outputStr).toBe("A short non-offloaded output value");
-        // Fast-path: BlobStore is never called when there are no eventref attrs.
+        // Fast-path: TraceBlobStoreService is never called when there are no eventref attrs.
         expect(getFromEventLogSpy).not.toHaveBeenCalled();
       });
     });

@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { TraceQueryClickHouse } from "../trace-query.clickhouse.adapter";
+import { TraceQueryClickHouseAdapter } from "../trace-query.clickhouse.adapter";
 
 const TENANT = "project_test";
 const TIME_RANGE = { from: 1714435200000, to: 1715040000000 };
 
 function translate(query: string) {
-  return TraceQueryClickHouse.translateFilter(query, TENANT, TIME_RANGE);
+  return TraceQueryClickHouseAdapter.translateFilter(query, TENANT, TIME_RANGE);
 }
 
 describe("dynamic attribute prefix translation", () => {

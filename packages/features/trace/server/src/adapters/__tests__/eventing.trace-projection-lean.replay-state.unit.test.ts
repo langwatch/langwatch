@@ -1,3 +1,4 @@
+import { TraceProjectionLeanEventingAdapter } from "../eventing.trace-projection-lean.adapter";
 import {
   nullLog,
   type ProjectionStoreContext,
@@ -14,7 +15,6 @@ import {
   EventingClickHouseReplayEventSource,
   type EventingClickHouseReplayClient,
 } from "@langwatch/eventing/server";
-import { leanReplayEvent } from "../eventing.trace-projection-lean.adapter";
 
 interface CounterState {
   count: number;
@@ -333,7 +333,7 @@ describe("replayStateProjection", () => {
           if (tenantId) resolvedTenants.push(tenantId);
           return client;
         },
-        lean: leanReplayEvent,
+        lean: TraceProjectionLeanEventingAdapter.leanReplayEvent,
       }),
       accumulatorOpts: {},
     };
@@ -413,7 +413,7 @@ describe("replayStateProjection", () => {
         redis,
         eventSource: new EventingClickHouseReplayEventSource({
           resolveClient: async () => client,
-          lean: leanReplayEvent,
+          lean: TraceProjectionLeanEventingAdapter.leanReplayEvent,
         }),
         accumulatorOpts: {},
       },
@@ -455,7 +455,7 @@ describe("replayStateProjection", () => {
       redis: forbiddenRedis,
       eventSource: new EventingClickHouseReplayEventSource({
         resolveClient: async () => client,
-        lean: leanReplayEvent,
+        lean: TraceProjectionLeanEventingAdapter.leanReplayEvent,
       }),
       accumulatorOpts: {},
     };
@@ -488,7 +488,7 @@ describe("the fold/map engine with state projections", () => {
         resolveClient: async () => {
           throw new Error("should not resolve — guard must fire first");
         },
-        lean: leanReplayEvent,
+        lean: TraceProjectionLeanEventingAdapter.leanReplayEvent,
       }),
       accumulatorOpts: {},
     } as unknown as ReplayContext;

@@ -14,6 +14,7 @@
  * meeting: two applications over one project's rows let two doors answer the
  * same question differently, and REST and tRPC are exactly two doors.
  */
+import { TraceContentExtractionService } from "@langwatch/trace-server";
 import { AgentApp } from "@langwatch/agent-server";
 import type { ApiKeyService } from "@langwatch/api-key-contract";
 import type {
@@ -36,7 +37,6 @@ import { SecretApp, type SecretEncryptionPort } from "@langwatch/secret-server";
 import type { SecretService } from "@langwatch/secret-contract";
 import type { StoredObjectsService } from "@langwatch/stored-object-server";
 import {
-  extractInlineMediaFromEvent,
   TraceMediaStorePort,
   type CollectorProject,
   type CollectorUsageLimitPort,
@@ -299,7 +299,7 @@ export function composeApiPackagedRest(
       ...(storedObjectBytes
         ? {
             extractInlineMedia: (input) =>
-              extractInlineMediaFromEvent({
+              TraceContentExtractionService.extractInlineMediaFromEvent({
                 ...input,
                 service: ApiTraceMediaStore.create(storedObjectBytes),
               }),

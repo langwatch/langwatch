@@ -1,10 +1,10 @@
+import { TraceSpanCostMatchingService } from "../trace-span-cost-matching.service";
 import { describe, expect, it } from "vitest";
-import { computeSpanCost } from "../trace-span-cost-matching.service";
 
-describe("computeSpanCost", () => {
+describe("TraceSpanCostMatchingService.computeSpanCost", () => {
   describe("when span has custom cost rates", () => {
     it("computes cost from custom rates", () => {
-      const result = computeSpanCost({
+      const result = TraceSpanCostMatchingService.computeSpanCost({
         attrs: {
           "langwatch.model.inputCostPerToken": 0.000005,
           "langwatch.model.outputCostPerToken": 0.000015,
@@ -17,7 +17,7 @@ describe("computeSpanCost", () => {
     });
 
     it("prices cache tokens at the custom override rate when present", () => {
-      const result = computeSpanCost({
+      const result = TraceSpanCostMatchingService.computeSpanCost({
         attrs: {
           "langwatch.model.inputCostPerToken": 0.000005,
           "langwatch.model.outputCostPerToken": 0.000015,
@@ -37,7 +37,7 @@ describe("computeSpanCost", () => {
     });
 
     it("falls back to the input rate for cache tokens when no cache override is set", () => {
-      const result = computeSpanCost({
+      const result = TraceSpanCostMatchingService.computeSpanCost({
         attrs: {
           "langwatch.model.inputCostPerToken": 0.000005,
           "langwatch.model.outputCostPerToken": 0.000015,
@@ -51,7 +51,7 @@ describe("computeSpanCost", () => {
     });
 
     it("returns 0 without falling through when custom rates yield zero cost", () => {
-      const result = computeSpanCost({
+      const result = TraceSpanCostMatchingService.computeSpanCost({
         attrs: {
           "langwatch.model.inputCostPerToken": 0,
           "langwatch.model.outputCostPerToken": 0,
@@ -68,7 +68,7 @@ describe("computeSpanCost", () => {
     it("prices cache-read tokens at the discounted cache rate, not the full input price", () => {
       // A mostly-cached follow-up: 510 fresh input + 37127 cache-read + 14
       // cache-write (the depleted-"yo" shape from the bug report).
-      const cacheAware = computeSpanCost({
+      const cacheAware = TraceSpanCostMatchingService.computeSpanCost({
         attrs: {
           "gen_ai.request.model": "claude-opus-4-7",
           "gen_ai.usage.cache_read.input_tokens": 37127,
@@ -78,7 +78,7 @@ describe("computeSpanCost", () => {
         completionTokens: 12,
       });
       // The bug: the 37k cache-read tokens billed as full input price.
-      const asIfFullInput = computeSpanCost({
+      const asIfFullInput = TraceSpanCostMatchingService.computeSpanCost({
         attrs: { "gen_ai.request.model": "claude-opus-4-7" },
         promptTokens: 510 + 37127 + 14,
         completionTokens: 12,
@@ -88,7 +88,7 @@ describe("computeSpanCost", () => {
     });
 
     it("adds cache-read cost on top of the non-cached input (input treated as exclusive)", () => {
-      const cost = computeSpanCost({
+      const cost = TraceSpanCostMatchingService.computeSpanCost({
         attrs: {
           "gen_ai.request.model": "claude-opus-4-7",
           "gen_ai.usage.cache_read.input_tokens": 1000,
@@ -103,7 +103,7 @@ describe("computeSpanCost", () => {
 
   describe("when span has model in static registry", () => {
     it("uses static registry pricing", () => {
-      const result = computeSpanCost({
+      const result = TraceSpanCostMatchingService.computeSpanCost({
         attrs: { "gen_ai.request.model": "gpt-5-mini" },
         promptTokens: 1000,
         completionTokens: 500,
@@ -116,7 +116,7 @@ describe("computeSpanCost", () => {
 
   describe("when model has provider subtype and date suffix", () => {
     it("resolves cost via cascading fallback", () => {
-      const result = computeSpanCost({
+      const result = TraceSpanCostMatchingService.computeSpanCost({
         attrs: {
           "gen_ai.request.model": "openai.responses/gpt-5-mini-2025-08-07",
         },
@@ -130,7 +130,7 @@ describe("computeSpanCost", () => {
 
   describe("when model is passed as param", () => {
     it("uses the param over attributes", () => {
-      const result = computeSpanCost({
+      const result = TraceSpanCostMatchingService.computeSpanCost({
         attrs: { "gen_ai.request.model": "totally-unknown-model" },
         model: "gpt-5-mini",
         promptTokens: 1000,
@@ -142,7 +142,7 @@ describe("computeSpanCost", () => {
 
   describe("when response model and request model both present", () => {
     it("prefers response model over request model", () => {
-      const result = computeSpanCost({
+      const result = TraceSpanCostMatchingService.computeSpanCost({
         attrs: {
           "gen_ai.response.model": "gpt-5-mini",
           "gen_ai.request.model": "totally-unknown-model",
@@ -156,7 +156,7 @@ describe("computeSpanCost", () => {
 
   describe("when span has SDK-provided cost", () => {
     it("uses the SDK cost when no model/tokens are present", () => {
-      const result = computeSpanCost({
+      const result = TraceSpanCostMatchingService.computeSpanCost({
         attrs: { "langwatch.span.cost": 0.005 },
         promptTokens: null,
         completionTokens: null,
@@ -168,7 +168,7 @@ describe("computeSpanCost", () => {
       // Regression: a known model + tokens used to win via the registry,
       // silently dropping an explicit negotiated/override cost. The explicit
       // figure is authoritative and must win.
-      const result = computeSpanCost({
+      const result = TraceSpanCostMatchingService.computeSpanCost({
         attrs: {
           "gen_ai.request.model": "gpt-5-mini",
           "langwatch.span.cost": 0.042,
@@ -184,7 +184,7 @@ describe("computeSpanCost", () => {
       // An application that states its own cost through the SDK's metrics.cost
       // must win over our token x registry estimate, even for a model the
       // registry knows how to price.
-      const result = computeSpanCost({
+      const result = TraceSpanCostMatchingService.computeSpanCost({
         attrs: {
           "gen_ai.response.model": "claude-opus-4-7",
           "langwatch.span.cost": 0.123,
@@ -197,7 +197,7 @@ describe("computeSpanCost", () => {
 
     it("falls through to the registry when the explicit cost is zero", () => {
       // A zero (or absent) explicit cost must not suppress registry costing.
-      const result = computeSpanCost({
+      const result = TraceSpanCostMatchingService.computeSpanCost({
         attrs: {
           "gen_ai.request.model": "gpt-5-mini",
           "langwatch.span.cost": 0,
@@ -210,7 +210,7 @@ describe("computeSpanCost", () => {
 
     it("keeps per-token enrichment rates ahead of an explicit total cost", () => {
       // Custom per-token rates are a deliberate pricing policy and stay first.
-      const result = computeSpanCost({
+      const result = TraceSpanCostMatchingService.computeSpanCost({
         attrs: {
           "gen_ai.request.model": "gpt-5-mini",
           "langwatch.model.inputCostPerToken": 1e-6,
@@ -227,7 +227,7 @@ describe("computeSpanCost", () => {
 
   describe("when span is a guardrail with USD cost", () => {
     it("extracts guardrail cost", () => {
-      const result = computeSpanCost({
+      const result = TraceSpanCostMatchingService.computeSpanCost({
         attrs: {
           "langwatch.span.type": "guardrail",
           "langwatch.output": {
@@ -242,7 +242,7 @@ describe("computeSpanCost", () => {
     });
 
     it("ignores non-USD guardrail currency", () => {
-      const result = computeSpanCost({
+      const result = TraceSpanCostMatchingService.computeSpanCost({
         attrs: {
           "langwatch.span.type": "guardrail",
           "langwatch.output": {
@@ -259,7 +259,7 @@ describe("computeSpanCost", () => {
 
   describe("when no cost information is available", () => {
     it("returns 0", () => {
-      const result = computeSpanCost({
+      const result = TraceSpanCostMatchingService.computeSpanCost({
         attrs: {},
         promptTokens: null,
         completionTokens: null,
@@ -276,7 +276,7 @@ describe("computeSpanCost", () => {
  * 0.1930215 USD. Pricing the writes as hour-long reproduces that number
  * exactly; pricing them short-lived lands about a third low.
  */
-describe("cache write TTL pricing through computeSpanCost", () => {
+describe("cache write TTL pricing through TraceSpanCostMatchingService.computeSpanCost", () => {
   const CLAUDE_CALL = {
     "gen_ai.request.model": "claude-opus-5",
     "gen_ai.usage.input_tokens": 2,
@@ -289,7 +289,7 @@ describe("cache write TTL pricing through computeSpanCost", () => {
   describe("given a span saying its cache entry lives an hour", () => {
     /** @scenario "Each cache write bucket is priced at its own rate" */
     it("reproduces the cost the provider reported for the call", () => {
-      const cost = computeSpanCost({
+      const cost = TraceSpanCostMatchingService.computeSpanCost({
         attrs: {
           ...CLAUDE_CALL,
           "gen_ai.usage.cache_creation_1h.input_tokens": 17854,
@@ -305,7 +305,7 @@ describe("cache write TTL pricing through computeSpanCost", () => {
   describe("given the same span without the cache lifetime", () => {
     /** @scenario "A call that does not say how long its cache lives is priced as before" */
     it("prices the writes short-lived, below what the provider charged", () => {
-      const cost = computeSpanCost({
+      const cost = TraceSpanCostMatchingService.computeSpanCost({
         attrs: CLAUDE_CALL,
         promptTokens: 2,
         completionTokens: 210,
@@ -322,7 +322,7 @@ describe("cache write TTL pricing through computeSpanCost", () => {
   describe("given a project overriding the rates itself", () => {
     /** @scenario "A model with no hour-long rate prices every write the same" */
     it("prices hour-long writes at the override's own cache write rate", () => {
-      const cost = computeSpanCost({
+      const cost = TraceSpanCostMatchingService.computeSpanCost({
         attrs: {
           ...CLAUDE_CALL,
           "gen_ai.usage.cache_creation_1h.input_tokens": 17854,
@@ -348,7 +348,7 @@ describe("cache write TTL pricing through computeSpanCost", () => {
      * @scenario "Each cache write bucket is priced at its own rate"
      */
     it("still prices the cache when the override zeroes input and output", () => {
-      const cost = computeSpanCost({
+      const cost = TraceSpanCostMatchingService.computeSpanCost({
         attrs: {
           ...CLAUDE_CALL,
           "gen_ai.usage.cache_creation_1h.input_tokens": 17854,
@@ -366,7 +366,7 @@ describe("cache write TTL pricing through computeSpanCost", () => {
 
     /** @scenario "Each cache write bucket is priced at its own rate" */
     it("uses the override's hour-long rate when it sets one", () => {
-      const cost = computeSpanCost({
+      const cost = TraceSpanCostMatchingService.computeSpanCost({
         attrs: {
           ...CLAUDE_CALL,
           "gen_ai.usage.cache_creation_1h.input_tokens": 17854,

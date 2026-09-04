@@ -4,7 +4,7 @@ import { SpanDataBag } from "../../../stores/canonical-span.bag";
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 import type { ExtractorContext } from "../../../ports/canonical-attributes.port";
 import { StrandsCanonicaliser } from "../strands.canonicaliser";
-import { createExtractorContext } from "../../../stores/__tests__/canonicalisation/adapters/test-helpers";
+import { createExtractorContext } from "./test-helpers";
 
 /**
  * Creates a context with events support for Strands tests.

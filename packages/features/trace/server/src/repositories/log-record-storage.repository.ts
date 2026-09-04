@@ -29,7 +29,7 @@ export interface StoredLogRecordRow {
  */
 export const TRACE_LOG_READ_CAP = 2000;
 
-export interface LogRecordStorageRepository {
+export abstract class LogRecordStorageRepository {
   /**
    * Read every log record correlated to one trace (generic — not filtered to
    * any emitter), oldest first, capped at `limit` rows
@@ -39,38 +39,34 @@ export interface LogRecordStorageRepository {
    * `occurredAtMs` is an optional partition-pruning hint on the `TimeUnixMs`
    * partition key.
    */
-  getLogsByTraceId(
+  abstract getLogsByTraceId(
     tenantId: string,
     traceId: string,
     occurredAtMs?: number,
     limit?: number,
   ): Promise<StoredLogRecordRow[]>;
-}
-
-/**
- * Dedup + time-order rows read from BOTH log stores during the canonical
- * cutover. Legacy rows preserve OTLP insertion order while canonical rows
- * are key-sorted (stableStringify), so attribute keys are sorted before
- * serialising or the same record could produce two different identities and
- * slip past the dedup.
- */
-export function mergeStoredLogRows(
-  rows: StoredLogRecordRow[],
-  limit?: number,
-): StoredLogRecordRow[] {
-  const deduped = new Map<string, StoredLogRecordRow>();
-  for (const row of rows) {
-    const key = [
-      row.traceId,
-      row.spanId,
-      row.timeUnixMs,
-      row.scopeName,
-      JSON.stringify(Object.fromEntries(Object.entries(row.attributes).sort())),
-    ].join("\0");
-    deduped.set(key, row);
+  /**
+   * Dedup + time-order rows read from BOTH log stores during the canonical
+   * cutover. Legacy rows preserve OTLP insertion order while canonical rows
+   * are key-sorted (stableStringify), so attribute keys are sorted before
+   * serialising or the same record could produce two different identities and
+   * slip past the dedup.
+   */
+  static mergeStoredLogRows(rows: StoredLogRecordRow[], limit?: number): StoredLogRecordRow[] {
+    const deduped = new Map<string, StoredLogRecordRow>();
+    for (const row of rows) {
+      const key = [
+        row.traceId,
+        row.spanId,
+        row.timeUnixMs,
+        row.scopeName,
+        JSON.stringify(Object.fromEntries(Object.entries(row.attributes).sort())),
+      ].join("\0");
+      deduped.set(key, row);
+    }
+    const sorted = [...deduped.values()].sort((left, right) => left.timeUnixMs - right.timeUnixMs);
+    return typeof limit === "number" && limit > 0 ? sorted.slice(0, limit) : sorted;
   }
-  const sorted = [...deduped.values()].sort((left, right) => left.timeUnixMs - right.timeUnixMs);
-  return typeof limit === "number" && limit > 0 ? sorted.slice(0, limit) : sorted;
 }
 
 export class NullLogRecordStorageRepository implements LogRecordStorageRepository {

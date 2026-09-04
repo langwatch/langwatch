@@ -6,15 +6,16 @@
  * parse it ONCE here and stamp the result on the record, so reads are cheap and
  * the data becomes queryable as ordinary log attributes.
  */
+import { TraceLogContentDerivationService } from "../trace-log-content-derivation.service";
 import { describe, expect, it } from "vitest";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
-import { DERIVED_ATTRS, deriveLogContentAttributes } from "../trace-log-content-derivation.service";
+import { DERIVED_ATTRS } from "../trace-log-content-derivation.service";
 
 const CLAUDE_SCOPE = "com.anthropic.claude_code.events";
 const traceCanonicalisation = TraceCanonicalisationService.create();
 
 function derive(attributes: Record<string, string>, scopeName = CLAUDE_SCOPE) {
-  return deriveLogContentAttributes({
+  return TraceLogContentDerivationService.deriveLogContentAttributes({
     scopeName,
     attributes,
     traceCanonicalisation,
@@ -41,7 +42,7 @@ const RESPONSE_BODY = JSON.stringify({
   ],
 });
 
-describe("deriveLogContentAttributes", () => {
+describe("TraceLogContentDerivationService.deriveLogContentAttributes", () => {
   describe("given an api_response_body", () => {
     const derived = derive({
       "event.name": "api_response_body",

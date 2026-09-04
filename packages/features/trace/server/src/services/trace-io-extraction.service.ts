@@ -35,6 +35,10 @@ import { ATTR_KEYS, type TraceCanonicalisationService } from "@langwatch/trace-c
  * ```
  */
 export class TraceIOExtractionService {
+  static create(traceCanonicalisation: TraceCanonicalisationService): TraceIOExtractionService {
+    return new TraceIOExtractionService(traceCanonicalisation);
+  }
+
   constructor(private readonly traceCanonicalisation: TraceCanonicalisationService) {}
   private readonly tracer = getLangWatchTracer("langwatch.trace-processing.io-extraction");
 

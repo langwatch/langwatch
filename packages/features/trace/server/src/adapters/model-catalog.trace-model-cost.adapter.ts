@@ -1,11 +1,11 @@
+import { TraceSpanCostMatchingService } from "../services/trace-span-cost-matching.service";
 import type { NormalizedAttributes } from "@langwatch/trace-contract";
 import { TraceModelCostPort } from "../ports/trace-model-cost.port";
-import { computeSpanCost } from "../services/trace-span-cost-matching.service";
 
 /**
  * Fold-time span cost, priced from the platform's immutable model catalog.
  *
- * It IS `computeSpanCost` — the application's own function, now this package's
+ * It IS `TraceSpanCostMatchingService.computeSpanCost` — the application's own function, now this package's
  * (`services/trace-span-cost-matching.service.ts`), which the legacy span
  * mapper and the stored-span reader also price through. It was a frozen twin
  * while both graphs ingested; now there is one, and the SURVEY THAT SHRANK THE
@@ -21,7 +21,7 @@ import { computeSpanCost } from "../services/trace-span-cost-matching.service";
  * `deriveScenarioRoleMetrics` blocked because it is "the App's per-project
  * span-cost matching, not the static-catalog trick". It is the static-catalog
  * trick: `TraceReadDerivationService` builds its `SpanCostService` over this
- * same `computeSpanCost`. Per-project, per-team and per-organization override
+ * same `TraceSpanCostMatchingService.computeSpanCost`. Per-project, per-team and per-organization override
  * rules are read by RECORD-TIME enrichment (`getCustomLLMModelCosts` ->
  * `OtlpSpanCostEnrichmentService`), which is a different pass, already
  * harvested, and correctly still needs a database. Nothing on the fold path
@@ -47,7 +47,7 @@ export class ModelCatalogTraceModelCostAdapter extends TraceModelCostPort {
     promptTokens: number | null;
     completionTokens: number | null;
   }): number {
-    return computeSpanCost({
+    return TraceSpanCostMatchingService.computeSpanCost({
       attrs: input.attributes,
       ...(input.model === undefined ? {} : { model: input.model }),
       promptTokens: input.promptTokens,

@@ -2,15 +2,17 @@ import { describe, expect, it } from "vitest";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import type { Span } from "@langwatch/trace-contract";
-import {
-  extractEventsFromSpans,
-  mapTraceSummaryToTrace as mapTraceSummaryToTraceWithServices,
-} from "../trace-legacy-summary-mapping.service";
+import { TraceLegacySummaryMappingService } from "../trace-legacy-summary-mapping.service";
 
 const traceCanonicalisation = TraceCanonicalisationService.create();
 
 function mapTraceSummaryToTrace(summary: TraceSummaryData, spans: Span[], projectId: string) {
-  return mapTraceSummaryToTraceWithServices(summary, spans, projectId, traceCanonicalisation);
+  return TraceLegacySummaryMappingService.mapTraceSummaryToTrace(
+    summary,
+    spans,
+    projectId,
+    traceCanonicalisation,
+  );
 }
 
 function makeSpan(overrides: Partial<Span> = {}): Span {
@@ -34,12 +36,12 @@ function makeSpan(overrides: Partial<Span> = {}): Span {
   };
 }
 
-describe("extractEventsFromSpans", () => {
+describe("TraceLegacySummaryMappingService.extractEventsFromSpans", () => {
   describe("when spans have no event attributes", () => {
     it("returns empty array", () => {
       const spans = [makeSpan({ params: { "langwatch.span.type": "llm" } })];
 
-      const result = extractEventsFromSpans({
+      const result = TraceLegacySummaryMappingService.extractEventsFromSpans({
         spans,
         projectId: "project-1",
         traceId: "trace-1",
@@ -64,7 +66,7 @@ describe("extractEventsFromSpans", () => {
         }),
       ];
 
-      const result = extractEventsFromSpans({
+      const result = TraceLegacySummaryMappingService.extractEventsFromSpans({
         spans,
         projectId: "project-1",
         traceId: "trace-1",
@@ -109,7 +111,7 @@ describe("extractEventsFromSpans", () => {
         }),
       ];
 
-      const result = extractEventsFromSpans({
+      const result = TraceLegacySummaryMappingService.extractEventsFromSpans({
         spans,
         projectId: "project-1",
         traceId: "trace-1",
@@ -130,7 +132,7 @@ describe("extractEventsFromSpans", () => {
         }),
       ];
 
-      const result = extractEventsFromSpans({
+      const result = TraceLegacySummaryMappingService.extractEventsFromSpans({
         spans,
         projectId: "project-1",
         traceId: "trace-1",
@@ -160,7 +162,7 @@ describe("extractEventsFromSpans", () => {
         }),
       ];
 
-      const result = extractEventsFromSpans({
+      const result = TraceLegacySummaryMappingService.extractEventsFromSpans({
         spans,
         projectId: "project-1",
         traceId: "trace-1",
@@ -184,7 +186,7 @@ describe("extractEventsFromSpans", () => {
         }),
       ];
 
-      const result = extractEventsFromSpans({
+      const result = TraceLegacySummaryMappingService.extractEventsFromSpans({
         spans,
         projectId: "project-1",
         traceId: "trace-1",

@@ -20,11 +20,11 @@
  * the affected field keeps its preview and a warning is logged; every other
  * field and trace still resolves.
  */
-import type { BlobStore } from "./trace-blob-store.service";
+import { TraceEventRefParsingService } from "./trace-eventref-parsing.service";
+import type { TraceBlobStoreService } from "./trace-blob-store.service";
 import { BlobFieldNotFoundError, BlobNotFoundError } from "./trace-blob-store.service";
 import type { TraceIOExtractionService } from "#services/trace-io-extraction.service";
 import type { NormalizedAttributes, NormalizedSpan } from "@langwatch/trace-contract";
-import { hasEventRefs, parseSpanEventRefs } from "./trace-eventref-parsing.service";
 import type { ResolvedTraceSpans, WarnLogger } from "./trace-offload-resolution.service";
 
 /**
@@ -132,125 +132,136 @@ function warnResolutionFailure(
   }
 }
 
-/**
- * Resolves offloaded event refs for a whole result set of traces in one bounded
- * pass. See the module doc for the algorithm and error policy.
- *
- * @param projectId - The tenantId / projectId all traces belong to.
- * @param spansPerTrace - The NormalizedSpan array for each trace, in result order.
- * @param blobStore - BlobStore providing getFromEventLog.
- * @param ioExtractionService - Recomputes trace-level IO from resolved spans.
- * @param logger - Logger for resolution-failure warnings.
- * @param aggregateType - Aggregate type for event_log lookup (default: "trace").
- * @param concurrency - Max concurrent event_log reads (default {@link EVENT_LOG_RESOLVE_CONCURRENCY}).
- * @returns One {@link ResolvedTraceSpans} per input trace, aligned to input order.
- */
-export async function resolveOffloadedTracesBatch({
-  projectId,
-  spansPerTrace,
-  blobStore,
-  ioExtractionService,
-  logger,
-  aggregateType = "trace",
-  concurrency = EVENT_LOG_RESOLVE_CONCURRENCY,
-}: {
-  projectId: string;
-  spansPerTrace: NormalizedSpan[][];
-  blobStore: BlobStore;
-  ioExtractionService: TraceIOExtractionService;
-  logger: WarnLogger;
-  aggregateType?: string;
-  concurrency?: number;
-}): Promise<ResolvedTraceSpans[]> {
-  // ----- Phase 1: parse every span, build per-span plans + a deduped fetch map.
-  const fetchTasks = new Map<string, FetchTask>();
-  const tracePlans: SpanPlan[][] = spansPerTrace.map((spans) =>
-    spans.map((span) => {
-      const attrs = span.spanAttributes;
-      if (!hasEventRefs(attrs)) {
-        return { cleanedAttrs: attrs, refs: [], hadRefs: false };
-      }
+export class TraceOffloadResolutionBatchService {
+  static create(): TraceOffloadResolutionBatchService {
+    return new TraceOffloadResolutionBatchService();
+  }
 
-      const { cleanedAttrs, eventrefEntries, missingEventIdKeys } = parseSpanEventRefs(attrs);
-
-      for (const attrKey of missingEventIdKeys) {
-        logger.warn(
-          { projectId, spanId: span.spanId, traceId: span.traceId, attrKey },
-          "eventref missing eventId — keeping preview value",
-        );
-      }
-
-      // ADR-022: aggregateId for the trace-processing pipeline IS the traceId.
-      const aggregateId = span.traceId;
-      const refs = eventrefEntries.map(({ attrKey, field, eventId }) => {
-        const fetchKey = fetchKeyOf({ aggregateId, eventId, field });
-        if (!fetchTasks.has(fetchKey)) {
-          fetchTasks.set(fetchKey, { eventId, field, aggregateId });
+  /**
+   * Resolves offloaded event refs for a whole result set of traces in one bounded
+   * pass. See the module doc for the algorithm and error policy.
+   *
+   * @param projectId - The tenantId / projectId all traces belong to.
+   * @param spansPerTrace - The NormalizedSpan array for each trace, in result order.
+   * @param blobStore - TraceBlobStoreService providing getFromEventLog.
+   * @param ioExtractionService - Recomputes trace-level IO from resolved spans.
+   * @param logger - Logger for resolution-failure warnings.
+   * @param aggregateType - Aggregate type for event_log lookup (default: "trace").
+   * @param concurrency - Max concurrent event_log reads (default {@link EVENT_LOG_RESOLVE_CONCURRENCY}).
+   * @returns One {@link ResolvedTraceSpans} per input trace, aligned to input order.
+   */
+  static async resolveOffloadedTracesBatch({
+    projectId,
+    spansPerTrace,
+    blobStore,
+    ioExtractionService,
+    logger,
+    aggregateType = "trace",
+    concurrency = EVENT_LOG_RESOLVE_CONCURRENCY,
+  }: {
+    projectId: string;
+    spansPerTrace: NormalizedSpan[][];
+    blobStore: TraceBlobStoreService;
+    ioExtractionService: TraceIOExtractionService;
+    logger: WarnLogger;
+    aggregateType?: string;
+    concurrency?: number;
+  }): Promise<ResolvedTraceSpans[]> {
+    // ----- Phase 1: parse every span, build per-span plans + a deduped fetch map.
+    const fetchTasks = new Map<string, FetchTask>();
+    const tracePlans: SpanPlan[][] = spansPerTrace.map((spans) =>
+      spans.map((span) => {
+        const attrs = span.spanAttributes;
+        if (!TraceEventRefParsingService.hasEventRefs(attrs)) {
+          return { cleanedAttrs: attrs, refs: [], hadRefs: false };
         }
 
-        return { attrKey, fetchKey };
-      });
+        const { cleanedAttrs, eventrefEntries, missingEventIdKeys } =
+          TraceEventRefParsingService.parseSpanEventRefs(attrs);
 
-      return { cleanedAttrs, refs, hadRefs: true };
-    }),
-  );
-
-  // ----- Phase 2: fetch each distinct ref once, bounded concurrency.
-  const fetchResults = new Map<string, FetchResult>();
-  await forEachWithConcurrency([...fetchTasks.entries()], concurrency, async ([fetchKey, task]) => {
-    try {
-      const value = await blobStore.getFromEventLog({
-        eventId: task.eventId,
-        field: task.field,
-        tenantId: projectId,
-        aggregateType,
-        aggregateId: task.aggregateId,
-      });
-      fetchResults.set(fetchKey, { ok: true, value });
-    } catch (error) {
-      fetchResults.set(fetchKey, { ok: false, error });
-    }
-  });
-
-  // ----- Phase 3: assemble resolved spans + recompute IO per trace.
-  return tracePlans.map((spanPlans, traceIdx) => {
-    const originalSpans = spansPerTrace[traceIdx]!;
-    let anyResolved = false;
-
-    const resolvedSpans: NormalizedSpan[] = spanPlans.map((plan, spanIdx) => {
-      const span = originalSpans[spanIdx]!;
-      if (!plan.hadRefs) {
-        return span;
-      }
-
-      const resolvedAttrs = { ...plan.cleanedAttrs };
-      for (const { attrKey, fetchKey } of plan.refs) {
-        const result = fetchResults.get(fetchKey);
-        if (result?.ok) {
-          resolvedAttrs[attrKey] = result.value;
-          anyResolved = true;
-        } else if (result && !result.ok) {
-          warnResolutionFailure(logger, projectId, span, attrKey, result.error);
+        for (const attrKey of missingEventIdKeys) {
+          logger.warn(
+            { projectId, spanId: span.spanId, traceId: span.traceId, attrKey },
+            "eventref missing eventId — keeping preview value",
+          );
         }
+
+        // ADR-022: aggregateId for the trace-processing pipeline IS the traceId.
+        const aggregateId = span.traceId;
+        const refs = eventrefEntries.map(({ attrKey, field, eventId }) => {
+          const fetchKey = fetchKeyOf({ aggregateId, eventId, field });
+          if (!fetchTasks.has(fetchKey)) {
+            fetchTasks.set(fetchKey, { eventId, field, aggregateId });
+          }
+
+          return { attrKey, fetchKey };
+        });
+
+        return { cleanedAttrs, refs, hadRefs: true };
+      }),
+    );
+
+    // ----- Phase 2: fetch each distinct ref once, bounded concurrency.
+    const fetchResults = new Map<string, FetchResult>();
+    await forEachWithConcurrency(
+      [...fetchTasks.entries()],
+      concurrency,
+      async ([fetchKey, task]) => {
+        try {
+          const value = await blobStore.getFromEventLog({
+            eventId: task.eventId,
+            field: task.field,
+            tenantId: projectId,
+            aggregateType,
+            aggregateId: task.aggregateId,
+          });
+          fetchResults.set(fetchKey, { ok: true, value });
+        } catch (error) {
+          fetchResults.set(fetchKey, { ok: false, error });
+        }
+      },
+    );
+
+    // ----- Phase 3: assemble resolved spans + recompute IO per trace.
+    return tracePlans.map((spanPlans, traceIdx) => {
+      const originalSpans = spansPerTrace[traceIdx]!;
+      let anyResolved = false;
+
+      const resolvedSpans: NormalizedSpan[] = spanPlans.map((plan, spanIdx) => {
+        const span = originalSpans[spanIdx]!;
+        if (!plan.hadRefs) {
+          return span;
+        }
+
+        const resolvedAttrs = { ...plan.cleanedAttrs };
+        for (const { attrKey, fetchKey } of plan.refs) {
+          const result = fetchResults.get(fetchKey);
+          if (result?.ok) {
+            resolvedAttrs[attrKey] = result.value;
+            anyResolved = true;
+          } else if (result && !result.ok) {
+            warnResolutionFailure(logger, projectId, span, attrKey, result.error);
+          }
+        }
+
+        return { ...span, spanAttributes: resolvedAttrs };
+      });
+
+      if (!anyResolved) {
+        return {
+          resolvedSpans,
+          recomputedInput: null,
+          recomputedOutput: null,
+          anyResolved: false,
+        };
       }
 
-      return { ...span, spanAttributes: resolvedAttrs };
-    });
-
-    if (!anyResolved) {
       return {
         resolvedSpans,
-        recomputedInput: null,
-        recomputedOutput: null,
-        anyResolved: false,
+        recomputedInput: ioExtractionService.extractFirstInput(resolvedSpans),
+        recomputedOutput: ioExtractionService.extractLastOutput(resolvedSpans),
+        anyResolved: true,
       };
-    }
-
-    return {
-      resolvedSpans,
-      recomputedInput: ioExtractionService.extractFirstInput(resolvedSpans),
-      recomputedOutput: ioExtractionService.extractLastOutput(resolvedSpans),
-      anyResolved: true,
-    };
-  });
+    });
+  }
 }

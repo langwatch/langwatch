@@ -18,6 +18,9 @@
  * axis — published here as {@link traceSearchBodyExtensions} so one
  * definition documents the public wire.
  */
+import { TraceProjectionCompileService } from "#services/trace-projection-compile.service";
+import { TraceReadableSpanService } from "#services/trace-readable-span.service";
+import { TraceFormattingService } from "#services/trace-formatting.service";
 import { requires } from "@langwatch/api";
 import {
   type AppRestProjectVariables,
@@ -36,9 +39,7 @@ import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 
 import { enrichTracesWithEvaluations } from "#services/trace-evaluation-enrichment.rules";
-import { formatTraceSummaryDigest, generateAsciiTree } from "#services/trace-formatting.service";
 import { AmbiguousTraceIdPrefixError } from "#services/trace-legacy-read.service";
-import { compileProjection } from "#services/trace-projection-compile.service";
 import {
   type CompiledProjection,
   type ProjectableTrace,
@@ -46,7 +47,6 @@ import {
   ProjectionValidationError,
   projectionRequestSchema,
 } from "#services/trace-projection.types";
-import { formatSpansDigest } from "#services/trace-readable-span.service";
 import type { TraceDateField } from "#services/trace-legacy-read.types";
 import {
   traceMetadataUpdateSchema,
@@ -304,10 +304,12 @@ export function createTracesRestApp<TBody extends TraceSearchBody, TBodyRaw>(opt
       let projection: CompiledProjection | undefined;
       if (select && select.length > 0) {
         try {
-          projection = compileProjection({
+          projection = TraceProjectionCompileService.compileProjection({
             from,
             select,
-            protections: protections as Parameters<typeof compileProjection>[0]["protections"],
+            protections: protections as Parameters<
+              typeof TraceProjectionCompileService.compileProjection
+            >[0]["protections"],
           });
         } catch (err) {
           if (err instanceof ProjectionValidationError) {
@@ -353,7 +355,7 @@ export function createTracesRestApp<TBody extends TraceSearchBody, TBodyRaw>(opt
         if (format === "digest") {
           return {
             trace_id: trace.trace_id,
-            formatted_trace: formatTraceSummaryDigest(trace),
+            formatted_trace: TraceFormattingService.formatTraceSummaryDigest(trace),
             input: trace.input,
             output: trace.output,
             timestamps: trace.timestamps,
@@ -706,7 +708,7 @@ export function createTracesRestApp<TBody extends TraceSearchBody, TBodyRaw>(opt
       if (format === "digest") {
         return c.json({
           trace_id: resolvedTraceId,
-          formatted_trace: await formatSpansDigest(trace.spans ?? []),
+          formatted_trace: await TraceReadableSpanService.formatSpansDigest(trace.spans ?? []),
           timestamps: trace.timestamps,
           metadata: trace.metadata,
           evaluations,
@@ -717,7 +719,7 @@ export function createTracesRestApp<TBody extends TraceSearchBody, TBodyRaw>(opt
         });
       }
 
-      const asciiTree = generateAsciiTree(trace.spans);
+      const asciiTree = TraceFormattingService.generateAsciiTree(trace.spans);
       return c.json({
         ...trace,
         evaluations,

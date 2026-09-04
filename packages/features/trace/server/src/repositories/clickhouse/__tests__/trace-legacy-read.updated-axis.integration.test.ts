@@ -20,7 +20,7 @@
  * Was `platform/app/src/server/traces/__tests__/clickhouse-trace-updated-axis.integration.test.ts`,
  * against its own `~/server/clickhouse/clickhouseClient` and `~/server/db`
  * mocks routed through the platform's two-door `getApp()` access. The service
- * (`ClickHouseTraceService`, now exported from `../trace-legacy-read.repository`)
+ * (`TraceLegacyReadClickHouseRepository`, now exported from `../trace-legacy-read.repository`)
  * takes `resolveClickHouseClient` as a plain constructor dep, so this test
  * uses the shape the sibling projection-search integration test already
  * uses — `createTestClickHouseClient`/`testClickHouseUrl`, skipped when no
@@ -34,7 +34,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { TraceCanonicalisationService } from "../../../services/trace-canonicalisation.service";
 import type { GetAllTracesForProjectInput } from "../../../services/trace-legacy-read.types";
 import type { TracesForProjectResult } from "@langwatch/trace-contract";
-import { ClickHouseTraceService } from "../trace-legacy-read.repository";
+import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
@@ -130,7 +130,7 @@ function makeQueryInput(
 }
 
 let ch: ClickHouseClient;
-let service: ClickHouseTraceService;
+let service: TraceLegacyReadClickHouseRepository;
 
 async function insert(values: Record<string, unknown>[]) {
   await ch.insert({
@@ -166,7 +166,7 @@ integration("updated date-axis pagination (integration)", () => {
   beforeAll(async () => {
     if (clickHouseUrl === null) return;
     ch = createTestClickHouseClient(clickHouseUrl);
-    service = ClickHouseTraceService.create({
+    service = TraceLegacyReadClickHouseRepository.create({
       prisma: {} as PrismaClient,
       resolveClickHouseClient: async () => ch,
       traceCanonicalisation: TraceCanonicalisationService.create(),

@@ -1,13 +1,13 @@
+import { VisibilityWindowService } from "./trace-visibility-window.service";
+import { TraceOffloadResolutionService } from "./trace-offload-resolution.service";
 import { createLogger } from "@langwatch/observability";
 import type { FindByTraceIdOptions, TraceSummaryRepository } from "@langwatch/trace-server";
 
-import { resolveOffloadedTraces } from "./trace-offload-resolution.service";
-import type { BlobStore } from "./trace-blob-store.service";
-import { TraceNotFoundError } from "./trace-read-error.service";
+import type { TraceBlobStoreService } from "./trace-blob-store.service";
+import { TraceNotFoundError } from "./trace-read.errors";
 import type { SpanStorageRepository } from "../repositories/span-storage.repository";
 import type { TraceIOExtractionService } from "./trace-io-extraction.service";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
-import { teaserOf } from "./trace-visibility-window.service";
 
 /**
  * Optional blob-offload resolution dependencies for the `full` read path
@@ -19,11 +19,21 @@ import { teaserOf } from "./trace-visibility-window.service";
  */
 export interface TraceSummaryFullResolutionDeps {
   spanStorageRepository: SpanStorageRepository;
-  blobStore: BlobStore;
+  blobStore: TraceBlobStoreService;
   ioExtractionService: TraceIOExtractionService;
 }
 
 export class TraceSummaryService {
+  static create({
+    repository,
+    fullResolutionDeps,
+  }: {
+    repository: TraceSummaryRepository;
+    fullResolutionDeps?: TraceSummaryFullResolutionDeps;
+  }): TraceSummaryService {
+    return new TraceSummaryService(repository, fullResolutionDeps);
+  }
+
   private readonly logger = createLogger("langwatch:traces:trace-summary-service");
 
   constructor(
@@ -64,11 +74,15 @@ export class TraceSummaryService {
       // to redact it would be a wasted spans + event_log read.
       return {
         ...result,
-        computedInput: result.computedInput ? teaserOf(result.computedInput) : result.computedInput,
+        computedInput: result.computedInput
+          ? VisibilityWindowService.teaserOf(result.computedInput)
+          : result.computedInput,
         computedOutput: result.computedOutput
-          ? teaserOf(result.computedOutput)
+          ? VisibilityWindowService.teaserOf(result.computedOutput)
           : result.computedOutput,
-        errorMessage: result.errorMessage ? teaserOf(result.errorMessage) : result.errorMessage,
+        errorMessage: result.errorMessage
+          ? VisibilityWindowService.teaserOf(result.errorMessage)
+          : result.errorMessage,
         redactedByVisibilityWindow: true,
       };
     }
@@ -98,13 +112,14 @@ export class TraceSummaryService {
         traceId: summary.traceId,
         occurredAtMs: summary.occurredAt,
       });
-      const { recomputedInput, recomputedOutput, anyResolved } = await resolveOffloadedTraces({
-        projectId: tenantId,
-        normalizedSpans,
-        blobStore: deps.blobStore,
-        ioExtractionService: deps.ioExtractionService,
-        logger: this.logger,
-      });
+      const { recomputedInput, recomputedOutput, anyResolved } =
+        await TraceOffloadResolutionService.resolveOffloadedTraces({
+          projectId: tenantId,
+          normalizedSpans,
+          blobStore: deps.blobStore,
+          ioExtractionService: deps.ioExtractionService,
+          logger: this.logger,
+        });
       if (!anyResolved) {
         return summary;
       }

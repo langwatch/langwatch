@@ -14,6 +14,8 @@
  * That resolution arrives as {@link TraceLegacyCredentialPort} so this door
  * and the framework chain decide the same thing about the same caller.
  */
+import { TraceReadableSpanService } from "#services/trace-readable-span.service";
+import { TraceFormattingService } from "#services/trace-formatting.service";
 import { handlerManagedAuth } from "@langwatch/api";
 import type { AppRestSecurity, SecuredApp } from "@langwatch/api/rest";
 import type {
@@ -28,12 +30,6 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { z } from "zod";
 
 import { enrichTracesWithEvaluations } from "#services/trace-evaluation-enrichment.rules";
-import {
-  formatTraceSummaryDigest,
-  generateAsciiTree,
-  toLLMModeTrace,
-} from "#services/trace-formatting.service";
-import { formatSpansDigest } from "#services/trace-readable-span.service";
 
 const AUTH_REASON = "project API key / public share resolved in-handler";
 
@@ -195,14 +191,14 @@ export function createTraceLegacyRestApp<
     if (format === "digest") {
       return c.json({
         trace_id: traceId,
-        formatted_trace: formatSpansDigest(trace.spans ?? []),
+        formatted_trace: TraceReadableSpanService.formatSpansDigest(trace.spans ?? []),
         timestamps: trace.timestamps,
         metadata: trace.metadata,
         evaluations,
       });
     }
 
-    const asciiTree = generateAsciiTree(trace.spans);
+    const asciiTree = TraceFormattingService.generateAsciiTree(trace.spans);
 
     return c.json({
       ...trace,
@@ -308,7 +304,7 @@ export function createTraceLegacyRestApp<
     if (format === "digest") {
       traces = enrichedTraces.map((trace) => ({
         trace_id: trace.trace_id,
-        formatted_trace: formatTraceSummaryDigest(trace),
+        formatted_trace: TraceFormattingService.formatTraceSummaryDigest(trace),
         input: trace.input,
         output: trace.output,
         timestamps: trace.timestamps,
@@ -318,7 +314,7 @@ export function createTraceLegacyRestApp<
       }));
     } else if (params.llmMode) {
       traces = enrichedTraces.map((trace) => ({
-        ...toLLMModeTrace(trace as Trace & { spans: Span[] }),
+        ...TraceFormattingService.toLLMModeTrace(trace as Trace & { spans: Span[] }),
         spans: [],
         evaluations: trace.evaluations,
       }));

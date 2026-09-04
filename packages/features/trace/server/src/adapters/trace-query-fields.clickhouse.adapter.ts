@@ -1,30 +1,25 @@
+import { ClickHouseFacetRegistryAdapter } from "./trace-facet-registry.clickhouse.adapter";
+import { ClickHouseTraceQueryCustomFieldsAdapter } from "./trace-query-custom-fields.clickhouse.adapter";
 import {
   type ExpressionCategoricalDef,
-  FACET_REGISTRY,
   type RangeFacetDef,
-  TABLE_TIME_COLUMNS,
 } from "./trace-facet-registry.clickhouse.adapter";
 import type {
   CategoricalRead,
   FieldDef,
   FieldNeeds,
   RangeRead,
-} from "./trace-query-evaluation.adapter";
-import { UNSUPPORTED } from "./trace-query-evaluation.adapter";
-import {
-  EVALUATOR_DEF,
-  LABEL_DEF,
-  MODEL_DEF,
-} from "./trace-query-custom-fields.clickhouse.adapter";
-import { TraceQueryTranslators } from "./trace-query-translators.clickhouse.adapter";
+} from "./trace-query-evaluation.types";
+import { UNSUPPORTED } from "./trace-query-evaluation.types";
+import { TraceQueryTranslatorsAdapter } from "./trace-query-translators.clickhouse.adapter";
 import { META_FIELD_DEFS } from "./trace-query-meta-fields.clickhouse.adapter";
 
 // ---------------------------------------------------------------------------
-// Registry lookup — single-sources the SQL `expression` from FACET_REGISTRY so
+// Registry lookup — single-sources the SQL `expression` from ClickHouseFacetRegistryAdapter.FACET_REGISTRY so
 // the compiled output never drifts from facet discovery.
 // ---------------------------------------------------------------------------
 
-const FACET_BY_KEY = new Map(FACET_REGISTRY.map((d) => [d.key, d]));
+const FACET_BY_KEY = new Map(ClickHouseFacetRegistryAdapter.FACET_REGISTRY.map((d) => [d.key, d]));
 
 // ---------------------------------------------------------------------------
 // Cross-table in-memory reads (item 4: iterate the referenced collection)
@@ -81,10 +76,17 @@ const spanStatusRead: CategoricalRead = (t) =>
  * the other — which is the failure mode this shape exists to prevent, since a
  * field that filters in SQL but not in memory silently disagrees with itself.
  */
-export class TraceQueryFields {
+export class TraceQueryFieldsAdapter {
+  static create(): TraceQueryFieldsAdapter {
+    return new TraceQueryFieldsAdapter();
+  }
+
   static expressionFacet(key: string): ExpressionCategoricalDef | RangeFacetDef {
     const def = FACET_BY_KEY.get(key);
-    if (!def) throw new Error(`facet '${key}' is missing from FACET_REGISTRY`);
+    if (!def)
+      throw new Error(
+        `facet '${key}' is missing from ClickHouseFacetRegistryAdapter.FACET_REGISTRY`,
+      );
     if (!("expression" in def)) {
       throw new Error(`facet '${key}' has no expression to derive a handler from`);
     }
@@ -93,22 +95,22 @@ export class TraceQueryFields {
 
   /** Auto-derived `trace_summaries` categorical: direct equality + summary read. */
   static categoricalFacet(key: string): FieldDef {
-    const def = TraceQueryFields.expressionFacet(key);
+    const def = TraceQueryFieldsAdapter.expressionFacet(key);
     if (def.kind !== "categorical") {
       throw new Error(`facet '${key}' is not a categorical facet`);
     }
     if (!def.read) throw new Error(`facet '${key}' has no in-memory read`);
-    return TraceQueryTranslators.categorical(def.expression, def.read, def.key);
+    return TraceQueryTranslatorsAdapter.categorical(def.expression, def.read, def.key);
   }
 
   /** Auto-derived `trace_summaries` range: numeric comparison + summary read. */
   static rangeFacet(key: string): FieldDef {
-    const def = TraceQueryFields.expressionFacet(key);
+    const def = TraceQueryFieldsAdapter.expressionFacet(key);
     if (def.kind !== "range") {
       throw new Error(`facet '${key}' is not a range facet`);
     }
     if (!def.read) throw new Error(`facet '${key}' has no in-memory read`);
-    return TraceQueryTranslators.range(def.expression, def.read, def.key);
+    return TraceQueryTranslatorsAdapter.range(def.expression, def.read, def.key);
   }
 
   /**
@@ -118,13 +120,13 @@ export class TraceQueryFields {
    * collection isn't loaded).
    */
   static crossCategoricalFacet(key: string, needs: FieldNeeds, read: CategoricalRead): FieldDef {
-    const def = TraceQueryFields.expressionFacet(key);
+    const def = TraceQueryFieldsAdapter.expressionFacet(key);
     if (def.kind !== "categorical") {
       throw new Error(`facet '${key}' is not a categorical facet`);
     }
-    return TraceQueryTranslators.crossTableCategorical(
+    return TraceQueryTranslatorsAdapter.crossTableCategorical(
       def.table,
-      TABLE_TIME_COLUMNS[def.table],
+      ClickHouseFacetRegistryAdapter.TABLE_TIME_COLUMNS[def.table],
       def.expression,
       read,
       needs,
@@ -133,13 +135,13 @@ export class TraceQueryFields {
   }
 
   static crossRangeFacet(key: string, needs: FieldNeeds, read: RangeRead): FieldDef {
-    const def = TraceQueryFields.expressionFacet(key);
+    const def = TraceQueryFieldsAdapter.expressionFacet(key);
     if (def.kind !== "range") {
       throw new Error(`facet '${key}' is not a range facet`);
     }
-    return TraceQueryTranslators.crossTableRange(
+    return TraceQueryTranslatorsAdapter.crossTableRange(
       def.table,
-      TABLE_TIME_COLUMNS[def.table],
+      ClickHouseFacetRegistryAdapter.TABLE_TIME_COLUMNS[def.table],
       def.expression,
       read,
       needs,
@@ -215,61 +217,61 @@ export type KnownField =
   | "evaluatorPassed";
 
 export const FIELD_DEFS = {
-  status: TraceQueryFields.categoricalFacet("status"),
-  origin: TraceQueryFields.categoricalFacet("origin"),
-  service: TraceQueryFields.categoricalFacet("service"),
-  model: MODEL_DEF,
-  user: TraceQueryFields.categoricalFacet("user"),
-  conversation: TraceQueryFields.categoricalFacet("conversation"),
-  customer: TraceQueryFields.categoricalFacet("customer"),
+  status: TraceQueryFieldsAdapter.categoricalFacet("status"),
+  origin: TraceQueryFieldsAdapter.categoricalFacet("origin"),
+  service: TraceQueryFieldsAdapter.categoricalFacet("service"),
+  model: ClickHouseTraceQueryCustomFieldsAdapter.MODEL_DEF,
+  user: TraceQueryFieldsAdapter.categoricalFacet("user"),
+  conversation: TraceQueryFieldsAdapter.categoricalFacet("conversation"),
+  customer: TraceQueryFieldsAdapter.categoricalFacet("customer"),
   scenarioRun: META_FIELD_DEFS.scenarioRun,
-  topic: TraceQueryFields.categoricalFacet("topic"),
-  subtopic: TraceQueryFields.categoricalFacet("subtopic"),
-  traceName: TraceQueryFields.categoricalFacet("traceName"),
-  rootSpanType: TraceQueryFields.categoricalFacet("rootSpanType"),
-  guardrail: TraceQueryFields.categoricalFacet("guardrail"),
-  annotation: TraceQueryFields.categoricalFacet("annotation"),
-  containsAi: TraceQueryFields.categoricalFacet("containsAi"),
-  errorMessage: TraceQueryFields.categoricalFacet("errorMessage"),
-  tokensEstimated: TraceQueryFields.categoricalFacet("tokensEstimated"),
-  selectedPrompt: TraceQueryFields.categoricalFacet("selectedPrompt"),
-  lastUsedPrompt: TraceQueryFields.categoricalFacet("lastUsedPrompt"),
-  promptVersion: TraceQueryFields.rangeFacet("promptVersion"),
-  label: LABEL_DEF,
-  cost: TraceQueryFields.rangeFacet("cost"),
-  duration: TraceQueryFields.rangeFacet("duration"),
-  tokens: TraceQueryFields.rangeFacet("tokens"),
-  ttft: TraceQueryFields.rangeFacet("ttft"),
-  ttlt: TraceQueryFields.rangeFacet("ttlt"),
-  promptTokens: TraceQueryFields.rangeFacet("promptTokens"),
-  completionTokens: TraceQueryFields.rangeFacet("completionTokens"),
-  tokensPerSecond: TraceQueryFields.rangeFacet("tokensPerSecond"),
-  spans: TraceQueryFields.rangeFacet("spans"),
-  size: TraceQueryFields.rangeFacet("size"),
-  evaluator: EVALUATOR_DEF,
-  evaluatorStatus: TraceQueryFields.crossCategoricalFacet(
+  topic: TraceQueryFieldsAdapter.categoricalFacet("topic"),
+  subtopic: TraceQueryFieldsAdapter.categoricalFacet("subtopic"),
+  traceName: TraceQueryFieldsAdapter.categoricalFacet("traceName"),
+  rootSpanType: TraceQueryFieldsAdapter.categoricalFacet("rootSpanType"),
+  guardrail: TraceQueryFieldsAdapter.categoricalFacet("guardrail"),
+  annotation: TraceQueryFieldsAdapter.categoricalFacet("annotation"),
+  containsAi: TraceQueryFieldsAdapter.categoricalFacet("containsAi"),
+  errorMessage: TraceQueryFieldsAdapter.categoricalFacet("errorMessage"),
+  tokensEstimated: TraceQueryFieldsAdapter.categoricalFacet("tokensEstimated"),
+  selectedPrompt: TraceQueryFieldsAdapter.categoricalFacet("selectedPrompt"),
+  lastUsedPrompt: TraceQueryFieldsAdapter.categoricalFacet("lastUsedPrompt"),
+  promptVersion: TraceQueryFieldsAdapter.rangeFacet("promptVersion"),
+  label: ClickHouseTraceQueryCustomFieldsAdapter.LABEL_DEF,
+  cost: TraceQueryFieldsAdapter.rangeFacet("cost"),
+  duration: TraceQueryFieldsAdapter.rangeFacet("duration"),
+  tokens: TraceQueryFieldsAdapter.rangeFacet("tokens"),
+  ttft: TraceQueryFieldsAdapter.rangeFacet("ttft"),
+  ttlt: TraceQueryFieldsAdapter.rangeFacet("ttlt"),
+  promptTokens: TraceQueryFieldsAdapter.rangeFacet("promptTokens"),
+  completionTokens: TraceQueryFieldsAdapter.rangeFacet("completionTokens"),
+  tokensPerSecond: TraceQueryFieldsAdapter.rangeFacet("tokensPerSecond"),
+  spans: TraceQueryFieldsAdapter.rangeFacet("spans"),
+  size: TraceQueryFieldsAdapter.rangeFacet("size"),
+  evaluator: ClickHouseTraceQueryCustomFieldsAdapter.EVALUATOR_DEF,
+  evaluatorStatus: TraceQueryFieldsAdapter.crossCategoricalFacet(
     "evaluatorStatus",
     "evaluations",
     evaluatorStatusRead,
   ),
-  evaluatorVerdict: TraceQueryFields.crossCategoricalFacet(
+  evaluatorVerdict: TraceQueryFieldsAdapter.crossCategoricalFacet(
     "evaluatorVerdict",
     "evaluations",
     evaluatorVerdictRead,
   ),
-  evaluatorScore: TraceQueryFields.crossRangeFacet(
+  evaluatorScore: TraceQueryFieldsAdapter.crossRangeFacet(
     "evaluatorScore",
     "evaluations",
     evaluatorScoreRead,
   ),
-  evaluatorLabel: TraceQueryFields.crossCategoricalFacet(
+  evaluatorLabel: TraceQueryFieldsAdapter.crossCategoricalFacet(
     "evaluatorLabel",
     "evaluations",
     evaluatorLabelRead,
   ),
-  spanType: TraceQueryFields.crossCategoricalFacet("spanType", "spans", spanTypeRead),
-  spanName: TraceQueryFields.crossCategoricalFacet("spanName", "spans", spanNameRead),
-  spanStatus: TraceQueryFields.crossCategoricalFacet("spanStatus", "spans", spanStatusRead),
+  spanType: TraceQueryFieldsAdapter.crossCategoricalFacet("spanType", "spans", spanTypeRead),
+  spanName: TraceQueryFieldsAdapter.crossCategoricalFacet("spanName", "spans", spanNameRead),
+  spanStatus: TraceQueryFieldsAdapter.crossCategoricalFacet("spanStatus", "spans", spanStatusRead),
   has: META_FIELD_DEFS.has,
   none: META_FIELD_DEFS.none,
   eval: META_FIELD_DEFS.eval,
@@ -286,7 +288,7 @@ export const FIELD_DEFS = {
   // Back-compat alias for the renamed `evaluatorVerdict` field. Any saved
   // query/lens using the old key keeps working; the SQL + predicate are the
   // same as `evaluatorVerdict`.
-  evaluatorPassed: TraceQueryFields.crossCategoricalFacet(
+  evaluatorPassed: TraceQueryFieldsAdapter.crossCategoricalFacet(
     "evaluatorVerdict",
     "evaluations",
     evaluatorVerdictRead,

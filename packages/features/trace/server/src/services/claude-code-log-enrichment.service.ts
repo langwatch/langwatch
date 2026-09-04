@@ -14,13 +14,14 @@
  * rather than two that can drift apart.
  *
  * This module adapts the stored log rows and the legacy {@link Span} shape into
- * the pure {@link computeClaudeSpanEnrichment} join, then attaches the (already
+ * the pure {@link ClaudeCodeSpanEnrichmentService.computeClaudeSpanEnrichment} join, then attaches the (already
  * capped) `input` / `output` back onto the spans.
  *
- * {@link enrichSpansWithClaudeLogContent} is pure (no IO); the caller supplies
- * the log rows. {@link enrichCodingAgentSpansFromLogs} is the IO wrapper both
+ * {@link ClaudeCodeLogEnrichmentService.enrichSpansWithClaudeLogContent} is pure (no IO); the caller supplies
+ * the log rows. {@link ClaudeCodeLogEnrichmentService.enrichCodingAgentSpansFromLogs} is the IO wrapper both
  * read paths call: it gates, reads the logs, and never fails the read.
  */
+import { ClaudeCodeSpanEnrichmentService } from "./claude-code-span-enrichment.service";
 import type { Logger } from "@langwatch/observability";
 import { contentAttrKeys, type CodingAgentService } from "@langwatch/coding-agent-contract";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
@@ -31,9 +32,6 @@ import {
   type ClaudeSpanRef,
   type ClaudeToolLog,
   type ClaudeToolSpanRef,
-  computeClaudeInteractionOutput,
-  computeClaudeSpanEnrichment,
-  computeClaudeToolSpanEnrichment,
 } from "./claude-code-span-enrichment.service";
 import { DERIVED_ATTRS } from "./trace-log-content-derivation.service";
 import type { SpanSummaryRow } from "@langwatch/trace-contract";
@@ -118,34 +116,6 @@ function nonEmptyOrNull(value: string | undefined): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
-/**
- * Map the trace's model-call spans to {@link ClaudeSpanRef}. Only spans that
- * carry a `request_id` (the real `llm_request` spans) participate: they are the
- * ones the logs join to, and restricting the set keeps the positional input
- * pairing (Nth span ↔ Nth request body / user prompt) aligned to model calls.
- * Sorted by start time so the positional order the pure fn relies on is the
- * call order.
- */
-export function mapSpansToClaudeRefs(spans: Span[]): ClaudeSpanRef[] {
-  return spans
-    .filter((span) => readStringParam(span.params, SPAN_REQUEST_ID_KEY) !== null)
-    .slice()
-    .sort((a, b) => a.timestamps.started_at - b.timestamps.started_at)
-    .map((span) => ({
-      spanId: span.span_id,
-      requestId: readStringParam(span.params, SPAN_REQUEST_ID_KEY),
-      querySource: readStringParam(span.params, SPAN_QUERY_SOURCE_KEY),
-    }));
-}
-
-/**
- * True when the trace carries Claude Code model-call spans — i.e. at least one
- * span has a `request_id` for the logs to join onto.
- */
-export function hasClaudeModelCallSpans(spans: Span[]): boolean {
-  return spans.some((span) => readStringParam(span.params, SPAN_REQUEST_ID_KEY) !== null);
-}
-
 function spanToolUseId(span: Span): string | null {
   return (
     readStringParam(span.params, SPAN_TOOL_USE_ID_KEY) ??
@@ -158,217 +128,6 @@ function isInteractionSpan(span: Span): boolean {
     span.name === INTERACTION_SPAN_NAME ||
     readStringParam(span.params, SPAN_USER_PROMPT_KEY) !== null
   );
-}
-
-/**
- * True when the trace has ANY span the claude log join could add content to:
- * a model call (`request_id`), a tool call (`tool_use_id`), or the turn's
- * interaction root. The gate every caller runs BEFORE reading logs, so a
- * trace with nothing to enrich never touches the log store.
- */
-export function hasCodingAgentJoinableSpans(spans: Span[]): boolean {
-  return spans.some(
-    (span) =>
-      readStringParam(span.params, SPAN_REQUEST_ID_KEY) !== null ||
-      spanToolUseId(span) !== null ||
-      isInteractionSpan(span),
-  );
-}
-
-/**
- * True when THIS span could gain content from the claude join — the
- * single-span (spanDetail) twin of {@link hasCodingAgentJoinableSpans}. The
- * name prefix is included so future claude_code.* span shapes at least
- * attempt the join instead of silently skipping.
- */
-export function isCodingAgentShapedSpan(span: Span): boolean {
-  return (
-    readStringParam(span.params, SPAN_REQUEST_ID_KEY) !== null ||
-    spanToolUseId(span) !== null ||
-    isInteractionSpan(span) ||
-    (span.name ?? "").startsWith(CLAUDE_SPAN_NAME_PREFIX)
-  );
-}
-
-/** Tool spans (`tool_use_id`-carrying) → exact-join refs. */
-export function mapSpansToClaudeToolRefs(spans: Span[]): ClaudeToolSpanRef[] {
-  const refs: ClaudeToolSpanRef[] = [];
-  for (const span of spans) {
-    const toolUseId = spanToolUseId(span);
-    if (toolUseId !== null) {
-      refs.push({ spanId: span.span_id, toolUseId });
-    }
-  }
-
-  return refs;
-}
-
-/**
- * Interaction-span INPUT from its own `user_prompt` attribute — the one
- * claude content that rides the span itself, so it needs no log read and
- * must apply even when the trace has zero logs.
- */
-export function enrichClaudeInteractionInputs(spans: Span[]): Span[] {
-  let hasChanged = false;
-  const next = spans.map((span) => {
-    if (span.input != null) {
-      return span;
-    }
-
-    const prompt = readStringParam(span.params, SPAN_USER_PROMPT_KEY);
-    if (prompt === null) {
-      return span;
-    }
-
-    hasChanged = true;
-
-    return {
-      ...span,
-      input: {
-        type: "text" as const,
-        value: capPayloadString(prompt, undefined, "user_prompt"),
-      },
-    };
-  });
-
-  // Identity-preserving on no-op so callers' referential contracts (and
-  // memoized readers) see an untouched trace as the SAME array.
-  return hasChanged ? next : spans;
-}
-
-/**
- * Map stored log rows to {@link ClaudeContentLog}. The event payload rides the
- * `body` attribute (not the OTLP Body column) for the `api_*_body` events;
- * `user_prompt` carries its text on `prompt` instead.
- */
-export function mapLogRowsToClaudeContentLogs(
-  rows: TraceLogRecordReadRow[],
-  codingAgents?: CodingAgentService,
-): ClaudeContentLog[] {
-  return rows.map((row) => {
-    const attrs = row.attributes;
-    const eventName = attrs[EVENT_NAME_ATTR] ?? "";
-    const toolCallCount = Number(attrs[DERIVED_ATTRS.OUTPUT_TOOL_CALL_COUNT]);
-
-    return {
-      eventName,
-      requestId: nonEmptyOrNull(attrs[REQUEST_ID_ATTR]),
-      querySource: nonEmptyOrNull(attrs[QUERY_SOURCE_ATTR]),
-      timeUnixMs: row.timeUnixMs,
-      body: readContentBody(eventName, attrs, codingAgents),
-      // Parsed out of the raw body once, at ingest, so the read path can skip
-      // re-parsing it. Absent on records ingested before that existed, which is
-      // why every consumer keeps its parse as a fallback.
-      derivedOutputText: nonEmptyOrNull(attrs[DERIVED_ATTRS.OUTPUT_TEXT]),
-      derivedToolCallCount: Number.isFinite(toolCallCount) ? toolCallCount : null,
-    };
-  });
-}
-
-/**
- * Attach the joined `input` / `output` onto the trace's spans: model calls
- * (request_id join), tool calls (tool_use_id join), and the interaction root
- * (own attr + windowed reply). Returns a new spans array (spans are
- * shallow-cloned only where enriched); untouched spans are returned as-is. The
- * attribute-only interaction input applies even with zero logs.
- */
-export function enrichSpansWithClaudeLogContent({
-  spans,
-  logRows,
-  traceCanonicalisation,
-  codingAgents,
-}: {
-  spans: Span[];
-  logRows: TraceLogRecordReadRow[];
-  traceCanonicalisation: TraceCanonicalisationService;
-  codingAgents?: CodingAgentService;
-}): Span[] {
-  if (spans.length === 0) {
-    return spans;
-  }
-
-  const withInteractionInputs = enrichClaudeInteractionInputs(spans);
-  if (logRows.length === 0) {
-    return withInteractionInputs;
-  }
-
-  const logs = mapLogRowsToClaudeContentLogs(logRows, codingAgents);
-  const refs = mapSpansToClaudeRefs(withInteractionInputs);
-  const enrichmentBySpanId = computeClaudeSpanEnrichment({
-    spans: refs,
-    logs,
-    traceCanonicalisation,
-  });
-  const toolEnrichmentBySpanId = computeClaudeToolSpanEnrichment({
-    spans: mapSpansToClaudeToolRefs(withInteractionInputs),
-    toolLogs: mapLogRowsToClaudeToolLogs(logRows),
-    contentLogs: logs,
-    traceCanonicalisation,
-  });
-
-  return withInteractionInputs.map((span) => {
-    const enrichment = enrichmentBySpanId.get(span.span_id);
-    const toolEnrichment = toolEnrichmentBySpanId.get(span.span_id);
-    const interactionOutput =
-      span.output == null && isInteractionSpan(span)
-        ? computeClaudeInteractionOutput({
-            logs,
-            windowStartMs: span.timestamps.started_at,
-            windowEndMs: span.timestamps.finished_at,
-            traceCanonicalisation,
-          })
-        : null;
-    if (!enrichment && !toolEnrichment && interactionOutput === null) {
-      return span;
-    }
-
-    const next: Span = { ...span };
-    const input = enrichment?.input ?? toolEnrichment?.input ?? null;
-    const output = enrichment?.output ?? toolEnrichment?.output ?? interactionOutput;
-    if (input !== null && next.input == null) {
-      next.input = input;
-    }
-
-    if (output !== null && next.output == null) {
-      next.output = output;
-    }
-
-    return next;
-  });
-}
-
-/**
- * Map stored log rows to {@link ClaudeToolLog} (tool_decision / tool_result
- * events only). Success arrives as the string "true"/"false"; numbers as
- * stringified numerics — both parsed here so the pure join sees clean types.
- */
-export function mapLogRowsToClaudeToolLogs(rows: TraceLogRecordReadRow[]): ClaudeToolLog[] {
-  const out: ClaudeToolLog[] = [];
-  for (const row of rows) {
-    const attrs = row.attributes;
-    const eventName = attrs[EVENT_NAME_ATTR] ?? "";
-    if (eventName !== TOOL_DECISION_EVENT && eventName !== TOOL_RESULT_EVENT) {
-      continue;
-    }
-
-    out.push({
-      eventName,
-      toolUseId: nonEmptyOrNull(attrs[TOOL_USE_ID_ATTR]),
-      toolName: nonEmptyOrNull(attrs[TOOL_NAME_ATTR]),
-      toolParameters: nonEmptyOrNull(attrs[TOOL_PARAMETERS_ATTR]),
-      toolInput: nonEmptyOrNull(attrs[TOOL_INPUT_ATTR]),
-      decision: nonEmptyOrNull(attrs[DECISION_ATTR]),
-      decisionSource:
-        nonEmptyOrNull(attrs[RESULT_DECISION_SOURCE_ATTR]) ??
-        nonEmptyOrNull(attrs[DECISION_SOURCE_ATTR]),
-      success: parseBoolAttr(attrs[SUCCESS_ATTR]),
-      durationMs: parseNumberAttr(attrs[DURATION_MS_ATTR]),
-      resultSizeBytes: parseNumberAttr(attrs[RESULT_SIZE_ATTR]),
-      timeUnixMs: row.timeUnixMs,
-    });
-  }
-
-  return out;
 }
 
 function parseBoolAttr(value: string | undefined): boolean | null {
@@ -393,143 +152,392 @@ function parseNumberAttr(value: string | undefined): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-/**
- * The IO wrapper both read paths share: gate on the trace actually having
- * Claude model-call spans, do one lazy, partition-pruned log read, and join the
- * content + cost onto the spans.
- *
- * Best-effort by design — a log-read failure returns the un-enriched spans
- * rather than failing the whole trace read, since the spans themselves (tokens,
- * timings, tool calls) are still worth showing without their content.
- */
-export async function enrichCodingAgentSpansFromLogs({
-  logRecords,
-  tenantId,
-  traceId,
-  spans,
-  occurredAtMs,
-  logger,
-  traceCanonicalisation,
-  codingAgents,
-}: {
-  logRecords: TraceLogRecordReader;
-  tenantId: string;
-  traceId: string;
-  spans: Span[];
-  /** Partition-pruning hint on the log store's `TimeUnixMs` partition key. */
-  occurredAtMs?: number;
-  logger?: Logger;
-  traceCanonicalisation: TraceCanonicalisationService;
-  codingAgents?: CodingAgentService;
-}): Promise<Span[]> {
-  if (!hasCodingAgentJoinableSpans(spans)) {
-    return spans;
+export class ClaudeCodeLogEnrichmentService {
+  static create(): ClaudeCodeLogEnrichmentService {
+    return new ClaudeCodeLogEnrichmentService();
   }
 
-  try {
-    const logRows = await logRecords.getLogsByTraceId(tenantId, traceId, occurredAtMs);
+  /**
+   * Map the trace's model-call spans to {@link ClaudeSpanRef}. Only spans that
+   * carry a `request_id` (the real `llm_request` spans) participate: they are the
+   * ones the logs join to, and restricting the set keeps the positional input
+   * pairing (Nth span ↔ Nth request body / user prompt) aligned to model calls.
+   * Sorted by start time so the positional order the pure fn relies on is the
+   * call order.
+   */
+  static mapSpansToClaudeRefs(spans: Span[]): ClaudeSpanRef[] {
+    return spans
+      .filter((span) => readStringParam(span.params, SPAN_REQUEST_ID_KEY) !== null)
+      .slice()
+      .sort((a, b) => a.timestamps.started_at - b.timestamps.started_at)
+      .map((span) => ({
+        spanId: span.span_id,
+        requestId: readStringParam(span.params, SPAN_REQUEST_ID_KEY),
+        querySource: readStringParam(span.params, SPAN_QUERY_SOURCE_KEY),
+      }));
+  }
 
-    return enrichSpansWithClaudeLogContent({
-      spans,
+  /**
+   * True when the trace carries Claude Code model-call spans — i.e. at least one
+   * span has a `request_id` for the logs to join onto.
+   */
+  static hasClaudeModelCallSpans(spans: Span[]): boolean {
+    return spans.some((span) => readStringParam(span.params, SPAN_REQUEST_ID_KEY) !== null);
+  }
+
+  /**
+   * True when the trace has ANY span the claude log join could add content to:
+   * a model call (`request_id`), a tool call (`tool_use_id`), or the turn's
+   * interaction root. The gate every caller runs BEFORE reading logs, so a
+   * trace with nothing to enrich never touches the log store.
+   */
+  static hasCodingAgentJoinableSpans(spans: Span[]): boolean {
+    return spans.some(
+      (span) =>
+        readStringParam(span.params, SPAN_REQUEST_ID_KEY) !== null ||
+        spanToolUseId(span) !== null ||
+        isInteractionSpan(span),
+    );
+  }
+
+  /**
+   * True when THIS span could gain content from the claude join — the
+   * single-span (spanDetail) twin of {@link ClaudeCodeLogEnrichmentService.hasCodingAgentJoinableSpans}. The
+   * name prefix is included so future claude_code.* span shapes at least
+   * attempt the join instead of silently skipping.
+   */
+  static isCodingAgentShapedSpan(span: Span): boolean {
+    return (
+      readStringParam(span.params, SPAN_REQUEST_ID_KEY) !== null ||
+      spanToolUseId(span) !== null ||
+      isInteractionSpan(span) ||
+      (span.name ?? "").startsWith(CLAUDE_SPAN_NAME_PREFIX)
+    );
+  }
+
+  /** Tool spans (`tool_use_id`-carrying) → exact-join refs. */
+  static mapSpansToClaudeToolRefs(spans: Span[]): ClaudeToolSpanRef[] {
+    const refs: ClaudeToolSpanRef[] = [];
+    for (const span of spans) {
+      const toolUseId = spanToolUseId(span);
+      if (toolUseId !== null) {
+        refs.push({ spanId: span.span_id, toolUseId });
+      }
+    }
+
+    return refs;
+  }
+
+  /**
+   * Interaction-span INPUT from its own `user_prompt` attribute — the one
+   * claude content that rides the span itself, so it needs no log read and
+   * must apply even when the trace has zero logs.
+   */
+  static enrichClaudeInteractionInputs(spans: Span[]): Span[] {
+    let hasChanged = false;
+    const next = spans.map((span) => {
+      if (span.input != null) {
+        return span;
+      }
+
+      const prompt = readStringParam(span.params, SPAN_USER_PROMPT_KEY);
+      if (prompt === null) {
+        return span;
+      }
+
+      hasChanged = true;
+
+      return {
+        ...span,
+        input: {
+          type: "text" as const,
+          value: capPayloadString(prompt, undefined, "user_prompt"),
+        },
+      };
+    });
+
+    // Identity-preserving on no-op so callers' referential contracts (and
+    // memoized readers) see an untouched trace as the SAME array.
+    return hasChanged ? next : spans;
+  }
+
+  /**
+   * Map stored log rows to {@link ClaudeContentLog}. The event payload rides the
+   * `body` attribute (not the OTLP Body column) for the `api_*_body` events;
+   * `user_prompt` carries its text on `prompt` instead.
+   */
+  static mapLogRowsToClaudeContentLogs(
+    rows: TraceLogRecordReadRow[],
+    codingAgents?: CodingAgentService,
+  ): ClaudeContentLog[] {
+    return rows.map((row) => {
+      const attrs = row.attributes;
+      const eventName = attrs[EVENT_NAME_ATTR] ?? "";
+      const toolCallCount = Number(attrs[DERIVED_ATTRS.OUTPUT_TOOL_CALL_COUNT]);
+
+      return {
+        eventName,
+        requestId: nonEmptyOrNull(attrs[REQUEST_ID_ATTR]),
+        querySource: nonEmptyOrNull(attrs[QUERY_SOURCE_ATTR]),
+        timeUnixMs: row.timeUnixMs,
+        body: readContentBody(eventName, attrs, codingAgents),
+        // Parsed out of the raw body once, at ingest, so the read path can skip
+        // re-parsing it. Absent on records ingested before that existed, which is
+        // why every consumer keeps its parse as a fallback.
+        derivedOutputText: nonEmptyOrNull(attrs[DERIVED_ATTRS.OUTPUT_TEXT]),
+        derivedToolCallCount: Number.isFinite(toolCallCount) ? toolCallCount : null,
+      };
+    });
+  }
+
+  /**
+   * Attach the joined `input` / `output` onto the trace's spans: model calls
+   * (request_id join), tool calls (tool_use_id join), and the interaction root
+   * (own attr + windowed reply). Returns a new spans array (spans are
+   * shallow-cloned only where enriched); untouched spans are returned as-is. The
+   * attribute-only interaction input applies even with zero logs.
+   */
+  static enrichSpansWithClaudeLogContent({
+    spans,
+    logRows,
+    traceCanonicalisation,
+    codingAgents,
+  }: {
+    spans: Span[];
+    logRows: TraceLogRecordReadRow[];
+    traceCanonicalisation: TraceCanonicalisationService;
+    codingAgents?: CodingAgentService;
+  }): Span[] {
+    if (spans.length === 0) {
+      return spans;
+    }
+
+    const withInteractionInputs =
+      ClaudeCodeLogEnrichmentService.enrichClaudeInteractionInputs(spans);
+    if (logRows.length === 0) {
+      return withInteractionInputs;
+    }
+
+    const logs = ClaudeCodeLogEnrichmentService.mapLogRowsToClaudeContentLogs(
+      logRows,
+      codingAgents,
+    );
+    const refs = ClaudeCodeLogEnrichmentService.mapSpansToClaudeRefs(withInteractionInputs);
+    const enrichmentBySpanId = ClaudeCodeSpanEnrichmentService.computeClaudeSpanEnrichment({
+      spans: refs,
+      logs,
+      traceCanonicalisation,
+    });
+    const toolEnrichmentBySpanId = ClaudeCodeSpanEnrichmentService.computeClaudeToolSpanEnrichment({
+      spans: ClaudeCodeLogEnrichmentService.mapSpansToClaudeToolRefs(withInteractionInputs),
+      toolLogs: ClaudeCodeLogEnrichmentService.mapLogRowsToClaudeToolLogs(logRows),
+      contentLogs: logs,
+      traceCanonicalisation,
+    });
+
+    return withInteractionInputs.map((span) => {
+      const enrichment = enrichmentBySpanId.get(span.span_id);
+      const toolEnrichment = toolEnrichmentBySpanId.get(span.span_id);
+      const interactionOutput =
+        span.output == null && isInteractionSpan(span)
+          ? ClaudeCodeSpanEnrichmentService.computeClaudeInteractionOutput({
+              logs,
+              windowStartMs: span.timestamps.started_at,
+              windowEndMs: span.timestamps.finished_at,
+              traceCanonicalisation,
+            })
+          : null;
+      if (!enrichment && !toolEnrichment && interactionOutput === null) {
+        return span;
+      }
+
+      const next: Span = { ...span };
+      const input = enrichment?.input ?? toolEnrichment?.input ?? null;
+      const output = enrichment?.output ?? toolEnrichment?.output ?? interactionOutput;
+      if (input !== null && next.input == null) {
+        next.input = input;
+      }
+
+      if (output !== null && next.output == null) {
+        next.output = output;
+      }
+
+      return next;
+    });
+  }
+
+  /**
+   * Map stored log rows to {@link ClaudeToolLog} (tool_decision / tool_result
+   * events only). Success arrives as the string "true"/"false"; numbers as
+   * stringified numerics — both parsed here so the pure join sees clean types.
+   */
+  static mapLogRowsToClaudeToolLogs(rows: TraceLogRecordReadRow[]): ClaudeToolLog[] {
+    const out: ClaudeToolLog[] = [];
+    for (const row of rows) {
+      const attrs = row.attributes;
+      const eventName = attrs[EVENT_NAME_ATTR] ?? "";
+      if (eventName !== TOOL_DECISION_EVENT && eventName !== TOOL_RESULT_EVENT) {
+        continue;
+      }
+
+      out.push({
+        eventName,
+        toolUseId: nonEmptyOrNull(attrs[TOOL_USE_ID_ATTR]),
+        toolName: nonEmptyOrNull(attrs[TOOL_NAME_ATTR]),
+        toolParameters: nonEmptyOrNull(attrs[TOOL_PARAMETERS_ATTR]),
+        toolInput: nonEmptyOrNull(attrs[TOOL_INPUT_ATTR]),
+        decision: nonEmptyOrNull(attrs[DECISION_ATTR]),
+        decisionSource:
+          nonEmptyOrNull(attrs[RESULT_DECISION_SOURCE_ATTR]) ??
+          nonEmptyOrNull(attrs[DECISION_SOURCE_ATTR]),
+        success: parseBoolAttr(attrs[SUCCESS_ATTR]),
+        durationMs: parseNumberAttr(attrs[DURATION_MS_ATTR]),
+        resultSizeBytes: parseNumberAttr(attrs[RESULT_SIZE_ATTR]),
+        timeUnixMs: row.timeUnixMs,
+      });
+    }
+
+    return out;
+  }
+
+  /**
+   * The IO wrapper both read paths share: gate on the trace actually having
+   * Claude model-call spans, do one lazy, partition-pruned log read, and join the
+   * content + cost onto the spans.
+   *
+   * Best-effort by design — a log-read failure returns the un-enriched spans
+   * rather than failing the whole trace read, since the spans themselves (tokens,
+   * timings, tool calls) are still worth showing without their content.
+   */
+  static async enrichCodingAgentSpansFromLogs({
+    logRecords,
+    tenantId,
+    traceId,
+    spans,
+    occurredAtMs,
+    logger,
+    traceCanonicalisation,
+    codingAgents,
+  }: {
+    logRecords: TraceLogRecordReader;
+    tenantId: string;
+    traceId: string;
+    spans: Span[];
+    /** Partition-pruning hint on the log store's `TimeUnixMs` partition key. */
+    occurredAtMs?: number;
+    logger?: Logger;
+    traceCanonicalisation: TraceCanonicalisationService;
+    codingAgents?: CodingAgentService;
+  }): Promise<Span[]> {
+    if (!ClaudeCodeLogEnrichmentService.hasCodingAgentJoinableSpans(spans)) {
+      return spans;
+    }
+
+    try {
+      const logRows = await logRecords.getLogsByTraceId(tenantId, traceId, occurredAtMs);
+
+      return ClaudeCodeLogEnrichmentService.enrichSpansWithClaudeLogContent({
+        spans,
+        logRows,
+        traceCanonicalisation,
+        codingAgents,
+      });
+    } catch (error) {
+      logger?.warn(
+        {
+          tenantId,
+          traceId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Claude Code log enrichment skipped: failed to read trace logs",
+      );
+
+      // Best-effort: the attribute-only interaction input needs no logs.
+      return ClaudeCodeLogEnrichmentService.enrichClaudeInteractionInputs(spans);
+    }
+  }
+
+  /**
+   * Light summary rows → {@link ClaudeSpanRef}s for the single-span join: the
+   * positional input pairing needs the WHOLE trace's model-call order, which the
+   * summary read supplies without the full-span cost. Rows arrive start-time
+   * sorted from the repository; sorted again here so the invariant doesn't hang
+   * on the caller.
+   */
+  static mapSummaryRowsToClaudeRefs(rows: SpanSummaryRow[]): ClaudeSpanRef[] {
+    return rows
+      .filter((row) => row.requestId !== null)
+      .slice()
+      .sort((a, b) => a.startTimeMs - b.startTimeMs)
+      .map((row) => ({
+        spanId: row.spanId,
+        requestId: row.requestId,
+        querySource: row.querySource,
+      }));
+  }
+
+  /**
+   * The single-span (spanDetail) join: enrich ONE fetched span using the
+   * trace's logs plus (for model-call spans) the light summary refs that give
+   * the positional input pairing its sibling order. PURE — the tracesV2 layer
+   * owns the reads. Never overwrites a non-null field.
+   */
+  static enrichSingleSpanWithClaudeLogContent({
+    span,
+    modelCallRefs,
+    logRows,
+    traceCanonicalisation,
+    codingAgents,
+  }: {
+    span: Span;
+    /** All model-call refs for the trace, [] when the span has no request_id. */
+    modelCallRefs: ClaudeSpanRef[];
+    logRows: TraceLogRecordReadRow[];
+    traceCanonicalisation: TraceCanonicalisationService;
+    codingAgents?: CodingAgentService;
+  }): Span {
+    const isModelCall = readStringParam(span.params, SPAN_REQUEST_ID_KEY) !== null;
+
+    const [enriched] = ClaudeCodeLogEnrichmentService.enrichSpansWithClaudeLogContent({
+      spans: [span],
       logRows,
       traceCanonicalisation,
       codingAgents,
     });
-  } catch (error) {
-    logger?.warn(
-      {
-        tenantId,
-        traceId,
-        error: error instanceof Error ? error.message : String(error),
-      },
-      "Claude Code log enrichment skipped: failed to read trace logs",
-    );
+    let next = enriched!;
 
-    // Best-effort: the attribute-only interaction input needs no logs.
-    return enrichClaudeInteractionInputs(spans);
-  }
-}
+    // The bulk pass's tool join (exact, by tool_use_id) and interaction joins
+    // (own attr + windowed reply) are single-span safe. Its model-call INPUT is
+    // not: positional pairing needs the whole trace's call order, and a
+    // one-span array degenerates to "this is the group's first call" — so for
+    // model calls that input is discarded and the full-refs join below is the
+    // only input source. Output is an exact request_id join either way.
+    if (isModelCall) {
+      if (next !== span && next.input !== span.input) {
+        next = { ...next, input: span.input };
+      }
 
-/**
- * Light summary rows → {@link ClaudeSpanRef}s for the single-span join: the
- * positional input pairing needs the WHOLE trace's model-call order, which the
- * summary read supplies without the full-span cost. Rows arrive start-time
- * sorted from the repository; sorted again here so the invariant doesn't hang
- * on the caller.
- */
-export function mapSummaryRowsToClaudeRefs(rows: SpanSummaryRow[]): ClaudeSpanRef[] {
-  return rows
-    .filter((row) => row.requestId !== null)
-    .slice()
-    .sort((a, b) => a.startTimeMs - b.startTimeMs)
-    .map((row) => ({
-      spanId: row.spanId,
-      requestId: row.requestId,
-      querySource: row.querySource,
-    }));
-}
+      if (modelCallRefs.length > 0 && logRows.length > 0) {
+        const enrichment = ClaudeCodeSpanEnrichmentService.computeClaudeSpanEnrichment({
+          spans: modelCallRefs,
+          logs: ClaudeCodeLogEnrichmentService.mapLogRowsToClaudeContentLogs(logRows, codingAgents),
+          traceCanonicalisation,
+        }).get(span.span_id);
+        if (enrichment) {
+          const clone: Span = { ...next };
+          if (enrichment.input !== null && span.input == null) {
+            clone.input = enrichment.input;
+          }
 
-/**
- * The single-span (spanDetail) join: enrich ONE fetched span using the
- * trace's logs plus (for model-call spans) the light summary refs that give
- * the positional input pairing its sibling order. PURE — the tracesV2 layer
- * owns the reads. Never overwrites a non-null field.
- */
-export function enrichSingleSpanWithClaudeLogContent({
-  span,
-  modelCallRefs,
-  logRows,
-  traceCanonicalisation,
-  codingAgents,
-}: {
-  span: Span;
-  /** All model-call refs for the trace, [] when the span has no request_id. */
-  modelCallRefs: ClaudeSpanRef[];
-  logRows: TraceLogRecordReadRow[];
-  traceCanonicalisation: TraceCanonicalisationService;
-  codingAgents?: CodingAgentService;
-}): Span {
-  const isModelCall = readStringParam(span.params, SPAN_REQUEST_ID_KEY) !== null;
+          if (enrichment.output !== null && clone.output == null) {
+            clone.output = enrichment.output;
+          }
 
-  const [enriched] = enrichSpansWithClaudeLogContent({
-    spans: [span],
-    logRows,
-    traceCanonicalisation,
-    codingAgents,
-  });
-  let next = enriched!;
-
-  // The bulk pass's tool join (exact, by tool_use_id) and interaction joins
-  // (own attr + windowed reply) are single-span safe. Its model-call INPUT is
-  // not: positional pairing needs the whole trace's call order, and a
-  // one-span array degenerates to "this is the group's first call" — so for
-  // model calls that input is discarded and the full-refs join below is the
-  // only input source. Output is an exact request_id join either way.
-  if (isModelCall) {
-    if (next !== span && next.input !== span.input) {
-      next = { ...next, input: span.input };
-    }
-
-    if (modelCallRefs.length > 0 && logRows.length > 0) {
-      const enrichment = computeClaudeSpanEnrichment({
-        spans: modelCallRefs,
-        logs: mapLogRowsToClaudeContentLogs(logRows, codingAgents),
-        traceCanonicalisation,
-      }).get(span.span_id);
-      if (enrichment) {
-        const clone: Span = { ...next };
-        if (enrichment.input !== null && span.input == null) {
-          clone.input = enrichment.input;
+          next = clone;
         }
-
-        if (enrichment.output !== null && clone.output == null) {
-          clone.output = enrichment.output;
-        }
-
-        next = clone;
       }
     }
-  }
 
-  return next;
+    return next;
+  }
 }

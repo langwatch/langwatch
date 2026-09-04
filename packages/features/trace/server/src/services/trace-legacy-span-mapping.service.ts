@@ -1,4 +1,5 @@
-import { computeSpanCost } from "./trace-span-cost-matching.service";
+import { TraceSpanCostMatchingService } from "./trace-span-cost-matching.service";
+import { TraceNumberCoercionService } from "./trace-number-coercion.service";
 import type { NormalizedAttributes, NormalizedSpan } from "@langwatch/trace-contract";
 import { NormalizedStatusCode } from "@langwatch/trace-contract";
 import type {
@@ -12,7 +13,6 @@ import type {
   SpanTimestamps,
   SpanTypes,
 } from "@langwatch/trace-contract";
-import { coerceToNumber } from "./trace-number-coercion.service";
 import { safeUnflatten } from "@langwatch/trace-contract";
 
 type JsonSerializable = string | number | boolean | null | Record<string, unknown> | unknown[];
@@ -304,28 +304,30 @@ function extractOutput(spanAttributes: NormalizedAttributes): SpanInputOutput | 
  * Falls back to gen_ai.usage.prompt_tokens/completion_tokens for compat.
  */
 function extractMetrics(spanAttributes: NormalizedAttributes): SpanMetrics | null {
-  const promptTokens = coerceToNumber(
+  const promptTokens = TraceNumberCoercionService.coerceToNumber(
     spanAttributes["gen_ai.usage.input_tokens"] ?? spanAttributes["gen_ai.usage.prompt_tokens"],
   );
 
-  const completionTokens = coerceToNumber(
+  const completionTokens = TraceNumberCoercionService.coerceToNumber(
     spanAttributes["gen_ai.usage.output_tokens"] ??
       spanAttributes["gen_ai.usage.completion_tokens"],
   );
 
-  const reasoningTokens = coerceToNumber(spanAttributes["gen_ai.usage.reasoning_tokens"]);
+  const reasoningTokens = TraceNumberCoercionService.coerceToNumber(
+    spanAttributes["gen_ai.usage.reasoning_tokens"],
+  );
   const tokensEstimated = spanAttributes["langwatch.tokens.estimated"];
 
   // Canonical name with Mastra non-standard fallback
-  const cacheReadInputTokens = coerceToNumber(
+  const cacheReadInputTokens = TraceNumberCoercionService.coerceToNumber(
     spanAttributes["gen_ai.usage.cache_read.input_tokens"] ??
       spanAttributes["gen_ai.usage.cached_input_tokens"],
   );
-  const cacheCreationInputTokens = coerceToNumber(
+  const cacheCreationInputTokens = TraceNumberCoercionService.coerceToNumber(
     spanAttributes["gen_ai.usage.cache_creation.input_tokens"],
   );
 
-  const rawCost = computeSpanCost({
+  const rawCost = TraceSpanCostMatchingService.computeSpanCost({
     attrs: spanAttributes,
     promptTokens,
     completionTokens,
@@ -466,85 +468,91 @@ function extractError(
   };
 }
 
-/**
- * Converts flat dot-notation keys into nested objects.
- * e.g. {"gen_ai.usage.input_tokens": 100} → {"gen_ai": {"usage": {"input_tokens": 100}}}
- * Keys without dots stay at top level. Leaf values (arrays, objects, scalars) stay as-is.
- *
- * Delegates to shared safeUnflatten utility which uses Object.create(null)
- * and DANGEROUS_KEYS blocklist for prototype pollution protection.
- *
- * @internal Exported for unit testing
- */
-export function unflattenDotNotation(flat: NormalizedAttributes): Record<string, unknown> {
-  return safeUnflatten(flat as Record<string, unknown>);
-}
-
-/**
- * Maps a NormalizedSpan (from ClickHouse stored_spans) to the legacy Span type
- * used by the pre-ClickHouse trace system.
- */
-export function mapNormalizedSpanToSpan(normalizedSpan: NormalizedSpan): Span {
-  const timestamps: SpanTimestamps = {
-    started_at: normalizedSpan.startTimeUnixMs,
-    finished_at: normalizedSpan.endTimeUnixMs,
-    first_token_at: null,
-  };
-
-  // Check for first token event
-  const firstTokenEvent = normalizedSpan.events.find(
-    (e) => e.name === "first_token" || e.name === "gen_ai.content.first_token",
-  );
-  if (firstTokenEvent) {
-    timestamps.first_token_at = firstTokenEvent.timeUnixMs;
+export class TraceLegacySpanMappingService {
+  static create(): TraceLegacySpanMappingService {
+    return new TraceLegacySpanMappingService();
   }
 
-  const spanType = normalizedSpan.spanAttributes["langwatch.span.type"] as SpanTypes;
+  /**
+   * Converts flat dot-notation keys into nested objects.
+   * e.g. {"gen_ai.usage.input_tokens": 100} → {"gen_ai": {"usage": {"input_tokens": 100}}}
+   * Keys without dots stay at top level. Leaf values (arrays, objects, scalars) stay as-is.
+   *
+   * Delegates to shared safeUnflatten utility which uses Object.create(null)
+   * and DANGEROUS_KEYS blocklist for prototype pollution protection.
+   *
+   * @internal Exported for unit testing
+   */
+  static unflattenDotNotation(flat: NormalizedAttributes): Record<string, unknown> {
+    return safeUnflatten(flat as Record<string, unknown>);
+  }
 
-  const baseSpan: BaseSpan = {
-    span_id: normalizedSpan.spanId,
-    parent_id: normalizedSpan.parentSpanId,
-    trace_id: normalizedSpan.traceId,
-    type: typeof spanType === "string" ? spanType : ("span" as const),
-    name: normalizedSpan.name,
-    input: extractInput(normalizedSpan.spanAttributes),
-    output: extractOutput(normalizedSpan.spanAttributes),
-    error: extractError(
-      normalizedSpan.statusCode,
-      normalizedSpan.statusMessage,
-      normalizedSpan.spanAttributes,
-      normalizedSpan.events,
-    ),
-    timestamps,
-    metrics: extractMetrics(normalizedSpan.spanAttributes),
-    params: unflattenDotNotation(normalizedSpan.spanAttributes),
-  };
-
-  // Add LLM-specific fields
-  if (baseSpan.type === "llm") {
-    return {
-      ...baseSpan,
-      type: "llm" as const,
-      model: extractModel(normalizedSpan.spanAttributes),
-      vendor: extractVendor(normalizedSpan.spanAttributes),
+  /**
+   * Maps a NormalizedSpan (from ClickHouse stored_spans) to the legacy Span type
+   * used by the pre-ClickHouse trace system.
+   */
+  static mapNormalizedSpanToSpan(normalizedSpan: NormalizedSpan): Span {
+    const timestamps: SpanTimestamps = {
+      started_at: normalizedSpan.startTimeUnixMs,
+      finished_at: normalizedSpan.endTimeUnixMs,
+      first_token_at: null,
     };
-  }
 
-  // Add RAG-specific fields
-  if (baseSpan.type === "rag") {
-    return {
-      ...baseSpan,
-      type: "rag" as const,
-      contexts: extractContexts(normalizedSpan.spanAttributes) ?? [],
+    // Check for first token event
+    const firstTokenEvent = normalizedSpan.events.find(
+      (e) => e.name === "first_token" || e.name === "gen_ai.content.first_token",
+    );
+    if (firstTokenEvent) {
+      timestamps.first_token_at = firstTokenEvent.timeUnixMs;
+    }
+
+    const spanType = normalizedSpan.spanAttributes["langwatch.span.type"] as SpanTypes;
+
+    const baseSpan: BaseSpan = {
+      span_id: normalizedSpan.spanId,
+      parent_id: normalizedSpan.parentSpanId,
+      trace_id: normalizedSpan.traceId,
+      type: typeof spanType === "string" ? spanType : ("span" as const),
+      name: normalizedSpan.name,
+      input: extractInput(normalizedSpan.spanAttributes),
+      output: extractOutput(normalizedSpan.spanAttributes),
+      error: extractError(
+        normalizedSpan.statusCode,
+        normalizedSpan.statusMessage,
+        normalizedSpan.spanAttributes,
+        normalizedSpan.events,
+      ),
+      timestamps,
+      metrics: extractMetrics(normalizedSpan.spanAttributes),
+      params: TraceLegacySpanMappingService.unflattenDotNotation(normalizedSpan.spanAttributes),
     };
+
+    // Add LLM-specific fields
+    if (baseSpan.type === "llm") {
+      return {
+        ...baseSpan,
+        type: "llm" as const,
+        model: extractModel(normalizedSpan.spanAttributes),
+        vendor: extractVendor(normalizedSpan.spanAttributes),
+      };
+    }
+
+    // Add RAG-specific fields
+    if (baseSpan.type === "rag") {
+      return {
+        ...baseSpan,
+        type: "rag" as const,
+        contexts: extractContexts(normalizedSpan.spanAttributes) ?? [],
+      };
+    }
+
+    return baseSpan;
   }
 
-  return baseSpan;
-}
-
-/**
- * Maps multiple NormalizedSpans to legacy Span format.
- */
-export function mapNormalizedSpansToSpans(normalizedSpans: NormalizedSpan[]): Span[] {
-  return normalizedSpans.map(mapNormalizedSpanToSpan);
+  /**
+   * Maps multiple NormalizedSpans to legacy Span format.
+   */
+  static mapNormalizedSpansToSpans(normalizedSpans: NormalizedSpan[]): Span[] {
+    return normalizedSpans.map(TraceLegacySpanMappingService.mapNormalizedSpanToSpan);
+  }
 }

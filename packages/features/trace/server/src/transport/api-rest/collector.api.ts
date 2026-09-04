@@ -45,7 +45,7 @@ import {
   type Span,
 } from "@langwatch/trace-contract";
 
-import { CollectorSpanUtils } from "#services/trace-collector-span.service";
+import { TraceCollectorSpanService } from "#services/trace-collector-span.service";
 
 const logger = createLogger("langwatch.collector");
 
@@ -90,8 +90,8 @@ export type CollectorUsageLimitPort = (input: { project: CollectorProject }) => 
 /** One already-normalized span, handed to the ingestion pipeline. */
 export type CollectorSpanIngestPort = (input: {
   tenantId: string;
-  span: ReturnType<typeof CollectorSpanUtils.convertSpanToOtlp>;
-  resource: ReturnType<typeof CollectorSpanUtils.buildResource>;
+  span: ReturnType<typeof TraceCollectorSpanService.convertSpanToOtlp>;
+  resource: ReturnType<typeof TraceCollectorSpanService.buildResource>;
   instrumentationScope: Readonly<{ name: string }>;
   piiRedactionLevel: typeof DEFAULT_PII_REDACTION_LEVEL;
 }) => Promise<Readonly<{ status: string; error?: string | undefined }>>;
@@ -596,7 +596,7 @@ export function createCollectorRestApp(options: {
           ? [`${droppedOldSpans} span(s) dropped: start time is more than 31 days in the past`]
           : [];
       try {
-        const resource = CollectorSpanUtils.buildResource({
+        const resource = TraceCollectorSpanService.buildResource({
           reservedTraceMetadata,
           customMetadata,
           expectedOutput,
@@ -610,7 +610,7 @@ export function createCollectorRestApp(options: {
             // here must not bypass dedup. occurredAt is stamped inside it.
             ports.ingestSpan({
               tenantId: project.id,
-              span: CollectorSpanUtils.convertSpanToOtlp(span),
+              span: TraceCollectorSpanService.convertSpanToOtlp(span),
               resource,
               instrumentationScope: { name: "langwatch.rest.collector" },
               piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,

@@ -31,18 +31,6 @@ const {
   mockGetAllTracesForProject: vi.fn(),
 }));
 
-vi.mock("../../repositories/clickhouse/trace-legacy-read.repository", () => ({
-  ClickHouseTraceService: {
-    create: () => ({
-      getTracesWithSpans: mockGetTracesWithSpans,
-      getTracesByThreadId: mockGetTracesByThreadId,
-      getTracesWithSpansByThreadIds: mockGetTracesWithSpansByThreadIds,
-      getAllTracesForProject: mockGetAllTracesForProject,
-      resolveTraceIdByPrefix: vi.fn().mockResolvedValue([]),
-    }),
-  },
-}));
-
 vi.mock("langwatch", () => ({
   getLangWatchTracer: () => ({
     withActiveSpan: (_name: string, ...args: unknown[]) => {
@@ -54,6 +42,8 @@ vi.mock("langwatch", () => ({
 }));
 
 import { TraceService } from "../trace-legacy-read.service";
+import type { TraceLegacyReadRepository } from "../../repositories/trace-legacy-read.repository";
+import type { TraceEditOverlayService } from "../trace-edit-overlay.service";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 
 const PROJECT_ID = "project_test";
@@ -164,8 +154,15 @@ function refusingEvaluations(): EvaluationService {
 
 function makeService(getLogsByTraceId: TraceLogRecordReader["getLogsByTraceId"]): TraceService {
   return TraceService.create({
-    prisma: {} as never,
     traceCanonicalisation: {} as TraceCanonicalisationService,
+    traceRead: {
+      getTracesWithSpans: mockGetTracesWithSpans,
+      getTracesByThreadId: mockGetTracesByThreadId,
+      getTracesWithSpansByThreadIds: mockGetTracesWithSpansByThreadIds,
+      getAllTracesForProject: mockGetAllTracesForProject,
+      resolveTraceIdByPrefix: vi.fn().mockResolvedValue([]),
+    } as unknown as TraceLegacyReadRepository,
+    editOverlay: {} as TraceEditOverlayService,
     logRecordStorage: { getLogsByTraceId } as unknown as TraceLogRecordReader,
     // The enrichment join reads no evaluation; a refusing double proves it.
     evaluationService: refusingEvaluations(),

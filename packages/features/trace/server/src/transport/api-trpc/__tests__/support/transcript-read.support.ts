@@ -9,6 +9,8 @@
  * for real — the only doubles are the two stores the trace is read from.
  */
 
+import { ClaudeCodeLogEnrichmentService } from "../../../../services/claude-code-log-enrichment.service";
+import { TraceReadRedactionService } from "../../../../services/trace-read-redaction.service";
 import { vi } from "vitest";
 import {
   CONTENT_KEY_CATALOG,
@@ -18,24 +20,11 @@ import {
 import type { CodingAgentService } from "@langwatch/coding-agent-contract";
 import { buildDisplayInput, stringifySpanIO } from "@langwatch/trace-contract";
 import { TraceApp } from "../../../../app/trace.app";
-import {
-  enrichCodingAgentSpansFromLogs,
-  enrichSingleSpanWithClaudeLogContent,
-  isCodingAgentShapedSpan,
-  mapSummaryRowsToClaudeRefs,
-} from "../../../../services/claude-code-log-enrichment.service";
 import type { ClaudeSpanRef } from "../../../../services/claude-code-span-enrichment.service";
 import {
   DERIVED_INPUT_ATTR_PREFIX,
   DERIVED_OUTPUT_ATTR_PREFIX,
 } from "../../../../services/trace-log-content-derivation.service";
-import {
-  applyDerivedTraceEventProtections,
-  applySpanProtections,
-  extractRedactionsFromAllSpanInputs,
-  extractRedactionsFromAllSpanOutputs,
-  redactObject,
-} from "../../../../services/trace-read-redaction.service";
 import type { TracesV2ReadPorts } from "../../traces-v2.api";
 
 /** One of the two stores the read is driven from. */
@@ -86,11 +75,14 @@ export function createTranscriptReadPorts(): TracesV2ReadPorts {
     mappers: {
       spanDisplay: { buildDisplayInput, stringifySpanIO },
       spanProtection: {
-        applySpanProtections,
-        extractRedactionsFromAllSpanInputs,
-        extractRedactionsFromAllSpanOutputs,
-        redactObject,
-        applyDerivedTraceEventProtections,
+        applySpanProtections: TraceReadRedactionService.applySpanProtections,
+        extractRedactionsFromAllSpanInputs:
+          TraceReadRedactionService.extractRedactionsFromAllSpanInputs,
+        extractRedactionsFromAllSpanOutputs:
+          TraceReadRedactionService.extractRedactionsFromAllSpanOutputs,
+        redactObject: TraceReadRedactionService.redactObject,
+        applyDerivedTraceEventProtections:
+          TraceReadRedactionService.applyDerivedTraceEventProtections,
       },
       contentPrivacy: {
         contentKeyCatalog: CONTENT_KEY_CATALOG,
@@ -109,14 +101,15 @@ export function createTranscriptReadPorts(): TracesV2ReadPorts {
       },
     },
     codingAgentEnrichment: {
-      isCodingAgentShapedSpan,
-      enrichSpansFromLogs: (input) => enrichCodingAgentSpansFromLogs(input),
+      isCodingAgentShapedSpan: ClaudeCodeLogEnrichmentService.isCodingAgentShapedSpan,
+      enrichSpansFromLogs: (input) =>
+        ClaudeCodeLogEnrichmentService.enrichCodingAgentSpansFromLogs(input),
       enrichSingleSpanWithLogContent: (input) =>
-        enrichSingleSpanWithClaudeLogContent({
+        ClaudeCodeLogEnrichmentService.enrichSingleSpanWithClaudeLogContent({
           ...input,
           modelCallRefs: input.modelCallRefs as ClaudeSpanRef[],
         }),
-      mapSummaryRowsToRefs: mapSummaryRowsToClaudeRefs,
+      mapSummaryRowsToRefs: ClaudeCodeLogEnrichmentService.mapSummaryRowsToClaudeRefs,
     },
   };
 }

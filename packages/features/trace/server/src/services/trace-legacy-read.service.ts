@@ -1,31 +1,24 @@
-import type { AnnotationService } from "@langwatch/annotation-contract";
-import type { DataRetentionService } from "@langwatch/data-retention-contract";
+import { TraceOffloadResolutionBatchService } from "./trace-offload-resolution-batch.service";
+import { TraceOffloadResolutionService } from "./trace-offload-resolution.service";
+import { TraceEditOverlayRedactionService } from "./trace-edit-overlay-redaction.service";
+import { ClaudeCodeLogEnrichmentService } from "./claude-code-log-enrichment.service";
+import { TraceEvaluationMappingService } from "./trace-evaluation-mapping.service";
 import type { EvaluationService } from "@langwatch/evaluation-contract";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { createLogger } from "@langwatch/observability";
 import { getLangWatchTracer } from "langwatch";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { BlobStore } from "./trace-blob-store.service";
+import type { TraceBlobStoreService } from "./trace-blob-store.service";
 import {
   CODING_AGENT_ORIGIN,
-  enrichCodingAgentSpansFromLogs,
   type TraceLogRecordReader,
 } from "./claude-code-log-enrichment.service";
 import type { TraceIOExtractionService } from "#services/trace-io-extraction.service";
-import { mapTraceEvaluationsToLegacyEvaluations } from "./trace-evaluation-mapping.service";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
 import type { Evaluation, Trace } from "@langwatch/trace-contract";
 import type { Protections } from "@langwatch/trace-server";
-import type { ClickHouseClient } from "@clickhouse/client";
-import {
-  ClickHouseTraceService,
-  type TraceLegacyFilterConditions,
-} from "../repositories/clickhouse/trace-legacy-read.repository";
+import type { TraceLegacyReadRepository } from "../repositories/trace-legacy-read.repository";
 import { applyOverlayToTrace } from "@langwatch/trace-contract";
-import { redactPatchForViewer } from "./trace-edit-overlay-redaction.service";
 import { TraceEditOverlayService } from "./trace-edit-overlay.service";
-import { resolveOffloadedTraces } from "./trace-offload-resolution.service";
-import { resolveOffloadedTracesBatch } from "./trace-offload-resolution-batch.service";
 
 /**
  * Minimum prefix length we will attempt to resolve. Shorter strings fall
@@ -104,7 +97,7 @@ import type {
  * (ADR-022: read-time recompute via event_log).
  *
  * When provided, every read path that returns `Trace[]` with spans passes
- * each trace's normalized spans through `resolveOffloadedTraces` to
+ * each trace's normalized spans through `TraceOffloadResolutionService.resolveOffloadedTraces` to
  * restore full field values that were offloaded by `leanForProjection`,
  * then re-runs `TraceIOExtractionService` to recompute trace.input /
  * trace.output from the resolved spans.
@@ -114,62 +107,8 @@ import type {
  * pre-ADR-022 behavior.
  */
 export interface BlobResolutionDeps {
-  blobStore: BlobStore;
+  blobStore: TraceBlobStoreService;
   ioExtractionService: TraceIOExtractionService;
-}
-
-/**
- * Builds the per-trace resolver callback from BlobResolutionDeps.
- *
- * Encapsulates the ADR-022 read-path wiring: given a projectId and the
- * NormalizedSpan array for a single trace, calls `resolveOffloadedTraces`
- * and returns the resolved spans + recomputed IO.
- *
- * Returned as `undefined` when `deps` is absent so that ClickHouseTraceService
- * falls back to the preview values from trace_summaries (pre-ADR-022 behavior).
- */
-class OffloadedSpanResolver {
-  constructor(
-    private readonly deps: BlobResolutionDeps,
-    private readonly logger: ReturnType<typeof createLogger>,
-  ) {}
-
-  /**
-   * Returns an async callback compatible with ClickHouseTraceService's
-   * `resolveTraceSpansFn` parameter.
-   */
-  toResolverFn(): (
-    projectId: string,
-    normalizedSpans: NormalizedSpan[],
-  ) => ReturnType<typeof resolveOffloadedTraces> {
-    return (projectId, normalizedSpans) =>
-      resolveOffloadedTraces({
-        projectId,
-        normalizedSpans,
-        blobStore: this.deps.blobStore,
-        ioExtractionService: this.deps.ioExtractionService,
-        logger: this.logger,
-      });
-  }
-
-  /**
-   * Returns the bulk-resolution callback compatible with ClickHouseTraceService's
-   * `resolveTraceSpansBatchFn` parameter. Resolves a whole result set in one
-   * bounded-concurrency pass over event_log (#4991 AC6).
-   */
-  toBatchResolverFn(): (
-    projectId: string,
-    spansPerTrace: NormalizedSpan[][],
-  ) => ReturnType<typeof resolveOffloadedTracesBatch> {
-    return (projectId, spansPerTrace) =>
-      resolveOffloadedTracesBatch({
-        projectId,
-        spansPerTrace,
-        blobStore: this.deps.blobStore,
-        ioExtractionService: this.deps.ioExtractionService,
-        logger: this.logger,
-      });
-  }
 }
 
 /**
@@ -186,46 +125,16 @@ class OffloadedSpanResolver {
 export class TraceService {
   private readonly tracer = getLangWatchTracer("langwatch.traces.service");
   private readonly logger = createLogger("langwatch:traces:service");
-  private readonly clickHouseService: ClickHouseTraceService;
   private readonly injectedLogRecordStorage?: TraceLogRecordReader;
-  private cachedEditOverlayService?: TraceEditOverlayService;
   private constructor(
-    readonly prisma: PrismaClient,
     private readonly traceCanonicalisation: TraceCanonicalisationService,
-    clickHouse: {
-      resolveClient?: ((tenantId: string) => Promise<ClickHouseClient>) | undefined;
-      filterConditions?: TraceLegacyFilterConditions | undefined;
-    },
+    private readonly clickHouseService: TraceLegacyReadRepository,
+    private readonly editOverlay: TraceEditOverlayService,
     // Required, so it comes before the optional tail: every single-trace read
     // resolves the evaluations behind it.
     private readonly evaluationService: EvaluationService,
-    private readonly blobResolutionDeps?: BlobResolutionDeps,
     logRecordStorage?: TraceLogRecordReader,
-    private readonly retentionResolver?: DataRetentionService,
-    private readonly annotationService?: AnnotationService,
   ) {
-    // Build the resolver callbacks when deps are present. They are passed to
-    // ClickHouseTraceService so resolution happens at the NormalizedSpan level
-    // (before mapping to legacy Span), the only level where spanAttributes
-    // carry the eventref keys. The per-trace fn serves single-trace detail
-    // reads (#4888); the batch fn serves bulk reads in one bounded pass (#4991).
-    const offloadedSpanResolver =
-      blobResolutionDeps !== undefined
-        ? new OffloadedSpanResolver(blobResolutionDeps, this.logger)
-        : undefined;
-    const resolveTraceSpansFn = offloadedSpanResolver?.toResolverFn();
-    const resolveTraceSpansBatchFn = offloadedSpanResolver?.toBatchResolverFn();
-
-    this.clickHouseService = ClickHouseTraceService.create({
-      prisma,
-      resolveClickHouseClient: clickHouse.resolveClient,
-      filterConditions: clickHouse.filterConditions,
-      resolveTraceSpans: resolveTraceSpansFn,
-      resolveTraceSpansBatch: resolveTraceSpansBatchFn,
-      retentionResolver: this.retentionResolver,
-      annotations: this.annotationService,
-      traceCanonicalisation: this.traceCanonicalisation,
-    });
     // Injected store for the read-time Claude Code content enrichment; the
     // default comes LAZILY from the App on first use (see
     // logRecordStorageService), so construction here stays free of ClickHouse
@@ -253,14 +162,6 @@ export class TraceService {
     }
 
     return injected;
-  }
-
-  /**
-   * Reviewer corrections, built lazily so a read that never opts into them
-   * never touches Postgres for the overlay table.
-   */
-  private editOverlayService(): TraceEditOverlayService {
-    return (this.cachedEditOverlayService ??= TraceEditOverlayService.create(this.prisma));
   }
 
   /**
@@ -311,7 +212,7 @@ export class TraceService {
       return traces;
     }
 
-    const patches = await this.editOverlayService().getPatchesByTraceIds({
+    const patches = await this.editOverlay.getPatchesByTraceIds({
       projectId,
       traceIds: traces.map((trace) => trace.trace_id),
     });
@@ -328,7 +229,7 @@ export class TraceService {
 
       const next = applyOverlayToTrace({
         trace,
-        patch: redactPatchForViewer({
+        patch: TraceEditOverlayRedactionService.redactPatchForViewer({
           patch,
           protections,
           isWindowRedacted: trace.redacted_by_visibility_window === true,
@@ -355,37 +256,26 @@ export class TraceService {
    */
   static create({
     traceCanonicalisation,
-    prisma,
-    resolveClickHouseClient,
-    filterConditions,
-    blobResolutionDeps,
+    traceRead,
+    editOverlay,
     logRecordStorage,
     evaluationService,
-    retentionResolver,
-    annotationService,
   }: {
     traceCanonicalisation: TraceCanonicalisationService;
-    prisma: PrismaClient;
-    /** The process's tenant-keyed connection; absent, every read refuses. */
-    resolveClickHouseClient?: ((tenantId: string) => Promise<ClickHouseClient>) | undefined;
-    /** The analytics filter translator; absent, a FILTERED list refuses. */
-    filterConditions?: TraceLegacyFilterConditions | undefined;
-    blobResolutionDeps?: BlobResolutionDeps;
+    /** The composed trace store; the composition root picks the implementation. */
+    traceRead: TraceLegacyReadRepository;
+    /** Reviewer corrections, applied only where a caller opts in. */
+    editOverlay: TraceEditOverlayService;
     logRecordStorage?: TraceLogRecordReader;
     /** Required: every single-trace read resolves the evaluations behind it. */
     evaluationService: EvaluationService;
-    retentionResolver?: DataRetentionService;
-    annotationService?: AnnotationService;
   }): TraceService {
     return new TraceService(
-      prisma,
       traceCanonicalisation,
-      { resolveClient: resolveClickHouseClient, filterConditions },
+      traceRead,
+      editOverlay,
       evaluationService,
-      blobResolutionDeps,
       logRecordStorage,
-      retentionResolver,
-      annotationService,
     );
   }
 
@@ -535,7 +425,7 @@ export class TraceService {
       return trace;
     }
 
-    const spans = await enrichCodingAgentSpansFromLogs({
+    const spans = await ClaudeCodeLogEnrichmentService.enrichCodingAgentSpansFromLogs({
       logRecords: this.logRecordStorageService(),
       tenantId: projectId,
       traceId: trace.trace_id,
@@ -701,7 +591,7 @@ export class TraceService {
           traceIds,
         });
 
-        return mapTraceEvaluationsToLegacyEvaluations(result);
+        return TraceEvaluationMappingService.mapTraceEvaluationsToLegacyEvaluations(result);
       },
     );
   }

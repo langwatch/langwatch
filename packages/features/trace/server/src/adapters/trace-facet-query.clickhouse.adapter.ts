@@ -6,24 +6,6 @@
 import type { FacetQueryContext } from "./trace-facet-registry.clickhouse.adapter";
 
 /**
- * `WHERE` predicate that pins every facet query to the right tenant and
- * time window. The time column varies per table — `OccurredAt` for
- * `trace_summaries`, `StartTime` for `stored_spans`, `ScheduledAt` for
- * `evaluation_runs`. See `TABLE_TIME_COLUMNS` in `facet-registry.ts`.
- *
- * TenantId comes first in the predicate list because of how the
- * cross-tenant index is laid out — the multitenancy review in
- * `dev/docs/best_practices/clickhouse-queries.md` calls this out.
- */
-export function buildTimeWhere(timeColumn: string): string {
-  return [
-    "TenantId = {tenantId:String}",
-    `${timeColumn} >= fromUnixTimestamp64Milli({timeFrom:Int64})`,
-    `${timeColumn} <= fromUnixTimestamp64Milli({timeTo:Int64})`,
-  ].join(" AND ");
-}
-
-/**
  * Per-query memory guard for the unbounded key-discovery facets
  * (`metadata-keys`, `span-attribute-keys`, `event-attribute-keys`). Each
  * flattens an attribute-map's keys with `arrayJoin` and groups by key over the
@@ -47,17 +29,41 @@ export const KEY_DISCOVERY_SETTINGS: Record<string, string> = {
   max_memory_usage: String(2 * 1024 * 1024 * 1024), // 2 GiB
 };
 
-/**
- * The bound-parameter tuple every facet query relies on. Helpers that need
- * `prefix` add it on top, since not every builder supports key/value
- * prefix-filtering.
- */
-export function baseParams(ctx: FacetQueryContext): Record<string, unknown> {
-  return {
-    tenantId: ctx.tenantId,
-    timeFrom: ctx.timeRange.from,
-    timeTo: ctx.timeRange.to,
-    limit: ctx.limit,
-    offset: ctx.offset,
-  };
+export class ClickHouseFacetQueryAdapter {
+  static create(): ClickHouseFacetQueryAdapter {
+    return new ClickHouseFacetQueryAdapter();
+  }
+
+  /**
+   * `WHERE` predicate that pins every facet query to the right tenant and
+   * time window. The time column varies per table — `OccurredAt` for
+   * `trace_summaries`, `StartTime` for `stored_spans`, `ScheduledAt` for
+   * `evaluation_runs`. See `TABLE_TIME_COLUMNS` in `facet-registry.ts`.
+   *
+   * TenantId comes first in the predicate list because of how the
+   * cross-tenant index is laid out — the multitenancy review in
+   * `dev/docs/best_practices/clickhouse-queries.md` calls this out.
+   */
+  static buildTimeWhere(timeColumn: string): string {
+    return [
+      "TenantId = {tenantId:String}",
+      `${timeColumn} >= fromUnixTimestamp64Milli({timeFrom:Int64})`,
+      `${timeColumn} <= fromUnixTimestamp64Milli({timeTo:Int64})`,
+    ].join(" AND ");
+  }
+
+  /**
+   * The bound-parameter tuple every facet query relies on. Helpers that need
+   * `prefix` add it on top, since not every builder supports key/value
+   * prefix-filtering.
+   */
+  static baseParams(ctx: FacetQueryContext): Record<string, unknown> {
+    return {
+      tenantId: ctx.tenantId,
+      timeFrom: ctx.timeRange.from,
+      timeTo: ctx.timeRange.to,
+      limit: ctx.limit,
+      offset: ctx.offset,
+    };
+  }
 }

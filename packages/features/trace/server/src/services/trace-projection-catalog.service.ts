@@ -163,86 +163,6 @@ function field(partial: Omit<ResolvedField, "path"> & { path: string }): Resolve
  */
 const FORBIDDEN_SEGMENTS = new Set(["__proto__", "constructor", "prototype"]);
 
-/**
- * Resolve a single dotted-path to its {@link ResolvedField}, or null when the
- * path is not in the allowlist (the caller collects nulls into a 400).
- */
-export function resolveField(path: string): ResolvedField | null {
-  // Reject prototype-pollution segments anywhere in the path (defense in depth
-  // alongside the projector's setPath guard).
-  if (path.split(".").some((segment) => FORBIDDEN_SEGMENTS.has(segment))) {
-    return null;
-  }
-
-  const scalar = TRACE_SCALARS[path];
-  if (scalar) {
-    return field({ path, collection: null, ...scalar });
-  }
-
-  if (path.startsWith(PREFIX.metrics)) {
-    const key = path.slice(PREFIX.metrics.length);
-    const type = TRACE_METRICS[key];
-    if (!type) {
-      return null;
-    }
-
-    return field({
-      path,
-      type,
-      collection: null,
-      protection: key === "total_cost" ? "costs" : null,
-      outPath: ["metrics", key],
-      read: (t) => t.metrics?.[key] ?? null,
-    });
-  }
-
-  if (path.startsWith(PREFIX.metadata)) {
-    const key = path.slice(PREFIX.metadata.length);
-    if (!key) {
-      return null;
-    }
-
-    return field({
-      path,
-      type: "json",
-      collection: null,
-      protection: null,
-      outPath: ["metadata", key],
-      read: (t) => t.metadata?.[key] ?? null,
-    });
-  }
-
-  if (path.startsWith(PREFIX.evaluations)) {
-    const key = path.slice(PREFIX.evaluations.length);
-    const type = EVALUATION_FIELDS[key];
-    if (!type) {
-      return null;
-    }
-
-    return field({
-      path,
-      type,
-      collection: "evaluations",
-      protection: null,
-      outPath: [key],
-      read: (ev) => ev[key] ?? null,
-    });
-  }
-
-  if (path.startsWith(PREFIX.events)) {
-    return resolveEventField({ path, rest: path.slice(PREFIX.events.length) });
-  }
-
-  if (path.startsWith(PREFIX.annotations)) {
-    return resolveAnnotationField({
-      path,
-      rest: path.slice(PREFIX.annotations.length),
-    });
-  }
-
-  return null;
-}
-
 function resolveEventField({ path, rest }: { path: string; rest: string }): ResolvedField | null {
   if (rest === "type") {
     return field({
@@ -370,4 +290,90 @@ function resolveAnnotationField({
   }
 
   return null;
+}
+
+export class TraceProjectionCatalogService {
+  static create(): TraceProjectionCatalogService {
+    return new TraceProjectionCatalogService();
+  }
+
+  /**
+   * Resolve a single dotted-path to its {@link ResolvedField}, or null when the
+   * path is not in the allowlist (the caller collects nulls into a 400).
+   */
+  static resolveField(path: string): ResolvedField | null {
+    // Reject prototype-pollution segments anywhere in the path (defense in depth
+    // alongside the projector's setPath guard).
+    if (path.split(".").some((segment) => FORBIDDEN_SEGMENTS.has(segment))) {
+      return null;
+    }
+
+    const scalar = TRACE_SCALARS[path];
+    if (scalar) {
+      return field({ path, collection: null, ...scalar });
+    }
+
+    if (path.startsWith(PREFIX.metrics)) {
+      const key = path.slice(PREFIX.metrics.length);
+      const type = TRACE_METRICS[key];
+      if (!type) {
+        return null;
+      }
+
+      return field({
+        path,
+        type,
+        collection: null,
+        protection: key === "total_cost" ? "costs" : null,
+        outPath: ["metrics", key],
+        read: (t) => t.metrics?.[key] ?? null,
+      });
+    }
+
+    if (path.startsWith(PREFIX.metadata)) {
+      const key = path.slice(PREFIX.metadata.length);
+      if (!key) {
+        return null;
+      }
+
+      return field({
+        path,
+        type: "json",
+        collection: null,
+        protection: null,
+        outPath: ["metadata", key],
+        read: (t) => t.metadata?.[key] ?? null,
+      });
+    }
+
+    if (path.startsWith(PREFIX.evaluations)) {
+      const key = path.slice(PREFIX.evaluations.length);
+      const type = EVALUATION_FIELDS[key];
+      if (!type) {
+        return null;
+      }
+
+      return field({
+        path,
+        type,
+        collection: "evaluations",
+        protection: null,
+        outPath: [key],
+        read: (ev) => ev[key] ?? null,
+      });
+    }
+
+    if (path.startsWith(PREFIX.events)) {
+      return resolveEventField({ path, rest: path.slice(PREFIX.events.length) });
+    }
+
+    if (path.startsWith(PREFIX.annotations)) {
+      return resolveAnnotationField({
+        path,
+        rest: path.slice(PREFIX.annotations.length),
+      });
+    }
+
+    return null;
+  }
 }

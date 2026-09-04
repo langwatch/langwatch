@@ -62,7 +62,7 @@ import {
   type TraceRecord,
   type TraceSummaryData,
 } from "@langwatch/trace-contract";
-import { TraceQueryEvaluationService } from "@langwatch/trace-server";
+import { TraceQueryEvaluationAdapter } from "@langwatch/trace-server";
 import {
   WorkerAutomationRunawayAdapter,
   type WorkerAutomationRunawayDirectories,
@@ -460,7 +460,7 @@ class UnavailableNotificationDelivery extends AutomationNotificationDeliveryPort
  * automations are written in.
  *
  * Both halves are the packaged decision, so an automation confirms here the
- * way it confirmed in the application. `TraceQueryEvaluationService` is
+ * way it confirmed in the application. `TraceQueryEvaluationAdapter` is
  * Trace's own LangWatchQL evaluator; `LegacyFilterMatchingService` is
  * Analytics' in-memory twin of the ClickHouse filter builder, reading the
  * settled fold state through `PreconditionTraceDataService`. Neither is
@@ -478,7 +478,7 @@ class WorkerSettlementFilterEvaluator extends AutomationSettlementFilterEvaluato
     evaluations: EvaluationRunData[] | null;
     events: DerivedTraceEvent[] | null;
   }): boolean {
-    return TraceQueryEvaluationService.matches(input.query, {
+    return TraceQueryEvaluationAdapter.matches(input.query, {
       summary: input.foldState,
       evaluations: input.evaluations,
       events: input.events,

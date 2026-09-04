@@ -14,9 +14,9 @@
  * routes on — two descriptions of one event stream drift into jobs nothing can
  * pick up.
  */
+import { TraceProcessingProducerAdapter } from "@langwatch/trace-server";
 import type { EventSourcing } from "@langwatch/eventing";
 import { HandledError } from "@langwatch/handled-error";
-import { createTraceProcessingProducerPipeline } from "@langwatch/trace-server";
 
 /** The marker a comment leaves on the trace it was left on. */
 export type TraceAnnotationMarker = Readonly<{
@@ -57,7 +57,9 @@ export function composeApiTraceProducerCommands(options: {
   }
 
   const registered = options.eventing.register(
-    createTraceProcessingProducerPipeline({ processName: options.processName }),
+    TraceProcessingProducerAdapter.createTraceProcessingProducerPipeline({
+      processName: options.processName,
+    }),
   );
   const commands = registered.commands as Record<string, unknown>;
   const add = commands.addAnnotation;

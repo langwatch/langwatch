@@ -9,12 +9,9 @@
  * ClickHouse/Postgres execution that consumes `plan` lives in the trace service.
  */
 
+import { TraceProjectionCatalogService } from "./trace-projection-catalog.service";
 import type { Protections } from "./trace-viewer-protections.service";
-import {
-  type ProjectionSource,
-  type ResolvedField,
-  resolveField,
-} from "./trace-projection-catalog.service";
+import { type ProjectionSource, type ResolvedField } from "./trace-projection-catalog.service";
 import {
   type CompiledProjection,
   type CompileProjectionArgs,
@@ -35,20 +32,6 @@ const COLLECTION_PREFIX: Record<ProjectionCollection, string> = {
   evaluations: "evaluations.",
 };
 
-export function compileProjection({
-  from = "traces",
-  select,
-  protections,
-}: CompileProjectionArgs): CompiledProjection {
-  const fields = resolveSelectedFields(select);
-
-  return {
-    schema: buildSchema({ from, fields }),
-    plan: buildPlan({ from, fields, protections }),
-    project: buildProjector({ fields, protections }),
-  };
-}
-
 /**
  * Resolve every select path against the allowlist, deduped and order-preserving.
  * Throws {@link ProjectionValidationError} listing all unknown paths at once.
@@ -63,7 +46,7 @@ function resolveSelectedFields(select: string[]): ResolvedField[] {
     }
 
     seen.add(path);
-    const resolved = resolveField(path);
+    const resolved = TraceProjectionCatalogService.resolveField(path);
     if (resolved) {
       fields.push(resolved);
     } else {
@@ -257,4 +240,24 @@ function setPath({
   }
 
   cursor[last] = value;
+}
+
+export class TraceProjectionCompileService {
+  static create(): TraceProjectionCompileService {
+    return new TraceProjectionCompileService();
+  }
+
+  static compileProjection({
+    from = "traces",
+    select,
+    protections,
+  }: CompileProjectionArgs): CompiledProjection {
+    const fields = resolveSelectedFields(select);
+
+    return {
+      schema: buildSchema({ from, fields }),
+      plan: buildPlan({ from, fields, protections }),
+      project: buildProjector({ fields, protections }),
+    };
+  }
 }

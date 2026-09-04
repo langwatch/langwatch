@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 import { TraceloopCanonicaliser } from "../traceloop.canonicaliser";
-import { createExtractorContext } from "../../../stores/__tests__/canonicalisation/adapters/test-helpers";
+import { createExtractorContext } from "./test-helpers";
 
 describe("TraceloopCanonicaliser", () => {
   const extractor = new TraceloopCanonicaliser();

@@ -1,7 +1,7 @@
 /**
  * Edge media extraction for trace spans.
  *
- * `maybeExtractSpanMedia` runs inside the processCommandData edge hook
+ * `TraceEdgeMediaExtractionService.maybeExtractSpanMedia` runs inside the processCommandData edge hook
  * (TraceRequestCollectionService), after the span is normalized and BEFORE
  * the ADR-022 `maybeSpool` size check. It walks the span's attribute values
  * (and span-event attribute values) for inline media parts — base64 audio
@@ -31,17 +31,14 @@
  * keeps today's behavior end to end.
  */
 
+import { TraceValueMediaExtractionService } from "./trace-value-media-extraction.service";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 import { containsMediaMarkers, type OtlpKeyValue, type OtlpSpan } from "@langwatch/trace-contract";
 import type { TraceEdgeMediaTelemetryPort } from "../ports/trace-media-store.port";
 import type { TraceMediaStorePort } from "../ports/trace-media-store.port";
 import type { ExtractedRef } from "./trace-content-extraction.service";
-import {
-  createExtractionBudget,
-  type ExtractionBudget,
-  extractInlineMediaFromValue,
-} from "./trace-value-media-extraction.service";
+import { type ExtractionBudget } from "./trace-value-media-extraction.service";
 
 /** Purpose tag for stored objects extracted from trace span content. */
 export const TRACE_MEDIA_PURPOSE = "trace_content";
@@ -71,33 +68,6 @@ export interface EdgeMediaExtractionDeps {
   createService?: (projectId: string) => TraceMediaStorePort;
 }
 
-/**
- * True when any span or span-event attribute string value carries a media
- * marker. Pure linear scans, no allocation, no I/O — this is the gate that
- * keeps the 99.9% no-media ingestion path at zero added cost.
- */
-export function spanCarriesMediaMarkers(span: OtlpSpan): boolean {
-  const attrsCarryMarkers = (attributes: OtlpKeyValue[] | undefined) =>
-    Array.isArray(attributes) &&
-    attributes.some(
-      (attr) =>
-        typeof attr?.value?.stringValue === "string" &&
-        containsMediaMarkers(attr.value.stringValue),
-    );
-
-  if (attrsCarryMarkers(span.attributes)) {
-    return true;
-  }
-
-  for (const event of span.events ?? []) {
-    if (attrsCarryMarkers(event.attributes)) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
 async function rewriteAttributeList({
   attributes,
   projectId,
@@ -118,7 +88,7 @@ async function rewriteAttributeList({
   for (const attr of attributes) {
     const stringValue = attr?.value?.stringValue;
     if (typeof stringValue === "string" && containsMediaMarkers(stringValue)) {
-      const result = await extractInlineMediaFromValue({
+      const result = await TraceValueMediaExtractionService.extractInlineMediaFromValue({
         value: stringValue,
         projectId,
         purpose: TRACE_MEDIA_PURPOSE,
@@ -144,157 +114,190 @@ async function rewriteAttributeList({
   return changed ? out : attributes;
 }
 
-/**
- * Externalizes inline media from the span's attribute values, returning the
- * command data with parts rewritten to stored-object references — or the
- * original command data unchanged when there is no media, the flag is off,
- * the project has content-drop rules, or anything fails (fail-open).
- */
-export async function maybeExtractSpanMedia({
-  data,
-  deps,
-  logger,
-}: {
-  data: RecordSpanCommandData;
-  deps: EdgeMediaExtractionDeps;
-  logger: EdgeMediaExtractionLogger;
-}): Promise<RecordSpanCommandData> {
-  const span = data.span;
-  if (!spanCarriesMediaMarkers(span)) {
-    return data;
+export class TraceEdgeMediaExtractionService {
+  static create(): TraceEdgeMediaExtractionService {
+    return new TraceEdgeMediaExtractionService();
   }
 
-  const resolved = {
-    featureFlags: deps.featureFlags,
-    hasContentDropRules: deps.hasContentDropRules,
-    service: deps.service,
-    createService: deps.createService,
-  };
+  /**
+   * True when any span or span-event attribute string value carries a media
+   * marker. Pure linear scans, no allocation, no I/O — this is the gate that
+   * keeps the 99.9% no-media ingestion path at zero added cost.
+   */
+  static spanCarriesMediaMarkers(span: OtlpSpan): boolean {
+    const attrsCarryMarkers = (attributes: OtlpKeyValue[] | undefined) =>
+      Array.isArray(attributes) &&
+      attributes.some(
+        (attr) =>
+          typeof attr?.value?.stringValue === "string" &&
+          containsMediaMarkers(attr.value.stringValue),
+      );
 
-  const projectId = data.tenantId;
-  const traceId = span.traceId;
-  const spanId = span.spanId;
+    if (attrsCarryMarkers(span.attributes)) {
+      return true;
+    }
 
-  let stage: "flag_store" | "privacy_probe" | "storage" = "flag_store";
-  try {
-    const enabled = await resolved.featureFlags.isEnabled("release_trace_media_extraction", {
-      kind: "project",
-      projectId,
-    });
-    if (!enabled) {
+    for (const event of span.events ?? []) {
+      if (attrsCarryMarkers(event.attributes)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Externalizes inline media from the span's attribute values, returning the
+   * command data with parts rewritten to stored-object references — or the
+   * original command data unchanged when there is no media, the flag is off,
+   * the project has content-drop rules, or anything fails (fail-open).
+   */
+  static async maybeExtractSpanMedia({
+    data,
+    deps,
+    logger,
+  }: {
+    data: RecordSpanCommandData;
+    deps: EdgeMediaExtractionDeps;
+    logger: EdgeMediaExtractionLogger;
+  }): Promise<RecordSpanCommandData> {
+    const span = data.span;
+    if (!TraceEdgeMediaExtractionService.spanCarriesMediaMarkers(span)) {
       return data;
     }
 
-    stage = "privacy_probe";
-    if (await resolved.hasContentDropRules(projectId)) {
-      return data;
-    }
+    const resolved = {
+      featureFlags: deps.featureFlags,
+      hasContentDropRules: deps.hasContentDropRules,
+      service: deps.service,
+      createService: deps.createService,
+    };
 
-    stage = "storage";
-    const service = resolved.service ?? resolved.createService?.(projectId);
-    if (!service) {
-      return data;
-    }
+    const projectId = data.tenantId;
+    const traceId = span.traceId;
+    const spanId = span.spanId;
 
-    const refs: ExtractedRef[] = [];
-    // One budget for the WHOLE span: the part cap and the deadline apply
-    // across every attribute and event-attribute value, so a span cannot
-    // multiply the cost by spreading media over many attributes.
-    const budget = createExtractionBudget();
+    let stage: "flag_store" | "privacy_probe" | "storage" = "flag_store";
+    try {
+      const enabled = await resolved.featureFlags.isEnabled("release_trace_media_extraction", {
+        kind: "project",
+        projectId,
+      });
+      if (!enabled) {
+        return data;
+      }
 
-    const attributes = await rewriteAttributeList({
-      attributes: span.attributes,
-      projectId,
-      ownerId: traceId,
-      service,
-      refs,
-      budget,
-    });
+      stage = "privacy_probe";
+      if (await resolved.hasContentDropRules(projectId)) {
+        return data;
+      }
 
-    let eventsChanged = false;
-    const events = (span.events ?? []).map((event) => event);
-    for (let i = 0; i < events.length; i++) {
-      const event = events[i]!;
-      const rewritten = await rewriteAttributeList({
-        attributes: event.attributes,
+      stage = "storage";
+      const service = resolved.service ?? resolved.createService?.(projectId);
+      if (!service) {
+        return data;
+      }
+
+      const refs: ExtractedRef[] = [];
+      // One budget for the WHOLE span: the part cap and the deadline apply
+      // across every attribute and event-attribute value, so a span cannot
+      // multiply the cost by spreading media over many attributes.
+      const budget = TraceValueMediaExtractionService.createExtractionBudget();
+
+      const attributes = await rewriteAttributeList({
+        attributes: span.attributes,
         projectId,
         ownerId: traceId,
         service,
         refs,
         budget,
       });
-      if (rewritten !== event.attributes) {
-        eventsChanged = true;
-        events[i] = { ...event, attributes: rewritten };
-      }
-    }
 
-    // Budget drops are fail-open per part, never silent: the affected parts
-    // ride through inline (today's behavior) and the drop is logged and
-    // counted so a sustained rate is alertable.
-    if (budget.droppedByCap > 0 || budget.droppedByDeadline > 0 || budget.failedParts > 0) {
-      if (budget.droppedByCap > 0) {
-        deps.telemetry?.failOpen("part_cap", budget.droppedByCap);
-      }
-
-      if (budget.droppedByDeadline > 0) {
-        deps.telemetry?.failOpen("deadline", budget.droppedByDeadline);
-      }
-
-      if (budget.failedParts > 0) {
-        deps.telemetry?.failOpen("part_store", budget.failedParts);
+      let eventsChanged = false;
+      const events = (span.events ?? []).map((event) => event);
+      for (let i = 0; i < events.length; i++) {
+        const event = events[i]!;
+        const rewritten = await rewriteAttributeList({
+          attributes: event.attributes,
+          projectId,
+          ownerId: traceId,
+          service,
+          refs,
+          budget,
+        });
+        if (rewritten !== event.attributes) {
+          eventsChanged = true;
+          events[i] = { ...event, attributes: rewritten };
+        }
       }
 
+      // Budget drops are fail-open per part, never silent: the affected parts
+      // ride through inline (today's behavior) and the drop is logged and
+      // counted so a sustained rate is alertable.
+      if (budget.droppedByCap > 0 || budget.droppedByDeadline > 0 || budget.failedParts > 0) {
+        if (budget.droppedByCap > 0) {
+          deps.telemetry?.failOpen("part_cap", budget.droppedByCap);
+        }
+
+        if (budget.droppedByDeadline > 0) {
+          deps.telemetry?.failOpen("deadline", budget.droppedByDeadline);
+        }
+
+        if (budget.failedParts > 0) {
+          deps.telemetry?.failOpen("part_store", budget.failedParts);
+        }
+
+        logger.warn(
+          {
+            projectId,
+            traceId,
+            spanId,
+            extractedParts: refs.length,
+            droppedByCap: budget.droppedByCap,
+            droppedByDeadline: budget.droppedByDeadline,
+            failedParts: budget.failedParts,
+          },
+          "span media extraction hit its budget — remaining parts stay inline",
+        );
+      }
+
+      if (attributes === span.attributes && !eventsChanged) {
+        return data;
+      }
+
+      logger.info(
+        {
+          projectId,
+          traceId,
+          spanId,
+          storedObjectIds: refs.map((ref) => ref.id),
+          dedupHits: refs.filter((ref) => ref.isDuplicate).length,
+        },
+        `span media extraction externalized ${refs.length} stored object(s)`,
+      );
+
+      return {
+        ...data,
+        span: {
+          ...span,
+          attributes,
+          ...(eventsChanged ? { events } : {}),
+        },
+      };
+    } catch (err) {
+      deps.telemetry?.failOpen(stage);
       logger.warn(
         {
           projectId,
           traceId,
           spanId,
-          extractedParts: refs.length,
-          droppedByCap: budget.droppedByCap,
-          droppedByDeadline: budget.droppedByDeadline,
-          failedParts: budget.failedParts,
+          reason: stage,
+          error: err instanceof Error ? err.message : String(err),
         },
-        "span media extraction hit its budget — remaining parts stay inline",
+        "Edge media extraction failed — falling back to unmodified command data (fail-open)",
       );
-    }
 
-    if (attributes === span.attributes && !eventsChanged) {
       return data;
     }
-
-    logger.info(
-      {
-        projectId,
-        traceId,
-        spanId,
-        storedObjectIds: refs.map((ref) => ref.id),
-        dedupHits: refs.filter((ref) => ref.isDuplicate).length,
-      },
-      `span media extraction externalized ${refs.length} stored object(s)`,
-    );
-
-    return {
-      ...data,
-      span: {
-        ...span,
-        attributes,
-        ...(eventsChanged ? { events } : {}),
-      },
-    };
-  } catch (err) {
-    deps.telemetry?.failOpen(stage);
-    logger.warn(
-      {
-        projectId,
-        traceId,
-        spanId,
-        reason: stage,
-        error: err instanceof Error ? err.message : String(err),
-      },
-      "Edge media extraction failed — falling back to unmodified command data (fail-open)",
-    );
-
-    return data;
   }
 }

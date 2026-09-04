@@ -44,12 +44,12 @@ class PlatformRetentionDaysProvider implements RetentionDaysProvider {
  * Pass no resolver and every read still gets a bound, at the platform default
  * — so a caller can adopt this before its construction site is rewired.
  */
-export function createRetentionFloorService(
-  resolver?: DataRetentionService,
-): RetentionFloorService {
-  return new RetentionFloorService({
-    defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
-    provider: resolver ? new PlatformRetentionDaysProvider(resolver) : undefined,
-    logger,
-  });
+export class TraceRetentionFloorService {
+  static create(resolver?: DataRetentionService): RetentionFloorService {
+    return new RetentionFloorService({
+      defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+      provider: resolver ? new PlatformRetentionDaysProvider(resolver) : undefined,
+      logger,
+    });
+  }
 }

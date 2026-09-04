@@ -41,7 +41,7 @@ vi.mock("~/server/filters/clickhouse", () => ({
   }),
 }));
 
-describe("ClickHouseTraceService", () => {
+describe("TraceLegacyReadClickHouseRepository", () => {
   const traceCanonicalisation = TraceCanonicalisationService.create();
   const protections: Protections = {
     canSeeCosts: true,
@@ -112,7 +112,7 @@ describe("ClickHouseTraceService", () => {
     Links_Attributes: [],
   });
 
-  let ClickHouseTraceService: typeof import("../trace-legacy-read.repository").ClickHouseTraceService;
+  let TraceLegacyReadClickHouseRepository: typeof import("../trace-legacy-read.repository").TraceLegacyReadClickHouseRepository;
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -121,7 +121,7 @@ describe("ClickHouseTraceService", () => {
 
     // Dynamic import to get fresh module after mocks are set
     const mod = await import("../trace-legacy-read.repository");
-    ClickHouseTraceService = mod.ClickHouseTraceService;
+    TraceLegacyReadClickHouseRepository = mod.TraceLegacyReadClickHouseRepository;
   });
 
   describe("getAllTracesForProject()", () => {
@@ -149,7 +149,7 @@ describe("ClickHouseTraceService", () => {
       it("returns traces with empty spans", async () => {
         setupStandardMocks(["trace-1"]);
 
-        const service = new ClickHouseTraceService({
+        const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
           prisma: {
@@ -170,7 +170,7 @@ describe("ClickHouseTraceService", () => {
       it("includes TraceId IN clause in the queries", async () => {
         setupStandardMocks(["trace-A"]);
 
-        const service = new ClickHouseTraceService({
+        const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
           prisma: {
@@ -201,7 +201,7 @@ describe("ClickHouseTraceService", () => {
       it("returns only matching traces", async () => {
         setupStandardMocks(["trace-A"]);
 
-        const service = new ClickHouseTraceService({
+        const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
           prisma: {
@@ -227,7 +227,7 @@ describe("ClickHouseTraceService", () => {
       it("does not include TraceId IN clause in the queries", async () => {
         setupStandardMocks(["trace-1"]);
 
-        const service = new ClickHouseTraceService({
+        const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
           prisma: {
@@ -273,7 +273,7 @@ describe("ClickHouseTraceService", () => {
           setupMocksForCursorTest();
           const scrollId = makeScrollId();
 
-          const service = new ClickHouseTraceService({
+          const service = new TraceLegacyReadClickHouseRepository({
             resolveClickHouseClient: testResolveClickHouseClient,
             traceCanonicalisation,
             prisma: {
@@ -302,7 +302,7 @@ describe("ClickHouseTraceService", () => {
           setupMocksForCursorTest();
           const scrollId = makeScrollId();
 
-          const service = new ClickHouseTraceService({
+          const service = new TraceLegacyReadClickHouseRepository({
             resolveClickHouseClient: testResolveClickHouseClient,
             traceCanonicalisation,
             prisma: {
@@ -334,7 +334,7 @@ describe("ClickHouseTraceService", () => {
         it("does not apply keyset cursor condition", async () => {
           setupMocksForCursorTest();
 
-          const service = new ClickHouseTraceService({
+          const service = new TraceLegacyReadClickHouseRepository({
             resolveClickHouseClient: testResolveClickHouseClient,
             traceCanonicalisation,
             prisma: {
@@ -361,7 +361,7 @@ describe("ClickHouseTraceService", () => {
         it("falls back to no cursor", async () => {
           setupMocksForCursorTest();
 
-          const service = new ClickHouseTraceService({
+          const service = new TraceLegacyReadClickHouseRepository({
             resolveClickHouseClient: testResolveClickHouseClient,
             traceCanonicalisation,
             prisma: {
@@ -393,7 +393,7 @@ describe("ClickHouseTraceService", () => {
           // Build a cursor with "asc" sortDirection to trigger mismatch
           const scrollId = makeScrollId({ sortDirection: "asc" });
 
-          const service = new ClickHouseTraceService({
+          const service = new TraceLegacyReadClickHouseRepository({
             resolveClickHouseClient: testResolveClickHouseClient,
             traceCanonicalisation,
             prisma: {
@@ -423,7 +423,7 @@ describe("ClickHouseTraceService", () => {
           // baseInput.pageSize is 2, build cursor with pageSize 10
           const scrollId = makeScrollId({ pageSize: 10 });
 
-          const service = new ClickHouseTraceService({
+          const service = new TraceLegacyReadClickHouseRepository({
             resolveClickHouseClient: testResolveClickHouseClient,
             traceCanonicalisation,
             prisma: {
@@ -456,7 +456,7 @@ describe("ClickHouseTraceService", () => {
       it("includes LIKE clause in count query", async () => {
         setupMocksForQueryTest();
 
-        const service = new ClickHouseTraceService({
+        const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
           prisma: {
@@ -481,7 +481,7 @@ describe("ClickHouseTraceService", () => {
       it("includes LIKE clause in data query", async () => {
         setupMocksForQueryTest();
 
-        const service = new ClickHouseTraceService({
+        const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
           prisma: {
@@ -506,7 +506,7 @@ describe("ClickHouseTraceService", () => {
       it("lowercases and wraps query param with wildcards", async () => {
         setupMocksForQueryTest();
 
-        const service = new ClickHouseTraceService({
+        const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
           prisma: {
@@ -526,7 +526,7 @@ describe("ClickHouseTraceService", () => {
       it("escapes wildcard characters in query", async () => {
         setupMocksForQueryTest();
 
-        const service = new ClickHouseTraceService({
+        const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
           prisma: {
@@ -555,7 +555,7 @@ describe("ClickHouseTraceService", () => {
       ])("searches the trace name in the %s query", async (_label, callIdx) => {
         setupMocksForQueryTest();
 
-        const service = new ClickHouseTraceService({
+        const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
           prisma: {
@@ -580,7 +580,7 @@ describe("ClickHouseTraceService", () => {
       ])("searches span names in the %s query", async (_label, callIdx) => {
         setupMocksForQueryTest();
 
-        const service = new ClickHouseTraceService({
+        const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
           prisma: {
@@ -605,7 +605,7 @@ describe("ClickHouseTraceService", () => {
       it("ORs the name branches with the IO branches rather than replacing them", async () => {
         setupMocksForQueryTest();
 
-        const service = new ClickHouseTraceService({
+        const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
           prisma: {
@@ -644,7 +644,7 @@ describe("ClickHouseTraceService", () => {
       it("still no-ops below the three-character floor", async () => {
         setupMocksForQueryTest();
 
-        const service = new ClickHouseTraceService({
+        const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
           prisma: {
@@ -669,7 +669,7 @@ describe("ClickHouseTraceService", () => {
       it("drops a redacted IO column but keeps the name branches", async () => {
         setupMocksForQueryTest();
 
-        const service = new ClickHouseTraceService({
+        const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
           prisma: {
@@ -692,7 +692,7 @@ describe("ClickHouseTraceService", () => {
 
     describe("when user cannot see input or output", () => {
       it("returns empty results when searching without I/O access", async () => {
-        const service = new ClickHouseTraceService({
+        const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
           prisma: {
@@ -716,7 +716,7 @@ describe("ClickHouseTraceService", () => {
       it("searches only output when input is hidden", async () => {
         setupMocksForQueryTest();
 
-        const service = new ClickHouseTraceService({
+        const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
           prisma: {
@@ -740,7 +740,7 @@ describe("ClickHouseTraceService", () => {
       it("searches only input when output is hidden", async () => {
         setupMocksForQueryTest();
 
-        const service = new ClickHouseTraceService({
+        const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
           prisma: {
@@ -766,7 +766,7 @@ describe("ClickHouseTraceService", () => {
       it("does not include LIKE clause for queries under 3 characters", async () => {
         setupStandardMocks(["trace-1"]);
 
-        const service = new ClickHouseTraceService({
+        const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
           prisma: {
@@ -789,7 +789,7 @@ describe("ClickHouseTraceService", () => {
       it("does not include LIKE clause in queries", async () => {
         setupStandardMocks(["trace-1"]);
 
-        const service = new ClickHouseTraceService({
+        const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
           prisma: {
@@ -846,7 +846,7 @@ describe("ClickHouseTraceService", () => {
             json: () => Promise.resolve([]),
           });
 
-        const service = new ClickHouseTraceService({
+        const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
           prisma: {
@@ -896,7 +896,7 @@ describe("ClickHouseTraceService", () => {
             json: () => Promise.resolve([]),
           });
 
-        const service = new ClickHouseTraceService({
+        const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
           prisma: {
@@ -932,7 +932,7 @@ describe("ClickHouseTraceService", () => {
           })
           .mockRejectedValueOnce(new Error("SYNTAX_ERROR: bad query"));
 
-        const service = new ClickHouseTraceService({
+        const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
           prisma: {
@@ -973,7 +973,7 @@ describe("ClickHouseTraceService", () => {
             json: () => Promise.resolve([]),
           });
 
-        const service = new ClickHouseTraceService({
+        const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
           prisma: {
@@ -1019,7 +1019,7 @@ describe("ClickHouseTraceService", () => {
             json: () => Promise.resolve([]),
           });
 
-        const service = new ClickHouseTraceService({
+        const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
           prisma: {
@@ -1077,7 +1077,7 @@ describe("ClickHouseTraceService", () => {
             json: () => Promise.resolve(traceIds.map((id) => makeSpanRow(id, `${id}-s`))),
           });
 
-        const service = new ClickHouseTraceService({
+        const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
           prisma: {
@@ -1120,7 +1120,7 @@ describe("ClickHouseTraceService", () => {
             json: () => Promise.resolve(traceIds.slice(25).map((id) => makeSpanRow(id, `${id}-s`))),
           });
 
-        const service = new ClickHouseTraceService({
+        const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
           prisma: {
@@ -1142,7 +1142,7 @@ describe("ClickHouseTraceService", () => {
       it("does not batch-retry non-OOM errors", async () => {
         mockClickHouseQuery.mockRejectedValue(new Error("SYNTAX_ERROR: bad query"));
 
-        const service = new ClickHouseTraceService({
+        const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
           prisma: {
@@ -1171,7 +1171,7 @@ describe("ClickHouseTraceService", () => {
             json: () => Promise.resolve([makeSpanRow("trace-0", "trace-0-s")]),
           });
 
-        const service = new ClickHouseTraceService({
+        const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
           prisma: {
@@ -1213,7 +1213,7 @@ describe("ClickHouseTraceService", () => {
             json: () => Promise.resolve([makeSpanRow("trace-0", "trace-0-s")]),
           });
 
-        const service = new ClickHouseTraceService({
+        const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
           prisma: {
@@ -1249,7 +1249,7 @@ describe("ClickHouseTraceService", () => {
             json: () => Promise.resolve([makeSpanRow("trace-0", "trace-0-s")]),
           });
 
-        const service = new ClickHouseTraceService({
+        const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
           prisma: {
@@ -1278,7 +1278,7 @@ describe("ClickHouseTraceService", () => {
             json: () => Promise.resolve([makeSpanRow("trace-0", "trace-0-s")]),
           });
 
-        const service = new ClickHouseTraceService({
+        const service = new TraceLegacyReadClickHouseRepository({
           resolveClickHouseClient: testResolveClickHouseClient,
           traceCanonicalisation,
           prisma: {
@@ -1322,32 +1322,32 @@ describe("isClickHouseMemoryLimitError", () => {
   }
 
   it("recognizes the resilient client's translated query_memory_exceeded", async () => {
-    const { isClickHouseMemoryLimitError } = await import("../trace-legacy-read.repository");
+    const { TraceLegacyReadClickHouseRepository } = await import("../trace-legacy-read.repository");
 
     const translated = new TranslatedClickHouseError("query_memory_exceeded", [
       new Error("some driver detail without the fragment"),
     ]);
 
-    expect(isClickHouseMemoryLimitError(translated)).toBe(true);
+    expect(TraceLegacyReadClickHouseRepository.isClickHouseMemoryLimitError(translated)).toBe(true);
   });
 
   it("recognizes a handled error wrapping a raw MEMORY_LIMIT_EXCEEDED in reasons", async () => {
-    const { isClickHouseMemoryLimitError } = await import("../trace-legacy-read.repository");
+    const { TraceLegacyReadClickHouseRepository } = await import("../trace-legacy-read.repository");
 
     const wrapped = new TranslatedClickHouseError("clickhouse_unavailable", [
       new Error("Code: 241. DB::Exception: ... (MEMORY_LIMIT_EXCEEDED)"),
     ]);
 
-    expect(isClickHouseMemoryLimitError(wrapped)).toBe(true);
+    expect(TraceLegacyReadClickHouseRepository.isClickHouseMemoryLimitError(wrapped)).toBe(true);
   });
 
   it("does not match an unrelated handled error", async () => {
-    const { isClickHouseMemoryLimitError } = await import("../trace-legacy-read.repository");
+    const { TraceLegacyReadClickHouseRepository } = await import("../trace-legacy-read.repository");
 
     const unrelated = new TranslatedClickHouseError("clickhouse_unavailable", [
       new Error("connection refused"),
     ]);
 
-    expect(isClickHouseMemoryLimitError(unrelated)).toBe(false);
+    expect(TraceLegacyReadClickHouseRepository.isClickHouseMemoryLimitError(unrelated)).toBe(false);
   });
 });

@@ -1,6 +1,6 @@
+import { TraceSpanCostMatchingService } from "../trace-span-cost-matching.service";
 import { describe, expect, it } from "vitest";
 import type { NormalizedAttributes } from "@langwatch/trace-contract";
-import { computeSpanCost } from "../trace-span-cost-matching.service";
 
 // Catalog rates under test (model-catalog.overlay.json), per token, from
 // OpenAI's pricing page: gpt-image-2 $5 text in, $8 image in, $30 image out
@@ -24,7 +24,7 @@ const costOf = ({
   promptTokens?: number;
   completionTokens?: number;
 }): number =>
-  computeSpanCost({
+  TraceSpanCostMatchingService.computeSpanCost({
     attrs: attrs as NormalizedAttributes,
     promptTokens,
     completionTokens,
@@ -44,10 +44,7 @@ describe("image model cost", () => {
           },
           promptTokens: 14,
         });
-        expect(result).toBeCloseTo(
-          14 * IMAGE2_TEXT_IN + ONE_SQUARE_IMAGE * IMAGE2_IMAGE_OUT,
-          12,
-        );
+        expect(result).toBeCloseTo(14 * IMAGE2_TEXT_IN + ONE_SQUARE_IMAGE * IMAGE2_IMAGE_OUT, 12);
         expect(result).toBeGreaterThan(0);
       });
     });
@@ -68,9 +65,7 @@ describe("image model cost", () => {
           promptTokens: 20,
         });
         expect(result).toBeCloseTo(
-          20 * IMAGE1_TEXT_IN +
-            323 * IMAGE1_IMAGE_IN +
-            ONE_SQUARE_IMAGE * IMAGE1_IMAGE_OUT,
+          20 * IMAGE1_TEXT_IN + 323 * IMAGE1_IMAGE_IN + ONE_SQUARE_IMAGE * IMAGE1_IMAGE_OUT,
           12,
         );
       });
@@ -123,10 +118,7 @@ describe("image model cost", () => {
           },
           promptTokens: 14,
         });
-        expect(result).toBeCloseTo(
-          14 * CUSTOM_TEXT_IN + ONE_SQUARE_IMAGE * IMAGE2_IMAGE_OUT,
-          12,
-        );
+        expect(result).toBeCloseTo(14 * CUSTOM_TEXT_IN + ONE_SQUARE_IMAGE * IMAGE2_IMAGE_OUT, 12);
       });
     });
 
@@ -146,9 +138,7 @@ describe("image model cost", () => {
           promptTokens: 20,
         });
         expect(result).toBeCloseTo(
-          20 * CUSTOM_TEXT_IN +
-            323 * IMAGE1_IMAGE_IN +
-            ONE_SQUARE_IMAGE * IMAGE1_IMAGE_OUT,
+          20 * CUSTOM_TEXT_IN + 323 * IMAGE1_IMAGE_IN + ONE_SQUARE_IMAGE * IMAGE1_IMAGE_OUT,
           12,
         );
       });

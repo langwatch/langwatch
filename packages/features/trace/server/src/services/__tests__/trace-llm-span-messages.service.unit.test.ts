@@ -1,8 +1,7 @@
+import { TraceLlmSpanMessagesService } from "../trace-llm-span-messages.service";
 import { describe, expect, it } from "vitest";
 
-import { parseLLMSpanMessages } from "../trace-llm-span-messages.service";
-
-describe("parseLLMSpanMessages()", () => {
+describe("TraceLlmSpanMessagesService.parseLLMSpanMessages()", () => {
   describe("when input carries the TypedValueJson chat_messages wrapper", () => {
     it("extracts every message in order", () => {
       const attrs = {
@@ -14,7 +13,7 @@ describe("parseLLMSpanMessages()", () => {
           ],
         }),
       };
-      expect(parseLLMSpanMessages(attrs)).toEqual([
+      expect(TraceLlmSpanMessagesService.parseLLMSpanMessages(attrs)).toEqual([
         { role: "system", content: "Be helpful." },
         { role: "user", content: "What is 2+2?" },
       ]);
@@ -39,7 +38,7 @@ describe("parseLLMSpanMessages()", () => {
           ],
         }),
       };
-      const result = parseLLMSpanMessages(attrs);
+      const result = TraceLlmSpanMessagesService.parseLLMSpanMessages(attrs);
       expect(result).toEqual([
         { role: "user", content: "no role here" },
         { role: "user", content: "explicit role" },
@@ -56,7 +55,7 @@ describe("parseLLMSpanMessages()", () => {
           { role: "user", content: "thanks bro!" },
         ]),
       };
-      expect(parseLLMSpanMessages(attrs)).toEqual([
+      expect(TraceLlmSpanMessagesService.parseLLMSpanMessages(attrs)).toEqual([
         { role: "system", content: "Be terse." },
         { role: "user", content: "thanks bro!" },
       ]);
@@ -79,7 +78,7 @@ describe("parseLLMSpanMessages()", () => {
           content: "You're welcome.",
         }),
       };
-      expect(parseLLMSpanMessages(attrs)).toEqual([
+      expect(TraceLlmSpanMessagesService.parseLLMSpanMessages(attrs)).toEqual([
         { role: "assistant", content: "You're welcome." },
       ]);
     });
@@ -88,7 +87,9 @@ describe("parseLLMSpanMessages()", () => {
       const attrs = {
         "langwatch.output": JSON.stringify({ content: "hello" }),
       };
-      expect(parseLLMSpanMessages(attrs)).toEqual([{ role: "assistant", content: "hello" }]);
+      expect(TraceLlmSpanMessagesService.parseLLMSpanMessages(attrs)).toEqual([
+        { role: "assistant", content: "hello" },
+      ]);
     });
   });
 
@@ -110,7 +111,7 @@ describe("parseLLMSpanMessages()", () => {
         }),
       };
 
-      expect(parseLLMSpanMessages(attrs)).toEqual([
+      expect(TraceLlmSpanMessagesService.parseLLMSpanMessages(attrs)).toEqual([
         { role: "system", content: "Welcome to the playground" },
         { role: "user", content: "how big is mars?" },
         { role: "assistant", content: "Mars is about 6,779 km..." },
@@ -128,7 +129,7 @@ describe("parseLLMSpanMessages()", () => {
           value: "Mars is small.",
         }),
       };
-      expect(parseLLMSpanMessages(attrs)).toEqual([
+      expect(TraceLlmSpanMessagesService.parseLLMSpanMessages(attrs)).toEqual([
         { role: "assistant", content: "Mars is small." },
       ]);
     });
@@ -136,20 +137,22 @@ describe("parseLLMSpanMessages()", () => {
 
   describe("when attributes are missing", () => {
     it("returns an empty array", () => {
-      expect(parseLLMSpanMessages({})).toEqual([]);
+      expect(TraceLlmSpanMessagesService.parseLLMSpanMessages({})).toEqual([]);
     });
   });
 
   describe("when input is unparseable JSON", () => {
     it("wraps the raw string as a single user message instead of throwing", () => {
       const attrs = { "langwatch.input": "not valid json {" };
-      expect(parseLLMSpanMessages(attrs)).toEqual([{ role: "user", content: "not valid json {" }]);
+      expect(TraceLlmSpanMessagesService.parseLLMSpanMessages(attrs)).toEqual([
+        { role: "user", content: "not valid json {" },
+      ]);
     });
   });
 
   describe("when a recognized envelope produces zero entries (CR fallback guard)", () => {
     // Without the `before = out.length` guard added per the major CR
-    // on parseLLMSpanMessages.ts:87, these cases silently dropped the
+    // on TraceLlmSpanMessagesService.parseLLMSpanMessages.ts:87, these cases silently dropped the
     // payload from the playground resume even though raw content was
     // present on the attribute. Falling back to a single raw-content
     // turn keeps something visible instead of pretending the LLM said
@@ -162,7 +165,7 @@ describe("parseLLMSpanMessages()", () => {
           value: [],
         }),
       };
-      const result = parseLLMSpanMessages(attrs);
+      const result = TraceLlmSpanMessagesService.parseLLMSpanMessages(attrs);
       expect(result).toHaveLength(1);
       expect(result[0]?.role).toBe("assistant");
       expect(result[0]?.content).toBe(attrs["langwatch.output"]);
@@ -175,7 +178,7 @@ describe("parseLLMSpanMessages()", () => {
           value: [{ role: "assistant" }, { wrong: "shape" }],
         }),
       };
-      const result = parseLLMSpanMessages(attrs);
+      const result = TraceLlmSpanMessagesService.parseLLMSpanMessages(attrs);
       expect(result).toHaveLength(1);
       expect(result[0]?.role).toBe("assistant");
       expect(result[0]?.content).toBe(attrs["langwatch.output"]);
@@ -185,7 +188,7 @@ describe("parseLLMSpanMessages()", () => {
       const attrs = {
         "langwatch.input": JSON.stringify([]),
       };
-      const result = parseLLMSpanMessages(attrs);
+      const result = TraceLlmSpanMessagesService.parseLLMSpanMessages(attrs);
       expect(result).toHaveLength(1);
       expect(result[0]?.role).toBe("user");
       expect(result[0]?.content).toBe(attrs["langwatch.input"]);
@@ -197,7 +200,7 @@ describe("parseLLMSpanMessages()", () => {
           custom_envelope: { something: "weird" },
         }),
       };
-      const result = parseLLMSpanMessages(attrs);
+      const result = TraceLlmSpanMessagesService.parseLLMSpanMessages(attrs);
       expect(result).toHaveLength(1);
       expect(result[0]?.role).toBe("assistant");
       expect(result[0]?.content).toBe(attrs["langwatch.output"]);
@@ -210,7 +213,9 @@ describe("parseLLMSpanMessages()", () => {
         "gen_ai.input.messages": JSON.stringify([{ role: "user", content: "newer" }]),
         "gen_ai.prompt": JSON.stringify([{ role: "user", content: "older" }]),
       };
-      expect(parseLLMSpanMessages(attrs)).toEqual([{ role: "user", content: "newer" }]);
+      expect(TraceLlmSpanMessagesService.parseLLMSpanMessages(attrs)).toEqual([
+        { role: "user", content: "newer" },
+      ]);
     });
   });
 });

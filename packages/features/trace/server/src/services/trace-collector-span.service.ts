@@ -205,7 +205,12 @@ const convertSpanToOtlp = (span: Span): OtlpSpan => ({
   droppedLinksCount: 0,
 });
 
-export const CollectorSpanUtils = {
-  convertSpanToOtlp,
-  buildResource,
-};
+export class TraceCollectorSpanService {
+  static create(): TraceCollectorSpanService {
+    return new TraceCollectorSpanService();
+  }
+
+  static convertSpanToOtlp = convertSpanToOtlp;
+
+  static buildResource = buildResource;
+}

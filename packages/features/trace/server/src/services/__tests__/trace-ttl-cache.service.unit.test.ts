@@ -1,5 +1,6 @@
+import { TraceTtlCacheService } from "../trace-ttl-cache.service";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { setTraceCacheRedis, TtlCache } from "../trace-ttl-cache.service";
+import { TtlCache } from "../trace-ttl-cache.service";
 
 const mockRedisStore = new Map<string, { value: string; ttl: number }>();
 const mockRedis = {
@@ -21,7 +22,7 @@ describe("TtlCache", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRedisStore.clear();
-    setTraceCacheRedis(mockRedis);
+    TraceTtlCacheService.setTraceCacheRedis(mockRedis);
   });
 
   describe("when Redis is available", () => {
@@ -188,7 +189,7 @@ describe("TtlCache", () => {
 
   describe("when Redis is not configured", () => {
     beforeEach(() => {
-      setTraceCacheRedis(null);
+      TraceTtlCacheService.setTraceCacheRedis(null);
     });
 
     it("uses in-memory cache only", async () => {

@@ -4,10 +4,7 @@ import { ClaudeCodeCanonicaliser } from "../claude-code.canonicaliser";
 import { isConversationalQuerySource } from "../../claude-code-call-policy.rules";
 import { ClaudeCodeRequest } from "../../claude-code-request.rules";
 import { ClaudeCodeResponse } from "../../claude-code-response.rules";
-import {
-  createExtractorContext,
-  createLogExtractorContext,
-} from "../../../stores/__tests__/canonicalisation/adapters/test-helpers";
+import { createExtractorContext, createLogExtractorContext } from "./test-helpers";
 
 const SCOPE = "com.anthropic.claude_code.events";
 

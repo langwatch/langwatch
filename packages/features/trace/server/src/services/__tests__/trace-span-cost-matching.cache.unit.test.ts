@@ -1,7 +1,7 @@
+import { TraceSpanCostMatchingService } from "../trace-span-cost-matching.service";
 import { describe, expect, it } from "vitest";
 
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import { computeSpanCost } from "../trace-span-cost-matching.service";
 import type { NormalizedAttributes } from "@langwatch/trace-contract";
 
 // Prompt-cache cost: a span whose prompt was mostly served from cache must be
@@ -10,7 +10,7 @@ import type { NormalizedAttributes } from "@langwatch/trace-contract";
 //
 // Spec: specs/ai-gateway/cache-token-telemetry.feature
 
-describe("computeSpanCost cache pricing", () => {
+describe("TraceSpanCostMatchingService.computeSpanCost cache pricing", () => {
   describe("given a cached request for a model that carries cache rates", () => {
     /** @scenario "Cost reflects cache pricing, not the full input price" */
     it("prices the cache-read tokens below the full input rate", () => {
@@ -19,7 +19,7 @@ describe("computeSpanCost cache pricing", () => {
 
       // Mostly served from cache: the fresh input is the small remainder, the
       // bulk is reported as cache_read (the dotted OTel attr the gateway emits).
-      const cachedCost = computeSpanCost({
+      const cachedCost = TraceSpanCostMatchingService.computeSpanCost({
         attrs: {
           [ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]: cachedTokens,
         } as unknown as NormalizedAttributes,
@@ -29,7 +29,7 @@ describe("computeSpanCost cache pricing", () => {
       });
 
       // The same token volume billed entirely as fresh input (no cache).
-      const fullInputCost = computeSpanCost({
+      const fullInputCost = TraceSpanCostMatchingService.computeSpanCost({
         attrs: {} as unknown as NormalizedAttributes,
         model,
         promptTokens: 510 + cachedTokens,

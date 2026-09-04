@@ -6,7 +6,7 @@ import {
 /**
  * Where a windowed read's outcome is counted.
  *
- * A module-level sink rather than a parameter because `queryWindowed` is a free
+ * A module-level sink rather than a parameter because `TraceWindowedReadService.queryWindowed` is a free
  * function called from inside a dozen query bodies, and threading an observer
  * through every one of them would put the process's telemetry decision in the
  * signature of every read. The platform app held a Prometheus counter here at
@@ -15,11 +15,6 @@ import {
  * counts nothing rather than opening a registry of its own.
  */
 let windowedReadMetrics: TraceWindowedReadMetricsPort | null = null;
-
-/** Registers the process's counter. Called once, at composition. */
-export function setTraceWindowedReadMetrics(port: TraceWindowedReadMetricsPort): void {
-  windowedReadMetrics = port;
-}
 
 function incrementWindowedReadCount(table: string, outcome: TraceWindowedReadOutcome): void {
   windowedReadMetrics?.record({ table, outcome });
@@ -125,74 +120,85 @@ function fallbackFragment(fallback: WindowFallback, windowMs: number): WindowFra
   return null;
 }
 
-/**
- * Runs a ClickHouse read with a partition-pruning time window and a graceful
- * fallback to a wider scan, recording the outcome on
- * `clickhouse_windowed_read_total` exactly once.
- *
- * Orchestration:
- *   - No hint (`hintMs === null`): run the fallback window directly (a lookback
- *     frame, or unbounded). Outcome `unwindowed`.
- *   - Hint present: prune to `±windowMs` around it.
- *       - Non-empty: accept it — we stayed on the cheap path. Outcome `hit`.
- *       - Empty under `fallback === "none"`: accept it without widening.
- *         Outcome `windowed_empty` — the miss is recorded as a miss, because a
- *         non-widening read has no widen outcome to surface it instead.
- *       - Empty and allowed to widen: re-run with the fallback window. Outcome
- *         `unbounded_{hit,empty}` for `"unbounded"`, `widened_{hit,empty}` for a
- *         lookback frame.
- *   - Any attempt that throws: outcome `error`, and the error is rethrown —
- *     every logical read emits exactly one outcome, failures included.
- *
- * The caller's `run` closure issues each attempt against its own resilient
- * client, so retries and error translation apply per attempt.
- */
-export async function queryWindowed<T>(opts: QueryWindowedOptions<T>): Promise<T> {
-  const { table, hintMs, fallback, isEmpty, run } = opts;
-  const windowMs = opts.windowMs ?? DEFAULT_PARTITION_WINDOW_MS;
+export class TraceWindowedReadService {
+  static create(): TraceWindowedReadService {
+    return new TraceWindowedReadService();
+  }
 
-  try {
-    if (hintMs === null) {
-      const result = await run(fallbackFragment(fallback, windowMs));
-      incrementWindowedReadCount(table, "unwindowed");
+  /** Registers the process's counter. Called once, at composition. */
+  static setTraceWindowedReadMetrics(port: TraceWindowedReadMetricsPort): void {
+    windowedReadMetrics = port;
+  }
 
-      return result;
+  /**
+   * Runs a ClickHouse read with a partition-pruning time window and a graceful
+   * fallback to a wider scan, recording the outcome on
+   * `clickhouse_windowed_read_total` exactly once.
+   *
+   * Orchestration:
+   *   - No hint (`hintMs === null`): run the fallback window directly (a lookback
+   *     frame, or unbounded). Outcome `unwindowed`.
+   *   - Hint present: prune to `±windowMs` around it.
+   *       - Non-empty: accept it — we stayed on the cheap path. Outcome `hit`.
+   *       - Empty under `fallback === "none"`: accept it without widening.
+   *         Outcome `windowed_empty` — the miss is recorded as a miss, because a
+   *         non-widening read has no widen outcome to surface it instead.
+   *       - Empty and allowed to widen: re-run with the fallback window. Outcome
+   *         `unbounded_{hit,empty}` for `"unbounded"`, `widened_{hit,empty}` for a
+   *         lookback frame.
+   *   - Any attempt that throws: outcome `error`, and the error is rethrown —
+   *     every logical read emits exactly one outcome, failures included.
+   *
+   * The caller's `run` closure issues each attempt against its own resilient
+   * client, so retries and error translation apply per attempt.
+   */
+  static async queryWindowed<T>(opts: QueryWindowedOptions<T>): Promise<T> {
+    const { table, hintMs, fallback, isEmpty, run } = opts;
+    const windowMs = opts.windowMs ?? DEFAULT_PARTITION_WINDOW_MS;
+
+    try {
+      if (hintMs === null) {
+        const result = await run(fallbackFragment(fallback, windowMs));
+        incrementWindowedReadCount(table, "unwindowed");
+
+        return result;
+      }
+
+      const hinted = await run(windowFragment(hintMs - windowMs, hintMs + windowMs));
+
+      // `none` treats the hinted window as authoritative (empty means genuinely
+      // absent within the window), so it never widens — which also means an empty
+      // result has no widen outcome to be recorded as. Give it its own: callers
+      // that resolve queued work through a `none` read retry on empty, so folding
+      // it into `hit` reports a permanently-failing lookup as a healthy one.
+      if (fallback === "none") {
+        incrementWindowedReadCount(table, isEmpty(hinted) ? "windowed_empty" : "hit");
+
+        return hinted;
+      }
+
+      // A non-empty hinted read needs no widening: it stayed cheap. Count as `hit`.
+      if (!isEmpty(hinted)) {
+        incrementWindowedReadCount(table, "hit");
+
+        return hinted;
+      }
+
+      const widened = await run(fallbackFragment(fallback, windowMs));
+      const isWidenedEmpty = isEmpty(widened);
+      if (fallback === "unbounded") {
+        incrementWindowedReadCount(table, isWidenedEmpty ? "unbounded_empty" : "unbounded_hit");
+      } else {
+        incrementWindowedReadCount(table, isWidenedEmpty ? "widened_empty" : "widened_hit");
+      }
+
+      return widened;
+    } catch (error) {
+      // A failed attempt still emits exactly one outcome — the future limiter's
+      // baseline must see failures, not undercount them as absent reads.
+      incrementWindowedReadCount(table, "error");
+
+      throw error;
     }
-
-    const hinted = await run(windowFragment(hintMs - windowMs, hintMs + windowMs));
-
-    // `none` treats the hinted window as authoritative (empty means genuinely
-    // absent within the window), so it never widens — which also means an empty
-    // result has no widen outcome to be recorded as. Give it its own: callers
-    // that resolve queued work through a `none` read retry on empty, so folding
-    // it into `hit` reports a permanently-failing lookup as a healthy one.
-    if (fallback === "none") {
-      incrementWindowedReadCount(table, isEmpty(hinted) ? "windowed_empty" : "hit");
-
-      return hinted;
-    }
-
-    // A non-empty hinted read needs no widening: it stayed cheap. Count as `hit`.
-    if (!isEmpty(hinted)) {
-      incrementWindowedReadCount(table, "hit");
-
-      return hinted;
-    }
-
-    const widened = await run(fallbackFragment(fallback, windowMs));
-    const isWidenedEmpty = isEmpty(widened);
-    if (fallback === "unbounded") {
-      incrementWindowedReadCount(table, isWidenedEmpty ? "unbounded_empty" : "unbounded_hit");
-    } else {
-      incrementWindowedReadCount(table, isWidenedEmpty ? "widened_empty" : "widened_hit");
-    }
-
-    return widened;
-  } catch (error) {
-    // A failed attempt still emits exactly one outcome — the future limiter's
-    // baseline must see failures, not undercount them as absent reads.
-    incrementWindowedReadCount(table, "error");
-
-    throw error;
   }
 }

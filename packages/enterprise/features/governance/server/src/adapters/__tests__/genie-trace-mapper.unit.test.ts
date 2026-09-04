@@ -15,8 +15,8 @@
  * of dollars silently appearing on routed conversations.
  */
 
+import { TraceSpanCostMatchingService } from "@langwatch/trace-server";
 import { describe, expect, it } from "vitest";
-import { computeSpanCost } from "@langwatch/trace-server";
 import { spanSchema } from "@langwatch/trace-contract";
 import {
   GENIE_AGENT_MODEL,
@@ -424,7 +424,7 @@ describe("given two ingestion sources routing into one destination project", () 
 
 describe("given the pricing table (Decision 14(d) pin)", () => {
   it("the Genie agent label resolves to no price — cost enrichment yields zero", () => {
-    const cost = computeSpanCost({
+    const cost = TraceSpanCostMatchingService.computeSpanCost({
       attrs: {},
       model: GENIE_AGENT_MODEL,
       promptTokens: 100_000,
@@ -442,7 +442,7 @@ describe("given the pricing table (Decision 14(d) pin)", () => {
    */
   /** @scenario "A source cannot name a real model as its agent" */
   it.each([...KNOWN_AGENT_IDENTITIES])("%s resolves to no price either", (agent) => {
-    const cost = computeSpanCost({
+    const cost = TraceSpanCostMatchingService.computeSpanCost({
       attrs: {},
       model: agent,
       promptTokens: 100_000,

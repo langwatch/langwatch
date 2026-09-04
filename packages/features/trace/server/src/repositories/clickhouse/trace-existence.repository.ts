@@ -1,6 +1,6 @@
 /**
  * Set membership over `trace_summaries`, moved out of the application process's
- * `ClickHouseTraceService.findExistingTraceIds` unchanged.
+ * `TraceLegacyReadClickHouseRepository.findExistingTraceIds` unchanged.
  *
  * No dedup: several unmerged versions of a row all prove the same thing, and
  * the answer is set membership rather than a value. `TenantId` is the first

@@ -6,8 +6,12 @@
  * reviewer's save has always run through.
  */
 import { generate } from "@langwatch/ksuid";
-import type { Prisma, PrismaClient, TraceEditOverlay } from "@langwatch/prisma-client/generated";
-import type { TraceEditOverlayAuthor, TraceEditOverlayPatch } from "@langwatch/trace-contract";
+import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
+import {
+  TraceEditOverlayRepository,
+  type TraceEditOverlayRow,
+} from "../trace-edit-overlay.repository";
 
 /**
  * The id prefix every correction carries.
@@ -23,11 +27,6 @@ const TRACE_EDIT_OVERLAY_KSUID_RESOURCE = "traceedit";
  *  trace, so it never carries the rest of the User record. */
 const AUTHOR_SELECT = { id: true, name: true, image: true } as const;
 
-export type TraceEditOverlayRow = TraceEditOverlay & {
-  createdBy: TraceEditOverlayAuthor | null;
-  updatedBy: TraceEditOverlayAuthor | null;
-};
-
 const WITH_AUTHORS = {
   createdBy: { select: AUTHOR_SELECT },
   updatedBy: { select: AUTHOR_SELECT },
@@ -41,8 +40,14 @@ function isUniqueConstraintViolation(error: unknown): boolean {
   );
 }
 
-export class TraceEditOverlayRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+export class PrismaTraceEditOverlayRepository extends TraceEditOverlayRepository {
+  private constructor(private readonly prisma: PrismaClient) {
+    super();
+  }
+
+  static create(prisma: PrismaClient): PrismaTraceEditOverlayRepository {
+    return new PrismaTraceEditOverlayRepository(prisma);
+  }
 
   async tryFindByProjectAndTrace({
     projectId,

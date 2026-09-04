@@ -1,10 +1,7 @@
+import { TraceLegacySpanMappingService } from "../trace-legacy-span-mapping.service";
 import { describe, expect, it } from "vitest";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
 import { NormalizedSpanKind, NormalizedStatusCode } from "@langwatch/trace-contract";
-import {
-  mapNormalizedSpanToSpan,
-  unflattenDotNotation,
-} from "../trace-legacy-span-mapping.service";
 
 const makeSpan = (overrides: Partial<NormalizedSpan> = {}): NormalizedSpan => ({
   id: "test-id",
@@ -35,7 +32,7 @@ const makeSpan = (overrides: Partial<NormalizedSpan> = {}): NormalizedSpan => ({
   ...overrides,
 });
 
-describe("mapNormalizedSpanToSpan", () => {
+describe("TraceLegacySpanMappingService.mapNormalizedSpanToSpan", () => {
   describe("when params contain dot-notation keys", () => {
     it("converts dot-notation keys to nested objects", () => {
       const span = makeSpan({
@@ -46,7 +43,7 @@ describe("mapNormalizedSpanToSpan", () => {
         },
       });
 
-      const result = mapNormalizedSpanToSpan(span);
+      const result = TraceLegacySpanMappingService.mapNormalizedSpanToSpan(span);
 
       const params = result.params as Record<string, unknown>;
       expect((params.gen_ai as Record<string, unknown>).usage).toEqual({
@@ -65,7 +62,7 @@ describe("mapNormalizedSpanToSpan", () => {
         },
       });
 
-      const result = mapNormalizedSpanToSpan(span);
+      const result = TraceLegacySpanMappingService.mapNormalizedSpanToSpan(span);
 
       const params = result.params as Record<string, unknown>;
       expect(
@@ -81,7 +78,7 @@ describe("mapNormalizedSpanToSpan", () => {
         },
       });
 
-      const result = mapNormalizedSpanToSpan(span);
+      const result = TraceLegacySpanMappingService.mapNormalizedSpanToSpan(span);
 
       const params = result.params as Record<string, unknown>;
       expect(params.simple_key).toBe("value");
@@ -100,7 +97,7 @@ describe("mapNormalizedSpanToSpan", () => {
         },
       });
 
-      const result = mapNormalizedSpanToSpan(span);
+      const result = TraceLegacySpanMappingService.mapNormalizedSpanToSpan(span);
 
       expect(result.metrics).toEqual({
         prompt_tokens: 100,
@@ -121,7 +118,7 @@ describe("mapNormalizedSpanToSpan", () => {
         },
       });
 
-      const result = mapNormalizedSpanToSpan(span);
+      const result = TraceLegacySpanMappingService.mapNormalizedSpanToSpan(span);
 
       expect(result.metrics).not.toBeNull();
       expect(result.metrics?.cache_read_input_tokens).toBe(200);
@@ -134,7 +131,7 @@ describe("mapNormalizedSpanToSpan", () => {
         },
       });
 
-      const result = mapNormalizedSpanToSpan(span);
+      const result = TraceLegacySpanMappingService.mapNormalizedSpanToSpan(span);
 
       expect(result.metrics).toBeNull();
     });
@@ -147,7 +144,7 @@ describe("mapNormalizedSpanToSpan", () => {
         },
       });
 
-      const result = mapNormalizedSpanToSpan(span);
+      const result = TraceLegacySpanMappingService.mapNormalizedSpanToSpan(span);
 
       expect(result.metrics).not.toBeNull();
       expect(result.metrics?.tokens_estimated).toBe(true);
@@ -163,7 +160,7 @@ describe("mapNormalizedSpanToSpan", () => {
         },
       });
 
-      const result = mapNormalizedSpanToSpan(span);
+      const result = TraceLegacySpanMappingService.mapNormalizedSpanToSpan(span);
 
       expect(result.metrics).toEqual({
         prompt_tokens: 100,
@@ -185,7 +182,7 @@ describe("mapNormalizedSpanToSpan", () => {
         },
       });
 
-      const result = mapNormalizedSpanToSpan(span);
+      const result = TraceLegacySpanMappingService.mapNormalizedSpanToSpan(span);
 
       expect(result.metrics?.cache_read_input_tokens).toBe(150);
     });
@@ -200,7 +197,7 @@ describe("mapNormalizedSpanToSpan", () => {
         },
       });
 
-      const result = mapNormalizedSpanToSpan(span);
+      const result = TraceLegacySpanMappingService.mapNormalizedSpanToSpan(span);
 
       expect(result.metrics?.cache_read_input_tokens).toBe(200);
     });
@@ -217,7 +214,7 @@ describe("mapNormalizedSpanToSpan", () => {
         },
       });
 
-      const result = mapNormalizedSpanToSpan(span);
+      const result = TraceLegacySpanMappingService.mapNormalizedSpanToSpan(span);
 
       expect(result.metrics).not.toBeNull();
       expect(result.metrics?.cost).not.toBeNull();
@@ -236,7 +233,7 @@ describe("mapNormalizedSpanToSpan", () => {
         },
       });
 
-      const result = mapNormalizedSpanToSpan(span);
+      const result = TraceLegacySpanMappingService.mapNormalizedSpanToSpan(span);
 
       expect(result.metrics).not.toBeNull();
       expect(result.metrics?.prompt_tokens).toBe(100);
@@ -258,7 +255,7 @@ describe("mapNormalizedSpanToSpan", () => {
         },
       });
 
-      const result = mapNormalizedSpanToSpan(span);
+      const result = TraceLegacySpanMappingService.mapNormalizedSpanToSpan(span);
 
       expect(result.input).toEqual({ type: "text", value: "hello world" });
     });
@@ -272,7 +269,7 @@ describe("mapNormalizedSpanToSpan", () => {
         },
       });
 
-      const result = mapNormalizedSpanToSpan(span);
+      const result = TraceLegacySpanMappingService.mapNormalizedSpanToSpan(span);
 
       expect(result.input).toEqual({ type: "chat_messages", value: messages });
     });
@@ -286,7 +283,7 @@ describe("mapNormalizedSpanToSpan", () => {
         },
       });
 
-      const result = mapNormalizedSpanToSpan(span);
+      const result = TraceLegacySpanMappingService.mapNormalizedSpanToSpan(span);
 
       expect(result.input).toEqual({ type: "json", value: data });
     });
@@ -305,7 +302,7 @@ describe("mapNormalizedSpanToSpan", () => {
         },
       });
 
-      const result = mapNormalizedSpanToSpan(span);
+      const result = TraceLegacySpanMappingService.mapNormalizedSpanToSpan(span);
 
       expect(result.input?.type).toBe("text");
       // Must NOT be "[object Object]"
@@ -323,7 +320,7 @@ describe("mapNormalizedSpanToSpan", () => {
         },
       });
 
-      const result = mapNormalizedSpanToSpan(span);
+      const result = TraceLegacySpanMappingService.mapNormalizedSpanToSpan(span);
 
       expect(result.output).toEqual({ type: "text", value: "response here" });
     });
@@ -339,7 +336,7 @@ describe("mapNormalizedSpanToSpan", () => {
         },
       });
 
-      const result = mapNormalizedSpanToSpan(span);
+      const result = TraceLegacySpanMappingService.mapNormalizedSpanToSpan(span);
 
       expect(result.output).toEqual({
         type: "evaluation_result",
@@ -362,7 +359,7 @@ describe("mapNormalizedSpanToSpan", () => {
         },
       });
 
-      const result = mapNormalizedSpanToSpan(span);
+      const result = TraceLegacySpanMappingService.mapNormalizedSpanToSpan(span);
 
       expect(result.output).toEqual({
         type: "evaluation_result",
@@ -384,7 +381,7 @@ describe("mapNormalizedSpanToSpan", () => {
         },
       });
 
-      const result = mapNormalizedSpanToSpan(span);
+      const result = TraceLegacySpanMappingService.mapNormalizedSpanToSpan(span);
 
       expect(result.output).toEqual({
         type: "evaluation_result",
@@ -412,7 +409,7 @@ describe("mapNormalizedSpanToSpan", () => {
         },
       });
 
-      const result = mapNormalizedSpanToSpan(span);
+      const result = TraceLegacySpanMappingService.mapNormalizedSpanToSpan(span);
 
       expect(result.output).toEqual({
         type: "guardrail_result",
@@ -435,7 +432,7 @@ describe("mapNormalizedSpanToSpan", () => {
         },
       });
 
-      const result = mapNormalizedSpanToSpan(span);
+      const result = TraceLegacySpanMappingService.mapNormalizedSpanToSpan(span);
 
       expect(result.type).toBe("rag");
       expect((result as { contexts: unknown }).contexts).toEqual([
@@ -452,7 +449,7 @@ describe("mapNormalizedSpanToSpan", () => {
         },
       });
 
-      const result = mapNormalizedSpanToSpan(span);
+      const result = TraceLegacySpanMappingService.mapNormalizedSpanToSpan(span);
 
       expect(result.type).toBe("rag");
       expect((result as { contexts: unknown }).contexts).toEqual([
@@ -469,7 +466,7 @@ describe("mapNormalizedSpanToSpan", () => {
         },
       });
 
-      const result = mapNormalizedSpanToSpan(span);
+      const result = TraceLegacySpanMappingService.mapNormalizedSpanToSpan(span);
 
       expect((result as { contexts: unknown }).contexts).toEqual([{ content: "plain chunk" }]);
     });
@@ -482,7 +479,7 @@ describe("mapNormalizedSpanToSpan", () => {
         },
       });
 
-      const result = mapNormalizedSpanToSpan(span);
+      const result = TraceLegacySpanMappingService.mapNormalizedSpanToSpan(span);
 
       expect(result.type).toBe("rag");
       expect((result as { contexts: unknown }).contexts).toEqual([]);
@@ -496,7 +493,7 @@ describe("mapNormalizedSpanToSpan", () => {
         },
       });
 
-      const result = mapNormalizedSpanToSpan(span);
+      const result = TraceLegacySpanMappingService.mapNormalizedSpanToSpan(span);
 
       expect((result as { contexts: unknown }).contexts).toEqual([]);
     });
@@ -510,7 +507,7 @@ describe("mapNormalizedSpanToSpan", () => {
         spanAttributes: { "exception.message": "ignored" },
       });
 
-      const result = mapNormalizedSpanToSpan(span);
+      const result = TraceLegacySpanMappingService.mapNormalizedSpanToSpan(span);
 
       expect(result.error).toBeNull();
     });
@@ -541,7 +538,7 @@ describe("mapNormalizedSpanToSpan", () => {
         ],
       });
 
-      const result = mapNormalizedSpanToSpan(span);
+      const result = TraceLegacySpanMappingService.mapNormalizedSpanToSpan(span);
 
       expect(result.error?.message).toBe(
         "provider openai not bound to this virtual key — define an alias or bind the provider",
@@ -558,7 +555,7 @@ describe("mapNormalizedSpanToSpan", () => {
         },
       });
 
-      const result = mapNormalizedSpanToSpan(span);
+      const result = TraceLegacySpanMappingService.mapNormalizedSpanToSpan(span);
 
       expect(result.error?.message).toBe("upstream timeout after 30s");
     });
@@ -569,7 +566,7 @@ describe("mapNormalizedSpanToSpan", () => {
         statusMessage: "Bad Request",
       });
 
-      const result = mapNormalizedSpanToSpan(span);
+      const result = TraceLegacySpanMappingService.mapNormalizedSpanToSpan(span);
 
       expect(result.error?.message).toBe("Bad Request");
     });
@@ -579,7 +576,7 @@ describe("mapNormalizedSpanToSpan", () => {
         statusCode: NormalizedStatusCode.ERROR,
       });
 
-      const result = mapNormalizedSpanToSpan(span);
+      const result = TraceLegacySpanMappingService.mapNormalizedSpanToSpan(span);
 
       expect(result.error?.message).toBe("Unknown error");
     });
@@ -609,7 +606,7 @@ describe("mapNormalizedSpanToSpan", () => {
         ],
       });
 
-      const result = mapNormalizedSpanToSpan(span);
+      const result = TraceLegacySpanMappingService.mapNormalizedSpanToSpan(span);
 
       expect(result.error?.message).toBe("final fatal error");
     });
@@ -629,24 +626,27 @@ describe("mapNormalizedSpanToSpan", () => {
         ],
       });
 
-      const result = mapNormalizedSpanToSpan(span);
+      const result = TraceLegacySpanMappingService.mapNormalizedSpanToSpan(span);
 
       expect(result.error?.message).toBe("Bad Request");
     });
   });
 });
 
-describe("unflattenDotNotation", () => {
+describe("TraceLegacySpanMappingService.unflattenDotNotation", () => {
   describe("when given single-level keys", () => {
     it("keeps them at top level", () => {
-      const result = unflattenDotNotation({ simple: "value", count: 42 });
+      const result = TraceLegacySpanMappingService.unflattenDotNotation({
+        simple: "value",
+        count: 42,
+      });
       expect(result).toEqual({ simple: "value", count: 42 });
     });
   });
 
   describe("when given dotted keys", () => {
     it("nests them into objects", () => {
-      const result = unflattenDotNotation({
+      const result = TraceLegacySpanMappingService.unflattenDotNotation({
         "a.b.c": 1,
         "a.b.d": 2,
         "x.y": "z",
@@ -660,7 +660,7 @@ describe("unflattenDotNotation", () => {
 
   describe("when paths conflict with existing values", () => {
     it("overwrites scalar intermediate values with objects", () => {
-      const result = unflattenDotNotation({
+      const result = TraceLegacySpanMappingService.unflattenDotNotation({
         "a.b": "scalar",
         "a.b.c": "deep",
       });
@@ -670,7 +670,7 @@ describe("unflattenDotNotation", () => {
 
   describe("when keys contain prototype pollution attempts", () => {
     it("skips __proto__ keys", () => {
-      const result = unflattenDotNotation({
+      const result = TraceLegacySpanMappingService.unflattenDotNotation({
         "__proto__.polluted": "yes",
         safe: "ok",
       });
@@ -680,7 +680,7 @@ describe("unflattenDotNotation", () => {
     });
 
     it("skips constructor keys", () => {
-      const result = unflattenDotNotation({
+      const result = TraceLegacySpanMappingService.unflattenDotNotation({
         "constructor.prototype.polluted": "yes",
         safe: "ok",
       });
@@ -689,7 +689,7 @@ describe("unflattenDotNotation", () => {
     });
 
     it("skips prototype keys", () => {
-      const result = unflattenDotNotation({
+      const result = TraceLegacySpanMappingService.unflattenDotNotation({
         "prototype.evil": "yes",
         safe: "ok",
       });
@@ -698,7 +698,7 @@ describe("unflattenDotNotation", () => {
     });
 
     it("skips dangerous keys at leaf position", () => {
-      const result = unflattenDotNotation({
+      const result = TraceLegacySpanMappingService.unflattenDotNotation({
         "a.__proto__": "bad",
         "a.ok": "good",
       });
@@ -708,7 +708,7 @@ describe("unflattenDotNotation", () => {
 
   describe("when given empty input", () => {
     it("returns an empty object", () => {
-      const result = unflattenDotNotation({});
+      const result = TraceLegacySpanMappingService.unflattenDotNotation({});
       expect(result).toEqual({});
     });
   });
@@ -723,7 +723,7 @@ describe("unflattenDotNotation", () => {
         },
       });
 
-      const result = mapNormalizedSpanToSpan(span);
+      const result = TraceLegacySpanMappingService.mapNormalizedSpanToSpan(span);
 
       expect(result.input).toEqual({
         type: "json",
@@ -739,7 +739,7 @@ describe("unflattenDotNotation", () => {
         },
       });
 
-      const result = mapNormalizedSpanToSpan(span);
+      const result = TraceLegacySpanMappingService.mapNormalizedSpanToSpan(span);
 
       expect(result.output).toEqual({
         type: "text",
@@ -756,7 +756,7 @@ describe("unflattenDotNotation", () => {
         },
       });
 
-      const result = mapNormalizedSpanToSpan(span);
+      const result = TraceLegacySpanMappingService.mapNormalizedSpanToSpan(span);
 
       expect(result.input).toEqual({ type: "text", value: "explicit input" });
     });

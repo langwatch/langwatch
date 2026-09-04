@@ -1,9 +1,9 @@
 /**
- * Unit tests for BlobStore.getFromEventLog (ADR-022 event_log read path)
- * and BlobStore.putSpool / BlobStore.deleteSpool (transient S3 spool).
+ * Unit tests for TraceBlobStoreService.getFromEventLog (ADR-022 event_log read path)
+ * and TraceBlobStoreService.putSpool / TraceBlobStoreService.deleteSpool (transient S3 spool).
  *
  * ADR-022: event_log is the single durable source of truth.
- * `BlobStore.getFromEventLog` issues a SELECT on event_log by
+ * `TraceBlobStoreService.getFromEventLog` issues a SELECT on event_log by
  * (TenantId, AggregateType, AggregateId, EventId) — TenantId is the FIRST
  * predicate in the WHERE clause, structurally blocking cross-tenant reads.
  *
@@ -14,6 +14,7 @@
  * No "should" in it() names (project convention).
  */
 
+import { TraceOffloadResolutionService } from "../trace-offload-resolution.service";
 import { createTenantId, EventUtils, eventToRecord } from "@langwatch/eventing";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { generate, Ksuid } from "@langwatch/ksuid";
@@ -31,11 +32,11 @@ import {
   NormalizedSpanKind,
   NormalizedStatusCode,
 } from "@langwatch/trace-contract";
-import { resolveOffloadedTraces, type WarnLogger } from "../trace-offload-resolution.service";
+import { type WarnLogger } from "../trace-offload-resolution.service";
 import {
   BlobFieldNotFoundError,
   BlobNotFoundError,
-  BlobStore,
+  TraceBlobStoreService,
   type S3ClientResolver,
 } from "../trace-blob-store.service";
 
@@ -123,7 +124,7 @@ describe("given an event_log row stored under tenantA with a known EventPayload"
         rows: [{ EventPayload: eventPayload }],
       });
 
-      const blobStore = new BlobStore({
+      const blobStore = new TraceBlobStoreService({
         resolveS3Client: makeS3Resolver({ send: vi.fn() }),
         resolveClickHouseClient: makeChResolver(client) as never,
       });
@@ -160,7 +161,7 @@ describe("given an event_log row stored under tenantA with a known EventPayload"
         rows: [{ EventPayload: eventPayload }],
       });
 
-      const blobStore = new BlobStore({
+      const blobStore = new TraceBlobStoreService({
         resolveS3Client: makeS3Resolver({ send: vi.fn() }),
         resolveClickHouseClient: makeChResolver(client) as never,
       });
@@ -196,7 +197,7 @@ describe("given a KSUID EventId (the time is embedded in the id)", () => {
       const { client, sqlCaptures, paramCaptures } = makeMockChClient({
         rows: [{ EventPayload: eventPayload }],
       });
-      const blobStore = new BlobStore({
+      const blobStore = new TraceBlobStoreService({
         resolveS3Client: makeS3Resolver({ send: vi.fn() }),
         resolveClickHouseClient: makeChResolver(client) as never,
       });
@@ -234,7 +235,7 @@ describe("given a non-KSUID EventId (legacy / unparseable id)", () => {
       const { client, sqlCaptures, paramCaptures } = makeMockChClient({
         rows: [{ EventPayload: eventPayload }],
       });
-      const blobStore = new BlobStore({
+      const blobStore = new TraceBlobStoreService({
         resolveS3Client: makeS3Resolver({ send: vi.fn() }),
         resolveClickHouseClient: makeChResolver(client) as never,
       });
@@ -264,7 +265,7 @@ describe("given an event_log row under tenantA when tenantB attempts to read it"
       // No rows returned — cross-tenant query returns empty set
       const { client } = makeMockChClient({ rows: [] });
 
-      const blobStore = new BlobStore({
+      const blobStore = new TraceBlobStoreService({
         resolveS3Client: makeS3Resolver({ send: vi.fn() }),
         resolveClickHouseClient: makeChResolver(client) as never,
       });
@@ -293,7 +294,7 @@ describe("given an event_log row with a corrupt (non-JSON) EventPayload", () => 
         rows: [{ EventPayload: "not-valid-json{{{{" }],
       });
 
-      const blobStore = new BlobStore({
+      const blobStore = new TraceBlobStoreService({
         resolveS3Client: makeS3Resolver({ send: vi.fn() }),
         resolveClickHouseClient: makeChResolver(client) as never,
       });
@@ -325,7 +326,7 @@ describe("given a valid event_log row whose EventPayload does not contain the re
         rows: [{ EventPayload: eventPayload }],
       });
 
-      const blobStore = new BlobStore({
+      const blobStore = new TraceBlobStoreService({
         resolveS3Client: makeS3Resolver({ send: vi.fn() }),
         resolveClickHouseClient: makeChResolver(client) as never,
       });
@@ -352,7 +353,7 @@ describe("given a transient spool ref", () => {
     it("issues an S3 DELETE and returns void (no error thrown even if S3 DELETE fails)", async () => {
       const sendMock = vi.fn().mockRejectedValue(new Error("S3 DELETE failed"));
 
-      const blobStore = new BlobStore({
+      const blobStore = new TraceBlobStoreService({
         resolveS3Client: makeS3Resolver({ send: sendMock }),
       });
 
@@ -384,7 +385,7 @@ describe("given an event_log row whose EventPayload is a log record (full body a
         rows: [{ EventPayload: eventPayload }],
       });
 
-      const blobStore = new BlobStore({
+      const blobStore = new TraceBlobStoreService({
         resolveS3Client: makeS3Resolver({ send: vi.fn() }),
         resolveClickHouseClient: makeChResolver(client) as never,
       });
@@ -406,7 +407,7 @@ describe("given an event_log row whose EventPayload is a log record (full body a
         rows: [{ EventPayload: eventPayload }],
       });
 
-      const blobStore = new BlobStore({
+      const blobStore = new TraceBlobStoreService({
         resolveS3Client: makeS3Resolver({ send: vi.fn() }),
         resolveClickHouseClient: makeChResolver(client) as never,
       });
@@ -432,7 +433,7 @@ describe("given an S3 GetObject that returns a response with no Body", () => {
   describe("when getSpool is called", () => {
     it("throws an explicit 'no body' error rather than returning an empty buffer", async () => {
       const sendMock = vi.fn().mockResolvedValue({ Body: undefined });
-      const blobStore = new BlobStore({
+      const blobStore = new TraceBlobStoreService({
         resolveS3Client: makeS3Resolver({ send: sendMock }),
       });
 
@@ -518,7 +519,7 @@ describe("given a SpanReceivedEvent written through eventToRecord (real write pa
         rows: [{ EventPayload: JSON.stringify(record.EventPayload) }],
       });
 
-      const blobStore = new BlobStore({
+      const blobStore = new TraceBlobStoreService({
         resolveS3Client: makeS3Resolver({ send: vi.fn() }),
         resolveClickHouseClient: makeChResolver(client) as never,
       });
@@ -545,7 +546,7 @@ describe("given a SpanReceivedEvent written through eventToRecord (real write pa
 
 /**
  * @scenario Read path is object-storage-independent (ADR-022 on-prem / no-object-storage).
- * Proves that BlobStore.getFromEventLog never calls resolveS3Client, so deployments
+ * Proves that TraceBlobStoreService.getFromEventLog never calls resolveS3Client, so deployments
  * with no object storage can still serve "show full" and online-eval reads.
  */
 describe("given a deployment with no object storage (resolveS3Client throws)", () => {
@@ -566,7 +567,7 @@ describe("given a deployment with no object storage (resolveS3Client throws)", (
         throw new Error("no object storage configured");
       };
 
-      const blobStore = new BlobStore({
+      const blobStore = new TraceBlobStoreService({
         resolveS3Client: noStorageResolver,
         resolveClickHouseClient: makeChResolver(client) as never,
       });
@@ -665,7 +666,7 @@ describe("given a real OTLP EventPayload whose span carries mixed-type sibling a
         rows: [{ EventPayload: JSON.stringify(record.EventPayload) }],
       });
 
-      const blobStore = new BlobStore({
+      const blobStore = new TraceBlobStoreService({
         resolveS3Client: makeS3Resolver({ send: vi.fn() }),
         resolveClickHouseClient: makeChResolver(client) as never,
       });
@@ -692,7 +693,7 @@ describe("given a real OTLP EventPayload whose span carries mixed-type sibling a
         rows: [{ EventPayload: JSON.stringify(record.EventPayload) }],
       });
 
-      const blobStore = new BlobStore({
+      const blobStore = new TraceBlobStoreService({
         resolveS3Client: makeS3Resolver({ send: vi.fn() }),
         resolveClickHouseClient: makeChResolver(client) as never,
       });
@@ -713,26 +714,26 @@ describe("given a real OTLP EventPayload whose span carries mixed-type sibling a
 });
 
 // ---------------------------------------------------------------------------
-// resolveOffloadedTraces — END-TO-END customer read path with a REAL BlobStore
+// TraceOffloadResolutionService.resolveOffloadedTraces — END-TO-END customer read path with a REAL TraceBlobStoreService
 // over a mixed-type EventPayload (#4888)
 // ---------------------------------------------------------------------------
 
 /**
- * END-TO-END (#4888): drives the customer-facing `resolveOffloadedTraces` read
- * orchestrator with a REAL `BlobStore` (NOT a mocked getFromEventLog), whose CH
+ * END-TO-END (#4888): drives the customer-facing `TraceOffloadResolutionService.resolveOffloadedTraces` read
+ * orchestrator with a REAL `TraceBlobStoreService` (NOT a mocked getFromEventLog), whose CH
  * client returns the REAL mixed-type EventPayload produced by `eventToRecord`.
  * This is the path that degraded in production: a leaned span carrying the
  * preview + a `langwatch.reserved.eventref.langwatch.input` pointer is resolved
  * back to the FULL value, and the reserved namespace is stripped.
  *
- * Pre-fix, `BlobStore.getFromEventLog` rejects the mixed-type payload and throws,
+ * Pre-fix, `TraceBlobStoreService.getFromEventLog` rejects the mixed-type payload and throws,
  * the resolver degrades to preview, so the resolved attribute would equal the
  * preview — this test fails. Post-fix the full value is restored.
  */
 describe("given a leaned span pointing at a real mixed-type EventPayload offloaded to event_log", () => {
   const BIG = "z".repeat(120 * 1024) + "🧪e2e";
 
-  describe("when resolveOffloadedTraces runs with a real BlobStore over event_log", () => {
+  describe("when TraceOffloadResolutionService.resolveOffloadedTraces runs with a real TraceBlobStoreService over event_log", () => {
     it("restores the FULL langwatch.input into spanAttributes and strips the reserved eventref key", async () => {
       // The FULL event the command worker writes to event_log, with mixed-type
       // siblings present alongside the offloaded IO field.
@@ -781,7 +782,7 @@ describe("given a leaned span pointing at a real mixed-type EventPayload offload
         rows: [{ EventPayload: JSON.stringify(record.EventPayload) }],
       });
 
-      const blobStore = new BlobStore({
+      const blobStore = new TraceBlobStoreService({
         resolveS3Client: makeS3Resolver({ send: vi.fn() }),
         resolveClickHouseClient: makeChResolver(client) as never,
       });
@@ -828,7 +829,7 @@ describe("given a leaned span pointing at a real mixed-type EventPayload offload
         error: vi.fn(),
       };
 
-      const result = await resolveOffloadedTraces({
+      const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
         projectId: TENANT_A,
         normalizedSpans: [stagedSpan],
         blobStore,

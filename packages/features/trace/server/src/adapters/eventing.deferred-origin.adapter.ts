@@ -24,58 +24,64 @@ export abstract class TraceDeferredOriginSchedulerPort {
   abstract schedule(payload: DeferredOriginPayload): Promise<void>;
 }
 
-export function needsOriginResolution({
-  event,
-  foldState,
-}: {
-  event: TraceProcessingEvent;
-  foldState: TraceSummaryData;
-}): boolean {
-  if (event.occurredAt < Date.now() - STALE_TRACE_THRESHOLD_MS) return false;
-  return !foldState.attributes?.["langwatch.origin"];
-}
+export class TraceDeferredOriginEventingAdapter {
+  static create(): TraceDeferredOriginEventingAdapter {
+    return new TraceDeferredOriginEventingAdapter();
+  }
 
-export function createOriginGateHandler(
-  scheduler: TraceDeferredOriginSchedulerPort,
-): (event: TraceProcessingEvent, context: TriggerContext<TraceSummaryData>) => Promise<void> {
-  return async (event, context) => {
-    const { tenantId, aggregateId: traceId, state: foldState } = context;
+  static needsOriginResolution({
+    event,
+    foldState,
+  }: {
+    event: TraceProcessingEvent;
+    foldState: TraceSummaryData;
+  }): boolean {
+    if (event.occurredAt < Date.now() - STALE_TRACE_THRESHOLD_MS) return false;
+    return !foldState.attributes?.["langwatch.origin"];
+  }
 
-    if (!needsOriginResolution({ event, foldState })) return;
-    if (!traceId) {
-      logger.warn(
-        { tenantId, eventId: event.id, eventType: event.type },
-        "Skipping deferred origin resolution: empty traceId on trace event",
+  static createOriginGateHandler(
+    scheduler: TraceDeferredOriginSchedulerPort,
+  ): (event: TraceProcessingEvent, context: TriggerContext<TraceSummaryData>) => Promise<void> {
+    return async (event, context) => {
+      const { tenantId, aggregateId: traceId, state: foldState } = context;
+
+      if (!TraceDeferredOriginEventingAdapter.needsOriginResolution({ event, foldState })) return;
+      if (!traceId) {
+        logger.warn(
+          { tenantId, eventId: event.id, eventType: event.type },
+          "Skipping deferred origin resolution: empty traceId on trace event",
+        );
+        return;
+      }
+
+      logger.debug(
+        { tenantId, traceId },
+        "No origin resolved, scheduling deferred origin resolution",
       );
-      return;
-    }
+      await scheduler.schedule({ id: traceId, tenantId, traceId });
+    };
+  }
 
-    logger.debug(
-      { tenantId, traceId },
-      "No origin resolved, scheduling deferred origin resolution",
-    );
-    await scheduler.schedule({ id: traceId, tenantId, traceId });
-  };
-}
+  static createDeferredOriginHandler(
+    resolveOrigin: (data: ResolveOriginCommandData) => Promise<void>,
+  ): (payload: DeferredOriginPayload) => Promise<void> {
+    return async (payload) => {
+      logger.debug(
+        { tenantId: payload.tenantId, traceId: payload.traceId },
+        "Deferred origin resolution: dispatching resolveOrigin command",
+      );
+      await resolveOrigin({
+        tenantId: payload.tenantId,
+        traceId: payload.traceId,
+        origin: "application",
+        reason: "deferred_fallback",
+        occurredAt: Date.now(),
+      });
+    };
+  }
 
-export function createDeferredOriginHandler(
-  resolveOrigin: (data: ResolveOriginCommandData) => Promise<void>,
-): (payload: DeferredOriginPayload) => Promise<void> {
-  return async (payload) => {
-    logger.debug(
-      { tenantId: payload.tenantId, traceId: payload.traceId },
-      "Deferred origin resolution: dispatching resolveOrigin command",
-    );
-    await resolveOrigin({
-      tenantId: payload.tenantId,
-      traceId: payload.traceId,
-      origin: "application",
-      reason: "deferred_fallback",
-      occurredAt: Date.now(),
-    });
-  };
-}
-
-export function makeDeferredOriginJobId(payload: DeferredOriginPayload): string {
-  return `deferred-origin:${payload.tenantId}:${payload.traceId}`;
+  static makeDeferredOriginJobId(payload: DeferredOriginPayload): string {
+    return `deferred-origin:${payload.tenantId}:${payload.traceId}`;
+  }
 }

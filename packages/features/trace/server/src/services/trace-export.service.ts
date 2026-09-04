@@ -208,6 +208,25 @@ export class TraceExportService {
 
     logger.info({ projectId: request.projectId, exported, total }, "Trace export completed");
   }
+
+  /**
+   * Remove the first line (header) from a CSV string.
+   *
+   * Must search for the same sequence the serializer wrote. Splitting on "\n"
+   * while the rows are terminated with "\r\n" leaves a stray carriage return at
+   * the head of the chunk, which becomes a phantom leading field.
+   *
+   * Exported for the batch-boundary tests, which concatenate chunks exactly as
+   * this service does. A test-local copy could pass while this regressed.
+   */
+  static stripCsvHeader(csv: string): string {
+    const firstBreak = csv.indexOf(CSV_NEWLINE);
+    if (firstBreak === -1) {
+      return "";
+    }
+
+    return csv.slice(firstBreak + CSV_NEWLINE.length);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -290,12 +309,12 @@ function serializeCsvBatch({
     case "summary": {
       const fullCsv = serializeTracesToSummaryCsv({ traces, evaluatorNames });
 
-      return includeHeader ? fullCsv : stripCsvHeader(fullCsv);
+      return includeHeader ? fullCsv : TraceExportService.stripCsvHeader(fullCsv);
     }
     case "full": {
       const fullCsv = serializeTracesToFullCsv({ traces, evaluatorNames });
 
-      return includeHeader ? fullCsv : stripCsvHeader(fullCsv);
+      return includeHeader ? fullCsv : TraceExportService.stripCsvHeader(fullCsv);
     }
     default: {
       const _exhaustive: never = request.mode;
@@ -323,23 +342,4 @@ function serializeJsonBatch({
       throw new Error(`Unsupported mode: ${_exhaustive}`);
     }
   }
-}
-
-/**
- * Remove the first line (header) from a CSV string.
- *
- * Must search for the same sequence the serializer wrote. Splitting on "\n"
- * while the rows are terminated with "\r\n" leaves a stray carriage return at
- * the head of the chunk, which becomes a phantom leading field.
- *
- * Exported for the batch-boundary tests, which concatenate chunks exactly as
- * this service does. A test-local copy could pass while this regressed.
- */
-export function stripCsvHeader(csv: string): string {
-  const firstBreak = csv.indexOf(CSV_NEWLINE);
-  if (firstBreak === -1) {
-    return "";
-  }
-
-  return csv.slice(firstBreak + CSV_NEWLINE.length);
 }

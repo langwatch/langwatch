@@ -11,7 +11,7 @@ import {
   graphTriggerActivityGroupKey,
 } from "@langwatch/automation-server";
 import {
-  createOriginGateHandler,
+  TraceDeferredOriginEventingAdapter,
   CUSTOM_EVAL_SYNC_DEDUP_TTL_MS,
   CUSTOM_EVAL_SYNC_DELAY_MS,
   CustomEvaluationSync,
@@ -21,9 +21,8 @@ import {
   EXPERIMENT_METRICS_SYNC_DELAY_MS,
   hasExperimentCostMetrics,
   hasSimulationMetrics,
-  leanForProjection,
+  TraceProjectionLeanService,
   ModelCatalogTraceModelCostAdapter,
-  needsOriginResolution,
   ORIGIN_GATE_DEDUP_TTL_MS,
   ORIGIN_GATE_DELAY_MS,
   PROJECT_METADATA_WINDOW_MS,
@@ -118,7 +117,7 @@ import type { WorkerTrackedEventComposition } from "./worker-tracked-event.compo
  *       |    |- TraceMediaReferenceAdapter             (g1)
  *       |    |- ModelCatalogTraceModelCostAdapter      (g1)
  *       |    |- TraceSpanNormalizationAdapter          (g1)
- *       |    |- leanForProjection                      (g1)
+ *       |    |- TraceProjectionLeanService.leanForProjection                      (g1)
  *       |    `- RecordSpanCommand                      (g2)
  *       `- fifteen subscribers, each over a named collaborator
  *            |- originGate            the installer's deferred scheduler
@@ -314,7 +313,9 @@ export class WorkerTraceProcessingPipeline extends TraceProcessingPipelinePort {
   build(options: { deferredOrigins: TraceDeferredOriginSchedulerPort }) {
     return createWorkerTraceProcessingPipeline({
       ...this.deps,
-      originGateHandler: createOriginGateHandler(options.deferredOrigins),
+      originGateHandler: TraceDeferredOriginEventingAdapter.createOriginGateHandler(
+        options.deferredOrigins,
+      ),
     });
   }
 }
@@ -446,7 +447,7 @@ function composeTraceProjections(deps: WorkerTraceProcessingPipelineDeps) {
     mediaReferences: TraceMediaReferenceAdapter.create(),
     modelCosts: ModelCatalogTraceModelCostAdapter.create(),
     spanNormalization: TraceSpanNormalizationAdapter.create(deps.traceCanonicalisation),
-    prepareEventForProjection: leanForProjection,
+    prepareEventForProjection: TraceProjectionLeanService.leanForProjection,
   }).build();
 }
 
@@ -464,7 +465,11 @@ export function createWorkerTraceProcessingPipeline(deps: WorkerTraceProcessingP
     // soon as the committed fold shows a resolved origin.
     .withProjectionSubscriber("originGate", {
       fold: "traceSummary",
-      when: (event, context) => needsOriginResolution({ event, foldState: context.state }),
+      when: (event, context) =>
+        TraceDeferredOriginEventingAdapter.needsOriginResolution({
+          event,
+          foldState: context.state,
+        }),
       delay: ORIGIN_GATE_DELAY_MS,
       ttl: ORIGIN_GATE_DEDUP_TTL_MS,
       handler: (event, context) => deps.originGateHandler(event, context),

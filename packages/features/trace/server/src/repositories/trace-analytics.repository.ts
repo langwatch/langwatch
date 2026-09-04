@@ -10,7 +10,7 @@ import type { TraceAnalyticsRow } from "../projections/trace-derived.projection"
  * path do NOT consume this repository yet. Phase 3 will add a read interface
  * for percentiles + arbitrary-filter queries that the rollup can't serve.
  */
-export interface TraceAnalyticsRepository {
+export abstract class TraceAnalyticsRepository {
   /**
    * Upserts a slim row. Idempotent — the table is ReplacingMergeTree(UpdatedAt)
    * and readers dedup to the latest UpdatedAt per (TenantId, TraceId).
@@ -22,7 +22,7 @@ export interface TraceAnalyticsRepository {
    * so a retry with a cold cache still recognises a batch it already committed.
    * Not part of the row — it is fold bookkeeping, not trace analytics.
    */
-  upsert(
+  abstract upsert(
     row: TraceAnalyticsRow,
     retentionDays?: number,
     appliedEventIds?: readonly string[],
@@ -33,7 +33,7 @@ export interface TraceAnalyticsRepository {
    * absent. Implementations should validate that all rows share the same
    * tenantId (mirroring TraceAnalyticsRollupClickHouseRepository.insertRows).
    */
-  upsertBatch?(
+  abstract upsertBatch?(
     entries: Array<{
       row: TraceAnalyticsRow;
       retentionDays?: number;
@@ -53,7 +53,7 @@ export interface TraceAnalyticsRepository {
    * rule out a row outside its window retries without one — the fold path gets
    * that retry from the executor's declared-read-window contract.
    */
-  tryFindByTraceIdWithApplied(params: {
+  abstract tryFindByTraceIdWithApplied(params: {
     tenantId: string;
     traceId: string;
     window?: { fromMs: number; toMs: number };

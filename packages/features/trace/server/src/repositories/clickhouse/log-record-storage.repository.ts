@@ -1,9 +1,7 @@
+import { TraceWindowedReadService } from "../../services/trace-windowed-read.service";
 import { EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import {
-  DEFAULT_PARTITION_WINDOW_MS,
-  queryWindowed,
-} from "../../services/trace-windowed-read.service";
+import { DEFAULT_PARTITION_WINDOW_MS } from "../../services/trace-windowed-read.service";
 import type { TraceClickHouseResolver as ClickHouseClientResolver } from "../../ports/clickhouse.port";
 import {
   type LogRecordStorageRepository,
@@ -27,6 +25,10 @@ const FALLBACK_LOOKBACK_MS = 90 * 24 * 60 * 60 * 1000;
 const logger = createLogger("langwatch:app-layer:traces:log-record-storage-repository");
 
 export class LogRecordStorageClickHouseRepository implements LogRecordStorageRepository {
+  static create(resolveClient: ClickHouseClientResolver): LogRecordStorageClickHouseRepository {
+    return new LogRecordStorageClickHouseRepository(resolveClient);
+  }
+
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   async getLogsByTraceId(
@@ -46,7 +48,7 @@ export class LogRecordStorageClickHouseRepository implements LogRecordStorageRep
     // partitions instead of cold-scanning every one (incl. tiered S3). With a
     // turn-time hint → ±2d around it; without → now − 90d … now + 2d.
     //
-    // Routed through the shared `queryWindowed` adopter for the
+    // Routed through the shared `TraceWindowedReadService.queryWindowed` adopter for the
     // clickhouse_windowed_read_total metric, but the read stays SINGLE-SHOT and
     // byte-identical to the previous inline window:
     //   * hint present → `fallback: "none"`, so an empty hinted window is
@@ -56,7 +58,7 @@ export class LogRecordStorageClickHouseRepository implements LogRecordStorageRep
     //     DEFAULT_PARTITION_WINDOW_MS clock-skew headroom).
     const hasWindow = typeof occurredAtMs === "number" && occurredAtMs > 0;
 
-    return queryWindowed<StoredLogRecordRow[]>({
+    return TraceWindowedReadService.queryWindowed<StoredLogRecordRow[]>({
       table: TABLE_NAME,
       hintMs: hasWindow ? occurredAtMs : null,
       windowMs: DEFAULT_PARTITION_WINDOW_MS,

@@ -22,7 +22,7 @@ import {
   NormalizedSpanKind,
   NormalizedStatusCode,
 } from "@langwatch/trace-contract";
-import type { BlobStore } from "../trace-blob-store.service";
+import type { TraceBlobStoreService } from "../trace-blob-store.service";
 import { BlobNotFoundError } from "../trace-blob-store.service";
 import { EVENTREF_ATTR_PREFIX } from "@langwatch/trace-contract";
 import type { SpanStorageRepository } from "../../repositories/span-storage.repository";
@@ -68,7 +68,7 @@ function makeSpan(
   } as NormalizedSpan;
 }
 
-function fakeBlobStore(resolvedValues: Record<string, string>): BlobStore {
+function fakeBlobStore(resolvedValues: Record<string, string>): TraceBlobStoreService {
   return {
     getFromEventLog: vi.fn(async ({ field }: { field: string }) => {
       if (field in resolvedValues) return resolvedValues[field]!;
@@ -77,7 +77,7 @@ function fakeBlobStore(resolvedValues: Record<string, string>): BlobStore {
     putSpool: vi.fn(),
     getSpool: vi.fn(),
     deleteSpool: vi.fn(),
-  } as unknown as BlobStore;
+  } as unknown as TraceBlobStoreService;
 }
 
 const realIOService = new TraceIOExtractionService(TraceCanonicalisationService.create());

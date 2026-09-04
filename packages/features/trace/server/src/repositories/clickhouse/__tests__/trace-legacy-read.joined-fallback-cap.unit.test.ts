@@ -42,7 +42,7 @@ vi.mock("langwatch", () => ({
   }),
 }));
 
-const { ClickHouseTraceService } = await import("../trace-legacy-read.repository");
+const { TraceLegacyReadClickHouseRepository } = await import("../trace-legacy-read.repository");
 const traceCanonicalisation = TraceCanonicalisationService.create();
 const { openProtections } = await import("./open-protections");
 
@@ -187,7 +187,7 @@ describe("the traces-with-spans memory-limit fallback", () => {
     it("stops and reports how far it got, rather than filling the heap", async () => {
       // 400 traces x 200 spans = 80,000 spans, past the 50,000 cap.
       clickHouseThatOOMsThenBatches({ spansPerTrace: 200 });
-      const service = new ClickHouseTraceService({
+      const service = new TraceLegacyReadClickHouseRepository({
         resolveClickHouseClient: testResolveClickHouseClient,
         prisma: {} as never,
         traceCanonicalisation,
@@ -203,7 +203,7 @@ describe("the traces-with-spans memory-limit fallback", () => {
     /** @scenario "The memory-limit fallback stops before it exhausts the heap" */
     it("names the traces it had already materialised", async () => {
       clickHouseThatOOMsThenBatches({ spansPerTrace: 200 });
-      const service = new ClickHouseTraceService({
+      const service = new TraceLegacyReadClickHouseRepository({
         resolveClickHouseClient: testResolveClickHouseClient,
         prisma: {} as never,
         traceCanonicalisation,
@@ -231,7 +231,7 @@ describe("the traces-with-spans memory-limit fallback", () => {
       const { served } = clickHouseThatOOMsThenBatches({
         spansPerTrace: 10_000,
       });
-      const service = new ClickHouseTraceService({
+      const service = new TraceLegacyReadClickHouseRepository({
         resolveClickHouseClient: testResolveClickHouseClient,
         prisma: {} as never,
         traceCanonicalisation,
@@ -250,7 +250,7 @@ describe("the traces-with-spans memory-limit fallback", () => {
       const { spanReadSettings } = clickHouseThatOOMsThenBatches({
         spansPerTrace: 10_000,
       });
-      const service = new ClickHouseTraceService({
+      const service = new TraceLegacyReadClickHouseRepository({
         resolveClickHouseClient: testResolveClickHouseClient,
         prisma: {} as never,
         traceCanonicalisation,
@@ -269,7 +269,7 @@ describe("the traces-with-spans memory-limit fallback", () => {
     /** @scenario "A fallback that fits under the cap still returns every trace" */
     it("returns every requested trace", async () => {
       clickHouseThatOOMsThenBatches({ spansPerTrace: 1 });
-      const service = new ClickHouseTraceService({
+      const service = new TraceLegacyReadClickHouseRepository({
         resolveClickHouseClient: testResolveClickHouseClient,
         prisma: {} as never,
         traceCanonicalisation,

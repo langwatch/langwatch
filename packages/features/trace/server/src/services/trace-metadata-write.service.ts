@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { TraceSpanIngestPort } from "../ports/trace-span-ingest.port";
 import { DEFAULT_PII_REDACTION_LEVEL } from "@langwatch/trace-contract";
 import type { CustomMetadata, ReservedTraceMetadata } from "@langwatch/trace-contract";
-import { CollectorSpanUtils } from "./trace-collector-span.service";
+import { TraceCollectorSpanService } from "./trace-collector-span.service";
 
 /**
  * Post-hoc trace metadata updates. A user can amend a trace's metadata after
@@ -55,50 +55,56 @@ function splitMetadata(metadata: TraceMetadataUpdate): {
   return { reserved, custom };
 }
 
-export async function updateTraceMetadata({
-  ingest,
-  projectId,
-  traceId,
-  metadata,
-}: {
-  /** Where the synthetic amendment span is recorded. */
-  ingest: TraceSpanIngestPort;
-  projectId: string;
-  traceId: string;
-  metadata: TraceMetadataUpdate;
-}): Promise<void> {
-  const { reserved, custom } = splitMetadata(metadata);
-  const resource = CollectorSpanUtils.buildResource({
-    reservedTraceMetadata: reserved,
-    customMetadata: custom,
-  });
+export class TraceMetadataWriteService {
+  static create(): TraceMetadataWriteService {
+    return new TraceMetadataWriteService();
+  }
 
-  const now = Date.now();
-  const nowNano = String(now * 1_000_000);
-  const spanId = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+  static async updateTraceMetadata({
+    ingest,
+    projectId,
+    traceId,
+    metadata,
+  }: {
+    /** Where the synthetic amendment span is recorded. */
+    ingest: TraceSpanIngestPort;
+    projectId: string;
+    traceId: string;
+    metadata: TraceMetadataUpdate;
+  }): Promise<void> {
+    const { reserved, custom } = splitMetadata(metadata);
+    const resource = TraceCollectorSpanService.buildResource({
+      reservedTraceMetadata: reserved,
+      customMetadata: custom,
+    });
 
-  await ingest.recordSpan({
-    tenantId: projectId,
-    span: {
-      traceId,
-      spanId,
-      traceState: null,
-      parentSpanId: null,
-      name: "langwatch.metadata_update",
-      kind: 1,
-      startTimeUnixNano: nowNano,
-      endTimeUnixNano: nowNano,
-      attributes: [{ key: "langwatch.span.type", value: { stringValue: "span" } }],
-      events: [],
-      links: [],
-      status: { code: 1 },
-      droppedAttributesCount: 0,
-      droppedEventsCount: 0,
-      droppedLinksCount: 0,
-    },
-    resource,
-    instrumentationScope: { name: "langwatch.api.metadata_update" },
-    piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
-    occurredAt: now,
-  });
+    const now = Date.now();
+    const nowNano = String(now * 1_000_000);
+    const spanId = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+
+    await ingest.recordSpan({
+      tenantId: projectId,
+      span: {
+        traceId,
+        spanId,
+        traceState: null,
+        parentSpanId: null,
+        name: "langwatch.metadata_update",
+        kind: 1,
+        startTimeUnixNano: nowNano,
+        endTimeUnixNano: nowNano,
+        attributes: [{ key: "langwatch.span.type", value: { stringValue: "span" } }],
+        events: [],
+        links: [],
+        status: { code: 1 },
+        droppedAttributesCount: 0,
+        droppedEventsCount: 0,
+        droppedLinksCount: 0,
+      },
+      resource,
+      instrumentationScope: { name: "langwatch.api.metadata_update" },
+      piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
+      occurredAt: now,
+    });
+  }
 }

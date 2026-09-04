@@ -1,3 +1,5 @@
+import { VisibilityWindowService } from "./trace-visibility-window.service";
+import { TraceSessionGroupsCursorService } from "./trace-session-groups-cursor.service";
 import type {
   SessionGroupCodingAgentDto,
   SessionGroupDto,
@@ -8,13 +10,7 @@ import type {
   SessionGroupSortColumn,
   SessionGroupsRepository,
 } from "../repositories/session-groups.repository";
-import {
-  cursorSortValueForRow,
-  encodeSessionGroupsCursor,
-  keysetCursorFor,
-} from "./trace-session-groups-cursor.service";
 import type { CodingAgentService } from "@langwatch/coding-agent-contract";
-import { teaserOf } from "./trace-visibility-window.service";
 
 /**
  * The Sessions lens read (specs/traces-v2/sessions-lens.feature): true
@@ -55,13 +51,13 @@ const emptyToNull = (value: string | null | undefined): string | null =>
 function teasedSession(session: SessionGroupDto): SessionGroupDto {
   return {
     ...session,
-    input: session.input ? teaserOf(session.input) : session.input,
-    output: session.output ? teaserOf(session.output) : session.output,
+    input: session.input ? VisibilityWindowService.teaserOf(session.input) : session.input,
+    output: session.output ? VisibilityWindowService.teaserOf(session.output) : session.output,
     codingAgent: session.codingAgent
       ? {
           ...session.codingAgent,
           title: session.codingAgent.title
-            ? teaserOf(session.codingAgent.title)
+            ? VisibilityWindowService.teaserOf(session.codingAgent.title)
             : session.codingAgent.title,
         }
       : session.codingAgent,
@@ -83,38 +79,15 @@ interface SessionGroupsParams {
   visibilityCutoffMs?: number | null;
 }
 
-export function mapSessionGroupRowToDto({
-  row,
-  codingAgent,
-}: {
-  row: SessionGroupRow;
-  codingAgent: SessionGroupCodingAgentDto | null;
-}): SessionGroupDto {
-  return {
-    conversationId: row.conversationId,
-    traceCount: row.traceCount,
-    totalCost: row.totalCost,
-    totalTokens: row.totalTokens,
-    cacheReadTokens: row.cacheReadTokens,
-    cacheCreationTokens: row.cacheCreationTokens,
-    contextSizeTokens: row.contextSizeTokens,
-    totalDurationMs: row.totalDurationMs,
-    startedAtMs: row.startedAtMs,
-    lastActivityMs: row.lastActivityMs,
-    models: row.models,
-    primaryModel: row.primaryModel,
-    serviceName: row.serviceName,
-    errorCount: row.errorCount,
-    warningCount: row.warningCount,
-    totalSpans: row.totalSpans,
-    lastTraceId: emptyToNull(row.lastTraceId),
-    input: row.input,
-    output: row.output,
-    codingAgent,
-  };
-}
-
 export class SessionGroupsService {
+  static create(options: {
+    repository: SessionGroupsRepository;
+    codingAgentSessions: CodingAgentService;
+    resolveOrganizationId?: (projectId: string) => Promise<string | undefined>;
+  }): SessionGroupsService {
+    return new SessionGroupsService(options);
+  }
+
   private readonly repository: SessionGroupsRepository;
   private readonly codingAgentSessions: CodingAgentService;
   /**
@@ -147,7 +120,7 @@ export class SessionGroupsService {
       sort: { column: sortColumn, direction: sortDirection },
       // One sentinel row past the page so `nextCursor` is exact.
       limit: params.pageSize + 1,
-      cursor: keysetCursorFor({
+      cursor: TraceSessionGroupsCursorService.keysetCursorFor({
         encoded: params.cursor,
         sortColumn,
         sortDirection,
@@ -171,7 +144,7 @@ export class SessionGroupsService {
 
     const cutoffMs = params.visibilityCutoffMs ?? null;
     const sessions = visibleRows.map((row, index) => {
-      const dto = mapSessionGroupRowToDto({
+      const dto = SessionGroupsService.mapSessionGroupRowToDto({
         row,
         codingAgent: enrichments[index] ?? null,
       });
@@ -186,8 +159,8 @@ export class SessionGroupsService {
       totalHits: page.totalHits,
       nextCursor:
         hasMore && lastRow
-          ? encodeSessionGroupsCursor({
-              sortValue: cursorSortValueForRow({
+          ? TraceSessionGroupsCursorService.encodeSessionGroupsCursor({
+              sortValue: TraceSessionGroupsCursorService.cursorSortValueForRow({
                 row: lastRow,
                 column: sortColumn,
               }),
@@ -305,5 +278,36 @@ export class SessionGroupsService {
     } catch {
       // Unlinked is a correct answer; a failed join must not take the list down.
     }
+  }
+
+  static mapSessionGroupRowToDto({
+    row,
+    codingAgent,
+  }: {
+    row: SessionGroupRow;
+    codingAgent: SessionGroupCodingAgentDto | null;
+  }): SessionGroupDto {
+    return {
+      conversationId: row.conversationId,
+      traceCount: row.traceCount,
+      totalCost: row.totalCost,
+      totalTokens: row.totalTokens,
+      cacheReadTokens: row.cacheReadTokens,
+      cacheCreationTokens: row.cacheCreationTokens,
+      contextSizeTokens: row.contextSizeTokens,
+      totalDurationMs: row.totalDurationMs,
+      startedAtMs: row.startedAtMs,
+      lastActivityMs: row.lastActivityMs,
+      models: row.models,
+      primaryModel: row.primaryModel,
+      serviceName: row.serviceName,
+      errorCount: row.errorCount,
+      warningCount: row.warningCount,
+      totalSpans: row.totalSpans,
+      lastTraceId: emptyToNull(row.lastTraceId),
+      input: row.input,
+      output: row.output,
+      codingAgent,
+    };
   }
 }

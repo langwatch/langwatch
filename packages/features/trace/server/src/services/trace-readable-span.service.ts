@@ -169,57 +169,63 @@ function buildStatus(span: Span): SpanStatus {
   return { code: SpanStatusCode.OK };
 }
 
-/**
- * A whole trace's spans rendered as the one readable digest a judge reads.
- *
- * The formatter is the scenario judge's, because the digest a judge is shown
- * and the digest an evaluator is shown have to be the same text — a second
- * renderer here would grade one thing and display another.
- */
-export function formatSpansDigest(spans: Span[]): Promise<string> {
-  const readableSpans = spans.map(langwatchSpanToReadableSpan);
+export class TraceReadableSpanService {
+  static create(): TraceReadableSpanService {
+    return new TraceReadableSpanService();
+  }
 
-  return Promise.resolve(judgeSpanDigestFormatter.format(readableSpans));
-}
+  /**
+   * A whole trace's spans rendered as the one readable digest a judge reads.
+   *
+   * The formatter is the scenario judge's, because the digest a judge is shown
+   * and the digest an evaluator is shown have to be the same text — a second
+   * renderer here would grade one thing and display another.
+   */
+  static formatSpansDigest(spans: Span[]): Promise<string> {
+    const readableSpans = spans.map(TraceReadableSpanService.langwatchSpanToReadableSpan);
 
-export function langwatchSpanToReadableSpan(span: Span): ReadableSpan {
-  const startTime = msToHrTime(span.timestamps.started_at);
-  const endTime = msToHrTime(span.timestamps.finished_at);
-  const duration = hrTimeDuration(startTime, endTime);
+    return Promise.resolve(judgeSpanDigestFormatter.format(readableSpans));
+  }
 
-  const spanCtx: SpanContext = {
-    traceId: span.trace_id,
-    spanId: span.span_id,
-    traceFlags: TraceFlags.SAMPLED,
-  };
+  static langwatchSpanToReadableSpan(span: Span): ReadableSpan {
+    const startTime = msToHrTime(span.timestamps.started_at);
+    const endTime = msToHrTime(span.timestamps.finished_at);
+    const duration = hrTimeDuration(startTime, endTime);
 
-  const parentSpanCtx: SpanContext | undefined = span.parent_id
-    ? {
-        traceId: span.trace_id,
-        spanId: span.parent_id,
-        traceFlags: TraceFlags.SAMPLED,
-      }
-    : undefined;
+    const spanCtx: SpanContext = {
+      traceId: span.trace_id,
+      spanId: span.span_id,
+      traceFlags: TraceFlags.SAMPLED,
+    };
 
-  const resource = emptyResource();
+    const parentSpanCtx: SpanContext | undefined = span.parent_id
+      ? {
+          traceId: span.trace_id,
+          spanId: span.parent_id,
+          traceFlags: TraceFlags.SAMPLED,
+        }
+      : undefined;
 
-  return {
-    name: span.name ?? "",
-    kind: spanTypeToKind(span.type),
-    spanContext: () => spanCtx,
-    parentSpanContext: parentSpanCtx,
-    startTime,
-    endTime,
-    status: buildStatus(span),
-    attributes: buildAttributes(span),
-    links: [],
-    events: [],
-    duration,
-    ended: true,
-    resource,
-    instrumentationScope: { name: "langwatch" },
-    droppedAttributesCount: 0,
-    droppedEventsCount: 0,
-    droppedLinksCount: 0,
-  };
+    const resource = emptyResource();
+
+    return {
+      name: span.name ?? "",
+      kind: spanTypeToKind(span.type),
+      spanContext: () => spanCtx,
+      parentSpanContext: parentSpanCtx,
+      startTime,
+      endTime,
+      status: buildStatus(span),
+      attributes: buildAttributes(span),
+      links: [],
+      events: [],
+      duration,
+      ended: true,
+      resource,
+      instrumentationScope: { name: "langwatch" },
+      droppedAttributesCount: 0,
+      droppedEventsCount: 0,
+      droppedLinksCount: 0,
+    };
+  }
 }

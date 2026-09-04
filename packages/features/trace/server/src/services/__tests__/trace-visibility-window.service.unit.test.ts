@@ -3,13 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 import type { Span, Trace } from "@langwatch/trace-contract";
 
 import {
-  redactSpanContent,
-  redactTraceContent,
   TEASER_ELLIPSIS,
   TEASER_FRACTION,
   TEASER_MAX_CHARS,
   TEASER_MIN_CHARS,
-  teaserOf,
   VisibilityWindowService,
 } from "../trace-visibility-window.service";
 
@@ -54,12 +51,14 @@ const makeSpan = (overrides: Partial<Span> = {}): Span =>
 describe("given the teaser truncation rule", () => {
   describe("when the text is long", () => {
     it("caps the teaser at TEASER_MAX_CHARS", () => {
-      expect(teaserOf("a".repeat(5000))).toHaveLength(TEASER_MAX_CHARS + TEASER_ELLIPSIS.length);
+      expect(VisibilityWindowService.teaserOf("a".repeat(5000))).toHaveLength(
+        TEASER_MAX_CHARS + TEASER_ELLIPSIS.length,
+      );
     });
 
     it("keeps 10% when that lands between the floor and the cap", () => {
       const text = "b".repeat(1000);
-      expect(teaserOf(text)).toHaveLength(
+      expect(VisibilityWindowService.teaserOf(text)).toHaveLength(
         Math.ceil(text.length * TEASER_FRACTION) + TEASER_ELLIPSIS.length,
       );
     });
@@ -68,21 +67,23 @@ describe("given the teaser truncation rule", () => {
   describe("when the text is shorter than the floor", () => {
     it("returns the full text untouched", () => {
       const text = "c".repeat(40);
-      expect(teaserOf(text)).toBe(text);
+      expect(VisibilityWindowService.teaserOf(text)).toBe(text);
     });
   });
 
   describe("when the text length equals the floor boundary", () => {
     it("keeps TEASER_MIN_CHARS plus the ellipsis for a 60-char text", () => {
-      expect(teaserOf("d".repeat(60))).toHaveLength(TEASER_MIN_CHARS + TEASER_ELLIPSIS.length);
+      expect(VisibilityWindowService.teaserOf("d".repeat(60))).toHaveLength(
+        TEASER_MIN_CHARS + TEASER_ELLIPSIS.length,
+      );
     });
   });
 });
 
 describe("given a trace beyond the visibility window", () => {
-  describe("when redactTraceContent runs", () => {
+  describe("when VisibilityWindowService.redactTraceContent runs", () => {
     it("truncates input, output, and error bodies to the teaser", () => {
-      const redacted = redactTraceContent(makeTrace());
+      const redacted = VisibilityWindowService.redactTraceContent(makeTrace());
       expect(redacted.input?.value).toHaveLength(TEASER_MAX_CHARS + TEASER_ELLIPSIS.length);
       expect(redacted.output?.value).toHaveLength(TEASER_MAX_CHARS + TEASER_ELLIPSIS.length);
       expect(redacted.error?.message).toHaveLength(TEASER_MAX_CHARS + TEASER_ELLIPSIS.length);
@@ -91,12 +92,14 @@ describe("given a trace beyond the visibility window", () => {
     });
 
     it("marks the trace as redacted by the visibility window", () => {
-      expect(redactTraceContent(makeTrace()).redacted_by_visibility_window).toBe(true);
+      expect(
+        VisibilityWindowService.redactTraceContent(makeTrace()).redacted_by_visibility_window,
+      ).toBe(true);
     });
 
     it("keeps metadata, metrics, and timestamps unchanged", () => {
       const trace = makeTrace();
-      const redacted = redactTraceContent(trace);
+      const redacted = VisibilityWindowService.redactTraceContent(trace);
       expect(redacted.metadata).toEqual(trace.metadata);
       expect(redacted.metrics).toEqual(trace.metrics);
       expect(redacted.timestamps).toEqual(trace.timestamps);
@@ -105,16 +108,16 @@ describe("given a trace beyond the visibility window", () => {
 
     it("does not mutate the original trace", () => {
       const trace = makeTrace();
-      redactTraceContent(trace);
+      VisibilityWindowService.redactTraceContent(trace);
       expect(trace.input?.value).toHaveLength(5000);
     });
   });
 });
 
 describe("given a span beyond the visibility window", () => {
-  describe("when redactSpanContent runs on well-formed payloads", () => {
+  describe("when VisibilityWindowService.redactSpanContent runs on well-formed payloads", () => {
     it("truncates text input and output values to the teaser", () => {
-      const redacted = redactSpanContent(makeSpan());
+      const redacted = VisibilityWindowService.redactSpanContent(makeSpan());
       expect((redacted.input as { value: string }).value).toHaveLength(
         TEASER_MAX_CHARS + TEASER_ELLIPSIS.length,
       );
@@ -124,7 +127,7 @@ describe("given a span beyond the visibility window", () => {
     });
 
     it("truncates string param values but keeps non-string params", () => {
-      const redacted = redactSpanContent(makeSpan());
+      const redacted = VisibilityWindowService.redactSpanContent(makeSpan());
       const params = redacted.params as Record<string, unknown>;
       expect((params.system_prompt as string).length).toBeLessThanOrEqual(
         TEASER_MAX_CHARS + TEASER_ELLIPSIS.length,
@@ -142,7 +145,7 @@ describe("given a span beyond the visibility window", () => {
           ],
         },
       });
-      const redacted = redactSpanContent(span);
+      const redacted = VisibilityWindowService.redactSpanContent(span);
       const messages = (redacted.input as { value: { content?: string | null }[] }).value;
       expect(messages[0]?.content).toHaveLength(TEASER_MAX_CHARS + TEASER_ELLIPSIS.length);
       expect(messages[1]?.content).toBe("hi");
@@ -150,7 +153,7 @@ describe("given a span beyond the visibility window", () => {
 
     it("keeps span name, type, timestamps, and metrics visible", () => {
       const span = makeSpan();
-      const redacted = redactSpanContent(span);
+      const redacted = VisibilityWindowService.redactSpanContent(span);
       expect(redacted.name).toBe(span.name);
       expect(redacted.type).toBe(span.type);
       expect(redacted.timestamps).toEqual(span.timestamps);
@@ -164,18 +167,18 @@ describe("given a span beyond the visibility window", () => {
           stacktrace: ["t".repeat(2000)],
         },
       });
-      const redacted = redactSpanContent(span);
+      const redacted = VisibilityWindowService.redactSpanContent(span);
       // 2000-char message -> ceil(10%) = 200 kept
       expect(redacted.error?.message).toHaveLength(200 + TEASER_ELLIPSIS.length);
     });
   });
 
-  describe("when redactSpanContent runs on malformed or rich payloads", () => {
+  describe("when VisibilityWindowService.redactSpanContent runs on malformed or rich payloads", () => {
     it("teases a chat_messages value that is not an array as raw", () => {
       const span = makeSpan({
         input: { type: "chat_messages", value: "x".repeat(2000) } as never,
       });
-      const redacted = redactSpanContent(span);
+      const redacted = VisibilityWindowService.redactSpanContent(span);
       expect(redacted.input?.type).toBe("raw");
       expect((redacted.input as { value: string }).value).toHaveLength(
         200 + TEASER_ELLIPSIS.length,
@@ -197,7 +200,7 @@ describe("given a span beyond the visibility window", () => {
           ],
         } as never,
       });
-      const redacted = redactSpanContent(span);
+      const redacted = VisibilityWindowService.redactSpanContent(span);
       const content = (redacted.input as { value: { content: unknown[] }[] }).value[0]!
         .content as Record<string, unknown>[];
       expect((content[0]!.text as string).length).toBeLessThanOrEqual(
@@ -212,7 +215,7 @@ describe("given a span beyond the visibility window", () => {
       const span = makeSpan({
         input: { type: "list", value: { nested: "y".repeat(5000) } } as never,
       });
-      const redacted = redactSpanContent(span);
+      const redacted = VisibilityWindowService.redactSpanContent(span);
       expect(redacted.input?.type).toBe("raw");
       expect((redacted.input as { value: string }).value.length).toBeLessThanOrEqual(
         TEASER_MAX_CHARS + TEASER_ELLIPSIS.length,

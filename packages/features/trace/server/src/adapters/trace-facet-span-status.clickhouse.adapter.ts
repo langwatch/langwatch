@@ -20,20 +20,26 @@ import type { ExpressionCategoricalDef } from "./trace-facet-registry.clickhouse
 const STATUS_EXPRESSION =
   "if(ifNull(StatusCode, 0) = 2, 'error', if(ifNull(StatusCode, 0) = 1, 'ok', 'unset'))";
 
-/**
- * Span Status facet: surfaces the OTel status of any span on the trace.
- *
- * Cross-table categorical against `stored_spans` — auto-translated into
- * an `IN`-tuple subquery joining back on TraceId. There's no roll-up
- * column on `trace_summaries` for span-level status today; if discover
- * latency on this facet ever becomes a problem, the right move is a
- * `ContainsErrorSpanStatus` flag at ingest, not a faster ad-hoc query.
- */
-export const SPAN_STATUS_FACET: ExpressionCategoricalDef = {
-  key: "spanStatus",
-  kind: "categorical",
-  label: "Span status",
-  group: "span",
-  table: "stored_spans",
-  expression: STATUS_EXPRESSION,
-};
+export class ClickHouseSpanStatusFacetAdapter {
+  static create(): ClickHouseSpanStatusFacetAdapter {
+    return new ClickHouseSpanStatusFacetAdapter();
+  }
+
+  /**
+   * Span Status facet: surfaces the OTel status of any span on the trace.
+   *
+   * Cross-table categorical against `stored_spans` — auto-translated into
+   * an `IN`-tuple subquery joining back on TraceId. There's no roll-up
+   * column on `trace_summaries` for span-level status today; if discover
+   * latency on this facet ever becomes a problem, the right move is a
+   * `ContainsErrorSpanStatus` flag at ingest, not a faster ad-hoc query.
+   */
+  static readonly SPAN_STATUS_FACET: ExpressionCategoricalDef = {
+    key: "spanStatus",
+    kind: "categorical",
+    label: "Span status",
+    group: "span",
+    table: "stored_spans",
+    expression: STATUS_EXPRESSION,
+  };
+}

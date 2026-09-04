@@ -1,21 +1,21 @@
+import { ClickHouseFacetRegistryAdapter } from "../trace-facet-registry.clickhouse.adapter";
 import { describe, expect, it } from "vitest";
 import { FilterFieldUnknownError, type DerivedTraceEvent } from "@langwatch/trace-contract";
 import {
   type ExpressionCategoricalDef,
-  FACET_REGISTRY,
   type RangeFacetDef,
 } from "../trace-facet-registry.clickhouse.adapter";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
-import { TraceQueryClickHouse } from "../trace-query.clickhouse.adapter";
-import { TraceQueryEvaluationService } from "../../services/trace-query-evaluation.service";
+import { TraceQueryClickHouseAdapter } from "../trace-query.clickhouse.adapter";
+import { TraceQueryEvaluationAdapter } from "../../adapters/trace-query-evaluation.adapter";
 
-const evaluateQueryInMemory = TraceQueryEvaluationService.matches;
-const queryNeeds = TraceQueryEvaluationService.needs;
+const evaluateQueryInMemory = TraceQueryEvaluationAdapter.matches;
+const queryNeeds = TraceQueryEvaluationAdapter.needs;
 import {
   type InMemoryTrace,
   type TraceQueryEvaluationRun,
   UNSUPPORTED,
-} from "../trace-query-evaluation.adapter";
+} from "../trace-query-evaluation.types";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -660,7 +660,7 @@ const hasExpression = (d: unknown): d is ExpressionFacet =>
   typeof d === "object" && d !== null && "expression" in d;
 
 /** The facets `build-handlers` auto-derives BOTH sides from (SQL + read). */
-const autoDerived = FACET_REGISTRY.filter(
+const autoDerived = ClickHouseFacetRegistryAdapter.FACET_REGISTRY.filter(
   (d): d is ExpressionFacet => hasExpression(d) && d.read != null,
 );
 
@@ -701,10 +701,14 @@ describe("FieldDef SQL/read parity", () => {
       "[%s] compiles against its registry expression",
       (key, def) => {
         const literal = def.kind === "range" ? "1" : "x";
-        const compiled = TraceQueryClickHouse.translateFilter(`${key}:${literal}`, "tenant-1", {
-          from: 0,
-          to: 1,
-        });
+        const compiled = TraceQueryClickHouseAdapter.translateFilter(
+          `${key}:${literal}`,
+          "tenant-1",
+          {
+            from: 0,
+            to: 1,
+          },
+        );
         expect(compiled?.sql).toContain(def.expression);
       },
     );
@@ -751,7 +755,7 @@ describe("given a filter field that collides with an Object.prototype member", (
   describe("when the save-time gate compiles it", () => {
     it.each(PROTOTYPE_FIELDS)("[%s] is rejected as an unknown field", (field) => {
       expect(() =>
-        TraceQueryClickHouse.translateFilter(`${field}:x`, "tenant-1", {
+        TraceQueryClickHouseAdapter.translateFilter(`${field}:x`, "tenant-1", {
           from: 0,
           to: 1,
         }),
@@ -854,7 +858,7 @@ describe("the in-memory free-text narrowing", () => {
 
     // The same filter compiled for ClickHouse does reach span names, which is
     // the asymmetry the spec records.
-    const compiled = TraceQueryClickHouse.translateFilter("codex", "tenant-1", {
+    const compiled = TraceQueryClickHouseAdapter.translateFilter("codex", "tenant-1", {
       from: 0,
       to: 1,
     });
@@ -887,7 +891,7 @@ describe("the in-memory free-text narrowing", () => {
 
 describe("free text compiled to ClickHouse", () => {
   function compile(query: string) {
-    return TraceQueryClickHouse.translateFilter(query, "tenant-1", {
+    return TraceQueryClickHouseAdapter.translateFilter(query, "tenant-1", {
       from: 1000,
       to: 2000,
     });

@@ -93,6 +93,10 @@ function buildBaseWhere(
 }
 
 export class SessionGroupsClickHouseRepository implements SessionGroupsRepository {
+  static create(resolveClient: ClickHouseClientResolver): SessionGroupsClickHouseRepository {
+    return new SessionGroupsClickHouseRepository(resolveClient);
+  }
+
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   async findSessionGroups(query: SessionGroupsQuery): Promise<SessionGroupsPage> {

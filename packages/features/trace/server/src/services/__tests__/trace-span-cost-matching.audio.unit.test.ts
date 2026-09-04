@@ -1,6 +1,6 @@
+import { TraceSpanCostMatchingService } from "../trace-span-cost-matching.service";
 import { describe, expect, it } from "vitest";
 import { getProviderModelOptions } from "@langwatch/model-provider-contract";
-import { computeSpanCost } from "../trace-span-cost-matching.service";
 
 // Catalog rates under test (model-catalog.overlay.json): flash v2 $0.05/1k
 // chars, scribe $0.22/hour, gpt-4o-transcribe $2.50/$10.00 per million
@@ -19,7 +19,7 @@ const REALTIME_AUDIO_OUT = 6.4e-5;
 describe("audio model cost", () => {
   /** @scenario "a text-to-speech call is costed by the characters it spoke" */
   it("prices a TTS span from gen_ai.usage.input_chars", () => {
-    const result = computeSpanCost({
+    const result = TraceSpanCostMatchingService.computeSpanCost({
       attrs: {
         "gen_ai.request.model": "elevenlabs/eleven_flash_v2",
         "gen_ai.usage.input_chars": 1000,
@@ -32,7 +32,7 @@ describe("audio model cost", () => {
 
   /** @scenario "a transcription call is costed by the audio it heard" */
   it("prices an STT span from gen_ai.usage.audio_seconds", () => {
-    const result = computeSpanCost({
+    const result = TraceSpanCostMatchingService.computeSpanCost({
       attrs: {
         "gen_ai.request.model": "elevenlabs/scribe_v1",
         "gen_ai.usage.audio_seconds": 60,
@@ -45,7 +45,7 @@ describe("audio model cost", () => {
 
   /** @scenario "an audio call with no token usage still gets a cost" */
   it("consults the registry when only audio usage is present, and not when nothing is", () => {
-    const withAudio = computeSpanCost({
+    const withAudio = TraceSpanCostMatchingService.computeSpanCost({
       attrs: {
         "gen_ai.request.model": "elevenlabs/eleven_flash_v2",
         "gen_ai.usage.input_chars": 500,
@@ -55,7 +55,7 @@ describe("audio model cost", () => {
     });
     expect(withAudio).toBeGreaterThan(0);
 
-    const withNothing = computeSpanCost({
+    const withNothing = TraceSpanCostMatchingService.computeSpanCost({
       attrs: { "gen_ai.request.model": "elevenlabs/eleven_flash_v2" },
       promptTokens: 0,
       completionTokens: 0,
@@ -65,7 +65,7 @@ describe("audio model cost", () => {
 
   /** @scenario "a model priced only by audio usage is never silently free" */
   it("prices every catalog entry with an audio-only rate above zero", () => {
-    const ttsResult = computeSpanCost({
+    const ttsResult = TraceSpanCostMatchingService.computeSpanCost({
       attrs: {
         "gen_ai.request.model": "elevenlabs/eleven_flash_v2",
         "gen_ai.usage.input_chars": 2000,
@@ -75,7 +75,7 @@ describe("audio model cost", () => {
     });
     expect(ttsResult).toBeCloseTo(2000 * FLASH_PER_CHAR, 10);
 
-    const sttResult = computeSpanCost({
+    const sttResult = TraceSpanCostMatchingService.computeSpanCost({
       attrs: {
         "gen_ai.request.model": "elevenlabs/scribe_v1",
         "gen_ai.usage.audio_seconds": 3600,
@@ -86,7 +86,7 @@ describe("audio model cost", () => {
     expect(sttResult).toBeCloseTo(3600 * SCRIBE_PER_SECOND, 10);
 
     // A model with no catalog entry at all reports zero, not undefined.
-    const unknownResult = computeSpanCost({
+    const unknownResult = TraceSpanCostMatchingService.computeSpanCost({
       attrs: {
         "gen_ai.request.model": "nonexistent-provider/no-such-model",
         "gen_ai.usage.input_chars": 100,
@@ -101,7 +101,7 @@ describe("audio model cost", () => {
     describe("when the span is costed", () => {
       /** @scenario "gpt-4o-transcribe bills at its own audio rate, not gpt-4o's chat rate" */
       it("prices gpt-4o-transcribe from the tokens it reports", () => {
-        const result = computeSpanCost({
+        const result = TraceSpanCostMatchingService.computeSpanCost({
           attrs: {
             "gen_ai.request.model": "openai/gpt-4o-transcribe",
             "gen_ai.usage.input_audio_tokens": 65,
@@ -119,7 +119,7 @@ describe("audio model cost", () => {
     describe("when the span is costed", () => {
       /** @scenario "the duration-priced transcribe model bills by the second" */
       it("prices gpt-transcribe per second", () => {
-        const result = computeSpanCost({
+        const result = TraceSpanCostMatchingService.computeSpanCost({
           attrs: {
             "gen_ai.request.model": "openai/gpt-transcribe",
             "gen_ai.usage.audio_seconds": 60,
@@ -136,7 +136,7 @@ describe("audio model cost", () => {
     describe("when the span is costed", () => {
       /** @scenario "an audio turn costs the audio rate on the trace, not the text rate" */
       it("prices audio tokens apart from the text totals on a span", () => {
-        const result = computeSpanCost({
+        const result = TraceSpanCostMatchingService.computeSpanCost({
           attrs: {
             "gen_ai.request.model": "openai/gpt-realtime",
             "gen_ai.usage.input_audio_tokens": 800,
@@ -155,7 +155,7 @@ describe("audio model cost", () => {
 
         // The same 1300 tokens priced flat at the text rate, which is what the
         // trace charged while the budget charged the audio rate.
-        const asIfText = computeSpanCost({
+        const asIfText = TraceSpanCostMatchingService.computeSpanCost({
           attrs: { "gen_ai.request.model": "openai/gpt-realtime" },
           promptTokens: 1000,
           completionTokens: 300,
@@ -170,7 +170,7 @@ describe("audio model cost", () => {
     describe("when each model id is matched", () => {
       /** @scenario "each transcribe model matches its own rate, not a shorter neighbour's" */
       it("keeps the transcribe entries from capturing each other", () => {
-        const perSecond = computeSpanCost({
+        const perSecond = TraceSpanCostMatchingService.computeSpanCost({
           attrs: {
             "gen_ai.request.model": "openai/gpt-transcribe",
             "gen_ai.usage.audio_seconds": 60,
@@ -180,7 +180,7 @@ describe("audio model cost", () => {
         });
         expect(perSecond).toBeCloseTo(60 * GPT_TRANSCRIBE_PER_SECOND, 12);
 
-        const mini = computeSpanCost({
+        const mini = TraceSpanCostMatchingService.computeSpanCost({
           attrs: { "gen_ai.request.model": "openai/gpt-4o-mini-transcribe" },
           promptTokens: 0,
           completionTokens: 100,
@@ -189,7 +189,7 @@ describe("audio model cost", () => {
 
         // A diarize call has no published rate of its own and OpenAI charges it
         // the same as gpt-4o-transcribe, so the prefix match is the right answer.
-        const diarize = computeSpanCost({
+        const diarize = TraceSpanCostMatchingService.computeSpanCost({
           attrs: { "gen_ai.request.model": "openai/gpt-4o-transcribe-diarize" },
           promptTokens: 0,
           completionTokens: 100,

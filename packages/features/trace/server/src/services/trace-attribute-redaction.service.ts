@@ -34,12 +34,12 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
  * records — a trace's spans and their events — compiles them once and reuses
  * them, rather than passing a matcher list from call to call.
  */
-export class TraceAttributeRedactor {
-  static for(hidden: Protections["hiddenAttributes"]): TraceAttributeRedactor {
+export class TraceAttributeRedactionService {
+  static create(hidden: Protections["hiddenAttributes"]): TraceAttributeRedactionService {
     const rules = hidden ?? [];
     const compiled = compileAttributePatterns(rules.map((rule) => rule.pattern));
 
-    return new TraceAttributeRedactor(
+    return new TraceAttributeRedactionService(
       compiled.map((matcher, index) => ({
         ...matcher,
         visibleTo: rules[index]?.visibleTo ?? "no one",

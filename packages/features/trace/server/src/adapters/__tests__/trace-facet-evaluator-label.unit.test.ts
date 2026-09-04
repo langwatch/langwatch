@@ -1,13 +1,13 @@
+import { ClickHouseFacetRegistryAdapter } from "../trace-facet-registry.clickhouse.adapter";
 import { describe, expect, it } from "vitest";
-import { FACET_REGISTRY } from "../trace-facet-registry.clickhouse.adapter";
-import { TraceQueryClickHouse } from "../trace-query.clickhouse.adapter";
+import { TraceQueryClickHouseAdapter } from "../trace-query.clickhouse.adapter";
 import { SEARCH_FIELDS } from "@langwatch/trace-contract";
 
 const TENANT = "project_test";
 const TIME_RANGE = { from: 1714435200000, to: 1715040000000 };
 
 const translate = (query: string) =>
-  TraceQueryClickHouse.translateFilter(query, TENANT, TIME_RANGE);
+  TraceQueryClickHouseAdapter.translateFilter(query, TENANT, TIME_RANGE);
 
 /**
  * `evaluatorLabel` is wired the same way as `evaluatorVerdict`: a categorical
@@ -17,8 +17,10 @@ const translate = (query: string) =>
  */
 describe("evaluatorLabel facet", () => {
   describe("when registered", () => {
-    it("lives in FACET_REGISTRY as an evaluation_runs categorical on Label", () => {
-      const def = FACET_REGISTRY.find((d) => d.key === "evaluatorLabel");
+    it("lives in ClickHouseFacetRegistryAdapter.FACET_REGISTRY as an evaluation_runs categorical on Label", () => {
+      const def = ClickHouseFacetRegistryAdapter.FACET_REGISTRY.find(
+        (d) => d.key === "evaluatorLabel",
+      );
       expect(def).toBeDefined();
       expect(def).toMatchObject({
         kind: "categorical",

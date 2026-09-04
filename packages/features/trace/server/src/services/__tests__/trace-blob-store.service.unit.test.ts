@@ -1,5 +1,5 @@
 /**
- * Unit tests for BlobStore spool operations (ADR-022 write/read path).
+ * Unit tests for TraceBlobStoreService spool operations (ADR-022 write/read path).
  *
  * Covers: putSpool, getSpool, deleteSpool across every storage destination, the
  * v1 reference format retained for the rollout, and the property that a
@@ -14,7 +14,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { StoredObjectStorageDestination as ProjectStorageDestination } from "@langwatch/stored-object-contract";
 import { StreamTooLargeError } from "../trace-stream-buffer.service";
 import {
-  BlobStore,
+  TraceBlobStoreService,
   MAX_SPOOL_BYTES,
   type S3ClientResolver,
   SPOOL_REF_V2,
@@ -150,7 +150,7 @@ describe("putSpool — given each supported storage destination", () => {
       "writes to the $name destination the deployment resolved",
       async ({ destination, expectedUri }) => {
         const objectStore = fakeObjectStore();
-        const store = new BlobStore({
+        const store = new TraceBlobStoreService({
           resolveS3Client: forbiddenS3Resolver,
           spoolStorage: spoolStorageFor(objectStore, destination),
         });
@@ -170,7 +170,7 @@ describe("putSpool — given a span payload body", () => {
   describe("when putSpool is called", () => {
     it("returns a reference carrying no storage location", async () => {
       const objectStore = fakeObjectStore();
-      const store = new BlobStore({
+      const store = new TraceBlobStoreService({
         resolveS3Client: forbiddenS3Resolver,
         spoolStorage: spoolStorageFor(objectStore, AZURE_DESTINATION),
       });
@@ -187,7 +187,7 @@ describe("putSpool — given a span payload body", () => {
 
     it("issues exactly ONE write", async () => {
       const objectStore = fakeObjectStore();
-      const store = new BlobStore({
+      const store = new TraceBlobStoreService({
         resolveS3Client: forbiddenS3Resolver,
         spoolStorage: spoolStorageFor(objectStore, S3_DESTINATION),
       });
@@ -206,7 +206,7 @@ describe("putSpool — given an OTLP id containing a path separator", () => {
   describe("when putSpool is called", () => {
     it("reduces the id to one path component so nothing can escape the prefix", async () => {
       const objectStore = fakeObjectStore();
-      const store = new BlobStore({
+      const store = new TraceBlobStoreService({
         resolveS3Client: forbiddenS3Resolver,
         spoolStorage: spoolStorageFor(objectStore, S3_DESTINATION),
       });
@@ -238,7 +238,7 @@ describe("putSpool — given an OTLP id containing a path separator", () => {
 
     it("derives the same location on read and delete", async () => {
       const objectStore = fakeObjectStore();
-      const store = new BlobStore({
+      const store = new TraceBlobStoreService({
         resolveS3Client: forbiddenS3Resolver,
         spoolStorage: spoolStorageFor(objectStore, S3_DESTINATION),
       });
@@ -259,7 +259,7 @@ describe("putSpool — given Azure storage whose orphan retention is unconfirmed
   describe("when putSpool is called", () => {
     it("refuses rather than writing an object no lifecycle rule will reap", async () => {
       const objectStore = fakeObjectStore();
-      const store = new BlobStore({
+      const store = new TraceBlobStoreService({
         resolveS3Client: forbiddenS3Resolver,
         spoolStorage: {
           objectStoreFor: () => objectStore,
@@ -284,7 +284,7 @@ describe("putSpool — given Azure storage whose orphan retention is unconfirmed
     });
 
     it("names the policy to create and the setting to flip", async () => {
-      const store = new BlobStore({
+      const store = new TraceBlobStoreService({
         resolveS3Client: forbiddenS3Resolver,
         spoolStorage: {
           objectStoreFor: () => fakeObjectStore(),
@@ -321,7 +321,7 @@ describe("given Azure retention was confirmed at write time and is unconfirmed n
    * prevent.
    */
   function storeAfterFlip(objectStore: ReturnType<typeof fakeObjectStore>) {
-    return new BlobStore({
+    return new TraceBlobStoreService({
       resolveS3Client: forbiddenS3Resolver,
       spoolStorage: {
         objectStoreFor: () => objectStore,
@@ -335,7 +335,7 @@ describe("given Azure retention was confirmed at write time and is unconfirmed n
     it("still returns the payload", async () => {
       const objectStore = fakeObjectStore();
       const body = Buffer.from("the full oversized payload", "utf-8");
-      const spoolRef = await new BlobStore({
+      const spoolRef = await new TraceBlobStoreService({
         resolveS3Client: forbiddenS3Resolver,
         spoolStorage: spoolStorageFor(objectStore, AZURE_DESTINATION),
       }).putSpool({ ...spoolCoords, body });
@@ -352,7 +352,7 @@ describe("given Azure retention was confirmed at write time and is unconfirmed n
   describe("when the worker deletes a span spooled before the flip", () => {
     it("still removes the object", async () => {
       const objectStore = fakeObjectStore();
-      const spoolRef = await new BlobStore({
+      const spoolRef = await new TraceBlobStoreService({
         resolveS3Client: forbiddenS3Resolver,
         spoolStorage: spoolStorageFor(objectStore, AZURE_DESTINATION),
       }).putSpool({
@@ -374,7 +374,7 @@ describe("putSpool — given S3 storage with retention unconfirmed", () => {
   describe("when putSpool is called", () => {
     it("still writes, because the flag scopes to Azure only", async () => {
       const objectStore = fakeObjectStore();
-      const store = new BlobStore({
+      const store = new TraceBlobStoreService({
         resolveS3Client: forbiddenS3Resolver,
         spoolStorage: {
           objectStoreFor: () => objectStore,
@@ -400,7 +400,7 @@ describe("putSpool — given the project's storage is the local filesystem", () 
   describe("when putSpool is called", () => {
     it("refuses rather than writing an object nothing will ever reap", async () => {
       const objectStore = fakeObjectStore();
-      const store = new BlobStore({
+      const store = new TraceBlobStoreService({
         resolveS3Client: forbiddenS3Resolver,
         spoolStorage: spoolStorageFor(objectStore, FILE_DESTINATION),
       });
@@ -422,7 +422,7 @@ describe("putSpool — given the project's storage is the local filesystem", () 
 describe("putSpool — given no spool storage is configured", () => {
   describe("when putSpool is called", () => {
     it("throws rather than falling back to a hardcoded backend", async () => {
-      const store = new BlobStore({ resolveS3Client: forbiddenS3Resolver });
+      const store = new TraceBlobStoreService({ resolveS3Client: forbiddenS3Resolver });
 
       await expect(
         store.putSpool({
@@ -438,7 +438,7 @@ describe("getSpool — given a spool object written by putSpool", () => {
   describe("when getSpool is called with the command's own coordinates", () => {
     it("returns the exact bytes that were put", async () => {
       const objectStore = fakeObjectStore();
-      const store = new BlobStore({
+      const store = new TraceBlobStoreService({
         resolveS3Client: forbiddenS3Resolver,
         spoolStorage: spoolStorageFor(objectStore, AZURE_DESTINATION),
       });
@@ -459,7 +459,7 @@ describe("getSpool — given a reference naming another tenant's object", () => 
   describe("when getSpool is called", () => {
     it("reads the location derived from the command, ignoring the reference", async () => {
       const objectStore = fakeObjectStore();
-      const store = new BlobStore({
+      const store = new TraceBlobStoreService({
         resolveS3Client: forbiddenS3Resolver,
         spoolStorage: spoolStorageFor(objectStore, S3_DESTINATION),
       });
@@ -497,7 +497,7 @@ describe("getSpool — given a v1-shaped reference naming another tenant", () =>
         `test-bucket/${victimKey}`,
         Buffer.from("another tenant's payload", "utf-8"),
       );
-      const store = new BlobStore({
+      const store = new TraceBlobStoreService({
         resolveS3Client: resolverFor(fake),
         spoolStorage: spoolStorageFor(fakeObjectStore(), S3_DESTINATION),
       });
@@ -518,7 +518,7 @@ describe("getSpool — given a v1 reference written before this deployment", () 
       fake.objects.set(`test-bucket/${legacyKey}`, legacyBytes);
 
       const objectStore = fakeObjectStore();
-      const store = new BlobStore({
+      const store = new TraceBlobStoreService({
         resolveS3Client: resolverFor(fake),
         spoolStorage: spoolStorageFor(objectStore, AZURE_DESTINATION),
       });
@@ -550,7 +550,7 @@ describe("getSpool — given a v1 object larger than the read cap", () => {
           ),
         })),
       };
-      const store = new BlobStore({
+      const store = new TraceBlobStoreService({
         resolveS3Client: async () => ({
           s3Client: oversizedS3 as never,
           s3Bucket: "test-bucket",
@@ -584,7 +584,7 @@ describe("getSpool — given an object larger than the read cap", () => {
           })(),
         ),
       );
-      const store = new BlobStore({
+      const store = new TraceBlobStoreService({
         resolveS3Client: forbiddenS3Resolver,
         spoolStorage: spoolStorageFor(objectStore, S3_DESTINATION),
       });
@@ -600,7 +600,7 @@ describe("getSpool — given the object is missing", () => {
   describe("when getSpool is called", () => {
     it("throws rather than returning an empty span", async () => {
       const objectStore = fakeObjectStore();
-      const store = new BlobStore({
+      const store = new TraceBlobStoreService({
         resolveS3Client: forbiddenS3Resolver,
         spoolStorage: spoolStorageFor(objectStore, S3_DESTINATION),
       });
@@ -614,7 +614,7 @@ describe("deleteSpool — given an existing spool object", () => {
   describe("when deleteSpool is called", () => {
     it("deletes the object it wrote", async () => {
       const objectStore = fakeObjectStore();
-      const store = new BlobStore({
+      const store = new TraceBlobStoreService({
         resolveS3Client: forbiddenS3Resolver,
         spoolStorage: spoolStorageFor(objectStore, AZURE_DESTINATION),
       });
@@ -640,7 +640,7 @@ describe("deleteSpool — given a v1 reference", () => {
       const legacyKey = "trace-blobs/spool/orgA/trace-1/span-1";
       fake.objects.set(`test-bucket/${legacyKey}`, Buffer.from("old"));
       const objectStore = fakeObjectStore();
-      const store = new BlobStore({
+      const store = new TraceBlobStoreService({
         resolveS3Client: resolverFor(fake),
         spoolStorage: spoolStorageFor(objectStore, AZURE_DESTINATION),
       });
@@ -658,7 +658,7 @@ describe("deleteSpool — given the storage backend rejects the delete", () => {
     it("does not throw (best-effort — the lifecycle rule is the safety net)", async () => {
       const objectStore = fakeObjectStore();
       objectStore.delete.mockRejectedValueOnce(new Error("AccessDenied"));
-      const store = new BlobStore({
+      const store = new TraceBlobStoreService({
         resolveS3Client: forbiddenS3Resolver,
         spoolStorage: spoolStorageFor(objectStore, S3_DESTINATION),
       });

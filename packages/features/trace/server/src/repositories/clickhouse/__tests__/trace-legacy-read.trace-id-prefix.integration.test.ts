@@ -8,9 +8,9 @@
  *
  * Was
  * `platform/app/src/server/traces/__tests__/clickhouse-trace-prefix.integration.test.ts`,
- * against `ClickHouseTraceService` from `clickhouse-trace.service.ts`. The
+ * against `TraceLegacyReadClickHouseRepository` from `clickhouse-trace.service.ts`. The
  * class now lives here as `trace-legacy-read.repository.ts`, built via
- * `ClickHouseTraceService.create({ prisma, resolveClickHouseClient,
+ * `TraceLegacyReadClickHouseRepository.create({ prisma, resolveClickHouseClient,
  * traceCanonicalisation })` rather than resolving its client through a
  * mocked application singleton.
  */
@@ -19,7 +19,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { ClickHouseTraceService } from "../trace-legacy-read.repository";
+import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
@@ -84,12 +84,12 @@ async function insertTraceSummary(
 const occurredAtRange = { from: now - 60_000, to: now + 60_000 };
 
 let ch: ClickHouseClient;
-let service: ClickHouseTraceService;
+let service: TraceLegacyReadClickHouseRepository;
 
-integration("ClickHouseTraceService.resolveTraceIdByPrefix (integration)", () => {
+integration("TraceLegacyReadClickHouseRepository.resolveTraceIdByPrefix (integration)", () => {
   beforeAll(async () => {
     ch = createTestClickHouseClient(clickHouseUrl!);
-    service = ClickHouseTraceService.create({
+    service = TraceLegacyReadClickHouseRepository.create({
       prisma: {} as never,
       resolveClickHouseClient: async () => ch,
       traceCanonicalisation: TraceCanonicalisationService.create(),

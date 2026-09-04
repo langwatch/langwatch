@@ -5,8 +5,8 @@
  * (specs/trace-processing/trace-media-blob-extraction.feature — the marker
  * gate and the walker/collector agreement):
  *
- *  1. `isExtractableMediaPart` (the sync classifier the extraction walker
- *     stops on) agrees with `processContentPart` (the store-side rewriter)
+ *  1. `TraceValueMediaExtractionService.isExtractableMediaPart` (the sync classifier the extraction walker
+ *     stops on) agrees with `TraceContentExtractionService.processContentPart` (the store-side rewriter)
  *     for every canonical shape — a disagreement means a part is either
  *     stored twice-walked or silently skipped.
  *  2. The serialized form of every extractable shape trips
@@ -17,19 +17,19 @@
  *     invisible storage cost.
  *
  * Was `platform/app/src/server/stored-objects/__tests__/media-walk-parity.unit.test.ts`.
- * `isExtractableMediaPart` and `processContentPart` now live in this package
+ * `TraceValueMediaExtractionService.isExtractableMediaPart` and `TraceContentExtractionService.processContentPart` now live in this package
  * (`trace-value-media-extraction.service` / `trace-content-extraction.service`);
  * `containsMediaMarkers` and `collectMediaParts` moved to `@langwatch/trace-contract`.
- * The store-side dependency `processContentPart` takes is a `TraceMediaStorePort`
+ * The store-side dependency `TraceContentExtractionService.processContentPart` takes is a `TraceMediaStorePort`
  * now, not the platform's own `StoredObjectsService` — this test fakes that
  * port the way `trace-content-extraction.service.unit.test.ts` already does.
  */
+import { TraceValueMediaExtractionService } from "../trace-value-media-extraction.service";
+import { TraceContentExtractionService } from "../trace-content-extraction.service";
 import { containsMediaMarkers, collectMediaParts } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { TraceMediaStorePort } from "../../ports/trace-media-store.port";
-import { processContentPart } from "../trace-content-extraction.service";
-import { isExtractableMediaPart } from "../trace-value-media-extraction.service";
 import {
   EXTRACTABLE_PART_EXAMPLES,
   NON_EXTRACTABLE_PART_EXAMPLES,
@@ -80,8 +80,8 @@ const RENDER_COLLECTOR_EXAMPLES = EXTRACTABLE_PART_EXAMPLES.filter(
 describe("media walk parity", () => {
   describe.each(EXTRACTABLE_PART_EXAMPLES)("given the extractable shape: $name", ({ part }) => {
     it("is classified extractable, matching the store-side rewriter", async () => {
-      expect(isExtractableMediaPart(part)).toBe(true);
-      const { part: rewritten, ref } = await processContentPart({
+      expect(TraceValueMediaExtractionService.isExtractableMediaPart(part)).toBe(true);
+      const { part: rewritten, ref } = await TraceContentExtractionService.processContentPart({
         part,
         service: makeFakeService(),
         ...PARAMS,
@@ -108,7 +108,7 @@ describe("media walk parity", () => {
     });
 
     it("is surfaced by the render-side collector after extraction", async () => {
-      const { part: rewritten } = await processContentPart({
+      const { part: rewritten } = await TraceContentExtractionService.processContentPart({
         part,
         service: makeFakeService(),
         ...PARAMS,
@@ -122,8 +122,8 @@ describe("media walk parity", () => {
     "given the non-extractable shape: $name",
     ({ part }) => {
       it("is not classified extractable and passes the rewriter untouched", async () => {
-        expect(isExtractableMediaPart(part)).toBe(false);
-        const { part: rewritten, ref } = await processContentPart({
+        expect(TraceValueMediaExtractionService.isExtractableMediaPart(part)).toBe(false);
+        const { part: rewritten, ref } = await TraceContentExtractionService.processContentPart({
           part,
           service: makeFakeService(),
           ...PARAMS,

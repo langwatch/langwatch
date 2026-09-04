@@ -2,19 +2,17 @@ import { describe, expect, it } from "vitest";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
 
 import {
+  ClaudeCodeSpanEnrichmentService,
   type ClaudeContentLog,
   type ClaudeSpanRef,
   type ClaudeToolLog,
   type ClaudeToolSpanRef,
-  computeClaudeInteractionOutput as computeClaudeInteractionOutputWithService,
-  computeClaudeSpanEnrichment as computeClaudeSpanEnrichmentWithService,
-  computeClaudeToolSpanEnrichment as computeClaudeToolSpanEnrichmentWithService,
 } from "../claude-code-span-enrichment.service";
 
 const traceCanonicalisation = TraceCanonicalisationService.create();
 
 function computeClaudeSpanEnrichment(input: { spans: ClaudeSpanRef[]; logs: ClaudeContentLog[] }) {
-  return computeClaudeSpanEnrichmentWithService({
+  return ClaudeCodeSpanEnrichmentService.computeClaudeSpanEnrichment({
     ...input,
     traceCanonicalisation,
   });
@@ -25,7 +23,7 @@ function computeClaudeToolSpanEnrichment(input: {
   toolLogs: ClaudeToolLog[];
   contentLogs: ClaudeContentLog[];
 }) {
-  return computeClaudeToolSpanEnrichmentWithService({
+  return ClaudeCodeSpanEnrichmentService.computeClaudeToolSpanEnrichment({
     ...input,
     traceCanonicalisation,
   });
@@ -37,7 +35,7 @@ function computeClaudeInteractionOutput(input: {
   windowEndMs: number;
   slackMs?: number;
 }) {
-  return computeClaudeInteractionOutputWithService({
+  return ClaudeCodeSpanEnrichmentService.computeClaudeInteractionOutput({
     ...input,
     traceCanonicalisation,
   });

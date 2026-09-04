@@ -23,7 +23,7 @@
  *
  * ADR-022: Single source of truth for the lean shape used by the projection queue.
  *
- * `leanForProjection` is invoked at TWO call sites:
+ * `TraceProjectionLeanService.leanForProjection` is invoked at TWO call sites:
  *   (a) eventSourcingService.ts:242-251 (live, between storeEvents and router.dispatch)
  *   (b) replayExecutor.apply (replay, before invoking projection.apply)
  *
@@ -58,22 +58,6 @@ export const IO_ATTR_KEYS = new Set([
   "gen_ai.output.messages",
 ]);
 
-/** UTF-8-safe truncation to at most `maxBytes`, backing off to a codepoint boundary. */
-export function utf8Preview(value: string, maxBytes: number): string {
-  const buf = Buffer.from(value, "utf8");
-  if (buf.byteLength <= maxBytes) {
-    return value;
-  }
-
-  let end = maxBytes;
-  // 0b10xxxxxx are UTF-8 continuation bytes — don't cut mid-codepoint.
-  while (end > 0 && (buf[end]! & 0xc0) === 0x80) {
-    end--;
-  }
-
-  return buf.subarray(0, end).toString("utf8") + "…";
-}
-
 /**
  * Per-string clamp inside a structure-preserving preview. Generous enough to
  * keep any real chat message readable while guaranteeing a single message can
@@ -102,7 +86,7 @@ function clampLongStrings(value: unknown, depth = 0): unknown {
 
   if (typeof value === "string") {
     return Buffer.byteLength(value, "utf8") > PREVIEW_STRING_CLAMP_BYTES
-      ? utf8Preview(value, PREVIEW_STRING_CLAMP_BYTES)
+      ? TraceProjectionLeanService.utf8Preview(value, PREVIEW_STRING_CLAMP_BYTES)
       : value;
   }
 
@@ -120,113 +104,6 @@ function clampLongStrings(value: unknown, depth = 0): unknown {
   }
 
   return value;
-}
-
-/**
- * Structure-preserving preview for an over-budget IO attribute that holds a
- * JSON payload — the shape every gen_ai.input/output.messages value has.
- *
- * A blind byte cut (`utf8Preview`) turns a chat-messages array into
- * unparseable JSON, and everything computed from the leaned span — the fold's
- * ComputedInput/ComputedOutput, the trace list, the Summary and Conversation
- * views — degrades to a raw JSON blob. A Langy turn's system prompt alone
- * exceeds the 64 KB budget, so EVERY such turn used to lose its "hi".
- *
- * Strategy, in order, always under `maxBytes`:
- *   1. Clamp long string leaves (the giant system prompt) to a per-string cap.
- *   2. Still over and the top level is an array: drop MIDDLE items, keeping
- *      the first message (system/developer context) and as much of the TAIL
- *      as fits — the latest user message and reply live there, and they are
- *      exactly what IO extraction reads.
- *   3. Anything that still cannot fit reports null; the caller falls back to
- *      the byte cut, so this can only ever improve on it.
- *
- * The full value is untouched in event_log (the eventref restores it); this
- * shapes ONLY the preview.
- */
-export function structuredIoPreview(value: string, maxBytes: number): string | null {
-  if (Buffer.byteLength(value, "utf8") > PREVIEW_MAX_SOURCE_BYTES) {
-    return null;
-  }
-
-  const trimmed = value.trim();
-  if (!trimmed.startsWith("[") && !trimmed.startsWith("{")) {
-    return null;
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(trimmed);
-  } catch {
-    return null;
-  }
-
-  if (parsed === null || typeof parsed !== "object") {
-    return null;
-  }
-
-  const clamped = clampLongStrings(parsed);
-  const clampedJson = JSON.stringify(clamped);
-  if (Buffer.byteLength(clampedJson, "utf8") <= maxBytes) {
-    return clampedJson;
-  }
-
-  if (!Array.isArray(clamped)) {
-    return null;
-  }
-
-  const first = clamped[0];
-  const firstSize = Buffer.byteLength(JSON.stringify(first), "utf8");
-  // Brackets plus the first item; each kept tail item costs its size plus a comma.
-  let budget = maxBytes - firstSize - 2;
-  const tail: unknown[] = [];
-  for (let i = clamped.length - 1; i >= 1; i--) {
-    const cost = Buffer.byteLength(JSON.stringify(clamped[i]), "utf8") + 1;
-    if (cost > budget) {
-      break;
-    }
-
-    tail.unshift(clamped[i]);
-    budget -= cost;
-  }
-
-  if (tail.length === 0 && clamped.length > 1) {
-    return null;
-  }
-
-  const preview = JSON.stringify([first, ...tail]);
-
-  return Buffer.byteLength(preview, "utf8") <= maxBytes ? preview : null;
-}
-
-/**
- * Rewrites over-threshold IO attribute values to a preview (≤ IO_PREVIEW_BYTES) and attaches
- * a `langwatch.reserved.eventref.<attrKey>` pointer carrying `{ field: <attrKey> }`.
- *
- * - SpanReceived: for each IO attr in IO_ATTR_KEYS that exceeds IO_PREVIEW_BYTES bytes,
- *   replaces the value with a UTF-8-safe preview and attaches an eventref.
- * - LogRecordReceived: if body exceeds IO_PREVIEW_BYTES bytes, replaces body with preview
- *   and attaches eventref.body.
- * - Other event types: pass through unchanged (no-op).
- *
- * The returned event is deeply independent of the input — no shared array references —
- * so mutations to the leaned event do not ripple back to the event stored in event_log.
- *
- * @param event - The event to lean.
- * @returns A new event with IO attributes replaced by previews + eventrefs, or the original
- *   event if no leaning was necessary.
- */
-export function leanForProjection<EventType extends Event>(event: EventType): EventType;
-export function leanForProjection(event: Event): Event {
-  if (event.type === SPAN_RECEIVED_EVENT_TYPE) {
-    return leanSpanReceivedEvent(event);
-  }
-
-  if (event.type === LOG_RECORD_RECEIVED_EVENT_TYPE) {
-    return leanLogRecordReceivedEvent(event);
-  }
-
-  return event;
 }
 
 /**
@@ -308,12 +185,14 @@ function leanSpanReceivedEvent(event: Event): Event {
         // VALID JSON under the budget so the fold still extracts the real
         // user/assistant text. The byte cut is the fallback for non-JSON.
         const preview =
-          structuredIoPreview(attr.value.stringValue, IO_PREVIEW_BYTES) ??
-          utf8Preview(attr.value.stringValue, IO_PREVIEW_BYTES);
+          TraceProjectionLeanService.structuredIoPreview(
+            attr.value.stringValue,
+            IO_PREVIEW_BYTES,
+          ) ?? TraceProjectionLeanService.utf8Preview(attr.value.stringValue, IO_PREVIEW_BYTES);
         ioLeanedAttrs.push({ key: attr.key, value: { stringValue: preview } });
         // ADR-022: embed event.id so the read path can JOIN event_log by
         // EventId without guessing. The eventref carries `{field, eventId}`;
-        // the read path uses both in `BlobStore.getFromEventLog`.
+        // the read path uses both in `TraceBlobStoreService.getFromEventLog`.
         eventrefAttrs.push({
           key: traceEventReferenceKey(attr.key),
           value: {
@@ -359,7 +238,7 @@ function leanLogRecordReceivedEvent(event: Event): Event {
     return event;
   }
 
-  const preview = utf8Preview(data.body, IO_PREVIEW_BYTES);
+  const preview = TraceProjectionLeanService.utf8Preview(data.body, IO_PREVIEW_BYTES);
   const eventrefKey = traceEventReferenceKey("body");
 
   return {
@@ -374,4 +253,134 @@ function leanLogRecordReceivedEvent(event: Event): Event {
       },
     },
   };
+}
+
+export class TraceProjectionLeanService {
+  static create(): TraceProjectionLeanService {
+    return new TraceProjectionLeanService();
+  }
+
+  /** UTF-8-safe truncation to at most `maxBytes`, backing off to a codepoint boundary. */
+  static utf8Preview(value: string, maxBytes: number): string {
+    const buf = Buffer.from(value, "utf8");
+    if (buf.byteLength <= maxBytes) {
+      return value;
+    }
+
+    let end = maxBytes;
+    // 0b10xxxxxx are UTF-8 continuation bytes — don't cut mid-codepoint.
+    while (end > 0 && (buf[end]! & 0xc0) === 0x80) {
+      end--;
+    }
+
+    return buf.subarray(0, end).toString("utf8") + "…";
+  }
+
+  /**
+   * Structure-preserving preview for an over-budget IO attribute that holds a
+   * JSON payload — the shape every gen_ai.input/output.messages value has.
+   *
+   * A blind byte cut (`TraceProjectionLeanService.utf8Preview`) turns a chat-messages array into
+   * unparseable JSON, and everything computed from the leaned span — the fold's
+   * ComputedInput/ComputedOutput, the trace list, the Summary and Conversation
+   * views — degrades to a raw JSON blob. A Langy turn's system prompt alone
+   * exceeds the 64 KB budget, so EVERY such turn used to lose its "hi".
+   *
+   * Strategy, in order, always under `maxBytes`:
+   *   1. Clamp long string leaves (the giant system prompt) to a per-string cap.
+   *   2. Still over and the top level is an array: drop MIDDLE items, keeping
+   *      the first message (system/developer context) and as much of the TAIL
+   *      as fits — the latest user message and reply live there, and they are
+   *      exactly what IO extraction reads.
+   *   3. Anything that still cannot fit reports null; the caller falls back to
+   *      the byte cut, so this can only ever improve on it.
+   *
+   * The full value is untouched in event_log (the eventref restores it); this
+   * shapes ONLY the preview.
+   */
+  static structuredIoPreview(value: string, maxBytes: number): string | null {
+    if (Buffer.byteLength(value, "utf8") > PREVIEW_MAX_SOURCE_BYTES) {
+      return null;
+    }
+
+    const trimmed = value.trim();
+    if (!trimmed.startsWith("[") && !trimmed.startsWith("{")) {
+      return null;
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(trimmed);
+    } catch {
+      return null;
+    }
+
+    if (parsed === null || typeof parsed !== "object") {
+      return null;
+    }
+
+    const clamped = clampLongStrings(parsed);
+    const clampedJson = JSON.stringify(clamped);
+    if (Buffer.byteLength(clampedJson, "utf8") <= maxBytes) {
+      return clampedJson;
+    }
+
+    if (!Array.isArray(clamped)) {
+      return null;
+    }
+
+    const first = clamped[0];
+    const firstSize = Buffer.byteLength(JSON.stringify(first), "utf8");
+    // Brackets plus the first item; each kept tail item costs its size plus a comma.
+    let budget = maxBytes - firstSize - 2;
+    const tail: unknown[] = [];
+    for (let i = clamped.length - 1; i >= 1; i--) {
+      const cost = Buffer.byteLength(JSON.stringify(clamped[i]), "utf8") + 1;
+      if (cost > budget) {
+        break;
+      }
+
+      tail.unshift(clamped[i]);
+      budget -= cost;
+    }
+
+    if (tail.length === 0 && clamped.length > 1) {
+      return null;
+    }
+
+    const preview = JSON.stringify([first, ...tail]);
+
+    return Buffer.byteLength(preview, "utf8") <= maxBytes ? preview : null;
+  }
+
+  /**
+   * Rewrites over-threshold IO attribute values to a preview (≤ IO_PREVIEW_BYTES) and attaches
+   * a `langwatch.reserved.eventref.<attrKey>` pointer carrying `{ field: <attrKey> }`.
+   *
+   * - SpanReceived: for each IO attr in IO_ATTR_KEYS that exceeds IO_PREVIEW_BYTES bytes,
+   *   replaces the value with a UTF-8-safe preview and attaches an eventref.
+   * - LogRecordReceived: if body exceeds IO_PREVIEW_BYTES bytes, replaces body with preview
+   *   and attaches eventref.body.
+   * - Other event types: pass through unchanged (no-op).
+   *
+   * The returned event is deeply independent of the input — no shared array references —
+   * so mutations to the leaned event do not ripple back to the event stored in event_log.
+   *
+   * @param event - The event to lean.
+   * @returns A new event with IO attributes replaced by previews + eventrefs, or the original
+   *   event if no leaning was necessary.
+   */
+  static leanForProjection<EventType extends Event>(event: EventType): EventType;
+
+  static leanForProjection(event: Event): Event {
+    if (event.type === SPAN_RECEIVED_EVENT_TYPE) {
+      return leanSpanReceivedEvent(event);
+    }
+
+    if (event.type === LOG_RECORD_RECEIVED_EVENT_TYPE) {
+      return leanLogRecordReceivedEvent(event);
+    }
+
+    return event;
+  }
 }

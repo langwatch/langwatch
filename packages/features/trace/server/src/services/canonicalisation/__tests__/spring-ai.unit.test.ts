@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { SpringAICanonicaliser } from "../spring-ai.canonicaliser";
-import { createLogExtractorContext } from "../../../stores/__tests__/canonicalisation/adapters/test-helpers";
+import { createLogExtractorContext } from "./test-helpers";
 
 const PROMPT_SCOPE =
   "org.springframework.ai.chat.observation.ChatModelPromptContentObservationHandler";

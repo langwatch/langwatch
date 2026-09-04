@@ -1,3 +1,4 @@
+import { TraceDeferredOriginEventingAdapter } from "./eventing.deferred-origin.adapter";
 import { EventSourcing, mapCommands, type EventSourcedQueueProcessor } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -7,10 +8,8 @@ import {
 import type { AssignTopicCommandData, ResolveOriginCommandData } from "@langwatch/trace-contract";
 import { EventingTraceTopicAssignmentPort } from "./eventing.trace-topic.adapter";
 import {
-  createDeferredOriginHandler,
   DEFERRED_ORIGIN_CHECK_DELAY_MS,
   type DeferredOriginPayload,
-  makeDeferredOriginJobId,
   TraceDeferredOriginSchedulerPort,
 } from "./eventing.deferred-origin.adapter";
 import { TraceProcessingPipelinePort } from "../ports/trace-processing-pipeline.port";
@@ -89,15 +88,15 @@ export class TraceProcessingServerInstaller extends TraceProcessingInstallerPort
       );
     }
 
-    const deferredOriginHandler = createDeferredOriginHandler((input: ResolveOriginCommandData) =>
-      resolveOrigin.send(input),
+    const deferredOriginHandler = TraceDeferredOriginEventingAdapter.createDeferredOriginHandler(
+      (input: ResolveOriginCommandData) => resolveOrigin.send(input),
     );
     const deferredOriginQueue = pipeline.service.registerJob<DeferredOriginPayload>({
       name: "deferredOriginResolution",
       process: deferredOriginHandler,
       delay: DEFERRED_ORIGIN_CHECK_DELAY_MS,
       deduplication: {
-        makeId: makeDeferredOriginJobId,
+        makeId: TraceDeferredOriginEventingAdapter.makeDeferredOriginJobId,
         ttlMs: DEFERRED_ORIGIN_CHECK_DELAY_MS + 60_000,
         extend: false,
         replace: false,
@@ -141,7 +140,7 @@ function createInMemoryDeferredOriginFallback(options: {
 }): (payload: DeferredOriginPayload) => Promise<void> {
   const pending = new Map<string, NodeJS.Timeout>();
   return async (payload) => {
-    const id = makeDeferredOriginJobId(payload);
+    const id = TraceDeferredOriginEventingAdapter.makeDeferredOriginJobId(payload);
     if (pending.has(id)) return;
 
     const timer = setTimeout(async () => {

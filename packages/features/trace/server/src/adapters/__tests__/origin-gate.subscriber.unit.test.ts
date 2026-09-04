@@ -1,13 +1,10 @@
+import { TraceDeferredOriginEventingAdapter } from "../eventing.deferred-origin.adapter";
 import type { TriggerContext } from "@langwatch/eventing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import type { TraceProcessingEvent } from "@langwatch/trace-contract";
 import {
-  createDeferredOriginHandler,
-  createOriginGateHandler as createOriginGateHandlerFor,
   type DeferredOriginPayload,
-  makeDeferredOriginJobId,
-  needsOriginResolution,
   TraceDeferredOriginSchedulerPort,
 } from "../eventing.deferred-origin.adapter";
 
@@ -112,7 +109,9 @@ class TestDeferredOriginScheduler extends TraceDeferredOriginSchedulerPort {
 }
 
 function createOriginGateHandler(deps: OriginGateSubscriberDeps) {
-  return createOriginGateHandlerFor(new TestDeferredOriginScheduler(deps));
+  return TraceDeferredOriginEventingAdapter.createOriginGateHandler(
+    new TestDeferredOriginScheduler(deps),
+  );
 }
 
 describe("originGate subscriber", () => {
@@ -205,7 +204,12 @@ describe("originGate subscriber", () => {
       it("returns true", () => {
         const state = createFoldState({ attributes: {} });
 
-        expect(needsOriginResolution({ event: createEvent(), foldState: state })).toBe(true);
+        expect(
+          TraceDeferredOriginEventingAdapter.needsOriginResolution({
+            event: createEvent(),
+            foldState: state,
+          }),
+        ).toBe(true);
       });
     });
 
@@ -215,7 +219,12 @@ describe("originGate subscriber", () => {
           attributes: { "langwatch.origin": "application" },
         });
 
-        expect(needsOriginResolution({ event: createEvent(), foldState: state })).toBe(false);
+        expect(
+          TraceDeferredOriginEventingAdapter.needsOriginResolution({
+            event: createEvent(),
+            foldState: state,
+          }),
+        ).toBe(false);
       });
     });
 
@@ -226,18 +235,24 @@ describe("originGate subscriber", () => {
           occurredAt: Date.now() - 2 * 60 * 60 * 1000,
         });
 
-        expect(needsOriginResolution({ event: oldEvent, foldState: state })).toBe(false);
+        expect(
+          TraceDeferredOriginEventingAdapter.needsOriginResolution({
+            event: oldEvent,
+            foldState: state,
+          }),
+        ).toBe(false);
       });
     });
   });
 });
 
-describe("createDeferredOriginHandler()", () => {
+describe("TraceDeferredOriginEventingAdapter.createDeferredOriginHandler()", () => {
   describe("when called", () => {
     /** @scenario 'Deferred check treats still-empty origin as "application"' */
     it("dispatches resolveOrigin command unconditionally", async () => {
       const resolveOriginFn = vi.fn().mockResolvedValue(undefined);
-      const handler = createDeferredOriginHandler(resolveOriginFn);
+      const handler =
+        TraceDeferredOriginEventingAdapter.createDeferredOriginHandler(resolveOriginFn);
       const payload: DeferredOriginPayload = {
         id: "trace-1",
         tenantId: "tenant-1",
@@ -263,7 +278,8 @@ describe("createDeferredOriginHandler()", () => {
   describe("when resolveOrigin throws", () => {
     it("propagates the error", async () => {
       const resolveOriginFn = vi.fn().mockRejectedValue(new Error("command failed"));
-      const handler = createDeferredOriginHandler(resolveOriginFn);
+      const handler =
+        TraceDeferredOriginEventingAdapter.createDeferredOriginHandler(resolveOriginFn);
       const payload: DeferredOriginPayload = {
         id: "trace-1",
         tenantId: "tenant-1",
@@ -275,13 +291,15 @@ describe("createDeferredOriginHandler()", () => {
   });
 });
 
-describe("makeDeferredOriginJobId()", () => {
+describe("TraceDeferredOriginEventingAdapter.makeDeferredOriginJobId()", () => {
   it("generates dedup key from tenant and trace", () => {
     const payload: DeferredOriginPayload = {
       id: "trace-1",
       tenantId: "tenant-1",
       traceId: "trace-1",
     };
-    expect(makeDeferredOriginJobId(payload)).toBe("deferred-origin:tenant-1:trace-1");
+    expect(TraceDeferredOriginEventingAdapter.makeDeferredOriginJobId(payload)).toBe(
+      "deferred-origin:tenant-1:trace-1",
+    );
   });
 });

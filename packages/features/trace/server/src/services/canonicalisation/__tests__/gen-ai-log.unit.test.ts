@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { GenAICanonicaliser } from "../gen-ai.canonicaliser";
-import { createLogExtractorContext } from "../../../stores/__tests__/canonicalisation/adapters/test-helpers";
+import { createLogExtractorContext } from "./test-helpers";
 
 const SCOPE = "gen_ai";
 

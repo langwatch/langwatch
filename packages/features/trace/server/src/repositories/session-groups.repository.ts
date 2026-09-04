@@ -86,8 +86,8 @@ export interface SessionGroupsPage {
   totalHits: number;
 }
 
-export interface SessionGroupsRepository {
-  findSessionGroups(query: SessionGroupsQuery): Promise<SessionGroupsPage>;
+export abstract class SessionGroupsRepository {
+  abstract findSessionGroups(query: SessionGroupsQuery): Promise<SessionGroupsPage>;
 }
 
 export class NullSessionGroupsRepository implements SessionGroupsRepository {

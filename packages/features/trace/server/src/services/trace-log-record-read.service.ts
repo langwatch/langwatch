@@ -1,7 +1,6 @@
 import type { LogService } from "@langwatch/log-contract";
 import {
-  type LogRecordStorageRepository,
-  mergeStoredLogRows,
+  LogRecordStorageRepository,
   type StoredLogRecordRow,
 } from "../repositories/log-record-storage.repository";
 
@@ -16,6 +15,13 @@ import {
  * in time order — the same pattern the claude-marked read established.
  */
 export class LogRecordStorageService {
+  static create(options: {
+    repository: LogRecordStorageRepository;
+    canonical: LogService;
+  }): LogRecordStorageService {
+    return new LogRecordStorageService(options);
+  }
+
   readonly repository: LogRecordStorageRepository;
   private readonly canonical: LogService;
 
@@ -62,6 +68,6 @@ export class LogRecordStorageService {
 
     // Keep-last dedup: canonical goes LAST so it wins a divergent duplicate,
     // matching "canonical is the authoritative store".
-    return mergeStoredLogRows([...legacy, ...canonical], limit);
+    return LogRecordStorageRepository.mergeStoredLogRows([...legacy, ...canonical], limit);
   }
 }

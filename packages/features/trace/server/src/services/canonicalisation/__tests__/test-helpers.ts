@@ -1,13 +1,13 @@
 import { vi } from "vitest";
 
 import type { CanonicalAttributes, CanonicalEvent } from "@langwatch/trace-contract";
-import { parseJsonStringValues as parseJsonStringAttrs } from "../../../../services/canonical-json.rules";
-import { LogRecordDataBag } from "../../../canonical-log-record.bag";
-import { SpanDataBag } from "../../../canonical-span.bag";
+import { parseJsonStringValues as parseJsonStringAttrs } from "../../canonical-json.rules";
+import { LogRecordDataBag } from "../../../stores/canonical-log-record.bag";
+import { SpanDataBag } from "../../../stores/canonical-span.bag";
 import type {
   ExtractorContext,
   LogExtractorContext,
-} from "../../../../ports/canonical-attributes.port";
+} from "../../../ports/canonical-attributes.port";
 
 export { parseJsonStringAttrs };
 

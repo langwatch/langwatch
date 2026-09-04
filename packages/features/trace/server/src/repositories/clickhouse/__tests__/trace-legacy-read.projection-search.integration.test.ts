@@ -11,6 +11,7 @@
  * (through a fake `AnnotationService`, since Postgres has no testcontainer here),
  * and the per-trace projector renders the requested shape.
  */
+import { TraceProjectionCompileService } from "../../../services/trace-projection-compile.service";
 import type { AnnotationScoreName } from "@langwatch/annotation-contract";
 import { AnnotationService, type ProjectionAnnotation } from "@langwatch/annotation-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -20,11 +21,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { TraceCanonicalisationService } from "../../../services/trace-canonicalisation.service";
 import { enrichTracesWithEvaluations } from "../../../services/trace-evaluation-enrichment.rules";
-import { compileProjection } from "../../../services/trace-projection-compile.service";
 import type { ProjectableTrace, ProjectionFrom } from "../../../services/trace-projection.types";
 import type { GetAllTracesForProjectInput } from "../../../services/trace-legacy-read.types";
 import type { Protections } from "../../../services/trace-viewer-protections.service";
-import { ClickHouseTraceService } from "../trace-legacy-read.repository";
+import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
@@ -238,7 +238,7 @@ class FakeAnnotationService extends AnnotationService {
 }
 
 let ch: ClickHouseClient;
-let service: ClickHouseTraceService;
+let service: TraceLegacyReadClickHouseRepository;
 const annotations = new FakeAnnotationService();
 
 /**
@@ -257,7 +257,7 @@ async function projectedSearch({
   protections?: Protections;
   dateField?: "occurred" | "updated";
 }) {
-  const compiled = compileProjection({ from, select, protections });
+  const compiled = TraceProjectionCompileService.compileProjection({ from, select, protections });
   const results = await service.getAllTracesForProject(makeQueryInput(), protections, {
     downloadMode: true,
     projection: compiled.plan,
@@ -276,7 +276,7 @@ integration("trace search projection (integration)", () => {
     if (!clickHouseUrl) return;
     ch = createTestClickHouseClient(clickHouseUrl);
 
-    service = ClickHouseTraceService.create({
+    service = TraceLegacyReadClickHouseRepository.create({
       prisma: {} as PrismaClient,
       resolveClickHouseClient: async () => ch,
       traceCanonicalisation: TraceCanonicalisationService.create(),

@@ -1,4 +1,4 @@
-export { computeSpanCost } from "./services/trace-span-cost-matching.service";
+export { TraceSpanCostMatchingService } from "./services/trace-span-cost-matching.service";
 export { ClickHouseTraceAdapter } from "./adapters/clickhouse.trace.adapter";
 export { TraceCanonicalisationService } from "./services/trace-canonicalisation.service";
 /**
@@ -7,7 +7,7 @@ export { TraceCanonicalisationService } from "./services/trace-canonicalisation.
  * floor port, and a second floor would let a trace and the evaluations behind
  * it disagree about how far back a project's rows go.
  */
-export { createRetentionFloorService } from "./services/trace-retention-floor.service";
+export { TraceRetentionFloorService } from "./services/trace-retention-floor.service";
 export { NullTraceListAdapter } from "./adapters/null-trace-list.adapter";
 export {
   EventingTracePipelineAdapter,
@@ -17,11 +17,10 @@ export {
 export { TraceProcessingServerInstaller } from "./adapters/eventing.trace-processing.installer";
 export { TraceProcessingInstallerPort } from "./ports/trace-processing-installer.port";
 export {
-  createOriginGateHandler,
   DEFERRED_ORIGIN_CHECK_DELAY_MS,
-  needsOriginResolution,
   ORIGIN_GATE_DEDUP_TTL_MS,
   ORIGIN_GATE_DELAY_MS,
+  TraceDeferredOriginEventingAdapter,
   TraceDeferredOriginSchedulerPort,
 } from "./adapters/eventing.deferred-origin.adapter";
 export { TraceProcessingPipelinePort } from "./ports/trace-processing-pipeline.port";
@@ -91,19 +90,18 @@ export { TraceEventDerivationPort } from "./ports/trace-event-derivation.port";
 export { TraceQueryFieldValuesPort } from "./ports/query-field-values.port";
 
 export { TraceQueryClassificationAdapter } from "./adapters/trace-query-classification.adapter";
-export { TraceQueryClickHouse } from "./adapters/trace-query.clickhouse.adapter";
+export { TraceQueryClickHouseAdapter } from "./adapters/trace-query.clickhouse.adapter";
 
 export {
-  FACET_REGISTRY,
-  TABLE_TIME_COLUMNS,
+  ClickHouseFacetRegistryAdapter,
   type ExpressionCategoricalDef,
   type FacetDefinition,
   type FacetTable,
   type RangeFacetDef,
 } from "./adapters/trace-facet-registry.clickhouse.adapter";
-export { buildSpanAttributeKeysFacetQuery } from "./adapters/trace-facet-span-attribute-keys.clickhouse.adapter";
-export { TraceQueryEvaluationService } from "./services/trace-query-evaluation.service";
-export type { FieldDef } from "./adapters/trace-query-evaluation.adapter";
+export { ClickHouseSpanAttributeKeysFacetAdapter } from "./adapters/trace-facet-span-attribute-keys.clickhouse.adapter";
+export { TraceQueryEvaluationAdapter } from "./adapters/trace-query-evaluation.adapter";
+export type { FieldDef } from "./adapters/trace-query-evaluation.types";
 export { TraceSummaryReaderPort } from "./ports/trace-summary-reader.port";
 export {
   TraceSummaryProjectionPort,
@@ -208,11 +206,9 @@ export { TraceProjectionRuntimeService } from "./services/trace-projection-runti
 export {
   IO_ATTR_KEYS,
   IO_PREVIEW_BYTES,
-  leanForProjection,
-  structuredIoPreview,
-  utf8Preview,
+  TraceProjectionLeanService,
 } from "./services/trace-projection-lean.service";
-export { leanReplayEvent } from "./adapters/eventing.trace-projection-lean.adapter";
+export { TraceProjectionLeanEventingAdapter } from "./adapters/eventing.trace-projection-lean.adapter";
 export { TraceIoExtractionAdapter } from "./adapters/trace-io-extraction.adapter";
 export { TraceSpanNormalizationAdapter } from "./adapters/trace-span-normalization.adapter";
 export { TraceMediaReferenceAdapter } from "./adapters/trace-media-reference.adapter";
@@ -249,11 +245,11 @@ export {
   type TracesTrpcPorts,
 } from "./transport/api-trpc/traces.api";
 export {
-  canReadCapturedContent,
   type CategoryVisibility,
   type Protections,
+  TraceViewerProtectionsService,
 } from "./services/trace-viewer-protections.service";
-export { TraceAttributeRedactor } from "./services/trace-attribute-redaction.service";
+export { TraceAttributeRedactionService } from "./services/trace-attribute-redaction.service";
 export {
   buildContentPrivacy,
   contentSearchTermsForViewer,
@@ -360,7 +356,7 @@ export {
   TraceEditOverlayService,
   type TraceEditIOField,
 } from "./services/trace-edit-overlay.service";
-export { createTraceProcessingProducerPipeline } from "./adapters/trace-processing-producer.adapter";
+export { TraceProcessingProducerAdapter } from "./adapters/trace-processing-producer.adapter";
 
 // ---------------------------------------------------------------------------
 // The ClickHouse trace READ stack
@@ -372,9 +368,18 @@ export { createTraceProcessingProducerPipeline } from "./adapters/trace-processi
 // the coding-agent log join, the AI composer and the reserved-metadata write.
 // ---------------------------------------------------------------------------
 export {
-  ClickHouseTraceService,
+  TraceLegacyReadClickHouseRepository,
   type TraceLegacyFilterConditions,
 } from "./repositories/clickhouse/trace-legacy-read.repository";
+export {
+  ClickHouseTraceLegacyReadAdapter,
+  type ClickHouseTraceLegacyReadOptions,
+} from "./adapters/clickhouse.trace-legacy-read.adapter";
+export {
+  TraceEditOverlayRepository,
+  type TraceEditOverlayRow,
+} from "./repositories/trace-edit-overlay.repository";
+export { PrismaTraceEditOverlayRepository } from "./repositories/prisma/prisma.trace-edit-overlay.repository";
 export {
   TraceService as TraceLegacyReadService,
   type BlobResolutionDeps,
@@ -407,29 +412,25 @@ export {
 } from "./repositories/log-record-storage.repository";
 export { LogRecordStorageClickHouseRepository } from "./repositories/clickhouse/log-record-storage.repository";
 export {
-  BlobStore,
+  TraceBlobStoreService,
   type S3ClientResolution,
   type S3ClientResolver,
   type SpoolStorage,
 } from "./services/trace-blob-store.service";
 export { TraceIOExtractionService } from "./services/trace-io-extraction.service";
-export {
-  formatSpansDigest,
-  langwatchSpanToReadableSpan,
-} from "./services/trace-readable-span.service";
+export { TraceReadableSpanService } from "./services/trace-readable-span.service";
 export { VisibilityWindowService } from "./services/trace-visibility-window.service";
-export { TraceNotFoundError } from "./services/trace-read-error.service";
-export { setTraceWindowedReadMetrics } from "./services/trace-windowed-read.service";
-export { setTraceCacheRedis, type TraceCacheRedis } from "./services/trace-ttl-cache.service";
+export { TraceNotFoundError } from "./services/trace-read.errors";
+export { TraceWindowedReadService } from "./services/trace-windowed-read.service";
+export { TraceTtlCacheService, type TraceCacheRedis } from "./services/trace-ttl-cache.service";
 export { TraceSpanIngestPort } from "./ports/trace-span-ingest.port";
 export {
+  TraceMetadataWriteService,
   traceMetadataUpdateSchema,
-  updateTraceMetadata,
   type TraceMetadataUpdate,
 } from "./services/trace-metadata-write.service";
 export {
-  generateTraceAction,
-  generateTraceQueryFromPrompt,
+  TraceAiQueryService,
   type AiQueryInput,
   type AiQueryModelResolver,
 } from "./services/trace-ai-query.service";
@@ -437,23 +438,12 @@ export {
   DERIVED_INPUT_ATTR_PREFIX,
   DERIVED_OUTPUT_ATTR_PREFIX,
 } from "./services/trace-log-content-derivation.service";
-export {
-  enrichCodingAgentSpansFromLogs,
-  enrichSingleSpanWithClaudeLogContent,
-  isCodingAgentShapedSpan,
-  mapSummaryRowsToClaudeRefs,
-} from "./services/claude-code-log-enrichment.service";
+export { ClaudeCodeLogEnrichmentService } from "./services/claude-code-log-enrichment.service";
 export type { ClaudeSpanRef } from "./services/claude-code-span-enrichment.service";
-export {
-  applyDerivedTraceEventProtections,
-  applySpanProtections,
-  extractRedactionsFromAllSpanInputs,
-  extractRedactionsFromAllSpanOutputs,
-  redactObject,
-} from "./services/trace-read-redaction.service";
-export { redactPatchForViewer } from "./services/trace-edit-overlay-redaction.service";
-export { restoreWithheldEdits } from "./services/trace-edit-overlay-restore.service";
-export { CollectorSpanUtils } from "./services/trace-collector-span.service";
+export { TraceReadRedactionService } from "./services/trace-read-redaction.service";
+export { TraceEditOverlayRedactionService } from "./services/trace-edit-overlay-redaction.service";
+export { TraceEditOverlayRestoreService } from "./services/trace-edit-overlay-restore.service";
+export { TraceCollectorSpanService } from "./services/trace-collector-span.service";
 
 // ---------------------------------------------------------------------------
 // The OTLP receiver
@@ -512,7 +502,7 @@ export type { TraceRequestCollectionResult } from "./services/trace-ingestion.se
 // publishes. `filters` is joined to the analytics schema at the mount; see
 // `trace-export.vocabulary.ts`.
 // ---------------------------------------------------------------------------
-export { TraceExportService, stripCsvHeader } from "./services/trace-export.service";
+export { TraceExportService } from "./services/trace-export.service";
 export {
   exportFormatSchema,
   exportModeSchema,
@@ -523,10 +513,7 @@ export {
   type ExportProgress,
   type ExportRequest,
 } from "./services/trace-export.vocabulary";
-export {
-  ExportFailedError,
-  ExportUnauthenticatedError,
-} from "./services/trace-export-error.service";
+export { ExportFailedError, ExportUnauthenticatedError } from "./services/trace-export.errors";
 export {
   CSV_NEWLINE,
   serializeTracesToFullCsv,
@@ -549,8 +536,7 @@ export { enrichTracesWithEvaluations } from "./services/trace-evaluation-enrichm
  */
 export {
   TRACE_MEDIA_PURPOSE,
-  maybeExtractSpanMedia,
-  spanCarriesMediaMarkers,
+  TraceEdgeMediaExtractionService,
   type EdgeMediaExtractionDeps,
   type EdgeMediaExtractionLogger,
 } from "./services/trace-edge-media-extraction.service";
@@ -559,30 +545,24 @@ export {
   TraceMediaStorePort,
   type TraceEdgeMediaFailOpenReason,
 } from "./ports/trace-media-store.port";
-export { coerceContentToArray } from "./services/trace-content-array.service";
-export { binaryInputPartSchema } from "./services/trace-binary-part.service";
+export { TraceContentArrayService } from "./services/trace-content-array.service";
+export { binaryInputPartSchema } from "./services/trace-content-extraction.service";
 export {
-  extractInlineMediaFromEvent,
-  processContentPart,
+  TraceContentExtractionService,
   type ExtractedRef,
 } from "./services/trace-content-extraction.service";
 export {
-  createExtractionBudget,
-  extractInlineMediaFromValue,
+  TraceValueMediaExtractionService,
   type ExtractionBudget,
 } from "./services/trace-value-media-extraction.service";
 
 /** The agent-readable rendering of a trace. Was `server/traces/trace-formatting.ts`. */
-export {
-  formatTraceSummaryDigest,
-  generateAsciiTree,
-  toLLMModeTrace,
-} from "./services/trace-formatting.service";
+export { TraceFormattingService } from "./services/trace-formatting.service";
 
 /** The REST projection compiler. Was `server/traces/projection/**`. */
-export { compileProjection } from "./services/trace-projection-compile.service";
+export { TraceProjectionCompileService } from "./services/trace-projection-compile.service";
 export {
-  resolveField,
+  TraceProjectionCatalogService,
   type FieldProtection,
   type ProjectionSource,
   type ResolvedField,

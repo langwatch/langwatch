@@ -1,13 +1,14 @@
+import { TraceWindowedReadService } from "../../services/trace-windowed-read.service";
+import { TraceSpanCostMatchingService } from "../../services/trace-span-cost-matching.service";
+import { TraceLegacySpanMappingService } from "../../services/trace-legacy-span-mapping.service";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import {
   DEFAULT_PARTITION_WINDOW_MS,
-  queryWindowed,
   RESOLVER_RECENT_WINDOW_MS,
   type WindowFragment,
 } from "../../services/trace-windowed-read.service";
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import { computeSpanCost } from "../../services/trace-span-cost-matching.service";
 import type { TraceClickHouseWriteResolver as ClickHouseClientResolver } from "../../ports/clickhouse.port";
 /**
  * The insert shape of a row whose epoch-millisecond fields are written as
@@ -47,8 +48,8 @@ import {
 } from "@langwatch/trace-server";
 
 const logger = createLogger("langwatch:app-layer:traces:span-storage-repository");
-import { mapNormalizedSpansToSpans } from "../../services/trace-legacy-span-mapping.service";
 import type { SpanInsertData } from "@langwatch/trace-contract";
+import { SpanStorageRepository } from "../span-storage.repository";
 import type {
   LangwatchSignalBucket,
   ModelSpanSampleRow,
@@ -56,12 +57,10 @@ import type {
   NormalizedSpanByIdParams,
   OccurredAtHint,
   SpanLangwatchSignalsRow,
-  SpanStorageRepository,
   TraceEventRollupParams,
 } from "../span-storage.repository";
 import type { SpanResourceInfo, SpanSummaryRow, TraceEventRollup } from "@langwatch/trace-contract";
 import {
-  clampSpanReadLimit,
   LANGWATCH_SIGNAL_BUCKETS,
   MAX_DERIVATION_SPANS,
   MAX_EVENT_NAMES_PER_TRACE,
@@ -556,7 +555,7 @@ function set(value: string | null | undefined): string | undefined {
  *
  * Most ingest paths emit token counts but no `gen_ai.usage.cost`: trace-level
  * cost is computed at fold time from tokens times pricing. This mirrors that
- * for one span, feeding computeSpanCost's priority cascade (custom enrichment
+ * for one span, feeding TraceSpanCostMatchingService.computeSpanCost's priority cascade (custom enrichment
  * rates, then the SDK's own span cost, then the static model registry) with
  * the attributes the summary query already selects.
  */
@@ -569,37 +568,23 @@ function computeSummaryRowCost({
   inputTokens: number | null;
   outputTokens: number | null;
 }): number {
-  return computeSpanCost({
+  return TraceSpanCostMatchingService.computeSpanCost({
     attrs: {
       [ATTR_KEYS.GEN_AI_RESPONSE_MODEL]: set(row.ResponseModel),
       [ATTR_KEYS.GEN_AI_REQUEST_MODEL]: set(row.Model),
-      [ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]: set(
-        row.CacheReadTokens,
-      ),
-      [ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]: set(
-        row.CacheCreationTokens,
-      ),
-      [ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_1H_INPUT_TOKENS]: set(
-        row.CacheCreation1hTokens,
-      ),
+      [ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]: set(row.CacheReadTokens),
+      [ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]: set(row.CacheCreationTokens),
+      [ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_1H_INPUT_TOKENS]: set(row.CacheCreation1hTokens),
       [ATTR_KEYS.GEN_AI_USAGE_INPUT_CHARS]: set(row.InputChars),
       [ATTR_KEYS.GEN_AI_USAGE_AUDIO_SECONDS]: set(row.AudioSeconds),
       [ATTR_KEYS.GEN_AI_USAGE_INPUT_AUDIO_TOKENS]: set(row.InputAudioTokens),
       [ATTR_KEYS.GEN_AI_USAGE_OUTPUT_AUDIO_TOKENS]: set(row.OutputAudioTokens),
       [ATTR_KEYS.GEN_AI_USAGE_INPUT_IMAGE_TOKENS]: set(row.InputImageTokens),
       [ATTR_KEYS.GEN_AI_USAGE_OUTPUT_IMAGE_TOKENS]: set(row.OutputImageTokens),
-      [ATTR_KEYS.LANGWATCH_MODEL_INPUT_COST_PER_TOKEN]: set(
-        row.CustomInputRate,
-      ),
-      [ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN]: set(
-        row.CustomOutputRate,
-      ),
-      [ATTR_KEYS.LANGWATCH_MODEL_CACHE_READ_COST_PER_TOKEN]: set(
-        row.CustomCacheReadRate,
-      ),
-      [ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_COST_PER_TOKEN]: set(
-        row.CustomCacheCreationRate,
-      ),
+      [ATTR_KEYS.LANGWATCH_MODEL_INPUT_COST_PER_TOKEN]: set(row.CustomInputRate),
+      [ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN]: set(row.CustomOutputRate),
+      [ATTR_KEYS.LANGWATCH_MODEL_CACHE_READ_COST_PER_TOKEN]: set(row.CustomCacheReadRate),
+      [ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_COST_PER_TOKEN]: set(row.CustomCacheCreationRate),
       [ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_1H_COST_PER_TOKEN]: set(
         row.CustomCacheCreation1hRate,
       ),
@@ -609,43 +594,6 @@ function computeSummaryRowCost({
     promptTokens: inputTokens,
     completionTokens: outputTokens,
   });
-}
-
-export function mapSpanSummaryRow(row: SpanSummaryQueryRow): SpanSummaryRow {
-  const explicitCost = attrNumber(row.Cost);
-  const inputTokens = attrNumber(row.InputTokens);
-  const outputTokens = attrNumber(row.OutputTokens);
-  const cacheReadTokens = attrNumber(row.CacheReadTokens);
-  const cacheCreationTokens = attrNumber(row.CacheCreationTokens);
-
-  // Some SDKs emit `gen_ai.usage.cost = 0` meaning "unknown", so any
-  // non-positive explicit cost counts as absent and the computed cost runs.
-  let cost = explicitCost !== null && explicitCost > 0 ? explicitCost : null;
-  if (cost === null) {
-    const computed = computeSummaryRowCost({ row, inputTokens, outputTokens });
-    cost = computed > 0 ? computed : null;
-  }
-
-  return {
-    spanId: row.SpanId,
-    parentSpanId: row.ParentSpanId,
-    spanName: row.SpanName,
-    durationMs: Number(row.DurationMs),
-    statusCode: row.StatusCode,
-    spanType: row.SpanType || null,
-    toolName: row.ToolName || null,
-    requestId: row.RequestId || null,
-    querySource: row.QuerySource || null,
-    toolUseId: row.ToolUseId || null,
-    model: row.Model || null,
-    cost,
-    inputTokens,
-    outputTokens,
-    cacheReadTokens,
-    cacheCreationTokens,
-    startTimeMs: Number(row.StartTimeMs),
-    updatedAtMs: Number(row.UpdatedAtMs),
-  };
 }
 
 interface EventRow {
@@ -761,6 +709,10 @@ interface ClickHouseSpanRecord {
 }
 
 export class SpanStorageClickHouseRepository implements SpanStorageRepository {
+  static create(resolveClient: ClickHouseClientResolver): SpanStorageClickHouseRepository {
+    return new SpanStorageClickHouseRepository(resolveClient);
+  }
+
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   async insertSpan(span: SpanInsertData): Promise<void> {
@@ -853,7 +805,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
 
     // Hard ceiling, applied unconditionally: a leaked trace_id with a huge span
     // count can never load the pipeline through this path, regardless of caller.
-    const effectiveLimit = clampSpanReadLimit(limit);
+    const effectiveLimit = SpanStorageRepository.clampSpanReadLimit(limit);
 
     try {
       return await this.readTraceSpans<Span[]>(
@@ -884,7 +836,9 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           });
 
           const rows = (await result.json()) as FullSpanRow[];
-          return mapNormalizedSpansToSpans(rows.map(mapChRowToNormalized));
+          return TraceLegacySpanMappingService.mapNormalizedSpansToSpans(
+            rows.map(mapChRowToNormalized),
+          );
         },
       );
     } catch (error) {
@@ -916,7 +870,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     );
 
     // Hard ceiling so even a leaked trace_id can never load the pipeline.
-    const effectiveLimit = clampSpanReadLimit(limit);
+    const effectiveLimit = SpanStorageRepository.clampSpanReadLimit(limit);
 
     // The ±window hint prunes partitions on the happy path; the empty-result
     // fallback covers a stale/wrong hint. The window (±2 days) dwarfs any real
@@ -990,7 +944,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
             window,
           });
           if (row === null) return null;
-          const [span] = mapNormalizedSpansToSpans([row]);
+          const [span] = TraceLegacySpanMappingService.mapNormalizedSpansToSpans([row]);
           return span ?? null;
         },
       );
@@ -1048,7 +1002,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     );
 
     try {
-      return await queryWindowed<NormalizedSpan | null>({
+      return await TraceWindowedReadService.queryWindowed<NormalizedSpan | null>({
         table: TABLE_NAME,
         hintMs: occurredAtMs,
         windowMs: DEFAULT_PARTITION_WINDOW_MS,
@@ -1279,19 +1233,19 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
    * authoritative: the trace has no matching events within its ±2-day span
    * window, and we do NOT rescan unbounded.
    *
-   * That is why the {@link queryWindowed} call uses `fallback: "none"`: the
+   * That is why the {@link TraceWindowedReadService.queryWindowed} call uses `fallback: "none"`: the
    * hinted window is single-shot, never widened on empty. The unbounded-on-empty
    * rescan spans use was itself a cold S3 partition walk, and a trace legitimately
    * *without* events would trigger it on every read. We only scan unbounded when
    * the trace time is genuinely unknown (the trace isn't in `trace_summaries`),
-   * which is the `hintMs === null` branch inside `queryWindowed`.
+   * which is the `hintMs === null` branch inside `TraceWindowedReadService.queryWindowed`.
    */
   private async readTraceEvents<T>(
     { tenantId, traceId, occurredAtMs }: { tenantId: string; traceId: string } & OccurredAtHint,
     run: (window: WindowFragment | null) => Promise<T>,
   ): Promise<T> {
     const hintMs = occurredAtMs ?? (await this.resolveTraceOccurredAtMs(tenantId, traceId));
-    return queryWindowed<T>({
+    return TraceWindowedReadService.queryWindowed<T>({
       table: TABLE_NAME,
       hintMs: hintMs ?? null,
       windowMs: DEFAULT_PARTITION_WINDOW_MS,
@@ -1327,7 +1281,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
    *
    * Only when the trace time is genuinely unknown (the trace isn't in
    * `trace_summaries`) do we go straight to the unbounded read — the
-   * `hintMs === null` branch inside {@link queryWindowed}.
+   * `hintMs === null` branch inside {@link TraceWindowedReadService.queryWindowed}.
    */
   private async readTraceSpans<T>(
     { tenantId, traceId, occurredAtMs }: { tenantId: string; traceId: string } & OccurredAtHint,
@@ -1335,7 +1289,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     run: (window: WindowFragment | null) => Promise<T>,
   ): Promise<T> {
     const hintMs = occurredAtMs ?? (await this.resolveTraceOccurredAtMs(tenantId, traceId));
-    return queryWindowed<T>({
+    return TraceWindowedReadService.queryWindowed<T>({
       table: TABLE_NAME,
       hintMs: hintMs ?? null,
       windowMs: DEFAULT_PARTITION_WINDOW_MS,
@@ -1652,7 +1606,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         });
 
         const rows = await result.json<SpanSummaryQueryRow>();
-        return rows.map(mapSpanSummaryRow);
+        return rows.map(SpanStorageClickHouseRepository.mapSpanSummaryRow);
       },
     );
   }
@@ -1800,7 +1754,9 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         const total = countRows.length > 0 ? Number(countRows[0]!.Total) : 0;
 
         return {
-          spans: mapNormalizedSpansToSpans(pageRows.map(mapChRowToNormalized)),
+          spans: TraceLegacySpanMappingService.mapNormalizedSpansToSpans(
+            pageRows.map(mapChRowToNormalized),
+          ),
           total,
         };
       },
@@ -1841,7 +1797,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     });
 
     const rows = (await result.json()) as FullSpanRow[];
-    return mapNormalizedSpansToSpans(rows.map(mapChRowToNormalized));
+    return TraceLegacySpanMappingService.mapNormalizedSpansToSpans(rows.map(mapChRowToNormalized));
   }
 
   async findModelUsageStats({
@@ -2022,5 +1978,42 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       UpdatedAt: new Date(),
       _retention_days: span.retentionDays ?? PLATFORM_DEFAULT_RETENTION_DAYS,
     } satisfies ClickHouseSpanWriteRecord;
+  }
+
+  static mapSpanSummaryRow(row: SpanSummaryQueryRow): SpanSummaryRow {
+    const explicitCost = attrNumber(row.Cost);
+    const inputTokens = attrNumber(row.InputTokens);
+    const outputTokens = attrNumber(row.OutputTokens);
+    const cacheReadTokens = attrNumber(row.CacheReadTokens);
+    const cacheCreationTokens = attrNumber(row.CacheCreationTokens);
+
+    // Some SDKs emit `gen_ai.usage.cost = 0` meaning "unknown", so any
+    // non-positive explicit cost counts as absent and the computed cost runs.
+    let cost = explicitCost !== null && explicitCost > 0 ? explicitCost : null;
+    if (cost === null) {
+      const computed = computeSummaryRowCost({ row, inputTokens, outputTokens });
+      cost = computed > 0 ? computed : null;
+    }
+
+    return {
+      spanId: row.SpanId,
+      parentSpanId: row.ParentSpanId,
+      spanName: row.SpanName,
+      durationMs: Number(row.DurationMs),
+      statusCode: row.StatusCode,
+      spanType: row.SpanType || null,
+      toolName: row.ToolName || null,
+      requestId: row.RequestId || null,
+      querySource: row.QuerySource || null,
+      toolUseId: row.ToolUseId || null,
+      model: row.Model || null,
+      cost,
+      inputTokens,
+      outputTokens,
+      cacheReadTokens,
+      cacheCreationTokens,
+      startTimeMs: Number(row.StartTimeMs),
+      updatedAtMs: Number(row.UpdatedAtMs),
+    };
   }
 }

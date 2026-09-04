@@ -1,3 +1,4 @@
+import { VisibilityWindowService } from "./trace-visibility-window.service";
 import { createLogger } from "@langwatch/observability";
 import type { TopicService } from "@langwatch/topic-contract";
 import type { EvaluationService } from "@langwatch/evaluation-contract";
@@ -33,16 +34,15 @@ import {
 import { TtlCache } from "./trace-ttl-cache.service";
 import { TRACE_LIST_MAX_OFFSET_ROWS } from "@langwatch/trace-contract";
 import { parseMediaRefs } from "@langwatch/trace-contract";
-import { PageTooDeepError } from "./trace-read-error.service";
+import { PageTooDeepError } from "./trace-read.errors";
 import type {
   ExpressionCategoricalDef,
   FacetDefinition,
   FacetTable,
   RangeFacetDef,
 } from "@langwatch/trace-server";
-import { FACET_REGISTRY, TABLE_TIME_COLUMNS } from "@langwatch/trace-server";
+import { ClickHouseFacetRegistryAdapter } from "@langwatch/trace-server";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
-import { teaserOf } from "./trace-visibility-window.service";
 
 interface ListParams {
   tenantId: string;
@@ -171,7 +171,7 @@ const DISCOVER_REFRESH_LOCK_CACHE = new TtlCache<number>(60_000, "tracesV2:disco
 
 /**
  * Optional sink for "discover finished refreshing" SSE pushes. Set
- * once at app bootstrap via `setDiscoverBroadcaster` so the service
+ * once at app bootstrap via `TraceListService.setDiscoverBroadcaster` so the service
  * can fire-and-forget into the broadcast layer when a background
  * refresh lands a fresher payload in the shared cache. The setter
  * pattern avoids threading BroadcastService through the constructor
@@ -180,10 +180,6 @@ const DISCOVER_REFRESH_LOCK_CACHE = new TtlCache<number>(60_000, "tracesV2:disco
  */
 type DiscoverBroadcaster = (tenantId: string) => void;
 let discoverBroadcaster: DiscoverBroadcaster | null = null;
-
-export function setDiscoverBroadcaster(fn: DiscoverBroadcaster | null): void {
-  discoverBroadcaster = fn;
-}
 
 /** Bucket size for live-range time params so the cache key stabilises across rapid refetches. */
 const CACHE_TIME_BUCKET_MS = 60_000;
@@ -313,6 +309,18 @@ const SUGGEST_COLUMN_MAP: Record<string, string> = {
 };
 
 export class TraceListService {
+  static create({
+    repository,
+    evaluations,
+    topicService,
+  }: {
+    repository: TraceListReadPort;
+    evaluations: EvaluationService;
+    topicService: TopicService;
+  }): TraceListService {
+    return new TraceListService(repository, evaluations, topicService);
+  }
+
   constructor(
     private readonly repository: TraceListReadPort,
     private readonly evaluations: EvaluationService,
@@ -369,7 +377,7 @@ export class TraceListService {
 
     const hasMore = result.rows.length > params.pageSize;
     const visibleRows = hasMore ? result.rows.slice(0, params.pageSize) : result.rows;
-    const items = visibleRows.map((row) => mapToTraceListItem(row));
+    const items = visibleRows.map((row) => TraceListService.mapToTraceListItem(row));
     const traceIds = items.map((item) => item.traceId);
 
     const evaluations = await this.evaluations.findSummariesByTraceIds({
@@ -389,10 +397,10 @@ export class TraceListService {
             item.timestamp < params.visibilityCutoffMs!
               ? {
                   ...item,
-                  input: item.input ? teaserOf(item.input) : item.input,
-                  output: item.output ? teaserOf(item.output) : item.output,
-                  error: item.error ? teaserOf(item.error) : item.error,
-                  labels: item.labels.map((label) => teaserOf(label)),
+                  input: item.input ? VisibilityWindowService.teaserOf(item.input) : item.input,
+                  output: item.output ? VisibilityWindowService.teaserOf(item.output) : item.output,
+                  error: item.error ? VisibilityWindowService.teaserOf(item.error) : item.error,
+                  labels: item.labels.map((label) => VisibilityWindowService.teaserOf(label)),
                 }
               : item,
           );
@@ -622,7 +630,7 @@ export class TraceListService {
     >();
     const standalone: FacetDefinition[] = [];
 
-    for (const def of FACET_REGISTRY) {
+    for (const def of ClickHouseFacetRegistryAdapter.FACET_REGISTRY) {
       if (def.kind === "categorical") {
         if (isExpressionCategorical(def) && !def.expression.includes("arrayJoin")) {
           const slot = batched.get(def.table) ?? {
@@ -672,7 +680,7 @@ export class TraceListService {
               tenantId: params.tenantId,
               timeRange: params.timeRange,
               table,
-              timeColumn: TABLE_TIME_COLUMNS[table],
+              timeColumn: ClickHouseFacetRegistryAdapter.TABLE_TIME_COLUMNS[table],
               categoricalSpecs: slot.categoricals.map((d) => ({
                 key: d.key,
                 expression: d.expression,
@@ -714,7 +722,7 @@ export class TraceListService {
 
     // Distinct-value discovery for `isDiscrete`-flagged integer facets. Runs as
     // its own GROUP BY per facet — the batched range pass only yields min/max.
-    for (const def of FACET_REGISTRY) {
+    for (const def of ClickHouseFacetRegistryAdapter.FACET_REGISTRY) {
       if (def.kind !== "range" || !def.isDiscrete) {
         continue;
       }
@@ -727,7 +735,7 @@ export class TraceListService {
               tenantId: params.tenantId,
               timeRange: params.timeRange,
               table: def.table,
-              timeColumn: TABLE_TIME_COLUMNS[def.table],
+              timeColumn: ClickHouseFacetRegistryAdapter.TABLE_TIME_COLUMNS[def.table],
               column: def.expression,
               limit: DISCRETE_VALUE_LIMIT,
             })
@@ -779,7 +787,7 @@ export class TraceListService {
 
     // Assemble in registry order so the sidebar's group ordering is preserved.
     const facets: FacetDescriptor[] = [];
-    for (const def of FACET_REGISTRY) {
+    for (const def of ClickHouseFacetRegistryAdapter.FACET_REGISTRY) {
       const descriptor = await this.materializeDescriptor(
         def,
         params,
@@ -931,7 +939,9 @@ export class TraceListService {
       );
     }
 
-    const def = FACET_REGISTRY.find((d) => d.key === params.facetKey);
+    const def = ClickHouseFacetRegistryAdapter.FACET_REGISTRY.find(
+      (d) => d.key === params.facetKey,
+    );
     if (!def) {
       throw new Error(`Unknown facet: ${params.facetKey}`);
     }
@@ -946,7 +956,7 @@ export class TraceListService {
         tenantId: params.tenantId,
         timeRange: params.timeRange,
         table: def.table,
-        timeColumn: TABLE_TIME_COLUMNS[def.table],
+        timeColumn: ClickHouseFacetRegistryAdapter.TABLE_TIME_COLUMNS[def.table],
         facetExpression: def.expression,
         limit: params.limit,
         offset: params.offset,
@@ -1012,7 +1022,7 @@ export class TraceListService {
         tenantId: params.tenantId,
         timeRange: params.timeRange,
         table: def.table,
-        timeColumn: TABLE_TIME_COLUMNS[def.table],
+        timeColumn: ClickHouseFacetRegistryAdapter.TABLE_TIME_COLUMNS[def.table],
         facetExpression: def.expression,
         limit,
         offset: 0,
@@ -1052,7 +1062,7 @@ export class TraceListService {
       tenantId: params.tenantId,
       timeRange: params.timeRange,
       table: def.table,
-      timeColumn: TABLE_TIME_COLUMNS[def.table],
+      timeColumn: ClickHouseFacetRegistryAdapter.TABLE_TIME_COLUMNS[def.table],
       column: def.expression,
     });
 
@@ -1094,6 +1104,83 @@ export class TraceListService {
       totalDistinct: result.totalDistinct,
     };
   }
+
+  static setDiscoverBroadcaster(fn: DiscoverBroadcaster | null): void {
+    discoverBroadcaster = fn;
+  }
+
+  /**
+   * Decode the `langwatch.labels` attribute — a JSON-encoded array of
+   * strings (e.g. `'["prod","beta"]'`) parked on the trace summary. A
+   * missing or malformed value reads as no labels rather than throwing.
+   */
+  static parseLabels(raw: string | undefined): string[] {
+    if (raw == null || raw === "") {
+      return [];
+    }
+
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        return [];
+      }
+
+      return parsed.filter((label): label is string => typeof label === "string" && label !== "");
+    } catch {
+      return [];
+    }
+  }
+
+  static mapToTraceListItem(row: TraceSummaryData): TraceListItem {
+    const status = deriveTraceStatus(row);
+
+    const totalTokens = (row.totalPromptTokenCount ?? 0) + (row.totalCompletionTokenCount ?? 0);
+
+    return {
+      traceId: row.traceId,
+      timestamp: deriveTraceTimestamp({
+        occurredAt: row.occurredAt,
+        storageAnchorMs: row.storageAnchorMs,
+      }),
+      name: row.attributes["langwatch.span.name"] ?? row.traceId.slice(0, 8),
+      serviceName: row.attributes["service.name"] ?? "",
+      durationMs: row.totalDurationMs,
+      totalCost: row.totalCost ?? 0,
+      nonBilledCost: resolveNonBilledCost({
+        foldedNonBilledCost: row.nonBilledCost,
+        totalCost: row.totalCost,
+        attributes: row.attributes,
+      }),
+      totalTokens,
+      inputTokens: row.totalPromptTokenCount,
+      outputTokens: row.totalCompletionTokenCount,
+      cacheReadTokens: parseTokenCount(row.attributes["langwatch.reserved.cache_read_tokens"]),
+      cacheCreationTokens: parseTokenCount(
+        row.attributes["langwatch.reserved.cache_creation_tokens"],
+      ),
+      reasoningTokens: parseTokenCount(row.attributes["langwatch.reserved.reasoning_tokens"]),
+      contextSizeTokens: parseTokenCount(row.attributes["langwatch.reserved.context_size_tokens"]),
+      models: row.models,
+      labels: TraceListService.parseLabels(row.attributes["langwatch.labels"]),
+      promptId: row.lastUsedPromptId,
+      promptVersionNumber: row.lastUsedPromptVersionNumber,
+      status,
+      spanCount: row.spanCount,
+      sizeBytes: row.sizeBytes ?? 0,
+      input: row.computedInput,
+      output: row.computedOutput,
+      inputMediaRefs: presentMediaRefs(row.attributes[RESERVED_INPUT_MEDIA_REFS]),
+      outputMediaRefs: presentMediaRefs(row.attributes[RESERVED_OUTPUT_MEDIA_REFS]),
+      error: row.errorMessage,
+      conversationId: row.attributes["gen_ai.conversation.id"] ?? null,
+      userId: row.attributes["langwatch.user_id"] ?? null,
+      origin: deriveTraceOrigin(row.attributes),
+      tokensEstimated: row.tokensEstimated,
+      ttft: row.timeToFirstTokenMs,
+      traceName: row.traceName,
+      rootSpanType: row.rootSpanType,
+    };
+  }
 }
 
 /**
@@ -1109,28 +1196,6 @@ function parseTokenCount(raw: string | undefined): number | null {
   const n = Number(raw);
 
   return Number.isFinite(n) ? n : null;
-}
-
-/**
- * Decode the `langwatch.labels` attribute — a JSON-encoded array of
- * strings (e.g. `'["prod","beta"]'`) parked on the trace summary. A
- * missing or malformed value reads as no labels rather than throwing.
- */
-export function parseLabels(raw: string | undefined): string[] {
-  if (raw == null || raw === "") {
-    return [];
-  }
-
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed.filter((label): label is string => typeof label === "string" && label !== "");
-  } catch {
-    return [];
-  }
 }
 
 /** Keep this normalization in lockstep with `cursorSortExpression` in the CH repository. */
@@ -1180,55 +1245,4 @@ function presentMediaRefs(serialized: string | undefined): TraceMediaRef[] | und
   const refs = parseMediaRefs(serialized);
 
   return refs.length > 0 ? refs : undefined;
-}
-
-export function mapToTraceListItem(row: TraceSummaryData): TraceListItem {
-  const status = deriveTraceStatus(row);
-
-  const totalTokens = (row.totalPromptTokenCount ?? 0) + (row.totalCompletionTokenCount ?? 0);
-
-  return {
-    traceId: row.traceId,
-    timestamp: deriveTraceTimestamp({
-      occurredAt: row.occurredAt,
-      storageAnchorMs: row.storageAnchorMs,
-    }),
-    name: row.attributes["langwatch.span.name"] ?? row.traceId.slice(0, 8),
-    serviceName: row.attributes["service.name"] ?? "",
-    durationMs: row.totalDurationMs,
-    totalCost: row.totalCost ?? 0,
-    nonBilledCost: resolveNonBilledCost({
-      foldedNonBilledCost: row.nonBilledCost,
-      totalCost: row.totalCost,
-      attributes: row.attributes,
-    }),
-    totalTokens,
-    inputTokens: row.totalPromptTokenCount,
-    outputTokens: row.totalCompletionTokenCount,
-    cacheReadTokens: parseTokenCount(row.attributes["langwatch.reserved.cache_read_tokens"]),
-    cacheCreationTokens: parseTokenCount(
-      row.attributes["langwatch.reserved.cache_creation_tokens"],
-    ),
-    reasoningTokens: parseTokenCount(row.attributes["langwatch.reserved.reasoning_tokens"]),
-    contextSizeTokens: parseTokenCount(row.attributes["langwatch.reserved.context_size_tokens"]),
-    models: row.models,
-    labels: parseLabels(row.attributes["langwatch.labels"]),
-    promptId: row.lastUsedPromptId,
-    promptVersionNumber: row.lastUsedPromptVersionNumber,
-    status,
-    spanCount: row.spanCount,
-    sizeBytes: row.sizeBytes ?? 0,
-    input: row.computedInput,
-    output: row.computedOutput,
-    inputMediaRefs: presentMediaRefs(row.attributes[RESERVED_INPUT_MEDIA_REFS]),
-    outputMediaRefs: presentMediaRefs(row.attributes[RESERVED_OUTPUT_MEDIA_REFS]),
-    error: row.errorMessage,
-    conversationId: row.attributes["gen_ai.conversation.id"] ?? null,
-    userId: row.attributes["langwatch.user_id"] ?? null,
-    origin: deriveTraceOrigin(row.attributes),
-    tokensEstimated: row.tokensEstimated,
-    ttft: row.timeToFirstTokenMs,
-    traceName: row.traceName,
-    rootSpanType: row.rootSpanType,
-  };
 }

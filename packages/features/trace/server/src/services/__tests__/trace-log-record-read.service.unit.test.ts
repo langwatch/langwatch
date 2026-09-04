@@ -1,11 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import type { LogService } from "@langwatch/log-contract";
 import { LogRecordStorageService } from "../trace-log-record-read.service";
-import type {
+import {
   LogRecordStorageRepository,
-  StoredLogRecordRow,
+  type StoredLogRecordRow,
 } from "../../repositories/log-record-storage.repository";
-import { mergeStoredLogRows } from "../../repositories/log-record-storage.repository";
 
 const row: StoredLogRecordRow = {
   traceId: "trace-1",
@@ -122,7 +121,7 @@ describe("LogRecordStorageService.getLogsByTraceId", () => {
   });
 });
 
-describe("mergeStoredLogRows", () => {
+describe("LogRecordStorageRepository.mergeStoredLogRows", () => {
   describe("given two rows that share the identity key with divergent bodies", () => {
     /** @scenario Ingested log telemetry reaches only the canonical store */
     it("keeps exactly one, and the canonical (later) value wins", () => {
@@ -145,7 +144,7 @@ describe("mergeStoredLogRows", () => {
         body: "canonical-body",
       };
 
-      const merged = mergeStoredLogRows([legacy, canonical]);
+      const merged = LogRecordStorageRepository.mergeStoredLogRows([legacy, canonical]);
 
       expect(merged).toHaveLength(1);
       expect(merged[0]?.body).toBe("canonical-body");
@@ -175,7 +174,7 @@ describe("mergeStoredLogRows", () => {
         attributes: { request_id: "req_a", "event.name": "api_request" },
       };
 
-      const merged = mergeStoredLogRows([insertionOrder, keySorted]);
+      const merged = LogRecordStorageRepository.mergeStoredLogRows([insertionOrder, keySorted]);
 
       expect(merged).toHaveLength(1);
     });

@@ -1,9 +1,9 @@
+import { TraceProcessingProducerAdapter } from "@langwatch/trace-server";
 import {
   AnnotationClickHouseBackfillTask,
   PostgresAnnotationBackfillAdapter,
   TraceAnnotationSyncPort,
 } from "@langwatch/annotation-server";
-import { createTraceProcessingProducerPipeline } from "@langwatch/trace-server";
 import { TASKS_PROCESS_NAME, type TasksEventingInfrastructure } from "./tasks-eventing.composition";
 import type { TasksHost } from "./tasks-host.composition";
 
@@ -64,7 +64,9 @@ export function buildAnnotationClickHouseBackfillTask({
         );
       }
       const registered = eventing.eventSourcing.register(
-        createTraceProcessingProducerPipeline({ processName: TASKS_PROCESS_NAME }),
+        TraceProcessingProducerAdapter.createTraceProcessingProducerPipeline({
+          processName: TASKS_PROCESS_NAME,
+        }),
       );
       return new TasksTraceAnnotationSync(registered.commands.bulkSyncAnnotations);
     },

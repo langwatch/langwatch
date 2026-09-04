@@ -39,7 +39,11 @@ import { HandledError } from "@langwatch/handled-error";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { Trace } from "@langwatch/trace-contract";
-import { ClickHouseTraceExistenceRepository, TraceEditOverlayService } from "@langwatch/trace-server";
+import {
+  ClickHouseTraceExistenceRepository,
+  PrismaTraceEditOverlayRepository,
+  TraceEditOverlayService,
+} from "@langwatch/trace-server";
 import type { UserService } from "@langwatch/user-contract";
 
 import type { ApiTrpcFeatureMount } from "../../api.application";
@@ -118,7 +122,7 @@ export function composeAnnotationFeature(options: {
     organizations,
   }).build();
 
-  const overlay = TraceEditOverlayService.create(prisma);
+  const overlay = TraceEditOverlayService.create(PrismaTraceEditOverlayRepository.create(prisma));
   const traceExistence = composeTraceExistence(options.resolveClickHouseClient);
   const traceContent = options.traceContent;
 
@@ -188,12 +192,14 @@ export function refusingAnnotationFeature(): ComposedAnnotationFeature {
   const refuse = (): never => {
     throw new ApiAnnotationUnavailableError("annotation surface");
   };
-  const refuseEvery = <T,>(): T =>
-    new Proxy({}, { get: () => refuse, has: () => true }) as T;
+  const refuseEvery = <T>(): T => new Proxy({}, { get: () => refuse, has: () => true }) as T;
 
   return {
     routers: (mount) => ({
-      annotation: createAnnotationTrpcRouter({ ...mount, ports: refuseEvery<AnnotationTrpcPorts>() }),
+      annotation: createAnnotationTrpcRouter({
+        ...mount,
+        ports: refuseEvery<AnnotationTrpcPorts>(),
+      }),
       annotationScore: createAnnotationScoreTrpcRouter(mount),
     }),
     app: refuseEvery<AnnotationApp>(),

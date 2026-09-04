@@ -1,55 +1,4 @@
 /**
- * Coerces a message's `content` field to an array we can walk.
- *
- * Some SDK callers (notably the langwatch python-sdk) used to send
- * `content` as a stringified Python-repr of a list
- * (`"[{'type': 'input_audio', ...}]"`) instead of a JSON-encoded array.
- * Newer SDK versions emit JSON directly; this function keeps the
- * Python-repr fallback for older clients in flight.
- *
- * Returns:
- *  - The array verbatim when content is already an array.
- *  - A parsed array when content is a string that decodes (JSON or
- *    Python-repr) to an array of objects.
- *  - null otherwise (caller should pass through unchanged).
- */
-export function coerceContentToArray(content: unknown): unknown[] | null {
-  if (Array.isArray(content)) {
-    return content;
-  }
-
-  if (typeof content !== "string") {
-    return null;
-  }
-
-  const trimmed = content.trim();
-  if (!trimmed.startsWith("[")) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(trimmed) as unknown;
-    if (Array.isArray(parsed)) {
-      return parsed;
-    }
-  } catch {
-    // fall through to Python-repr recovery
-  }
-
-  const jsonified = pythonReprToJsonish(trimmed);
-  try {
-    const parsed = JSON.parse(jsonified) as unknown;
-    if (Array.isArray(parsed)) {
-      return parsed;
-    }
-  } catch {
-    // give up
-  }
-
-  return null;
-}
-
-/**
  * Convert a Python-repr-like string to a best-effort JSON string.
  *
  * Walks character-by-character with a tiny quote state machine so that
@@ -245,4 +194,61 @@ function pythonReprToJsonish(input: string): string {
   }
 
   return out;
+}
+
+export class TraceContentArrayService {
+  static create(): TraceContentArrayService {
+    return new TraceContentArrayService();
+  }
+
+  /**
+   * Coerces a message's `content` field to an array we can walk.
+   *
+   * Some SDK callers (notably the langwatch python-sdk) used to send
+   * `content` as a stringified Python-repr of a list
+   * (`"[{'type': 'input_audio', ...}]"`) instead of a JSON-encoded array.
+   * Newer SDK versions emit JSON directly; this function keeps the
+   * Python-repr fallback for older clients in flight.
+   *
+   * Returns:
+   *  - The array verbatim when content is already an array.
+   *  - A parsed array when content is a string that decodes (JSON or
+   *    Python-repr) to an array of objects.
+   *  - null otherwise (caller should pass through unchanged).
+   */
+  static coerceContentToArray(content: unknown): unknown[] | null {
+    if (Array.isArray(content)) {
+      return content;
+    }
+
+    if (typeof content !== "string") {
+      return null;
+    }
+
+    const trimmed = content.trim();
+    if (!trimmed.startsWith("[")) {
+      return null;
+    }
+
+    try {
+      const parsed = JSON.parse(trimmed) as unknown;
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+    } catch {
+      // fall through to Python-repr recovery
+    }
+
+    const jsonified = pythonReprToJsonish(trimmed);
+    try {
+      const parsed = JSON.parse(jsonified) as unknown;
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+    } catch {
+      // give up
+    }
+
+    return null;
+  }
 }

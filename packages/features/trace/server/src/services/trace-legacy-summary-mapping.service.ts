@@ -37,123 +37,6 @@ const FALLBACK_ATTRIBUTE_MAPPINGS: Record<string, keyof TraceMetadata> = {
 };
 
 /**
- * Maps TraceSummaryData.attributes to the legacy TraceMetadata format.
- *
- * The Attributes map in ClickHouse stores various metadata using semantic
- * convention keys. These need to be mapped to the flat TraceMetadata structure.
- */
-export function mapAttributesToMetadata(
-  attributes: Record<string, string>,
-  topicId: string | null,
-  subTopicId: string | null,
-): TraceMetadata {
-  const metadata: TraceMetadata = {};
-
-  // Map known attributes to reserved fields (primary — last-wins within this set)
-  for (const [attrKey, metadataKey] of Object.entries(RESERVED_ATTRIBUTE_MAPPINGS)) {
-    const value = attributes[attrKey];
-    if (value !== void 0) {
-      metadata[metadataKey] = value;
-    }
-  }
-
-  // Map fallback attributes (only if target field not already set)
-  for (const [attrKey, metadataKey] of Object.entries(FALLBACK_ATTRIBUTE_MAPPINGS)) {
-    const value = attributes[attrKey];
-    if (value !== void 0 && metadata[metadataKey] === undefined) {
-      metadata[metadataKey] = value;
-    }
-  }
-
-  // Add topic IDs
-  if (topicId) {
-    metadata.topic_id = topicId;
-  }
-
-  if (subTopicId) {
-    metadata.subtopic_id = subTopicId;
-  }
-
-  // Extract labels if present
-  const labelsStr = attributes["langwatch.labels"] ?? attributes.labels;
-  if (labelsStr) {
-    try {
-      const labels = JSON.parse(labelsStr);
-      if (Array.isArray(labels)) {
-        metadata.labels = labels;
-      }
-    } catch {
-      // If not valid JSON, treat as single label
-      metadata.labels = [labelsStr];
-    }
-  }
-
-  // Extract prompt IDs if present
-  const promptIdsStr = attributes["langwatch.prompt_ids"];
-  if (promptIdsStr) {
-    try {
-      const promptIds = JSON.parse(promptIdsStr);
-      if (Array.isArray(promptIds)) {
-        metadata.prompt_ids = promptIds;
-      }
-    } catch {
-      // Ignore parse errors
-    }
-  }
-
-  // The fold stamps `metadata.models` as a JSON array string (the set of
-  // models the trace's spans used, most-recent-first); surface it as a real
-  // array like labels/prompt_ids. `metadata.model` (the primary) flows
-  // through the generic passthrough below as a plain string.
-  // A value that is not a JSON array is not ours: it stays reachable through
-  // the generic passthrough below with its original string value.
-  const modelsStr = attributes["metadata.models"];
-  let modelsParsedAsArray = false;
-  if (modelsStr) {
-    try {
-      const models = JSON.parse(modelsStr);
-      if (Array.isArray(models)) {
-        metadata.models = models;
-        modelsParsedAsArray = true;
-      }
-    } catch {
-      // Ignore parse errors
-    }
-  }
-
-  // Add remaining attributes as custom metadata
-  const knownKeys = new Set([
-    ...Object.keys(RESERVED_ATTRIBUTE_MAPPINGS),
-    ...Object.keys(FALLBACK_ATTRIBUTE_MAPPINGS),
-    "langwatch.labels",
-    "labels",
-    "langwatch.prompt_ids",
-    "langwatch.prompt_version_ids",
-    // Fold-internal bookkeeping for the metadata.model stamp; not user metadata.
-    "langwatch.reserved.model_metadata_stamped",
-  ]);
-  if (modelsParsedAsArray) {
-    knownKeys.add("metadata.models");
-  }
-
-  for (const [key, value] of Object.entries(attributes)) {
-    if (knownKeys.has(key)) {
-      continue;
-    }
-
-    // Strip internal metadata. prefix so API returns bare keys (e.g., "user" not "metadata.user")
-    const bareKey = key.startsWith("metadata.") ? key.slice("metadata.".length) : key;
-    if (bareKey && metadata[bareKey] === undefined) {
-      metadata[bareKey] = value;
-    }
-  }
-
-  addOtelLogRecordCountAlias(metadata, attributes);
-
-  return metadata;
-}
-
-/**
  * Clearly named sibling for the OTel log-record count: it counts log records
  * correlated to the trace, not model/API calls, and the raw
  * `langwatch.reserved.log_record_count` key keeps flowing unchanged because
@@ -480,120 +363,251 @@ function createError(
   };
 }
 
-/**
- * Extracts Event objects from spans that have event.type in their attributes.
- * Events are stored in ClickHouse as spans with event.* span attributes.
- * After unflattening, these appear as params.event.type, params.event.metrics.*, etc.
- */
-export function extractEventsFromSpans({
-  spans,
-  projectId,
-  traceId,
-}: {
-  spans: Span[];
-  projectId: string;
-  traceId: string;
-}): Event[] {
-  const events: Event[] = [];
-
-  for (const span of spans) {
-    const eventObj = span.params?.event;
-    if (typeof eventObj !== "object" || eventObj === null) {
-      continue;
-    }
-
-    const eventRecord = eventObj as Record<string, unknown>;
-    const eventType = eventRecord.type;
-    if (typeof eventType !== "string" || !eventType) {
-      continue;
-    }
-
-    const metrics: Record<string, number> = {};
-    const rawMetrics = eventRecord.metrics;
-    if (typeof rawMetrics === "object" && rawMetrics !== null) {
-      for (const [key, value] of Object.entries(rawMetrics as Record<string, unknown>)) {
-        const num = Number(value);
-        if (Number.isFinite(num)) {
-          metrics[key] = num;
-        }
-      }
-    }
-
-    const eventDetails: Record<string, string> = {};
-    const rawDetails = eventRecord.details;
-    if (typeof rawDetails === "object" && rawDetails !== null) {
-      for (const [key, value] of Object.entries(rawDetails as Record<string, unknown>)) {
-        if (typeof value === "string") {
-          eventDetails[key] = value;
-        }
-      }
-    }
-
-    events.push({
-      event_id: span.span_id,
-      event_type: eventType,
-      project_id: projectId,
-      metrics,
-      event_details: eventDetails,
-      trace_id: traceId,
-      timestamps: {
-        started_at: span.timestamps.started_at,
-        inserted_at: span.timestamps.started_at,
-        updated_at: span.timestamps.finished_at,
-      },
-    });
+export class TraceLegacySummaryMappingService {
+  static create(): TraceLegacySummaryMappingService {
+    return new TraceLegacySummaryMappingService();
   }
 
-  return events;
-}
+  /**
+   * Maps TraceSummaryData.attributes to the legacy TraceMetadata format.
+   *
+   * The Attributes map in ClickHouse stores various metadata using semantic
+   * convention keys. These need to be mapped to the flat TraceMetadata structure.
+   */
+  static mapAttributesToMetadata(
+    attributes: Record<string, string>,
+    topicId: string | null,
+    subTopicId: string | null,
+  ): TraceMetadata {
+    const metadata: TraceMetadata = {};
 
-/**
- * Maps a TraceSummaryData (from ClickHouse trace_summaries) and its associated spans
- * to the legacy Trace type used by the pre-ClickHouse trace system.
- */
-export function mapTraceSummaryToTrace(
-  summary: TraceSummaryData,
-  spans: Span[],
-  projectId: string,
-  traceCanonicalisation: TraceCanonicalisationService,
-): Trace {
-  const metadata = mapAttributesToMetadata(summary.attributes, summary.topicId, summary.subTopicId);
+    // Map known attributes to reserved fields (primary — last-wins within this set)
+    for (const [attrKey, metadataKey] of Object.entries(RESERVED_ATTRIBUTE_MAPPINGS)) {
+      const value = attributes[attrKey];
+      if (value !== void 0) {
+        metadata[metadataKey] = value;
+      }
+    }
 
-  const events = extractEventsFromSpans({
+    // Map fallback attributes (only if target field not already set)
+    for (const [attrKey, metadataKey] of Object.entries(FALLBACK_ATTRIBUTE_MAPPINGS)) {
+      const value = attributes[attrKey];
+      if (value !== void 0 && metadata[metadataKey] === undefined) {
+        metadata[metadataKey] = value;
+      }
+    }
+
+    // Add topic IDs
+    if (topicId) {
+      metadata.topic_id = topicId;
+    }
+
+    if (subTopicId) {
+      metadata.subtopic_id = subTopicId;
+    }
+
+    // Extract labels if present
+    const labelsStr = attributes["langwatch.labels"] ?? attributes.labels;
+    if (labelsStr) {
+      try {
+        const labels = JSON.parse(labelsStr);
+        if (Array.isArray(labels)) {
+          metadata.labels = labels;
+        }
+      } catch {
+        // If not valid JSON, treat as single label
+        metadata.labels = [labelsStr];
+      }
+    }
+
+    // Extract prompt IDs if present
+    const promptIdsStr = attributes["langwatch.prompt_ids"];
+    if (promptIdsStr) {
+      try {
+        const promptIds = JSON.parse(promptIdsStr);
+        if (Array.isArray(promptIds)) {
+          metadata.prompt_ids = promptIds;
+        }
+      } catch {
+        // Ignore parse errors
+      }
+    }
+
+    // The fold stamps `metadata.models` as a JSON array string (the set of
+    // models the trace's spans used, most-recent-first); surface it as a real
+    // array like labels/prompt_ids. `metadata.model` (the primary) flows
+    // through the generic passthrough below as a plain string.
+    // A value that is not a JSON array is not ours: it stays reachable through
+    // the generic passthrough below with its original string value.
+    const modelsStr = attributes["metadata.models"];
+    let modelsParsedAsArray = false;
+    if (modelsStr) {
+      try {
+        const models = JSON.parse(modelsStr);
+        if (Array.isArray(models)) {
+          metadata.models = models;
+          modelsParsedAsArray = true;
+        }
+      } catch {
+        // Ignore parse errors
+      }
+    }
+
+    // Add remaining attributes as custom metadata
+    const knownKeys = new Set([
+      ...Object.keys(RESERVED_ATTRIBUTE_MAPPINGS),
+      ...Object.keys(FALLBACK_ATTRIBUTE_MAPPINGS),
+      "langwatch.labels",
+      "labels",
+      "langwatch.prompt_ids",
+      "langwatch.prompt_version_ids",
+      // Fold-internal bookkeeping for the metadata.model stamp; not user metadata.
+      "langwatch.reserved.model_metadata_stamped",
+    ]);
+    if (modelsParsedAsArray) {
+      knownKeys.add("metadata.models");
+    }
+
+    for (const [key, value] of Object.entries(attributes)) {
+      if (knownKeys.has(key)) {
+        continue;
+      }
+
+      // Strip internal metadata. prefix so API returns bare keys (e.g., "user" not "metadata.user")
+      const bareKey = key.startsWith("metadata.") ? key.slice("metadata.".length) : key;
+      if (bareKey && metadata[bareKey] === undefined) {
+        metadata[bareKey] = value;
+      }
+    }
+
+    addOtelLogRecordCountAlias(metadata, attributes);
+
+    return metadata;
+  }
+
+  /**
+   * Extracts Event objects from spans that have event.type in their attributes.
+   * Events are stored in ClickHouse as spans with event.* span attributes.
+   * After unflattening, these appear as params.event.type, params.event.metrics.*, etc.
+   */
+  static extractEventsFromSpans({
     spans,
     projectId,
-    traceId: summary.traceId,
-  });
+    traceId,
+  }: {
+    spans: Span[];
+    projectId: string;
+    traceId: string;
+  }): Event[] {
+    const events: Event[] = [];
 
-  const trace: Trace = {
-    trace_id: summary.traceId,
-    project_id: projectId,
-    metadata,
-    timestamps: {
-      // The span timing baseline where the trace has one, otherwise the storage
-      // anchor (ADR-087). A trace whose only signal is a log record has no span
-      // start to report; before the anchor existed it reported the epoch, which
-      // rendered as 1970 in the drawer and the list. The anchor is the time that
-      // trace's first signal was accepted, which is the honest answer.
-      started_at: summary.occurredAt > 0 ? summary.occurredAt : (summary.storageAnchorMs ?? 0),
-      inserted_at: summary.createdAt,
-      updated_at: summary.updatedAt,
-    },
-    input: parseComputedInput(summary.computedInput, summary.attributes, traceCanonicalisation),
-    output: parseComputedOutput(summary.computedOutput, summary.attributes, traceCanonicalisation),
-    metrics: {
-      first_token_ms: summary.timeToFirstTokenMs,
-      total_time_ms: summary.totalDurationMs,
-      prompt_tokens: summary.totalPromptTokenCount,
-      completion_tokens: summary.totalCompletionTokenCount,
-      total_cost: summary.totalCost,
-      tokens_estimated: summary.tokensEstimated,
-      ...tokenMetricsFromAttributes(summary.attributes),
-    },
-    error: createError(summary.containsErrorStatus, summary.errorMessage),
-    events: events.length > 0 ? events : undefined,
-    spans,
-  };
+    for (const span of spans) {
+      const eventObj = span.params?.event;
+      if (typeof eventObj !== "object" || eventObj === null) {
+        continue;
+      }
 
-  return trace;
+      const eventRecord = eventObj as Record<string, unknown>;
+      const eventType = eventRecord.type;
+      if (typeof eventType !== "string" || !eventType) {
+        continue;
+      }
+
+      const metrics: Record<string, number> = {};
+      const rawMetrics = eventRecord.metrics;
+      if (typeof rawMetrics === "object" && rawMetrics !== null) {
+        for (const [key, value] of Object.entries(rawMetrics as Record<string, unknown>)) {
+          const num = Number(value);
+          if (Number.isFinite(num)) {
+            metrics[key] = num;
+          }
+        }
+      }
+
+      const eventDetails: Record<string, string> = {};
+      const rawDetails = eventRecord.details;
+      if (typeof rawDetails === "object" && rawDetails !== null) {
+        for (const [key, value] of Object.entries(rawDetails as Record<string, unknown>)) {
+          if (typeof value === "string") {
+            eventDetails[key] = value;
+          }
+        }
+      }
+
+      events.push({
+        event_id: span.span_id,
+        event_type: eventType,
+        project_id: projectId,
+        metrics,
+        event_details: eventDetails,
+        trace_id: traceId,
+        timestamps: {
+          started_at: span.timestamps.started_at,
+          inserted_at: span.timestamps.started_at,
+          updated_at: span.timestamps.finished_at,
+        },
+      });
+    }
+
+    return events;
+  }
+
+  /**
+   * Maps a TraceSummaryData (from ClickHouse trace_summaries) and its associated spans
+   * to the legacy Trace type used by the pre-ClickHouse trace system.
+   */
+  static mapTraceSummaryToTrace(
+    summary: TraceSummaryData,
+    spans: Span[],
+    projectId: string,
+    traceCanonicalisation: TraceCanonicalisationService,
+  ): Trace {
+    const metadata = TraceLegacySummaryMappingService.mapAttributesToMetadata(
+      summary.attributes,
+      summary.topicId,
+      summary.subTopicId,
+    );
+
+    const events = TraceLegacySummaryMappingService.extractEventsFromSpans({
+      spans,
+      projectId,
+      traceId: summary.traceId,
+    });
+
+    const trace: Trace = {
+      trace_id: summary.traceId,
+      project_id: projectId,
+      metadata,
+      timestamps: {
+        // The span timing baseline where the trace has one, otherwise the storage
+        // anchor (ADR-087). A trace whose only signal is a log record has no span
+        // start to report; before the anchor existed it reported the epoch, which
+        // rendered as 1970 in the drawer and the list. The anchor is the time that
+        // trace's first signal was accepted, which is the honest answer.
+        started_at: summary.occurredAt > 0 ? summary.occurredAt : (summary.storageAnchorMs ?? 0),
+        inserted_at: summary.createdAt,
+        updated_at: summary.updatedAt,
+      },
+      input: parseComputedInput(summary.computedInput, summary.attributes, traceCanonicalisation),
+      output: parseComputedOutput(
+        summary.computedOutput,
+        summary.attributes,
+        traceCanonicalisation,
+      ),
+      metrics: {
+        first_token_ms: summary.timeToFirstTokenMs,
+        total_time_ms: summary.totalDurationMs,
+        prompt_tokens: summary.totalPromptTokenCount,
+        completion_tokens: summary.totalCompletionTokenCount,
+        total_cost: summary.totalCost,
+        tokens_estimated: summary.tokensEstimated,
+        ...tokenMetricsFromAttributes(summary.attributes),
+      },
+      error: createError(summary.containsErrorStatus, summary.errorMessage),
+      events: events.length > 0 ? events : undefined,
+      spans,
+    };
+
+    return trace;
+  }
 }

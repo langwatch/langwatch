@@ -44,6 +44,14 @@
  *   - the EVALUATION summaries the grid labels its rows with, when the
  *     execution half composed none.
  */
+import {
+  TraceReadRedactionService,
+  ClaudeCodeLogEnrichmentService,
+  TraceReadableSpanService,
+  TraceEditOverlayRedactionService,
+  TraceEditOverlayRestoreService,
+  TraceMetadataWriteService,
+} from "@langwatch/trace-server";
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { CodingAgentService } from "@langwatch/coding-agent-contract";
@@ -84,36 +92,25 @@ import {
   type TraceService as TraceTreeService,
 } from "@langwatch/trace-contract";
 import {
-  applyDerivedTraceEventProtections,
-  applySpanProtections,
-  BlobStore,
+  TraceBlobStoreService,
   ClickHouseTraceAdapter,
   DERIVED_INPUT_ATTR_PREFIX,
   DERIVED_OUTPUT_ATTR_PREFIX,
-  enrichCodingAgentSpansFromLogs,
-  enrichSingleSpanWithClaudeLogContent,
-  extractRedactionsFromAllSpanInputs,
-  extractRedactionsFromAllSpanOutputs,
-  formatSpansDigest,
-  generateTraceAction,
-  generateTraceQueryFromPrompt,
-  isCodingAgentShapedSpan,
+  TraceAiQueryService,
   LogRecordStorageClickHouseRepository,
   LogRecordStorageService,
-  mapSummaryRowsToClaudeRefs,
   NullLogRecordStorageRepository,
   NullSessionGroupsRepository,
   NullSpanStorageRepository,
   NullTraceListAdapter,
   NullTraceSummaryRepository,
-  redactObject,
-  redactPatchForViewer,
-  restoreWithheldEdits,
   SessionGroupsClickHouseRepository,
   SessionGroupsService,
   SpanStorageClickHouseRepository,
   SpanStorageService,
   TraceCanonicalisationService,
+  ClickHouseTraceLegacyReadAdapter,
+  PrismaTraceEditOverlayRepository,
   TraceEditOverlayService,
   TraceIOExtractionService,
   TraceListClickHouseRepository,
@@ -127,7 +124,6 @@ import {
   TraceSummaryClickHouseRepository,
   TraceSummaryService,
   traceMetadataUpdateSchema,
-  updateTraceMetadata,
   VisibilityWindowService,
   type ClaudeSpanRef,
   type Protections,
@@ -430,11 +426,14 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
       mappers: {
         spanDisplay: { buildDisplayInput, stringifySpanIO },
         spanProtection: {
-          applySpanProtections,
-          extractRedactionsFromAllSpanInputs,
-          extractRedactionsFromAllSpanOutputs,
-          redactObject,
-          applyDerivedTraceEventProtections,
+          applySpanProtections: TraceReadRedactionService.applySpanProtections,
+          extractRedactionsFromAllSpanInputs:
+            TraceReadRedactionService.extractRedactionsFromAllSpanInputs,
+          extractRedactionsFromAllSpanOutputs:
+            TraceReadRedactionService.extractRedactionsFromAllSpanOutputs,
+          redactObject: TraceReadRedactionService.redactObject,
+          applyDerivedTraceEventProtections:
+            TraceReadRedactionService.applyDerivedTraceEventProtections,
         },
         contentPrivacy: {
           contentKeyCatalog: CONTENT_KEY_CATALOG,
@@ -446,14 +445,15 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
         },
       },
       codingAgentEnrichment: {
-        isCodingAgentShapedSpan,
-        enrichSpansFromLogs: (input) => enrichCodingAgentSpansFromLogs(input),
+        isCodingAgentShapedSpan: ClaudeCodeLogEnrichmentService.isCodingAgentShapedSpan,
+        enrichSpansFromLogs: (input) =>
+          ClaudeCodeLogEnrichmentService.enrichCodingAgentSpansFromLogs(input),
         enrichSingleSpanWithLogContent: (input) =>
-          enrichSingleSpanWithClaudeLogContent({
+          ClaudeCodeLogEnrichmentService.enrichSingleSpanWithClaudeLogContent({
             ...input,
             modelCallRefs: input.modelCallRefs as ClaudeSpanRef[],
           }),
-        mapSummaryRowsToRefs: mapSummaryRowsToClaudeRefs,
+        mapSummaryRowsToRefs: ClaudeCodeLogEnrichmentService.mapSummaryRowsToClaudeRefs,
       },
     };
   }
@@ -469,22 +469,24 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
   > {
     return {
       runAiQuery: (input) =>
-        generateTraceQueryFromPrompt({
+        TraceAiQueryService.generateTraceQueryFromPrompt({
           ...input,
           resolveModel: (model) => this.resolveComposerModel(model),
           traces: this.composed.tree,
         }),
       runAiAction: (input) =>
-        generateTraceAction({
+        TraceAiQueryService.generateTraceAction({
           ...input,
           resolveModel: (model) => this.resolveComposerModel(model),
           traces: this.composed.tree,
         }),
       traceMetadataUpdateSchema,
       updateTraceMetadata: (input) =>
-        updateTraceMetadata({
+        TraceMetadataWriteService.updateTraceMetadata({
           ...input,
-          metadata: input.metadata as Parameters<typeof updateTraceMetadata>[0]["metadata"],
+          metadata: input.metadata as Parameters<
+            typeof TraceMetadataWriteService.updateTraceMetadata
+          >[0]["metadata"],
           ingest: this.requireIngest(),
         }),
       // The unmapped-cost hint is the MODEL PROVIDER feature's reading, and it
@@ -511,7 +513,7 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
       listInputSchema: API_TRACE_LIST_INPUT,
       evaluatorTypeSchema: evaluatorTypesSchema,
       preconditionSchema: apiPreconditionSchema,
-      formatSpansDigest: (spans) => formatSpansDigest(spans),
+      formatSpansDigest: (spans) => TraceReadableSpanService.formatSpansDigest(spans),
       checkEvaluatorRequiredFields: (input) => this.evaluatorRequiredFieldsMet(input),
       buildPreconditionTraceData: (input) => preconditionTraceData(input),
       evaluatePreconditions: (input) => this.preconditionsHold(input),
@@ -559,10 +561,13 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
   }
 
   editOverlayRedaction(): {
-    redactPatchForViewer: typeof redactPatchForViewer;
-    restoreWithheldEdits: typeof restoreWithheldEdits;
+    redactPatchForViewer: typeof TraceEditOverlayRedactionService.redactPatchForViewer;
+    restoreWithheldEdits: typeof TraceEditOverlayRestoreService.restoreWithheldEdits;
   } {
-    return { redactPatchForViewer, restoreWithheldEdits };
+    return {
+      redactPatchForViewer: TraceEditOverlayRedactionService.redactPatchForViewer,
+      restoreWithheldEdits: TraceEditOverlayRestoreService.restoreWithheldEdits,
+    };
   }
 
   // -------------------------------------------------------------------------
@@ -574,7 +579,7 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
     const resolve = options.resolveClickHouseClient;
     const enabled = resolve !== null;
 
-    const blobStore = new BlobStore({
+    const blobStore = new TraceBlobStoreService({
       // The v1 spool predates this deployment: a ref written before the
       // stored-object registry existed reads back through S3 directly, and
       // this process composes no such client. `resolveOffloadedTraces`
@@ -593,16 +598,22 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
 
     const read = TraceLegacyReadService.create({
       traceCanonicalisation: this.canonicalisation,
-      prisma: options.prisma,
-      ...(resolve ? { resolveClickHouseClient: resolve } : {}),
-      ...(options.filterConditions ? { filterConditions: options.filterConditions } : {}),
-      blobResolutionDeps,
+      traceRead: ClickHouseTraceLegacyReadAdapter.create({
+        prisma: options.prisma,
+        traceCanonicalisation: this.canonicalisation,
+        ...(resolve ? { resolveClickHouseClient: resolve } : {}),
+        ...(options.filterConditions ? { filterConditions: options.filterConditions } : {}),
+        blobResolutionDeps,
+        retentionResolver: options.dataRetention,
+      }),
+      editOverlay: TraceEditOverlayService.create(
+        PrismaTraceEditOverlayRepository.create(options.prisma),
+      ),
       logRecordStorage: this.composeLogRecords(),
       // The SAME rule the list beside it follows: a composed capability where
       // the process has one, and a refusal by name where it does not. Left
       // absent, every single-trace read threw a plain Error and answered a 500.
       evaluationService: options.evaluations ?? this.refusingEvaluations(),
-      retentionResolver: options.dataRetention,
     });
 
     return {
@@ -637,7 +648,9 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
       tree: this.composeTree(),
       logRecords: this.composeLogRecords(),
       canonicalisation: this.canonicalisation,
-      editOverlay: TraceEditOverlayService.create(options.prisma),
+      editOverlay: TraceEditOverlayService.create(
+        PrismaTraceEditOverlayRepository.create(options.prisma),
+      ),
       changeTraceName: () => Promise.reject(this.refuse("the trace rename command")),
     } as TraceAppDependencies["traces"];
   }

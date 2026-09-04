@@ -7,11 +7,11 @@
  * ClickHouse SQL correctness — those are separately covered by unit tests
  * (trace-blob-store.service.unit.test.ts, trace-offload-resolution.service.unit.test.ts).
  * The full pipeline wiring is exercised by:
- *   - Simulating the dispatch interposition: calling `leanForProjection` on a
+ *   - Simulating the dispatch interposition: calling `TraceProjectionLeanService.leanForProjection` on a
  *     synthetic SpanReceived event whose IO attr exceeds IO_PREVIEW_BYTES.
  *   - Verifying the lean event carries the eventref pointer and the preview.
- *   - Feeding the lean span attributes directly into `resolveOffloadedTraces`
- *     backed by a fake BlobStore.getFromEventLog, which returns the full value.
+ *   - Feeding the lean span attributes directly into `TraceOffloadResolutionService.resolveOffloadedTraces`
+ *     backed by a fake TraceBlobStoreService.getFromEventLog, which returns the full value.
  *   - Asserting TraceIOExtractionService recomputes trace.output correctly.
  *
  * This approach exercises every production module in the pipeline without
@@ -20,13 +20,15 @@
  *
  * Was
  * `platform/app/src/server/app-layer/traces/__tests__/large-trace-blob-offload.integration.test.ts`.
- * `leanForProjection` now lives in `trace-projection-lean.service`,
- * `resolveOffloadedTraces` in `trace-offload-resolution.service`. The
+ * `TraceProjectionLeanService.leanForProjection` now lives in `trace-projection-lean.service`,
+ * `TraceOffloadResolutionService.resolveOffloadedTraces` in `trace-offload-resolution.service`. The
  * "over-threshold command is spooled to S3" scenario is retired — see the
  * lane report.
  *
  * BDD structure: `describe("given …")` -> `describe("when …")` -> `it("…")`.
  */
+import { TraceProjectionLeanService } from "../trace-projection-lean.service";
+import { TraceOffloadResolutionService } from "../trace-offload-resolution.service";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // TraceIOExtractionService wraps its methods in getLangWatchTracer spans.
@@ -68,10 +70,10 @@ import {
   SPAN_RECEIVED_EVENT_TYPE,
 } from "@langwatch/trace-contract";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
-import type { BlobStore } from "../trace-blob-store.service";
+import type { TraceBlobStoreService } from "../trace-blob-store.service";
 import { BlobNotFoundError } from "../trace-blob-store.service";
-import { IO_PREVIEW_BYTES, leanForProjection } from "../trace-projection-lean.service";
-import { resolveOffloadedTraces, type WarnLogger } from "../trace-offload-resolution.service";
+import { IO_PREVIEW_BYTES } from "../trace-projection-lean.service";
+import { type WarnLogger } from "../trace-offload-resolution.service";
 import { TraceIOExtractionService } from "../trace-io-extraction.service";
 
 // ---------------------------------------------------------------------------
@@ -90,11 +92,11 @@ function ioExtractionService(): TraceIOExtractionService {
 }
 
 /**
- * Builds a fake BlobStore whose getFromEventLog returns values from an in-memory map.
+ * Builds a fake TraceBlobStoreService whose getFromEventLog returns values from an in-memory map.
  * Simulates the event_log read path without a real ClickHouse instance.
  */
 function makeEventLogBlobStore(contents: Record<string, string>): {
-  blobStore: BlobStore;
+  blobStore: TraceBlobStoreService;
   getFromEventLogSpy: ReturnType<typeof vi.fn>;
 } {
   const getFromEventLogSpy = vi.fn(
@@ -117,7 +119,7 @@ function makeEventLogBlobStore(contents: Record<string, string>): {
     putSpool: vi.fn(),
     getSpool: vi.fn(),
     deleteSpool: vi.fn(),
-  } as unknown as BlobStore;
+  } as unknown as TraceBlobStoreService;
 
   return { blobStore, getFromEventLogSpy };
 }
@@ -157,7 +159,7 @@ function makeSpanReceivedEvent({ output }: { output: string }): Event {
 }
 
 /**
- * Extracts span attributes from a lean event (post-leanForProjection) into
+ * Extracts span attributes from a lean event (post-TraceProjectionLeanService.leanForProjection) into
  * the Record<string, string> format that NormalizedSpan.spanAttributes uses.
  */
 function extractSpanAttrs(event: Event): Record<string, string> {
@@ -175,7 +177,7 @@ function extractSpanAttrs(event: Event): Record<string, string> {
 
 /**
  * Builds a NormalizedSpan from a span attributes map, simulating what the
- * projection receives from the command worker after leanForProjection.
+ * projection receives from the command worker after TraceProjectionLeanService.leanForProjection.
  */
 function makeNormalizedSpan(spanAttributes: Record<string, string>): NormalizedSpan {
   return {
@@ -208,7 +210,7 @@ function makeNormalizedSpan(spanAttributes: Record<string, string>): NormalizedS
 }
 
 // ---------------------------------------------------------------------------
-// leanForProjection + resolveOffloadedTraces pipeline
+// TraceProjectionLeanService.leanForProjection + TraceOffloadResolutionService.resolveOffloadedTraces pipeline
 // ---------------------------------------------------------------------------
 
 describe("given a span field value exceeds the offload threshold (IO_PREVIEW_BYTES)", () => {
@@ -216,11 +218,11 @@ describe("given a span field value exceeds the offload threshold (IO_PREVIEW_BYT
 
   beforeEach(() => {
     const fullEvent = makeSpanReceivedEvent({ output: ONE_MB_OUTPUT });
-    const leanEvent = leanForProjection(fullEvent);
+    const leanEvent = TraceProjectionLeanService.leanForProjection(fullEvent);
     leanAttrs = extractSpanAttrs(leanEvent);
   });
 
-  describe("when leanForProjection is applied (simulating dispatch interposition)", () => {
+  describe("when TraceProjectionLeanService.leanForProjection is applied (simulating dispatch interposition)", () => {
     /** @scenario event_log carries the full event content; projection queue carries the lean shape */
     it("the lean event carries a preview within the IO_PREVIEW_BYTES budget for langwatch.output", () => {
       const previewValue = leanAttrs["langwatch.output"] ?? "";
@@ -245,8 +247,10 @@ describe("given a span field value exceeds the offload threshold (IO_PREVIEW_BYT
     });
   });
 
-  describe("when the lean span is resolved via resolveOffloadedTraces backed by event_log", () => {
-    let resolvedResult: Awaited<ReturnType<typeof resolveOffloadedTraces>>;
+  describe("when the lean span is resolved via TraceOffloadResolutionService.resolveOffloadedTraces backed by event_log", () => {
+    let resolvedResult: Awaited<
+      ReturnType<typeof TraceOffloadResolutionService.resolveOffloadedTraces>
+    >;
     let getFromEventLogSpy: ReturnType<typeof vi.fn>;
     let logger: WarnLogger;
 
@@ -259,7 +263,7 @@ describe("given a span field value exceeds the offload threshold (IO_PREVIEW_BYT
 
       const normalizedSpan = makeNormalizedSpan(leanAttrs);
 
-      resolvedResult = await resolveOffloadedTraces({
+      resolvedResult = await TraceOffloadResolutionService.resolveOffloadedTraces({
         projectId: PROJECT_ID,
         normalizedSpans: [normalizedSpan],
         blobStore,
@@ -291,7 +295,7 @@ describe("given a span field value exceeds the offload threshold (IO_PREVIEW_BYT
       expect(resolvedResult.anyResolved).toBe(true);
     });
 
-    it("BlobStore.getFromEventLog is called once for the langwatch.output field", () => {
+    it("TraceBlobStoreService.getFromEventLog is called once for the langwatch.output field", () => {
       expect(getFromEventLogSpy).toHaveBeenCalledOnce();
       expect(getFromEventLogSpy).toHaveBeenCalledWith(
         expect.objectContaining({ field: "langwatch.output", tenantId: PROJECT_ID }),
@@ -311,15 +315,15 @@ describe("given the span output is below IO_PREVIEW_BYTES (flag-off / sub-thresh
 
   beforeEach(() => {
     const fullEvent = makeSpanReceivedEvent({ output: SMALL_OUTPUT });
-    // leanForProjection is a no-op for sub-threshold values
-    const leanEvent = leanForProjection(fullEvent);
+    // TraceProjectionLeanService.leanForProjection is a no-op for sub-threshold values
+    const leanEvent = TraceProjectionLeanService.leanForProjection(fullEvent);
     leanAttrs = extractSpanAttrs(leanEvent);
   });
 
-  describe("when leanForProjection is applied", () => {
+  describe("when TraceProjectionLeanService.leanForProjection is applied", () => {
     it("the event is returned unchanged (same object reference)", () => {
       const fullEvent = makeSpanReceivedEvent({ output: SMALL_OUTPUT });
-      const result = leanForProjection(fullEvent);
+      const result = TraceProjectionLeanService.leanForProjection(fullEvent);
       expect(result).toBe(fullEvent);
     });
 
@@ -329,7 +333,7 @@ describe("given the span output is below IO_PREVIEW_BYTES (flag-off / sub-thresh
     });
   });
 
-  describe("when resolved via resolveOffloadedTraces", () => {
+  describe("when resolved via TraceOffloadResolutionService.resolveOffloadedTraces", () => {
     /** @scenario With the flag off, ingestion and reads behave exactly as before */
     it("returns spans unchanged and calls getFromEventLog zero times", async () => {
       const { blobStore, getFromEventLogSpy } = makeEventLogBlobStore({});
@@ -337,7 +341,7 @@ describe("given the span output is below IO_PREVIEW_BYTES (flag-off / sub-thresh
 
       const normalizedSpan = makeNormalizedSpan(leanAttrs);
 
-      const result = await resolveOffloadedTraces({
+      const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
         projectId: PROJECT_ID,
         normalizedSpans: [normalizedSpan],
         blobStore,
@@ -370,7 +374,7 @@ describe("given the span was offloaded but the event_log row is missing on read 
 
   beforeEach(() => {
     const fullEvent = makeSpanReceivedEvent({ output: ONE_MB_OUTPUT });
-    const leanEvent = leanForProjection(fullEvent);
+    const leanEvent = TraceProjectionLeanService.leanForProjection(fullEvent);
     leanAttrs = extractSpanAttrs(leanEvent);
     previewValue = leanAttrs["langwatch.output"] ?? "";
   });
@@ -382,7 +386,7 @@ describe("given the span was offloaded but the event_log row is missing on read 
       const normalizedSpan = makeNormalizedSpan(leanAttrs);
 
       await expect(
-        resolveOffloadedTraces({
+        TraceOffloadResolutionService.resolveOffloadedTraces({
           projectId: PROJECT_ID,
           normalizedSpans: [normalizedSpan],
           blobStore,
@@ -397,7 +401,7 @@ describe("given the span was offloaded but the event_log row is missing on read 
       const logger = { warn: vi.fn(), error: vi.fn() };
       const normalizedSpan = makeNormalizedSpan(leanAttrs);
 
-      const result = await resolveOffloadedTraces({
+      const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
         projectId: PROJECT_ID,
         normalizedSpans: [normalizedSpan],
         blobStore,
@@ -416,7 +420,7 @@ describe("given the span was offloaded but the event_log row is missing on read 
       const logger = { warn: vi.fn(), error: vi.fn() };
       const normalizedSpan = makeNormalizedSpan(leanAttrs);
 
-      await resolveOffloadedTraces({
+      await TraceOffloadResolutionService.resolveOffloadedTraces({
         projectId: PROJECT_ID,
         normalizedSpans: [normalizedSpan],
         blobStore,
@@ -432,7 +436,7 @@ describe("given the span was offloaded but the event_log row is missing on read 
       const logger = { warn: vi.fn(), error: vi.fn() };
       const normalizedSpan = makeNormalizedSpan(leanAttrs);
 
-      const result = await resolveOffloadedTraces({
+      const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
         projectId: PROJECT_ID,
         normalizedSpans: [normalizedSpan],
         blobStore,

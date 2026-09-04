@@ -144,8 +144,8 @@ function matchRows({
  * break rather than as a confusing `undefined` assertion failure.
  */
 async function readTraces(traceIds: string[]) {
-  const { ClickHouseTraceService } = await import("../trace-legacy-read.repository");
-  const service = new ClickHouseTraceService({
+  const { TraceLegacyReadClickHouseRepository } = await import("../trace-legacy-read.repository");
+  const service = new TraceLegacyReadClickHouseRepository({
     resolveClickHouseClient: testResolveClickHouseClient,
     prisma: {
       project: { findUnique: vi.fn() },

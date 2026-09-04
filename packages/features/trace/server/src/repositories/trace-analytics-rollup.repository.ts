@@ -12,9 +12,9 @@ import type { TraceAnalyticsRollupRow } from "../projections/trace-rollup.projec
  * `retentionDays` (when provided) is stamped onto the row's `_retention_days`
  * column; the table's TTL drops the row that many days after its `BucketStart`.
  */
-export interface TraceAnalyticsRollupRepository {
-  insertRow(row: TraceAnalyticsRollupRow, retentionDays?: number): Promise<void>;
-  insertRows(rows: TraceAnalyticsRollupRow[], retentionDays?: number): Promise<void>;
+export abstract class TraceAnalyticsRollupRepository {
+  abstract insertRow(row: TraceAnalyticsRollupRow, retentionDays?: number): Promise<void>;
+  abstract insertRows(rows: TraceAnalyticsRollupRow[], retentionDays?: number): Promise<void>;
 }
 
 /** No-op implementation for tests and ClickHouse-less environments. */

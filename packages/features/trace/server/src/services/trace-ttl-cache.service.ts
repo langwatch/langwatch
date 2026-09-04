@@ -24,11 +24,6 @@ export interface TraceCacheRedis {
 
 let registeredRedis: TraceCacheRedis | null = null;
 
-/** Registers the process's connection. Called once, at composition. */
-export function setTraceCacheRedis(redis: TraceCacheRedis | null): void {
-  registeredRedis = redis;
-}
-
 type MemoryEntry<T> = { value: T; expiresAt: number };
 
 /**
@@ -183,5 +178,16 @@ export class TtlCache<T> {
     }
 
     return entry.value;
+  }
+}
+
+export class TraceTtlCacheService {
+  static create(): TraceTtlCacheService {
+    return new TraceTtlCacheService();
+  }
+
+  /** Registers the process's connection. Called once, at composition. */
+  static setTraceCacheRedis(redis: TraceCacheRedis | null): void {
+    registeredRedis = redis;
   }
 }

@@ -34,7 +34,7 @@ import {
 } from "@langwatch/trace-contract";
 import {
   ClickHouseTraceDerivationSpanReaderAdapter,
-  ClickHouseTraceService,
+  TraceLegacyReadClickHouseRepository,
   TraceEventDerivationService,
   TraceQueryClassificationAdapter,
   VisibilityWindowService,
@@ -141,7 +141,7 @@ export class WorkerAutomationSettlementTraceReader extends AutomationSettlementT
  *
  * ## What it is
  *
- * `ClickHouseTraceService` is Trace's own legacy read, and it is packaged: the
+ * `TraceLegacyReadClickHouseRepository` is Trace's own legacy read, and it is packaged: the
  * span-tree assembly, the offload preview, the annotation join and the
  * redaction pass are all inside it. The application reached the same object
  * through `TraceService.getById`, which added three things on top — git-style
@@ -204,7 +204,7 @@ export class WorkerTraceRecordReader {
     logger?: Logger;
   }): WorkerTraceRecordReader {
     return new WorkerTraceRecordReader(
-      ClickHouseTraceService.create({
+      TraceLegacyReadClickHouseRepository.create({
         prisma: options.connection.client,
         // The deployment's real ClickHouse client, which this graph narrows to
         // the two methods the event store uses and the legacy read has not
@@ -220,7 +220,7 @@ export class WorkerTraceRecordReader {
   }
 
   private constructor(
-    private readonly reads: ClickHouseTraceService,
+    private readonly reads: TraceLegacyReadClickHouseRepository,
     private readonly dataPrivacy: DataPrivacyResolutionService,
     private readonly window: VisibilityWindowService,
     private readonly projects: Pick<ProjectService, "getOrganizationId">,

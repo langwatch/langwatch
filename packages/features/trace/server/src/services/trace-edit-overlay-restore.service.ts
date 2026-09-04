@@ -1,8 +1,6 @@
+import { TraceEditOverlayRedactionService } from "./trace-edit-overlay-redaction.service";
 import type { Protections } from "@langwatch/trace-server";
-import {
-  redactPatchForViewer,
-  type TraceMetadataEdits,
-} from "./trace-edit-overlay-redaction.service";
+import { type TraceMetadataEdits } from "./trace-edit-overlay-redaction.service";
 import {
   TRACE_EDIT_SPAN_FIELDS,
   TRACE_EDIT_TRACE_FIELDS,
@@ -190,67 +188,73 @@ function traceEditsWithWithheld({
   return { value: carriesEdit ? value : void 0, isRestored };
 }
 
-/**
- * The correction to store when this viewer saves.
- *
- * A save replaces the whole correction, and the viewer composed theirs on top of
- * the one {@link redactPatchForViewer} handed them, so anything withheld from
- * the read would be dropped by the write, and a reviewer who may not read a
- * field would silently delete someone else's correction to it. Whatever the
- * viewer never received faithfully is therefore carried over from the stored
- * correction: they could not have meant to change it.
- *
- * Everything the viewer could read is theirs to decide, including removing it,
- * and the structural side of the patch (renames, type changes, cleared errors,
- * `deletedSpanIds`) comes from the incoming save unchanged. Removing the whole
- * correction stays a separate, deliberate action.
- */
-export function restoreWithheldEdits({
-  incoming,
-  stored,
-  protections,
-  isWindowRedacted,
-}: {
-  incoming: TraceEditOverlayPatch;
-  stored: TraceEditOverlayPatch | null | undefined;
-  protections: Protections;
-  isWindowRedacted?: boolean;
-}): TraceEditOverlayPatch {
-  if (!stored) {
-    return incoming;
+export class TraceEditOverlayRestoreService {
+  static create(): TraceEditOverlayRestoreService {
+    return new TraceEditOverlayRestoreService();
   }
 
-  const readable = redactPatchForViewer({
-    patch: stored,
+  /**
+   * The correction to store when this viewer saves.
+   *
+   * A save replaces the whole correction, and the viewer composed theirs on top of
+   * the one {@link TraceEditOverlayRedactionService.redactPatchForViewer} handed them, so anything withheld from
+   * the read would be dropped by the write, and a reviewer who may not read a
+   * field would silently delete someone else's correction to it. Whatever the
+   * viewer never received faithfully is therefore carried over from the stored
+   * correction: they could not have meant to change it.
+   *
+   * Everything the viewer could read is theirs to decide, including removing it,
+   * and the structural side of the patch (renames, type changes, cleared errors,
+   * `deletedSpanIds`) comes from the incoming save unchanged. Removing the whole
+   * correction stays a separate, deliberate action.
+   */
+  static restoreWithheldEdits({
+    incoming,
+    stored,
     protections,
     isWindowRedacted,
-  });
-  if (readable === stored) {
-    return incoming;
-  }
+  }: {
+    incoming: TraceEditOverlayPatch;
+    stored: TraceEditOverlayPatch | null | undefined;
+    protections: Protections;
+    isWindowRedacted?: boolean;
+  }): TraceEditOverlayPatch {
+    if (!stored) {
+      return incoming;
+    }
 
-  const spans = spansWithWithheldEdits({
-    incoming: incoming.spans,
-    stored: stored.spans,
-    readable: readable.spans,
-  });
-  const traceEdits = traceEditsWithWithheld({
-    incoming: incoming.trace,
-    stored: stored.trace,
-    readable: readable.trace,
-  });
-  if (!spans.isRestored && !traceEdits.isRestored) {
-    return incoming;
-  }
+    const readable = TraceEditOverlayRedactionService.redactPatchForViewer({
+      patch: stored,
+      protections,
+      isWindowRedacted,
+    });
+    if (readable === stored) {
+      return incoming;
+    }
 
-  const next: TraceEditOverlayPatch = {
-    version: incoming.version,
-    spans: spans.value,
-    deletedSpanIds: incoming.deletedSpanIds,
-  };
-  if (traceEdits.value) {
-    next.trace = traceEdits.value;
-  }
+    const spans = spansWithWithheldEdits({
+      incoming: incoming.spans,
+      stored: stored.spans,
+      readable: readable.spans,
+    });
+    const traceEdits = traceEditsWithWithheld({
+      incoming: incoming.trace,
+      stored: stored.trace,
+      readable: readable.trace,
+    });
+    if (!spans.isRestored && !traceEdits.isRestored) {
+      return incoming;
+    }
 
-  return next;
+    const next: TraceEditOverlayPatch = {
+      version: incoming.version,
+      spans: spans.value,
+      deletedSpanIds: incoming.deletedSpanIds,
+    };
+    if (traceEdits.value) {
+      next.trace = traceEdits.value;
+    }
+
+    return next;
+  }
 }

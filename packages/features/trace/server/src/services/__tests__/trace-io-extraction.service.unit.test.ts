@@ -1,8 +1,9 @@
+import { TraceProjectionLeanService } from "../trace-projection-lean.service";
 import { describe, expect, it } from "vitest";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
 import { NormalizedSpanKind, NormalizedStatusCode } from "@langwatch/trace-contract";
-import { IO_PREVIEW_BYTES, structuredIoPreview } from "../trace-projection-lean.service";
+import { IO_PREVIEW_BYTES } from "../trace-projection-lean.service";
 import { TraceIOExtractionService } from "../trace-io-extraction.service";
 
 const service = new TraceIOExtractionService(TraceCanonicalisationService.create());
@@ -835,7 +836,10 @@ describe("TraceIOExtractionService", () => {
       { role: "user", content: [{ type: "input_text", text: "hi" }] },
     ]);
     // Exactly what ingest stores inline after leanForProjection (ADR-022).
-    const leanedInput = structuredIoPreview(fullInput, IO_PREVIEW_BYTES)!;
+    const leanedInput = TraceProjectionLeanService.structuredIoPreview(
+      fullInput,
+      IO_PREVIEW_BYTES,
+    )!;
 
     const makeTurnSpans = () => [
       createTestSpan({

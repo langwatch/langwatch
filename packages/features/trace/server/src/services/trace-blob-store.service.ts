@@ -1,3 +1,4 @@
+import { TraceStreamBufferService } from "./trace-stream-buffer.service";
 import { createHash } from "node:crypto";
 import type { Readable } from "node:stream";
 import { DeleteObjectCommand, GetObjectCommand, type S3Client } from "@aws-sdk/client-s3";
@@ -23,7 +24,6 @@ interface BlobStoreClickHouseClient {
 type ClickHouseClientResolver = (tenantId: string) => Promise<BlobStoreClickHouseClient>;
 import type { StoredObjectStorageDestination as ProjectStorageDestination } from "@langwatch/stored-object-contract";
 import { mintStoredObjectUri } from "@langwatch/stored-object-contract";
-import { streamToBuffer } from "./trace-stream-buffer.service";
 
 export interface S3ClientResolution {
   s3Client: S3Client;
@@ -50,7 +50,7 @@ export interface SpoolObjectStore {
 }
 
 /**
- * Destination-agnostic storage for the trace spool, injected so `BlobStore`
+ * Destination-agnostic storage for the trace spool, injected so `TraceBlobStoreService`
  * carries no env coupling and the tests run without infrastructure.
  */
 export interface SpoolStorage {
@@ -92,7 +92,7 @@ function parseKsuidCreatedAtMs(eventId: string): number | null {
 export type S3ClientResolver = (projectId: string) => Promise<S3ClientResolution>;
 
 /**
- * Thrown by `BlobStore.getFromEventLog` when the requested row is not found or
+ * Thrown by `TraceBlobStoreService.getFromEventLog` when the requested row is not found or
  * the TenantId predicate returns no rows (including cross-tenant attempts).
  * ADR-022: TenantId in the WHERE clause structurally blocks cross-tenant reads.
  */
@@ -108,7 +108,7 @@ export class BlobNotFoundError extends Error {
 }
 
 /**
- * Thrown by `BlobStore.getFromEventLog` when the requested `field` is not
+ * Thrown by `TraceBlobStoreService.getFromEventLog` when the requested `field` is not
  * present in the EventPayload. Indicates a corrupted event or a stale ref.
  */
 export class BlobFieldNotFoundError extends Error {
@@ -314,7 +314,7 @@ function assertLegacySpoolKeyBelongsTo(spoolRef: string, projectId: string): voi
  * Refuses a destination that cannot bound an orphaned spool object.
  *
  * WRITE PATH ONLY. This is a rule about creating new objects, not about the
- * ones already out there — see the `purpose` note on `BlobStore.mintSpoolUri`.
+ * ones already out there — see the `purpose` note on `TraceBlobStoreService.mintSpoolUri`.
  */
 function assertDestinationCanHostSpool({
   destination,
@@ -387,7 +387,16 @@ function assertDestinationCanHostSpool({
  * EventId). TenantId is the FIRST predicate, structurally blocking
  * cross-tenant reads. ADR-022.
  */
-export class BlobStore {
+export class TraceBlobStoreService {
+  static create(options: {
+    resolveS3Client: S3ClientResolver;
+    resolveClickHouseClient?: ClickHouseClientResolver;
+    spoolStorage?: SpoolStorage;
+    logger?: Logger;
+  }): TraceBlobStoreService {
+    return new TraceBlobStoreService(options);
+  }
+
   /**
    * @param resolveS3Client - Resolver for per-org S3 client + bucket. Used ONLY
    *   to read back v1 spool refs written before this deployment; every new
@@ -453,7 +462,7 @@ export class BlobStore {
   }): Promise<{ uri: string; objectStore: SpoolObjectStore }> {
     if (!this.spoolStorage) {
       throw new Error(
-        "BlobStore has no spool storage configured — cannot resolve the trace spool destination.",
+        "TraceBlobStoreService has no spool storage configured — cannot resolve the trace spool destination.",
       );
     }
 
@@ -671,7 +680,7 @@ export class BlobStore {
       purpose: "access",
     });
 
-    return streamToBuffer(await objectStore.get(uri), MAX_SPOOL_BYTES);
+    return TraceStreamBufferService.streamToBuffer(await objectStore.get(uri), MAX_SPOOL_BYTES);
   }
 
   /**
@@ -691,7 +700,7 @@ export class BlobStore {
     // buffers the whole object first, so it would have skipped MAX_SPOOL_BYTES
     // entirely — and a v1 reference points at an object written before this
     // deploy, which is exactly the input the cap exists to distrust.
-    return streamToBuffer(Body as unknown as Readable, MAX_SPOOL_BYTES);
+    return TraceStreamBufferService.streamToBuffer(Body as unknown as Readable, MAX_SPOOL_BYTES);
   }
 
   /**

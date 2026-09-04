@@ -1,10 +1,6 @@
+import { TraceWindowedReadService } from "../trace-windowed-read.service";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  DEFAULT_PARTITION_WINDOW_MS,
-  queryWindowed,
-  setTraceWindowedReadMetrics,
-  type WindowFragment,
-} from "../trace-windowed-read.service";
+import { DEFAULT_PARTITION_WINDOW_MS, type WindowFragment } from "../trace-windowed-read.service";
 import type { TraceWindowedReadOutcome } from "../../ports/trace-windowed-read-metrics.port";
 
 const TABLE = "windowed_read_test";
@@ -14,7 +10,7 @@ const counts = new Map<string, number>();
 
 beforeEach(() => {
   counts.clear();
-  setTraceWindowedReadMetrics({
+  TraceWindowedReadService.setTraceWindowedReadMetrics({
     record: ({ table, outcome }: { table: string; outcome: TraceWindowedReadOutcome }) => {
       const key = `${table}:${outcome}`;
       counts.set(key, (counts.get(key) ?? 0) + 1);
@@ -38,13 +34,13 @@ function fakeRun<T>(results: T[]) {
   return { run, windows };
 }
 
-describe("queryWindowed", () => {
+describe("TraceWindowedReadService.queryWindowed", () => {
   describe("given a hint whose window has rows", () => {
     it("runs the windowed attempt once and records a hit", async () => {
       const before = await outcomeCount("hit");
       const { run } = fakeRun([["row"]]);
 
-      const result = await queryWindowed({
+      const result = await TraceWindowedReadService.queryWindowed({
         table: TABLE,
         hintMs: 1_000_000,
         fallback: "unbounded",
@@ -60,7 +56,7 @@ describe("queryWindowed", () => {
     it("passes a ±DEFAULT_PARTITION_WINDOW_MS fragment with fromMs/toMs params", async () => {
       const { run, windows } = fakeRun([["row"]]);
 
-      await queryWindowed({
+      await TraceWindowedReadService.queryWindowed({
         table: TABLE,
         hintMs: 1_000_000,
         fallback: "unbounded",
@@ -85,7 +81,7 @@ describe("queryWindowed", () => {
     it("honours an explicit windowMs override", async () => {
       const { run, windows } = fakeRun([["row"]]);
 
-      await queryWindowed({
+      await TraceWindowedReadService.queryWindowed({
         table: TABLE,
         hintMs: 500,
         windowMs: 100,
@@ -105,7 +101,7 @@ describe("queryWindowed", () => {
         const before = await outcomeCount("unbounded_hit");
         const { run, windows } = fakeRun([[], ["row"]]);
 
-        const result = await queryWindowed({
+        const result = await TraceWindowedReadService.queryWindowed({
           table: TABLE,
           hintMs: 42,
           fallback: "unbounded",
@@ -123,7 +119,7 @@ describe("queryWindowed", () => {
         const before = await outcomeCount("unbounded_empty");
         const { run } = fakeRun([[], []]);
 
-        await queryWindowed({
+        await TraceWindowedReadService.queryWindowed({
           table: TABLE,
           hintMs: 42,
           fallback: "unbounded",
@@ -150,7 +146,7 @@ describe("queryWindowed", () => {
         const beforeHit = await outcomeCount("hit");
         const { run } = fakeRun([[]]);
 
-        const result = await queryWindowed({
+        const result = await TraceWindowedReadService.queryWindowed({
           table: TABLE,
           hintMs: 42,
           fallback: "none",
@@ -173,7 +169,7 @@ describe("queryWindowed", () => {
         const beforeEmpty = await outcomeCount("windowed_empty");
         const { run } = fakeRun([["row"]]);
 
-        const result = await queryWindowed({
+        const result = await TraceWindowedReadService.queryWindowed({
           table: TABLE,
           hintMs: 42,
           fallback: "none",
@@ -195,7 +191,7 @@ describe("queryWindowed", () => {
         const { run, windows } = fakeRun([[], ["row"]]);
 
         try {
-          const result = await queryWindowed({
+          const result = await TraceWindowedReadService.queryWindowed({
             table: TABLE,
             hintMs: 42,
             windowMs: 1_000,
@@ -220,7 +216,7 @@ describe("queryWindowed", () => {
         const before = await outcomeCount("widened_empty");
         const { run } = fakeRun([[], []]);
 
-        await queryWindowed({
+        await TraceWindowedReadService.queryWindowed({
           table: TABLE,
           hintMs: 42,
           fallback: { lookbackMs: 5_000 },
@@ -239,7 +235,7 @@ describe("queryWindowed", () => {
       const before = await outcomeCount("unwindowed");
       const { run, windows } = fakeRun([["row"]]);
 
-      const result = await queryWindowed({
+      const result = await TraceWindowedReadService.queryWindowed({
         table: TABLE,
         hintMs: null,
         fallback: "unbounded",
@@ -259,7 +255,7 @@ describe("queryWindowed", () => {
       const { run, windows } = fakeRun([[]]);
 
       try {
-        await queryWindowed({
+        await TraceWindowedReadService.queryWindowed({
           table: TABLE,
           hintMs: null,
           windowMs: 2_000,
@@ -287,7 +283,7 @@ describe("queryWindowed", () => {
       });
 
       await expect(
-        queryWindowed({
+        TraceWindowedReadService.queryWindowed({
           table: TABLE,
           hintMs: 1_000_000,
           fallback: "unbounded",
@@ -309,7 +305,7 @@ describe("queryWindowed", () => {
       });
 
       await expect(
-        queryWindowed({
+        TraceWindowedReadService.queryWindowed({
           table: TABLE,
           hintMs: 1_000_000,
           fallback: "unbounded",
@@ -329,7 +325,7 @@ describe("queryWindowed", () => {
       });
 
       await expect(
-        queryWindowed({
+        TraceWindowedReadService.queryWindowed({
           table: TABLE,
           hintMs: null,
           fallback: "unbounded",

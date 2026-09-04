@@ -1,3 +1,7 @@
+import { TraceWindowedReadService } from "../../services/trace-windowed-read.service";
+import { TraceEvaluationMappingService } from "../../services/trace-evaluation-mapping.service";
+import { TraceEventAttributeMappingService } from "../../services/trace-event-attribute-mapping.service";
+import { TraceLlmSpanMessagesService } from "../../services/trace-llm-span-messages.service";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { type AnnotationService, annotationSuggestedOutput } from "@langwatch/annotation-contract";
 import type { DataRetentionService } from "@langwatch/data-retention-contract";
@@ -7,19 +11,15 @@ import { LLM_PARAMETER_MAP, parsePromptTraceReference } from "@langwatch/prompt-
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { getLangWatchTracer } from "langwatch";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { createRetentionFloorService } from "../../services/trace-retention-floor.service";
-import {
-  DEFAULT_PARTITION_WINDOW_MS,
-  queryWindowed,
-} from "../../services/trace-windowed-read.service";
+import { TraceRetentionFloorService } from "../../services/trace-retention-floor.service";
+import { TraceLegacyReadRepository } from "../trace-legacy-read.repository";
+import { DEFAULT_PARTITION_WINDOW_MS } from "../../services/trace-windowed-read.service";
 import { deserializeAttributes, ensureStringRecord } from "@langwatch/trace-server";
 import type { ExtractedIO } from "#services/trace-io-extraction.service";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import {
   type ClickHouseEvaluationRunRow,
   EVALUATION_RUN_COLUMNS_WITH_INPUTS,
-  mapClickHouseEvaluationToTraceEvaluation,
-  mapTraceEvaluationsToLegacyEvaluations,
 } from "../../services/trace-evaluation-mapping.service";
 import { isStorageAnchoredVersion } from "@langwatch/trace-contract";
 import type {
@@ -30,18 +30,10 @@ import type {
 import type { Event, Span, Trace } from "@langwatch/trace-contract";
 import type { Protections } from "@langwatch/trace-server";
 import { findPromptReferenceInAncestors } from "@langwatch/trace-contract";
-import {
-  applyEventProtections,
-  applyTraceProtections,
-  extractRedactionsForObject,
-  mapNormalizedSpansToSpans,
-  mapTraceSummaryToTrace,
-} from "../../services/trace-legacy-mapping.service";
-import { parseLLMSpanMessages } from "../../services/trace-llm-span-messages.service";
-import {
-  type EventSpanRow,
-  mapEventAttrsToEvent,
-} from "../../services/trace-event-attribute-mapping.service";
+import { TraceReadRedactionService } from "../../services/trace-read-redaction.service";
+import { TraceLegacySpanMappingService } from "../../services/trace-legacy-span-mapping.service";
+import { TraceLegacySummaryMappingService } from "../../services/trace-legacy-summary-mapping.service";
+import { type EventSpanRow } from "../../services/trace-event-attribute-mapping.service";
 import type { ProjectableTrace, ProjectedAnnotation } from "../../services/trace-projection.types";
 import type { ResolvedTraceSpans } from "../../services/trace-offload-resolution.service";
 import type {
@@ -230,33 +222,6 @@ const EVENT_PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
 const FORBIDDEN_SCORE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
 /**
- * Annotation `scoreOptions` is keyed by AnnotationScore id; the public contract
- * exposes `annotations.scores.<name>`, so remap id -> name. Score names are not
- * unique per project — on a collision the last definition wins. An id with no
- * matching score (e.g. a deleted definition) keeps its id as the key so data is
- * never silently dropped. Prototype-polluting keys are skipped.
- */
-export function remapScoreOptionsToNames(
-  scoreOptions: unknown,
-  scoreNameById: Map<string, string>,
-): Record<string, unknown> {
-  if (!scoreOptions || typeof scoreOptions !== "object") return {};
-  const remapped: Record<string, unknown> = {};
-  for (const [scoreId, value] of Object.entries(scoreOptions as Record<string, unknown>)) {
-    const name = scoreNameById.get(scoreId) ?? scoreId;
-    if (FORBIDDEN_SCORE_KEYS.has(name)) continue;
-    // AnnotationScore names are not unique. On a collision the first entry
-    // keeps the plain name and later ones get an id-suffixed key — deterministic
-    // (object iteration is insertion-ordered) and lossless, instead of the
-    // engine-defined last-write-wins this used to be.
-    const key = name in remapped ? `${name} (${scoreId})` : name;
-    if (FORBIDDEN_SCORE_KEYS.has(key)) continue;
-    remapped[key] = value;
-  }
-  return remapped;
-}
-
-/**
  * Bound the events stored_spans scan to the partitions the page's traces
  * actually occurred in. Occurrence times are clustered (a new cluster starts on
  * a gap larger than the merge window), and each cluster contributes one tight
@@ -396,7 +361,7 @@ export type TraceLegacyFilterConditions = (
   hasUnsupportedFilters: boolean;
 };
 
-export class ClickHouseTraceService {
+export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadRepository {
   private readonly logger = createLogger("langwatch:traces:clickhouse-service");
   private readonly tracer = getLangWatchTracer("langwatch.traces.clickhouse-service");
 
@@ -447,6 +412,7 @@ export class ClickHouseTraceService {
     annotations?: AnnotationService;
     traceCanonicalisation: TraceCanonicalisationService;
   }) {
+    super();
     this.prisma = prisma;
     this.resolveClickHouseClient = resolveClickHouseClient;
     this.filterConditions = filterConditions;
@@ -454,10 +420,10 @@ export class ClickHouseTraceService {
     this.traceCanonicalisation = traceCanonicalisation;
     this.resolveTraceSpans = resolveTraceSpans;
     this.resolveTraceSpansBatch = resolveTraceSpansBatch;
-    this.retentionFloor = createRetentionFloorService(retentionResolver);
+    this.retentionFloor = TraceRetentionFloorService.create(retentionResolver);
   }
 
-  private readonly retentionFloor: ReturnType<typeof createRetentionFloorService>;
+  private readonly retentionFloor: ReturnType<typeof TraceRetentionFloorService.create>;
 
   /**
    * Resolve the ClickHouse client for a given project.
@@ -503,7 +469,7 @@ export class ClickHouseTraceService {
   }
 
   /**
-   * Static factory method for creating ClickHouseTraceService with explicit
+   * Static factory method for creating TraceLegacyReadClickHouseRepository with explicit
    * canonicalisation and retention dependencies.
    */
   static create({
@@ -526,8 +492,8 @@ export class ClickHouseTraceService {
     retentionResolver?: DataRetentionService;
     annotations?: AnnotationService;
     traceCanonicalisation: TraceCanonicalisationService;
-  }): ClickHouseTraceService {
-    return new ClickHouseTraceService({
+  }): TraceLegacyReadClickHouseRepository {
+    return new TraceLegacyReadClickHouseRepository({
       prisma,
       resolveClickHouseClient,
       filterConditions,
@@ -564,7 +530,7 @@ export class ClickHouseTraceService {
     opts?: { resolveBlobs?: boolean },
   ): Promise<Trace[]> {
     return await this.tracer.withActiveSpan(
-      "ClickHouseTraceService.getTracesWithSpans",
+      "TraceLegacyReadClickHouseRepository.getTracesWithSpans",
       {
         attributes: { "tenant.id": projectId },
       },
@@ -661,7 +627,7 @@ export class ClickHouseTraceService {
     limit?: number;
   }): Promise<string[]> {
     return await this.tracer.withActiveSpan(
-      "ClickHouseTraceService.resolveTraceIdByPrefix",
+      "TraceLegacyReadClickHouseRepository.resolveTraceIdByPrefix",
       { attributes: { "tenant.id": projectId, "trace.id.prefix": prefix } },
       async () => {
         const clickHouseClient = await this.resolveClient(projectId);
@@ -735,7 +701,7 @@ export class ClickHouseTraceService {
     opts?: { resolveBlobs?: boolean },
   ): Promise<Trace[]> {
     return await this.tracer.withActiveSpan(
-      "ClickHouseTraceService.getTracesByThreadId",
+      "TraceLegacyReadClickHouseRepository.getTracesByThreadId",
       {
         attributes: { "tenant.id": projectId, "thread.id": threadId },
       },
@@ -825,7 +791,7 @@ export class ClickHouseTraceService {
     opts?: { resolveBlobs?: boolean },
   ): Promise<Trace[]> {
     return await this.tracer.withActiveSpan(
-      "ClickHouseTraceService.getTracesWithSpansByThreadIds",
+      "TraceLegacyReadClickHouseRepository.getTracesWithSpansByThreadIds",
       {
         attributes: {
           "tenant.id": projectId,
@@ -923,7 +889,7 @@ export class ClickHouseTraceService {
     options: GetAllTracesForProjectOptions = {},
   ): Promise<TracesForProjectResult> {
     return await this.tracer.withActiveSpan(
-      "ClickHouseTraceService.getAllTracesForProject",
+      "TraceLegacyReadClickHouseRepository.getAllTracesForProject",
       async (_span) => {
         const clickHouseClient = await this.resolveClient(input.projectId);
 
@@ -1192,18 +1158,23 @@ export class ClickHouseTraceService {
 
             const grouped: Record<
               string,
-              ReturnType<typeof mapClickHouseEvaluationToTraceEvaluation>[]
+              ReturnType<
+                typeof TraceEvaluationMappingService.mapClickHouseEvaluationToTraceEvaluation
+              >[]
             > = {};
             for (const id of traceIds) {
               grouped[id] = [];
             }
             for (const row of evalRows) {
               if (row.TraceId && grouped[row.TraceId]) {
-                grouped[row.TraceId]!.push(mapClickHouseEvaluationToTraceEvaluation(row));
+                grouped[row.TraceId]!.push(
+                  TraceEvaluationMappingService.mapClickHouseEvaluationToTraceEvaluation(row),
+                );
               }
             }
 
-            traceChecks = mapTraceEvaluationsToLegacyEvaluations(grouped);
+            traceChecks =
+              TraceEvaluationMappingService.mapTraceEvaluationsToLegacyEvaluations(grouped);
           }
 
           // Projection JOINs — attach child collections the legacy read path
@@ -1262,7 +1233,7 @@ export class ClickHouseTraceService {
    */
   async getTopicCounts(input: AggregationFiltersInput): Promise<TopicCountsResult> {
     return await this.tracer.withActiveSpan(
-      "ClickHouseTraceService.getTopicCounts",
+      "TraceLegacyReadClickHouseRepository.getTopicCounts",
       { attributes: { "tenant.id": input.projectId } },
       async () => {
         const clickHouseClient = await this.resolveClient(input.projectId);
@@ -1353,7 +1324,7 @@ export class ClickHouseTraceService {
    */
   async getCustomersAndLabels(input: AggregationFiltersInput): Promise<CustomersAndLabelsResult> {
     return await this.tracer.withActiveSpan(
-      "ClickHouseTraceService.getCustomersAndLabels",
+      "TraceLegacyReadClickHouseRepository.getCustomersAndLabels",
       { attributes: { "tenant.id": input.projectId } },
       async () => {
         const clickHouseClient = await this.resolveClient(input.projectId);
@@ -1471,7 +1442,7 @@ export class ClickHouseTraceService {
     protections: Protections;
   }): Promise<PromptStudioSpanResult | null> {
     return await this.tracer.withActiveSpan(
-      "ClickHouseTraceService.tryGetSpanForPromptStudio",
+      "TraceLegacyReadClickHouseRepository.tryGetSpanForPromptStudio",
       { attributes: { "tenant.id": projectId, "span.id": spanId } },
       async () => {
         const clickHouseClient = await this.resolveClient(projectId);
@@ -1619,11 +1590,12 @@ export class ClickHouseTraceService {
   ): PromptStudioSpanResult {
     const attrs = row.SpanAttributes;
     // Pure extraction of input + output messages from the span's
-    // attributes. Lives in parseLLMSpanMessages.ts so the wire-shape
+    // attributes. Lives in TraceLlmSpanMessagesService.parseLLMSpanMessages.ts so the wire-shape
     // contract — including the single-message-object form nlpgo emits
     // for langwatch.output — is unit-testable without standing up the
     // full service. See that file's docstring for the shape catalog.
-    const messages: PromptStudioSpanResult["messages"] = parseLLMSpanMessages(attrs);
+    const messages: PromptStudioSpanResult["messages"] =
+      TraceLlmSpanMessagesService.parseLLMSpanMessages(attrs);
 
     // Extract LLM config
     const model =
@@ -1713,7 +1685,7 @@ export class ClickHouseTraceService {
     endDate: number,
   ): Promise<DistinctFieldNamesResult> {
     return await this.tracer.withActiveSpan(
-      "ClickHouseTraceService.getDistinctFieldNames",
+      "TraceLegacyReadClickHouseRepository.getDistinctFieldNames",
       { attributes: { "tenant.id": projectId } },
       async () => {
         const clickHouseClient = await this.resolveClient(projectId);
@@ -1872,7 +1844,7 @@ export class ClickHouseTraceService {
     scrollStart?: number;
   }): Promise<{ traces: Trace[]; totalHits: number; lastTrace: Trace | null }> {
     return await this.tracer.withActiveSpan(
-      "ClickHouseTraceService.fetchTracesWithPagination",
+      "TraceLegacyReadClickHouseRepository.fetchTracesWithPagination",
       {
         attributes: { "tenant.id": projectId },
       },
@@ -2113,8 +2085,13 @@ export class ClickHouseTraceService {
 
         const traces: Trace[] = summaryRows.map((row) => {
           const summary = this.rowToTraceSummaryData(row);
-          const trace = mapTraceSummaryToTrace(summary, [], projectId, this.traceCanonicalisation);
-          return applyTraceProtections(trace, protections);
+          const trace = TraceLegacySummaryMappingService.mapTraceSummaryToTrace(
+            summary,
+            [],
+            projectId,
+            this.traceCanonicalisation,
+          );
+          return TraceReadRedactionService.applyTraceProtections(trace, protections);
         });
 
         const lastTrace = traces.length > 0 ? (traces[traces.length - 1] ?? null) : null;
@@ -2258,17 +2235,21 @@ export class ClickHouseTraceService {
     try {
       return await runQuery(traceIds);
     } catch (error) {
-      if (!isClickHouseMemoryLimitError(error)) {
+      if (!TraceLegacyReadClickHouseRepository.isClickHouseMemoryLimitError(error)) {
         throw error;
       }
 
       this.logger.warn(
-        `Summary query OOM for ${traceIds.length} traces, retrying in batches of ${ClickHouseTraceService.SUMMARY_BATCH_SIZE}`,
+        `Summary query OOM for ${traceIds.length} traces, retrying in batches of ${TraceLegacyReadClickHouseRepository.SUMMARY_BATCH_SIZE}`,
       );
 
       const allRows: TraceSummaryRow[] = [];
-      for (let i = 0; i < traceIds.length; i += ClickHouseTraceService.SUMMARY_BATCH_SIZE) {
-        const batch = traceIds.slice(i, i + ClickHouseTraceService.SUMMARY_BATCH_SIZE);
+      for (
+        let i = 0;
+        i < traceIds.length;
+        i += TraceLegacyReadClickHouseRepository.SUMMARY_BATCH_SIZE
+      ) {
+        const batch = traceIds.slice(i, i + TraceLegacyReadClickHouseRepository.SUMMARY_BATCH_SIZE);
         const batchRows = await runQuery(batch);
         allRows.push(...batchRows);
       }
@@ -2371,7 +2352,7 @@ export class ClickHouseTraceService {
     const rows = (await result.json()) as EventSpanRow[];
     const byTrace = new Map<string, Event[]>();
     for (const row of rows) {
-      const event = mapEventAttrsToEvent({ row, projectId });
+      const event = TraceEventAttributeMappingService.mapEventAttrsToEvent({ row, projectId });
       if (!event) continue;
       const list = byTrace.get(row.TraceId) ?? [];
       list.push(event);
@@ -2390,19 +2371,21 @@ export class ClickHouseTraceService {
       );
     }
     // RBAC parity with the legacy read path: events attach AFTER
-    // applyTraceProtections ran, so they must get the same treatment —
+    // TraceReadRedactionService.applyTraceProtections ran, so they must get the same treatment —
     // event_details are blanked when captured input is not visible, and
     // otherwise scrubbed of any substring mirroring the trace's redacted io.
     for (const trace of traces) {
       const rawEvents = byTrace.get(trace.trace_id) ?? [];
       const redactions = new Set<string>([
-        ...(!protections.canSeeCapturedInput ? extractRedactionsForObject(trace.input?.value) : []),
+        ...(!protections.canSeeCapturedInput
+          ? TraceReadRedactionService.extractRedactionsForObject(trace.input?.value)
+          : []),
         ...(!protections.canSeeCapturedOutput
-          ? extractRedactionsForObject(trace.output?.value)
+          ? TraceReadRedactionService.extractRedactionsForObject(trace.output?.value)
           : []),
       ]);
       trace.events = rawEvents.map((event) =>
-        applyEventProtections(event, protections, redactions),
+        TraceReadRedactionService.applyEventProtections(event, protections, redactions),
       );
     }
   }
@@ -2455,7 +2438,10 @@ export class ClickHouseTraceService {
             annotation: row,
             traceId: row.traceId,
           }) ?? null,
-        scores: remapScoreOptionsToNames(row.scoreOptions, scoreNameById),
+        scores: TraceLegacyReadClickHouseRepository.remapScoreOptionsToNames(
+          row.scoreOptions,
+          scoreNameById,
+        ),
         created_at: row.createdAt.getTime(),
       });
       byTrace.set(row.traceId, list);
@@ -2505,17 +2491,21 @@ export class ClickHouseTraceService {
     try {
       return await runQuery(traceIds);
     } catch (error) {
-      if (!isClickHouseMemoryLimitError(error)) {
+      if (!TraceLegacyReadClickHouseRepository.isClickHouseMemoryLimitError(error)) {
         throw error;
       }
 
       this.logger.warn(
-        `Evaluations query OOM for ${traceIds.length} traces, retrying in batches of ${ClickHouseTraceService.SUMMARY_BATCH_SIZE}`,
+        `Evaluations query OOM for ${traceIds.length} traces, retrying in batches of ${TraceLegacyReadClickHouseRepository.SUMMARY_BATCH_SIZE}`,
       );
 
       const allRows: ClickHouseEvaluationRunRow[] = [];
-      for (let i = 0; i < traceIds.length; i += ClickHouseTraceService.SUMMARY_BATCH_SIZE) {
-        const batch = traceIds.slice(i, i + ClickHouseTraceService.SUMMARY_BATCH_SIZE);
+      for (
+        let i = 0;
+        i < traceIds.length;
+        i += TraceLegacyReadClickHouseRepository.SUMMARY_BATCH_SIZE
+      ) {
+        const batch = traceIds.slice(i, i + TraceLegacyReadClickHouseRepository.SUMMARY_BATCH_SIZE);
         const batchRows = await runQuery(batch);
         allRows.push(...batchRows);
       }
@@ -2609,7 +2599,7 @@ export class ClickHouseTraceService {
 
   /**
    * Resolve offloaded blob refs (if any), map normalized spans to legacy Span
-   * objects, build the Trace via mapTraceSummaryToTrace, patch recomputed I/O,
+   * objects, build the Trace via TraceLegacySummaryMappingService.mapTraceSummaryToTrace, patch recomputed I/O,
    * and apply field-redaction protections.
    *
    * Extracted to remove the duplicated resolve+map+merge block that previously
@@ -2767,8 +2757,15 @@ export class ClickHouseTraceService {
       ? resolution.recomputedOutput
       : null;
 
-    const mappedSpans = mapNormalizedSpansToSpans(resolution.resolvedSpans);
-    let trace = mapTraceSummaryToTrace(summary, mappedSpans, projectId, this.traceCanonicalisation);
+    const mappedSpans = TraceLegacySpanMappingService.mapNormalizedSpansToSpans(
+      resolution.resolvedSpans,
+    );
+    let trace = TraceLegacySummaryMappingService.mapTraceSummaryToTrace(
+      summary,
+      mappedSpans,
+      projectId,
+      this.traceCanonicalisation,
+    );
 
     // When blobs were resolved, patch trace.input / trace.output with
     // the recomputed full values (overwriting the preview from trace_summaries).
@@ -2780,7 +2777,7 @@ export class ClickHouseTraceService {
       };
     }
 
-    return applyTraceProtections(trace, protections);
+    return TraceReadRedactionService.applyTraceProtections(trace, protections);
   }
 
   /**
@@ -2917,7 +2914,7 @@ export class ClickHouseTraceService {
     occurredAt?: OccurredAtRange,
   ): Promise<Map<string, { summary: TraceSummaryData; spans: NormalizedSpan[] }>> {
     return await this.tracer.withActiveSpan(
-      "ClickHouseTraceService.fetchTracesWithSpansJoined",
+      "TraceLegacyReadClickHouseRepository.fetchTracesWithSpansJoined",
       {
         attributes: { "tenant.id": projectId },
       },
@@ -2990,7 +2987,7 @@ export class ClickHouseTraceService {
           // a hint we keep the original unbounded read.
           //
           // resolveOccurredAtRange yields a RANGE (min/max OccurredAt), not a
-          // point, so map it onto queryWindowed's centre+half-width form: centre
+          // point, so map it onto TraceWindowedReadService.queryWindowed's centre+half-width form: centre
           // on the range midpoint and grow the half-width to cover half the range
           // PLUS the ±2-day margin. The emitted fragment's bounds then land on
           // exactly [from - 2d, to + 2d] — the same predicate the old local
@@ -3016,7 +3013,7 @@ export class ClickHouseTraceService {
           // StartTime always falls within its trace's lifetime, so a ±2-day window
           // around the summaries' OccurredAt range is safe headroom; when no
           // summary row is found we fall back to an unbounded span scan.
-          const summaryRows = await queryWindowed<TraceSummaryRow[]>({
+          const summaryRows = await TraceWindowedReadService.queryWindowed<TraceSummaryRow[]>({
             table: "trace_summaries",
             hintMs: summaryHintMs,
             windowMs: summaryWindowMs,
@@ -3179,7 +3176,7 @@ export class ClickHouseTraceService {
                   result_overflow_mode: "throw" as const,
                 };
 
-          const spanRows = await queryWindowed<SpanRow[]>({
+          const spanRows = await TraceWindowedReadService.queryWindowed<SpanRow[]>({
             table: "stored_spans",
             hintMs: spanHintMs,
             windowMs: spanWindowMs,
@@ -3303,18 +3300,25 @@ export class ClickHouseTraceService {
         try {
           return await runBatch({ batchTraceIds: traceIds });
         } catch (error) {
-          if (!isClickHouseMemoryLimitError(error)) {
+          if (!TraceLegacyReadClickHouseRepository.isClickHouseMemoryLimitError(error)) {
             throw error;
           }
 
           this.logger.warn(
-            `Traces-with-spans join OOM for ${traceIds.length} traces, retrying in batches of ${ClickHouseTraceService.SUMMARY_BATCH_SIZE}`,
+            `Traces-with-spans join OOM for ${traceIds.length} traces, retrying in batches of ${TraceLegacyReadClickHouseRepository.SUMMARY_BATCH_SIZE}`,
           );
 
           const merged = new Map<string, { summary: TraceSummaryData; spans: NormalizedSpan[] }>();
           let mergedSpanCount = 0;
-          for (let i = 0; i < traceIds.length; i += ClickHouseTraceService.SUMMARY_BATCH_SIZE) {
-            const batch = traceIds.slice(i, i + ClickHouseTraceService.SUMMARY_BATCH_SIZE);
+          for (
+            let i = 0;
+            i < traceIds.length;
+            i += TraceLegacyReadClickHouseRepository.SUMMARY_BATCH_SIZE
+          ) {
+            const batch = traceIds.slice(
+              i,
+              i + TraceLegacyReadClickHouseRepository.SUMMARY_BATCH_SIZE,
+            );
 
             // Batching caps ClickHouse's peak memory, not ours — the merge
             // rebuilds the whole result set here. Stop before the heap does,
@@ -3330,7 +3334,8 @@ export class ClickHouseTraceService {
                 maxSpanRows: remainingSpanBudget,
               });
             } catch (batchError) {
-              if (!isClickHouseResultOverflowError(batchError)) throw batchError;
+              if (!TraceLegacyReadClickHouseRepository.isClickHouseResultOverflowError(batchError))
+                throw batchError;
               throw new Error(
                 `Traces-with-spans join fallback exceeded ${MAX_SPANS_PER_JOINED_FALLBACK} spans ` +
                   `(${mergedSpanCount} already merged across ${merged.size} of ${traceIds.length} traces, ` +
@@ -3496,6 +3501,75 @@ export class ClickHouseTraceService {
       nonBilledCost: null,
     };
   }
+
+  /**
+   * Annotation `scoreOptions` is keyed by AnnotationScore id; the public contract
+   * exposes `annotations.scores.<name>`, so remap id -> name. Score names are not
+   * unique per project — on a collision the last definition wins. An id with no
+   * matching score (e.g. a deleted definition) keeps its id as the key so data is
+   * never silently dropped. Prototype-polluting keys are skipped.
+   */
+  static remapScoreOptionsToNames(
+    scoreOptions: unknown,
+    scoreNameById: Map<string, string>,
+  ): Record<string, unknown> {
+    if (!scoreOptions || typeof scoreOptions !== "object") return {};
+    const remapped: Record<string, unknown> = {};
+    for (const [scoreId, value] of Object.entries(scoreOptions as Record<string, unknown>)) {
+      const name = scoreNameById.get(scoreId) ?? scoreId;
+      if (FORBIDDEN_SCORE_KEYS.has(name)) continue;
+      // AnnotationScore names are not unique. On a collision the first entry
+      // keeps the plain name and later ones get an id-suffixed key — deterministic
+      // (object iteration is insertion-ordered) and lossless, instead of the
+      // engine-defined last-write-wins this used to be.
+      const key = name in remapped ? `${name} (${scoreId})` : name;
+      if (FORBIDDEN_SCORE_KEYS.has(key)) continue;
+      remapped[key] = value;
+    }
+    return remapped;
+  }
+
+  /**
+   * ClickHouse refused a query because its result exceeded `max_result_rows`
+   * under `result_overflow_mode = 'throw'` (TOO_MANY_ROWS_OR_BYTES, code 396).
+   *
+   * That is a deliberate refusal on our side, not a fault: the joined-span
+   * fallback sets the limit from its own remaining heap budget so an over-budget
+   * batch never reaches this process. Matched by code and by name because the
+   * driver surfaces one or the other depending on how far the error has been
+   * wrapped.
+   */
+  static isClickHouseResultOverflowError(error: unknown): boolean {
+    if (!(error instanceof Error)) return false;
+    if (HandledError.isHandled(error)) {
+      return (error.reasons ?? []).some(
+        TraceLegacyReadClickHouseRepository.isClickHouseResultOverflowError,
+      );
+    }
+    return (
+      error.message.includes("TOO_MANY_ROWS_OR_BYTES") ||
+      (error as { type?: string }).type === "TOO_MANY_ROWS_OR_BYTES" ||
+      (error as { code?: string | number }).code === 396 ||
+      (error as { code?: string | number }).code === "396"
+    );
+  }
+
+  static isClickHouseMemoryLimitError(error: unknown): boolean {
+    if (!(error instanceof Error)) return false;
+    // The resilient client translates the raw driver error into a handled
+    // `query_memory_exceeded`, wrapping the original in `reasons`.
+    if (HandledError.isHandled(error)) {
+      return (
+        error.code === "query_memory_exceeded" ||
+        (error.reasons ?? []).some(TraceLegacyReadClickHouseRepository.isClickHouseMemoryLimitError)
+      );
+    }
+    return (
+      error.message.includes("MEMORY_LIMIT_EXCEEDED") ||
+      error.message.toLowerCase().includes("memory limit exceeded") ||
+      (error as { type?: string }).type === "MEMORY_LIMIT_EXCEEDED"
+    );
+  }
 }
 
 /**
@@ -3603,46 +3677,6 @@ interface PromptStudioCandidateRow {
   ParentSpanId: string | null;
   SpanAttributes: Record<string, unknown>;
   StartTime: number;
-}
-
-/**
- * ClickHouse refused a query because its result exceeded `max_result_rows`
- * under `result_overflow_mode = 'throw'` (TOO_MANY_ROWS_OR_BYTES, code 396).
- *
- * That is a deliberate refusal on our side, not a fault: the joined-span
- * fallback sets the limit from its own remaining heap budget so an over-budget
- * batch never reaches this process. Matched by code and by name because the
- * driver surfaces one or the other depending on how far the error has been
- * wrapped.
- */
-export function isClickHouseResultOverflowError(error: unknown): boolean {
-  if (!(error instanceof Error)) return false;
-  if (HandledError.isHandled(error)) {
-    return (error.reasons ?? []).some(isClickHouseResultOverflowError);
-  }
-  return (
-    error.message.includes("TOO_MANY_ROWS_OR_BYTES") ||
-    (error as { type?: string }).type === "TOO_MANY_ROWS_OR_BYTES" ||
-    (error as { code?: string | number }).code === 396 ||
-    (error as { code?: string | number }).code === "396"
-  );
-}
-
-export function isClickHouseMemoryLimitError(error: unknown): boolean {
-  if (!(error instanceof Error)) return false;
-  // The resilient client translates the raw driver error into a handled
-  // `query_memory_exceeded`, wrapping the original in `reasons`.
-  if (HandledError.isHandled(error)) {
-    return (
-      error.code === "query_memory_exceeded" ||
-      (error.reasons ?? []).some(isClickHouseMemoryLimitError)
-    );
-  }
-  return (
-    error.message.includes("MEMORY_LIMIT_EXCEEDED") ||
-    error.message.toLowerCase().includes("memory limit exceeded") ||
-    (error as { type?: string }).type === "MEMORY_LIMIT_EXCEEDED"
-  );
 }
 
 /**

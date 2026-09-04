@@ -34,7 +34,7 @@ import type { TopicService } from "@langwatch/topic-contract";
 import {
   TraceListClickHouseRepository,
   TraceListService,
-  TraceQueryClickHouse,
+  TraceQueryClickHouseAdapter,
 } from "@langwatch/trace-server";
 import type { ReportTraceRow } from "@langwatch/automation-contract";
 import type { WorkerAutomationDeliveryComposition } from "./worker-automation-graph.composition";
@@ -170,7 +170,7 @@ export function createWorkerReportTraceList(options: {
       refuseReportRead<TopicService>("the topic names a facet is labelled with"),
     ),
     translateFilter: (query, projectId, window) =>
-      TraceQueryClickHouse.translateFilter(query, projectId, window),
+      TraceQueryClickHouseAdapter.translateFilter(query, projectId, window),
     baseHost: options.baseHost,
   });
 }

@@ -1,3 +1,4 @@
+import { TraceProjectionLeanService } from "../../services/trace-projection-lean.service";
 import { describe, expect, it } from "vitest";
 import {
   NormalizedSpanKind,
@@ -12,11 +13,7 @@ import { TraceIoExtractionAdapter } from "../trace-io-extraction.adapter";
 import { TraceMediaReferenceAdapter } from "../trace-media-reference.adapter";
 import { ModelCatalogTraceModelCostAdapter } from "../model-catalog.trace-model-cost.adapter";
 import { SpanCostService } from "../../services/span-cost.service";
-import {
-  IO_ATTR_KEYS,
-  IO_PREVIEW_BYTES,
-  leanForProjection,
-} from "../../services/trace-projection-lean.service";
+import { IO_ATTR_KEYS, IO_PREVIEW_BYTES } from "../../services/trace-projection-lean.service";
 
 /**
  * The four collaborators the trace pipeline definition is built from, harvested
@@ -255,7 +252,7 @@ describe("given the lean projection payload transform", () => {
         { key: "langwatch.input", value: { stringValue: overBudget } },
       ]);
 
-      const leaned = leanForProjection(event) as unknown as {
+      const leaned = TraceProjectionLeanService.leanForProjection(event) as unknown as {
         data: { span: { attributes: Array<{ key: string; value: { stringValue: string } }> } };
       };
       const attrs = Object.fromEntries(
@@ -278,7 +275,7 @@ describe("given the lean projection payload transform", () => {
         { key: "langwatch.input", value: { stringValue: overBudget } },
       ]);
 
-      leanForProjection(event);
+      TraceProjectionLeanService.leanForProjection(event);
 
       const original = event as unknown as {
         data: { span: { attributes: Array<{ value: { stringValue: string } }> } };
@@ -295,7 +292,7 @@ describe("given the lean projection payload transform", () => {
         { key: "langwatch.input", value: { stringValue: "small" } },
       ]);
 
-      expect(leanForProjection(event)).toBe(event);
+      expect(TraceProjectionLeanService.leanForProjection(event)).toBe(event);
     });
   });
 
@@ -310,7 +307,7 @@ describe("given the lean projection payload transform", () => {
         data: { body: overBudget, attributes: {} },
       } as never;
 
-      const leaned = leanForProjection(event) as unknown as {
+      const leaned = TraceProjectionLeanService.leanForProjection(event) as unknown as {
         data: { body: string; attributes: Record<string, string> };
       };
 

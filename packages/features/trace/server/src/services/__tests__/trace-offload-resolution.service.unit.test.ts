@@ -1,10 +1,11 @@
 /**
- * Unit tests for the resolveOffloadedTraces helper — per-trace span-level
+ * Unit tests for the TraceOffloadResolutionService.resolveOffloadedTraces helper — per-trace span-level
  * eventref resolution and TraceIO recompute (read-resolution half of ADR-022).
  * Each test covers one assertion.
  *
  * BDD structure: given/when nested describes, action-based it() names.
  */
+import { TraceOffloadResolutionService } from "../trace-offload-resolution.service";
 import { describe, expect, it, vi } from "vitest";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
 
@@ -20,7 +21,7 @@ vi.mock("langwatch", () => ({
   }),
 }));
 
-import type { BlobStore } from "../trace-blob-store.service";
+import type { TraceBlobStoreService } from "../trace-blob-store.service";
 import { BlobNotFoundError } from "../trace-blob-store.service";
 import { EVENTREF_ATTR_PREFIX } from "@langwatch/trace-contract";
 import { TraceIOExtractionService } from "../trace-io-extraction.service";
@@ -29,7 +30,6 @@ import {
   NormalizedSpanKind,
   NormalizedStatusCode,
 } from "@langwatch/trace-contract";
-import { resolveOffloadedTraces } from "../trace-offload-resolution.service";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -80,10 +80,10 @@ function createMockLogger() {
 }
 
 /**
- * Creates a fake BlobStore whose getFromEventLog returns a pre-configured map
+ * Creates a fake TraceBlobStoreService whose getFromEventLog returns a pre-configured map
  * of field → fullValue for the given eventId / aggregateId combination.
  */
-function fakeBlobStore(resolvedValues: Record<string, string>): BlobStore {
+function fakeBlobStore(resolvedValues: Record<string, string>): TraceBlobStoreService {
   return {
     getFromEventLog: vi.fn(
       async ({
@@ -104,7 +104,7 @@ function fakeBlobStore(resolvedValues: Record<string, string>): BlobStore {
     putSpool: vi.fn(),
     getSpool: vi.fn(),
     deleteSpool: vi.fn(),
-  } as unknown as BlobStore;
+  } as unknown as TraceBlobStoreService;
 }
 
 const realIOService = new TraceIOExtractionService(TraceCanonicalisationService.create());
@@ -113,7 +113,7 @@ const realIOService = new TraceIOExtractionService(TraceCanonicalisationService.
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("resolveOffloadedTraces()", () => {
+describe("TraceOffloadResolutionService.resolveOffloadedTraces()", () => {
   describe("given a trace whose span has a reserved eventref pointer", () => {
     const fullOutput = "The full 50 KB output value that was offloaded via event_log";
 
@@ -134,7 +134,7 @@ describe("resolveOffloadedTraces()", () => {
         const blobSvc = fakeBlobStore({ "langwatch.output": fullOutput });
         const logger = createMockLogger();
 
-        const result = await resolveOffloadedTraces({
+        const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [spanWithRef],
           blobStore: blobSvc,
@@ -149,7 +149,7 @@ describe("resolveOffloadedTraces()", () => {
         const blobSvc = fakeBlobStore({ "langwatch.output": fullOutput });
         const logger = createMockLogger();
 
-        const result = await resolveOffloadedTraces({
+        const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [spanWithRef],
           blobStore: blobSvc,
@@ -166,7 +166,7 @@ describe("resolveOffloadedTraces()", () => {
         const blobSvc = fakeBlobStore({ "langwatch.output": fullOutput });
         const logger = createMockLogger();
 
-        const result = await resolveOffloadedTraces({
+        const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [spanWithRef],
           blobStore: blobSvc,
@@ -181,7 +181,7 @@ describe("resolveOffloadedTraces()", () => {
         const blobSvc = fakeBlobStore({ "langwatch.output": fullOutput });
         const logger = createMockLogger();
 
-        const result = await resolveOffloadedTraces({
+        const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [spanWithRef],
           blobStore: blobSvc,
@@ -206,7 +206,7 @@ describe("resolveOffloadedTraces()", () => {
             },
           },
         });
-        const result = await resolveOffloadedTraces({
+        const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [span],
           blobStore: fakeBlobStore({ "langwatch.output": "full output" }),
@@ -236,7 +236,7 @@ describe("resolveOffloadedTraces()", () => {
         const blobSvc = fakeBlobStore({});
         const logger = createMockLogger();
 
-        const result = await resolveOffloadedTraces({
+        const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [spanClean],
           blobStore: blobSvc,
@@ -247,12 +247,12 @@ describe("resolveOffloadedTraces()", () => {
         expect(result.resolvedSpans[0]).toBe(spanClean);
       });
 
-      it("calls BlobStore.getFromEventLog zero times", async () => {
+      it("calls TraceBlobStoreService.getFromEventLog zero times", async () => {
         const blobSvc = fakeBlobStore({});
         const getFromEventLogSpy = blobSvc.getFromEventLog as ReturnType<typeof vi.fn>;
         const logger = createMockLogger();
 
-        await resolveOffloadedTraces({
+        await TraceOffloadResolutionService.resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [spanClean],
           blobStore: blobSvc,
@@ -267,7 +267,7 @@ describe("resolveOffloadedTraces()", () => {
         const blobSvc = fakeBlobStore({});
         const logger = createMockLogger();
 
-        const result = await resolveOffloadedTraces({
+        const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [spanClean],
           blobStore: blobSvc,
@@ -280,7 +280,7 @@ describe("resolveOffloadedTraces()", () => {
     });
   });
 
-  describe("given a missing event_log row (BlobStore.getFromEventLog throws BlobNotFoundError)", () => {
+  describe("given a missing event_log row (TraceBlobStoreService.getFromEventLog throws BlobNotFoundError)", () => {
     const spanWithRef = makeSpan({
       traceId: "trace-1",
       spanId: "span-1",
@@ -293,7 +293,7 @@ describe("resolveOffloadedTraces()", () => {
       },
     });
 
-    function failingBlobStore(): BlobStore {
+    function failingBlobStore(): TraceBlobStoreService {
       return {
         getFromEventLog: vi.fn(async () => {
           throw new BlobNotFoundError("evt-test", "langwatch.output", "proj-1");
@@ -301,7 +301,7 @@ describe("resolveOffloadedTraces()", () => {
         putSpool: vi.fn(),
         getSpool: vi.fn(),
         deleteSpool: vi.fn(),
-      } as unknown as BlobStore;
+      } as unknown as TraceBlobStoreService;
     }
 
     describe("when resolved", () => {
@@ -310,7 +310,7 @@ describe("resolveOffloadedTraces()", () => {
         const logger = createMockLogger();
 
         await expect(
-          resolveOffloadedTraces({
+          TraceOffloadResolutionService.resolveOffloadedTraces({
             projectId: "proj-1",
             normalizedSpans: [spanWithRef],
             blobStore: blobSvc,
@@ -324,7 +324,7 @@ describe("resolveOffloadedTraces()", () => {
         const blobSvc = failingBlobStore();
         const logger = createMockLogger();
 
-        const result = await resolveOffloadedTraces({
+        const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [spanWithRef],
           blobStore: blobSvc,
@@ -339,7 +339,7 @@ describe("resolveOffloadedTraces()", () => {
         const blobSvc = failingBlobStore();
         const logger = createMockLogger();
 
-        await resolveOffloadedTraces({
+        await TraceOffloadResolutionService.resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [spanWithRef],
           blobStore: blobSvc,
@@ -354,7 +354,7 @@ describe("resolveOffloadedTraces()", () => {
         const blobSvc = failingBlobStore();
         const logger = createMockLogger();
 
-        const result = await resolveOffloadedTraces({
+        const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [spanWithRef],
           blobStore: blobSvc,
@@ -380,7 +380,7 @@ describe("resolveOffloadedTraces()", () => {
         const blobSvc = fakeBlobStore({});
         const logger = createMockLogger();
 
-        const result = await resolveOffloadedTraces({
+        const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [spanWithMalformedRef],
           blobStore: blobSvc,

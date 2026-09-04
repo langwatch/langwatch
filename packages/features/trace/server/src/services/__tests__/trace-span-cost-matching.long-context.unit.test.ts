@@ -1,6 +1,6 @@
+import { TraceSpanCostMatchingService } from "../trace-span-cost-matching.service";
 import { describe, expect, it } from "vitest";
 import { getStaticModelCostRates, matchModelCost } from "@langwatch/model-provider-contract";
-import { computeSpanCost } from "../trace-span-cost-matching.service";
 
 /**
  * Claude Code appends "[1m]" to the model id when the 1M-token context
@@ -32,7 +32,7 @@ describe("long-context [1m] model cost matching", () => {
 
   /** @scenario "A Claude Code span on claude-opus-5[1m] with cache traffic gets a nonzero cost" */
   it("computes a nonzero cost for the literal claude-opus-5[1m] with cache tokens", () => {
-    const result = computeSpanCost({
+    const result = TraceSpanCostMatchingService.computeSpanCost({
       attrs: {
         "gen_ai.request.model": "claude-opus-5[1m]",
         "gen_ai.usage.cache_read.input_tokens": 20540,
@@ -48,7 +48,7 @@ describe("long-context [1m] model cost matching", () => {
 
   /** @scenario "A Claude Code span on claude-opus-5[1m] with cache traffic gets a nonzero cost" */
   it("adds fresh input and output tokens at the standard Opus 5 rates", () => {
-    const result = computeSpanCost({
+    const result = TraceSpanCostMatchingService.computeSpanCost({
       attrs: {
         "gen_ai.request.model": "claude-opus-5[1m]",
         "gen_ai.usage.cache_read.input_tokens": 20540,

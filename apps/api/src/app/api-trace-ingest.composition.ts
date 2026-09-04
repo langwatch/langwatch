@@ -60,6 +60,7 @@
  *     behind it refuses by name, because this composition holds no runtime for
  *     them and a silent empty answer would read as "this session had nothing".
  */
+import { TraceProcessingProducerAdapter } from "@langwatch/trace-server";
 import {
   CodingAgentService,
   type CodingAgentSpanFilterInput,
@@ -71,7 +72,6 @@ import { PlanLimitExceededError } from "@langwatch/entitlement-contract";
 import type { UsageLimitResult } from "@langwatch/entitlement-server";
 import { DEFAULT_PII_REDACTION_LEVEL, type RecordSpanCommandData } from "@langwatch/trace-contract";
 import {
-  createTraceProcessingProducerPipeline,
   TraceIngestionService,
   TraceIngressCommandPort,
   TraceSpanCollectionService,
@@ -428,7 +428,9 @@ function resolveRecordSpan(input: {
   const registered =
     tryGetPipeline(input.eventing) ??
     input.eventing.register(
-      createTraceProcessingProducerPipeline({ processName: input.processName }),
+      TraceProcessingProducerAdapter.createTraceProcessingProducerPipeline({
+        processName: input.processName,
+      }),
     );
   const recordSpan = (registered.commands as Record<string, unknown>).recordSpan;
   if (!isSender(recordSpan)) {
@@ -565,7 +567,7 @@ class ApiNullTraceSpanDedupAdapter extends TraceSpanDedupPort {
  * answering empty: an empty answer would be read as "this coding session
  * recorded nothing", which is a different and wrong fact.
  *
- * The same stand-in shape `createTraceProcessingProducerPipeline` uses for the
+ * The same stand-in shape `TraceProcessingProducerAdapter.createTraceProcessingProducerPipeline` uses for the
  * consumer-side collaborators a producer does not hold.
  */
 class ApiSpanFilterOnlyCodingAgents extends CodingAgentService {

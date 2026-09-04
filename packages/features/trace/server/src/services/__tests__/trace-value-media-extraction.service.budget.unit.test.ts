@@ -8,6 +8,7 @@
  * deterministic ids; the walker, the visitor dispatch, and the per-part
  * rewriting are the production code.
  */
+import { TraceValueMediaExtractionService } from "../trace-value-media-extraction.service";
 import { containsMediaMarkers } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -21,11 +22,7 @@ vi.mock("@langwatch/observability", () => ({
 }));
 
 import type { TraceMediaStorePort } from "../../ports/trace-media-store.port";
-import {
-  createExtractionBudget,
-  extractInlineMediaFromValue,
-  MAX_MEDIA_PARTS_PER_SPAN,
-} from "../trace-value-media-extraction.service";
+import { MAX_MEDIA_PARTS_PER_SPAN } from "../trace-value-media-extraction.service";
 
 interface StoredCall {
   mediaType: string;
@@ -66,10 +63,10 @@ describe("extraction budget", () => {
     /** @scenario Extraction cost inside the collector request is bounded */
     it("externalizes at most the cap and leaves the rest inline, counted", async () => {
       const { service, calls } = makeFakeService();
-      const budget = createExtractionBudget();
+      const budget = TraceValueMediaExtractionService.createExtractionBudget();
       const value = contentWith(MAX_MEDIA_PARTS_PER_SPAN + 4);
 
-      const result = await extractInlineMediaFromValue({
+      const result = await TraceValueMediaExtractionService.extractInlineMediaFromValue({
         value,
         service,
         budget,
@@ -99,7 +96,7 @@ describe("the marker gate", () => {
 
       expect(containsMediaMarkers(serialized)).toBe(false);
 
-      const result = await extractInlineMediaFromValue({
+      const result = await TraceValueMediaExtractionService.extractInlineMediaFromValue({
         value: plain,
         service,
         ...PARAMS,

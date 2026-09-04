@@ -1,13 +1,11 @@
+import { VisibilityWindowService } from "./trace-visibility-window.service";
+import { TraceOffloadResolutionService } from "./trace-offload-resolution.service";
+import { TraceLegacySpanMappingService } from "./trace-legacy-span-mapping.service";
 import { createLogger } from "@langwatch/observability";
 import type { DerivedTraceEvent } from "@langwatch/trace-contract";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
 import type { ElasticSearchEvent, Span } from "@langwatch/trace-contract";
-import {
-  mapNormalizedSpansToSpans,
-  mapNormalizedSpanToSpan,
-} from "./trace-legacy-span-mapping.service";
-import { resolveOffloadedTraces } from "./trace-offload-resolution.service";
-import type { BlobStore } from "./trace-blob-store.service";
+import type { TraceBlobStoreService } from "./trace-blob-store.service";
 import type {
   ModelSpanSampleRow,
   ModelUsageStatsRow,
@@ -20,7 +18,6 @@ import type {
 import type { SpanResourceInfo, SpanSummaryRow, TraceEventRollup } from "@langwatch/trace-contract";
 import type { TraceIOExtractionService } from "./trace-io-extraction.service";
 import type { SpanInsertData } from "@langwatch/trace-contract";
-import { redactSpanContent } from "./trace-visibility-window.service";
 
 /**
  * Optional blob-offload resolution dependencies for the v2 read path (ADR-022).
@@ -31,7 +28,7 @@ import { redactSpanContent } from "./trace-visibility-window.service";
  * in `stored_spans` — identical to pre-ADR-022 behaviour.
  */
 export interface SpanReadBlobResolutionDeps {
-  blobStore: BlobStore;
+  blobStore: TraceBlobStoreService;
   ioExtractionService: TraceIOExtractionService;
 }
 
@@ -63,11 +60,23 @@ const applyVisibilityGate = <T extends Span>(
   }
 
   return spans.map((span) =>
-    span.timestamps.started_at < visibilityCutoffMs ? redactSpanContent(span) : span,
+    span.timestamps.started_at < visibilityCutoffMs
+      ? VisibilityWindowService.redactSpanContent(span)
+      : span,
   );
 };
 
 export class SpanStorageService {
+  static create({
+    repository,
+    blobResolutionDeps,
+  }: {
+    repository: SpanStorageRepository;
+    blobResolutionDeps?: SpanReadBlobResolutionDeps;
+  }): SpanStorageService {
+    return new SpanStorageService(repository, blobResolutionDeps);
+  }
+
   private readonly blobResolutionDeps?: SpanReadBlobResolutionDeps;
   private readonly logger = createLogger("langwatch:traces:span-storage-service");
 
@@ -105,7 +114,7 @@ export class SpanStorageService {
 
     // Fetch normalized spans so resolution can access raw spanAttributes.
     const normalizedSpans = await this.repository.getNormalizedSpansByTraceId(params);
-    const { resolvedSpans } = await resolveOffloadedTraces({
+    const { resolvedSpans } = await TraceOffloadResolutionService.resolveOffloadedTraces({
       projectId: params.tenantId,
       normalizedSpans,
       blobStore: this.blobResolutionDeps.blobStore,
@@ -113,7 +122,10 @@ export class SpanStorageService {
       logger: this.logger,
     });
 
-    return applyVisibilityGate(mapNormalizedSpansToSpans(resolvedSpans), params.visibilityCutoffMs);
+    return applyVisibilityGate(
+      TraceLegacySpanMappingService.mapNormalizedSpansToSpans(resolvedSpans),
+      params.visibilityCutoffMs,
+    );
   }
 
   async getNormalizedSpansByTraceId(
@@ -148,7 +160,7 @@ export class SpanStorageService {
    *
    * Resolution fetches normalized spans for the whole trace and isolates the
    * requested span after resolution — this reuses the same
-   * `resolveOffloadedTraces` path as `getSpansByTraceId` so that sibling
+   * `TraceOffloadResolutionService.resolveOffloadedTraces` path as `getSpansByTraceId` so that sibling
    * eventref pointers on the same trace are also resolved consistently.
    */
   async getSpanById(params: BySpanId & VisibilityGate): Promise<Span | null> {
@@ -161,7 +173,7 @@ export class SpanStorageService {
 
     // Resolve the single span via the normalized+resolve path.
     const normalizedSpans = await this.repository.getNormalizedSpansByTraceId(params);
-    const { resolvedSpans } = await resolveOffloadedTraces({
+    const { resolvedSpans } = await TraceOffloadResolutionService.resolveOffloadedTraces({
       projectId: params.tenantId,
       normalizedSpans,
       blobStore: this.blobResolutionDeps.blobStore,
@@ -173,7 +185,7 @@ export class SpanStorageService {
       return null;
     }
 
-    return gateOne(mapNormalizedSpanToSpan(resolved));
+    return gateOne(TraceLegacySpanMappingService.mapNormalizedSpanToSpan(resolved));
   }
 
   async getTraceEventsByTraceId(params: ByTraceId): Promise<DerivedTraceEvent[]> {

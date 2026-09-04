@@ -6,11 +6,11 @@
  * collapses them, so a filter evaluated before the version dedup reads a stale
  * version as if it were current.
  */
+import { ClickHouseFacetRegistryAdapter } from "../../../adapters/trace-facet-registry.clickhouse.adapter";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { FACET_REGISTRY } from "../../../adapters/trace-facet-registry.clickhouse.adapter";
-import { TraceQueryClickHouse } from "../../../adapters/trace-query.clickhouse.adapter";
+import { TraceQueryClickHouseAdapter } from "../../../adapters/trace-query.clickhouse.adapter";
 import { TraceListClickHouseRepository } from "../trace-list.repository";
 import {
   createTestClickHouseClient,
@@ -81,7 +81,9 @@ integration("TraceListClickHouseRepository filtering across row versions", () =>
   const timeRange = { from: base - 60_000, to: base + 60_000 };
 
   const annotationFacetExpression = (() => {
-    const def = FACET_REGISTRY.find((facet) => facet.key === "annotation");
+    const def = ClickHouseFacetRegistryAdapter.FACET_REGISTRY.find(
+      (facet) => facet.key === "annotation",
+    );
     if (!def || !("expression" in def)) {
       throw new Error("the annotation facet no longer carries an expression");
     }
@@ -90,7 +92,11 @@ integration("TraceListClickHouseRepository filtering across row versions", () =>
 
   /** The filter the sidebar compiles, so the test reads the production SQL. */
   const filterFor = (queryText: string) => {
-    const compiled = TraceQueryClickHouse.translateFilter(queryText, versionTenant, timeRange);
+    const compiled = TraceQueryClickHouseAdapter.translateFilter(
+      queryText,
+      versionTenant,
+      timeRange,
+    );
     if (!compiled) throw new Error(`"${queryText}" compiled to no filter`);
     return compiled;
   };

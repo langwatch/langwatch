@@ -128,6 +128,10 @@ export type ClickHouseTraceProjectionStorageOptions = {
 
 /** The three projection-storage ports, each over its own ClickHouse repository. */
 export class ClickHouseTraceProjectionStorageAdapter {
+  static create(): ClickHouseTraceProjectionStorageAdapter {
+    return new ClickHouseTraceProjectionStorageAdapter();
+  }
+
   private constructor() {}
 
   static createSummary(

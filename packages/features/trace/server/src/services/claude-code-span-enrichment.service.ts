@@ -104,40 +104,6 @@ type ChatRole = (typeof CHAT_ROLES)[number];
 const CHAT_ROLE_SET: ReadonlySet<string> = new Set(CHAT_ROLES);
 
 /**
- * Compute the input/output content to attach to each `llm_request`-style span
- * from the trace's claude_code content logs. Returns a map keyed by `spanId`; a
- * span appears only when it gained input or output, so an unrelated span (or a
- * trace with no claude logs) is left untouched.
- */
-export function computeClaudeSpanEnrichment({
-  spans,
-  logs,
-  traceCanonicalisation,
-}: {
-  spans: ClaudeSpanRef[];
-  logs: ClaudeContentLog[];
-  traceCanonicalisation: TraceCanonicalisationService;
-}): Map<string, ClaudeSpanEnrichment> {
-  const result = new Map<string, ClaudeSpanEnrichment>();
-  if (spans.length === 0 || logs.length === 0) {
-    return result;
-  }
-
-  const outputByRequestId = buildOutputIndex(logs, traceCanonicalisation);
-  const inputBySpanId = buildInputIndex({ spans, logs, traceCanonicalisation });
-
-  for (const span of spans) {
-    const output = span.requestId !== null ? (outputByRequestId.get(span.requestId) ?? null) : null;
-    const input = inputBySpanId.get(span.spanId) ?? null;
-    if (input !== null || output !== null) {
-      result.set(span.spanId, { input, output });
-    }
-  }
-
-  return result;
-}
-
-/**
  * Index output content by `request_id`. `api_response_body` (parsed) takes
  * precedence over `assistant_response` (raw text) for the same request id, and
  * the first log of each kind wins. Bodies are bounded by `capPayloadString`
@@ -498,79 +464,6 @@ const TOOL_DECISION_EVENT = "tool_decision";
 const TOOL_RESULT_EVENT = "tool_result";
 
 /**
- * Compute input/output for the trace's tool spans from its tool event logs —
- * an EXACT join by `tool_use_id` (both sides carry it), no positional risk.
- *
- * Input: the `tool_result`'s real `tool_input` JSON, else its derived
- * `tool_parameters`, else the `tool_decision`'s parameters.
- *
- * Output: the actual result content when the trace's request bodies carry it
- * (`contentLogs` — see {@link extractToolResultsFromRequestBody}: claude ships
- * tool stdout only as `tool_result` blocks of the NEXT model call's request
- * body). Without bodies (light path), a structured summary of what the
- * telemetry does state: status, success, duration, result size, decision. A
- * rejected tool (decision without a result — it never ran) reports
- * `status: "rejected"`.
- */
-export function computeClaudeToolSpanEnrichment({
-  spans,
-  toolLogs,
-  contentLogs,
-  traceCanonicalisation,
-}: {
-  spans: ClaudeToolSpanRef[];
-  toolLogs: ClaudeToolLog[];
-  contentLogs: ClaudeContentLog[];
-  traceCanonicalisation: TraceCanonicalisationService;
-}): Map<string, ClaudeToolSpanEnrichment> {
-  const result = new Map<string, ClaudeToolSpanEnrichment>();
-  if (spans.length === 0 || toolLogs.length === 0) {
-    return result;
-  }
-
-  // First log per (event, tool_use_id) wins, mirroring buildOutputIndex.
-  const resultByUseId = new Map<string, ClaudeToolLog>();
-  const decisionByUseId = new Map<string, ClaudeToolLog>();
-  for (const log of toolLogs) {
-    if (log.toolUseId === null) {
-      continue;
-    }
-
-    if (log.eventName === TOOL_RESULT_EVENT && !resultByUseId.has(log.toolUseId)) {
-      resultByUseId.set(log.toolUseId, log);
-    } else if (log.eventName === TOOL_DECISION_EVENT && !decisionByUseId.has(log.toolUseId)) {
-      decisionByUseId.set(log.toolUseId, log);
-    }
-  }
-
-  if (resultByUseId.size === 0 && decisionByUseId.size === 0) {
-    return result;
-  }
-
-  const resultContentByUseId = buildToolResultContentIndex(contentLogs, traceCanonicalisation);
-
-  for (const span of spans) {
-    const toolResult = resultByUseId.get(span.toolUseId) ?? null;
-    const decision = decisionByUseId.get(span.toolUseId) ?? null;
-    if (toolResult === null && decision === null) {
-      continue;
-    }
-
-    const input = buildToolInput({ toolResult, decision });
-    const output = buildToolOutput({
-      toolResult,
-      decision,
-      resultContent: resultContentByUseId.get(span.toolUseId) ?? null,
-    });
-    if (input !== null || output !== null) {
-      result.set(span.spanId, { input, output });
-    }
-  }
-
-  return result;
-}
-
-/**
  * Harvest every request body's `tool_result` blocks into one
  * `tool_use_id` → content index (first occurrence wins — a tool result is
  * re-sent verbatim in every later turn's rolling history).
@@ -685,80 +578,194 @@ function prune<T extends Record<string, unknown>>(obj: T): T {
   return out;
 }
 
-/**
- * The interaction (turn) span's OUTPUT: the last conversational assistant
- * reply that falls inside the turn's window (+`slackMs` for the exporter
- * flushing the reply just after the span closes). `api_response_body` beats
- * `assistant_response` at the same timestamp (parsed body keeps `tool_use`
- * markers); both are gated on {@link isConversationalQuerySource} so a
- * utility reply (title generation, autosuggest) can never headline the turn.
- */
-export function computeClaudeInteractionOutput({
-  logs,
-  windowStartMs,
-  windowEndMs,
-  slackMs = 2_000,
-  traceCanonicalisation,
-}: {
-  logs: ClaudeContentLog[];
-  windowStartMs: number;
-  windowEndMs: number;
-  slackMs?: number;
-  traceCanonicalisation: TraceCanonicalisationService;
-}): SpanInputOutput | null {
-  let best: { timeUnixMs: number; rank: number; text: string } | null = null;
-  for (const log of logs) {
-    if (
-      !traceCanonicalisation.classifyClaudeCall({
-        querySource: log.querySource,
-      }).conversational
-    ) {
-      continue;
-    }
-
-    if (log.timeUnixMs < windowStartMs) {
-      continue;
-    }
-
-    if (log.timeUnixMs > windowEndMs + slackMs) {
-      continue;
-    }
-
-    let text: string | null = null;
-    let rank = 0;
-    if (log.eventName === OUTPUT_BODY_EVENT) {
-      const derived =
-        log.derivedOutputText != null && (log.derivedToolCallCount ?? 0) === 0
-          ? log.derivedOutputText
-          : null;
-      text =
-        derived ??
-        traceCanonicalisation.deriveClaudeResponseContent({
-          body: log.body,
-        }).assistantOutput;
-      rank = 1;
-    } else if (log.eventName === ASSISTANT_RESPONSE_EVENT) {
-      text =
-        log.body !== null && log.body.length > 0
-          ? capPayloadString(log.body, undefined, "assistant_output")
-          : null;
-      rank = 0;
-    } else {
-      continue;
-    }
-
-    if (text === null) {
-      continue;
-    }
-
-    if (
-      best === null ||
-      log.timeUnixMs > best.timeUnixMs ||
-      (log.timeUnixMs === best.timeUnixMs && rank > best.rank)
-    ) {
-      best = { timeUnixMs: log.timeUnixMs, rank, text };
-    }
+export class ClaudeCodeSpanEnrichmentService {
+  static create(): ClaudeCodeSpanEnrichmentService {
+    return new ClaudeCodeSpanEnrichmentService();
   }
 
-  return best !== null ? { type: "text", value: best.text } : null;
+  /**
+   * Compute the input/output content to attach to each `llm_request`-style span
+   * from the trace's claude_code content logs. Returns a map keyed by `spanId`; a
+   * span appears only when it gained input or output, so an unrelated span (or a
+   * trace with no claude logs) is left untouched.
+   */
+  static computeClaudeSpanEnrichment({
+    spans,
+    logs,
+    traceCanonicalisation,
+  }: {
+    spans: ClaudeSpanRef[];
+    logs: ClaudeContentLog[];
+    traceCanonicalisation: TraceCanonicalisationService;
+  }): Map<string, ClaudeSpanEnrichment> {
+    const result = new Map<string, ClaudeSpanEnrichment>();
+    if (spans.length === 0 || logs.length === 0) {
+      return result;
+    }
+
+    const outputByRequestId = buildOutputIndex(logs, traceCanonicalisation);
+    const inputBySpanId = buildInputIndex({ spans, logs, traceCanonicalisation });
+
+    for (const span of spans) {
+      const output =
+        span.requestId !== null ? (outputByRequestId.get(span.requestId) ?? null) : null;
+      const input = inputBySpanId.get(span.spanId) ?? null;
+      if (input !== null || output !== null) {
+        result.set(span.spanId, { input, output });
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Compute input/output for the trace's tool spans from its tool event logs —
+   * an EXACT join by `tool_use_id` (both sides carry it), no positional risk.
+   *
+   * Input: the `tool_result`'s real `tool_input` JSON, else its derived
+   * `tool_parameters`, else the `tool_decision`'s parameters.
+   *
+   * Output: the actual result content when the trace's request bodies carry it
+   * (`contentLogs` — see {@link extractToolResultsFromRequestBody}: claude ships
+   * tool stdout only as `tool_result` blocks of the NEXT model call's request
+   * body). Without bodies (light path), a structured summary of what the
+   * telemetry does state: status, success, duration, result size, decision. A
+   * rejected tool (decision without a result — it never ran) reports
+   * `status: "rejected"`.
+   */
+  static computeClaudeToolSpanEnrichment({
+    spans,
+    toolLogs,
+    contentLogs,
+    traceCanonicalisation,
+  }: {
+    spans: ClaudeToolSpanRef[];
+    toolLogs: ClaudeToolLog[];
+    contentLogs: ClaudeContentLog[];
+    traceCanonicalisation: TraceCanonicalisationService;
+  }): Map<string, ClaudeToolSpanEnrichment> {
+    const result = new Map<string, ClaudeToolSpanEnrichment>();
+    if (spans.length === 0 || toolLogs.length === 0) {
+      return result;
+    }
+
+    // First log per (event, tool_use_id) wins, mirroring buildOutputIndex.
+    const resultByUseId = new Map<string, ClaudeToolLog>();
+    const decisionByUseId = new Map<string, ClaudeToolLog>();
+    for (const log of toolLogs) {
+      if (log.toolUseId === null) {
+        continue;
+      }
+
+      if (log.eventName === TOOL_RESULT_EVENT && !resultByUseId.has(log.toolUseId)) {
+        resultByUseId.set(log.toolUseId, log);
+      } else if (log.eventName === TOOL_DECISION_EVENT && !decisionByUseId.has(log.toolUseId)) {
+        decisionByUseId.set(log.toolUseId, log);
+      }
+    }
+
+    if (resultByUseId.size === 0 && decisionByUseId.size === 0) {
+      return result;
+    }
+
+    const resultContentByUseId = buildToolResultContentIndex(contentLogs, traceCanonicalisation);
+
+    for (const span of spans) {
+      const toolResult = resultByUseId.get(span.toolUseId) ?? null;
+      const decision = decisionByUseId.get(span.toolUseId) ?? null;
+      if (toolResult === null && decision === null) {
+        continue;
+      }
+
+      const input = buildToolInput({ toolResult, decision });
+      const output = buildToolOutput({
+        toolResult,
+        decision,
+        resultContent: resultContentByUseId.get(span.toolUseId) ?? null,
+      });
+      if (input !== null || output !== null) {
+        result.set(span.spanId, { input, output });
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * The interaction (turn) span's OUTPUT: the last conversational assistant
+   * reply that falls inside the turn's window (+`slackMs` for the exporter
+   * flushing the reply just after the span closes). `api_response_body` beats
+   * `assistant_response` at the same timestamp (parsed body keeps `tool_use`
+   * markers); both are gated on {@link isConversationalQuerySource} so a
+   * utility reply (title generation, autosuggest) can never headline the turn.
+   */
+  static computeClaudeInteractionOutput({
+    logs,
+    windowStartMs,
+    windowEndMs,
+    slackMs = 2_000,
+    traceCanonicalisation,
+  }: {
+    logs: ClaudeContentLog[];
+    windowStartMs: number;
+    windowEndMs: number;
+    slackMs?: number;
+    traceCanonicalisation: TraceCanonicalisationService;
+  }): SpanInputOutput | null {
+    let best: { timeUnixMs: number; rank: number; text: string } | null = null;
+    for (const log of logs) {
+      if (
+        !traceCanonicalisation.classifyClaudeCall({
+          querySource: log.querySource,
+        }).conversational
+      ) {
+        continue;
+      }
+
+      if (log.timeUnixMs < windowStartMs) {
+        continue;
+      }
+
+      if (log.timeUnixMs > windowEndMs + slackMs) {
+        continue;
+      }
+
+      let text: string | null = null;
+      let rank = 0;
+      if (log.eventName === OUTPUT_BODY_EVENT) {
+        const derived =
+          log.derivedOutputText != null && (log.derivedToolCallCount ?? 0) === 0
+            ? log.derivedOutputText
+            : null;
+        text =
+          derived ??
+          traceCanonicalisation.deriveClaudeResponseContent({
+            body: log.body,
+          }).assistantOutput;
+        rank = 1;
+      } else if (log.eventName === ASSISTANT_RESPONSE_EVENT) {
+        text =
+          log.body !== null && log.body.length > 0
+            ? capPayloadString(log.body, undefined, "assistant_output")
+            : null;
+        rank = 0;
+      } else {
+        continue;
+      }
+
+      if (text === null) {
+        continue;
+      }
+
+      if (
+        best === null ||
+        log.timeUnixMs > best.timeUnixMs ||
+        (log.timeUnixMs === best.timeUnixMs && rank > best.rank)
+      ) {
+        best = { timeUnixMs: log.timeUnixMs, rank, text };
+      }
+    }
+
+    return best !== null ? { type: "text", value: best.text } : null;
+  }
 }

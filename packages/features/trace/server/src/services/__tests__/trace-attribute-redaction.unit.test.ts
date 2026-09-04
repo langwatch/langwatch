@@ -1,20 +1,20 @@
 import { describe, expect, it } from "vitest";
 
-import { TraceAttributeRedactor } from "../trace-attribute-redaction.service";
+import { TraceAttributeRedactionService } from "../trace-attribute-redaction.service";
 import type { Protections } from "../trace-viewer-protections.service";
 
 /** The one-shot spelling, which is what most call sites want. */
 const redactHiddenAttributes = <T extends Record<string, unknown> | null | undefined>(
   value: T,
   hidden: Protections["hiddenAttributes"],
-): T => TraceAttributeRedactor.for(hidden).redact(value);
+): T => TraceAttributeRedactionService.create(hidden).redact(value);
 
 const hidden = [
   { pattern: "app.billing.*", visibleTo: "Admins" },
   { pattern: "app.session_token", visibleTo: "no one" },
 ];
 
-describe("TraceAttributeRedactor", () => {
+describe("TraceAttributeRedactionService", () => {
   describe("given a flat dotted-key record", () => {
     /** @scenario A restricted custom attribute is hidden from outside the audience */
     it("replaces matched values with a placeholder naming the audience and keeps the rest", () => {
@@ -103,7 +103,7 @@ describe("TraceAttributeRedactor", () => {
       // The reason this is a class: a trace redacts its spans and their events
       // against one viewer's rules, and compiling the patterns per record was
       // what the second, pre-compiled entry point existed to avoid.
-      const redactor = TraceAttributeRedactor.for(hidden);
+      const redactor = TraceAttributeRedactionService.create(hidden);
 
       expect(redactor.redact({ "app.session_token": "x" })).toEqual({
         "app.session_token": "[REDACTED] (visible to no one)",
@@ -117,7 +117,7 @@ describe("TraceAttributeRedactor", () => {
 
   describe("given a viewer with nothing hidden", () => {
     it("hands every record straight back", () => {
-      const redactor = TraceAttributeRedactor.for(undefined);
+      const redactor = TraceAttributeRedactionService.create(undefined);
       const value = { "app.session_token": "x" };
 
       expect(redactor.redact(value)).toBe(value);

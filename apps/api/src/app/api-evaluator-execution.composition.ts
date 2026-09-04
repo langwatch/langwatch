@@ -55,6 +55,7 @@
  * its four failure outcomes are known — because a run reported by one of them
  * and not the other is a dashboard that undercounts without saying so.
  */
+import { TraceReadableSpanService } from "@langwatch/trace-server";
 import {
   AZURE_SAFETY_PROVIDER_KEY,
   isAzureEvaluatorType,
@@ -86,7 +87,6 @@ import {
   resolveMaxTokensCeiling,
 } from "@langwatch/model-provider-server";
 import type { Logger } from "@langwatch/observability";
-import { formatSpansDigest } from "@langwatch/trace-server";
 import { mappingStateSchema, type Span } from "@langwatch/trace-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
 
@@ -355,7 +355,7 @@ class ApiEvaluationSpanDigest extends EvaluationSpanDigestPort {
   }
 
   format(spans: Span[]): Promise<string> {
-    return formatSpansDigest(spans);
+    return TraceReadableSpanService.formatSpansDigest(spans);
   }
 }
 

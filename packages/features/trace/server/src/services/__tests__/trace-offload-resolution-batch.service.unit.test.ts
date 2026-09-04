@@ -1,5 +1,5 @@
 /**
- * Unit tests for resolveOffloadedTracesBatch — the BULK read-path resolver
+ * Unit tests for TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch — the BULK read-path resolver
  * (#4991, "2 of 2" of #4888). Where resolveOffloadedTraces resolves one trace's
  * spans (detail reads, #4984), this resolves a WHOLE result set (export, thread,
  * annotation, sample builders) with a single bounded-concurrency pass over
@@ -12,6 +12,7 @@
  *
  * BDD structure: given/when nested describes, action-based it() names.
  */
+import { TraceOffloadResolutionBatchService } from "../trace-offload-resolution-batch.service";
 import { describe, expect, it, vi } from "vitest";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
 
@@ -26,7 +27,7 @@ vi.mock("langwatch", () => ({
   }),
 }));
 
-import type { BlobStore } from "../trace-blob-store.service";
+import type { TraceBlobStoreService } from "../trace-blob-store.service";
 import { BlobNotFoundError } from "../trace-blob-store.service";
 import { EVENTREF_ATTR_PREFIX } from "@langwatch/trace-contract";
 import { TraceIOExtractionService } from "../trace-io-extraction.service";
@@ -35,10 +36,7 @@ import {
   NormalizedSpanKind,
   NormalizedStatusCode,
 } from "@langwatch/trace-contract";
-import {
-  EVENT_LOG_RESOLVE_CONCURRENCY,
-  resolveOffloadedTracesBatch,
-} from "../trace-offload-resolution-batch.service";
+import { EVENT_LOG_RESOLVE_CONCURRENCY } from "../trace-offload-resolution-batch.service";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -116,12 +114,12 @@ function createMockLogger() {
 }
 
 /**
- * A BlobStore whose getFromEventLog tracks in-flight concurrency so the test can
+ * A TraceBlobStoreService whose getFromEventLog tracks in-flight concurrency so the test can
  * assert the resolver never exceeds the pool size. Each call resolves after a
  * microtask delay so overlapping calls are observable.
  */
 function makeConcurrencyTrackingBlobStore(fullValue: string): {
-  blobStore: BlobStore;
+  blobStore: TraceBlobStoreService;
   getCalls: () => number;
   peakConcurrency: () => number;
 } {
@@ -143,7 +141,7 @@ function makeConcurrencyTrackingBlobStore(fullValue: string): {
       putSpool: vi.fn(),
       getSpool: vi.fn(),
       deleteSpool: vi.fn(),
-    } as unknown as BlobStore,
+    } as unknown as TraceBlobStoreService,
     getCalls: () => calls,
     peakConcurrency: () => peak,
   };
@@ -155,7 +153,7 @@ const realIOService = new TraceIOExtractionService(TraceCanonicalisationService.
 // AC6 — streamed / bounded-concurrency resolution
 // ---------------------------------------------------------------------------
 
-describe("resolveOffloadedTracesBatch() — AC6 bounded resolution", () => {
+describe("TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch() — AC6 bounded resolution", () => {
   describe("given a large result set where every trace has one offloaded span", () => {
     const TRACE_COUNT = EVENT_LOG_RESOLVE_CONCURRENCY * 3;
     const fullValue = "X".repeat(100_000);
@@ -174,7 +172,7 @@ describe("resolveOffloadedTracesBatch() — AC6 bounded resolution", () => {
       it("never exceeds the configured event_log read concurrency", async () => {
         const { blobStore, peakConcurrency } = makeConcurrencyTrackingBlobStore(fullValue);
 
-        await resolveOffloadedTracesBatch({
+        await TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch({
           projectId: "proj-1",
           spansPerTrace: buildResultSet(),
           blobStore,
@@ -189,7 +187,7 @@ describe("resolveOffloadedTracesBatch() — AC6 bounded resolution", () => {
       it("issues exactly one event_log read per offloaded field (no N×M blow-up)", async () => {
         const { blobStore, getCalls } = makeConcurrencyTrackingBlobStore(fullValue);
 
-        await resolveOffloadedTracesBatch({
+        await TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch({
           projectId: "proj-1",
           spansPerTrace: buildResultSet(),
           blobStore,
@@ -203,7 +201,7 @@ describe("resolveOffloadedTracesBatch() — AC6 bounded resolution", () => {
       it("returns one resolution entry per input trace, in order, all resolved", async () => {
         const { blobStore } = makeConcurrencyTrackingBlobStore(fullValue);
 
-        const results = await resolveOffloadedTracesBatch({
+        const results = await TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch({
           projectId: "proj-1",
           spansPerTrace: buildResultSet(),
           blobStore,
@@ -230,7 +228,7 @@ describe("resolveOffloadedTracesBatch() — AC6 bounded resolution", () => {
           eventId: "evt-dup",
         });
 
-        const results = await resolveOffloadedTracesBatch({
+        const results = await TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch({
           projectId: "proj-1",
           spansPerTrace: [[span], [span]],
           blobStore,
@@ -260,7 +258,7 @@ describe("resolveOffloadedTracesBatch() — AC6 bounded resolution", () => {
           },
         });
 
-        const results = await resolveOffloadedTracesBatch({
+        const results = await TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch({
           projectId: "proj-1",
           spansPerTrace: [[span]],
           blobStore,
@@ -287,7 +285,7 @@ describe("resolveOffloadedTracesBatch() — AC6 bounded resolution", () => {
           spanAttributes: { "langwatch.output": "small inline value" },
         });
 
-        const results = await resolveOffloadedTracesBatch({
+        const results = await TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch({
           projectId: "proj-1",
           spansPerTrace: [[plainSpan]],
           blobStore,
@@ -309,9 +307,9 @@ describe("resolveOffloadedTracesBatch() — AC6 bounded resolution", () => {
 // AC7 — degrade to preview WITH a warn log
 // ---------------------------------------------------------------------------
 
-describe("resolveOffloadedTracesBatch() — AC7 graceful degradation", () => {
+describe("TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch() — AC7 graceful degradation", () => {
   describe("given one trace whose event_log row is missing", () => {
-    function makeMissingRowBlobStore(): BlobStore {
+    function makeMissingRowBlobStore(): TraceBlobStoreService {
       return {
         getFromEventLog: vi.fn(async ({ field }: { field: string }) => {
           throw new BlobNotFoundError("evt-missing", field, "proj-1");
@@ -319,13 +317,13 @@ describe("resolveOffloadedTracesBatch() — AC7 graceful degradation", () => {
         putSpool: vi.fn(),
         getSpool: vi.fn(),
         deleteSpool: vi.fn(),
-      } as unknown as BlobStore;
+      } as unknown as TraceBlobStoreService;
     }
 
     describe("when resolved as a batch", () => {
       it("keeps the preview value for the unresolved field", async () => {
         const logger = createMockLogger();
-        const results = await resolveOffloadedTracesBatch({
+        const results = await TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch({
           projectId: "proj-1",
           spansPerTrace: [
             [
@@ -350,7 +348,7 @@ describe("resolveOffloadedTracesBatch() — AC7 graceful degradation", () => {
 
       it("logs a warning (no silent truncation)", async () => {
         const logger = createMockLogger();
-        await resolveOffloadedTracesBatch({
+        await TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch({
           projectId: "proj-1",
           spansPerTrace: [
             [
@@ -371,7 +369,7 @@ describe("resolveOffloadedTracesBatch() — AC7 graceful degradation", () => {
 
       it("strips the reserved eventref key even when resolution fails", async () => {
         const logger = createMockLogger();
-        const results = await resolveOffloadedTracesBatch({
+        const results = await TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch({
           projectId: "proj-1",
           spansPerTrace: [
             [
@@ -394,7 +392,7 @@ describe("resolveOffloadedTracesBatch() — AC7 graceful degradation", () => {
   });
 
   describe("given a result set where one trace fails and others succeed", () => {
-    function makeSelectiveBlobStore(goodValue: string): BlobStore {
+    function makeSelectiveBlobStore(goodValue: string): TraceBlobStoreService {
       return {
         getFromEventLog: vi.fn(async ({ eventId, field }: { eventId: string; field: string }) => {
           if (eventId === "evt-bad") {
@@ -405,13 +403,13 @@ describe("resolveOffloadedTracesBatch() — AC7 graceful degradation", () => {
         putSpool: vi.fn(),
         getSpool: vi.fn(),
         deleteSpool: vi.fn(),
-      } as unknown as BlobStore;
+      } as unknown as TraceBlobStoreService;
     }
 
     describe("when resolved as a batch", () => {
       it("resolves the healthy traces and degrades only the failing one", async () => {
         const goodValue = "Y".repeat(80_000);
-        const results = await resolveOffloadedTracesBatch({
+        const results = await TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch({
           projectId: "proj-1",
           spansPerTrace: [
             [

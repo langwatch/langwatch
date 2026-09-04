@@ -1,7 +1,6 @@
+import { TraceReadRedactionService } from "../trace-read-redaction.service";
 import type { Trace } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
-
-import { applyTraceProtections } from "../trace-read-redaction.service";
 
 function traceWithIO(): Trace {
   return {
@@ -50,11 +49,11 @@ const visibleToAll = {
   canSeeCosts: true,
 };
 
-describe("applyTraceProtections metadata preservation", () => {
+describe("TraceReadRedactionService.applyTraceProtections metadata preservation", () => {
   describe("when input is restricted but the viewer keeps cost access", () => {
     /** @scenario Restricting content does not hide its metadata */
     it("hides the input while keeping token counts, cost, and latency", () => {
-      const result = applyTraceProtections(traceWithIO(), {
+      const result = TraceReadRedactionService.applyTraceProtections(traceWithIO(), {
         canSeeCapturedInput: false,
         canSeeCapturedOutput: true,
         canSeeCosts: true,
@@ -73,19 +72,25 @@ describe("applyTraceProtections metadata preservation", () => {
   describe("when a drop privacy policy stripped content at ingestion", () => {
     /** @scenario The trace view marks content a privacy policy dropped */
     it("surfaces the dropped categories from the span marker", () => {
-      const result = applyTraceProtections(traceWithDroppedSpan("input,output"), visibleToAll);
+      const result = TraceReadRedactionService.applyTraceProtections(
+        traceWithDroppedSpan("input,output"),
+        visibleToAll,
+      );
 
       expect(result.privacy?.droppedCategories).toEqual(["input", "output"]);
     });
 
     it("orders categories stably regardless of the marker order", () => {
-      const result = applyTraceProtections(traceWithDroppedSpan("tools,input"), visibleToAll);
+      const result = TraceReadRedactionService.applyTraceProtections(
+        traceWithDroppedSpan("tools,input"),
+        visibleToAll,
+      );
 
       expect(result.privacy?.droppedCategories).toEqual(["input", "tools"]);
     });
 
     it("leaves privacy unset when no span carries a drop marker", () => {
-      const result = applyTraceProtections(traceWithIO(), visibleToAll);
+      const result = TraceReadRedactionService.applyTraceProtections(traceWithIO(), visibleToAll);
 
       expect(result.privacy).toBeUndefined();
     });

@@ -11,7 +11,7 @@ import { getLangWatchTracer } from "langwatch";
 import { TraceLogRecordIOService } from "@langwatch/trace-server";
 import { piiRedactionLevelSchema } from "@langwatch/trace-contract";
 import type { LogRecordReceivedEventData } from "@langwatch/trace-contract";
-import { IO_PREVIEW_BYTES, utf8Preview } from "@langwatch/trace-server";
+import { IO_PREVIEW_BYTES, TraceProjectionLeanService } from "@langwatch/trace-server";
 
 /**
  * Every field optional, all the way down.
@@ -230,8 +230,10 @@ function makeTraceContribution(
   }
 
   const io = TraceLogRecordIOService.create(traceCanonicalisation).extractIO(legacyView);
-  const input = io.input === null ? null : utf8Preview(io.input, IO_PREVIEW_BYTES);
-  const output = io.output === null ? null : utf8Preview(io.output, IO_PREVIEW_BYTES);
+  const input =
+    io.input === null ? null : TraceProjectionLeanService.utf8Preview(io.input, IO_PREVIEW_BYTES);
+  const output =
+    io.output === null ? null : TraceProjectionLeanService.utf8Preview(io.output, IO_PREVIEW_BYTES);
   if (input !== io.input || output !== io.output) {
     liftedAttributes["langwatch.reserved.log_io_truncated"] = true;
   }

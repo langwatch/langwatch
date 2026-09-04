@@ -50,82 +50,88 @@ const sessionGroupsCursorSchema = z.object({
 
 export type SessionGroupsCursor = z.infer<typeof sessionGroupsCursorSchema>;
 
-/**
- * Opaque session page cursor. Base64url-encoded JSON so the wire shape can
- * evolve without clients ever parsing it. Client-supplied on the way back in,
- * so the decode validates rather than asserts.
- */
-export function encodeSessionGroupsCursor(cursor: SessionGroupsCursor): string {
-  return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
-}
-
-export function decodeSessionGroupsCursor(encoded: string): SessionGroupsCursor {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"));
-  } catch {
-    throw new ValidationError("Invalid sessions cursor");
+export class TraceSessionGroupsCursorService {
+  static create(): TraceSessionGroupsCursorService {
+    return new TraceSessionGroupsCursorService();
   }
 
-  const result = sessionGroupsCursorSchema.safeParse(parsed);
-  if (!result.success) {
-    throw new ValidationError("Invalid sessions cursor");
+  /**
+   * Opaque session page cursor. Base64url-encoded JSON so the wire shape can
+   * evolve without clients ever parsing it. Client-supplied on the way back in,
+   * so the decode validates rather than asserts.
+   */
+  static encodeSessionGroupsCursor(cursor: SessionGroupsCursor): string {
+    return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
   }
 
-  return result.data;
-}
+  static decodeSessionGroupsCursor(encoded: string): SessionGroupsCursor {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"));
+    } catch {
+      throw new ValidationError("Invalid sessions cursor");
+    }
 
-/**
- * The repository's keyset boundary for this request. A cursor minted under
- * another sort points at a boundary the repository would compare against a
- * different aggregate expression, so a dollar amount would be measured
- * against a timestamp and the caller would walk an arbitrary window with no
- * error. Refuse it instead.
- */
-export function keysetCursorFor({
-  encoded,
-  sortColumn,
-  sortDirection,
-}: {
-  encoded: string | undefined;
-  sortColumn: SessionGroupSortColumn;
-  sortDirection: "asc" | "desc";
-}): SessionGroupCursor | undefined {
-  if (encoded === undefined) {
-    return undefined;
+    const result = sessionGroupsCursorSchema.safeParse(parsed);
+    if (!result.success) {
+      throw new ValidationError("Invalid sessions cursor");
+    }
+
+    return result.data;
   }
 
-  const cursor = decodeSessionGroupsCursor(encoded);
-  if (cursor.sortColumn !== sortColumn || cursor.sortDirection !== sortDirection) {
-    throw new ValidationError("Sessions cursor does not match the sort");
+  /**
+   * The repository's keyset boundary for this request. A cursor minted under
+   * another sort points at a boundary the repository would compare against a
+   * different aggregate expression, so a dollar amount would be measured
+   * against a timestamp and the caller would walk an arbitrary window with no
+   * error. Refuse it instead.
+   */
+  static keysetCursorFor({
+    encoded,
+    sortColumn,
+    sortDirection,
+  }: {
+    encoded: string | undefined;
+    sortColumn: SessionGroupSortColumn;
+    sortDirection: "asc" | "desc";
+  }): SessionGroupCursor | undefined {
+    if (encoded === undefined) {
+      return undefined;
+    }
+
+    const cursor = TraceSessionGroupsCursorService.decodeSessionGroupsCursor(encoded);
+    if (cursor.sortColumn !== sortColumn || cursor.sortDirection !== sortDirection) {
+      throw new ValidationError("Sessions cursor does not match the sort");
+    }
+
+    return {
+      sortValue: cursor.sortValue,
+      conversationId: cursor.conversationId,
+    };
   }
 
-  return {
-    sortValue: cursor.sortValue,
-    conversationId: cursor.conversationId,
-  };
-}
-
-/** Keep in lockstep with SORT_EXPRESSIONS in the ClickHouse repository. */
-export function cursorSortValueForRow({
-  row,
-  column,
-}: {
-  row: SessionGroupRow;
-  column: SessionGroupSortColumn;
-}): number {
-  switch (column) {
-    case "lastActivity":
-      return row.lastActivityMs;
-    case "started":
-      return row.startedAtMs;
-    case "cost":
-      return row.totalCost;
-    case "tokens":
-      return row.totalTokens;
-    case "duration":
-      return row.totalDurationMs;
-    case "traces":
-      return row.traceCount;
+  /** Keep in lockstep with SORT_EXPRESSIONS in the ClickHouse repository. */
+  static cursorSortValueForRow({
+    row,
+    column,
+  }: {
+    row: SessionGroupRow;
+    column: SessionGroupSortColumn;
+  }): number {
+    switch (column) {
+      case "lastActivity":
+        return row.lastActivityMs;
+      case "started":
+        return row.startedAtMs;
+      case "cost":
+        return row.totalCost;
+      case "tokens":
+        return row.totalTokens;
+      case "duration":
+        return row.totalDurationMs;
+      case "traces":
+        return row.traceCount;
+    }
   }
 }

@@ -15,6 +15,12 @@ import { TraceRequestUtils } from "./otlp-trace-request.rules";
 import { SpanRecordIdentity } from "./span-record-identity.rules";
 
 export class SpanNormalizationPipelineService {
+  static create(
+    traceCanonicalisation: TraceCanonicalisationService,
+  ): SpanNormalizationPipelineService {
+    return new SpanNormalizationPipelineService(traceCanonicalisation);
+  }
+
   private readonly logger = createLogger(
     "langwatch:trace-processing:span-normalization-pipeline-service",
   );

@@ -19,15 +19,13 @@
 import { createSsrfUrlValidator, fetchValidatedDestination } from "@langwatch/egress";
 import type { GatewayRealtimeSessionRecord } from "@langwatch/gateway-contract";
 import {
-  closeAndConfirmRealtimeSession,
-  expireStaleRealtimeSessions,
+  GatewayElevenLabsCredentialService,
   GatewayModelProviderCredentialsPort,
-  GatewayRealtimeSessionReconciliationWorker,
-  elevenLabsConversationReportSchema,
-  getElevenLabsApiCredential,
-  realtimeSessionReconciliationConfig,
-  releaseRealtimeSession,
+  GatewayRealtimeSessionReconciliationService,
+  GatewayRealtimeSessionService,
   ModelCatalogGatewaySpendRatingAdapter,
+  elevenLabsConversationReportSchema,
+  realtimeSessionReconciliationConfig,
   type ElevenLabsConversationReader,
   type ElevenLabsConversationReport,
   type ElevenLabsCredentialReader,
@@ -39,6 +37,7 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
 
+const realtimeSessions = GatewayRealtimeSessionService.create();
 /**
  * Reports the composition decision an absent poller would otherwise hide.
  *
@@ -68,7 +67,7 @@ export type WorkerRealtimeSessionCompositionInput = Readonly<{
 
 export function tryCreateWorkerRealtimeSessionPoller(
   options: WorkerRealtimeSessionCompositionInput,
-): GatewayRealtimeSessionReconciliationWorker | undefined {
+): GatewayRealtimeSessionReconciliationService | undefined {
   const { database, encryptionKey } = options;
   if (!database) {
     options.absence?.withoutPoller("no-typed-prisma-connection");
@@ -93,7 +92,7 @@ export function tryCreateWorkerRealtimeSessionPoller(
     encryption: AesGcmSecretEncryptionAdapter.create({ key: encryptionKey }),
   });
 
-  return GatewayRealtimeSessionReconciliationWorker.create({
+  return GatewayRealtimeSessionReconciliationService.create({
     repository: WorkerRealtimeSessionRepository.create({ database, collaborators }),
     credentials,
     conversations: WorkerElevenLabsConversations.create(),
@@ -125,7 +124,10 @@ class WorkerRealtimeSessionRepository {
   ) {}
 
   expireStaleSessions(input: { now: Date }): Promise<number> {
-    return expireStaleRealtimeSessions({ now: input.now, collaborators: this.collaborators });
+    return realtimeSessions.expireStaleRealtimeSessions({
+      now: input.now,
+      collaborators: this.collaborators,
+    });
   }
 
   async listOpenElevenLabsSessions(input: {
@@ -149,7 +151,7 @@ class WorkerRealtimeSessionRepository {
     projectId: string;
     reason: string;
   }): Promise<void> {
-    await releaseRealtimeSession({
+    await realtimeSessions.releaseRealtimeSession({
       ...input,
       status: "EXPIRED",
       collaborators: this.collaborators,
@@ -163,7 +165,7 @@ class WorkerRealtimeSessionRepository {
     durationMs: number;
     reason: string;
   }): Promise<void> {
-    return closeAndConfirmRealtimeSession({
+    return realtimeSessions.closeAndConfirmRealtimeSession({
       session: input.session,
       usage: { audio_ms: input.audioMs },
       vendorCostRaw: input.vendorCostRaw,
@@ -191,13 +193,10 @@ class WorkerElevenLabsCredentials implements ElevenLabsCredentialReader {
   getApiCredential(input: {
     modelProviderId: string;
   }): Promise<{ apiKey: string; baseUrl: string } | null> {
-    return getElevenLabsApiCredential({
-      modelProviderId: input.modelProviderId,
-      collaborators: {
-        database: this.database,
-        credentials: WorkerGatewayModelProviderCredentials.create(this.encryption),
-      },
-    });
+    return GatewayElevenLabsCredentialService.create({
+      database: this.database,
+      credentials: WorkerGatewayModelProviderCredentials.create(this.encryption),
+    }).getApiCredential({ modelProviderId: input.modelProviderId });
   }
 }
 

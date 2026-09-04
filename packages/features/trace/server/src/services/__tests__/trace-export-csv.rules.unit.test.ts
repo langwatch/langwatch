@@ -5,10 +5,10 @@
  * Pure function tests — no mocking needed.
  */
 
+import { TraceExportService } from "../trace-export.service";
 import Parse from "papaparse";
 import { describe, expect, it } from "vitest";
 import type { Evaluation, LLMSpan, RAGSpan, Span, Trace } from "@langwatch/trace-contract";
-import { stripCsvHeader } from "../trace-export.service";
 import { serializeTracesToFullCsv, serializeTracesToSummaryCsv } from "../trace-export-csv.rules";
 
 // ---------------------------------------------------------------------------
@@ -554,7 +554,7 @@ describe("serializeTracesToFullCsv()", () => {
 // These tests reproduce TraceExportService.serializeCsvBatch: the first batch keeps
 // its header, later batches are stripped with the SAME function production
 // uses, and the pieces are concatenated with no separator. Importing rather
-// than re-implementing stripCsvHeader is the point — a local copy could keep
+// than re-implementing TraceExportService.stripCsvHeader is the point — a local copy could keep
 // passing while the real one regressed.
 
 describe("when an export spans several batches", () => {
@@ -564,7 +564,7 @@ describe("when an export spans several batches", () => {
       traces: [buildTrace({ trace_id: "trace-1" }), buildTrace({ trace_id: "trace-2" })],
       evaluatorNames,
     });
-    const batch2 = stripCsvHeader(
+    const batch2 = TraceExportService.stripCsvHeader(
       serializeTracesToSummaryCsv({
         traces: [buildTrace({ trace_id: "trace-3" }), buildTrace({ trace_id: "trace-4" })],
         evaluatorNames,
@@ -585,7 +585,7 @@ describe("when an export spans several batches", () => {
       traces: [buildTrace({ trace_id: "a" })],
       evaluatorNames,
     });
-    const batch2 = stripCsvHeader(
+    const batch2 = TraceExportService.stripCsvHeader(
       serializeTracesToSummaryCsv({
         traces: [buildTrace({ trace_id: "b" })],
         evaluatorNames,
@@ -604,7 +604,7 @@ describe("when an export spans several batches", () => {
       traces: [buildTrace({ trace_id: "trace-1", spans: [buildLLMSpan()] })],
       evaluatorNames,
     });
-    const batch2 = stripCsvHeader(
+    const batch2 = TraceExportService.stripCsvHeader(
       serializeTracesToFullCsv({
         traces: [buildTrace({ trace_id: "trace-2", spans: [buildLLMSpan()] })],
         evaluatorNames,

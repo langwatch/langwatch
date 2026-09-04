@@ -32,7 +32,7 @@ vi.mock("langwatch", () => ({
   }),
 }));
 
-const { ClickHouseTraceService } = await import("../trace-legacy-read.repository");
+const { TraceLegacyReadClickHouseRepository } = await import("../trace-legacy-read.repository");
 const traceCanonicalisation = TraceCanonicalisationService.create();
 const retentionResolver = { resolve: async () => null };
 
@@ -51,7 +51,7 @@ describe("the production trace-service factory", () => {
     describe("when the service is created", () => {
       /** @scenario "The floor follows the tenant's own retention policy" */
       it("still wires a live retention cascade, so the floor is tenant-aware", () => {
-        const service = ClickHouseTraceService.create({
+        const service = TraceLegacyReadClickHouseRepository.create({
           prisma: {} as never,
           retentionResolver: retentionResolver as never,
           traceCanonicalisation,
@@ -62,7 +62,7 @@ describe("the production trace-service factory", () => {
 
       /** @scenario "The floor follows the tenant's own retention policy" */
       it("wires the policy cascade itself, not some other provider", () => {
-        const service = ClickHouseTraceService.create({
+        const service = TraceLegacyReadClickHouseRepository.create({
           prisma: {} as never,
           retentionResolver: retentionResolver as never,
           traceCanonicalisation,
@@ -78,7 +78,7 @@ describe("the production trace-service factory", () => {
 
       it("keeps the annotation service supplied to the factory", () => {
         const annotations = {} as never;
-        const service = ClickHouseTraceService.create({
+        const service = TraceLegacyReadClickHouseRepository.create({
           prisma: {} as never,
           annotations,
           traceCanonicalisation,
@@ -93,7 +93,7 @@ describe("the production trace-service factory", () => {
     describe("when no resolver is supplied", () => {
       /** @scenario "A caller with no resolver wired still gets a bounded read" */
       it("leaves the floor on the platform default, so unit tests stay database-free", () => {
-        const service = new ClickHouseTraceService({
+        const service = new TraceLegacyReadClickHouseRepository({
           prisma: {} as never,
           traceCanonicalisation,
         });

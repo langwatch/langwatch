@@ -1,5 +1,5 @@
+import { TraceReadableSpanService } from "../trace-readable-span.service";
 import { describe, expect, it } from "vitest";
-import { formatSpansDigest } from "../trace-readable-span.service";
 import {
   buildMetadataFieldChildren,
   buildSpanFieldChildren,
@@ -722,7 +722,7 @@ describe("THREAD_MAPPINGS", () => {
   });
 });
 
-describe("formatSpansDigest", () => {
+describe("TraceReadableSpanService.formatSpansDigest", () => {
   /** @scenario Formatted trace produces a span hierarchy digest */
   /** @scenario Formatted trace includes inputs and outputs */
   it("produces a string digest from spans", async () => {
@@ -762,7 +762,7 @@ describe("formatSpansDigest", () => {
       },
     ];
 
-    const result = await formatSpansDigest(spans);
+    const result = await TraceReadableSpanService.formatSpansDigest(spans);
 
     expect(typeof result).toBe("string");
     expect(result).toContain("my-agent");
@@ -770,7 +770,7 @@ describe("formatSpansDigest", () => {
   });
 
   it("returns empty digest for empty spans array", async () => {
-    const result = await formatSpansDigest([]);
+    const result = await TraceReadableSpanService.formatSpansDigest([]);
     expect(result).toBe("No spans recorded.");
   });
 
@@ -795,7 +795,7 @@ describe("formatSpansDigest", () => {
       },
     ];
 
-    const result = await formatSpansDigest(spans);
+    const result = await TraceReadableSpanService.formatSpansDigest(spans);
 
     expect(typeof result).toBe("string");
     expect(result).toContain("failing-tool");
@@ -834,7 +834,11 @@ describe("formatSpansDigest", () => {
     ];
 
     const result = (
-      await Promise.all([trace1Spans, trace2Spans].map((spans) => formatSpansDigest(spans)))
+      await Promise.all(
+        [trace1Spans, trace2Spans].map((spans) =>
+          TraceReadableSpanService.formatSpansDigest(spans),
+        ),
+      )
     ).join("\n\n---\n\n");
 
     expect(typeof result).toBe("string");

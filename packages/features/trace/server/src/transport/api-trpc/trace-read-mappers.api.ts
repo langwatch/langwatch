@@ -47,7 +47,7 @@ import {
   resolveNonBilledCost,
 } from "@langwatch/trace-contract";
 import type { CodingAgentService, LogContentCategory } from "@langwatch/coding-agent-contract";
-import { TraceAttributeRedactor } from "../../services/trace-attribute-redaction.service";
+import { TraceAttributeRedactionService } from "../../services/trace-attribute-redaction.service";
 import type {
   CategoryVisibility,
   Protections,
@@ -571,7 +571,7 @@ export function redactV2Content<
     ...hiddenCategoryAttributeRules(protections, contentPrivacy),
   ];
   if (hidden.length > 0) {
-    const redactor = TraceAttributeRedactor.for(hidden);
+    const redactor = TraceAttributeRedactionService.create(hidden);
     if (dto.attributes) {
       redacted.attributes = redactor.redact(dto.attributes);
     }

@@ -1,11 +1,17 @@
-export function safeJsonParse(json: string | null): Record<string, unknown> | null {
-  if (!json) {
-    return null;
+export class TraceSafeJsonService {
+  static create(): TraceSafeJsonService {
+    return new TraceSafeJsonService();
   }
 
-  try {
-    return JSON.parse(json);
-  } catch {
-    return null;
+  static safeJsonParse(json: string | null): Record<string, unknown> | null {
+    if (!json) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(json);
+    } catch {
+      return null;
+    }
   }
 }
