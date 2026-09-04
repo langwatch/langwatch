@@ -61,6 +61,14 @@ vi.mock("~/server/analytics/lwql/access", () => ({
   LWQL_FLAG: "release_lwql_workbench",
 }));
 
+// This suite is about the workbench flag alone; the playground flag is
+// pinned off so its own `dashboard_srcdoc` kind never enters these clauses
+// (that combination is `graphs.playgroundGate.unit.test.ts`'s job).
+vi.mock("~/server/analytics/dashboard-widgets/access", () => ({
+  customChartPlaygroundEnabled: vi.fn().mockResolvedValue(false),
+  CUSTOM_CHART_PLAYGROUND_FLAG: "release_custom_chart_playground",
+}));
+
 const findUnique = vi.fn();
 const deleteGraph = vi.fn();
 const update = vi.fn();
