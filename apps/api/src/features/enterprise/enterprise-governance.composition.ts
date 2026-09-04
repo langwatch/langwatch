@@ -20,7 +20,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
 
 import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context";
-import type { ApiEnterpriseApplicationPort } from "../../app/api-trpc-collaborators.org-group.composition";
+import type { ApiEnterpriseApplicationPort } from "./enterprise.composition";
 
 /** A capability this deployment did not compose, refused by name. */
 class ApiCapabilityUnavailableError extends HandledError {

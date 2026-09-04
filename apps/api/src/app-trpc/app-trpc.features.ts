@@ -18,11 +18,6 @@ import type { ApiTrpcFeatureMount } from "../api.application";
 import type { ApiTrpcInfrastructure } from "./app-trpc.infrastructure";
 import type { ComposedApiFeatures } from "./app-trpc.composed";
 
-import type { EmailSuppressionTrpcPorts } from "@langwatch/automation-server";
-
-import type { CodingAgentTrpcPorts } from "@langwatch/coding-agent-server";
-
-
 import type { AuthApp } from "@langwatch/auth-server";
 import type { SavedViewTrpcPorts } from "@langwatch/dashboard-server";
 import type { CostTrpcPorts, LimitsTrpcPorts } from "@langwatch/entitlement-server";
@@ -30,12 +25,10 @@ import type { CostTrpcPorts, LimitsTrpcPorts } from "@langwatch/entitlement-serv
 import type { TraceEditOverlayVisibilityWindow } from "@langwatch/trace-server";
 import type { TraceLegacyFilterInput, TraceLegacyListInput } from "@langwatch/trace-contract";
 
-
 import type {
   GroupTrpcPorts,
   JoinRequestTrpcPorts,
   OnboardingTrpcPorts,
-  OrganizationTrpcPorts,
 } from "@langwatch/organization-server";
 
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -58,37 +51,17 @@ import {
   createGroupTrpcRouter,
   createJoinRequestTrpcRouter,
   createOnboardingTrpcRouter,
-  createOrganizationTrpcRouter,
   createPersonalWorkspaceFeaturesTrpcRouter,
 } from "../features/organization/organization-trpc.mount";
-import {
-  createProjectTrpcRouter,
-  type ProjectTrpcChecks,
-  type ProjectTrpcMountPorts,
-} from "../features/project/project-trpc.mount";
-import {
-  createAutomationTrpcRouter,
-  createEmailSuppressionTrpcRouter,
-  type AutomationMountPorts,
-} from "../features/automation/automation-trpc.mount";
-import { createCodingAgentTrpcRouter } from "../features/coding-agent/coding-agent-trpc.mount";
 import { createPromptTagTrpcRouter } from "../features/prompt/prompt-trpc.mount";
 import { createRoleBindingTrpcRouter } from "../features/role/role-trpc.mount";
 import { composeGithubTrpcRouter } from "../features/github/github.composition";
 import { createIdentityTrpcRouter, createUserTrpcRouter } from "../features/user/user-trpc.mount";
 import { createEnterpriseBillingTrpcRouters } from "../features/enterprise/enterprise-billing-trpc.mount";
-import {
-  createEnterpriseTrpcRouters,
-  type EnterpriseTrpcMountPorts,
-} from "../features/enterprise/enterprise-trpc.mount";
 import { createEnterpriseGovernanceTrpcRouters } from "../features/enterprise/enterprise-governance-trpc.mount";
 import { composeGovernanceHomeTrpcRouter } from "../features/enterprise/governance-home.composition";
-import {
-  createPlanTrpcRouter,
-} from "../features/entitlement/entitlement-trpc.mount";
-import {
-  type ModelProviderTrpcChecks,
-} from "../features/model-provider/model-provider-trpc.mount";
+import { createPlanTrpcRouter } from "../features/entitlement/entitlement-trpc.mount";
+import { type ModelProviderTrpcChecks } from "../features/model-provider/model-provider-trpc.mount";
 
 /**
  * The capabilities these surfaces reach that their own feature packages do not
@@ -115,22 +88,6 @@ export interface AppTrpcFeaturePorts<
   TApiKeyValidation = unknown,
   TStoredKeyValidation = unknown,
 > {
-  /** The forty-six answers `organization.*` needs from this deployment. */
-  organization: OrganizationTrpcPorts<TSignUpDataSchema>;
-  /** The audit-log read's own `kind: "custom"` check, already built. */
-  organizationAuditLogCheck: unknown;
-  /** The six answers `project.*` needs. */
-  project: ProjectTrpcMountPorts;
-  /** `project.create`'s custom tier resolution and the trace-sharing demand. */
-  projectChecks: ProjectTrpcChecks;
-  /** What one viewer may see of one project's captured content and spend. */
-  codingAgents: CodingAgentTrpcPorts;
-  /** The three answers the automation transport reaches beyond automation's own. */
-  automation: AutomationMountPorts;
-  /** The unsubscribe pair's client address, its throttle and its audit trail. */
-  emailSuppression: EmailSuppressionTrpcPorts;
-  /** The SCIM plan gate, and the back office's connection ledger with its trail. */
-  enterprise: EnterpriseTrpcMountPorts;
   /**
    * The composed auth application BOTH signed-out doors answer from — the
    * front door and `publicEnv` beside it. One instance rather than two,
@@ -250,7 +207,8 @@ export function createAppTrpcFeatures<
   const datasetRouters = composed.dataset.routers(mount);
   const roleRouters = composed.role.routers(mount);
   const governance = createEnterpriseGovernanceTrpcRouters(mount);
-  const enterprise = createEnterpriseTrpcRouters({ ...mount, ports: ports.enterprise });
+  const enterprise = composed.enterprise.routers(mount);
+  const automationRouters = composed.automation.routers(mount);
   const billing = createEnterpriseBillingTrpcRouters({
     ...mount,
     saasBilling: infrastructure.saasBilling,
@@ -289,30 +247,18 @@ export function createAppTrpcFeatures<
     // Carries `onDiscoverUpdate`, for the same reason.
     tracesV2: traceRouters.tracesV2,
     translate: modelProviderRouters.translate,
-    automation: createAutomationTrpcRouter({ ...mount, ports: ports.automation }),
-    codingAgents: createCodingAgentTrpcRouter({ ...mount, ports: ports.codingAgents }),
+    automation: automationRouters.automation,
+    codingAgents: composed.codingAgent.router(mount),
     // The unsubscribe pair arrives from a mail client with no session, so this
     // one takes the process's PUBLIC procedure as well. In the record rather
     // than beside it for the same reason every other public surface here is:
     // a namespace mounted outside the list would serve traffic from outside
     // every audit that reads it.
-    emailSuppression: createEmailSuppressionTrpcRouter({
-      ...mount,
-      publicProcedure: mount.publicProcedure,
-      ports: ports.emailSuppression,
-    }),
+    emailSuppression: automationRouters.emailSuppression,
     license: enterprise.license,
     licenseEnforcement: enterprise.licenseEnforcement,
-    organization: createOrganizationTrpcRouter({
-      ...mount,
-      auditLogCheck: ports.organizationAuditLogCheck,
-      ports: ports.organization,
-    }),
-    project: createProjectTrpcRouter({
-      ...mount,
-      ports: ports.project,
-      checks: ports.projectChecks,
-    }),
+    organization: composed.organization.router(mount),
+    project: composed.project.router(mount),
     scimToken: enterprise.scimToken,
     ssoConnections: enterprise.ssoConnections,
     // Carries `onConversationUpdate` and `onTurnStream`. In the record rather

@@ -31,7 +31,6 @@ import type { ApiTrpcFeatureApplication } from "../app-trpc/app-trpc.context";
 import { createAppTrpcFeatures, type AppTrpcFeatureRecord } from "../app-trpc/app-trpc.features";
 import { createApiTrpcPorts } from "./api-trpc-ports.composition";
 import type { ApiIdentityCollaborators } from "./api-trpc-collaborators.identity.composition";
-import type { ApiOrgGroupCollaborators } from "./api-trpc-collaborators.org-group.composition";
 
 /**
  * Everything the record is composed from: the shared infrastructure a feature
@@ -42,15 +41,11 @@ import type { ApiOrgGroupCollaborators } from "./api-trpc-collaborators.org-grou
  * infrastructure means this process opened no database or no permission
  * service; no collaborators means it composed none of what the record reaches.
  */
-export type ApiTrpcFeaturesCompositionOptions<
-  TSignUpDataSchema extends ZodTypeAny,
-> = Readonly<{
+export type ApiTrpcFeaturesCompositionOptions<TSignUpDataSchema extends ZodTypeAny> = Readonly<{
   infrastructure: ApiTrpcInfrastructure | undefined;
   /** The features the process composed before it had a mount; see the type. */
   composed: ComposedApiFeatures;
-  collaborators:
-    | ApiTrpcCollaborators<TSignUpDataSchema>
-    | undefined;
+  collaborators: ApiTrpcCollaborators<TSignUpDataSchema> | undefined;
   report?: ApiTrpcCollaboratorsAbsence;
 }>;
 
@@ -78,7 +73,9 @@ class MembershipDisabledError extends HandledError {
   }
 }
 
-export class ApiTrpcFeaturesComposition<TSignUpDataSchema extends ZodTypeAny> extends ApiTrpcFeaturesPort {
+export class ApiTrpcFeaturesComposition<
+  TSignUpDataSchema extends ZodTypeAny,
+> extends ApiTrpcFeaturesPort {
   /**
    * Composes the record only when this process has BOTH halves of it.
    *
@@ -90,13 +87,9 @@ export class ApiTrpcFeaturesComposition<TSignUpDataSchema extends ZodTypeAny> ex
    * be able to mount those surfaces over a service that does not exist. The
    * collaborator set is not negotiable for the reason its own docblock gives.
    */
-  static tryCompose<
-    TSignUpDataSchema extends ZodTypeAny,
-  >(
+  static tryCompose<TSignUpDataSchema extends ZodTypeAny>(
     options: ApiTrpcFeaturesCompositionOptions<TSignUpDataSchema>,
-  ):
-    | ApiTrpcFeaturesComposition<TSignUpDataSchema>
-    | undefined {
+  ): ApiTrpcFeaturesComposition<TSignUpDataSchema> | undefined {
     const { infrastructure, collaborators } = options;
     if (!infrastructure) {
       options.report?.absent("no-database");
@@ -196,13 +189,12 @@ export class LoggedApiTrpcFeaturesAbsence extends ApiTrpcCollaboratorsAbsence {
 }
 
 /**
- * The three halves {@link composeApiTrpcCollaborators} reads into one flat
- * {@link ApiTrpcCollaborators} record. Each is `undefined` exactly when the
+ * The one remaining half {@link composeApiTrpcCollaborators} reads into a flat
+ * {@link ApiTrpcCollaborators} record. It is `undefined` exactly when the
  * process composed nothing for it — see that half's own composing function
  * for why it can be missing.
- */
-/**
- * The same three once every one of them is present.
+ *
+ * The same half once it is present.
  *
  * `Required<>` is not this: it strips the `?` a member does not have and leaves
  * the `| undefined` a member does, so the whole record read below stayed
@@ -214,7 +206,6 @@ type ComposedApiTrpcCollaboratorHalves = {
 
 export type ApiTrpcCollaboratorHalves = Readonly<{
   identity: ApiIdentityCollaborators | undefined;
-  orgGroup: ApiOrgGroupCollaborators | undefined;
 }>;
 
 /**
@@ -234,6 +225,12 @@ export type ApiTrpcFeatureApplicationSlices = Pick<
   | "share"
   | "topics"
   | "traces"
+  | "automation"
+  | "codingAgentApp"
+  | "licensing"
+  | "projects"
+  | "scimApp"
+  | "usageLimits"
   | "workflows"
   | "experiments"
   | "evaluations"
@@ -262,8 +259,8 @@ export type ApiTrpcFeatureApplicationSlices = Pick<
 >;
 
 /**
- * Reads all three collaborator halves into ONE flat {@link ApiTrpcCollaborators}
- * record, or refuses by name.
+ * Reads the remaining collaborator half into ONE flat
+ * {@link ApiTrpcCollaborators} record, or refuses by name.
  *
  * All-or-nothing, replacing the ten `withApi*Collaborators` folds and the
  * runtime `sealApiTrpcCollaborators` check those folds needed: a process
@@ -291,14 +288,11 @@ export function composeApiTrpcCollaborators(
     report?.incomplete(missing);
     return undefined;
   }
-  const { identity, orgGroup } = halves as ComposedApiTrpcCollaboratorHalves;
+  const { identity } = halves as ComposedApiTrpcCollaboratorHalves;
 
   return {
     application: {
       ...identity.application,
-      // `projects` is the ORG group's: `...orgGroup.application` below carries
-      // it and overwrote the product group's reader in this slot, silently.
-      ...orgGroup.application,
       ...application,
     },
 
@@ -308,16 +302,5 @@ export function composeApiTrpcCollaborators(
     joinRequests: identity.joinRequests,
     onboarding: identity.onboarding,
     user: identity.user,
-
-
-    organization: orgGroup.organization,
-    organizationAuditLogCheck: orgGroup.organizationAuditLogCheck,
-    project: orgGroup.project,
-    projectChecks: orgGroup.projectChecks,
-    codingAgents: orgGroup.codingAgents,
-    automation: orgGroup.automation,
-    emailSuppression: orgGroup.emailSuppression,
-    enterprise: orgGroup.enterprise,
-
   };
 }

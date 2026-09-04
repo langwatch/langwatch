@@ -21,10 +21,6 @@ import type { AppTrpcPolicyMiddlewares } from "@langwatch/api/trpc";
 
 import { declareAuthzMiddleware } from "@langwatch/authz-contract";
 
-import type { OrganizationTrpcPorts } from "@langwatch/organization-server";
-
-import type { AutomationMountPorts } from "../../features/automation/automation-trpc.mount";
-
 import type { TraceLegacyFilterInput, TraceLegacyListInput } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -57,6 +53,11 @@ import { refusingTraceFeature } from "../../features/trace/trace.composition";
 import { refusingWorkflowFeature } from "../../features/workflow/workflow.composition";
 import { refusingExperimentFeature } from "../../features/experiment/experiment.composition";
 import { refusingEvaluationFeature } from "../../features/evaluation/evaluation.composition";
+import { refusingOrganizationFeature } from "../../features/organization/organization.composition";
+import { refusingProjectFeature } from "../../features/project/project.composition";
+import { refusingCodingAgentFeature } from "../../features/coding-agent/coding-agent.composition";
+import { refusingAutomationFeature } from "../../features/automation/automation.composition";
+import { refusingEnterpriseFeature } from "../../features/enterprise/enterprise.composition";
 import { refusingOpsFeature } from "../../features/ops/ops.composition";
 import { createAppTrpcFeatures, type AppTrpcFeaturePorts } from "../app-trpc.features";
 
@@ -114,18 +115,6 @@ function refusingPorts(): AppTrpcFeaturePorts<typeof testSignUpDataSchema> {
   const refuseEvery = (what: string) =>
     new Proxy({}, { get: (_target, member) => refuse(`${what}.${String(member)}`) }) as never;
 
-  /** A refusing check that still carries a declaration, as the real ones do. */
-  const refusingCheck = (what: string) =>
-    declareAuthzMiddleware(
-      {
-        kind: "service-authorized",
-        reason: `${what} is enforced by the process's resolver`,
-        permissions: [],
-        enforces: { projectId: what },
-      },
-      refuse(what) as unknown as (params: never) => Promise<unknown>,
-    );
-
   return {
     auth: refuseEvery("auth"),
     group: refuseEvery("group"),
@@ -139,27 +128,6 @@ function refusingPorts(): AppTrpcFeaturePorts<typeof testSignUpDataSchema> {
       signUpDataSchema: testSignUpDataSchema,
     } as never,
     prisma: refuseEvery("prisma"),
-    organization: {
-      ...(refuseEvery("organization") as object),
-      signUpDataSchema: testSignUpDataSchema,
-      isCustomRole: () => false,
-    } as unknown as OrganizationTrpcPorts<typeof testSignUpDataSchema>,
-    organizationAuditLogCheck: refusingCheck("organizationAuditLogCheck"),
-    project: refuseEvery("project"),
-    projectChecks: {
-      create: refusingCheck("projectChecks.create"),
-      traceSharing: refusingCheck("projectChecks.traceSharing"),
-    },
-    codingAgents: refuseEvery("codingAgents"),
-    automation: {
-      ...(refuseEvery("automation") as object),
-      providers: refuseEvery("automation.providers"),
-    } as unknown as AutomationMountPorts,
-    emailSuppression: refuseEvery("emailSuppression"),
-    enterprise: {
-      scimToken: refuseEvery("enterprise.scimToken"),
-      ssoConnections: refuseEvery("enterprise.ssoConnections"),
-    },
     user: refuseEvery("user"),
   };
 }
@@ -216,6 +184,11 @@ function buildFeatures() {
       workflow: refusingWorkflowFeature(),
       experiment: refusingExperimentFeature(),
       evaluation: refusingEvaluationFeature(),
+      organization: refusingOrganizationFeature(),
+      project: refusingProjectFeature(),
+      codingAgent: refusingCodingAgentFeature(),
+      automation: refusingAutomationFeature(),
+      enterprise: refusingEnterpriseFeature(),
     },
     // The features that compose themselves take this rather than a ports
     // entry; every member refuses, for the same reason the ports do.

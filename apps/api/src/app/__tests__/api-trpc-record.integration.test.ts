@@ -32,6 +32,7 @@ import {
   stubApplicationSlices,
   stubComposedFeatures,
   stubInfrastructureEntitlements,
+  stubMount,
   testHalves,
 } from "./api-trpc-collaborators.test-halves";
 
@@ -314,7 +315,7 @@ describe("given an API process composed with the packaged tRPC record", () => {
       })();
 
       const composed = composeApiTrpcCollaborators(
-        testHalves({ orgGroup: undefined }),
+        testHalves({ identity: undefined }),
         stubApplicationSlices(),
         report,
       );
@@ -322,52 +323,7 @@ describe("given an API process composed with the packaged tRPC record", () => {
       expect(composed).toBeUndefined();
       // Named by half: "the record did not mount" is a symptom every half
       // shares, and the name is what an operator can act on.
-      expect(reported[0]).toEqual(["orgGroup"]);
+      expect(reported[0]).toEqual(["identity"]);
     });
   });
-
 });
-
-/**
- * The mount the record is built on, for the two structural assertions above.
- *
- * They ask what the record CONTAINS rather than what it answers, so the mount
- * only has to be constructible: every procedure builder below returns itself,
- * which is what a chain of decorators expects.
- */
-function stubMount(): never {
-  const procedure: Record<string, unknown> = {};
-  const chain = new Proxy(procedure, {
-    get: (_target, property) => {
-      if (property === "_def") return {};
-      return () => chain;
-    },
-  });
-  const root = {
-    // `_def.procedures` as well as the routes themselves: a real tRPC router
-    // carries both, and the surfaces that merge sub-routers flat — the scenario
-    // and suite transports — read the routes back off `_def`.
-    router: (routes: Record<string, unknown>) =>
-      Object.assign({}, routes, { _def: { procedures: routes } }),
-    mergeRouters: (...routers: Array<Record<string, unknown>>) =>
-      Object.assign({}, ...routers) as Record<string, unknown>,
-    procedure: chain,
-  };
-  return {
-    root,
-    protectedProcedure: chain,
-    publicProcedure: chain,
-    // Every middleware answers a callable that yields a middleware object. The
-    // chain above swallows whatever `.use()` is handed, so what a middleware IS
-    // does not matter here — only that naming one never throws.
-    middlewares: new Proxy(
-      {},
-      {
-        get: () => {
-          const middleware = () => middleware;
-          return middleware;
-        },
-      },
-    ),
-  } as never;
-}

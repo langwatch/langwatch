@@ -27,26 +27,17 @@
  * silently degraded — see {@link ApiTrpcCollaboratorsAbsence}.
  */
 import type { AuthApp } from "@langwatch/auth-server";
-import type { EmailSuppressionTrpcPorts } from "@langwatch/automation-server";
 import type {
   GroupTrpcPorts,
   JoinRequestTrpcPorts,
   OnboardingTrpcPorts,
-  OrganizationTrpcPorts,
 } from "@langwatch/organization-server";
 import type { IdentityTrpcPorts, UserTrpcPorts } from "@langwatch/user-server";
 import type { ZodTypeAny } from "zod";
 import type { ApiTrpcFeatureApplication } from "./app-trpc.context";
-import type { CodingAgentTrpcPorts } from "@langwatch/coding-agent-server";
 import type { OpsTrpcPorts } from "@langwatch/ops-server";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { AppTrpcDeclaredCheck } from "./app-trpc.policy-kit";
-import type { AutomationMountPorts } from "../features/automation/automation-trpc.mount";
-import type { EnterpriseTrpcMountPorts } from "../features/enterprise/enterprise-trpc.mount";
-import type {
-  ProjectTrpcChecks,
-  ProjectTrpcMountPorts,
-} from "../features/project/project-trpc.mount";
 import type { SavedViewTrpcPorts } from "@langwatch/dashboard-server";
 import type { CostTrpcPorts, LimitsTrpcPorts } from "@langwatch/entitlement-server";
 
@@ -84,37 +75,13 @@ export type ApiTrpcCollaborators<TSignUpDataSchema extends ZodTypeAny> = Readonl
   /** The composed auth application both signed-out doors answer from. */
   auth: AuthApp;
 
-
-
   group: GroupTrpcPorts;
-
 
   identity: IdentityTrpcPorts;
 
   joinRequests: Omit<JoinRequestTrpcPorts, "listUserNames">;
 
   onboarding: OnboardingTrpcPorts<TSignUpDataSchema>;
-
-
-
-
-
-  /** The forty-six answers `organization.*` needs from this deployment. */
-  organization: OrganizationTrpcPorts<TSignUpDataSchema>;
-  /** The audit-log read's own `kind: "custom"` check, already built. */
-  organizationAuditLogCheck: unknown;
-  /** The six answers `project.*` needs. */
-  project: ProjectTrpcMountPorts;
-  /** `project.create`'s custom tier resolution and the trace-sharing demand. */
-  projectChecks: ProjectTrpcChecks;
-  /** What one viewer may see of one project's captured content and spend. */
-  codingAgents: CodingAgentTrpcPorts;
-  /** The three answers the automation transport reaches beyond automation's own. */
-  automation: AutomationMountPorts;
-  /** The unsubscribe pair's client address, its throttle and its audit trail. */
-  emailSuppression: EmailSuppressionTrpcPorts;
-  /** The SCIM plan gate, and the back office's connection ledger with its trail. */
-  enterprise: EnterpriseTrpcMountPorts;
 
   /**
    * The retention policy: who may write an override at a scope, which values
@@ -124,7 +91,6 @@ export type ApiTrpcCollaborators<TSignUpDataSchema extends ZodTypeAny> = Readonl
   /** The monitor surface's precondition parser, comparison window and evaluator replication. */
 
   user: Omit<UserTrpcPorts, ApiOwnedUserPorts>;
-
 }>;
 
 /** What a set is missing, and therefore why the record is not mountable. */

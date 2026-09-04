@@ -197,12 +197,33 @@ import {
   type ComposedStoredObjectFeature,
 } from "../features/stored-object/stored-object.composition";
 import {
-  composeApiOrgGroupCollaborators,
-  type ApiEnterpriseApplicationPort,
-  type ApiOrgGroupCollaborators,
+  composeOrganizationFeature,
+  refusingOrganizationFeature,
   type ApiOrganizationInvitePort,
-  type ApiViewerProtectionsPort,
-} from "./api-trpc-collaborators.org-group.composition";
+  type ComposedOrganizationFeature,
+} from "../features/organization/organization.composition";
+import {
+  composeProjectFeature,
+  refusingProjectFeature,
+  type ComposedProjectFeature,
+} from "../features/project/project.composition";
+import {
+  composeCodingAgentFeature,
+  refusingCodingAgentFeature,
+  type ComposedCodingAgentFeature,
+} from "../features/coding-agent/coding-agent.composition";
+import {
+  composeAutomationFeature,
+  refusingAutomationFeature,
+  type ComposedAutomationFeature,
+} from "../features/automation/automation.composition";
+import {
+  composeEnterpriseFeature,
+  refusingEnterpriseFeature,
+  type ApiEnterpriseApplicationPort,
+  type ComposedEnterpriseFeature,
+} from "../features/enterprise/enterprise.composition";
+import type { ApiViewerProtectionsPort } from "../features/trace/trace-viewer-protections";
 import {
   composeApiOrganizationInvites,
   type ApiOrganizationInvites,
@@ -737,7 +758,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    */
   private composedTraceCommands!: ApiTraceProducerCommands;
   private composedScenario!: ComposedScenarioFeature;
-  private composedOrgGroup: ApiOrgGroupCollaborators | undefined;
+  private composedOrganization!: ComposedOrganizationFeature;
+  private composedProject!: ComposedProjectFeature;
+  private composedCodingAgent!: ComposedCodingAgentFeature;
+  private composedAutomation!: ComposedAutomationFeature;
+  private composedEnterprise!: ComposedEnterpriseFeature;
   /**
    * The process's ONE invitation service, or none.
    *
@@ -1134,7 +1159,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // agents inside them, the automations they fire, and the four Enterprise
     // namespaces. It folds on rather than seeding, because every one of them
     // resolves an organization or a project through the tenancy graph.
-    this.composedOrgGroup = this.composeOrgGroup(options, authz, queueInfrastructure, encryption);
+    // The five tenant-administration features: a tenant's members and their
+    // bindings, its projects' own lifecycle, the coding agents inside them,
+    // the automations they fire, and the four Enterprise namespaces.
+    this.composeTenantFeatures(options, encryption, queueInfrastructure, infrastructure);
     // A project's own object store and the monitors running beside it. They
     // compose after the execution and product-group halves because the monitor
     // surface takes their monitor service, evaluator service and evaluator
@@ -1322,14 +1350,18 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         workflow: this.composedWorkflow,
         experiment: this.composedExperiment,
         evaluation: this.composedEvaluation,
+        organization: this.composedOrganization,
+        project: this.composedProject,
+        codingAgent: this.composedCodingAgent,
+        automation: this.composedAutomation,
+        enterprise: this.composedEnterprise,
       },
-      // One literal, checked against the real type each half returns. A
-      // process missing any of the eight composes none of the record — see
+      // One literal, checked against the real type the half returns. A
+      // process missing it composes none of the record — see
       // {@link composeApiTrpcCollaborators}.
       collaborators: composeApiTrpcCollaborators(
         {
           identity: this.composedIdentity,
-          orgGroup: this.composedOrgGroup,
         },
         // The `ctx.app` slices no half owns: the gateway's own application, the
         // GitHub App the coding-agent reads resolve through, and the four
@@ -1347,6 +1379,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
           workflows: this.composedWorkflow.app,
           experiments: this.composedExperiment.app,
           evaluations: this.composedEvaluation.app,
+          automation: this.composedAutomation.app,
+          codingAgentApp: this.composedCodingAgent.app,
+          projects: this.composedProject.app,
+          ...this.composedEnterprise.application,
           authzApp: this.composedRole.authzApp,
           dashboard: this.composedAnalytics.dashboard,
           dataset: this.composedDataset.app,
@@ -1965,7 +2001,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // only class the routes have ever accepted. Resolving through the service
     // rather than reading the column keeps one answer to "whose key is this";
     // narrowing after it keeps the door exactly as wide as it was.
-    const automationApp = this.composedOrgGroup?.application.automation;
+    const automationApp = this.composedAutomation.service;
     const healthProbes =
       publicBaseUrl && automationApp && workflowService
         ? {
@@ -2214,7 +2250,9 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // differently.
       enterpriseGovernance: composeEnterpriseGovernanceApplication(this.options.enterprise),
       identity: this.composedIdentity,
-      orgGroup: this.composedOrgGroup,
+      automation: this.composedAutomation,
+      codingAgent: this.composedCodingAgent,
+      enterprise: this.composedEnterprise,
       dataset: this.composedDataset,
       evaluator: this.composedEvaluator,
       role: this.composedRole,
@@ -2673,15 +2711,15 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   /**
    * The one-click unsubscribe door's collaborators, or none.
    *
-   * `undefined` where this process composed no org-group half, because the
-   * automation application lives there. The address a caller is counted as is
+   * `undefined` where this process composed no automation application. The
+   * address a caller is counted as is
    * resolved here rather than in the family: header priority is one half of
    * the answer and the raw socket address — which only the Node server's
    * connection info carries — is the other, and a family that read headers
    * alone would drop every caller sending none into one bucket.
    */
   private composeUnsubscribe(): UnsubscribeRestPorts | undefined {
-    const automation = this.composedOrgGroup?.application.automation;
+    const automation = this.composedAutomation.service;
     if (!automation) return undefined;
     return {
       automation: () => automation,
@@ -3486,85 +3524,118 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   }
 
   /**
-   * Composes the org-group half over this process's own graph.
+   * Composes the five tenant-administration features over this process's own
+   * graph.
    *
-   * Five things gate it, and each is a fact the nine surfaces turn on: a
-   * database, because every one of them is a row reader; the tenancy graph,
-   * because every one of them resolves an organization or a project; the
-   * analytics application, because a graph automation is evaluated against a
-   * charted read; the product-group half's flag store, because the webhook
-   * channel is behind a rollout; and the observability half, because a
-   * project's sharing rule and its topic tree are ONE each and this half must
-   * read the same ones the explorer does. A host that injected its own
-   * collaborator set composed none of those here and holds the set whole.
+   * One gate for all five, and each part of it is a fact every one of them
+   * turns on: the shared infrastructure, because every one of them is a row
+   * reader over the same connection, the same permission service and the same
+   * plan provider; the tenancy graph, because every one of them resolves an
+   * organization or a project; and the evaluator service, because the monitor
+   * directory a trigger names is built over it and a second one would let a
+   * trigger and the `evaluators.*` surface disagree about what runs.
    *
    * Everything else degrades where it is USED rather than here — the
    * invitation service, the protections resolver, the Enterprise application
    * and the GitHub App each name their own absence at the call, so a
    * deployment missing one of them still administers its tenant.
    */
-  private composeOrgGroup(
+  private composeTenantFeatures(
     options: ApiRuntimeCompositionOptions,
-    authz: AuthzService,
-    queueInfrastructure: ApiQueueInfrastructure | undefined,
     encryption: SecretEncryptionPort | undefined,
-  ): ApiOrgGroupCollaborators | undefined {
+    queueInfrastructure: ApiQueueInfrastructure | undefined,
+    infrastructure: ApiTrpcInfrastructure | undefined,
+  ): void {
     const database = this.composedDatabase?.connection;
     const tenancy = this.composedTenancy;
-    const featureFlags = this.composedFeatureFlag.service;
-    // The evaluator service the execution half composed, for the monitor
+    // The evaluator service the execution features composed, for the monitor
     // directory below: taken rather than built so a monitor's evaluator and
     // the `evaluators.*` surface cannot disagree about what one runs.
     const evaluators = this.composedEvaluators;
-    if (!database || !tenancy || !evaluators) return undefined;
+    if (!infrastructure || !database || !tenancy || !evaluators) {
+      this.composedOrganization = refusingOrganizationFeature();
+      this.composedProject = refusingProjectFeature();
+      this.composedCodingAgent = refusingCodingAgentFeature();
+      this.composedAutomation = refusingAutomationFeature();
+      this.composedEnterprise = refusingEnterpriseFeature();
+      return;
+    }
 
-    return composeApiOrgGroupCollaborators({
-      prisma: database.client,
-      authz,
-      organizations: tenancy.organizations,
-      projects: tenancy.projects,
-      apiKeys: tenancy.apiKeys,
-      // Taken rather than built: a second share ledger or topic tree would let
-      // the settings form and the explorer disagree about what a project holds.
-      share: this.composedShare.service,
-      topics: this.composedTopic.service,
-      monitors: this.resolveMonitors(database.client, evaluators),
-      featureFlags,
-      // The SAME plan provider the usage panel and every allowance banner
-      // read, for the automation persist ceiling and both Enterprise gates.
-      plans: this.resolvePlanProvider(options),
-      encryption,
-      audit: this.options.audit,
-      // The SAME Redis the queue owns, which the worker spends the automation
-      // persist ceiling against.
-      redis: queueInfrastructure?.redis ?? null,
+    // Injected wins; otherwise the service this process composed over its own
+    // graph. Resolved here rather than left to the organization feature's own
+    // fold because the management REST family administers the same
+    // invitations, and one service is what keeps the two doors from
+    // disagreeing about them.
+    const invites =
+      this.options.organizationInvites ?? this.resolveOrganizationInvites(options)?.trpc;
+
+    this.composedOrganization = composeOrganizationFeature({
+      infrastructure,
+      peers: {
+        encryption,
+        ...(invites ? { invites } : {}),
+        ...(this.options.enterprise ? { enterprise: this.options.enterprise } : {}),
+      },
       // The process's ONE counter: two limiters would give a caller two budgets.
       rateLimit: (input) => this.rateLimiter.consume(input),
-      unsubscribeSecret: options.config.storedSecretEncryptionKey,
       baseHost: options.config.infrastructure.execution.publicBaseUrl ?? "",
       demoProject: {
         userId: options.config.authz.demoProjectUserId ?? "",
         projectId: options.config.authz.demoProjectId ?? "",
       },
-      github: this.resolveGithub(options, database.client, queueInfrastructure, tenancy),
-      // The SAME ClickHouse the charted reads and the traces run on: a
-      // coding-agent session is a projection in that instance, and a second
-      // connection would be a second pool.
-      codingAgentClickHouse: this.resolveCodingAgentClickHouse(),
-      // Injected wins; otherwise the half this process composed over its own
-      // graph. Passed rather than left to this half's own fold because the
-      // management REST family administers the same invitations, and one
-      // service is what keeps the two doors from disagreeing about them.
-      ...(() => {
-        const invites =
-          this.options.organizationInvites ?? this.resolveOrganizationInvites(options)?.trpc;
-        return invites ? { invites } : {};
-      })(),
-      ...(this.options.viewerProtections
-        ? { viewerProtections: this.options.viewerProtections }
-        : {}),
-      ...(this.options.enterprise ? { enterprise: this.options.enterprise } : {}),
+    });
+
+    this.composedProject = composeProjectFeature({
+      infrastructure,
+      peers: {
+        projects: tenancy.projects,
+        apiKeys: tenancy.apiKeys,
+        // Taken rather than built: a second share ledger or topic tree would
+        // let the settings form and the explorer disagree about what a
+        // project holds.
+        share: this.composedShare.service,
+        topics: this.composedTopic.service,
+        encryption,
+        ...(this.options.viewerProtections
+          ? { viewerProtections: this.options.viewerProtections }
+          : {}),
+      },
+    });
+
+    this.composedCodingAgent = composeCodingAgentFeature({
+      infrastructure,
+      peers: {
+        projects: tenancy.projects,
+        github: this.resolveGithub(options, database.client, queueInfrastructure, tenancy),
+        // The SAME ClickHouse the charted reads and the traces run on: a
+        // coding-agent session is a projection in that instance, and a second
+        // connection would be a second pool.
+        clickHouse: this.resolveCodingAgentClickHouse(),
+        ...(this.options.viewerProtections
+          ? { viewerProtections: this.options.viewerProtections }
+          : {}),
+      },
+    });
+
+    this.composedAutomation = composeAutomationFeature({
+      infrastructure,
+      peers: {
+        projects: tenancy.projects,
+        monitors: this.resolveMonitors(database.client, evaluators),
+        encryption,
+        // The SAME Redis the queue owns, which the worker spends the
+        // automation persist ceiling against.
+        redis: queueInfrastructure?.redis ?? null,
+      },
+      rateLimit: (input) => this.rateLimiter.consume(input),
+      unsubscribeSecret: options.config.storedSecretEncryptionKey,
+      baseHost: options.config.infrastructure.execution.publicBaseUrl ?? "",
       processName: options.config.serviceName,
+    });
+
+    this.composedEnterprise = composeEnterpriseFeature({
+      audit: this.options.audit,
+      ...(this.options.enterprise ? { enterprise: this.options.enterprise } : {}),
     });
   }
 

@@ -1,10 +1,10 @@
 /**
- * Stub builders for the collaborator halves a per-half integration test
- * is NOT exercising, plus the shared `stub()` proxy every one of those tests
- * already used to fake a namespace's build-time surface.
+ * Stub builders for the collaborators and features an integration test is NOT
+ * exercising, plus the shared `stub()` proxy every one of those tests already
+ * used to fake a namespace's build-time surface.
  *
- * Each per-half integration test composes ONE real half (the one its file
- * names) and needs the other nine only well enough for
+ * Each composition integration test composes the REAL feature its file names
+ * and needs the rest only well enough for
  * `ApiTrpcFeaturesComposition.tryCompose(...).build(mount)` to construct the
  * full ninety-one-namespace router — which reads every namespace's input
  * schemas and middleware wrappers at BUILD time, not only the ones a test's
@@ -46,12 +46,15 @@ import { refusingIntegrationsChecksFeature } from "../../features/project/integr
 import { refusingWorkflowFeature } from "../../features/workflow/workflow.composition";
 import { refusingExperimentFeature } from "../../features/experiment/experiment.composition";
 import { refusingEvaluationFeature } from "../../features/evaluation/evaluation.composition";
+import { refusingOrganizationFeature } from "../../features/organization/organization.composition";
+import { refusingProjectFeature } from "../../features/project/project.composition";
+import { refusingCodingAgentFeature } from "../../features/coding-agent/coding-agent.composition";
+import { refusingAutomationFeature } from "../../features/automation/automation.composition";
+import { refusingEnterpriseFeature } from "../../features/enterprise/enterprise.composition";
 import type { ComposedApiFeatures } from "../../app-trpc/app-trpc.composed";
 import type { ApiIdentityCollaborators } from "../api-trpc-collaborators.identity.composition";
-import type { ApiOrgGroupCollaborators } from "../api-trpc-collaborators.org-group.composition";
 
 const anySchema = z.any();
-const passThroughMiddleware = ({ next }: { next: () => unknown }) => next();
 
 /**
  * A collaborator surface with only the members the record reads while it is
@@ -128,36 +131,6 @@ export function stubIdentityHalf(broadcast: EventEmitter): ApiIdentityCollaborat
   });
 }
 
-export function stubOrgGroupHalf(): ApiOrgGroupCollaborators {
-  return stub<ApiOrgGroupCollaborators>("orgGroup", {
-    application: {
-      automation: stub("app.automation"),
-      codingAgentApp: stub("app.codingAgentApp"),
-      licensing: stub("app.licensing"),
-      projects: stub("app.projects", { getOrganizationId: async () => "organization-1" }),
-      scimApp: stub("app.scimApp"),
-      usageLimits: stub("app.usageLimits"),
-    },
-    organization: stub("organization", {
-      signUpDataSchema: anySchema,
-      isCustomRole: () => false,
-    }),
-    organizationAuditLogCheck: passThroughMiddleware,
-    project: stub("project"),
-    projectChecks: {
-      create: passThroughMiddleware,
-      traceSharing: passThroughMiddleware,
-    },
-    codingAgents: stub("codingAgents"),
-    automation: stub("automation", { providers: stub("automation.providers") }),
-    emailSuppression: stub("emailSuppression"),
-    enterprise: {
-      scimToken: stub("enterprise.scimToken"),
-      ssoConnections: stub("enterprise.ssoConnections"),
-    },
-  });
-}
-
 /**
  * The `ctx.app` slices no half owns any more, as a suite that drives none of
  * them supplies them: the gateway's application, the GitHub directory and the
@@ -190,6 +163,12 @@ export function stubApplicationSlices(): ApiTrpcFeatureApplicationSlices {
     scenarios: stub("app.scenarios"),
     storedObjectApp: stub("app.storedObjectApp"),
     suites: stub("app.suites"),
+    automation: stub("app.automation"),
+    codingAgentApp: stub("app.codingAgentApp"),
+    licensing: stub("app.licensing"),
+    projects: stub("app.projects", { getOrganizationId: async () => "organization-1" }),
+    scimApp: stub("app.scimApp"),
+    usageLimits: stub("app.usageLimits"),
     // Answers rather than refuses: several namespaces that are NOT the surface
     // under test still gate on `ctx.app.ops.isAdmin()` at call time.
     ops: stub("app.ops", { isAdmin: () => true }),
@@ -244,12 +223,17 @@ export function stubComposedFeatures(): ComposedApiFeatures {
     trace: refusingTraceFeature(),
     dataPrivacy: refusingDataPrivacyFeature(),
     integrationsChecks: refusingIntegrationsChecksFeature(),
+    organization: refusingOrganizationFeature(),
+    project: refusingProjectFeature(),
+    codingAgent: refusingCodingAgentFeature(),
+    automation: refusingAutomationFeature(),
+    enterprise: refusingEnterpriseFeature(),
   };
 }
 
 /**
- * Both halves, stubbed by default. Pass the half(s) a test actually
- * composes as overrides — the rest stay stubbed so the full record still
+ * The remaining half, stubbed by default. Pass it as an override where a test
+ * actually composes it — otherwise it stays stubbed so the full record still
  * builds. `broadcast` seeds the identity half's tenant emitter; give it the
  * same `EventEmitter` a subscription test emits on.
  */
@@ -259,7 +243,50 @@ export function testHalves(
 ): ApiTrpcCollaboratorHalves {
   return {
     identity: stubIdentityHalf(broadcast),
-    orgGroup: stubOrgGroupHalf(),
     ...overrides,
   };
+}
+
+/**
+ * The mount a record is built on, for the structural assertions that ask what
+ * a record CONTAINS rather than what it answers.
+ *
+ * The mount only has to be constructible: every procedure builder below
+ * returns itself, which is what a chain of decorators expects.
+ */
+export function stubMount(): never {
+  const procedure: Record<string, unknown> = {};
+  const chain = new Proxy(procedure, {
+    get: (_target, property) => {
+      if (property === "_def") return {};
+      return () => chain;
+    },
+  });
+  const root = {
+    // `_def.procedures` as well as the routes themselves: a real tRPC router
+    // carries both, and the surfaces that merge sub-routers flat — the scenario
+    // and suite transports — read the routes back off `_def`.
+    router: (routes: Record<string, unknown>) =>
+      Object.assign({}, routes, { _def: { procedures: routes } }),
+    mergeRouters: (...routers: Array<Record<string, unknown>>) =>
+      Object.assign({}, ...routers) as Record<string, unknown>,
+    procedure: chain,
+  };
+  return {
+    root,
+    protectedProcedure: chain,
+    publicProcedure: chain,
+    // Every middleware answers a callable that yields a middleware object. The
+    // chain above swallows whatever `.use()` is handed, so what a middleware IS
+    // does not matter here — only that naming one never throws.
+    middlewares: new Proxy(
+      {},
+      {
+        get: () => {
+          const middleware = () => middleware;
+          return middleware;
+        },
+      },
+    ),
+  } as never;
 }

@@ -81,6 +81,11 @@ import { refusingTraceFeature } from "../../trace/trace.composition";
 import { refusingWorkflowFeature } from "../../workflow/workflow.composition";
 import { refusingExperimentFeature } from "../../experiment/experiment.composition";
 import { refusingEvaluationFeature } from "../../evaluation/evaluation.composition";
+import { refusingOrganizationFeature } from "../../organization/organization.composition";
+import { refusingProjectFeature } from "../../project/project.composition";
+import { refusingCodingAgentFeature } from "../../coding-agent/coding-agent.composition";
+import { refusingAutomationFeature } from "../../automation/automation.composition";
+import { refusingEnterpriseFeature } from "../../enterprise/enterprise.composition";
 import { refusingOpsFeature } from "../../ops/ops.composition";
 import { refusingHomeFeature } from "../../project/home.composition";
 import { refusingRoleFeature } from "../../role/role.composition";
@@ -261,6 +266,11 @@ function composeApplication(overrides: { saasBilling?: boolean; enterprise?: unk
       workflow: refusingWorkflowFeature(),
       experiment: refusingExperimentFeature(),
       evaluation: refusingEvaluationFeature(),
+      organization: refusingOrganizationFeature(),
+      project: refusingProjectFeature(),
+      codingAgent: refusingCodingAgentFeature(),
+      automation: refusingAutomationFeature(),
+      enterprise: refusingEnterpriseFeature(),
     },
     infrastructure,
     collaborators: composeApiTrpcCollaborators(testHalves(), {

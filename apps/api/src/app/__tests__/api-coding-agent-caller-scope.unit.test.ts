@@ -27,7 +27,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   ApiCodingAgentScopeDirectory,
   ApiCodingAgentScopePermissions,
-} from "../api-trpc-collaborators.org-group.composition";
+} from "../../features/coding-agent/coding-agent.composition";
 
 const ORGANIZATION = "organization-1";
 const KEY = "key-1";
@@ -198,9 +198,9 @@ describe("given personal-workspace membership rows read from Postgres", () => {
   describe("when a member has no display name set", () => {
     /** @scenario "A person with no display name is named by their email address" */
     it("names them by their email address", async () => {
-      const findMany = vi.fn().mockResolvedValue([
-        { teamId: "team-1", user: { name: null, email: "ada@example.com" } },
-      ]);
+      const findMany = vi
+        .fn()
+        .mockResolvedValue([{ teamId: "team-1", user: { name: null, email: "ada@example.com" } }]);
       const directory = new ApiCodingAgentScopeDirectory({ teamUser: { findMany } } as never);
 
       const names = await directory.listPersonalTeamOwnerNames({ teamIds: ["team-1"] });

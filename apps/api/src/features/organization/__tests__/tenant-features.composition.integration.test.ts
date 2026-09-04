@@ -1,12 +1,14 @@
 /**
- * The org-group half of the packaged tRPC record, served by the API process.
+ * The five tenant-administration features, served by the API process.
  *
- * What this pins is one call per namespace this half mounts, each of them made
- * over the REAL `/api/trpc` handler on THIS process's root, through THIS
- * process's policy chain, against the collaborator set
- * `composeApiOrgGroupCollaborators` produced. Nothing here reaches a stub
- * through a proxy for the surfaces under test: the fakes are at the PORTS — a
- * Prisma double, an AuthZ service, a project directory, a plan provider — and
+ * `organization`, `project`, `coding-agent`, `automation` and `enterprise`
+ * each compose themselves, and together they mount the nine namespaces a
+ * TENANT is administered through. What this pins is one call per namespace,
+ * each of them made over the REAL `/api/trpc` handler on THIS process's root,
+ * through THIS process's policy chain, against the features those five
+ * `compose*Feature` functions produced. Nothing here reaches a stub through a
+ * proxy for the surfaces under test: the fakes are at the PORTS — a Prisma
+ * double, an AuthZ service, a project directory, a plan provider — and
  * everything between the HTTP request and them is the real composed graph.
  *
  *   organization.getAll          the organization directory, off `ctx.app`
@@ -38,28 +40,49 @@ import type {
 import type { ApiKeyService } from "@langwatch/api-key-contract";
 import type { GithubService } from "@langwatch/github-contract";
 import type { MonitorService } from "@langwatch/monitor-contract";
-import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { ShareService } from "@langwatch/share-contract";
 import type { TopicService } from "@langwatch/topic-contract";
 import { EventEmitter } from "node:events";
 import { describe, expect, it, vi } from "vitest";
-import { ApiApplication, MissingAgentService, MissingSecretService } from "../../api.application";
+import {
+  ApiApplication,
+  MissingAgentService,
+  MissingSecretService,
+} from "../../../api.application";
 import {
   ApiTrpcFeaturesComposition,
   composeApiTrpcCollaborators,
-} from "../api-trpc-features.composition";
-import { composeApiOrgGroupCollaborators } from "../api-trpc-collaborators.org-group.composition";
+} from "../../../app/api-trpc-features.composition";
+import { composeAutomationFeature } from "../../automation/automation.composition";
+import { composeCodingAgentFeature } from "../../coding-agent/coding-agent.composition";
+import { composeEnterpriseFeature } from "../../enterprise/enterprise.composition";
+import { composeProjectFeature } from "../../project/project.composition";
+import { composeOrganizationFeature } from "../organization.composition";
 import {
   stubApplicationSlices,
   stubComposedFeatures,
   stubIdentityHalf,
   stubInfrastructureEntitlements,
+  stubMount,
   testHalves,
-} from "./api-trpc-collaborators.test-halves";
+} from "../../../app/__tests__/api-trpc-collaborators.test-halves";
 
 const SESSION_USER = { id: "user-1", name: "Sam Rivers", email: "sam@acme.test", role: "ADMIN" };
+
+/** The nine namespaces a tenant is administered through, as the wire names them. */
+const TENANT_NAMESPACES = [
+  "automation",
+  "codingAgents",
+  "emailSuppression",
+  "license",
+  "licenseEnforcement",
+  "organization",
+  "project",
+  "scimToken",
+  "ssoConnections",
+] as const;
 const PROJECT_ID = "project-1";
 const ORGANIZATION_ID = "organization-1";
 
@@ -154,59 +177,101 @@ function composeApplication(options: { withInvitations?: boolean } = {}) {
     tryGetSummaryById: vi.fn(async () => ({ name: "Acme", slug: "acme" })),
   } as unknown as ProjectService;
 
-  const group = composeApiOrgGroupCollaborators({
+  const encryption = {
+    encrypt: (value: string) => value,
+    decrypt: (value: string) => value,
+  } as never;
+
+  const infrastructure = {
+    ...stubInfrastructureEntitlements(),
     prisma: prisma.client,
     authz,
-    organizations: {} as unknown as OrganizationService,
-    projects,
-    apiKeys: {} as unknown as ApiKeyService,
-    share: {} as unknown as ShareService,
-    topics: {
-      getClusteringStatus: vi.fn(async () => ({ isRunInFlight: false })),
-    } as unknown as TopicService,
-    monitors: { getAllByIds: vi.fn(async () => []) } as unknown as MonitorService,
-    featureFlags: { isEnabled: vi.fn(async () => true) } as never,
-    plans: { getActivePlan: vi.fn(async () => ({ type: "FREE", free: true })) } as never,
-    encryption: { encrypt: (value: string) => value, decrypt: (value: string) => value } as never,
     audit,
-    redis: null,
+  };
+
+  const organizationFeature = composeOrganizationFeature({
+    infrastructure,
+    peers: {
+      encryption,
+      ...(options.withInvitations
+        ? {
+            authzGrants: {
+              grant: vi.fn(async () => undefined),
+              revoke: vi.fn(async () => undefined),
+            } as never,
+            roles: { listAssignableCustomRoles: vi.fn(async () => []) } as never,
+          }
+        : {}),
+    },
+    rateLimit: async () => ({ allowed: true, resetAt: 0 }),
+    baseHost: "https://app.langwatch.test",
+    demoProject: { userId: "", projectId: "" },
+  });
+
+  const projectFeature = composeProjectFeature({
+    infrastructure,
+    peers: {
+      projects,
+      apiKeys: {} as unknown as ApiKeyService,
+      share: {} as unknown as ShareService,
+      topics: {
+        getClusteringStatus: vi.fn(async () => ({ isRunInFlight: false })),
+      } as unknown as TopicService,
+      encryption,
+    },
+  });
+
+  const codingAgentFeature = composeCodingAgentFeature({
+    infrastructure,
+    peers: {
+      projects,
+      github: {} as unknown as GithubService,
+      // No ClickHouse: a coding-agent session is a projection there, so the
+      // package's own null repositories answer emptily.
+      clickHouse: null,
+    },
+  });
+
+  const automationFeature = composeAutomationFeature({
+    infrastructure,
+    peers: {
+      projects,
+      monitors: { getAllByIds: vi.fn(async () => []) } as unknown as MonitorService,
+      encryption,
+      redis: null,
+    },
     rateLimit: async () => ({ allowed: true, resetAt: 0 }),
     unsubscribeSecret: "0".repeat(64),
     baseHost: "https://app.langwatch.test",
-    demoProject: { userId: "", projectId: "" },
-    github: {} as unknown as GithubService,
-    // No ClickHouse: a coding-agent session is a projection there, so the
-    // package's own null repositories answer emptily.
-    codingAgentClickHouse: null,
-    ...(options.withInvitations
-      ? {
-          authzGrants: {
-            grant: vi.fn(async () => undefined),
-            revoke: vi.fn(async () => undefined),
-          } as never,
-          roles: { listAssignableCustomRoles: vi.fn(async () => []) } as never,
-        }
-      : {}),
     processName: "langwatch-api-test",
   });
 
+  const enterpriseFeature = composeEnterpriseFeature({ audit });
+
   const features = ApiTrpcFeaturesComposition.tryCompose({
-    composed: stubComposedFeatures(),
-    infrastructure: {
-      ...stubInfrastructureEntitlements(),
-      prisma: prisma.client,
-      authz,
-      audit: undefined,
+    composed: {
+      ...stubComposedFeatures(),
+      organization: organizationFeature,
+      project: projectFeature,
+      codingAgent: codingAgentFeature,
+      automation: automationFeature,
+      enterprise: enterpriseFeature,
     },
+    infrastructure,
     collaborators: composeApiTrpcCollaborators(
       testHalves({
-        orgGroup: group,
         identity: {
           ...stubIdentityHalf(broadcast),
           application: { ...stubIdentityHalf(broadcast).application, organizations },
         },
       }),
-      stubApplicationSlices(),
+      {
+        ...stubApplicationSlices(),
+        projects: projectFeature.app,
+        codingAgentApp: codingAgentFeature.app,
+        automation: automationFeature.app,
+        ...enterpriseFeature.application,
+      },
     ),
   });
   if (!features) throw new Error("the record refused to compose against its collaborators");
@@ -231,7 +296,7 @@ function composeApplication(options: { withInvitations?: boolean } = {}) {
     }
   ).organizationInvite;
 
-  return { application, prisma, authz, organizations, projects, group, audit, invites };
+  return { application, features, prisma, authz, organizations, projects, audit, invites };
 }
 
 async function callTrpc(
@@ -260,22 +325,16 @@ function refusal(body: unknown): string {
   return JSON.stringify(body);
 }
 
-describe("given an API process composed with the org-group half of the record", () => {
+describe("given an API process composed with the five tenant features", () => {
   describe("when the record is built", () => {
     it("mounts all nine tenant-administration namespaces", () => {
-      const { group } = composeApplication();
+      const { features } = composeApplication();
 
-      expect(Object.keys(group).sort()).toEqual([
-        "application",
-        "automation",
-        "codingAgents",
-        "emailSuppression",
-        "enterprise",
-        "organization",
-        "organizationAuditLogCheck",
-        "project",
-        "projectChecks",
-      ]);
+      const record = features.build(stubMount());
+
+      expect(
+        TENANT_NAMESPACES.filter((namespace) => record[namespace as keyof typeof record]),
+      ).toEqual(TENANT_NAMESPACES);
     });
   });
 

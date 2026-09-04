@@ -85,11 +85,9 @@ export function createApiTrpcPorts<TSignUpDataSchema extends ZodTypeAny>(
   ): Promise<boolean> => authz.hasPermission({ userId: actorId(ctx), permission, projectId });
 
   return {
-
     auth: collaborators.auth,
 
     group: collaborators.group,
-
 
     identity: collaborators.identity,
 
@@ -111,20 +109,6 @@ export function createApiTrpcPorts<TSignUpDataSchema extends ZodTypeAny>(
      * every caller.
      */
     prisma,
-
-
-
-
-
-
-    organization: collaborators.organization,
-    organizationAuditLogCheck: collaborators.organizationAuditLogCheck,
-    project: collaborators.project,
-    projectChecks: collaborators.projectChecks,
-    codingAgents: collaborators.codingAgents,
-    automation: collaborators.automation,
-    emailSuppression: collaborators.emailSuppression,
-    enterprise: collaborators.enterprise,
 
     /**
      * The user rows this connection answers, and the four it deliberately

@@ -38,6 +38,11 @@ import type { ComposedStoredObjectFeature } from "../features/stored-object/stor
 import type { ComposedWorkflowFeature } from "../features/workflow/workflow.composition";
 import type { ComposedExperimentFeature } from "../features/experiment/experiment.composition";
 import type { ComposedEvaluationFeature } from "../features/evaluation/evaluation.composition";
+import type { ComposedOrganizationFeature } from "../features/organization/organization.composition";
+import type { ComposedProjectFeature } from "../features/project/project.composition";
+import type { ComposedCodingAgentFeature } from "../features/coding-agent/coding-agent.composition";
+import type { ComposedAutomationFeature } from "../features/automation/automation.composition";
+import type { ComposedEnterpriseFeature } from "../features/enterprise/enterprise.composition";
 
 export type ComposedApiFeatures = Readonly<{
   /** Six namespaces, one `ctx.app` slice and two REST families over one application. */
@@ -141,4 +146,27 @@ export type ComposedApiFeatures = Readonly<{
    * reports on.
    */
   evaluation: ComposedEvaluationFeature;
+  /** The one namespace a tenant's members, teams and invitations are administered through. */
+  organization: ComposedOrganizationFeature;
+  /**
+   * One namespace and the `ctx.app.projects` application several other
+   * namespaces read a project's own summary off.
+   */
+  project: ComposedProjectFeature;
+  /**
+   * One namespace, the `ctx.app.codingAgentApp` application, and the same
+   * application again for the packaged coding-agent REST family.
+   */
+  codingAgent: ComposedCodingAgentFeature;
+  /**
+   * Two namespaces over one application: a project's triggers and the
+   * addresses that asked their channels to stop.
+   */
+  automation: ComposedAutomationFeature;
+  /**
+   * The four Enterprise tenant namespaces and the three `ctx.app` slices
+   * behind them, mounted whether or not this deployment composed the
+   * Enterprise application.
+   */
+  enterprise: ComposedEnterpriseFeature;
 }>;

@@ -55,7 +55,11 @@ import { PostgresDatasetAdapter } from "@langwatch/dataset-server";
 import type { ProjectService } from "@langwatch/project-contract";
 import { EventEmitter } from "node:events";
 import { describe, expect, it, vi } from "vitest";
-import { ApiApplication, MissingAgentService, MissingSecretService } from "../../../api.application";
+import {
+  ApiApplication,
+  MissingAgentService,
+  MissingSecretService,
+} from "../../../api.application";
 import {
   ApiTrpcFeaturesComposition,
   composeApiTrpcCollaborators,
@@ -71,7 +75,6 @@ import {
   stubComposedFeatures,
   stubIdentityHalf,
   stubInfrastructureEntitlements,
-  stubOrgGroupHalf,
   testHalves,
 } from "../../../app/__tests__/api-trpc-collaborators.test-halves";
 
@@ -286,18 +289,15 @@ function composeApplication(options: { customRolePlan?: undefined } = {}) {
           ...stubIdentityHalf(broadcast),
           application: { ...stubIdentityHalf(broadcast).application, organizations },
         },
-        // `application.projects` is org-group's to write in production (see
-        // `composeApiTrpcCollaborators`), so the org-group half's stub here has
-        // to carry the SAME `projects` this test observes, or the flag
-        // resolution reads a different project directory than the one it
-        // asserts against.
-        orgGroup: {
-          ...stubOrgGroupHalf(),
-          application: { ...stubOrgGroupHalf().application, projects },
-        } as never,
       }),
       {
         ...stubApplicationSlices(),
+        // `application.projects` is the project feature's in production, so the
+        // slice here has to carry the SAME `projects` this test observes, or
+        // the flag resolution reads a different project directory than the one
+        // it asserts against. The slice is the project APPLICATION in
+        // production; this suite drives only the directory behind it.
+        projects: projects as never,
         dataset: dataset.app,
         evaluatorApp: evaluator.app,
         prompts: prompt.app,

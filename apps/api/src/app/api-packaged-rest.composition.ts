@@ -51,7 +51,9 @@ import type { ComposedAnalyticsFeature } from "../features/analytics/analytics.c
 import type { ComposedExperimentFeature } from "../features/experiment/experiment.composition";
 import type { ComposedWorkflowFeature } from "../features/workflow/workflow.composition";
 import type { ApiIdentityCollaborators } from "./api-trpc-collaborators.identity.composition";
-import type { ApiOrgGroupCollaborators } from "./api-trpc-collaborators.org-group.composition";
+import type { ComposedAutomationFeature } from "../features/automation/automation.composition";
+import type { ComposedCodingAgentFeature } from "../features/coding-agent/coding-agent.composition";
+import type { ComposedEnterpriseFeature } from "../features/enterprise/enterprise.composition";
 import type { ComposedDatasetFeature } from "../features/dataset/dataset.composition";
 import type { ComposedEvaluatorFeature } from "../features/evaluator/evaluator.composition";
 import type { ComposedRoleFeature } from "../features/role/role.composition";
@@ -111,7 +113,9 @@ export type ApiPackagedRestCompositionOptions = Readonly<{
    */
   enterpriseGovernance: EnterpriseGovernanceApplication;
   identity: ApiIdentityCollaborators | undefined;
-  orgGroup: ApiOrgGroupCollaborators | undefined;
+  automation: ComposedAutomationFeature;
+  codingAgent: ComposedCodingAgentFeature;
+  enterprise: ComposedEnterpriseFeature;
   dataset: ComposedDatasetFeature;
   evaluator: ComposedEvaluatorFeature;
   role: ComposedRoleFeature;
@@ -191,13 +195,9 @@ export function composeApiPackagedRest(
         : {}),
       apiKeys: () => options.apiKeys,
       ...(options.authzComposition ? { authzGrants: () => options.authzComposition!.grants } : {}),
-      ...(options.orgGroup
-        ? {
-            automation: () => options.orgGroup!.application.automation,
-            codingAgents: () => options.orgGroup!.application.codingAgentApp,
-            scim: () => options.orgGroup!.application.scimApp,
-          }
-        : {}),
+      ...(options.automation.service ? { automation: () => options.automation.service! } : {}),
+      ...(options.codingAgent.service ? { codingAgents: () => options.codingAgent.service! } : {}),
+      ...(options.enterprise.scim ? { scim: () => options.enterprise.scim! } : {}),
       // REST audits a read that names people; tRPC does not, which is why this
       // is a port of the family rather than something the application does.
       codingAgentAudit: () => ({
