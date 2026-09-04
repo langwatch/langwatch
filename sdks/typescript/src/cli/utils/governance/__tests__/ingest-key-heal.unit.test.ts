@@ -236,7 +236,9 @@ describe("healRevokedIngestKey", () => {
 
   describe("given wiring that cannot be written", () => {
     it("reports no target rather than a half-wired tool", async () => {
+      const cfg = config();
       const d = deps({
+        loadConfig: () => cfg,
         installTelemetryWiring: vi.fn().mockReturnValue({
           labels: [],
           warnings: [],
@@ -251,13 +253,15 @@ describe("healRevokedIngestKey", () => {
       });
 
       expect(healed).toEqual({ status: "failed" });
-      expect(d.saveConfig).not.toHaveBeenCalled();
+      expect(cfg.default_personal_ingest_keys?.claude_code?.secret).toBe(
+        CACHED,
+      );
     });
   });
 
   describe("given wiring that reports no failure but writes no target", () => {
     /** @scenario "Wiring that writes no target leaves the cached key in place" */
-    it("leaves the cache on the rejected key, so the next 401 can heal", async () => {
+    it("puts the cache back on the rejected key, so the next 401 can heal", async () => {
       const cfg = config();
       const d = deps({
         loadConfig: () => cfg,
@@ -275,9 +279,43 @@ describe("healRevokedIngestKey", () => {
       });
 
       expect(healed).toEqual({ status: "failed" });
-      expect(d.saveConfig).not.toHaveBeenCalled();
       // The invariant the next heal depends on: the cache still names the key
-      // the collector rejected, so `rejectedToken === cached` holds next time.
+      // the collector rejected, so `rejectedToken === cached` holds next time,
+      // on disk as well as in memory.
+      expect(cfg.default_personal_ingest_keys?.claude_code?.secret).toBe(
+        CACHED,
+      );
+      expect(d.saveConfig).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          default_personal_ingest_keys: expect.objectContaining({
+            claude_code: expect.objectContaining({ secret: CACHED }),
+          }),
+        }),
+      );
+    });
+  });
+
+  describe("given a config file the device cannot write", () => {
+    /** @scenario "A key the cache cannot record is not reported as healed" */
+    it("reports a failure and leaves the tool on the rejected key", async () => {
+      const cfg = config();
+      const d = deps({
+        loadConfig: () => cfg,
+        saveConfig: vi.fn().mockImplementation(() => {
+          throw new Error("EACCES: ~/.langwatch/config.yaml");
+        }),
+      });
+
+      const healed = await healRevokedIngestKey({
+        agent: "claude_code",
+        rejectedToken: CACHED,
+        deps: d,
+      });
+
+      expect(healed).toEqual({ status: "failed" });
+      // A key the cache never recorded would be rejected by the next heal as
+      // someone else's, so the tool is left on the one the cache does name.
+      expect(d.installTelemetryWiring).not.toHaveBeenCalled();
       expect(cfg.default_personal_ingest_keys?.claude_code?.secret).toBe(
         CACHED,
       );

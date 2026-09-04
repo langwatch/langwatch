@@ -271,7 +271,7 @@ async function runHook({
   // the device finds out. Re-mint, rewrite the wiring, retry, and tell the
   // user to restart the agent: the running process still holds the old key.
   let liveTarget = target;
-  if (own.httpStatus === 401 && !healedRecently({ stateDir, agent, now })) {
+  if (own.httpStatus === 401 && claimHealWindow({ stateDir, agent, now })) {
     const outcome = await healRevokedKey({
       agent,
       rejectedToken: bearerOf(target.headers),
@@ -280,10 +280,10 @@ async function runHook({
       return { status: "failed" } as const;
     });
     // Only an attempt spends the window. A decline is read off the config
-    // without touching the platform, so throttling it would cost nothing to
-    // repeat and would silence the next 401 that this device CAN repair.
-    if (outcome.status !== "declined") {
-      recordHealAttempt({ stateDir, agent, now });
+    // without touching the platform, so holding the window would cost nothing
+    // to repeat and would silence the next 401 that this device CAN repair.
+    if (outcome.status === "declined") {
+      releaseHealWindow({ stateDir, agent });
     }
     if (outcome.status === "healed") {
       liveTarget = outcome.target;
@@ -331,8 +331,18 @@ function healStateFile({
   return path.join(stateDir, `heal-${agent}.json`);
 }
 
-/** Whether a heal was attempted inside the throttle window. */
-function healedRecently({
+/**
+ * Take this agent's heal window, or report that another attempt holds it.
+ *
+ * The window is claimed before the mint and with an exclusive create, so two
+ * sessions that start together and read the same 401 cannot both ask the
+ * platform to replace the same dead key: the second finds the first one's
+ * claim and stands down. A claim older than the window belonged to a run that
+ * died mid-heal, and is taken over the same atomic way, so only one of the
+ * hooks waiting on it wins. A state directory that cannot be written claims
+ * nothing and costs one extra attempt, the same trade the fingerprints make.
+ */
+function claimHealWindow({
   stateDir,
   agent,
   now,
@@ -341,8 +351,45 @@ function healedRecently({
   agent: string;
   now: () => number;
 }): boolean {
+  const file = healStateFile({ stateDir, agent });
+  const claim = JSON.stringify({ attemptedAt: now() });
+  const write = (): "claimed" | "taken" | "unwritable" => {
+    try {
+      fs.writeFileSync(file, claim, { flag: "wx" });
+      return "claimed";
+    } catch (error) {
+      return (error as NodeJS.ErrnoException).code === "EEXIST"
+        ? "taken"
+        : "unwritable";
+    }
+  };
+
   try {
-    const raw = fs.readFileSync(healStateFile({ stateDir, agent }), "utf8");
+    fs.mkdirSync(stateDir, { recursive: true });
+  } catch {
+    return true;
+  }
+
+  if (write() !== "taken") return true;
+  if (standingClaimIsFresh({ file, now })) return false;
+  try {
+    fs.rmSync(file, { force: true });
+  } catch {
+    return true;
+  }
+  return write() !== "taken";
+}
+
+/** Whether the claim on disk is young enough to still stand for its run. */
+function standingClaimIsFresh({
+  file,
+  now,
+}: {
+  file: string;
+  now: () => number;
+}): boolean {
+  try {
+    const raw = fs.readFileSync(file, "utf8");
     const attemptedAt = Number((JSON.parse(raw) as { attemptedAt?: number }).attemptedAt);
     return Number.isFinite(attemptedAt) && now() - attemptedAt < HEAL_THROTTLE_MS;
   } catch {
@@ -350,23 +397,18 @@ function healedRecently({
   }
 }
 
-function recordHealAttempt({
+/** Hand the window back, for an outcome that never reached the platform. */
+function releaseHealWindow({
   stateDir,
   agent,
-  now,
 }: {
   stateDir: string;
   agent: string;
-  now: () => number;
 }): void {
   try {
-    fs.mkdirSync(stateDir, { recursive: true });
-    fs.writeFileSync(
-      healStateFile({ stateDir, agent }),
-      JSON.stringify({ attemptedAt: now() }),
-    );
+    fs.rmSync(healStateFile({ stateDir, agent }), { force: true });
   } catch {
-    // A throttle we cannot record costs one extra attempt next time.
+    // A claim we cannot clear stands for the window, costing one repair.
   }
 }
 

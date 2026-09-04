@@ -153,6 +153,34 @@ describe("the session context hook's self-heal", () => {
     });
   });
 
+  describe("given two sessions that start at the same moment", () => {
+    /** @scenario "Two sessions rejected at the same moment mint one key" */
+    it("lets one of the two reach the healer", async () => {
+      // A healer held open across both runs. The window is claimed before the
+      // mint, so the second hook finds the first one's claim; were it recorded
+      // afterwards, both would read no attempt and both would mint.
+      const healRevokedKey = vi.fn().mockImplementation(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        return DECLINED;
+      });
+
+      await Promise.all([
+        hook.runHook({
+          env: OLD_KEY_ENV,
+          fetchImpl: rotatedCollector,
+          healRevokedKey,
+        }),
+        hook.runHook({
+          env: OLD_KEY_ENV,
+          fetchImpl: rotatedCollector,
+          healRevokedKey,
+        }),
+      ]);
+
+      expect(healRevokedKey).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("given a 401 on a target that carried no key", () => {
     /** @scenario "A 401 the device sent no key with is not this key's failure" */
     it("hands the healer no rejected token, and stays silent when it declines", async () => {

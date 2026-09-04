@@ -321,6 +321,17 @@ Rule: A revoked ingest key heals itself
     When the next session starts inside the window
     Then no second mint is attempted
 
+  # The window is claimed before the mint rather than recorded after it. Two
+  # sessions opened at the same second read the same 401, and a device that
+  # asked the platform twice for one dead key would spend two of the slots
+  # the per-tool cap gives it.
+
+  @unit
+  Scenario: Two sessions rejected at the same moment mint one key
+    Given two hooks that start together, both exporting with the rejected key
+    When they run at the same time
+    Then only one of them reaches the healer
+
   @unit
   Scenario: A tool pinned to a project is not re-minted on the personal path
     Given a tool pinned to a project key
@@ -386,6 +397,18 @@ Rule: A revoked ingest key heals itself
     And the cache still holds the key the collector rejected, so the next
     session heals instead of comparing against a key it never exported with
     And stdout stays empty and the exit code is zero
+
+  # A heal the device cannot remember is not a heal. The next 401 is repaired
+  # only when the rejected key is the one the cache names, so a tool wired
+  # with a key the cache never recorded would decline its own repair forever.
+
+  @unit
+  Scenario: A key the cache cannot record is not reported as healed
+    Given a signed-in CLI whose cached personal key the collector answers 401 to
+    And a device whose config file cannot be written
+    When the hook runs
+    Then the tool's wiring is left on the key the collector rejected
+    And the hook reports no healed target
 
   @unit
   Scenario: A payload that never arrives does not outlive the session

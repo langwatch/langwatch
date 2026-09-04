@@ -93,9 +93,10 @@ const TOOL_BY_AGENT: Record<string, string> = {
  * platform's own revocations, a rotation or the cap, are re-minted.
  *
  * Reports a failure once it has gone to the platform and not come back with a
- * wired tool: a server that says the cached key is still live, in which case
- * the 401 means something else, or a key that minted but could not be written
- * into the tool's wiring.
+ * wired tool that this device can recognise again: a server that says the
+ * cached key is still live, in which case the 401 means something else, or a
+ * key that minted but could not be written into the cache or into the tool's
+ * wiring.
  */
 export async function healRevokedIngestKey({
   agent,
@@ -135,11 +136,27 @@ export async function healRevokedIngestKey({
   });
   if (!resolved.minted) return { status: "failed" };
 
-  // Wire before caching. A cache that names a key the tool is not wired
-  // with is worse than no cache: the next 401 would compare the rejected
-  // token against a key this device never exported with, and the heal would
-  // decline. An install that wrote no target is a failed heal too, not only
-  // one that reports a required failure: both leave the tool on the dead key.
+  // The cache and the wiring must never name different keys. The next 401 is
+  // repaired only when the rejected bearer is the key the cache holds, so a
+  // pair that disagrees declines a repair this device could have made. The
+  // cache is written first and put back when the wiring lands no target, and
+  // a cache that cannot be written at all is a failed heal rather than a
+  // healed one whose key this device would not recognise next time.
+  const cachedKeys = cfg.default_personal_ingest_keys;
+  cfg.default_personal_ingest_keys = {
+    ...(cachedKeys ?? {}),
+    [agent]: { secret: resolved.token, prefix: resolved.prefix },
+  };
+  try {
+    deps.saveConfig(cfg);
+  } catch {
+    cfg.default_personal_ingest_keys = cachedKeys;
+    return { status: "failed" };
+  }
+
+  // An install that wrote no target is a failed heal too, not only one that
+  // reports a required failure: both leave the tool on the dead key, so the
+  // cache goes back to naming it.
   const wiring = deps.installTelemetryWiring({
     cfg,
     tool,
@@ -147,18 +164,14 @@ export async function healRevokedIngestKey({
     token: resolved.token,
   });
   if (wiring.requiredFailures.length > 0 || wiring.labels.length === 0) {
+    cfg.default_personal_ingest_keys = cachedKeys;
+    try {
+      deps.saveConfig(cfg);
+    } catch {
+      // The write that put the new key there succeeded a moment ago, so this
+      // one failing costs the device the heal it would make on the next 401.
+    }
     return { status: "failed" };
-  }
-
-  cfg.default_personal_ingest_keys = {
-    ...(cfg.default_personal_ingest_keys ?? {}),
-    [agent]: { secret: resolved.token, prefix: resolved.prefix },
-  };
-  try {
-    deps.saveConfig(cfg);
-  } catch {
-    // The tool is wired with the new key either way; only the cache write
-    // failed, which costs a re-mint the next time the hook heals.
   }
 
   return {
