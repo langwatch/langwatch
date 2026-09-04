@@ -652,6 +652,7 @@ export function LangyToolActivity({
   message,
   reasoningTitles,
   live = true,
+  answeredAfter = false,
 }: {
   message: UIMessage;
   /**
@@ -663,12 +664,15 @@ export function LangyToolActivity({
   reasoningTitles?: string[];
   /** @see LangyActivityParts */
   live?: boolean;
+  /** @see LangyActivityParts */
+  answeredAfter?: boolean;
 }) {
   return (
     <LangyActivityParts
       parts={message.parts}
       reasoningTitles={reasoningTitles}
       live={live}
+      answeredAfter={answeredAfter}
     />
   );
 }
@@ -690,7 +694,17 @@ export function LangyActivityParts({
   parts,
   reasoningTitles = [],
   live = true,
-}: PartsView & { reasoningTitles?: string[]; live?: boolean }) {
+  answeredAfter = false,
+}: PartsView & {
+  reasoningTitles?: string[];
+  live?: boolean;
+  /**
+   * The turn wrote its reply in a LATER run than this one. A run holds only
+   * its own parts, so it cannot see the answer that followed it; the caller
+   * can. See the recovered-failure fold below.
+   */
+  answeredAfter?: boolean;
+}) {
   const [devMode] = useLangyDevMode();
   const turnProgress = useLangyStore((state) => state.turnProgress);
   const turnProgressSample = useLangyStore((state) => state.turnProgressSample);
@@ -757,7 +771,7 @@ export function LangyActivityParts({
           call={call}
           presentation={presentation}
           devMode={devMode}
-          recovered={!live && answerIndex > order}
+          recovered={!live && (answeredAfter || answerIndex > order)}
         />
       ),
     })),

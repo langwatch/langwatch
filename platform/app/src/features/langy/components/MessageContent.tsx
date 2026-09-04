@@ -177,6 +177,12 @@ function MessageContentImpl({
   const lastActivityRunIndex = runs.findLastIndex(
     (run) => run.kind === "activity",
   );
+  // The run that carries the turn's reply. An activity run before it is work
+  // the turn went on to answer after, which is what makes a failure in it a
+  // step the turn RECOVERED from rather than the story of the turn.
+  const lastAnswerRunIndex = runs.findLastIndex(
+    (run) => run.kind === "answer" && langyRunText(run.parts).trim().length > 0,
+  );
 
   // The agent's `question` TOOL call, mapped onto the choices contract
   // (langyQuestionTool.ts) and rendered through the same card path a stamped
@@ -410,6 +416,9 @@ function MessageContentImpl({
                 // dead turn leaves its open calls looking like they still run.
                 // Off the streaming turn, an open call is an interrupted one.
                 live={isStreaming}
+                // The turn answered after this run, so a failure inside it is
+                // one the turn recovered from.
+                answeredAfter={index < lastAnswerRunIndex}
               />
             </LangyCardBoundary>
           ) : (

@@ -82,6 +82,27 @@ describe("a failed step on a settled turn", () => {
     });
   });
 
+  describe("given the reply is a separate run of the turn", () => {
+    /** @scenario "A step the turn recovered from folds to one line" */
+    it("folds the failure the run cannot see the reply from", () => {
+      // MessageContent splits a turn into runs, so an activity run holds only
+      // its own parts and cannot see the answer that followed it. The caller
+      // says so instead.
+      const message: UIMessage = {
+        id: "assistant-1",
+        role: "assistant",
+        parts: [failedProbe],
+      };
+      const { container } = render(
+        <ChakraProvider value={defaultSystem}>
+          <LangyToolActivity message={message} live={false} answeredAfter />
+        </ChakraProvider>,
+      );
+
+      expect(container.textContent).toContain("and Langy carried on");
+    });
+  });
+
   describe("given the turn is still running", () => {
     it("keeps the card while the reader is watching it happen", () => {
       const message: UIMessage = {

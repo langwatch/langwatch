@@ -57,6 +57,9 @@ describe("LangyScenarioCard", () => {
       ).toBeNull();
       expect(screen.queryByText(/^\{$/)).toBeNull();
       expect(screen.queryByText(/"id"\s*:/)).toBeNull();
+      // Its array elements are values out of a document, not sentences.
+      expect(screen.queryByText(/^"support",?$/)).toBeNull();
+      expect(screen.queryByText(/^"refunds",?$/)).toBeNull();
     });
   });
 

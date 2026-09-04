@@ -753,7 +753,10 @@ export function isProposalOutput(output: unknown): boolean {
 export function isSerializedDocumentLine(line: string): boolean {
   if (/^[[{]/.test(line) && /[\]}]$/.test(line)) return true;
   if (/^[[\]{},]+$/.test(line)) return true;
-  return /^"[^"]*"\s*:/.test(line);
+  if (/^"[^"]*"\s*:/.test(line)) return true;
+  // One element of a pretty-printed array: `"refunds",`. A quoted word with
+  // nothing around it is a value out of its document, never a sentence.
+  return /^"[^"]*"[,;]?$/.test(line);
 }
 
 /** First N non-empty, non-heading lines of a tool's textual result. */
