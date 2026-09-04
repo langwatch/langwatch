@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { modelProviders } from "../model-provider-registry";
 
 describe("Model Provider registry", () => {
+  /** @scenario "Azure Safety appears in the Add Model Provider list" */
+  /** @scenario "Azure Safety form only shows credentials and extra headers" */
   it("defines Azure Safety as a non-LLM provider with its supported credentials", () => {
     const provider = modelProviders.azure_safety;
 
@@ -16,6 +18,8 @@ describe("Model Provider registry", () => {
     expect(provider.blurb).toMatch(/jailbreak/i);
   });
 
+  /** @scenario "Azure Safety validates endpoint is a URL" */
+  /** @scenario "Azure Safety validates subscription key is non-empty" */
   it("validates the Azure Safety endpoint and subscription key", () => {
     const schema = modelProviders.azure_safety.keysSchema;
 

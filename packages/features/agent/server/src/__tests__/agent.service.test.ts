@@ -68,6 +68,7 @@ describe("Agents service", () => {
     expect(create).toHaveBeenCalledOnce();
   });
 
+  /** @scenario "Invalid config is rejected before persistence" */
   it("rejects a config that does not match its declared type before persistence", async () => {
     const { service, create } = setup();
     await expect(
@@ -96,6 +97,7 @@ describe("Agents service", () => {
     });
   });
 
+  /** @scenario "A missing singular agent read throws" */
   it("throws a concrete error carrying both identifiers when an agent is absent", async () => {
     const { service } = setup();
 

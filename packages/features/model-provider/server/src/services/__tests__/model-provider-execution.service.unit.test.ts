@@ -109,6 +109,7 @@ describe("ModelProviderExecutionService.prepare", () => {
 
   describe("given a latest alias on a configured provider", () => {
     /** @scenario "The LiteLLM params carry the concrete model for an alias" */
+    /** @scenario An explicit alias handed to the model factory resolves before the provider lookup */
     it("names the model the alias currently resolves to", async () => {
       // The catalog decides what the alias means today, so the expectation
       // reads the same resolver instead of pinning a model id that retires.

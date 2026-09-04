@@ -265,8 +265,8 @@ describe("ModelProviderKeysService merge", () => {
   });
 });
 
-/** @scenario API key masking when editing existing provider */
 describe("ModelProviderKeysService maskApiKeys", () => {
+  /** @scenario "API key masking when editing existing provider" */
   it("masks the API key and leaves the base URL visible", () => {
     const result = policy.tryMask({
       OPENAI_API_KEY: "sk-actual-key",

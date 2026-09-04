@@ -418,6 +418,7 @@ describe("GroupQueueProcessor — decode-drop durability (#5538)", () => {
       });
 
       /** @scenario a decode failure leaves the group live for its next job */
+      /** @scenario "An unreadable job does not wedge its group" */
       it("dispatches the next job staged under the same group id normally", async () => {
         const name = freshName();
         const groupId = `${TENANT}/next-job-dispatches`;

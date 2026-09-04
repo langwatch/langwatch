@@ -132,7 +132,10 @@ describe.skipIf(!DB_URL)("given an organization with a prompt version to tag", (
   });
 
   describe("when the organization already holds the tag being assigned", () => {
-    /** @scenario "Assigning a tag that exists in the DB succeeds" */
+    /**
+     * @scenario "Assigning a tag that exists in the DB succeeds"
+     * @scenario "Assigning a tag to a specific version"
+     */
     it("records the assignment against the version", async () => {
       const assignment = await prompts.assignTag({
         configId,

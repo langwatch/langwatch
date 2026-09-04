@@ -14,6 +14,7 @@ import {
 } from "../jobEnvelope";
 
 describe("Group Queue framework contract", () => {
+  /** @scenario "A queue definition fixes its transport contract" */
   it("builds one immutable transport definition", () => {
     const definition = defineGroupQueue({
       name: "projection-work",
@@ -61,6 +62,7 @@ describe("Group Queue framework contract", () => {
     ).toThrow("globalConcurrency must be a positive integer");
   });
 
+  /** @scenario "The canonical envelope round-trips a payload" */
   it("round-trips the canonical envelope and reads routing from its header", async () => {
     const payload = {
       id: "event_1",

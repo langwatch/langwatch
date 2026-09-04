@@ -68,6 +68,7 @@ describe("PromptService", () => {
 
   describe("duplicatePrompt()", () => {
     describe("given no other prompt has claimed the numbered handle", () => {
+      /** @scenario "A user duplicates a prompt from the prompt row menu" */
       it("numbers the duplicate from one", async () => {
         const { service, createPrompt } = buildService();
 
@@ -79,6 +80,7 @@ describe("PromptService", () => {
         expect(createPrompt).toHaveBeenCalledWith(createdWithHandle("support-bot-1"));
       });
 
+      /** @scenario "A duplicated prompt stays in the project it was duplicated from" */
       it("records where the duplicate came from", async () => {
         const { service, createPrompt } = buildService();
 
@@ -93,6 +95,7 @@ describe("PromptService", () => {
         });
       });
 
+      /** @scenario "A duplicated prompt keeps the original's configuration" */
       it("carries the source configuration over to the duplicate", async () => {
         const { service, createPrompt } = buildService();
 
@@ -111,6 +114,27 @@ describe("PromptService", () => {
           outputs: [{ identifier: "answer", type: "str" }],
           authorId: "user-2",
         });
+      });
+    });
+
+    describe("given the same prompt is duplicated twice in a row", () => {
+      /** @scenario "Duplicating the same prompt twice produces two distinct prompts" */
+      it("produces support-bot-1 then support-bot-2", async () => {
+        const taken = new Set<string>();
+        const { service, createPrompt } = buildService();
+        vi.spyOn(service, "checkHandleUniqueness").mockImplementation(
+          async ({ handle }) => !taken.has(handle),
+        );
+        createPrompt.mockImplementation(async ({ handle }) => {
+          if (handle) taken.add(handle);
+          return handle ? { ...SOURCE_PROMPT, id: `prompt_${handle}`, handle } : SOURCE_PROMPT;
+        });
+
+        await service.duplicatePrompt({ idOrHandle: "support-bot", projectId: "project-1" });
+        await service.duplicatePrompt({ idOrHandle: "support-bot", projectId: "project-1" });
+
+        expect(createPrompt).toHaveBeenNthCalledWith(1, createdWithHandle("support-bot-1"));
+        expect(createPrompt).toHaveBeenNthCalledWith(2, createdWithHandle("support-bot-2"));
       });
     });
 
@@ -145,6 +169,7 @@ describe("PromptService", () => {
     });
 
     describe("given the source prompt does not exist", () => {
+      /** @scenario "Duplicating a prompt that no longer exists reports it as missing" */
       it("reports it as not found", async () => {
         const { service, createPrompt } = buildService({ source: null });
 

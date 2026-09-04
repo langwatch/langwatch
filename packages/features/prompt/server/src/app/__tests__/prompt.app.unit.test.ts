@@ -66,7 +66,10 @@ function harness() {
 
   const app = PromptApp.create({
     prompts: prompts as PromptService,
-    projects: { getOrganizationId: async () => "org-1" },
+    projects: {
+      getOrganizationId: async () => "org-1",
+      listIdsByOrganization: async () => ["project-copy"],
+    },
   });
 
   const apply = (source: VersionedPrompt) =>

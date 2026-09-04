@@ -134,6 +134,7 @@ describe("given the Model Providers screen's scope filter", () => {
   afterEach(() => cleanup());
 
   describe("when the address carries no scope", () => {
+    /** @scenario "The default view shows every provider I have access to across scopes" */
     it("shows every row the reader can see", () => {
       renderWithModelProviderHost(<ModelProvidersScreen />, hostAt({}));
 
