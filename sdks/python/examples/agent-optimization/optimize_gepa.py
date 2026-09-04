@@ -25,12 +25,11 @@ import scenario  # noqa: F401
 import dspy
 from gepa.core.callbacks import GEPACallback, ValsetEvaluatedEvent
 
-import langwatch
-import langwatch.dspy
 from langwatch.dspy import (
     DSPyExample,
     DSPyOptimizer,
     DSPyPredictor,
+    init as init_dspy_tracking,
     langwatch_dspy,
 )
 
@@ -127,7 +126,7 @@ def main() -> None:
 
     callbacks = []
     if os.environ.get("LANGWATCH_API_KEY"):
-        langwatch.dspy.init(experiment=EXPERIMENT, optimizer=None, run_id=run_id)
+        init_dspy_tracking(experiment=EXPERIMENT, optimizer=None, run_id=run_id)
         callbacks.append(LangWatchGEPACallback(parameters))
     else:
         print("LANGWATCH_API_KEY is not set, the optimizer run is not tracked.")
