@@ -474,7 +474,7 @@ export function callActivityLine({
   call,
   machine,
 }: {
-  call: Pick<StoredLocalCall, "tool" | "params">;
+  call: LocalToolCall;
   machine: string;
 }): string {
   if (call.tool === "local_bash") {

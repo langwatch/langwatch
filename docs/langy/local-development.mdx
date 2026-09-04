@@ -82,10 +82,10 @@ The same choice is visible in **Settings > Integrations**, next to the GitHub co
 
 ## What the CLI does and does not do
 
-- The connection is outbound only, from your machine to LangWatch. Nothing listens on your machine.
+- The connection is outbound only, from your machine to LangWatch. The CLI opens no listening port and accepts no inbound connection.
 - The CLI receives a key scoped to the one conversation. Ctrl-C ends it. You can also disconnect from the chat.
 - Command output returns to Langy when the command ends, capped at 64 KiB. Longer output is kept in a log file under `.langwatch/langy-logs/` in the folder, and Langy gets the path.
 - A server Langy starts in the background keeps running after the CLI exits. Langy reports its process id and log path.
-- Nothing is installed. `npx langwatch@latest` runs the CLI from the registry.
+- The CLI is not installed on your machine. `npx langwatch@latest` runs it from the registry.
 
 Self-hosting? The CLI connects to your instance's base URL. See [Networking and egress](/self-hosting/langy/networking-and-egress#local-control-connections) for the one route your ingress must pass through.

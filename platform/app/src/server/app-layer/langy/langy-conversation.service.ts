@@ -81,6 +81,67 @@ import type {
 export type { LangyConversationRepository as LangyConversationReadRepository } from "./repositories/langy-conversation.repository";
 
 /**
+ * Whether the developer's folder is attached, as of the last connect or
+ * disconnect in the log. Absent either, it was never attached.
+ */
+function lastWorkspaceConnection(
+  events: readonly LangyConversationProcessingEvent[],
+): boolean {
+  for (let i = events.length - 1; i >= 0; i--) {
+    const type = events[i]?.type;
+    if (type === LANGY_CONVERSATION_EVENT_TYPES.LOCAL_WORKSPACE_CONNECTED) {
+      return true;
+    }
+    if (type === LANGY_CONVERSATION_EVENT_TYPES.LOCAL_WORKSPACE_DISCONNECTED) {
+      return false;
+    }
+  }
+  return false;
+}
+
+/**
+ * One document per turn, folded from that turn's card events only: the waits
+ * ride on the tool calls, and no other part of the vocabulary is needed to
+ * read them back.
+ */
+function foldWaitTurns(
+  events: readonly LangyConversationProcessingEvent[],
+): Map<string, LangyConversationTurnFoldState> {
+  const turns = new Map<string, LangyConversationTurnFoldState>();
+  for (const event of events) {
+    if (!isLangyWaitEventType(event.type)) continue;
+    const parsed = langyConversationTurnEventSchema.safeParse({
+      id: event.id,
+      createdAt: event.createdAt,
+      occurredAt: event.occurredAt,
+      type: event.type,
+      data: event.data,
+    });
+    if (!parsed.success) continue;
+    const turnId = parsed.data.data.turnId;
+    turns.set(
+      turnId,
+      foldLangyConversationTurn(
+        turns.get(turnId) ?? initLangyConversationTurnState(),
+        parsed.data,
+      ),
+    );
+  }
+  return turns;
+}
+
+/** Every card the folded turns carry, tagged with the turn that raised it. */
+function recordWaitsOf(
+  turns: ReadonlyMap<string, LangyConversationTurnFoldState>,
+): LangyLocalRecordWait[] {
+  return [...turns].flatMap(([turnId, turn]) =>
+    turn.ToolCalls.flatMap((call) =>
+      call.wait ? [{ turnId, toolCallId: call.toolCallId, ...call.wait }] : [],
+    ),
+  );
+}
+
+/**
  * Narrow read port over the canonical event log, for the tail read (ADR-059).
  * Structurally satisfied by `EventStore.getEventsOccurredSince` — the service
  * never sees appends, pagination internals, or other aggregates. The explicit
@@ -549,52 +610,10 @@ export class LangyConversationService {
       0,
     );
 
-    // One document per turn, folded from that turn's card events only: the
-    // waits ride on the tool calls, and nothing else in the vocabulary is
-    // needed to read them back.
-    const turns = new Map<string, LangyConversationTurnFoldState>();
-    let workspaceConnected = false;
-    for (const event of all) {
-      if (
-        event.type === LANGY_CONVERSATION_EVENT_TYPES.LOCAL_WORKSPACE_CONNECTED
-      ) {
-        workspaceConnected = true;
-        continue;
-      }
-      if (
-        event.type ===
-        LANGY_CONVERSATION_EVENT_TYPES.LOCAL_WORKSPACE_DISCONNECTED
-      ) {
-        workspaceConnected = false;
-        continue;
-      }
-      if (!isLangyWaitEventType(event.type)) continue;
-      const parsed = langyConversationTurnEventSchema.safeParse({
-        id: event.id,
-        createdAt: event.createdAt,
-        occurredAt: event.occurredAt,
-        type: event.type,
-        data: event.data,
-      });
-      if (!parsed.success) continue;
-      const turnId = parsed.data.data.turnId;
-      turns.set(
-        turnId,
-        foldLangyConversationTurn(
-          turns.get(turnId) ?? initLangyConversationTurnState(),
-          parsed.data,
-        ),
-      );
-    }
-
-    const waits: LangyLocalRecordWait[] = [];
-    for (const [turnId, turn] of turns) {
-      for (const call of turn.ToolCalls) {
-        if (!call.wait) continue;
-        waits.push({ turnId, toolCallId: call.toolCallId, ...call.wait });
-      }
-    }
-    return { waits, workspaceConnected };
+    return {
+      waits: recordWaitsOf(foldWaitTurns(all)),
+      workspaceConnected: lastWorkspaceConnection(all),
+    };
   }
 
   /**

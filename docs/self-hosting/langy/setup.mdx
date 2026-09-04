@@ -39,7 +39,7 @@ default on every cluster:
   with its own credentials and no listener a sibling could dial. Workers cannot read
   each other's keys or reach each other's control ports.
 - **Network.** A default-deny NetworkPolicy. Workers reach the control plane and
-  the gateway, and nothing else. Egress to the internet is off until you turn it
+  the gateway, and no other destination. Egress to the internet is off until you turn it
   on, and private ranges plus the cloud metadata endpoint stay blocked even
   then.
 
@@ -69,7 +69,7 @@ silently lose its sandbox.
 
 Your cluster has to define that class first, and if it does not, the pod is
 rejected at admission: no pod is created at all, `kubectl get pods -l
-app.kubernetes.io/name=langyagent` lists nothing, and the reason sits on the
+app.kubernetes.io/name=langyagent` returns an empty list, and the reason sits on the
 Deployment.
 
 ```bash
@@ -318,5 +318,5 @@ langyagent:
   chartManaged: false
 ```
 
-The agent pod and every reference to it are removed on the next upgrade. Nothing
-else in your install changes.
+The agent pod and every reference to it are removed on the next upgrade. Every
+other part of your install is left as it was.

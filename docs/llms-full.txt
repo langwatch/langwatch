@@ -61093,11 +61093,11 @@ The same choice is visible in **Settings > Integrations**, next to the GitHub co
 
 ## What the CLI does and does not do
 
-- The connection is outbound only, from your machine to LangWatch. Nothing listens on your machine.
+- The connection is outbound only, from your machine to LangWatch. The CLI opens no listening port and accepts no inbound connection.
 - The CLI receives a key scoped to the one conversation. Ctrl-C ends it. You can also disconnect from the chat.
 - Command output returns to Langy when the command ends, capped at 64 KiB. Longer output is kept in a log file under `.langwatch/langy-logs/` in the folder, and Langy gets the path.
 - A server Langy starts in the background keeps running after the CLI exits. Langy reports its process id and log path.
-- Nothing is installed. `npx langwatch@latest` runs the CLI from the registry.
+- The CLI is not installed on your machine. `npx langwatch@latest` runs it from the registry.
 
 Self-hosting? The CLI connects to your instance's base URL. See [Networking and egress](/self-hosting/langy/networking-and-egress#local-control-connections) for the one route your ingress must pass through.
 
@@ -61374,7 +61374,7 @@ This page covers the GitHub App path. The shared folder is described in [Local d
   </Step>
 </Steps>
 
-<Note>Langy contributes to your codebase exclusively through pull requests. Nothing touches your code without a human approving the merge.</Note>
+<Note>Langy contributes to your codebase exclusively through pull requests. Your code changes only when a human approves the merge.</Note>
 
 {/* TODO screenshot: a Langy-authored GitHub PR page showing the Co-authored-by / "Requested by @login" trailer and the in-chat card that produced it */}
 
@@ -61930,7 +61930,7 @@ For a self-hosted install, egress is **denied by default**: `networkPolicy.allow
 - **Can reach (when configured):** the LangWatch API (through the per-session `langwatch` CLI credentials), the LangWatch AI Gateway for LLM traffic, and `github.com` / `api.github.com` / `codeload.github.com` when external HTTPS is enabled.
 - **Cannot reach:** RFC 1918 private ranges, CGNAT, and the cloud metadata endpoint. These are blocked at L3/L4 to prevent SSRF and IMDS credential theft, so the block holds regardless of what the worker attempts.
 - **Reaches only through the adapter, by cooperation:** any other external host goes through the L7 egress adapter, which enforces the project allow-list and the operator floor. In the stock pod that path is cooperative, not mandatory: a worker that ignores `HTTPS_PROXY` and dials a public address on `:443` directly is monitored rather than blocked, per the limits above.
-- **Does not keep at rest:** nothing durable lives worker-side. The manager wipes the sessions root on boot, and the idle reaper deletes a worker's home once it has been idle for 10 minutes, so clones and injected credentials do not survive.
+- **Does not keep at rest:** the worker writes only to disposable storage. The manager wipes the sessions root on boot, and the idle reaper deletes a worker's home once it has been idle for 10 minutes, so clones and injected credentials do not survive.
 
 <Info>
 **Also check:** [Data flow and privacy](/langy/security/data-flow-and-privacy), [What Langy can do in your GitHub](/langy/security/github-access), [Self-hosting: networking and egress](/self-hosting/langy/networking-and-egress).
@@ -65324,7 +65324,7 @@ Set these on the control plane to enable bot-authored pull requests and coding-a
 | `GITHUB_LANGY_WEBHOOK_SECRET` | Verifies the `X-Hub-Signature-256` on inbound webhooks. Optional: without it the instance still connects, mints tokens and opens pull requests, but it reconciles late. Linkage then waits for the outbound recheck, and an uninstall clears only when a live read gets a 404. See [Restricted networks](/self-hosting/langy/github-app#restricted-networks). | No | unset |
 | `GITHUB_LANGY_APP_SLUG` | App slug for the install deep-link. | For GitHub | unset |
 | `GITHUB_LANGY_HOST` | The GitHub host this instance connects to. Set it to a GitHub Enterprise Server hostname (no scheme, no path) to bind the instance to that server. One instance connects to one host. | No | `github.com` |
-| `CREDENTIALS_SECRET` | Signs the GitHub install state round-trip and encrypts provider keys at rest. Already required in production, so nothing new is needed for GitHub. | Yes (prod) | none |
+| `CREDENTIALS_SECRET` | Signs the GitHub install state round-trip and encrypts provider keys at rest. Already required in production, so GitHub adds no new variable. | Yes (prod) | none |
 
 <Warning>
 `GITHUB_LANGY_PRIVATE_KEY` grants write access to installed repositories. Keep it in a secrets manager and never let it reach a worker.
@@ -65660,7 +65660,7 @@ The `langyagent` pod is a single Go "manager" process that spawns one gVisor-san
 </Info>
 
 <Note>
-**Turning Langy off.** Set `langyagent.chartManaged: false`: the agent pod and every reference to it are removed on the next upgrade, and nothing else in the install changes. For opening Langy to a few projects before everyone, see [staged rollout](/self-hosting/langy/setup#staged-rollout). On LangWatch Cloud, availability is managed for you.
+**Turning Langy off.** Set `langyagent.chartManaged: false`: the agent pod and every reference to it are removed on the next upgrade, and every other part of the install is left as it was. For opening Langy to a few projects before everyone, see [staged rollout](/self-hosting/langy/setup#staged-rollout). On LangWatch Cloud, availability is managed for you.
 </Note>
 
 ## At a glance
@@ -65774,7 +65774,7 @@ default on every cluster:
   with its own credentials and no listener a sibling could dial. Workers cannot read
   each other's keys or reach each other's control ports.
 - **Network.** A default-deny NetworkPolicy. Workers reach the control plane and
-  the gateway, and nothing else. Egress to the internet is off until you turn it
+  the gateway, and no other destination. Egress to the internet is off until you turn it
   on, and private ranges plus the cloud metadata endpoint stay blocked even
   then.
 
@@ -65804,7 +65804,7 @@ silently lose its sandbox.
 
 Your cluster has to define that class first, and if it does not, the pod is
 rejected at admission: no pod is created at all, `kubectl get pods -l
-app.kubernetes.io/name=langyagent` lists nothing, and the reason sits on the
+app.kubernetes.io/name=langyagent` returns an empty list, and the reason sits on the
 Deployment.
 
 ```bash
@@ -66053,8 +66053,8 @@ langyagent:
   chartManaged: false
 ```
 
-The agent pod and every reference to it are removed on the next upgrade. Nothing
-else in your install changes.
+The agent pod and every reference to it are removed on the next upgrade. Every
+other part of your install is left as it was.
 
 ---
 

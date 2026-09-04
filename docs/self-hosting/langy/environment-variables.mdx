@@ -75,7 +75,7 @@ Set these on the control plane to enable bot-authored pull requests and coding-a
 | `GITHUB_LANGY_WEBHOOK_SECRET` | Verifies the `X-Hub-Signature-256` on inbound webhooks. Optional: without it the instance still connects, mints tokens and opens pull requests, but it reconciles late. Linkage then waits for the outbound recheck, and an uninstall clears only when a live read gets a 404. See [Restricted networks](/self-hosting/langy/github-app#restricted-networks). | No | unset |
 | `GITHUB_LANGY_APP_SLUG` | App slug for the install deep-link. | For GitHub | unset |
 | `GITHUB_LANGY_HOST` | The GitHub host this instance connects to. Set it to a GitHub Enterprise Server hostname (no scheme, no path) to bind the instance to that server. One instance connects to one host. | No | `github.com` |
-| `CREDENTIALS_SECRET` | Signs the GitHub install state round-trip and encrypts provider keys at rest. Already required in production, so nothing new is needed for GitHub. | Yes (prod) | none |
+| `CREDENTIALS_SECRET` | Signs the GitHub install state round-trip and encrypts provider keys at rest. Already required in production, so GitHub adds no new variable. | Yes (prod) | none |
 
 <Warning>
 `GITHUB_LANGY_PRIVATE_KEY` grants write access to installed repositories. Keep it in a secrets manager and never let it reach a worker.

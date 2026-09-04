@@ -68,7 +68,7 @@ For a self-hosted install, egress is **denied by default**: `networkPolicy.allow
 - **Can reach (when configured):** the LangWatch API (through the per-session `langwatch` CLI credentials), the LangWatch AI Gateway for LLM traffic, and `github.com` / `api.github.com` / `codeload.github.com` when external HTTPS is enabled.
 - **Cannot reach:** RFC 1918 private ranges, CGNAT, and the cloud metadata endpoint. These are blocked at L3/L4 to prevent SSRF and IMDS credential theft, so the block holds regardless of what the worker attempts.
 - **Reaches only through the adapter, by cooperation:** any other external host goes through the L7 egress adapter, which enforces the project allow-list and the operator floor. In the stock pod that path is cooperative, not mandatory: a worker that ignores `HTTPS_PROXY` and dials a public address on `:443` directly is monitored rather than blocked, per the limits above.
-- **Does not keep at rest:** nothing durable lives worker-side. The manager wipes the sessions root on boot, and the idle reaper deletes a worker's home once it has been idle for 10 minutes, so clones and injected credentials do not survive.
+- **Does not keep at rest:** the worker writes only to disposable storage. The manager wipes the sessions root on boot, and the idle reaper deletes a worker's home once it has been idle for 10 minutes, so clones and injected credentials do not survive.
 
 <Info>
 **Also check:** [Data flow and privacy](/langy/security/data-flow-and-privacy), [What Langy can do in your GitHub](/langy/security/github-access), [Self-hosting: networking and egress](/self-hosting/langy/networking-and-egress).

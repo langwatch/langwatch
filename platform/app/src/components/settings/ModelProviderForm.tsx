@@ -279,6 +279,14 @@ export const EditModelProviderForm = ({
     string[]
   >([]);
 
+  // Auto-expand the accordion so the inline error is visible. Save would
+  // otherwise stop spinning + the drawer stay open with no visible feedback
+  // if the user collapsed the section before save.
+  const reportAdvancedJsonError = useCallback((e: unknown) => {
+    setAdvancedJsonError(e instanceof Error ? e.message : "Invalid JSON");
+    setAdvancedAccordionValue([ADVANCED_ACCORDION_VALUE]);
+  }, []);
+
   const getAdvancedPayload = useCallback((): AdvancedGatewayPayload | null => {
     const langySkipPermissionsModels = showSkipPermissionsField
       ? parseSkipPermissionsDraft(advancedDraft)
@@ -293,15 +301,15 @@ export const EditModelProviderForm = ({
       setAdvancedJsonError(null);
       return { gateway, langySkipPermissionsModels };
     } catch (e) {
-      const message = e instanceof Error ? e.message : "Invalid JSON";
-      setAdvancedJsonError(message);
-      // Auto-expand the accordion so the inline error is visible. Save
-      // would otherwise stop spinning + the drawer stay open with no
-      // visible feedback if the user collapsed the section before save.
-      setAdvancedAccordionValue([ADVANCED_ACCORDION_VALUE]);
+      reportAdvancedJsonError(e);
       throw e;
     }
-  }, [gatewayMenuEnabled, showSkipPermissionsField, advancedDraft]);
+  }, [
+    gatewayMenuEnabled,
+    showSkipPermissionsField,
+    advancedDraft,
+    reportAdvancedJsonError,
+  ]);
 
   // The server refuses a pattern that does not compile and names the field it
   // came from, so the refusal lands on the textarea and the accordion opens

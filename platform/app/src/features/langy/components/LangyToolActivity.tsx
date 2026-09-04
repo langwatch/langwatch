@@ -1463,21 +1463,10 @@ function FailedToolCallRow({
         )}
         {devMode ? (
           <Box position="absolute" top={2} right={2}>
-            <Tooltip
-              content={open ? "Hide raw data" : "Show raw data"}
-              showArrow
-            >
-              <IconButton
-                size="2xs"
-                variant="ghost"
-                color={open ? "orange.solid" : "fg.subtle"}
-                aria-label={open ? "Hide raw data" : "Show raw data"}
-                aria-expanded={open}
-                onClick={() => setOpen((value) => !value)}
-              >
-                <Braces size={12} />
-              </IconButton>
-            </Tooltip>
+            <RawDataToggle
+              isOpen={open}
+              onToggle={() => setOpen((value) => !value)}
+            />
           </Box>
         ) : null}
       </Box>

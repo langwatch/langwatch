@@ -99,6 +99,7 @@ import { resolveLangyActivityOwnership } from "../logic/langyActivityOwnership";
 import {
   createLangyChatTransport,
   type LangyTurnRequestContext,
+  type LangyTurnSignalEntry,
 } from "../logic/langyChatTransport";
 import { langyChoicesTimeline } from "../logic/langyChoicesTimeline";
 import { latestCodeAccessCallId } from "../logic/langyCodeAccessTool";
@@ -550,6 +551,67 @@ function LangyLauncher({
   );
 }
 
+/**
+ * A live turn signal, onto the store the panel reads.
+ *
+ * Status, progress, reasoning and plan are the four the panel renders;
+ * milestone entries carry no numeric rollup and have no consumer yet.
+ */
+function applyTurnSignal(signal: LangyTurnSignalEntry): void {
+  const store = useLangyStore.getState();
+  if (signal.type === "status") {
+    if (signal.readiness) store.setTurnReadinessStatus(signal.status);
+    else store.setTurnStatus(signal.status);
+    return;
+  }
+  if (signal.type === "progress") {
+    applyProgressSignal(signal);
+    return;
+  }
+  if (signal.type === "reasoning") {
+    // Ephemeral thinking — accumulate the run onto the live reasoning so it
+    // reads as one flowing block while it streams.
+    store.appendTurnReasoning(signal.text);
+    return;
+  }
+  if (signal.type === "plan") {
+    // The manager's typed plan snapshot — the checklist the plan card prefers
+    // over parsing the raw todowrite part on the live turn.
+    store.setTurnPlan(signal.items);
+  }
+}
+
+/** The progress half of {@link applyTurnSignal}. */
+function applyProgressSignal(
+  signal: Extract<LangyTurnSignalEntry, { type: "progress" }>,
+): void {
+  const store = useLangyStore.getState();
+  if (signal.message?.trim()) store.setTurnStatus(signal.message);
+  if (signal.progress !== undefined) store.setTurnProgress(signal.progress);
+
+  const { current, total } = signal;
+  const counted =
+    typeof current === "number" &&
+    Number.isFinite(current) &&
+    current >= 0 &&
+    typeof total === "number" &&
+    Number.isFinite(total) &&
+    total > 0;
+  if (!counted) return;
+
+  store.setTurnProgressSample({
+    current,
+    total,
+    ...(signal.batchItems !== undefined
+      ? { batchItems: signal.batchItems }
+      : {}),
+    ...(signal.batchDurationMs !== undefined
+      ? { batchDurationMs: signal.batchDurationMs }
+      : {}),
+    receivedAtMs: Date.now(),
+  });
+}
+
 function LangyPanel({
   proposalHandlersRef,
   actionHandlersRef,
@@ -914,49 +976,7 @@ function LangyPanel({
             },
           });
         },
-        onSignal: (signal) => {
-          const store = useLangyStore.getState();
-          if (signal.type === "status") {
-            if (signal.readiness) store.setTurnReadinessStatus(signal.status);
-            else store.setTurnStatus(signal.status);
-          } else if (signal.type === "progress") {
-            if (signal.message?.trim()) {
-              store.setTurnStatus(signal.message);
-            }
-            if (signal.progress !== undefined) {
-              store.setTurnProgress(signal.progress);
-            }
-            if (
-              typeof signal.current === "number" &&
-              Number.isFinite(signal.current) &&
-              typeof signal.total === "number" &&
-              Number.isFinite(signal.total) &&
-              signal.current >= 0 &&
-              signal.total > 0
-            ) {
-              store.setTurnProgressSample({
-                current: signal.current,
-                total: signal.total,
-                ...(signal.batchItems !== undefined
-                  ? { batchItems: signal.batchItems }
-                  : {}),
-                ...(signal.batchDurationMs !== undefined
-                  ? { batchDurationMs: signal.batchDurationMs }
-                  : {}),
-                receivedAtMs: Date.now(),
-              });
-            }
-          } else if (signal.type === "reasoning") {
-            // Ephemeral thinking — accumulate the run onto the live reasoning so
-            // it reads as one flowing block while it streams.
-            store.appendTurnReasoning(signal.text);
-          } else if (signal.type === "plan") {
-            // The manager's typed plan snapshot — the checklist the plan card
-            // prefers over parsing the raw todowrite part on the live turn.
-            store.setTurnPlan(signal.items);
-          }
-          // milestone entries carry no numeric rollup and have no consumer yet.
-        },
+        onSignal: applyTurnSignal,
         // Developer mode's tape (see LangyDevDrawer). A no-op unless the
         // inspector is open and has armed recording, so a normal session pays
         // one boolean per entry.

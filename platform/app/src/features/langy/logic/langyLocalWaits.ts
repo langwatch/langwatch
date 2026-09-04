@@ -121,6 +121,32 @@ function durableWaits(sources: WaitSources): LangyTurnWait[] {
 }
 
 /**
+ * One permission card folded over its other durable reading.
+ *
+ * The two durable sources are the same record read at two moments, so neither
+ * is simply newer: the turn fold can hold the answer the record has not caught
+ * up with, and the record can hold the answer for a turn this browser stopped
+ * folding. A card only ever moves forward.
+ */
+function mergeDurable({
+  known,
+  next,
+}: {
+  known: LangyPermissionCardData;
+  next: LangyPermissionCardData;
+}): LangyPermissionCardData {
+  return {
+    ...known,
+    ...next,
+    status: mergeLangyWaitStatus({ durable: known.status, live: next.status }),
+    decision: next.decision ?? known.decision,
+    command: next.command || known.command,
+    pattern: next.pattern ?? known.pattern,
+    reason: next.reason ?? known.reason,
+  };
+}
+
+/**
  * Every permission card of the current turn, in the order the commands were
  * asked about. A live entry with no durable twin still renders — that is the
  * whole point of the fast path — and the durable twin then takes over without
@@ -135,27 +161,7 @@ export function langyPermissionCards(
     if (wait.kind !== "permission") continue;
     const known = cards.get(wait.waitId);
     const next = fromDurable(wait);
-    // The two durable sources are the same record read at two moments, so
-    // neither is simply newer: the turn fold can hold the answer the record
-    // has not caught up with, and the record can hold the answer for a turn
-    // this browser stopped folding. A card only ever moves forward.
-    cards.set(
-      wait.waitId,
-      known
-        ? {
-            ...known,
-            ...next,
-            status: mergeLangyWaitStatus({
-              durable: known.status,
-              live: next.status,
-            }),
-            decision: next.decision ?? known.decision,
-            command: next.command || known.command,
-            pattern: next.pattern ?? known.pattern,
-            reason: next.reason ?? known.reason,
-          }
-        : next,
-    );
+    cards.set(wait.waitId, known ? mergeDurable({ known, next }) : next);
   }
   for (const entry of Object.values(sources.live ?? {})) {
     if (entry.kind !== "permission") continue;
@@ -208,6 +214,45 @@ function withLive(
   };
 }
 
+/** One question wait as a map entry, keyed by the tool call that asked. */
+type QuestionWaitEntry = [toolCallId: string, wait: LangyQuestionWait];
+
+/** Every question wait the durable record carries. */
+function recordQuestionWaits(sources: WaitSources): QuestionWaitEntry[] {
+  return (sources.record ?? []).flatMap((wait) =>
+    wait.kind === "question"
+      ? ([
+          [wait.toolCallId, { waitId: wait.waitId, status: wait.status }],
+        ] satisfies QuestionWaitEntry[])
+      : [],
+  );
+}
+
+/** The same, read off the folded turn document's tool calls. */
+function foldedQuestionWaits(sources: WaitSources): QuestionWaitEntry[] {
+  return (sources.toolCalls ?? []).flatMap((call) =>
+    call.wait?.kind === "question"
+      ? ([
+          [
+            call.toolCallId,
+            { waitId: call.wait.waitId, status: call.wait.status },
+          ],
+        ] satisfies QuestionWaitEntry[])
+      : [],
+  );
+}
+
+/** The same, read off the live entries this tab is watching. */
+function liveQuestionWaits(sources: WaitSources): QuestionWaitEntry[] {
+  return Object.values(sources.live ?? {}).flatMap((entry) =>
+    entry.kind === "question" && entry.toolCallId
+      ? ([
+          [entry.toolCallId, { waitId: entry.waitId, status: entry.status }],
+        ] satisfies QuestionWaitEntry[])
+      : [],
+  );
+}
+
 /**
  * The question waits of the current turn, keyed by the tool call that asked.
  * The choices card knows its own tool call id (its block id derives from it),
@@ -217,34 +262,21 @@ function withLive(
 export function langyQuestionWaitsByToolCall(
   sources: WaitSources,
 ): Map<string, LangyQuestionWait> {
-  const waits = new Map<string, LangyQuestionWait>();
+  const waits = new Map<string, LangyQuestionWait>(
+    recordQuestionWaits(sources),
+  );
 
-  for (const wait of sources.record ?? []) {
-    if (wait.kind !== "question") continue;
-    waits.set(wait.toolCallId, { waitId: wait.waitId, status: wait.status });
-  }
-
-  for (const call of sources.toolCalls ?? []) {
-    const wait = call.wait;
-    if (wait?.kind !== "question") continue;
-    const known = waits.get(call.toolCallId);
-    waits.set(call.toolCallId, {
+  // Each later source only moves a wait forward, so a status one of them has
+  // not caught up with is never rolled back over the one that has.
+  for (const [toolCallId, wait] of [
+    ...foldedQuestionWaits(sources),
+    ...liveQuestionWaits(sources),
+  ]) {
+    waits.set(toolCallId, {
       waitId: wait.waitId,
       status: mergeLangyWaitStatus({
-        durable: known?.status,
+        durable: waits.get(toolCallId)?.status,
         live: wait.status,
-      }),
-    });
-  }
-
-  for (const entry of Object.values(sources.live ?? {})) {
-    if (entry.kind !== "question" || !entry.toolCallId) continue;
-    const durable = waits.get(entry.toolCallId);
-    waits.set(entry.toolCallId, {
-      waitId: entry.waitId,
-      status: mergeLangyWaitStatus({
-        durable: durable?.status,
-        live: entry.status,
       }),
     });
   }
