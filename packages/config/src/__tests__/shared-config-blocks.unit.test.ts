@@ -21,6 +21,7 @@ import { postgresConfigDefinition } from "../postgres.config";
 import { groupQueueConfigDefinition } from "../queue.config";
 import { redisConfigDefinition } from "../redis.config";
 import { runtimeIdentityConfigDefinition } from "../runtime-identity.config";
+import { trustedProxyConfigDefinition } from "../trusted-proxy.config";
 import { InvalidRuntimeConfigError, RuntimeConfig } from "../runtime-config";
 
 describe("shared configuration blocks", () => {
@@ -244,5 +245,23 @@ describe("shared configuration blocks", () => {
         source: { GITHUB_LANGY_APP_ID: "12345", GITHUB_LANGY_HOST: "github.acme.test" },
       }).value,
     ).toEqual({ appId: "12345", host: "github.acme.test" });
+  });
+  /** @scenario "A forwarding header from an untrusted peer is ignored" */
+  it("resolves the trusted proxy list, defaulting to none so no forwarding header is trusted", () => {
+    expect(
+      RuntimeConfig.create({
+        name: "trusted-proxy-block",
+        definition: trustedProxyConfigDefinition,
+        source: { TRUSTED_PROXY_ADDRESSES: "198.51.100.4,10.0.0.0/8" },
+      }).value,
+    ).toEqual({ trustedProxies: "198.51.100.4,10.0.0.0/8" });
+
+    expect(
+      RuntimeConfig.create({
+        name: "trusted-proxy-block",
+        definition: trustedProxyConfigDefinition,
+        source: {},
+      }).value.trustedProxies,
+    ).toBeUndefined();
   });
 });

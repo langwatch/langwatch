@@ -113,7 +113,9 @@ import {
 import type { TraceLegacyFilterInput, TraceLegacyListInput } from "@langwatch/trace-contract";
 import type { CostTrpcPorts } from "@langwatch/entitlement-server";
 import type { SavedViewTrpcPorts } from "@langwatch/dashboard-server";
+import type { TrpcRequestLike } from "@langwatch/api/trpc";
 import type { ModelProviderTrpcChecks } from "../features/model-provider/model-provider-trpc.mount";
+import { trpcClientAddress } from "./api-client-address";
 
 // ---------------------------------------------------------------------------
 // The four named absences
@@ -792,12 +794,15 @@ class UnscheduledTopicClustering extends TopicClusteringSchedulePort {
   }
 }
 
-/** The request's client IP, as far as this process resolves it. */
+/**
+ * The request's client address, through the process's ONE resolver: the socket
+ * peer unless it is a configured trusted proxy, and then the rightmost hop
+ * that proxy did not write. Taking the leftmost `x-forwarded-for` entry let a
+ * caller rotate the header, shed the per-address limit and burn a share
+ * link's view cap one "new viewer" at a time.
+ */
 function clientIpOf(req: unknown): string | undefined {
-  const headers = (req as { headers?: Record<string, unknown> } | undefined)?.headers;
-  const forwarded = headers?.["x-forwarded-for"];
-  const first = Array.isArray(forwarded) ? forwarded[0] : forwarded;
-  return typeof first === "string" ? first.split(",")[0]?.trim() : undefined;
+  return trpcClientAddress(req as TrpcRequestLike | undefined);
 }
 
 /** A capability this process did not compose, refused by name at the call. */

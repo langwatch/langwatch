@@ -14,7 +14,7 @@ export interface BodyLimitOptions {
  * Drains `body`, stopping the moment `maxSize` is passed so an oversized
  * upload is never fully buffered. Returns null once the cap is exceeded.
  */
-async function drainWithinCap(
+export async function drainWithinCap(
   body: ReadableStream<Uint8Array>,
   maxSize: number,
 ): Promise<Uint8Array<ArrayBuffer> | null> {
@@ -57,7 +57,7 @@ const CONTENT_LENGTH = /^\d+$/;
  *
  * In every one of those cases the size is knowable only by reading the body.
  */
-function declaredSize(headers: Headers): number | null {
+export function declaredSize(headers: Headers): number | null {
   if (headers.has("transfer-encoding")) return null;
 
   const header = headers.get("content-length");

@@ -28,6 +28,7 @@ import { z } from "zod";
 import { ApiApplication, MissingAgentService, MissingSecretService } from "../../api.application";
 import { ApiRestSecurity } from "../../api-rest.security";
 import { createSseSubscriptionApp } from "../../app-trpc/app-trpc.sse";
+import { sameOriginSseInit } from "../../app-trpc/__tests__/support/sse-browser-request";
 import { ApiRestObservabilityComposition } from "../api-rest-observability.composition";
 import {
   ApiTrpcFeaturesComposition,
@@ -40,7 +41,12 @@ import {
   type ApiTraceGroupPorts,
   type ApiTraceReadStackPort,
 } from "../api-trpc-collaborators.trace-group.composition";
-import { stubApplicationSlices, stubComposedFeatures, stubInfrastructureEntitlements, testHalves } from "./api-trpc-collaborators.test-halves";
+import {
+  stubApplicationSlices,
+  stubComposedFeatures,
+  stubInfrastructureEntitlements,
+  testHalves,
+} from "./api-trpc-collaborators.test-halves";
 import { ApiRateLimitInfrastructure } from "../../platform/infrastructure/api-rate-limit.infrastructure";
 import { resolveDataPrivacy } from "@langwatch/data-privacy-contract";
 import { composeApiModelProviderHost } from "../api-model-provider-host.composition";
@@ -258,8 +264,13 @@ function subscriptionSecurity() {
 function composeApplication() {
   const { broadcast, emitterFor } = testBroadcast();
   const features = ApiTrpcFeaturesComposition.tryCompose({
-      composed: stubComposedFeatures(),
-    infrastructure: { ...stubInfrastructureEntitlements(), prisma: {} as unknown as PrismaClient, authz: testAuthz(), audit: undefined },
+    composed: stubComposedFeatures(),
+    infrastructure: {
+      ...stubInfrastructureEntitlements(),
+      prisma: {} as unknown as PrismaClient,
+      authz: testAuthz(),
+      audit: undefined,
+    },
     collaborators: composeApiTrpcCollaborators(
       testHalves({ traceGroup: testTraceGroupHalf(broadcast) }, broadcast),
       stubApplicationSlices(),
@@ -331,7 +342,7 @@ async function watchSse(options: {
   const encoded = encodeURIComponent(superjson.stringify(input));
   const response = await application.hono.request(
     `http://127.0.0.1/api/sse/${path}?input=${encoded}`,
-    { signal: controller.signal },
+    sameOriginSseInit({ signal: controller.signal }),
   );
 
   await vi.waitFor(() => {
@@ -736,11 +747,19 @@ describe("given an API process that composed the real observability collaborator
   function composeRealApplication(clickHouse: ReturnType<typeof testClickHouse>) {
     const { broadcast } = testBroadcast();
     const group = composeRealGroup(clickHouse);
-    const collaborators = composeApiTrpcCollaborators(testHalves({ traceGroup: group }, broadcast), stubApplicationSlices());
+    const collaborators = composeApiTrpcCollaborators(
+      testHalves({ traceGroup: group }, broadcast),
+      stubApplicationSlices(),
+    );
 
     const features = ApiTrpcFeaturesComposition.tryCompose({
       composed: stubComposedFeatures(),
-      infrastructure: { ...stubInfrastructureEntitlements(), prisma: {} as unknown as PrismaClient, authz: testAuthz(), audit: undefined },
+      infrastructure: {
+        ...stubInfrastructureEntitlements(),
+        prisma: {} as unknown as PrismaClient,
+        authz: testAuthz(),
+        audit: undefined,
+      },
       collaborators,
     });
     if (!features) throw new Error("the record refused to compose against its real collaborators");
@@ -1089,11 +1108,19 @@ describe("given the anonymous share read composed on this process", () => {
       readCachedSharePayload: async () => sharedTracePayload(),
     });
 
-    const collaborators = composeApiTrpcCollaborators(testHalves({ traceGroup: group }, broadcast), stubApplicationSlices());
+    const collaborators = composeApiTrpcCollaborators(
+      testHalves({ traceGroup: group }, broadcast),
+      stubApplicationSlices(),
+    );
 
     const features = ApiTrpcFeaturesComposition.tryCompose({
       composed: stubComposedFeatures(),
-      infrastructure: { ...stubInfrastructureEntitlements(), prisma: {} as unknown as PrismaClient, authz: testAuthz(), audit: undefined },
+      infrastructure: {
+        ...stubInfrastructureEntitlements(),
+        prisma: {} as unknown as PrismaClient,
+        authz: testAuthz(),
+        audit: undefined,
+      },
       collaborators,
     });
     if (!features) throw new Error("the record refused to compose against its collaborators");
@@ -1163,15 +1190,20 @@ describe("given the anonymous share read composed on this process", () => {
       });
     });
 
-    /** @scenario "An anonymous share read is metered against the process's own counter" */
-    it("counts the read against both the share token and the caller's address", async () => {
+    /**
+     * @scenario "An anonymous share read is metered against the process's own counter"
+     * @scenario "The shared-trace limit reads the same resolver"
+     */
+    it("counts the read against the share token, and against no address the caller merely asserted", async () => {
       const { application, metered } = composeShareApplication();
 
       await readShare(application, "share-token-1", CLIENT_IP);
 
+      // The forwarding header arrived from a peer no trusted-proxy setting
+      // names, so it names nobody: keying the 120-a-minute ceiling on it let a
+      // caller rotate the header and shed the limit entirely.
       expect(metered).toEqual([
         { key: "sharedTrace:token:share-token-1", windowSeconds: 60, max: 60 },
-        { key: `sharedTrace:ip:${CLIENT_IP}`, windowSeconds: 60, max: 120 },
       ]);
     });
   });

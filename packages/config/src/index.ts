@@ -36,6 +36,7 @@ export { authzConfigDefinition } from "./authz.config";
 export { runtimeIdentityConfigDefinition } from "./runtime-identity.config";
 export { licensingConfigDefinition } from "./licensing.config";
 export { githubAppConfigDefinition } from "./github.config";
+export { trustedProxyConfigDefinition } from "./trusted-proxy.config";
 
 // These switches intentionally retain the old instrumentation policy: only
 // the literal string "true" enables them. In particular, accepting "1" here

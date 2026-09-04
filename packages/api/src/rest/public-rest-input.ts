@@ -2,6 +2,7 @@ import type { Context, MiddlewareHandler } from "hono";
 import { uniqueSymbol, validator as zValidator } from "hono-openapi";
 import { z } from "zod";
 
+import { declaredSize, drainWithinCap } from "./body-limit.js";
 import { routeParameterNames } from "./definition.js";
 import { createApiSchemaError, parseApiSchema, type ApiSchema } from "../schema.js";
 import type { EndpointRegistration } from "./types.js";
@@ -95,14 +96,11 @@ async function readJsonObject(
   if (maxInputBytes === undefined) {
     throw new Error("Modern REST JSON parsing requires maxInputBytes");
   }
-  const contentLength = context.req.header("content-length");
-  if (contentLength !== undefined && Number(contentLength) > maxInputBytes) {
+  const declared = declaredSize(context.req.raw.headers);
+  if (declared !== null && declared > maxInputBytes) {
     throw inputError("request_too_large", "Request body exceeds the configured size limit");
   }
-  const text = await context.req.text();
-  if (new TextEncoder().encode(text).byteLength > maxInputBytes) {
-    throw inputError("request_too_large", "Request body exceeds the configured size limit");
-  }
+  const text = await readBodyWithinCap(context, maxInputBytes);
   if (text.trim() === "") {
     return {};
   }
@@ -114,6 +112,29 @@ async function readJsonObject(
     throw inputError("invalid_json", "Request body must be valid JSON");
   }
   return inputObjectSchema.parse(value);
+}
+
+/**
+ * The body as text, refused the moment it passes the cap. A chunked body
+ * declares no length, so `Content-Length` cannot be the gate: reading the
+ * whole request into a string before measuring it is what let one caller
+ * hold gigabytes of heap per request.
+ */
+async function readBodyWithinCap(context: Context, maxInputBytes: number): Promise<string> {
+  const body = context.req.raw.body;
+  if (!body || context.req.raw.bodyUsed) {
+    const buffered = await context.req.text();
+    if (new TextEncoder().encode(buffered).byteLength > maxInputBytes) {
+      throw inputError("request_too_large", "Request body exceeds the configured size limit");
+    }
+    return buffered;
+  }
+
+  const drained = await drainWithinCap(body, maxInputBytes);
+  if (!drained) {
+    throw inputError("request_too_large", "Request body exceeds the configured size limit");
+  }
+  return new TextDecoder().decode(drained);
 }
 
 function readQueryObject(context: Context): Record<string, unknown> {

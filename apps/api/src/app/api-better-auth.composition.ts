@@ -13,6 +13,7 @@ import {
   type SignUpVerificationPort,
 } from "@langwatch/auth-server";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
+import type { LicensingService } from "@langwatch/enterprise-licensing-contract";
 import type { RoutingDecision, SignInMethodPolicy } from "@langwatch/identity-contract";
 import { sendResetPasswordEmail } from "@langwatch/mail";
 import { resolveSignInMethodPolicy } from "@langwatch/identity-server";
@@ -62,11 +63,11 @@ import type { ApiMailComposition } from "./api-mail.composition";
  *    zero-footprint path: it returns having read nothing, computed nothing and
  *    logged nothing.
  *
- * And one refusal that is a decision rather than a gap: this process composes
- * no licensing store, so {@link ApiBetterAuthFederation} answers that
- * federation is not licensed — the same answer the identity half of the tRPC
- * record already gives, from the same reasoning. Reporting a federated mode a
- * process cannot serve would send a person to a door that does not open.
+ * And the licence: {@link ApiBetterAuthFederation} answers from the licensing
+ * service it is GIVEN, so a licensed install is told it is licensed. A
+ * deployment supplying none keeps the unlicensed answer and warns at boot, so
+ * "federation is off" is a reported decision rather than a constant nobody
+ * can see.
  */
 
 /**
@@ -92,21 +93,21 @@ export class ApiPrismaBetterAuthStorage extends BetterAuthStoragePort {
 }
 
 /**
- * ADR-027 on a process that composes no licensing store.
- *
- * `federationCapable` follows the deployment's named provider, so an
- * email-mode install leaves every route untouched exactly as it always did.
- * The licence questions both answer "not licensed", which is not a degraded
- * guess: a licence is what unlocks a federated door, and this process has
- * nowhere to read one from. The consequence is stated so it is not mistaken
- * for a bug — `ssoDomain` auto-join and every `ssoDomain` enforcement are off
- * here, which is the same posture the tRPC identity half already takes.
+ * ADR-027's licence questions, answered from the licence this deployment
+ * holds. `federationLicensed` is the same question the Enterprise SSO gate
+ * asks — is any signed platform licence valid — and it decides both whether
+ * SSO is refused AND whether the credential doors stay open: held to `false`,
+ * a licensed install refused its own SSO and left `/sign-up/email` mounted.
  */
 export class ApiBetterAuthFederation extends BetterAuthFederationPort {
+  private licensed: Promise<boolean> | null = null;
+
   static create(options: {
     authProvider: string | undefined;
     passkeysEnabled: boolean;
     isSaas: boolean;
+    licensing: LicensingService | undefined;
+    logger: Logger;
   }): ApiBetterAuthFederation {
     return new ApiBetterAuthFederation(options);
   }
@@ -116,6 +117,8 @@ export class ApiBetterAuthFederation extends BetterAuthFederationPort {
       authProvider: string | undefined;
       passkeysEnabled: boolean;
       isSaas: boolean;
+      licensing: LicensingService | undefined;
+      logger: Logger;
     },
   ) {
     super();
@@ -129,7 +132,7 @@ export class ApiBetterAuthFederation extends BetterAuthFederationPort {
   resolveSignInMethodPolicy(): Promise<SignInMethodPolicy> {
     return resolveSignInMethodPolicy({
       resolveAuthProvider: () => Promise.resolve(this.deployment.authProvider ?? "email"),
-      federationLicensed: () => Promise.resolve(false),
+      federationLicensed: () => this.federationLicensed(),
       offersPasskeys: () => this.deployment.passkeysEnabled,
       selfHosted: () => !this.deployment.isSaas,
     });
@@ -137,6 +140,32 @@ export class ApiBetterAuthFederation extends BetterAuthFederationPort {
 
   platformSsoAllowed(): Promise<boolean> {
     return Promise.resolve(false);
+  }
+
+  /**
+   * The hosted product is licensed by definition; a self-hosted install is
+   * licensed when a signed licence inspects valid. No licensing store answers
+   * no — `composeApiBetterAuth` says so at boot — and an unreachable one
+   * denies this request and retries on the next.
+   */
+  private federationLicensed(): Promise<boolean> {
+    if (this.deployment.isSaas) return Promise.resolve(true);
+
+    const licensing = this.deployment.licensing;
+    if (!licensing) return Promise.resolve(false);
+
+    this.licensed ??= licensing
+      .inspectPlatformAccess({})
+      .then((access) => access.allowed)
+      .catch((error: unknown) => {
+        this.licensed = null;
+        this.deployment.logger.warn(
+          { error },
+          "Enterprise licence inspection failed: federation reports unlicensed for this request and retries on the next",
+        );
+        return false;
+      });
+    return this.licensed;
   }
 }
 
@@ -368,8 +397,8 @@ export class AbsentApiSignUpVerification implements SignUpVerificationPort {
 /**
  * Nothing to write a grant with.
  *
- * Reached only from the SSO domain auto-join, which runs only when the licence
- * gate allows federation — and {@link ApiBetterAuthFederation} answers that it
+ * Reached only from the SSO domain auto-join, which runs only when
+ * {@link ApiBetterAuthFederation} allows platform SSO — and it answers that it
  * does not. Refuses rather than silently skipping, because a membership
  * written with no grant beside it is a person who is "in the organization" to
  * legacy code and has zero access under authorization.
@@ -401,6 +430,11 @@ export type ApiBetterAuthCompositionOptions = Readonly<{
   authProvider: string | undefined;
   /** Whether this is the hosted product rather than a self-hosted install. */
   isSaas: boolean;
+  /**
+   * The licence federation is gated on. Absent, this process answers that
+   * federation is not licensed and says so once at boot.
+   */
+  licensing?: LicensingService | undefined;
   /** The grant ledger an SSO domain auto-join writes its membership through. */
   authzGrants?: AuthzGrantsService | undefined;
   /** The gateway a password-reset link leaves through. */
@@ -419,6 +453,12 @@ export type ApiBetterAuthCompositionOptions = Readonly<{
  */
 export function composeApiBetterAuth(options: ApiBetterAuthCompositionOptions) {
   const { configuration, logger } = options;
+
+  if (!options.licensing) {
+    logger.warn(
+      "Better Auth composed no licensing store: federation reports unlicensed on this process, so single sign-on stays refused whatever licence this deployment holds",
+    );
+  }
 
   return createBetterAuthTransport({
     auth: options.auth,
@@ -448,6 +488,8 @@ export function composeApiBetterAuth(options: ApiBetterAuthCompositionOptions) {
       authProvider: options.authProvider,
       passkeysEnabled: configuration.passkeysEnabled,
       isSaas: options.isSaas,
+      licensing: options.licensing,
+      logger,
     }),
     identity: AbsentApiBetterAuthIdentityCeremonies.create(),
     invites: AbsentApiBetterAuthPendingInvites.create(logger),
