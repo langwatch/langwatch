@@ -10,7 +10,10 @@
  * - clicking a value emits exactly one top-level
  *   `event.attribute.event.metrics.<key>` toggle — never a group mutation
  *   (the cross-event AND collision is a documented, accepted limitation);
- * - values are rendered verbatim as stored ("1", "-1"), never reformatted;
+ * - a predefined event's opaque codes read as words ("-1" shows as "thumbs
+ *   down") while the click still emits the stored string; every metric
+ *   without a human name shows exactly what ingest wrote;
+ * - an event carrying no metrics renders nothing to expand into;
  * - active values read their include/exclude state from the AST.
  */
 
@@ -150,6 +153,36 @@ describe("EventDrilldown", () => {
       expect(
         screen.getByRole("button", { name: "stars 1 — click to filter" }),
       ).toBeInTheDocument();
+    });
+  });
+
+  describe("given an event type carrying no metrics", () => {
+    /** @scenario "An event type with no metrics shows no drilldown affordance" */
+    it("renders nothing to expand into", () => {
+      // Two shapes reach here. The server omits `eventMetrics` entirely for an
+      // event with no `event.metrics.*` attributes, which is what suppresses
+      // the chevron in SectionRenderer. The empty array is the shape no
+      // endpoint currently emits — guarded anyway so a future payload change
+      // cannot produce a chevron that expands into a blank strip.
+      for (const eventMetrics of [undefined, []]) {
+        const { container, unmount } = render(
+          <ChakraProvider value={defaultSystem}>
+            <EventDrilldown
+              item={{
+                value: "custom_marker",
+                label: "custom_marker",
+                count: 3,
+                eventMetrics,
+              }}
+              ast={EMPTY_AST}
+              toggleFacet={vi.fn()}
+            />
+          </ChakraProvider>,
+        );
+
+        expect(container).toBeEmptyDOMElement();
+        unmount();
+      }
     });
   });
 

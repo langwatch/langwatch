@@ -1996,6 +1996,7 @@ Rule: Event rows drill down into their metric values
   # independent trace-scoped subqueries — they may match different events in
   # the same trace. Same-event pairing would need new filter grammar and is
   # out of scope here.
+  @integration @unimplemented
   Scenario: The drilldown filter is trace-scoped, not same-event-scoped
     Given a trace has a "thumbs_up_down" event with vote "1" and another event with vote "-1"
     When the user clicks the vote value "-1" in the thumbs_up_down drilldown
