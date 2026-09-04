@@ -333,8 +333,32 @@ test.describe("browser product journey", () => {
   test("reads the run verdict and finds the run plan on the Results tab", async () => {
     test.skip(!OPENAI_API_KEY, NO_KEY);
 
+    // A lane restart while the run is judged leaves the tab on "Couldn't load
+    // your workspace" and the drawer gone, so the walk reloads and reopens the
+    // run from the Results tab, which is where a person would look for it.
     const verdict = page.getByTestId("run-verdict-panel").or(page.getByTestId("run-verdict-error"));
-    await verdict.first().waitFor({ state: "visible", timeout: 300000 });
+    const stalled = page.getByRole("heading", { name: /couldn't load your workspace/i });
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const seen = await verdict
+        .first()
+        .waitFor({ state: "visible", timeout: 60000 })
+        .then(() => true)
+        .catch(() => false);
+      if (seen) break;
+      if (
+        (await stalled.isVisible().catch(() => false)) ||
+        !(await page.getByTestId("agent-testing-run-drawer").isVisible().catch(() => false))
+      ) {
+        await visit(`/${projectSlug}/agent-testing/results`);
+        await page
+          .getByTestId("agent-testing-run-plans")
+          .getByText(SCENARIO_TITLE)
+          .first()
+          .click()
+          .catch(() => undefined);
+      }
+    }
+    await verdict.first().waitFor({ state: "visible", timeout: 60000 });
     await expect(page.getByTestId("agent-testing-run-drawer")).toContainText(ECHO_AGENT_REPLY, {
       timeout: 60000,
     });
