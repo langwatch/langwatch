@@ -27,6 +27,7 @@ import {
   dashboardWidgetQuerySchema,
 } from "~/server/analytics/dashboardWidgetDefinition";
 
+import { enforceCustomChartPlaygroundEnabled } from "../dashboardWidgetAccessMiddleware";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const layoutSchema = z.object({
@@ -49,6 +50,7 @@ export const dashboardWidgetsRouter = createTRPCRouter({
   list: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .permission("analytics:view")
+    .use(enforceCustomChartPlaygroundEnabled)
     .query(async ({ ctx, input }) => {
       return await ctx.prisma.customGraph.findMany({
         where: {
@@ -70,6 +72,7 @@ export const dashboardWidgetsRouter = createTRPCRouter({
       }),
     )
     .permission("analytics:create")
+    .use(enforceCustomChartPlaygroundEnabled)
     .mutation(async ({ ctx, input }) => {
       // Next free row: one below the lowest dashboard widget in the project.
       const last = await ctx.prisma.customGraph.findFirst({
@@ -108,6 +111,7 @@ export const dashboardWidgetsRouter = createTRPCRouter({
       }),
     )
     .permission("analytics:update")
+    .use(enforceCustomChartPlaygroundEnabled)
     .mutation(async ({ ctx, input }) => {
       await ctx.prisma.customGraph.updateMany({
         where: {
@@ -130,6 +134,7 @@ export const dashboardWidgetsRouter = createTRPCRouter({
         .merge(layoutSchema),
     )
     .permission("analytics:update")
+    .use(enforceCustomChartPlaygroundEnabled)
     .mutation(async ({ ctx, input }) => {
       await ctx.prisma.customGraph.updateMany({
         where: {
@@ -155,6 +160,7 @@ export const dashboardWidgetsRouter = createTRPCRouter({
       }),
     )
     .permission("analytics:update")
+    .use(enforceCustomChartPlaygroundEnabled)
     .mutation(async ({ ctx, input }) => {
       await ctx.prisma.$transaction(
         input.layouts.map((layout) =>
@@ -185,6 +191,7 @@ export const dashboardWidgetsRouter = createTRPCRouter({
       }),
     )
     .permission("analytics:update")
+    .use(enforceCustomChartPlaygroundEnabled)
     .mutation(async ({ ctx, input }) => {
       await DashboardWidgetService.create(ctx.prisma).assignToDashboard({
         id: input.id,
@@ -197,6 +204,7 @@ export const dashboardWidgetsRouter = createTRPCRouter({
   delete: protectedProcedure
     .input(z.object({ projectId: z.string(), id: z.string() }))
     .permission("analytics:delete")
+    .use(enforceCustomChartPlaygroundEnabled)
     .mutation(async ({ ctx, input }) => {
       await ctx.prisma.customGraph.deleteMany({
         where: {
