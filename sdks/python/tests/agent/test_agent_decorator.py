@@ -4,6 +4,7 @@
 # See specs/python-sdk/agent-decorator.feature
 
 import asyncio
+import builtins
 import logging
 import subprocess
 import sys
@@ -254,28 +255,29 @@ def test_call_reads_the_scenario_input_shape():
 
 
 # @scenario "The decorated function is accepted as the agent under test"
-def test_scenario_executor_picks_the_connected_agent_for_the_agent_role():
-    from scenario.scenario_executor import ScenarioExecutor
-    from scenario.types import AgentRole
+def test_scenario_run_accepts_the_connected_agent_as_the_agent_under_test():
+    import scenario
 
     @connect_agent(name="under-test")
     def agent(messages) -> str:
-        return "reply"
+        return f"answered {messages[-1]['content']}"
 
-    executor = ScenarioExecutor(
-        name="connected agent under test",
-        description="the decorated function answers the user simulator",
-        agents=[agent],
+    result = run(
+        scenario.run(
+            name="connected agent under test",
+            description="the decorated function answers the user",
+            # The simulator is there to own the user role. Every message is
+            # scripted, so its model is declared but never called.
+            agents=[agent, scenario.UserSimulatorAgent(model="openai/gpt-5-mini")],
+            script=[scenario.user("hello"), scenario.agent(), scenario.succeed()],
+        )
     )
-    executor._pending_agents_on_turn = set(executor.agents)
-    executor._pending_roles_on_turn = [
-        AgentRole.USER,
-        AgentRole.AGENT,
-        AgentRole.JUDGE,
-    ]
 
-    assert executor._next_agent_for_role(AgentRole.AGENT) == (0, agent)
-    assert executor._next_agent_for_role(AgentRole.USER) == (-1, None)
+    assert result.success
+    assert [(m["role"], m["content"]) for m in result.messages] == [
+        ("user", "hello"),
+        ("assistant", "answered hello"),
+    ]
 
 
 def test_role_is_the_scenario_enum_member():
@@ -290,10 +292,10 @@ def test_role_is_the_scenario_enum_member():
     assert agent.role != AgentRole.AGENT.value
 
 
-def test_importing_the_sdk_never_imports_the_scenario_package():
+def test_importing_the_decorator_never_imports_the_scenario_package():
     """The scenario package is optional, so the role resolves it lazily."""
     probe = (
-        "import sys, langwatch;"
+        "import sys;"
         " from langwatch.agent import decorator;"
         " assert 'scenario' not in sys.modules, sorted("
         "     m for m in sys.modules if m.startswith('scenario'))"
@@ -301,6 +303,49 @@ def test_importing_the_sdk_never_imports_the_scenario_package():
     done = subprocess.run([sys.executable, "-c", probe], capture_output=True, text=True)
 
     assert done.returncode == 0, done.stderr
+
+
+def break_the_scenario_import(monkeypatch, *, missing: str) -> None:
+    """Fail every scenario import, reporting `missing` as the absent module."""
+    real_import = builtins.__import__
+
+    def fake_import(module, *args, **kwargs):
+        if module.split(".")[0] == "scenario":
+            raise ModuleNotFoundError(f"No module named '{missing}'", name=missing)
+        return real_import(module, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+
+
+def test_role_falls_back_when_the_scenario_package_is_not_installed(monkeypatch):
+    @connect_agent(name="no-scenario")
+    def agent(messages) -> str:
+        return "reply"
+
+    break_the_scenario_import(monkeypatch, missing="scenario")
+
+    assert agent.role == "Agent"
+
+
+def test_role_raises_when_scenario_is_installed_but_one_of_its_imports_fails(
+    monkeypatch,
+):
+    """Only an absent scenario package falls back; a broken install is raised.
+
+    Swallowing this would hand the executor the string value, which never
+    matches AgentRole.AGENT, and the run would fail somewhere else entirely.
+    """
+
+    @connect_agent(name="broken-scenario")
+    def agent(messages) -> str:
+        return "reply"
+
+    break_the_scenario_import(monkeypatch, missing="litellm")
+
+    with pytest.raises(ModuleNotFoundError) as raised:
+        agent.role
+
+    assert raised.value.name == "litellm"
 
 
 def test_call_accepts_a_dict_input():
