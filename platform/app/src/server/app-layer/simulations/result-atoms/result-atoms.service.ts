@@ -8,11 +8,13 @@ import {
   parseRunParametersJson,
   type RunParameterValues,
 } from "~/server/scenarios/parameters";
+import { columnsToEvaluations } from "~/server/simulations/simulation-evaluations.columns";
 import { mapStatus } from "~/server/simulations/simulation-run.mappers";
 import { extractSuiteId, getSuiteSetId } from "~/server/suites/suite-set-id";
 import type {
   AtomCost,
   AtomCostSource,
+  AtomEvaluation,
   AtomOutcome,
   CodeScenario,
   ResultAtom,
@@ -404,11 +406,33 @@ function toAtom({
     targetName: row.TargetName === "" ? null : row.TargetName,
     status: mapStatus(row.Status),
     outcome: row.Outcome as AtomOutcome,
+    evaluations: atomEvaluationsOf(row),
     durationMs: row.DurationMs === "" ? null : Number(row.DurationMs),
     // '' is the one value that means "never measured". Zero is a real answer.
     costUsd: row.CostUsd === "" ? null : Number(row.CostUsd),
     costSource,
   };
+}
+
+/** The evaluator results an atom row carries, without the prose. */
+function atomEvaluationsOf(row: RawAtomRow): AtomEvaluation[] {
+  return columnsToEvaluations({
+    "Evaluations.EvaluatorId": row.EvaluationIds ?? [],
+    "Evaluations.Name": row.EvaluationNames ?? [],
+    "Evaluations.Status": row.EvaluationStatuses ?? [],
+    "Evaluations.Required": row.EvaluationRequired ?? [],
+    "Evaluations.Passed": row.EvaluationPassed ?? [],
+    "Evaluations.Score": row.EvaluationScores ?? [],
+    "Evaluations.Label": row.EvaluationLabels ?? [],
+  }).map((evaluation) => ({
+    evaluatorId: evaluation.evaluatorId,
+    name: evaluation.name,
+    status: evaluation.status,
+    required: evaluation.required,
+    passed: evaluation.passed ?? null,
+    score: evaluation.score ?? null,
+    label: evaluation.label ?? null,
+  }));
 }
 
 function toGroup({

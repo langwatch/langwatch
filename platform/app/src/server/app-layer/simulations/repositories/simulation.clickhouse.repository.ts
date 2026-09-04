@@ -17,6 +17,10 @@ import type {
   ScenarioSetData,
 } from "~/server/scenarios/scenario-event.types";
 import {
+  EVALUATION_COLUMNS_SQL,
+  EVALUATION_LIST_COLUMNS_SQL,
+} from "~/server/simulations/simulation-evaluations.columns";
+import {
   type ClickHouseSimulationRunRow,
   mapClickHouseRowToScenarioRunData,
   mapStatus,
@@ -389,6 +393,7 @@ const RUN_COLUMNS = `
   \`Messages.TraceId\`, \`Messages.Rest\`,
   TraceIds,
   Verdict, Reasoning, MetCriteria, UnmetCriteria, Error,
+  ${EVALUATION_COLUMNS_SQL},
   toString(DurationMs) AS DurationMs,
   TotalCost, RoleCosts, RoleLatencies,
   toString(toUnixTimestamp64Milli(StartedAt)) AS StartedAt,
@@ -426,6 +431,7 @@ const LIST_COLUMNS = `
   CAST(NULL AS Nullable(String)) AS Reasoning,
   MetCriteria, UnmetCriteria,
   CAST(NULL AS Nullable(String)) AS Error,
+  ${EVALUATION_LIST_COLUMNS_SQL},
   toString(DurationMs) AS DurationMs,
   TotalCost, RoleCosts, RoleLatencies,
   toString(toUnixTimestamp64Milli(StartedAt)) AS StartedAt,

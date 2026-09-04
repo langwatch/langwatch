@@ -9,6 +9,7 @@ import type {
   BatchSummary,
   ScenarioRunData,
 } from "~/server/scenarios/scenario-event.types";
+import { scenarioEvaluationResultSchema } from "~/server/scenarios/schemas/event-schemas";
 import { readTestingInterface } from "~/server/suites/platform-path";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { baseResponses } from "../../shared/base-responses";
@@ -32,6 +33,12 @@ const scenarioRunResponseSchema = z.object({
       metCriteria: z.array(z.string()).optional(),
       unmetCriteria: z.array(z.string()).optional(),
       error: z.string().nullable().optional(),
+      evaluations: z
+        .array(scenarioEvaluationResultSchema)
+        .optional()
+        .describe(
+          "One result per evaluator that ran on the scenario. Absent on a run with no evaluators, and on servers that predate evaluators.",
+        ),
     })
     .nullable(),
   messages: z.array(

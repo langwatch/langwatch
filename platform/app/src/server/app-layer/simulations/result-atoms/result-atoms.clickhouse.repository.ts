@@ -58,6 +58,14 @@ export interface RawAtomRow {
   CostUsd: string;
   CostSource: string;
   SortKey: string;
+  /** The evaluator results, one entry per evaluator, as parallel arrays. */
+  EvaluationIds: string[];
+  EvaluationNames: string[];
+  EvaluationStatuses: string[];
+  EvaluationRequired: number[];
+  EvaluationPassed: (number | null)[];
+  EvaluationScores: (number | null)[];
+  EvaluationLabels: string[];
 }
 
 /** One run of one plan, with the position that gives it its number. */
@@ -228,7 +236,14 @@ export class ResultAtomsClickHouseRepository {
          ${TRIGGER_EXPR} AS Trigger,
          ${COST_VALUE_EXPR} AS CostUsd,
          ${COST_SOURCE_EXPR} AS CostSource,
-         toString(${ATOM_SORT_KEY}) AS SortKey
+         toString(${ATOM_SORT_KEY}) AS SortKey,
+         \`Evaluations.EvaluatorId\` AS EvaluationIds,
+         \`Evaluations.Name\` AS EvaluationNames,
+         \`Evaluations.Status\` AS EvaluationStatuses,
+         \`Evaluations.Required\` AS EvaluationRequired,
+         \`Evaluations.Passed\` AS EvaluationPassed,
+         \`Evaluations.Score\` AS EvaluationScores,
+         \`Evaluations.Label\` AS EvaluationLabels
        ${atomScopeSql(filters)}
          ${cursorPredicate}
        ORDER BY ${ATOM_SORT_KEY} DESC, ScenarioRunId DESC

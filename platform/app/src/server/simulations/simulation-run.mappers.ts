@@ -1,5 +1,9 @@
 import { ScenarioRunStatus, Verdict } from "../scenarios/scenario-event.enums";
 import type { ScenarioRunData } from "../scenarios/scenario-event.types";
+import {
+  type ClickHouseEvaluationColumns,
+  columnsToEvaluations,
+} from "./simulation-evaluations.columns";
 
 type ScenarioMessages = ScenarioRunData["messages"];
 
@@ -9,7 +13,8 @@ type ScenarioMessages = ScenarioRunData["messages"];
  * Timestamp columns are returned as Unix milliseconds via toUnixTimestamp64Milli().
  * Messages are stored as parallel Nested arrays (Messages.id, Messages.role, etc.).
  */
-export interface ClickHouseSimulationRunRow {
+export interface ClickHouseSimulationRunRow
+  extends Partial<ClickHouseEvaluationColumns> {
   ScenarioRunId: string;
   ScenarioId: string;
   BatchRunId: string;
@@ -152,6 +157,7 @@ export function mapClickHouseRowToScenarioRunData(
 
   const metCriteria = row.MetCriteria ?? [];
   const unmetCriteria = row.UnmetCriteria ?? [];
+  const evaluations = columnsToEvaluations(row);
 
   const results =
     verdictEnum != null
@@ -161,6 +167,7 @@ export function mapClickHouseRowToScenarioRunData(
           metCriteria,
           unmetCriteria,
           error: row.Error ?? undefined,
+          ...(evaluations.length > 0 && { evaluations }),
         }
       : null;
 
