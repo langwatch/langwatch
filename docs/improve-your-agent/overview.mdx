@@ -26,7 +26,7 @@ Repeat from step 3, and put the suite in CI so a later change cannot undo the ga
 
 ## Where the changes come from
 
-The hypotheses come out of the last run, and reading it is not your job. When a criterion failed, the judge's reasoning quotes the turn where it happened and the trace of that turn shows what the agent saw and did; when a scenario passed but took ten turns, the conversation usually shows the same tool called twice in a row. Two engines do that reading and propose the change for you:
+The hypotheses come out of the last run. When a criterion failed, the judge's reasoning quotes the turn where it happened and the trace of that turn shows what the agent saw and did; when a scenario passed but took ten turns, the conversation usually shows the same tool called twice in a row. Two engines read that and propose the change:
 
 - **Guided.** Langy, or your own coding agent with the LangWatch skills, reads the results and the traces, proposes one change and opens it as a pull request. The suite then runs in your CI on that pull request, so you review the diff and the result together. See [Prompt optimization with Langy](/langy/prompt-optimization) for the prompt case.
 - **Algorithmic.** A DSPy optimizer rewrites the instructions and the tool descriptions and scores every candidate by running the suite, and GEPA also feeds the judge's reasoning back in as the feedback for the next candidate. See [Optimize with DSPy](/improve-your-agent/optimize-with-dspy).

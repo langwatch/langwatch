@@ -237,7 +237,7 @@ GEPA, from the judge's reasoning and the tool errors in the feedback, on its fir
      - "wrong item", "received the wrong product" -> "incorrect_item"
 ```
 
-That is the same tool description fix as in [Fix tool calls](/improve-your-agent/fix-tool-calls), found by search instead of by reading the trace yourself. On both runs the damaged blender return went from failed to passed and from 5 steps to 4.
+That is the same tool description fix as in [Fix tool calls](/improve-your-agent/fix-tool-calls), found by search. On both runs the damaged blender return went from failed to passed and from 5 steps to 4.
 
 The scenario where the customer asks for a recipe failed before and after on both runs: the agent answers the recipe instead of saying it only helps with orders, and no candidate instruction changed that. On the MIPROv2 run the angry customer passed before and failed after, and the 83% of the best trial did not repeat on the final pass, which is the non-determinism described in the Limits below.
 

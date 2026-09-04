@@ -7,8 +7,6 @@ description: Find out why your agent is taking ten turns for a basic task, chang
 
 A turn is one reply from your agent, and behind each reply there are one or more model calls, since every tool call is a model call too. So when a tool rejects a call and your agent retries it, you pay for another model call even though the reply count stays at one, and this guide counts both.
 
-The digging is not yours to do: you wire the suite up, run the commands below, and Langy or your coding agent reads the run, tells you the cause and proposes the change for you to review.
-
 ## What you need
 
 - Your agent [connected to LangWatch](/agent-testing/connect-your-agent), so the suite runs against your real code and the judge reads your traces.
@@ -32,7 +30,7 @@ The command prints the batch id, and the run header in LangWatch shows the pass 
 
 ## Step 2: Get a hypothesis and one change
 
-You do not go through the conversations yourself. Ask Langy, or your coding agent, to read the run and come back with the cause and a change:
+Ask Langy, or your coding agent, to read the run and come back with the cause and a change:
 
 <Tabs>
   <Tab title="Langy">
@@ -105,7 +103,7 @@ Run the suite on every pull request that touches the agent, so a later change ca
 langwatch test-suite run "Returns" --target connected:returns-agent@staging --wait
 ```
 
-The command exits 1 when a scenario fails. `--wait` gives up after ten minutes, and a suite with repeats can take longer than that, so poll the batch yourself for those: see [Run from CI](/agent-testing/run-from-ci).
+The command exits 1 when a scenario fails. `--wait` gives up after ten minutes, and a suite with repeats can take longer than that, so poll the batch for those: see [Run from CI](/agent-testing/run-from-ci).
 
 ## Common failures
 

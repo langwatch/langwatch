@@ -7,8 +7,6 @@ description: Catch a tool your agent calls wrong or retries, get the tool contra
 
 A tool call goes wrong in two ways: your agent calls the wrong tool, or it calls the right tool with arguments the tool rejects. The second is the common one, and it is silent, because the agent retries with new wording until the call succeeds and the conversation still ends well; the only signs of the problem are the failed calls in the trace and the extra model calls they cost.
 
-Finding those calls and fixing the contract is work for Langy or your coding agent; your part is the suite, the criteria that catch the retries, and the review of the change.
-
 ## How a bad tool call shows up
 
 - **As a failed criterion.** The judge reads your agent's traces, so a criterion such as `The agent creates the return` fails when the call never succeeded, and the judge's reasoning tells you which tool and which error.
