@@ -29,8 +29,8 @@ import {
 import { EventDrilldown } from "../EventDrilldown";
 import type { FacetItem } from "../types";
 
-const buildItem = (
-  eventMetrics: FacetItem["eventMetrics"] = [
+const buildItem = ({
+  eventMetrics = [
     {
       key: "event.metrics.vote",
       values: [
@@ -39,7 +39,9 @@ const buildItem = (
       ],
     },
   ],
-): FacetItem => ({
+}: {
+  eventMetrics?: FacetItem["eventMetrics"];
+} = {}): FacetItem => ({
   value: "thumbs_up_down",
   label: "thumbs_up_down",
   count: 15,
@@ -71,7 +73,6 @@ describe("EventDrilldown", () => {
       expect(screen.getByText("thumbs down")).toBeInTheDocument();
       expect(screen.getByText("12")).toBeInTheDocument();
       expect(screen.getByText("3")).toBeInTheDocument();
-      // The bare codes never reach the user.
       expect(screen.queryByText("-1")).not.toBeInTheDocument();
     });
 
@@ -139,73 +140,91 @@ describe("EventDrilldown", () => {
   });
 
   describe("given two metric groups that share a stored value", () => {
-    it("qualifies each value with its metric key so the names stay distinct", () => {
-      renderDrilldown({
-        item: buildItem([
-          { key: "event.metrics.rating", values: [{ value: "1", count: 2 }] },
-          { key: "event.metrics.stars", values: [{ value: "1", count: 4 }] },
-        ]),
-      });
+    describe("when the drilldown renders", () => {
+      it("qualifies each value with its metric key so the names stay distinct", () => {
+        renderDrilldown({
+          item: buildItem({
+            eventMetrics: [
+              {
+                key: "event.metrics.rating",
+                values: [{ value: "1", count: 2 }],
+              },
+              {
+                key: "event.metrics.stars",
+                values: [{ value: "1", count: 4 }],
+              },
+            ],
+          }),
+        });
 
-      expect(
-        screen.getByRole("button", { name: "rating 1 — click to filter" }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: "stars 1 — click to filter" }),
-      ).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: "rating 1 — click to filter" }),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: "stars 1 — click to filter" }),
+        ).toBeInTheDocument();
+      });
     });
   });
 
   describe("given an event type carrying no metrics", () => {
-    /** @scenario "An event type with no metrics shows no drilldown affordance" */
-    it("renders nothing to expand into", () => {
-      // Two shapes reach here. The server omits `eventMetrics` entirely for an
-      // event with no `event.metrics.*` attributes, which is what suppresses
-      // the chevron in SectionRenderer. The empty array is the shape no
-      // endpoint currently emits — guarded anyway so a future payload change
-      // cannot produce a chevron that expands into a blank strip.
-      for (const eventMetrics of [undefined, []]) {
-        const { container, unmount } = render(
-          <ChakraProvider value={defaultSystem}>
-            <EventDrilldown
-              item={{
-                value: "custom_marker",
-                label: "custom_marker",
-                count: 3,
-                eventMetrics,
-              }}
-              ast={EMPTY_AST}
-              toggleFacet={vi.fn()}
-            />
-          </ChakraProvider>,
-        );
+    describe("when the drilldown renders", () => {
+      /** @scenario "An event type with no metrics shows no drilldown affordance" */
+      it("renders nothing to expand into", () => {
+        // Two shapes reach here. The server omits `eventMetrics` entirely for
+        // an event with no `event.metrics.*` attributes, which is what
+        // suppresses the chevron in SectionRenderer. The empty array is the
+        // shape no endpoint currently emits — guarded anyway so a future
+        // payload change cannot produce a chevron expanding into a blank strip.
+        for (const eventMetrics of [undefined, []]) {
+          const { container, unmount } = render(
+            <ChakraProvider value={defaultSystem}>
+              <EventDrilldown
+                item={{
+                  value: "custom_marker",
+                  label: "custom_marker",
+                  count: 3,
+                  eventMetrics,
+                }}
+                ast={EMPTY_AST}
+                toggleFacet={vi.fn()}
+              />
+            </ChakraProvider>,
+          );
 
-        expect(container).toBeEmptyDOMElement();
-        unmount();
-      }
+          expect(container).toBeEmptyDOMElement();
+          unmount();
+        }
+      });
     });
   });
 
   describe("given an event whose metric has no human name", () => {
-    /** @scenario "A metric with no human name shows its stored value" */
-    it("shows the stored value", () => {
-      // Metric values are numbers on every path — `eventSchema.metrics` is a
-      // record of string to number — so the unlabelled case is a decimal, not
-      // some free-form string. Ingest rejects a string with a 400.
-      renderDrilldown({
-        item: {
-          value: "checkout_survey",
-          label: "checkout_survey",
-          count: 1,
-          eventMetrics: [
-            { key: "event.metrics.stars", values: [{ value: "4", count: 1 }] },
-          ],
-        },
-      });
+    describe("when the drilldown renders", () => {
+      /** @scenario "A metric with no human name shows its stored value" */
+      it("shows the stored value", () => {
+        // Metric values are numbers on every path — `eventSchema.metrics` is a
+        // record of string to number — so the unlabelled case is a decimal,
+        // not some free-form string. Ingest rejects a string with a 400.
+        renderDrilldown({
+          item: {
+            value: "checkout_survey",
+            label: "checkout_survey",
+            count: 1,
+            eventMetrics: [
+              {
+                key: "event.metrics.stars",
+                values: [{ value: "4", count: 1 }],
+              },
+            ],
+          },
+        });
 
-      expect(
-        screen.getByRole("button", { name: "stars 4 — click to filter" }),
-      ).toBeInTheDocument();
+        expect(screen.getByText("4")).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: "stars 4 — click to filter" }),
+        ).toBeInTheDocument();
+      });
     });
   });
 });

@@ -23,9 +23,14 @@ export const EVENT_METRICS_PREFIX = "event.metrics.";
 /**
  * Composite-key separator for the metric buckets: `sumMap` needs scalar keys,
  * so (metric key, stored value) pairs are joined with the ASCII unit
- * separator (0x1F) — a control char that can't appear in either half. The
- * SQL emits it via `char(31)`; the repository's facet-row mapper splits on
- * this constant.
+ * separator (0x1F). The SQL emits it via `char(31)`; the repository's
+ * facet-row mapper splits on this constant.
+ *
+ * The value half can never contain it — metric values are numbers everywhere
+ * (`eventSchema.metrics` is a record of string to number), so they stringify
+ * to decimals. The key half is an unconstrained string, so a caller can send
+ * one carrying 0x1F; that bucket is ambiguous and the mapper drops it rather
+ * than showing a row split in the wrong place.
  */
 export const EVENT_METRIC_SEP = String.fromCharCode(31);
 

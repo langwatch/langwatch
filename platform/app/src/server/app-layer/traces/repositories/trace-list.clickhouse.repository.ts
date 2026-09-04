@@ -1251,7 +1251,11 @@ function extractEventMetrics(r: FacetRow): {
     if (sep <= 0) continue; // malformed bucket — no separator or empty key
     const key = composite.slice(0, sep);
     const value = composite.slice(sep + EVENT_METRIC_SEP.length);
-    if (value === "") continue;
+    // A second separator means the metric key itself carried one. Metric keys
+    // are unconstrained strings, so nothing stops a caller sending one with an
+    // embedded 0x1F, and the split point is then a guess. Drop the bucket
+    // rather than render a row whose key and value are both wrong.
+    if (value === "" || value.includes(EVENT_METRIC_SEP)) continue;
     let list = byKey.get(key);
     if (!list) {
       list = [];
