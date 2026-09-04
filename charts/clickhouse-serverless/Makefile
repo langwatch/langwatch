@@ -3,7 +3,7 @@ NAMESPACE := ch-test
 CH_IMAGE  := langwatch/clickhouse-serverless:next
 CH_DIR    := ../../infra/clickhouse-serverless
 
-.PHONY: lint template test-e2e test-upgrade test clean images
+.PHONY: lint template test-e2e test-upgrade test-transition-guard test clean images
 
 ## Build the clickhouse-serverless Docker image
 images:
@@ -33,6 +33,12 @@ test-e2e:
 ## See tests/upgrade-access.sh for exit codes and the full env contract.
 test-upgrade:
 	bash tests/upgrade-access.sh
+
+## Transition-guard harness: AC11-D — replicas 1→3 transition is blocked.
+## Hand-run test (requires kind/docker/eks). Not part of `make test` or CI.
+## See tests/ac11d-transition-guard.sh for detailed AC coverage.
+test-transition-guard:
+	bash tests/ac11d-transition-guard.sh
 
 ## Run all tests
 test: template test-e2e

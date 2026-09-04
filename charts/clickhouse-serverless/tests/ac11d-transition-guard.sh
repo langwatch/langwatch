@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # AC11-D — the chart blocks the unsupported replicas:1 -> replicas:3 transition.
 #
-# Plan authority: /tmp/1168-draft3-comment.md line 134. The AC is falsifiable by
+# Plan authority: https://github.com/langwatch/langwatch-saas/issues/1168 (AC6, replicas 1→3 transition).
+# The AC is falsifiable by
 # command, which is why it was chosen over a docs branch:
 #
 #   (a) `helm upgrade --set replicas=3` against a release installed at
