@@ -84,7 +84,7 @@ import {
   DEFAULT_POSTGRES_READER_LIMITS,
   postgresNamedCollectionStatements,
   postgresReaderRoleStatements,
-} from "../postgresMapping";
+} from "../provisioning/postgresMapping";
 import {
   CLICKHOUSE_ACCESS_MANAGEMENT_CONFIG_PATH,
   CLICKHOUSE_CUSTOM_SETTINGS_PREFIX_CONFIG_PATH,
@@ -94,13 +94,13 @@ import {
   type LangWatchQLTable,
   lwqlClickHouseSetupStatements,
   lwqlRowPolicyStatement,
-} from "../provisioning";
+} from "../provisioning/accessModel";
 import {
   lwqlApprovedPostgresViewNames,
   lwqlPostgresApprovedViewStatements,
   lwqlPostgresEngineTableStatements,
   lwqlPostgresReaderConnectionLimit,
-} from "../views";
+} from "../provisioning/catalogStatements";
 
 /** PostgreSQL image the PG-engine half of the proof runs against. */
 export const TEST_POSTGRES_IMAGE = "postgres:17";

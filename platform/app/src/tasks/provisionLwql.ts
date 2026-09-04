@@ -11,7 +11,7 @@
  * self-hosted distributions) there is no terraform, and this task owns the
  * whole model: it additionally converges the PostgreSQL reader role, the
  * restricted identity, the named collection, and the PostgreSQL-engine
- * tables, from `../server/analytics/lwql/selfProvisioning.ts`'s composition.
+ * tables, from `../server/analytics/lwql/provisioning/selfProvisioning.ts`'s composition.
  * That path is deliberately non-fatal — a default-on feature must never turn
  * a server-side provisioning failure into a boot crashloop; the endpoint
  * simply stays fail-closed ("unavailable") until the next boot converges.
@@ -23,9 +23,9 @@
  * generator emits `IF NOT EXISTS`/`OR REPLACE`/`CREATE OR REPLACE` DDL, and
  * the key-map backfill only inserts rows missing from the table.
  *
- * @see ../server/analytics/lwql/productionProvisioning.ts — the pure
+ * @see ../server/analytics/lwql/provisioning/productionProvisioning.ts — the pure
  *   composition this orchestrates
- * @see ../server/analytics/lwql/selfProvisioning.ts — the self-hosted extras
+ * @see ../server/analytics/lwql/provisioning/selfProvisioning.ts — the self-hosted extras
  * @see ../server/clickhouse/migrations/00084_create_lwql_api_key_tenant_map.sql
  * @see specs/analytics/lwql-api.feature
  */
@@ -44,19 +44,19 @@ import {
   productionPostgresApprovedViewStatements,
   productionPostgresReaderGrantStatements,
   withTenancyOptOut,
-} from "../server/analytics/lwql/productionProvisioning";
+} from "../server/analytics/lwql/provisioning/productionProvisioning";
 import {
   KEY_MAP_COLUMNS,
   type LangWatchQLNames,
-} from "../server/analytics/lwql/provisioning";
+} from "../server/analytics/lwql/provisioning/accessModel";
 import {
   type LwqlSelfProvisionEnv,
   lwqlPostgresEndpointFromDatabaseUrl,
   lwqlSelfProvisionFromEnv,
   selfHostedClickHouseProvisioningStatements,
   selfHostedPostgresReaderStatements,
-} from "../server/analytics/lwql/selfProvisioning";
-import { withLwqlSelfProvisionLock } from "../server/analytics/lwql/selfProvisionLock";
+} from "../server/analytics/lwql/provisioning/selfProvisioning";
+import { withLwqlSelfProvisionLock } from "../server/analytics/lwql/provisioning/selfProvisionLock";
 import { parseConnectionUrl } from "../server/clickhouse/goose";
 import { prisma } from "../server/db";
 

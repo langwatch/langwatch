@@ -45,8 +45,8 @@ import {
   LangWatchQLUnavailableError,
   LangWatchQLUnknownIdentifierError,
 } from "./errors";
-import { DEFAULT_LWQL_RESOURCE_LIMITS } from "./provisioning";
-import { lwqlDerivedConnectionFromEnv } from "./selfProvisioning";
+import { DEFAULT_LWQL_RESOURCE_LIMITS } from "./provisioning/accessModel";
+import { lwqlDerivedConnectionFromEnv } from "./provisioning/selfProvisioning";
 
 const logger = createLogger("langwatch:analytics:lwql:executor");
 

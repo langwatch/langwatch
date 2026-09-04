@@ -36,7 +36,7 @@ import {
   DEFAULT_LWQL_RESOURCE_LIMITS,
   type LangWatchQLResourceLimits,
   lwqlClickHouseSetupStatements,
-} from "../provisioning";
+} from "../provisioning/accessModel";
 import {
   type LangWatchQLClickHouseHarness,
   recordSeedControl,

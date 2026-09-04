@@ -17,7 +17,7 @@ these objects:
    `langwatch-saas`) and by the `charts/clickhouse-serverless` subchart
    (`infra/clickhouse-serverless/internal/render/lwql.go`).
 2. **Application SQL DDL**, issued at app startup — the self-provisioning path
-   in `platform/app/src/server/analytics/lwql/selfProvisioning.ts` and
+   in `platform/app/src/server/analytics/lwql/provisioning/selfProvisioning.ts` and
    `provisioning.ts`.
 
 ClickHouse treats a name collision between these two systems as fatal, not as
@@ -97,6 +97,6 @@ thing that can create these objects when it does not own the server."
 - Issue: https://github.com/langwatch/langwatch-saas/issues/1168 (Design C)
 - Related: `charts/langwatch/README.md` ("LangWatchQL (LWQL)")
 - Related: `charts/clickhouse-serverless/README.md`, `infra/clickhouse-serverless/README.md`
-- `platform/app/src/server/analytics/lwql/provisioning.ts`
+- `platform/app/src/server/analytics/lwql/provisioning/accessModel.ts`
 - `infra/clickhouse-serverless/internal/render/lwql.go`
 - `charts/langwatch/templates/_helpers.tpl` (`langwatch.lwql.selfProvisionActive`)

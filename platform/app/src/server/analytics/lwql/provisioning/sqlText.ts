@@ -12,8 +12,8 @@
  * everywhere. One implementation means one place a reviewer has to look and one
  * place a test can pin.
  *
- * @see ./provisioning.ts — the access model, as statements
- * @see ./views.ts — the `analytics.*` views, as statements
+ * @see ./accessModel.ts — the access model, as statements
+ * @see ./catalogStatements.ts — the `analytics.*` views, as statements
  */
 
 /**

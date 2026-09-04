@@ -18,7 +18,7 @@
  *    SaaS-convention default names. Pure over its `env` argument.
  *  - **Statement composition** ({@link selfHostedClickHouseProvisioningStatements},
  *    {@link selfHostedPostgresReaderStatements}) — sequences the reference
- *    builders (`provisioning.ts`, `postgresMapping.ts`, `views.ts`) in the
+ *    builders (`accessModel.ts`, `postgresMapping.ts`, `catalogStatements.ts`) in the
  *    order the integration harness proves works: access model, bridge,
  *    views. Pure; `src/tasks/provisionLwql.ts` is the only caller with I/O.
  *
@@ -31,9 +31,9 @@
 
 import { createLogger } from "@langwatch/observability";
 
-import { LWQL_VIEW_CATALOG } from "./catalog/lwqlViews";
-import { lwqlPostgresViews } from "./catalog/types";
-import type { LangWatchQLConnection } from "./executor";
+import { LWQL_VIEW_CATALOG } from "../catalog/lwqlViews";
+import { lwqlPostgresViews } from "../catalog/types";
+import type { LangWatchQLConnection } from "../executor";
 import {
   DEFAULT_POSTGRES_READER_LIMITS,
   postgresNamedCollectionStatements,
@@ -44,14 +44,14 @@ import {
   type LangWatchQLNames,
   lwqlClickHouseSetupStatements,
   qualified,
-} from "./provisioning";
+} from "./accessModel";
 import {
   lwqlApprovedPostgresViewNames,
   lwqlPostgresEngineTableStatements,
   lwqlPostgresReaderConnectionLimit,
   lwqlViewSetupStatements,
   SHIPPED_LWQL_DEDUP,
-} from "./views";
+} from "./catalogStatements";
 
 const logger = createLogger("langwatch:analytics:lwql:selfProvisioning");
 

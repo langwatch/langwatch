@@ -25,9 +25,9 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { CONTENT_CATEGORIES } from "../../../data-privacy/dataPrivacy.types";
-import { CONTENT_KEY_CATALOG } from "../../../data-privacy/dropKeyCatalog";
-import { LWQL_VIEW_CATALOG } from "../catalog/lwqlViews";
+import { CONTENT_CATEGORIES } from "../../../../data-privacy/dataPrivacy.types";
+import { CONTENT_KEY_CATALOG } from "../../../../data-privacy/dropKeyCatalog";
+import { LWQL_VIEW_CATALOG } from "../../catalog/lwqlViews";
 import {
   isContentGated,
   isPostgresResident,
@@ -35,21 +35,21 @@ import {
   lwqlAllowedTables,
   lwqlGatedColumns,
   lwqlGrainColumns,
-} from "../catalog/types";
+} from "../../catalog/types";
 import {
   definerViewAuditQuery,
   dropLangWatchQLRowPolicyStatement,
   lwqlPolicyCoverageQuery,
   lwqlRowPolicyStatement,
-} from "../provisioning";
-import { validateLangWatchQL } from "../validation/validate";
+} from "../accessModel";
+import { validateLangWatchQL } from "../../validation/validate";
 import {
   lwqlGrantedSourceColumns,
   lwqlSourceTables,
   lwqlViewSetupStatements,
   lwqlViewStatement,
   SHIPPED_LWQL_DEDUP,
-} from "../views";
+} from "../catalogStatements";
 import {
   CLICKHOUSE_ERROR_CODE,
   DEDUP_FIXTURE,
@@ -74,7 +74,7 @@ import {
   selectScalar,
   startLangWatchQLClickHouse,
   startLangWatchQLPostgres,
-} from "./lwqlClickHouseHarness";
+} from "../../__tests__/lwqlClickHouseHarness";
 
 /** A column no view exposes, so the grant must make it unreachable. */
 const OFF_CATALOG_COLUMN = "ProjectionId";

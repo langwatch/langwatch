@@ -16,8 +16,8 @@
 import { describe, expect, it } from "vitest";
 
 import type { LangWatchQLViewDefinition } from "../catalog/types";
-import type { LangWatchQLNames } from "../provisioning";
-import { lwqlSourceTables } from "../views";
+import type { LangWatchQLNames } from "../provisioning/accessModel";
+import { lwqlSourceTables } from "../provisioning/catalogStatements";
 
 const NAMES: LangWatchQLNames = {
   database: "lwql_unit",

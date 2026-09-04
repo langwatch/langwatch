@@ -27,8 +27,8 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { LWQL_VIEW_CATALOG } from "../lwqlViews";
-import { lwqlSourceTables } from "../../views";
-import type { LangWatchQLNames } from "../../provisioning";
+import { lwqlSourceTables } from "../../provisioning/catalogStatements";
+import type { LangWatchQLNames } from "../../provisioning/accessModel";
 
 const MANIFEST_PATH = join(
   process.cwd(),

@@ -2,7 +2,7 @@
  * LangWatchQL analytics SQL — PostgreSQL-resident data, reached through
  * server-side named collections.
  *
- * `provisioning.ts` builds the ClickHouse access model over objects that
+ * `accessModel.ts` builds the ClickHouse access model over objects that
  * already exist. Some LangWatchQL datasets do not live in ClickHouse at all: they
  * are rows in the application's own PostgreSQL primary. This module provisions
  * the path to them, which has a half on each side of the wire:
@@ -13,7 +13,7 @@
  *  - **On ClickHouse** — a named collection holding the credentials
  *    server-side, and one PostgreSQL-engine table per dataset in the LangWatchQL
  *    database. Those tables are ordinary LangWatchQL objects: the row policies
- *    from `./provisioning.ts` apply to them exactly as they do to a fact table.
+ *    from `./accessModel.ts` apply to them exactly as they do to a fact table.
  *
  * The tenant column is `TenantId` on both sides by the time a LangWatchQL query
  * sees it — the approved view is where the application's `projectId` takes that
@@ -23,12 +23,12 @@
  * `./sqlText.ts`: `postgresQuoted` on the PostgreSQL side, `assertIdentifier`
  * on the ClickHouse side, and the literal escapers for values.
  *
- * @see ./provisioning.ts — the ClickHouse access model applied over these tables
+ * @see ./accessModel.ts — the ClickHouse access model applied over these tables
  * @see ./sqlText.ts — the escaping and identifier rules these statements obey
  * @see specs/analytics/lwql-api.feature
  */
 
-import { assertNames, type LangWatchQLNames, qualified } from "./provisioning";
+import { assertNames, type LangWatchQLNames, qualified } from "./accessModel";
 import {
   assertIdentifier,
   clickHouseLiteral,
@@ -235,7 +235,7 @@ export interface PostgresReaderRole {
  * `connectionLimit` is a *floor for a one-table deployment* and is not the
  * number a real catalog should use: the demand is per mapped table, so the cap
  * has to be derived from how many there are. Use
- * `lwqlPostgresReaderConnectionLimit` from `../views.ts`, which does that —
+ * `lwqlPostgresReaderConnectionLimit` from `./catalogStatements.ts`, which does that —
  * this constant is what a caller mapping a single table by hand would want.
  *
  * Called for real by self-hosted provisioning (`selfProvisioning.ts`, issue

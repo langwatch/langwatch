@@ -25,7 +25,7 @@ import { lwqlPostgresViews } from "../catalog/types";
 import {
   lwqlApprovedPostgresViewNames,
   lwqlPostgresApprovedViewStatements,
-} from "../views";
+} from "../provisioning/catalogStatements";
 
 /**
  * The prefix the infrastructure bootstrap's grant predicate matches

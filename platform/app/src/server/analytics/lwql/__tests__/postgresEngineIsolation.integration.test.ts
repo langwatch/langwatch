@@ -33,12 +33,12 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { LWQL_VIEW_CATALOG } from "../catalog/lwqlViews";
 import { lwqlPostgresViews } from "../catalog/types";
-import { DEFAULT_POSTGRES_ENGINE_POOL_SIZE } from "../postgresMapping";
+import { DEFAULT_POSTGRES_ENGINE_POOL_SIZE } from "../provisioning/postgresMapping";
 import {
   lwqlPostgresReaderConnectionLimit,
   lwqlViewSetupStatements,
   SHIPPED_LWQL_DEDUP,
-} from "../views";
+} from "../provisioning/catalogStatements";
 import {
   CLICKHOUSE_ERROR_CODE,
   expectClickHouseError,

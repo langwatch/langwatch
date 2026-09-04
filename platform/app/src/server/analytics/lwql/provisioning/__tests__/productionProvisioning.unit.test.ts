@@ -17,11 +17,11 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { lwqlTenantCapability } from "../capability";
-import { LWQL_VIEW_CATALOG } from "../catalog/lwqlViews";
-import type { LangWatchQLViewDefinition } from "../catalog/types";
-import { lwqlPostgresViews } from "../catalog/types";
-import type { LangWatchQLConnection } from "../executor";
+import { lwqlTenantCapability } from "../../capability";
+import { LWQL_VIEW_CATALOG } from "../../catalog/lwqlViews";
+import type { LangWatchQLViewDefinition } from "../../catalog/types";
+import { lwqlPostgresViews } from "../../catalog/types";
+import type { LangWatchQLConnection } from "../../executor";
 import {
   LWQL_KEY_MAP_TABLE,
   lwqlKeyMapTableQualifiedName,
@@ -32,8 +32,8 @@ import {
   productionPostgresApprovedViewStatements,
   withTenancyOptOut,
 } from "../productionProvisioning";
-import type { LangWatchQLNames } from "../provisioning";
-import { GATED_DATASET } from "./gatedDatasetFixture";
+import type { LangWatchQLNames } from "../accessModel";
+import { GATED_DATASET } from "../../__tests__/gatedDatasetFixture";
 
 const CONNECTION: LangWatchQLConnection = {
   url: "https://ch.internal.example.com:8443",

@@ -22,7 +22,7 @@ import {
   lwqlKeyMapTableStatement,
   lwqlRowPolicyStatement,
   lwqlSettingsProfileStatement,
-} from "../provisioning";
+} from "../accessModel";
 
 const NAMES: LangWatchQLNames = {
   database: "lwql_unit",

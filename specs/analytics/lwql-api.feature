@@ -1054,7 +1054,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
 #   → Scenario: Missing time buckets diagnostic fires (MISSING_TIME_BUCKETS)
 # AC "clean = no known issue detected" → Scenario: Clean diagnostic status is documented as no known issue detected
 # (a fifth rule beyond the four the issue scopes, because the partition-pruning
-#  measurement recorded in src/server/analytics/lwql/views.ts puts an
+#  measurement recorded in src/server/analytics/lwql/provisioning/catalogStatements.ts puts an
 #  eight-fold read cost on the shape it reports)
 #   → Scenario: An unbounded read is reported as covering the whole history (UNBOUNDED_TIME_RANGE)
 #

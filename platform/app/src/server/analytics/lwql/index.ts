@@ -65,7 +65,7 @@ export type {
   LangWatchQLSchemaDataset,
 } from "./schema";
 export { describeLangWatchQLSchema, lwqlExampleSql } from "./schema";
-export { MAX_LWQL_LENGTH } from "./sqlText";
+export { MAX_LWQL_LENGTH } from "./provisioning/sqlText";
 export type { LangWatchQLTimeWindow } from "./timeWindow";
 export {
   formatLangWatchQLDateTimeParameter,

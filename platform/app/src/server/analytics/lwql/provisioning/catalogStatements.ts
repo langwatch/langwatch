@@ -1,16 +1,20 @@
 /**
- * LangWatchQL analytics SQL — the `analytics.*` views, as SQL text.
+ * LangWatchQL catalog statements — binds the catalog into DDL for both
+ * ClickHouse (the `analytics.*` views) and PostgreSQL (approved views and
+ * engine tables), as SQL text.
  *
- * `provisioning.ts` builds the access model (who the restricted identity is,
+ * `accessModel.ts` builds the access model (who the restricted identity is,
  * what it may change, which rows it may see). This module builds the objects
- * that model is applied to: one normal view per catalog entry over the real
- * fact tables, the column grants that bound what those views may read, and the
- * row policies that bound which rows they return.
+ * that model is applied to: one normal ClickHouse view per catalog entry over
+ * the real fact tables, the column grants that bound what those views may
+ * read, the row policies that bound which rows they return, and — for
+ * catalog entries whose data lives in PostgreSQL — the approved views and
+ * engine tables that expose them there instead.
  *
- * Everything here is generated from `./catalog/`, so the exposed surface is the
- * catalog and nothing else. A column that is not in the catalog is not in the
- * grant, which under ClickHouse's column-level access means unreachable rather
- * than merely unselected.
+ * Everything here is generated from `../catalog/`, so the exposed surface is
+ * the catalog and nothing else. A column that is not in the catalog is not in
+ * the grant, which under ClickHouse's column-level access means unreachable
+ * rather than merely unselected.
  *
  * ## Three properties that are not negotiable
  *
@@ -43,11 +47,11 @@
  * `./catalog/contentGating.ts` for how the views themselves strip content keys.
  *
  * @see ./catalog/lwqlViews.ts — the catalog these statements are built from
- * @see ./provisioning.ts — the access model applied over them
+ * @see ./accessModel.ts — the access model applied over them
  * @see specs/analytics/lwql-api.feature
  */
 
-import { LWQL_VIEW_CATALOG } from "./catalog/lwqlViews";
+import { LWQL_VIEW_CATALOG } from "../catalog/lwqlViews";
 import {
   columnExpression,
   isPostgresResident,
@@ -57,7 +61,7 @@ import {
   lwqlGrainColumns,
   lwqlPostgresViews,
   lwqlViewSourceColumns,
-} from "./catalog/types";
+} from "../catalog/types";
 import {
   DEFAULT_POSTGRES_ENGINE_POOL_SIZE,
   postgresApprovedViewStatement,
@@ -69,7 +73,7 @@ import {
   type LangWatchQLTable,
   lwqlGrantStatement,
   lwqlRowPolicyStatement,
-} from "./provisioning";
+} from "./accessModel";
 
 /**
  * The strategy the shipped views use where a catalog entry pins none of its
@@ -114,7 +118,7 @@ import {
  * above for a correctness problem they do not have.
  *
  * Re-measured on every run by the pruning case in
- * `__tests__/lwqlViews.integration.test.ts`.
+ * `__tests__/catalogStatements.integration.test.ts`.
  */
 export const SHIPPED_LWQL_DEDUP: LangWatchQLDedupStrategy = "final";
 

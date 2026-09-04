@@ -17,7 +17,7 @@
 
 import { z } from "zod";
 
-import { MAX_LWQL_LENGTH } from "../lwql/sqlText";
+import { MAX_LWQL_LENGTH } from "../lwql/provisioning/sqlText";
 
 /**
  * The version this build writes, and the only one it reads.
