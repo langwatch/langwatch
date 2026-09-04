@@ -94,6 +94,9 @@ type workerConfig struct {
 	AgentsFilePath string            `json:"agentsFilePath"`
 	SkillsDir      string            `json:"skillsDir,omitempty"`
 	SessionDir     string            `json:"sessionDir"`
+	// DisabledSkills mirrors domain.Credentials.DisabledSkillIds — the flag-
+	// gated-off skill ids the worker must hide from the model this turn.
+	DisabledSkills []string `json:"disabledSkills,omitempty"`
 }
 
 // modelLane maps a provider-prefixed model id onto the pi API lane and compat
@@ -270,6 +273,7 @@ func (a *Agent) Provision(in ProvisionInput) error {
 		AgentsFilePath: agentsPath,
 		SkillsDir:      skillsDir(in.WorkspaceRoot),
 		SessionDir:     in.SessionDir,
+		DisabledSkills: in.Creds.DisabledSkillIds,
 	}
 	configBytes, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {

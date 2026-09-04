@@ -264,6 +264,14 @@ export type LangyCredentials = {
    * and the worker re-warms on the other harness.
    */
   harness?: LangyHarness;
+  /**
+   * Skill ids the worker must hide from the model this turn — the full
+   * catalogue (`LANGY_SKILLS`) filtered by this caller's flag state, resolved
+   * once in `langy-turn.service.ts` and folded in here so the Go relay and
+   * the worker never see a skill this project's flags have turned off.
+   * Absent/empty ⇒ nothing is hidden.
+   */
+  disabledSkillIds?: string[];
 };
 
 /**

@@ -18,7 +18,7 @@ import (
 // path does — capabilitiesFor → app.SignatureKeys → domain.SignatureOf — so tests
 // exercise the real composition rather than a hand-spelled copy that could drift.
 func sigOf(creds domain.Credentials) domain.CredentialSignature {
-	return domain.SignatureOf(creds.ProjectID, creds.ActorUserID, creds.Model, creds.EgressAllowlist, app.SignatureKeys(capabilitiesFor(creds)), creds.MirrorTier, creds.Harness)
+	return domain.SignatureOf(creds.ProjectID, creds.ActorUserID, creds.Model, creds.EgressAllowlist, app.SignatureKeys(capabilitiesFor(creds)), creds.DisabledSkillIds, creds.MirrorTier, creds.Harness)
 }
 
 type recordingRevoker struct {
