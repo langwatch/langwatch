@@ -33,12 +33,11 @@ import (
 // in for the customer's Azure resource, so what they observe is the URL
 // Bifrost actually builds, not a restatement of the mapping helper.
 
-// azureUpstream records the path of every request it receives and answers
-// with an OpenAI-shaped chat completion (Azure's wire format).
+// azureUpstream answers with an OpenAI-shaped chat completion (Azure's wire
+// format) and keeps the path of every request it received, in arrival order.
 type azureUpstream struct {
-	srv *httptest.Server
-	mu  sync.Mutex
-	// paths holds each received request path, in arrival order.
+	srv   *httptest.Server
+	mu    sync.Mutex
 	paths []string
 }
 
@@ -102,9 +101,9 @@ func azureCredNoDeploymentMap(endpoint string) domain.Credential {
 	}
 }
 
-func azureChatRequest(stream bool) *domain.Request {
+func azureChatRequest(isStream bool) *domain.Request {
 	body := `{"model":"gpt-5-mini","messages":[{"role":"user","content":"hi"}]}`
-	if stream {
+	if isStream {
 		body = `{"model":"gpt-5-mini","messages":[{"role":"user","content":"hi"}],"stream":true}`
 	}
 	return &domain.Request{
