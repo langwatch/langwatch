@@ -1,6 +1,5 @@
 /** Manages evaluation execution across multiple cells: builds and dispatches workflows, maps events to SSE, and coordinates parallel, abortable runs. */
 
-import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import {
   type CarriedOverCell,
@@ -13,7 +12,6 @@ import {
   type ExecutionSummary,
   type ExperimentService,
   generateHumanReadableId,
-  isComparisonEvaluator,
   type RecordEvaluatorResultCommandData,
   type RecordTargetResultCommandData,
   type TargetConfig,
@@ -46,6 +44,7 @@ import type { RunActor } from "@langwatch/scenario-contract";
 import { assertConnectedAgentsRunnable } from "@langwatch/suite-server";
 import type { ResultMapperConfig } from "../processes/experiment-result-mapping.process";
 import { createSemaphore } from "../processes/experiment-run-semaphore.process";
+import { createEventStream } from "../processes/experiment-run-event-stream.process";
 import {
   evaluatorErrorResult,
   evaluatorTargetNoInputsResult,
@@ -72,17 +71,11 @@ import {
 import { ExperimentWorkflowCellService } from "./experiment-workflow-cell.service";
 import { ExperimentConnectedCellService } from "./experiment-connected-cell.service";
 import { ExperimentRunSandboxKeyService } from "./experiment-run-sandbox-key.service";
+import { ExperimentRunStorageService } from "./experiment-run-storage.service";
 import {
   comparisonSkipMessage as processComparisonSkipMessage,
   formatList as processFormatList,
 } from "../processes/experiment-comparison-skip.process";
-
-/**
- * The KSUID resource prefix an evaluation row is minted under. Fixed by
- * rows already in ClickHouse; stated rather than imported to avoid
- * depending on every other feature's prefixes.
- */
-const EVALUATION_KSUID_RESOURCE = "eval";
 
 const logger = createLogger("langwatch:experiment:run-orchestrator");
 
@@ -522,48 +515,15 @@ export async function* runOrchestrator(
   // The canonical Experiment service owns the Eventing command dispatch.
   const commands = ports.experiments;
 
-  // Track CH dispatch failures for observability
-  let chDispatchFailures = 0;
-  let chDispatchTotal = 0;
-
-  // Track traceId per cell so evaluator_result events can reference it
-  const cellTraceIds = new Map<string, string>();
-
-  // Track per-(row, target) outputs as Phase 1 completes, so Phase 2
-  // comparison cells (#5100) can bake variant outputs into their input.
-  // Pre-seeded from prior-run outputs the client already has.
-  const completedTargetOutputs = new Map<
-    string,
-    { output: unknown; cost?: number; duration?: number }
-  >();
-  if (seedTargetOutputs) {
-    for (const [key, value] of Object.entries(seedTargetOutputs)) {
-      completedTargetOutputs.set(key, value);
-    }
-  }
-
-  /**
-   * `${rowIndex}:${targetId}` keys this run actually executed, as opposed
-   * to inherited via seedTargetOutputs — lets Phase 2 tell "computed" from
-   * "reused", so only the reused ones need back-filling.
-   */
-  const producedTargetKeys = new Set<string>();
-
-  // Track per-(row, target) evaluator results so the Phase 2 comparison
-  // judge can factor each variant's existing scores into its verdict.
-  // Keyed by `${rowIndex}:${targetId}`.
-  const completedTargetEvaluatorScores = new Map<
-    string,
-    Array<{ name: string; score?: number; label?: string; passed?: boolean }>
-  >();
-
-  // Pre-seed from cells that already have a traceId (e.g., evaluator reruns
-  // that skip target execution and won't generate target_result events)
-  for (const cell of cells) {
-    if (cell.traceId) {
-      cellTraceIds.set(`${cell.rowIndex}:${cell.targetId}`, cell.traceId);
-    }
-  }
+  // Owns the run's CH/evaluation-pipeline writes and the per-(row, target)
+  // caches Phase 2 reads. Delegates to {@link ExperimentRunStorageService}.
+  const storage = ExperimentRunStorageService.create({
+    commands,
+    evaluationReporting: ports.evaluationReporting,
+    dispatches: resultDispatches,
+    cells,
+    seedTargetOutputs,
+  });
 
   // Build target metadata for storage (model + name attribution — see
   // buildTargetMetadata's JSDoc).
@@ -592,20 +552,16 @@ export async function* runOrchestrator(
 
   // Dispatch event to ClickHouse.
   if (experimentId) {
-    chDispatchTotal++;
     try {
-      await commands.startExperimentRun({
-        tenantId: projectId,
+      await storage.startRun({
+        projectId,
         runId,
         experimentId,
-        workflowVersionId: workflowVersionId ?? null,
-        total: totalCells,
+        workflowVersionId,
+        totalCells,
         targets: targetMetadata,
-        occurredAt: Date.now(),
       });
     } catch (err) {
-      chDispatchFailures++;
-      logger.error({ err, runId }, "Failed to dispatch startExperimentRun to CH");
       await ports.abort.clearRunning(runId);
       throw err;
     }
@@ -624,137 +580,10 @@ export async function* runOrchestrator(
     });
   }
 
-  // Helper to process event for ClickHouse dispatch
-  const processEventForStorage = async (event: EvaluationV3Event) => {
-    // Track traceId from target_result so evaluator_result events can reference it.
-    if (event.type === "target_result" && event.traceId) {
-      cellTraceIds.set(`${event.rowIndex}:${event.targetId}`, event.traceId);
-    }
-
-    // Capture successful target outputs for Phase 2 pairwise cells.
-    if (
-      event.type === "target_result" &&
-      !event.error &&
-      event.output !== null &&
-      event.output !== undefined
-    ) {
-      completedTargetOutputs.set(`${event.rowIndex}:${event.targetId}`, {
-        output: event.output,
-        cost: event.cost ?? undefined,
-        duration: event.duration ?? undefined,
-      });
-      producedTargetKeys.add(`${event.rowIndex}:${event.targetId}`);
-    }
-
-    // Dispatch to evaluation processing pipeline for per-trace eval CH writes.
-    if (event.type === "evaluator_result") {
-      const evalResult = event.result as SingleEvaluationResult;
-      const evaluatorConfig = state.evaluators.find((e) => e.id === event.evaluatorId);
-
-      // Cache per-(row, target) evaluator scores for the Phase 2 judge.
-      // Skip comparison evaluators themselves — a comparison judge reading
-      // another comparison's verdict is circular.
-      if (
-        evalResult.status === "processed" &&
-        evaluatorConfig &&
-        !isComparisonEvaluator(evaluatorConfig)
-      ) {
-        const dbEval = evaluatorConfig.dbEvaluatorId
-          ? loadedEvaluators?.get(evaluatorConfig.dbEvaluatorId)
-          : null;
-        const name =
-          dbEval?.name ?? evaluatorConfig.evaluatorType?.split("/").pop() ?? evaluatorConfig.id;
-        const key = `${event.rowIndex}:${event.targetId}`;
-        const arr = completedTargetEvaluatorScores.get(key) ?? [];
-        arr.push({
-          name,
-          score: evalResult.score ?? undefined,
-          label: evalResult.label ?? undefined,
-          passed: evalResult.passed ?? undefined,
-        });
-        completedTargetEvaluatorScores.set(key, arr);
-      }
-      const dbEvaluator = evaluatorConfig?.dbEvaluatorId
-        ? loadedEvaluators?.get(evaluatorConfig.dbEvaluatorId)
-        : null;
-      const traceId = cellTraceIds.get(`${event.rowIndex}:${event.targetId}`);
-      const evaluationId = generate(EVALUATION_KSUID_RESOURCE).toString();
-      try {
-        await ports.evaluationReporting.reportEvaluation({
-          tenantId: projectId,
-          evaluationId,
-          evaluatorId: event.evaluatorId,
-          evaluatorType: evaluatorConfig?.evaluatorType ?? "unknown",
-          evaluatorName: dbEvaluator?.name,
-          traceId,
-          status: evalResult.status,
-          score: evalResult.status === "processed" ? (evalResult.score ?? undefined) : undefined,
-          passed: evalResult.status === "processed" ? (evalResult.passed ?? undefined) : undefined,
-          // For pairwise verdicts, langevals now returns the winner's
-          // candidate id (or "tie") directly in `label`. No translation
-          // needed here; SDK / REST / MCP consumers see the winner by id.
-          label: evalResult.status === "processed" ? (evalResult.label ?? undefined) : undefined,
-          details:
-            evalResult.status === "processed" ? (evalResult.details ?? undefined) : undefined,
-          error: evalResult.status === "error" ? evalResult.details : undefined,
-          occurredAt: Date.now(),
-        });
-      } catch (error) {
-        logger.error(
-          { error, evaluationId, evaluatorId: event.evaluatorId },
-          "Failed to dispatch evaluator result to evaluation processing pipeline",
-        );
-      }
-    }
-
-    // Dispatch events to ClickHouse.
-    if (experimentId) {
-      const targetResultDispatch =
-        event.type === "target_result" || event.type === "error"
-          ? buildTargetResultDispatch({
-              tenantId: projectId,
-              runId,
-              experimentId,
-              event,
-              datasetEntry: event.rowIndex !== undefined ? (datasetRows[event.rowIndex] ?? {}) : {},
-              occurredAt: Date.now(),
-            })
-          : null;
-
-      if (targetResultDispatch) {
-        chDispatchTotal++;
-        await commands.recordTargetResult(targetResultDispatch).catch((err) => {
-          chDispatchFailures++;
-          logger.warn({ err, runId }, "Failed to dispatch recordTargetResult to CH");
-        });
-      } else if (event.type === "evaluator_result") {
-        const result = event.result as SingleEvaluationResult;
-        const evaluatorConfig = state.evaluators.find((e) => e.id === event.evaluatorId);
-        const dbEvaluator = evaluatorConfig?.dbEvaluatorId
-          ? loadedEvaluators?.get(evaluatorConfig.dbEvaluatorId)
-          : null;
-        chDispatchTotal++;
-        await commands
-          .recordEvaluatorResult(
-            buildEvaluatorResultDispatch({
-              tenantId: projectId,
-              runId,
-              experimentId,
-              event,
-              result,
-              // Workflow evaluator nodes have no DB record, so fall back to
-              // the name the event carries from the DSL node.
-              evaluatorName: dbEvaluator?.name ?? event.evaluatorName ?? null,
-              occurredAt: Date.now(),
-            }),
-          )
-          .catch((err) => {
-            chDispatchFailures++;
-            logger.warn({ err, runId }, "Failed to dispatch recordEvaluatorResult to CH");
-          });
-      }
-    }
-  };
+  // Mirrors an event to storage: caches, evaluation reporting, ClickHouse.
+  // Delegates to {@link ExperimentRunStorageService}.
+  const processEventForStorage = (event: EvaluationV3Event) =>
+    storage.record({ event, projectId, runId, experimentId, state, loadedEvaluators, datasetRows });
 
   // Emit execution_started
   yield {
@@ -771,47 +600,11 @@ export async function* runOrchestrator(
 
   logger.info({ runId, totalCells, concurrency, experimentId }, "Starting evaluation execution");
 
-  // Event queue for collecting results from parallel executions
-  // Uses a resolver pattern to allow yielding events as they arrive
-  type EventResolver = (event: EvaluationV3Event | null) => void;
-  let eventResolve: EventResolver | null = null;
-  const eventQueue: EvaluationV3Event[] = [];
-  let allCellsComplete = false;
   let completed = 0;
 
-  const pushEvent = (event: EvaluationV3Event) => {
-    if (eventResolve) {
-      const resolve = eventResolve;
-      eventResolve = null;
-      resolve(event);
-    } else {
-      eventQueue.push(event);
-    }
-  };
-
-  const signalComplete = () => {
-    allCellsComplete = true;
-    if (eventResolve) {
-      const resolve = eventResolve;
-      eventResolve = null;
-      resolve(null);
-    }
-  };
-
-  const waitForEvent = (): Promise<EvaluationV3Event | null> => {
-    // Check queue first
-    if (eventQueue.length > 0) {
-      return Promise.resolve(eventQueue.shift()!);
-    }
-    // If all cells complete and queue empty, we're done
-    if (allCellsComplete) {
-      return Promise.resolve(null);
-    }
-    // Wait for next event
-    return new Promise<EvaluationV3Event | null>((resolve) => {
-      eventResolve = resolve;
-    });
-  };
+  // Delivers events to the caller as parallel cells complete. Delegates to
+  // {@link createEventStream}.
+  const { pushEvent, signalComplete, waitForEvent } = createEventStream();
 
   // Create semaphore for rate limiting
   const semaphore = createSemaphore(concurrency);
@@ -980,8 +773,8 @@ export async function* runOrchestrator(
         const { cells: phase2Cells, skipReasons } = generateComparisonCells({
           state,
           datasetRows,
-          completedTargetOutputs,
-          completedTargetEvaluatorScores,
+          completedTargetOutputs: storage.outputs,
+          completedTargetEvaluatorScores: storage.evaluatorScores,
           loadedPrompts,
           loadedEvaluators,
           // Only the rows this run owns. Without this, re-running row 1 alone
@@ -1033,7 +826,7 @@ export async function* runOrchestrator(
             resolveScopedRowIndices({ scope, rowCount: datasetRows.length }),
           );
           for (const [key, seeded] of Object.entries(seedTargetOutputs)) {
-            if (producedTargetKeys.has(key)) continue;
+            if (storage.hasProduced(key)) continue;
             const separator = key.indexOf(":");
             if (separator < 0) continue;
             const rowIndex = Number(key.slice(0, separator));
@@ -1153,28 +946,19 @@ export async function* runOrchestrator(
 
     // Dispatch completion event to ClickHouse.
     if (experimentId) {
-      chDispatchTotal++;
-      await commands
-        .completeExperimentRun({
-          tenantId: projectId,
-          runId,
-          experimentId,
-          finishedAt: aborted ? null : finishedAt,
-          stoppedAt: aborted ? finishedAt : null,
-          occurredAt: Date.now(),
-        })
-        .catch((err) => {
-          chDispatchFailures++;
-          logger.warn({ err, runId }, "Failed to dispatch completeExperimentRun to CH");
-        });
+      await storage.completeRun({ projectId, runId, experimentId, aborted, finishedAt });
     }
   }
 
   // Log CH dispatch failure summary if any failed
-  if (chDispatchFailures > 0) {
+  if (storage.dispatchFailures > 0) {
     logger.warn(
-      { runId, chDispatchFailures, chDispatchTotal },
-      `${chDispatchFailures} of ${chDispatchTotal} CH dispatches failed for run ${runId}`,
+      {
+        runId,
+        chDispatchFailures: storage.dispatchFailures,
+        chDispatchTotal: storage.dispatchTotal,
+      },
+      `${storage.dispatchFailures} of ${storage.dispatchTotal} CH dispatches failed for run ${runId}`,
     );
   }
 
@@ -1195,7 +979,7 @@ export async function* runOrchestrator(
       completedCells,
       failedCells,
       duration,
-      ...(chDispatchFailures > 0 && { chDispatchFailures }),
+      ...(storage.dispatchFailures > 0 && { chDispatchFailures: storage.dispatchFailures }),
       timestamps: {
         startedAt: startTime,
         finishedAt,
