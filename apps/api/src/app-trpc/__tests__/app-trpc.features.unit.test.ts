@@ -16,12 +16,6 @@
  * every port refuses, because building a surface is what registers its access
  * decisions — the part the audits read.
  */
-import {
-  analyticsReadInputSchema,
-  analyticsTimeseriesInputSchema,
-  type AnalyticsReadInput,
-  type AnalyticsTimeseriesInput,
-} from "@langwatch/analytics-contract";
 
 import type { AnnotationTrpcPorts } from "@langwatch/annotation-server";
 import type { AppTrpcPolicyMiddlewares } from "@langwatch/api/trpc";
@@ -40,6 +34,7 @@ import { createTrpcRoot } from "../../api.application";
 import { composeGatewayFeature } from "../../features/gateway/gateway.composition";
 import { refusingLangyFeature } from "../../features/langy/langy.composition";
 import { refusingDataRetentionFeature } from "../../features/data-retention/data-retention.composition";
+import { refusingAnalyticsFeature } from "../../features/analytics/analytics.composition";
 import { refusingMonitorFeature } from "../../features/monitor/monitor.composition";
 import { refusingScenarioFeature } from "../../features/scenario/scenario.composition";
 import { refusingStoredObjectFeature } from "../../features/stored-object/stored-object.composition";
@@ -64,18 +59,6 @@ const passThrough =
   () =>
   ({ next }: { next: () => Promise<unknown> }) =>
     next();
-
-/**
- * A rollout gate that lets every procedure through.
- *
- * Chained onto the builder as the surface is BUILT, so unlike the ports below
- * it cannot refuse: a refusing gate would mean no workbench procedure exists to
- * read the names of.
- */
-const passThroughGate = <TProcedure>(procedure: TProcedure): TProcedure => procedure;
-
-/** The period a workbench caller reports over, as the two doors parse it. */
-const testTimeWindowSchema = z.object({ start: z.date(), end: z.date() });
 
 /** The sign-up questionnaire, as the process hands its schema to onboarding. */
 const testSignUpDataSchema = z.object({ utmCampaign: z.string().optional() });
@@ -109,14 +92,11 @@ function refusingPorts(): AppTrpcFeaturePorts<
   Record<string, unknown>,
   Record<string, unknown>,
   Record<string, unknown>,
-  string,
   Record<string, unknown>,
   Record<string, unknown>,
   Record<string, unknown>,
   Record<string, unknown>,
-  AnalyticsReadInput,
   typeof testSignUpDataSchema,
-  AnalyticsTimeseriesInput,
   Record<string, unknown>,
   Record<string, unknown>,
   Record<string, unknown>
@@ -141,36 +121,6 @@ function refusingPorts(): AppTrpcFeaturePorts<
     );
 
   return {
-    // Every schema here is read while the surface is BUILT — the parsers become
-    // the procedures' own — and so is the rollout gate, which is chained onto
-    // each builder. Refusals in those places could not be mounted at all.
-    analytics: {
-      reads: {
-        timeseriesInputSchema: analyticsTimeseriesInputSchema,
-        sharedFiltersSchema: analyticsReadInputSchema,
-        filterFieldSchema: z.enum(["metadata.user_id"]),
-        filterFieldRequiresKey: refuse("analytics.reads.filterFieldRequiresKey"),
-        filterFieldRequiresSubkey: refuse("analytics.reads.filterFieldRequiresSubkey"),
-      },
-      workbench: {
-        requireWorkbenchEnabled: passThroughGate,
-        isWorkbenchEnabled: refuse("analytics.workbench.isWorkbenchEnabled"),
-        maxStatementLength: 8_000,
-        timeWindowSchema: testTimeWindowSchema,
-        granularityStepSchema: z.number(),
-        resolveProtections: refuse("analytics.workbench.resolveProtections"),
-        resolveRunCaller: refuse("analytics.workbench.resolveRunCaller"),
-      },
-      savedCharts: {
-        requireWorkbenchEnabled: passThroughGate,
-        timeWindowSchema: testTimeWindowSchema,
-        granularityStepSchema: z.number(),
-        resolveProtections: refuse("analytics.savedCharts.resolveProtections"),
-        resolveRunCaller: refuse("analytics.savedCharts.resolveRunCaller"),
-        admitDefinition: refuse("analytics.savedCharts.admitDefinition"),
-        mapError: refuse("analytics.savedCharts.mapError"),
-      },
-    },
     annotation: refuseEvery("annotation"),
     batchRecord: refuseEvery("batchRecord"),
     bugReports: refuseEvery("bugReports"),
@@ -193,10 +143,6 @@ function refusingPorts(): AppTrpcFeaturePorts<
       workbenchStateSchema: z.object({ rows: z.array(z.unknown()) }),
     } as never,
     evaluators: refuseEvery("evaluators"),
-    graphs: {
-      ...(refuseEvery("graphs") as object),
-      filterFieldSchema: z.enum(["metadata.user_id"]),
-    } as never,
     group: refuseEvery("group"),
     home: refuseEvery("home"),
     identity: refuseEvery("identity"),
@@ -351,6 +297,7 @@ function buildFeatures() {
       langy: refusingLangyFeature(),
       ops: refusingOpsFeature(),
       scenario: refusingScenarioFeature(),
+      analytics: refusingAnalyticsFeature(),
       dataRetention: refusingDataRetentionFeature(),
       monitor: refusingMonitorFeature(),
       storedObject: refusingStoredObjectFeature(),

@@ -15,7 +15,6 @@
  * mounting a partial record whose gaps a person discovers by clicking into
  * them.
  */
-import type { AnalyticsReadInput, AnalyticsTimeseriesInput } from "@langwatch/analytics-contract";
 import { LiteMemberRestrictedError, type AuthzService } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
@@ -30,7 +29,6 @@ import {
 import type { ApiTrpcFeatureApplication } from "../app-trpc/app-trpc.context";
 import { createAppTrpcFeatures, type AppTrpcFeatureRecord } from "../app-trpc/app-trpc.features";
 import { createApiTrpcPorts } from "./api-trpc-ports.composition";
-import type { ApiAnalyticsCollaborators } from "./api-trpc-collaborators.analytics.composition";
 import type { ApiExecutionCollaborators } from "./api-trpc-collaborators.execution.composition";
 import type { ApiIdentityCollaborators } from "./api-trpc-collaborators.identity.composition";
 import type { ApiOrgGroupCollaborators } from "./api-trpc-collaborators.org-group.composition";
@@ -54,17 +52,12 @@ export type ApiTrpcFeaturesCompositionOptions<
   TBugReport,
   TBugReportPage,
   TCheckStatus,
-  TFilterField extends string,
   TMappingsIn,
   TMappingsOut,
   TPrivacyRule,
   TPrivacySnapshot,
-  TReadInput extends AnalyticsReadInput,
   TSignUpDataSchema extends ZodTypeAny,
-  TTimeseriesInput extends AnalyticsTimeseriesInput,
   TWorkbenchState,
-  TTimeseriesInputWire,
-  TReadInputWire,
 > = Readonly<{
   infrastructure: ApiTrpcInfrastructure | undefined;
   /** The features the process composed before it had a mount; see the type. */
@@ -74,17 +67,12 @@ export type ApiTrpcFeaturesCompositionOptions<
         TBugReport,
         TBugReportPage,
         TCheckStatus,
-        TFilterField,
         TMappingsIn,
         TMappingsOut,
         TPrivacyRule,
         TPrivacySnapshot,
-        TReadInput,
         TSignUpDataSchema,
-        TTimeseriesInput,
         TWorkbenchState,
-        TTimeseriesInputWire,
-        TReadInputWire
       >
     | undefined;
   report?: ApiTrpcCollaboratorsAbsence;
@@ -118,17 +106,12 @@ export class ApiTrpcFeaturesComposition<
   TBugReport,
   TBugReportPage,
   TCheckStatus,
-  TFilterField extends string,
   TMappingsIn,
   TMappingsOut,
   TPrivacyRule,
   TPrivacySnapshot,
-  TReadInput extends AnalyticsReadInput,
   TSignUpDataSchema extends ZodTypeAny,
-  TTimeseriesInput extends AnalyticsTimeseriesInput,
   TWorkbenchState,
-  TTimeseriesInputWire,
-  TReadInputWire,
 > extends ApiTrpcFeaturesPort {
   /**
    * Composes the record only when this process has BOTH halves of it.
@@ -145,50 +128,35 @@ export class ApiTrpcFeaturesComposition<
     TBugReport,
     TBugReportPage,
     TCheckStatus,
-    TFilterField extends string,
     TMappingsIn,
     TMappingsOut,
     TPrivacyRule,
     TPrivacySnapshot,
-    TReadInput extends AnalyticsReadInput,
     TSignUpDataSchema extends ZodTypeAny,
-    TTimeseriesInput extends AnalyticsTimeseriesInput,
     TWorkbenchState,
-    TTimeseriesInputWire,
-    TReadInputWire,
   >(
     options: ApiTrpcFeaturesCompositionOptions<
       TBugReport,
       TBugReportPage,
       TCheckStatus,
-      TFilterField,
       TMappingsIn,
       TMappingsOut,
       TPrivacyRule,
       TPrivacySnapshot,
-      TReadInput,
       TSignUpDataSchema,
-      TTimeseriesInput,
       TWorkbenchState,
-      TTimeseriesInputWire,
-      TReadInputWire
     >,
   ):
     | ApiTrpcFeaturesComposition<
         TBugReport,
         TBugReportPage,
         TCheckStatus,
-        TFilterField,
         TMappingsIn,
         TMappingsOut,
         TPrivacyRule,
         TPrivacySnapshot,
-        TReadInput,
         TSignUpDataSchema,
-        TTimeseriesInput,
         TWorkbenchState,
-        TTimeseriesInputWire,
-        TReadInputWire
       >
     | undefined {
     const { infrastructure, collaborators } = options;
@@ -215,17 +183,12 @@ export class ApiTrpcFeaturesComposition<
       TBugReport,
       TBugReportPage,
       TCheckStatus,
-      TFilterField,
       TMappingsIn,
       TMappingsOut,
       TPrivacyRule,
       TPrivacySnapshot,
-      TReadInput,
       TSignUpDataSchema,
-      TTimeseriesInput,
       TWorkbenchState,
-      TTimeseriesInputWire,
-      TReadInputWire
     >,
   ) {
     super();
@@ -296,7 +259,7 @@ export class LoggedApiTrpcFeaturesAbsence extends ApiTrpcCollaboratorsAbsence {
     const consequence =
       reason === "no-database"
         ? "no database or no AuthZ service was composed"
-        : "the deployment supplied none of the collaborators the record reaches — the analytics filter catalogue, the LangWatchQL workbench, the trace pipeline, the sign-in and sign-up ceremonies, the evaluator runtime, the model gateway and the Enterprise governance surfaces";
+        : "the deployment supplied none of the collaborators the record reaches — the trace pipeline, the sign-in and sign-up ceremonies, the evaluator runtime, the model gateway and the Enterprise governance surfaces";
     this.logger.warn(
       { reason },
       `API process serves no packaged tRPC namespaces: ${consequence}. The agent and secret routers are unaffected.`,
@@ -305,13 +268,13 @@ export class LoggedApiTrpcFeaturesAbsence extends ApiTrpcCollaboratorsAbsence {
 }
 
 /**
- * The seven halves {@link composeApiTrpcCollaborators} reads into one flat
+ * The six halves {@link composeApiTrpcCollaborators} reads into one flat
  * {@link ApiTrpcCollaborators} record. Each is `undefined` exactly when the
  * process composed nothing for it — see that half's own composing function
  * for why it can be missing.
  */
 /**
- * The same seven once every one of them is present.
+ * The same six once every one of them is present.
  *
  * `Required<>` is not this: it strips the `?` a member does not have and leaves
  * the `| undefined` a member does, so the whole record read below stayed
@@ -323,7 +286,6 @@ type ComposedApiTrpcCollaboratorHalves = {
 
 export type ApiTrpcCollaboratorHalves = Readonly<{
   product: ApiProductCollaborators | undefined;
-  analytics: ApiAnalyticsCollaborators | undefined;
   identity: ApiIdentityCollaborators | undefined;
   execution: ApiExecutionCollaborators | undefined;
   productGroup: ApiProductGroupCollaborators | undefined;
@@ -342,6 +304,8 @@ export type ApiTrpcCollaboratorHalves = Readonly<{
  */
 export type ApiTrpcFeatureApplicationSlices = Pick<
   ApiTrpcFeatureApplication,
+  | "analytics"
+  | "dashboard"
   | "gateway"
   | "github"
   | "governance"
@@ -357,13 +321,13 @@ export type ApiTrpcFeatureApplicationSlices = Pick<
 >;
 
 /**
- * Reads all seven collaborator halves into ONE flat {@link ApiTrpcCollaborators}
+ * Reads all six collaborator halves into ONE flat {@link ApiTrpcCollaborators}
  * record, or refuses by name.
  *
  * All-or-nothing, replacing the ten `withApi*Collaborators` folds and the
  * runtime `sealApiTrpcCollaborators` check those folds needed: a process
  * missing any half composes none of the record, named, rather than mounting
- * the other six over a gap. No cast to an erased type anywhere in this
+ * the other five over a gap. No cast to an erased type anywhere in this
  * function — every `half.field` access below is checked against the real,
  * concrete type each `compose*` function already returns, so a half's return
  * type drifting from what this literal expects is a compile error here
@@ -388,7 +352,6 @@ export function composeApiTrpcCollaborators(
   }
   const {
     product,
-    analytics,
     identity,
     execution,
     productGroup,
@@ -399,8 +362,6 @@ export function composeApiTrpcCollaborators(
   return {
     application: {
       annotations: product.annotations,
-      analytics: analytics.analytics,
-      dashboard: analytics.dashboard,
       ...identity.application,
       workflows: execution.workflows,
       experiments: execution.experiments,
@@ -429,8 +390,6 @@ export function composeApiTrpcCollaborators(
     dataPrivacy: product.dataPrivacyPorts,
     integrationsChecks: product.integrationsChecksPorts,
 
-    analytics: analytics.analyticsPorts,
-    graphs: analytics.graphPorts,
 
     auth: identity.auth,
     group: identity.group,

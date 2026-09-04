@@ -17,8 +17,6 @@
 import type { ApiTrpcFeatureMount } from "../api.application";
 import type { ApiTrpcInfrastructure } from "./app-trpc.infrastructure";
 import type { ComposedApiFeatures } from "./app-trpc.composed";
-import type { AnalyticsReadInput, AnalyticsTimeseriesInput } from "@langwatch/analytics-contract";
-import type { AnalyticsTrpcPorts, LangWatchQLTrpcPorts } from "@langwatch/analytics-server";
 import type { AnnotationTrpcPorts } from "@langwatch/annotation-server";
 
 import type { EmailSuppressionTrpcPorts } from "@langwatch/automation-server";
@@ -29,11 +27,7 @@ import type { BatchRecordTrpcPorts, DatasetTrpcPorts } from "@langwatch/dataset-
 
 import type { AuthApp } from "@langwatch/auth-server";
 import type { DataPrivacyTrpcPorts } from "@langwatch/data-privacy-server";
-import type {
-  GraphTrpcPorts,
-  SavedViewTrpcPorts,
-  SavedWorkbenchChartTrpcPorts,
-} from "@langwatch/dashboard-server";
+import type { SavedViewTrpcPorts } from "@langwatch/dashboard-server";
 import type { HttpProxyTrpcPorts } from "@langwatch/agent-server";
 import type { CostTrpcPorts, LimitsTrpcPorts } from "@langwatch/entitlement-server";
 import type {
@@ -74,10 +68,6 @@ import type { WorkflowOptimizationTrpcPorts, WorkflowTrpcPorts } from "@langwatc
 import type { ZodTypeAny } from "zod";
 
 import {
-  createAnalyticsTrpcRouter,
-  createLangWatchQLTrpcRouter,
-} from "../features/analytics/analytics-trpc.mount";
-import {
   createAnnotationScoreTrpcRouter,
   createAnnotationTrpcRouter,
 } from "../features/annotation/annotation-trpc.mount";
@@ -93,11 +83,7 @@ import {
   createDatasetRecordTrpcRouter,
   createDatasetTrpcRouter,
 } from "../features/dataset/dataset-trpc.mount";
-import {
-  createDashboardTrpcRouter,
-  createGraphTrpcRouter,
-  createSavedWorkbenchChartTrpcRouter,
-} from "../features/dashboard/dashboard-trpc.mount";
+import { createDashboardTrpcRouter } from "../features/dashboard/dashboard-trpc.mount";
 import {
   createDataPrivacyTrpcRouter,
   type DataPrivacyTrpcChecks,
@@ -197,19 +183,14 @@ export interface AppTrpcFeaturePorts<
   TBugReport,
   TBugReportPage,
   TCheckStatus,
-  TFilterField extends string,
   TMappingsIn,
   TMappingsOut,
   TPrivacyRule,
   TPrivacySnapshot,
-  TReadInput extends AnalyticsReadInput,
   TSignUpDataSchema extends ZodTypeAny,
-  TTimeseriesInput extends AnalyticsTimeseriesInput,
   TWorkbenchState,
   TWorkflowVersion,
   TPublishedComponent,
-  TTimeseriesInputWire = unknown,
-  TReadInputWire = unknown,
   TListInput extends TraceLegacyListInput = TraceLegacyListInput,
   TListInputRaw = unknown,
   TFilterInput extends TraceLegacyFilterInput = TraceLegacyFilterInput,
@@ -265,33 +246,6 @@ export interface AppTrpcFeaturePorts<
   httpProxy: HttpProxyTrpcPorts;
   /** The usage reading and the approaching-limit notifier, over the billing store. */
   limits: LimitsTrpcPorts;
-  /**
-   * One namespace, three transports, two owners — so one entry with a group
-   * per transport inside it.
-   *
-   * `reads` answers the charted `analytics.*` reads, `workbench` the
-   * LangWatchQL doors under `analytics.lwql`, and `savedCharts` the stored
-   * workbench charts under `analytics.savedWorkbenchCharts` — which belong to
-   * Dashboard, because that is where the `saved-workbench-chart` subject
-   * lives even though the name a member reaches it through is this one.
-   *
-   * What all three reach for is the same kind of thing: the shared analytics
-   * input schemas and the filter catalogue this deployment offers, the
-   * workbench rollout gate, the member's own content protections, and the
-   * project identity a restricted statement executes as. None of it is
-   * Analytics' or Dashboard's to know.
-   */
-  analytics: {
-    reads: AnalyticsTrpcPorts<
-      TTimeseriesInput,
-      TReadInput,
-      TFilterField,
-      TTimeseriesInputWire,
-      TReadInputWire
-    >;
-    workbench: LangWatchQLTrpcPorts;
-    savedCharts: SavedWorkbenchChartTrpcPorts;
-  };
   /**
    * The annotation queue rows, the trace reads that resolve an item's content
    * for a reviewer, the correction overlay a suggested output is carried into,
@@ -365,11 +319,6 @@ export interface AppTrpcFeaturePorts<
    * reaches through the application while those verticals are drained.
    */
   experiments: ExperimentTrpcPorts<TWorkbenchState>;
-  /**
-   * The filter-field catalogue a stored graph is read back against, and the
-   * automation secret redaction a bundled trigger row goes through.
-   */
-  graphs: GraphTrpcPorts<TFilterField>;
   /** The Enterprise plan gate behind groups, read out of the billing store. */
   group: GroupTrpcPorts;
   /**
@@ -478,19 +427,14 @@ export function createAppTrpcFeatures<
   TBugReport,
   TBugReportPage,
   TCheckStatus,
-  TFilterField extends string,
   TMappingsIn,
   TMappingsOut,
   TPrivacyRule,
   TPrivacySnapshot,
-  TReadInput extends AnalyticsReadInput,
   TSignUpDataSchema extends ZodTypeAny,
-  TTimeseriesInput extends AnalyticsTimeseriesInput,
   TWorkbenchState,
   TWorkflowVersion,
   TPublishedComponent,
-  TTimeseriesInputWire = unknown,
-  TReadInputWire = unknown,
   TListInput extends TraceLegacyListInput = TraceLegacyListInput,
   TListInputRaw = unknown,
   TFilterInput extends TraceLegacyFilterInput = TraceLegacyFilterInput,
@@ -523,19 +467,14 @@ export function createAppTrpcFeatures<
     TBugReport,
     TBugReportPage,
     TCheckStatus,
-    TFilterField,
     TMappingsIn,
     TMappingsOut,
     TPrivacyRule,
     TPrivacySnapshot,
-    TReadInput,
     TSignUpDataSchema,
-    TTimeseriesInput,
     TWorkbenchState,
     TWorkflowVersion,
     TPublishedComponent,
-    TTimeseriesInputWire,
-    TReadInputWire,
     TListInput,
     TListInputRaw,
     TFilterInput,
@@ -554,6 +493,7 @@ export function createAppTrpcFeatures<
   const gateway = composed.gateway.router(mount);
   const langyRouters = composed.langy.routers(mount);
   const scenarioRouters = composed.scenario.routers(mount);
+  const analyticsRouters = composed.analytics.routers(mount);
   const governance = createEnterpriseGovernanceTrpcRouters(mount);
   const enterprise = createEnterpriseTrpcRouters({ ...mount, ports: ports.enterprise });
   const billing = createEnterpriseBillingTrpcRouters({
@@ -690,16 +630,7 @@ export function createAppTrpcFeatures<
     // `analytics.savedWorkbenchCharts`. Merged here rather than at the caller
     // so the whole namespace is one entry in this list, and so nothing outside
     // it can add a fourth door onto the same name.
-    analytics: mount.root.mergeRouters(
-      createAnalyticsTrpcRouter({ ...mount, ports: ports.analytics.reads }),
-      mount.root.router({
-        lwql: createLangWatchQLTrpcRouter({ ...mount, ports: ports.analytics.workbench }),
-        savedWorkbenchCharts: createSavedWorkbenchChartTrpcRouter({
-          ...mount,
-          ports: ports.analytics.savedCharts,
-        }),
-      }),
-    ),
+    analytics: analyticsRouters.analytics,
     annotation: createAnnotationTrpcRouter({ ...mount, ports: ports.annotation }),
     annotationScore: createAnnotationScoreTrpcRouter(mount),
     apiKey: composeApiKeyTrpcRouter({ mount, infrastructure }),
@@ -746,7 +677,7 @@ export function createAppTrpcFeatures<
     // which is not the scope id the input carries. The mount declares that
     // claim once for the whole surface.
     featureFlag: createFeatureFlagTrpcRouter(mount),
-    graphs: createGraphTrpcRouter({ ...mount, ports: ports.graphs }),
+    graphs: analyticsRouters.graphs,
     group: createGroupTrpcRouter({ ...mount, ports: ports.group }),
     // The GitHub App an organization connected, and the pull requests its
     // coding agents opened. Composed by the feature itself off the shared

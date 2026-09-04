@@ -47,7 +47,7 @@ import type { MiddlewareHandler } from "hono";
 
 import type { EnterpriseGovernanceApplication } from "../features/enterprise/enterprise-governance.composition";
 import type { ComposedScenarioFeature } from "../features/scenario/scenario.composition";
-import type { ApiAnalyticsCollaborators } from "./api-trpc-collaborators.analytics.composition";
+import type { ComposedAnalyticsFeature } from "../features/analytics/analytics.composition";
 import type { ApiExecutionCollaborators } from "./api-trpc-collaborators.execution.composition";
 import type { ApiIdentityCollaborators } from "./api-trpc-collaborators.identity.composition";
 import type { ApiOrgGroupCollaborators } from "./api-trpc-collaborators.org-group.composition";
@@ -93,7 +93,7 @@ export type ApiPackagedRestCompositionOptions = Readonly<{
   /** The connected-agent transport (ADR-128), for `/api/v1/agents`'s connect and call routes. */
   connectedAgents: ApiConnectedAgentsComposition | undefined;
   scenario: ComposedScenarioFeature;
-  analytics: ApiAnalyticsCollaborators | undefined;
+  analytics: ComposedAnalyticsFeature;
   authz: AuthzService;
   authzComposition: ApiAuthzComposition | undefined;
   credentials: ApiHandlerManagedCredentials;
@@ -208,7 +208,7 @@ export function composeApiPackagedRest(
           });
         },
       }),
-      ...(options.analytics ? { dashboard: () => options.analytics!.dashboard } : {}),
+      dashboard: () => options.analytics.dashboard,
       ...(options.productGroup
         ? {
             datasets: () => options.productGroup!.datasetApp,

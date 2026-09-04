@@ -163,7 +163,6 @@ export function createApiTrpcPorts<
   ): Promise<boolean> => authz.hasPermission({ userId: actorId(ctx), permission, projectId });
 
   return {
-    analytics: collaborators.analytics,
 
     annotation: {
       // Queue rows are Postgres, and the packaged adapter is what reads them.
@@ -293,7 +292,6 @@ export function createApiTrpcPorts<
 
     evaluators: collaborators.evaluators,
 
-    graphs: collaborators.graphs,
 
     group: collaborators.group,
 

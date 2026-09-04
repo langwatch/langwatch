@@ -13,6 +13,7 @@
 import type { ComposedGatewayFeature } from "../features/gateway/gateway.composition";
 import type { ComposedLangyFeature } from "../features/langy/langy.composition";
 import type { ComposedOpsFeature } from "../features/ops/ops.composition";
+import type { ComposedAnalyticsFeature } from "../features/analytics/analytics.composition";
 import type { ComposedDataRetentionFeature } from "../features/data-retention/data-retention.composition";
 import type { ComposedMonitorFeature } from "../features/monitor/monitor.composition";
 import type { ComposedScenarioFeature } from "../features/scenario/scenario.composition";
@@ -37,6 +38,11 @@ export type ComposedApiFeatures = Readonly<{
    * the four services the two packaged scenario REST families take directly.
    */
   scenario: ComposedScenarioFeature;
+  /**
+   * Two namespaces, the `ctx.app.analytics` and `ctx.app.dashboard` slices, and
+   * the governed-SQL runner the public LangWatchQL REST family takes whole.
+   */
+  analytics: ComposedAnalyticsFeature;
   /** One namespace, over the policy this process supplies the packaged rules. */
   dataRetention: ComposedDataRetentionFeature;
   /** One namespace and the `ctx.app.monitors` slice the monitor REST family reads. */

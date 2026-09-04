@@ -18,11 +18,11 @@ import type {
   ApiTrpcCollaboratorHalves,
   ApiTrpcFeatureApplicationSlices,
 } from "../api-trpc-features.composition";
-import type { ApiAnalyticsCollaborators } from "../api-trpc-collaborators.analytics.composition";
 import type { ApiExecutionCollaborators } from "../api-trpc-collaborators.execution.composition";
 import { createGatewayTrpcRouters } from "../../features/gateway/gateway-trpc.mount";
 import { refusingLangyFeature } from "../../features/langy/langy.composition";
 import { refusingOpsFeature } from "../../features/ops/ops.composition";
+import { refusingAnalyticsFeature } from "../../features/analytics/analytics.composition";
 import { refusingDataRetentionFeature } from "../../features/data-retention/data-retention.composition";
 import { refusingMonitorFeature } from "../../features/monitor/monitor.composition";
 import { refusingScenarioFeature } from "../../features/scenario/scenario.composition";
@@ -35,7 +35,6 @@ import type { ApiProductCollaborators } from "../api-trpc-collaborators.product.
 import type { ApiTraceGroupCollaborators } from "../api-trpc-collaborators.trace-group.composition";
 
 const anySchema = z.any();
-const openGate = <TProcedure>(procedure: TProcedure): TProcedure => procedure;
 const passThroughMiddleware = ({ next }: { next: () => unknown }) => next();
 
 /**
@@ -194,31 +193,6 @@ export function stubProductHalf(): ApiProductCollaborators {
   });
 }
 
-export function stubAnalyticsHalf(): ApiAnalyticsCollaborators {
-  return stub<ApiAnalyticsCollaborators>("analytics", {
-    analyticsPorts: {
-      reads: stub("analytics.reads", {
-        timeseriesInputSchema: anySchema,
-        sharedFiltersSchema: anySchema,
-        filterFieldSchema: anySchema,
-      }),
-      workbench: stub("analytics.workbench", {
-        requireWorkbenchEnabled: openGate,
-        maxStatementLength: 4_000,
-        timeWindowSchema: anySchema,
-        granularityStepSchema: anySchema,
-      }),
-      savedCharts: stub("analytics.savedCharts", {
-        requireWorkbenchEnabled: openGate,
-        timeWindowSchema: anySchema,
-        granularityStepSchema: anySchema,
-      }),
-    },
-    graphPorts: stub("graphs", { filterFieldSchema: anySchema }),
-    analytics: stub("app.analytics"),
-    dashboard: stub("app.dashboard"),
-  });
-}
 
 export function stubOrgGroupHalf(): ApiOrgGroupCollaborators {
   return stub<ApiOrgGroupCollaborators>("orgGroup", {
@@ -259,6 +233,8 @@ export function stubApplicationSlices(): ApiTrpcFeatureApplicationSlices {
   return {
     gateway: stub("app.gateway"),
     github: stub("app.github"),
+    analytics: stub("app.analytics"),
+    dashboard: stub("app.dashboard"),
     langy: stub("app.langy"),
     monitors: stub("app.monitors"),
     scenarios: stub("app.scenarios"),
@@ -293,6 +269,7 @@ export function stubComposedFeatures(): ComposedApiFeatures {
     langy: refusingLangyFeature(),
     ops: refusingOpsFeature(),
     scenario: refusingScenarioFeature(),
+    analytics: refusingAnalyticsFeature(),
     dataRetention: refusingDataRetentionFeature(),
     monitor: refusingMonitorFeature(),
     storedObject: refusingStoredObjectFeature(),
@@ -311,7 +288,6 @@ export function testHalves(
 ): ApiTrpcCollaboratorHalves {
   return {
     product: stubProductHalf(),
-    analytics: stubAnalyticsHalf(),
     identity: stubIdentityHalf(broadcast),
     execution: stubExecutionHalf(),
     productGroup: stubProductGroupHalf(),

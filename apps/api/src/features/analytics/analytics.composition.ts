@@ -85,15 +85,21 @@ import {
   PostgresFeatureFlagAdapter,
   type FeatureFlagCacheSlot,
 } from "@langwatch/feature-flag-server";
-import { NotFoundError } from "@langwatch/handled-error";
+import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { ResourceScope } from "@langwatch/runtime-composition";
 import { nanoid } from "nanoid";
 import type { z } from "zod";
-import type { ApiLangWatchQLConfigResolution } from "../platform/config/api.config";
-import type { ApiTrpcPortsContext } from "../app-trpc/app-trpc.context";
+import type { ApiLangWatchQLConfigResolution } from "../../platform/config/api.config";
+import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context";
+import type { ApiTrpcFeatureMount } from "../../api.application";
+import {
+  createGraphTrpcRouter,
+  createSavedWorkbenchChartTrpcRouter,
+} from "../dashboard/dashboard-trpc.mount";
+import { createAnalyticsTrpcRouter, createLangWatchQLTrpcRouter } from "./analytics-trpc.mount";
 
 /**
  * The retention floor an evaluation read is bounded by when a project names no
@@ -107,7 +113,7 @@ import type { ApiTrpcPortsContext } from "../app-trpc/app-trpc.context";
 const DEFAULT_RETENTION_DAYS = 49;
 
 /** Everything the analytics half is composed from. */
-export type ApiAnalyticsCollaboratorsOptions = Readonly<{
+export type AnalyticsFeatureCollaborators = Readonly<{
   /** The one guarded connection every row read below runs on. */
   prisma: PrismaClient;
   /** The same AuthZ service the REST doors and the declared checks authorize through. */
@@ -145,8 +151,21 @@ export type ApiAnalyticsCollaboratorsOptions = Readonly<{
   ) => Record<string, unknown>;
 }>;
 
-/** The two application slices and the four port groups, composed together. */
-export type ApiAnalyticsCollaborators = Readonly<{
+/** The two namespaces, the two `ctx.app` slices, and what the REST doors take. */
+export type ComposedAnalyticsFeature = Readonly<{
+  /**
+   * `analytics.*` and `graphs.*`, on the process's own root.
+   *
+   * The first is one wire namespace assembled from three packaged transports,
+   * exactly as the client has always called it: the charted reads at
+   * `analytics.*`, the workbench at `analytics.lwql`, and the saved charts at
+   * `analytics.savedWorkbenchCharts`. Merged here rather than at the record so
+   * nothing outside this feature can add a fourth door onto the same name.
+   */
+  routers(mount: ApiTrpcFeatureMount): {
+    analytics: ReturnType<ApiTrpcFeatureMount["root"]["mergeRouters"]>;
+    graphs: ReturnType<typeof createGraphTrpcRouter>;
+  };
   /** For `ctx.app.analytics`. */
   analytics: AnalyticsApp;
   /** For `ctx.app.dashboard`. */
@@ -164,14 +183,6 @@ export type ApiAnalyticsCollaborators = Readonly<{
   featureFlags: FeatureFlagService;
   /** See {@link ApiAnalyticsProtections.resolveForApiKey}. */
   apiKeyProtections: (input: { projectId: string }) => Promise<LangWatchQLProtections>;
-  /** The `analytics` entry of {@link ApiTrpcCollaborators}. */
-  analyticsPorts: Readonly<{
-    reads: ApiAnalyticsReadPorts;
-    workbench: LangWatchQLTrpcPorts;
-    savedCharts: SavedWorkbenchChartTrpcPorts;
-  }>;
-  /** The `graphs` entry of {@link ApiTrpcCollaborators}. */
-  graphPorts: GraphTrpcPorts<ApiFilterField>;
 }>;
 
 /** The filter fields this deployment offers, as the enum publishes them. */
@@ -205,9 +216,9 @@ type ApiTimeseriesInputWire = z.input<typeof timeseriesInputSchema>;
  * policy — because in both cases two of them would be two answers to one
  * question.
  */
-export function composeApiAnalyticsCollaborators(
-  options: ApiAnalyticsCollaboratorsOptions,
-): ApiAnalyticsCollaborators {
+export function composeAnalyticsFeature(
+  options: AnalyticsFeatureCollaborators,
+): ComposedAnalyticsFeature {
   const langWatchQL = LangWatchQLAdapter.create({
     connection: options.langWatchQL ?? null,
   });
@@ -314,58 +325,170 @@ export function composeApiAnalyticsCollaborators(
 
   const savedChartPolicy = AnalyticsSavedWorkbenchChartPolicy.create({ langWatchQL });
 
+  const ports = {
+    reads: {
+      // The two schemas are this process's because the same shapes are the
+      // REST analytics body and the traces filter input: one definition, here,
+      // is what keeps those surfaces from drifting.
+      timeseriesInputSchema,
+      sharedFiltersSchema: sharedFiltersInputSchema,
+      filterFieldSchema: filterFieldsEnum,
+      filterFieldRequiresKey,
+      filterFieldRequiresSubkey,
+    } as ApiAnalyticsReadPorts,
+
+    workbench: {
+      requireWorkbenchEnabled,
+      isWorkbenchEnabled: (_ctx, input) => workbenchEnabled(input.projectId),
+      maxStatementLength: MAX_LWQL_LENGTH,
+      timeWindowSchema: lwqlTimeWindowSchema,
+      granularityStepSchema: lwqlGranularityStepSchema,
+      resolveProtections,
+      resolveRunCaller,
+    },
+
+    savedCharts: {
+      requireWorkbenchEnabled,
+      timeWindowSchema: lwqlTimeWindowSchema,
+      granularityStepSchema: lwqlGranularityStepSchema,
+      resolveProtections,
+      resolveRunCaller,
+      // Admitted against the CALLER's own protections before it is stored,
+      // which is the one place they are known: a member who cannot read costs
+      // must not be able to save a chart that selects them.
+      admitDefinition: (_ctx, input) =>
+        savedChartPolicy.admit({
+          projectId: input.projectId,
+          protections: input.protections,
+          definition: input.definition,
+        }),
+      mapError: mapDashboardSavedWorkbenchChartError,
+    },
+  } as AnalyticsFeaturePorts;
+
+  const graphPorts: GraphTrpcPorts<ApiFilterField> = {
+    filterFieldSchema: filterFieldsEnum,
+    redactActionParams: (action, actionParams) =>
+      options.redactActionParams ? options.redactActionParams(action, actionParams) : {},
+  };
+
   return {
+    routers: (mount) => analyticsRouters(mount, ports, graphPorts),
     analytics,
     dashboard,
     langWatchQL,
     featureFlags,
     apiKeyProtections: (input) => protections.resolveForApiKey(input),
-    analyticsPorts: {
-      reads: {
-        // The two schemas are this process's because the same shapes are the
-        // REST analytics body and the traces filter input: one definition, here,
-        // is what keeps those surfaces from drifting.
-        timeseriesInputSchema,
-        sharedFiltersSchema: sharedFiltersInputSchema,
-        filterFieldSchema: filterFieldsEnum,
-        filterFieldRequiresKey,
-        filterFieldRequiresSubkey,
-      } as ApiAnalyticsReadPorts,
-
-      workbench: {
-        requireWorkbenchEnabled,
-        isWorkbenchEnabled: (_ctx, input) => workbenchEnabled(input.projectId),
-        maxStatementLength: MAX_LWQL_LENGTH,
-        timeWindowSchema: lwqlTimeWindowSchema,
-        granularityStepSchema: lwqlGranularityStepSchema,
-        resolveProtections,
-        resolveRunCaller,
-      },
-
-      savedCharts: {
-        requireWorkbenchEnabled,
-        timeWindowSchema: lwqlTimeWindowSchema,
-        granularityStepSchema: lwqlGranularityStepSchema,
-        resolveProtections,
-        resolveRunCaller,
-        // Admitted against the CALLER's own protections before it is stored,
-        // which is the one place they are known: a member who cannot read costs
-        // must not be able to save a chart that selects them.
-        admitDefinition: (_ctx, input) =>
-          savedChartPolicy.admit({
-            projectId: input.projectId,
-            protections: input.protections,
-            definition: input.definition,
-          }),
-        mapError: mapDashboardSavedWorkbenchChartError,
-      },
-    },
-    graphPorts: {
-      filterFieldSchema: filterFieldsEnum,
-      redactActionParams: (action, actionParams) =>
-        options.redactActionParams ? options.redactActionParams(action, actionParams) : {},
-    },
   };
+}
+
+/** The two namespaces, built the one way whether the feature composed or not. */
+function analyticsRouters(
+  mount: ApiTrpcFeatureMount,
+  ports: AnalyticsFeaturePorts,
+  graphPorts: GraphTrpcPorts<ApiFilterField>,
+) {
+  return {
+    analytics: mount.root.mergeRouters(
+      createAnalyticsTrpcRouter({ ...mount, ports: ports.reads }),
+      mount.root.router({
+        lwql: createLangWatchQLTrpcRouter({ ...mount, ports: ports.workbench }),
+        savedWorkbenchCharts: createSavedWorkbenchChartTrpcRouter({
+          ...mount,
+          ports: ports.savedCharts,
+        }),
+      }),
+    ),
+    graphs: createGraphTrpcRouter({ ...mount, ports: graphPorts }),
+  };
+}
+
+/** The three port groups the `analytics.*` namespace is assembled from. */
+type AnalyticsFeaturePorts = Readonly<{
+  reads: ApiAnalyticsReadPorts;
+  workbench: LangWatchQLTrpcPorts;
+  savedCharts: SavedWorkbenchChartTrpcPorts;
+}>;
+
+/**
+ * The analytics surfaces on a process that composed no graph to read them over.
+ *
+ * Both namespaces still mount, and every schema the record reads while it is
+ * BUILDING them stays real — the two shared input schemas, the filter-field
+ * enum, the workbench's time-window and granularity parsers and its statement
+ * ceiling. A procedure cannot be constructed without its input parser, so a
+ * refusing stand-in there would take the whole router down rather than the one
+ * answer it cannot give. Only what a REQUEST reaches refuses, by name.
+ */
+export function refusingAnalyticsFeature(): ComposedAnalyticsFeature {
+  const refuse = (): never => {
+    throw new ApiAnalyticsUnavailableError("The analytics surface");
+  };
+  const refuseAsync = (): Promise<never> =>
+    Promise.reject(new ApiAnalyticsUnavailableError("The analytics surface"));
+
+  const workbench: LangWatchQLTrpcPorts = {
+    // Applied while the procedure is built; it refuses when one is CALLED.
+    requireWorkbenchEnabled: <TProcedure,>(procedure: TProcedure): TProcedure =>
+      (procedure as ChainableProcedure).use(refuse) as TProcedure,
+    isWorkbenchEnabled: refuseAsync,
+    maxStatementLength: MAX_LWQL_LENGTH,
+    timeWindowSchema: lwqlTimeWindowSchema,
+    granularityStepSchema: lwqlGranularityStepSchema,
+    resolveProtections: refuseAsync,
+    resolveRunCaller: refuseAsync,
+  } as LangWatchQLTrpcPorts;
+
+  const ports: AnalyticsFeaturePorts = {
+    reads: {
+      timeseriesInputSchema,
+      sharedFiltersSchema: sharedFiltersInputSchema,
+      filterFieldSchema: filterFieldsEnum,
+      filterFieldRequiresKey,
+      filterFieldRequiresSubkey,
+    } as ApiAnalyticsReadPorts,
+    workbench,
+    savedCharts: {
+      ...workbench,
+      admitDefinition: refuseAsync,
+      mapError: mapDashboardSavedWorkbenchChartError,
+    } as SavedWorkbenchChartTrpcPorts,
+  };
+
+  const refusingApplication = <T,>(): T =>
+    new Proxy(
+      {},
+      {
+        get: () => refuse,
+        has: () => true,
+      },
+    ) as T;
+
+  return {
+    routers: (mount) =>
+      analyticsRouters(mount, ports, {
+        filterFieldSchema: filterFieldsEnum,
+        redactActionParams: () => ({}),
+      }),
+    analytics: refusingApplication<AnalyticsApp>(),
+    dashboard: refusingApplication<DashboardApp>(),
+    langWatchQL: refusingApplication<LangWatchQLService>(),
+    featureFlags: refusingApplication<FeatureFlagService>(),
+    apiKeyProtections: refuseAsync,
+  };
+}
+
+/** A capability this deployment did not compose, refused by name. */
+class ApiAnalyticsUnavailableError extends HandledError {
+  declare readonly code: "service_unavailable";
+
+  constructor(capability: string) {
+    super("service_unavailable", `${capability} is not available on this deployment.`, {
+      httpStatus: 503,
+      fault: "platform",
+    });
+    this.name = "ApiAnalyticsUnavailableError";
+  }
 }
 
 /** The `.use()` surface every tRPC procedure builder shares. */

@@ -67,9 +67,10 @@ import {
 import { readAgentPresence } from "@langwatch/agent-server";
 import { ApiUpgradeRouter } from "../api-upgrade-router";
 import {
-  composeApiAnalyticsCollaborators,
-  type ApiAnalyticsCollaborators,
-} from "./api-trpc-collaborators.analytics.composition";
+  composeAnalyticsFeature,
+  refusingAnalyticsFeature,
+  type ComposedAnalyticsFeature,
+} from "../features/analytics/analytics.composition";
 import {
   composeApiIdentityCollaborators,
   type ApiIdentityCollaborators,
@@ -586,7 +587,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * changing one URL.
    */
   private composedUsageEnforcement: UsageService | undefined;
-  private composedAnalytics: ApiAnalyticsCollaborators | undefined;
+  private composedAnalytics!: ComposedAnalyticsFeature;
   private composedIdentity: ApiIdentityCollaborators | undefined;
   /**
    * The identity ledgers' event stack, or none.
@@ -1012,6 +1013,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // existed. Absent infrastructure there is no record either, so the
       // refusing gateway stands in rather than a second condition here.
       composed: {
+        analytics: this.composedAnalytics,
         gateway: this.composedGateway,
         langy: this.composedLangy,
         ops: this.composedOps,
@@ -1026,7 +1028,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       collaborators: composeApiTrpcCollaborators(
         {
           product: this.composedProduct,
-          analytics: this.composedAnalytics,
           identity: this.composedIdentity,
           execution: this.composedExecution,
           productGroup: this.composedProductGroup,
@@ -1038,6 +1039,8 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         // Enterprise governance slices — each contributed by the feature that
         // composes it, or by that feature's named refusal.
         {
+          analytics: this.composedAnalytics.analytics,
+          dashboard: this.composedAnalytics.dashboard,
           gateway: this.composedGateway.app,
           github,
           langy: this.composedLangy.app,
@@ -1493,27 +1496,26 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // on. Taken from the halves rather than built a second time: two analytics
     // applications would let the public door and the dashboard disagree about
     // what a metric means, and two prompt services about what a project holds.
-    const analytics = this.composedAnalytics?.analytics;
+    const analytics = this.composedAnalytics.analytics;
     const prompts = this.composedProductGroup?.promptApp.promptService;
     // The governed-SQL family. Every collaborator is the analytics half's own,
     // so the API key's door and the workbench's door run one validator against
     // one catalogue; the saved charts sit on the same Dashboard application
     // the browser's dashboards do.
-    const analyticsHalf = this.composedAnalytics;
+    const analyticsFeature = this.composedAnalytics;
     const projects = this.composedTenancy?.projects;
-    const langWatchQL =
-      analyticsHalf && projects
-        ? {
-            collaborators: {
-              featureFlags: () => analyticsHalf.featureFlags,
-              projects: () => projects,
-              langWatchQL: () => analyticsHalf.langWatchQL,
-              protectionsFor: (input: { projectId: string }) =>
-                analyticsHalf.apiKeyProtections(input),
-            },
-            dashboard: () => analyticsHalf.dashboard,
-          }
-        : undefined;
+    const langWatchQL = projects
+      ? {
+          collaborators: {
+            featureFlags: () => analyticsFeature.featureFlags,
+            projects: () => projects,
+            langWatchQL: () => analyticsFeature.langWatchQL,
+            protectionsFor: (input: { projectId: string }) =>
+              analyticsFeature.apiKeyProtections(input),
+          },
+          dashboard: () => analyticsFeature.dashboard,
+        }
+      : undefined;
     // The management family's five collaborators, or none. The organization
     // object is the identity half's own merged one — the canonical settings
     // reads plus the membership operations the contract does not declare — so
@@ -1922,7 +1924,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       services: {
         packaged,
         ...(annotations ? { annotations: () => annotations } : {}),
-        ...(analytics ? { analytics: () => analytics } : {}),
+        analytics: () => analytics,
         ...(langWatchQL ? { langWatchQL } : {}),
         ...(prompts ? { prompts: () => prompts } : {}),
         ...(organizationManagement ? { organizationManagement } : {}),
@@ -2632,7 +2634,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private composeAnalytics(
     options: ApiRuntimeCompositionOptions,
     authz: AuthzService,
-  ): ApiAnalyticsCollaborators | undefined {
+  ): ComposedAnalyticsFeature {
     const database = this.composedDatabase?.connection;
     // The project service, and this process's OWN: three of the four things
     // below are project row reads — which organization a tenant routes to,
@@ -2641,7 +2643,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // organization pair composed no tenancy here, so it holds the collaborator
     // set whole and hands it in rather than having this half built for it.
     const projects = this.composedTenancy?.projects;
-    if (!database || !projects) return undefined;
+    if (!database || !projects) return refusingAnalyticsFeature();
 
     this.composedClickHouse = ApiClickHouseInfrastructure.tryCreate({
       resources: options.resources,
@@ -2655,7 +2657,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       report: LoggedApiClickHouseAbsence.create(createLogger(options.config.serviceName)),
     });
 
-    return composeApiAnalyticsCollaborators({
+    return composeAnalyticsFeature({
       prisma: database.client,
       authz,
       projects,

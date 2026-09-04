@@ -119,7 +119,6 @@ function stub<T>(group: string, buildTime: Record<string, unknown> = {}): T {
 const anySchema = z.any();
 
 /** The rollout gate, open: the closed case is the workbench feature's own suite. */
-const openGate = <TProcedure>(procedure: TProcedure): TProcedure => procedure;
 
 /**
  * A middleware that does nothing, for the custom checks a mount installs while
@@ -222,24 +221,6 @@ function testAuthApp(): AuthApp {
 function testCollaborators(overrides: Record<string, unknown> = {}) {
   return {
     application: testApplication(),
-    analytics: {
-      reads: stub("analytics.reads", {
-        timeseriesInputSchema: anySchema,
-        sharedFiltersSchema: anySchema,
-        filterFieldSchema: anySchema,
-      }),
-      workbench: stub("analytics.workbench", {
-        requireWorkbenchEnabled: openGate,
-        maxStatementLength: 4_000,
-        timeWindowSchema: anySchema,
-        granularityStepSchema: anySchema,
-      }),
-      savedCharts: stub("analytics.savedCharts", {
-        requireWorkbenchEnabled: openGate,
-        timeWindowSchema: anySchema,
-        granularityStepSchema: anySchema,
-      }),
-    },
     annotation: stub("annotation"),
     batchRecord: stub("batchRecord"),
     auth: testAuthApp(),
@@ -252,7 +233,6 @@ function testCollaborators(overrides: Record<string, unknown> = {}) {
     evaluators: stub("evaluators"),
     evaluations: stub("evaluations", { mappingsSchema: anySchema }),
     experiments: stub("experiments", { workbenchStateSchema: anySchema }),
-    graphs: stub("graphs", { filterFieldSchema: anySchema }),
     group: stub("group"),
     home: stub("home"),
     identity: stub("identity"),

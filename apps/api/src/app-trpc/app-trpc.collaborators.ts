@@ -26,11 +26,8 @@
  * process that has them mounts all twenty-two. Nothing in between, and nothing
  * silently degraded — see {@link ApiTrpcCollaboratorsAbsence}.
  */
-import type { AnalyticsReadInput, AnalyticsTimeseriesInput } from "@langwatch/analytics-contract";
-import type { AnalyticsTrpcPorts, LangWatchQLTrpcPorts } from "@langwatch/analytics-server";
 import type { AnnotationTrpcPorts } from "@langwatch/annotation-server";
 import type { AuthApp } from "@langwatch/auth-server";
-import type { SavedWorkbenchChartTrpcPorts, GraphTrpcPorts } from "@langwatch/dashboard-server";
 import type { DataPrivacyTrpcPorts } from "@langwatch/data-privacy-server";
 import type { EvaluatorTrpcPorts } from "@langwatch/evaluator-server";
 import type { BatchRecordTrpcPorts, DatasetTrpcPorts } from "@langwatch/dataset-server";
@@ -137,17 +134,12 @@ export type ApiTrpcCollaborators<
   TBugReport,
   TBugReportPage,
   TCheckStatus,
-  TFilterField extends string,
   TMappingsIn,
   TMappingsOut,
   TPrivacyRule,
   TPrivacySnapshot,
-  TReadInput extends AnalyticsReadInput,
   TSignUpDataSchema extends ZodTypeAny,
-  TTimeseriesInput extends AnalyticsTimeseriesInput,
   TWorkbenchState,
-  TTimeseriesInputWire = unknown,
-  TReadInputWire = unknown,
   TListInput extends TraceLegacyListInput = TraceLegacyListInput,
   TListInputRaw = unknown,
   TFilterInput extends TraceLegacyFilterInput = TraceLegacyFilterInput,
@@ -169,19 +161,6 @@ export type ApiTrpcCollaborators<
    * the annotation surface than to the queueing behind it would have two.
    */
   application: ApiTrpcFeatureApplication;
-
-  /** The charted reads, the workbench, and the saved workbench charts. */
-  analytics: Readonly<{
-    reads: AnalyticsTrpcPorts<
-      TTimeseriesInput,
-      TReadInput,
-      TFilterField,
-      TTimeseriesInputWire,
-      TReadInputWire
-    >;
-    workbench: LangWatchQLTrpcPorts;
-    savedCharts: SavedWorkbenchChartTrpcPorts;
-  }>;
 
   /** Everything an annotation needs from the TRACE side, and nothing else. */
   annotation: Omit<AnnotationTrpcPorts, ApiOwnedAnnotationPorts>;
@@ -218,8 +197,6 @@ export type ApiTrpcCollaborators<
   evaluators: EvaluatorTrpcPorts;
 
   experiments: Omit<ExperimentTrpcPorts<TWorkbenchState>, ApiOwnedExperimentPorts>;
-
-  graphs: GraphTrpcPorts<TFilterField>;
 
   group: GroupTrpcPorts;
 

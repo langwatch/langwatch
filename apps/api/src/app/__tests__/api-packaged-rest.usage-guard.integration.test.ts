@@ -18,6 +18,7 @@ import { composeEnterpriseGovernanceApplication } from "../../features/enterpris
 import { composeApiPackagedRest } from "../api-packaged-rest.composition";
 import type { ApiPackagedRestCompositionOptions } from "../api-packaged-rest.composition";
 import type { ApiTraceIngestComposition } from "../api-trace-ingest.composition";
+import { refusingAnalyticsFeature } from "../../features/analytics/analytics.composition";
 import { refusingMonitorFeature } from "../../features/monitor/monitor.composition";
 import { refusingScenarioFeature } from "../../features/scenario/scenario.composition";
 import { refusingStoredObjectFeature } from "../../features/stored-object/stored-object.composition";
@@ -45,7 +46,7 @@ function composeGuard(usageLimit: ApiTraceIngestComposition["usageLimit"] | unde
     monitor: refusingMonitorFeature(),
     scenario: refusingScenarioFeature(),
     storedObject: refusingStoredObjectFeature(),
-    analytics: undefined,
+    analytics: refusingAnalyticsFeature(),
     authz: { authorizeProjectPermission: async () => undefined } as never,
     authzComposition: undefined,
     credentials: { authenticate: async () => null } as never,
