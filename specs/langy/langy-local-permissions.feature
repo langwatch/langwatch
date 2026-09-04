@@ -143,6 +143,26 @@ Feature: The CLI decides what Langy may run on the developer's machine
       When the conversation is reloaded
       Then the card renders locked with my answer marked
 
+    @unit
+    Scenario: My answer settles the card before the record catches up
+      Given a permission card rendered from the durable record alone
+      When I answer it
+      Then the card reads answered at once
+      And a replay of the live stream does not put it back to waiting
+
+    @unit
+    Scenario: A card that was already answered says which answer closed it
+      When I answer a card that someone already answered
+      Then the refusal says it was already answered, and with which answer
+      And it does not say Langy stopped waiting
+
+    @integration
+    Scenario: Every card of the conversation is on screen again after a reload
+      Given a finished conversation where I allowed, denied and let one expire
+      When I reopen it
+      Then each card renders with the answer it ended on
+      And a pattern grant names the pattern it covered
+
     @integration
     Scenario: A grant lives with the session, not with the conversation
       Given I allowed a pattern for this session

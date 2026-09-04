@@ -2240,14 +2240,14 @@ function LangyPanel({
         onSuccess: () =>
           useLangyLocalControlStore
             .getState()
-            .settleWait({ waitId, status: "answered" }),
+            .settleWait({ waitId, kind: "question", status: "answered" }),
         onError: (error) => {
           // Only an expired wait falls back to a message. Anything else is a
           // real failure, and the toast says what it was.
           if (readHandledError(error)?.code === "langy_wait_expired") {
             useLangyLocalControlStore
               .getState()
-              .settleWait({ waitId, status: "expired" });
+              .settleWait({ waitId, kind: "question", status: "expired" });
             selectChoiceImplementationRef.current({ selection, card });
             return;
           }

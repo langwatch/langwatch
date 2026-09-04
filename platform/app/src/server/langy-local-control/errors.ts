@@ -110,18 +110,39 @@ export class LangyLocalSkipModelNotAllowedError extends HandledError {
   }
 }
 
-/** The card is no longer waiting: it was answered, it expired, or it was stopped. */
+/**
+ * The card is no longer waiting: it was answered, it expired, or it was
+ * stopped. Which of the three rides in `meta`, because the three are very
+ * different news: an answered card ran the command the reader allowed, and
+ * telling them Langy gave up on it is wrong on both halves.
+ */
 export class LangyWaitExpiredError extends HandledError {
   declare readonly code: "langy_wait_expired";
 
-  constructor({ waitId }: { waitId: string }) {
+  constructor({
+    waitId,
+    outcome,
+    decision,
+  }: {
+    waitId: string;
+    /** How the card ended, when the record still holds it. */
+    outcome?: "answered" | "expired" | "cancelled";
+    /** The answer that closed an already-answered card. */
+    decision?: "allow_once" | "allow_pattern" | "deny";
+  }) {
     super(
       "langy_wait_expired",
-      "This card is no longer waiting for an answer. Send Langy a message with your answer instead.",
+      outcome === "answered"
+        ? "This card was already answered, and Langy carried on with that answer."
+        : "This card is no longer waiting for an answer. Send Langy a message with your answer instead.",
       {
         httpStatus: 410,
         fault: "customer",
-        meta: { waitId },
+        meta: {
+          waitId,
+          ...(outcome ? { outcome } : {}),
+          ...(decision ? { decision } : {}),
+        },
         ...remediation("langy_wait_expired"),
       },
     );

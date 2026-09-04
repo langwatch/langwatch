@@ -255,7 +255,14 @@ export class UserWaitService {
     answers?: Array<{ question: string; selected: string[]; other?: string }>;
   }): Promise<StoredUserWait> {
     const wait = await this.readSettlingExpiry(waitId);
-    if (wait?.state !== "pending") throw new LangyWaitExpiredError({ waitId });
+    if (wait?.state !== "pending") {
+      const ended = wait?.state;
+      throw new LangyWaitExpiredError({
+        waitId,
+        ...(ended && ended !== "pending" ? { outcome: ended } : {}),
+        ...(wait?.decision ? { decision: wait.decision } : {}),
+      });
+    }
 
     const answered: StoredUserWait = {
       ...wait,

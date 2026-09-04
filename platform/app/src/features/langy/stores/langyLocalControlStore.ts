@@ -13,7 +13,10 @@
  */
 import { create } from "zustand";
 
-import type { LangyLiveWait } from "../logic/langyLocalWaits";
+import {
+  type LangyLiveWait,
+  mergeLangyWaitStatus,
+} from "../logic/langyLocalWaits";
 
 /** The folder as the live stream last reported it. */
 export interface LangyLiveWorkspace {
@@ -42,8 +45,19 @@ interface LangyLocalControlState {
     conversationId: string | null;
     workspace: LangyLiveWorkspace;
   }) => void;
-  /** Mark a card settled locally, the moment the answer is accepted. */
-  settleWait: (a: { waitId: string; status: LangyLiveWait["status"] }) => void;
+  /**
+   * Mark a card settled locally, the moment the answer is accepted.
+   *
+   * Records the settle even for a card this stream never carried: a tab that
+   * adopted a running turn renders its cards from the durable record alone,
+   * and the answer it just gave has to win over a durable record that still
+   * reads `pending` until the tail lands.
+   */
+  settleWait: (a: {
+    waitId: string;
+    kind?: LangyLiveWait["kind"];
+    status: LangyLiveWait["status"];
+  }) => void;
   /** Open another conversation: everything here belonged to the last one. */
   reset: (conversationId: string | null) => void;
 }
@@ -60,7 +74,15 @@ export const useLangyLocalControlStore = create<LangyLocalControlState>(
       // An entry for a conversation nobody is reading is not worth keeping,
       // and folding it into the open one would show the wrong card.
       if (conversationId && state.conversationId !== conversationId) return;
-      set({ waits: { ...state.waits, [wait.waitId]: wait } });
+      // The live stream is replayed from its start on every attach, so the
+      // `pending` entry that raised a card arrives again after the card was
+      // answered. A card only ever moves forward.
+      const known = state.waits[wait.waitId];
+      const status = mergeLangyWaitStatus({
+        durable: known?.status,
+        live: wait.status,
+      });
+      set({ waits: { ...state.waits, [wait.waitId]: { ...wait, status } } });
     },
 
     recordWorkspace: ({ conversationId, workspace }) => {
@@ -72,10 +94,9 @@ export const useLangyLocalControlStore = create<LangyLocalControlState>(
       });
     },
 
-    settleWait: ({ waitId, status }) => {
+    settleWait: ({ waitId, kind = "permission", status }) => {
       const state = get();
-      const wait = state.waits[waitId];
-      if (!wait) return;
+      const wait = state.waits[waitId] ?? { waitId, kind, status: "pending" };
       set({ waits: { ...state.waits, [waitId]: { ...wait, status } } });
     },
 

@@ -76,6 +76,13 @@ const strList = (error: HandledErrorShape, key: string): string[] => {
     .slice(0, 10);
 };
 
+/** What the reader answered on a permission card, in the words they clicked. */
+const LANGY_WAIT_ANSWERS: Record<string, string | undefined> = {
+  allow_once: "allowed this command once",
+  allow_pattern: "allowed this pattern for the session",
+  deny: "denied this command",
+};
+
 /**
  * Names the piece of a scenario a parameter failure came from, so the copy can
  * point at it instead of asking the reader to search their own text.
@@ -2449,9 +2456,21 @@ const presentations = {
       "Check the allowed models list in the provider settings, or answer each card as it comes.",
   },
   langy_wait_expired: {
-    title: "That card is no longer waiting",
-    describe: () =>
-      "Langy stopped waiting for an answer. Send your answer as a message and it will pick it up.",
+    title: "That card is not waiting any more",
+    describe: (error) => {
+      const outcome = str(error, "outcome", "");
+      if (outcome === "answered") {
+        const decision = str(error, "decision", "");
+        const answer = LANGY_WAIT_ANSWERS[decision];
+        return answer
+          ? `You already ${answer}, and Langy carried on with that answer.`
+          : "You already answered this card, and Langy carried on with that answer.";
+      }
+      if (outcome === "cancelled") {
+        return "The turn was stopped before anyone answered. Send Langy a message to pick it up again.";
+      }
+      return "Langy stopped waiting for an answer. Send your answer as a message and it will pick it up.";
+    },
   },
   langy_turn_in_progress: {
     title: "Langy is still replying",
