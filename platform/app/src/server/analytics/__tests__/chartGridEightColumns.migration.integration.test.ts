@@ -16,7 +16,7 @@ import { prisma } from "~/server/db";
 const MIGRATION_SQL = readFileSync(
   join(
     process.cwd(),
-    "prisma/migrations/20260903120000_chart_grid_eight_columns/migration.sql",
+    "prisma/migrations/20260903120001_chart_grid_eight_columns/migration.sql",
   ),
   "utf8",
 );

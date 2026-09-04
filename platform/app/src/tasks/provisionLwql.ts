@@ -51,7 +51,6 @@ import {
 } from "../server/analytics/lwql/views";
 import { parseConnectionUrl } from "../server/clickhouse/goose";
 import { prisma } from "../server/db";
-import { env } from "~/env.mjs";
 
 const logger = createLogger("langwatch:task:provisionLwql");
 
