@@ -3,7 +3,7 @@ NAMESPACE := ch-test
 CH_IMAGE  := langwatch/clickhouse-serverless:next
 CH_DIR    := ../../infra/clickhouse-serverless
 
-.PHONY: lint template test-e2e test clean images
+.PHONY: lint template test-e2e test-upgrade test clean images
 
 ## Build the clickhouse-serverless Docker image
 images:
@@ -26,6 +26,13 @@ template: lint
 ## Deploy to Kind and run functional tests (requires: kind, helm, kubectl)
 test-e2e:
 	bash tests/e2e.sh
+
+## Upgrade-access harness: old->new upgrade with pre-existing SQL access state.
+## REPLICAS=3 is the real run; REPLICAS=1 is the AC24(b) negative control and
+## MUST exit 20. Not part of `make test` — it deliberately runs to a red result.
+## See tests/upgrade-access.sh for exit codes and the full env contract.
+test-upgrade:
+	bash tests/upgrade-access.sh
 
 ## Run all tests
 test: template test-e2e
