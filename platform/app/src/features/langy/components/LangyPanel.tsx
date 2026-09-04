@@ -100,6 +100,7 @@ import {
   type LangyTurnRequestContext,
 } from "../logic/langyChatTransport";
 import { langyChoicesTimeline } from "../logic/langyChoicesTimeline";
+import { latestCodeAccessCallId } from "../logic/langyCodeAccessTool";
 import { resolveComposerModel } from "../logic/langyComposerModel";
 import { mergeContextChips } from "../logic/langyContextChips";
 import { langyDraftToRestore } from "../logic/langyDraftRecovery";
@@ -2190,6 +2191,15 @@ function LangyPanel({
     return choicesTimelineRef.current.value;
   }, [displayMessages]);
 
+  // The one `code_access` call the conversation is asking on. Langy can ask
+  // again (the reader clicked Change, or the folder went away), and every state
+  // the card shows is read from the workspace query rather than from the call,
+  // so the older card would render the same live question twice.
+  const liveCodeAccessCallId = useMemo(
+    () => latestCodeAccessCallId(displayMessages),
+    [displayMessages],
+  );
+
   // ── The developer's own machine (ADR-129) ───────────────────────────────
   //
   // Everything the local cards read comes from three places and no more: the
@@ -3268,6 +3278,7 @@ function LangyPanel({
                                 onAskCodeAccessAgain={
                                   timeTravel ? undefined : askCodeAccessAgain
                                 }
+                                liveCodeAccessCallId={liveCodeAccessCallId}
                                 // (No connect-card prop: MessageContent no longer sniffs
                                 // the prose for `[langy:connect-github]`. The connect card
                                 // is driven by the structured `langy_github_not_connected`

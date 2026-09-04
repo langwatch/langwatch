@@ -286,6 +286,25 @@ describe("given a request the terminal has not approved yet", () => {
   });
 });
 
+describe("given Langy asked again further down the conversation", () => {
+  beforeEach(() => {
+    workspaceData = ASKING;
+  });
+
+  /** @scenario "Only the newest code access card can be answered" */
+  it("reads as closed, points at the newer card, and answers nothing", () => {
+    const { container } = renderCard({ superseded: true });
+
+    expect(
+      screen.getByText("Asked again further down. Answer the newer card."),
+    ).toBeDefined();
+    expect(screen.queryByText("Share my local folder")).toBeNull();
+    expect(screen.queryByText("Use GitHub")).toBeNull();
+    expect(screen.queryByTestId("langy-remember-code-access")).toBeNull();
+    expect(container.querySelector('[data-superseded="true"]')).not.toBeNull();
+  });
+});
+
 describe("given the folder is connected", () => {
   beforeEach(() => {
     workspaceData = {

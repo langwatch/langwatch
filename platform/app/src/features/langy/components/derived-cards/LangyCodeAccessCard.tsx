@@ -118,6 +118,14 @@ export interface LangyCodeAccessCardProps {
   }) => void;
   /** Stop any running turn and ask Langy the question again. */
   onAskAgain?: () => void;
+  /**
+   * A newer `code_access` call exists in this conversation, so this card is
+   * the older ask. It reads closed and answers nothing: every state of the
+   * card is read from the one workspace query, so two live cards would offer
+   * the same answer twice and only the newer one belongs to the question the
+   * reader is being asked now.
+   */
+  superseded?: boolean;
   /** Test seam: the clock the countdown reads. */
   now?: () => number;
 }
@@ -162,12 +170,13 @@ type LangyLocalWorkspaceStatus = {
 
 export function LangyCodeAccessCard(props: LangyCodeAccessCardProps) {
   const { projectId, conversationId } = props;
+  const superseded = props.superseded ?? false;
   const workspaceRevision = useLangyLocalControlStore(
     (s) => s.workspaceRevision,
   );
   const workspace = api.langy.getLocalWorkspace.useQuery(
     { projectId, conversationId },
-    { enabled: !!projectId && !!conversationId },
+    { enabled: !!projectId && !!conversationId && !superseded },
   );
 
   // The live stream says the folder came or went; the query says what it is.
@@ -177,6 +186,7 @@ export function LangyCodeAccessCard(props: LangyCodeAccessCardProps) {
     void refetch();
   }, [workspaceRevision, refetch]);
 
+  if (superseded) return <SupersededState />;
   const data = workspace.data;
   if (workspace.isLoading || !data) return <LoadingState />;
   return <CodeAccessBody {...props} folder={data} onRefetch={refetch} />;
@@ -230,6 +240,27 @@ function CodeAccessBody({
     );
   }
   return <AskingState {...props} onPickLocal={pickLocal} />;
+}
+
+/** The older ask, once Langy has asked again: readable, closed, unanswerable. */
+function SupersededState() {
+  return (
+    <CardShell superseded>
+      <VStack align="stretch" gap={1}>
+        <HStack gap={2}>
+          <Box color="fg.muted" display="flex">
+            <FolderCode size={14} />
+          </Box>
+          <Text textStyle="xs" color="fg.muted">
+            How should I reach your code?
+          </Text>
+        </HStack>
+        <Text textStyle="2xs" color="fg.subtle">
+          Asked again further down. Answer the newer card.
+        </Text>
+      </VStack>
+    </CardShell>
+  );
 }
 
 function LoadingState() {
@@ -626,10 +657,18 @@ function FailureLine({ text }: { text: string }) {
   );
 }
 
-function CardShell({ children }: { children: ReactNode }) {
+function CardShell({
+  children,
+  superseded = false,
+}: {
+  children: ReactNode;
+  superseded?: boolean;
+}) {
   return (
     <Box
       data-testid="langy-code-access-card"
+      data-superseded={superseded ? "true" : undefined}
+      opacity={superseded ? 0.65 : 1}
       borderWidth="1px"
       borderColor="border.muted"
       borderRadius="md"

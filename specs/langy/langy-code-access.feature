@@ -79,6 +79,14 @@ Feature: Langy asks how to reach the customer's code, once
       When I reopen the conversation before the folder connects
       Then the card still shows the command and the countdown
 
+    @integration
+    Scenario: Only the newest code access card can be answered
+      Given Langy asked for code access earlier in this conversation
+      When Langy asks again
+      Then the earlier card reads as closed and offers no way to answer it
+      And it says the question was asked again further down
+      And only the newest card offers to share my local folder or to use GitHub
+
     @e2e
     Scenario: Langy does not ask twice in one conversation
       Given a conversation with my local folder connected

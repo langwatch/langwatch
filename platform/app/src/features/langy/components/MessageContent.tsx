@@ -90,6 +90,7 @@ function MessageContentImpl({
   onChoiceSelect,
   onVerifyDerivedCard,
   onAskCodeAccessAgain,
+  liveCodeAccessCallId,
 }: {
   message: UIMessage;
   organizationId?: string | null;
@@ -140,6 +141,12 @@ function MessageContentImpl({
    * the card renders read-only.
    */
   onAskCodeAccessAgain?: () => void;
+  /**
+   * The `code_access` call the whole conversation is asking on right now
+   * (`latestCodeAccessCallId`). A card hanging on an older call renders
+   * closed. Absent = this message is read on its own, so its card is live.
+   */
+  liveCodeAccessCallId?: string | null;
 }) {
   const isUser = message.role === "user";
   const { project } = useOrganizationTeamProject();
@@ -491,6 +498,10 @@ function MessageContentImpl({
               conversationId={conversationId}
               callId={codeAccessCall}
               organizationId={organizationId ?? null}
+              superseded={
+                liveCodeAccessCallId != null &&
+                liveCodeAccessCallId !== codeAccessCall
+              }
               {...(onChoiceSelect ? { onChoiceSelect } : {})}
               {...(onAskCodeAccessAgain
                 ? { onAskAgain: onAskCodeAccessAgain }

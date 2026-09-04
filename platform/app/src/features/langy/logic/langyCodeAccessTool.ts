@@ -61,6 +61,27 @@ export function codeAccessCallId(parts: readonly unknown[]): string | null {
   return found;
 }
 
+/**
+ * The id of the LAST `code_access` call in a whole conversation, or null when
+ * no message carries one.
+ *
+ * Only that card is live. Every state the card shows is read from the one
+ * workspace query, so an older ask renders exactly what the newest one does:
+ * two identical cards, two ways to answer the same question, and a click on
+ * the older one answering a call the turn has moved past.
+ */
+export function latestCodeAccessCallId(
+  messages: readonly { role?: string; parts?: readonly unknown[] }[],
+): string | null {
+  let found: string | null = null;
+  for (const message of messages) {
+    if (message?.role === "user") continue;
+    const id = codeAccessCallId(message?.parts ?? []);
+    if (id) found = id;
+  }
+  return found;
+}
+
 /** The one line Langy gave for the change it wants to make, when it gave one. */
 export function codeAccessReason(parts: readonly unknown[]): string | null {
   for (const part of parts) {
