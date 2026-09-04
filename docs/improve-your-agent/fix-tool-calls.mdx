@@ -13,7 +13,7 @@ A tool call goes wrong in two ways: the agent calls the wrong tool, or it calls 
 - **As a passing scenario with retries inside it.** The verdict is green and the conversation took eight turns. Open the conversation, then the trace link on the run: the tool span appears three times, the first two with an error.
 
 <Frame caption="The trace link on a run opens the agent's trace for that conversation, the same trace the judge read.">
-<img className="block" src="/images/agent-testing/run-drawer-trace-link.png" alt="The conversation drawer of a run with the link to the agent's trace" />
+<img className="block" src="/images/improve-your-agent/run-drawer-trace-link.png" alt="The conversation drawer of a failed scenario, with the View trace link on the turn and the agent reply below it" />
 </Frame>
 
 To make the second case fail on its own, add a criterion on the process as well as the outcome: `The agent does not call check_return_eligibility more than once for the same order`.

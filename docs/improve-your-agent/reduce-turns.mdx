@@ -23,7 +23,7 @@ langwatch test-suite run "Returns" --target connected:returns-agent@development 
 The run header shows the pass rate, the total duration and the total cost of the run. Hover it for **Avg Agent Latency** and **Avg Agent Cost**, each with percentiles. Open the conversation with the highest **Time · cost** in the table. Count the agent's replies, then read the judge's reasoning under the verdict to find the turn where the agent looped.
 
 <Frame caption="The run detail, with Time · cost per scenario. The row with the highest value is the first conversation to open.">
-<img className="block" src="/images/agent-testing/run-detail-table.png" alt="A run detail table with one row per scenario, the verdict, the evaluators and the time and cost of each" />
+<img className="block" src="/images/improve-your-agent/run-detail-table.png" alt="The run detail of the baseline run: the header with the pass rate, the duration and the cost, and one row per scenario with its verdict and its time and cost" />
 </Frame>
 
 ## Step 2: Find the cause
@@ -50,7 +50,7 @@ langwatch test-suite run "Returns" \
 The run detail shows one column per target with the pass rate, the cost and the latency of each, and four charts above them: **Pass rate**, **Total cost**, **Average reply latency** and **Pass rate over runs**. Keep the change when the pass rate holds and the latency and the cost went down. When a criterion fails on the changed side, read the judge's reasoning for the turn the agent skipped.
 
 <Frame caption="A comparison run: one column per target, and the charts above the table.">
-<img className="block" src="/images/agent-testing/comparison-run-detail.png" alt="A comparison run with one column per target, the four charts and the matrix of results" />
+<img className="block" src="/images/improve-your-agent/comparison-run-detail.png" alt="A comparison run of the returns agent in production against development: the four charts, one column per target with its pass rate, duration and cost, and one row per scenario" />
 </Frame>
 
 To pin the gain, add a criterion that counts: `The agent completes the return within four replies`. The judge counts the replies in the conversation and fails the scenario when the agent takes more.

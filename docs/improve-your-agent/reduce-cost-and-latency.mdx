@@ -61,7 +61,7 @@ langwatch test-suite run "Returns" \
 `--repeat 3` runs every scenario three times per target, so the result does not rest on one lucky pass.
 
 <Frame caption="The run dialog with the same agent on two rows and a different model on each.">
-<img className="block" src="/images/agent-testing/run-dialog-compare.png" alt="The run dialog with two targets and the Run button counting both" />
+<img className="block" src="/images/improve-your-agent/run-dialog-compare.png" alt="The run dialog with the same agent on two rows, model=gpt-5 on one and model=gpt-5-mini on the other, and the Run button counting both" />
 </Frame>
 
 ## Step 3: Read the comparison
@@ -69,7 +69,7 @@ langwatch test-suite run "Returns" \
 The run detail has one column per model. Decide from the four charts above the table: **Pass rate**, **Total cost**, **Average reply latency** and **Pass rate over runs**.
 
 <Frame caption="One column per model. The pass rate must hold; the cost and the latency should drop.">
-<img className="block" src="/images/agent-testing/comparison-run-detail.png" alt="A comparison run with one column per target, the four charts and the matrix of results" />
+<img className="block" src="/images/improve-your-agent/model-comparison-run-detail.png" alt="A comparison run of the same agent on gpt-5 and on gpt-5-mini, with the four charts and one column per model" />
 </Frame>
 
 Keep the cheaper model when its pass rate equals the baseline's across the repeats. When it fails one scenario and passes the rest, open that conversation and read which criterion failed. Then route that kind of request to the larger model in your code, or keep the larger model for everything, and rerun.
