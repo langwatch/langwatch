@@ -1,5 +1,6 @@
 import {
   GithubInstallationConflictError,
+  GithubInstallationNotFromFlowError,
   type GithubRepositoryRef,
   type GithubTurnToken,
 } from "@langwatch/github-contract";
@@ -59,11 +60,28 @@ export class GithubInstallationsService {
     return this.access.tryGetByInstallationId(installationId);
   }
 
+  /**
+   * Binds an installation to the organization whose flow produced it.
+   *
+   * `flowStartedAt` is the signed state's issue time. An installation id is
+   * attacker-chosen — it arrives in GitHub's redirect query string, and the
+   * App's own JWT resolves ANY installation — so a first claim is accepted only
+   * for an installation GitHub says this flow created. Anything older already
+   * belongs to whoever installed it, whether or not we ever recorded a row.
+   */
   async recordInstallation(input: {
     installationId: string;
     organizationId: string;
+    flowStartedAt: number;
   }): Promise<{ accountLogin: string }> {
     const details = await this.appTokens.getInstallation(input.installationId);
+    const alreadyRecorded = await this.repository.tryFindByInstallationId(details.installationId);
+    if (!alreadyRecorded && !installationBelongsToFlow(details.createdAt, input.flowStartedAt)) {
+      throw new GithubInstallationNotFromFlowError({
+        installationId: details.installationId,
+        attemptedOrganizationId: input.organizationId,
+      });
+    }
     const repositories = await this.tryReadSelectedRepositories(details);
     const record = {
       installationId: details.installationId,
@@ -185,4 +203,20 @@ export class GithubInstallationsService {
       logger.warn({ error, installationId, action }, "failed to refresh webhook repositories");
     }
   }
+}
+
+/** Clock skew allowed between GitHub's creation stamp and our own state. */
+const INSTALLATION_CREATION_SKEW_MS = 60_000;
+
+/**
+ * Whether GitHub's creation stamp puts the installation inside this flow.
+ *
+ * An installation GitHub declines to date cannot be shown to belong to the
+ * flow, so it is refused: the whole point is that an unproven claim fails.
+ */
+function installationBelongsToFlow(createdAt: string | null, flowStartedAt: number): boolean {
+  if (!createdAt) return false;
+  const created = Date.parse(createdAt);
+  if (Number.isNaN(created)) return false;
+  return created >= flowStartedAt - INSTALLATION_CREATION_SKEW_MS;
 }

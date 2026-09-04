@@ -403,3 +403,31 @@ Feature: Staged automation authoring drawer
       When the user opens the automation's detail panel
       Then the panel shows the template-error warning
       And the panel shows any missing variable names from that dispatch
+
+  Rule: Delivery settings change only where they are validated and stamped
+
+    An automation's delivery settings carry secrets that are encrypted on the
+    way in, a channel that ships behind a flag, and the creator an annotation
+    queue attributes its items to. The REST edit does none of that work, so it
+    refuses the field instead of forwarding it unchecked.
+
+    @unit
+    Scenario: A REST edit cannot rewrite an automation's delivery settings
+      Given a stored automation that delivers to a webhook
+      When a REST patch carries new delivery settings
+      Then the request is refused with the machine-readable invalid-action-params code
+      And the stored automation is not written at all
+
+    @unit
+    Scenario: A REST edit cannot re-attribute an automation to another user
+      Given a stored automation that queues annotations for its creator
+      When a REST patch names a different creator in the delivery settings
+      Then the request is refused with the machine-readable invalid-action-params code
+      And the stored automation is not written at all
+
+    @unit
+    Scenario: A REST edit still changes an automation's name and state
+      Given a stored automation
+      When a REST patch renames it and pauses it
+      Then the edit is applied
+      And no delivery settings are forwarded to the write

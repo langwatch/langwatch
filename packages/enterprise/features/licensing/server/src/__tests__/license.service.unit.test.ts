@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { UNLIMITED_PLAN } from "@langwatch/enterprise-licensing-contract";
 import {
+  LicenseGenerationService,
   LicenseLoggerPort,
   LicenseStoragePort,
   LicenseRetentionPort,
@@ -13,9 +14,22 @@ import {
 import {
   EXPIRED_LICENSE_KEY,
   TAMPERED_LICENSE_KEY,
+  TEST_PRIVATE_KEY,
   TEST_PUBLIC_KEY,
   VALID_LICENSE_KEY,
 } from "../testing";
+
+/** A freshly minted key, bound to one organization or to none. */
+function mintLicenseKey(options: { organizationId?: string } = {}): string {
+  return LicenseGenerationService.create(NodeLicenseCryptographyAdapter.create()).generate({
+    ...(options.organizationId ? { organizationId: options.organizationId } : {}),
+    organizationName: "Acme Corp",
+    email: "buyer@acme.com",
+    planType: "GROWTH",
+    maxMembers: 5,
+    privateKey: TEST_PRIVATE_KEY,
+  }).licenseKey;
+}
 
 const ORGANIZATION_ID = "org_123";
 
@@ -208,6 +222,62 @@ describe("LicenseService", () => {
     });
     expect(result).toEqual({ success: false, error: "Invalid signature" });
     expect(repository.stored.size).toBe(0);
+  });
+
+  /** @scenario "A license activates only on the organization it was issued for" */
+  it("refuses a license issued for another organization, and stores nothing", async () => {
+    const result = await service.validateAndStoreLicense({
+      organizationId: ORGANIZATION_ID,
+      licenseKey: mintLicenseKey({ organizationId: "org_someone_else" }),
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "License was issued for a different organization",
+    });
+    expect(repository.stored.size).toBe(0);
+  });
+
+  /** @scenario "A license activates only on the organization it was issued for" */
+  it("activates a license issued for this organization", async () => {
+    const result = await service.validateAndStoreLicense({
+      organizationId: ORGANIZATION_ID,
+      licenseKey: mintLicenseKey({ organizationId: ORGANIZATION_ID }),
+    });
+
+    expect(result.success).toBe(true);
+    expect(repository.stored.has(ORGANIZATION_ID)).toBe(true);
+  });
+
+  /** @scenario "A license minted before the binding existed keeps working" */
+  it("still activates a license minted before keys carried an organization", async () => {
+    const result = await service.validateAndStoreLicense({
+      organizationId: ORGANIZATION_ID,
+      licenseKey: mintLicenseKey(),
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  /** @scenario "A license activates only on the organization it was issued for" */
+  it("does not read a stored license as platform access for another organization", async () => {
+    repository.stored.set(ORGANIZATION_ID, {
+      licenseKey: mintLicenseKey({ organizationId: "org_someone_else" }),
+      expiresAt: new Date("2030-01-01T00:00:00.000Z"),
+      validatedAt: new Date("2026-01-01T00:00:00.000Z"),
+    });
+
+    const result = await service.inspectPlatformAccess({});
+
+    expect(result.allowed).toBe(false);
+    expect(result.inspections).toEqual([
+      expect.objectContaining({
+        source: "organization",
+        organizationId: ORGANIZATION_ID,
+        valid: false,
+        reason: "organization_mismatch",
+      }),
+    ]);
   });
 
   it("raises a handled not-found error for an unknown organization", async () => {

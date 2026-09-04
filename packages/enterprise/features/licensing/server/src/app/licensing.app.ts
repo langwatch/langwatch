@@ -183,6 +183,8 @@ export class LicensingApp {
         webhookEndpointsEnabled: input.plan.webhookEndpointsEnabled,
         usageUnit: input.plan.usageUnit,
       }),
+      // The binding: without it the key activates on any organization.
+      organizationId: input.organizationId,
     };
 
     try {

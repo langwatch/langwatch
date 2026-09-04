@@ -128,6 +128,7 @@ describe("SCIM characterization: Auth0 webhook", () => {
     const service = new ScimServiceFake();
     await ScimWebhookApi.create().handle({
       service,
+      organizationId: "org_1",
       events: [
         {
           type: "sscim",

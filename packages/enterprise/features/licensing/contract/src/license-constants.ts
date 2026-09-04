@@ -41,6 +41,7 @@ export const LICENSE_ERRORS = {
   INVALID_FORMAT: "Invalid license format",
   INVALID_SIGNATURE: "Invalid signature",
   EXPIRED: "License expired",
+  ORGANIZATION_MISMATCH: "License was issued for a different organization",
 } as const;
 
 export type LicenseError = (typeof LICENSE_ERRORS)[keyof typeof LICENSE_ERRORS];

@@ -36,7 +36,10 @@ import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { z } from "zod";
 import type { GithubInstallStatePayload, GithubService } from "@langwatch/github-contract";
-import { GithubInstallationConflictError } from "@langwatch/github-contract";
+import {
+  GithubInstallationConflictError,
+  GithubInstallationNotFromFlowError,
+} from "@langwatch/github-contract";
 
 /** Who is signed in, as this process resolves a browser session. */
 export type GithubRestSessionPort = (
@@ -248,6 +251,7 @@ async function handleSetup(c: Context, ports: GithubRestPorts): Promise<Response
     ({ accountLogin } = await service.recordInstallation({
       installationId,
       organizationId: state.organizationId,
+      flowStartedAt: state.issuedAt,
     }));
   } catch (err) {
     await reportInstallationFailure({ err, ports, state });
@@ -347,10 +351,11 @@ async function rejectUnauthorizedSetup({
 /**
  * Record why the installation could not be written.
  *
- * A cross-tenant takeover attempt (installation already owned by another org)
- * is a security event, not an ordinary failure: audit it against the acting
- * user/org so it is visible. The caller still returns the generic message, so
- * nothing leaks about whether the installation id exists.
+ * A takeover attempt — an installation already owned by another organization,
+ * or one this flow did not create — is a security event, not an ordinary
+ * failure: audit it against the acting user/org so it is visible. The caller
+ * still returns the generic message, so nothing leaks about whether the
+ * installation id exists.
  */
 async function reportInstallationFailure({
   err,
@@ -361,23 +366,30 @@ async function reportInstallationFailure({
   ports: GithubRestPorts;
   state: GithubInstallStatePayload;
 }): Promise<void> {
-  if (!(err instanceof GithubInstallationConflictError)) {
+  if (
+    !(err instanceof GithubInstallationConflictError) &&
+    !(err instanceof GithubInstallationNotFromFlowError)
+  ) {
     logger.warn({ err }, "github installation record failed");
     return;
   }
+  const action =
+    err instanceof GithubInstallationConflictError
+      ? "github.connection.install.rejected_cross_tenant"
+      : "github.connection.install.rejected_foreign_installation";
   logger.warn(
     {
       installationId: err.installationId,
       attemptedOrganizationId: err.attemptedOrganizationId,
       userId: state.userId,
     },
-    "blocked cross-tenant github installation rebind attempt",
+    "blocked github installation claim",
   );
   try {
     await ports.audit({
       userId: state.userId,
       organizationId: state.organizationId,
-      action: "github.connection.install.rejected_cross_tenant",
+      action,
       args: { installationId: err.installationId },
     });
   } catch (auditErr) {

@@ -43,6 +43,7 @@ const installationSchema = z.object({
     })
     .nullish(),
   repository_selection: z.string().optional(),
+  created_at: z.string().optional(),
 });
 
 const repositoriesSchema = z.object({
@@ -143,6 +144,7 @@ export class GithubApiAdapter extends GithubApiPort {
       accountType: body.account?.type ?? "",
       accountId: body.account?.id !== void 0 ? String(body.account.id) : "",
       repositorySelection: body.repository_selection ?? "all",
+      createdAt: body.created_at ?? null,
     };
   }
 

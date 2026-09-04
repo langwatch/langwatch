@@ -8,7 +8,11 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import { GithubInstallationConflictError, type GithubRepository } from "@langwatch/github-contract";
+import {
+  GithubInstallationConflictError,
+  GithubInstallationNotFromFlowError,
+  type GithubRepository,
+} from "@langwatch/github-contract";
 import {
   GithubAppTokenAdapter,
   type GithubInstallationDetails,
@@ -100,6 +104,7 @@ function makeAppTokens(
         accountType: "Organization",
         accountId: "9000",
         repositorySelection: "all",
+        createdAt: new Date().toISOString(),
       })),
   );
   vi.spyOn(tokens, "mintInstallationToken").mockImplementation(
@@ -128,6 +133,7 @@ describe("recordInstallation", () => {
     const result = await svc.recordInstallation({
       installationId: "inst-1",
       organizationId: "org-1",
+      flowStartedAt: Date.now(),
     });
     expect(result.accountLogin).toBe("acme");
     expect(repo.insertOrGetExisting).toHaveBeenCalledWith(
@@ -156,6 +162,7 @@ describe("recordInstallation", () => {
         svc.recordInstallation({
           installationId: "inst-1",
           organizationId: "org-2",
+          flowStartedAt: Date.now(),
         }),
       ).rejects.toBeInstanceOf(GithubInstallationConflictError);
 
@@ -184,6 +191,7 @@ describe("recordInstallation", () => {
           accountType: "Organization",
           accountId: "9000",
           repositorySelection: "all",
+          createdAt: new Date().toISOString(),
         })),
       });
       const svc = service(repo, appTokens);
@@ -192,10 +200,12 @@ describe("recordInstallation", () => {
         svc.recordInstallation({
           installationId: "inst-race",
           organizationId: "org-a",
+          flowStartedAt: Date.now(),
         }),
         svc.recordInstallation({
           installationId: "inst-race",
           organizationId: "org-b",
+          flowStartedAt: Date.now(),
         }),
       ]);
 
@@ -215,6 +225,64 @@ describe("recordInstallation", () => {
     });
   });
 
+  describe("when the callback claims an installation the flow did not create", () => {
+    /** @scenario "A setup callback cannot claim an installation another account owns" */
+    it("refuses the claim and records nothing", async () => {
+      // The victim installed the App days ago and was never recorded here, so
+      // the first-writer guard has no row to compare against. The attacker
+      // holds a valid state for their OWN organization and supplies the
+      // victim's installation id.
+      const repo = makeRepo();
+      const appTokens = makeAppTokens({
+        getInstallation: vi.fn(async (installationId: string) => ({
+          installationId,
+          accountLogin: "victim",
+          accountType: "Organization",
+          accountId: "1234",
+          repositorySelection: "all",
+          createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+        })),
+      });
+      const svc = service(repo, appTokens);
+
+      await expect(
+        svc.recordInstallation({
+          installationId: "inst-victim",
+          organizationId: "org-attacker",
+          flowStartedAt: Date.now(),
+        }),
+      ).rejects.toBeInstanceOf(GithubInstallationNotFromFlowError);
+
+      expect(repo.insertOrGetExisting).not.toHaveBeenCalled();
+      expect(repo.upsert).not.toHaveBeenCalled();
+    });
+
+    it("refuses a claim GitHub will not date", async () => {
+      const repo = makeRepo();
+      const appTokens = makeAppTokens({
+        getInstallation: vi.fn(async (installationId: string) => ({
+          installationId,
+          accountLogin: "victim",
+          accountType: "Organization",
+          accountId: "1234",
+          repositorySelection: "all",
+          createdAt: null,
+        })),
+      });
+      const svc = service(repo, appTokens);
+
+      await expect(
+        svc.recordInstallation({
+          installationId: "inst-undated",
+          organizationId: "org-attacker",
+          flowStartedAt: Date.now(),
+        }),
+      ).rejects.toBeInstanceOf(GithubInstallationNotFromFlowError);
+
+      expect(repo.insertOrGetExisting).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when the same organization re-installs the same installation", () => {
     it("upserts cleanly (no conflict on a genuine re-install)", async () => {
       const repo = makeRepo([row({ installationId: "inst-1", organizationId: "org-1" })]);
@@ -223,6 +291,7 @@ describe("recordInstallation", () => {
       await svc.recordInstallation({
         installationId: "inst-1",
         organizationId: "org-1",
+        flowStartedAt: Date.now(),
       });
 
       expect(repo.upsert).toHaveBeenCalledWith(
@@ -320,6 +389,7 @@ describe("handleWebhookEvent", () => {
             accountType: "Organization",
             accountId: "9000",
             repositorySelection: "selected",
+            createdAt: new Date().toISOString(),
           })),
           listInstallationRepositories: vi.fn(async () => [
             { id: "77", fullName: "acme/service-x" },

@@ -24,6 +24,7 @@ export class LicenseGenerationService extends LicenseGenerationCapability {
   }
 
   generate({
+    organizationId,
     organizationName,
     email,
     planType,
@@ -65,6 +66,8 @@ export class LicenseGenerationService extends LicenseGenerationCapability {
         webhookEndpointsEnabled: template.webhookEndpointsEnabled,
         usageUnit: template.usageUnit,
       }),
+      // The binding: without it the key activates on any organization.
+      ...(organizationId ? { organizationId } : {}),
     };
     const signedLicense = this.cryptography.signLicense(licenseData, privateKey);
     return {

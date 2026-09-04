@@ -197,6 +197,18 @@ Rule: The installation flow verifies who is installing what
     Then no installation is recorded
     And I am shown that the installation could not be verified
 
+  # The installation id arrives in GitHub's redirect query string and the App's
+  # own JWT resolves ANY installation, so a valid state for the attacker's own
+  # organization plus somebody else's installation id used to be a takeover. A
+  # first claim is now accepted only for an installation this flow created.
+  @unit
+  Scenario: A setup callback cannot claim an installation another account owns
+    Given an installation that was created before my installation flow started
+    And no organization has recorded it
+    When my setup callback claims that installation id for my organization
+    Then the claim is refused and audited
+    And no installation is recorded
+
   @integration
   Scenario: An installation cannot be rebound across organizations
     Given the "acme" organization already recorded installation 12345

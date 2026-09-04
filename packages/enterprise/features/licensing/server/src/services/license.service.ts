@@ -1,4 +1,5 @@
 import {
+  LICENSE_ERRORS,
   LicensingService as LicensingServiceContract,
   OrganizationNotFoundError,
   resolvePlanDefaults,
@@ -138,6 +139,16 @@ export class LicenseService extends LicensingServiceContract {
   }): Promise<StoreLicenseResult> {
     const result = this.cryptography.validateLicense({ licenseKey });
     if (!result.valid) return { success: false, error: result.error };
+    // A key that names an organization activates on that organization only.
+    // A key minted before the claim existed carries none, and stays a bearer
+    // token until it is reissued — see the migration note in
+    // packages/enterprise/features/licensing/specs/licensing.feature.
+    if (
+      result.licenseData.organizationId !== void 0 &&
+      result.licenseData.organizationId !== organizationId
+    ) {
+      return { success: false, error: LICENSE_ERRORS.ORGANIZATION_MISMATCH };
+    }
     if (!(await this.repository.organizationExists(organizationId))) {
       throw new OrganizationNotFoundError();
     }
@@ -230,6 +241,12 @@ export class LicenseService extends LicensingServiceContract {
     }
     if (!this.cryptography.verifySignature(signedLicense)) {
       return { ...source, valid: false, reason: "invalid_signature" };
+    }
+    // A stored key that names another organization is not this organization's
+    // entitlement, however genuine the signature is.
+    const claimed = signedLicense.data.organizationId;
+    if (claimed !== void 0 && source.organizationId !== void 0 && claimed !== source.organizationId) {
+      return { ...source, valid: false, reason: "organization_mismatch" };
     }
     return {
       ...source,

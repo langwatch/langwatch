@@ -78,3 +78,26 @@ export class GithubApiRateLimitedError extends HandledError {
     this.name = "GithubApiRateLimitedError";
   }
 }
+
+/**
+ * A setup callback claimed an installation that the flow did not create.
+ *
+ * The signed state proves who started an installation and for which
+ * organization; it cannot carry the installation id, because GitHub only mints
+ * one after the operator confirms. What the platform can insist on is that an
+ * unclaimed installation being bound to an organization was created by the flow
+ * that is binding it — an older installation belongs to whoever installed it.
+ */
+export class GithubInstallationNotFromFlowError extends Error {
+  readonly installationId: string;
+  readonly attemptedOrganizationId: string;
+
+  constructor(input: { installationId: string; attemptedOrganizationId: string }) {
+    super(
+      `GitHub installation ${input.installationId} was not created by the installation flow claiming it`,
+    );
+    this.installationId = input.installationId;
+    this.attemptedOrganizationId = input.attemptedOrganizationId;
+    this.name = "GithubInstallationNotFromFlowError";
+  }
+}

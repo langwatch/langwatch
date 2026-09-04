@@ -8,7 +8,11 @@ import {
   type SecuredApp,
   validator as zValidator,
 } from "@langwatch/api/rest";
-import type { Trigger, UpdateTriggerCommand } from "@langwatch/automation-contract";
+import {
+  InvalidActionParamsError,
+  type Trigger,
+  type UpdateTriggerCommand,
+} from "@langwatch/automation-contract";
 import { createLogger } from "@langwatch/observability";
 import { describeRoute, resolver } from "hono-openapi";
 import { nanoid } from "nanoid";
@@ -57,6 +61,11 @@ const createTriggerSchema = z.object({
   alertType: alertTypeEnum.optional(),
 });
 
+// Delivery settings are declared here only so an edit that carries them is
+// REFUSED rather than silently dropped. They are not updatable through REST:
+// the per-action shape check, the secret encryption and the unconditional
+// `createdByUserId` stamp all live on the authoring surface, and a forwarded
+// record would skip every one of them.
 const updateTriggerSchema = z.object({
   name: z.string().min(1).optional(),
   active: z.boolean().optional(),
@@ -268,6 +277,12 @@ export function createTriggerRestApp(options: {
       const project = c.get("project");
       const { id } = c.req.param();
       const body = c.req.valid("json");
+      if (body.actionParams !== undefined) {
+        throw new InvalidActionParamsError(
+          "Delivery settings are changed in the automation editor, not through this endpoint.",
+          "actionParams",
+        );
+      }
       logger.info({ projectId: project.id, triggerId: id }, "Updating trigger");
 
       const app = automation();
@@ -294,7 +309,6 @@ export function createTriggerRestApp(options: {
       if (body.message !== undefined) data.message = body.message;
       if (body.alertType !== undefined) data.alertType = body.alertType;
       if (body.filters !== undefined) data.filters = body.filters;
-      if (body.actionParams !== undefined) data.actionParams = body.actionParams;
 
       const updated = await app.update({
         ...data,

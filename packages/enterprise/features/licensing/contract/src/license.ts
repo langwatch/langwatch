@@ -61,6 +61,12 @@ export const licenseDataSchema = z.object({
   issuedAt: z.string(), // ISO 8601 date string
   expiresAt: z.string(), // ISO 8601 date string
   plan: licensePlanLimitsSchema,
+  // The organization the key was issued for, and the only thing that stops a
+  // signed key activating anywhere. LAST and optional on purpose: every key
+  // issued before this field existed must still re-serialize to the exact
+  // bytes it was signed over, so the position and the optionality are part of
+  // the signature contract, not style.
+  organizationId: z.string().optional(),
 });
 
 export type LicenseData = z.infer<typeof licenseDataSchema>;
@@ -78,7 +84,7 @@ export const platformLicenseInspectionSchema = z.discriminatedUnion("valid", [
     source: z.enum(["instance", "organization"]),
     organizationId: z.string().optional(),
     valid: z.literal(false),
-    reason: z.enum(["invalid_format", "invalid_signature"]),
+    reason: z.enum(["invalid_format", "invalid_signature", "organization_mismatch"]),
   }),
   z.object({
     source: z.enum(["instance", "organization"]),

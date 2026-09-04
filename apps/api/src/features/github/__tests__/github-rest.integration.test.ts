@@ -11,6 +11,7 @@
  * answers 404 rather than 401 where the install configured no secret.
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
+import { GithubInstallationNotFromFlowError } from "@langwatch/github-contract";
 import { createGithubRestApp, type GithubRestPorts } from "@langwatch/github-server";
 import { createHmac } from "crypto";
 import { Hono, type ErrorHandler } from "hono";
@@ -128,9 +129,32 @@ describe("given GitHub's post-install redirect", () => {
       );
 
       expect(response.status).toBe(302);
-      expect(world.recorded).toEqual([{ installationId: "42", organizationId: "org_1" }]);
+      expect(world.recorded).toEqual([
+        { installationId: "42", organizationId: "org_1", flowStartedAt: expect.any(Number) },
+      ]);
       expect(world.audited).toEqual([
         { userId: "user_1", organizationId: "org_1", action: "github.connection.install" },
+      ]);
+    });
+
+    /** @scenario "A setup callback cannot claim an installation another account owns" */
+    it("audits a claim on an installation the flow did not create, and records nothing", async () => {
+      const world = githubWorld({ refuseForeignInstallation: true });
+      const api = mount(world);
+
+      const response = await api.fetch(
+        `/api/github/setup?installation_id=99&state=${signedState()}`,
+      );
+
+      expect(response.status).toBe(302);
+      expect(response.headers.get("location")).toContain("githubError=");
+      expect(world.recorded).toEqual([]);
+      expect(world.audited).toEqual([
+        {
+          userId: "user_1",
+          organizationId: "org_1",
+          action: "github.connection.install.rejected_foreign_installation",
+        },
       ]);
     });
   });
@@ -253,10 +277,11 @@ function githubWorld(
     canManage?: boolean;
     session?: { id: string } | null;
     webhookSecret?: string;
+    refuseForeignInstallation?: boolean;
   } = {},
 ) {
   const permissionProbes: string[] = [];
-  const recorded: { installationId: string; organizationId: string }[] = [];
+  const recorded: { installationId: string; organizationId: string; flowStartedAt: number }[] = [];
   const audited: { userId: string; organizationId: string; action: string }[] = [];
   const webhookEvents: { action: string; installationId: string }[] = [];
   const world = {
@@ -281,7 +306,17 @@ function githubWorld(
       token ? (JSON.parse(token) as unknown) : null,
     tryConsumeInstallNonce: async () => true,
     isOrganizationMember: async () => options.isMember ?? true,
-    recordInstallation: async (input: { installationId: string; organizationId: string }) => {
+    recordInstallation: async (input: {
+      installationId: string;
+      organizationId: string;
+      flowStartedAt: number;
+    }) => {
+      if (options.refuseForeignInstallation) {
+        throw new GithubInstallationNotFromFlowError({
+          installationId: input.installationId,
+          attemptedOrganizationId: input.organizationId,
+        });
+      }
       recorded.push(input);
       return { accountLogin: "acme" };
     },
@@ -348,6 +383,7 @@ function passThroughSecurity(): AppRestSecurity {
     authorizeApiKeyCeiling: unreachable,
     authenticateOrganization: unreachable,
     authorizeOrganizationPermission: unreachable,
+    authorizeRouteTeamPermission: unreachable,
     authorizeRouteProjectPermission: unreachable,
     authenticateOrganizationThrowing: noop,
     authorizeOrganizationPermissionThrowing: unreachable,

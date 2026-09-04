@@ -135,6 +135,7 @@ class TestAppTokens extends GithubAppTokenPort {
       accountType: "Organization",
       accountId: "1",
       repositorySelection: "selected",
+      createdAt: new Date().toISOString(),
     });
   }
 

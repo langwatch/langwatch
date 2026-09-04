@@ -21,6 +21,8 @@ export type GithubInstallationDetails = {
   accountType: string;
   accountId: string;
   repositorySelection: string;
+  /** When GitHub says the installation was created; null when it does not say. */
+  createdAt: string | null;
 };
 
 export type GithubPullRequestSummary = {

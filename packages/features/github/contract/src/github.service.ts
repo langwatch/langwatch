@@ -55,6 +55,8 @@ export abstract class GithubService {
   abstract recordInstallation(input: {
     installationId: string;
     organizationId: string;
+    /** When the signed state that is claiming this installation was issued. */
+    flowStartedAt: number;
   }): Promise<{ accountLogin: string }>;
   abstract handleWebhookEvent(input: {
     action: "created" | "deleted" | "suspend" | "unsuspend" | "added" | "removed";

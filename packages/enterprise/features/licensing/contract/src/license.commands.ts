@@ -13,6 +13,8 @@ export const removeLicenseInputSchema = z.object({
 export type RemoveLicenseInput = z.infer<typeof removeLicenseInputSchema>;
 
 export const generateLicenseInputSchema = z.object({
+  /** Binds the minted key to one organization; omitted only by legacy callers. */
+  organizationId: z.string().optional(),
   organizationName: z.string(),
   email: z.email(),
   planType: z.string().min(1),

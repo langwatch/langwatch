@@ -40,7 +40,16 @@ export class ScimWebhookApi {
     return new ScimWebhookApi();
   }
 
-  async handle(input: { service: ScimService; events: unknown[] }): Promise<void> {
+  async handle(input: {
+    service: ScimService;
+    /**
+     * The tenant, resolved from the credential that authenticated the delivery.
+     * Never derived from the payload: an e-mail domain in the body would let one
+     * secret provision into every organization that claims that domain.
+     */
+    organizationId: string;
+    events: unknown[];
+  }): Promise<void> {
     for (const candidate of input.events) {
       const parsed = scimWebhookEventSchema.safeParse(candidate);
       if (!parsed.success || !isScimEvent(parsed.data)) {
@@ -53,22 +62,10 @@ export class ScimWebhookApi {
         continue;
       }
 
-      const domain = emailDomain(email);
-      if (!domain) {
-        continue;
-      }
-
-      const organization = await input.service.tryFindOrganizationBySsoDomain({
-        domain,
-      });
-      if (!organization) {
-        continue;
-      }
-
       if (extractAction(event) === "create") {
         const name = extractName(event) ?? email.split("@")[0] ?? email;
         await input.service.createUser({
-          organizationId: organization.id,
+          organizationId: input.organizationId,
           request: {
             schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
             userName: email,
@@ -77,7 +74,7 @@ export class ScimWebhookApi {
         });
       } else if (extractAction(event) === "deactivate") {
         const users = await input.service.listUsers({
-          organizationId: organization.id,
+          organizationId: input.organizationId,
           filter: `userName eq "${email}"`,
           startIndex: 1,
           count: 1,
@@ -85,7 +82,7 @@ export class ScimWebhookApi {
         const user = users.Resources[0];
         if (user) {
           await input.service.deleteUser({
-            organizationId: organization.id,
+            organizationId: input.organizationId,
             id: user.id,
           });
         }
@@ -130,11 +127,6 @@ function extractAction(event: ScimWebhookEvent): "create" | "deactivate" | null 
     return "deactivate";
   }
   return operation === "create" ? "create" : null;
-}
-
-function emailDomain(email: string): string | null {
-  const at = email.lastIndexOf("@");
-  return at > 0 && at < email.length - 1 ? email.slice(at + 1).toLowerCase() : null;
 }
 
 function parseName(name: string): { givenName: string; familyName?: string } {
