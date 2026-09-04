@@ -412,7 +412,10 @@ describe("runScenarioEvaluations", () => {
 
       expect(deps.recordEvaluations).toHaveBeenCalledTimes(1);
       expect(recorded(deps)?.evaluations[0]).toEqual(
-        expect.objectContaining({ evaluatorId: "eval-exact", status: "passed" }),
+        expect.objectContaining({
+          evaluatorId: "eval-exact",
+          status: "passed",
+        }),
       );
     });
   });

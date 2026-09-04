@@ -384,7 +384,11 @@ export function inferScenarioMappings({
 }): Record<string, ScenarioMapping> {
   const mappings: Record<string, ScenarioMapping> = {};
   for (const input of inputs) {
-    const mapping = inferScenarioMapping({ inputId: input.id, ctx, isPlanLevel });
+    const mapping = inferScenarioMapping({
+      inputId: input.id,
+      ctx,
+      isPlanLevel,
+    });
     if (mapping) mappings[input.id] = mapping;
   }
   return mappings;

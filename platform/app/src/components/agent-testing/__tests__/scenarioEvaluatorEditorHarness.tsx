@@ -4,8 +4,8 @@
  * real form with a fully wired controller. The `vi.mock` calls stay in each
  * test file, since they have to hoist above that file's own imports.
  */
-import type React from "react";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type React from "react";
 import { type FieldValues, useForm } from "react-hook-form";
 import { vi } from "vitest";
 
