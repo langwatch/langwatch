@@ -66,7 +66,7 @@ has_env() {
   printf '%s\n' "$1" | grep -qxF "$2"
 }
 
-# @scenario "Chart-managed ClickHouse emits the full LangWatchQL connection on app and workers"
+# Verifies: Chart-managed ClickHouse emits the full LangWatchQL connection on app and workers
 test_chart_managed_full_connection() {
   local out="${TMPDIR:-/tmp}/lwql-conn-managed.yaml"
   local err="${TMPDIR:-/tmp}/lwql-conn-managed.err"
@@ -115,7 +115,7 @@ $(cat "$err")"
   fi
 }
 
-# @scenario "External ClickHouse self-provisions and omits the chart-managed connection vars"
+# Verifies: External ClickHouse self-provisions and omits the chart-managed connection vars
 test_external_self_provision() {
   local out="${TMPDIR:-/tmp}/lwql-conn-external.yaml"
   local err="${TMPDIR:-/tmp}/lwql-conn-external.err"
