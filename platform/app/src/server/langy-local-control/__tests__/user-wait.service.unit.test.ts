@@ -38,6 +38,7 @@ let buffer: UserWaitBuffer & {
   permissions: unknown[];
   questions: unknown[];
   statuses: unknown[];
+  beats: unknown[];
 };
 let sendPermission: ReturnType<typeof vi.fn>;
 let service: UserWaitService;
@@ -61,10 +62,12 @@ function recordingBuffer() {
   const permissions: unknown[] = [];
   const questions: unknown[] = [];
   const statuses: unknown[] = [];
+  const beats: unknown[] = [];
   return {
     permissions,
     questions,
     statuses,
+    beats,
     async appendLocalPermission(args: { entry: unknown }) {
       permissions.push(args.entry);
     },
@@ -74,10 +77,14 @@ function recordingBuffer() {
     async appendStatus(args: unknown) {
       statuses.push(args);
     },
+    async heartbeat(args: unknown) {
+      beats.push(args);
+    },
   } as UserWaitBuffer & {
     permissions: unknown[];
     questions: unknown[];
     statuses: unknown[];
+    beats: unknown[];
   };
 }
 
@@ -262,6 +269,18 @@ describe("given a command that is not on the read-only list", () => {
       now += LIVE_STREAM_KEEPALIVE_MS + 1;
       await service.poll({ waitId: wait.waitId, holdMs: 0 });
       expect(buffer.statuses).toHaveLength(2);
+    });
+
+    /** @scenario "The live stream stays alive during a long wait" */
+    it("refreshes the turn's liveness on every poll, which is what the subscriber reads", async () => {
+      const wait = await startPermission();
+
+      await service.poll({ waitId: wait.waitId, holdMs: 0 });
+      now += LIVE_STREAM_KEEPALIVE_MS + 1;
+      await service.poll({ waitId: wait.waitId, holdMs: 0 });
+
+      expect(buffer.beats).toHaveLength(2);
+      expect(buffer.beats[0]).toMatchObject({ conversationId, turnId });
     });
   });
 });

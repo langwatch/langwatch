@@ -14,7 +14,9 @@
  *   last append, and a wait appends nothing while it waits. Every poll that
  *   crosses the keepalive interval writes one `status` entry, which restores
  *   the full window. The poll is where it happens, so there is no timer to own
- *   and no pod that has to stay the same one.
+ *   and no pod that has to stay the same one. The same poll refreshes the
+ *   turn's liveness key, or the subscriber ends a turn that is only waiting
+ *   for an answer.
  * - **One terminal.** An answer, an expiry and a turn's Stop contend for the
  *   same transition, so a late answer to an expired card changes nothing and
  *   the record never contradicts itself.
@@ -27,6 +29,7 @@ import type {
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import { LANGY_LIVENESS } from "~/server/app-layer/langy/streaming/langy.streaming.constants";
 import type { LangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
 import type { AgentStateStore } from "~/server/connected-agents/state-store";
 import {
@@ -85,10 +88,10 @@ export interface UserWaitEvents {
   ): Promise<void>;
 }
 
-/** The live half: the entries the panel wakes up on. */
+/** The live half: the entries the panel wakes up on, and the turn's liveness. */
 export type UserWaitBuffer = Pick<
   LangyTokenBuffer,
-  "appendLocalPermission" | "appendQuestion" | "appendStatus"
+  "appendLocalPermission" | "appendQuestion" | "appendStatus" | "heartbeat"
 >;
 
 /** What one question asks, as the worker sends it. */
@@ -227,14 +230,38 @@ export class UserWaitService {
     signal?: AbortSignal;
   }): Promise<PollWaitResponse | null> {
     const until = this.now() + holdMs;
+    const beat = this.beater();
     for (;;) {
       const wait = await this.readSettlingExpiry(waitId);
       if (!wait) return null;
       if (wait.state !== "pending") return toPollResponse(wait);
+      await beat(wait);
       await this.keepAlive(wait);
       if (this.now() >= until || signal?.aborted) return toPollResponse(wait);
       await sleep(this.pollIntervalMs, signal);
     }
+  }
+
+  /**
+   * The liveness gate of one poll request: it refreshes on the first pass,
+   * then once per heartbeat interval for as long as the request holds. The
+   * request is the worker's own, so a worker that stopped stops refreshing.
+   */
+  private beater(): (wait: StoredUserWait) => Promise<void> {
+    let lastBeatAt: number | null = null;
+    return async (wait) => {
+      const now = this.now();
+      const due =
+        lastBeatAt === null ||
+        now - lastBeatAt >= LANGY_LIVENESS.HEARTBEAT_INTERVAL_MS;
+      if (!due) return;
+      lastBeatAt = now;
+      await this.buffer.heartbeat({
+        conversationId: wait.conversationId,
+        turnId: wait.turnId,
+        now,
+      });
+    };
   }
 
   /**
