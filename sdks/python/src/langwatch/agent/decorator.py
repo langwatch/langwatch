@@ -2,7 +2,8 @@
 
 The decorated object stays callable with the original signature, so unit
 tests and local scenario runs use it as before. It also answers `.call(input)`
-for the scenario library and `.invoke(call)` for the connection client.
+and `.role` for the scenario library, and `.invoke(call)` for the connection
+client.
 """
 
 from __future__ import annotations
@@ -151,6 +152,21 @@ class ConnectedAgent:
     @property
     def timeout_ms(self) -> int:
         return int(self.timeout * 1000)
+
+    @property
+    def role(self) -> Any:
+        """The role the scenario executor reads to pick the agent under test.
+
+        `ScenarioExecutor._next_agent_for_role` compares enum members, so
+        this returns the member itself; the string value would never match.
+        The scenario package is an optional dependency, so it is imported here
+        rather than at module load, and its value stands in without it.
+        """
+        try:
+            from scenario.types import AgentRole
+        except ImportError:
+            return "Agent"
+        return AgentRole.AGENT
 
     def registration(self) -> AgentRegistration:
         frame: AgentRegistration = {
