@@ -51,11 +51,13 @@ export {
   type UiFeatureApiTransport,
 } from "./behavior/ui-feature-transport";
 export { createRouterUiNavigation, useRouterUiNavigation } from "./behavior/ui-router-navigation";
+export { useUiOrgQueryParamSelection } from "./behavior/ui-scope-org-param";
 export {
   organizationRoleOf,
   projectSlugAddressedBy,
   resolveUiScope,
   selectAmbientTeam,
+  uiOrgQueryParamWrites,
   uiScopeSelectionWrites,
   userBelongsToTeam,
   userCanOpenTeam,
@@ -64,6 +66,7 @@ export {
 } from "./behavior/ui-scope-resolution";
 export {
   isUiPublicRoute,
+  UI_ORG_QUERY_PARAM,
   UI_PUBLIC_ROUTES,
   useUiRouteReading,
   type UiRouteReading,

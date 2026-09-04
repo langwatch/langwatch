@@ -81,6 +81,16 @@ describe("given an address the router matched", () => {
     });
   });
 
+  describe("when it carries an org query", () => {
+    it("reads it", () => {
+      expect(readAt("/me?org=beta").orgParam).toBe("beta");
+    });
+
+    it("reads no org when the query names none", () => {
+      expect(readAt("/me").orgParam).toBe("");
+    });
+  });
+
   describe("when it is the personal workspace's own", () => {
     it("says so for the personal home", () => {
       expect(readAt("/me").isPersonalScopeRoute).toBe(true);

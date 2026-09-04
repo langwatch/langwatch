@@ -12,8 +12,9 @@
  * analytics identify — is now either the host or gone:
  *
  * - The workspace, the reader and the deployment come off the host.
- * - `useOrgQueryParamSelection` is the application's address handling, and it
- *   already runs above this shell rather than inside it.
+ * - The one-shot `?org=` selection is the application's address handling: it
+ *   runs in `apps/ui`'s own `useUiOrgQueryParamSelection`, mounted by the
+ *   application chrome above this shell rather than inside it.
  * - `usePostHogIdentify` did not travel. Product analytics is the
  *   application's, the line every family since the gateway has drawn.
  * - The Langy dock handshake did not travel either: the panel it reserves room

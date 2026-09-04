@@ -10,6 +10,7 @@ import { Outlet, useMatches } from "react-router";
 import { installedUiDrawers } from "../../../installed-ui-drawers";
 import { NavigationHostSection } from "../../../navigation";
 import { UiTraceDrawerMount } from "../../../traces";
+import { useUiOrgQueryParamSelection } from "../../../../behavior/ui-scope-org-param";
 import { uiMatchedPageKey } from "../../../../ui/sections/ui-route-objects";
 
 export default function UiAppChrome() {
@@ -25,10 +26,13 @@ export default function UiAppChrome() {
 /**
  * Everything that must be inside the host: `useNavigationTracking` keeps
  * the product memory and Settings-entry page current, which the sidebar's
- * "Back to {product}" entry reads.
+ * "Back to {product}" entry reads, and the `?org=` switch runs here because
+ * every org-scoped page (`/me`, `/settings/*`, `/gateway/*`) is served under
+ * this route.
  */
 function UiAppChromeBody() {
   useNavigationTracking();
+  useUiOrgQueryParamSelection();
   const matches = useMatches();
   const page = uiMatchedPageKey(matches);
   const servedHere = page !== void 0;

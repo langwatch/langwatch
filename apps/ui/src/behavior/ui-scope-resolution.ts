@@ -288,3 +288,33 @@ export function uiScopeSelectionWrites({
 
   return writes;
 }
+
+/**
+ * The one-shot `?org=<slug>` switch, as selection writes: an organization
+ * the caller belongs to is selected, and the remembered team and project are
+ * cleared so the new organization's own defaults resolve rather than the
+ * previous organization's pinning the page. A slug naming no organization of
+ * theirs writes nothing.
+ * Spec: specs/ai-gateway/governance/org-query-param-switch.feature
+ */
+export function uiOrgQueryParamWrites({
+  orgParam,
+  organizations,
+  selection,
+}: {
+  readonly orgParam: string;
+  /** Undefined until `organization.getAll` has answered; membership cannot be judged before. */
+  readonly organizations: readonly Pick<UiScopeOrganization, "id" | "slug">[] | undefined;
+  readonly selection: UiScopeSelection;
+}): UiScopeSelectionWrite[] {
+  if (!orgParam || !organizations) return [];
+
+  const match = organizations.find((organization) => organization.slug === orgParam);
+  if (!match || match.id === selection.organizationId) return [];
+
+  return [
+    { key: "organizationId", value: match.id },
+    { key: "teamId", value: "" },
+    { key: "projectSlug", value: "" },
+  ];
+}

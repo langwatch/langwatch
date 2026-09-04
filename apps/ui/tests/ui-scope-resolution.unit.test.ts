@@ -19,6 +19,7 @@ import {
   projectSlugAddressedBy,
   resolveUiScope,
   selectAmbientTeam,
+  uiOrgQueryParamWrites,
   uiScopeSelectionWrites,
   userCanOpenTeam,
 } from "../src/behavior/ui-scope-resolution";
@@ -733,6 +734,71 @@ describe("given the two predicates the resolution is built out of", () => {
       expect(organizationRoleOf({ members: [{ role: "EXTERNAL" }] })).toBe("EXTERNAL");
       expect(organizationRoleOf({ members: [] })).toBeUndefined();
       expect(organizationRoleOf(void 0)).toBeUndefined();
+    });
+  });
+});
+
+describe("given the one-shot `?org=` switch", () => {
+  const ORGANIZATIONS = [
+    { id: "org-alpha", slug: "alpha" },
+    { id: "org-beta", slug: "beta" },
+  ];
+  const ON_ALPHA = { organizationId: "org-alpha", teamId: "team-shared", projectSlug: "acme-app" };
+
+  describe("when the slug names an organization the reader belongs to", () => {
+    it("selects it and clears the previous organization's team and project", () => {
+      expect(
+        uiOrgQueryParamWrites({
+          orgParam: "beta",
+          organizations: ORGANIZATIONS,
+          selection: ON_ALPHA,
+        }),
+      ).toEqual([
+        { key: "organizationId", value: "org-beta" },
+        { key: "teamId", value: "" },
+        { key: "projectSlug", value: "" },
+      ]);
+    });
+
+    it("writes nothing when it is the organization already selected", () => {
+      expect(
+        uiOrgQueryParamWrites({
+          orgParam: "alpha",
+          organizations: ORGANIZATIONS,
+          selection: ON_ALPHA,
+        }),
+      ).toEqual([]);
+    });
+  });
+
+  describe("when the slug names no organization of theirs", () => {
+    it("writes nothing", () => {
+      expect(
+        uiOrgQueryParamWrites({
+          orgParam: "not-a-member",
+          organizations: ORGANIZATIONS,
+          selection: ON_ALPHA,
+        }),
+      ).toEqual([]);
+    });
+  });
+
+  describe("when the graph has not arrived, or the address names no organization", () => {
+    it("writes nothing either way", () => {
+      expect(
+        uiOrgQueryParamWrites({
+          orgParam: "beta",
+          organizations: void 0,
+          selection: ON_ALPHA,
+        }),
+      ).toEqual([]);
+      expect(
+        uiOrgQueryParamWrites({
+          orgParam: "",
+          organizations: ORGANIZATIONS,
+          selection: ON_ALPHA,
+        }),
+      ).toEqual([]);
     });
   });
 });

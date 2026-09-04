@@ -25,6 +25,9 @@ export const UI_PUBLIC_ROUTES: readonly string[] = [
 /** The personal workspace's own top-level segment. */
 const PERSONAL_SCOPE_SEGMENT = "me";
 
+/** The query parameter that names an organization to switch to, once. */
+export const UI_ORG_QUERY_PARAM = "org";
+
 export function isUiPublicRoute(pathname: string): boolean {
   return UI_PUBLIC_ROUTES.some((pattern) => matchPath(pattern, pathname) !== null);
 }
@@ -34,6 +37,11 @@ export type UiRouteReading = UiScopeRoute & {
   readonly pathname: string;
   /** The share token, on the page that takes one. */
   readonly shareToken: string;
+  /**
+   * The one-shot `?org=<slug>` organization switch, "" when the address
+   * carries none. Spec: specs/ai-gateway/governance/org-query-param-switch.feature
+   */
+  readonly orgParam: string;
   readonly isPublicRoute: boolean;
 };
 
@@ -44,6 +52,7 @@ export function useUiRouteReading(): UiRouteReading {
 
   const projectParam = params.project;
   const teamParam = searchParams.get("team");
+  const orgParam = searchParams.get(UI_ORG_QUERY_PARAM) ?? "";
   const shareToken = typeof params.id === "string" ? params.id : "";
   const pathname = location.pathname;
 
@@ -59,9 +68,10 @@ export function useUiRouteReading(): UiRouteReading {
       // slug spells; only a page the router matched WITHOUT one can be the
       // personal workspace.
       isPersonalScopeRoute: projectParam === void 0 && firstSegment === PERSONAL_SCOPE_SEGMENT,
+      orgParam,
       pathname,
       shareToken,
       isPublicRoute: isUiPublicRoute(pathname),
     };
-  }, [projectParam, teamParam, shareToken, pathname]);
+  }, [projectParam, teamParam, orgParam, shareToken, pathname]);
 }
