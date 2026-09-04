@@ -12,7 +12,7 @@ from langevals_core.base_evaluator import (
 )
 from pydantic import Field
 from ragas.llms import LangchainLLMWrapper
-from langchain_community.callbacks import get_openai_callback
+from langevals_ragas.lib.token_usage import get_token_usage_callback
 
 from langevals_ragas.lib.model_to_langchain import (
     embeddings_model_to_langchain,
@@ -110,7 +110,7 @@ def check_max_tokens(
 
 @contextmanager
 def capture_cost(llm: LangchainLLMWrapper):
-    with get_openai_callback() as cb:
+    with get_token_usage_callback() as cb:
         money = Money(amount=0, currency="USD")
         yield money
 
