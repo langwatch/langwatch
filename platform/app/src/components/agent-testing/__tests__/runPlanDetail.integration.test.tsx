@@ -68,6 +68,10 @@ const mockGetSuiteById = vi.hoisted(() =>
 
 vi.mock("~/utils/api", () => ({
   api: {
+    // The run dialog reads the saved evaluators for the ones a run carries.
+    evaluators: {
+      getAll: { useQuery: () => ({ data: [], isLoading: false }) },
+    },
     useUtils: () => ({
       scenarios: {
         getSuiteRunData: { invalidate: vi.fn() },

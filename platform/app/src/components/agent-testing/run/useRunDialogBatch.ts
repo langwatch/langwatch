@@ -155,7 +155,7 @@ function runStartedInfoOf({
 function useQueuePlanRun(input: BatchRunInput) {
   const runPlan = api.suites.runPlan.useMutation();
   const { projectId, target, noteInput, runParameters, suiteTargets } = input;
-  const { runName, scope, scopedScenarioIds } = input;
+  const { runName, scope, scopedScenarioIds, evaluators } = input;
   const { repeatCount, simulatorModel, judgeModel } = input;
   const setLastRunTarget = useAgentTestingStore(
     (state) => state.setLastRunTarget,
@@ -179,6 +179,7 @@ function useQueuePlanRun(input: BatchRunInput) {
           repeatCount,
           simulatorModel,
           judgeModel,
+          evaluators,
         },
         idempotencyKey: attempt.idempotencyKey,
         batchRunId: attempt.batchRunId,
@@ -203,6 +204,7 @@ function useQueuePlanRun(input: BatchRunInput) {
       repeatCount,
       simulatorModel,
       judgeModel,
+      evaluators,
       noteInput,
       runParameters,
       setLastRunTarget,
@@ -236,6 +238,7 @@ export function useBatchRun(input: BatchRunInput) {
     input.judgeModel,
     input.noteInput,
     input.runParameters,
+    input.evaluators,
   ]);
 
   const run = useCallback(async () => {

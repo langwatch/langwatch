@@ -45,6 +45,12 @@ export type EvaluatorListDrawerProps = {
    * comparison evaluators and nothing else.
    */
   filterEvaluatorType?: string;
+  /**
+   * Evaluators left out of the list. A caller that cannot offer what an
+   * evaluator needs, such as a run plan with no scenario field for an
+   * evaluator that expects a golden value, names those here.
+   */
+  hiddenEvaluatorIds?: string[];
   /** Drawer heading. Defaults to "Choose Evaluator". */
   title?: string;
   /** Label on the create button. Defaults to "New Evaluator". */
@@ -91,8 +97,12 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
     { enabled: !!project?.id && isOpen },
   );
 
+  const hiddenEvaluatorIds = new Set(props.hiddenEvaluatorIds ?? []);
+  const listed = evaluatorsQuery.data?.filter(
+    (evaluator) => !hiddenEvaluatorIds.has(evaluator.id),
+  );
   const evaluators = props.filterEvaluatorType
-    ? evaluatorsQuery.data?.filter(
+    ? listed?.filter(
         (evaluator) =>
           (evaluator.config as { evaluatorType?: string } | null)
             ?.evaluatorType === props.filterEvaluatorType,
@@ -102,7 +112,7 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
       // Comparison card in TargetTypeSelectorDrawer, which sets their
       // `variants`/`goldenField`. Attached here as a per-target chip
       // instead, they'd have no variants configured and nothing to judge.
-      evaluatorsQuery.data?.filter((evaluator) => {
+      listed?.filter((evaluator) => {
         const evaluatorType = (
           evaluator.config as { evaluatorType?: string } | null
         )?.evaluatorType;

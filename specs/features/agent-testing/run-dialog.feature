@@ -202,7 +202,7 @@ Feature: The run dialog
   Scenario: The chips read in one fixed order
     Given the run dialog is open with a prompt published and parameters declared
     When the customize chips are read
-    Then they read "Add parameters", "Compare agents", "Add a note", "Run against a prompt", "Custom simulation models" and "Run multiple times"
+    Then they read "Add parameters", "Compare agents", "Add a note", "Run against a prompt", "Custom simulation models", "Run multiple times" and "Add evaluators"
 
   @integration
   Scenario: The note chip adds a note field
@@ -489,6 +489,71 @@ Feature: The run dialog
     Then the run is refused with "scenario_parameter_unknown"
     And the rejection names the unknown name and the names the run does declare
     And it says the agent the run goes against does not declare it either
+
+  # --- Evaluators ---
+  #
+  # A run carries two kinds of evaluators: the ones the test suites in its
+  # scope attach, which every run of those suites gets and which are edited
+  # in the suite, and the plan's own, which read only the conversation and
+  # the trace, since a plan may cover scenarios from several suites.
+
+  @integration
+  Scenario: The evaluators of the suites in scope read as inherited chips
+    Given a test suite that attaches an evaluator
+    When the run dialog is opened on that suite
+    Then an Evaluators block stands open, with no chip needed to open it
+    And it reads "Inherited from <suite> · edit in the suite" over the suite's evaluators
+    And each evaluator reads as a muted pill
+    And the block cannot be removed while a suite in scope holds it
+
+  @integration
+  Scenario: An inherited chip opens the suite editor on that evaluator
+    Given the run dialog with an inherited evaluator
+    When its pill is chosen
+    Then the suite editor opens on that suite, at that evaluator
+
+  @integration
+  Scenario: The evaluators chip adds the plan's own evaluators
+    Given the run dialog on a suite that attaches no evaluator
+    When "Add evaluators" is chosen
+    Then the Evaluators block opens
+    And the evaluator list opens, without the evaluators that expect a golden value
+
+  @integration
+  Scenario: A picked evaluator becomes a pill on this run
+    Given the evaluator list open from the run dialog
+    When "PII Leak Scanner" is picked
+    Then it reads as a pill under "On this run"
+    And its inputs read the conversation
+    And the run goes out with it as the plan's own evaluator
+
+  @integration
+  Scenario: The plan's own evaluator is edited in the evaluator editor with the run sources
+    Given the run dialog with an evaluator of its own
+    When its pill is chosen
+    Then the evaluator editor opens on it with the conversation and the trace as sources, and no scenario field
+    And the Required to pass switch reads under the mappings
+
+  @integration
+  Scenario: Run opens the evaluator that still reads nothing instead of running
+    Given a suite in scope whose evaluator has a required input with no mapping
+    When Run is chosen
+    Then no run is queued
+    And the suite editor opens on that evaluator
+    And Run says "Configure missing mappings for evaluator" over the pointer
+
+  @integration
+  Scenario: A run the server refuses for a missing mapping says which evaluator and offers the way to it
+    Given the run dialog with an agent chosen
+    When the run is refused with "suite_evaluator_mappings_missing"
+    Then the refusal reads inside the dialog
+    And a "Configure the evaluator" action opens the suite editor on that evaluator
+
+  @integration
+  Scenario: A stored run plan opens on the evaluators it carries
+    Given a stored run plan with an evaluator of its own
+    When it is opened from the Results tab
+    Then the Evaluators block stands open with that evaluator as a pill
 
   # --- Where a queued run lands ---
 

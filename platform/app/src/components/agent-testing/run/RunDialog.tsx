@@ -22,6 +22,7 @@ import { RunDialogFields } from "./RunDialogFields";
 import { RunDialogFooter } from "./RunDialogFooter";
 import { isNoteTooLong } from "./RunNoteField";
 import type { RunDialogProps, RunDialogSubject } from "./run-dialog-types";
+import { RUN_MISSING_MAPPINGS_TOOLTIP } from "./run-evaluators";
 import { type RunDialogForm, useRunDialogForm } from "./useRunDialogForm";
 import {
   type RunDialogController,
@@ -156,6 +157,7 @@ export function RunDialog({ subject, onClose, onRunStarted }: RunDialogProps) {
     runParameters: form.runParameters,
     storableRunParameters: form.storableRunParameters,
     storableSecretNames: form.storableSecretNames,
+    evaluators: form.extras,
     onRunStarted,
     onClose,
     setInlineError: form.setInlineError,
@@ -165,6 +167,12 @@ export function RunDialog({ subject, onClose, onRunStarted }: RunDialogProps) {
 
   if (!subject) return null;
 
+  // An evaluator whose required input reads nothing holds the run: Run opens
+  // its editor instead, so the fix is one click away and nothing is queued
+  // that the server would refuse.
+  const offender = form.offender;
+  const onRun = offender ? form.openOffender : () => void controller.run();
+
   return (
     <Dialog.Root
       open={!!subject}
@@ -173,6 +181,9 @@ export function RunDialog({ subject, onClose, onRunStarted }: RunDialogProps) {
       }}
       placement="center"
       closeOnEscape={!isNameListOpen && openLists.size === 0}
+      // The evaluator list and the evaluator editor open as drawers over the
+      // dialog; a click inside them must not read as a click outside it.
+      closeOnInteractOutside={!form.isEvaluatorFlowOpen}
     >
       <Dialog.Content
         bg="bg.panel"
@@ -199,6 +210,8 @@ export function RunDialog({ subject, onClose, onRunStarted }: RunDialogProps) {
           controller={controller}
           isRunBlocked={isRunBlocked({ form, controller })}
           blockedReason={runBlockedReason({ subject, form, controller })}
+          warning={offender ? RUN_MISSING_MAPPINGS_TOOLTIP : null}
+          onRun={onRun}
           caseCount={form.caseCount}
           targetCount={form.runTargets.length}
           onClose={onClose}
