@@ -19,7 +19,6 @@ export const dataPrivacyPageLoaders: UiPageLoaderRegistry = {
       default: (await dataPrivacyScreens.dataPrivacy()).default as ComponentType,
     }),
     host: DataPrivacyHost,
-    settingsLayout: true,
     permission: DATA_PRIVACY_PAGE_PERMISSION,
   }),
 };

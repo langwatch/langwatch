@@ -19,6 +19,7 @@ import { UiApplicationShell } from "./ui/sections/ui-application-shell";
 import type { UiApplication } from "./ui/sections/ui-application";
 
 import "nprogress/nprogress.css";
+import "./styles/globals.scss";
 
 /** A provider position whose implementation has not moved here yet. */
 function UiPendingProvider({ children }: { children: ReactNode }) {

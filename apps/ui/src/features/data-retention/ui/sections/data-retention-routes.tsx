@@ -15,7 +15,6 @@ export const dataRetentionPageLoaders: UiPageLoaderRegistry = {
       default: (await dataRetentionScreens.dataRetention()).default as ComponentType,
     }),
     host: DataRetentionHost,
-    settingsLayout: true,
     permission: DATA_RETENTION_PAGE_PERMISSION,
   }),
 };

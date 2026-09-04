@@ -16,13 +16,11 @@ export const modelProviderPageLoaders: UiPageLoaderRegistry = {
       default: (await modelProviderScreens.modelProviders()).default as ComponentType,
     }),
     host: ModelProviderHost,
-    settingsLayout: true,
   }),
   "pages/settings/model-costs": uiPage({
     screen: async () => ({
       default: (await modelProviderScreens.modelCosts()).default as ComponentType,
     }),
     host: ModelProviderHost,
-    settingsLayout: true,
   }),
 };

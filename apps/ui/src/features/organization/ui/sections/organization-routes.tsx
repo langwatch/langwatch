@@ -22,7 +22,6 @@ export const organizationPageLoaders: UiPageLoaderRegistry = {
       default: (await organizationScreens.auditLog()).default as ComponentType,
     }),
     host: OrganizationHost,
-    settingsLayout: true,
     permission: AUDIT_LOG_PAGE_PERMISSION,
   }),
   "pages/settings/members": uiPage({
@@ -30,7 +29,6 @@ export const organizationPageLoaders: UiPageLoaderRegistry = {
       default: (await organizationScreens.members()).default as ComponentType,
     }),
     host: OrganizationHost,
-    settingsLayout: true,
     permission: MEMBERS_PAGE_PERMISSION,
   }),
   "pages/settings/teams": uiPage({
@@ -38,7 +36,6 @@ export const organizationPageLoaders: UiPageLoaderRegistry = {
       default: (await organizationScreens.teams()).default as ComponentType,
     }),
     host: OrganizationHost,
-    settingsLayout: true,
     permission: TEAMS_PAGE_PERMISSION,
   }),
   "pages/settings/teams/[team]": uiPage({
@@ -46,7 +43,6 @@ export const organizationPageLoaders: UiPageLoaderRegistry = {
       default: (await organizationScreens.teamDetail()).default as ComponentType,
     }),
     host: OrganizationHost,
-    settingsLayout: true,
     permission: TEAM_DETAIL_PAGE_PERMISSION,
   }),
   "pages/settings/groups": uiPage({
@@ -54,7 +50,6 @@ export const organizationPageLoaders: UiPageLoaderRegistry = {
       default: (await organizationScreens.groups()).default as ComponentType,
     }),
     host: OrganizationHost,
-    settingsLayout: true,
     permission: GROUPS_PAGE_PERMISSION,
   }),
 };

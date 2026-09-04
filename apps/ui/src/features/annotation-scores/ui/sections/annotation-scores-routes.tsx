@@ -20,7 +20,6 @@ export const annotationScoresPageLoaders: UiPageLoaderRegistry = {
       default: (await annotationScoresScreens.annotationScores()).default as ComponentType,
     }),
     host: AnnotationScoresHost,
-    settingsLayout: true,
     permission: ANNOTATION_SCORES_PAGE_PERMISSION,
   }),
 };

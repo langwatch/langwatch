@@ -19,7 +19,6 @@ export const projectPageLoaders: UiPageLoaderRegistry = {
       default: (await projectScreens.projectSettings()).default as ComponentType,
     }),
     host: ProjectHost,
-    settingsLayout: true,
     permission: PROJECT_SETTINGS_PAGE_PERMISSION,
   }),
 };

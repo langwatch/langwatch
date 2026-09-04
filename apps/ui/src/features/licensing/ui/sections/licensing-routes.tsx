@@ -11,6 +11,5 @@ export const licensingPageLoaders: UiPageLoaderRegistry = {
   "pages/settings/license": uiPage({
     screen: async () => ({ default: (await licensingScreens.license()).default as ComponentType }),
     host: LicensingHost,
-    settingsLayout: true,
   }),
 };

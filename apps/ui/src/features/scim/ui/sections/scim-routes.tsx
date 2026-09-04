@@ -14,7 +14,6 @@ export const scimPageLoaders: UiPageLoaderRegistry = {
   "pages/settings/scim": uiPage({
     screen: async () => ({ default: (await scimScreens.scim()).default as ComponentType }),
     host: ScimHost,
-    settingsLayout: true,
     permission: SCIM_PAGE_PERMISSION,
   }),
 };

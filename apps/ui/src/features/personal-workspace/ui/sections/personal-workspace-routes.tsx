@@ -54,7 +54,6 @@ export const personalWorkspacePageLoaders: UiPageLoaderRegistry = {
       ),
     }),
     host: PersonalWorkspaceHost,
-    settingsLayout: true,
   }),
   "pages/me/index": personalWorkspacePage("overview", { title: "My Usage · LangWatch" }),
   "pages/me/configure": personalWorkspacePage("configure", {

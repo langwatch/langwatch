@@ -29,7 +29,6 @@ function billingPage(
       return { default: Component };
     },
     host: BillingHost,
-    settingsLayout: true,
     permission,
   });
 }

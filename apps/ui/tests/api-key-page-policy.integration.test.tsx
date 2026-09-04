@@ -19,14 +19,27 @@
  * asserted in BOTH directions, which is what turns "we did not add a guard" into
  * a decision somebody can disagree with.
  *
+ * THE CHROME IS `NavigationShell` NOW, MOUNTED HERE — see
+ * `settings-family-page-policy.integration.test.tsx` for why: this
+ * application's own settings layout, which drew a duplicate of
+ * `NavigationShell`'s own sidebar, is deleted. `/cli/auth` is not a
+ * `/settings` address, so `NavigationShell` draws it no settings sidebar
+ * either — the same absence the CLI authorize case below still asserts.
+ *
  * Specs: specs/api-keys/unified-api-keys.feature,
  *        specs/secrets/secrets-manager.feature,
  *        specs/ai-governance/cli-onboarding/login-unified.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { navigationApi } from "@langwatch/navigation-web/screens/landing";
+import { NavigationShell } from "@langwatch/navigation-web/chrome";
+import { WithStubNavigationHost, type StubNavigationReadings } from "@langwatch/navigation-web/testing";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createUiFeatureApiClient } from "../src/behavior/ui-feature-transport";
 
 const { apiNode } = vi.hoisted(() => {
   const emptyQuery = { data: undefined, isLoading: false };
@@ -160,6 +173,58 @@ function capabilities(session: UiSessionPort): UiCapabilities {
 
 const LOADERS = { ...apiKeyPageLoaders, ...secretPageLoaders };
 
+/** A desktop viewport: `NavigationShell` draws phone chrome with none. */
+function useDesktopViewport() {
+  window.matchMedia = ((query: string) => ({
+    matches: query.includes("min-width"),
+    media: query,
+    onchange: null,
+    addEventListener: () => void 0,
+    removeEventListener: () => void 0,
+    addListener: () => void 0,
+    removeListener: () => void 0,
+    dispatchEvent: () => false,
+  })) as unknown as typeof window.matchMedia;
+}
+
+function ShellTransport({ children }: { children: React.ReactNode }) {
+  useDesktopViewport();
+  const [queryClient] = useState(
+    () => new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+  );
+  const [client] = useState(() => createUiFeatureApiClient());
+  return (
+    <QueryClientProvider client={queryClient}>
+      <navigationApi.Provider client={client} queryClient={queryClient}>
+        {children}
+      </navigationApi.Provider>
+    </QueryClientProvider>
+  );
+}
+
+const SHELL_TEAM = {
+  id: "team_1",
+  name: "Core",
+  isPersonal: false,
+  ownerUserId: null,
+  members: [{ userId: "user_1" }],
+  projects: [{ id: "project_1", slug: "demo", name: "Demo", isPersonal: false }],
+};
+const SHELL_ORGANIZATION = { id: "org_1", name: "ACME", teams: [SHELL_TEAM] };
+
+function shellReadings(pathname: string): StubNavigationReadings {
+  return {
+    organizations: [SHELL_ORGANIZATION],
+    organization: SHELL_ORGANIZATION,
+    team: SHELL_TEAM,
+    project: SHELL_TEAM.projects[0],
+    currentUser: { id: "user_1", name: "Ada", email: "ada@acme.test", image: null },
+    isLoading: false,
+    pathname,
+    permissions: ["organization:view"],
+  };
+}
+
 async function openPage(key: string, permissions: readonly string[]): Promise<void> {
   const loader = LOADERS[key];
   if (!loader) throw new Error(`no loader is registered for ${key}`);
@@ -167,11 +232,17 @@ async function openPage(key: string, permissions: readonly string[]): Promise<vo
   const pathname = key.replace(/^pages/, "");
   render(
     <ChakraProvider value={defaultSystem}>
-      <MemoryRouter initialEntries={[pathname]}>
-        <UiCapabilityContextProvider value={capabilities(new AnsweringSession(permissions))}>
-          <Mounted />
-        </UiCapabilityContextProvider>
-      </MemoryRouter>
+      <ShellTransport>
+        <WithStubNavigationHost readings={shellReadings(pathname)}>
+          <MemoryRouter initialEntries={[pathname]}>
+            <UiCapabilityContextProvider value={capabilities(new AnsweringSession(permissions))}>
+              <NavigationShell>
+                <Mounted />
+              </NavigationShell>
+            </UiCapabilityContextProvider>
+          </MemoryRouter>
+        </WithStubNavigationHost>
+      </ShellTransport>
     </ChakraProvider>,
   );
 }
@@ -209,7 +280,7 @@ describe.each([
     /** @scenario No page the Settings menu opens is left without it */
     it("frames itself in the settings chrome, with the menu the reader navigated by", async () => {
       await openPage(key, ["organization:view"]);
-      expect(screen.getByRole("link", { name: "General Settings" })).toBeDefined();
+      expect(screen.getByRole("link", { name: "General" })).toBeDefined();
     });
   });
 });
@@ -225,7 +296,7 @@ describe("given the CLI authorize key", () => {
     /** @scenario the screen asks for the code check first */
     it("is NOT framed in the settings chrome, because it is not a settings page", async () => {
       await openPage(CLI_AUTH_KEY, []);
-      expect(screen.queryByRole("link", { name: "General Settings" })).toBeNull();
+      expect(screen.queryByRole("link", { name: "General" })).toBeNull();
     });
 
     /** @scenario the screen asks for the code check first */

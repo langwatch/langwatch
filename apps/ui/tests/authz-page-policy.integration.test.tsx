@@ -20,13 +20,24 @@
  * wraps them in, plus the settings chrome sitting OUTSIDE the guard, so a
  * refused reader still sees the settings frame they navigated into.
  *
+ * THE CHROME IS `NavigationShell` NOW, MOUNTED HERE — see
+ * `settings-family-page-policy.integration.test.tsx` for why: this
+ * application's own settings layout, which drew a duplicate of
+ * `NavigationShell`'s own sidebar, is deleted.
+ *
  * Spec: specs/rbac/custom-role-permission-editing.feature
  * Spec: specs/rbac/role-binding-audit.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { navigationApi } from "@langwatch/navigation-web/screens/landing";
+import { NavigationShell } from "@langwatch/navigation-web/chrome";
+import { WithStubNavigationHost, type StubNavigationReadings } from "@langwatch/navigation-web/testing";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createUiFeatureApiClient } from "../src/behavior/ui-feature-transport";
 
 const { apiNode } = vi.hoisted(() => {
   const emptyQuery = { data: undefined, isLoading: false };
@@ -142,6 +153,60 @@ function capabilities(session: UiSessionPort): UiCapabilities {
   };
 }
 
+/** A desktop viewport: `NavigationShell` draws phone chrome with none. */
+function useDesktopViewport() {
+  window.matchMedia = ((query: string) => ({
+    matches: query.includes("min-width"),
+    media: query,
+    onchange: null,
+    addEventListener: () => void 0,
+    removeEventListener: () => void 0,
+    addListener: () => void 0,
+    removeListener: () => void 0,
+    dispatchEvent: () => false,
+  })) as unknown as typeof window.matchMedia;
+}
+
+function ShellTransport({ children }: { children: React.ReactNode }) {
+  useDesktopViewport();
+  const [queryClient] = useState(
+    () => new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+  );
+  const [client] = useState(() => createUiFeatureApiClient());
+  return (
+    <QueryClientProvider client={queryClient}>
+      <navigationApi.Provider client={client} queryClient={queryClient}>
+        {children}
+      </navigationApi.Provider>
+    </QueryClientProvider>
+  );
+}
+
+const SHELL_TEAM = {
+  id: "team_1",
+  name: "Core",
+  isPersonal: false,
+  ownerUserId: null,
+  members: [{ userId: "user_1" }],
+  projects: [{ id: "project_1", slug: "demo", name: "Demo", isPersonal: false }],
+};
+const SHELL_ORGANIZATION = { id: "org_1", name: "ACME", teams: [SHELL_TEAM] };
+
+/** Roles, role bindings and the rest of Access are enterprise-only entries. */
+function shellReadings(pathname: string): StubNavigationReadings {
+  return {
+    organizations: [SHELL_ORGANIZATION],
+    organization: SHELL_ORGANIZATION,
+    team: SHELL_TEAM,
+    project: SHELL_TEAM.projects[0],
+    currentUser: { id: "user_1", name: "Ada", email: "ada@acme.test", image: null },
+    isLoading: false,
+    pathname,
+    permissions: ["organization:view"],
+    plan: { isEnterprise: true, isLoading: false, isLiteMember: false },
+  };
+}
+
 async function openPage(key: string, permissions: readonly string[]): Promise<void> {
   const loader = authzPageLoaders[key];
   if (!loader) throw new Error(`no loader is registered for ${key}`);
@@ -151,11 +216,17 @@ async function openPage(key: string, permissions: readonly string[]): Promise<vo
   const pathname = key.replace(/^pages/, "");
   render(
     <ChakraProvider value={defaultSystem}>
-      <MemoryRouter initialEntries={[pathname]}>
-        <UiCapabilityContextProvider value={capabilities(new AnsweringSession(permissions))}>
-          <Mounted />
-        </UiCapabilityContextProvider>
-      </MemoryRouter>
+      <ShellTransport>
+        <WithStubNavigationHost readings={shellReadings(pathname)}>
+          <MemoryRouter initialEntries={[pathname]}>
+            <UiCapabilityContextProvider value={capabilities(new AnsweringSession(permissions))}>
+              <NavigationShell>
+                <Mounted />
+              </NavigationShell>
+            </UiCapabilityContextProvider>
+          </MemoryRouter>
+        </WithStubNavigationHost>
+      </ShellTransport>
     </ChakraProvider>,
   );
 }
@@ -200,7 +271,7 @@ describe.each([
     it("still frames the refusal in the settings chrome", async () => {
       await openPage(key, ["organization:view"]);
 
-      expect(screen.getByRole("link", { name: "General Settings" })).toBeDefined();
+      expect(screen.getByRole("link", { name: "General" })).toBeDefined();
     });
   });
 

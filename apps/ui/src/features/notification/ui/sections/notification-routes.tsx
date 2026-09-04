@@ -15,7 +15,6 @@ export const notificationPageLoaders: UiPageLoaderRegistry = {
       default: (await notificationScreens.emailSuppressions()).default as ComponentType,
     }),
     host: NotificationHost,
-    settingsLayout: true,
     permission: EMAIL_SUPPRESSIONS_PAGE_PERMISSION,
   }),
 };

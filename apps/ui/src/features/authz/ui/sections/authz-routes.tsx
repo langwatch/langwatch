@@ -14,7 +14,6 @@ export const authzPageLoaders: UiPageLoaderRegistry = {
   "pages/settings/roles": uiPage({
     screen: async () => ({ default: (await authzScreens.roles()).default as ComponentType }),
     host: AuthzHost,
-    settingsLayout: true,
     permission: AUTHZ_MANAGE_PERMISSION,
   }),
   "pages/settings/role-bindings": uiPage({
@@ -22,7 +21,6 @@ export const authzPageLoaders: UiPageLoaderRegistry = {
       default: (await authzScreens.roleBindings()).default as ComponentType,
     }),
     host: AuthzHost,
-    settingsLayout: true,
     permission: AUTHZ_MANAGE_PERMISSION,
   }),
 };

@@ -13,7 +13,6 @@ export const topicPageLoaders: UiPageLoaderRegistry = {
       default: (await topicScreens.topicClustering()).default as ComponentType,
     }),
     host: TopicHost,
-    settingsLayout: true,
     permission: "project:manage",
   }),
 };

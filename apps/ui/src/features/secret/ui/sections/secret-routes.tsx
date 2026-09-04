@@ -13,6 +13,5 @@ export const secretPageLoaders: UiPageLoaderRegistry = {
   "pages/settings/secrets": uiPage({
     screen: async () => ({ default: (await secretScreens.secrets()).default as ComponentType }),
     host: SecretHost,
-    settingsLayout: true,
   }),
 };

@@ -1,7 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * What `/settings/integrations` is actually behind, proved by mounting it.
+ * What `/settings/integrations` is actually behind, proved by mounting it
+ * under the real chrome.
  *
  * `ui-page-guard.unit.test.tsx` pins the guard's ordering; it would not notice
  * a loader that names the wrong grant — the failure that refuses a reader the
@@ -15,13 +16,23 @@
  * that a connection exists, but starting or removing an installation changes
  * what LangWatch can write to on the organization's repositories.
  *
+ * THE CHROME IS `NavigationShell` NOW, MOUNTED HERE — see
+ * `settings-family-page-policy.integration.test.tsx` for why: this
+ * application's own settings layout, which drew a duplicate of
+ * `NavigationShell`'s own sidebar, is deleted.
+ *
  * Spec: specs/integrations/github-connection.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { navigationApi } from "@langwatch/navigation-web/screens/landing";
+import { NavigationShell } from "@langwatch/navigation-web/chrome";
+import { WithStubNavigationHost, type StubNavigationReadings } from "@langwatch/navigation-web/testing";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createUiFeatureApiClient } from "../src/behavior/ui-feature-transport";
 
 const { apiNode } = vi.hoisted(() => {
   const emptyQuery = { data: undefined, isLoading: false, isSuccess: false };
@@ -135,19 +146,72 @@ function capabilities(session: UiSessionPort): UiCapabilities {
 
 const INTEGRATIONS_KEY = "pages/settings/integrations";
 
+/** A desktop viewport: `NavigationShell` draws phone chrome with none. */
+function useDesktopViewport() {
+  window.matchMedia = ((query: string) => ({
+    matches: query.includes("min-width"),
+    media: query,
+    onchange: null,
+    addEventListener: () => void 0,
+    removeEventListener: () => void 0,
+    addListener: () => void 0,
+    removeListener: () => void 0,
+    dispatchEvent: () => false,
+  })) as unknown as typeof window.matchMedia;
+}
+
+function ShellTransport({ children }: { children: React.ReactNode }) {
+  useDesktopViewport();
+  const [queryClient] = useState(
+    () => new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+  );
+  const [client] = useState(() => createUiFeatureApiClient());
+  return (
+    <QueryClientProvider client={queryClient}>
+      <navigationApi.Provider client={client} queryClient={queryClient}>
+        {children}
+      </navigationApi.Provider>
+    </QueryClientProvider>
+  );
+}
+
+const SHELL_TEAM = {
+  id: "team_1",
+  name: "Core",
+  isPersonal: false,
+  ownerUserId: null,
+  members: [{ userId: "user_1" }],
+  projects: [{ id: "project_1", slug: "demo", name: "Demo", isPersonal: false }],
+};
+const SHELL_ORGANIZATION = { id: "org_1", name: "ACME", teams: [SHELL_TEAM] };
+const SHELL_READINGS: StubNavigationReadings = {
+  organizations: [SHELL_ORGANIZATION],
+  organization: SHELL_ORGANIZATION,
+  team: SHELL_TEAM,
+  project: SHELL_TEAM.projects[0],
+  currentUser: { id: "user_1", name: "Ada", email: "ada@acme.test", image: null },
+  isLoading: false,
+  pathname: "/settings/integrations",
+  permissions: ["organization:view"],
+};
+
 async function openIntegrations(permissions: readonly string[]): Promise<void> {
   const loader = githubPageLoaders[INTEGRATIONS_KEY];
   if (!loader) throw new Error(`no loader is registered for ${INTEGRATIONS_KEY}`);
   const Mounted = (await loader()).default;
   render(
     <ChakraProvider value={defaultSystem}>
-      <QueryClientProvider client={new QueryClient()}>
-        <MemoryRouter initialEntries={["/settings/integrations"]}>
-          <UiCapabilityContextProvider value={capabilities(new AnsweringSession(permissions))}>
-            <Mounted />
-          </UiCapabilityContextProvider>
-        </MemoryRouter>
-      </QueryClientProvider>
+      <ShellTransport>
+        <WithStubNavigationHost readings={{ ...SHELL_READINGS }}>
+          <MemoryRouter initialEntries={["/settings/integrations"]}>
+            <UiCapabilityContextProvider value={capabilities(new AnsweringSession(permissions))}>
+              <NavigationShell>
+                <Mounted />
+              </NavigationShell>
+            </UiCapabilityContextProvider>
+          </MemoryRouter>
+        </WithStubNavigationHost>
+      </ShellTransport>
     </ChakraProvider>,
   );
 }
@@ -166,7 +230,7 @@ describe("given the integrations page", () => {
     it("renders inside the settings chrome", async () => {
       await openIntegrations(["organization:manage"]);
 
-      expect(screen.getByRole("link", { name: "General Settings" })).toBeDefined();
+      expect(screen.getByRole("link", { name: "General" })).toBeDefined();
     });
   });
 
@@ -187,7 +251,7 @@ describe("given the integrations page", () => {
     it("still frames the refusal in the settings chrome", async () => {
       await openIntegrations(["organization:view"]);
 
-      expect(screen.getByRole("link", { name: "General Settings" })).toBeDefined();
+      expect(screen.getByRole("link", { name: "General" })).toBeDefined();
     });
   });
 

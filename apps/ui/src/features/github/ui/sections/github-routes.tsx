@@ -20,7 +20,6 @@ export const githubPageLoaders: UiPageLoaderRegistry = {
       default: (await githubScreens.integrations()).default as ComponentType,
     }),
     host: GithubHost,
-    settingsLayout: true,
     permission: INTEGRATIONS_PAGE_PERMISSION,
   }),
 };

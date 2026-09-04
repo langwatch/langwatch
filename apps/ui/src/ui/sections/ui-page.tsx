@@ -1,14 +1,20 @@
 /**
  * The wrapping order, fixed once here instead of in 38 route files: host
  * OUTERMOST (a page needs it mounted before first render even when refused),
- * settings chrome outside the guard, guard innermost around the screen.
+ * guard innermost around the screen.
+ *
+ * There is no settings-chrome layer here any more. `NavigationShell` (mounted
+ * by `apps/ui`'s chrome route for every matched page) already draws the
+ * settings sidebar for any `/settings` or `/ops` address —
+ * `resolveShellRoute`'s `isSettingsRoute` is a path test, not an opt-in — so a
+ * second, page-level settings layout produced two sidebars nested inside one
+ * another. See `specs/ui/ui-page-composition.feature`.
  */
 
 import type { ComponentType, ReactNode } from "react";
 import type { UiPageLoader } from "../../behavior/ui-page-loaders";
 import { UiPageForbidden, UiPageLoading, UiPageNotFound } from "../elements/ui-page-fallbacks";
 import { withUiPageGuard, type UiPageGuardFallbacks } from "./ui-page-guard";
-import { withUiSettingsLayout } from "./ui-settings-layout";
 
 /** The one copy of the guard's fallback trio; every route used to repeat this. */
 export const UI_PAGE_FALLBACKS: UiPageGuardFallbacks = {
@@ -20,7 +26,6 @@ export const UI_PAGE_FALLBACKS: UiPageGuardFallbacks = {
 export type UiPageInstall = {
   screen: () => Promise<{ default: ComponentType }>;
   host?: ComponentType<{ children: ReactNode }>;
-  settingsLayout?: boolean;
   permission?: string;
   flags?: readonly string[];
 };
@@ -41,20 +46,13 @@ export function withHost<P extends object>(
   return Mounted;
 }
 
-export function uiPage({
-  screen,
-  host,
-  settingsLayout = false,
-  permission,
-  flags,
-}: UiPageInstall): UiPageLoader {
+export function uiPage({ screen, host, permission, flags }: UiPageInstall): UiPageLoader {
   return async () => {
     const module = await screen();
     const needsGuard = permission !== void 0 || (flags !== void 0 && flags.length > 0);
     const guarded = needsGuard
       ? withUiPageGuard({ permission, flags, fallbacks: UI_PAGE_FALLBACKS })(module.default)
       : module.default;
-    const framed = settingsLayout ? withUiSettingsLayout(guarded) : guarded;
-    return { default: host ? withHost(host, framed) : framed };
+    return { default: host ? withHost(host, guarded) : guarded };
   };
 }

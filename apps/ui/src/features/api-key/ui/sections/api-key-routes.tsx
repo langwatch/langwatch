@@ -32,7 +32,6 @@ export const apiKeyPageLoaders: UiPageLoaderRegistry = {
   "pages/settings/api-keys": uiPage({
     screen: async () => ({ default: (await apiKeyScreens.apiKeys()).default as ComponentType }),
     host: ApiKeyHost,
-    settingsLayout: true,
   }),
   "pages/cli/auth": uiPage({
     screen: async () => ({

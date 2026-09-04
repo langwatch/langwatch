@@ -2,11 +2,19 @@
  * @vitest-environment jsdom
  *
  * The one page helper every route file composes through. What it pins is the
- * wrapping order the route docblocks used to defend one by one: host outermost,
- * settings chrome outside the guard, guard innermost around the screen — and
- * that a key with neither a grant nor a flag mounts no guard at all.
+ * wrapping order the route docblocks used to defend one by one: host
+ * outermost, guard innermost around the screen — and that a key with neither
+ * a grant nor a flag mounts no guard at all.
  *
- * Spec: specs/frontend/ui-page-composition.feature
+ * There is no settings-layout layer in this helper. `NavigationShell` draws
+ * the settings sidebar for every matched `/settings` or `/ops` address on
+ * its own (`resolveShellRoute`'s `isSettingsRoute` is a path test, not a
+ * per-page opt-in); a second, page-level settings layout used to wrap the
+ * same pages in a duplicate sidebar. See
+ * packages/navigation/web/src/ui/sections/__tests__/settings-shell.integration.test.tsx
+ * for the one sidebar this composition now relies on.
+ *
+ * Spec: specs/ui/ui-page-composition.feature
  */
 
 import { describe, expect, it } from "vitest";
@@ -24,18 +32,15 @@ function TestHost({ children }: { children: ReactNode }) {
 const screen = async () => ({ default: Screen });
 
 describe("uiPage", () => {
-  describe("when a host, the settings layout and a grant are all asked for", () => {
-    /** @scenario The host sits outside the settings chrome, which sits outside the guard */
-    it("mounts host › settings layout › guard › screen", async () => {
+  describe("when a host and a grant are both asked for", () => {
+    /** @scenario The host sits outside the guard */
+    it("mounts host › guard › screen", async () => {
       const page = await uiPage({
         screen,
         host: TestHost,
-        settingsLayout: true,
         permission: "secrets:manage",
       })();
-      expect(page.default.displayName).toBe(
-        "withHost(TestHost, withUiSettingsLayout(withUiPageGuard(Screen)))",
-      );
+      expect(page.default.displayName).toBe("withHost(TestHost, withUiPageGuard(Screen))");
     });
   });
 

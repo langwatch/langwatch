@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  *
  * What the thirteen settings addresses are actually behind, proved by mounting
- * them.
+ * them under the real chrome.
  *
  * THIRTEEN KEYS LEFT `platform/app` AT ONCE, and three guarantees left with
  * them that nothing in this application would otherwise hold. Each one used to
@@ -24,13 +24,27 @@
  * session that answers precisely, so a loader that names the wrong grant fails
  * rather than a file that merely mentions the right word.
  *
+ * THE CHROME IS `NavigationShell` NOW, MOUNTED HERE ON PURPOSE. `uiPage()`
+ * used to wrap a `settingsLayout: true` screen in this application's own
+ * `withUiSettingsLayout`, a second settings sidebar nested inside the one
+ * `NavigationShell` already draws for every `/settings` address — two menus,
+ * "General Settings" from the local copy beside "General" from the real one.
+ * That local copy is deleted; `settingsSidebarCount()` below counts the survivor's
+ * "General" link, so a page that opened with two of them, or none, fails
+ * here rather than only reading correctly to the eye.
+ *
  * Spec: specs/settings/settings-page-chrome.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { navigationApi } from "@langwatch/navigation-web/screens/landing";
+import { NavigationShell } from "@langwatch/navigation-web/chrome";
+import { WithStubNavigationHost, type StubNavigationReadings } from "@langwatch/navigation-web/testing";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createUiFeatureApiClient } from "../src/behavior/ui-feature-transport";
 
 const { apiNode, screenFor } = vi.hoisted(() => {
   const emptyQuery = { data: void 0, isLoading: false, isSuccess: false, error: null };
@@ -224,26 +238,96 @@ const SETTINGS_LOADERS: UiPageLoaderRegistry = {
   ...topicPageLoaders,
 };
 
+/**
+ * A desktop viewport, because jsdom does not implement `matchMedia` at all.
+ *
+ * Without it every Chakra breakpoint query reports false, `base` wins, and
+ * `NavigationShell` draws its phone chrome — a compact bar with no sidebar
+ * column to count links in.
+ */
+function useDesktopViewport() {
+  window.matchMedia = ((query: string) => ({
+    matches: query.includes("min-width"),
+    media: query,
+    onchange: null,
+    addEventListener: () => void 0,
+    removeEventListener: () => void 0,
+    addListener: () => void 0,
+    removeListener: () => void 0,
+    dispatchEvent: () => false,
+  })) as unknown as typeof window.matchMedia;
+}
+
+/** The Providers `NavigationShell`'s own reads (the top bar's badges, usage) run on. */
+function ShellTransport({ children }: { children: React.ReactNode }) {
+  useDesktopViewport();
+  const [queryClient] = useState(
+    () => new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+  );
+  const [client] = useState(() => createUiFeatureApiClient());
+  return (
+    <QueryClientProvider client={queryClient}>
+      <navigationApi.Provider client={client} queryClient={queryClient}>
+        {children}
+      </navigationApi.Provider>
+    </QueryClientProvider>
+  );
+}
+
+const SHELL_TEAM = {
+  id: "team_1",
+  name: "Core",
+  isPersonal: false,
+  ownerUserId: null,
+  members: [{ userId: "user_1" }],
+  projects: [{ id: "project_1", slug: "demo", name: "Demo", isPersonal: false }],
+};
+const SHELL_ORGANIZATION = { id: "org_1", name: "ACME", teams: [SHELL_TEAM] };
+const SHELL_READINGS: StubNavigationReadings = {
+  organizations: [SHELL_ORGANIZATION],
+  organization: SHELL_ORGANIZATION,
+  team: SHELL_TEAM,
+  project: SHELL_TEAM.projects[0],
+  currentUser: { id: "user_1", name: "Ada", email: "ada@acme.test", image: null },
+  isLoading: false,
+  pathname: "/settings",
+  permissions: ["organization:view"],
+};
+
+/**
+ * Mounts what the loader hands back the way `UiAppChrome` actually does:
+ * inside `NavigationShell`, which draws the settings sidebar for this
+ * pathname on its own. A page that also drew one used to nest a second
+ * inside it.
+ */
 async function open(pageKey: string, permissions: readonly string[]): Promise<void> {
   const loader = SETTINGS_LOADERS[pageKey];
   if (!loader) throw new Error(`no loader is registered for ${pageKey}`);
   const Mounted = (await loader()).default as () => ReactNode;
   render(
     <ChakraProvider value={defaultSystem}>
-      <QueryClientProvider client={new QueryClient()}>
-        <MemoryRouter initialEntries={["/settings"]}>
-          <UiCapabilityContextProvider value={capabilities(new AnsweringSession(permissions))}>
-            <Mounted />
-          </UiCapabilityContextProvider>
-        </MemoryRouter>
-      </QueryClientProvider>
+      <ShellTransport>
+        <WithStubNavigationHost readings={{ ...SHELL_READINGS }}>
+          <MemoryRouter initialEntries={["/settings"]}>
+            <UiCapabilityContextProvider value={capabilities(new AnsweringSession(permissions))}>
+              <NavigationShell>
+                <Mounted />
+              </NavigationShell>
+            </UiCapabilityContextProvider>
+          </MemoryRouter>
+        </WithStubNavigationHost>
+      </ShellTransport>
     </ChakraProvider>,
   );
 }
 
-/** Whether the settings menu framed whatever the loader handed back. */
-function isFramed(): boolean {
-  return screen.queryAllByRole("link", { name: "General Settings" }).length > 0;
+/**
+ * How many settings sidebars framed whatever the loader handed back. Exactly
+ * one is "framed"; zero is bare; two or more is the duplicate-sidebar bug
+ * this file used to be blind to, because it only ever mounted the page.
+ */
+function settingsSidebarCount(): number {
+  return screen.queryAllByRole("link", { name: "General" }).length;
 }
 
 afterEach(cleanup);
@@ -268,7 +352,7 @@ describe("the thirteen settings pages that moved", () => {
     it.each(Object.keys(SETTINGS_LOADERS))("%s opens inside the settings chrome", async (key) => {
       await open(key, EVERY_GRANT);
 
-      expect(isFramed()).toBe(true);
+      expect(settingsSidebarCount()).toBe(1);
     });
   });
 
@@ -292,7 +376,7 @@ describe("the thirteen settings pages that moved", () => {
     it("still frames each refusal in the settings chrome", async () => {
       await open("pages/settings/members", ["organization:view"]);
 
-      expect(isFramed()).toBe(true);
+      expect(settingsSidebarCount()).toBe(1);
     });
   });
 
@@ -302,7 +386,7 @@ describe("the thirteen settings pages that moved", () => {
       await open("pages/settings/email-suppressions", ["triggers:view"]);
 
       expect(screen.getByText("the email suppressions page")).toBeDefined();
-      expect(isFramed()).toBe(true);
+      expect(settingsSidebarCount()).toBe(1);
     });
   });
 
