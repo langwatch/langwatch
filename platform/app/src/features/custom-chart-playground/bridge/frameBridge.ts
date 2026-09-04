@@ -18,9 +18,9 @@
  */
 
 import type {
+  ChartFrameDashboardContext,
   ChartFrameLogSource,
-  ChartFrameParams,
-  ChartFrameTheme,
+  ChartFrameParamsSnapshot,
   ChartQueryError,
   ChartQueryParamValue,
   ChartQueryResult,
@@ -51,8 +51,9 @@ export interface ChartFrameLogEntry {
 export interface CreateFrameBridgeOptions {
   readonly iframe: HTMLIFrameElement;
   readonly executeQuery: ChartFrameExecuteQuery;
-  readonly params: ChartFrameParams;
-  readonly theme: ChartFrameTheme;
+  readonly dashboardContext: ChartFrameDashboardContext;
+  /** Author-declared parameter defaults, delivered once on `lw:init`. */
+  readonly params?: ChartFrameParamsSnapshot;
   readonly onLog: (entry: ChartFrameLogEntry) => void;
   readonly onHeightChange: (px: number) => void;
   /**
@@ -71,8 +72,8 @@ export interface CreateFrameBridgeOptions {
 }
 
 export interface FrameBridge {
-  /** Pushes new page-level params into the frame (`lw:params-change`). */
-  postParamsChange(params: ChartFrameParams): void;
+  /** Pushes new dashboard context into the frame (`lw:dashboard-context-change`). */
+  postDashboardContextChange(dashboardContext: ChartFrameDashboardContext): void;
   /** Detaches everything. Safe to call twice. */
   dispose(): void;
 }
@@ -198,7 +199,11 @@ export function createFrameBridge(
     // Sandboxed srcdoc frames have the opaque origin "null" — "*" is the only
     // targetOrigin that reaches them. Nothing sensitive rides on init.
     iframe.contentWindow.postMessage(
-      { type: "lw:init", params: options.params, theme: options.theme },
+      {
+        type: "lw:init",
+        dashboardContext: options.dashboardContext,
+        params: options.params ?? {},
+      },
       "*",
       [channel.port2],
     );
@@ -231,9 +236,12 @@ export function createFrameBridge(
   }
 
   return {
-    postParamsChange(params: ChartFrameParams) {
+    postDashboardContextChange(dashboardContext: ChartFrameDashboardContext) {
       if (disposed || !port) return;
-      port.postMessage({ type: "lw:params-change", params });
+      port.postMessage({
+        type: "lw:dashboard-context-change",
+        dashboardContext,
+      });
     },
     dispose: stop,
   };

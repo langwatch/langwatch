@@ -8,8 +8,8 @@
  * the `LW` global, forwards console output and uncaught errors to the
  * parent, posts a heartbeat, and — the init-race fix — calls
  * `window.__lwActivateAuthor` only AFTER `lw:init` has delivered the port,
- * params and theme, so author code can read `LW.params` synchronously at its
- * first line.
+ * dashboardContext and params, so author code can read `LW.dashboardContext`
+ * / `LW.params` synchronously at its first line.
  *
  * The shim itself knows nothing about Babel or the module format — that
  * lives in `bridge/authorRuntime.ts`, which is what defines the hook this
@@ -38,7 +38,7 @@ export function buildShimScript(): string {
   var buffered = [];
   var nextRequestId = 1;
   var pending = {};
-  var paramsCallbacks = [];
+  var dashboardContextCallbacks = [];
   var resolveReady;
   var ready = new Promise(function (resolve) { resolveReady = resolve; });
 
@@ -72,9 +72,11 @@ export function buildShimScript(): string {
   }
 
   // keep in sync with bridge/lwGlobalTypes.ts — every member below (plus
-  // LW.useChartQuery, added after this object) needs a matching declared
-  // member with JSDoc there for Monaco's autocomplete/hover in the author pane.
+  // LW.useChartQuery, LW.useDashboardContext and LW.useParams, all added
+  // after this object) needs a matching declared member with JSDoc there
+  // for Monaco's autocomplete/hover in the author pane.
   var LW = {
+    dashboardContext: undefined,
     params: undefined,
     theme: undefined,
     query: function (name, params) {
@@ -94,17 +96,18 @@ export function buildShimScript(): string {
       var clamped = Math.max(${CHART_FRAME_MIN_HEIGHT_PX}, Math.min(${CHART_FRAME_MAX_HEIGHT_PX}, Number(px) || ${CHART_FRAME_MIN_HEIGHT_PX}));
       post({ type: "lw:set-height", px: clamped });
     },
-    // Returns an unsubscribe function — useChartQuery below relies on this to
-    // drop its listener on cleanup instead of accumulating one per mount.
-    onParamsChange: function (callback) {
+    // Returns an unsubscribe function — useChartQuery/useDashboardContext
+    // below rely on this to drop their listener on cleanup instead of
+    // accumulating one per mount.
+    onDashboardContextChange: function (callback) {
       var removed = false;
       ready.then(function () {
-        if (!removed) paramsCallbacks.push(callback);
+        if (!removed) dashboardContextCallbacks.push(callback);
       });
       return function () {
         removed = true;
-        var index = paramsCallbacks.indexOf(callback);
-        if (index !== -1) paramsCallbacks.splice(index, 1);
+        var index = dashboardContextCallbacks.indexOf(callback);
+        if (index !== -1) dashboardContextCallbacks.splice(index, 1);
       };
     },
     error: function (err) {
@@ -158,8 +161,8 @@ export function buildShimScript(): string {
    *    setState-on-unmounted race;
    *  - 'params' is compared by value (JSON), not identity, so an inline
    *    object literal in the widget's JSX does not cause a refetch loop.
-   * It also refetches on its own whenever the page-level time window or
-   * granularity changes, via the same onParamsChange feed LW.onParamsChange
+   * It also refetches on its own whenever the dashboard context (time
+   * window, granularity) changes, via the same feed LW.onDashboardContextChange
    * exposes directly - a widget using this hook stays live without its
    * author ever touching that lower-level API. 'refetch' triggers the same
    * run manually.
@@ -207,7 +210,7 @@ export function buildShimScript(): string {
       // scratch rather than keeping the previous query's stale data/error.
       setState({ status: "pending", data: null, error: null, isFetching: true });
       run();
-      var unsubscribe = LW.onParamsChange(run);
+      var unsubscribe = LW.onDashboardContextChange(run);
 
       return function () {
         cancelled = true;
@@ -229,6 +232,32 @@ export function buildShimScript(): string {
         if (runRef.current) runRef.current();
       }
     };
+  };
+
+  /**
+   * Live view of LW.dashboardContext — re-renders whenever the host pushes
+   * an update (lw:dashboard-context-change).
+   */
+  LW.useDashboardContext = function () {
+    var React = window.React;
+    var stateHook = React.useState(LW.dashboardContext);
+    var setState = stateHook[1];
+    React.useEffect(function () {
+      return LW.onDashboardContextChange(setState);
+    }, []);
+    return stateHook[0];
+  };
+
+  /**
+   * Live view of LW.params — author-declared parameters and their current
+   * values. Re-renders on change via the same subscription mechanism as
+   * useDashboardContext; there is no dashboard-side UI to change params yet,
+   * so today this only ever reflects the widget's declared defaults.
+   */
+  LW.useParams = function () {
+    var React = window.React;
+    var stateHook = React.useState(LW.params);
+    return stateHook[0];
   };
 
   // Console + uncaught-error forwarding, installed before the author's code
@@ -261,10 +290,10 @@ export function buildShimScript(): string {
     } else if (data.type === "lw:query-error") {
       var failed = pending[data.requestId];
       if (failed) { delete pending[data.requestId]; failed.reject(data.error); }
-    } else if (data.type === "lw:params-change") {
-      LW.params = data.params;
-      paramsCallbacks.forEach(function (callback) {
-        try { callback(data.params); } catch (callbackError) { LW.error(callbackError); }
+    } else if (data.type === "lw:dashboard-context-change") {
+      LW.dashboardContext = data.dashboardContext;
+      dashboardContextCallbacks.forEach(function (callback) {
+        try { callback(data.dashboardContext); } catch (callbackError) { LW.error(callbackError); }
       });
     }
   }
@@ -291,8 +320,9 @@ export function buildShimScript(): string {
     if (port || !event.ports || !event.ports[0]) return;
     port = event.ports[0];
     port.onmessage = onPortMessage;
+    LW.dashboardContext = data.dashboardContext;
     LW.params = data.params;
-    LW.theme = data.theme;
+    LW.theme = data.dashboardContext.theme;
     buffered.forEach(function (message) { port.postMessage(message); });
     buffered = [];
     setInterval(function () {

@@ -4,7 +4,7 @@
   "queries": [
     {
       "name": "main",
-      "sql": "SELECT toHour(OccurredAt) AS hour,\n  toDayOfWeek(OccurredAt) AS dow,\n  uniqExact(TraceId) AS traces\nFROM traces\nWHERE OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime}\nGROUP BY hour, dow\nORDER BY dow, hour",
+      "sql": "SELECT toHour(OccurredAt) AS hour,\n  toDayOfWeek(OccurredAt) AS dow,\n  uniqExact(TraceId) AS traces\nFROM traces\nWHERE OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime}\nGROUP BY hour, dow\nORDER BY dow, hour",
       "parameters": []
     }
   ]

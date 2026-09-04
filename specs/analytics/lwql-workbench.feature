@@ -379,17 +379,18 @@ Feature: LangWatchQL Vega-Lite charts — the shared rendering and governance en
   # ---------------------------------------------------------------------------
   # The time window — reserved period parameters (#6631)
   #
-  # A statement opts into the page's period by declaring `{period_start:DateTime}`
-  # and `{period_end:DateTime}`. The surface owns those two names: it supplies
-  # their values and refuses a caller that tries to. A statement that declares
-  # neither is allowed and is labelled as not following the period, because the
+  # A statement opts into the page's period by declaring `{dashboard_context_period_start:DateTime}`
+  # and `{dashboard_context_period_end:DateTime}`. The `dashboard_context_` prefix is reserved:
+  # supplied by the dashboard, read-only; author-declared params are separate. The surface owns
+  # those two names: it supplies their values and refuses a caller that tries to. A statement that
+  # declares neither is allowed and is labelled as not following the period, because the
   # failure this contract exists to prevent is two charts on one dashboard
   # silently showing different periods.
   # ---------------------------------------------------------------------------
 
   @unit
   Scenario: A statement declaring the reserved period parameters is given the surface's window
-    Given SQL declaring period_start and period_end as ClickHouse date-times
+    Given SQL declaring dashboard_context_period_start and dashboard_context_period_end as ClickHouse date-times
     And the surface supplies the window the member is looking at
     When the member runs the query
     Then the values the database is bound with are that window
@@ -397,15 +398,15 @@ Feature: LangWatchQL Vega-Lite charts — the shared rendering and governance en
 
   @unit
   Scenario: A statement declaring only one reserved period parameter is given that one
-    Given SQL declaring period_start and no period_end
+    Given SQL declaring dashboard_context_period_start and no dashboard_context_period_end
     When the member runs the query with the surface's window
-    Then period_start is bound to the window's start
-    And no period_end value is sent
+    Then dashboard_context_period_start is bound to the window's start
+    And no dashboard_context_period_end value is sent
 
   @unit
   Scenario: A caller that supplies a reserved period parameter itself is refused
     Given SQL declaring the reserved period parameters
-    When the request carries a value for period_start of its own
+    When the request carries a value for dashboard_context_period_start of its own
     Then it is refused with error code lwql_reserved_parameter_supplied
     And nothing reaches the database
 
@@ -418,7 +419,7 @@ Feature: LangWatchQL Vega-Lite charts — the shared rendering and governance en
 
   @unit
   Scenario: A reserved period parameter declared as anything but a date-time is refused
-    Given SQL declaring period_start as a string
+    Given SQL declaring dashboard_context_period_start as a string
     When the statement is validated
     Then it is refused with error code lwql_reserved_parameter_type
     And the refusal comes from the validation step both running and saving pass through
@@ -580,7 +581,7 @@ Feature: LangWatchQL Vega-Lite charts — the shared rendering and governance en
 # AC2 "the same statement submitted with a reserved name in `parameters` is
 #     refused and does not execute"
 #   → Scenario: A caller that supplies a reserved period parameter itself is refused
-# AC3 "`{period_start:String}` is refused at validate time, so it is refused at
+# AC3 "`{dashboard_context_period_start:String}` is refused at validate time, so it is refused at
 #     save as well as at run"
 #   → Scenario: A reserved period parameter declared as anything but a date-time is refused
 # AC4 "a statement declaring neither reserved name executes unchanged, and the
@@ -610,16 +611,16 @@ Feature: LangWatchQL Vega-Lite charts — the shared rendering and governance en
 
 # --- Granularity contract (#6713 slice 3, S1): the surface-owned bucket size ---
 #
-# A statement may declare `{period_granularity_seconds:UInt32}` and use it as
+# A statement may declare `{dashboard_context_granularity_seconds:UInt32}` and use it as
 # the multiplier of a fixed-unit interval -- `INTERVAL
-# {period_granularity_seconds:UInt32} SECOND` -- because ClickHouse compiles an
+# {dashboard_context_granularity_seconds:UInt32} SECOND` -- because ClickHouse compiles an
 # interval unit to a function name, so only the multiplier can be a bound value.
 #
 # AC1 "a chart declaring the parameter runs at the step the surface supplies"
 #   → Scenario: A statement declaring the granularity parameter runs at the step the surface supplies
 #   → Scenario: The resolver reports an unfilled declared granularity rather than inventing a step
 # AC2 "a caller-supplied value for a reserved name is refused" (granularity half)
-#   → Scenario: A caller that supplies period_granularity_seconds itself is refused
+#   → Scenario: A caller that supplies dashboard_context_granularity_seconds itself is refused
 # AC3 "the declaration must be UInt32"
 #   → Scenario: The granularity parameter declared as anything but UInt32 is refused
 #   → Scenario: A zero or fractional step is refused as a wrong declaration
@@ -651,7 +652,7 @@ Feature: LangWatchQL Vega-Lite charts — the shared rendering and governance en
 
 @unit
 Scenario: A statement declaring the granularity parameter runs at the step the surface supplies
-  Given SQL declaring period_granularity_seconds as UInt32 alongside both period bounds
+  Given SQL declaring dashboard_context_granularity_seconds as UInt32 alongside both period bounds
   And the surface supplies a step of 60 seconds
   When the member runs the query
   Then the statement is bound with a granularity of 60 seconds
@@ -659,43 +660,43 @@ Scenario: A statement declaring the granularity parameter runs at the step the s
 
 @unit
 Scenario: The resolver reports an unfilled declared granularity rather than inventing a step
-  Given SQL declaring period_granularity_seconds as UInt32
+  Given SQL declaring dashboard_context_granularity_seconds as UInt32
   And no step supplied
   When the declaration is resolved on its own, apart from the run path that would refuse it
   Then the resolution still says the statement follows the granularity
   And it carries no granularity value, since inventing one would change what a member's chart shows without them asking
 
 @unit
-Scenario: A caller that supplies period_granularity_seconds itself is refused
-  Given SQL declaring period_granularity_seconds as UInt32
-  When a caller supplies a value for period_granularity_seconds directly
+Scenario: A caller that supplies dashboard_context_granularity_seconds itself is refused
+  Given SQL declaring dashboard_context_granularity_seconds as UInt32
+  When a caller supplies a value for dashboard_context_granularity_seconds directly
   Then the run is refused as a reserved parameter supplied
   And the refusal names exactly the parameters the caller supplied
 
 @unit
 Scenario: The granularity parameter declared as anything but UInt32 is refused
-  Given SQL declaring period_granularity_seconds as a String
+  Given SQL declaring dashboard_context_granularity_seconds as a String
   When the statement is validated
   Then it is refused as a wrong granularity declaration
   And the refusal names UInt32 as the required declared type
 
 @unit
 Scenario: A zero or fractional step is refused as a wrong declaration
-  Given SQL declaring period_granularity_seconds as UInt32
+  Given SQL declaring dashboard_context_granularity_seconds as UInt32
   When the surface supplies a step that is zero, negative, fractional, or not an offered step
   Then the run is refused as a wrong granularity declaration
   And the refusal says the step must be one of the offered steps
 
 @integration
 Scenario: A saved chart declaring granularity without both period parameters is refused at save
-  Given SQL declaring period_granularity_seconds without period_start or period_end
+  Given SQL declaring dashboard_context_granularity_seconds without dashboard_context_period_start or dashboard_context_period_end
   When the member saves the chart
   Then the save is refused because granularity requires the period parameters
   And the refusal names which period bounds are absent
 
 @unit
 Scenario: A granularity declared alongside a mistyped period bound is refused at save
-  Given SQL declaring period_granularity_seconds and period_start declared as a String
+  Given SQL declaring dashboard_context_granularity_seconds and dashboard_context_period_start declared as a String
   When the statement is validated
   Then it is refused because granularity requires well-typed period parameters
   And the refusal distinguishes the mistyped bound from an absent one
@@ -718,7 +719,7 @@ Scenario: A window too wide for even the coarsest offered step is refused everyw
 
 @unit
 Scenario: A chart declaring the granularity parameter runs at the step the surface supplies
-  Given a saved chart whose SQL declares period_granularity_seconds as UInt32
+  Given a saved chart whose SQL declares dashboard_context_granularity_seconds as UInt32
   And the surface supplies an offered step
   When the chart is run by id
   Then the stored statement is executed at the supplied step
@@ -726,11 +727,11 @@ Scenario: A chart declaring the granularity parameter runs at the step the surfa
 
 @unit
 Scenario: A declared granularity with no step supplied refuses to run naming the parameter
-  Given a saved chart whose SQL declares period_granularity_seconds as UInt32
+  Given a saved chart whose SQL declares dashboard_context_granularity_seconds as UInt32
   And the surface supplies no step
   When the chart is run by id
   Then the run is refused for the missing parameter
-  And the refusal names period_granularity_seconds
+  And the refusal names dashboard_context_granularity_seconds
 
 @unit
 Scenario: Running a saved chart executes its stored statement with its saved values and the surface's window and step

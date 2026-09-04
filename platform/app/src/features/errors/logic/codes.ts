@@ -72,6 +72,8 @@ export const APP_ERROR_CODES = [
   "custom_role_name_taken",
   "custom_role_not_assignable",
   "custom_role_not_found",
+  "dashboard_widget_definition_invalid",
+  "dashboard_widget_not_found",
   "dataset_column_type_change_unsupported",
   "dataset_name_taken",
   "dataset_not_ready",

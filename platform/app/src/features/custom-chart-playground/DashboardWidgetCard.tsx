@@ -27,6 +27,7 @@ import { Menu } from "~/components/ui/menu";
 import { chartGridCardHeightPx } from "~/server/analytics/chartGrid";
 import type { DashboardWidgetQuery } from "~/server/analytics/dashboardWidgetDefinition";
 
+import type { ChartFrameDashboardContext } from "./bridge/bridgeProtocol";
 import { DashboardWidgetEditDrawer } from "./DashboardWidgetEditDrawer";
 import { EditableWidgetName } from "./EditableWidgetName";
 import { SandboxedChartFrame } from "./SandboxedChartFrame";
@@ -151,9 +152,39 @@ export function DashboardWidgetCard({
     return () => clearTimeout(timer);
   }, [draftCode, draftQueries]);
 
-  const { executeQuery, runStandalone, params, lastRuns } =
+  const { executeQuery, runStandalone, params: hostParams, lastRuns } =
     useDashboardWidgetExecutor(projectId, previewQueries, { timeWindow });
   const onNavigate = useDashboardWidgetChartNavigate(projectSlug);
+
+  // Known host-side at this boundary, mirroring DashboardWidgetFrame's own
+  // dashboardContext build — timezone reads the browser's own zone.
+  const dashboardContext: ChartFrameDashboardContext = useMemo(
+    () => ({
+      timeWindow: hostParams.timeWindow,
+      granularitySeconds: hostParams.granularitySeconds,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      theme: colorMode === "dark" ? "dark" : "light",
+      widgetId: widget.id,
+      dashboardId: widget.dashboardId ?? undefined,
+      projectId,
+      widgetName: widget.name,
+    }),
+    [hostParams, colorMode, widget.id, widget.dashboardId, projectId, widget.name],
+  );
+
+  // Every declared parameter's default, deduped by name across the widget's
+  // preview queries — mirrors DashboardWidgetFrame's own paramsSnapshot.
+  const paramsSnapshot = useMemo(() => {
+    const defaults: Record<string, string | number | boolean> = {};
+    for (const query of previewQueries) {
+      for (const parameter of query.parameters ?? []) {
+        if (parameter.default !== undefined) {
+          defaults[parameter.name] = parameter.default;
+        }
+      }
+    }
+    return defaults;
+  }, [previewQueries]);
 
   const isDirty =
     draftName !== widget.name ||
@@ -280,8 +311,8 @@ export function DashboardWidgetCard({
                 key={`${previewCode}\u0000${JSON.stringify(previewQueries)}`}
                 code={previewCode}
                 executeQuery={executeQuery}
-                params={params}
-                theme={colorMode === "dark" ? "dark" : "light"}
+                dashboardContext={dashboardContext}
+                params={paramsSnapshot}
                 onLog={noopLog}
                 onNavigate={onNavigate}
                 maxHeight={rowSpanHeight(widget.rowSpan)}
@@ -314,8 +345,8 @@ export function DashboardWidgetCard({
               key={`${previewCode}\u0000${JSON.stringify(previewQueries)}`}
               code={previewCode}
               executeQuery={executeQuery}
-              params={params}
-              theme={colorMode === "dark" ? "dark" : "light"}
+              dashboardContext={dashboardContext}
+              params={paramsSnapshot}
               onLog={noopLog}
               onNavigate={onNavigate}
               maxHeight={DRAWER_PREVIEW_HEIGHT_PX}

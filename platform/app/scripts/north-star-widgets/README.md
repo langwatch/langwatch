@@ -2,12 +2,12 @@
 
 Ten dashboard widgets, one per `@langwatch/charts` primitive,
 showing the intended "north-star" shape of a dashboard widget: a query
-scoped only to `{period_start:DateTime}` / `{period_end:DateTime}`, a
+scoped only to `{dashboard_context_period_start:DateTime}` / `{dashboard_context_period_end:DateTime}`, a
 component from the shared chart library, and the three guard-clause states
 (error, loading, empty) every widget should degrade through gracefully.
 
 Every query below declares no explicit parameters — each uses only the
-reserved `{period_start:DateTime}` / `{period_end:DateTime}` bounds, which the
+reserved `{dashboard_context_period_start:DateTime}` / `{dashboard_context_period_end:DateTime}` bounds, which the
 executor fills from the page's own time window automatically (see
 `platform/app/src/features/custom-chart-playground/presets.ts`).
 
@@ -52,7 +52,7 @@ into a new widget once seeded data exists:
 SELECT avg(SatisfactionScore) AS score
 FROM traces
 WHERE SatisfactionScore IS NOT NULL
-  AND OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime}
+  AND OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime}
 ```
 
 **Evaluation pass rate — Donut** (`evaluation_metrics.Passed`, confirmed
@@ -63,7 +63,7 @@ brief's sketch, no adjustment needed):
 SELECT if(Passed, 'pass', 'fail') AS outcome, count() AS n
 FROM evaluation_metrics
 WHERE Passed IS NOT NULL
-  AND OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime}
+  AND OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime}
 GROUP BY outcome
 ```
 
@@ -83,6 +83,6 @@ GROUP BY outcome
 
 - `platform/app/src/features/custom-chart-playground/bridge/chartsLib/index.ts` — the 10 component prop shapes.
 - `platform/app/src/server/analytics/lwql/catalog/lwqlViews.ts` — `traces` (~89-322), `trace_metrics` (~819-1053), `evaluation_metrics` (~1349-1531).
-- `platform/app/src/features/custom-chart-playground/presets.ts` — reserved `{period_start}` / `{period_end}` parameter contract.
+- `platform/app/src/features/custom-chart-playground/presets.ts` — reserved `{dashboard_context_period_start}` / `{dashboard_context_period_end}` parameter contract.
 - `skills/recipes/dashboard-widgets/SKILL.mdx` — worked widget example and hook contract.
 - `platform/app/scripts/legacy-parity-widgets/` — sibling golden set (per-legacy-chart, rather than per-primitive) this set mirrors in structure.

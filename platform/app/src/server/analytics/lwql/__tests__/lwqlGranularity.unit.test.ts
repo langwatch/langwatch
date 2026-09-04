@@ -1,6 +1,6 @@
 /**
  * The granularity contract on its own: what declaring
- * `{period_granularity_seconds:UInt32}` means for one run, and the three ways
+ * `{dashboard_context_granularity_seconds:UInt32}` means for one run, and the three ways
  * a surface can get it wrong.
  *
  * Driven directly rather than through the service, because these are the
@@ -25,12 +25,12 @@ import { LWQL_GRANULARITY_STEPS } from "../timeWindow";
 import type { LangWatchQLParameter } from "../validation/validate";
 
 const GRANULARITY: LangWatchQLParameter[] = [
-  { name: "period_granularity_seconds", type: "UInt32" },
+  { name: "dashboard_context_granularity_seconds", type: "UInt32" },
 ];
 
 const PERIOD: LangWatchQLParameter[] = [
-  { name: "period_start", type: "DateTime" },
-  { name: "period_end", type: "DateTime" },
+  { name: "dashboard_context_period_start", type: "DateTime" },
+  { name: "dashboard_context_period_end", type: "DateTime" },
 ];
 
 const WINDOW = {
@@ -139,7 +139,7 @@ describe("resolveLangWatchQLGranularity", () => {
     ])("refuses %s at run as well as save", (type) => {
       expect(() =>
         resolveLangWatchQLGranularity({
-          declared: [...PERIOD, { name: "period_granularity_seconds", type }],
+          declared: [...PERIOD, { name: "dashboard_context_granularity_seconds", type }],
           timeWindow: WINDOW,
           granularitySeconds: 60,
         }),
@@ -153,7 +153,7 @@ describe("resolveLangWatchQLGranularity", () => {
         resolveLangWatchQLGranularity({
           declared: [
             ...PERIOD,
-            { name: "period_granularity_seconds", type: "Int64" },
+            { name: "dashboard_context_granularity_seconds", type: "Int64" },
           ],
           parameters: {},
           timeWindow: WINDOW,
@@ -169,11 +169,11 @@ describe("resolveLangWatchQLGranularity", () => {
     const suppliesGranularity = () =>
       resolveLangWatchQLGranularity({
         declared: [...PERIOD, ...GRANULARITY],
-        parameters: { period_granularity_seconds: 60 },
+        parameters: { dashboard_context_granularity_seconds: 60 },
         timeWindow: WINDOW,
       });
 
-    /** @scenario "A caller that supplies period_granularity_seconds itself is refused" */
+    /** @scenario "A caller that supplies dashboard_context_granularity_seconds itself is refused" */
     it("is refused by this resolver even when called on its own", () => {
       expect(codeOf(suppliesGranularity)).toBe(
         "lwql_reserved_parameter_supplied",
@@ -186,13 +186,13 @@ describe("resolveLangWatchQLGranularity", () => {
       // parameters it had never sent, and not the one it had.
       const message = messageOf(suppliesGranularity);
 
-      expect(message).toContain("period_granularity_seconds");
-      expect(message).not.toContain("period_start");
-      expect(message).not.toContain("period_end");
+      expect(message).toContain("dashboard_context_granularity_seconds");
+      expect(message).not.toContain("dashboard_context_period_start");
+      expect(message).not.toContain("dashboard_context_period_end");
     });
 
     it("does not reject a caller parameter that is not a surface name", () => {
-      // The guard's own reserved name is period_granularity_seconds; a
+      // The guard's own reserved name is dashboard_context_granularity_seconds; a
       // member's own parameter must ride through untouched even when a
       // genuine granularity declaration and step are present alongside it.
       const resolution = resolveLangWatchQLGranularity({

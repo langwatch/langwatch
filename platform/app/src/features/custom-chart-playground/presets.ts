@@ -10,10 +10,10 @@
 import type { DashboardWidgetQuery } from "~/server/analytics/dashboardWidgetDefinition";
 
 /** Bucketed trace counts — the canonical follows-everything statement. */
-const BUCKETED_TRACES_SQL = `SELECT toStartOfInterval(OccurredAt, INTERVAL {period_granularity_seconds:UInt32} SECOND) AS bucket,
+const BUCKETED_TRACES_SQL = `SELECT toStartOfInterval(OccurredAt, INTERVAL {dashboard_context_granularity_seconds:UInt32} SECOND) AS bucket,
   count() AS events
 FROM traces
-WHERE OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime}
+WHERE OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime}
 GROUP BY bucket
 ORDER BY bucket`;
 

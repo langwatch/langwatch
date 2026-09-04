@@ -163,7 +163,7 @@ describe("the LangWatchQL request machine", () => {
 
         expect(calls[0]!.request.granularitySeconds).toBe(60);
         expect(calls[0]!.request.parameters ?? {}).not.toHaveProperty(
-          "period_granularity_seconds",
+          "dashboard_context_granularity_seconds",
         );
       });
 

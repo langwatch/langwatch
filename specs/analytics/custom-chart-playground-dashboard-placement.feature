@@ -63,9 +63,3 @@ Feature: Dashboard widgets placed on a dashboard
     Given a dashboard grid holding a dashboard widget
     When the dashboard's period selector changes
     Then the widget's queries re-run against the new period, the same one control every other card on the grid reads
-
-  @integration
-  Scenario: Charts written with the earlier period placeholder names keep following the period
-    Given a saved chart whose statement still names {dashboard_context_period_start}, {dashboard_context_period_end} or {dashboard_context_granularity_seconds}
-    When the platform upgrades
-    Then the statement is rewritten once to the reserved period names, so the chart runs against the dashboard's period instead of refusing for missing parameters

@@ -25,8 +25,9 @@ const OFFERED_GRANULARITY_STEP_NAMES = "1 (1 second), 60 (1 minute), 3600 (1 hou
  * and stored parameter values through the LangWatchQL query door — the same
  * governed execution path every other surface uses, so what this prints is
  * what the workbench would show. `--start`/`--end` fill the reserved
- * `period_start`/`period_end` parameters for statements that declare them,
- * and `--granularity` the reserved datapoint step, in seconds.
+ * `dashboard_context_period_start`/`dashboard_context_period_end` parameters
+ * for statements that declare them, and `--granularity` the reserved
+ * datapoint step, in seconds.
  */
 export const runChartCommand = async (
   id: string,

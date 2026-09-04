@@ -46,9 +46,9 @@ const FULLY_PERMITTED: Protections = {
  * makes it subject to the bucket budget at all.
  */
 const TIMESERIES_SQL =
-  "SELECT toStartOfInterval(OccurredAt, INTERVAL {period_granularity_seconds:UInt32} SECOND) AS bucket, " +
+  "SELECT toStartOfInterval(OccurredAt, INTERVAL {dashboard_context_granularity_seconds:UInt32} SECOND) AS bucket, " +
   "count() AS value FROM analytics.traces " +
-  "WHERE OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime} " +
+  "WHERE OccurredAt >= {dashboard_context_period_start:DateTime} AND OccurredAt < {dashboard_context_period_end:DateTime} " +
   "GROUP BY bucket";
 
 /**
@@ -179,7 +179,7 @@ describe("running a saved chart whose period overflows its step", () => {
       // The substitution is not merely reported — it is what actually ran.
       expect(executor.calls).toHaveLength(1);
       expect(executor.calls[0]?.parameters).toMatchObject({
-        period_granularity_seconds: 3600,
+        dashboard_context_granularity_seconds: 3600,
       });
     });
   });
