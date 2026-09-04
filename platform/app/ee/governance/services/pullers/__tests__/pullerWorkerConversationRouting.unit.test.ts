@@ -54,6 +54,10 @@ const SOURCE = {
   organizationId: "org-1",
   teamId: null,
   traceProjectId: "proj-dest",
+  // A source that has never failed to price anything. Routing does not read
+  // these, but the fixture stands in for a real row, which always carries them.
+  unpricedUsageSince: null,
+  unpricedUsageThrough: null,
 };
 
 function genieEvent(): NormalizedPullEvent {

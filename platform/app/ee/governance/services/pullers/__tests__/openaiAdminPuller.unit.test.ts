@@ -98,6 +98,11 @@ const KEY_GROUPING_REFUSAL = errorResponse({
 /**
  * `amount.value` is a JSON number in DOLLARS. The sibling adapter's provider
  * reports cents; a decimal shift here would report a hundred times this.
+ *
+ * The field list is the endpoint's own and nothing more. There is deliberately
+ * no email here: the cost result carries amount, line_item, project_id,
+ * user_id, api_key_id and quantity, and inventing an address in the fixture is
+ * exactly what let the adapter read one that never arrives and name nobody.
  */
 function costRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -107,7 +112,6 @@ function costRow(overrides: Record<string, unknown> = {}) {
     project_id: "proj_a",
     organization_id: "org_acme",
     user_id: "user-1",
-    user_email: "someone@example.com",
     api_key_id: "key_a",
     ...overrides,
   };
@@ -194,14 +198,47 @@ describe("given an OpenAI Admin cost source", () => {
     });
 
     /** @scenario "Spend is attributed to the person the provider named" */
-    it("names the person by email and carries the provider's raw id", async () => {
+    it("names the person by the identifier on the row, not by an address the report never sends", async () => {
       fetchMock.mockResolvedValue(jsonResponse(page()));
 
       const result = await new OpenAiAdminPuller().runOnce(RUN_OPTIONS, CONFIG);
       const event = result.events[0]!;
 
-      expect(event.actor).toBe("someone@example.com");
+      // Not "": a blank actor is what person discovery skips, so a blank here
+      // is the whole provider discovering nobody.
+      expect(event.actor).toBe("user-1");
       expect(event.extra?.actorUserId).toBe("user-1");
+    });
+
+    /** @scenario "Spend the provider attributes to nobody names nobody" */
+    it("leaves the person blank when the row carries no user", async () => {
+      fetchMock.mockResolvedValue(
+        jsonResponse(page({ results: [costRow({ user_id: null })] })),
+      );
+
+      const result = await new OpenAiAdminPuller().runOnce(RUN_OPTIONS, CONFIG);
+
+      // Blank rather than a placeholder: a row the provider attributes to
+      // nobody must not invent somebody for the People screen.
+      expect(result.events[0]?.actor).toBe("");
+    });
+
+    /** @scenario "Naming the person does not re-key the day" */
+    it("keeps the identity of a day built from its coordinates alone", async () => {
+      fetchMock.mockResolvedValue(jsonResponse(page()));
+
+      const result = await new OpenAiAdminPuller().runOnce(RUN_OPTIONS, CONFIG);
+      const event = result.events[0]!;
+
+      // Pinned to the digit. The person is already a coordinate here (`user-1`
+      // rides the path as the userId dimension), so filling the actor in adds
+      // nothing to the identity. If a later change appends the actor to this
+      // string, every day already stored re-keys and its spend is counted a
+      // second time — which is what this literal exists to catch.
+      expect(event.source_event_id).toBe(
+        `cost:${BUCKET_START_ISO}:cost:1d:proj_a:gpt-5%2C%20input:user-1:key_a`,
+      );
+      expect(event.source_event_id).not.toContain("user-1:user-1");
     });
 
     /** @scenario "The credential the spend was billed to is recorded" */

@@ -148,8 +148,29 @@ Feature: OpenAI Admin cost puller
     Scenario: Spend is attributed to the person the provider named
       Given a day whose spend the provider attributes to a person
       When the puller records it
-      Then the record names that person by the email the provider gave
+      Then the record names that person by the identifier the provider gave
       And the record carries the provider's own id for that person
+      # The identifier is an opaque one, not an email address: the cost report
+      # has no address field. Turning it into a name is the identity engine's
+      # job, and it needs the record to name somebody at all to have anything
+      # to work from.
+
+    @unit
+    Scenario: Spend the provider attributes to nobody names nobody
+      Given a day whose spend the provider attributes to no person
+      When the puller records it
+      Then the record names nobody
+      # An invented placeholder would put a person on the People screen who
+      # does not exist, and give the tenant's procurement somebody to blame.
+
+    @unit
+    Scenario: Naming the person does not re-key the day
+      Given a day whose spend the provider attributes to a person
+      When the puller records it
+      Then the day is identified by its coordinates alone
+      # The person is already one of those coordinates. Adding them a second
+      # time as a separate term would give every day already recorded a new
+      # identity, and the same spend would be counted twice.
 
     @integration
     Scenario: The credential the spend was billed to is recorded

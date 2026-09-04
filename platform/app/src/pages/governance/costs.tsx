@@ -10,6 +10,7 @@ import {
 import type {
   GovernanceCostStaleSourcesDto,
   GovernanceCostSummaryDto,
+  GovernanceCostUnpricedWindowDto,
 } from "@ee/governance/services/governanceCost.service";
 import numeral from "numeral";
 import {
@@ -299,6 +300,7 @@ function CostsBody({
   return (
     <VStack align="stretch" gap={6}>
       <StaleSourcesNotice staleSources={data.staleSources} />
+      <UnpricedWindowNotice unpricedWindow={data.unpricedWindow} />
       <HStack align="stretch" gap={4} flexWrap="wrap">
         <CostLanePanel
           testId="cost-lane-billed"
@@ -368,6 +370,53 @@ function StaleSourcesNotice({
           {staleSources.sourceNames.join(", ")}{" "}
           {staleSources.sourceNames.length === 1 ? "is" : "are"} failing to
           pull, so spend after that point is unknown rather than zero.
+        </Alert.Description>
+      </Alert.Content>
+    </Alert.Root>
+  );
+}
+
+/**
+ * Days that were read but never priced, because pulled cost recording was off.
+ *
+ * The sibling of the notice above, for a gap nothing broke to cause. Those days
+ * have their audit rows; only the money was dropped, and a dropped figure draws
+ * as zero. Turning the setting on stops the loss from growing but does not undo
+ * it — the pull cursor moved past those days and will not revisit them on its
+ * own — so the line has to say both, or a reader fixes the setting and believes
+ * the history is now correct.
+ *
+ * Dates rather than "since": this gap is bounded at both ends, and a gap that
+ * closed last month should not read as an open wound.
+ */
+function UnpricedWindowNotice({
+  unpricedWindow,
+}: {
+  unpricedWindow: GovernanceCostUnpricedWindowDto | null;
+}) {
+  if (!unpricedWindow) return null;
+
+  const asDay = (iso: string) =>
+    new Date(iso).toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  const since = asDay(unpricedWindow.sinceIso);
+  const through = asDay(unpricedWindow.throughIso);
+  const span = since === through ? since : `${since} to ${through}`;
+
+  return (
+    <Alert.Root status="warning" data-testid="cost-unpriced-window">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Title>Spend not recorded for {span}</Alert.Title>
+        <Alert.Description>
+          {unpricedWindow.sourceNames.join(", ")} read those days while this
+          organization was not recording pulled cost, so their spend is unknown
+          rather than zero. Switching recording on stops the loss but leaves
+          these days empty — move a source&apos;s start date back across them to
+          read them again.
         </Alert.Description>
       </Alert.Content>
     </Alert.Root>

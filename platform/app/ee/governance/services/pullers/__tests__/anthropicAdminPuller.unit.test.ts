@@ -275,6 +275,23 @@ describe("the Anthropic Admin puller", () => {
       expect(record?.costNanoMinor).toBe(412_800_000_000);
     });
 
+    it("names nobody, because the cost report carries no person to name", async () => {
+      fetchMock.mockResolvedValue(jsonResponse(COST_PAGE));
+
+      const result = await new AnthropicAdminPuller().runOnce(RUN_OPTIONS, {
+        adapter: "anthropic_admin",
+        report: "cost",
+        bucketWidth: "1d",
+        schedule: "0 * * * *",
+      });
+
+      // Deliberate, and the opposite of the OpenAI sibling, whose cost rows do
+      // name a person. Anthropic groups this report by workspace and
+      // description only — there is no user dimension to ask for — so an actor
+      // here could only be invented. Blank is what person discovery skips.
+      expect(result.events[0]?.actor).toBe("");
+    });
+
     /** @scenario "A provider amount in minor units becomes the correct dollar amount" */
     it("reads 1234 minor units as twelve dollars and thirty-four cents", async () => {
       fetchMock.mockResolvedValue(

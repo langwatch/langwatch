@@ -249,14 +249,28 @@ export class DiscoveredPersonRepository {
 
   /**
    * Records that the directory listed this identity — creating the person on
-   * first sight, and upgrading the display text of one already known.
+   * first sight, and upgrading the display text and department of one already
+   * known.
    *
    * Deliberately narrower than an activity sighting: a directory lists
    * presence, not activity, so it never widens the seen range — a person
    * refreshed daily by the directory must not read as "active today" on a
    * screen whose seen dates otherwise mean spend. The display text upgrade is
    * the read direction: a transcript knows people only as directory ids, and
-   * the directory is the one source that knows what the id is called.
+   * the directory is the one source that knows what the id is called. The
+   * department travels the same road for the same reason — the directory is
+   * the only source that knows it, and it is the one fact the People screen
+   * can show about somebody who holds no LangWatch account.
+   *
+   * WIDEN-ONLY, on both texts: a sighting that names neither leaves the row
+   * exactly as it was. "" is not a value here, it is the absence of one — the
+   * pullers spell a missing directory field as "", tenants routinely leave
+   * `department` blank on some people, and the read is idempotent and daily.
+   * A blanking write would therefore erase a real department every morning
+   * for anyone the tenant filed under nothing, and there is no way to tell
+   * that apart from a field the tenant genuinely cleared. Between losing a
+   * fact we hold and being one day slow to notice a deletion, the screen is
+   * better served by the fact.
    *
    * `erasedAt: null` on the update is belt and braces — an erased row's key is
    * a pseudonym and cannot match — kept because "never rewrite an erased
@@ -269,6 +283,8 @@ export class DiscoveredPersonRepository {
       provider: string;
       rawActorId: string;
       displayText: string;
+      /** The directory's own department text, "" when it named none. */
+      department: string;
       seenAt: Date;
     },
   ): Promise<void> {
@@ -282,6 +298,10 @@ export class DiscoveredPersonRepository {
         data: {
           ...key,
           displayText: params.displayText,
+          // Null rather than "": a person the directory filed under nothing has
+          // no department recorded, which is not the same claim as one whose
+          // department is the empty string.
+          department: params.department === "" ? null : params.department,
           kind: DISCOVERED_PERSON_KIND.PERSON,
           firstSeenAt: params.seenAt,
           lastSeenAt: params.seenAt,
@@ -291,14 +311,31 @@ export class DiscoveredPersonRepository {
     } catch (error) {
       if (!isUniqueViolation(error)) throw error;
     }
-    if (params.displayText === "") return;
+
+    // Only the fields this sighting actually named, and only when the stored
+    // row disagrees with them. The directory read is daily over the whole
+    // tenant, so the overwhelmingly common pass must write no rows at all.
+    const data: { displayText?: string; department?: string } = {};
+    const differs: Prisma.DiscoveredPersonWhereInput[] = [];
+    if (params.displayText !== "") {
+      data.displayText = params.displayText;
+      differs.push({ displayText: { not: params.displayText } });
+    }
+    if (params.department !== "") {
+      data.department = params.department;
+      // The null arm is spelled out rather than left to `not`: a row that has
+      // never carried a department must count as disagreeing, and how Prisma
+      // treats NULL under a negated filter is not a rule worth betting the
+      // first-ever department write on.
+      differs.push({
+        OR: [{ department: null }, { department: { not: params.department } }],
+      });
+    }
+    if (differs.length === 0) return;
+
     await client.discoveredPerson.updateMany({
-      where: {
-        ...key,
-        erasedAt: null,
-        displayText: { not: params.displayText },
-      },
-      data: { displayText: params.displayText },
+      where: { ...key, erasedAt: null, OR: differs },
+      data,
     });
   }
 
@@ -364,6 +401,11 @@ export class DiscoveredPersonRepository {
    * somebody's, and deleting the row would move that money to "unknown" rather
    * than to "a person we are no longer allowed to name". `erasedAt` is what
    * tells a later reader which of those two it is looking at.
+   *
+   * The directory's department goes with the identifier rather than staying
+   * with the money. It describes the person, not the spend — nothing rolls up
+   * by it, so keeping it buys the row nothing and leaves a personal detail on
+   * a person we were asked to forget.
    */
   async pseudonymize(
     client: Client,
@@ -379,6 +421,7 @@ export class DiscoveredPersonRepository {
       data: {
         rawActorId: params.pseudonym,
         displayText: params.pseudonym,
+        department: null,
         erasedAt: params.erasedAt,
       },
     });

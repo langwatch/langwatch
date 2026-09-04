@@ -20,7 +20,10 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 
-import { DISCOVERED_PERSON_KIND } from "../../repositories/governanceIdentity.repository";
+import {
+  DISCOVERED_PERSON_KIND,
+  DiscoveredPersonRepository,
+} from "../../repositories/governanceIdentity.repository";
 import { PersonDiscoveryService } from "../personDiscovery.service";
 import { DIRECTORY_REPORT_ACTION } from "../pullers/microsoftGraphDirectory";
 import type { NormalizedPullEvent } from "../pullers/pullerAdapter";
@@ -257,6 +260,122 @@ describe("given a directory listing of the tenant's people", () => {
 
     const rows = await personRows();
     expect(rows[0]?.lastSeenAt).toEqual(new Date("2026-08-10T12:00:00.000Z"));
+  });
+
+  /** @scenario "A directory row records the department it names on the person" */
+  it("records the department the directory filed the person under", async () => {
+    await service().recordFromPulledEvents({
+      organizationId,
+      provider: "copilot_studio_dataverse",
+      events: [
+        directoryEvent({
+          actor: oid,
+          displayName: "Maria Silva",
+          department: "Engineering",
+        }),
+      ],
+    });
+
+    const rows = await personRows();
+    expect(rows[0]?.department).toBe("Engineering");
+  });
+
+  it("records no department for a person the directory filed under none", async () => {
+    // Null, not "": a tenant leaving the field blank is an absence of
+    // information, never a claim that this person has no department.
+    await service().recordFromPulledEvents({
+      organizationId,
+      provider: "copilot_studio_dataverse",
+      events: [directoryEvent({ actor: oid, displayName: "Maria Silva" })],
+    });
+
+    const rows = await personRows();
+    expect(rows[0]?.department).toBeNull();
+  });
+
+  /** @scenario "A later directory row naming no department keeps the recorded one" */
+  it("keeps the recorded department when a later sighting names none", async () => {
+    const named = () =>
+      service().recordFromPulledEvents({
+        organizationId,
+        provider: "copilot_studio_dataverse",
+        events: [
+          directoryEvent({
+            actor: oid,
+            displayName: "Maria Silva",
+            department: "Engineering",
+          }),
+        ],
+      });
+    await named();
+    await service().recordFromPulledEvents({
+      organizationId,
+      provider: "copilot_studio_dataverse",
+      events: [directoryEvent({ actor: oid, displayName: "Maria Silva" })],
+    });
+
+    expect((await personRows())[0]?.department).toBe("Engineering");
+
+    // And a blank department does not stop the display text upgrade travelling
+    // on the same row — the two texts widen independently.
+    await service().recordFromPulledEvents({
+      organizationId,
+      provider: "copilot_studio_dataverse",
+      events: [directoryEvent({ actor: oid, displayName: "Maria S. Silva" })],
+    });
+    const after = (await personRows())[0];
+    expect(after?.displayText).toBe("Maria S. Silva");
+    expect(after?.department).toBe("Engineering");
+  });
+
+  it("moves the person when the directory names a different department", async () => {
+    // Whitespace-only is the tenant leaving it blank, so the move has to come
+    // from a real second name rather than from any non-empty string.
+    const filedUnder = async (department: string) =>
+      await service().recordFromPulledEvents({
+        organizationId,
+        provider: "copilot_studio_dataverse",
+        events: [
+          directoryEvent({
+            actor: oid,
+            displayName: "Maria Silva",
+            department,
+          }),
+        ],
+      });
+    await filedUnder("Engineering");
+    await filedUnder("   ");
+    expect((await personRows())[0]?.department).toBe("Engineering");
+
+    await filedUnder("Product");
+    expect((await personRows())[0]?.department).toBe("Product");
+  });
+
+  /** @scenario "Erasing a person removes the department the directory gave them" */
+  it("drops the department when the identity is erased", async () => {
+    await service().recordFromPulledEvents({
+      organizationId,
+      provider: "copilot_studio_dataverse",
+      events: [
+        directoryEvent({
+          actor: oid,
+          displayName: "Maria Silva",
+          department: "Engineering",
+        }),
+      ],
+    });
+    const before = (await personRows())[0]!;
+
+    await new DiscoveredPersonRepository().pseudonymize(prisma, {
+      id: before.id,
+      organizationId,
+      pseudonym: "pseudonym_abc",
+      erasedAt: new Date("2026-09-03T00:00:00.000Z"),
+    });
+
+    const after = (await personRows())[0];
+    expect(after?.department).toBeNull();
+    expect(after?.displayText).toBe("pseudonym_abc");
   });
 
   it("never rewrites an erased row's text", async () => {

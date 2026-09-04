@@ -29,6 +29,35 @@ Feature: The People screen shows who the providers named
     # The row shows it through the link; an unlinked person shows none.
 
   @integration
+  Scenario: An unlinked person shows the department their directory named
+    Given a discovered person the directory filed under a department
+    And no link to any account
+    When the list is read
+    Then that person's row carries the directory's department
+    # The case the linked-member department cannot cover, and the common one:
+    # on a tenant where nobody is linked yet, the directory is the only thing
+    # that knows where anybody works.
+
+  @unit
+  Scenario: The directory's department wins over the linked member's
+    Given a linked person whose directory names one department
+    And whose linked member is assigned to another
+    When the row picks a department to show
+    Then the directory's is shown
+    # It is a fact about the identity being read. The member's department is
+    # a fact about an account we decided is the same human — one hop further
+    # away, and the hop the reader cannot see.
+
+  @unit
+  Scenario: Departments the providers see are counted from the directory only
+    Given discovered people carrying directory departments
+    And a linked person whose department comes only from their member
+    When the observed departments are grouped
+    Then only the directory's departments are counted
+    # A panel headed "departments the providers see" that counted our own
+    # assignments would be reporting our answers back to us.
+
+  @integration
   Scenario: An erased person shows a stand-in, never the identifier
     Given a person who has been erased
     When the list is read

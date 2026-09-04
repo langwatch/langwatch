@@ -13,19 +13,27 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // lifted above every declaration in the file, which is what forces the dynamic
 // import this replaces. With the doubles declared up here, `runIngestionPull`
 // is an ordinary top-level import.
-const { findUnique, insertEvent, runOnce, isEnabled } = vi.hoisted(() => ({
-  findUnique: vi.fn(),
-  insertEvent: vi.fn(),
-  runOnce: vi.fn(),
-  isEnabled: vi.fn(),
-}));
+const { findUnique, update, insertEvent, runOnce, isEnabled } = vi.hoisted(
+  () => ({
+    findUnique: vi.fn(),
+    update: vi.fn(),
+    insertEvent: vi.fn(),
+    runOnce: vi.fn(),
+    isEnabled: vi.fn(),
+  }),
+);
 
 vi.mock("~/server/featureFlag", () => ({
   featureFlagService: { isEnabled: (...a: unknown[]) => isEnabled(...a) },
 }));
 vi.mock("~/server/db", () => ({
   prisma: {
-    ingestionSource: { findUnique: (...a: unknown[]) => findUnique(...a) },
+    ingestionSource: {
+      findUnique: (...a: unknown[]) => findUnique(...a),
+      // A run that drops a price records the window it lost. Pinned in
+      // `pullerWorkerUnpricedWindow.unit.test.ts`; here it only has to exist.
+      update: (...a: unknown[]) => update(...a),
+    },
   },
 }));
 // The OCSF repository comes off the App (#6622 made `getApp()` the only way
@@ -109,6 +117,7 @@ const auditOnlyEvent = {
 
 beforeEach(() => {
   findUnique.mockReset().mockResolvedValue(SOURCE_ROW);
+  update.mockReset().mockResolvedValue(undefined);
   insertEvent.mockReset().mockResolvedValue(undefined);
   runOnce.mockReset();
   // The ADR-088 gate, on for every case except the one that asserts it.

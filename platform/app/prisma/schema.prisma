@@ -3915,6 +3915,17 @@ model IngestionSource {
   /// Spec: specs/governance/ingestion-source-health.feature
   lastSuccessAt DateTime?
 
+  /// ADR-088 - the window this source read while pulled cost recording was
+  /// off for the organization, so its spend was dropped rather than priced.
+  /// Both null = nothing dropped. The pull cursor advances whether or not the
+  /// money path is live (audit-only is a supported mode), so without this the
+  /// loss is unrecoverable AND invisible: those days read as no spend rather
+  /// than as unknown. Widened by any run that drops a priced item, cleared
+  /// only when a later run re-reads back across the whole window.
+  /// Spec: specs/governance/pulled-usage-cost-gap.feature
+  unpricedUsageSince   DateTime?
+  unpricedUsageThrough DateTime?
+
   archivedAt DateTime?
 
   createdAt   DateTime @default(now())
@@ -5053,6 +5064,15 @@ model DiscoveredPerson {
   /// (a bare UUID in Databricks `executed_by` is a service account, never an
   /// agent), never guessed from the shape of a name.
   kind            String
+  /// The department the provider's directory filed this person under, verbatim.
+  /// An OBSERVATION, not the `Department` entity: it is free text a tenant owns
+  /// on their side, it exists for people who hold no LangWatch account, and
+  /// nothing rolls spend up by it. Spend attribution stays on `Department`, via
+  /// the membership the match engine proves (directoryDepartmentSync.service).
+  /// Null means no directory has named one - never "no department", because a
+  /// blank field in the tenant's directory and a person no directory lists are
+  /// the same null here.
+  department      String?
   firstSeenAt     DateTime
   lastSeenAt      DateTime
   /// Set when this row's identity has been erased. The row survives so its
