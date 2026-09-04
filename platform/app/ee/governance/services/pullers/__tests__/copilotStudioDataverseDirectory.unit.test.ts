@@ -144,7 +144,7 @@ async function runPull({
       botIds: [],
       // Licences off so every Graph call in these tests is the directory's.
       readSeats: false,
-      ...(readDirectory === undefined ? {} : { readDirectory }),
+      readDirectory: readDirectory ?? false,
     },
   );
 }

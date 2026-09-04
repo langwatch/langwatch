@@ -103,6 +103,25 @@ export class DirectoryDepartmentSyncService {
     }
     if (desired.size === 0) return { assigned: 0 };
 
+    const assigned = await this.assignWhereChanged({ organizationId, desired });
+
+    if (assigned > 0) {
+      logger.info(
+        { organizationId, assigned },
+        "directory departments assigned to proven members",
+      );
+    }
+    return { assigned };
+  }
+
+  /** Writes each changed assignment, resolving each department name once. */
+  private async assignWhereChanged({
+    organizationId,
+    desired,
+  }: {
+    organizationId: string;
+    desired: Map<string, string>;
+  }): Promise<number> {
     const memberships = await this.prisma.organizationUser.findMany({
       where: { organizationId, userId: { in: [...desired.keys()] } },
       select: { userId: true, departmentId: true },
@@ -134,14 +153,7 @@ export class DirectoryDepartmentSyncService {
       });
       assigned += 1;
     }
-
-    if (assigned > 0) {
-      logger.info(
-        { organizationId, assigned },
-        "directory departments assigned to proven members",
-      );
-    }
-    return { assigned };
+    return assigned;
   }
 }
 

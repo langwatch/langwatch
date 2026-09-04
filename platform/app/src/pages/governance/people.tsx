@@ -121,13 +121,7 @@ const fmtDay = (d: Date | string) => {
  *
  * Spec: specs/governance/governance-people-screen.feature
  */
-function DiscoveredPeoplePanel({
-  orgId,
-  canManage,
-}: {
-  orgId: string;
-  canManage: boolean;
-}) {
+function useDiscoveredPeople(orgId: string) {
   const utils = api.useUtils();
   const peopleQuery = api.governancePeople.list.useQuery(
     { organizationId: orgId },
@@ -161,6 +155,65 @@ function DiscoveredPeoplePanel({
       }),
   });
 
+  return { peopleQuery, suggestionsQuery, refreshIdentity, runMatch };
+}
+
+function DiscoveredPeopleHeader({
+  canManage,
+  running,
+  onRun,
+}: {
+  canManage: boolean;
+  running: boolean;
+  onRun: () => void;
+}) {
+  return (
+    <HStack
+      paddingY={2}
+      paddingX={3}
+      borderBottomWidth="1px"
+      borderColor="border.muted"
+      backgroundColor="bg.subtle"
+      justifyContent="space-between"
+    >
+      <VStack align="start" gap={0}>
+        <Text
+          fontSize="xs"
+          fontWeight="semibold"
+          color="fg.muted"
+          textTransform="uppercase"
+          letterSpacing="wider"
+        >
+          People the providers see
+        </Text>
+        <Text fontSize="xs" color="fg.subtle">
+          Everyone named on pulled rows, most of whom hold no LangWatch account.
+          Run the match pass to link the ones something proves.
+        </Text>
+      </VStack>
+      {canManage && (
+        <Button
+          size="xs"
+          colorPalette="orange"
+          loading={running}
+          onClick={onRun}
+        >
+          Run match pass
+        </Button>
+      )}
+    </HStack>
+  );
+}
+
+function DiscoveredPeoplePanel({
+  orgId,
+  canManage,
+}: {
+  orgId: string;
+  canManage: boolean;
+}) {
+  const { peopleQuery, suggestionsQuery, refreshIdentity, runMatch } =
+    useDiscoveredPeople(orgId);
   const people = peopleQuery.data ?? [];
   const suggestions = suggestionsQuery.data ?? [];
 
@@ -174,40 +227,11 @@ function DiscoveredPeoplePanel({
         borderRadius="md"
         overflow="hidden"
       >
-        <HStack
-          paddingY={2}
-          paddingX={3}
-          borderBottomWidth="1px"
-          borderColor="border.muted"
-          backgroundColor="bg.subtle"
-          justifyContent="space-between"
-        >
-          <VStack align="start" gap={0}>
-            <Text
-              fontSize="xs"
-              fontWeight="semibold"
-              color="fg.muted"
-              textTransform="uppercase"
-              letterSpacing="wider"
-            >
-              People the providers see
-            </Text>
-            <Text fontSize="xs" color="fg.subtle">
-              Everyone named on pulled rows, most of whom hold no LangWatch
-              account. Run the match pass to link the ones something proves.
-            </Text>
-          </VStack>
-          {canManage && (
-            <Button
-              size="xs"
-              colorPalette="orange"
-              loading={runMatch.isPending}
-              onClick={() => runMatch.mutate({ organizationId: orgId })}
-            >
-              Run match pass
-            </Button>
-          )}
-        </HStack>
+        <DiscoveredPeopleHeader
+          canManage={canManage}
+          running={runMatch.isPending}
+          onRun={() => runMatch.mutate({ organizationId: orgId })}
+        />
 
         <HandledErrorAlert
           error={peopleQuery.error}
@@ -272,28 +296,35 @@ function DiscoveredPersonRow({ person }: { person: DiscoveredPerson }) {
           {fmtDay(person.lastSeenAt)}
         </Text>
       </VStack>
-      <VStack align="end" gap={0} flexShrink={0}>
-        {person.link ? (
-          <>
-            <Text fontSize="sm">
-              {person.link.memberName ?? person.link.userId}
-              {person.link.departmentName
-                ? ` · ${person.link.departmentName}`
-                : ""}
-            </Text>
-            <Text fontSize="xs" color="fg.muted">
-              linked ·{" "}
-              {EVIDENCE_LABEL[person.link.evidenceKind] ??
-                person.link.evidenceKind}
-            </Text>
-          </>
-        ) : (
-          <Text fontSize="xs" color="fg.subtle">
-            {person.erasedAt ? "" : "not linked"}
-          </Text>
-        )}
-      </VStack>
+      <PersonLinkCell person={person} />
     </HStack>
+  );
+}
+
+/** The right-hand column: who the person is linked to, or that they are not. */
+function PersonLinkCell({ person }: { person: DiscoveredPerson }) {
+  return (
+    <VStack align="end" gap={0} flexShrink={0}>
+      {person.link ? (
+        <>
+          <Text fontSize="sm">
+            {person.link.memberName ?? person.link.userId}
+            {person.link.departmentName
+              ? ` · ${person.link.departmentName}`
+              : ""}
+          </Text>
+          <Text fontSize="xs" color="fg.muted">
+            linked ·{" "}
+            {EVIDENCE_LABEL[person.link.evidenceKind] ??
+              person.link.evidenceKind}
+          </Text>
+        </>
+      ) : (
+        <Text fontSize="xs" color="fg.subtle">
+          {person.erasedAt ? "" : "not linked"}
+        </Text>
+      )}
+    </VStack>
   );
 }
 

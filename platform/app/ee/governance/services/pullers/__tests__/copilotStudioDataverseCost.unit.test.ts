@@ -170,6 +170,7 @@ async function runPull({
       botIds: [],
       // Off throughout this file: the licence read has its own, next door.
       readSeats: false,
+      readDirectory: false,
       ...(azureSubscriptionId === undefined ? {} : { azureSubscriptionId }),
     },
   );

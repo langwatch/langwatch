@@ -99,46 +99,7 @@ export class PersonDiscoveryService {
     provider: string;
     events: NormalizedPullEvent[];
   }): Promise<{ discovered: number }> {
-    const activityByActor = new Map<
-      string,
-      { earliestAt: Date; latestAt: Date }
-    >();
-    const directoryByActor = new Map<
-      string,
-      { displayText: string; seenAt: Date }
-    >();
-
-    for (const event of events) {
-      if (event.actor === "") continue;
-      const seenAt = new Date(event.event_timestamp);
-      // An adapter that emitted an unparseable timestamp gets its event
-      // recorded elsewhere; a seen-date of `Invalid Date` would poison the
-      // widen comparisons for everyone sharing the row.
-      if (Number.isNaN(seenAt.getTime())) continue;
-
-      if (event.action === DIRECTORY_REPORT_ACTION) {
-        // The best name the row offers, falling back to the address and
-        // finally the id itself — a person must never render as "".
-        const displayText =
-          extraString(event, "displayName") ||
-          extraString(event, "mail") ||
-          extraString(event, "userPrincipalName") ||
-          event.actor;
-        directoryByActor.set(event.actor, { displayText, seenAt });
-        continue;
-      }
-
-      const range = activityByActor.get(event.actor);
-      if (!range) {
-        activityByActor.set(event.actor, {
-          earliestAt: seenAt,
-          latestAt: seenAt,
-        });
-      } else {
-        if (seenAt < range.earliestAt) range.earliestAt = seenAt;
-        if (seenAt > range.latestAt) range.latestAt = seenAt;
-      }
-    }
+    const { activityByActor, directoryByActor } = bucketByActor(events);
 
     for (const [rawActorId, range] of activityByActor) {
       await this.people.recordActivitySighting(this.prisma, {
@@ -163,4 +124,68 @@ export class PersonDiscoveryService {
 
     return { discovered: activityByActor.size + directoryByActor.size };
   }
+}
+
+/** One entry per distinct actor: activity as a seen range, directory as the freshest name. */
+function bucketByActor(events: NormalizedPullEvent[]): {
+  activityByActor: Map<string, { earliestAt: Date; latestAt: Date }>;
+  directoryByActor: Map<string, { displayText: string; seenAt: Date }>;
+} {
+  const activityByActor = new Map<
+    string,
+    { earliestAt: Date; latestAt: Date }
+  >();
+  const directoryByActor = new Map<
+    string,
+    { displayText: string; seenAt: Date }
+  >();
+
+  for (const event of events) {
+    if (event.actor === "") continue;
+    const seenAt = new Date(event.event_timestamp);
+    // An adapter that emitted an unparseable timestamp gets its event
+    // recorded elsewhere; a seen-date of `Invalid Date` would poison the
+    // widen comparisons for everyone sharing the row.
+    if (Number.isNaN(seenAt.getTime())) continue;
+
+    if (event.action === DIRECTORY_REPORT_ACTION) {
+      directoryByActor.set(event.actor, {
+        displayText: directoryDisplayText(event),
+        seenAt,
+      });
+      continue;
+    }
+
+    widenRange(activityByActor, event.actor, seenAt);
+  }
+
+  return { activityByActor, directoryByActor };
+}
+
+/**
+ * The best name a directory row offers, falling back to the address and
+ * finally the id itself — a person must never render as "".
+ */
+function directoryDisplayText(event: NormalizedPullEvent): string {
+  return (
+    extraString(event, "displayName") ||
+    extraString(event, "mail") ||
+    extraString(event, "userPrincipalName") ||
+    event.actor
+  );
+}
+
+/** Stretches the actor's seen range to include this sighting. */
+function widenRange(
+  activityByActor: Map<string, { earliestAt: Date; latestAt: Date }>,
+  actor: string,
+  seenAt: Date,
+): void {
+  const range = activityByActor.get(actor);
+  if (!range) {
+    activityByActor.set(actor, { earliestAt: seenAt, latestAt: seenAt });
+    return;
+  }
+  if (seenAt < range.earliestAt) range.earliestAt = seenAt;
+  if (seenAt > range.latestAt) range.latestAt = seenAt;
 }

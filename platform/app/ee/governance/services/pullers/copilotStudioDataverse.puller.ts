@@ -382,6 +382,29 @@ const NO_CURSOR: StoredCursor = {
   directory: { reportedThroughDay: null, heldSinceMs: null },
 };
 
+/** The per-read sections of a stored position; absent and null read the same. */
+function sectionsOf(
+  data: z.infer<typeof storedCursorSchema>,
+): Pick<StoredCursor, "cost" | "seats" | "directory"> {
+  return {
+    cost: {
+      pricedThroughDay: data.costPricedThroughDay ?? null,
+      heldSinceMs: data.costHeldSinceMs ?? null,
+      // Absent on every position written before the ask was recorded, which
+      // reads as never asked and so asks at once.
+      readAtMs: data.costReadAtMs ?? null,
+    },
+    seats: {
+      reportedThroughDay: data.seatsReportedThroughDay ?? null,
+      heldSinceMs: data.seatsHeldSinceMs ?? null,
+    },
+    directory: {
+      reportedThroughDay: data.directoryReportedThroughDay ?? null,
+      heldSinceMs: data.directoryHeldSinceMs ?? null,
+    },
+  };
+}
+
 function parseCursor(raw: string | null): StoredCursor {
   if (!raw) return NO_CURSOR;
   try {
@@ -395,21 +418,7 @@ function parseCursor(raw: string | null): StoredCursor {
         createdon && conversationtranscriptid
           ? { createdon, conversationtranscriptid }
           : null,
-      cost: {
-        pricedThroughDay: parsed.data.costPricedThroughDay ?? null,
-        heldSinceMs: parsed.data.costHeldSinceMs ?? null,
-        // Absent on every position written before the ask was recorded, which
-        // reads as never asked and so asks at once.
-        readAtMs: parsed.data.costReadAtMs ?? null,
-      },
-      seats: {
-        reportedThroughDay: parsed.data.seatsReportedThroughDay ?? null,
-        heldSinceMs: parsed.data.seatsHeldSinceMs ?? null,
-      },
-      directory: {
-        reportedThroughDay: parsed.data.directoryReportedThroughDay ?? null,
-        heldSinceMs: parsed.data.directoryHeldSinceMs ?? null,
-      },
+      ...sectionsOf(parsed.data),
     };
   } catch {
     // A cursor we cannot read is treated as no cursor: re-reading a window is
@@ -448,6 +457,133 @@ export function readStoredCostCursor(pollerCursor: unknown): {
     costPricedThroughDay: cursor.cost.pricedThroughDay,
     costHeldSinceMs: cursor.cost.heldSinceMs,
   };
+}
+
+/**
+ * One directory page: fetched, refusal-checked, parsed — or null when the
+ * whole day must hold.
+ */
+async function readDirectoryPage({
+  url,
+  token,
+  options,
+}: {
+  url: string;
+  token: string;
+  options: PullRunOptions;
+}): Promise<ReturnType<typeof readDirectoryUserRows> | null> {
+  const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+  const response = await ssrfSafeFetch(url, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+    },
+    signal: options.signal
+      ? AbortSignal.any([options.signal, timeout])
+      : timeout,
+    // Carries a token minted from the customer's secret, so a redirect
+    // must not hand it to whoever answers.
+    followRedirects: false,
+  });
+
+  if (!response.ok) {
+    logger.warn(
+      { status: response.status },
+      response.status === 403
+        ? "copilot studio dataverse: the tenant has not consented to the directory read (HTTP 403); holding the day"
+        : "copilot studio dataverse: Microsoft Graph refused the directory read; holding the day",
+    );
+    return null;
+  }
+
+  const read = readDirectoryUserRows({ response: await response.json() });
+  if (read.malformed) {
+    logger.warn(
+      "copilot studio dataverse: Microsoft Graph answered the directory read with an unrecognised body; holding the day",
+    );
+    return null;
+  }
+  return read;
+}
+
+/** The finished list — unless nothing in it survived parsing. */
+function completeDirectoryList({
+  users,
+  unreadableRows,
+}: {
+  users: DirectoryUser[];
+  unreadableRows: number;
+}): DirectoryUser[] | null {
+  if (users.length === 0 && unreadableRows > 0) {
+    // Nothing survived. Recording the day would publish "this tenant
+    // lists nobody" for "nobody could be read" — permanently.
+    logger.warn(
+      { unreadableRows },
+      "copilot studio dataverse: no directory row in Microsoft Graph's reply could be read; holding the day",
+    );
+    return null;
+  }
+  if (unreadableRows > 0) {
+    // Counted here and nowhere else, exactly as the licence read does:
+    // reaching the run's own error count would cost it its
+    // conversations.
+    logger.warn(
+      { unreadableRows },
+      "copilot studio dataverse: some directory rows could not be read; the rest of the list is recorded",
+    );
+  }
+  return users;
+}
+
+/**
+ * Whether the run's outgoing position differs from the one it started with.
+ *
+ * Any of the four reads counts, on a clean run and on a failing one alike. A
+ * run whose conversations broke but whose bill was read is a partial success:
+ * the worker persists the advance, keeps the figures, and warns. What such a
+ * run does to the source's recorded health is the fold projection's decision
+ * to make, not this gate's — refusing the advance here would buy that
+ * visibility by throwing away figures already in hand.
+ *
+ * What stops a dead environment reading as steady progress is that the seat
+ * and directory marks only move on the day roll, and the cost mark only on
+ * the few runs a day that are due to ask about the bill at all. On a
+ * five-minute schedule that is four runs out of two hundred and eighty-eight;
+ * the rest hand back the incoming cursor string verbatim, which the worker
+ * reads as no progress and fails. The signal is weaker than it was when
+ * nothing but the day roll moved these marks, and it still holds.
+ * `refusesNextLink` still fails or warns exactly as it did, because there the
+ * transcript cursor is what moved.
+ */
+function positionMoved({
+  previous,
+  next,
+}: {
+  previous: StoredCursor;
+  next: StoredCursor;
+}): boolean {
+  const transcriptMoved =
+    next.transcript !== null &&
+    (next.transcript.createdon !== previous.transcript?.createdon ||
+      next.transcript.conversationtranscriptid !==
+        previous.transcript?.conversationtranscriptid);
+  const costMoved =
+    next.cost.pricedThroughDay !== previous.cost.pricedThroughDay ||
+    next.cost.heldSinceMs !== previous.cost.heldSinceMs ||
+    // The instant of the ask counts as movement in its own right. A run that
+    // asked and found the same figure moves neither of the two above, and
+    // dropping the record of the ask would leave the source due again on the
+    // very next run.
+    next.cost.readAtMs !== previous.cost.readAtMs;
+  const seatsMoved =
+    next.seats.reportedThroughDay !== previous.seats.reportedThroughDay ||
+    next.seats.heldSinceMs !== previous.seats.heldSinceMs;
+  const directoryMoved =
+    next.directory.reportedThroughDay !==
+      previous.directory.reportedThroughDay ||
+    next.directory.heldSinceMs !== previous.directory.heldSinceMs;
+  return transcriptMoved || costMoved || seatsMoved || directoryMoved;
 }
 
 /** The position a run hands back, as the string that is stored. */
@@ -991,43 +1127,7 @@ export class CopilotStudioDataversePuller
     // environment with no new conversations never price its bill, or a bill
     // that cannot be read stall the transcripts.
     const advanced = walk.last?.createdon ? walk.last : previous.transcript;
-    const transcriptMoved =
-      advanced !== null &&
-      (advanced.createdon !== previous.transcript?.createdon ||
-        advanced.conversationtranscriptid !==
-          previous.transcript?.conversationtranscriptid);
-    const costMoved =
-      cost.pricedThroughDay !== previous.cost.pricedThroughDay ||
-      cost.heldSinceMs !== previous.cost.heldSinceMs ||
-      // The instant of the ask counts as movement in its own right. A run that
-      // asked and found the same figure moves neither of the two above, and
-      // dropping the record of the ask would leave the source due again on the
-      // very next run.
-      cost.readAtMs !== previous.cost.readAtMs;
-    const seatsMoved =
-      seats.reportedThroughDay !== previous.seats.reportedThroughDay ||
-      seats.heldSinceMs !== previous.seats.heldSinceMs;
-    const directoryMoved =
-      directory.reportedThroughDay !== previous.directory.reportedThroughDay ||
-      directory.heldSinceMs !== previous.directory.heldSinceMs;
-
-    // Any of the three reads counts, on a clean run and on a failing one
-    // alike. A run whose conversations broke but whose bill was read is a
-    // partial success: the worker persists the advance, keeps the figures, and
-    // warns. What such a run does to the source's recorded health is the fold
-    // projection's decision to make, not this gate's — refusing the advance
-    // here bought that visibility by throwing away figures already in hand.
-    //
-    // What stops a dead environment reading as steady progress is that the
-    // seat mark only moves on the day roll, and the cost mark only on the few
-    // runs a day that are due to ask about the bill at all. On a five-minute
-    // schedule that is four runs out of two hundred and eighty-eight; the rest
-    // hand back the incoming cursor string verbatim, which the worker reads as
-    // no progress and fails. The signal is weaker than it was when nothing but
-    // the day roll moved these marks, and it still holds. `refusesNextLink`
-    // still fails or warns exactly as it did, because there the transcript
-    // cursor is what moved.
-    const moved = transcriptMoved || costMoved || seatsMoved || directoryMoved;
+    const next: StoredCursor = { transcript: advanced, cost, seats, directory };
 
     return {
       events: walk.events,
@@ -1037,8 +1137,8 @@ export class CopilotStudioDataversePuller
       // position yields a different string — the cost fields now spelled out
       // — which it would read as an advance and persist. That is the whole
       // reason this is a string comparison and not a deep one.
-      cursor: moved
-        ? encodeCursor({ transcript: advanced, cost, seats, directory })
+      cursor: positionMoved({ previous, next })
+        ? encodeCursor(next)
         : options.cursor,
       errorCount: walk.errorCount,
     };
@@ -1567,61 +1667,13 @@ export class CopilotStudioDataversePuller
     let url: string = DIRECTORY_USERS_FIRST_PAGE;
 
     for (let page = 0; page < MAX_DIRECTORY_PAGES; page += 1) {
-      const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
-      const response = await ssrfSafeFetch(url, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-        },
-        signal: options.signal
-          ? AbortSignal.any([options.signal, timeout])
-          : timeout,
-        // Carries a token minted from the customer's secret, so a redirect
-        // must not hand it to whoever answers.
-        followRedirects: false,
-      });
-
-      if (!response.ok) {
-        logger.warn(
-          { status: response.status },
-          response.status === 403
-            ? "copilot studio dataverse: the tenant has not consented to the directory read (HTTP 403); holding the day"
-            : "copilot studio dataverse: Microsoft Graph refused the directory read; holding the day",
-        );
-        return null;
-      }
-
-      const read = readDirectoryUserRows({ response: await response.json() });
-      if (read.malformed) {
-        logger.warn(
-          "copilot studio dataverse: Microsoft Graph answered the directory read with an unrecognised body; holding the day",
-        );
-        return null;
-      }
+      const read = await readDirectoryPage({ url, token, options });
+      if (read === null) return null;
       users.push(...read.users);
       unreadableRows += read.unreadableRows;
 
       if (read.nextLink === null) {
-        if (users.length === 0 && unreadableRows > 0) {
-          // Nothing survived. Recording the day would publish "this tenant
-          // lists nobody" for "nobody could be read" — permanently.
-          logger.warn(
-            { unreadableRows },
-            "copilot studio dataverse: no directory row in Microsoft Graph's reply could be read; holding the day",
-          );
-          return null;
-        }
-        if (unreadableRows > 0) {
-          // Counted here and nowhere else, exactly as the licence read does:
-          // reaching the run's own error count would cost it its
-          // conversations.
-          logger.warn(
-            { unreadableRows },
-            "copilot studio dataverse: some directory rows could not be read; the rest of the list is recorded",
-          );
-        }
-        return users;
+        return completeDirectoryList({ users, unreadableRows });
       }
       if (!isMicrosoftGraphUrl(read.nextLink)) {
         logger.error(
