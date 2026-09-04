@@ -235,6 +235,13 @@ Feature: Langy consumes the event-sourced backend with optimized fetches and lig
     And no status placeholder renders under the answer
 
   @unit
+  Scenario: A turn held by a card says it is waiting for me
+    Given a turn is in flight with a card waiting for my answer
+    Then the thinking line says it is waiting for my answer on the card above
+    And it never says the turn is taking longer than usual
+    And it never says Langy may be stuck
+
+  @unit
   Scenario: Live reasoning reads as thinking, not as starting up
     Given a turn is in flight with no prose and no tool call yet
     And the model's reasoning is streaming live

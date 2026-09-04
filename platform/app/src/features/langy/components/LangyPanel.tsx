@@ -2206,6 +2206,14 @@ function LangyPanel({
     [recordWaits, turnToolCalls, liveWaits],
   );
 
+  // A card is holding the turn for the developer's answer. What the panel
+  // says while that is true is not what it says while Langy is working: the
+  // waiting line points at the card, and the composer stops claiming Langy is
+  // busy (ADR-129).
+  const awaitingAnswer =
+    permissionCards.some((card) => card.status === "pending") ||
+    [...questionWaits.values()].some((wait) => wait.status === "pending");
+
   // The live entries belong to one conversation; opening another drops them.
   useEffect(() => {
     useLangyLocalControlStore.getState().reset(activeConversationId);
@@ -3312,6 +3320,12 @@ function LangyPanel({
                                 <LangyThinkingLine
                                   messages={displayMessages}
                                   hasLiveReasoning={!!displaySignals.reasoning}
+                                  // A card is holding the turn: the line says
+                                  // so and points at it, rather than
+                                  // escalating toward "Langy may be stuck"
+                                  // about a turn that is waiting on the
+                                  // reader (ADR-129).
+                                  awaitingAnswer={awaitingAnswer}
                                   // The panel-open warm proved this
                                   // conversation's worker alive, so the first
                                   // message reads "Thinking…" instead of the
@@ -3496,6 +3510,7 @@ function LangyPanel({
                     onRemoveChip={removeContextChip}
                     addableChips={addableChips}
                     onAddChip={chooseChip}
+                    awaitingAnswer={awaitingAnswer}
                   />
                 </Box>
               </>

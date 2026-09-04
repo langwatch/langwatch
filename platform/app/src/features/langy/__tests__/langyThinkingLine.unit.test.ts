@@ -16,6 +16,7 @@
 import { describe, expect, it } from "vitest";
 import { LANGY_THINKING_VERBS } from "../components/langyThinkingVerbs";
 import {
+  LANGY_AWAITING_ANSWER_LINE,
   langyThinkingLine,
   THINKING_SLOW_MS,
   THINKING_STILL_STARTING_MS,
@@ -29,6 +30,39 @@ const assistant = (parts: unknown[]) => ({
 const user = { role: "user", parts: [{ type: "text", text: "hi" }] };
 
 describe("langyThinkingLine", () => {
+  describe("given a card holding the turn for the reader's answer", () => {
+    /** @scenario "A turn held by a card says it is waiting for me" */
+    it("says it is waiting for that answer, however long the card is open", () => {
+      const messages = [user, assistant([])];
+
+      for (const elapsedMs of [1_000, THINKING_SLOW_MS, THINKING_STUCK_MS]) {
+        const line = langyThinkingLine({
+          messages,
+          elapsedMs,
+          awaitingAnswer: true,
+        });
+        expect(line?.text).toBe(LANGY_AWAITING_ANSWER_LINE);
+        expect(line?.tone).toBe("waiting");
+        expect(line?.text).not.toContain("taking longer");
+        expect(line?.text).not.toContain("stuck");
+      }
+    });
+
+    it("outranks the tool the card is holding", () => {
+      const line = langyThinkingLine({
+        messages: [
+          user,
+          assistant([
+            { type: "tool-local_bash", state: "input-available", input: {} },
+          ]),
+        ],
+        elapsedMs: 1_000,
+        awaitingAnswer: true,
+      });
+      expect(line?.text).toBe(LANGY_AWAITING_ANSWER_LINE);
+    });
+  });
+
   describe("given a turn where NOTHING has happened", () => {
     /** The 97-second lie, in one test. */
     it("never invents work — it says the workspace is being prepared", () => {

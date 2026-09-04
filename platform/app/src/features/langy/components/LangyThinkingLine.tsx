@@ -57,8 +57,14 @@ export function LangyThinkingLine({
   messages,
   hasLiveReasoning = false,
   workerReady = false,
+  awaitingAnswer = false,
 }: {
   messages: UIMessage[];
+  /**
+   * A card is holding the turn for the developer's answer (ADR-129), so the
+   * line says that instead of escalating toward "Langy may be stuck".
+   */
+  awaitingAnswer?: boolean;
   /**
    * The model's ephemeral reasoning is streaming right now. Reasoning deltas
    * never become message parts, so without this signal a reasoning-but-no-prose
@@ -98,6 +104,7 @@ export function LangyThinkingLine({
     hasLiveReasoning,
     workerReady,
     pageActivity,
+    awaitingAnswer,
   });
 
   // Whimsy ONLY where the truth signal permits it — i.e. the model is genuinely

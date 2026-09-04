@@ -96,6 +96,13 @@ Feature: Langy composer, feedback, and card polish
       Then it says Langy is working and the message sends when it stops
 
     @integration
+    Scenario: The message field points at the card while one is waiting
+      Given a turn held by a card waiting for the customer's answer
+      When the customer looks at the message field
+      Then it says to answer the card above
+      And it does not say Langy is working
+
+    @integration
     Scenario: Enter during a turn keeps the message instead of sending it
       Given a Langy turn is in flight
       When the customer types a message and presses Enter

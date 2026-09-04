@@ -25,7 +25,10 @@ import { useLangyStore } from "../stores/langyStore";
 const MID_TURN_PLACEHOLDER = "Langy is working. You can send when it stops.";
 const IDLE_PLACEHOLDER = "Ask Langy or describe what you want…";
 
-function renderComposer(onSend: (input: string) => void) {
+function renderComposer(
+  onSend: (input: string) => void,
+  over: { awaitingAnswer?: boolean } = {},
+) {
   return render(
     <ChakraProvider value={defaultSystem}>
       <Composer
@@ -35,6 +38,7 @@ function renderComposer(onSend: (input: string) => void) {
         onSend={onSend}
         onStop={() => {}}
         disabled={false}
+        {...over}
       />
     </ChakraProvider>,
   );
@@ -67,6 +71,17 @@ describe("given a Langy turn is in flight", () => {
       renderComposer(() => {});
 
       expect(screen.getByPlaceholderText(MID_TURN_PLACEHOLDER)).toBeTruthy();
+    });
+
+    /** @scenario "The message field points at the card while one is waiting" */
+    it("points at the card while one is waiting, and stops blaming Langy", () => {
+      useLangyStore.setState({ turnPhase: "active" });
+      renderComposer(() => {}, { awaitingAnswer: true });
+
+      expect(
+        screen.getByPlaceholderText("Answer the card above to keep going."),
+      ).toBeTruthy();
+      expect(screen.queryByPlaceholderText(MID_TURN_PLACEHOLDER)).toBeNull();
     });
   });
 

@@ -89,6 +89,14 @@ const CONTEXT_ICON: Record<LangyContextChip["kind"], LucideIcon> = {
 // stays out of the way of what the person is trying to type.
 const COMPOSER_PLACEHOLDER = "Ask Langy or describe what you want…";
 
+/** While a turn runs and nothing is waiting on the reader. */
+export const MID_TURN_PLACEHOLDER =
+  "Langy is working. You can send when it stops.";
+
+/** While a card is holding the turn for the reader's answer (ADR-129). */
+export const AWAITING_ANSWER_PLACEHOLDER =
+  "Answer the card above to keep going.";
+
 // Shown under every composer, in every variant and at every viewport height. A
 // notice about what happens to what you type only does its job where you type,
 // so it is not gated on the layout the way the tagline below it is.
@@ -123,6 +131,7 @@ function ComposerImpl({
   addableChips = [],
   onAddChip,
   placeholder = COMPOSER_PLACEHOLDER,
+  awaitingAnswer = false,
   cardRef,
 }: {
   /** The model Langy will use for the next send. "" = let the server pick. */
@@ -154,6 +163,11 @@ function ComposerImpl({
   addableChips?: LangyContextChip[];
   onAddChip?: (id: string) => void;
   placeholder?: string;
+  /**
+   * A card is holding the turn for the reader's answer (ADR-129). The mid-turn
+   * line must not say Langy is working: it is not, it is waiting for them.
+   */
+  awaitingAnswer?: boolean;
 }) {
   const floating = variant === "floating";
   const hero = variant === "hero";
@@ -394,6 +408,7 @@ function ComposerImpl({
             hero={hero}
             disabled={disabled}
             placeholder={placeholder}
+            awaitingAnswer={awaitingAnswer}
             onSend={onSend}
             onStop={onStop}
             openPalette={openPalette}
@@ -557,6 +572,7 @@ const ComposerInputRow = memo(function ComposerInputRow({
   hero,
   disabled,
   placeholder,
+  awaitingAnswer,
   onSend,
   onStop,
   openPalette,
@@ -565,6 +581,7 @@ const ComposerInputRow = memo(function ComposerInputRow({
   hero: boolean;
   disabled: boolean;
   placeholder: string;
+  awaitingAnswer: boolean;
   onSend: (input: string) => void;
   onStop: () => void;
   openPalette: (mode: PaletteMode) => void;
@@ -614,10 +631,16 @@ const ComposerInputRow = memo(function ComposerInputRow({
         // next message…", the user wrote one, pressed Enter, and nothing
         // happened: the text sat in the field with no sign it had been
         // refused.
+        //
+        // While a card is open the turn is waiting for the reader, not
+        // working, so the line points at the card instead of blaming Langy
+        // for the wait (ADR-129).
         placeholder={
-          turnActive
-            ? "Langy is working. You can send when it stops."
-            : placeholder
+          awaitingAnswer
+            ? AWAITING_ANSWER_PLACEHOLDER
+            : turnActive
+              ? MID_TURN_PLACEHOLDER
+              : placeholder
         }
         disabled={disabled}
         rows={1}

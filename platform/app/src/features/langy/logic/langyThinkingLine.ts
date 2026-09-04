@@ -47,6 +47,10 @@ export type LangyThinkingTone =
   /** Long enough with nothing that the honest word is "stuck". */
   | "stuck";
 
+/** What the line says while a card is holding the turn (ADR-129). */
+export const LANGY_AWAITING_ANSWER_LINE =
+  "Waiting for your answer on the card above";
+
 export interface LangyThinkingLine {
   /** The line to render. Always true at the moment it is produced. */
   text: string;
@@ -242,6 +246,7 @@ export function langyThinkingLine({
   hasLiveReasoning = false,
   workerReady = false,
   pageActivity = null,
+  awaitingAnswer = false,
 }: {
   messages: ThinkingMessage[];
   /** Time since the turn was sent. */
@@ -264,6 +269,14 @@ export function langyThinkingLine({
    */
   hasLiveReasoning?: boolean;
   /**
+   * A card is open and the turn is holding for the developer's answer
+   * (ADR-129). Nothing is running, and nothing is late: the panel used to
+   * escalate through "This is taking longer than usual" to "Langy still
+   * hasn't answered, it may be stuck", every word of it about Langy, while
+   * the turn was waiting on the reader.
+   */
+  awaitingAnswer?: boolean;
+  /**
    * A panel-open warm proved this conversation's worker alive before the send
    * (`warmed: true` from `langy.warmWorker`). A first message then skips the
    * startup ladder — the workspace it would claim to be preparing already
@@ -275,7 +288,19 @@ export function langyThinkingLine({
 }): LangyThinkingLine | null {
   const last = currentTurnAssistant(messages);
 
-  // 0. THE PAGE IS DOING SOMETHING. It reports its own work, so this is both
+  // 0. A CARD IS WAITING FOR THE READER. The turn is holding on purpose, so
+  //    nothing about it is slow and nothing about it is stuck. This outranks
+  //    every line below, including the tool that reads as still running: that
+  //    tool IS the card.
+  if (awaitingAnswer) {
+    return {
+      text: LANGY_AWAITING_ANSWER_LINE,
+      tone: "waiting",
+      allowWhimsy: false,
+    };
+  }
+
+  // 0b. THE PAGE IS DOING SOMETHING. It reports its own work, so this is both
   //    true and more specific than anything below: the column being run and
   //    the rows already back, rather than the poll the agent is blocked on.
   const reported = pageActivity?.trim();
