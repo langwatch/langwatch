@@ -99,12 +99,30 @@ export async function thenISeeTheResultsTab(page: Page) {
 // =============================================================================
 
 /**
+ * Given the scenarios panel has settled
+ * The panel shows a skeleton while its queries are in flight. A day-zero
+ * probe run against the skeleton finds no empty state, reads that as "the
+ * project already has one" and skips the setup it was there to do, so the
+ * steps below wait for the panel to reach one of its settled states first.
+ */
+export async function givenTheScenariosPanelHasSettled(page: Page) {
+  await page
+    .getByTestId("agent-testing-cases-panel")
+    .waitFor({ state: "visible", timeout: 30000 });
+  await page
+    .getByTestId("agent-testing-cases-skeleton")
+    .waitFor({ state: "detached", timeout: 30000 })
+    .catch(() => undefined);
+}
+
+/**
  * Given the project has an agent
  * A project with no agent reads "Setup agent" first. This creates an HTTP
  * agent through the same drawer a person uses. The address does not have to
  * answer: a run against it fails, and that is a result too.
  */
 export async function givenTheProjectHasAnAgent(page: Page) {
+  await givenTheScenariosPanelHasSettled(page);
   const connectEmpty = page.getByTestId("agent-testing-connect-agent-empty");
   const needsAgent = await connectEmpty
     .waitFor({ state: "visible", timeout: 5000 })
@@ -130,6 +148,7 @@ export async function givenTheProjectHasAnAgent(page: Page) {
  * Every scenario sits in a suite, so a project with none names one first.
  */
 export async function givenTheProjectHasATestSuite(page: Page) {
+  await givenTheScenariosPanelHasSettled(page);
   const suiteEmpty = page.getByTestId("agent-testing-first-suite-empty");
   const needsSuite = await suiteEmpty
     .waitFor({ state: "visible", timeout: 5000 })

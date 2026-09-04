@@ -1029,6 +1029,63 @@ export type EvaluatorEditorFooterProps = {
   onCancel?: () => void;
 };
 
+/** Whether the save/apply button is disabled: an invalid name, or already saving. */
+function isSaveDisabled({
+  isValid,
+  isSaving,
+}: {
+  isValid: boolean;
+  isSaving: boolean;
+}): boolean {
+  return !isValid || isSaving;
+}
+
+/**
+ * Whether Apply is disabled. Only a comparison editor mirrors its config
+ * into the store live, so only there does an unrunnable (sub-2-variant)
+ * config need Apply gated — every other local-config evaluator, such as an
+ * unnamed LLM judge, keeps Apply always enabled.
+ */
+function isApplyDisabled({
+  isComparisonEditor,
+  isValid,
+  isSaving,
+}: {
+  isComparisonEditor: boolean;
+  isValid: boolean;
+  isSaving: boolean;
+}): boolean {
+  return isComparisonEditor && isSaveDisabled({ isValid, isSaving });
+}
+
+/**
+ * The button that takes the attachment off, when the editor is open on one,
+ * and the spacer that pins it to its own side of the footer.
+ */
+function FooterRemoveArea({
+  onRemove,
+  withSpacer,
+}: {
+  onRemove: (() => void) | undefined;
+  withSpacer: boolean;
+}) {
+  if (!onRemove) return null;
+  return (
+    <>
+      <Button
+        variant="ghost"
+        colorPalette="red"
+        size="sm"
+        onClick={onRemove}
+        data-testid="evaluator-remove-button"
+      >
+        {REMOVE_EVALUATOR_LABEL}
+      </Button>
+      {withSpacer && <Spacer />}
+    </>
+  );
+}
+
 export function EvaluatorEditorFooter({
   controller,
   onCancel,
@@ -1048,32 +1105,18 @@ export function EvaluatorEditorFooter({
     handleClose,
   } = controller;
 
-  // The way an attachment is taken off, when the editor is open on one. It
-  // stands on its own side of the footer, away from Save.
-  const removeButton = onRemove ? (
-    <Button
-      variant="ghost"
-      colorPalette="red"
-      size="sm"
-      onClick={onRemove}
-      data-testid="evaluator-remove-button"
-    >
-      {REMOVE_EVALUATOR_LABEL}
-    </Button>
-  ) : null;
-
-  // Only a comparison editor mirrors its config into the store live (via
-  // onComparisonChange), so only there does an unrunnable (sub-2-variant)
-  // config need Apply gated. For every other local-config evaluator — an
-  // unnamed LLM-judge whose name isValid deliberately rejects — Apply must
-  // keep its original always-enabled behavior, so gating on isValid here
-  // doesn't newly trap them behind the name requirement.
   const isComparisonEditor = !!onComparisonChange;
+  const saveDisabled = isSaveDisabled({ isValid, isSaving });
+  const applyDisabled = isApplyDisabled({
+    isComparisonEditor,
+    isValid,
+    isSaving,
+  });
 
   if (onLocalConfigChange) {
     return (
       <HStack width="full">
-        {removeButton}
+        <FooterRemoveArea onRemove={onRemove} withSpacer={false} />
         {hasUnsavedChanges && (
           <Button
             variant="outline"
@@ -1089,7 +1132,7 @@ export function EvaluatorEditorFooter({
           variant="outline"
           size="sm"
           onClick={handleSave}
-          disabled={!isValid || isSaving}
+          disabled={saveDisabled}
           loading={isSaving}
           data-testid="evaluator-save-button"
         >
@@ -1099,13 +1142,7 @@ export function EvaluatorEditorFooter({
           colorPalette="blue"
           size="sm"
           onClick={handleApply}
-          // A comparison below its 2-variant minimum must not be applyable —
-          // onComparisonChange has already mirrored an unrunnable config into
-          // the store live and Apply just closes over it. The ENTIRE guard is
-          // scoped to the comparison editor: base had no `disabled` on Apply
-          // at all, so a non-comparison editor (e.g. a still-unnamed LLM
-          // judge) keeps Apply always-enabled, pixel-identical to before.
-          disabled={isComparisonEditor && (!isValid || isSaving)}
+          disabled={applyDisabled}
           data-testid="evaluator-apply-button"
         >
           Apply
@@ -1115,16 +1152,15 @@ export function EvaluatorEditorFooter({
   }
 
   return (
-    <HStack gap={3} width={removeButton ? "full" : undefined}>
-      {removeButton}
-      {removeButton && <Spacer />}
+    <HStack gap={3} width={onRemove ? "full" : undefined}>
+      <FooterRemoveArea onRemove={onRemove} withSpacer={true} />
       <Button variant="outline" onClick={onCancel ?? handleClose}>
         Cancel
       </Button>
       <Button
         colorPalette="green"
         onClick={handleSave}
-        disabled={!isValid || isSaving}
+        disabled={saveDisabled}
         loading={isSaving}
         data-testid="save-evaluator-button"
       >

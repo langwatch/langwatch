@@ -88,34 +88,43 @@ function definitionsOf(rows: readonly SuiteFieldRow[]): SuiteFieldDefinition[] {
 }
 
 /**
+ * One row's refusal: an empty identifier, a malformed one, or one already
+ * seen on an earlier row. Records the identifier as seen either way, so a
+ * later row with the same identifier reads as a duplicate.
+ */
+function fieldRowRefusal({
+  row,
+  seen,
+}: {
+  row: SuiteFieldRow;
+  seen: Set<string>;
+}): SuiteFieldRow {
+  const identifier = row.identifier.trim();
+  if (identifier === "") return { ...row, error: FIELD_IDENTIFIER_REQUIRED };
+  const parsed = suiteFieldDefinitionSchema.safeParse({
+    identifier,
+    type: row.type,
+  });
+  const issues = parsed.success ? [] : parsed.error.issues;
+  const error = issues[0]
+    ? issues[0].message
+    : seen.has(identifier)
+      ? SUITE_FIELD_IDENTIFIER_DUPLICATE_MESSAGE
+      : undefined;
+  seen.add(identifier);
+  return { ...row, error };
+}
+
+/**
  * What the editor refuses before it saves: an empty name, an empty or
  * malformed identifier, and two rows with one identifier. Returns the draft
  * with the refusals written on it, or nothing when the draft is complete.
  */
 function refusalsOf(draft: SuiteDraft): SuiteDraft | null {
-  let refused = false;
   const seen = new Set<string>();
-  const fields = draft.fields.map((row) => {
-    const identifier = row.identifier.trim();
-    let error: string | undefined;
-    if (identifier === "") {
-      error = FIELD_IDENTIFIER_REQUIRED;
-    } else {
-      const parsed = suiteFieldDefinitionSchema.safeParse({
-        identifier,
-        type: row.type,
-      });
-      const issues = parsed.success ? [] : parsed.error.issues;
-      if (issues[0]) error = issues[0].message;
-      else if (seen.has(identifier))
-        error = SUITE_FIELD_IDENTIFIER_DUPLICATE_MESSAGE;
-      seen.add(identifier);
-    }
-    if (error) refused = true;
-    return { ...row, error };
-  });
+  const fields = draft.fields.map((row) => fieldRowRefusal({ row, seen }));
   const nameError = draft.name.trim() === "" ? SUITE_NAME_REQUIRED : undefined;
-  if (nameError) refused = true;
+  const refused = fields.some((row) => row.error) || !!nameError;
   if (!refused) return null;
   return { ...draft, nameError, fields, fieldsError: undefined };
 }
@@ -364,6 +373,193 @@ function useSuiteFieldRows() {
   );
 }
 
+type SuiteDraftUpdate = (change: (draft: SuiteDraft) => SuiteDraft) => void;
+
+/**
+ * Opens the editor for one attachment, wiring its mapping, gate and removal
+ * writes back into the store.
+ */
+function editAttachment({
+  attachment,
+  evaluator,
+  navigation,
+  ctx,
+  update,
+  goBack,
+  openEvaluatorEditor,
+}: {
+  attachment: EvaluatorAttachment;
+  evaluator: AttachableEvaluator;
+  navigation?: { replaceCurrentInStack?: boolean };
+  ctx: ScenarioMappingContext;
+  update: SuiteDraftUpdate;
+  goBack: () => void;
+  openEvaluatorEditor: ReturnType<typeof useOpenScenarioEvaluatorEditor>;
+}) {
+  const attachmentId = attachment.id;
+  openEvaluatorEditor({
+    attachment,
+    evaluator,
+    ctx,
+    navigation,
+    onMappingChange: (input: string, mapping: ScenarioMapping | undefined) =>
+      update((draft) => ({
+        ...draft,
+        evaluatorsError: undefined,
+        evaluators: replaceAttachment(
+          draft.evaluators,
+          attachmentId,
+          (current) => {
+            const mappings = { ...current.mappings };
+            if (mapping) mappings[input] = mapping;
+            else delete mappings[input];
+            return { ...current, mappings };
+          },
+        ),
+      })),
+    onRequiredChange: (required: boolean) =>
+      update((draft) => ({
+        ...draft,
+        evaluators: replaceAttachment(
+          draft.evaluators,
+          attachmentId,
+          (current) => ({ ...current, required }),
+        ),
+      })),
+    onRemove: () => {
+      update((draft) => ({
+        ...draft,
+        evaluators: draft.evaluators.filter(
+          (current) => current.id !== attachmentId,
+        ),
+      }));
+      goBack();
+    },
+  });
+}
+
+/**
+ * What a pick does: an evaluator already attached opens its editor, a new
+ * one is attached with inferred mappings and opens its editor when an input
+ * still needs a person.
+ *
+ * A pick from the list replaces the list in the stack, so back from the
+ * editor lands on the suite editor. An evaluator created from the list
+ * arrives once the stack is already back on the suite editor, so its editor
+ * is pushed on top and nothing goes back.
+ */
+function attachEvaluator({
+  evaluator,
+  origin,
+  ctx,
+  update,
+  edit,
+  goBack,
+}: {
+  evaluator: EvaluatorWithFields;
+  origin: "list" | "created";
+  ctx: ScenarioMappingContext;
+  update: SuiteDraftUpdate;
+  edit: (
+    attachment: EvaluatorAttachment,
+    evaluator: AttachableEvaluator,
+    navigation?: { replaceCurrentInStack?: boolean },
+  ) => void;
+  goBack: () => void;
+}) {
+  const draft = useSuiteEditorStore.getState().draft;
+  if (!draft) return;
+  const navigation =
+    origin === "list" ? { replaceCurrentInStack: true } : undefined;
+  const already = draft.evaluators.find(
+    (attachment) => attachment.evaluatorId === evaluator.id,
+  );
+  if (already) {
+    edit(already, evaluator, navigation);
+    return;
+  }
+  const attachment = newAttachment({ evaluator, ctx });
+  update((current) => ({
+    ...current,
+    showEvaluators: true,
+    evaluators: [...current.evaluators, attachment],
+  }));
+  if (opensOnAttach({ attachment, evaluator })) {
+    edit(attachment, evaluator, navigation);
+    return;
+  }
+  if (origin === "list") goBack();
+}
+
+/**
+ * Opens the evaluator list for a pick, and wires the flow that lets a person
+ * create an evaluator from it instead: once it is saved, the stack resets to
+ * this drawer and the evaluator is attached like a picked one, so its editor
+ * sits on top of the suite editor.
+ */
+function openEvaluatorPicker({
+  attach,
+  openDrawer,
+  goBack,
+  utils,
+  projectId,
+  testSuiteId,
+}: {
+  attach: (evaluator: EvaluatorWithFields, origin?: "list" | "created") => void;
+  openDrawer: ReturnType<typeof useDrawer>["openDrawer"];
+  goBack: () => void;
+  utils: ReturnType<typeof api.useUtils>;
+  projectId: string;
+  testSuiteId: string | null;
+}) {
+  setFlowCallbacks("evaluatorList", {
+    onSelect: (evaluator) => attach(evaluator, "list"),
+  });
+  setFlowCallbacks(
+    "evaluatorEditor",
+    createEvaluatorEditorCallbacks({
+      onSave: async (saved) => {
+        const evaluator = await utils.evaluators.getById.fetch({
+          id: saved.id,
+          projectId,
+        });
+        if (testSuiteId) {
+          openDrawer(
+            SUITE_EDITOR_DRAWER,
+            { testSuiteId },
+            { resetStack: true },
+          );
+        }
+        if (evaluator) attach(evaluator, "created");
+        return true;
+      },
+    }),
+  );
+  openDrawer("evaluatorList", { onClose: goBack });
+}
+
+/** Opens the evaluators section, with a pick already in flight. */
+function openEvaluatorsSection({
+  update,
+  add,
+}: {
+  update: SuiteDraftUpdate;
+  add: () => void;
+}) {
+  update((draft) => ({ ...draft, showEvaluators: true }));
+  add();
+}
+
+/** Closes the evaluators section, dropping its attachments. */
+function closeEvaluatorsSection(update: SuiteDraftUpdate) {
+  update((draft) => ({
+    ...draft,
+    showEvaluators: false,
+    evaluators: [],
+    evaluatorsError: undefined,
+  }));
+}
+
 /**
  * The evaluators of the draft: the list to pick from, the editor of one
  * attachment, and the writes both of them make into the store.
@@ -400,150 +596,120 @@ function useSuiteAttachments({
       attachment: EvaluatorAttachment,
       evaluator: AttachableEvaluator,
       navigation?: { replaceCurrentInStack?: boolean },
-    ) => {
-      const attachmentId = attachment.id;
-      openEvaluatorEditor({
+    ) =>
+      editAttachment({
         attachment,
         evaluator,
-        ctx,
         navigation,
-        onMappingChange: (
-          input: string,
-          mapping: ScenarioMapping | undefined,
-        ) =>
-          update((draft) => ({
-            ...draft,
-            evaluatorsError: undefined,
-            evaluators: replaceAttachment(
-              draft.evaluators,
-              attachmentId,
-              (current) => {
-                const mappings = { ...current.mappings };
-                if (mapping) mappings[input] = mapping;
-                else delete mappings[input];
-                return { ...current, mappings };
-              },
-            ),
-          })),
-        onRequiredChange: (required: boolean) =>
-          update((draft) => ({
-            ...draft,
-            evaluators: replaceAttachment(
-              draft.evaluators,
-              attachmentId,
-              (current) => ({ ...current, required }),
-            ),
-          })),
-        onRemove: () => {
-          update((draft) => ({
-            ...draft,
-            evaluators: draft.evaluators.filter(
-              (current) => current.id !== attachmentId,
-            ),
-          }));
-          goBack();
-        },
-      });
-    },
+        ctx,
+        update,
+        goBack,
+        openEvaluatorEditor,
+      }),
     [openEvaluatorEditor, ctx, update, goBack],
   );
 
-  const editById = useCallback(
-    (attachment: EvaluatorAttachment) => {
-      const evaluator = evaluatorsById.get(attachment.evaluatorId);
-      if (evaluator) edit(attachment, evaluator);
-    },
-    [edit, evaluatorsById],
-  );
-
-  /**
-   * What a pick does: an evaluator already attached opens its editor, a new
-   * one is attached with inferred mappings and opens its editor when an
-   * input still needs a person.
-   *
-   * A pick from the list replaces the list in the stack, so back from the
-   * editor lands on the suite editor. An evaluator created from the list
-   * arrives once the stack is already back on the suite editor, so its
-   * editor is pushed on top and nothing goes back.
-   */
   const attach = useCallback(
-    (evaluator: EvaluatorWithFields, origin: "list" | "created" = "list") => {
-      const draft = useSuiteEditorStore.getState().draft;
-      if (!draft) return;
-      const navigation =
-        origin === "list" ? { replaceCurrentInStack: true } : undefined;
-      const already = draft.evaluators.find(
-        (attachment) => attachment.evaluatorId === evaluator.id,
-      );
-      if (already) {
-        edit(already, evaluator, navigation);
-        return;
-      }
-      const attachment = newAttachment({ evaluator, ctx });
-      update((current) => ({
-        ...current,
-        showEvaluators: true,
-        evaluators: [...current.evaluators, attachment],
-      }));
-      if (opensOnAttach({ attachment, evaluator })) {
-        edit(attachment, evaluator, navigation);
-        return;
-      }
-      if (origin === "list") goBack();
-    },
+    (evaluator: EvaluatorWithFields, origin: "list" | "created" = "list") =>
+      attachEvaluator({ evaluator, origin, ctx, update, edit, goBack }),
     [ctx, edit, update, goBack],
   );
 
-  const add = useCallback(() => {
-    setFlowCallbacks("evaluatorList", {
-      onSelect: (evaluator) => attach(evaluator, "list"),
-    });
-    // A person may create an evaluator from the list. Once it is saved, the
-    // stack is reset to this drawer and the evaluator is attached like a
-    // picked one, so its editor sits on top of the suite editor.
-    setFlowCallbacks(
-      "evaluatorEditor",
-      createEvaluatorEditorCallbacks({
-        onSave: async (saved) => {
-          const evaluator = await utils.evaluators.getById.fetch({
-            id: saved.id,
-            projectId,
-          });
-          if (testSuiteId) {
-            openDrawer(
-              SUITE_EDITOR_DRAWER,
-              { testSuiteId },
-              { resetStack: true },
-            );
-          }
-          if (evaluator) attach(evaluator, "created");
-          return true;
-        },
+  const add = useCallback(
+    () =>
+      openEvaluatorPicker({
+        attach,
+        openDrawer,
+        goBack,
+        utils,
+        projectId,
+        testSuiteId,
       }),
-    );
-    openDrawer("evaluatorList", { onClose: goBack });
-  }, [attach, openDrawer, goBack, utils, projectId, testSuiteId]);
+    [attach, openDrawer, goBack, utils, projectId, testSuiteId],
+  );
 
   return useMemo(
     () => ({
-      open: () => {
-        update((draft) => ({ ...draft, showEvaluators: true }));
-        add();
-      },
-      close: () =>
-        update((draft) => ({
-          ...draft,
-          showEvaluators: false,
-          evaluators: [],
-          evaluatorsError: undefined,
-        })),
+      open: () => openEvaluatorsSection({ update, add }),
+      close: () => closeEvaluatorsSection(update),
       add,
-      edit: editById,
+      edit: (attachment: EvaluatorAttachment) => {
+        const evaluator = evaluatorsById.get(attachment.evaluatorId);
+        if (evaluator) edit(attachment, evaluator);
+      },
       evaluatorsById,
       missingOf,
     }),
-    [update, add, editById, evaluatorsById, missingOf],
+    [update, add, edit, evaluatorsById, missingOf],
   );
+}
+
+/**
+ * Opens a pill's pending attachment as soon as the draft and its evaluator
+ * are here, and only once: read the pending id, then clear it.
+ */
+function usePendingAttachmentEditor({
+  isOpen,
+  draft,
+  edit,
+  evaluatorsById,
+}: {
+  isOpen: boolean;
+  draft: SuiteDraft | null;
+  edit: (attachment: EvaluatorAttachment) => void;
+  evaluatorsById: ReadonlyMap<string, AttachableEvaluator>;
+}) {
+  const pendingAttachmentId = useSuiteEditorStore(
+    (state) => state.pendingAttachmentId,
+  );
+  const setPendingAttachmentId = useSuiteEditorStore(
+    (state) => state.setPendingAttachmentId,
+  );
+
+  useEffect(() => {
+    if (!isOpen || !draft || !pendingAttachmentId) return;
+    const attachment = draft.evaluators.find(
+      (candidate) => candidate.id === pendingAttachmentId,
+    );
+    if (!attachment) {
+      setPendingAttachmentId(null);
+      return;
+    }
+    if (!evaluatorsById.has(attachment.evaluatorId)) return;
+    setPendingAttachmentId(null);
+    edit(attachment);
+  }, [
+    isOpen,
+    draft,
+    pendingAttachmentId,
+    evaluatorsById,
+    edit,
+    setPendingAttachmentId,
+  ]);
+}
+
+/** The sections not open yet, offered as chips in the order shown. */
+function suiteChipsOf({
+  draft,
+  openFields,
+  openEvaluators,
+}: {
+  draft: SuiteDraft | null;
+  openFields: () => void;
+  openEvaluators: () => void;
+}): CustomizeChip[] {
+  const chips: CustomizeChip[] = [];
+  if (draft && !draft.showFields) {
+    chips.push({ key: "suite-fields", label: "Add fields", onAdd: openFields });
+  }
+  if (draft && !draft.showEvaluators) {
+    chips.push({
+      key: "suite-evaluators",
+      label: "Add evaluators",
+      onAdd: openEvaluators,
+    });
+  }
+  return chips;
 }
 
 export function useSuiteEditor({
@@ -558,12 +724,6 @@ export function useSuiteEditor({
   const { closeDrawer } = useDrawer();
   const update = useSuiteEditorStore((state) => state.update);
   const clear = useSuiteEditorStore((state) => state.clear);
-  const pendingAttachmentId = useSuiteEditorStore(
-    (state) => state.pendingAttachmentId,
-  );
-  const setPendingAttachmentId = useSuiteEditorStore(
-    (state) => state.setPendingAttachmentId,
-  );
 
   const { data: suite, isLoading: isSuiteLoading } =
     api.suites.getById.useQuery(
@@ -601,45 +761,18 @@ export function useSuiteEditor({
     onSaved: close,
   });
 
-  // A pill outside the drawer asked for one attachment's editor: open it as
-  // soon as the draft and the evaluator are here, and only once.
-  const { edit, evaluatorsById } = evaluators;
-  useEffect(() => {
-    if (!isOpen || !draft || !pendingAttachmentId) return;
-    const attachment = draft.evaluators.find(
-      (candidate) => candidate.id === pendingAttachmentId,
-    );
-    if (!attachment) {
-      setPendingAttachmentId(null);
-      return;
-    }
-    if (!evaluatorsById.has(attachment.evaluatorId)) return;
-    setPendingAttachmentId(null);
-    edit(attachment);
-  }, [
+  usePendingAttachmentEditor({
     isOpen,
     draft,
-    pendingAttachmentId,
-    evaluatorsById,
-    edit,
-    setPendingAttachmentId,
-  ]);
+    edit: evaluators.edit,
+    evaluatorsById: evaluators.evaluatorsById,
+  });
 
-  const chips: CustomizeChip[] = [];
-  if (draft && !draft.showFields) {
-    chips.push({
-      key: "suite-fields",
-      label: "Add fields",
-      onAdd: fields.open,
-    });
-  }
-  if (draft && !draft.showEvaluators) {
-    chips.push({
-      key: "suite-evaluators",
-      label: "Add evaluators",
-      onAdd: evaluators.open,
-    });
-  }
+  const chips = suiteChipsOf({
+    draft,
+    openFields: fields.open,
+    openEvaluators: evaluators.open,
+  });
 
   return {
     isLoading: isOpen && (isSuiteLoading || !draft),

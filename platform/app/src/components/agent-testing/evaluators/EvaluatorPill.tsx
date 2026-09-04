@@ -21,6 +21,29 @@ const pulse = keyframes`
   50% { transform: scale(1.2); }
 `;
 
+/** The border, background, text color and hover styling of one pill. */
+function pillStyle({
+  isMissing,
+  inherited,
+  onClick,
+  selected,
+}: {
+  isMissing: boolean;
+  inherited: boolean;
+  onClick?: () => void;
+  selected: boolean;
+}) {
+  return {
+    borderColor: isMissing ? "orange.solid" : "border",
+    background: isMissing ? "orange.subtle" : "bg.muted/60",
+    color: isMissing ? "orange.fg" : inherited ? FG_MUTED : "fg",
+    cursor: onClick ? "pointer" : "default",
+    outline: selected ? "1px solid" : undefined,
+    outlineColor: selected ? "blue.solid" : undefined,
+    hoverStyle: onClick ? { borderColor: "border.emphasized" } : undefined,
+  };
+}
+
 export type EvaluatorPillProps = {
   /** The attachment id, which is what a test addresses the pill by. */
   attachmentId: string;
@@ -48,6 +71,7 @@ export function EvaluatorPill({
   onClick,
 }: EvaluatorPillProps) {
   const isMissing = missingInputs.length > 0;
+  const style = pillStyle({ isMissing, inherited, onClick, selected });
   const pill = (
     <chakra.button
       type="button"
@@ -58,15 +82,15 @@ export function EvaluatorPill({
       paddingX="10px"
       borderRadius="full"
       borderWidth="1px"
-      borderColor={isMissing ? "orange.solid" : "border"}
-      background={isMissing ? "orange.subtle" : "bg.muted/60"}
-      color={isMissing ? "orange.fg" : inherited ? FG_MUTED : "fg"}
+      borderColor={style.borderColor}
+      background={style.background}
+      color={style.color}
       fontSize="11px"
       fontWeight="medium"
-      cursor={onClick ? "pointer" : "default"}
-      outline={selected ? "1px solid" : undefined}
-      outlineColor={selected ? "blue.solid" : undefined}
-      _hover={onClick ? { borderColor: "border.emphasized" } : undefined}
+      cursor={style.cursor}
+      outline={style.outline}
+      outlineColor={style.outlineColor}
+      _hover={style.hoverStyle}
       onClick={onClick}
       title={isMissing ? undefined : title}
       aria-label={name}

@@ -58,41 +58,119 @@ function replaceAttachment(
   );
 }
 
-export type RunEvaluatorsInput = {
-  scope: RunScope;
-  scopedScenarioIds: readonly string[];
-  scopeScenarios: readonly ScopeScenario[];
-  testSuites: readonly SuiteRow[];
-  extras: EvaluatorAttachment[];
-  setExtras: (
-    change: (extras: EvaluatorAttachment[]) => EvaluatorAttachment[],
-  ) => void;
-  showExtras: boolean;
-  setShowExtras: (show: boolean) => void;
-  /** Whether the dialog is open, which is when the evaluators are read. */
-  isOpen: boolean;
-};
+/**
+ * The mapping/required/remove callbacks an evaluator editor calls back into
+ * for one of the plan's own attachments.
+ */
+function buildExtraEditorCallbacks({
+  attachmentId,
+  setExtras,
+  goBack,
+}: {
+  attachmentId: string;
+  setExtras: RunEvaluatorsInput["setExtras"];
+  goBack: () => void;
+}) {
+  return {
+    onMappingChange: (input: string, mapping: ScenarioMapping | undefined) =>
+      setExtras((current) =>
+        replaceAttachment(current, attachmentId, (entry) => {
+          const mappings = { ...entry.mappings };
+          if (mapping) mappings[input] = mapping;
+          else delete mappings[input];
+          return { ...entry, mappings };
+        }),
+      ),
+    onRequiredChange: (required: boolean) =>
+      setExtras((current) =>
+        replaceAttachment(current, attachmentId, (entry) => ({
+          ...entry,
+          required,
+        })),
+      ),
+    onRemove: () => {
+      setExtras((current) =>
+        current.filter((entry) => entry.id !== attachmentId),
+      );
+      goBack();
+    },
+  };
+}
 
-export function useRunEvaluators({
+/** The inherited attachment that already runs this evaluator, if any. */
+function findInheritedAttachment({
+  inherited,
+  evaluatorId,
+}: {
+  inherited: readonly ReturnType<typeof inheritedSuitesOf>[number][];
+  evaluatorId: string;
+}) {
+  return inherited
+    .flatMap((suite) =>
+      suite.attachments.map((attachment) => ({ suite, attachment })),
+    )
+    .find(({ attachment }) => attachment.evaluatorId === evaluatorId);
+}
+
+/** The evaluator ids a run plan cannot feed, hidden from the attach list. */
+function hiddenEvaluatorIdsOf(
+  evaluatorsById: ReadonlyMap<string, AttachableEvaluator>,
+): string[] {
+  return [...evaluatorsById.values()]
+    .filter((evaluator) => !evaluatorFitsPlanLevel(evaluator))
+    .map((evaluator) => evaluator.id);
+}
+
+/**
+ * Where a `suite_evaluator_mappings_missing` refusal is fixed: the suite
+ * attachment it names, or the plan's own attachment. `null` when the error
+ * is not this refusal, or names nothing we can open.
+ */
+function resolveMappingsMissingTarget({
+  error,
+  testSuites,
+  extras,
+}: {
+  error: unknown;
+  testSuites: readonly SuiteRow[];
+  extras: readonly EvaluatorAttachment[];
+}):
+  | { kind: "suite"; suiteId: string; attachmentId: string }
+  | { kind: "extra"; attachment: EvaluatorAttachment }
+  | null {
+  const handled = readHandledError(error);
+  if (handled?.code !== "suite_evaluator_mappings_missing") return null;
+  const { suiteId, evaluatorId } = handled.meta;
+  if (typeof evaluatorId !== "string") return null;
+  const suite = testSuites.find((row) => row.id === suiteId);
+  const attachment = suite
+    ? parseEvaluatorAttachments(suite.evaluators).find(
+        (entry) => entry.evaluatorId === evaluatorId,
+      )
+    : undefined;
+  if (suite && attachment) {
+    return { kind: "suite", suiteId: suite.id, attachmentId: attachment.id };
+  }
+  const extra = extras.find((entry) => entry.evaluatorId === evaluatorId);
+  return extra ? { kind: "extra", attachment: extra } : null;
+}
+
+/** The evaluators inherited from the suites in scope, and the offender. */
+function useInheritedEvaluators({
   scope,
   scopedScenarioIds,
   scopeScenarios,
   testSuites,
+  evaluatorsById,
   extras,
-  setExtras,
-  showExtras,
-  setShowExtras,
-  isOpen,
-}: RunEvaluatorsInput) {
-  const router = useRouter();
-  const { project } = useOrganizationTeamProject();
-  const projectId = project?.id ?? "";
-  const utils = api.useUtils();
-  const { openDrawer, closeDrawer, goBack } = useDrawer();
-  const openEvaluatorEditor = useOpenScenarioEvaluatorEditor();
-  const openSuiteEditor = useOpenSuiteEditor();
-  const { evaluatorsById } = useProjectEvaluators({ enabled: isOpen });
-
+}: {
+  scope: RunScope;
+  scopedScenarioIds: readonly string[];
+  scopeScenarios: readonly ScopeScenario[];
+  testSuites: readonly SuiteRow[];
+  evaluatorsById: ReadonlyMap<string, AttachableEvaluator>;
+  extras: EvaluatorAttachment[];
+}) {
   const inherited = useMemo(
     () =>
       inheritedSuitesOf({
@@ -121,17 +199,25 @@ export function useRunEvaluators({
     [inherited, extras, evaluatorsById],
   );
 
-  const openInherited = useCallback(
-    ({ suiteId, attachmentId }: { suiteId: string; attachmentId: string }) =>
-      openSuiteEditor({ testSuiteId: suiteId, attachmentId }),
-    [openSuiteEditor],
-  );
+  return { inherited, missingOf, offender };
+}
 
-  /**
-   * Opens the editor on one of the plan's own attachments. An evaluator just
-   * created is handed in, since the list has not read it back yet.
-   */
-  const editExtra = useCallback(
+/**
+ * Opens the editor on one of the plan's own attachments. An evaluator just
+ * created is handed in, since the list has not read it back yet.
+ */
+function useEditExtra({
+  evaluatorsById,
+  openEvaluatorEditor,
+  setExtras,
+  goBack,
+}: {
+  evaluatorsById: ReadonlyMap<string, AttachableEvaluator>;
+  openEvaluatorEditor: ReturnType<typeof useOpenScenarioEvaluatorEditor>;
+  setExtras: RunEvaluatorsInput["setExtras"];
+  goBack: () => void;
+}) {
+  return useCallback(
     (
       attachment: EvaluatorAttachment,
       options?: {
@@ -142,56 +228,49 @@ export function useRunEvaluators({
       const evaluator =
         options?.evaluator ?? evaluatorsById.get(attachment.evaluatorId);
       if (!evaluator) return;
-      const navigation = options?.navigation;
-      const attachmentId = attachment.id;
       openEvaluatorEditor({
         attachment,
         evaluator,
         ctx: PLAN_CTX,
         planLevel: true,
-        navigation,
-        onMappingChange: (
-          input: string,
-          mapping: ScenarioMapping | undefined,
-        ) =>
-          setExtras((current) =>
-            replaceAttachment(current, attachmentId, (entry) => {
-              const mappings = { ...entry.mappings };
-              if (mapping) mappings[input] = mapping;
-              else delete mappings[input];
-              return { ...entry, mappings };
-            }),
-          ),
-        onRequiredChange: (required: boolean) =>
-          setExtras((current) =>
-            replaceAttachment(current, attachmentId, (entry) => ({
-              ...entry,
-              required,
-            })),
-          ),
-        onRemove: () => {
-          setExtras((current) =>
-            current.filter((entry) => entry.id !== attachmentId),
-          );
-          goBack();
-        },
+        navigation: options?.navigation,
+        ...buildExtraEditorCallbacks({
+          attachmentId: attachment.id,
+          setExtras,
+          goBack,
+        }),
       });
     },
     [evaluatorsById, openEvaluatorEditor, setExtras, goBack],
   );
+}
 
-  /**
-   * What a pick does: an evaluator a suite in scope carries is edited there,
-   * one the plan already has opens its editor, and a new one is attached
-   * with the conversation and the trace inferred.
-   */
-  const attach = useCallback(
+/**
+ * What a pick does: an evaluator a suite in scope carries is edited there,
+ * one the plan already has opens its editor, and a new one is attached
+ * with the conversation and the trace inferred.
+ */
+function useAttachEvaluator({
+  inherited,
+  extras,
+  openInherited,
+  editExtra,
+  setExtras,
+  goBack,
+}: {
+  inherited: readonly ReturnType<typeof inheritedSuitesOf>[number][];
+  extras: EvaluatorAttachment[];
+  openInherited: (params: { suiteId: string; attachmentId: string }) => void;
+  editExtra: ReturnType<typeof useEditExtra>;
+  setExtras: RunEvaluatorsInput["setExtras"];
+  goBack: () => void;
+}) {
+  return useCallback(
     (evaluator: EvaluatorWithFields) => {
-      const fromSuite = inherited
-        .flatMap((suite) =>
-          suite.attachments.map((attachment) => ({ suite, attachment })),
-        )
-        .find(({ attachment }) => attachment.evaluatorId === evaluator.id);
+      const fromSuite = findInheritedAttachment({
+        inherited,
+        evaluatorId: evaluator.id,
+      });
       if (fromSuite) {
         openInherited({
           suiteId: fromSuite.suite.suiteId,
@@ -226,8 +305,28 @@ export function useRunEvaluators({
     },
     [inherited, extras, openInherited, editExtra, setExtras, goBack],
   );
+}
 
-  /** Opens the list, without the evaluators a run plan cannot feed. */
+/** Opens the list, without the evaluators a run plan cannot feed, and the toggles around it. */
+function useAddExtraFlow({
+  attach,
+  evaluatorsById,
+  openDrawer,
+  closeDrawer,
+  utils,
+  projectId,
+  setShowExtras,
+  setExtras,
+}: {
+  attach: ReturnType<typeof useAttachEvaluator>;
+  evaluatorsById: ReadonlyMap<string, AttachableEvaluator>;
+  openDrawer: ReturnType<typeof useDrawer>["openDrawer"];
+  closeDrawer: ReturnType<typeof useDrawer>["closeDrawer"];
+  utils: ReturnType<typeof api.useUtils>;
+  projectId: string;
+  setShowExtras: (show: boolean) => void;
+  setExtras: RunEvaluatorsInput["setExtras"];
+}) {
   const addExtra = useCallback(() => {
     setFlowCallbacks("evaluatorList", { onSelect: attach });
     // An evaluator created from the list is attached like a picked one once
@@ -246,10 +345,9 @@ export function useRunEvaluators({
         },
       }),
     );
-    const hiddenEvaluatorIds = [...evaluatorsById.values()]
-      .filter((evaluator) => !evaluatorFitsPlanLevel(evaluator))
-      .map((evaluator) => evaluator.id);
-    openDrawer("evaluatorList", { hiddenEvaluatorIds });
+    openDrawer("evaluatorList", {
+      hiddenEvaluatorIds: hiddenEvaluatorIdsOf(evaluatorsById),
+    });
   }, [attach, evaluatorsById, openDrawer, closeDrawer, utils, projectId]);
 
   const showEvaluatorsBlock = useCallback(() => {
@@ -262,6 +360,113 @@ export function useRunEvaluators({
     setExtras(() => []);
   }, [setShowExtras, setExtras]);
 
+  return { addExtra, showEvaluatorsBlock, removeEvaluatorsBlock };
+}
+
+/**
+ * Every action the dialog can take on an evaluator: opening one, attaching
+ * one, adding or clearing the extras block, and reaching the offender or a
+ * mappings-missing refusal. Grouped into one hook so `useRunEvaluators`
+ * itself stays a thin composition of its parts.
+ */
+function useRunEvaluatorsActions({
+  inherited,
+  extras,
+  setExtras,
+  evaluatorsById,
+  openEvaluatorEditor,
+  openSuiteEditor,
+  goBack,
+  offender,
+  testSuites,
+  openDrawer,
+  closeDrawer,
+  utils,
+  projectId,
+  setShowExtras,
+}: {
+  inherited: readonly ReturnType<typeof inheritedSuitesOf>[number][];
+  extras: EvaluatorAttachment[];
+  setExtras: RunEvaluatorsInput["setExtras"];
+  evaluatorsById: ReadonlyMap<string, AttachableEvaluator>;
+  openEvaluatorEditor: ReturnType<typeof useOpenScenarioEvaluatorEditor>;
+  openSuiteEditor: ReturnType<typeof useOpenSuiteEditor>;
+  goBack: () => void;
+  offender: EvaluatorOffender | null;
+  testSuites: readonly SuiteRow[];
+  openDrawer: ReturnType<typeof useDrawer>["openDrawer"];
+  closeDrawer: ReturnType<typeof useDrawer>["closeDrawer"];
+  utils: ReturnType<typeof api.useUtils>;
+  projectId: string;
+  setShowExtras: (show: boolean) => void;
+}) {
+  const openInherited = useCallback(
+    ({ suiteId, attachmentId }: { suiteId: string; attachmentId: string }) =>
+      openSuiteEditor({ testSuiteId: suiteId, attachmentId }),
+    [openSuiteEditor],
+  );
+
+  const editExtra = useEditExtra({
+    evaluatorsById,
+    openEvaluatorEditor,
+    setExtras,
+    goBack,
+  });
+
+  const attach = useAttachEvaluator({
+    inherited,
+    extras,
+    openInherited,
+    editExtra,
+    setExtras,
+    goBack,
+  });
+
+  const { addExtra, showEvaluatorsBlock, removeEvaluatorsBlock } =
+    useAddExtraFlow({
+      attach,
+      evaluatorsById,
+      openDrawer,
+      closeDrawer,
+      utils,
+      projectId,
+      setShowExtras,
+      setExtras,
+    });
+
+  const { openOffender, openMappingsMissingRefusal } = useOffenderActions({
+    offender,
+    openInherited,
+    editExtra,
+    testSuites,
+    extras,
+  });
+
+  return {
+    openInherited,
+    editExtra,
+    addExtra,
+    showEvaluatorsBlock,
+    removeEvaluatorsBlock,
+    openOffender,
+    openMappingsMissingRefusal,
+  };
+}
+
+/** Where the offender opens, and where a mappings-missing refusal is fixed. */
+function useOffenderActions({
+  offender,
+  openInherited,
+  editExtra,
+  testSuites,
+  extras,
+}: {
+  offender: EvaluatorOffender | null;
+  openInherited: (params: { suiteId: string; attachmentId: string }) => void;
+  editExtra: ReturnType<typeof useEditExtra>;
+  testSuites: readonly SuiteRow[];
+  extras: EvaluatorAttachment[];
+}) {
   const openOffender = useCallback(() => {
     if (!offender) return;
     if (offender.kind === "suite") {
@@ -274,31 +479,122 @@ export function useRunEvaluators({
     editExtra(offender.attachment);
   }, [offender, openInherited, editExtra]);
 
-  /**
-   * Where a refusal the server named is fixed: the suite that attaches the
-   * evaluator, or the plan's own attachment.
-   */
   const openMappingsMissingRefusal = useCallback(
     (error: unknown) => {
-      const handled = readHandledError(error);
-      if (handled?.code !== "suite_evaluator_mappings_missing") return;
-      const { suiteId, evaluatorId } = handled.meta;
-      if (typeof evaluatorId !== "string") return;
-      const suite = testSuites.find((row) => row.id === suiteId);
-      const attachment = suite
-        ? parseEvaluatorAttachments(suite.evaluators).find(
-            (entry) => entry.evaluatorId === evaluatorId,
-          )
-        : undefined;
-      if (suite && attachment) {
-        openInherited({ suiteId: suite.id, attachmentId: attachment.id });
+      const target = resolveMappingsMissingTarget({
+        error,
+        testSuites,
+        extras,
+      });
+      if (!target) return;
+      if (target.kind === "suite") {
+        openInherited({
+          suiteId: target.suiteId,
+          attachmentId: target.attachmentId,
+        });
         return;
       }
-      const extra = extras.find((entry) => entry.evaluatorId === evaluatorId);
-      if (extra) editExtra(extra);
+      editExtra(target.attachment);
     },
     [testSuites, extras, openInherited, editExtra],
   );
+
+  return { openOffender, openMappingsMissingRefusal };
+}
+
+/** The dialog's own primitive hooks: routing, the project, and the drawer editors. */
+function useRunEvaluatorsBase({ isOpen }: { isOpen: boolean }) {
+  const router = useRouter();
+  const { project } = useOrganizationTeamProject();
+  const utils = api.useUtils();
+  const { openDrawer, closeDrawer, goBack } = useDrawer();
+  const openEvaluatorEditor = useOpenScenarioEvaluatorEditor();
+  const openSuiteEditor = useOpenSuiteEditor();
+  const { evaluatorsById } = useProjectEvaluators({ enabled: isOpen });
+  return {
+    router,
+    projectId: project?.id ?? "",
+    utils,
+    openDrawer,
+    closeDrawer,
+    goBack,
+    openEvaluatorEditor,
+    openSuiteEditor,
+    evaluatorsById,
+  };
+}
+
+export type RunEvaluatorsInput = {
+  scope: RunScope;
+  scopedScenarioIds: readonly string[];
+  scopeScenarios: readonly ScopeScenario[];
+  testSuites: readonly SuiteRow[];
+  extras: EvaluatorAttachment[];
+  setExtras: (
+    change: (extras: EvaluatorAttachment[]) => EvaluatorAttachment[],
+  ) => void;
+  showExtras: boolean;
+  setShowExtras: (show: boolean) => void;
+  /** Whether the dialog is open, which is when the evaluators are read. */
+  isOpen: boolean;
+};
+
+export function useRunEvaluators({
+  scope,
+  scopedScenarioIds,
+  scopeScenarios,
+  testSuites,
+  extras,
+  setExtras,
+  showExtras,
+  setShowExtras,
+  isOpen,
+}: RunEvaluatorsInput) {
+  const {
+    router,
+    projectId,
+    utils,
+    openDrawer,
+    closeDrawer,
+    goBack,
+    openEvaluatorEditor,
+    openSuiteEditor,
+    evaluatorsById,
+  } = useRunEvaluatorsBase({ isOpen });
+
+  const { inherited, missingOf, offender } = useInheritedEvaluators({
+    scope,
+    scopedScenarioIds,
+    scopeScenarios,
+    testSuites,
+    evaluatorsById,
+    extras,
+  });
+
+  const {
+    openInherited,
+    editExtra,
+    addExtra,
+    showEvaluatorsBlock,
+    removeEvaluatorsBlock,
+    openOffender,
+    openMappingsMissingRefusal,
+  } = useRunEvaluatorsActions({
+    inherited,
+    extras,
+    setExtras,
+    evaluatorsById,
+    openEvaluatorEditor,
+    openSuiteEditor,
+    goBack,
+    offender,
+    testSuites,
+    openDrawer,
+    closeDrawer,
+    utils,
+    projectId,
+    setShowExtras,
+  });
 
   const hasInherited = inherited.length > 0;
 

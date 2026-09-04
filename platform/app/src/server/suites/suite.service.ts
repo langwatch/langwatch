@@ -397,6 +397,66 @@ export type RunPlanConfigInput = {
   evaluators?: EvaluatorAttachment[];
 };
 
+/** What starts a run of one test suite, addressed by its id. */
+export type RunTestSuiteInput = {
+  projectId: string;
+  organizationId: string;
+  testSuiteId: string;
+  targets: SuiteTarget[];
+  /** Derived from the suite's name and the targets when absent. */
+  name?: string;
+  repeatCount?: number;
+  simulatorModel?: string | null;
+  judgeModel?: string | null;
+  idempotencyKey: string;
+  batchRunId?: string;
+  parameters?: RunParameterValues;
+  note?: string;
+  actor?: RunActor;
+  /** The plan's own evaluators, beside the suite's. */
+  evaluators?: EvaluatorAttachment[];
+};
+
+/** The `runPlan` call a test suite run resolves to. */
+function testSuiteRunPlanInput(params: RunTestSuiteInput): {
+  projectId: string;
+  organizationId: string;
+  name?: string;
+  config: RunPlanConfigInput;
+  idempotencyKey: string;
+  batchRunId?: string;
+  parameters?: RunParameterValues;
+  note?: string;
+  actor?: RunActor;
+} {
+  return {
+    projectId: params.projectId,
+    organizationId: params.organizationId,
+    ...(params.name !== undefined && { name: params.name }),
+    config: {
+      scope: { mode: "test_suites", testSuiteIds: [params.testSuiteId] },
+      targets: params.targets,
+      ...(params.repeatCount !== undefined && {
+        repeatCount: params.repeatCount,
+      }),
+      ...(params.simulatorModel !== undefined && {
+        simulatorModel: params.simulatorModel,
+      }),
+      ...(params.judgeModel !== undefined && {
+        judgeModel: params.judgeModel,
+      }),
+      ...(params.evaluators !== undefined && {
+        evaluators: params.evaluators,
+      }),
+    },
+    idempotencyKey: params.idempotencyKey,
+    ...(params.batchRunId !== undefined && { batchRunId: params.batchRunId }),
+    ...(params.parameters !== undefined && { parameters: params.parameters }),
+    ...(params.note !== undefined && { note: params.note }),
+    ...(params.actor !== undefined && { actor: params.actor }),
+  };
+}
+
 /**
  * What a suite update may carry beside the stored columns: the fields a
  * test suite declares and the evaluators a suite or a plan attaches, both in
@@ -980,48 +1040,23 @@ export class SuiteService {
         }
         const { fields, evaluators, ...columns } = params.data;
         const data: UpdateSuiteInput = { ...columns };
-        if (existing.kind === "test_suite") {
-          assertTestSuiteUpdate(data);
-          // A test suite rename keeps its slug (see renameTestSuite), so no re-slug.
-        } else if (fields !== undefined) {
-          throw new ValidationError(PLAN_FIELDS_REFUSAL, {
-            meta: { fieldErrors: { fields: [PLAN_FIELDS_REFUSAL] } },
-          });
-        } else if (params.data.name) {
-          const slug = slugify(params.data.name);
-          await this.ensureSlugAvailable({
-            slug,
-            projectId: params.projectId,
-            excludeId: params.id,
-          });
-          data.slug = slug;
-        }
-        if (fields !== undefined || evaluators !== undefined) {
-          const nextFields =
-            fields === undefined
-              ? parseSuiteFieldDefinitions(existing.fields)
-              : readSuiteFieldDefinitions(fields);
-          const nextAttachments =
-            evaluators === undefined
-              ? parseEvaluatorAttachments(existing.evaluators)
-              : await this.readAttachments({
-                  projectId: params.projectId,
-                  attachments: evaluators,
-                  fields: nextFields,
-                  planLevel: existing.kind !== "test_suite",
-                });
-          assertFieldsNotInUse({
-            fields: nextFields,
-            attachments: nextAttachments,
-          });
-          if (fields !== undefined) {
-            data.fields = nextFields as unknown as Prisma.InputJsonValue;
-          }
-          if (evaluators !== undefined) {
-            data.evaluators =
-              nextAttachments as unknown as Prisma.InputJsonValue;
-          }
-        }
+
+        await this.resolveUpdateSlug({
+          projectId: params.projectId,
+          excludeId: params.id,
+          kind: existing.kind,
+          fields,
+          name: params.data.name,
+          data,
+        });
+        await this.applyFieldsAndEvaluatorsUpdate({
+          projectId: params.projectId,
+          existing,
+          fields,
+          evaluators,
+          data,
+        });
+
         return await this.repository.update({
           id: params.id,
           projectId: params.projectId,
@@ -1029,6 +1064,77 @@ export class SuiteService {
         });
       },
     );
+  }
+
+  /**
+   * What a write does with the suite's slug: a test suite keeps the one it
+   * has (see {@link renameTestSuite}), a run plan takes a fresh one from its
+   * new name, and a run plan refuses fields outright, since only a test
+   * suite declares them.
+   */
+  private async resolveUpdateSlug(params: {
+    projectId: string;
+    excludeId: string;
+    kind: SuiteKind;
+    fields: SuiteFieldDefinition[] | undefined;
+    name: string | undefined;
+    data: UpdateSuiteInput;
+  }): Promise<void> {
+    if (params.kind === "test_suite") {
+      assertTestSuiteUpdate(params.data);
+      return;
+    }
+    if (params.fields !== undefined) {
+      throw new ValidationError(PLAN_FIELDS_REFUSAL, {
+        meta: { fieldErrors: { fields: [PLAN_FIELDS_REFUSAL] } },
+      });
+    }
+    if (!params.name) return;
+    const slug = slugify(params.name);
+    await this.ensureSlugAvailable({
+      slug,
+      projectId: params.projectId,
+      excludeId: params.excludeId,
+    });
+    params.data.slug = slug;
+  }
+
+  /**
+   * Folds a write's fields and evaluators onto the update: each defaults to
+   * what the row already holds, then the pair is checked together, since an
+   * evaluator's mapping and the field it reads must agree.
+   */
+  private async applyFieldsAndEvaluatorsUpdate(params: {
+    projectId: string;
+    existing: SimulationSuite;
+    fields: SuiteFieldDefinition[] | undefined;
+    evaluators: EvaluatorAttachment[] | undefined;
+    data: UpdateSuiteInput;
+  }): Promise<void> {
+    if (params.fields === undefined && params.evaluators === undefined) {
+      return;
+    }
+    const nextFields =
+      params.fields === undefined
+        ? parseSuiteFieldDefinitions(params.existing.fields)
+        : readSuiteFieldDefinitions(params.fields);
+    const nextAttachments =
+      params.evaluators === undefined
+        ? parseEvaluatorAttachments(params.existing.evaluators)
+        : await this.readAttachments({
+            projectId: params.projectId,
+            attachments: params.evaluators,
+            fields: nextFields,
+            planLevel: params.existing.kind !== "test_suite",
+          });
+    assertFieldsNotInUse({ fields: nextFields, attachments: nextAttachments });
+    if (params.fields !== undefined) {
+      params.data.fields = nextFields as unknown as Prisma.InputJsonValue;
+    }
+    if (params.evaluators !== undefined) {
+      params.data.evaluators =
+        nextAttachments as unknown as Prisma.InputJsonValue;
+    }
   }
 
   async duplicate(params: {
@@ -1578,50 +1684,21 @@ export class SuiteService {
       async (span) => {
         const requestedName = readRequestedPlanName(params.name);
 
-        // Normalised before the plan is matched and before anything is
-        // stored, so hand-picking every suite and pressing Run all reach one
-        // plan.
-        const scope = await normalizePlanScope({
-          projectId: params.projectId,
-          scope: params.config.scope,
-          prisma: this.prisma,
-        });
-        const targets = sortSuiteTargets(params.config.targets);
-        span.setAttribute("suite.target_count", targets.length);
-
-        const prepared = await this.prepareRun({
+        const { scope, targets, prepared } = await this.prepareScopedRun({
           projectId: params.projectId,
           organizationId: params.organizationId,
-          targets,
-          readScenarioIds: () =>
-            this.readPlanMembership({
-              projectId: params.projectId,
-              scope,
-              scenarioIds: params.config.scenarioIds ?? [],
-            }),
+          config: params.config,
           parameters: params.parameters,
           actor: params.actor,
         });
+        span.setAttribute("suite.target_count", targets.length);
         span.setAttribute("suite.scenario_count", prepared.scenarioIds.length);
 
-        // The plan's own evaluators: what the caller sent, checked, or what
-        // the plan of that name already holds when the caller sent none.
-        const evaluators =
-          params.config.evaluators === undefined
-            ? undefined
-            : await this.readAttachments({
-                projectId: params.projectId,
-                attachments: params.config.evaluators,
-                fields: [],
-                planLevel: true,
-              });
-        const existingPlan =
-          evaluators === undefined && requestedName !== undefined
-            ? await this.repository.findPlanByName({
-                projectId: params.projectId,
-                name: requestedName,
-              })
-            : null;
+        const { evaluators, existingPlan } = await this.resolvePlanEvaluators({
+          projectId: params.projectId,
+          config: params.config,
+          requestedName,
+        });
         await this.assertRunMappings({
           projectId: params.projectId,
           scenarioIds: prepared.references.activeScenarioIds,
@@ -1630,27 +1707,13 @@ export class SuiteService {
             evaluators ?? parseEvaluatorAttachments(existingPlan?.evaluators),
         });
 
-        // Derived only once the run holds up, so a refused run reads no names
-        // it will not use. The prepared targets carry the canonical
-        // overrides, so the name and the stored config read the same target
-        // the run was stamped with.
-        const name =
-          requestedName ??
-          (await this.defaultPlanName({
-            projectId: params.projectId,
-            organizationId: params.organizationId,
-            scope,
-            scenarioIds: params.config.scenarioIds ?? [],
-            targets: prepared.targets,
-          }));
-
-        const { suite, created } = await this.resolvePlanByName({
+        const { suite, created } = await this.resolveNamedPlan({
           projectId: params.projectId,
-          name,
+          organizationId: params.organizationId,
           config: params.config,
           scope,
-          targets: prepared.targets,
-          scenarioIds: prepared.scenarioIds,
+          prepared,
+          requestedName,
           evaluators,
         });
         span.setAttribute("suite.id", suite.id);
@@ -1680,6 +1743,118 @@ export class SuiteService {
   }
 
   /**
+   * The scope a run covers, normalised, and the run's checked, canonical
+   * targets and scenarios.
+   *
+   * The scope is normalised before the plan is matched and before anything
+   * is stored, so hand-picking every suite and pressing Run all reach one
+   * plan.
+   */
+  private async prepareScopedRun(params: {
+    projectId: string;
+    organizationId: string;
+    config: RunPlanConfigInput;
+    parameters: RunParameterValues | undefined;
+    actor: RunActor | undefined;
+  }): Promise<{
+    scope: SuiteScope;
+    targets: SuiteTarget[];
+    prepared: PreparedRun;
+  }> {
+    const scope = await normalizePlanScope({
+      projectId: params.projectId,
+      scope: params.config.scope,
+      prisma: this.prisma,
+    });
+    const targets = sortSuiteTargets(params.config.targets);
+    const prepared = await this.prepareRun({
+      projectId: params.projectId,
+      organizationId: params.organizationId,
+      targets,
+      readScenarioIds: () =>
+        this.readPlanMembership({
+          projectId: params.projectId,
+          scope,
+          scenarioIds: params.config.scenarioIds ?? [],
+        }),
+      parameters: params.parameters,
+      actor: params.actor,
+    });
+    return { scope, targets, prepared };
+  }
+
+  /**
+   * The plan's own evaluators, checked, and the plan the requested name
+   * already resolves to when the run sends no evaluators of its own. Read
+   * together because a run whose evaluators the caller sent takes over the
+   * name it resolves to; it does not read a plan by that name first.
+   */
+  private async resolvePlanEvaluators(params: {
+    projectId: string;
+    config: RunPlanConfigInput;
+    requestedName: string | undefined;
+  }): Promise<{
+    evaluators: EvaluatorAttachment[] | undefined;
+    existingPlan: SimulationSuite | null;
+  }> {
+    const evaluators =
+      params.config.evaluators === undefined
+        ? undefined
+        : await this.readAttachments({
+            projectId: params.projectId,
+            attachments: params.config.evaluators,
+            fields: [],
+            planLevel: true,
+          });
+    const existingPlan =
+      evaluators === undefined && params.requestedName !== undefined
+        ? await this.repository.findPlanByName({
+            projectId: params.projectId,
+            name: params.requestedName,
+          })
+        : null;
+    return { evaluators, existingPlan };
+  }
+
+  /**
+   * The name a run resolves to, then the plan row that name resolves to.
+   *
+   * Derived only once the run holds up, so a refused run reads no names it
+   * will not use. The prepared targets carry the canonical overrides, so the
+   * name and the stored config read the same target the run was stamped
+   * with.
+   */
+  private async resolveNamedPlan(params: {
+    projectId: string;
+    organizationId: string;
+    config: RunPlanConfigInput;
+    scope: SuiteScope;
+    prepared: PreparedRun;
+    requestedName: string | undefined;
+    evaluators: EvaluatorAttachment[] | undefined;
+  }): Promise<{ suite: SimulationSuite; created: boolean }> {
+    const name =
+      params.requestedName ??
+      (await this.defaultPlanName({
+        projectId: params.projectId,
+        organizationId: params.organizationId,
+        scope: params.scope,
+        scenarioIds: params.config.scenarioIds ?? [],
+        targets: params.prepared.targets,
+      }));
+
+    return await this.resolvePlanByName({
+      projectId: params.projectId,
+      name,
+      config: params.config,
+      scope: params.scope,
+      targets: params.prepared.targets,
+      scenarioIds: params.prepared.scenarioIds,
+      evaluators: params.evaluators,
+    });
+  }
+
+  /**
    * Starts a run of one test suite, addressed by its id.
    *
    * A test suite holds what it collects and nothing about how a run of it is
@@ -1690,24 +1865,7 @@ export class SuiteService {
    *
    * @see specs/suites/test-suite-run-plan-reuse.feature
    */
-  async runTestSuite(params: {
-    projectId: string;
-    organizationId: string;
-    testSuiteId: string;
-    targets: SuiteTarget[];
-    /** Derived from the suite's name and the targets when absent. */
-    name?: string;
-    repeatCount?: number;
-    simulatorModel?: string | null;
-    judgeModel?: string | null;
-    idempotencyKey: string;
-    batchRunId?: string;
-    parameters?: RunParameterValues;
-    note?: string;
-    actor?: RunActor;
-    /** The plan's own evaluators, beside the suite's. */
-    evaluators?: EvaluatorAttachment[];
-  }): Promise<
+  async runTestSuite(params: RunTestSuiteInput): Promise<
     SuiteRunResult & {
       suiteId: string;
       planName: string;
@@ -1725,34 +1883,7 @@ export class SuiteService {
     if (testSuite?.kind !== "test_suite") {
       throw new SuiteNotFoundError();
     }
-    return this.runPlan({
-      projectId: params.projectId,
-      organizationId: params.organizationId,
-      ...(params.name !== undefined && { name: params.name }),
-      config: {
-        scope: { mode: "test_suites", testSuiteIds: [params.testSuiteId] },
-        targets: params.targets,
-        ...(params.repeatCount !== undefined && {
-          repeatCount: params.repeatCount,
-        }),
-        ...(params.simulatorModel !== undefined && {
-          simulatorModel: params.simulatorModel,
-        }),
-        ...(params.judgeModel !== undefined && {
-          judgeModel: params.judgeModel,
-        }),
-        ...(params.evaluators !== undefined && {
-          evaluators: params.evaluators,
-        }),
-      },
-      idempotencyKey: params.idempotencyKey,
-      ...(params.batchRunId !== undefined && { batchRunId: params.batchRunId }),
-      ...(params.parameters !== undefined && {
-        parameters: params.parameters,
-      }),
-      ...(params.note !== undefined && { note: params.note }),
-      ...(params.actor !== undefined && { actor: params.actor }),
-    });
+    return this.runPlan(testSuiteRunPlanInput(params));
   }
 
   /**

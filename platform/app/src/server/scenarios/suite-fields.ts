@@ -135,6 +135,38 @@ export function fieldValueIsBlank(value: unknown): boolean {
   return false;
 }
 
+/** A text field's own value: any scalar stored as its text. */
+function coerceTextFieldValue(raw: unknown): string | undefined {
+  if (typeof raw === "string") return raw;
+  if (typeof raw === "number" || typeof raw === "boolean") return String(raw);
+  return undefined;
+}
+
+/** A number field's own value: a number, or a numeric string. */
+function coerceNumberFieldValue(raw: unknown): number | undefined {
+  if (typeof raw === "number") return Number.isFinite(raw) ? raw : undefined;
+  if (typeof raw === "string") {
+    const trimmed = raw.trim();
+    if (!/^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/.test(trimmed)) {
+      return undefined;
+    }
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
+}
+
+/** A boolean field's own value: a boolean, or the words true, false, yes and no. */
+function coerceBooleanFieldValue(raw: unknown): boolean | undefined {
+  if (typeof raw === "boolean") return raw;
+  if (typeof raw === "string") {
+    const word = raw.trim().toLowerCase();
+    if (word === "true" || word === "yes") return true;
+    if (word === "false" || word === "no") return false;
+  }
+  return undefined;
+}
+
 /**
  * Turns what a person or a caller typed into the field's own type.
  *
@@ -153,35 +185,12 @@ export function coerceFieldValue({
 }): string | number | boolean | undefined {
   if (fieldValueIsBlank(raw)) return undefined;
   switch (definition.type) {
-    case "text": {
-      if (typeof raw === "string") return raw;
-      if (typeof raw === "number" || typeof raw === "boolean") {
-        return String(raw);
-      }
-      return undefined;
-    }
-    case "number": {
-      if (typeof raw === "number")
-        return Number.isFinite(raw) ? raw : undefined;
-      if (typeof raw === "string") {
-        const trimmed = raw.trim();
-        if (!/^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/.test(trimmed)) {
-          return undefined;
-        }
-        const parsed = Number(trimmed);
-        return Number.isFinite(parsed) ? parsed : undefined;
-      }
-      return undefined;
-    }
-    case "boolean": {
-      if (typeof raw === "boolean") return raw;
-      if (typeof raw === "string") {
-        const word = raw.trim().toLowerCase();
-        if (word === "true" || word === "yes") return true;
-        if (word === "false" || word === "no") return false;
-      }
-      return undefined;
-    }
+    case "text":
+      return coerceTextFieldValue(raw);
+    case "number":
+      return coerceNumberFieldValue(raw);
+    case "boolean":
+      return coerceBooleanFieldValue(raw);
   }
 }
 

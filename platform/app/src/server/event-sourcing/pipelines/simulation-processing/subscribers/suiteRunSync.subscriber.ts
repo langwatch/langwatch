@@ -55,6 +55,145 @@ export interface SuiteRunSyncSubscriberDeps {
 }
 
 /**
+ * Syncs a RunStarted event to the suite run pipeline, when the run belongs
+ * to a suite.
+ */
+async function handleRunStarted(
+  event: SimulationRunStartedEvent,
+  deps: SuiteRunSyncSubscriberDeps,
+): Promise<void> {
+  const tenantId = String(event.tenantId);
+  const { scenarioSetId, batchRunId, scenarioRunId, scenarioId } = event.data;
+
+  if (!isSuiteSetId(scenarioSetId)) return;
+
+  await deps.recordSuiteRunItemStarted({
+    tenantId,
+    batchRunId,
+    scenarioRunId,
+    scenarioId,
+    occurredAt: event.occurredAt,
+  });
+
+  logger.debug(
+    { tenantId, batchRunId, scenarioRunId },
+    "Dispatched recordSuiteRunItemStarted",
+  );
+}
+
+/**
+ * Syncs a RunFinished event to the suite run pipeline, when the run belongs
+ * to a suite and its ECST identity fields have been backfilled.
+ */
+async function handleRunFinished(
+  event: SimulationRunFinishedEvent,
+  deps: SuiteRunSyncSubscriberDeps,
+): Promise<void> {
+  const tenantId = String(event.tenantId);
+  const { data } = event;
+
+  if (!data.scenarioSetId || !isSuiteSetId(data.scenarioSetId)) {
+    return;
+  }
+
+  // Pre-enrichment events lack the ECST identity fields — skip them
+  // rather than dispatch a suite command that cannot validate.
+  if (!data.batchRunId || !data.scenarioId || !data.status) {
+    logger.debug(
+      { tenantId, scenarioRunId: data.scenarioRunId },
+      "Skipped suiteRunSync for RunFinished without ECST identity fields (pre-enrichment event)",
+    );
+    return;
+  }
+
+  await deps.completeSuiteRunItem({
+    tenantId,
+    batchRunId: data.batchRunId,
+    scenarioRunId: data.scenarioRunId,
+    scenarioId: data.scenarioId,
+    status: data.status,
+    verdict: data.results?.verdict,
+    durationMs: data.durationMs,
+    reasoning: data.results?.reasoning,
+    error: data.results?.error,
+    occurredAt: event.occurredAt,
+  });
+
+  logger.debug(
+    {
+      tenantId,
+      batchRunId: data.batchRunId,
+      scenarioRunId: data.scenarioRunId,
+      status: data.status,
+    },
+    "Dispatched completeSuiteRunItem",
+  );
+}
+
+/**
+ * Syncs a RunEvaluated event to the suite run pipeline, when the run belongs
+ * to a suite, its ECST identity fields have been backfilled, and the
+ * evaluation actually moved the verdict or status.
+ */
+async function handleRunEvaluated(
+  event: SimulationRunEvaluatedEvent,
+  deps: SuiteRunSyncSubscriberDeps,
+): Promise<void> {
+  const tenantId = String(event.tenantId);
+  const { data } = event;
+
+  if (!data.scenarioSetId || !isSuiteSetId(data.scenarioSetId)) {
+    return;
+  }
+
+  if (
+    !data.batchRunId ||
+    !data.scenarioId ||
+    !data.status ||
+    !data.previousStatus
+  ) {
+    logger.debug(
+      { tenantId, scenarioRunId: data.scenarioRunId },
+      "Skipped suiteRunSync for RunEvaluated without ECST identity fields",
+    );
+    return;
+  }
+
+  // Only a verdict change moves the counts. Evaluations that report
+  // beside the verdict change nothing on the suite run.
+  if (
+    data.status === data.previousStatus &&
+    data.verdict === data.previousVerdict
+  ) {
+    return;
+  }
+
+  await deps.regradeSuiteRunItem({
+    tenantId,
+    batchRunId: data.batchRunId,
+    scenarioRunId: data.scenarioRunId,
+    scenarioId: data.scenarioId,
+    previousStatus: data.previousStatus,
+    previousVerdict: data.previousVerdict,
+    status: data.status,
+    verdict: data.verdict,
+    idempotencyKey: event.id,
+    occurredAt: event.occurredAt,
+  });
+
+  logger.debug(
+    {
+      tenantId,
+      batchRunId: data.batchRunId,
+      scenarioRunId: data.scenarioRunId,
+      status: data.status,
+      previousStatus: data.previousStatus,
+    },
+    "Dispatched regradeSuiteRunItem",
+  );
+}
+
+/**
  * Cross-pipeline subscriber that syncs simulation events to the suite run
  * pipeline. Event-carried state (ECST) only — identity fields ride on the
  * event, so this never reads fold state.
@@ -69,133 +208,6 @@ export interface SuiteRunSyncSubscriberDeps {
 export function createSuiteRunSyncSubscriber(
   deps: SuiteRunSyncSubscriberDeps,
 ): SubscriberSpec<SimulationProcessingEvent> {
-  const handleStarted = async (
-    event: SimulationRunStartedEvent,
-  ): Promise<void> => {
-    const tenantId = String(event.tenantId);
-    const { scenarioSetId, batchRunId, scenarioRunId, scenarioId } = event.data;
-
-    // Only process simulation runs that belong to suites
-    if (!isSuiteSetId(scenarioSetId)) {
-      return;
-    }
-
-    await deps.recordSuiteRunItemStarted({
-      tenantId,
-      batchRunId,
-      scenarioRunId,
-      scenarioId,
-      occurredAt: event.occurredAt,
-    });
-
-    logger.debug(
-      { tenantId, batchRunId, scenarioRunId },
-      "Dispatched recordSuiteRunItemStarted",
-    );
-  };
-
-  const handleFinished = async (
-    event: SimulationRunFinishedEvent,
-  ): Promise<void> => {
-    const tenantId = String(event.tenantId);
-    const { data } = event;
-
-    // Only process simulation runs that belong to suites
-    if (!data.scenarioSetId || !isSuiteSetId(data.scenarioSetId)) {
-      return;
-    }
-
-    // Pre-enrichment events lack the ECST identity fields — skip them
-    // rather than dispatch a suite command that cannot validate.
-    if (!data.batchRunId || !data.scenarioId || !data.status) {
-      logger.debug(
-        { tenantId, scenarioRunId: data.scenarioRunId },
-        "Skipped suiteRunSync for RunFinished without ECST identity fields (pre-enrichment event)",
-      );
-      return;
-    }
-
-    await deps.completeSuiteRunItem({
-      tenantId,
-      batchRunId: data.batchRunId,
-      scenarioRunId: data.scenarioRunId,
-      scenarioId: data.scenarioId,
-      status: data.status,
-      verdict: data.results?.verdict,
-      durationMs: data.durationMs,
-      reasoning: data.results?.reasoning,
-      error: data.results?.error,
-      occurredAt: event.occurredAt,
-    });
-
-    logger.debug(
-      {
-        tenantId,
-        batchRunId: data.batchRunId,
-        scenarioRunId: data.scenarioRunId,
-        status: data.status,
-      },
-      "Dispatched completeSuiteRunItem",
-    );
-  };
-
-  const handleEvaluated = async (
-    event: SimulationRunEvaluatedEvent,
-  ): Promise<void> => {
-    const tenantId = String(event.tenantId);
-    const { data } = event;
-
-    if (!data.scenarioSetId || !isSuiteSetId(data.scenarioSetId)) {
-      return;
-    }
-
-    if (
-      !data.batchRunId ||
-      !data.scenarioId ||
-      !data.status ||
-      !data.previousStatus
-    ) {
-      logger.debug(
-        { tenantId, scenarioRunId: data.scenarioRunId },
-        "Skipped suiteRunSync for RunEvaluated without ECST identity fields",
-      );
-      return;
-    }
-
-    // Only a verdict change moves the counts. Evaluations that report
-    // beside the verdict change nothing on the suite run.
-    if (
-      data.status === data.previousStatus &&
-      data.verdict === data.previousVerdict
-    ) {
-      return;
-    }
-
-    await deps.regradeSuiteRunItem({
-      tenantId,
-      batchRunId: data.batchRunId,
-      scenarioRunId: data.scenarioRunId,
-      scenarioId: data.scenarioId,
-      previousStatus: data.previousStatus,
-      previousVerdict: data.previousVerdict,
-      status: data.status,
-      verdict: data.verdict,
-      idempotencyKey: event.id,
-      occurredAt: event.occurredAt,
-    });
-
-    logger.debug(
-      {
-        tenantId,
-        batchRunId: data.batchRunId,
-        scenarioRunId: data.scenarioRunId,
-        status: data.status,
-        previousStatus: data.previousStatus,
-      },
-      "Dispatched regradeSuiteRunItem",
-    );
-  };
-
   return {
     events: [
       SIMULATION_RUN_EVENT_TYPES.STARTED,
@@ -205,17 +217,17 @@ export function createSuiteRunSyncSubscriber(
 
     async handler(event: SimulationProcessingEvent): Promise<void> {
       if (isSimulationRunStartedEvent(event)) {
-        await handleStarted(event);
+        await handleRunStarted(event, deps);
         return;
       }
 
       if (isSimulationRunFinishedEvent(event)) {
-        await handleFinished(event);
+        await handleRunFinished(event, deps);
         return;
       }
 
       if (isSimulationRunEvaluatedEvent(event)) {
-        await handleEvaluated(event);
+        await handleRunEvaluated(event, deps);
       }
     },
   };

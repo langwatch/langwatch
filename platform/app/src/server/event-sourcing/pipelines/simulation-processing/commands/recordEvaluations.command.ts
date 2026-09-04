@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { createLogger } from "@langwatch/observability";
 import { ValidationError } from "~/server/event-sourcing/services/errorHandling";
+import type { GatedVerdict } from "~/server/scenarios/scenario-evaluation-gate";
 import {
   gatedStatus,
   gatedVerdict,
@@ -20,6 +21,8 @@ import type {
   SimulationProcessingEvent,
   SimulationRunEvaluatedEvent,
   SimulationRunEvaluatedEventData,
+  SimulationRunFinishedEvent,
+  SimulationRunQueuedEvent,
 } from "../schemas/events";
 import {
   isSimulationRunEvaluatedEvent,
@@ -66,6 +69,106 @@ export function evaluationsFingerprint(
 }
 
 /**
+ * Finds the run's finished event among its prior events.
+ *
+ * A run that has not finished cannot take evaluations, so its absence is a
+ * validation error the queue does not retry.
+ */
+function getFinishedEventOrThrow(
+  priorEvents: readonly SimulationProcessingEvent[],
+  scenarioRunId: string,
+): SimulationRunFinishedEvent {
+  const finished = priorEvents.find(isSimulationRunFinishedEvent);
+  if (!finished) {
+    throw new ValidationError(
+      `Scenario run ${scenarioRunId} has not finished, evaluations can only be recorded on a finished run`,
+      "scenarioRunId",
+      scenarioRunId,
+    );
+  }
+  return finished;
+}
+
+/** The verdict and status a run held right before this command's gate ran. */
+interface PriorGateState {
+  judgeVerdict: GatedVerdict | undefined;
+  judgeStatus: string;
+  previousVerdict: GatedVerdict | undefined;
+  previousStatus: string;
+}
+
+/**
+ * Reads the verdict and status the run held before this command's gate: the
+ * judge's own verdict from the finished event, and either the last recorded
+ * evaluation's verdict/status or the judge's, when this is the first one.
+ */
+function derivePriorGateState(params: {
+  finished: SimulationRunFinishedEvent;
+  lastEvaluated: SimulationRunEvaluatedEvent | undefined;
+}): PriorGateState {
+  const { finished, lastEvaluated } = params;
+
+  const judgeVerdict = finished.data.results?.verdict;
+  const judgeStatus = finishedStatusOf({
+    explicitStatus: finished.data.status,
+    verdict: judgeVerdict,
+  });
+  const previousVerdict = lastEvaluated
+    ? lastEvaluated.data.verdict
+    : judgeVerdict;
+  const previousStatus = lastEvaluated
+    ? (lastEvaluated.data.status ?? judgeStatus)
+    : judgeStatus;
+
+  return { judgeVerdict, judgeStatus, previousVerdict, previousStatus };
+}
+
+/**
+ * Builds the RunEvaluated event data: the results, the verdict and status
+ * the run holds after the gate, the ones it held before, and the run's
+ * identity, falling back from the finished event to the queued event for
+ * whichever identity fields the finished event does not carry.
+ */
+function buildEvaluatedEventData(params: {
+  scenarioRunId: string;
+  evaluations: ScenarioEvaluationResult[];
+  status: string;
+  previousStatus: string;
+  verdict: GatedVerdict | undefined;
+  previousVerdict: GatedVerdict | undefined;
+  finished: SimulationRunFinishedEvent;
+  queued: SimulationRunQueuedEvent | undefined;
+}): SimulationRunEvaluatedEventData {
+  const {
+    scenarioRunId,
+    evaluations,
+    status,
+    previousStatus,
+    verdict,
+    previousVerdict,
+    finished,
+    queued,
+  } = params;
+
+  const scenarioId = finished.data.scenarioId ?? queued?.data.scenarioId;
+  const batchRunId = finished.data.batchRunId ?? queued?.data.batchRunId;
+  const scenarioSetId =
+    finished.data.scenarioSetId ?? queued?.data.scenarioSetId;
+
+  return {
+    scenarioRunId,
+    evaluations,
+    status,
+    previousStatus,
+    ...(verdict !== undefined && { verdict }),
+    ...(previousVerdict !== undefined && { previousVerdict }),
+    ...(scenarioId !== undefined && { scenarioId }),
+    ...(batchRunId !== undefined && { batchRunId }),
+    ...(scenarioSetId !== undefined && { scenarioSetId }),
+  };
+}
+
+/**
  * Command handler that records evaluator results on a finished run.
  *
  * Emits the RunEvaluated event with everything a reader needs on the event
@@ -102,51 +205,28 @@ export class RecordEvaluationsCommand
       scenarioRunId,
     });
 
-    const finished = priorEvents.find(isSimulationRunFinishedEvent);
-    if (!finished) {
-      throw new ValidationError(
-        `Scenario run ${scenarioRunId} has not finished, evaluations can only be recorded on a finished run`,
-        "scenarioRunId",
-        scenarioRunId,
-      );
-    }
-
+    const finished = getFinishedEventOrThrow(priorEvents, scenarioRunId);
     const queued = priorEvents.find(isSimulationRunQueuedEvent);
     const lastEvaluated = priorEvents
       .filter(isSimulationRunEvaluatedEvent)
       .at(-1);
 
-    const judgeVerdict = finished.data.results?.verdict;
-    const judgeStatus = finishedStatusOf({
-      explicitStatus: finished.data.status,
-      verdict: judgeVerdict,
-    });
-    const previousVerdict = lastEvaluated
-      ? lastEvaluated.data.verdict
-      : judgeVerdict;
-    const previousStatus = lastEvaluated
-      ? (lastEvaluated.data.status ?? judgeStatus)
-      : judgeStatus;
+    const { judgeVerdict, judgeStatus, previousVerdict, previousStatus } =
+      derivePriorGateState({ finished, lastEvaluated });
 
     const verdict = gatedVerdict({ evaluations, judgeVerdict });
     const status = gatedStatus({ status: judgeStatus, verdict });
 
-    const scenarioId = finished.data.scenarioId ?? queued?.data.scenarioId;
-    const batchRunId = finished.data.batchRunId ?? queued?.data.batchRunId;
-    const scenarioSetId =
-      finished.data.scenarioSetId ?? queued?.data.scenarioSetId;
-
-    const eventData: SimulationRunEvaluatedEventData = {
+    const eventData = buildEvaluatedEventData({
       scenarioRunId,
       evaluations,
       status,
       previousStatus,
-      ...(verdict !== undefined && { verdict }),
-      ...(previousVerdict !== undefined && { previousVerdict }),
-      ...(scenarioId !== undefined && { scenarioId }),
-      ...(batchRunId !== undefined && { batchRunId }),
-      ...(scenarioSetId !== undefined && { scenarioSetId }),
-    };
+      verdict,
+      previousVerdict,
+      finished,
+      queued,
+    });
 
     const event = EventUtils.createEvent<SimulationRunEvaluatedEvent>({
       aggregateType: "simulation_run",

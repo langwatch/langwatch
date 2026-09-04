@@ -184,6 +184,37 @@ export function retrievedContextsOf(spans: Span[]): string[] {
     .filter((text) => text.length > 0);
 }
 
+/** What the trace's retrieved contexts answer, or why they cannot yet. */
+function resolveTraceContextsMapping({
+  spans,
+  notYet,
+}: {
+  spans: Span[];
+  notYet: (reason: string) => ResolvedInput;
+}): ResolvedInput {
+  const contexts = retrievedContextsOf(spans);
+  if (contexts.length > 0) return value(contexts);
+  return notYet("no retrieved contexts in the trace");
+}
+
+/** What the last call of the named tool answers, or why it cannot yet. */
+function resolveTraceToolCallMapping({
+  toolName,
+  part,
+  spans,
+  notYet,
+}: {
+  toolName: string;
+  part: string | undefined;
+  spans: Span[];
+  notYet: (reason: string) => ResolvedInput;
+}): ResolvedInput {
+  const call = toolCallsNamed({ spans, toolName }).at(-1);
+  if (!call) return notYet(`no ${toolName} call in the trace`);
+  const io = part === "input" ? call.input : call.output;
+  return value(stringifySpanIO(io) ?? "");
+}
+
 /**
  * What the trace source answers for one path. The last call of a tool wins,
  * the way a person reads the final answer of an agent that retried.
@@ -201,9 +232,7 @@ export function resolveTraceMapping({
   const notYet = hasTraces && spans.length === 0 ? pending : failed;
 
   if (head === TRACE_CONTEXTS_PATH) {
-    const contexts = retrievedContextsOf(spans);
-    if (contexts.length > 0) return value(contexts);
-    return notYet("no retrieved contexts in the trace");
+    return resolveTraceContextsMapping({ spans, notYet });
   }
 
   if (
@@ -211,10 +240,7 @@ export function resolveTraceMapping({
     toolName &&
     (TOOL_CALL_PARTS as readonly string[]).includes(part ?? "")
   ) {
-    const call = toolCallsNamed({ spans, toolName }).at(-1);
-    if (!call) return notYet(`no ${toolName} call in the trace`);
-    const io = part === "input" ? call.input : call.output;
-    return value(stringifySpanIO(io) ?? "");
+    return resolveTraceToolCallMapping({ toolName, part, spans, notYet });
   }
 
   return failed(`the trace has no ${path.join(".")}`);
@@ -255,6 +281,60 @@ export type ResolvedAttachmentInputs =
   | { kind: "failed"; details: string }
   | { kind: "pending"; details: string };
 
+/** What resolving one input of an attachment does to the loop that reads it. */
+type InputResolutionOutcome =
+  | { action: "return"; result: ResolvedAttachmentInputs }
+  | { action: "set"; id: string; value: ResolvedValue }
+  | { action: "pending"; details: string }
+  | { action: "failed"; details: string }
+  | { action: "skip" };
+
+/**
+ * How one input of an attachment resolves against the run, and what that
+ * means for the attachment as a whole: a required input with no mapping or a
+ * mapping that resolves to `skipped` ends the attachment outright; an
+ * optional input the run cannot give yet, or ever, is left out instead.
+ */
+function resolveAttachmentInput({
+  input,
+  attachment,
+  run,
+  scenario,
+  finalAttempt,
+}: {
+  input: EvaluatorInputSpec;
+  attachment: Pick<EvaluatorAttachment, "mappings">;
+  run: RunInputs;
+  scenario: ScenarioInputs;
+  finalAttempt: boolean;
+}): InputResolutionOutcome {
+  const mapping = attachment.mappings[input.id];
+  if (!mapping) {
+    if (!input.required) return { action: "skip" };
+    return {
+      action: "return",
+      result: { kind: "skipped", details: `no mapping for ${input.id}` },
+    };
+  }
+
+  const resolved = resolveMapping({ mapping, run, scenario });
+  switch (resolved.kind) {
+    case "value":
+      return { action: "set", id: input.id, value: resolved.value };
+    case "skipped":
+      return {
+        action: "return",
+        result: { kind: "skipped", details: resolved.details },
+      };
+    case "pending":
+      if (!input.required && finalAttempt) return { action: "skip" };
+      return { action: "pending", details: resolved.details };
+    case "failed":
+      if (!input.required) return { action: "skip" };
+      return { action: "failed", details: resolved.details };
+  }
+}
+
 /**
  * Resolves every input the evaluator declares through the attachment's
  * mappings.
@@ -286,27 +366,26 @@ export function resolveAttachmentInputs({
   let firstFailed: string | undefined;
 
   for (const input of inputs) {
-    const mapping = attachment.mappings[input.id];
-    if (!mapping) {
-      if (input.required) {
-        return { kind: "skipped", details: `no mapping for ${input.id}` };
-      }
-      continue;
-    }
-    const resolved = resolveMapping({ mapping, run, scenario });
-    switch (resolved.kind) {
-      case "value":
-        data[input.id] = resolved.value;
+    const outcome = resolveAttachmentInput({
+      input,
+      attachment,
+      run,
+      scenario,
+      finalAttempt,
+    });
+    switch (outcome.action) {
+      case "return":
+        return outcome.result;
+      case "set":
+        data[outcome.id] = outcome.value;
         break;
-      case "skipped":
-        return { kind: "skipped", details: resolved.details };
       case "pending":
-        if (!input.required && finalAttempt) break;
-        firstPending ??= resolved.details;
+        firstPending ??= outcome.details;
         break;
       case "failed":
-        if (!input.required) break;
-        firstFailed ??= resolved.details;
+        firstFailed ??= outcome.details;
+        break;
+      case "skip":
         break;
     }
   }

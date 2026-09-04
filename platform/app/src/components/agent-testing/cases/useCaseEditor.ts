@@ -405,6 +405,92 @@ function useCaseSave({
   );
 }
 
+/** The stored scenario the dialog reads, when it opens on one. */
+function useCaseScenarioQuery({
+  open,
+  projectId,
+  scenarioId,
+}: {
+  open: boolean;
+  projectId: string;
+  scenarioId: string | null;
+}) {
+  const {
+    data: scenario,
+    isLoading: isScenarioLoading,
+    refetch,
+  } = api.scenarios.getById.useQuery(
+    { projectId, id: scenarioId ?? "" },
+    { enabled: open && !!projectId && !!scenarioId },
+  );
+  return { scenario, isScenarioLoading, refetchScenario: refetch };
+}
+
+/** Clears the stale-version and field refusals each time the dialog opens on a scenario. */
+function useCaseErrorReset({
+  open,
+  scenarioId,
+  setStaleVersion,
+  setFieldsError,
+}: {
+  open: boolean;
+  scenarioId: string | null;
+  setStaleVersion: (value: number | null) => void;
+  setFieldsError: (value: string | null) => void;
+}) {
+  useEffect(() => {
+    if (open) {
+      setStaleVersion(null);
+      setFieldsError(null);
+    }
+  }, [open, scenarioId, setStaleVersion, setFieldsError]);
+}
+
+/**
+ * The fields of the draft's suite, and the parameter types already stored.
+ * The fields follow the suite the draft is filed in, so moving the scenario
+ * to another suite asks for that suite's fields.
+ */
+function useCaseDerived({
+  suites,
+  draft,
+  scenario,
+}: {
+  suites: TestSuiteEntry[];
+  draft: CaseDraft;
+  scenario: Scenario | undefined;
+}) {
+  const fieldDefinitions = useMemo(
+    () => suites.find((suite) => suite.id === draft.testSuiteId)?.fields ?? [],
+    [suites, draft.testSuiteId],
+  );
+  const existingParameters: ScenarioParameterDefinition[] = useMemo(
+    () => parseScenarioParameterDefinitions(scenario?.parameters),
+    [scenario?.parameters],
+  );
+  const problem = useCaseProblem(draft);
+  return { fieldDefinitions, existingParameters, problem };
+}
+
+/** Rereads the scenario, seeds the draft from it, and clears the stale flag. */
+function useCaseReload<T extends { data: Scenario | undefined }>({
+  refetchScenario,
+  seedFrom,
+  setStaleVersion,
+}: {
+  refetchScenario: () => Promise<T>;
+  seedFrom: (stored: Scenario) => void;
+  setStaleVersion: (value: number | null) => void;
+}) {
+  return useCallback(() => {
+    void (async () => {
+      const reread = await refetchScenario();
+      if (reread.data) seedFrom(reread.data);
+      setStaleVersion(null);
+    })();
+  }, [refetchScenario, seedFrom, setStaleVersion]);
+}
+
 export function useCaseEditor({
   open,
   projectId,
@@ -427,13 +513,8 @@ export function useCaseEditor({
   // callback built on an earlier render, so this cannot be state.
   const runAfterSave = useRef(false);
 
-  const {
-    data: scenario,
-    isLoading: isScenarioLoading,
-    refetch: refetchScenario,
-  } = api.scenarios.getById.useQuery(
-    { projectId, id: scenarioId ?? "" },
-    { enabled: open && !!projectId && !!scenarioId },
+  const { scenario, isScenarioLoading, refetchScenario } = useCaseScenarioQuery(
+    { open, projectId, scenarioId },
   );
 
   const { draft, setDraft, version, seedCount, seedFrom } = useCaseDraft({
@@ -454,26 +535,13 @@ export function useCaseEditor({
     setFieldsError,
   } = useCaseWrites({ projectId, onSaved, runAfterSave });
 
-  useEffect(() => {
-    if (open) {
-      setStaleVersion(null);
-      setFieldsError(null);
-    }
-  }, [open, scenarioId, setStaleVersion, setFieldsError]);
+  useCaseErrorReset({ open, scenarioId, setStaleVersion, setFieldsError });
 
-  // The fields follow the suite the draft is filed in, so moving the scenario
-  // to another suite asks for that suite's fields.
-  const fieldDefinitions = useMemo(
-    () => suites.find((suite) => suite.id === draft.testSuiteId)?.fields ?? [],
-    [suites, draft.testSuiteId],
-  );
-
-  const existingParameters: ScenarioParameterDefinition[] = useMemo(
-    () => parseScenarioParameterDefinitions(scenario?.parameters),
-    [scenario?.parameters],
-  );
-
-  const problem = useCaseProblem(draft);
+  const { fieldDefinitions, existingParameters, problem } = useCaseDerived({
+    suites,
+    draft,
+    scenario,
+  });
 
   const save = useCaseSave({
     problem,
@@ -488,13 +556,11 @@ export function useCaseEditor({
     updateMutation,
   });
 
-  const reloadStale = useCallback(() => {
-    void (async () => {
-      const reread = await refetchScenario();
-      if (reread.data) seedFrom(reread.data);
-      setStaleVersion(null);
-    })();
-  }, [refetchScenario, seedFrom, setStaleVersion]);
+  const reloadStale = useCaseReload({
+    refetchScenario,
+    seedFrom,
+    setStaleVersion,
+  });
 
   return {
     draft,

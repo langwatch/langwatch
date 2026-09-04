@@ -129,7 +129,20 @@ function RunDialogHeader({ subject }: { subject: RunDialogSubject }) {
   );
 }
 
-export function RunDialog({ subject, onClose, onRunStarted }: RunDialogProps) {
+/**
+ * All the dialog's hook state: the two open-list flags, the form, and the
+ * submit controller. Kept as one hook so `RunDialog` itself stays a thin
+ * wrapper around "compute state, then render".
+ */
+function useRunDialogState({
+  subject,
+  onClose,
+  onRunStarted,
+}: {
+  subject: RunDialogSubject | null;
+  onClose: () => void;
+  onRunStarted: RunDialogProps["onRunStarted"];
+}) {
   // Escape belongs to the run name list while that list is open. The dialog's
   // own Escape handling listens on the document in the capture phase, so it
   // runs before the field can stop the key and has to be turned off instead.
@@ -165,14 +178,39 @@ export function RunDialog({ subject, onClose, onRunStarted }: RunDialogProps) {
     setMissingProvider: form.setMissingProvider,
   });
 
-  if (!subject) return null;
-
   // An evaluator whose required input reads nothing holds the run: Run opens
   // its editor instead, so the fix is one click away and nothing is queued
   // that the server would refuse.
   const offender = form.offender;
   const onRun = offender ? form.openOffender : () => void controller.run();
 
+  return {
+    isNameListOpen,
+    setIsNameListOpen,
+    openLists,
+    reportOpenList,
+    form,
+    controller,
+    offender,
+    onRun,
+  };
+}
+
+function RunDialogContent({
+  subject,
+  onClose,
+  isNameListOpen,
+  setIsNameListOpen,
+  openLists,
+  reportOpenList,
+  form,
+  controller,
+  offender,
+  onRun,
+}: {
+  subject: RunDialogSubject;
+  onClose: () => void;
+} & ReturnType<typeof useRunDialogState>) {
   return (
     <Dialog.Root
       open={!!subject}
@@ -219,4 +257,12 @@ export function RunDialog({ subject, onClose, onRunStarted }: RunDialogProps) {
       </Dialog.Content>
     </Dialog.Root>
   );
+}
+
+export function RunDialog({ subject, onClose, onRunStarted }: RunDialogProps) {
+  const state = useRunDialogState({ subject, onClose, onRunStarted });
+
+  if (!subject) return null;
+
+  return <RunDialogContent subject={subject} onClose={onClose} {...state} />;
 }

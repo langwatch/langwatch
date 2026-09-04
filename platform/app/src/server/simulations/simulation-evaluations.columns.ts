@@ -69,6 +69,88 @@ export function evaluationsToColumns(
 
 const KNOWN_STATUSES = new Set<string>(SCENARIO_EVALUATION_STATUSES);
 
+/** The status column value read back as one of the statuses we know, or `error`. */
+function evaluationStatusOf(rawStatus: string): ScenarioEvaluationStatus {
+  return KNOWN_STATUSES.has(rawStatus)
+    ? (rawStatus as ScenarioEvaluationStatus)
+    : "error";
+}
+
+/** One entry of a parallel-array column, or `undefined` past its length. */
+function columnEntry<T>(column: T[] | undefined, index: number): T | undefined {
+  return column ? column[index] : undefined;
+}
+
+/** One entry of a string column, read back as `""` when it carries no value. */
+function stringColumnEntry(
+  column: string[] | undefined,
+  index: number,
+): string {
+  const entry = columnEntry(column, index);
+  return entry === undefined ? "" : entry;
+}
+
+/** Whether a nullable numeric column entry actually carries a value. */
+function isNumberColumnEntrySet(
+  entry: number | null | undefined,
+): entry is number {
+  return entry !== null && entry !== undefined;
+}
+
+/** The cost an evaluation's row stores, or `undefined` when it charged nothing. */
+function evaluationCostOf({
+  record,
+  index,
+}: {
+  record: Partial<ClickHouseEvaluationColumns>;
+  index: number;
+}): { currency: string; amount: number } | undefined {
+  const amount = columnEntry(record["Evaluations.CostAmount"], index);
+  if (!isNumberColumnEntrySet(amount)) return undefined;
+  const currency = stringColumnEntry(record["Evaluations.CostCurrency"], index);
+  return { currency: currency || "USD", amount: Number(amount) };
+}
+
+/** One evaluation, rebuilt from its row's parallel arrays at the given index. */
+function evaluationFromColumns({
+  record,
+  evaluatorId,
+  index,
+}: {
+  record: Partial<ClickHouseEvaluationColumns>;
+  evaluatorId: string;
+  index: number;
+}): ScenarioEvaluationResult {
+  const result: ScenarioEvaluationResult = {
+    evaluatorId,
+    name: stringColumnEntry(record["Evaluations.Name"], index),
+    status: evaluationStatusOf(
+      stringColumnEntry(record["Evaluations.Status"], index),
+    ),
+    required: columnEntry(record["Evaluations.Required"], index) === 1,
+  };
+
+  const passed = columnEntry(record["Evaluations.Passed"], index);
+  if (isNumberColumnEntrySet(passed)) result.passed = passed === 1;
+
+  const score = columnEntry(record["Evaluations.Score"], index);
+  if (isNumberColumnEntrySet(score)) result.score = Number(score);
+
+  const label = stringColumnEntry(record["Evaluations.Label"], index);
+  if (label !== "") result.label = label;
+
+  const details = stringColumnEntry(record["Evaluations.Details"], index);
+  if (details !== "") result.details = details;
+
+  const cost = evaluationCostOf({ record, index });
+  if (cost) result.cost = cost;
+
+  const inputsJson = stringColumnEntry(record["Evaluations.InputsJson"], index);
+  if (inputsJson !== "") result.inputs = parseInputs(inputsJson);
+
+  return result;
+}
+
 /**
  * The evaluations a row stores, rebuilt from its parallel arrays. A row
  * written before the columns existed reads as no evaluations, and a column
@@ -78,35 +160,9 @@ export function columnsToEvaluations(
   record: Partial<ClickHouseEvaluationColumns>,
 ): ScenarioEvaluationResult[] {
   const ids = record["Evaluations.EvaluatorId"] ?? [];
-  return ids.map((evaluatorId, i) => {
-    const rawStatus = record["Evaluations.Status"]?.[i] ?? "error";
-    const status: ScenarioEvaluationStatus = KNOWN_STATUSES.has(rawStatus)
-      ? (rawStatus as ScenarioEvaluationStatus)
-      : "error";
-    const passed = record["Evaluations.Passed"]?.[i];
-    const score = record["Evaluations.Score"]?.[i];
-    const label = record["Evaluations.Label"]?.[i] ?? "";
-    const details = record["Evaluations.Details"]?.[i] ?? "";
-    const costAmount = record["Evaluations.CostAmount"]?.[i];
-    const costCurrency = record["Evaluations.CostCurrency"]?.[i] ?? "";
-    const inputsJson = record["Evaluations.InputsJson"]?.[i] ?? "";
-
-    return {
-      evaluatorId,
-      name: record["Evaluations.Name"]?.[i] ?? "",
-      status,
-      required: (record["Evaluations.Required"]?.[i] ?? 0) === 1,
-      ...(passed !== null && passed !== undefined && { passed: passed === 1 }),
-      ...(score !== null && score !== undefined && { score: Number(score) }),
-      ...(label !== "" && { label }),
-      ...(details !== "" && { details }),
-      ...(costAmount !== null &&
-        costAmount !== undefined && {
-          cost: { currency: costCurrency || "USD", amount: Number(costAmount) },
-        }),
-      ...(inputsJson !== "" && { inputs: parseInputs(inputsJson) }),
-    };
-  });
+  return ids.map((evaluatorId, index) =>
+    evaluationFromColumns({ record, evaluatorId, index }),
+  );
 }
 
 function parseInputs(json: string): Record<string, string> {

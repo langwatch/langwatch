@@ -5,7 +5,10 @@ import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { extractSuiteId } from "~/server/suites/suite-set-id";
 import type { SubscriberSpec } from "../../../pipeline/processManagerDefinition";
 import { SIMULATION_RUN_EVENT_TYPES } from "../schemas/constants";
-import type { SimulationProcessingEvent } from "../schemas/events";
+import type {
+  SimulationProcessingEvent,
+  SimulationRunFinishedEventData,
+} from "../schemas/events";
 import { isSimulationRunFinishedEvent } from "../schemas/typeGuards";
 
 const logger = createLogger(
@@ -28,6 +31,77 @@ const UNGRADED_STATUSES: ReadonlySet<string> = new Set([
   ScenarioRunStatus.ERROR,
   ScenarioRunStatus.CANCELLED,
 ]);
+
+/**
+ * The scenario id a finished run should be evaluated under, or `null` when
+ * it should not be evaluated at all: its own results already carry
+ * evaluations, its status has no conversation to grade, or it names no
+ * scenario.
+ */
+function scenarioIdToEvaluate(params: {
+  tenantId: string;
+  scenarioRunId: string;
+  scenarioId: string | undefined;
+  status: SimulationRunFinishedEventData["status"];
+  results: SimulationRunFinishedEventData["results"];
+}): string | null {
+  const { tenantId, scenarioRunId, scenarioId, status, results } = params;
+
+  if (results?.evaluations) {
+    logger.debug(
+      { tenantId, scenarioRunId },
+      "Run finished with its own evaluations, not evaluated again",
+    );
+    return null;
+  }
+  if (status && UNGRADED_STATUSES.has(status)) return null;
+  if (!scenarioId) {
+    logger.warn(
+      { tenantId, scenarioRunId },
+      "Finished event names no scenario, the run is not evaluated",
+    );
+    return null;
+  }
+  return scenarioId;
+}
+
+/** Logs and enqueues the evaluation job for a run whose attachments resolved. */
+async function enqueueScenarioEvaluations(params: {
+  deps: ScenarioEvaluationsSubscriberDeps;
+  tenantId: string;
+  scenarioRunId: string;
+  scenarioId: string;
+  suiteId: string | null;
+  planId: string | null;
+  traceIds: string[];
+  attachmentCount: number;
+}): Promise<void> {
+  const {
+    deps,
+    tenantId,
+    scenarioRunId,
+    scenarioId,
+    suiteId,
+    planId,
+    traceIds,
+    attachmentCount,
+  } = params;
+
+  logger.debug(
+    { tenantId, scenarioRunId, suiteId, planId, attachmentCount },
+    "Queueing scenario evaluations for finished run",
+  );
+  await deps.enqueue({
+    tenantId,
+    scenarioRunId,
+    scenarioId,
+    suiteId,
+    planId,
+    traceIds,
+    attempt: 1,
+    occurredAt: Date.now(),
+  });
+}
 
 /**
  * On RunFinished, queues the evaluation job for the run when its suite or
@@ -55,49 +129,32 @@ export function createScenarioEvaluationsSubscriber(
       const scenarioRunId = event.aggregateId;
       const { scenarioId, scenarioSetId, status, results } = event.data;
 
-      if (results?.evaluations) {
-        logger.debug(
-          { tenantId, scenarioRunId },
-          "Run finished with its own evaluations, not evaluated again",
-        );
-        return;
-      }
-      if (status && UNGRADED_STATUSES.has(status)) return;
-      if (!scenarioId) {
-        logger.warn(
-          { tenantId, scenarioRunId },
-          "Finished event names no scenario, the run is not evaluated",
-        );
-        return;
-      }
+      const evaluatedScenarioId = scenarioIdToEvaluate({
+        tenantId,
+        scenarioRunId,
+        scenarioId,
+        status,
+        results,
+      });
+      if (!evaluatedScenarioId) return;
 
       const planId = scenarioSetId ? extractSuiteId(scenarioSetId) : null;
       const { suiteId, attachments } = await deps.loadRunAttachments({
         projectId: tenantId,
-        scenarioId,
+        scenarioId: evaluatedScenarioId,
         planId,
       });
       if (attachments.length === 0) return;
 
-      logger.debug(
-        {
-          tenantId,
-          scenarioRunId,
-          suiteId,
-          planId,
-          attachmentCount: attachments.length,
-        },
-        "Queueing scenario evaluations for finished run",
-      );
-      await deps.enqueue({
+      await enqueueScenarioEvaluations({
+        deps,
         tenantId,
         scenarioRunId,
-        scenarioId,
+        scenarioId: evaluatedScenarioId,
         suiteId,
         planId,
         traceIds: event.data.traceIds ?? [],
-        attempt: 1,
-        occurredAt: Date.now(),
+        attachmentCount: attachments.length,
       });
     },
   };

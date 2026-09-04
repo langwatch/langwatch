@@ -102,7 +102,11 @@ export interface SimulationProcessingPipelineDeps {
  * - deleteRun: Emits SimulationRunDeletedEvent for soft-delete
  * - computeRunMetrics: Computes cost/latency metrics from traces (ECST + pull)
  */
-export function createSimulationProcessingPipeline(
+/**
+ * Builds the pipeline's projections, subscribers and process manager, before
+ * any commands are wired in.
+ */
+function createSimulationProcessingBuilder(
   deps: SimulationProcessingPipelineDeps,
 ) {
   let builder = definePipeline<SimulationProcessingEvent>()
@@ -148,7 +152,13 @@ export function createSimulationProcessingPipeline(
     );
   }
 
-  return builder
+  return builder;
+}
+
+export function createSimulationProcessingPipeline(
+  deps: SimulationProcessingPipelineDeps,
+) {
+  return createSimulationProcessingBuilder(deps)
     .withCommand("queueRun", QueueRunCommand)
     .withCommand("startRun", StartRunCommand)
     .withCommand("messageSnapshot", MessageSnapshotCommand)

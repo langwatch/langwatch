@@ -308,6 +308,43 @@ const source = (
   path: string[],
 ): ScenarioMapping => ({ type: "source", sourceId, path });
 
+/** The mapping an input name reads as on its own, with no scenario fields involved. */
+function inferMappingFromInputName(lower: string): ScenarioMapping | undefined {
+  if (INPUT_LIKE.has(lower)) {
+    return source("conversation", ["first_user_message"]);
+  }
+  if (OUTPUT_LIKE.has(lower)) {
+    return source("conversation", ["last_agent_message"]);
+  }
+  if (TRANSCRIPT_LIKE.has(lower)) {
+    return source("conversation", ["transcript"]);
+  }
+  if (CONTEXTS_LIKE.has(lower)) {
+    return source("trace", [TRACE_CONTEXTS_PATH]);
+  }
+  return undefined;
+}
+
+/**
+ * The mapping an input name reads as against the suite's own fields. Never
+ * answers for a plan level attachment, since a plan has no fields of its own.
+ */
+function inferScenarioFieldMapping({
+  lower,
+  ctx,
+  planLevel,
+}: {
+  lower: string;
+  ctx: ScenarioMappingContext;
+  planLevel: boolean | undefined;
+}): ScenarioMapping | undefined {
+  if (planLevel) return undefined;
+  const field = isExpectedLikeInput(lower)
+    ? inferExpectedField({ inputId: lower, fields: ctx.fields })
+    : ctx.fields.find((candidate) => candidate.identifier === lower);
+  return field ? source("scenario", ["fields", field.identifier]) : undefined;
+}
+
 /**
  * The mapping one input gets on attach, or none when nothing reads as the
  * obvious source for it.
@@ -322,26 +359,10 @@ export function inferScenarioMapping({
   planLevel?: boolean;
 }): ScenarioMapping | undefined {
   const lower = inputId.toLowerCase();
-  if (INPUT_LIKE.has(lower)) {
-    return source("conversation", ["first_user_message"]);
-  }
-  if (OUTPUT_LIKE.has(lower)) {
-    return source("conversation", ["last_agent_message"]);
-  }
-  if (TRANSCRIPT_LIKE.has(lower)) {
-    return source("conversation", ["transcript"]);
-  }
-  if (CONTEXTS_LIKE.has(lower)) {
-    return source("trace", [TRACE_CONTEXTS_PATH]);
-  }
-  if (isExpectedLikeInput(lower)) {
-    if (planLevel) return undefined;
-    const field = inferExpectedField({ inputId: lower, fields: ctx.fields });
-    return field ? source("scenario", ["fields", field.identifier]) : undefined;
-  }
-  if (planLevel) return undefined;
-  const field = ctx.fields.find((candidate) => candidate.identifier === lower);
-  return field ? source("scenario", ["fields", field.identifier]) : undefined;
+  return (
+    inferMappingFromInputName(lower) ??
+    inferScenarioFieldMapping({ lower, ctx, planLevel })
+  );
 }
 
 /**

@@ -11,7 +11,7 @@ import {
  * The JSON shape of one evaluator result, exactly as the scenario framework
  * sends it. Copy this object verbatim when mirroring the schema elsewhere.
  */
-export const FULL_EVALUATION_RESULT_JSON = {
+const FULL_EVALUATION_RESULT_JSON = {
   evaluatorId: "ragas/sql_query_equivalence",
   name: "SQL Query Equivalence",
   status: "failed",
@@ -28,7 +28,7 @@ export const FULL_EVALUATION_RESULT_JSON = {
 } as const;
 
 /** The smallest result the schema accepts. */
-export const MINIMAL_EVALUATION_RESULT_JSON = {
+const MINIMAL_EVALUATION_RESULT_JSON = {
   evaluatorId: "eval_123",
   name: "Answer quality",
   status: "scored",
