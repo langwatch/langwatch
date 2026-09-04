@@ -778,7 +778,7 @@
           "docs": null
         },
         "platform": {
-          "ui": "/analytics/dashboards",
+          "ui": "/analytics/custom",
           "mcp": [
             "platform_list_dashboards",
             "platform_get_dashboard",
@@ -818,7 +818,7 @@
           "docs": null
         },
         "platform": {
-          "ui": "/alerts",
+          "ui": "/automations/alerts",
           "mcp": [
             "platform_list_triggers",
             "platform_create_trigger",

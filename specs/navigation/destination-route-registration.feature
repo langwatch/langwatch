@@ -60,3 +60,17 @@ Feature: Navigation destinations resolve to registered routes
     But a destination inside a subtree a sub-router owns may be served by that
     sub-router, because the route table hands the whole subtree over and stops
     being able to answer for what is inside it
+
+  # ── The product catalogue's own links ─────────────────────────────────
+  # feature-map.json is the surface agents and skills read to find a page for
+  # a feature; its "platform.ui" field is a hand-written path with the same
+  # failure mode as a sidebar href — nothing re-checks it against the route
+  # table when a page moves or is renamed.
+
+  @unit
+  Scenario: Every feature-map.json platform UI link opens a page
+    Given feature-map.json's catalogue of features
+    When each feature's platform.ui address is resolved the way the router
+      would resolve it, trying the project scope when the bare address does not
+      match
+    Then no address falls through to the catch-all route
