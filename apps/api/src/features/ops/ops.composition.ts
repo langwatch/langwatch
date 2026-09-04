@@ -184,11 +184,9 @@ function refusingOps<T>(): T {
   return new Proxy(
     {},
     {
-      get:
-        () =>
-        (): never => {
-          throw new ApiOpsUnavailableError("The operator back office");
-        },
+      get: () => (): never => {
+        throw new ApiOpsUnavailableError("The operator back office");
+      },
       has: () => true,
     },
   ) as T;
@@ -416,7 +414,6 @@ function composeOpsCheck(ops: OpsApp) {
       },
     );
 }
-
 
 /** An operator capability this process does not run, refused by name. */
 class ApiOpsUnavailableError extends HandledError {

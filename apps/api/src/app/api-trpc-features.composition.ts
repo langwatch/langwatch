@@ -30,7 +30,6 @@ import {
 import type { ApiTrpcFeatureApplication } from "../app-trpc/app-trpc.context";
 import { createAppTrpcFeatures, type AppTrpcFeatureRecord } from "../app-trpc/app-trpc.features";
 import { createApiTrpcPorts } from "./api-trpc-ports.composition";
-import type { ApiAgentGroupCollaborators } from "./api-trpc-collaborators.agent-group.composition";
 import type { ApiAnalyticsCollaborators } from "./api-trpc-collaborators.analytics.composition";
 import type { ApiExecutionCollaborators } from "./api-trpc-collaborators.execution.composition";
 import type { ApiIdentityCollaborators } from "./api-trpc-collaborators.identity.composition";
@@ -307,13 +306,13 @@ export class LoggedApiTrpcFeaturesAbsence extends ApiTrpcCollaboratorsAbsence {
 }
 
 /**
- * The nine halves {@link composeApiTrpcCollaborators} reads into one flat
+ * The eight halves {@link composeApiTrpcCollaborators} reads into one flat
  * {@link ApiTrpcCollaborators} record. Each is `undefined` exactly when the
  * process composed nothing for it — see that half's own composing function
  * for why it can be missing.
  */
 /**
- * The same nine once every one of them is present.
+ * The same eight once every one of them is present.
  *
  * `Required<>` is not this: it strips the `?` a member does not have and leaves
  * the `| undefined` a member does, so the whole record read below stayed
@@ -330,7 +329,6 @@ export type ApiTrpcCollaboratorHalves = Readonly<{
   execution: ApiExecutionCollaborators | undefined;
   productGroup: ApiProductGroupCollaborators | undefined;
   traceGroup: ApiTraceGroupCollaborators | undefined;
-  agentGroup: ApiAgentGroupCollaborators | undefined;
   orgGroup: ApiOrgGroupCollaborators | undefined;
   productInfra: ApiProductInfraCollaborators | undefined;
 }>;
@@ -352,18 +350,20 @@ export type ApiTrpcFeatureApplicationSlices = Pick<
   | "governanceApp"
   | "langy"
   | "ops"
+  | "scenarios"
   | "sessionPolicy"
+  | "suites"
   | "webhooks"
 >;
 
 /**
- * Reads all ten collaborator halves into ONE flat {@link ApiTrpcCollaborators}
+ * Reads all eight collaborator halves into ONE flat {@link ApiTrpcCollaborators}
  * record, or refuses by name.
  *
  * All-or-nothing, replacing the ten `withApi*Collaborators` folds and the
  * runtime `sealApiTrpcCollaborators` check those folds needed: a process
  * missing any half composes none of the record, named, rather than mounting
- * the other nine over a gap. No cast to an erased type anywhere in this
+ * the other seven over a gap. No cast to an erased type anywhere in this
  * function — every `half.field` access below is checked against the real,
  * concrete type each `compose*` function already returns, so a half's return
  * type drifting from what this literal expects is a compile error here
@@ -393,7 +393,6 @@ export function composeApiTrpcCollaborators(
     execution,
     productGroup,
     traceGroup,
-    agentGroup,
     orgGroup,
     productInfra,
   } = halves as ComposedApiTrpcCollaboratorHalves;
@@ -422,8 +421,6 @@ export function composeApiTrpcCollaborators(
       topics: traceGroup.topics,
       modelProviders: traceGroup.modelProviders,
       planProvider: traceGroup.planProvider,
-      scenarios: agentGroup.scenarios,
-      suites: agentGroup.suites,
       ...orgGroup.application,
       monitors: productInfra.monitorApp,
       storedObjectApp: productInfra.storedObjectApp,
@@ -471,8 +468,6 @@ export function composeApiTrpcCollaborators(
     httpProxy: traceGroup.ports.httpProxy,
     limits: traceGroup.ports.limits,
 
-    scenarios: agentGroup.ports.scenarios,
-
     organization: orgGroup.organization,
     organizationAuditLogCheck: orgGroup.organizationAuditLogCheck,
     project: orgGroup.project,
@@ -484,6 +479,5 @@ export function composeApiTrpcCollaborators(
 
     dataRetention: productInfra.dataRetention,
     monitors: productInfra.monitors,
-
   };
 }

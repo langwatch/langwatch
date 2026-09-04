@@ -39,6 +39,7 @@ import { z } from "zod";
 import { createTrpcRoot } from "../../api.application";
 import { composeGatewayFeature } from "../../features/gateway/gateway.composition";
 import { refusingLangyFeature } from "../../features/langy/langy.composition";
+import { refusingScenarioFeature } from "../../features/scenario/scenario.composition";
 import { refusingOpsFeature } from "../../features/ops/ops.composition";
 import { createAppTrpcFeatures, type AppTrpcFeaturePorts } from "../app-trpc.features";
 
@@ -338,9 +339,15 @@ function buildFeatures() {
     // existed. The gateway's application refuses like every port below; its
     // PARSERS are real, because a procedure cannot be built without them.
     composed: {
-      gateway: composeGatewayFeature({ infrastructure: undefined, peers: undefined, clickhouse: null, virtualKeyPepper: undefined }),
+      gateway: composeGatewayFeature({
+        infrastructure: undefined,
+        peers: undefined,
+        clickhouse: null,
+        virtualKeyPepper: undefined,
+      }),
       langy: refusingLangyFeature(),
       ops: refusingOpsFeature(),
+      scenario: refusingScenarioFeature(),
     },
     // The features that compose themselves take this rather than a ports
     // entry; every member refuses, for the same reason the ports do.

@@ -27,7 +27,7 @@ durable read model exists.
   implemented package-side by `SuiteExecutionService`
   (`server/src/services/suite-execution.service.ts`), which resolves run-only
   parameters and dispatches the existing simulation and Suite-run commands.
-  `apps/api/src/app/api-trpc-collaborators.agent-group.composition.ts` only
+  `apps/api/src/features/scenario/scenario.composition.ts` only
   injects its collaborators (the command queue, the run-id generator, and run-
   model resolution). The Suite service and its run repository remain
   package-owned.

@@ -111,10 +111,13 @@ import type {
 import type { UserService } from "@langwatch/user-contract";
 import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
-import type { ApiAgentPipelines } from "./api-agent-pipelines.composition";
-import { ApiAgentTestConnectedDispatchAdapter } from "../features/agent/agent-test-connected-dispatch.adapter";
-import { ApiAgentTestOwnershipAdapter } from "../features/agent/agent-test-ownership.adapter";
-
+import type { ApiAgentPipelines } from "../../app/api-agent-pipelines.composition";
+import type { ApiTrpcFeatureMount } from "../../api.application";
+import { createSetupSkillsTrpcRouter } from "../langy/setup-skills-trpc.mount";
+import { createSuiteTrpcRouter } from "../suite/suite-trpc.mount";
+import { createScenarioTrpcRouter } from "./scenario-trpc.mount";
+import { ApiAgentTestConnectedDispatchAdapter } from "../agent/agent-test-connected-dispatch.adapter";
+import { ApiAgentTestOwnershipAdapter } from "../agent/agent-test-ownership.adapter";
 
 /**
  * The ksuid resource prefixes a scenario and a run are persisted under.
@@ -138,7 +141,7 @@ const OPS_EVENT_LOG_LOOKBACK_DAYS = 365;
  * capability is missing, and that is the `capability` the message carries. The
  * `code` is what the presentation registry is keyed by, and there is one code.
  */
-class ApiAgentGroupUnavailableError extends HandledError {
+class ApiScenarioUnavailableError extends HandledError {
   declare readonly code: "service_unavailable";
 
   constructor(capability: string) {
@@ -146,34 +149,26 @@ class ApiAgentGroupUnavailableError extends HandledError {
       httpStatus: 503,
       fault: "platform",
     });
-    this.name = "ApiAgentGroupUnavailableError";
+    this.name = "ApiScenarioUnavailableError";
   }
 }
 
 /** Reports each absence in this half, with what it costs. */
-export abstract class ApiAgentGroupAbsenceReport {
-  abstract absent(
-    capability:
-      | "live-buffer"
-      | "scenario-secrets",
-  ): void;
+export abstract class ApiScenarioAbsenceReport {
+  abstract absent(capability: "live-buffer" | "scenario-secrets"): void;
 }
 
 /** Writes each absence to the process log, with its consequence. */
-export class LoggedApiAgentGroupAbsence extends ApiAgentGroupAbsenceReport {
-  static create(logger: Pick<Logger, "warn">): LoggedApiAgentGroupAbsence {
-    return new LoggedApiAgentGroupAbsence(logger);
+export class LoggedApiScenarioAbsence extends ApiScenarioAbsenceReport {
+  static create(logger: Pick<Logger, "warn">): LoggedApiScenarioAbsence {
+    return new LoggedApiScenarioAbsence(logger);
   }
 
   private constructor(private readonly logger: Pick<Logger, "warn">) {
     super();
   }
 
-  absent(
-    capability:
-      | "live-buffer"
-      | "scenario-secrets",
-  ): void {
+  absent(capability: "live-buffer" | "scenario-secrets"): void {
     this.logger.warn({ capability }, CONSEQUENCE[capability]);
   }
 }
@@ -212,7 +207,7 @@ export type ApiScenarioExecutionCollaborators = Readonly<{
   config: ScenarioExecutionPrefetchConfig;
 }>;
 
-export type ApiAgentGroupCollaboratorsOptions = Readonly<{
+export type ScenarioFeatureCollaborators = Readonly<{
   /** The one guarded connection every row read below runs on. */
   prisma: PrismaClient;
   /** The permission service this process authorizes every other surface with. */
@@ -272,26 +267,17 @@ export type ApiAgentGroupCollaboratorsOptions = Readonly<{
   pipelines: ApiAgentPipelines;
   /** Names this process in every refusal below. */
   processName: string;
-  report?: ApiAgentGroupAbsenceReport;
+  report?: ApiScenarioAbsenceReport;
 }>;
 
-/**
- * The tRPC ports {@link ApiTrpcCollaborators} mounts individually.
- *
- * Nested here rather than flattened onto {@link ApiAgentGroupCollaborators}
- * itself: this half also carries the `scenarios` APPLICATION slice under that
- * exact name, and a port and an application slice cannot share one key on one
- * object. `composeApiTrpcCollaborators`
- * (`api-trpc-features.composition.ts`) reads `ports.*` into the flat record
- * and the application slices into `application` beside them.
- */
-type ApiAgentGroupPorts = Readonly<{
-  scenarios: ScenarioTrpcPorts;
-}>;
-
-/** The application slices and the port group this half owns, composed together. */
-export type ApiAgentGroupCollaborators = Readonly<{
-  ports: ApiAgentGroupPorts;
+/** The three routers, the two `ctx.app` slices, and the services the doors take. */
+export type ComposedScenarioFeature = Readonly<{
+  /** `scenarios.*`, `suites.*` and `setupSkills.*`, on the process's own root. */
+  routers(mount: ApiTrpcFeatureMount): {
+    scenarios: ReturnType<typeof createScenarioTrpcRouter>;
+    setupSkills: ReturnType<typeof createSetupSkillsTrpcRouter>;
+    suites: ReturnType<typeof createSuiteTrpcRouter>;
+  };
   /** For `ctx.app.scenarios`. */
   scenarios: ScenarioApp;
   /**
@@ -323,11 +309,11 @@ export type ApiAgentGroupCollaborators = Readonly<{
   suites: SuiteApp;
 }>;
 
-/** Composes the agent-group half from this process's own graph. */
-export function composeApiAgentGroupCollaborators(
-  options: ApiAgentGroupCollaboratorsOptions,
-): ApiAgentGroupCollaborators {
-  const logger = createLogger(`${options.processName}:agent-group`);
+/** Composes the scenario feature over this process's own graph. */
+export function composeScenarioFeature(
+  options: ScenarioFeatureCollaborators,
+): ComposedScenarioFeature {
+  const logger = createLogger(`${options.processName}:scenario`);
 
   const pipelines = options.pipelines;
   if (!options.redis) options.report?.absent("live-buffer");
@@ -427,9 +413,62 @@ export function composeApiAgentGroupCollaborators(
     simulations,
     agentTestService,
     suites: suiteApp,
-    ports: {
-      scenarios: composeScenarioPorts(logger),
-    },
+    routers: (mount) => scenarioRouters(mount, composeScenarioPorts(logger)),
+  };
+}
+
+/**
+ * The three namespaces, built the one way whether the feature composed or not.
+ *
+ * `suites.*` and `setupSkills.*` take no ports at all — a suite is read through
+ * `ctx.app.suites`, and the setup catalogue is a compiled artifact the package
+ * holds — so the only thing a refusal changes is the two fire-and-forget
+ * signals `scenarios.*` carries.
+ */
+function scenarioRouters(mount: ApiTrpcFeatureMount, ports: ScenarioTrpcPorts) {
+  return {
+    scenarios: createScenarioTrpcRouter({ ...mount, ports }),
+    // Takes no ports: the catalogue is a compiled artifact the Langy package
+    // holds, so there is nothing for a deployment to answer.
+    setupSkills: createSetupSkillsTrpcRouter(mount),
+    // Takes no ports either — a suite, its folders and its runs are all read
+    // through `ctx.app.suites`.
+    suites: createSuiteTrpcRouter(mount),
+  };
+}
+
+/**
+ * The scenario surfaces on a process that composed no graph to run them over.
+ *
+ * All three namespaces still mount, so no other surface has to branch on
+ * whether `ctx.app.scenarios` exists, and every call refuses by name — which is
+ * what tells a customer their test cases are unreachable rather than gone.
+ */
+export function refusingScenarioFeature(): ComposedScenarioFeature {
+  const refuse = <T>(capability: string): T =>
+    new Proxy(
+      {},
+      {
+        get: () => (): never => {
+          throw new ApiScenarioUnavailableError(capability);
+        },
+        has: () => true,
+      },
+    ) as T;
+
+  return {
+    routers: (mount) =>
+      scenarioRouters(mount, {
+        trackScenarioCreated: () => undefined,
+        fireScenarioCreatedNurturing: () => undefined,
+        captureException: () => undefined,
+      }),
+    scenarios: refuse<ScenarioApp>("The scenario surface"),
+    scenarioService: refuse<ScenarioService>("The scenario store"),
+    scenarioTabs: refuse<ScenarioTabRegistry>("The scenario tab registry"),
+    simulations: refuse<SimulationService>("The simulation run store"),
+    agentTestService: refuse<AgentTestService>("Running a test agent"),
+    suites: refuse<SuiteApp>("The suite surface"),
   };
 }
 
@@ -445,10 +484,7 @@ export function composeApiAgentGroupCollaborators(
  * and that is correct rather than degraded — a deployment that stores no runs
  * has no run to show.
  */
-function composeSimulations(
-  options: ApiAgentGroupCollaboratorsOptions,
-  pipelines: ApiAgentPipelines,
-) {
+function composeSimulations(options: ScenarioFeatureCollaborators, pipelines: ApiAgentPipelines) {
   const execution = pipelines.simulations;
   if (!options.resolveClickHouseClient) {
     return SimulationClickHouseAdapter.createNull({ execution });
@@ -469,7 +505,7 @@ function composeSimulations(
  * deployment with no ClickHouse endpoint is failing or merely quiet, so both
  * refuse by name instead of quietly reporting zero runs.
  */
-function composeResultAtoms(options: ApiAgentGroupCollaboratorsOptions): ResultAtomsService {
+function composeResultAtoms(options: ScenarioFeatureCollaborators): ResultAtomsService {
   if (!options.resolveClickHouseClient) {
     return ResultAtomsClickHouseAdapter.createUnavailable({ prisma: options.prisma });
   }
@@ -479,9 +515,7 @@ function composeResultAtoms(options: ApiAgentGroupCollaboratorsOptions): ResultA
   });
 }
 
-function composeRunConfigurations(
-  options: ApiAgentGroupCollaboratorsOptions,
-): RunConfigurationsService {
+function composeRunConfigurations(options: ScenarioFeatureCollaborators): RunConfigurationsService {
   if (!options.resolveClickHouseClient) {
     return RunConfigurationsClickHouseAdapter.createUnavailable({ prisma: options.prisma });
   }
@@ -567,7 +601,7 @@ class ApiScenarioSecretCipher extends ScenarioSecretCipherPort {
  * nothing but a scenario's own secret should lose anything.
  */
 function composeScenarioSecretCipher(
-  options: ApiAgentGroupCollaboratorsOptions,
+  options: ScenarioFeatureCollaborators,
 ): ScenarioSecretCipherPort {
   if (options.encryption) return new ApiScenarioSecretCipher(options.encryption);
   options.report?.absent("scenario-secrets");
@@ -657,7 +691,7 @@ class UnavailableApiScenarioTabStore extends ScenarioTabStorePort {
  *                       service every other run read answers from.
  */
 function composeScenarioExecution(
-  options: ApiAgentGroupCollaboratorsOptions,
+  options: ScenarioFeatureCollaborators,
   composed: {
     scenarios: ScenarioService;
     suites: SuiteService;

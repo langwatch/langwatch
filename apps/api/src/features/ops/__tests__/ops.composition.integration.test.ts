@@ -16,7 +16,7 @@
  *                          shared endpoint, and its named refusal on a
  *                          deployment that has none
  *
- * It used to be composed inside the agent-group half, so a process missing any
+ * It used to be composed inside the agent half, so a process missing any
  * scenario collaborator lost the whole back office with it. It composes itself
  * now, and the tests moved with it.
  */
@@ -31,7 +31,11 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { UserService } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
-import { ApiApplication, MissingAgentService, MissingSecretService } from "../../../api.application";
+import {
+  ApiApplication,
+  MissingAgentService,
+  MissingSecretService,
+} from "../../../api.application";
 import {
   ApiTrpcFeaturesComposition,
   composeApiTrpcCollaborators,

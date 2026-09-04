@@ -46,7 +46,7 @@ import type { WorkflowEvaluationOutcome } from "@langwatch/workflow-server";
 import type { MiddlewareHandler } from "hono";
 
 import type { EnterpriseGovernanceApplication } from "../features/enterprise/enterprise-governance.composition";
-import type { ApiAgentGroupCollaborators } from "./api-trpc-collaborators.agent-group.composition";
+import type { ComposedScenarioFeature } from "../features/scenario/scenario.composition";
 import type { ApiAnalyticsCollaborators } from "./api-trpc-collaborators.analytics.composition";
 import type { ApiExecutionCollaborators } from "./api-trpc-collaborators.execution.composition";
 import type { ApiIdentityCollaborators } from "./api-trpc-collaborators.identity.composition";
@@ -91,7 +91,7 @@ export type ApiPackagedRestCompositionOptions = Readonly<{
   agents: AgentService | undefined;
   /** The connected-agent transport (ADR-128), for `/api/v1/agents`'s connect and call routes. */
   connectedAgents: ApiConnectedAgentsComposition | undefined;
-  agentGroup: ApiAgentGroupCollaborators | undefined;
+  scenario: ComposedScenarioFeature;
   analytics: ApiAnalyticsCollaborators | undefined;
   authz: AuthzService;
   authzComposition: ApiAuthzComposition | undefined;
@@ -167,7 +167,11 @@ export function composeApiPackagedRest(
   const agentCache = composeAgentCache(options);
   const storedObjectBytes = options.productInfra?.storedObjectBytes;
   const dualAuth = options.session
-    ? createApiDualCredentialAuth({ apiKeys: options.apiKeys, session: options.session })
+    ? createApiDualCredentialAuth({
+        apiKeys: options.apiKeys,
+        session: options.session,
+        credentials: options.credentials,
+      })
     : undefined;
 
   return {
@@ -234,14 +238,10 @@ export function composeApiPackagedRest(
               createApiUserAvatarObjectReader(() => options.productInfra!.storedObjectApp),
           }
         : {}),
-      ...(options.agentGroup
-        ? {
-            scenarios: () => options.agentGroup!.scenarioService,
-            scenarioTabs: () => options.agentGroup!.scenarioTabs,
-            simulations: () => options.agentGroup!.simulations,
-            suites: () => options.agentGroup!.suites,
-          }
-        : {}),
+      scenarios: () => options.scenario.scenarioService,
+      scenarioTabs: () => options.scenario.scenarioTabs,
+      simulations: () => options.scenario.simulations,
+      suites: () => options.scenario.suites,
       ...(options.secrets ? { secrets: secretAppFrom(options.secrets) } : {}),
       // Both tracked-event URLs, over the SAME span collection the OTLP
       // receiver and the SDK collector send on. Absent where this process

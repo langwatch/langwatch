@@ -41,7 +41,7 @@
  *
  * The run EXECUTOR is not a command and is not composed here: submitting a
  * scenario run to a pool and resolving its target reach ten other verticals,
- * and `api-trpc-collaborators.agent-group.composition.ts` still refuses those by
+ * and `features/scenario/scenario.composition.ts` still refuses those by
  * name. Same for the Langy AGENT MANAGER: starting a turn dispatches to it over
  * HTTP, and a process with no `LANGY_*` configuration has none. Those are
  * deployment absences, which is exactly what this file's absence is NOT.
@@ -77,7 +77,7 @@ import {
 /**
  * A write this deployment cannot enqueue, refused by name.
  *
- * The same `service_unavailable` the agent-group half answers with — the code
+ * The same `service_unavailable` the scenario feature answers with — the code
  * is what the client presentation registry is keyed by — declared here so this
  * module composes without reaching back into the half that consumes it.
  */

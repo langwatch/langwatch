@@ -56,7 +56,6 @@ import type { DataRetentionTrpcPolicy } from "@langwatch/data-retention-server";
 import type { MonitorTrpcPorts } from "@langwatch/monitor-server";
 import type { CodingAgentTrpcPorts } from "@langwatch/coding-agent-server";
 import type { OpsTrpcPorts } from "@langwatch/ops-server";
-import type { ScenarioTrpcPorts } from "@langwatch/scenario-server";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { AppTrpcDeclaredCheck } from "./app-trpc.policy-kit";
 import type { AutomationMountPorts } from "../features/automation/automation-trpc.mount";
@@ -308,9 +307,6 @@ export type ApiTrpcCollaborators<
   emailSuppression: EmailSuppressionTrpcPorts;
   /** The SCIM plan gate, and the back office's connection ledger with its trail. */
   enterprise: EnterpriseTrpcMountPorts;
-
-  /** The two fire-and-forget signals a new test case triggers, and where a failure in either goes. */
-  scenarios: ScenarioTrpcPorts;
 
   /**
    * The retention policy: who may write an override at a scope, which values

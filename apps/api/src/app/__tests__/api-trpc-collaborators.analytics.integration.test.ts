@@ -45,7 +45,13 @@ import {
   ApiTrpcFeaturesComposition,
   composeApiTrpcCollaborators,
 } from "../api-trpc-features.composition";
-import { stub, stubApplicationSlices, stubComposedFeatures, stubInfrastructureEntitlements, testHalves } from "./api-trpc-collaborators.test-halves";
+import {
+  stub,
+  stubApplicationSlices,
+  stubComposedFeatures,
+  stubInfrastructureEntitlements,
+  testHalves,
+} from "./api-trpc-collaborators.test-halves";
 
 const dashboardRow = {
   id: "dashboard-1",
@@ -179,7 +185,7 @@ function composeApplication(options: { clickhouse?: boolean; workbenchEnabled?: 
   });
 
   const features = ApiTrpcFeaturesComposition.tryCompose({
-      composed: stubComposedFeatures(),
+    composed: stubComposedFeatures(),
     infrastructure: {
       ...stubInfrastructureEntitlements(),
       prisma: prisma.client,

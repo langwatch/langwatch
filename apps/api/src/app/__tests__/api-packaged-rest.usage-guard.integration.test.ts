@@ -18,6 +18,7 @@ import { composeEnterpriseGovernanceApplication } from "../../features/enterpris
 import { composeApiPackagedRest } from "../api-packaged-rest.composition";
 import type { ApiPackagedRestCompositionOptions } from "../api-packaged-rest.composition";
 import type { ApiTraceIngestComposition } from "../api-trace-ingest.composition";
+import { refusingScenarioFeature } from "../../features/scenario/scenario.composition";
 
 const project = {
   id: "project-1",
@@ -39,7 +40,7 @@ function composeGuard(usageLimit: ApiTraceIngestComposition["usageLimit"] | unde
   const collaborators = composeApiPackagedRest({
     agents: undefined,
     connectedAgents: undefined,
-    agentGroup: undefined,
+    scenario: refusingScenarioFeature(),
     analytics: undefined,
     authz: { authorizeProjectPermission: async () => undefined } as never,
     authzComposition: undefined,

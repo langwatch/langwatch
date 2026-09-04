@@ -354,9 +354,6 @@ export function createApiTrpcPorts<
     emailSuppression: collaborators.emailSuppression,
     enterprise: collaborators.enterprise,
 
-    scenarios: collaborators.scenarios,
-
-
     /**
      * The user rows this connection answers, and the four it deliberately
      * does not.

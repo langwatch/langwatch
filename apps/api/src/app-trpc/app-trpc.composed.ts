@@ -13,6 +13,7 @@
 import type { ComposedGatewayFeature } from "../features/gateway/gateway.composition";
 import type { ComposedLangyFeature } from "../features/langy/langy.composition";
 import type { ComposedOpsFeature } from "../features/ops/ops.composition";
+import type { ComposedScenarioFeature } from "../features/scenario/scenario.composition";
 
 export type ComposedApiFeatures = Readonly<{
   /** Six namespaces, one `ctx.app` slice and two REST families over one application. */
@@ -28,4 +29,9 @@ export type ComposedApiFeatures = Readonly<{
    * literal because that slice is read by surfaces this feature does not own.
    */
   ops: ComposedOpsFeature;
+  /**
+   * Three namespaces, the `ctx.app.scenarios` and `ctx.app.suites` slices, and
+   * the four services the two packaged scenario REST families take directly.
+   */
+  scenario: ComposedScenarioFeature;
 }>;

@@ -1,10 +1,10 @@
 /**
- * The agent-group half of the packaged tRPC record, served by the API process.
+ * The scenario feature of the packaged tRPC record, served by the API process.
  *
  * What this pins is one call per namespace this half mounts, each of them made
  * over the REAL `/api/trpc` handler on THIS process's root, through THIS
  * process's policy chain, against the collaborator set
- * `composeApiAgentGroupCollaborators` produced. Nothing here reaches a stub
+ * `composeScenarioFeature` produced. Nothing here reaches a stub
  * through a proxy: the fakes are at the PORTS — a Prisma double, an AuthZ
  * service, a flag store and a broadcast fabric — and everything between the
  * HTTP request and them is the real composed graph.
@@ -53,21 +53,29 @@ import type { WorkflowService } from "@langwatch/workflow-contract";
 import type { UserService } from "@langwatch/user-contract";
 import superjson from "superjson";
 import { describe, expect, it, vi } from "vitest";
-import { ApiApplication, MissingAgentService, MissingSecretService } from "../../api.application";
-import { createSseSubscriptionApp } from "../../app-trpc/app-trpc.sse";
-import { ApiRestSecurity } from "../../api-rest.security";
-import { ApiRestObservabilityComposition } from "../api-rest-observability.composition";
+import {
+  ApiApplication,
+  MissingAgentService,
+  MissingSecretService,
+} from "../../../api.application";
+import { createSseSubscriptionApp } from "../../../app-trpc/app-trpc.sse";
+import { sameOriginSseInit } from "../../../app-trpc/__tests__/support/sse-browser-request";
+import { ApiRestSecurity } from "../../../api-rest.security";
+import { ApiRestObservabilityComposition } from "../../../app/api-rest-observability.composition";
 import {
   ApiTrpcFeaturesComposition,
   composeApiTrpcCollaborators,
-} from "../api-trpc-features.composition";
+} from "../../../app/api-trpc-features.composition";
+import { ApiScenarioAbsenceReport, composeScenarioFeature } from "../scenario.composition";
+import { composeApiAgentPipelines } from "../../../app/api-agent-pipelines.composition";
+import { composeLangyFeature } from "../../langy/langy.composition";
 import {
-  ApiAgentGroupAbsenceReport,
-  composeApiAgentGroupCollaborators,
-} from "../api-trpc-collaborators.agent-group.composition";
-import { composeApiAgentPipelines } from "../api-agent-pipelines.composition";
-import { composeLangyFeature } from "../../features/langy/langy.composition";
-import { stub, stubApplicationSlices, stubComposedFeatures, stubInfrastructureEntitlements, testHalves } from "./api-trpc-collaborators.test-halves";
+  stub,
+  stubApplicationSlices,
+  stubComposedFeatures,
+  stubInfrastructureEntitlements,
+  testHalves,
+} from "../../../app/__tests__/api-trpc-collaborators.test-halves";
 
 const SESSION_USER = {
   id: "user-1",
@@ -218,7 +226,7 @@ function composeApplication(
     eventing?: EventSourcing;
     /** Unset, which is the shape the cipher's own absence is driven from. */
     encryption?: null;
-    report?: ApiAgentGroupAbsenceReport;
+    report?: ApiScenarioAbsenceReport;
   } = {},
 ) {
   const prisma = testPrisma();
@@ -260,7 +268,7 @@ function composeApplication(
     processName: "langwatch-api-test",
   });
 
-  const group = composeApiAgentGroupCollaborators({
+  const scenario = composeScenarioFeature({
     prisma: prisma.client,
     authz,
     // The agent directory a suite's cases and an HTTP target resolve through.
@@ -311,11 +319,13 @@ function composeApplication(
   });
 
   const features = ApiTrpcFeaturesComposition.tryCompose({
-    composed: { ...stubComposedFeatures(), langy },
+    composed: { ...stubComposedFeatures(), langy, scenario },
     infrastructure,
-    collaborators: composeApiTrpcCollaborators(testHalves({ agentGroup: group }), {
+    collaborators: composeApiTrpcCollaborators(testHalves(), {
       ...stubApplicationSlices(),
       langy: langy.app,
+      scenarios: scenario.scenarios,
+      suites: scenario.suites,
     }),
   });
   if (!features) throw new Error("the record refused to compose against its collaborators");
@@ -343,7 +353,7 @@ function composeApplication(
     },
   });
 
-  return { application, prisma, group, emitterFor };
+  return { application, prisma, scenario, emitterFor };
 }
 
 /** The REST security the subscription lane declares its access against. */
@@ -403,7 +413,7 @@ async function watchSse(options: {
   const encoded = encodeURIComponent(superjson.stringify(input));
   const response = await application.hono.request(
     `http://127.0.0.1/api/sse/${path}?input=${encoded}`,
-    { signal: controller.signal },
+    sameOriginSseInit({ signal: controller.signal }),
   );
 
   if (emitter && channel) {
@@ -442,7 +452,7 @@ async function watchSse(options: {
   return { status: response.status, contentType: response.headers.get("Content-Type"), frames };
 }
 
-describe("given the API process composed the agent-group half from its own graph", () => {
+describe("given the API process composed the scenario feature from its own graph", () => {
   describe("when the record is built", () => {
     it("mounts all six of this half's namespaces and no others of its own", () => {
       const { application } = composeApplication();
@@ -689,13 +699,13 @@ describe("given the API process composed the agent-group half from its own graph
 
   describe("when a scenario run is prepared against this process's own graph", () => {
     it("validates the run through the composed prefetcher rather than refusing by name", async () => {
-      const { group, prisma } = composeApplication();
+      const { scenario, prisma } = composeApplication();
 
       // Driven on the composed application rather than over HTTP, the way the
       // trace half's reads are: reaching this through `scenarios.run` would
       // first have to satisfy a parameter resolution that reads a scenario row
       // this test does not hold.
-      const result = await group.scenarios.prefetchExecution({
+      const result = await scenario.scenarios.prefetchExecution({
         context: {
           projectId: PROJECT_ID,
           scenarioId: "scenario-1",
@@ -791,7 +801,7 @@ describe("given a deployment that configured no stored-secret encryption key", (
     const absent: string[] = [];
     composeApplication({
       encryption: null,
-      report: new (class extends ApiAgentGroupAbsenceReport {
+      report: new (class extends ApiScenarioAbsenceReport {
         absent(capability: string): void {
           absent.push(capability);
         }

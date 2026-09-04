@@ -355,8 +355,13 @@ function composeApplication(
   const prisma = testPrisma();
   const audit = new RecordingAudit();
   const features = ApiTrpcFeaturesComposition.tryCompose({
-      composed: stubComposedFeatures(),
-    infrastructure: { ...stubInfrastructureEntitlements(), prisma: prisma.client, authz: testAuthz(), audit },
+    composed: stubComposedFeatures(),
+    infrastructure: {
+      ...stubInfrastructureEntitlements(),
+      prisma: prisma.client,
+      authz: testAuthz(),
+      audit,
+    },
     collaborators: testCollaborators(),
   });
   if (!features) throw new Error("the record refused to compose against its test collaborators");
@@ -479,7 +484,12 @@ describe("given an API process with no collaborators for the record", () => {
 
     const features = ApiTrpcFeaturesComposition.tryCompose({
       composed: stubComposedFeatures(),
-      infrastructure: { ...stubInfrastructureEntitlements(), prisma: {} as unknown as PrismaClient, authz: testAuthz(), audit: undefined },
+      infrastructure: {
+        ...stubInfrastructureEntitlements(),
+        prisma: {} as unknown as PrismaClient,
+        authz: testAuthz(),
+        audit: undefined,
+      },
       collaborators: undefined,
       report: LoggedApiTrpcFeaturesAbsence.create({ warn }),
     });
@@ -533,7 +543,6 @@ describe("given a process that opened no infrastructure for the record", () => {
     expect(warn).toHaveBeenCalledWith({ reason: "no-database" }, expect.any(String));
   });
 });
-
 
 /**
  * The signed-in caller, in the two shapes the process holds them: what Better
@@ -611,7 +620,7 @@ function composeSessionApplication(options: {
   session?: BrowserSession;
 }) {
   const features = ApiTrpcFeaturesComposition.tryCompose({
-      composed: stubComposedFeatures(),
+    composed: stubComposedFeatures(),
     infrastructure: {
       ...stubInfrastructureEntitlements(),
       prisma: testPrisma().client,

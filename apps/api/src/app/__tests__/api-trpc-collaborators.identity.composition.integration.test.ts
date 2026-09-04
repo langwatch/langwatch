@@ -59,7 +59,12 @@ import {
   composeApiTrpcCollaborators,
 } from "../api-trpc-features.composition";
 import { composeApiIdentityCollaborators } from "../api-trpc-collaborators.identity.composition";
-import { stubApplicationSlices, stubComposedFeatures, stubInfrastructureEntitlements, testHalves } from "./api-trpc-collaborators.test-halves";
+import {
+  stubApplicationSlices,
+  stubComposedFeatures,
+  stubInfrastructureEntitlements,
+  testHalves,
+} from "./api-trpc-collaborators.test-halves";
 
 const SESSION_USER = {
   id: "user-1",
@@ -219,8 +224,13 @@ function composeApplication(
   const client = overrides.prismaClient ?? prisma.client;
 
   const features = ApiTrpcFeaturesComposition.tryCompose({
-      composed: stubComposedFeatures(),
-    infrastructure: { ...stubInfrastructureEntitlements(), prisma: client, authz: testAuthz(), audit },
+    composed: stubComposedFeatures(),
+    infrastructure: {
+      ...stubInfrastructureEntitlements(),
+      prisma: client,
+      authz: testAuthz(),
+      audit,
+    },
     collaborators: composeApiTrpcCollaborators(
       testHalves({ identity: composeIdentityHalf(client, grants, overrides.eventing) }),
       stubApplicationSlices(),

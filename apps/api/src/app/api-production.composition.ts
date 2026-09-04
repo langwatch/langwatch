@@ -118,10 +118,11 @@ import {
   LoggedApiModelProviderAbsence,
 } from "./api-model-provider.composition";
 import {
-  composeApiAgentGroupCollaborators,
-  LoggedApiAgentGroupAbsence,
-  type ApiAgentGroupCollaborators,
-} from "./api-trpc-collaborators.agent-group.composition";
+  composeScenarioFeature,
+  LoggedApiScenarioAbsence,
+  refusingScenarioFeature,
+  type ComposedScenarioFeature,
+} from "../features/scenario/scenario.composition";
 import {
   composeApiProductGroupCollaborators,
   type ApiProductGroupCollaborators,
@@ -589,7 +590,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private composedProductGroup: ApiProductGroupCollaborators | undefined;
 
   private composedProductInfra: ApiProductInfraCollaborators | undefined;
-  private composedAgentGroup: ApiAgentGroupCollaborators | undefined;
+  private composedScenario!: ComposedScenarioFeature;
   private composedOrgGroup: ApiOrgGroupCollaborators | undefined;
   /**
    * The process's ONE invitation service, or none.
@@ -822,12 +823,12 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     });
     const agents = this.resolveAgents(options);
     this.resolveConnectedAgents(options, authz, tenancy, agents);
-    // "Test agent", over the agent-group half's Scenario application — a
+    // "Test agent", over the scenario feature's Scenario application — a
     // thunk for the same reason `workflowCopies` above is one: the agent
     // group composes AFTER this point, so a service read here rather than at
     // the call would always be absent.
     const agentTesting = ApiAgentTestAdapter.create({
-      service: () => this.composedAgentGroup?.agentTestService,
+      service: () => this.composedScenario?.agentTestService,
       processName: options.config.serviceName,
     });
     // The charted reads, the workbench and the dashboards, composed over this
@@ -920,12 +921,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       processName: options.config.serviceName,
       report: LoggedApiAgentPipelinesAbsence.create(createLogger(options.config.serviceName)),
     });
-    this.composedAgentGroup = this.composeAgentGroup(
-      options,
-      authz,
-      queueInfrastructure,
-      encryption,
-    );
+    this.composedScenario = this.composeScenario(options, authz, queueInfrastructure, encryption);
     // The org-group half: the nine surfaces a TENANT is administered through —
     // its members and their bindings, its projects' own lifecycle, the coding
     // agents inside them, the automations they fire, and the four Enterprise
@@ -999,9 +995,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         gateway: this.composedGateway,
         langy: this.composedLangy,
         ops: this.composedOps,
+        scenario: this.composedScenario,
       },
       // One literal, checked against the real type each half returns. A
-      // process missing any of the nine composes none of the record — see
+      // process missing any of the eight composes none of the record — see
       // {@link composeApiTrpcCollaborators}.
       collaborators: composeApiTrpcCollaborators(
         {
@@ -1011,7 +1008,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
           execution: this.composedExecution,
           productGroup: this.composedProductGroup,
           traceGroup: this.composedTraceGroup,
-          agentGroup: this.composedAgentGroup,
           orgGroup: this.composedOrgGroup,
           productInfra: this.composedProductInfra,
         },
@@ -1024,6 +1020,8 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
           github,
           langy: this.composedLangy.app,
           ops: this.composedOps.app,
+          scenarios: this.composedScenario.scenarios,
+          suites: this.composedScenario.suites,
           ...composeEnterpriseGovernanceApplication(this.options.enterprise),
         },
         LoggedApiCollaboratorGap.create(createLogger(options.config.serviceName)),
@@ -1033,12 +1031,14 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // The hosted Model Context Protocol endpoint, served off the Node server
     // ahead of the Hono application because its Streamable HTTP and
     // Server-Sent Events transports hold the raw response for a session's
-    // life. Absent when this process has no cipher or no database: the
-    // endpoint would then have no way to store the API key a session was
-    // minted from, or to tell whose key a bearer token is.
+    // life. Absent when this process has no cipher, no database or no
+    // authorization: the endpoint would then have no way to store the API key
+    // a session was minted from, to tell whose key a bearer token is, or to
+    // re-prove the grant that bearer was minted from.
     const hostedMcp = tryCreateHostedMcpSurface({
       prisma: this.composedDatabase?.connection.client,
       encryption,
+      authz,
       redis: queueInfrastructure?.redis ?? null,
       baseHost: options.config.infrastructure.execution.publicBaseUrl ?? "https://app.langwatch.ai",
     });
@@ -1515,7 +1515,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
           authz,
         })
       : undefined;
-    const simulations = this.composedAgentGroup?.simulations;
+    const simulations = this.composedScenario.simulations;
     const exportBroadcast = this.composedIdentity?.broadcast;
     // The bulk trace download, beside the bulk run download below. It reads
     // THROUGH the one read stack every other trace surface redacts through —
@@ -1829,11 +1829,12 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
             probeProjectPermission: (input: {
               session: { user: { id: string } };
               projectId: string;
+              permission: AuthzPermission;
             }) =>
               authoringSession.permitted({
                 session: input.session,
                 projectId: input.projectId,
-                permission: "project:view",
+                permission: input.permission,
               }),
             // The demo project grants `project:view` to everybody, so the
             // permission probe above would PASS for it — which is why this is
@@ -1853,7 +1854,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     const packaged = composeApiPackagedRest({
       agents: this.composedAgents?.agents,
       connectedAgents: this.composedConnectedAgents,
-      agentGroup: this.composedAgentGroup,
+      scenario: this.composedScenario,
       analytics: this.composedAnalytics,
       authz,
       authzComposition: this.composedAuthz,
@@ -2861,44 +2862,39 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   }
 
   /**
-   * Composes the agent half over this process's own graph.
+   * Composes the scenario feature over this process's own graph.
    *
-   * Five things gate it, and each one is read by more than one of the six
+   * Five things gate it, and each one is read by more than one of the three
    * surfaces — plus the four collaborators a scenario run is PREPARED against,
    * which every one of the five already implies (see the narrowing below).
-   * The five: the database (every scenario, suite and conversation is a row),
-   * the tenancy graph (a suite resolves its project's organization and the
-   * Langy rollout gate resolves the same), the agent directory (a suite's cases
-   * run against one), the user directory (a run and a conversation both name
-   * who started them) and the broadcast fabric (all three subscriptions stream
-   * off it). A host that injected its own collaborator set composed none of
-   * them here and holds the set whole.
+   * The five: the database (every scenario and suite is a row), the tenancy
+   * graph (a suite resolves its project's organization), the agent directory
+   * (a suite's cases run against one), the user directory (a run names who
+   * started it) and the broadcast fabric (the live simulation subscription
+   * streams off it). A host that injected its own collaborator set composed
+   * none of them here and holds the set whole.
    *
-   * Everything else degrades where it is used rather than here — see the four
-   * absences on `api-trpc-collaborators.agent-group.composition.ts`. That is
-   * the same rule the trace half follows and for the same reason: a missing
-   * queue must not make six namespaces unmountable, because three of them are
-   * subscriptions that stream off this process's own emitter and one of them is
-   * a compiled catalogue that reaches nothing at all.
+   * Absent any of them all three namespaces still mount and refuse by name.
+   * Everything else degrades where it is used rather than here — see the two
+   * absences on `features/scenario/scenario.composition.ts`. That is the same
+   * rule the trace half follows and for the same reason: a missing queue must
+   * not make three namespaces unmountable, when one of them is a subscription
+   * that streams off this process's own emitter and one is a compiled
+   * catalogue that reaches nothing at all.
    */
-  private composeAgentGroup(
+  private composeScenario(
     options: ApiRuntimeCompositionOptions,
     authz: AuthzService,
     queueInfrastructure: ApiQueueInfrastructure | undefined,
     encryption: SecretEncryptionPort | undefined,
-  ): ApiAgentGroupCollaborators | undefined {
+  ): ComposedScenarioFeature {
     const database = this.composedDatabase?.connection;
     const tenancy = this.composedTenancy;
     const agents = this.composedAgents?.agents;
     const identity = this.composedIdentity;
     const auth = this.composedAuth?.compose();
-    // The SAME flag store the `featureFlag.*` surface answers from, composed by
-    // the product-group half. Taken rather than built: the Langy rollout gate
-    // and the browser's own flag read must never disagree about whether an
-    // account is inside the rollout.
-    const featureFlags = this.composedProductGroup?.featureFlagService;
-    if (!database || !tenancy || !agents || !identity || !auth || !featureFlags) {
-      return undefined;
+    if (!database || !tenancy || !agents || !identity || !auth) {
+      return refusingScenarioFeature();
     }
 
     // The four collaborators a scenario RUN is prepared against, and the
@@ -2915,9 +2911,9 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     const modelProviders = this.composedModelProviders;
     const secrets = this.secrets;
     const traces = this.composedTraceGroup?.traceReads?.readers().tree;
-    if (!execution || !modelProviders || !secrets || !traces) return undefined;
+    if (!execution || !modelProviders || !secrets || !traces) return refusingScenarioFeature();
 
-    return composeApiAgentGroupCollaborators({
+    return composeScenarioFeature({
       prisma: database.client,
       authz,
       agents,
@@ -2959,7 +2955,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       pipelines: this.composedAgentPipelines,
       defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
       processName: options.config.serviceName,
-      report: LoggedApiAgentGroupAbsence.create(createLogger(options.config.serviceName)),
+      report: LoggedApiScenarioAbsence.create(createLogger(options.config.serviceName)),
     });
   }
 

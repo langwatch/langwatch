@@ -57,7 +57,6 @@ import type {
 import type { EvaluatorTrpcPorts } from "@langwatch/evaluator-server";
 import type { ExperimentTrpcPorts } from "@langwatch/experiment-server";
 import type { BugReportTrpcPorts } from "@langwatch/ops-server";
-import type { ScenarioTrpcPorts } from "@langwatch/scenario-server";
 
 import type {
   GroupTrpcPorts,
@@ -160,9 +159,6 @@ import {
 } from "../features/enterprise/enterprise-trpc.mount";
 import { createEnterpriseGovernanceTrpcRouters } from "../features/enterprise/enterprise-governance-trpc.mount";
 import { composeGovernanceHomeTrpcRouter } from "../features/enterprise/governance-home.composition";
-import { createSetupSkillsTrpcRouter } from "../features/langy/setup-skills-trpc.mount";
-import { createScenarioTrpcRouter } from "../features/scenario/scenario-trpc.mount";
-import { createSuiteTrpcRouter } from "../features/suite/suite-trpc.mount";
 import { createHttpProxyTrpcRouter } from "../features/agent/http-proxy-trpc.mount";
 import { createSavedViewTrpcRouter } from "../features/dashboard/dashboard-trpc.mount";
 import {
@@ -246,8 +242,6 @@ export interface AppTrpcFeaturePorts<
    * and the evaluator replication a monitor copy carries with it.
    */
   monitors: MonitorTrpcPorts;
-  /** The two fire-and-forget signals a new test case triggers, and where a failure in either goes. */
-  scenarios: ScenarioTrpcPorts;
   /** The forty-six answers `organization.*` needs from this deployment. */
   organization: OrganizationTrpcPorts<TSignUpDataSchema>;
   /** The audit-log read's own `kind: "custom"` check, already built. */
@@ -582,6 +576,7 @@ export function createAppTrpcFeatures<
   const { mount, composed, infrastructure, ports } = options;
   const gateway = composed.gateway.router(mount);
   const langyRouters = composed.langy.routers(mount);
+  const scenarioRouters = composed.scenario.routers(mount);
   const governance = createEnterpriseGovernanceTrpcRouters(mount);
   const enterprise = createEnterpriseTrpcRouters({ ...mount, ports: ports.enterprise });
   const billing = createEnterpriseBillingTrpcRouters({
@@ -668,13 +663,11 @@ export function createAppTrpcFeatures<
     langyEgress: langyRouters.langyEgress,
     ops: composed.ops.router(mount),
     // Carries `onSimulationUpdate`, for the same reason.
-    scenarios: createScenarioTrpcRouter({ ...mount, ports: ports.scenarios }),
-    // Takes no ports: the catalogue is a compiled artifact the Langy package
-    // holds, so there is nothing for a deployment to answer.
-    setupSkills: createSetupSkillsTrpcRouter(mount),
+    scenarios: scenarioRouters.scenarios,
+    setupSkills: scenarioRouters.setupSkills,
     // Takes no ports either — a suite, its folders and its runs are all read
     // through `ctx.app.suites`.
-    suites: createSuiteTrpcRouter(mount),
+    suites: scenarioRouters.suites,
     dataRetention: createDataRetentionTrpcRouter({ ...mount, ports: ports.dataRetention }),
     monitors: createMonitorTrpcRouter({ ...mount, ports: ports.monitors }),
     // No ports: the probe reads `ctx.app.storedObjectApp` and nothing else.

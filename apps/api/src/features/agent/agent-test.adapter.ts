@@ -7,7 +7,7 @@
  * the seam belongs to the composition root.
  *
  * The service arrives as a THUNK because of composition order, not taste.
- * `resolveAgents` runs before the agent-group half that builds
+ * `resolveAgents` runs before the scenario feature that builds
  * `AgentTestService`, so a service read at composition time would always be
  * absent. It is read at the call instead, which is the only moment it is
  * needed.

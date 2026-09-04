@@ -141,11 +141,9 @@ export function refusingLangyFeature(): ComposedLangyFeature {
   const app = new Proxy(
     {},
     {
-      get:
-        () =>
-        (): never => {
-          throw new ApiLangyUnavailableError("The Langy conversation surface");
-        },
+      get: () => (): never => {
+        throw new ApiLangyUnavailableError("The Langy conversation surface");
+      },
       has: () => true,
     },
   ) as LangyApp;
@@ -237,8 +235,7 @@ function composeLangy(options: LangyFeatureCollaborators): LangyApp {
     turns,
     credentials: {
       sessionKeys: {
-        mint: () =>
-          Promise.reject(new ApiLangyUnavailableError("Minting a Langy session key")),
+        mint: () => Promise.reject(new ApiLangyUnavailableError("Minting a Langy session key")),
         revokeManaged: () => Promise.resolve("refused" as const),
       },
       virtualKeys: {
@@ -276,10 +273,7 @@ function composeLangy(options: LangyFeatureCollaborators): LangyApp {
  * the behaviour the platform host pinned: a chat that stops working because the
  * cache is down is worse than an unmetered minute.
  */
-function composeLangyPorts(
-  options: LangyFeatureCollaborators,
-  langy: LangyApp,
-): LangyTrpcPorts {
+function composeLangyPorts(options: LangyFeatureCollaborators, langy: LangyApp): LangyTrpcPorts {
   const logger = createLogger(`${options.processName}:langy`);
   const uiActions = () =>
     new LangyUiActionService({
@@ -426,4 +420,3 @@ function composeLangyEgressPorts(options: LangyFeatureCollaborators): LangyEgres
     },
   };
 }
-

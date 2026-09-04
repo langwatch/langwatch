@@ -46,7 +46,11 @@ import type { MonitorService } from "@langwatch/monitor-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
-import { ApiApplication, MissingAgentService, MissingSecretService } from "../../../api.application";
+import {
+  ApiApplication,
+  MissingAgentService,
+  MissingSecretService,
+} from "../../../api.application";
 import {
   ApiTrpcFeaturesComposition,
   composeApiTrpcCollaborators,
@@ -54,8 +58,14 @@ import {
 import { composeEnterpriseGovernanceApplication } from "../../enterprise/enterprise-governance.composition";
 import { composeGatewayFeature } from "../gateway.composition";
 import { refusingLangyFeature } from "../../langy/langy.composition";
+import { refusingScenarioFeature } from "../../scenario/scenario.composition";
 import { refusingOpsFeature } from "../../ops/ops.composition";
-import { stub, stubApplicationSlices, stubInfrastructureEntitlements, testHalves } from "../../../app/__tests__/api-trpc-collaborators.test-halves";
+import {
+  stub,
+  stubApplicationSlices,
+  stubInfrastructureEntitlements,
+  testHalves,
+} from "../../../app/__tests__/api-trpc-collaborators.test-halves";
 
 const SESSION_USER = { id: "user-1", name: "Sam Rivers", email: "sam@acme.test", role: "ADMIN" };
 const PROJECT_ID = "project-1";
@@ -198,7 +208,12 @@ function composeApplication(overrides: { saasBilling?: boolean; enterprise?: unk
   });
 
   const features = ApiTrpcFeaturesComposition.tryCompose({
-    composed: { gateway, langy: refusingLangyFeature(), ops: refusingOpsFeature() },
+    composed: {
+      gateway,
+      langy: refusingLangyFeature(),
+      ops: refusingOpsFeature(),
+      scenario: refusingScenarioFeature(),
+    },
     infrastructure,
     collaborators: composeApiTrpcCollaborators(testHalves(), {
       ...stubApplicationSlices(),

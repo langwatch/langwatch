@@ -18,12 +18,12 @@ import type {
   ApiTrpcCollaboratorHalves,
   ApiTrpcFeatureApplicationSlices,
 } from "../api-trpc-features.composition";
-import type { ApiAgentGroupCollaborators } from "../api-trpc-collaborators.agent-group.composition";
 import type { ApiAnalyticsCollaborators } from "../api-trpc-collaborators.analytics.composition";
 import type { ApiExecutionCollaborators } from "../api-trpc-collaborators.execution.composition";
 import { createGatewayTrpcRouters } from "../../features/gateway/gateway-trpc.mount";
 import { refusingLangyFeature } from "../../features/langy/langy.composition";
 import { refusingOpsFeature } from "../../features/ops/ops.composition";
+import { refusingScenarioFeature } from "../../features/scenario/scenario.composition";
 import type { ComposedApiFeatures } from "../../app-trpc/app-trpc.composed";
 import type { ApiIdentityCollaborators } from "../api-trpc-collaborators.identity.composition";
 import type { ApiOrgGroupCollaborators } from "../api-trpc-collaborators.org-group.composition";
@@ -55,64 +55,6 @@ export function stub<T>(group: string, buildTime: Record<string, unknown> = {}):
 }
 
 /**
- * The plan lookup and the flag store the record's own compositions read, as a
- * suite that drives neither supplies them: every organization is on the free
- * plan and inside every rollout, so a feature gated on either still MOUNTS and
- * a suite asserting on the gate itself overrides them.
- */
-export function stubInfrastructureEntitlements(): Pick<
-  ApiTrpcInfrastructure,
-  "plans" | "featureFlags" | "saasBilling"
-> {
-  return {
-    plans: { getActivePlan: async () => ({ type: "FREE" }) as never },
-    featureFlags: stub("featureFlags", { isEnabled: async () => true }),
-    // Self-hosted, so the two Enterprise billing namespaces mount as the empty
-    // routers of the same served type. A suite asserting on billing overrides it.
-    saasBilling: false,
-  };
-}
-
-export function stubProductHalf(): ApiProductCollaborators {
-  return stub<ApiProductCollaborators>("product", {
-    annotations: stub("app.annotations"),
-    annotationPorts: stub("annotation", {
-      writeTraceSuggestion: passThroughMiddleware,
-    }),
-    bugReportPorts: stub("bugReports"),
-    dataPrivacyPorts: stub("dataPrivacy"),
-    integrationsChecksPorts: stub("integrationsChecks"),
-    traceCommands: stub("product.traceCommands"),
-  });
-}
-
-export function stubAnalyticsHalf(): ApiAnalyticsCollaborators {
-  return stub<ApiAnalyticsCollaborators>("analytics", {
-    analyticsPorts: {
-      reads: stub("analytics.reads", {
-        timeseriesInputSchema: anySchema,
-        sharedFiltersSchema: anySchema,
-        filterFieldSchema: anySchema,
-      }),
-      workbench: stub("analytics.workbench", {
-        requireWorkbenchEnabled: openGate,
-        maxStatementLength: 4_000,
-        timeWindowSchema: anySchema,
-        granularityStepSchema: anySchema,
-      }),
-      savedCharts: stub("analytics.savedCharts", {
-        requireWorkbenchEnabled: openGate,
-        timeWindowSchema: anySchema,
-        granularityStepSchema: anySchema,
-      }),
-    },
-    graphPorts: stub("graphs", { filterFieldSchema: anySchema }),
-    analytics: stub("app.analytics"),
-    dashboard: stub("app.dashboard"),
-  });
-}
-
-/**
  * @param broadcast The tenant fan-out `ctx.app.broadcast.getTenantEmitter()`
  * returns. A real `EventEmitter`, not a stub: a subscription test emits on
  * this instance and asserts the SSE lane relays it, so it has to be the SAME
@@ -128,8 +70,8 @@ export function stubIdentityHalf(broadcast: EventEmitter): ApiIdentityCollaborat
     },
     application: {
       apiKeys: stub("app.apiKeys"),
-      // Overwritten by the agent-group half's full `OpsApp` once that half is
-      // real; this narrow reader is what a process with no agent-group half
+      // Overwritten by the ops feature's full `OpsApp` once that feature is
+      // real; this narrow reader is what a process with no ops feature
       // composed leaves behind.
       broadcast: {
         getTenantEmitter: () => broadcast,
@@ -218,31 +160,61 @@ export function stubTraceGroupHalf(): ApiTraceGroupCollaborators {
   });
 }
 
-export function stubAgentGroupHalf(): ApiAgentGroupCollaborators {
-  return stub<ApiAgentGroupCollaborators>("agentGroup", {
-    scenarios: stub("app.scenarios"),
-    scenarioService: stub("agentGroup.scenarioService"),
-    scenarioTabs: stub("agentGroup.scenarioTabs"),
-    simulations: stub("agentGroup.simulations"),
-    agentTestService: stub("agentGroup.agentTestService"),
-    suites: stub("app.suites"),
-    langy: stub("app.langy"),
-    // Overwrites identity's own narrower `application.ops` in the merge (see
-    // `composeApiTrpcCollaborators`), so it has to answer something rather
-    // than throw: several namespaces this test double is NOT the half under
-    // test still gate on `ctx.app.ops.isAdmin()` at call time.
-    ops: { isAdmin: () => true },
-    ports: {
-      scenarios: stub("scenarios"),
-      langy: stub("langy"),
-      langyGates: {
-        refuseDemoProject: passThroughMiddleware,
-        enforceLangyAccess: passThroughMiddleware,
-      },
-      langyEgress: stub("langyEgress"),
-      ops: stub("ops"),
-      opsCheck: () => passThroughMiddleware,
+/**
+ * The plan lookup and the flag store the record's own compositions read, as a
+ * suite that drives neither supplies them: every organization is on the free
+ * plan and inside every rollout, so a feature gated on either still MOUNTS and
+ * a suite asserting on the gate itself overrides them.
+ */
+export function stubInfrastructureEntitlements(): Pick<
+  ApiTrpcInfrastructure,
+  "plans" | "featureFlags" | "saasBilling"
+> {
+  return {
+    plans: { getActivePlan: async () => ({ type: "FREE" }) as never },
+    featureFlags: stub("featureFlags", { isEnabled: async () => true }),
+    // Self-hosted, so the two Enterprise billing namespaces mount as the empty
+    // routers of the same served type. A suite asserting on billing overrides it.
+    saasBilling: false,
+  };
+}
+
+export function stubProductHalf(): ApiProductCollaborators {
+  return stub<ApiProductCollaborators>("product", {
+    annotations: stub("app.annotations"),
+    annotationPorts: stub("annotation", {
+      writeTraceSuggestion: passThroughMiddleware,
+    }),
+    bugReportPorts: stub("bugReports"),
+    dataPrivacyPorts: stub("dataPrivacy"),
+    integrationsChecksPorts: stub("integrationsChecks"),
+    traceCommands: stub("product.traceCommands"),
+  });
+}
+
+export function stubAnalyticsHalf(): ApiAnalyticsCollaborators {
+  return stub<ApiAnalyticsCollaborators>("analytics", {
+    analyticsPorts: {
+      reads: stub("analytics.reads", {
+        timeseriesInputSchema: anySchema,
+        sharedFiltersSchema: anySchema,
+        filterFieldSchema: anySchema,
+      }),
+      workbench: stub("analytics.workbench", {
+        requireWorkbenchEnabled: openGate,
+        maxStatementLength: 4_000,
+        timeWindowSchema: anySchema,
+        granularityStepSchema: anySchema,
+      }),
+      savedCharts: stub("analytics.savedCharts", {
+        requireWorkbenchEnabled: openGate,
+        timeWindowSchema: anySchema,
+        granularityStepSchema: anySchema,
+      }),
     },
+    graphPorts: stub("graphs", { filterFieldSchema: anySchema }),
+    analytics: stub("app.analytics"),
+    dashboard: stub("app.dashboard"),
   });
 }
 
@@ -297,6 +269,8 @@ export function stubApplicationSlices(): ApiTrpcFeatureApplicationSlices {
     gateway: stub("app.gateway"),
     github: stub("app.github"),
     langy: stub("app.langy"),
+    scenarios: stub("app.scenarios"),
+    suites: stub("app.suites"),
     // Answers rather than refuses: several namespaces that are NOT the surface
     // under test still gate on `ctx.app.ops.isAdmin()` at call time.
     ops: stub("app.ops", { isAdmin: () => true }),
@@ -325,6 +299,7 @@ export function stubComposedFeatures(): ComposedApiFeatures {
     },
     langy: refusingLangyFeature(),
     ops: refusingOpsFeature(),
+    scenario: refusingScenarioFeature(),
   };
 }
 
@@ -345,7 +320,6 @@ export function testHalves(
     execution: stubExecutionHalf(),
     productGroup: stubProductGroupHalf(),
     traceGroup: stubTraceGroupHalf(),
-    agentGroup: stubAgentGroupHalf(),
     orgGroup: stubOrgGroupHalf(),
     productInfra: stubProductInfraHalf(),
     ...overrides,
