@@ -1096,7 +1096,7 @@ func (r *BifrostRouter) responseFromBifrostError(
 	if raw.parseFailure != nil && r.logger != nil {
 		r.logger.Warn("provider 2xx body did not fit the engine schema, forwarded as-is",
 			zap.String("provider", string(berr.ExtraFields.Provider)),
-			zap.String("model", berr.ExtraFields.ModelRequested),
+			zap.String("model", berr.ExtraFields.OriginalModelRequested),
 			zap.Int("prompt_tokens", raw.usage.PromptTokens),
 			zap.Int("completion_tokens", raw.usage.CompletionTokens),
 			zap.Error(raw.parseFailure))
