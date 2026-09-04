@@ -58,6 +58,7 @@ class RunPlansFacade:
         repeat_count: Optional[int] = None,
         simulator_model: Optional[str] = None,
         judge_model: Optional[str] = None,
+        evaluators: Optional[List[Dict[str, Any]]] = None,
         parameters: Optional[Dict[str, Any]] = None,
         note: Optional[str] = None,
         idempotency_key: Optional[str] = None,
@@ -79,6 +80,11 @@ class RunPlansFacade:
             repeat_count: How many times to run each scenario, 1 to 5.
             simulator_model: The model that plays the user.
             judge_model: The model that grades the run.
+            evaluators: The plan's own evaluators, run beside the ones the
+                test suites attach, as ``{"id", "evaluatorId", "required",
+                "mappings"}`` rows. A plan evaluator reads the conversation
+                and the trace, never a scenario field. Left out, the plan
+                keeps what it already holds.
             parameters: Constants applied to every scenario in the run, e.g.
                 ``{"account_tier": "gold"}``. A value here overrides the
                 scenario's own default for that name.
@@ -88,7 +94,9 @@ class RunPlansFacade:
 
         Returns:
             Dictionary with the run result, the plan it belongs to and whether
-            the plan was created.
+            the plan was created. Every scenario run of the plan reports its
+            evaluator results under ``results.evaluations`` on
+            ``GET /api/simulation-runs/{scenarioRunId}``.
         """
         config: Dict[str, Any] = {
             "scope": build_scope(
@@ -105,6 +113,8 @@ class RunPlansFacade:
             config["simulatorModel"] = simulator_model
         if judge_model is not None:
             config["judgeModel"] = judge_model
+        if evaluators is not None:
+            config["evaluators"] = list(evaluators)
         if scenario_ids is not None:
             config["scenarioIds"] = list(scenario_ids)
 
