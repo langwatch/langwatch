@@ -2,13 +2,16 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import {
   createMcpHandler,
   HeaderMcpClientAddressAdapter,
+  MCP_AUTHORIZE_PERMISSION,
   McpProjectLookupPort,
+  McpSessionGrantPort,
   McpSessionToolRegistrarPort,
   type HostedMcpDependencies,
   type HostedMcpRedis,
   type McpHandler,
   type McpToolServer,
 } from "@langwatch/hosted-mcp-server";
+import type { AuthzService } from "@langwatch/authz-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
 import { ApiRawRequestSurfacePort } from "../../api-http.listener";
@@ -76,6 +79,36 @@ export class PrismaMcpProjectLookupAdapter extends McpProjectLookupPort {
 }
 
 /**
+ * Whether the person an MCP bearer was minted for still holds the grant the
+ * approval step demanded. The SAME permission the authorize step names, read
+ * through the SAME `AuthzService` every other door decides on — a second
+ * answer here would be a token that outlived the membership behind it.
+ */
+export class AuthzMcpSessionGrantAdapter extends McpSessionGrantPort {
+  private constructor(private readonly authz: AuthzService) {
+    super();
+  }
+
+  static create({ authz }: { authz: AuthzService }): AuthzMcpSessionGrantAdapter {
+    return new AuthzMcpSessionGrantAdapter(authz);
+  }
+
+  async stillGranted({
+    userId,
+    projectId,
+  }: {
+    userId: string;
+    projectId: string;
+  }): Promise<boolean> {
+    return await this.authz.hasPermission({
+      userId,
+      projectId,
+      permission: MCP_AUTHORIZE_PERMISSION,
+    });
+  }
+}
+
+/**
  * Installs the tools an Enterprise deployment adds to each MCP session.
  *
  * The registrar is a function rather than the governance module itself
@@ -117,25 +150,28 @@ export class DelegatingMcpSessionToolRegistrar extends McpSessionToolRegistrarPo
 /**
  * Composes the endpoint, or reports that this process cannot serve it.
  *
- * Two things are required and neither has a safe default. Without the cipher
+ * Three things are required and none has a safe default. Without the cipher
  * the endpoint cannot store the API key an OAuth session was minted from, so
  * every session it issued would fail on its first tool call; without a
- * database it cannot tell whose key a bearer token is. A deployment missing
- * either serves no MCP rather than serving a broken one, and says so.
+ * database it cannot tell whose key a bearer token is; without authorization
+ * it cannot re-prove the grant a thirty-day bearer was minted from. A
+ * deployment missing any serves no MCP rather than a broken one, and says so.
  */
 export function tryCreateHostedMcpSurface(options: {
   prisma: PrismaClient | undefined;
   encryption: SecretEncryptionPort | undefined;
+  authz: AuthzService | undefined;
   redis: HostedMcpRedis | null;
   baseHost: string;
   sessionTools?: McpSessionToolRegistrarPort | undefined;
 }): HostedMcpSurface | undefined {
-  const { prisma, encryption } = options;
-  if (!prisma || !encryption) return undefined;
+  const { prisma, encryption, authz } = options;
+  if (!prisma || !encryption || !authz) return undefined;
 
   return HostedMcpSurface.create({
     redis: options.redis,
     projects: PrismaMcpProjectLookupAdapter.create({ prisma }),
+    grants: AuthzMcpSessionGrantAdapter.create({ authz }),
     cipher: encryption,
     address: HeaderMcpClientAddressAdapter.create(),
     sessionTools: options.sessionTools,

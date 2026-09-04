@@ -40,6 +40,18 @@ export abstract class McpApiKeyCipherPort {
 }
 
 /**
+ * Whether the grant an OAuth bearer was minted from still holds.
+ *
+ * The bearer lives thirty days and carries the project's credential, so
+ * without this the token outlives the membership that approved it: removing
+ * somebody from a project, or dropping their role, would leave their token
+ * working until it expired (security pass 2026-09-04, H5).
+ */
+export abstract class McpSessionGrantPort {
+  abstract stillGranted(input: { userId: string; projectId: string }): Promise<boolean>;
+}
+
+/**
  * How the process identifies a caller for rate-limiting purposes.
  *
  * Injected so the endpoint buckets on exactly the address the rest of the
@@ -93,6 +105,8 @@ export type HostedMcpDependencies = Readonly<{
    */
   redis: HostedMcpRedis | null;
   projects: McpProjectLookupPort;
+  /** Required, not optional: an unwired re-check is a token that never expires. */
+  grants: McpSessionGrantPort;
   cipher: McpApiKeyCipherPort;
   address: McpClientAddressPort;
   /** Absent installs no extra tools; see {@link McpSessionToolRegistrarPort}. */

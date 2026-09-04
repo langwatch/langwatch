@@ -27,6 +27,7 @@ import {
   HeaderMcpClientAddressAdapter,
   McpApiKeyCipherPort,
   McpProjectLookupPort,
+  McpSessionGrantPort,
   type HostedMcpRedis,
   type McpHandler,
 } from "../../../index";
@@ -66,6 +67,18 @@ class FakeProjectLookup extends McpProjectLookupPort {
   }
 }
 
+/** The grant behind an OAuth bearer, answered by whatever a test set. */
+class FakeSessionGrant extends McpSessionGrantPort {
+  granted = true;
+  readonly asked: Array<{ userId: string; projectId: string }> = [];
+  stillGranted(input: { userId: string; projectId: string }): Promise<boolean> {
+    this.asked.push(input);
+    return Promise.resolve(this.granted);
+  }
+}
+
+const sessionGrant = new FakeSessionGrant();
+
 /** Identity "encryption", so a test can read the value it expected to be stored. */
 class ReversibleTestCipher extends McpApiKeyCipherPort {
   encrypt(text: string): string {
@@ -82,6 +95,7 @@ class ReversibleTestCipher extends McpApiKeyCipherPort {
 
 const VALID_API_KEY = "lw_test_key_123";
 const PROJECT_ID = "test-project-id";
+const APPROVING_USER_ID = "approving-user-1";
 
 function validProject() {
   return {
@@ -226,6 +240,7 @@ function mockAuthCodeInRedis({
   expiresAt,
   redirectUri = TEST_REDIRECT_URI,
   clientId = TEST_CLIENT_ID,
+  userId,
 }: {
   code: string;
   codeChallenge: string;
@@ -233,10 +248,12 @@ function mockAuthCodeInRedis({
   expiresAt?: number;
   redirectUri?: string;
   clientId?: string;
+  userId?: string;
 }) {
   const entry = JSON.stringify({
     projectId: PROJECT_ID,
     encryptedApiKey: `encrypted:${apiKey}`,
+    ...(userId === undefined ? {} : { userId }),
     codeChallenge,
     codeChallengeMethod: "S256",
     redirectUri,
@@ -321,6 +338,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
     handler = createMcpHandler({
       redis: mockRedis as unknown as HostedMcpRedis,
       projects: new FakeProjectLookup(),
+      grants: sessionGrant,
       cipher: new ReversibleTestCipher(),
       address: HeaderMcpClientAddressAdapter.create(),
       baseHost: "https://app.langwatch.ai",
@@ -352,6 +370,8 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
     mockRedis.srem.mockResolvedValue(1);
     mockRedis.smembers.mockResolvedValue([]);
     mockRedis.exists.mockResolvedValue(0);
+    sessionGrant.granted = true;
+    sessionGrant.asked.length = 0;
   });
 
   // --- Route Mounting ---
@@ -978,6 +998,85 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       expect(mockPrisma.project.findUnique).toHaveBeenCalledWith({
         where: { apiKey: VALID_API_KEY, archivedAt: null },
       });
+    });
+  });
+
+  // --- Grant re-validation (specs/security/hosted-mcp-grant-fidelity.feature) ---
+
+  describe("given an OAuth bearer minted through the approval flow for a person", () => {
+    async function mintBearer(): Promise<string> {
+      mockPrisma.project.findUnique.mockResolvedValue(validProject());
+      const code = randomUUID();
+      const { codeVerifier, codeChallenge } = createPkceChallenge();
+      mockAuthCodeInRedis({ code, codeChallenge, userId: APPROVING_USER_ID });
+
+      const addr = server.address();
+      const port = typeof addr === "object" && addr ? addr.port : 0;
+      const tokenRes = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: formBody({
+          grant_type: "authorization_code",
+          code,
+          code_verifier: codeVerifier,
+          redirect_uri: TEST_REDIRECT_URI,
+          client_id: TEST_CLIENT_ID,
+        }),
+      });
+      const body = (await tokenRes.json()) as Record<string, unknown>;
+      return body.access_token as string;
+    }
+
+    describe("when that person no longer holds the permission on the project", () => {
+      // @scenario "A bearer whose approver lost the permission is refused"
+      it("refuses the call with the code mcp_grant_revoked", async () => {
+        const accessToken = await mintBearer();
+        sessionGrant.granted = false;
+
+        const res = await sendRequest({
+          server,
+          body: mcpInitializeBody(),
+          headers: { authorization: `Bearer ${accessToken}` },
+        });
+
+        expect(res.status).toBe(401);
+        expect(res.json().error).toBe("mcp_grant_revoked");
+      });
+    });
+
+    describe("when that person still holds the permission on the project", () => {
+      // @scenario "A bearer whose approver still holds the permission is served"
+      it("serves the call, having re-proved the grant rather than assumed it", async () => {
+        const accessToken = await mintBearer();
+
+        const res = await sendRequest({
+          server,
+          body: mcpInitializeBody(),
+          headers: { authorization: `Bearer ${accessToken}` },
+        });
+
+        expect(res.status).toBe(200);
+        expect(sessionGrant.asked).toContainEqual({
+          userId: APPROVING_USER_ID,
+          projectId: PROJECT_ID,
+        });
+      });
+    });
+  });
+
+  describe("given a caller presenting a project API key as the bearer", () => {
+    // @scenario "A direct project API key carries no grant to re-prove"
+    it("serves the call without probing any person's grant", async () => {
+      mockPrisma.project.findUnique.mockResolvedValue(validProject());
+
+      const res = await sendRequest({
+        server,
+        body: mcpInitializeBody(),
+        headers: { authorization: `Bearer ${VALID_API_KEY}` },
+      });
+
+      expect(res.status).toBe(200);
+      expect(sessionGrant.asked).toEqual([]);
     });
   });
 

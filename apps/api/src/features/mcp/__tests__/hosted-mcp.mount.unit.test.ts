@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { AuthzService } from "@langwatch/authz-contract";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
 import { PrismaMcpProjectLookupAdapter, tryCreateHostedMcpSurface } from "../hosted-mcp.mount";
 
@@ -10,6 +11,8 @@ const cipher = {
 
 const prisma = { project: { findUnique: vi.fn() } } as unknown as PrismaClient;
 
+const authz = { hasPermission: vi.fn(() => Promise.resolve(true)) } as unknown as AuthzService;
+
 describe("given the hosted MCP endpoint being composed for the API process", () => {
   describe("when the process has no stored-secret cipher", () => {
     it("serves no MCP rather than an endpoint whose sessions all fail", () => {
@@ -17,6 +20,7 @@ describe("given the hosted MCP endpoint being composed for the API process", () 
         tryCreateHostedMcpSurface({
           prisma,
           encryption: undefined,
+          authz,
           redis: null,
           baseHost: "https://app.langwatch.ai",
         }),
@@ -30,6 +34,7 @@ describe("given the hosted MCP endpoint being composed for the API process", () 
         tryCreateHostedMcpSurface({
           prisma: undefined,
           encryption: cipher,
+          authz,
           redis: null,
           baseHost: "https://app.langwatch.ai",
         }),
@@ -37,11 +42,27 @@ describe("given the hosted MCP endpoint being composed for the API process", () 
     });
   });
 
-  describe("when both are composed", () => {
+  describe("when the process composed no authorization service", () => {
+    // @scenario "A process without authorization serves no hosted MCP"
+    it("serves no MCP, because no bearer's minting grant could be re-proved", () => {
+      expect(
+        tryCreateHostedMcpSurface({
+          prisma,
+          encryption: cipher,
+          authz: undefined,
+          redis: null,
+          baseHost: "https://app.langwatch.ai",
+        }),
+      ).toBeUndefined();
+    });
+  });
+
+  describe("when all three are composed", () => {
     it("claims the MCP routes and nothing else", () => {
       const surface = tryCreateHostedMcpSurface({
         prisma,
         encryption: cipher,
+        authz,
         redis: null,
         baseHost: "https://app.langwatch.ai",
       });

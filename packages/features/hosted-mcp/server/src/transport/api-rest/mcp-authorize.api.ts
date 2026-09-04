@@ -56,6 +56,14 @@ function isAllowedRedirectScheme(candidate: string): boolean {
   }
 }
 
+/**
+ * The permission a caller must hold to mint an authorization code here. The
+ * code embeds the project's legacy API key, which every REST family lets past
+ * its RBAC check, so approving one confers the whole project. Same grain as
+ * `GET /api/project/:id/api-key`, which reveals that key — never `project:view`.
+ */
+export const MCP_AUTHORIZE_PERMISSION = "project:update" as const;
+
 /** The signed-in person behind the request, as this process resolves one. */
 export type McpAuthorizeSession = Readonly<{ user: Readonly<{ id: string }> }>;
 
@@ -72,10 +80,15 @@ export interface McpAuthorizeRestPorts {
   resolveSession(request: Request): Promise<McpAuthorizeSession | null>;
   /** The project, with the credential the code embeds. Null when unreadable. */
   tryGetProject(projectId: string): Promise<McpAuthorizeProject | null>;
-  /** Whether that person may view that project. */
+  /**
+   * Whether that person holds the named permission on that project. The
+   * permission is named by this transport rather than by the process, so no
+   * composition can gate the flow below what the minted code confers.
+   */
   probeProjectPermission(input: {
     session: McpAuthorizeSession;
     projectId: string;
+    permission: typeof MCP_AUTHORIZE_PERMISSION;
   }): Promise<boolean>;
   /**
    * Whether the project is the globally-readable demo showcase.
@@ -228,7 +241,11 @@ export function createMcpAuthorizeRestApp(options: {
       if (
         !project ||
         project.archivedAt !== null ||
-        !(await ports.probeProjectPermission({ session, projectId }))
+        !(await ports.probeProjectPermission({
+          session,
+          projectId,
+          permission: MCP_AUTHORIZE_PERMISSION,
+        }))
       ) {
         // A single 403 whether the project is missing, archived, or simply
         // inaccessible — never disclose the existence of a project the caller

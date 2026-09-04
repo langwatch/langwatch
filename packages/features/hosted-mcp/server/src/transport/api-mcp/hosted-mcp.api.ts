@@ -22,6 +22,13 @@
 
 import { createHash, randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import {
+  handlerManagedAuth,
+  publicEndpoint,
+  type AccessPolicy,
+  type CredentialClass,
+} from "@langwatch/api";
+import { registerRoutePolicy } from "@langwatch/api/rest";
 import { getConfig, initConfig, runWithConfig, tryGetConfig } from "@langwatch/mcp-server/config";
 import { createMcpServer } from "@langwatch/mcp-server/create-mcp-server";
 import { createLogger } from "@langwatch/observability";
@@ -65,6 +72,16 @@ const REDIS_SSE_RELAY_CHANNEL_PREFIX = "mcp:sse:relay:";
 
 /** OAuth token TTL in seconds (30 days — matches cookie-based login duration). */
 const TOKEN_TTL_SECONDS = 30 * 24 * 3600;
+
+/**
+ * How long a re-checked grant is trusted before the next probe. The bearer
+ * lives thirty days; the membership behind it is re-proved on this cadence, so
+ * an offboarded person loses the session in minutes rather than weeks.
+ */
+const GRANT_RECHECK_INTERVAL_MS = 5 * 60 * 1000;
+
+/** The refusal a caller whose minting grant is gone reads on the wire. */
+const GRANT_REVOKED_CODE = "mcp_grant_revoked";
 
 /** Max concurrent sessions per API key. */
 const MAX_SESSIONS_PER_KEY = 20;
@@ -197,6 +214,116 @@ export interface McpHandler {
   closeAllSessions: () => Promise<void>;
 }
 
+// ---------------------------------------------------------------------------
+// Declared access policies
+// ---------------------------------------------------------------------------
+
+/** The family these routes are grouped under in the route-policy registry. */
+export const HOSTED_MCP_FAMILY = "hosted-mcp";
+
+/**
+ * The policy every route verb below wears.
+ *
+ * This family answers off the raw Node listener rather than the Hono stack, so
+ * no `SecuredApp` records it and an authorization audit reading the registry
+ * saw nothing here at all. The declarations are written by hand for exactly
+ * that reason, and registered when the handler is composed.
+ */
+const BEARER_SESSION_POLICY: AccessPolicy = handlerManagedAuth({
+  reason:
+    "MCP transport: the handler authenticates the bearer it minted (or a project " +
+    "API key) and re-proves the grant that bearer was minted from",
+  permissions: [],
+  credential: "apiKey",
+});
+
+const OAUTH_HANDSHAKE_POLICY: AccessPolicy = publicEndpoint(
+  "OAuth 2.1 handshake and discovery for MCP clients (RFC 6749/8414/9728); takes no credential",
+);
+
+const MCP_HEALTH_POLICY: AccessPolicy = publicEndpoint("MCP liveness probe; reads no project data");
+
+const ROUTE_VERBS: ReadonlyArray<{
+  path: string;
+  methods: readonly string[];
+  policy: AccessPolicy;
+}> = [
+  { path: "/mcp", methods: ["POST", "GET", "DELETE"], policy: BEARER_SESSION_POLICY },
+  { path: "/mcp/health", methods: ["GET"], policy: MCP_HEALTH_POLICY },
+  { path: "/sse", methods: ["GET"], policy: BEARER_SESSION_POLICY },
+  { path: "/messages", methods: ["POST"], policy: BEARER_SESSION_POLICY },
+  { path: "/sse/messages", methods: ["POST"], policy: BEARER_SESSION_POLICY },
+  {
+    path: "/.well-known/oauth-protected-resource",
+    methods: ["GET"],
+    policy: OAUTH_HANDSHAKE_POLICY,
+  },
+  {
+    path: "/.well-known/oauth-protected-resource/mcp",
+    methods: ["GET"],
+    policy: OAUTH_HANDSHAKE_POLICY,
+  },
+  {
+    path: "/.well-known/oauth-protected-resource/sse",
+    methods: ["GET"],
+    policy: OAUTH_HANDSHAKE_POLICY,
+  },
+  {
+    path: "/.well-known/oauth-authorization-server",
+    methods: ["GET"],
+    policy: OAUTH_HANDSHAKE_POLICY,
+  },
+  {
+    path: "/.well-known/oauth-authorization-server/mcp",
+    methods: ["GET"],
+    policy: OAUTH_HANDSHAKE_POLICY,
+  },
+  {
+    path: "/.well-known/oauth-authorization-server/sse",
+    methods: ["GET"],
+    policy: OAUTH_HANDSHAKE_POLICY,
+  },
+  { path: "/.well-known/openid-configuration", methods: ["GET"], policy: OAUTH_HANDSHAKE_POLICY },
+  { path: "/oauth/register", methods: ["POST"], policy: OAUTH_HANDSHAKE_POLICY },
+  { path: "/oauth/token", methods: ["POST"], policy: OAUTH_HANDSHAKE_POLICY },
+];
+
+/**
+ * Every route verb this family serves, CORS preflight included: the dispatcher
+ * answers `OPTIONS` on every path it claims, and a preflight nobody declared is
+ * exactly the kind of verb this registry exists to surface.
+ */
+export function hostedMcpRoutePolicies(): ReadonlyArray<{
+  method: string;
+  path: string;
+  policy: AccessPolicy;
+  family: string;
+  credentialClass: CredentialClass;
+}> {
+  return ROUTE_VERBS.flatMap((route) =>
+    [...route.methods, "OPTIONS"].map((method) => {
+      const policy =
+        method === "OPTIONS"
+          ? publicEndpoint(`CORS preflight for ${route.path}; answers headers only, reads nothing`)
+          : route.policy;
+      return {
+        method,
+        path: route.path,
+        policy,
+        family: HOSTED_MCP_FAMILY,
+        credentialClass: policy.kind === "public" ? "none" : "project_api_key",
+      };
+    }),
+  );
+}
+
+/** Puts this family in the process-wide route-policy registry. Idempotent. */
+export function registerHostedMcpRoutePolicies(): void {
+  for (const route of hostedMcpRoutePolicies()) {
+    registerRoutePolicy(route);
+  }
+}
+
 /**
  * Creates an MCP handler instance that manages sessions, OAuth tokens,
  * and routes for the Streamable HTTP transport.
@@ -214,7 +341,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
   // in-memory map, so a single process keeps working; the OAuth
   // authorization-code exchange cannot, because the code is written by whichever
   // process served the authorize request, so it answers 500 instead.
-  const { redis, projects, cipher, address, sessionTools } = dependencies;
+  const { redis, projects, grants, cipher, address, sessionTools } = dependencies;
   const encrypt = (plaintext: string): string => cipher.encrypt(plaintext);
   const decrypt = (ciphertext: string): string => cipher.decrypt(ciphertext);
 
@@ -226,10 +353,18 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
     initConfig({ endpoint: dependencies.baseHost });
   }
 
+  // Composed means mounted, and mounted means the audit should see it.
+  registerHostedMcpRoutePolicies();
+
   // Use Map to avoid prototype pollution — sessionId comes from user input
   const sessions = new Map<string, SessionState>();
   const sseSessions = new Map<string, SseSessionState>();
   const oauthTokens = new Map<string, OAuthTokenEntry>();
+
+  // The last answer the grant probe gave for a bearer, and when. Read by the
+  // 401 senders so a refused caller learns the grant is gone rather than that
+  // their token is malformed.
+  const grantChecks = new Map<string, { checkedAt: number; granted: boolean }>();
 
   // Rate limiters. Registration and token exchange get a budget each: a
   // client that just registered immediately exchanges a code, so one shared
@@ -282,6 +417,13 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
     for (const [token, entry] of oauthTokens) {
       if (now >= entry.expiresAt) {
         oauthTokens.delete(token);
+      }
+    }
+
+    // Sweep grant probes that have gone stale; the next request re-proves them.
+    for (const [token, check] of grantChecks) {
+      if (now - check.checkedAt > GRANT_RECHECK_INTERVAL_MS) {
+        grantChecks.delete(token);
       }
     }
 
@@ -505,6 +647,60 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
   async function resolveSessionContext(
     token: string,
   ): Promise<{ apiKey: string; userId?: string } | null> {
+    const context = await lookupSessionContext(token);
+    if (!context) return null;
+    // A token minted by the OAuth flow carries the person who approved it, and
+    // that approval is what this endpoint runs on. A direct project key carries
+    // nobody, so there is no grant to re-prove and the key check is the check.
+    if (context.userId === undefined) return context;
+    const granted = await grantStillHolds({
+      token,
+      apiKey: context.apiKey,
+      userId: context.userId,
+    });
+    return granted ? context : null;
+  }
+
+  /**
+   * Whether the project membership the bearer was minted from still holds.
+   * Probed on first use and every {@link GRANT_RECHECK_INTERVAL_MS} after.
+   * A probe that could not answer is never cached, so a database blip refuses
+   * the request in front of it without locking every session out for minutes.
+   */
+  async function grantStillHolds(input: {
+    token: string;
+    apiKey: string;
+    userId: string;
+  }): Promise<boolean> {
+    const cached = grantChecks.get(input.token);
+    if (cached && Date.now() - cached.checkedAt < GRANT_RECHECK_INTERVAL_MS) {
+      return cached.granted;
+    }
+    const project = await validateApiKey(input.apiKey);
+    if (!project) {
+      grantChecks.delete(input.token);
+      return false;
+    }
+    let granted: boolean;
+    try {
+      granted = await grants.stillGranted({ userId: input.userId, projectId: project.id });
+    } catch (err) {
+      logger.error({ error: err }, "MCP grant re-check failed");
+      grantChecks.delete(input.token);
+      return false;
+    }
+    grantChecks.set(input.token, { checkedAt: Date.now(), granted });
+    return granted;
+  }
+
+  /** Whether this bearer was refused because its minting grant is gone. */
+  function isGrantRevoked(token: string): boolean {
+    return grantChecks.get(token)?.granted === false;
+  }
+
+  async function lookupSessionContext(
+    token: string,
+  ): Promise<{ apiKey: string; userId?: string } | null> {
     // 1. Check in-memory OAuth token cache
     const memEntry = oauthTokens.get(token);
     if (memEntry) {
@@ -590,7 +786,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
     const apiKey = await resolveApiKey(token);
     if (!apiKey) {
       authFailRateLimiter.track(getClientIp(req));
-      send401(res, "Invalid or expired token");
+      send401(res, isGrantRevoked(token) ? GRANT_REVOKED_CODE : "Invalid or expired token");
       return null;
     }
 
@@ -1472,7 +1668,10 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
       }
       const apiKey = await resolveApiKey(token);
       if (apiKey !== session.apiKey) {
-        send401(res, "Bearer token does not match session");
+        send401(
+          res,
+          isGrantRevoked(token) ? GRANT_REVOKED_CODE : "Bearer token does not match session",
+        );
         return;
       }
 
@@ -1605,7 +1804,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
     const apiKey = await resolveApiKey(token);
     if (!apiKey) {
       authFailRateLimiter.track(getClientIp(req));
-      send401(res, "Invalid or expired token");
+      send401(res, isGrantRevoked(token) ? GRANT_REVOKED_CODE : "Invalid or expired token");
       return;
     }
 
@@ -1859,6 +2058,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
 
   function clearTokenCache(): void {
     oauthTokens.clear();
+    grantChecks.clear();
   }
 
   function clearRateLimiters(): void {
