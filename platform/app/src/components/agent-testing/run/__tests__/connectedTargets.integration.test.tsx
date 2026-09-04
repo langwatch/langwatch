@@ -2,8 +2,9 @@
  * @vitest-environment jsdom
  *
  * Connected agents in the run dialog: the presence mark, the environment in
- * the label, the disabled card of another person's development agent, and
- * the warning about an agent no process is holding.
+ * the label, the disabled card of another person's development agent, the
+ * disabled card of an agent no process is holding, and the warning about
+ * such an agent when a stored plan already points at it.
  *
  * @see specs/features/agents/connected-agents-ui.feature
  */
@@ -150,6 +151,57 @@ describe("connected agents in the run dialog", () => {
       await user.hover(screen.getByTestId("run-dialog-agent-agent_theirs"));
 
       expect(await screen.findByRole("tooltip")).toHaveTextContent("Ana");
+    });
+  });
+
+  describe("given a connected agent that no process is holding", () => {
+    /** @scenario "An offline connected agent cannot be chosen as a run target" */
+    it("draws it beside the others, disabled", async () => {
+      const user = userEvent.setup();
+      const onSelect = vi.fn();
+      render(
+        <TargetSection
+          mode="agents"
+          agents={agentsFor([
+            connectedRow({ id: "agent_on", status: "online" }),
+            connectedRow({
+              id: "agent_off",
+              status: "offline",
+              environment: "staging",
+            }),
+          ])}
+          prompts={[]}
+          target={null}
+          onSelect={onSelect}
+          onRemovePromptPicker={vi.fn()}
+          onSetupAgent={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getByTestId("run-dialog-agent-agent_on")).toHaveAttribute(
+        "aria-disabled",
+        "false",
+      );
+      const offline = screen.getByTestId("run-dialog-agent-agent_off");
+      expect(offline).toHaveAttribute("aria-disabled", "true");
+
+      await user.click(offline);
+      expect(onSelect).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "An offline connected agent says why on hover" */
+    it("says the agent is offline on hover", async () => {
+      const user = userEvent.setup();
+      renderSection(
+        agentsFor([connectedRow({ id: "agent_off", status: "offline" })]),
+      );
+
+      await user.hover(screen.getByTestId("run-dialog-agent-agent_off"));
+
+      expect(await screen.findByRole("tooltip")).toHaveTextContent(
+        "This agent is offline",
+      );
     });
   });
 

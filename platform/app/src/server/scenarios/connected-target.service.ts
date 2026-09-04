@@ -4,8 +4,8 @@
  * A run may name a connected agent by its `<name>@<environment>` reference
  * rather than by id, so the target is resolved once here before anything is
  * scheduled: the reference becomes the agent's id, the actor is checked
- * against the agent's owner, and the agent's own declared parameters come
- * back beside it.
+ * against the agent's owner, the agent is checked to be held by a process,
+ * and the agent's own declared parameters come back beside it.
  *
  * The router calls this and never reaches the repository itself.
  *
@@ -15,10 +15,12 @@
 
 import type { PrismaClient } from "~/generated/prisma/client";
 import { AgentRepository } from "~/server/agents/agent.repository";
+import type { PresenceReads } from "~/server/connected-agents/presence.read";
 import type { ScenarioParameterDefinition } from "~/server/scenarios/parameters";
 import type { RunActor } from "~/server/scenarios/run-actor";
 import {
   agentParameterDefinitionsOf,
+  assertConnectedAgentsOnline,
   assertConnectedAgentsRunnable,
   resolveConnectedReferences,
 } from "~/server/suites/connected-targets";
@@ -35,17 +37,20 @@ import type { SimulationTarget } from "./simulation-target";
  *
  * @throws {AgentOwnerOnlyError} when the agent is a personal development
  *   agent of someone else.
+ * @throws {AgentOfflineError} when no process is holding the agent.
  */
 export async function resolveConnectedTarget({
   prisma,
   projectId,
   target,
   actor,
+  presence,
 }: {
   prisma: PrismaClient;
   projectId: string;
   target: SimulationTarget;
   actor: RunActor;
+  presence: PresenceReads;
 }): Promise<{
   target: SimulationTarget;
   targetDefinitions: ScenarioParameterDefinition[];
@@ -68,6 +73,11 @@ export async function resolveConnectedTarget({
     agents: agent ? [agent] : [],
     actor,
     users: prisma,
+  });
+  await assertConnectedAgentsOnline({
+    agents: agent ? [agent] : [],
+    projectId,
+    presence,
   });
   return {
     target: { type: named.type, referenceId: named.referenceId },

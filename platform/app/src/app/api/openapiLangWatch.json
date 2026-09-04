@@ -4671,6 +4671,9 @@
           },
           "422": {
             "description": "The agent cannot be tested as it is set up"
+          },
+          "503": {
+            "description": "No process is holding the connected agent right now"
           }
         },
         "description": "Run one scripted scenario against an agent: the user sends \"ping\", the agent answers, and the run succeeds when the answer arrives. No model is used, and no scenario, run plan or test suite is added to the project. Answers at once with the run ids; the run itself is asynchronous.",

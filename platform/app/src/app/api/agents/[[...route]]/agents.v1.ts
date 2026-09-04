@@ -439,6 +439,9 @@ export function registerAgentTestEndpoint({
           },
           404: { description: "No agent with that id in this project" },
           422: { description: "The agent cannot be tested as it is set up" },
+          503: {
+            description: "No process is holding the connected agent right now",
+          },
         },
       },
     },

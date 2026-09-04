@@ -14,6 +14,7 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { Bot, ExternalLink, Laptop, Play, User } from "lucide-react";
 import { LuTrash2 } from "react-icons/lu";
+import { OFFLINE_AGENT_COPY } from "~/components/scenarios/useFilteredScenarioTargets";
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
 import {
@@ -141,6 +142,39 @@ function ScopeChip({ agent }: { agent: ConnectedAgentView }) {
   );
 }
 
+/**
+ * The "Test agent" entry of the card menu.
+ *
+ * An agent no process is holding cannot answer, so the entry is disabled and
+ * the reason reads on hover rather than after a refused run.
+ */
+function TestAgentItem({
+  agent,
+  onTest,
+}: {
+  agent: ConnectedAgentView;
+  onTest: () => void;
+}) {
+  const isOffline = agent.status === "offline";
+  return (
+    <Tooltip content={OFFLINE_AGENT_COPY} disabled={!isOffline}>
+      <Menu.Item
+        value="test"
+        disabled={isOffline}
+        onClick={(event) => {
+          event.stopPropagation();
+          if (isOffline) return;
+          onTest();
+        }}
+        data-testid={`agent-test-${agent.id}`}
+      >
+        <Play size={14} />
+        Test agent
+      </Menu.Item>
+    </Tooltip>
+  );
+}
+
 /** The actions of one card: open the agent, test it, or delete it. */
 function ConnectedAgentMenu({
   agent,
@@ -167,19 +201,7 @@ function ConnectedAgentMenu({
           <ExternalLink size={14} />
           Open
         </Menu.Item>
-        {onTest && (
-          <Menu.Item
-            value="test"
-            onClick={(event) => {
-              event.stopPropagation();
-              onTest();
-            }}
-            data-testid={`agent-test-${agent.id}`}
-          >
-            <Play size={14} />
-            Test agent
-          </Menu.Item>
-        )}
+        {onTest && <TestAgentItem agent={agent} onTest={onTest} />}
         {onDelete && (
           <Menu.Item
             value="delete"

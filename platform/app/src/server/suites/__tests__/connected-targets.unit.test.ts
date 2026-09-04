@@ -20,6 +20,7 @@ import type { LlmConfigRepository } from "../../prompt-config/repositories/llm-c
 import type { ScenarioParameterDefinition } from "../../scenarios/parameters";
 import type { ScenarioRepository } from "../../scenarios/scenario.repository";
 import {
+  assertConnectedAgentsOnline,
   assertConnectedAgentsRunnable,
   resolveConnectedReferences,
 } from "../connected-targets";
@@ -471,7 +472,7 @@ describe("assertConnectedAgentsRunnable", () => {
     user: { findMany: vi.fn(async () => [{ id: "u_2", name: "Ana" }]) },
   } as unknown as Pick<PrismaClient, "user">;
 
-  describe("when every agent is shared or the actor's own, and online", () => {
+  describe("when every agent is shared or the actor's own", () => {
     it("lets the run through", async () => {
       await expect(
         assertConnectedAgentsRunnable({
@@ -481,8 +482,6 @@ describe("assertConnectedAgentsRunnable", () => {
           ],
           actor: { id: "u_1", label: "user" },
           users,
-          projectId,
-          presence: presenceWith(),
         }),
       ).resolves.toBeUndefined();
     });
@@ -497,8 +496,6 @@ describe("assertConnectedAgentsRunnable", () => {
           ],
           actor: undefined,
           users,
-          projectId,
-          presence: presenceWith(),
         }),
       ).rejects.toMatchObject({
         code: "agent_owner_only",
@@ -506,17 +503,32 @@ describe("assertConnectedAgentsRunnable", () => {
       });
     });
   });
+});
 
-  describe("when a connected agent has no live instance", () => {
-    it("refuses the run as offline, naming the agent and its environment", async () => {
+describe("assertConnectedAgentsOnline", () => {
+  describe("when every connected agent has a live instance", () => {
+    it("lets the run through", async () => {
       await expect(
-        assertConnectedAgentsRunnable({
+        assertConnectedAgentsOnline({
           agents: [
             connectedAgent({ id: "a", parameters: [] }),
             connectedAgent({ id: "b", parameters: [] }),
           ],
-          actor: { id: "u_1", label: "user" },
-          users,
+          projectId,
+          presence: presenceWith(),
+        }),
+      ).resolves.toBeUndefined();
+    });
+  });
+
+  describe("when a connected agent has no live instance", () => {
+    it("refuses the run as offline, naming the agent and its environment", async () => {
+      await expect(
+        assertConnectedAgentsOnline({
+          agents: [
+            connectedAgent({ id: "a", parameters: [] }),
+            connectedAgent({ id: "b", parameters: [] }),
+          ],
           projectId,
           presence: presenceWith(["b"]),
         }),
@@ -533,18 +545,15 @@ describe("assertConnectedAgentsRunnable", () => {
       const presence = presenceWith(["http_1"]);
 
       await expect(
-        assertConnectedAgentsRunnable({
+        assertConnectedAgentsOnline({
           agents: [
             {
               id: "http_1",
               name: "Support API",
               type: "http",
               environment: null,
-              ownerUserId: null,
             },
           ],
-          actor: { id: "u_1", label: "user" },
-          users,
           projectId,
           presence,
         }),
@@ -552,24 +561,28 @@ describe("assertConnectedAgentsRunnable", () => {
       expect(presence.listLive).not.toHaveBeenCalled();
     });
   });
+});
 
-  describe("when someone else's personal agent is offline too", () => {
-    /** @scenario "The owner-only refusal comes before the offline one" */
-    it("refuses as owner only without reading presence", async () => {
-      const presence = presenceWith(["b"]);
-
-      await expect(
-        assertConnectedAgentsRunnable({
-          agents: [
-            connectedAgent({ id: "b", parameters: [], ownerUserId: "u_2" }),
-          ],
-          actor: { id: "u_1", label: "user" },
-          users,
-          projectId,
-          presence,
-        }),
-      ).rejects.toMatchObject({ code: "agent_owner_only" });
-      expect(presence.listLive).not.toHaveBeenCalled();
+describe("SuiteService.run with someone else's personal agent that is offline", () => {
+  /** @scenario "The owner-only refusal comes before the offline one" */
+  it("refuses as owner only and schedules nothing", async () => {
+    const { service, startRun } = serviceWith({
+      agents: [
+        connectedAgent({ id: "agent_1", parameters: [], ownerUserId: "u_2" }),
+      ],
+      scenarioParameters: null,
+      users: [{ id: "u_2", name: "Ana" }],
+      offlineIds: ["agent_1"],
     });
+
+    const failure = await service
+      .run({
+        ...runDefaults,
+        suite: suiteWith([{ type: "connected", referenceId: "agent_1" }]),
+      })
+      .catch((error: unknown) => error);
+
+    expect(failure).toMatchObject({ code: "agent_owner_only" });
+    expect(startRun).not.toHaveBeenCalled();
   });
 });

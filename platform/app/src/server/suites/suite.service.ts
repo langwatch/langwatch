@@ -60,6 +60,7 @@ import {
 } from "../scenarios/suite-fields";
 import {
   agentParameterDefinitionsOf,
+  assertConnectedAgentsOnline,
   assertConnectedAgentsRunnable,
   isAgentUnseen,
   ownerNamesOf,
@@ -1433,6 +1434,9 @@ export class SuiteService {
       agents: [...resolved.agentsById.values()],
       actor: params.actor,
       users: this.prisma,
+    });
+    await assertConnectedAgentsOnline({
+      agents: [...resolved.agentsById.values()],
       projectId: params.projectId,
       presence: this.presence,
     });
