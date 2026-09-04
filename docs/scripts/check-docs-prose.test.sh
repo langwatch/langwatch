@@ -73,14 +73,20 @@ else
 fi
 
 # A paragraph over the word limit fails, a list item over it fails, and a
-# table row or a paragraph split in two passes. The limit is set low so the
-# page stays short.
+# table row or a paragraph split in two passes. An indented heading, a table
+# written without its outer pipes and a list item of exactly the limit pass
+# too. The limit is set low so the page stays short.
 LONG_PAGE="$WORK/docs/long.mdx"
 {
   printf -- '---\ntitle: Long\n---\n\n'
   printf 'one two three four five six seven eight nine ten eleven twelve\n\n'
   printf -- '- one two three four five six seven eight nine ten eleven twelve\n- one two three\n\n'
   printf '| one two three four five six seven eight nine ten eleven twelve |\n\n'
+  printf '   ### one two three four five six seven eight nine ten eleven twelve\n\n'
+  printf 'one two three four five six | seven eight nine ten eleven twelve\n'
+  printf -- '--- | ---\n'
+  printf 'one two three four five six | seven eight nine ten eleven twelve\n\n'
+  printf -- '- one two three four five six seven eight nine ten\n\n'
   printf 'one two three four five six\n\none two three four five six\n'
 } > "$LONG_PAGE"
 rm -f "$WORK/docs/$PAGE_NAME"
@@ -93,6 +99,27 @@ if [[ "$LONG_COUNT" -eq 2 ]]; then
 else
   check "the long paragraph and the long list item fail, the table row and the split paragraphs pass" no
   echo "Output: $LONG_OUTPUT"
+fi
+
+if printf '%s\n' "$LONG_OUTPUT" | grep -q 'long.mdx,line=12::'; then
+  check "the indented heading is not counted as prose" no
+  echo "Output: $LONG_OUTPUT"
+else
+  check "the indented heading is not counted as prose" yes
+fi
+
+if printf '%s\n' "$LONG_OUTPUT" | grep -qE 'long.mdx,line=1[456]::'; then
+  check "a table without outer pipes is not counted as prose" no
+  echo "Output: $LONG_OUTPUT"
+else
+  check "a table without outer pipes is not counted as prose" yes
+fi
+
+if printf '%s\n' "$LONG_OUTPUT" | grep -q 'long.mdx,line=18::'; then
+  check "a list item of exactly the limit passes" no
+  echo "Output: $LONG_OUTPUT"
+else
+  check "a list item of exactly the limit passes" yes
 fi
 
 if printf '%s\n' "$LONG_OUTPUT" | grep -q 'long.mdx,line=5::'; then

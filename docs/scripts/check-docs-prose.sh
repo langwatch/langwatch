@@ -129,22 +129,37 @@ for file in "${FILES[@]}"; do
 
   # Paragraph length. Frontmatter, headings, tables, JSX tags, imports and
   # blank lines end a paragraph and are not counted; everything else is prose.
+  # A heading may carry up to three leading spaces, and a table may be written
+  # without its outer pipes, in which case the separator row is what identifies
+  # it and the header row above it has to be taken back out of the count.
   long=$(echo "$cleaned" | awk -v max="$MAX_PARAGRAPH_WORDS" '
     function flush() {
       if (words > max) printf "%d\t%d\n", start, words
-      words = 0; start = 0
+      words = 0; start = 0; last = 0
     }
     NR == 1 && /^---$/   { in_front = 1; next }
     in_front && /^---$/  { in_front = 0; next }
     in_front             { next }
     /^[[:space:]]*$/     { flush(); next }
-    /^#/                 { flush(); next }
+    /^ {0,3}#/           { flush(); next }
     /^[[:space:]]*[|<]/  { flush(); next }
     /^import /           { flush(); next }
-    /^[[:space:]]*([-*]|[0-9]+\.)[[:space:]]/ { flush(); start = NR; words = NF; next }
+    /^[[:space:]]*:?-+[-:|[:space:]]*\|[-:|[:space:]]*$/ {
+      words -= last
+      if (words <= 0) { words = 0; start = 0 }
+      last = 0
+      in_table = 1
+      next
+    }
+    in_table && /\|/     { next }
+    in_table             { in_table = 0 }
+    /^[[:space:]]*([-*]|[0-9]+\.)[[:space:]]/ {
+      flush(); start = NR; words = NF - 1; last = words; next
+    }
     {
       if (words == 0) start = NR
       words += NF
+      last = NF
     }
     END { flush() }
   ')
