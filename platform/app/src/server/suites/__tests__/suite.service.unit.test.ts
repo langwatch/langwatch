@@ -1919,3 +1919,30 @@ describe("SuiteService", () => {
     });
   });
 });
+
+describe("SuiteService fields and evaluators on a run plan", () => {
+  describe("given a run plan", () => {
+    describe("when fields are written on it", () => {
+      /** @scenario "A run plan takes evaluators but no fields" */
+      it("refuses with validation_error naming the fields", async () => {
+        const { service, suiteRepo } = createService({
+          suiteRepository: {
+            findById: vi.fn(async () => makeSuite({ kind: "run_plan" })),
+          },
+        });
+
+        await expect(
+          service.update({
+            id: "suite_abc123",
+            projectId: "proj_1",
+            data: { fields: [{ identifier: "golden_sql", type: "text" }] },
+          }),
+        ).rejects.toMatchObject({
+          code: "validation_error",
+          meta: { fieldErrors: { fields: expect.any(Array) } },
+        });
+        expect(suiteRepo.update).not.toHaveBeenCalled();
+      });
+    });
+  });
+});

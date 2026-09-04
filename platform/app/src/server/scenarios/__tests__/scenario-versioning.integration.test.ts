@@ -86,6 +86,47 @@ beforeEach(async () => {
 });
 
 describe("scenario versioning", () => {
+  describe("field values", () => {
+    /** @scenario "A save that changes a field value records a version naming fields" */
+    it("records a version naming fields and snapshots the value", async () => {
+      const testSuite = await createTestSuite("Case lookups");
+      await prisma.simulationSuite.updateMany({
+        where: { id: testSuite.id, projectId },
+        data: { fields: [{ identifier: "golden_sql", type: "text" }] },
+      });
+      const scenario = await service.create(
+        {
+          projectId,
+          name: "Chargebacks",
+          situation: "An analyst asks for chargebacks",
+          criteria: ["The agent answers"],
+          labels: [],
+          testSuiteId: testSuite.id,
+        },
+        { actor: { userId: null, label: "api" } },
+      );
+
+      const updated = await service.update({
+        id: scenario.id,
+        projectId,
+        data: { fields: { golden_sql: "SELECT 1" } },
+      });
+
+      expect(updated.version).toBe(2);
+      const { versions } = await service.listVersions({
+        projectId,
+        scenarioId: scenario.id,
+      });
+      expect(versions[0]?.changedFields).toEqual(["fields"]);
+      const detail = await service.getVersion({
+        projectId,
+        scenarioId: scenario.id,
+        version: 2,
+      });
+      expect(detail.fields.fields).toEqual({ golden_sql: "SELECT 1" });
+    });
+  });
+
   describe("numbering", () => {
     /** @scenario "A new scenario starts at version 1" */
     it("starts a new scenario at version 1 with one entry named Created", async () => {
