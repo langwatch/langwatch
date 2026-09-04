@@ -31,11 +31,28 @@ import { useLangyLocalControlStore } from "../stores/langyLocalControlStore";
 export const SKIP_NOT_ALLOWED_HINT =
   "This model is not allowed to skip permission checks. Check the allowed models list in the provider settings.";
 
-const DECISION_LABEL: Record<LangyPermissionDecision, string> = {
-  allow_once: "You allowed this command once",
-  allow_pattern: "You allowed this pattern for the session",
-  deny: "You denied this command",
-};
+/**
+ * What the settled card says the reader did. A pattern grant NAMES the
+ * pattern: it covers every future command that matches it, and the session's
+ * grants are readable nowhere else, so "this pattern" left the reader with no
+ * way to know what they had given away.
+ */
+export function langyDecisionLabel({
+  decision,
+  pattern,
+}: {
+  decision: LangyPermissionDecision | null;
+  pattern: string | null;
+}): string {
+  if (decision === "allow_once") return "You allowed this command once";
+  if (decision === "deny") return "You denied this command";
+  if (decision === "allow_pattern") {
+    return pattern
+      ? `You allowed "${pattern}" for the session`
+      : "You allowed this pattern for the session";
+  }
+  return "You answered this card";
+}
 
 export interface LangyLocalPermissionCardProps {
   projectId: string;
@@ -83,6 +100,10 @@ export function LangyLocalPermissionCard({
           </Text>
         </HStack>
 
+        {/* The whole command, wrapped. It used to scroll sideways inside a
+            420px card, so a chain that stages, commits, pushes and opens a
+            pull request was approved from its first few words. Nobody can
+            rule on text they cannot read. */}
         <Box
           as="pre"
           borderWidth="1px"
@@ -91,9 +112,17 @@ export function LangyLocalPermissionCard({
           background="bg.muted"
           paddingX={2}
           paddingY={1.5}
-          overflowX="auto"
+          whiteSpace="pre-wrap"
+          wordBreak="break-word"
         >
-          <Text as="code" textStyle="2xs" fontFamily="mono" color="fg">
+          <Text
+            as="code"
+            textStyle="2xs"
+            fontFamily="mono"
+            color="fg"
+            whiteSpace="pre-wrap"
+            wordBreak="break-word"
+          >
             {card.command}
           </Text>
         </Box>
@@ -233,9 +262,10 @@ function Outcome({ card }: { card: LangyPermissionCardData }) {
           )}
         </Box>
         <Text textStyle="2xs" color="fg.muted">
-          {card.decision
-            ? DECISION_LABEL[card.decision]
-            : "You answered this card"}
+          {langyDecisionLabel({
+            decision: card.decision,
+            pattern: card.pattern,
+          })}
         </Text>
       </HStack>
     );

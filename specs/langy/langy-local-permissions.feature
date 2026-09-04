@@ -68,6 +68,17 @@ Feature: The CLI decides what Langy may run on the developer's machine
       And the terminal reads that Langy asked for permission in the panel
 
     @integration
+    Scenario: The card shows the whole command, wrapped
+      Given a permission card for a command chain longer than the card is wide
+      Then the card shows every character of the command, wrapped onto more lines
+      And no part of it is left off the side of the card
+
+    @integration
+    Scenario: A pattern grant names the pattern it covers on the settled card
+      Given I allowed a pattern for the session
+      Then the settled card names the pattern the grant covers
+
+    @integration
     Scenario: Allowing once runs the command and returns its output
       Given a permission card for the type check
       When I allow it once

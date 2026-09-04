@@ -139,6 +139,34 @@ export type LangyStreamEntry =
 export const LANGY_EMPTY_TURN_FALLBACK =
   "I finished this turn without writing a reply. Check the cards above for what ran before you ask again.";
 
+/** The tool call that puts the code access card up (ADR-129). */
+const CODE_ACCESS_TOOL = "code_access";
+
+/**
+ * What the panel says when a turn ends on a card and nothing else.
+ *
+ * A turn that ends on a card has not failed to answer: it is holding for the
+ * developer, and the card is the ask. Apologising for the missing reply told
+ * the reader to check cards they were already looking at, and said nothing
+ * about the one thing they had to do.
+ */
+export function langyEmptyTurnLine(
+  entries: readonly LangyStreamEntry[],
+): string {
+  for (const entry of [...entries].reverse()) {
+    if (entry.type === "local_permission" && entry.status === "pending") {
+      return "I'm waiting for your answer on the permission card above before I run that command.";
+    }
+    if (entry.type === "question" && entry.status === "pending") {
+      return "I'm waiting for your answer on the card above before I go on.";
+    }
+    if (entry.type === "tool" && entry.name === CODE_ACCESS_TOOL) {
+      return "I'm waiting for you to say how I should reach your code, on the card above.";
+    }
+  }
+  return LANGY_EMPTY_TURN_FALLBACK;
+}
+
 /** An entry paired with the Redis stream id it was read at. */
 export interface LangyStreamRead {
   id: string;
@@ -648,7 +676,7 @@ export class LangyTokenBuffer {
     conversationId: string;
     turnId: string;
     backstopSilentTurn?: boolean;
-  }): Promise<{ backstopped: boolean }> {
+  }): Promise<{ backstopped: boolean; text?: string }> {
     await this.flush({ conversationId, turnId });
     await this.flushReasoning({ conversationId, turnId });
     // A turn that completes without a text delta leaves a finished spinner and
@@ -656,42 +684,36 @@ export class LangyTokenBuffer {
     // the turn succeeded. The agent is told to always end with visible text;
     // this is the backstop. Pure whitespace reads the same as nothing, so it
     // takes the fallback too.
-    const backstopped =
+    //
+    // The stream also decides WHICH line: a turn holding on a card is waiting
+    // for the reader, not failing to answer them.
+    //
+    // The tail is what decides both, not `sawVisibleText`: that map is in
+    // memory and a buffer is built per relay request, so a worker that
+    // reconnected mid-turn ends the stream on an instance that never saw the
+    // earlier deltas. Only read when instance memory says nothing was written,
+    // which is the rare case, so the normal path pays no read.
+    let backstopped = false;
+    let text: string | undefined;
+    if (
       backstopSilentTurn &&
-      !this.sawVisibleText.has(this.pendingKey(conversationId, turnId)) &&
-      !(await this.streamCarriesVisibleText({ conversationId, turnId }));
-    if (backstopped) {
-      await this.append(conversationId, turnId, {
-        type: "delta",
-        text: LANGY_EMPTY_TURN_FALLBACK,
-      });
+      !this.sawVisibleText.has(this.pendingKey(conversationId, turnId))
+    ) {
+      const { reads } = await this.readTail({ conversationId, turnId });
+      const entries = reads.map((read) => read.entry);
+      const visible = entries.some(
+        (entry) => entry.type === "delta" && entry.text.trim() !== "",
+      );
+      if (!visible) {
+        backstopped = true;
+        text = langyEmptyTurnLine(entries);
+        await this.append(conversationId, turnId, { type: "delta", text });
+      }
     }
     this.firstFlushDone.delete(this.pendingKey(conversationId, turnId));
     this.sawVisibleText.delete(this.pendingKey(conversationId, turnId));
     await this.append(conversationId, turnId, { type: "end" });
-    return { backstopped };
-  }
-
-  /**
-   * Did this turn already write something the user can read?
-   *
-   * `sawVisibleText` is in-memory and a buffer is built per relay request, so a
-   * worker that reconnects mid-turn ends the stream on an instance that never
-   * saw the earlier deltas. The stream is the durable record of what the user
-   * got, so it decides. Only reached when instance memory says nothing was
-   * written, which is the rare case, so the normal path pays no read.
-   */
-  private async streamCarriesVisibleText({
-    conversationId,
-    turnId,
-  }: {
-    conversationId: string;
-    turnId: string;
-  }): Promise<boolean> {
-    const { reads } = await this.readTail({ conversationId, turnId });
-    return reads.some(
-      ({ entry }) => entry.type === "delta" && entry.text.trim() !== "",
-    );
+    return { backstopped, ...(text !== undefined ? { text } : {}) };
   }
 
   /** Terminal marker: the turn errored. Flushes buffered tokens first. */

@@ -163,6 +163,17 @@ describe("given a card that already settled", () => {
     expect(screen.queryByText("Deny")).toBeNull();
   });
 
+  /** @scenario "A pattern grant names the pattern it covers on the settled card" */
+  it("names the pattern a session grant covered", () => {
+    renderCard({
+      card: { ...PENDING, status: "answered", decision: "allow_pattern" },
+    });
+
+    expect(
+      screen.getByText('You allowed "pnpm *" for the session'),
+    ).toBeDefined();
+  });
+
   /** @scenario "A card left unanswered expires and Langy ends its turn in words" */
   it("says nobody answered in time", () => {
     renderCard({ card: { ...PENDING, status: "expired" } });
@@ -176,6 +187,23 @@ describe("given a card that already settled", () => {
   it("says a stopped turn took the card with it", () => {
     renderCard({ card: { ...PENDING, status: "cancelled" } });
     expect(screen.getByText("Cancelled with the turn")).toBeDefined();
+  });
+});
+
+describe("given a long command chain", () => {
+  const CHAIN =
+    'git add app/agent.py README.md && git commit -m "feat: add tracing" && git push -u origin HEAD && gh pr create --base main --title "Add tracing"';
+
+  /** @scenario "The card shows the whole command, wrapped" */
+  it("shows every character of it, wrapped rather than clipped", () => {
+    renderCard({ card: { ...PENDING, command: CHAIN } });
+
+    const command = screen.getByText(CHAIN);
+    expect(command.textContent).toBe(CHAIN);
+    const block = command.closest("pre");
+    expect(block).not.toBeNull();
+    expect(getComputedStyle(block as Element).whiteSpace).toBe("pre-wrap");
+    expect(getComputedStyle(block as Element).overflowX).not.toBe("auto");
   });
 });
 

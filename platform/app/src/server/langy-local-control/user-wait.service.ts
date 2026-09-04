@@ -259,7 +259,7 @@ export class UserWaitService {
       const ended = wait?.state;
       throw new LangyWaitExpiredError({
         waitId,
-        ...(ended && ended !== "pending" ? { outcome: ended } : {}),
+        ...(ended ? { outcome: ended } : {}),
         ...(wait?.decision ? { decision: wait.decision } : {}),
       });
     }

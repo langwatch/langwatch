@@ -206,6 +206,53 @@ describe("LangyTokenBuffer hybrid flush", () => {
         expect(entries.at(-1)?.type).toBe("end");
       });
 
+      /** @scenario "A turn that ends on a card says what the card is waiting for" */
+      it("says what the card is waiting for when the turn ends on one", async () => {
+        const { redis, entries } = makeRedis();
+        const buffer = new LangyTokenBuffer({ redis });
+
+        await buffer.appendLocalPermission({
+          ...ids,
+          entry: {
+            waitId: "lwait_1",
+            callId: "call_1",
+            summary: "uv sync",
+            pattern: "uv",
+            reason: "Installs packages",
+            skipOffered: true,
+            workspaceName: "acme-app",
+            hostname: "rogerio-mbp",
+            status: "pending",
+          },
+        });
+        const { text } = await buffer.markEnd({
+          ...ids,
+          backstopSilentTurn: true,
+        });
+
+        expect(text).toContain("waiting for your answer");
+        expect(text).not.toBe(LANGY_EMPTY_TURN_FALLBACK);
+        expect(deltas(entries).at(-1)?.text).toBe(text);
+      });
+
+      /** @scenario "A turn that ends on a card says what the card is waiting for" */
+      it("names the code access card when the turn ends on that one", async () => {
+        const { redis, entries } = makeRedis();
+        const buffer = new LangyTokenBuffer({ redis });
+
+        await buffer.appendTool({
+          ...ids,
+          id: "call_1",
+          name: "code_access",
+          phase: "end",
+        });
+        await buffer.markEnd({ ...ids, backstopSilentTurn: true });
+
+        expect(deltas(entries).at(-1)?.text).toContain(
+          "how I should reach your code",
+        );
+      });
+
       /** @scenario A turn never ends silently */
       it("counts a whitespace-only delta as no text at all", async () => {
         const { redis, entries } = makeRedis();
