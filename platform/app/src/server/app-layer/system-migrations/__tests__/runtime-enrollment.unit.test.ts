@@ -14,11 +14,13 @@ const stubs = vi.hoisted(() => {
   const warnings: Array<[string, unknown, unknown]> = [];
   const organizationUserFindMany = vi.fn().mockResolvedValue([]);
   const organizationUserFindFirst = vi.fn().mockResolvedValue(null);
+  const userFindUnique = vi.fn().mockResolvedValue(null);
   return {
     enrollmentFindMany,
     enrollmentFindUnique,
     organizationUserFindMany,
     organizationUserFindFirst,
+    userFindUnique,
     warnings,
     prisma: {
       systemMigrationEnrollment: {
@@ -30,9 +32,11 @@ const stubs = vi.hoisted(() => {
       organization: {
         findMany: vi.fn().mockResolvedValue([]),
       },
-      // The user-rooted leg pages users the same way.
+      // The user-rooted leg pages users the same way; the cohort reads a
+      // candidate's memberships as a relation off their own row.
       user: {
         findMany: vi.fn().mockResolvedValue([]),
+        findUnique: userFindUnique,
       },
       organizationUser: {
         findMany: organizationUserFindMany,
@@ -44,19 +48,15 @@ const stubs = vi.hoisted(() => {
 
 /** Answers the cohort's per-user membership probes from a plain map. */
 function stubMemberships(memberships: Record<string, string[]>): void {
-  stubs.organizationUserFindFirst.mockImplementation(
-    async ({
-      where,
-    }: {
-      where: { userId: string; organizationId: { in: string[] } };
-    }) => {
-      const organizations = memberships[where.userId] ?? [];
-      return organizations.some((organizationId) =>
-        where.organizationId.in.includes(organizationId),
-      )
-        ? { userId: where.userId }
-        : null;
-    },
+  stubs.userFindUnique.mockImplementation(
+    async ({ where }: { where: { id: string } }) =>
+      where.id in memberships
+        ? {
+            orgMemberships: memberships[where.id]!.map((organizationId) => ({
+              organizationId,
+            })),
+          }
+        : null,
   );
 }
 
@@ -95,6 +95,7 @@ vi.mock("@langwatch/observability", async (importOriginal) => {
   };
 });
 
+import { guardOrganizationId } from "~/utils/dbOrganizationIdProtection";
 import { AUTHZ_ENGINE_MIGRATION_NAME } from "../../authz/migration-name";
 import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../../identity/migration-name";
 import {
@@ -103,6 +104,21 @@ import {
   runSystemMigrationTargetedPass,
   userMigrationPassCohort,
 } from "../runtime";
+
+// The production client refuses tenancy-unbounded queries (guardOrganizationId
+// in db.ts); route every stubbed delegate through the real guard so a query
+// shape that throws on cloud throws here too. The cohort probe once read
+// OrganizationUser by userId alone — a shape the guard rejects — and this
+// suite could not see that while the stubs bypassed the guard.
+for (const [delegateName, delegate] of Object.entries(stubs.prisma)) {
+  const model = delegateName.charAt(0).toUpperCase() + delegateName.slice(1);
+  for (const [action, fn] of Object.entries(delegate)) {
+    (delegate as Record<string, unknown>)[action] = (args: unknown) =>
+      guardOrganizationId({ model, action, args }, (params) =>
+        (fn as (a: unknown) => Promise<unknown>)(params.args),
+      );
+  }
+}
 
 describe("migrationPassCohort on cloud", () => {
   beforeEach(() => {
@@ -274,17 +290,52 @@ describe("userMigrationPassCohort on cloud", () => {
       await expect(
         cohort({ tenantId: "user_solo", migrationName: backfill }),
       ).resolves.toBe(false);
-      // Membership is probed per user against the enrolled organizations
-      // only - never materialized fleet-wide.
-      expect(stubs.organizationUserFindFirst).toHaveBeenCalledWith(
+      // Membership is probed off the user's own row alone — the enrolled set
+      // stays in memory and never rides along as an IN list (whose planning
+      // cost scales with every enrolled organization). Reading it as a
+      // relation of the user is also what keeps the probe inside the
+      // organization guard: a top-level OrganizationUser read bounded only by
+      // userId has no admitted shape there.
+      expect(stubs.userFindUnique).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({
-            userId: "user_sam",
-            organizationId: { in: ["org_acme"] },
-          }),
+          where: { id: "user_sam" },
         }),
       );
       expect(stubs.organizationUserFindMany).not.toHaveBeenCalled();
+      expect(stubs.organizationUserFindFirst).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when many organizations are enrolled and the user belongs to a few", () => {
+    // Regression for langwatch/langwatch#7709 — the cohort probe must not inline the enrolled set.
+    it("answers from the user's memberships without shipping the enrolled set to the database", async () => {
+      const backfill = IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME;
+      const enrolled = Array.from({ length: 500 }, (_, i) => ({
+        organizationId: `org_${i}`,
+        migrationName: backfill,
+      }));
+      stubs.enrollmentFindMany.mockResolvedValueOnce(enrolled);
+      stubMemberships({
+        user_multi: ["org_unenrolled", "org_7"],
+        user_out: ["org_unenrolled"],
+      });
+
+      const cohort = await userMigrationPassCohort();
+
+      await expect(
+        cohort({ tenantId: "user_multi", migrationName: backfill }),
+      ).resolves.toBe(true);
+      await expect(
+        cohort({ tenantId: "user_out", migrationName: backfill }),
+      ).resolves.toBe(false);
+      // The regression #7709 guards against: one parameter per probe, no
+      // organizationId filter, regardless of how many organizations are
+      // enrolled.
+      for (const call of stubs.userFindUnique.mock.calls) {
+        expect(call[0].where).toEqual({ id: expect.any(String) });
+      }
+      expect(stubs.organizationUserFindMany).not.toHaveBeenCalled();
+      expect(stubs.organizationUserFindFirst).not.toHaveBeenCalled();
     });
   });
 
@@ -335,6 +386,7 @@ describe("userMigrationPassCohort on cloud", () => {
         }),
       ).resolves.toBe(false);
       // An empty enrolled set answers false before any membership probe.
+      expect(stubs.userFindUnique).not.toHaveBeenCalled();
       expect(stubs.organizationUserFindFirst).not.toHaveBeenCalled();
       expect(stubs.organizationUserFindMany).not.toHaveBeenCalled();
     });
