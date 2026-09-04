@@ -71,6 +71,7 @@ import { api, trpcClient } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { useLangyConversationCommands } from "../data/useLangyConversationCommands";
 import { useLangyConversationList } from "../data/useLangyConversationList";
+import { useLangyLocalRecord } from "../data/useLangyLocalRecord";
 import { useLangyMessages } from "../data/useLangyMessages";
 import { useGlobalLangyShortcut } from "../hooks/useGlobalLangyShortcut";
 import { useLangyChatEngine } from "../hooks/useLangyChatEngine";
@@ -2163,26 +2164,46 @@ function LangyPanel({
 
   // ── The developer's own machine (ADR-129) ───────────────────────────────
   //
-  // Everything the local cards read comes from two places and no more: the
-  // folded turn document (the durable truth, which a tab that adopted a
-  // running turn has without ever seeing the live stream) and the live wait
-  // entries this browser's own stream delivered. `langyLocalWaits` merges
-  // them with a rule that only ever moves a card forward.
+  // Everything the local cards read comes from three places and no more: the
+  // conversation's durable record (`langy.localRecord`, every card of every
+  // turn), the folded turn document (the current turn, which a tab that
+  // adopted a running turn has without ever seeing the live stream) and the
+  // live wait entries this browser's own stream delivered. `langyLocalWaits`
+  // merges them with a rule that only ever moves a card forward.
+  //
+  // The record is what the other two cannot give: the local fold starts at
+  // the snapshot's cursor, so a card raised before this tab opened is not in
+  // it, and a reopened conversation has no fold at all — every card the
+  // developer answered used to vanish with the reload.
   const turnToolCalls = useLangyStore(
     (s) => s.turnProjection.turn?.ToolCalls ?? null,
   );
   const liveWaits = useLangyLocalControlStore((s) => s.waits);
+  const localRecord = useLangyLocalRecord({
+    projectId,
+    conversationId: activeConversationId,
+    // The messages poll moves this while a turn runs, so the record follows a
+    // turn at the poll's own pace rather than one of its own.
+    cursor: snapshotEventCursor,
+  });
+  const recordWaits = localRecord.waits;
   const permissionCards = useMemo(
-    () => langyPermissionCards({ toolCalls: turnToolCalls, live: liveWaits }),
-    [turnToolCalls, liveWaits],
+    () =>
+      langyPermissionCards({
+        record: recordWaits,
+        toolCalls: turnToolCalls,
+        live: liveWaits,
+      }),
+    [recordWaits, turnToolCalls, liveWaits],
   );
   const questionWaits = useMemo(
     () =>
       langyQuestionWaitsByToolCall({
+        record: recordWaits,
         toolCalls: turnToolCalls,
         live: liveWaits,
       }),
-    [turnToolCalls, liveWaits],
+    [recordWaits, turnToolCalls, liveWaits],
   );
 
   // The live entries belong to one conversation; opening another drops them.

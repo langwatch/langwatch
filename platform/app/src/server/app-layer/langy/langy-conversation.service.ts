@@ -28,10 +28,15 @@ import type {
 } from "@langwatch/langy";
 import {
   cursorHasReachedEvent,
+  foldLangyConversationTurn,
+  initLangyConversationTurnState,
+  LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_STATUS,
   LANGY_CONVERSATION_TURN_EVENT_TYPES,
+  type LangyConversationTurnFoldState,
   type LangyConversationTurnWireEvent,
   type LangyEventCursor,
+  type LangyTurnWait,
   langyConversationTurnEventSchema,
   langyJsonValueSchema,
 } from "@langwatch/langy";
@@ -286,6 +291,29 @@ function toListItem(
   };
 }
 
+/** One card the developer's machine put up, as the durable record holds it. */
+export type LangyLocalRecordWait = LangyTurnWait & {
+  /** The turn that raised it, so the panel keeps them in turn order. */
+  turnId: string;
+  /** The tool call it rides on. */
+  toolCallId: string;
+};
+
+/** Everything one conversation's local control left on the record. */
+export interface LangyLocalRecord {
+  waits: LangyLocalRecordWait[];
+  /** Whether the last thing the folder did was connect. */
+  workspaceConnected: boolean;
+}
+
+/** The two events that carry a card, as the fold reads them. */
+function isLangyWaitEventType(type: string): boolean {
+  return (
+    type === LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_STARTED ||
+    type === LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_ENDED
+  );
+}
+
 /**
  * Langy application service. Reads come from the Postgres operational
  * projection; writes remain event-sourcing commands.
@@ -478,6 +506,95 @@ export class LangyConversationService {
       cursor: last ? { acceptedAt: last.createdAt, eventId: last.id } : after,
       truncated,
     };
+  }
+
+  /**
+   * The developer's own machine in one conversation, off the durable record
+   * (ADR-129): every card it raised, in the order they were raised, and
+   * whether the folder is connected right now.
+   *
+   * The live stream cannot answer either question. A tab that adopted a
+   * running turn never subscribes to it, so a card raised before that tab
+   * opened reached nobody; and the browser's local fold starts at the
+   * snapshot's cursor, so everything the turn did before that cursor — a
+   * pending permission ask included — is not in it. Reopening a finished
+   * conversation had the same hole in the other direction: none of the cards
+   * the developer answered were on screen any more.
+   *
+   * Authorized exactly like the other reads (owner-or-shared, reported as
+   * not-found so it cannot probe), and folded with the SAME reducer the
+   * browser and the server projection use.
+   */
+  async getLocalRecord({
+    projectId,
+    conversationId,
+    userId,
+  }: {
+    projectId: string;
+    conversationId: string;
+    userId: string;
+  }): Promise<LangyLocalRecord> {
+    const visible = await this.findVisibleToleratingDispatchLag({
+      id: conversationId,
+      projectId,
+      userId,
+    });
+    if (!visible) throw new LangyConversationNotFoundError(conversationId);
+    if (!this.events) return { waits: [], workspaceConnected: false };
+
+    const all = await this.events.getEventsOccurredSince(
+      conversationId,
+      { tenantId: createTenantId(projectId) },
+      "langy_conversation",
+      0,
+    );
+
+    // One document per turn, folded from that turn's card events only: the
+    // waits ride on the tool calls, and nothing else in the vocabulary is
+    // needed to read them back.
+    const turns = new Map<string, LangyConversationTurnFoldState>();
+    let workspaceConnected = false;
+    for (const event of all) {
+      if (
+        event.type === LANGY_CONVERSATION_EVENT_TYPES.LOCAL_WORKSPACE_CONNECTED
+      ) {
+        workspaceConnected = true;
+        continue;
+      }
+      if (
+        event.type ===
+        LANGY_CONVERSATION_EVENT_TYPES.LOCAL_WORKSPACE_DISCONNECTED
+      ) {
+        workspaceConnected = false;
+        continue;
+      }
+      if (!isLangyWaitEventType(event.type)) continue;
+      const parsed = langyConversationTurnEventSchema.safeParse({
+        id: event.id,
+        createdAt: event.createdAt,
+        occurredAt: event.occurredAt,
+        type: event.type,
+        data: event.data,
+      });
+      if (!parsed.success) continue;
+      const turnId = parsed.data.data.turnId;
+      turns.set(
+        turnId,
+        foldLangyConversationTurn(
+          turns.get(turnId) ?? initLangyConversationTurnState(),
+          parsed.data,
+        ),
+      );
+    }
+
+    const waits: LangyLocalRecordWait[] = [];
+    for (const [turnId, turn] of turns) {
+      for (const call of turn.ToolCalls) {
+        if (!call.wait) continue;
+        waits.push({ turnId, toolCallId: call.toolCallId, ...call.wait });
+      }
+    }
+    return { waits, workspaceConnected };
   }
 
   /**

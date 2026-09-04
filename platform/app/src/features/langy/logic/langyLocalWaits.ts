@@ -94,16 +94,30 @@ export function mergeLangyWaitStatus({
 }
 
 interface WaitSources {
+  /**
+   * Every card of the whole conversation, off the durable record
+   * (`langy.localRecord`). The broadest source and the slowest: it is what
+   * puts a card raised before this tab was watching on screen, and what keeps
+   * the answered cards of a finished conversation on screen when it is
+   * reopened. The two sources below overwrite it as they arrive.
+   */
+  record?: readonly LangyRecordWait[] | null | undefined;
   /** The folded turn document's tool calls, or null before any turn is seen. */
   toolCalls?: readonly LangyTurnToolCall[] | null | undefined;
   /** Live entries by wait id, newest state per id. */
   live?: Readonly<Record<string, LangyLiveWait>> | undefined;
 }
 
+/** One card as the durable conversation record carries it. */
+export type LangyRecordWait = LangyTurnWait & { toolCallId: string };
+
 function durableWaits(sources: WaitSources): LangyTurnWait[] {
-  return (sources.toolCalls ?? []).flatMap((call) =>
-    call.wait ? [call.wait] : [],
-  );
+  return [
+    ...(sources.record ?? []),
+    ...(sources.toolCalls ?? []).flatMap((call) =>
+      call.wait ? [call.wait] : [],
+    ),
+  ];
 }
 
 /**
@@ -118,7 +132,30 @@ export function langyPermissionCards(
   const cards = new Map<string, LangyPermissionCardData>();
 
   for (const wait of durableWaits(sources)) {
-    if (wait.kind === "permission") cards.set(wait.waitId, fromDurable(wait));
+    if (wait.kind !== "permission") continue;
+    const known = cards.get(wait.waitId);
+    const next = fromDurable(wait);
+    // The two durable sources are the same record read at two moments, so
+    // neither is simply newer: the turn fold can hold the answer the record
+    // has not caught up with, and the record can hold the answer for a turn
+    // this browser stopped folding. A card only ever moves forward.
+    cards.set(
+      wait.waitId,
+      known
+        ? {
+            ...known,
+            ...next,
+            status: mergeLangyWaitStatus({
+              durable: known.status,
+              live: next.status,
+            }),
+            decision: next.decision ?? known.decision,
+            command: next.command || known.command,
+            pattern: next.pattern ?? known.pattern,
+            reason: next.reason ?? known.reason,
+          }
+        : next,
+    );
   }
   for (const entry of Object.values(sources.live ?? {})) {
     if (entry.kind !== "permission") continue;
@@ -182,10 +219,22 @@ export function langyQuestionWaitsByToolCall(
 ): Map<string, LangyQuestionWait> {
   const waits = new Map<string, LangyQuestionWait>();
 
+  for (const wait of sources.record ?? []) {
+    if (wait.kind !== "question") continue;
+    waits.set(wait.toolCallId, { waitId: wait.waitId, status: wait.status });
+  }
+
   for (const call of sources.toolCalls ?? []) {
     const wait = call.wait;
     if (wait?.kind !== "question") continue;
-    waits.set(call.toolCallId, { waitId: wait.waitId, status: wait.status });
+    const known = waits.get(call.toolCallId);
+    waits.set(call.toolCallId, {
+      waitId: wait.waitId,
+      status: mergeLangyWaitStatus({
+        durable: known?.status,
+        live: wait.status,
+      }),
+    });
   }
 
   for (const entry of Object.values(sources.live ?? {})) {

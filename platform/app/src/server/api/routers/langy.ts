@@ -1065,6 +1065,26 @@ export const langyRouter = createTRPCRouter({
     },
   ),
 
+  /**
+   * Every card the developer's machine put up in this conversation, and
+   * whether the folder is connected, off the durable record (ADR-129).
+   *
+   * The panel reads it on open and while a turn is in flight, which is what
+   * puts a card raised before this tab was watching on screen, keeps the
+   * cards of a finished conversation on screen when it is reopened, and tells
+   * the code access card that the folder connected on a turn this tab never
+   * subscribed to.
+   */
+  localRecord: langyReadProcedure
+    .input(z.object({ conversationId: z.string() }))
+    .query(async ({ input, ctx }) => {
+      return await getApp().langy.conversations.getLocalRecord({
+        projectId: input.projectId,
+        conversationId: input.conversationId,
+        userId: ctx.session.user.id,
+      });
+    }),
+
   /** What the panel chip, the code access card and the settings page read. */
   getLocalWorkspace: langyReadProcedure
     .input(z.object({ conversationId: z.string() }))

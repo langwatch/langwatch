@@ -110,6 +110,13 @@ Feature: Langy works in a folder shared from the developer's machine
       Then the chip and the card read disconnected within a second
       And a call in flight fails with the folder offline
 
+
+    @unit
+    Scenario: The card reads the connection off the record, not only off the stream
+      Given the folder connected on a turn this browser never watched
+      When the panel reads the conversation's record
+      Then the card is told the folder is there and reads connected
+
     @integration
     Scenario: A folder not seen for thirty seconds reads offline
       Given a connected folder whose machine went to sleep

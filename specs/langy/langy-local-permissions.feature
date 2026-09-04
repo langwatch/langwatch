@@ -167,12 +167,19 @@ Feature: The CLI decides what Langy may run on the developer's machine
       Then the refusal says it was already answered, and with which answer
       And it does not say Langy stopped waiting
 
-    @integration
+    @unit
     Scenario: Every card of the conversation is on screen again after a reload
       Given a finished conversation where I allowed, denied and let one expire
       When I reopen it
-      Then each card renders with the answer it ended on
+      Then each card is on screen with the answer it ended on
       And a pattern grant names the pattern it covered
+
+    @unit
+    Scenario: A card raised before this tab was watching still appears
+      Given Langy raised a permission card on a turn this browser did not start
+      When the panel opens on that conversation
+      Then the card is on screen, waiting for my answer
+      And answering it there releases the command the same way
 
     @integration
     Scenario: A grant lives with the session, not with the conversation

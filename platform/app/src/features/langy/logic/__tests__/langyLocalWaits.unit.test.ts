@@ -74,6 +74,106 @@ describe("langyPermissionCards", () => {
     });
   });
 
+  describe("given the conversation's durable record alone", () => {
+    const record = [
+      {
+        ...permissionWait({
+          waitId: "wait-a",
+          status: "answered",
+          decision: "allow_pattern",
+        }),
+        toolCallId: "call-a",
+      },
+      {
+        ...permissionWait({
+          waitId: "wait-b",
+          status: "expired",
+          summary: "rm -rf build",
+          pattern: null,
+        }),
+        toolCallId: "call-b",
+      },
+    ];
+
+    /** @scenario "Every card of the conversation is on screen again after a reload" */
+    it("renders every card of the conversation with the answer it ended on", () => {
+      const cards = langyPermissionCards({ record: record as never });
+
+      expect(cards).toHaveLength(2);
+      expect(cards[0]).toMatchObject({
+        waitId: "wait-a",
+        status: "answered",
+        decision: "allow_pattern",
+        pattern: "pnpm *",
+      });
+      expect(cards[1]).toMatchObject({ waitId: "wait-b", status: "expired" });
+    });
+
+    /** @scenario "A card raised before this tab was watching still appears" */
+    it("renders a card still waiting on a turn this browser never watched", () => {
+      const cards = langyPermissionCards({
+        record: [
+          {
+            ...permissionWait({ waitId: "wait-c" }),
+            toolCallId: "call-c",
+          },
+        ] as never,
+        toolCalls: null,
+      });
+
+      expect(cards[0]).toMatchObject({
+        waitId: "wait-c",
+        status: "pending",
+        command: "pnpm typecheck",
+      });
+    });
+
+    describe("when the turn document has moved on", () => {
+      it("keeps the settled state, whichever of the two holds it", () => {
+        const cards = langyPermissionCards({
+          record: [
+            { ...permissionWait({ waitId: "wait-1" }), toolCallId: "call-1" },
+          ] as never,
+          toolCalls: [
+            toolCall({
+              wait: permissionWait({
+                status: "answered",
+                decision: "deny",
+              }),
+            }),
+          ] as never,
+        });
+
+        expect(cards).toHaveLength(1);
+        expect(cards[0]).toMatchObject({
+          status: "answered",
+          decision: "deny",
+        });
+      });
+
+      it("never lets a stale read put an answered card back to waiting", () => {
+        const cards = langyPermissionCards({
+          record: [
+            {
+              ...permissionWait({
+                waitId: "wait-1",
+                status: "answered",
+                decision: "deny",
+              }),
+              toolCallId: "call-1",
+            },
+          ] as never,
+          toolCalls: [toolCall()] as never,
+        });
+
+        expect(cards[0]).toMatchObject({
+          status: "answered",
+          decision: "deny",
+        });
+      });
+    });
+  });
+
   describe("given only the live stream", () => {
     it("renders the card before the durable tail lands", () => {
       const live: Record<string, LangyLiveWait> = {

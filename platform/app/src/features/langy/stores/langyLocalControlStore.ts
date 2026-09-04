@@ -34,6 +34,12 @@ interface LangyLocalControlState {
   waits: Record<string, LangyLiveWait>;
   /** The last folder change this stream reported, or null. */
   workspace: LangyLiveWorkspace | null;
+  /**
+   * Whether the durable record says the folder is connected, or null before
+   * that record has been read. Its own field, because the record answers for
+   * turns this browser never watched and the live entry above does not.
+   */
+  workspaceConnected: boolean | null;
   /** Bumped whenever the folder changed, so a query can refetch on it. */
   workspaceRevision: number;
 
@@ -44,6 +50,15 @@ interface LangyLocalControlState {
   recordWorkspace: (a: {
     conversationId: string | null;
     workspace: LangyLiveWorkspace;
+  }) => void;
+  /**
+   * The durable record's word on whether the folder is connected. Bumps the
+   * revision only when the answer CHANGES, so the queries watching it refetch
+   * on the connect rather than on every read of the record.
+   */
+  recordWorkspaceState: (a: {
+    conversationId: string | null;
+    connected: boolean;
   }) => void;
   /**
    * Mark a card settled locally, the moment the answer is accepted.
@@ -67,6 +82,7 @@ export const useLangyLocalControlStore = create<LangyLocalControlState>(
     conversationId: null,
     waits: {},
     workspace: null,
+    workspaceConnected: null,
     workspaceRevision: 0,
 
     recordWait: ({ conversationId, wait }) => {
@@ -94,6 +110,21 @@ export const useLangyLocalControlStore = create<LangyLocalControlState>(
       });
     },
 
+    recordWorkspaceState: ({ conversationId, connected }) => {
+      const state = get();
+      if (conversationId && state.conversationId !== conversationId) return;
+      if (state.workspaceConnected === connected) return;
+      // The first read is not a change, it is the starting point: the queries
+      // watching the revision are fetching their own first answer anyway.
+      const first = state.workspaceConnected === null;
+      set({
+        workspaceConnected: connected,
+        workspaceRevision: first
+          ? state.workspaceRevision
+          : state.workspaceRevision + 1,
+      });
+    },
+
     settleWait: ({ waitId, kind = "permission", status }) => {
       const state = get();
       const wait = state.waits[waitId] ?? { waitId, kind, status: "pending" };
@@ -105,6 +136,7 @@ export const useLangyLocalControlStore = create<LangyLocalControlState>(
         conversationId,
         waits: {},
         workspace: null,
+        workspaceConnected: null,
         workspaceRevision: 0,
       }),
   }),
