@@ -1308,6 +1308,15 @@ func (a *account) GetConfigForProvider(provider bfschemas.ModelProvider) (*bfsch
 // credentialToBifrostKey converts a domain.Credential into bifrost's Key
 // format. logger may be nil (e.g. bare tests); used only to warn on a
 // dropped api_version override.
+// warnIgnoredAzureAPIVersion logs when a caller supplied an Azure api_version
+// override that bifrost v1.5 no longer forwards. logger may be nil.
+func warnIgnoredAzureAPIVersion(cred domain.Credential, logger *zap.Logger) {
+	if v := cred.Extra["api_version"]; v != "" && logger != nil {
+		logger.Warn("azure api_version override is ignored: bifrost v1.5 sets api-version itself",
+			zap.String("api_version", v))
+	}
+}
+
 func credentialToBifrostKey(cred domain.Credential, provider bfschemas.ModelProvider, logger *zap.Logger) bfschemas.Key {
 	k := bfschemas.Key{
 		ID:     cred.ID,
@@ -1335,10 +1344,7 @@ func credentialToBifrostKey(cred domain.Credential, provider bfschemas.ModelProv
 		// bifrost v1.5 dropped the per-key api-version field; the Azure
 		// provider now injects its own and a caller-supplied override is
 		// no longer forwarded (see the warning below).
-		if v := cred.Extra["api_version"]; v != "" && logger != nil {
-			logger.Warn("azure api_version override is ignored: bifrost v1.5 sets api-version itself",
-				zap.String("api_version", v))
-		}
+		warnIgnoredAzureAPIVersion(cred, logger)
 		// bifrost v1.5 moved model->deployment mapping off AzureKeyConfig onto
 		// Key.Aliases, resolved uniformly via Aliases.Resolve.
 		k.Aliases = bfschemas.KeyAliases(cred.DeploymentMap)
