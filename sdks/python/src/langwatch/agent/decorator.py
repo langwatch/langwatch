@@ -160,14 +160,18 @@ class ConnectedAgent:
         `ScenarioExecutor._next_agent_for_role` compares enum members, so
         this returns the member itself; the string value would never match.
         The scenario package is an optional dependency, so it is imported here
-        rather than at module load, and its value stands in without it. An
-        import that fails for any other reason is raised, since returning the
-        value there would leave the executor silently unable to match the role.
+        rather than at module load, and its value stands in without it.
+
+        Only an absent package falls back. Python names the top-level package
+        when it is the missing one, so any other name, `scenario.types`
+        included, means the package is installed and broken, and that is
+        raised: standing in for it would leave the executor unable to match
+        the role and fail somewhere far from the cause.
         """
         try:
             from scenario.types import AgentRole
         except ModuleNotFoundError as missing:
-            if (missing.name or "").split(".")[0] != "scenario":
+            if missing.name != "scenario":
                 raise
             return "Agent"
         return AgentRole.AGENT

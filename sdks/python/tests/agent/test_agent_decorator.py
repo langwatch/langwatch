@@ -327,8 +327,9 @@ def test_role_falls_back_when_the_scenario_package_is_not_installed(monkeypatch)
     assert agent.role == "Agent"
 
 
-def test_role_raises_when_scenario_is_installed_but_one_of_its_imports_fails(
-    monkeypatch,
+@pytest.mark.parametrize("missing", ["scenario.types", "litellm"])
+def test_role_raises_when_the_scenario_package_is_installed_but_broken(
+    monkeypatch, missing
 ):
     """Only an absent scenario package falls back; a broken install is raised.
 
@@ -336,16 +337,33 @@ def test_role_raises_when_scenario_is_installed_but_one_of_its_imports_fails(
     matches AgentRole.AGENT, and the run would fail somewhere else entirely.
     """
 
-    @connect_agent(name="broken-scenario")
+    @connect_agent(name=f"broken-{missing}")
     def agent(messages) -> str:
         return "reply"
 
-    break_the_scenario_import(monkeypatch, missing="litellm")
+    break_the_scenario_import(monkeypatch, missing=missing)
 
     with pytest.raises(ModuleNotFoundError) as raised:
         agent.role
 
-    assert raised.value.name == "litellm"
+    assert raised.value.name == missing
+
+
+def test_an_absent_package_is_named_by_its_top_level_module():
+    """What the role guard tells a missing package from a broken one by.
+
+    Python reports the top-level name when the package itself is absent, and
+    the dotted name when only the submodule is, so an exact match on
+    "scenario" is what separates the two.
+    """
+    with pytest.raises(ModuleNotFoundError) as absent:
+        from langwatch_no_such_package.types import AgentRole  # noqa: F401
+
+    with pytest.raises(ModuleNotFoundError) as broken:
+        from scenario.no_such_module import AgentRole  # noqa: F401
+
+    assert absent.value.name == "langwatch_no_such_package"
+    assert broken.value.name == "scenario.no_such_module"
 
 
 def test_call_accepts_a_dict_input():
