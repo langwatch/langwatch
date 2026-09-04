@@ -132,8 +132,8 @@ export function OnboardingHost({ children }: { children: ReactNode }) {
           text,
           succeeded,
           writeClipboard: writeUiClipboard,
-          onSucceeded: feedback.succeeded,
-          onFailed: feedback.failed,
+          onSucceeded: (notice) => feedback.succeeded(notice),
+          onFailed: (failure) => feedback.failed(failure),
         }),
       // An empty string is what the server sends a reader who may not hold the
       // key; it is an absence rather than a key, and the screen renders it as one.

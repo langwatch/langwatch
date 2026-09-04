@@ -66,7 +66,7 @@ export function DatasetHost({ children }: { children: ReactNode }) {
       succeeded: (notice) =>
         notifyDatasetSuccess({
           notice,
-          succeeded: feedback.succeeded,
+          succeeded: (notice) => feedback.succeeded(notice),
           createToast: (toast) => toaster.create(toast),
         }),
       failed: (failure) => feedback.failed(failure),

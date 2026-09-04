@@ -196,8 +196,8 @@ export function ApiKeyHost({ children }: { children: ReactNode }) {
           text,
           succeeded,
           writeClipboard: writeUiClipboard,
-          onSucceeded: feedback.succeeded,
-          onFailed: feedback.failed,
+          onSucceeded: (notice) => feedback.succeeded(notice),
+          onFailed: (failure) => feedback.failed(failure),
         }),
       recordLeadSourceIfAbsent: (source) =>
         recordLeadSourceIfAbsent({ storage: browserUiSessionStorage, source }),
