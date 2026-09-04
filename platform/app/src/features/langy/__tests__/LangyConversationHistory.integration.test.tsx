@@ -499,6 +499,9 @@ vi.mock("~/utils/api", async () => {
       getLocalWorkspace: {
         useQuery: () => ({ data: undefined, refetch: () => undefined }),
       },
+      localRecord: {
+        useQuery: () => ({ data: undefined, refetch: () => undefined }),
+      },
       answerQuestion: {
         useMutation: () => ({ mutate: () => undefined, isPending: false }),
       },
