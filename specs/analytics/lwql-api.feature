@@ -160,6 +160,56 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Then the log entry carries the key hash
     And the raw API key appears nowhere in the log entry
 
+  # ---------------------------------------------------------------------------
+  # How the capability is derived from the project's secret. The capability IS
+  # the tenant's name in the key map, so anything that lets two projects derive
+  # the same one lets each read the other's rows — and anything that makes a
+  # project derive a capability the map does not hold reads as a tenant with no
+  # data rather than as a failure.
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: Two projects never derive the same tenant capability
+    Given two projects with different LangWatchQL secrets
+    When each project's tenant capability is derived
+    Then the two capabilities differ
+    And each verifies against only its own project's secret
+
+  @unit
+  Scenario: A project's tenant capability is the same every time it is derived
+    Given a project's LangWatchQL secret
+    When its tenant capability is derived more than once, in any order
+    Then every derivation returns the same capability
+    And the capability is a work-factored digest that never contains the raw secret
+
+  @unit
+  Scenario: A secret the derivation cannot represent is refused, never truncated
+    Given a project whose LangWatchQL secret is longer than the derivation reads
+    When its tenant capability is derived
+    Then the derivation is refused with an error naming the limit
+    And no capability is produced that a shorter secret could also produce
+
+  @unit
+  Scenario: An unset secret is refused rather than hashed
+    Given a caller that did not select the project's LangWatchQL secret
+    When it asks for that project's tenant capability
+    Then the derivation is refused
+    And no capability is produced that would match no key-map row and read as an empty tenant
+
+  @unit
+  Scenario: One project's unusable secret never costs the other projects their key-map rows
+    Given a set of projects of which one has a secret the derivation refuses
+    When the key-map backfill is planned for all of them
+    Then the plan reports the refused project by id
+    And the plan still contains a row for every other project
+
+  @unit
+  Scenario: A deploy re-derives only the projects whose key-map row is out of date
+    Given projects whose key-map rows were written by the current derivation
+    And a project whose only key-map row was written by a previous derivation
+    When the key-map backfill is planned
+    Then only the out-of-date project's capability is derived
+
   @integration
   Scenario: Revoking a key hash from the key map takes effect within the stated revocation bound
     Given the restricted identity carries tenant-a's valid key-hash context
