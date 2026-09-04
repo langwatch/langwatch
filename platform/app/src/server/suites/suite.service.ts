@@ -1044,7 +1044,7 @@ export class SuiteService {
         await this.resolveUpdateSlug({
           projectId: params.projectId,
           excludeId: params.id,
-          kind: existing.kind,
+          existing,
           fields,
           name: params.data.name,
           data,
@@ -1075,12 +1075,12 @@ export class SuiteService {
   private async resolveUpdateSlug(params: {
     projectId: string;
     excludeId: string;
-    kind: SuiteKind;
+    existing: SimulationSuite;
     fields: SuiteFieldDefinition[] | undefined;
     name: string | undefined;
     data: UpdateSuiteInput;
   }): Promise<void> {
-    if (params.kind === "test_suite") {
+    if (params.existing.kind === "test_suite") {
       assertTestSuiteUpdate(params.data);
       return;
     }
