@@ -17,7 +17,10 @@
  *   down") while the click still emits the stored string; every metric
  *   without a human name shows exactly what ingest wrote;
  * - an event carrying no metrics renders nothing to expand into;
- * - active values read their include/exclude state from the AST.
+ * - active values read their include/exclude state from the AST;
+ * - driven against the real filter store, one click yields
+ *   "event:x AND event.attribute...:v" and cycling the value back off leaves
+ *   the bare "event:x" anchor behind (the accepted limitation).
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -29,6 +32,7 @@ import {
   EMPTY_AST,
   parse,
 } from "~/server/app-layer/traces/query-language/parse";
+import { useFilterStore } from "../../../stores/filterStore";
 import { EventDrilldown } from "../EventDrilldown";
 import type { FacetItem } from "../types";
 
@@ -248,6 +252,70 @@ describe("EventDrilldown", () => {
         expect(
           screen.getByRole("button", { name: "stars 4 — click to filter" }),
         ).toBeInTheDocument();
+      });
+    });
+  });
+
+  /**
+   * Every case above hands `toggleFacet` a `vi.fn()` and asserts the
+   * arguments, which proves what the component ASKS for but never what the
+   * query BECOMES. These two drive the real store, so the assertion is the
+   * text a user would read in the search bar.
+   */
+  describe("given the drilldown drives the real filter store", () => {
+    const renderAgainstStore = () => {
+      useFilterStore.getState().applyQueryText("");
+      const item = buildItem();
+      const toggleFacet = ({
+        field,
+        value,
+      }: {
+        field: string;
+        value: string;
+      }) => useFilterStore.getState().toggleFacet(field, value);
+      const tree = () => (
+        <ChakraProvider value={defaultSystem}>
+          <EventDrilldown
+            item={item}
+            ast={useFilterStore.getState().ast}
+            toggleFacet={toggleFacet}
+          />
+        </ChakraProvider>
+      );
+      const view = render(tree());
+      // `eventActive` is derived from the `ast` PROP, so the component has to
+      // be handed the store's new AST after each click the way the sidebar
+      // does when it re-renders.
+      const clickThumbsDown = () => {
+        fireEvent.click(
+          screen.getByRole("button", { name: /^vote thumbs down/ }),
+        );
+        view.rerender(tree());
+      };
+      return { clickThumbsDown };
+    };
+
+    describe("when the user clicks a vote value on an inactive row", () => {
+      /** @scenario "Clicking a vote value on an inactive event row scopes the filter to that event first" */
+      it("writes the anchor and the metric clause as one AND query", () => {
+        const { clickThumbsDown } = renderAgainstStore();
+        clickThumbsDown();
+        expect(useFilterStore.getState().queryText).toBe(
+          "event:thumbs_up_down AND event.attribute.event.metrics.vote:-1",
+        );
+      });
+    });
+
+    describe("when the user cycles that same value back off", () => {
+      /** @scenario "Clearing the metric leaves the event anchor it added behind" */
+      it("drops the metric clause and leaves the anchor it added behind", () => {
+        const { clickThumbsDown } = renderAgainstStore();
+        clickThumbsDown(); // neutral -> include
+        clickThumbsDown(); // include -> exclude
+        clickThumbsDown(); // exclude -> neutral
+        expect(useFilterStore.getState().queryText).toBe(
+          "event:thumbs_up_down",
+        );
       });
     });
   });

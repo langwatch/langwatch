@@ -2022,7 +2022,7 @@ Rule: Event rows drill down into their metric values
   # bound tests already assert the un-prefixed form (filterStore.unit.test.ts
   # :94-96 expects "(origin:sample OR origin:application)"). The "@" spellings
   # elsewhere in this file are inaccurate and predate this Rule.
-  @integration @unimplemented
+  @integration
   Scenario: Clearing the metric leaves the event anchor it added behind
     Given the user clicked a vote value on the inactive "thumbs_up_down" row
     When the user cycles that same vote value back off
