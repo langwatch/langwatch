@@ -36,6 +36,34 @@ describe("Langy derived card presentation", () => {
     expect(screen.getByText("+1 more rows in the reply")).toBeDefined();
   });
 
+  /** @scenario "A grounded option still reads as the answer it is" */
+  it("reads a grounded option as its own label with the resource's name as detail", () => {
+    const card: LangyDerivedChoicesCard = {
+      kind: "choices",
+      blockId: "q-publish",
+      question: "Publish the winner?",
+      options: [
+        { id: "publish", label: "Publish the winning draft", ref: { type: "prompt", id: "prompt_1" } },
+      ],
+    };
+
+    render(
+      <ChakraProvider value={defaultSystem}>
+        <LangyChoicesCard
+          card={card}
+          lockState={{ status: "open" }}
+          onSelect={vi.fn()}
+          refRows={
+            new Map([["publish", { state: "live", primary: "support-reply-v1", secondary: "version 3" }]])
+          }
+        />
+      </ChakraProvider>,
+    );
+
+    expect(screen.getByText("Publish the winning draft")).toBeDefined();
+    expect(screen.getByText("support-reply-v1 · version 3")).toBeDefined();
+  });
+
   it("answers an open single-select question through the named action", () => {
     const onSelect = vi.fn();
     const card: LangyDerivedChoicesCard = {

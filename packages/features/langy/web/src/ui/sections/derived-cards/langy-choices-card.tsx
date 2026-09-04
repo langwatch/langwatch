@@ -33,6 +33,30 @@ export type ChoicesRefRow =
   | { state: "dead" }
   | { state: "live"; primary?: string; secondary?: string };
 
+/**
+ * An option's label is the answer, not a name for the thing it points at: a
+ * live reference supplies the detail line, the label stays the row.
+ */
+function optionRowText({
+  option,
+  refRow,
+}: {
+  option: LangyDerivedChoicesCard["options"][number];
+  refRow: ChoicesRefRow;
+}): { primary: string; secondary?: string } {
+  if (refRow.state === "dead") {
+    return { primary: option.label, secondary: "No longer exists" };
+  }
+  const detail =
+    refRow.state === "live"
+      ? [refRow.primary, refRow.secondary]
+          .filter((part): part is string => !!part && part !== option.label)
+          .join(" · ")
+      : "";
+  const secondary = detail !== "" ? detail : option.description;
+  return { primary: option.label, ...(secondary !== undefined ? { secondary } : {}) };
+}
+
 export function LangyChoicesCard({
   card,
   lockState,
@@ -110,10 +134,7 @@ export function LangyChoicesCard({
           const isPicked = picked.has(option.id);
           const selectable = open && !dead;
 
-          const primary = refRow.state === "live" && refRow.primary ? refRow.primary : option.label;
-          const secondary = dead
-            ? "No longer exists"
-            : ((refRow.state === "live" ? refRow.secondary : undefined) ?? option.description);
+          const { primary, secondary } = optionRowText({ option, refRow });
 
           return (
             <chakra.button
