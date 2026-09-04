@@ -7,7 +7,7 @@ Uses httpx via the generated REST API client for HTTP transport.
 """
 
 import urllib.parse
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import httpx
 
@@ -82,16 +82,18 @@ class DashboardsFacade:
     def _http(self) -> httpx.Client:
         return self._client.get_httpx_client()
 
-    def list(self) -> Dict[str, Any]:
+    def list(self) -> List[Dict[str, Any]]:
         """
         List all dashboards for the project.
 
         Returns:
-            Dictionary with dashboard data.
+            List of dashboards, empty when the project has none. Alone among
+            the dashboard routes this one wraps its body in a ``data`` key,
+            which is why it is the only one that unwraps.
         """
         response = self._http().get("/api/dashboards")
         _raise_for_status(response, operation="list")
-        return response.json()
+        return response.json()["data"]
 
     def get(self, dashboard_id: str) -> Dict[str, Any]:
         """
