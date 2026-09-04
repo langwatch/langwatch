@@ -1,4 +1,7 @@
-import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
+import {
+  type EvaluationRunData,
+  evaluationRunDataSchema,
+} from "~/server/app-layer/evaluations/types";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import type {
@@ -114,6 +117,92 @@ export function classifyTriggerFilters(filters: TriggerFilters): {
     evaluationFilters,
     hasEvaluationFilters: Object.keys(evaluationFilters).length > 0,
   };
+}
+
+export interface TriggerFilterReachabilityReason {
+  code: "unsupported_structured_fields" | "invalid_evaluation_state";
+  fields: string[];
+}
+
+/**
+ * Return only conditions that are provably unable to match at dispatch. The
+ * check shares the matcher's own unsupported-field set/actionability predicate
+ * and replays evaluation-state filters through `matchesEvaluationFilters`
+ * against every status in the canonical EvaluationRun schema.
+ */
+export function diagnoseTriggerFilterReachability(
+  filters: TriggerFilters,
+): TriggerFilterReachabilityReason[] {
+  const unsupportedFields = Object.entries(filters)
+    .filter(
+      ([field, value]) =>
+        UNSUPPORTED_FIELDS.has(field) &&
+        value !== undefined &&
+        filterValueHasActionableCondition(value),
+    )
+    .map(([field]) => field)
+    .sort();
+
+  const reasons: TriggerFilterReachabilityReason[] = [];
+  if (unsupportedFields.length > 0) {
+    reasons.push({
+      code: "unsupported_structured_fields",
+      fields: unsupportedFields,
+    });
+  }
+
+  const evaluationState = filters["evaluations.state"];
+  if (
+    evaluationState !== undefined &&
+    filterValueHasActionableCondition(evaluationState) &&
+    !evaluationStateFilterCanMatch(evaluationState)
+  ) {
+    reasons.push({
+      code: "invalid_evaluation_state",
+      fields: ["evaluations.state"],
+    });
+  }
+
+  return reasons;
+}
+
+function evaluationStateFilterCanMatch(
+  filterValue: TriggerFilterValue,
+): boolean {
+  const evaluatorIds = Array.isArray(filterValue)
+    ? ["__reachability__"]
+    : Object.keys(filterValue);
+  const evaluations = evaluatorIds.flatMap((evaluatorId) =>
+    evaluationRunDataSchema.shape.status.options.map(
+      (status): EvaluationRunData => ({
+        evaluationId: `${evaluatorId}:${status}`,
+        evaluatorId,
+        evaluatorType: "__reachability__",
+        evaluatorName: null,
+        traceId: null,
+        isGuardrail: false,
+        status,
+        score: null,
+        passed: null,
+        label: null,
+        details: null,
+        inputs: null,
+        error: null,
+        errorDetails: null,
+        createdAt: 0,
+        updatedAt: 0,
+        LastEventOccurredAt: 0,
+        archivedAt: null,
+        scheduledAt: null,
+        startedAt: null,
+        completedAt: null,
+        costId: null,
+      }),
+    ),
+  );
+  return matchesEvaluationFilters(evaluations, {
+    "evaluations.state": filterValue,
+  });
 }
 
 /**
