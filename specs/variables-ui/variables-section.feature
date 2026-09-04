@@ -171,6 +171,13 @@ Feature: Variables section UI
     And I see "Test Data" group with fields "input", "expected_output"
     And I see "GPT-4o Runner" group with field "output"
 
+  @integration
+  Scenario: The mapping dropdown stays clickable over a modal dialog
+    Given the evaluator drawer opened on top of the run dialog
+    When the mapping dropdown opens
+    Then its options take pointer events even though the dialog turned them off around itself
+    And a click on an option selects it
+
   @unimplemented
   Scenario: Select mapping from dropdown
     Given showMappings is true
