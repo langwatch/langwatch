@@ -5,6 +5,7 @@ import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
+import { unwrapApiResult } from "@/client-sdk/services/_shared/unwrap-api-result";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 import type { RunPlanRunResult } from "@/client-sdk/services/run-plans/run-plans-api.service";
 
@@ -80,24 +81,39 @@ export class TestSuitesApiService {
     const { data, error, response } = await this.apiClient.GET("/api/v1/test-suites", {
       ...(options?.includeArchived ? { params: { query: { includeArchived: "true" } } } : {}),
     });
-    if (error) this.handleApiError("list test suites", error, response);
-    return data as unknown as TestSuite[];
+    return unwrapApiResult({
+      operation: "list test suites",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as TestSuite[];
   }
 
   async create(params: CreateTestSuiteBody): Promise<TestSuite> {
     const { data, error, response } = await this.apiClient.POST("/api/v1/test-suites", {
       body: params,
     });
-    if (error) this.handleApiError("create test suite", error, response);
-    return data as unknown as TestSuite;
+    return unwrapApiResult({
+      operation: "create test suite",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as TestSuite;
   }
 
   async get(id: string): Promise<TestSuiteDetail> {
     const { data, error, response } = await this.apiClient.GET("/api/v1/test-suites/{id}", {
       params: { path: { id } },
     });
-    if (error) this.handleApiError(`get test suite "${id}"`, error, response);
-    return data as unknown as TestSuiteDetail;
+    return unwrapApiResult({
+      operation: `get test suite "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as TestSuiteDetail;
   }
 
   /** Renames a suite. The slug is kept, so links and run history stay put. */
@@ -106,8 +122,13 @@ export class TestSuitesApiService {
       params: { path: { id } },
       body: params,
     });
-    if (error) this.handleApiError(`rename test suite "${id}"`, error, response);
-    return data as unknown as TestSuite;
+    return unwrapApiResult({
+      operation: `rename test suite "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as TestSuite;
   }
 
   /** Archives a suite. The scenarios filed in it are archived with it. */
@@ -115,8 +136,13 @@ export class TestSuitesApiService {
     const { data, error, response } = await this.apiClient.DELETE("/api/v1/test-suites/{id}", {
       params: { path: { id } },
     });
-    if (error) this.handleApiError(`archive test suite "${id}"`, error, response);
-    return data as unknown as { id: string; archived: true };
+    return unwrapApiResult({
+      operation: `archive test suite "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as { id: string; archived: true };
   }
 
   /**
@@ -130,7 +156,12 @@ export class TestSuitesApiService {
       params: { path: { id } },
       body: note ? { ...rest, note } : rest,
     });
-    if (error) this.handleApiError(`run test suite "${id}"`, error, response);
-    return data as unknown as TestSuiteRunResult;
+    return unwrapApiResult({
+      operation: `run test suite "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as TestSuiteRunResult;
   }
 }

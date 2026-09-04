@@ -5,6 +5,7 @@ import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
+import { unwrapApiResult } from "@/client-sdk/services/_shared/unwrap-api-result";
 
 export type GraphResponse = NonNullable<
   paths["/api/v1/graphs"]["get"]["responses"]["200"]["content"]["application/json"]
@@ -39,55 +40,80 @@ export class GraphsApiService {
     this.apiClient = config?.langwatchApiClient ?? createLangWatchApiClient();
   }
 
-  private handleApiError(operation: string, error: unknown): never {
+  private handleApiError(operation: string, error: unknown, response?: Response): never {
     const message = formatApiErrorForOperation({
       operation: operation,
       error: error,
       options: {
-        status: extractStatusFromResponse(error),
+        status: response?.status ?? extractStatusFromResponse(error),
       },
     });
     throw new GraphsApiError(message, operation, error);
   }
 
   async getAll(dashboardId?: string): Promise<GraphResponse[]> {
-    const { data, error } = await this.apiClient.GET("/api/v1/graphs", {
+    const { data, error, response } = await this.apiClient.GET("/api/v1/graphs", {
       params: { query: { dashboardId } },
     });
-    if (error) this.handleApiError("list graphs", error);
-    return data;
+    return unwrapApiResult({
+      operation: "list graphs",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   async get(id: string): Promise<GraphResponse> {
-    const { data, error } = await this.apiClient.GET("/api/v1/graphs/{id}", {
+    const { data, error, response } = await this.apiClient.GET("/api/v1/graphs/{id}", {
       params: { path: { id } },
     });
-    if (error) this.handleApiError(`get graph "${id}"`, error);
-    return data;
+    return unwrapApiResult({
+      operation: `get graph "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   async create(params: CreateGraphBody): Promise<GraphResponse> {
-    const { data, error } = await this.apiClient.POST("/api/v1/graphs", {
+    const { data, error, response } = await this.apiClient.POST("/api/v1/graphs", {
       body: params,
     });
-    if (error) this.handleApiError("create graph", error);
-    return data;
+    return unwrapApiResult({
+      operation: "create graph",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   async update(id: string, params: UpdateGraphBody): Promise<GraphResponse> {
-    const { data, error } = await this.apiClient.PATCH("/api/v1/graphs/{id}", {
+    const { data, error, response } = await this.apiClient.PATCH("/api/v1/graphs/{id}", {
       params: { path: { id } },
       body: params,
     });
-    if (error) this.handleApiError(`update graph "${id}"`, error);
-    return data;
+    return unwrapApiResult({
+      operation: `update graph "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   async delete(id: string): Promise<GraphDeleteResponse> {
-    const { data, error } = await this.apiClient.DELETE("/api/v1/graphs/{id}", {
+    const { data, error, response } = await this.apiClient.DELETE("/api/v1/graphs/{id}", {
       params: { path: { id } },
     });
-    if (error) this.handleApiError(`delete graph "${id}"`, error);
-    return data;
+    return unwrapApiResult({
+      operation: `delete graph "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 }

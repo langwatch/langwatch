@@ -165,4 +165,17 @@ describe("ChartsApiService", () => {
       expect(result).toEqual(schemaResult);
     });
   });
+
+  describe("when the platform answers a 204 on a method that promises no data", () => {
+    /** @scenario "A 204 on a method that promises nothing still resolves" */
+    it("resolves without throwing", async () => {
+      const service = serviceWith({
+        data: undefined,
+        error: undefined,
+        response: new Response(null, { status: 204 }),
+      });
+
+      await expect(service.delete("chart-1")).resolves.toBeUndefined();
+    });
+  });
 });

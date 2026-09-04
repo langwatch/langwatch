@@ -4,6 +4,7 @@ import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
+import { unwrapApiResult } from "@/client-sdk/services/_shared/unwrap-api-result";
 
 export interface DashboardSummary {
   id: string;
@@ -43,53 +44,78 @@ export class DashboardsApiService {
     this.apiClient = config?.langwatchApiClient ?? createLangWatchApiClient();
   }
 
-  private handleApiError(operation: string, error: unknown): never {
+  private handleApiError(operation: string, error: unknown, response?: Response): never {
     const message = formatApiErrorForOperation({
       operation: operation,
       error: error,
       options: {
-        status: extractStatusFromResponse(error),
+        status: response?.status ?? extractStatusFromResponse(error),
       },
     });
     throw new DashboardsApiError(message, operation, error);
   }
 
   async list(): Promise<{ data: DashboardSummary[] }> {
-    const { data, error } = await this.apiClient.GET("/api/v1/dashboards");
-    if (error) this.handleApiError("list dashboards", error);
-    return data as unknown as { data: DashboardSummary[] };
+    const { data, error, response } = await this.apiClient.GET("/api/v1/dashboards");
+    return unwrapApiResult({
+      operation: "list dashboards",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as { data: DashboardSummary[] };
   }
 
   async get(id: string): Promise<DashboardDetail> {
-    const { data, error } = await this.apiClient.GET("/api/v1/dashboards/{id}", {
+    const { data, error, response } = await this.apiClient.GET("/api/v1/dashboards/{id}", {
       params: { path: { id } },
     });
-    if (error) this.handleApiError(`get dashboard "${id}"`, error);
-    return data as unknown as DashboardDetail;
+    return unwrapApiResult({
+      operation: `get dashboard "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as DashboardDetail;
   }
 
   async create(params: { name: string }): Promise<DashboardDetail> {
-    const { data, error } = await this.apiClient.POST("/api/v1/dashboards", {
+    const { data, error, response } = await this.apiClient.POST("/api/v1/dashboards", {
       body: params,
     });
-    if (error) this.handleApiError("create dashboard", error);
-    return data as unknown as DashboardDetail;
+    return unwrapApiResult({
+      operation: "create dashboard",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as DashboardDetail;
   }
 
   async rename(id: string, params: { name: string }): Promise<DashboardDetail> {
-    const { data, error } = await this.apiClient.PATCH("/api/v1/dashboards/{id}", {
+    const { data, error, response } = await this.apiClient.PATCH("/api/v1/dashboards/{id}", {
       params: { path: { id } },
       body: params,
     });
-    if (error) this.handleApiError(`rename dashboard "${id}"`, error);
-    return data as unknown as DashboardDetail;
+    return unwrapApiResult({
+      operation: `rename dashboard "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as DashboardDetail;
   }
 
   async delete(id: string): Promise<{ id: string; name: string }> {
-    const { data, error } = await this.apiClient.DELETE("/api/v1/dashboards/{id}", {
+    const { data, error, response } = await this.apiClient.DELETE("/api/v1/dashboards/{id}", {
       params: { path: { id } },
     });
-    if (error) this.handleApiError(`delete dashboard "${id}"`, error);
-    return data as unknown as { id: string; name: string };
+    return unwrapApiResult({
+      operation: `delete dashboard "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as { id: string; name: string };
   }
 }

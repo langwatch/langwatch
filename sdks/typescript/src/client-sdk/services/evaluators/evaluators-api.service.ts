@@ -11,6 +11,7 @@ import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
+import { unwrapApiResult } from "@/client-sdk/services/_shared/unwrap-api-result";
 
 /**
  * Service for retrieving evaluator resources via the LangWatch API.
@@ -24,12 +25,12 @@ export class EvaluatorsApiService {
     this.apiClient = config?.langwatchApiClient ?? createLangWatchApiClient();
   }
 
-  private handleApiError(operation: string, error: unknown): never {
+  private handleApiError(operation: string, error: unknown, response?: Response): never {
     const message = formatApiErrorForOperation({
       operation: operation,
       error: error,
       options: {
-        status: extractStatusFromResponse(error),
+        status: response?.status ?? extractStatusFromResponse(error),
       },
     });
     throw new EvaluatorsApiError(message, operation, error);
@@ -39,53 +40,78 @@ export class EvaluatorsApiService {
    * Fetches all evaluators for the project.
    */
   async getAll(): Promise<EvaluatorResponse[]> {
-    const { data, error } = await this.apiClient.GET("/api/v1/evaluators");
-    if (error) this.handleApiError("fetch all evaluators", error);
-    return data;
+    const { data, error, response } = await this.apiClient.GET("/api/v1/evaluators");
+    return unwrapApiResult({
+      operation: "fetch all evaluators",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   /**
    * Fetches a single evaluator by its ID or slug.
    */
   async get(idOrSlug: string): Promise<EvaluatorResponse> {
-    const { data, error } = await this.apiClient.GET("/api/v1/evaluators/{idOrSlug}", {
+    const { data, error, response } = await this.apiClient.GET("/api/v1/evaluators/{idOrSlug}", {
       params: { path: { idOrSlug } },
     });
-    if (error) this.handleApiError(`fetch evaluator with ID or slug "${idOrSlug}"`, error);
-    return data;
+    return unwrapApiResult({
+      operation: `fetch evaluator with ID or slug "${idOrSlug}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   /**
    * Creates a new evaluator.
    */
   async create(params: CreateEvaluatorBody): Promise<EvaluatorResponse> {
-    const { data, error } = await this.apiClient.POST("/api/v1/evaluators", {
+    const { data, error, response } = await this.apiClient.POST("/api/v1/evaluators", {
       body: params,
     });
-    if (error) this.handleApiError("create evaluator", error);
-    return data;
+    return unwrapApiResult({
+      operation: "create evaluator",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   /**
    * Updates an evaluator by its ID.
    */
   async update(id: string, params: UpdateEvaluatorBody): Promise<EvaluatorResponse> {
-    const { data, error } = await this.apiClient.PUT("/api/v1/evaluators/{id}", {
+    const { data, error, response } = await this.apiClient.PUT("/api/v1/evaluators/{id}", {
       params: { path: { id } },
       body: params,
     });
-    if (error) this.handleApiError(`update evaluator with ID "${id}"`, error);
-    return data;
+    return unwrapApiResult({
+      operation: `update evaluator with ID "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   /**
    * Deletes (archives) an evaluator by its ID.
    */
   async delete(id: string): Promise<DeleteEvaluatorResponse> {
-    const { data, error } = await this.apiClient.DELETE("/api/v1/evaluators/{id}", {
+    const { data, error, response } = await this.apiClient.DELETE("/api/v1/evaluators/{id}", {
       params: { path: { id } },
     });
-    if (error) this.handleApiError(`delete evaluator with ID "${id}"`, error);
-    return data;
+    return unwrapApiResult({
+      operation: `delete evaluator with ID "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 }

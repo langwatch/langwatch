@@ -5,6 +5,7 @@ import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
+import { unwrapApiResult } from "@/client-sdk/services/_shared/unwrap-api-result";
 
 export type ModelProvidersListResponse =
   paths["/api/v1/model-providers"]["get"]["responses"]["200"]["content"]["application/json"];
@@ -31,32 +32,45 @@ export class ModelProvidersApiService {
     this.apiClient = config?.langwatchApiClient ?? createLangWatchApiClient();
   }
 
-  private handleApiError(operation: string, error: unknown): never {
+  private handleApiError(operation: string, error: unknown, response?: Response): never {
     const message = formatApiErrorForOperation({
       operation: operation,
       error: error,
       options: {
-        status: extractStatusFromResponse(error),
+        status: response?.status ?? extractStatusFromResponse(error),
       },
     });
     throw new ModelProvidersApiError(message, operation, error);
   }
 
   async list(): Promise<ModelProvidersListResponse> {
-    const { data, error } = await this.apiClient.GET("/api/v1/model-providers");
-    if (error) this.handleApiError("list model providers", error);
-    return data;
+    const { data, error, response } = await this.apiClient.GET("/api/v1/model-providers");
+    return unwrapApiResult({
+      operation: "list model providers",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   async set(
     provider: string,
     params: UpdateModelProviderBody,
   ): Promise<ModelProvidersListResponse> {
-    const { data, error } = await this.apiClient.PUT("/api/v1/model-providers/{provider}", {
-      params: { path: { provider } },
-      body: params,
+    const { data, error, response } = await this.apiClient.PUT(
+      "/api/v1/model-providers/{provider}",
+      {
+        params: { path: { provider } },
+        body: params,
+      },
+    );
+    return unwrapApiResult({
+      operation: `set model provider "${provider}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
     });
-    if (error) this.handleApiError(`set model provider "${provider}"`, error);
-    return data;
   }
 }

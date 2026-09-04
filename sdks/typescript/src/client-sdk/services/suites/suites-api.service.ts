@@ -5,6 +5,7 @@ import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
+import { unwrapApiResult } from "@/client-sdk/services/_shared/unwrap-api-result";
 
 export type SuiteResponse = NonNullable<
   paths["/api/v1/suites"]["get"]["responses"]["200"]["content"]["application/json"]
@@ -75,58 +76,83 @@ export class SuitesApiService {
     this.apiClient = config?.langwatchApiClient ?? createLangWatchApiClient();
   }
 
-  private handleApiError(operation: string, error: unknown): never {
+  private handleApiError(operation: string, error: unknown, response?: Response): never {
     const message = formatApiErrorForOperation({
       operation: operation,
       error: error,
       options: {
-        status: extractStatusFromResponse(error),
+        status: response?.status ?? extractStatusFromResponse(error),
       },
     });
     throw new SuitesApiError(message, operation, error);
   }
 
   async getAll(options?: { kind?: SuiteKind }): Promise<SuiteResponse[]> {
-    const { data, error } = await this.apiClient.GET("/api/v1/suites", {
+    const { data, error, response } = await this.apiClient.GET("/api/v1/suites", {
       ...(options?.kind !== undefined && {
         params: { query: { kind: options.kind } },
       }),
     });
-    if (error) this.handleApiError("list suites", error);
-    return data;
+    return unwrapApiResult({
+      operation: "list suites",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   async get(id: string): Promise<SuiteResponse> {
-    const { data, error } = await this.apiClient.GET("/api/v1/suites/{id}", {
+    const { data, error, response } = await this.apiClient.GET("/api/v1/suites/{id}", {
       params: { path: { id } },
     });
-    if (error) this.handleApiError(`get suite "${id}"`, error);
-    return data;
+    return unwrapApiResult({
+      operation: `get suite "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   async create(params: CreateSuiteBody): Promise<SuiteResponse> {
-    const { data, error } = await this.apiClient.POST("/api/v1/suites", {
+    const { data, error, response } = await this.apiClient.POST("/api/v1/suites", {
       body: params,
     });
-    if (error) this.handleApiError("create suite", error);
-    return data;
+    return unwrapApiResult({
+      operation: "create suite",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   async update(id: string, params: UpdateSuiteBody): Promise<SuiteResponse> {
-    const { data, error } = await this.apiClient.PATCH("/api/v1/suites/{id}", {
+    const { data, error, response } = await this.apiClient.PATCH("/api/v1/suites/{id}", {
       params: { path: { id } },
       body: params,
     });
-    if (error) this.handleApiError(`update suite "${id}"`, error);
-    return data;
+    return unwrapApiResult({
+      operation: `update suite "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   async duplicate(id: string): Promise<SuiteResponse> {
-    const { data, error } = await this.apiClient.POST("/api/v1/suites/{id}/duplicate", {
+    const { data, error, response } = await this.apiClient.POST("/api/v1/suites/{id}/duplicate", {
       params: { path: { id } },
     });
-    if (error) this.handleApiError(`duplicate suite "${id}"`, error);
-    return data;
+    return unwrapApiResult({
+      operation: `duplicate suite "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   async run(id: string, options?: SuiteRunOptions): Promise<SuiteRunResult>;
@@ -158,19 +184,29 @@ export class SuitesApiService {
     const note = options.note?.trim();
     if (note) body.note = note;
 
-    const { data, error } = await this.apiClient.POST("/api/v1/suites/{id}/run", {
+    const { data, error, response } = await this.apiClient.POST("/api/v1/suites/{id}/run", {
       params: { path: { id } },
       body,
     });
-    if (error) this.handleApiError(`run suite "${id}"`, error);
-    return data;
+    return unwrapApiResult({
+      operation: `run suite "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   async delete(id: string): Promise<{ id: string; archived: boolean }> {
-    const { data, error } = await this.apiClient.DELETE("/api/v1/suites/{id}", {
+    const { data, error, response } = await this.apiClient.DELETE("/api/v1/suites/{id}", {
       params: { path: { id } },
     });
-    if (error) this.handleApiError(`delete suite "${id}"`, error);
-    return data as unknown as { id: string; archived: boolean };
+    return unwrapApiResult({
+      operation: `delete suite "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as { id: string; archived: boolean };
   }
 }

@@ -5,6 +5,7 @@ import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
+import { unwrapApiResult } from "@/client-sdk/services/_shared/unwrap-api-result";
 import { ExperimentsApiService } from "@/client-sdk/services/experiments/experiments-api.service";
 import {
   pollExperimentRun,
@@ -76,12 +77,12 @@ export class WorkflowsApiService {
     });
   }
 
-  private handleApiError(operation: string, error: unknown): never {
+  private handleApiError(operation: string, error: unknown, response?: Response): never {
     const message = formatApiErrorForOperation({
       operation: operation,
       error: error,
       options: {
-        status: extractStatusFromResponse(error),
+        status: response?.status ?? extractStatusFromResponse(error),
       },
     });
     throw new WorkflowsApiError(message, operation, error);
@@ -113,30 +114,50 @@ export class WorkflowsApiService {
       this.handleApiError(operation, error);
     }
 
-    if (result.error) this.handleApiError(operation, result.error);
-    return result.data as T;
+    return unwrapApiResult({
+      operation,
+      data: result.data,
+      error: result.error,
+      response: result.response,
+      onError: this.handleApiError.bind(this),
+    }) as T;
   }
 
   async getAll(): Promise<WorkflowResponse[]> {
-    const { data, error } = await this.apiClient.GET("/api/v1/workflows");
-    if (error) this.handleApiError("list workflows", error);
-    return data;
+    const { data, error, response } = await this.apiClient.GET("/api/v1/workflows");
+    return unwrapApiResult({
+      operation: "list workflows",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   async get(id: string): Promise<WorkflowResponse> {
-    const { data, error } = await this.apiClient.GET("/api/v1/workflows/{id}", {
+    const { data, error, response } = await this.apiClient.GET("/api/v1/workflows/{id}", {
       params: { path: { id } },
     });
-    if (error) this.handleApiError(`get workflow "${id}"`, error);
-    return data;
+    return unwrapApiResult({
+      operation: `get workflow "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   async delete(id: string): Promise<WorkflowDeleteResponse> {
-    const { data, error } = await this.apiClient.DELETE("/api/v1/workflows/{id}", {
+    const { data, error, response } = await this.apiClient.DELETE("/api/v1/workflows/{id}", {
       params: { path: { id } },
     });
-    if (error) this.handleApiError(`delete workflow "${id}"`, error);
-    return data;
+    return unwrapApiResult({
+      operation: `delete workflow "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   /**

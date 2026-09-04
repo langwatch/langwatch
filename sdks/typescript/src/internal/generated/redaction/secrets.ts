@@ -403,8 +403,7 @@ const PLACEHOLDER_VALUE_REGEX =
  * or a SCREAMING_SNAKE name. The underscore is required on the bare form so an
  * all-uppercase secret (a base32 TOTP seed, say) is not mistaken for a name.
  */
-const ENV_REFERENCE_REGEX =
-  /^(?:\$[A-Za-z_][A-Za-z0-9_]*|[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)$/;
+const ENV_REFERENCE_REGEX = /^(?:\$[A-Za-z_][A-Za-z0-9_]*|[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)$/;
 
 /** `process.env.OPENAI_API_KEY`, `config.auth.token`: code, not key material. */
 const CODE_EXPRESSION_REGEX = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+$/;
@@ -638,8 +637,7 @@ const VALUE_RULES: ValueRule[] = [
     // in prose is a sentence, not a header, and matching it redacted one.
     id: "authorization_scheme_token",
     description: "Non-Bearer authorization scheme token",
-    regex:
-      /\b(Authorization:\s*(?:Token|SSWS|GenieKey|Splunk|OAuth)\s+)[A-Za-z0-9._~+/-]{10,}=*/gi,
+    regex: /\b(Authorization:\s*(?:Token|SSWS|GenieKey|Splunk|OAuth)\s+)[A-Za-z0-9._~+/-]{10,}=*/gi,
     render: (_m, prefix) => `${prefix}${REPLACEMENT}`,
   },
   {
@@ -690,8 +688,7 @@ const VALUE_RULES: ValueRule[] = [
       `${TOKEN_START}([A-Za-z][A-Za-z0-9]{1,11})[_-]([A-Za-z0-9_+/-]{${SHAPED_TOKEN_MIN_BODY},})${TOKEN_END}`,
       "g",
     ),
-    accept: (groups) =>
-      !isNonCredentialPrefix(groups[1] ?? "") && isKeyShapedBody(groups[2] ?? ""),
+    accept: (groups) => !isNonCredentialPrefix(groups[1] ?? "") && isKeyShapedBody(groups[2] ?? ""),
     precondition: (text) => text.includes("_") || text.includes("-"),
   },
   {
@@ -1032,8 +1029,7 @@ function sliceEndAfter(text: string, start: number): number {
     // which is the unbounded scan the budget exists to prevent.
     const lookahead = text.slice(target, target + SAFE_CUT_LOOKAHEAD);
     const next = lookahead.search(/\s/);
-    end =
-      next === -1 ? Math.min(target + SAFE_CUT_LOOKAHEAD, text.length) : target + next;
+    end = next === -1 ? Math.min(target + SAFE_CUT_LOOKAHEAD, text.length) : target + next;
   }
 
   const begin = text.lastIndexOf(PEM_BEGIN, end);
@@ -1098,9 +1094,7 @@ export function redactSecretsInText({
  * absent or empty list becomes `null`, which the rule loop reads as "run
  * everything" without a lookup per rule.
  */
-function toSkipSet(
-  skipRuleIds: readonly string[] | undefined,
-): ReadonlySet<string> | null {
+function toSkipSet(skipRuleIds: readonly string[] | undefined): ReadonlySet<string> | null {
   if (!skipRuleIds || skipRuleIds.length === 0) return null;
   return new Set(skipRuleIds);
 }
@@ -1258,9 +1252,7 @@ function matchesOfCustomPattern(pattern: RegExp, text: string): SecretMatch[] {
 function withoutOverlaps(matches: SecretMatch[]): SecretMatch[] {
   const kept: SecretMatch[] = [];
   for (const match of matches) {
-    const overlaps = kept.some(
-      (other) => match.start < other.end && other.start < match.end,
-    );
+    const overlaps = kept.some((other) => match.start < other.end && other.start < match.end);
     if (!overlaps) kept.push(match);
   }
   return kept.sort((a, b) => a.start - b.start);

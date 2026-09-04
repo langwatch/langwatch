@@ -148,6 +148,11 @@ export class DatasetService {
   /**
    * Unwraps an API response, throwing a mapped error if the response contains an error.
    * Centralizes the repeated `if (error) handleApiError; return data` pattern.
+   *
+   * Also guards the case neither `data` nor `error` came back — an unreadable
+   * body (e.g. an empty 502 from a proxy) that `asResponseEnvelope`'s
+   * transport left alone. Without this the promise would resolve `undefined`
+   * instead of raising the same typed failure a named error produces (D12).
    */
   private unwrapResponse<T>(
     response: { data?: unknown; error?: unknown; response: { status: number } },
@@ -155,6 +160,9 @@ export class DatasetService {
     slugOrId?: string,
   ): T {
     if (response.error) {
+      this.handleApiError(operation, response.error, response.response.status, slugOrId);
+    }
+    if (response.data === undefined) {
       this.handleApiError(operation, response.error, response.response.status, slugOrId);
     }
     return response.data as T;

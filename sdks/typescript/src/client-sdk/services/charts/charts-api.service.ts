@@ -7,6 +7,7 @@ import {
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
+import { unwrapApiResult } from "@/client-sdk/services/_shared/unwrap-api-result";
 import {
   QueryApiService,
   type QueryRunParams,
@@ -147,8 +148,13 @@ export class ChartsApiService {
       "/api/v1/projects/{projectId}/analytics/charts",
       { params: { path: { projectId } } },
     );
-    if (error) this.handleApiError("list charts", error, response);
-    return data as unknown as { data: SavedChart[] };
+    return unwrapApiResult({
+      operation: "list charts",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as { data: SavedChart[] };
   }
 
   async get(id: string): Promise<SavedChart> {
@@ -157,8 +163,13 @@ export class ChartsApiService {
       "/api/v1/projects/{projectId}/analytics/charts/{chartId}",
       { params: { path: { projectId, chartId: id } } },
     );
-    if (error) this.handleApiError(`get chart "${id}"`, error, response);
-    return data as unknown as SavedChart;
+    return unwrapApiResult({
+      operation: `get chart "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as SavedChart;
   }
 
   async create(params: {
@@ -170,8 +181,13 @@ export class ChartsApiService {
       "/api/v1/projects/{projectId}/analytics/charts",
       { params: { path: { projectId } }, body: params },
     );
-    if (error) this.handleApiError("create chart", error, response);
-    return data as unknown as SavedChart;
+    return unwrapApiResult({
+      operation: "create chart",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as SavedChart;
   }
 
   async update(
@@ -183,18 +199,30 @@ export class ChartsApiService {
       "/api/v1/projects/{projectId}/analytics/charts/{chartId}",
       { params: { path: { projectId, chartId: id } }, body: params },
     );
-    if (error) this.handleApiError(`update chart "${id}"`, error, response);
-    return data as unknown as SavedChart;
+    return unwrapApiResult({
+      operation: `update chart "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as SavedChart;
   }
 
   /** Deletes a chart. The route answers `204` with no body, like `unplace`. */
   async delete(id: string): Promise<void> {
     const projectId = this.projectId(`delete chart "${id}"`);
-    const { error, response } = await this.apiClient.DELETE(
+    const { data, error, response } = await this.apiClient.DELETE(
       "/api/v1/projects/{projectId}/analytics/charts/{chartId}",
       { params: { path: { projectId, chartId: id } } },
     );
-    if (error) this.handleApiError(`delete chart "${id}"`, error, response);
+    unwrapApiResult({
+      operation: `delete chart "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+      allowEmpty: true,
+    });
   }
 
   async place(
@@ -212,17 +240,29 @@ export class ChartsApiService {
       "/api/v1/projects/{projectId}/analytics/charts/{chartId}/placement",
       { params: { path: { projectId, chartId: id } }, body: params },
     );
-    if (error) this.handleApiError(`place chart "${id}"`, error, response);
-    return data as unknown as SavedChart;
+    return unwrapApiResult({
+      operation: `place chart "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as SavedChart;
   }
 
   async unplace(id: string): Promise<void> {
     const projectId = this.projectId(`unplace chart "${id}"`);
-    const { error, response } = await this.apiClient.DELETE(
+    const { data, error, response } = await this.apiClient.DELETE(
       "/api/v1/projects/{projectId}/analytics/charts/{chartId}/placement",
       { params: { path: { projectId, chartId: id } } },
     );
-    if (error) this.handleApiError(`unplace chart "${id}"`, error, response);
+    unwrapApiResult({
+      operation: `unplace chart "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+      allowEmpty: true,
+    });
   }
 
   /**

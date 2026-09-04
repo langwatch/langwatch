@@ -5,6 +5,7 @@ import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
+import { unwrapApiResult } from "@/client-sdk/services/_shared/unwrap-api-result";
 
 export type TraceSearchBody = NonNullable<
   paths["/api/v1/traces/search"]["post"]["requestBody"]
@@ -69,8 +70,13 @@ export class TracesApiService {
     const { data, error, response } = await this.apiClient.POST("/api/v1/traces/search", {
       body: params,
     });
-    if (error) this.handleApiError("search traces", error, response);
-    return data;
+    return unwrapApiResult({
+      operation: "search traces",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   async get(traceId: string, options?: { format?: "digest" | "json" }): Promise<TraceGetResponse> {
@@ -80,7 +86,12 @@ export class TracesApiService {
         query: options,
       },
     });
-    if (error) this.handleApiError(`get trace "${traceId}"`, error, response);
-    return data;
+    return unwrapApiResult({
+      operation: `get trace "${traceId}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 }

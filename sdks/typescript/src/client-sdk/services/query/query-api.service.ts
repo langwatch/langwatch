@@ -5,6 +5,7 @@ import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
+import { unwrapApiResult } from "@/client-sdk/services/_shared/unwrap-api-result";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 
 /** The typed columns/rows/statistics payload `POST /api/v1/query` answers with. */
@@ -94,8 +95,13 @@ export class QueryApiService {
    */
   async query(params: QueryRunParams): Promise<QueryRunResult> {
     const { data, error, response } = await this.apiClient.POST("/api/v1/query", { body: params });
-    if (error) this.handleApiError("run query", error, response);
-    return data;
+    return unwrapApiResult({
+      operation: "run query",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   /**
@@ -106,7 +112,12 @@ export class QueryApiService {
    */
   async schema(): Promise<QuerySchemaResult> {
     const { data, error, response } = await this.apiClient.GET("/api/v1/query/schema", {});
-    if (error) this.handleApiError("discover query schema", error, response);
-    return data;
+    return unwrapApiResult({
+      operation: "discover query schema",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 }

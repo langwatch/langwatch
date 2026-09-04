@@ -5,6 +5,7 @@ import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
+import { unwrapApiResult } from "@/client-sdk/services/_shared/unwrap-api-result";
 
 export interface ExperimentRunStartResponse {
   runId: string;
@@ -274,12 +275,12 @@ export class ExperimentsApiService {
     this.apiClient = config?.langwatchApiClient ?? createLangWatchApiClient();
   }
 
-  private handleApiError(operation: string, error: unknown): never {
+  private handleApiError(operation: string, error: unknown, response?: Response): never {
     const message = formatApiErrorForOperation({
       operation: operation,
       error: error,
       options: {
-        status: extractStatusFromResponse(error),
+        status: response?.status ?? extractStatusFromResponse(error),
       },
     });
     throw new ExperimentsApiServiceError(message, operation, error);
@@ -308,8 +309,13 @@ export class ExperimentsApiService {
       this.handleApiError(operation, error);
     }
 
-    if (result.error) this.handleApiError(operation, result.error);
-    return result.data as T;
+    return unwrapApiResult({
+      operation,
+      data: result.data,
+      error: result.error,
+      response: result.response,
+      onError: this.handleApiError.bind(this),
+    }) as T;
   }
 
   private async postUndeclaredEndpoint<T>({
@@ -338,8 +344,13 @@ export class ExperimentsApiService {
       this.handleApiError(operation, error);
     }
 
-    if (result.error) this.handleApiError(operation, result.error);
-    return result.data as T;
+    return unwrapApiResult({
+      operation,
+      data: result.data,
+      error: result.error,
+      response: result.response,
+      onError: this.handleApiError.bind(this),
+    }) as T;
   }
 
   /**
@@ -355,12 +366,17 @@ export class ExperimentsApiService {
     } = {},
   ): Promise<ExperimentRunStartResponse> {
     const body = toRunStartRequest({ parameters: options.parameters });
-    const { data, error } = await this.apiClient.POST("/api/v1/experiments/{slug}/run", {
+    const { data, error, response } = await this.apiClient.POST("/api/v1/experiments/{slug}/run", {
       params: { path: { slug } },
       ...(body !== undefined ? { body } : {}),
     });
-    if (error) this.handleApiError(`start experiment run for "${slug}"`, error);
-    return data as unknown as ExperimentRunStartResponse;
+    return unwrapApiResult({
+      operation: `start experiment run for "${slug}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as ExperimentRunStartResponse;
   }
 
   /**
@@ -377,14 +393,19 @@ export class ExperimentsApiService {
     name?: string;
     state?: ExperimentWorkbenchState;
   } = {}): Promise<ExperimentCreateResponse> {
-    const { data, error } = await this.apiClient.POST("/api/v1/experiments", {
+    const { data, error, response } = await this.apiClient.POST("/api/v1/experiments", {
       body: {
         ...(name !== undefined ? { name } : {}),
         ...(state !== undefined ? { state } : {}),
       },
     });
-    if (error) this.handleApiError("create experiment", error);
-    return data;
+    return unwrapApiResult({
+      operation: "create experiment",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   /**
@@ -409,16 +430,22 @@ export class ExperimentsApiService {
     slug: string;
     fields?: "version";
   }): Promise<ExperimentWorkbenchStateResponse | ExperimentWorkbenchVersionProbe> {
-    const { data, error } = await this.apiClient.GET("/api/v1/experiments/{slug}/workbench-state", {
-      params: {
-        path: { slug },
-        ...(fields !== undefined ? { query: { fields } } : {}),
+    const { data, error, response } = await this.apiClient.GET(
+      "/api/v1/experiments/{slug}/workbench-state",
+      {
+        params: {
+          path: { slug },
+          ...(fields !== undefined ? { query: { fields } } : {}),
+        },
       },
+    );
+    return unwrapApiResult({
+      operation: `get workbench state for "${slug}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
     });
-    if (error) {
-      this.handleApiError(`get workbench state for "${slug}"`, error);
-    }
-    return data;
   }
 
   /**
@@ -439,18 +466,24 @@ export class ExperimentsApiService {
     expectedVersion?: number;
     commitMessage?: string;
   }): Promise<ExperimentSaveWorkbenchStateResponse> {
-    const { data, error } = await this.apiClient.PUT("/api/v1/experiments/{slug}/workbench-state", {
-      params: { path: { slug } },
-      body: {
-        state,
-        ...(expectedVersion !== undefined ? { expectedVersion } : {}),
-        ...(commitMessage !== undefined ? { commitMessage } : {}),
+    const { data, error, response } = await this.apiClient.PUT(
+      "/api/v1/experiments/{slug}/workbench-state",
+      {
+        params: { path: { slug } },
+        body: {
+          state,
+          ...(expectedVersion !== undefined ? { expectedVersion } : {}),
+          ...(commitMessage !== undefined ? { commitMessage } : {}),
+        },
       },
+    );
+    return unwrapApiResult({
+      operation: `save workbench state for "${slug}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
     });
-    if (error) {
-      this.handleApiError(`save workbench state for "${slug}"`, error);
-    }
-    return data;
   }
 
   /** The experiment's saved versions, newest first. */
@@ -463,19 +496,25 @@ export class ExperimentsApiService {
     limit?: number;
     cursor?: number;
   }): Promise<ExperimentVersionsResponse> {
-    const { data, error } = await this.apiClient.GET("/api/v1/experiments/{slug}/versions", {
-      params: {
-        path: { slug },
-        query: {
-          ...(limit !== undefined ? { limit } : {}),
-          ...(cursor !== undefined ? { cursor } : {}),
+    const { data, error, response } = await this.apiClient.GET(
+      "/api/v1/experiments/{slug}/versions",
+      {
+        params: {
+          path: { slug },
+          query: {
+            ...(limit !== undefined ? { limit } : {}),
+            ...(cursor !== undefined ? { cursor } : {}),
+          },
         },
       },
+    );
+    return unwrapApiResult({
+      operation: `list versions for experiment "${slug}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
     });
-    if (error) {
-      this.handleApiError(`list versions for experiment "${slug}"`, error);
-    }
-    return data;
   }
 
   /**
@@ -489,22 +528,30 @@ export class ExperimentsApiService {
     slug: string;
     version: number;
   }): Promise<ExperimentRestoreVersionResponse> {
-    const { data, error } = await this.apiClient.POST(
+    const { data, error, response } = await this.apiClient.POST(
       "/api/v1/experiments/{slug}/versions/{version}/restore",
       { params: { path: { slug, version } } },
     );
-    if (error) {
-      this.handleApiError(`restore version ${version} of experiment "${slug}"`, error);
-    }
-    return data;
+    return unwrapApiResult({
+      operation: `restore version ${version} of experiment "${slug}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   async getRunStatus(runId: string): Promise<ExperimentRunStatusResponse> {
-    const { data, error } = await this.apiClient.GET("/api/v1/experiments/runs/{runId}", {
+    const { data, error, response } = await this.apiClient.GET("/api/v1/experiments/runs/{runId}", {
       params: { path: { runId } },
     });
-    if (error) this.handleApiError(`get run status for "${runId}"`, error);
-    return data;
+    return unwrapApiResult({
+      operation: `get run status for "${runId}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   /**
