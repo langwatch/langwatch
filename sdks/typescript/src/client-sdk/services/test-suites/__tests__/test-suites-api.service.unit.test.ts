@@ -5,6 +5,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import {
+  type EvaluatorAttachment,
   TestSuitesApiError,
   TestSuitesApiService,
 } from "../test-suites-api.service";
@@ -20,6 +21,25 @@ const nestedUnauthorized = {
     type: "unauthorized",
     code: "invalid_api_key",
     message: "The API key is not valid.",
+  },
+};
+
+/** A required SQL equivalence evaluator reading a tool call and a field. */
+const sqlEvaluator: EvaluatorAttachment = {
+  id: "att_sql",
+  evaluatorId: "evaluator_sql",
+  required: true,
+  mappings: {
+    output: {
+      type: "source",
+      sourceId: "trace",
+      path: ["tool_calls", "run_sql", "input"],
+    },
+    expected_output: {
+      type: "source",
+      sourceId: "scenario",
+      path: ["fields", "golden_sql"],
+    },
   },
 };
 
@@ -92,6 +112,27 @@ describe("TestSuitesApiService", () => {
     });
   });
 
+  describe("when creating a suite with fields and evaluators", () => {
+    /** @scenario "Create a test suite with fields and evaluators" */
+    it("posts the name, the fields and the evaluators", async () => {
+      const { service, calls } = serviceWith({ data: { id: "suite_abc" } });
+
+      await service.create({
+        name: "Case lookups",
+        fields: [{ identifier: "golden_sql", type: "text" }],
+        evaluators: [sqlEvaluator],
+      });
+
+      expect(calls.POST).toHaveBeenCalledWith("/api/v1/test-suites", {
+        body: {
+          name: "Case lookups",
+          fields: [{ identifier: "golden_sql", type: "text" }],
+          evaluators: [sqlEvaluator],
+        },
+      });
+    });
+  });
+
   describe("when renaming a suite", () => {
     /** @scenario "Rename a test suite" */
     it("patches the name", async () => {
@@ -102,6 +143,34 @@ describe("TestSuitesApiService", () => {
       expect(calls.PATCH).toHaveBeenCalledWith("/api/v1/test-suites/{id}", {
         params: { path: { id: "suite_abc" } },
         body: { name: "Refunds and credits" },
+      });
+    });
+  });
+
+  describe("when updating a suite", () => {
+    /** @scenario "Update the fields of a test suite" */
+    it("patches the field list alone", async () => {
+      const { service, calls } = serviceWith({ data: { id: "suite_abc" } });
+
+      await service.update("suite_abc", {
+        fields: [{ identifier: "golden_sql", type: "text" }],
+      });
+
+      expect(calls.PATCH).toHaveBeenCalledWith("/api/v1/test-suites/{id}", {
+        params: { path: { id: "suite_abc" } },
+        body: { fields: [{ identifier: "golden_sql", type: "text" }] },
+      });
+    });
+
+    /** @scenario "Update the evaluators of a test suite" */
+    it("patches the evaluator list alone", async () => {
+      const { service, calls } = serviceWith({ data: { id: "suite_abc" } });
+
+      await service.update("suite_abc", { evaluators: [sqlEvaluator] });
+
+      expect(calls.PATCH).toHaveBeenCalledWith("/api/v1/test-suites/{id}", {
+        params: { path: { id: "suite_abc" } },
+        body: { evaluators: [sqlEvaluator] },
       });
     });
   });

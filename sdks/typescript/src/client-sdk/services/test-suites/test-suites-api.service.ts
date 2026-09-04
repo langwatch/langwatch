@@ -25,10 +25,30 @@ export type CreateTestSuiteBody = NonNullable<
   paths["/api/v1/test-suites"]["post"]["requestBody"]
 >["content"]["application/json"];
 
-/** The body `PATCH /api/v1/test-suites/{id}` takes. */
-export type RenameTestSuiteBody = NonNullable<
+/**
+ * The body `PATCH /api/v1/test-suites/{id}` takes: any of the name, the full
+ * field list and the full evaluator list.
+ */
+export type UpdateTestSuiteBody = NonNullable<
   paths["/api/v1/test-suites/{id}"]["patch"]["requestBody"]
 >["content"]["application/json"];
+
+/** The body `rename` sends: the name alone. */
+export type RenameTestSuiteBody = Pick<UpdateTestSuiteBody, "name"> &
+  Required<Pick<UpdateTestSuiteBody, "name">>;
+
+/** One field a test suite declares: an identifier and a type. */
+export type SuiteFieldDefinition = NonNullable<
+  UpdateTestSuiteBody["fields"]
+>[number];
+
+/** One evaluator attached to a test suite or a run plan, with its mappings. */
+export type EvaluatorAttachment = NonNullable<
+  UpdateTestSuiteBody["evaluators"]
+>[number];
+
+/** Where one evaluator input reads its value: a source path or a literal. */
+export type ScenarioMapping = EvaluatorAttachment["mappings"][string];
 
 /** The body `POST /api/v1/test-suites/{id}/run` takes. */
 export type RunTestSuiteBody = NonNullable<
@@ -114,11 +134,25 @@ export class TestSuitesApiService {
     return data as unknown as TestSuiteDetail;
   }
 
+  /**
+   * Edits a suite: any of its name, its fields and its evaluators. A field
+   * list or an evaluator list replaces the one the suite holds; a key left
+   * out keeps what the suite has.
+   */
+  async update(id: string, params: UpdateTestSuiteBody): Promise<TestSuite> {
+    const { data, error, response } = await this.apiClient.PATCH(
+      "/api/v1/test-suites/{id}",
+      { params: { path: { id } }, body: params },
+    );
+    if (error) this.handleApiError(`update test suite "${id}"`, error, response);
+    return data as unknown as TestSuite;
+  }
+
   /** Renames a suite. The slug is kept, so links and run history stay put. */
   async rename(id: string, params: RenameTestSuiteBody): Promise<TestSuite> {
     const { data, error, response } = await this.apiClient.PATCH(
       "/api/v1/test-suites/{id}",
-      { params: { path: { id } }, body: params },
+      { params: { path: { id } }, body: { name: params.name } },
     );
     if (error) this.handleApiError(`rename test suite "${id}"`, error, response);
     return data as unknown as TestSuite;
