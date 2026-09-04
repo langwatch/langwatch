@@ -167,6 +167,42 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
     And the remaining keys past the cap are still retired
 
   # ---------------------------------------------------------------------------
+  # Revocation records its cause
+  # ---------------------------------------------------------------------------
+  # A device whose key died asks the platform why before it re-mints. The
+  # platform's own revocations, a hard-cut rotation and the cap, name
+  # themselves. Everything a person does through the API-keys page or the REST
+  # API is recorded as that person's decision, and the CLI leaves such a key
+  # dead until the person sets the device up again.
+
+  @unit @ingest-api-key
+  Scenario: A revoke from the API keys page records a person as its cause
+    Given jane revokes one of her keys from the API keys page
+    When the row is written
+    Then its revocation cause is "user"
+
+  @unit @ingest-api-key @rotation
+  Scenario: A hard-cut rotation names itself as the cause
+    Given a project mint that replaces a prior key
+    When the prior key is revoked
+    Then its revocation cause is "rotation"
+
+  @unit @ingest-api-key @issue @personal @create-only
+  Scenario: The cap names itself as the cause of the keys it retires
+    Given a personal mint past the cap
+    When the key used least recently is revoked
+    Then its revocation cause is "cap"
+
+  @integration @ingest-api-key @issue @personal
+  Scenario: The CLI can ask what became of its own key
+    Given jane's device minted a personal key and a person then revoked it
+    When the CLI asks the platform about that key's lookup id
+    Then the answer is revoked, with "user" as the cause
+    And a key the cap retired answers with "cap"
+    And a key that is still live answers live
+    And a lookup id that names none of jane's keys answers unknown
+
+  # ---------------------------------------------------------------------------
   # Ingest-only RBAC — the genuinely-write-only guarantee
   # ---------------------------------------------------------------------------
 

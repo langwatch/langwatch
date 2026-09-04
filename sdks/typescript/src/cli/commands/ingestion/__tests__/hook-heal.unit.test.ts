@@ -35,6 +35,8 @@ const HEALED = {
 const DECLINED = { status: "declined" } as const;
 /** The healer went to the platform and did not come back with a wired tool. */
 const FAILED = { status: "failed" } as const;
+/** The platform said a person revoked the key on purpose. */
+const WITHHELD = { status: "withheld" } as const;
 
 /** A collector that rejects the old bearer and accepts the fresh one. */
 const rotatedCollector: typeof fetch = ((
@@ -217,6 +219,48 @@ describe("the session context hook's self-heal", () => {
         fs.existsSync(path.join(hook.stateDir, "heal-claude_code.json")),
       ).toBe(true);
       expect(hook.stdout).toEqual([]);
+    });
+  });
+
+  describe("given a key the platform says a person revoked", () => {
+    /** @scenario "A key a person revoked is not re-minted" */
+    it("posts nothing more and tells the user to set the machine up again", async () => {
+      await hook.runHook({
+        env: OLD_KEY_ENV,
+        fetchImpl: rotatedCollector,
+        healRevokedKey: vi.fn().mockResolvedValue(WITHHELD),
+      });
+
+      expect(posted.map((request) => request.headers.Authorization)).toEqual([
+        `Bearer ${OLD}`,
+      ]);
+      expect(hook.stdout).toHaveLength(1);
+      const notice = JSON.parse(hook.stdout[0]!) as { systemMessage: string };
+      expect(notice.systemMessage).toContain("revoked");
+      expect(notice.systemMessage).toContain("langwatch instrument claude");
+      expect(hook.exits).toEqual([]);
+    });
+
+    /** @scenario "A withheld heal spends the throttle" */
+    it("does not ask the platform again inside the window", async () => {
+      const healRevokedKey = vi.fn().mockResolvedValue(WITHHELD);
+
+      await hook.runHook({
+        env: OLD_KEY_ENV,
+        fetchImpl: rotatedCollector,
+        healRevokedKey,
+      });
+      await hook.runHook({
+        env: OLD_KEY_ENV,
+        fetchImpl: rotatedCollector,
+        healRevokedKey,
+        now: NOW + 60_000,
+      });
+
+      expect(healRevokedKey).toHaveBeenCalledTimes(1);
+      expect(
+        fs.existsSync(path.join(hook.stateDir, "heal-claude_code.json")),
+      ).toBe(true);
     });
   });
 

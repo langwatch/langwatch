@@ -350,6 +350,33 @@ Rule: A revoked ingest key heals itself
     Then no personal key is minted
     And stdout stays empty and the exit code is zero
 
+  # A revoke from the API-keys page is a decision about the device that held
+  # the key. The platform records why each key died, and the hook asks before
+  # it re-mints: a key the cap retired or a rotation replaced is the platform's
+  # own doing and is re-minted; a key a person revoked stays dead, and the
+  # person is told to set the machine up again.
+
+  @unit
+  Scenario: A key a person revoked is not re-minted
+    Given a signed-in CLI whose cached key the platform says a person revoked
+    And a collector that answers 401
+    When the hook runs
+    Then no new key is minted
+    And the user is told to run langwatch instrument again
+
+  @unit
+  Scenario: A key the cap retired is re-minted
+    Given a signed-in CLI whose cached key the platform says the cap retired
+    And a collector that answers 401
+    When the hook runs
+    Then a new key is minted
+
+  @unit
+  Scenario: A withheld heal spends the throttle
+    Given a hook that was told a person revoked its key minutes ago
+    When the collector answers 401 again
+    Then the platform is not asked again inside the window
+
   @unit
   Scenario: Wiring that writes no target leaves the cached key in place
     Given a signed-in CLI whose cached personal key the collector answers 401 to

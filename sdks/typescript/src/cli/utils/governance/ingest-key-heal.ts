@@ -14,6 +14,7 @@
  * session broke, so every failure is a null and a debug line.
  */
 import { installTelemetryWiring } from "./instrument-wiring";
+import { describeIngestionKey, extractLookupIdFromToken } from "./cli-api";
 import {
   type GovernanceConfig,
   isLoggedIn,
@@ -31,17 +32,21 @@ export interface HealedTarget {
 /**
  * How a heal ended, and whether it cost anything.
  *
- * The split the caller cares about is `declined` against the other two. A
+ * The split the caller cares about is `declined` against the other three. A
  * decline is decided from the config alone, before any network call: this
  * device is not the one that can repair this 401, and running again a second
- * later would decide the same thing just as cheaply. A `failed` heal went to
- * the platform and may already have spent a mint, so it is the one that must
- * not be retried in a loop. Throttling a decline would spend a repair window
- * on a rejection that never cost anything, and delay the real repair.
+ * later would decide the same thing just as cheaply. The other three went to
+ * the platform. A `failed` heal may already have spent a mint, so it is the
+ * one that must not be retried in a loop. A `withheld` heal found that a
+ * person revoked the key on purpose: the device must not replace it, and the
+ * person must be told to set the device up again. Throttling a decline would
+ * spend a repair window on a rejection that never cost anything, and delay
+ * the real repair.
  */
 export type HealOutcome =
   | { status: "declined" }
   | { status: "failed" }
+  | { status: "withheld" }
   | { status: "healed"; target: HealedTarget };
 
 const DECLINED: HealOutcome = { status: "declined" };
@@ -51,6 +56,7 @@ export interface HealDeps {
   loadConfig: () => GovernanceConfig;
   saveConfig: (cfg: GovernanceConfig) => void;
   isLoggedIn: (cfg: GovernanceConfig) => boolean;
+  describeIngestionKey: typeof describeIngestionKey;
   resolveLiveIngestionKey: typeof resolveLiveIngestionKey;
   installTelemetryWiring: typeof installTelemetryWiring;
 }
@@ -59,6 +65,7 @@ const REAL_DEPS: HealDeps = {
   loadConfig,
   saveConfig,
   isLoggedIn,
+  describeIngestionKey,
   resolveLiveIngestionKey,
   installTelemetryWiring,
 };
@@ -79,6 +86,11 @@ const TOOL_BY_AGENT: Record<string, string> = {
  * token that is not exactly the cached personal key (a pasted credential is
  * the user's, never overwritten, and a request that carried no bearer at all
  * was rejected for another reason).
+ *
+ * Withholds the repair when the platform says a person revoked the cached key
+ * on purpose. A revoke from the API-keys page is a decision about this device,
+ * and a device that minted its way past it would make that page a no-op. The
+ * platform's own revocations, a rotation or the cap, are re-minted.
  *
  * Reports a failure once it has gone to the platform and not come back with a
  * wired tool: a server that says the cached key is still live, in which case
@@ -107,6 +119,14 @@ export async function healRevokedIngestKey({
   // no bearer for, or carried someone else's, is not this key's failure.
   const cached = cfg.default_personal_ingest_keys?.[agent]?.secret;
   if (!cached || rejectedToken !== cached) return DECLINED;
+
+  const lookupId = extractLookupIdFromToken(cached);
+  if (lookupId) {
+    const described = await deps.describeIngestionKey(cfg, lookupId);
+    if (described.status === "revoked" && described.revocationCause === "user") {
+      return { status: "withheld" };
+    }
+  }
 
   const resolved = await deps.resolveLiveIngestionKey({
     cfg,

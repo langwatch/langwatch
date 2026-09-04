@@ -5,6 +5,10 @@ import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { ApiKeyRepository } from "~/server/api-key/api-key.repository";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
+import {
+  type ApiKeyRevocationCause,
+  isApiKeyRevocationCause,
+} from "~/server/api-key/revocation-cause";
 
 import { PersonalWorkspaceService } from "./personalWorkspace.service";
 
@@ -139,6 +143,7 @@ export class IngestionKeyService {
         // for the new key's own writes: the CLI's first `langwatch claude`
         // after a logout sat well over twenty seconds on this one request.
         awaitProjection: false,
+        cause: "rotation",
       });
     }
 
@@ -343,6 +348,7 @@ export class IngestionKeyService {
           callerIsAdmin: true,
           organizationId,
           awaitProjection: false,
+          cause: "cap",
         });
       } catch (error) {
         logger.warn(
@@ -434,5 +440,46 @@ export class IngestionKeyService {
         lookupId: k.lookupId,
         ingestionTemplateId: k.ingestionTemplateId,
       }));
+  }
+
+  /**
+   * What became of one of the caller's own personal ingest keys, looked up by
+   * the lookup id embedded in its token. The CLI asks this before it re-mints
+   * a key the collector rejected: a key the cap retired or a rotation replaced
+   * may be re-minted, a key a person revoked may not.
+   *
+   * Null when no such key belongs to this user in this organization, which is
+   * also what a key of another user reads as: the answer never confirms that
+   * someone else's key exists.
+   */
+  async describePersonalKey({
+    userId,
+    organizationId,
+    lookupId,
+  }: {
+    userId: string;
+    organizationId: string;
+    lookupId: string;
+  }): Promise<{
+    sourceType: string;
+    live: boolean;
+    revocationCause: ApiKeyRevocationCause | null;
+  } | null> {
+    const key = await this.apiKeyRepo.findByLookupId({ lookupId });
+    if (
+      !key ||
+      key.organizationId !== organizationId ||
+      key.userId !== userId ||
+      !key.ingestSourceType
+    ) {
+      return null;
+    }
+    return {
+      sourceType: key.ingestSourceType,
+      live: key.revokedAt === null,
+      revocationCause: isApiKeyRevocationCause(key.revocationCause)
+        ? key.revocationCause
+        : null,
+    };
   }
 }

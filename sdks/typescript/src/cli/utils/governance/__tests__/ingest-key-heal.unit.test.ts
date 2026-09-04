@@ -9,8 +9,9 @@ import { describe, expect, it, vi } from "vitest";
 import type { GovernanceConfig } from "../config";
 import { type HealDeps, healRevokedIngestKey } from "../ingest-key-heal";
 
-const CACHED = "ik-lw-cached-token";
-const FRESH = "ik-lw-fresh-token";
+const CACHED = "ik-lw-cachedlookupid_cached-secret";
+const CACHED_LOOKUP_ID = "cachedlookupid";
+const FRESH = "ik-lw-freshlookupid0_fresh-secret";
 
 function config(over: Partial<GovernanceConfig> = {}): GovernanceConfig {
   return {
@@ -25,6 +26,7 @@ function config(over: Partial<GovernanceConfig> = {}): GovernanceConfig {
 
 function deps(over: Partial<HealDeps> = {}): HealDeps & {
   saveConfig: ReturnType<typeof vi.fn>;
+  describeIngestionKey: ReturnType<typeof vi.fn>;
   resolveLiveIngestionKey: ReturnType<typeof vi.fn>;
   installTelemetryWiring: ReturnType<typeof vi.fn>;
 } {
@@ -32,6 +34,10 @@ function deps(over: Partial<HealDeps> = {}): HealDeps & {
     loadConfig: () => config(),
     saveConfig: vi.fn(),
     isLoggedIn: (cfg: GovernanceConfig) => Boolean(cfg.access_token),
+    // A platform from before the cause was recorded: the heal proceeds.
+    describeIngestionKey: vi
+      .fn()
+      .mockResolvedValue({ status: "unknown", revocationCause: null }),
     resolveLiveIngestionKey: vi.fn().mockResolvedValue({
       token: FRESH,
       prefix: FRESH.slice(0, 12),
@@ -82,6 +88,52 @@ describe("healRevokedIngestKey", () => {
           headers: { Authorization: `Bearer ${FRESH}` },
         },
       });
+    });
+  });
+
+  describe("given a platform that says a person revoked the cached key", () => {
+    /** @scenario "A key a person revoked is not re-minted" */
+    it("withholds the repair: no mint, no wiring, no cache write", async () => {
+      const d = deps({
+        describeIngestionKey: vi
+          .fn()
+          .mockResolvedValue({ status: "revoked", revocationCause: "user" }),
+      });
+
+      const healed = await healRevokedIngestKey({
+        agent: "claude_code",
+        rejectedToken: CACHED,
+        deps: d,
+      });
+
+      expect(healed).toEqual({ status: "withheld" });
+      expect(d.describeIngestionKey).toHaveBeenCalledWith(
+        expect.anything(),
+        CACHED_LOOKUP_ID,
+      );
+      expect(d.resolveLiveIngestionKey).not.toHaveBeenCalled();
+      expect(d.installTelemetryWiring).not.toHaveBeenCalled();
+      expect(d.saveConfig).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a platform that says the cap retired the cached key", () => {
+    /** @scenario "A key the cap retired is re-minted" */
+    it("re-mints as it would for any platform revocation", async () => {
+      const d = deps({
+        describeIngestionKey: vi
+          .fn()
+          .mockResolvedValue({ status: "revoked", revocationCause: "cap" }),
+      });
+
+      const healed = await healRevokedIngestKey({
+        agent: "claude_code",
+        rejectedToken: CACHED,
+        deps: d,
+      });
+
+      expect(healed.status).toBe("healed");
+      expect(d.resolveLiveIngestionKey).toHaveBeenCalledTimes(1);
     });
   });
 

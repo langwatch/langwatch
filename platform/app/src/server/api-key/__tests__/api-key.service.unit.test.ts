@@ -428,6 +428,50 @@ describe("ApiKeyService", () => {
           }),
         );
       });
+
+      /** @scenario "A revoke from the API keys page records a person as its cause" */
+      it("records a person as the cause when none is given", async () => {
+        prisma.apiKey.findUnique.mockResolvedValue(existingKey);
+        prisma._mockTx.apiKey.update.mockResolvedValue({
+          ...existingKey,
+          revokedAt: new Date(),
+        });
+
+        await service.revoke({
+          id: "ak_1",
+          callerUserId: "user_1",
+          callerIsAdmin: false,
+          organizationId: "org_1",
+        });
+
+        expect(prisma._mockTx.apiKey.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({ revocationCause: "user" }),
+          }),
+        );
+      });
+
+      it("records the cause the platform names", async () => {
+        prisma.apiKey.findUnique.mockResolvedValue(existingKey);
+        prisma._mockTx.apiKey.update.mockResolvedValue({
+          ...existingKey,
+          revokedAt: new Date(),
+        });
+
+        await service.revoke({
+          id: "ak_1",
+          callerUserId: "user_1",
+          callerIsAdmin: false,
+          organizationId: "org_1",
+          cause: "cap",
+        });
+
+        expect(prisma._mockTx.apiKey.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({ revocationCause: "cap" }),
+          }),
+        );
+      });
     });
 
     describe("when non-owner non-admin tries to revoke", () => {

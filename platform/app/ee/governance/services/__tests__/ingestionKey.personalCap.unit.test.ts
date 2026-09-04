@@ -120,6 +120,22 @@ describe("IngestionKeyService.issueForPersonalProject", () => {
       );
     });
 
+    /** @scenario "The cap names itself as the cause of the keys it retires" */
+    it("names the cap as the cause of the revoke", async () => {
+      apiKeyRepo.findIngestKeysForProject.mockResolvedValue([
+        liveKey({ id: "ak_new", createdAt: day(30) }),
+        ...Array.from({ length: PERSONAL_INGEST_KEYS_PER_TOOL_CAP }, (_, i) =>
+          liveKey({ id: `ak_${i}`, createdAt: day(i) }),
+        ),
+      ]);
+
+      await service.issueForPersonalProject(PARAMS);
+
+      expect(apiKeys.revoke).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "ak_0", cause: "cap" }),
+      );
+    });
+
     it("never revokes the key it just minted", async () => {
       const others = Array.from(
         { length: PERSONAL_INGEST_KEYS_PER_TOOL_CAP },

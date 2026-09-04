@@ -15,6 +15,7 @@ import { CutoverAwareAccessListingRepository } from "~/server/app-layer/authz/re
 import type { AccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.repository";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { HIDDEN_SYSTEM_KEY_NAMES } from "./reserved-names";
+import type { ApiKeyRevocationCause } from "./revocation-cause";
 
 /** The grants an API key carries, as the request states them. */
 export type ApiKeyBindingInput = {
@@ -353,10 +354,16 @@ export class ApiKeyRepository {
     });
   }
 
-  async revoke({ id }: { id: string }): Promise<ApiKey> {
+  async revoke({
+    id,
+    cause,
+  }: {
+    id: string;
+    cause: ApiKeyRevocationCause;
+  }): Promise<ApiKey> {
     return this.prisma.apiKey.update({
       where: { id },
-      data: { revokedAt: new Date() },
+      data: { revokedAt: new Date(), revocationCause: cause },
     });
   }
 

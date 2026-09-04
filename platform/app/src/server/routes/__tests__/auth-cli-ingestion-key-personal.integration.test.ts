@@ -14,6 +14,7 @@ import { PersonalWorkspaceService } from "@ee/governance/services/personalWorksp
 import type { Redis } from "ioredis";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { TokenResolver } from "~/server/api-key/token-resolver";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
@@ -45,6 +46,28 @@ async function mintPersonal(
   });
   const json = (await res.json()) as { token: string; prefix: string };
   return { status: res.status, token: json.token, prefix: json.prefix };
+}
+
+function lookupIdOf(token: string): string {
+  const match = /^ik-lw-([^_]+)_/.exec(token);
+  if (!match?.[1]) throw new Error(`not an ingest token: ${token}`);
+  return match[1];
+}
+
+async function describeKey(
+  lookupId: string,
+): Promise<{ status: string; revocation_cause?: string | null }> {
+  const res = await app.request(
+    `/api/auth/cli/governance/ingestion-keys/${lookupId}`,
+    { headers: { Authorization: `Bearer ${TOKEN}` } },
+  );
+  if (res.status !== 200) {
+    throw new Error(`describe answered ${res.status} for ${lookupId}`);
+  }
+  return (await res.json()) as {
+    status: string;
+    revocation_cause?: string | null;
+  };
 }
 
 async function liveKeysFor(sourceType: string) {
@@ -206,6 +229,48 @@ describe("POST /api/auth/cli/governance/ingestion-key for the personal workspace
 
       const after = (await liveKeysFor("claude_code")).map((key) => key.id);
       expect(after).toEqual(before);
+    });
+  });
+
+  describe("given keys the person and the platform each revoked", () => {
+    /** @scenario "The CLI can ask what became of its own key" */
+    it("answers with the cause, live for a live key, unknown for a stranger's", async () => {
+      const apiKeys = ApiKeyService.create(prisma);
+      const byPerson = await mintPersonal("opencode");
+      const byCap = await mintPersonal("opencode");
+      const live = await mintPersonal("opencode");
+      const revoke = async (token: string, cause?: "cap") => {
+        const key = await prisma.apiKey.findFirstOrThrow({
+          where: { lookupId: lookupIdOf(token) },
+        });
+        await apiKeys.revoke({
+          id: key.id,
+          callerUserId: USER_ID,
+          callerIsAdmin: false,
+          organizationId: ORG_ID,
+          cause,
+        });
+      };
+      // The API-keys page names no cause; the cap names itself.
+      await revoke(byPerson.token);
+      await revoke(byCap.token, "cap");
+
+      expect(await describeKey(lookupIdOf(byPerson.token))).toMatchObject({
+        status: "revoked",
+        revocation_cause: "user",
+      });
+      expect(await describeKey(lookupIdOf(byCap.token))).toMatchObject({
+        status: "revoked",
+        revocation_cause: "cap",
+      });
+      expect(await describeKey(lookupIdOf(live.token))).toMatchObject({
+        status: "live",
+        revocation_cause: null,
+      });
+      expect(await describeKey("nosuchlookupid00")).toEqual({
+        lookup_id: "nosuchlookupid00",
+        status: "unknown",
+      });
     });
   });
 });

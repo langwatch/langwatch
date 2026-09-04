@@ -2505,6 +2505,68 @@ secured
   });
 
 // ---------------------------------------------------------------------------
+// GET /api/auth/cli/governance/ingestion-keys/:lookup_id
+// ---------------------------------------------------------------------------
+// What became of one of the caller's own personal ingestion keys. The session
+// context hook asks this when the collector rejects the key the device
+// exports with, before it re-mints: a key the cap retired or a rotation
+// replaced is the platform's doing and the device may repair itself, a key a
+// person revoked from the API-keys page stays dead until that person runs
+// `langwatch instrument` again.
+//
+// Response: { lookup_id, status: "live" | "revoked" | "unknown",
+//             source_type?, revocation_cause?: "user" | "rotation" | "cap" | null }
+//
+// `unknown` is a 200, not a 404, so a CLI can tell "no such key of yours"
+// from "a server too old to have this route".
+// ---------------------------------------------------------------------------
+secured
+  .access(CLI_POLICY)
+  .get("/governance/ingestion-keys/:lookup_id", async (c: Context) => {
+    const tokenRecord = await validateAccessToken(
+      c.req.header("Authorization"),
+    );
+    if (!tokenRecord) {
+      return c.json(
+        {
+          error: "unauthorized",
+          error_description:
+            "Bearer access token is missing, malformed, or expired",
+        },
+        401,
+      );
+    }
+    const lookupId = c.req.param("lookup_id");
+    if (!lookupId) {
+      return c.json(
+        {
+          error: "invalid_request",
+          error_description: "lookup_id is required",
+        },
+        400,
+      );
+    }
+    const service = IngestionKeyService.create(prisma);
+    const key = await service.describePersonalKey({
+      userId: tokenRecord.user_id,
+      organizationId: tokenRecord.organization_id,
+      lookupId,
+    });
+    if (!key) {
+      return c.json({ lookup_id: lookupId, status: "unknown" }, 200);
+    }
+    return c.json(
+      {
+        lookup_id: lookupId,
+        status: key.live ? "live" : "revoked",
+        source_type: key.sourceType,
+        revocation_cause: key.revocationCause,
+      },
+      200,
+    );
+  });
+
+// ---------------------------------------------------------------------------
 // GET /api/auth/cli/lookup?user_code=XXXX-YYYY
 // ---------------------------------------------------------------------------
 // Used by the browser-side approval page to surface the device-code
