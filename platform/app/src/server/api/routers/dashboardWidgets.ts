@@ -15,14 +15,10 @@
  * else.
  */
 
-import { nanoid } from "nanoid";
 import { z } from "zod";
 
 import type { Prisma } from "~/generated/prisma/client";
 import {
-  CHART_GRID_DEFAULT_COL_SPAN,
-  CHART_GRID_DEFAULT_ROW_SPAN,
-  chartGridBottomRow,
   chartGridPlacementSchema,
   fitsChartGridWidth,
 } from "~/server/analytics/chartGrid";
@@ -81,28 +77,13 @@ export const dashboardWidgetsRouter = createTRPCRouter({
     .permission("analytics:create")
     .use(enforceCustomChartPlaygroundEnabled)
     .mutation(async ({ ctx, input }) => {
-      // Next free row: just below the lowest dashboard widget in the project.
-      const existing = await ctx.prisma.customGraph.findMany({
-        where: {
-          projectId: input.projectId,
-          kind: DASHBOARD_SRCDOC_CHART_KIND,
-        },
-        select: { gridRow: true, rowSpan: true },
-      });
-
-      return await ctx.prisma.customGraph.create({
-        data: {
-          id: nanoid(),
-          projectId: input.projectId,
-          name: input.name,
-          kind: DASHBOARD_SRCDOC_CHART_KIND,
-          graph: graphOf({ code: input.code, queries: input.queries }),
-          ...(input.dashboardId ? { dashboardId: input.dashboardId } : {}),
-          gridColumn: 0,
-          gridRow: chartGridBottomRow(existing),
-          colSpan: CHART_GRID_DEFAULT_COL_SPAN,
-          rowSpan: CHART_GRID_DEFAULT_ROW_SPAN,
-        },
+      // Through the service so the row scan and write are one atomic
+      // transaction, the scan is scoped to the placement target, and a
+      // `dashboardId` from another project is refused before it is persisted.
+      return await DashboardWidgetService.create(ctx.prisma).createWidget({
+        projectId: input.projectId,
+        dashboardId: input.dashboardId,
+        input: { name: input.name, code: input.code, queries: input.queries },
       });
     }),
 

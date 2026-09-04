@@ -63,3 +63,25 @@ Feature: Dashboard widgets placed on a dashboard
     Given a dashboard grid holding a dashboard widget
     When the dashboard's period selector changes
     Then the widget's queries re-run against the new period, the same one control every other card on the grid reads
+
+  # Persistence invariants for the write path (dashboardWidget.service):
+  # placement scoped to the target, dashboard ownership enforced, and partial
+  # definition updates that do not blank the half the caller omitted.
+
+  @integration
+  Scenario: A widget's grid row is allocated from its target dashboard alone
+    Given a dashboard already holding a tall card and a second, empty dashboard in the same project
+    When a widget is created on the empty dashboard
+    Then it is placed at the top of that dashboard, not pushed below the tall card on the other one
+
+  @integration
+  Scenario: A widget targeting a dashboard from another project is refused
+    Given a dashboard owned by a different project
+    When a widget create or an assignment names that dashboard
+    Then it is refused as "not found", indistinguishable from a dashboard that never existed, and nothing is persisted or reassigned
+
+  @integration
+  Scenario: A partial widget definition update keeps the untouched half
+    Given a saved widget with both author code and named queries
+    When only the code is updated, or only the queries
+    Then the side that was not sent is kept, not blanked, and the update is not silently dropped

@@ -35,6 +35,7 @@ import {
   chartGridBottomRow,
 } from "~/server/analytics/chartGrid";
 import { DASHBOARD_SRCDOC_CHART_KIND } from "~/server/analytics/chartKinds";
+import { dashboardBelongsToProject } from "~/server/analytics/dashboardBelongsToProject";
 import {
   DASHBOARD_WIDGET_DEFINITION_VERSION,
   type DashboardWidgetDefinition,
@@ -168,31 +169,60 @@ export class DashboardWidgetService {
     return this.present(row);
   }
 
-  /** Saves a new widget below the project's lowest dashboard-widget row. */
+  /**
+   * Saves a new widget below the lowest row it would collide with.
+   *
+   * Row computation and write share one interactive transaction so two
+   * concurrent creates cannot read the same maximum row and then both write
+   * it — the placement is atomic, not last-writer-wins.
+   *
+   * @throws {DashboardWidgetNotFoundError} when `dashboardId` is given but
+   *   names no dashboard in this project — including one in another project,
+   *   which must not be distinguishable from a missing one (IDOR).
+   */
   async createWidget({
     projectId,
+    dashboardId,
     input,
   }: {
     projectId: string;
+    /** When placing on a dashboard; absent for the unplaced authoring grid. */
+    dashboardId?: string;
     input: { name: string } & DashboardWidgetDefinitionInput;
   }): Promise<DashboardWidget> {
-    const existing = await this.prisma.customGraph.findMany({
-      where: { projectId, kind: DASHBOARD_SRCDOC_CHART_KIND },
-      select: { gridRow: true, rowSpan: true },
-    });
+    const row = await this.prisma.$transaction(async (tx) => {
+      if (
+        dashboardId !== undefined &&
+        !(await dashboardBelongsToProject(tx, dashboardId, projectId))
+      ) {
+        throw new DashboardWidgetNotFoundError();
+      }
 
-    const row = await this.prisma.customGraph.create({
-      data: {
-        id: nanoid(),
-        projectId,
-        name: input.name,
-        kind: DASHBOARD_SRCDOC_CHART_KIND,
-        graph: graphOf(input),
-        gridColumn: 0,
-        gridRow: chartGridBottomRow(existing),
-        colSpan: CHART_GRID_DEFAULT_COL_SPAN,
-        rowSpan: CHART_GRID_DEFAULT_ROW_SPAN,
-      },
+      // Scoped to the placement target: a card on another dashboard must not
+      // push this one down. Unplaced widgets share the kind-scoped authoring
+      // grid; a placed one shares the whole target dashboard's grid.
+      const existing = await tx.customGraph.findMany({
+        where:
+          dashboardId === undefined
+            ? { projectId, kind: DASHBOARD_SRCDOC_CHART_KIND }
+            : { projectId, dashboardId },
+        select: { gridRow: true, rowSpan: true },
+      });
+
+      return await tx.customGraph.create({
+        data: {
+          id: nanoid(),
+          projectId,
+          name: input.name,
+          kind: DASHBOARD_SRCDOC_CHART_KIND,
+          graph: graphOf(input),
+          ...(dashboardId === undefined ? {} : { dashboardId }),
+          gridColumn: 0,
+          gridRow: chartGridBottomRow(existing),
+          colSpan: CHART_GRID_DEFAULT_COL_SPAN,
+          rowSpan: CHART_GRID_DEFAULT_ROW_SPAN,
+        },
+      });
     });
     return this.present(row);
   }
@@ -212,17 +242,32 @@ export class DashboardWidgetService {
     projectId: string;
     input: { name?: string } & Partial<DashboardWidgetDefinitionInput>;
   }): Promise<DashboardWidget> {
-    const data: Prisma.CustomGraphUpdateManyMutationInput = {};
-    if (input.name !== undefined) data.name = input.name;
-    if (input.code !== undefined && input.queries !== undefined) {
-      data.graph = graphOf({ code: input.code, queries: input.queries });
-    }
+    await this.prisma.$transaction(async (tx) => {
+      const data: Prisma.CustomGraphUpdateManyMutationInput = {};
+      if (input.name !== undefined) data.name = input.name;
 
-    const result = await this.prisma.customGraph.updateMany({
-      where: { id, projectId, kind: DASHBOARD_SRCDOC_CHART_KIND },
-      data,
+      // A partial definition update keeps the untouched half: `code` alone must
+      // not blank the stored queries, nor `queries` alone the stored code. The
+      // `graph` column is one JSON blob, so the surviving side is read back and
+      // re-merged inside the transaction rather than overwritten.
+      if (input.code !== undefined || input.queries !== undefined) {
+        const current = await tx.customGraph.findFirst({
+          where: { id, projectId, kind: DASHBOARD_SRCDOC_CHART_KIND },
+        });
+        if (!current) throw new DashboardWidgetNotFoundError();
+        const { definition } = this.present(current);
+        data.graph = graphOf({
+          code: input.code ?? definition.code,
+          queries: input.queries ?? definition.queries,
+        });
+      }
+
+      const result = await tx.customGraph.updateMany({
+        where: { id, projectId, kind: DASHBOARD_SRCDOC_CHART_KIND },
+        data,
+      });
+      if (result.count === 0) throw new DashboardWidgetNotFoundError();
     });
-    if (result.count === 0) throw new DashboardWidgetNotFoundError();
     return this.getById({ id, projectId });
   }
 
@@ -248,8 +293,12 @@ export class DashboardWidgetService {
   /**
    * Adds a widget to a dashboard at the next free row, keeping its size.
    *
-   * @throws {DashboardWidgetNotFoundError} when the update touches no row —
-   *   a missing id, or one in another project.
+   * Row computation and write share one interactive transaction so two
+   * concurrent assignments cannot both read the same maximum row and overlap.
+   *
+   * @throws {DashboardWidgetNotFoundError} when the target dashboard is not in
+   *   this project (including one in another project, indistinguishable from
+   *   missing — IDOR), or when the update touches no widget row.
    */
   async assignToDashboard({
     id,
@@ -260,20 +309,26 @@ export class DashboardWidgetService {
     projectId: string;
     dashboardId: string;
   }): Promise<DashboardWidget> {
-    // Next free row on the TARGET dashboard across every kind (gridRow is shared
-    // between the widget-authoring grid and dashboard grid — accepted prototype coupling).
-    const onDashboard = await this.prisma.customGraph.findMany({
-      where: { projectId, dashboardId },
-      select: { gridRow: true, rowSpan: true },
-    });
-    await this.prisma.customGraph.updateMany({
-      where: { id, projectId, kind: DASHBOARD_SRCDOC_CHART_KIND },
-      data: {
-        dashboardId,
-        gridColumn: 0,
-        gridRow: chartGridBottomRow(onDashboard),
-        // colSpan/rowSpan intentionally untouched — keep the widget's size.
-      },
+    await this.prisma.$transaction(async (tx) => {
+      if (!(await dashboardBelongsToProject(tx, dashboardId, projectId))) {
+        throw new DashboardWidgetNotFoundError();
+      }
+      // Next free row on the TARGET dashboard across every kind (gridRow is shared
+      // between the widget-authoring grid and dashboard grid — accepted prototype coupling).
+      const onDashboard = await tx.customGraph.findMany({
+        where: { projectId, dashboardId },
+        select: { gridRow: true, rowSpan: true },
+      });
+      const result = await tx.customGraph.updateMany({
+        where: { id, projectId, kind: DASHBOARD_SRCDOC_CHART_KIND },
+        data: {
+          dashboardId,
+          gridColumn: 0,
+          gridRow: chartGridBottomRow(onDashboard),
+          // colSpan/rowSpan intentionally untouched — keep the widget's size.
+        },
+      });
+      if (result.count === 0) throw new DashboardWidgetNotFoundError();
     });
     return this.getById({ id, projectId });
   }

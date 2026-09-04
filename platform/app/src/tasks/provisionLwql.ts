@@ -170,6 +170,55 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/**
+ * Replaces every occurrence of each secret with a fixed marker.
+ *
+ * A ClickHouse error can echo the DDL that failed, and the access-model DDL
+ * embeds `LWQL_CLICKHOUSE_PASSWORD`; the admin `CLICKHOUSE_URL` can likewise
+ * surface in a connection error. Both are stripped before the message is
+ * logged or re-thrown. Literal `split`/`join` so no secret has to be escaped
+ * into a regexp. Empty/undefined secrets are skipped, never matched.
+ */
+export function redactSecrets(
+  text: string,
+  secrets: readonly (string | undefined)[],
+): string {
+  let redacted = text;
+  for (const secret of secrets) {
+    if (secret) redacted = redacted.split(secret).join("[REDACTED]");
+  }
+  return redacted;
+}
+
+/**
+ * Aborts the deploy when access-model reconciliation fails — the fail-closed
+ * path, not log-and-continue.
+ *
+ * The source GRANTs are applied before the row policies that scope them, so a
+ * failure part-way through can leave an existing ClickHouse view readable
+ * across tenants; continuing with the executor still available would serve
+ * those rows. Aborting is the safe state — the next run reconciles from
+ * scratch. Both the logged message and the re-thrown error are redacted, so
+ * neither this line nor the boot handler above it can leak the secrets the DDL
+ * carried.
+ */
+export function failClosedOnAccessModelReconciliation({
+  error,
+  secrets,
+}: {
+  error: unknown;
+  secrets: readonly (string | undefined)[];
+}): never {
+  const redacted = redactSecrets(errorMessage(error), secrets);
+  logger.error(
+    { error: redacted },
+    "lwql self-provisioning: failed to reconcile ClickHouse access model — aborting",
+  );
+  throw new Error(
+    `lwql self-provisioning: failed to reconcile ClickHouse access model: ${redacted}`,
+  );
+}
+
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: linear top-to-bottom provisioning sequence (Postgres views, grants, ClickHouse objects); splitting it would scatter the ordering it depends on.
 export default async function execute() {
   const connection = lwqlConnectionFromEnv();
@@ -305,13 +354,15 @@ export default async function execute() {
           "lwql self-provisioning: ClickHouse access model (user, profile, grants, row policies) and view grants reconciled",
         );
       } catch (error) {
-        // Log-and-continue, never crash boot: queries already fail closed via
-        // lwql_provisioning_incomplete when the access model is missing, so a
-        // ClickHouse hiccup here costs nothing extra in availability terms.
-        logger.error(
-          { error: errorMessage(error) },
-          "lwql self-provisioning: failed to reconcile ClickHouse access model",
-        );
+        // The DDL above embeds LWQL_CLICKHOUSE_PASSWORD and dials CLICKHOUSE_URL;
+        // both are stripped before anything is logged or re-thrown.
+        failClosedOnAccessModelReconciliation({
+          error,
+          secrets: [
+            process.env.LWQL_CLICKHOUSE_PASSWORD,
+            process.env.CLICKHOUSE_URL,
+          ],
+        });
       }
     }
   });
