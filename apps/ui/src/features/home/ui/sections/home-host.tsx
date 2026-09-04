@@ -19,6 +19,8 @@ import { readPublicAppConfig } from "../../../../behavior/public-config";
 import { isLangyDemoProject } from "../../../../behavior/langy-demo-project";
 import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
 import { useUiPrefersReducedMotion } from "../../../../behavior/ui-reduced-motion";
+import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
 
 /** The two Langy grants, and the rollout that reveals it at all. */
 const LANGY_VIEW_PERMISSION = "langy:view";
@@ -63,6 +65,14 @@ export function ProjectHomeHostSection({ children }: { children: ReactNode }) {
   const reducedMotion = useUiPrefersReducedMotion();
 
   const organizations = homeApi.organization.getAll.useQuery({ isDemo: false });
+
+  // A refused graph is a state, not an empty one: every value below is read
+  // off this query, so a host that only reported `isLoading` told the page it
+  // had settled with no organization and the page rendered nothing at all.
+  const failure = useUiShellFailure({
+    error: organizations.error,
+    fallbackTitle: "Couldn't load your organizations",
+  });
 
   const organization: ProjectHomeOrganization | undefined = useMemo(() => {
     const found = ((organizations.data ?? []) as OrganizationsRead).find(
@@ -133,6 +143,9 @@ export function ProjectHomeHostSection({ children }: { children: ReactNode }) {
       navigation,
     ],
   );
+
+  if (failure.departing) return <UiPageLoading />;
+  if (failure.copy) return <UiPageFailure copy={failure.copy} />;
 
   return <ProjectHomeHostProvider value={host}>{children}</ProjectHomeHostProvider>;
 }

@@ -12,7 +12,12 @@ import {
 } from "../../access-policy.js";
 import { createService, type ServiceBuilder } from "../builder.js";
 import type { RouteChain } from "../definition.js";
-import type { EndpointVariables, MountedRoute } from "../types.js";
+import {
+  ENDPOINT_ROUTE,
+  REQUEST_FAMILY,
+  type EndpointVariables,
+  type MountedRoute,
+} from "../types.js";
 import { registerRoutePolicy } from "./route-registry.js";
 
 /**
@@ -50,7 +55,11 @@ export interface RestApiServicePorts {
    * Every family mounts it, so no middleware or handler resolves a singleton.
    */
   readonly appContext: MiddlewareHandler;
-  /** The request logger, one instance per family. */
+  /**
+   * The request logger, mounted by every family. It writes ONE record per
+   * request whichever family's instance runs first, so a request through the
+   * twenty-one families sharing `/api` is still one line.
+   */
   readonly requestLogger: () => MiddlewareHandler;
   /** The server-span tracer, named for the family it wraps. */
   readonly requestTracer: (options: { name: string }) => MiddlewareHandler;
@@ -265,9 +274,10 @@ export class SecuredApp<E extends Env> {
 
     const bind = (method: HttpVerb | "head" | "all") => {
       return ((path: string, ...handlers: MiddlewareHandler[]) => {
+        const registeredPath = mergePath(this.basePath, path);
         registerRoutePolicy({
           method: method.toUpperCase(),
-          path: mergePath(this.basePath, path),
+          path: registeredPath,
           policy,
           family: this.family,
           credentialClass: this.publishedCredentialClass(policy),
@@ -285,19 +295,20 @@ export class SecuredApp<E extends Env> {
         // not 404s. The registration is kept because the policy it records is
         // what `generateOpenAPISpec` reads; the handler is decoration.
         // Asserted both ways in rest-api-service.unit.test.ts.
+        const stack = [this.stampRoute(method, registeredPath), ...chain, ...handlers];
         if (method === "head") {
           const on = this.hono.on as unknown as (
             method: string,
             path: string,
             ...handlers: MiddlewareHandler[]
           ) => unknown;
-          return on.call(this.hono, "HEAD", path, ...chain, ...handlers);
+          return on.call(this.hono, "HEAD", path, ...stack);
         }
         const verb = this.hono[method] as unknown as (
           path: string,
           ...handlers: MiddlewareHandler[]
         ) => unknown;
-        return verb.call(this.hono, path, ...chain, ...handlers);
+        return verb.call(this.hono, path, ...stack);
       }) as SecuredVerbs<E>[HttpVerb];
     };
 
@@ -309,6 +320,23 @@ export class SecuredApp<E extends Env> {
       delete: bind("delete"),
       head: bind("head"),
       all: bind("all"),
+    };
+  }
+
+  /**
+   * Names this family and the endpoint the request resolved to, built once per
+   * registration. Twenty-one families share the `/api` base path, so every one
+   * of their app-level middlewares runs for `/api/prompts` and only the route
+   * that matched can say which endpoint answered it. The request logger writes
+   * one record per request and reads both off the context.
+   */
+  private stampRoute(method: string, path: string): MiddlewareHandler {
+    const family = this.family;
+    const route = `${method.toUpperCase()} ${path}`;
+    return async (c, next) => {
+      c.set(REQUEST_FAMILY, family);
+      c.set(ENDPOINT_ROUTE, route);
+      await next();
     };
   }
 

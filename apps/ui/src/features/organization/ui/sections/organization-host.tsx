@@ -16,6 +16,8 @@ import { readPublicAppConfig } from "../../../../behavior/public-config";
 import { useUiCapabilities } from "../../../../behavior/ui-capabilities";
 import { downloadUiFile } from "../../../../behavior/ui-file-download";
 import { useUiOrganizationFacts } from "../../../../behavior/ui-organization-facts";
+import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
 import { UiProjectSwitcher } from "../../../chrome";
 
 /**
@@ -38,6 +40,14 @@ export function OrganizationHost({ children }: { children: ReactNode }) {
   const activeScope = session.activeScope();
 
   const organizations = organizationApi.organization.getAll.useQuery({ isDemo: false });
+
+  // A refused graph is a state, not an empty one: the organization, its teams
+  // and the active project are all read off this query, so every settings
+  // screen below rendered an empty document when it failed.
+  const failure = useUiShellFailure({
+    error: organizations.error,
+    fallbackTitle: "Couldn't load your organization",
+  });
 
   const organization: OrganizationReading | undefined = useMemo(() => {
     const found = (organizations.data ?? []).find(
@@ -124,6 +134,9 @@ export function OrganizationHost({ children }: { children: ReactNode }) {
       closeDrawer,
     ],
   );
+
+  if (failure.departing) return <UiPageLoading />;
+  if (failure.copy) return <UiPageFailure copy={failure.copy} />;
 
   return <OrganizationHostProvider value={host}>{children}</OrganizationHostProvider>;
 }

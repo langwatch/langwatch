@@ -71,6 +71,24 @@ Feature: A refused session read degrades to signed out
     Then the visitor is not sent anywhere
 
   @integration
+  Scenario: A refused organization graph sends an unauthenticated reader to sign in
+    Given the reader is on a route inside the organization shell
+    And the organization graph refuses because the caller is not authenticated
+    When the shell renders
+    Then the reader is sent to the sign-in screen
+    And the address they asked for is carried as the callback
+    And the shell it was mounted around is not rendered
+
+  @integration
+  Scenario: A refused organization graph renders its handled failure, never a blank page
+    Given the reader is on a route inside the organization shell
+    And the organization graph refuses with a named failure the reader can act on
+    When the shell renders
+    Then the copy registered for that failure code is shown
+    And the trace id is offered so the reader can quote it to support
+    And the reader is not sent anywhere
+
+  @integration
   Scenario: An offline visitor is not sent to sign in
     Given the session endpoint refuses the read
     And the browser reports it is offline

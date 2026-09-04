@@ -19,6 +19,9 @@
 import { Box, Center, Heading, HStack, Spinner, Stack, Text } from "@chakra-ui/react";
 import { Lock } from "lucide-react";
 
+import type { ResolvedUiFailureCopy } from "../../behavior/ui-feedback";
+import { UiErrorActions } from "./ui-error-actions";
+
 /** While the flags a page is behind have not answered. */
 export function UiPageLoading() {
   return (
@@ -71,6 +74,26 @@ export function UiPageForbidden({ permission }: { permission: string }) {
           </Stack>
         </HStack>
       </Box>
+    </Center>
+  );
+}
+
+/**
+ * When a read the page is built on refused. The words come from the code-keyed
+ * presentation registry, resolved by `resolveUiFailureCopy`; the trace id is
+ * the only technical detail shown, and is what a reader quotes to support.
+ */
+export function UiPageFailure({ copy }: { copy: ResolvedUiFailureCopy }) {
+  return (
+    <Center minHeight="60vh" padding={8}>
+      <Stack gap={3} align="center" maxWidth="480px" textAlign="center" role="alert">
+        <Heading size="lg">{copy.title}</Heading>
+        {copy.description && <Text color="fg.muted">{copy.description}</Text>}
+        <UiErrorActions
+          {...(copy.docsUrl ? { docsUrl: copy.docsUrl } : {})}
+          {...(copy.traceId ? { traceId: copy.traceId } : {})}
+        />
+      </Stack>
     </Center>
   );
 }

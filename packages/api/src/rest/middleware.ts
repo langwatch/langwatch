@@ -11,7 +11,7 @@ import type { Context, Next } from "hono";
 
 import { RESOLVED_ERROR, type ResolvedError } from "../errors.js";
 import { getSSECompletion } from "./sse.js";
-import { ENDPOINT_ROUTE } from "./types.js";
+import { ENDPOINT_ROUTE, REQUEST_FAMILY, REQUEST_LOG_CLAIM } from "./types.js";
 
 // ---------------------------------------------------------------------------
 // Tracer middleware
@@ -119,11 +119,20 @@ export function tracerMiddleware(options?: { name?: string }) {
  *
  * Sets up async context propagation so that downstream code can access
  * org/project/user context via `getCurrentContext()`.
+ *
+ * ONE record per request, whatever the mount looks like. Families are mounted
+ * side by side and twenty-one of them share the `/api` base path, so a request
+ * for `/api/prompts` runs twenty-one of these; the first to run claims the
+ * record and the rest pass straight through. Which family it belongs to comes
+ * from {@link REQUEST_FAMILY}, stamped by the stack that resolved the route.
  */
 export function loggerMiddleware(options?: { name?: string }) {
   const logger = createLogger(`langwatch:api:${options?.name ?? "hono"}`);
 
   return async (c: Context, next: Next): Promise<void> => {
+    if (c.get(REQUEST_LOG_CLAIM)) return next();
+    c.set(REQUEST_LOG_CLAIM, true);
+
     const ctx = {
       organizationId: c.get("organization")?.id,
       projectId: c.get("project")?.id,
@@ -167,6 +176,9 @@ export function loggerMiddleware(options?: { name?: string }) {
           // asking which endpoint is failing. Absent for anything that never
           // reached an endpoint stack: a 404, or a version-namespace guard.
           const route = c.get(ENDPOINT_ROUTE) as string | undefined;
+          // The family that resolved the route, which is not the family whose
+          // logger claimed the record when several share a base path.
+          const family = (c.get(REQUEST_FAMILY) as string | undefined) ?? options?.name;
 
           logHttpRequest(logger, {
             method: c.req.method,
@@ -177,6 +189,7 @@ export function loggerMiddleware(options?: { name?: string }) {
             error: requestError,
             extra: {
               ...(route ? { route } : {}),
+              ...(family ? { family } : {}),
               ...(resolved?.traceId ? { traceId: resolved.traceId } : {}),
             },
           });

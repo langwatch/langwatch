@@ -80,6 +80,24 @@ export const ENDPOINT_ROUTE = "endpointRoute" as const;
 /** Context key holding the complete validated input passed to a regular handler. */
 export const ENDPOINT_INPUT = "endpointInput" as const;
 
+/**
+ * Context key holding the family that actually resolved the request.
+ *
+ * Stamped by the route stack, not by the mount, because twenty-one families
+ * share the `/api` base path: every one of their app-level middlewares matches
+ * `/api/prompts`, and only the one owning the route ever reaches its handler.
+ */
+export const REQUEST_FAMILY = "requestFamily" as const;
+
+/**
+ * Context key marking that a request log record is already owed for this
+ * request. See {@link REQUEST_FAMILY}: a request passing through twenty-one
+ * mounted families passed through twenty-one request loggers and wrote
+ * twenty-one identical lines. The outermost one owns the record; the rest
+ * stand down.
+ */
+export const REQUEST_LOG_CLAIM = "requestLogClaim" as const;
+
 // ---------------------------------------------------------------------------
 // Base app context (provider factories)
 // ---------------------------------------------------------------------------

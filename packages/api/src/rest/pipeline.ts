@@ -30,7 +30,7 @@ import {
 } from "./public-rest-input.js";
 import { serializeEndpointResult } from "./response.js";
 import { createSSEResponse } from "./sse.js";
-import { ENDPOINT_INPUT, ENDPOINT_ROUTE } from "./types.js";
+import { ENDPOINT_INPUT, ENDPOINT_ROUTE, REQUEST_FAMILY } from "./types.js";
 import type {
   BaseApp,
   EndpointDef,
@@ -295,6 +295,7 @@ function versionContextMiddleware({
 
   return async (c, next) => {
     c.set(ENDPOINT_ROUTE, route);
+    c.set(REQUEST_FAMILY, serviceConfig.name);
     const staticVersioning = serviceConfig.publicRest?.staticVersioning;
     const staticSelection = staticVersioning?.selector.select({
       pathVersion: staticVersioning.pathVersion,

@@ -76,6 +76,7 @@ export class StorageStatsCollectionService {
 
   private timer: ReturnType<typeof setInterval> | undefined;
   private backupsFailing = false;
+  private backupLogAbsent = false;
 
   private constructor(private readonly options: StorageStatsCollectionOptions) {}
 
@@ -232,14 +233,26 @@ export class StorageStatsCollectionService {
         });
       }
 
-      if (this.backupsFailing) {
+      if (this.backupsFailing || this.backupLogAbsent) {
         logger.info({ instance: instance.target }, "ClickHouse backup stats collection recovered");
         this.backupsFailing = false;
+        this.backupLogAbsent = false;
       }
     } catch (error) {
-      // Edge-triggered: only deployments that opted in reach here and they
-      // care, but the table is transiently unavailable across a restart and a
+      // Collection is opt-OUT (`CLICKHOUSE_BACKUP_METRICS_ENABLED`), so a
+      // deployment that never took a backup reaches here with no table to
+      // read. That absence is a fact about the instance, not a fault: it is
+      // named once at info. A real failure is still edge-triggered, because a
       // warning every fifteen seconds would bury the one that matters.
+      if (isMissingBackupLog(error)) {
+        if (this.backupLogAbsent) return;
+        logger.info(
+          { instance: instance.target },
+          "ClickHouse has no system.backup_log, so no backup status is collected; this instance has never taken a backup",
+        );
+        this.backupLogAbsent = true;
+        return;
+      }
       if (this.backupsFailing) {
         logger.debug({ error }, "failed to collect ClickHouse backup stats");
         return;
@@ -251,4 +264,18 @@ export class StorageStatsCollectionService {
       this.backupsFailing = true;
     }
   }
+}
+
+/**
+ * Whether ClickHouse refused because `system.backup_log` is not there.
+ *
+ * The table is created by the first backup, so an instance that has never
+ * taken one answers `UNKNOWN_TABLE` (error code 60) rather than failing.
+ */
+function isMissingBackupLog(error: unknown): boolean {
+  const detail = error as { code?: unknown; type?: unknown; message?: unknown };
+  if (detail?.type === "UNKNOWN_TABLE" || String(detail?.code) === "60") return true;
+  return /UNKNOWN_TABLE|Table system\.backup_log (does not|doesn't) exist/i.test(
+    typeof detail?.message === "string" ? detail.message : "",
+  );
 }
