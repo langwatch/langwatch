@@ -39,7 +39,7 @@ extra turns and the extra model calls, and make one change in the prompt, the to
 or the code for me to evaluate. Change nothing else.
 ```
 
-Langy answers with a pull request, and the suite runs in your CI on it; your coding agent answers with the change in your working tree. Both come with the cause and the conversations it was found in, so you review the reasoning and the diff together.
+The agent comes back with a hypothesis, the conversations it was found in, and the change that follows from it, and the next step proves with the suite whether the change made the agent better.
 
 The hypothesis usually lands on one of a few causes, and it helps to recognise them when you read the proposal:
 
