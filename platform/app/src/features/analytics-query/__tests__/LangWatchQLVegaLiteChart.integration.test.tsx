@@ -514,7 +514,7 @@ describe("the LangWatchQL Vega-Lite chart", () => {
       ).not.toContain("secret-value");
     });
 
-    /** @scenario "A chart over too much data refuses clearly and leaves the table available" */
+    /** @scenario "A result past the row ceiling is refused clearly, naming the limit it crossed" */
     it("refuses a result past the row ceiling, naming the limit it crossed", async () => {
       const tooMany: LangWatchQLDataset = Array.from(
         { length: 10_001 },

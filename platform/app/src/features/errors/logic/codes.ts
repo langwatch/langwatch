@@ -236,6 +236,7 @@ export const APP_ERROR_CODES = [
   "lwql_not_enabled",
   "lwql_not_permitted",
   "lwql_parameter_missing",
+  "lwql_provisioning_incomplete",
   "lwql_reserved_parameter_supplied",
   "lwql_reserved_parameter_type",
   "lwql_unavailable",

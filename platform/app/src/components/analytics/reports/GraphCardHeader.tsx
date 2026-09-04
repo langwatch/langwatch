@@ -1,14 +1,14 @@
 import { Box, Button, HStack, Spacer, Text } from "@chakra-ui/react";
-import type { DraggableAttributes } from "@dnd-kit/core";
-import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import { Bell } from "lucide-react";
 import { useMemo } from "react";
 import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
 import { deriveSeriesIdentifier } from "~/components/analytics/seriesIdentifier";
 import { Tooltip } from "~/components/ui/tooltip";
+import { EditableWidgetName } from "~/features/custom-chart-playground/EditableWidgetName";
 import { useDrawer } from "~/hooks/useDrawer";
 import type { FilterField } from "~/server/filters/types";
-import { GraphCardMenu, type SizeOption } from "./GraphCardMenu";
+import { CHART_GRID_DRAG_HANDLE_CLASS } from "./ChartGrid";
+import { GraphCardMenu } from "./GraphCardMenu";
 import { GraphFilterIndicator } from "./GraphFilterIndicator";
 
 const stripPackPrefix = (n: string) =>
@@ -21,8 +21,6 @@ interface GraphCardHeaderProps {
   projectId: string;
   projectSlug: string;
   dashboardId?: string;
-  colSpan: number;
-  rowSpan: number;
   filters: unknown;
   trigger?: {
     id: string;
@@ -35,10 +33,16 @@ interface GraphCardHeaderProps {
   isDashboardWidget?: boolean;
   /** The datapoint step a workbench card runs at, when it has one stored. */
   granularitySeconds?: number;
-  isDragging: boolean;
-  dragAttributes: DraggableAttributes;
-  dragListeners: SyntheticListenerMap | undefined;
-  onSizeChange: (size: SizeOption) => void;
+  /**
+   * When present, Edit runs this instead of navigating away — passed
+   * straight through to `GraphCardMenu`.
+   */
+  onEdit?: () => void;
+  /**
+   * Renames the widget directly from the card title. Only meaningful when
+   * `isDashboardWidget` — the title stays plain, static text otherwise.
+   */
+  onRename?: (name: string) => void;
   onGranularityChange?: (granularitySeconds: number) => void;
   onDelete: () => void;
   isDeleting: boolean;
@@ -51,17 +55,13 @@ export function GraphCardHeader({
   projectId,
   projectSlug,
   dashboardId,
-  colSpan,
-  rowSpan,
   filters,
   trigger,
   isWorkbenchChart = false,
   isDashboardWidget = false,
   granularitySeconds,
-  isDragging,
-  dragAttributes,
-  dragListeners,
-  onSizeChange,
+  onEdit,
+  onRename,
   onGranularityChange,
   onDelete,
   isDeleting,
@@ -136,16 +136,35 @@ export function GraphCardHeader({
   };
 
   return (
+    // The header is the card's drag handle — the grid only starts a move
+    // from this class, so the chart body below never does.
     <HStack
-      {...dragAttributes}
-      {...dragListeners}
+      className={CHART_GRID_DRAG_HANDLE_CLASS}
       align="center"
-      marginBottom={2}
-      cursor={isDragging ? "grabbing" : "grab"}
+      marginBottom={1}
+      cursor="grab"
+      _active={{ cursor: "grabbing" }}
     >
-      <Text fontSize="13px" fontWeight="500" lineClamp={1} title={displayName}>
-        {stripPackPrefix(displayName)}
-      </Text>
+      {isDashboardWidget && onRename ? (
+        <EditableWidgetName
+          name={displayName}
+          displayText={stripPackPrefix(displayName)}
+          id={graphId}
+          onRename={onRename}
+          fontSize="13px"
+          fontWeight="500"
+          truncate
+        />
+      ) : (
+        <Text
+          fontSize="13px"
+          fontWeight="500"
+          lineClamp={1}
+          title={displayName}
+        >
+          {stripPackPrefix(displayName)}
+        </Text>
+      )}
       <Spacer />
 
       {isSavedGraph && (
@@ -222,12 +241,10 @@ export function GraphCardHeader({
         projectId={projectId}
         projectSlug={projectSlug}
         dashboardId={dashboardId}
-        colSpan={colSpan}
-        rowSpan={rowSpan}
         isWorkbenchChart={isWorkbenchChart}
         isDashboardWidget={isDashboardWidget}
         {...(granularitySeconds === undefined ? {} : { granularitySeconds })}
-        onSizeChange={onSizeChange}
+        {...(onEdit ? { onEdit } : {})}
         {...(onGranularityChange ? { onGranularityChange } : {})}
         onDelete={onDelete}
         isDeleting={isDeleting}

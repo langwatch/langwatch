@@ -80,9 +80,7 @@ const configureTypeScriptDefaults: BeforeMount = (monaco) => {
 /** Matches ClickHouse bound-param tokens like `{dashboard_context_period_start:DateTime}`. */
 const BOUND_PARAM_PATTERN = /\{([A-Za-z_][A-Za-z0-9_]*):[A-Za-z0-9_]+\}/g;
 
-const RESERVED_PARAM_NAMES = new Set<string>(
-  RESERVED_PARAMETERS.map((p) => p.name),
-);
+const RESERVED_PARAM_NAMES = new Set(RESERVED_PARAMETERS.map((p) => p.name));
 
 const PARAM_TOKEN_CLASS_RESERVED = "lw-sql-param-reserved";
 const PARAM_TOKEN_CLASS_DECLARED = "lw-sql-param-declared";
@@ -135,7 +133,6 @@ export function DashboardWidgetCodeEditor({
   const updateDecorations = useRef(() => {
     // placeholder until the real implementation is assigned below
   });
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: walks the editor model line-by-line applying several independent decoration rules; the branches don't interact.
   updateDecorations.current = () => {
     const ed = editorRef.current;
     if (!ed || language !== "sql") return;

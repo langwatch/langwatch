@@ -1,8 +1,10 @@
 /**
  * The drawer's Queries tab: every query the widget declares, as an accordion
- * of `DashboardWidgetQueryRow`s plus "+ Add query". No save affordance of its own
- * — Code and Queries edit one persisted record, so the drawer's own Footer
- * is the single Save for both tabs.
+ * of `DashboardWidgetQueryRow`s, the first one open by default. No save
+ * affordance of its own — Code and Queries edit one persisted record, so the
+ * drawer's own Footer is the single Save for both tabs. "+ Add query" lives
+ * in the drawer's tab bar (`DashboardWidgetEditDrawer`), inline with
+ * "Code" / "Queries (N)", not here — `nextQueryName` is exported for it.
  *
  * Holds no execution state of its own — `lastRuns` and `onRun` come from the
  * card's `useDashboardWidgetExecutor`, the same instance the live chart
@@ -10,9 +12,8 @@
  * of whether the chart or this tab's own Run button produced it.
  */
 
-import { Accordion, Button, VStack } from "@chakra-ui/react";
-import { Plus } from "lucide-react";
-import { useState } from "react";
+import { Accordion, VStack } from "@chakra-ui/react";
+import { useEffect, useRef, useState } from "react";
 
 import type { DashboardWidgetQuery } from "~/server/analytics/dashboardWidgetDefinition";
 
@@ -20,7 +21,7 @@ import { DashboardWidgetQueryRow } from "./DashboardWidgetQueryRow";
 import type { QueryLastRun } from "./useDashboardWidgetExecutor";
 
 /** The name a newly-added query gets, deduped against its siblings. */
-function nextQueryName(existing: DashboardWidgetQuery[]): string {
+export function nextQueryName(existing: DashboardWidgetQuery[]): string {
   const taken = new Set(existing.map((q) => q.name));
   let n = existing.length + 1;
   while (taken.has(`query${n}`)) n += 1;
@@ -75,12 +76,43 @@ export function DashboardWidgetQueriesPanel({
     }
   };
 
+  // The row's own value in the accordion — index-based, matching the key
+  // below: a name mid-rename must not detach a row from its open/closed state.
+  const valueOf = (index: number) => String(index);
+
+  // Opens the first query by default — a drawer landing on this tab with
+  // every row collapsed makes a member click through before they see any
+  // SQL at all. Controlled (not defaultValue): DashboardWidgetQueryRow reads
+  // this same state to pick its own chevron — Chakra's built-in indicator
+  // applies no rotation here (`transform: none` in both states, verified),
+  // so the open/closed icon has to be driven explicitly rather than left to
+  // the framework.
+  const [openValues, setOpenValues] = useState<string[]>(
+    queries.length > 0 ? [valueOf(0)] : [],
+  );
+
+  // "+ Add query" (in the drawer's tab bar) appends straight to `queries` —
+  // this panel doesn't own that action, so it notices the addition here
+  // instead: a growing list opens the new (last) row and collapses whatever
+  // was open before, so a member typing a new query isn't left hunting for
+  // it under an already-open sibling.
+  const previousLengthRef = useRef(queries.length);
+  useEffect(() => {
+    if (queries.length > previousLengthRef.current) {
+      setOpenValues([valueOf(queries.length - 1)]);
+    }
+    previousLengthRef.current = queries.length;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queries.length]);
+
   return (
     <VStack align="stretch" gap={2} width="full" height="full" minHeight={0}>
       <Accordion.Root
         variant="plain"
         multiple
         collapsible
+        value={openValues}
+        onValueChange={(e) => setOpenValues(e.value)}
         flex={1}
         minHeight={0}
         overflowY="auto"
@@ -90,6 +122,8 @@ export function DashboardWidgetQueriesPanel({
             // Index, not name: a row mid-rename (typing toward a duplicate,
             // or briefly blank) must not remount and lose editor focus.
             key={index}
+            value={valueOf(index)}
+            isOpen={openValues.includes(valueOf(index))}
             query={query}
             nameError={
               dupes.has(query.name)
@@ -111,17 +145,6 @@ export function DashboardWidgetQueriesPanel({
           />
         ))}
       </Accordion.Root>
-
-      <Button
-        size="xs"
-        variant="ghost"
-        alignSelf="flex-start"
-        onClick={() =>
-          onChange([...queries, { name: nextQueryName(queries), sql: "" }])
-        }
-      >
-        <Plus size={14} /> Add query
-      </Button>
     </VStack>
   );
 }

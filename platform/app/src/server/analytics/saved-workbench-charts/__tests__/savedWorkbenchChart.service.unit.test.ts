@@ -656,8 +656,9 @@ describe("placing a saved workbench chart on a dashboard", () => {
         // and row 1 are already taken".
         expect(placed.gridRow).toBe(2);
         expect(placed.gridColumn).toBe(0);
-        expect(placed.colSpan).toBe(1);
-        expect(placed.rowSpan).toBe(1);
+        // The grid's default footprint: half the row wide, three rows tall.
+        expect(placed.colSpan).toBe(4);
+        expect(placed.rowSpan).toBe(3);
       });
     });
   });
@@ -677,11 +678,9 @@ describe("placing a saved workbench chart on a dashboard", () => {
           projectId: PROJECT_ID,
           input: {
             dashboardId: "dashboard-1",
-            // gridColumn 1 + colSpan 1 is the widest column placement the
-            // 2-column grid still accepts at gridColumn 1 (see placementSchema's
-            // cross-field refine) — chosen so gridColumn, gridRow and rowSpan
-            // each start away from their post-unplace default and the
-            // assertions below actually prove they were cleared.
+            // Chosen so gridColumn, gridRow and rowSpan each start away from
+            // their post-unplace default and the assertions below actually
+            // prove they were cleared.
             gridColumn: 1,
             gridRow: 3,
             colSpan: 1,

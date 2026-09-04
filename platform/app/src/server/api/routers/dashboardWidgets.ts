@@ -19,6 +19,13 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 
 import type { Prisma } from "~/generated/prisma/client";
+import {
+  CHART_GRID_DEFAULT_COL_SPAN,
+  CHART_GRID_DEFAULT_ROW_SPAN,
+  chartGridBottomRow,
+  chartGridPlacementSchema,
+  fitsChartGridWidth,
+} from "~/server/analytics/chartGrid";
 import { DASHBOARD_SRCDOC_CHART_KIND } from "~/server/analytics/chartKinds";
 import { DashboardWidgetService } from "~/server/analytics/dashboard-widgets/dashboardWidget.service";
 import {
@@ -30,11 +37,11 @@ import {
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { enforceCustomChartPlaygroundEnabled } from "./dashboardWidgetAccessMiddleware";
 
-const layoutSchema = z.object({
-  gridColumn: z.number().min(0).max(1),
-  gridRow: z.number().min(0),
-  colSpan: z.number().min(1).max(2),
-  rowSpan: z.number().min(1).max(2),
+// A card's column and span pass their own bounds and still overflow the grid
+// together; refused here rather than clipped by the grid that reads it.
+const layoutSchema = chartGridPlacementSchema.refine(fitsChartGridWidth, {
+  message: "gridColumn + colSpan must not exceed the grid's columns",
+  path: ["colSpan"],
 });
 
 const graphOf = (input: {
@@ -74,14 +81,13 @@ export const dashboardWidgetsRouter = createTRPCRouter({
     .permission("analytics:create")
     .use(enforceCustomChartPlaygroundEnabled)
     .mutation(async ({ ctx, input }) => {
-      // Next free row: one below the lowest dashboard widget in the project.
-      const last = await ctx.prisma.customGraph.findFirst({
+      // Next free row: just below the lowest dashboard widget in the project.
+      const existing = await ctx.prisma.customGraph.findMany({
         where: {
           projectId: input.projectId,
           kind: DASHBOARD_SRCDOC_CHART_KIND,
         },
-        orderBy: { gridRow: "desc" },
-        select: { gridRow: true },
+        select: { gridRow: true, rowSpan: true },
       });
 
       return await ctx.prisma.customGraph.create({
@@ -93,9 +99,9 @@ export const dashboardWidgetsRouter = createTRPCRouter({
           graph: graphOf({ code: input.code, queries: input.queries }),
           ...(input.dashboardId ? { dashboardId: input.dashboardId } : {}),
           gridColumn: 0,
-          gridRow: last ? last.gridRow + 1 : 0,
-          colSpan: 1,
-          rowSpan: 1,
+          gridRow: chartGridBottomRow(existing),
+          colSpan: CHART_GRID_DEFAULT_COL_SPAN,
+          rowSpan: CHART_GRID_DEFAULT_ROW_SPAN,
         },
       });
     }),
@@ -131,7 +137,7 @@ export const dashboardWidgetsRouter = createTRPCRouter({
     .input(
       z
         .object({ projectId: z.string(), graphId: z.string() })
-        .merge(layoutSchema),
+        .and(layoutSchema),
     )
     .permission("analytics:update")
     .use(enforceCustomChartPlaygroundEnabled)
@@ -156,7 +162,7 @@ export const dashboardWidgetsRouter = createTRPCRouter({
     .input(
       z.object({
         projectId: z.string(),
-        layouts: z.array(z.object({ graphId: z.string() }).merge(layoutSchema)),
+        layouts: z.array(z.object({ graphId: z.string() }).and(layoutSchema)),
       }),
     )
     .permission("analytics:update")

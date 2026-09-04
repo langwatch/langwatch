@@ -13,7 +13,8 @@
  * also where the executor and the debounce that feeds it live.
  */
 
-import { Box, Button, Tabs } from "@chakra-ui/react";
+import { Box, Button, Spacer, Tabs } from "@chakra-ui/react";
+import { Plus } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Drawer } from "~/components/ui/drawer";
@@ -22,14 +23,20 @@ import type { DashboardWidgetQuery } from "~/server/analytics/dashboardWidgetDef
 import { DashboardWidgetCodeEditor } from "./DashboardWidgetCodeEditor";
 import {
   DashboardWidgetQueriesPanel,
+  nextQueryName,
   queryNamesAreValid,
 } from "./DashboardWidgetQueriesPanel";
+import { EditableWidgetName } from "./EditableWidgetName";
 import type { QueryLastRun } from "./useDashboardWidgetExecutor";
 
 interface DashboardWidgetEditDrawerProps {
   open: boolean;
   /** The live chart preview, already built by the card — null while closed. */
   chart: ReactNode;
+  /** Omitted before the first Save — a widget that doesn't exist yet has no id. */
+  id?: string;
+  name: string;
+  onNameChange: (name: string) => void;
   code: string;
   queries: DashboardWidgetQuery[];
   onCodeChange: (code: string) => void;
@@ -47,6 +54,9 @@ interface DashboardWidgetEditDrawerProps {
 export function DashboardWidgetEditDrawer({
   open,
   chart,
+  id,
+  name,
+  onNameChange,
   code,
   queries,
   onCodeChange,
@@ -72,7 +82,12 @@ export function DashboardWidgetEditDrawer({
     >
       <Drawer.Content display="flex" flexDirection="column">
         <Drawer.Header>
-          <Drawer.Title>Edit widget</Drawer.Title>
+          <EditableWidgetName
+            name={name}
+            id={id}
+            onRename={onNameChange}
+            fontSize="md"
+          />
         </Drawer.Header>
         <Drawer.CloseTrigger />
         <Drawer.Body
@@ -89,19 +104,43 @@ export function DashboardWidgetEditDrawer({
           <Tabs.Root
             value={activeTab}
             onValueChange={(e) => onTabChange(e.value as "code" | "queries")}
-            variant="line"
+            colorPalette="orange"
             size="sm"
             display="flex"
             flexDirection="column"
             flex={1}
             minHeight={0}
           >
-            <Tabs.List flexShrink={0}>
+            {/* Same Tabs setup as the HTTP agent's Body/Auth toggle
+                (`components/agents/http/HttpConfigEditor.tsx`) — a bottom
+                border on the list plus `colorPalette` is enough for Chakra's
+                own recipe to show the selected tab; no hand-rolled
+                `Tabs.Indicator`. */}
+            <Tabs.List
+              flexShrink={0}
+              alignItems="center"
+              borderBottomWidth="1px"
+              borderColor="border"
+            >
               <Tabs.Trigger value="code">Code</Tabs.Trigger>
               <Tabs.Trigger value="queries">
                 Queries ({queries.length})
               </Tabs.Trigger>
-              <Tabs.Indicator />
+              <Spacer />
+              {activeTab === "queries" && (
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  onClick={() =>
+                    onQueriesChange([
+                      ...queries,
+                      { name: nextQueryName(queries), sql: "" },
+                    ])
+                  }
+                >
+                  <Plus size={14} /> Add query
+                </Button>
+              )}
             </Tabs.List>
 
             <Tabs.Content

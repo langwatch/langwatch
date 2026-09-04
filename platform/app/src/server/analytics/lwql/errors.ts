@@ -61,10 +61,14 @@ export class LangWatchQLNotEnabledError extends HandledError {
  *
  * Two ways to arrive here, one condition: the deployment configured no
  * restricted identity at all (no executor is built), or it configured one but
- * the database objects the catalog promises — the views, the grants — are not
- * there for it (the server answers UNKNOWN_TABLE / UNKNOWN_DATABASE /
- * ACCESS_DENIED for a name the validator already approved, so it cannot be
- * the caller's SQL; see `executor.ts`).
+ * the database objects the catalog promises are not there at all for it (the
+ * server answers UNKNOWN_TABLE / UNKNOWN_DATABASE for a name the validator
+ * already approved, so it cannot be the caller's SQL; see `executor.ts`).
+ *
+ * An ACCESS_DENIED refusal is deliberately NOT one of the two — that means
+ * the objects exist but this identity's grants on one are incomplete, a
+ * narrower condition than "not provisioned" that gets its own code and copy:
+ * {@link LangWatchQLProvisioningIncompleteError}.
  *
  * Fail-closed, and the reason this is an error rather than a fallback: without
  * the restricted identity there is no identity to run a customer's SQL as
@@ -140,6 +144,44 @@ export class LangWatchQLUnknownIdentifierError extends HandledError {
       },
     );
     this.name = "LangWatchQLUnknownIdentifierError";
+  }
+}
+
+/**
+ * The execution path IS provisioned — the restricted identity connects, and
+ * the catalog's views and tables mostly exist for it — but this query hit a
+ * ClickHouse access refusal (`ACCESS_DENIED`) rather than a missing object
+ * (`UNKNOWN_TABLE` / `UNKNOWN_DATABASE`).
+ *
+ * Split from {@link LangWatchQLUnavailableError} on purpose: that code's copy
+ * tells the caller to ask their *own* workspace administrator, which is
+ * correct for a self-hosted deployment that never provisioned LangWatchQL at
+ * all, but wrong here — an access refusal on an otherwise-working deployment
+ * means our own grants are incomplete for one catalog object, something no
+ * customer's administrator can act on. Sending them to their admin anyway
+ * both wastes their time and hides a real provisioning gap behind "config the
+ * customer owns."
+ *
+ * Still `platform` fault, 503, and still fail-closed for the same reason:
+ * ACCESS_DENIED for a name the validator already approved cannot be the
+ * caller's SQL (see `executor.ts`), and it is not safe to retry as a
+ * different identity.
+ */
+export class LangWatchQLProvisioningIncompleteError extends HandledError {
+  declare readonly code: "lwql_provisioning_incomplete";
+
+  constructor(options: { reasons?: readonly Error[] } = {}) {
+    super(
+      "lwql_provisioning_incomplete",
+      "The LangWatchQL analytics SQL API could not read one of the datasets this query needs.",
+      {
+        httpStatus: 503,
+        fault: "platform",
+        ...remediation("lwql_provisioning_incomplete"),
+        ...options,
+      },
+    );
+    this.name = "LangWatchQLProvisioningIncompleteError";
   }
 }
 

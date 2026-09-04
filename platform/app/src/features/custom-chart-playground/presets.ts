@@ -55,10 +55,10 @@ export default function Widget() {
       <div style={{ fontSize: "11px", color: "#666", marginBottom: 4, flexShrink: 0 }}>{status}</div>
       <div style={{ flex: 1, minHeight: 0 }}>
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={rows}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="bucket" tick={{ fontSize: 10 }} />
-            <YAxis allowDecimals={false} />
+          <BarChart data={rows} margin={{ top: 6, right: 8, bottom: 0, left: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+            <XAxis dataKey="bucket" axisLine={false} tickLine={false} tick={{ fontSize: 10 }} />
+            <YAxis allowDecimals={false} axisLine={false} tickLine={false} width={48} tick={{ fontSize: 11 }} />
             <Tooltip />
             <Bar dataKey="events" fill="#f97316" />
           </BarChart>

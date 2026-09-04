@@ -29,6 +29,11 @@ import type {
   Prisma,
   PrismaClient,
 } from "~/generated/prisma/client";
+import {
+  CHART_GRID_DEFAULT_COL_SPAN,
+  CHART_GRID_DEFAULT_ROW_SPAN,
+  chartGridBottomRow,
+} from "~/server/analytics/chartGrid";
 import { DASHBOARD_SRCDOC_CHART_KIND } from "~/server/analytics/chartKinds";
 import {
   DASHBOARD_WIDGET_DEFINITION_VERSION,
@@ -171,10 +176,9 @@ export class DashboardWidgetService {
     projectId: string;
     input: { name: string } & DashboardWidgetDefinitionInput;
   }): Promise<DashboardWidget> {
-    const last = await this.prisma.customGraph.findFirst({
+    const existing = await this.prisma.customGraph.findMany({
       where: { projectId, kind: DASHBOARD_SRCDOC_CHART_KIND },
-      orderBy: { gridRow: "desc" },
-      select: { gridRow: true },
+      select: { gridRow: true, rowSpan: true },
     });
 
     const row = await this.prisma.customGraph.create({
@@ -185,9 +189,9 @@ export class DashboardWidgetService {
         kind: DASHBOARD_SRCDOC_CHART_KIND,
         graph: graphOf(input),
         gridColumn: 0,
-        gridRow: last ? last.gridRow + 1 : 0,
-        colSpan: 1,
-        rowSpan: 1,
+        gridRow: chartGridBottomRow(existing),
+        colSpan: CHART_GRID_DEFAULT_COL_SPAN,
+        rowSpan: CHART_GRID_DEFAULT_ROW_SPAN,
       },
     });
     return this.present(row);
@@ -258,17 +262,16 @@ export class DashboardWidgetService {
   }): Promise<DashboardWidget> {
     // Next free row on the TARGET dashboard across every kind (gridRow is shared
     // between the widget-authoring grid and dashboard grid — accepted prototype coupling).
-    const last = await this.prisma.customGraph.findFirst({
+    const onDashboard = await this.prisma.customGraph.findMany({
       where: { projectId, dashboardId },
-      orderBy: { gridRow: "desc" },
-      select: { gridRow: true },
+      select: { gridRow: true, rowSpan: true },
     });
     await this.prisma.customGraph.updateMany({
       where: { id, projectId, kind: DASHBOARD_SRCDOC_CHART_KIND },
       data: {
         dashboardId,
         gridColumn: 0,
-        gridRow: last ? last.gridRow + 1 : 0,
+        gridRow: chartGridBottomRow(onDashboard),
         // colSpan/rowSpan intentionally untouched — keep the widget's size.
       },
     });

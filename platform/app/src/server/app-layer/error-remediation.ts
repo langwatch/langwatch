@@ -210,6 +210,12 @@ const registry = {
       "Contact support to have it enabled for this workspace",
     ],
   },
+  lwql_provisioning_incomplete: {
+    tips: [
+      "The deployment's LangWatchQL access is provisioned, but the identity's grants on one dataset this query needs are incomplete",
+      "This is a platform-side gap, not a per-workspace setting; retry shortly, and contact support if it persists",
+    ],
+  },
   page_too_deep: {
     tips: [
       "Narrow the time range or filters so the page falls inside the window",

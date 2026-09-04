@@ -450,6 +450,15 @@ const presentations = {
     describe: () =>
       "This feature isn't switched on for this workspace yet. Ask your workspace administrator to enable it, or contact support.",
   },
+  lwql_provisioning_incomplete: {
+    // Deliberately does NOT name the workspace administrator: unlike
+    // lwql_unavailable, this fires on a deployment where the feature IS
+    // provisioned and working — one dataset behind it is not fully readable
+    // yet, which is entirely on us, not something a customer's admin can fix.
+    title: "This query couldn't read one of its datasets",
+    describe: () =>
+      "This is a temporary gap on our side, not a setting in your workspace. Try again shortly, or contact support if it persists.",
+  },
   cli_key_selection_invalid: {
     title: "Check the access selection",
     describe: (error) => {
@@ -1110,6 +1119,16 @@ const presentations = {
     title: "Dashboard graph editing is off while the playground is on",
     describe: () =>
       "This project has the custom chart playground enabled, which turns off creating or editing dashboard graphs. Use the playground to build a chart instead.",
+  },
+  dashboard_widget_definition_invalid: {
+    title: "This widget couldn't be read",
+    describe: () =>
+      "The stored definition of this dashboard widget is not in a shape we can load. This is on our side, not something you changed; contact support with the widget name so we can repair it.",
+  },
+  dashboard_widget_not_found: {
+    title: "Dashboard widget not found",
+    describe: () =>
+      "This widget no longer exists in the project. It may have been deleted; refresh the dashboard to see the current set.",
   },
   custom_role_not_found: {
     title: "Custom role not found",

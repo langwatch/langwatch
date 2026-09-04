@@ -3,9 +3,9 @@
  * sandboxed chart frame wired to the real LangWatchQL endpoint.
  *
  * "+ New widget" persists a blank widget immediately (starter code + query).
- * Widgets live in the same 2-column grid the reports dashboard uses — drag to
- * reorder, pick a size preset, delete, flip a card to Code to edit its file
- * in place, or edit both the file and its queries in a drawer. The
+ * Widgets live on the same grid the reports dashboard uses — drag a header to
+ * move, drag a corner to resize, delete, or edit the file and its queries in
+ * a drawer. The
  * frame's bridge tears itself down after ~10s of missed heartbeats (paused
  * while the tab is hidden), so widgets stay mounted while the page is up; a
  * Save re-keys only the touched frame.
@@ -13,12 +13,10 @@
 
 import { Box, Button, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
-import type { SizeOption } from "~/components/analytics/reports/GraphCardMenu";
-import { sizeOptions } from "~/components/analytics/reports/GraphCardMenu";
 import { toaster } from "~/components/ui/toaster";
+import type { ChartGridPlacement } from "~/server/analytics/chartGrid";
 import { dashboardWidgetDefinitionSchema } from "~/server/analytics/dashboardWidgetDefinition";
 import { api } from "~/utils/api";
-import { calculateGridPositions, type GridLayout } from "~/utils/gridPositions";
 
 import type { DashboardWidget } from "./DashboardWidgetCard";
 import { DashboardWidgetGrid } from "./DashboardWidgetGrid";
@@ -60,8 +58,6 @@ function toWidget(row: {
 const showError = (title: string) =>
   toaster.create({ title, type: "error", duration: 3000 });
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: top-level playground component wiring several independent hooks/handlers (query state, execution, save, navigation); the branches don't interact.
-// biome-ignore lint/complexity/noExcessiveLinesPerFunction: top-level playground component assembling several independently-scoped panels.
 export function CustomChartPlayground({
   projectId,
   projectSlug,
@@ -88,7 +84,6 @@ export function CustomChartPlayground({
   const createWidget = api.dashboardWidgets.create.useMutation();
   const updateWidget = api.dashboardWidgets.update.useMutation();
   const deleteWidget = api.dashboardWidgets.delete.useMutation();
-  const updateLayout = api.dashboardWidgets.updateLayout.useMutation();
   const batchUpdateLayouts =
     api.dashboardWidgets.batchUpdateLayouts.useMutation();
 
@@ -120,47 +115,12 @@ export function CustomChartPlayground({
     );
   };
 
-  const handleSizeChange = (id: string, size: SizeOption) => {
-    const sizeConfig = sizeOptions.find((s) => s.value === size);
-    const widget = widgets.find((w) => w.id === id);
-    if (!sizeConfig || !widget) return;
-
-    updateLayout.mutate(
-      {
-        projectId,
-        graphId: id,
-        gridColumn: widget.gridColumn,
-        gridRow: widget.gridRow,
-        colSpan: sizeConfig.colSpan,
-        rowSpan: sizeConfig.rowSpan,
-      },
-      {
-        onSuccess: () => {
-          const updated = widgets.map((w) =>
-            w.id === id
-              ? {
-                  ...w,
-                  colSpan: sizeConfig.colSpan,
-                  rowSpan: sizeConfig.rowSpan,
-                }
-              : w,
-          );
-          batchUpdateLayouts.mutate(
-            { projectId, layouts: calculateGridPositions(updated) },
-            { onSuccess: () => void widgetsQuery.refetch() },
-          );
-        },
-        onError: () => showError("Error updating widget size"),
-      },
-    );
-  };
-
-  const handleReorder = (layouts: GridLayout[]) => {
+  const handlePlacementChange = (placements: ChartGridPlacement[]) => {
     batchUpdateLayouts.mutate(
-      { projectId, layouts },
+      { projectId, layouts: placements },
       {
         onSuccess: () => void widgetsQuery.refetch(),
-        onError: () => showError("Error reordering widgets"),
+        onError: () => showError("Error saving the widget layout"),
       },
     );
   };
@@ -169,7 +129,12 @@ export function CustomChartPlayground({
   // mutation and the same refetch. `onSuccess` lets the caller flip itself
   // back to Chart only once the write landed.
   const handleSave = (
-    input: { id: string; code: string; queries: DashboardWidget["queries"] },
+    input: {
+      id: string;
+      name?: string;
+      code: string;
+      queries: DashboardWidget["queries"];
+    },
     options?: { onSuccess?: () => void },
   ) => {
     updateWidget.mutate(
@@ -234,9 +199,8 @@ export function CustomChartPlayground({
           projectId={projectId}
           projectSlug={projectSlug}
           onWidgetDelete={handleDelete}
-          onWidgetSizeChange={handleSizeChange}
           onWidgetSave={handleSave}
-          onWidgetsReorder={handleReorder}
+          onWidgetsPlacementChange={handlePlacementChange}
           deletingWidgetId={
             deleteWidget.isPending ? (deleteWidget.variables?.id ?? null) : null
           }
