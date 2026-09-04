@@ -51,12 +51,33 @@ Feature: Langy asks how to reach the customer's code, once
       And no pull request is attempted
 
     @integration
+    Scenario: The remembered choice is stored before the install card opens
+      Given my organization has not installed the LangWatch GitHub App
+      And an open code access card with the remember option ticked
+      When I choose to use GitHub
+      Then GitHub is remembered for the next conversation
+      And Langy renders the in-chat Install GitHub App card
+
+    @integration
     Scenario: Choosing the local folder turns the card into the waiting state
       Given an open code access card
       When I choose to share my local folder
       Then the card shows the one command to run in my folder, with a copy button
       And the card says it is waiting for my approval in the terminal
       And the card shows when the request expires
+
+    @integration
+    Scenario: A fresh card asks even though the request to share a folder exists
+      Given Langy recorded a request to share a folder when it asked
+      When the code access card renders
+      Then the card offers to share my local folder or to use GitHub
+      And the card shows the command only after I choose the local folder
+
+    @integration
+    Scenario: A card left waiting is still waiting after a reload
+      Given I chose to share my local folder
+      When I reopen the conversation before the folder connects
+      Then the card still shows the command and the countdown
 
     @e2e
     Scenario: Langy does not ask twice in one conversation

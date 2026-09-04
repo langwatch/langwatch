@@ -40,6 +40,10 @@ import { describeError } from "~/features/errors";
 import { SHARE_CONTROL_COMMAND } from "~/server/langy-local-control/constants";
 import { api } from "~/utils/api";
 
+import {
+  readLocalFolderPick,
+  writeLocalFolderPick,
+} from "../../logic/langyCodeAccessPick";
 import { useLangyLocalControlStore } from "../../stores/langyLocalControlStore";
 import { LangyGitHubConnectCard } from "../github/LangyGitHubConnectCard";
 
@@ -119,23 +123,28 @@ export interface LangyCodeAccessCardProps {
 }
 
 /**
- * Which of the four states the card is in. A pure reading of the one query, so
- * the decision is testable and the component below only renders it.
+ * Which of the four states the card is in. A pure reading of the one query and
+ * the developer's own pick, so the decision is testable and the component
+ * below only renders it.
+ *
+ * The waiting state is driven by the PICK alone, never by the open control
+ * request. The `code_access` tool records the request before it answers, so a
+ * request exists by the time the card first mounts: reading it as "waiting"
+ * showed the command to a reader who had not been offered the choice, and made
+ * the GitHub option unreachable from a first ask.
  */
 export function langyCodeAccessState({
   connected,
   preference,
-  hasRequest,
   pickedLocal,
 }: {
   connected: boolean;
   preference: "github" | null;
-  hasRequest: boolean;
   pickedLocal: boolean;
 }): "connected" | "remembered" | "waiting" | "asking" {
   if (connected) return "connected";
   if (preference === "github") return "remembered";
-  if (hasRequest || pickedLocal) return "waiting";
+  if (pickedLocal) return "waiting";
   return "asking";
 }
 
@@ -182,13 +191,18 @@ function CodeAccessBody({
   folder: LangyLocalWorkspaceStatus;
   onRefetch: () => void;
 }) {
-  const [pickedLocal, setPickedLocal] = useState(false);
-  const { projectId, onAskAgain, now } = props;
+  const { projectId, conversationId, callId, onAskAgain, now } = props;
+  const [pickedLocal, setPickedLocal] = useState(() =>
+    readLocalFolderPick({ conversationId, callId }),
+  );
+  const pickLocal = () => {
+    writeLocalFolderPick({ conversationId, callId });
+    setPickedLocal(true);
+  };
   const request = folder.pendingRequest;
   const state = langyCodeAccessState({
     connected: folder.connected && !!folder.workspace,
     preference: folder.codeAccessPreference,
-    hasRequest: !!request,
     pickedLocal,
   });
 
@@ -215,7 +229,7 @@ function CodeAccessBody({
       </CardShell>
     );
   }
-  return <AskingState {...props} onPickLocal={() => setPickedLocal(true)} />;
+  return <AskingState {...props} onPickLocal={pickLocal} />;
 }
 
 function LoadingState() {
@@ -332,23 +346,15 @@ function AskingState({
 
   const answerWithGithub = () => onChoiceSelect?.(githubSelection(callId));
 
-  const chooseGithub = () => {
-    setFailure(null);
-    // Nothing to open a pull request with yet. The install card goes here, in
-    // place of the option, so the reader finishes the choice they made rather
-    // than reading a failure a turn later.
-    if (organizationId && !installed) {
-      setInstalling(true);
-      return;
-    }
+  const rememberThen = (next: () => void) => {
     if (!remember) {
-      answerWithGithub();
+      next();
       return;
     }
     rememberChoice.mutate(
       { projectId, preference: "github" },
       {
-        onSuccess: answerWithGithub,
+        onSuccess: next,
         onError: (error) =>
           setFailure(
             describeError({
@@ -358,6 +364,20 @@ function AskingState({
           ),
       },
     );
+  };
+
+  const chooseGithub = () => {
+    setFailure(null);
+    // Nothing to open a pull request with yet. The install card goes here, in
+    // place of the option, so the reader finishes the choice they made rather
+    // than reading a failure a turn later. The ticked box is stored on the way
+    // in: the choice was made here, and the install is the next step of it, not
+    // a condition of it.
+    if (organizationId && !installed) {
+      rememberThen(() => setInstalling(true));
+      return;
+    }
+    rememberThen(answerWithGithub);
   };
 
   return (

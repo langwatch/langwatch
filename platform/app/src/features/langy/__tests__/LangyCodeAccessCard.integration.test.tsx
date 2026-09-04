@@ -75,6 +75,9 @@ beforeEach(() => {
   setPreference.mockClear();
   refetchWorkspace.mockClear();
   githubInstallations = [{ installationId: "i1", accountLogin: "acme" }];
+  // The local-folder pick persists per browser, so one test's click would
+  // otherwise open the next test's card already waiting.
+  localStorage.clear();
 });
 
 const ASKING = {
@@ -203,6 +206,24 @@ describe("given no folder and nothing remembered", () => {
       ).toBeDefined();
       expect(onChoiceSelect).not.toHaveBeenCalled();
     });
+
+    /** @scenario "The remembered choice is stored before the install card opens" */
+    it("stores the ticked choice on the way into the install card", () => {
+      renderCard();
+
+      fireEvent.click(screen.getByTestId("langy-remember-code-access"));
+      fireEvent.click(screen.getByText("Use GitHub"));
+
+      expect(setPreference).toHaveBeenCalledWith({
+        projectId: "p_1",
+        preference: "github",
+      });
+      expect(
+        screen.getByText(
+          "Install the LangWatch GitHub App so I can open the pull request",
+        ),
+      ).toBeDefined();
+    });
   });
 });
 
@@ -217,8 +238,20 @@ describe("given a request the terminal has not approved yet", () => {
     };
   });
 
-  it("opens on the waiting state and says when the request expires", () => {
+  /** @scenario "A fresh card asks even though the request to share a folder exists" */
+  it("still asks, because the reader has not chosen anything yet", () => {
     renderCard({ now: () => 10_000 });
+
+    expect(screen.getByText("How should I reach your code?")).toBeDefined();
+    expect(screen.getByText("Use GitHub")).toBeDefined();
+    expect(
+      screen.queryByText("npx langwatch@latest langy --share-control"),
+    ).toBeNull();
+  });
+
+  it("shows the command and the countdown once the folder is chosen", () => {
+    renderCard({ now: () => 10_000 });
+    fireEvent.click(screen.getByText("Share my local folder"));
 
     expect(
       screen.getByText(/Waiting for you to approve in the terminal/),
@@ -226,10 +259,25 @@ describe("given a request the terminal has not approved yet", () => {
     expect(screen.getByText(/Expires in 5 minutes/)).toBeDefined();
   });
 
+  /** @scenario "A card left waiting is still waiting after a reload" */
+  it("opens on the waiting state again after the card is remounted", () => {
+    const first = renderCard({ now: () => 10_000 });
+    fireEvent.click(screen.getByText("Share my local folder"));
+    first.unmount();
+
+    renderCard({ now: () => 10_000 });
+
+    expect(
+      screen.getByText("npx langwatch@latest langy --share-control"),
+    ).toBeDefined();
+    expect(screen.queryByText("How should I reach your code?")).toBeNull();
+  });
+
   describe("when the request has run out", () => {
     it("says so and offers to ask again", () => {
       const onAskAgain = vi.fn();
       renderCard({ now: () => 10_000 + 20 * 60_000, onAskAgain });
+      fireEvent.click(screen.getByText("Share my local folder"));
 
       expect(screen.getByText("Request expired, ask again")).toBeDefined();
       fireEvent.click(screen.getByText("Ask again"));
