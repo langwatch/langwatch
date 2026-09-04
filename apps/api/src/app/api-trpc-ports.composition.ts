@@ -180,25 +180,6 @@ export function createApiTrpcPorts<
     },
 
     /**
-     * Fire and forget, exactly as the API-key router has always recorded it: a
-     * credential response never waits on the audit write. The minted token is
-     * never among the arguments the package passes here.
-     */
-    apiKeyAudit: (entry: {
-      userId: string;
-      organizationId: string;
-      action: string;
-      args: Readonly<Record<string, unknown>>;
-    }) => {
-      void audit?.record({
-        actorId: entry.userId,
-        path: entry.action,
-        input: { organizationId: entry.organizationId, args: entry.args },
-        error: null,
-      });
-    },
-
-    /**
      * The support inbox, and the audit trail every read of it is written to.
      *
      * Unlike the API-key sink above this one is AWAITED: the row is the record
@@ -383,9 +364,6 @@ export function createApiTrpcPorts<
     gateway: collaborators.gateway,
     governanceHome: collaborators.governanceHome,
     saasBilling: collaborators.saasBilling,
-
-    /** The two answers `github.*` reaches, forwarded whole for the same reason. */
-    github: collaborators.github,
 
     /**
      * The user rows this connection answers, and the four it deliberately

@@ -182,7 +182,6 @@ function composeApplication(overrides: { saasBilling?: boolean; enterprise?: unk
     featureFlags: { isEnabled: vi.fn(async () => true) } as never,
     plans: { getActivePlan: vi.fn(async () => ({ type: "FREE", free: true })) } as never,
     github,
-    audit: { record: vi.fn(async () => undefined) },
     // No ClickHouse: the gateway ledger is a projection there, so the spend
     // source is off by name rather than answering a zero nobody can read.
     clickhouse: null,

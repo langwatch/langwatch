@@ -15,6 +15,7 @@
  * the same chain per feature could drift, and one cannot.
  */
 import type { ApiTrpcFeatureMount } from "../api.application";
+import type { ApiTrpcInfrastructure } from "./app-trpc.infrastructure";
 import type { AnalyticsReadInput, AnalyticsTimeseriesInput } from "@langwatch/analytics-contract";
 import type { AnalyticsTrpcPorts, LangWatchQLTrpcPorts } from "@langwatch/analytics-server";
 import type { AnnotationTrpcPorts } from "@langwatch/annotation-server";
@@ -86,10 +87,7 @@ import {
   createAnnotationScoreTrpcRouter,
   createAnnotationTrpcRouter,
 } from "../features/annotation/annotation-trpc.mount";
-import {
-  createApiKeyTrpcRouter,
-  type ApiKeyAuditSink,
-} from "../features/api-key/api-key-trpc.mount";
+import { composeApiKeyTrpcRouter } from "../features/api-key/api-key.composition";
 import {
   createFrontDoorTrpcRouter,
   createPublicEnvTrpcProcedure,
@@ -110,13 +108,9 @@ import {
   createDataPrivacyTrpcRouter,
   type DataPrivacyTrpcChecks,
 } from "../features/data-privacy/data-privacy-trpc.mount";
-import {
-  createDataRetentionTrpcRouter,
-} from "../features/data-retention/data-retention-trpc.mount";
+import { createDataRetentionTrpcRouter } from "../features/data-retention/data-retention-trpc.mount";
 import { createMonitorTrpcRouter } from "../features/monitor/monitor-trpc.mount";
-import {
-  createStoredObjectTrpcRouter,
-} from "../features/stored-object/stored-object-trpc.mount";
+import { createStoredObjectTrpcRouter } from "../features/stored-object/stored-object-trpc.mount";
 import {
   createEvaluationTrpcRouter,
   type EvaluationMountPorts,
@@ -156,28 +150,18 @@ import {
   createRoleTrpcRouter,
   type RoleTrpcPorts,
 } from "../features/role/role-trpc.mount";
-import {
-  createGithubTrpcRouter,
-  type GithubTrpcMountPorts,
-} from "../features/github/github-trpc.mount";
-import {
-  createIdentityTrpcRouter,
-  createUserTrpcRouter,
-} from "../features/user/user-trpc.mount";
+import { composeGithubTrpcRouter } from "../features/github/github.composition";
+import { createIdentityTrpcRouter, createUserTrpcRouter } from "../features/user/user-trpc.mount";
 import {
   createWorkflowOptimizationTrpcRouter,
   createWorkflowTrpcRouter,
 } from "../features/workflow/workflow-trpc.mount";
-import {
-  createEnterpriseBillingTrpcRouters,
-} from "../features/enterprise/enterprise-billing-trpc.mount";
+import { createEnterpriseBillingTrpcRouters } from "../features/enterprise/enterprise-billing-trpc.mount";
 import {
   createEnterpriseTrpcRouters,
   type EnterpriseTrpcMountPorts,
 } from "../features/enterprise/enterprise-trpc.mount";
-import {
-  createEnterpriseGovernanceTrpcRouters,
-} from "../features/enterprise/enterprise-governance-trpc.mount";
+import { createEnterpriseGovernanceTrpcRouters } from "../features/enterprise/enterprise-governance-trpc.mount";
 import {
   createGovernanceHomeTrpcRouter,
   type GovernanceHomeTrpcPorts,
@@ -271,12 +255,6 @@ export interface AppTrpcFeaturePorts<
   governanceHome: GovernanceHomeTrpcPorts;
   /** Whether this installation bills through Stripe. */
   saasBilling: boolean;
-  /**
-   * The two answers `github.*` reaches that the GitHub feature does not own:
-   * which organization a project belongs to, and where a command on the
-   * connection is recorded.
-   */
-  github: GithubTrpcMountPorts;
   /**
    * The retention policy: who may write an override at a scope, which values
    * that scope's plan may persist, who may switch retention off, and the two
@@ -377,11 +355,6 @@ export interface AppTrpcFeaturePorts<
    * concrete group because those return types are what the client sees.
    */
   annotation: TAnnotationPorts;
-  /**
-   * The process's audit trail for credential writes. Fire and forget: a
-   * credential response never waits on the audit write.
-   */
-  apiKeyAudit: ApiKeyAuditSink["recordAudit"];
   /**
    * The two batch-evaluation rollups. The PROCESS's rather than the dataset
    * package's because the table is: `BatchEvaluation` records what an
@@ -590,6 +563,12 @@ export function createAppTrpcFeatures<
   TStorageScopeUsage = unknown,
 >(options: {
   mount: ApiTrpcFeatureMount;
+  /**
+   * What a feature composes ITSELF from, for the features that already do.
+   * Every entry still reached through `ports` below is one that has not moved
+   * yet.
+   */
+  infrastructure: ApiTrpcInfrastructure;
   ports: AppTrpcFeaturePorts<
     TAnnotationPorts,
     TBugReport,
@@ -624,7 +603,7 @@ export function createAppTrpcFeatures<
     TStorageScopeUsage
   >;
 }) {
-  const { mount, ports } = options;
+  const { mount, infrastructure, ports } = options;
   const gateway = createGatewayTrpcRouters({ ...mount, ports: ports.gateway });
   const governance = createEnterpriseGovernanceTrpcRouters(mount);
   const enterprise = createEnterpriseTrpcRouters({ ...mount, ports: ports.enterprise });
@@ -786,7 +765,7 @@ export function createAppTrpcFeatures<
     ),
     annotation: createAnnotationTrpcRouter({ ...mount, ports: ports.annotation }),
     annotationScore: createAnnotationScoreTrpcRouter(mount),
-    apiKey: createApiKeyTrpcRouter({ ...mount, recordAudit: ports.apiKeyAudit }),
+    apiKey: composeApiKeyTrpcRouter({ mount, infrastructure }),
     // What the caller may do at one scope, as the product reports their own
     // standing back to them. It takes no ports: the answer comes from the same
     // AuthZ service every declared check on this root already runs on, so a
@@ -833,9 +812,10 @@ export function createAppTrpcFeatures<
     graphs: createGraphTrpcRouter({ ...mount, ports: ports.graphs }),
     group: createGroupTrpcRouter({ ...mount, ports: ports.group }),
     // The GitHub App an organization connected, and the pull requests its
-    // coding agents opened. Its own entry rather than part of a group: one
-    // namespace, two ports, and no graph shared with anything beside it.
-    github: createGithubTrpcRouter({ ...mount, ports: ports.github }),
+    // coding agents opened. Composed by the feature itself off the shared
+    // infrastructure: one namespace, two answers nobody else owns, and no
+    // graph shared with anything beside it.
+    github: composeGithubTrpcRouter({ mount, infrastructure }),
     home: createHomeTrpcRouter({ ...mount, ports: ports.home }),
     identity: createIdentityTrpcRouter({ ...mount, ports: ports.identity }),
     integrationsChecks: createIntegrationsChecksTrpcRouter({

@@ -1,8 +1,7 @@
 /**
- * The GATEWAY GROUP half of {@link ApiTrpcCollaborators}: the twenty-one
+ * The GATEWAY GROUP half of {@link ApiTrpcCollaborators}: the twenty
  * surfaces the AI Gateway and the governance console that steers it are
- * administered through, plus the one namespace beside them that answers for the
- * organization's GitHub App.
+ * administered through.
  *
  *   virtualKeys.* / gatewayBudgets.* / gatewayCacheRules.* /
  *   gatewayGuardrails.* / gatewayUsage.* / gatewaySpendEvents.*
@@ -14,7 +13,10 @@
  *                            what an organization is governed by
  *   subscription.* / currency.*
  *                            what it pays, and in which currency
- *   github.*                 the GitHub App its coding agents work through
+ *
+ * `github.*` used to be here too. It composes itself now, in
+ * `features/github/github.composition.ts`, and this half supplies only the
+ * `ctx.app.github` slice every request context carries.
  *
  * ## This half OVERLAYS
  *
@@ -59,8 +61,6 @@ import type { ProjectService } from "@langwatch/project-contract";
 import type { ApiTrpcFeatureApplication } from "../app-trpc/app-trpc.context";
 import type { GatewayTrpcPorts } from "../features/gateway/gateway-trpc.mount";
 import type { GovernanceHomeTrpcPorts } from "../features/enterprise/governance-home.mount";
-import type { GithubTrpcMountPorts } from "../features/github/github-trpc.mount";
-import type { ApiAuditPort } from "../api-request.policy";
 import {
   composeApiGateway,
   type ApiGatewayComposition,
@@ -112,8 +112,6 @@ export type ApiGatewayGroupCollaboratorsOptions = Readonly<{
   plans: Pick<PlanProvider, "getActivePlan">;
   /** The GitHub App this deployment registered, blank where it registered none. */
   github: GithubService;
-  /** The audit trail a GitHub connection command is written to. */
-  audit: ApiAuditPort | undefined;
   /**
    * This process's ClickHouse, where the gateway's spend ledger is projected.
    * `null` where the deployment opened none.
@@ -144,8 +142,6 @@ export type ApiGatewayGroupCollaborators = Readonly<{
   governanceHome: GovernanceHomeTrpcPorts;
   /** Whether this installation bills through Stripe. */
   saasBilling: boolean;
-  /** The `github` entry beside it: one namespace, two answers nobody else owns. */
-  github: GithubTrpcMountPorts;
   /**
    * The gateway application, for the two REST families that take it directly.
    *
@@ -196,7 +192,6 @@ export function composeApiGatewayGroupCollaborators(
     gateway: { virtualKeys: gateway.app.schemas },
     governanceHome: governanceHomePorts(options),
     saasBilling: options.saasBilling,
-    github: githubPorts(options, logger),
     gatewayApp: gateway.app,
     composition: gateway,
   };
@@ -272,38 +267,6 @@ function governanceHomePorts(
         select: { primaryIntent: true },
       });
       return organization?.primaryIntent ?? null;
-    },
-  };
-}
-
-/**
- * The two answers `github.*` reaches that GitHub does not own.
- *
- * The organization is derived from the project rather than taken from the
- * client: the pull-request read is project-scoped because that is how a caller
- * reaches it, and a caller naming an organization id could otherwise ask about
- * another tenant's pull requests.
- */
-function githubPorts(
-  options: ApiGatewayGroupCollaboratorsOptions,
-  logger: Logger,
-): GithubTrpcMountPorts {
-  return {
-    tryResolveOrganizationForProject: async (projectId) => {
-      const project = await options.prisma.project.findUnique({
-        where: { id: projectId },
-        select: { team: { select: { organizationId: true } } },
-      });
-      return project?.team.organizationId ?? undefined;
-    },
-    recordAudit: async (entry) => {
-      await options.audit?.record({
-        actorId: entry.userId,
-        path: entry.action,
-        input: { organizationId: entry.organizationId, ...entry.args },
-        error: null,
-      });
-      logger.debug({ action: entry.action }, "recorded a GitHub connection command");
     },
   };
 }

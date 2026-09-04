@@ -106,10 +106,10 @@ describe("ApiApplication Secret tRPC composition", () => {
     const service = new TestSecretService();
     const authorizationError = new Error("project access denied");
     const app = ApiApplication.create({
-    agents: new MissingAgentService(),
-    features: new NoApiTrpcFeatures(),
-    secrets: service,
-  });
+      agents: new MissingAgentService(),
+      features: new NoApiTrpcFeatures(),
+      secrets: service,
+    });
     const secrets = secretRouterOf(
       app.createCaller({
         actor: () => ({ id: "user-1" }),
@@ -141,10 +141,10 @@ describe("ApiApplication Secret tRPC composition", () => {
   it("keeps one composed service instance across callers", async () => {
     const service = new TestSecretService();
     const app = ApiApplication.create({
-    agents: new MissingAgentService(),
-    features: new NoApiTrpcFeatures(),
-    secrets: service,
-  });
+      agents: new MissingAgentService(),
+      features: new NoApiTrpcFeatures(),
+      secrets: service,
+    });
     const callerContext = {
       actor: () => ({ id: "user-1" }),
       authorize: async () => undefined,

@@ -38,6 +38,8 @@ import type { StoredObjectsService } from "@langwatch/stored-object-server";
 import {
   extractInlineMediaFromEvent,
   TraceMediaStorePort,
+  type CollectorProject,
+  type CollectorUsageLimitPort,
   type TrackedEventPorts,
 } from "@langwatch/trace-server";
 import type { WorkflowEvaluationOutcome } from "@langwatch/workflow-server";
@@ -270,13 +272,16 @@ export function composeApiPackagedRest(
       // narrowing the monitors tRPC surface already settled for.
       monitorMappingsSchema: monitorApiMappingsSchema,
       requireApiKeyPermission: options.requireApiKeyPermission,
-      // The allowance this process cannot read. The SAME degradation the OTLP
-      // receiver has always had when the lookup failed: telemetry a customer
-      // already paid to produce is accepted, and the absent meter is reported
-      // at boot rather than once per request.
-      traceUsageGuard: async (_c, next) => {
-        await next();
-      },
+      // The SAME gate object both ingest doors hold, applied to the one
+      // packaged family that reports run data: a scenario event is trace
+      // content, and a project over its plan must be refused at every door
+      // that writes it or the allowance is only advisory.
+      //
+      // With no gate composed the request is accepted, which is the
+      // degradation the receiver has always had when the lookup failed:
+      // telemetry a customer already paid to produce is not dropped, and the
+      // absent meter is named at boot rather than once per request.
+      traceUsageGuard: traceUsageGuardFor(options.traceIngest?.usageLimit),
       requireProjectPermission: (args) => options.authz.authorizeProjectPermission(args),
       ...(dualAuth ? { dualAuth } : {}),
       ...(enterpriseGate ? { enterpriseGate } : {}),
@@ -305,6 +310,28 @@ export function composeApiPackagedRest(
         Promise.reject(new ApiRestCapabilityUnavailableError("workflow evaluation runner")),
     },
   } as ApiPackagedRestCollaborators;
+}
+
+/**
+ * Refuses a project's write once its team has spent the plan's allowance.
+ *
+ * The gate itself is the ingest composition's, taken rather than rebuilt: the
+ * collector, the OTLP receiver and this family are one allowance, and a second
+ * meter over the same team would let a customer route around the first by
+ * choosing a door. It throws {@link PlanLimitExceededError}, which the family's
+ * error boundary renders as a 402 — terminal rather than retryable, for the
+ * reason the ingest composition's own docblock gives.
+ */
+function traceUsageGuardFor(usageLimit: CollectorUsageLimitPort | undefined): MiddlewareHandler {
+  if (!usageLimit) {
+    return async (_c, next) => {
+      await next();
+    };
+  }
+  return async (c, next) => {
+    await usageLimit({ project: c.get("project") as CollectorProject });
+    await next();
+  };
 }
 
 /**

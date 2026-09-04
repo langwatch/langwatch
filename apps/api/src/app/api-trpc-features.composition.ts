@@ -268,7 +268,11 @@ export class ApiTrpcFeaturesComposition<
       mount,
       collaborators: this.collaborators,
     });
-    return createAppTrpcFeatures({ mount, ports });
+    return createAppTrpcFeatures({
+      mount,
+      infrastructure: { prisma: this.prisma, audit: this.audit },
+      ports,
+    });
   }
 
   private readonly logger: Pick<Logger, "error"> = createLogger("langwatch:api:trpc");
@@ -469,6 +473,5 @@ export function composeApiTrpcCollaborators(
     gateway: gatewayGroup.gateway,
     governanceHome: gatewayGroup.governanceHome,
     saasBilling: gatewayGroup.saasBilling,
-    github: gatewayGroup.github,
   };
 }

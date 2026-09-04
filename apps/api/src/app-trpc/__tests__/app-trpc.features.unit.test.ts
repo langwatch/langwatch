@@ -32,10 +32,7 @@ import type { OrganizationTrpcPorts } from "@langwatch/organization-server";
 
 import type { AutomationMountPorts } from "../../features/automation/automation-trpc.mount";
 
-import type {
-  TraceLegacyFilterInput,
-  TraceLegacyListInput,
-} from "@langwatch/trace-contract";
+import type { TraceLegacyFilterInput, TraceLegacyListInput } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
@@ -44,6 +41,16 @@ import { createAppTrpcFeatures, type AppTrpcFeaturePorts } from "../app-trpc.fea
 
 import type { TracesTrpcPorts } from "@langwatch/trace-server";
 
+/** Every member refuses, so reaching one while BUILDING a surface is a failure. */
+const refuseEveryMember = (what: string) =>
+  new Proxy(
+    {},
+    {
+      get: (_target, member) => (): never => {
+        throw new Error(`${what}.${String(member)} was reached while building the feature list`);
+      },
+    },
+  ) as never;
 
 /** A pass-through stand-in for one of the process's policy middlewares. */
 const passThrough =
@@ -158,7 +165,6 @@ function refusingPorts(): AppTrpcFeaturePorts<
       },
     },
     annotation: refuseEvery("annotation"),
-    apiKeyAudit: refuse("apiKeyAudit"),
     batchRecord: refuseEvery("batchRecord"),
     bugReports: refuseEvery("bugReports"),
     dataset: refuseEvery("dataset"),
@@ -303,7 +309,6 @@ function refusingPorts(): AppTrpcFeaturePorts<
     // routers of the same type. Which shape a deployment gets is the gateway
     // group's own suite to pin.
     saasBilling: true,
-    github: refuseEvery("github"),
     user: refuseEvery("user"),
     workflows: {
       lifecycle: refuseEvery("workflows.lifecycle"),
@@ -325,6 +330,9 @@ function buildFeatures() {
       publicProcedure: trpc.procedure,
       middlewares,
     },
+    // The features that compose themselves take this rather than a ports
+    // entry; every member refuses, for the same reason the ports do.
+    infrastructure: { prisma: refuseEveryMember("infrastructure.prisma"), audit: undefined },
     ports: refusingPorts(),
   });
 }

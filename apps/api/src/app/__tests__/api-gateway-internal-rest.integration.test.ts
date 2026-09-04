@@ -384,13 +384,11 @@ describe("the gateway internal control plane", () => {
         monitors: [
           { id: "mon_1", evaluatorId: "eval_1", checkType: "langevals/basic", parameters: {} },
         ],
-        runEvaluator: vi.fn(
-          async (): Promise<SingleEvaluationResult> => ({
-            status: "processed",
-            passed: false,
-            details: "PII detected: email",
-          }),
-        ),
+        runEvaluator: vi.fn(async (): Promise<SingleEvaluationResult> => ({
+          status: "processed",
+          passed: false,
+          details: "PII detected: email",
+        })),
       });
       const app = composeFamily({ changes: testChangeEventRows(), guardrails });
 

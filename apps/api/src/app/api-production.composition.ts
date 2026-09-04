@@ -3156,7 +3156,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // decision's Enterprise test.
       plans: this.resolvePlanProvider(options),
       github: this.resolveGithub(options, database.client, queueInfrastructure, tenancy),
-      audit: this.options.audit,
       // The SAME ClickHouse the charted reads and the traces run on: the
       // gateway ledger is a projection in that instance, and a second
       // connection would be a second pool.

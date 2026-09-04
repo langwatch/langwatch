@@ -274,7 +274,6 @@ export function stubGatewayGroupHalf(): ApiGatewayGroupCollaborators {
     gateway: { virtualKeys: { virtualKeyBudgetInput: anySchema } },
     governanceHome: stub("governanceHome"),
     saasBilling: false,
-    github: stub("github"),
     gatewayApp: stub("gatewayGroup.gatewayApp"),
     composition: stub("gatewayGroup.composition"),
   });

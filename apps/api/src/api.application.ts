@@ -443,9 +443,7 @@ export function createTrpcRoot(errorFormatter: ApiErrorFormatter = defaultErrorF
  * policy is injected at boot so platform-specific session and audit adapters
  * do not leak into feature packages.
  */
-export class ApiApplication<
-  TRecord extends TRPCCreateRouterOptions = AppTrpcFeatureRecord,
-> {
+export class ApiApplication<TRecord extends TRPCCreateRouterOptions = AppTrpcFeatureRecord> {
   static create<TRecord extends TRPCCreateRouterOptions>(options: {
     /**
      * Required — a process that composes no real agent service passes

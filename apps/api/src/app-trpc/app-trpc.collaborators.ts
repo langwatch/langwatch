@@ -47,7 +47,6 @@ import type {
 import type { HomeTrpcPorts, IntegrationsChecksTrpcPorts } from "@langwatch/project-server";
 import type { PromptTrpcPorts } from "@langwatch/prompt-server";
 import type { RoleTrpcPorts } from "../features/role/role-trpc.mount";
-import type { GithubTrpcMountPorts } from "../features/github/github-trpc.mount";
 import type { IdentityTrpcPorts, UserTrpcPorts } from "@langwatch/user-server";
 import type { WorkflowOptimizationTrpcPorts, WorkflowTrpcPorts } from "@langwatch/workflow-server";
 import type { ZodTypeAny } from "zod";
@@ -346,17 +345,6 @@ export type ApiTrpcCollaborators<
   governanceHome: GovernanceHomeTrpcPorts;
   /** Whether this installation bills through Stripe. */
   saasBilling: boolean;
-
-  /**
-   * The two answers `github.*` reaches that the GitHub feature does not own:
-   * which organization a project belongs to, and where a command on the
-   * connection is recorded.
-   *
-   * Its own entry rather than a member of the group above, because it is one
-   * namespace with two ports and no shared graph: the GitHub App an
-   * organization connected has nothing to do with what its virtual keys spend.
-   */
-  github: GithubTrpcMountPorts;
 
   /**
    * The retention policy: who may write an override at a scope, which values
