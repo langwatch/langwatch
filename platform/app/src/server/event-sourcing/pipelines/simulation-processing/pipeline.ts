@@ -84,7 +84,8 @@ export interface SimulationProcessingPipelineDeps {
  *   metrics_computed event (metrics are computed upstream by
  *   ComputeRunMetricsCommand and carried on the event).
  * - Subscribers own side effects (SSE broadcast, suite-run sync, trace
- *   metrics pull, Customer.io sync) from event payloads only.
+ *   metrics pull, scenario evaluations queueing, Customer.io sync) from
+ *   event payloads only.
  * - The simulationRunExecution process manager owns the execution
  *   lifecycle: dispatch to the worker pool, cancellation broadcast with a
  *   force-terminal backstop, and the stall watchdog.
