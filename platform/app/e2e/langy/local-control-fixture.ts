@@ -191,6 +191,10 @@ export function getCliApiKey(): Promise<string> {
         refusal = await keyRefusal(created.token);
         if (refusal === "") return created.token;
         console.log(`[fixture] minted key refused, minting again: ${refusal}`);
+        // A key minted seconds after the app booted is refused for
+        // `langy:view` until the permission read catches up, and three mints
+        // in the same second all land inside that window.
+        await sleep(3_000 * (attempt + 1));
       }
       throw new Error(
         `every minted key was refused by the control route: ${refusal}`,
