@@ -13,9 +13,6 @@ import { READ_BUDGET_MS, apiKey, client, endpoint, pollUntil, unique } from "./s
 describe("given an application that evaluates what its model said", () => {
   describe("when it records an evaluation on the span it just wrote", () => {
     // @scenario "An evaluation recorded on a span is readable on the trace"
-    // Red on D11: a trace that carries an evaluation answers 500 on read, because
-    // the ClickHouse DateTime columns are read with Number() and land as NaN
-    // (packages/features/evaluation/server/src/repositories/clickhouse/evaluation-run-read.repository.ts:51).
     it("reads that evaluation back on the trace, under the name it gave", async () => {
       const langwatch: LangWatch = client();
       const evaluationName = unique("sdk-app-span-evaluation");

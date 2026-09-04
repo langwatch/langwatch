@@ -31,9 +31,6 @@ describe("given an agent defined in the application's own code", () => {
 
   describe("when a test suite runs a scenario against it", () => {
     // @scenario "An agent defined in code is reachable and answers a simulation run"
-    // Red on D10: scheduling a suite run answers 500, because the advisory lock
-    // the run plan takes carries no tenancy predicate
-    // (packages/features/suite/server/src/repositories/prisma/prisma.suite.repository.ts:208).
     it.skipIf(!hasModelProviderKey())(
       `reaches a terminal run status and the handler was called (${NO_PROVIDER_REASON} skips this)`,
       async () => {

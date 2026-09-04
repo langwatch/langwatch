@@ -138,22 +138,17 @@ describe("given the built CLI working a seeded project", () => {
 
   describe("when a test suite is created and run from the terminal", () => {
     // @scenario "A test suite is created and run from the terminal"
-    // Red on D10: scheduling a suite run answers 500, because the advisory
-    // lock the run plan takes carries no tenancy predicate
-    // (packages/features/suite/server/src/repositories/prisma/prisma.suite.repository.ts:208).
     it("schedules the run it names", async () => {
       const suiteName = unique("cli-journey-suite");
       const suiteResult = workspace.cli.run(`test-suite create ${suiteName} -o json`);
       expect(suiteResult.exitCode ?? 0).toBe(0);
       const suite = parseJson<{ id: string }>(suiteResult.output, "test-suite create");
 
-      // Filed through the SDK: `scenario create --test-suite` resolves the
-      // reference by listing suites, and that list is D9.
-      const scenario = await langwatch.scenarios.create({
-        name: unique("cli-journey-suite-scenario"),
-        situation: "A customer asks what LangWatch does",
-        testSuiteId: suite.id,
-      });
+      const scenarioResult = workspace.cli.run(
+        `scenario create ${unique("cli-journey-suite-scenario")} --situation "A customer asks what LangWatch does" --test-suite ${suite.id} -o json`,
+      );
+      expect(scenarioResult.exitCode ?? 0).toBe(0);
+      const scenario = parseJson<{ id: string }>(scenarioResult.output, "scenario create");
       scenarioIds.push(scenario.id);
 
       const agent = await langwatch.agents.create({
@@ -165,7 +160,12 @@ describe("given the built CLI working a seeded project", () => {
 
       const run = workspace.cli.run(`test-suite run ${suite.id} --target http:${agent.id} -o json`);
       expect(run.exitCode ?? 0).toBe(0);
-      expect(run.output).toMatch(/scheduled|batch/i);
+      const scheduled = parseJson<{ batchRunId?: string; jobCount?: number }>(
+        run.output,
+        "test-suite run",
+      );
+      expect(scheduled.batchRunId).toBeTruthy();
+      expect(scheduled.jobCount).toBeGreaterThan(0);
     }, CLI_TIMEOUT_MS);
   });
 
