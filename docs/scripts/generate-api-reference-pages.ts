@@ -80,6 +80,9 @@ const UNDOCUMENTED_MODEL_DEFAULTS =
 const UNDOCUMENTED_SAVED_WORKBENCH_CHARTS =
   "Not yet documented in the API reference: the saved workbench chart routes require the analytics:view permission and have no reference pages yet.";
 
+const UNDOCUMENTED_DASHBOARD_WIDGETS =
+  "Live surface gated behind the release_custom_chart_playground feature flag, deliberately undocumented until release.";
+
 /**
  * Spec paths that deliberately get no reference page, each with the reason it
  * is excluded. Every other spec path has to be owned by an ENDPOINT_GROUPS
@@ -109,6 +112,12 @@ const SKIP_PATHS: Record<string, string> = {
     UNDOCUMENTED_SAVED_WORKBENCH_CHARTS,
   "/api/v1/projects/{projectId}/analytics/charts/{chartId}/placement":
     UNDOCUMENTED_SAVED_WORKBENCH_CHARTS,
+  "/api/v1/projects/{projectId}/analytics/dashboard-widgets":
+    UNDOCUMENTED_DASHBOARD_WIDGETS,
+  "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}":
+    UNDOCUMENTED_DASHBOARD_WIDGETS,
+  "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}/dashboard":
+    UNDOCUMENTED_DASHBOARD_WIDGETS,
 };
 
 const ENDPOINT_GROUPS: EndpointGroup[] = [

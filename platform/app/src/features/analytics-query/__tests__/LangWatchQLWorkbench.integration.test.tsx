@@ -376,9 +376,8 @@ describe("the LangWatchQL workbench", () => {
         const editor = await renderWorkbench();
         typeSql(editor, SQL);
         addParameter({ name: "since", value: "not a number" });
-        fireEvent.change(screen.getByLabelText("Parameter type"), {
-          target: { value: "number" },
-        });
+        await userEvent.click(screen.getByTestId(/^param-type-select-/));
+        await userEvent.click(screen.getByTestId("field-type-option-number"));
 
         const parameters = screen.getByTestId("lwql-parameters");
         expect(within(parameters).getByText("Enter a number.")).toBeVisible();

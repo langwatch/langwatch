@@ -1029,7 +1029,7 @@ export function Heatmap({
   const lookup = new Map<string, number>();
   data.forEach((row) => {
     lookup.set(
-      `${String(row[xKey])} ${String(row[yKey])}`,
+      `${String(row[xKey])}\u0000${String(row[yKey])}`,
       toNumber(row[valueKey]),
     );
   });
@@ -1048,7 +1048,7 @@ export function Heatmap({
       },
       ...yValues.flatMap((yValue, yIndex) =>
         xValues.map((xValue, xIndex) => {
-          const raw = lookup.get(`${xValue} ${yValue}`) ?? 0;
+          const raw = lookup.get(`${xValue}\u0000${yValue}`) ?? 0;
           const t = maxValue > 0 ? raw / maxValue : 0;
           return h("div", {
             key: `${yIndex}-${xIndex}`,
