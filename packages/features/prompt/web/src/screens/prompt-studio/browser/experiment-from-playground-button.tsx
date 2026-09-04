@@ -190,15 +190,19 @@ export function ExperimentFromPlaygroundButton({ iconOnly }: ExperimentFromPlayg
   const [isCreating, setIsCreating] = useState(false);
   const utils = promptApi.useUtils();
 
-  // Get all tabs from all windows
-  const { isComparing, allTabs, activeTab } = useDraggableTabsBrowserStore((state) => {
-    const activeWindow = state.windows.find((w) => w.id === state.activeWindowId);
-    return {
-      isComparing: state.windows.length > 1,
-      allTabs: state.windows.flatMap((w) => w.tabs),
-      activeTab: activeWindow?.tabs.find((t) => t.id === activeWindow?.activeTabId),
-    };
-  });
+  // Get all tabs from all windows. `windows` and `activeWindowId` are the
+  // store's own references, so selecting them directly is stable; the
+  // derived values below are recomputed only when those references change.
+  const windows = useDraggableTabsBrowserStore((state) => state.windows);
+  const activeWindowId = useDraggableTabsBrowserStore(
+    (state) => state.activeWindowId,
+  );
+  const isComparing = windows.length > 1;
+  const allTabs = useMemo(() => windows.flatMap((w) => w.tabs), [windows]);
+  const activeTab = useMemo(() => {
+    const activeWindow = windows.find((w) => w.id === activeWindowId);
+    return activeWindow?.tabs.find((t) => t.id === activeWindow?.activeTabId);
+  }, [windows, activeWindowId]);
 
   const promptCount = allTabs.length;
   const isDisabled = promptCount === 0 || !hasPermission("evaluations:manage");

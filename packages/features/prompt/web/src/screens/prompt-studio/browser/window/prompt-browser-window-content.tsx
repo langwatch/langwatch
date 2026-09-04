@@ -24,13 +24,14 @@ export { useTabId } from "../../studio-internals";
  */
 export function PromptBrowserWindowContent() {
   const tabId = useTabId();
-  const { tab, isSingleWindow } = useDraggableTabsBrowserStore(({ windows }) => {
-    const allTabs = windows.flatMap((w) => w.tabs);
-    return {
-      tab: allTabs.find((t) => t.id === tabId),
-      isSingleWindow: windows.length === 1,
-    };
-  });
+  // `windows` is the store's own reference, so selecting it directly is
+  // stable; the derived values below are recomputed only when it changes.
+  const windows = useDraggableTabsBrowserStore((state) => state.windows);
+  const tab = useMemo(
+    () => windows.flatMap((w) => w.tabs).find((t) => t.id === tabId),
+    [windows, tabId],
+  );
+  const isSingleWindow = windows.length === 1;
 
   // All hooks must run on every render — `useMemo` below used to sit
   // after an early-return for `tab?.data.loading`, which crashed React
@@ -79,9 +80,9 @@ function PromptBrowserWindowInner(props: {
   layoutMode: LayoutMode;
 }) {
   const form = usePromptConfigForm(props);
-  const { updateTabData } = useDraggableTabsBrowserStore(({ updateTabData }) => ({
-    updateTabData,
-  }));
+  const updateTabData = useDraggableTabsBrowserStore(
+    (state) => state.updateTabData,
+  );
 
   const updateTabDataDebounced = useMemo(() => debounce(updateTabData, 500), [updateTabData]);
 

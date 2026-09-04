@@ -15,17 +15,16 @@ import { DraggableTabsBrowser } from "./draggable-tabs-browser";
  * Single Responsibility: Manages the browser-like tab interface for editing multiple prompts simultaneously.
  */
 export function PromptPlaygroundBrowser() {
-  const { windows, splitTab, moveTab, setActiveTab, activeWindowId, setActiveWindow } =
-    useDraggableTabsBrowserStore(
-      ({ windows, splitTab, moveTab, setActiveTab, activeWindowId, setActiveWindow }) => ({
-        windows,
-        splitTab,
-        moveTab,
-        setActiveTab,
-        activeWindowId,
-        setActiveWindow,
-      }),
-    );
+  const windows = useDraggableTabsBrowserStore((state) => state.windows);
+  const splitTab = useDraggableTabsBrowserStore((state) => state.splitTab);
+  const moveTab = useDraggableTabsBrowserStore((state) => state.moveTab);
+  const setActiveTab = useDraggableTabsBrowserStore((state) => state.setActiveTab);
+  const activeWindowId = useDraggableTabsBrowserStore(
+    (state) => state.activeWindowId,
+  );
+  const setActiveWindow = useDraggableTabsBrowserStore(
+    (state) => state.setActiveWindow,
+  );
 
   function handleTabMove(params: {
     tabId: string;

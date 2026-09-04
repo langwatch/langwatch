@@ -306,13 +306,11 @@ export function useLoadSpanIntoPromptPlayground() {
   const { project } = usePromptProject();
   const { spanId, action, clearParamsFromUrl } = useSpanIdFromUrl();
   const trpc = promptApi.useUtils();
-  const { addTab, updateTabData, removeTab } = useDraggableTabsBrowserStore(
-    ({ addTab, updateTabData, removeTab }) => ({
-      addTab,
-      updateTabData,
-      removeTab,
-    }),
+  const addTab = useDraggableTabsBrowserStore((state) => state.addTab);
+  const updateTabData = useDraggableTabsBrowserStore(
+    (state) => state.updateTabData,
   );
+  const removeTab = useDraggableTabsBrowserStore((state) => state.removeTab);
 
   useEffect(() => {
     if (!spanId || loadedRef.current || !project?.id) return;

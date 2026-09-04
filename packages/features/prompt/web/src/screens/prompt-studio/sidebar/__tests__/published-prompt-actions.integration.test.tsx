@@ -29,7 +29,7 @@ vi.mock("../../../../behavior/use-rename-prompt-handle", () => ({
 }));
 
 vi.mock("../../../../behavior/use-prompt-tabs-browser-store", () => ({
-  useDraggableTabsBrowserStore: () => ({ addTab: vi.fn() }),
+  useDraggableTabsBrowserStore: () => vi.fn(),
 }));
 
 vi.mock("../../../../ui/blocks/delete-confirmation-dialog", () => ({

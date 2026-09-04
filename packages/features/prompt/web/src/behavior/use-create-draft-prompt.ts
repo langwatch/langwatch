@@ -28,7 +28,7 @@ export function useCreateDraftPrompt() {
   const { modelMetadata } = useModelProvidersSettings({
     projectId: project?.id,
   });
-  const { addTab } = useDraggableTabsBrowserStore(({ addTab }) => ({ addTab }));
+  const addTab = useDraggableTabsBrowserStore((state) => state.addTab);
 
   // Cascade-resolved model for "new prompt" surfaces. Returns null when
   // nothing is configured at any scope (post system-tier removal) — the

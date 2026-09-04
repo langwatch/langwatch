@@ -39,7 +39,7 @@ export function PublishedPromptActions({
   const { deletePrompt } = usePrompts();
   const { project } = usePromptProject();
   const host = usePromptHost();
-  const { addTab } = useDraggableTabsBrowserStore(({ addTab }) => ({ addTab }));
+  const addTab = useDraggableTabsBrowserStore((state) => state.addTab);
   const {
     renameHandle,
     canRename,

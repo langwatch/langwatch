@@ -26,9 +26,9 @@ export function useHandleSavePrompt() {
   const methods = useFormContext<PromptConfigFormValues>();
   const configId = methods.watch("configId");
   const currentVersion = methods.watch("versionMetadata.versionNumber");
-  const { updateTabData } = useDraggableTabsBrowserStore(({ updateTabData }) => ({
-    updateTabData,
-  }));
+  const updateTabData = useDraggableTabsBrowserStore(
+    (state) => state.updateTabData,
+  );
   const tabId = useTabId();
   const utils = promptApi.useUtils();
   const host = usePromptHost();

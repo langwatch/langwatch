@@ -4,7 +4,7 @@
  * Tests for PromptPlaygroundChat component ref methods.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearStoreInstances,
@@ -77,9 +77,15 @@ const captured = vi.hoisted(() => ({
   chatProps: null as Record<string, any> | null,
 }));
 
+// Counts CopilotChat renders, which only happen when PromptPlaygroundChatInner
+// (its parent) re-renders — the render loop this file's selectors were fixed
+// for would show up here as an ever-growing count.
+const { renderCount } = vi.hoisted(() => ({ renderCount: { value: 0 } }));
+
 // Mock CopilotKit components since they require complex setup
 vi.mock("@copilotkit/react-ui", () => ({
   CopilotChat: (props: Record<string, any>) => {
+    renderCount.value += 1;
     captured.chatProps = props;
     return <div data-testid="copilot-chat" />;
   },
@@ -142,6 +148,7 @@ describe("PromptPlaygroundChat ref methods", () => {
     localStorage.clear();
     clearStoreInstances();
     store = getStoreForTesting({ projectId: TEST_PROJECT_ID, capabilities });
+    renderCount.value = 0;
   });
 
   afterEach(() => {
@@ -341,6 +348,35 @@ describe("PromptPlaygroundChat ref methods", () => {
 
       const textarea = screen.getByPlaceholderText(/type your message/i) as HTMLTextAreaElement;
       expect(textarea).toHaveAttribute("data-tab-id", tabId);
+    });
+  });
+
+  describe("when the store updates something the chat did not select", () => {
+    /** @scenario "The prompt playground chat stays put on an unrelated store update" */
+    it("does not re-render on an unrelated store update", () => {
+      store.getState().addTab({ data: createTabData() });
+      const tabId = store.getState().windows[0]?.tabs[0]?.id;
+      expect(tabId).toBeDefined();
+
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <PromptHostProvider value={testHost}>
+            <TabIdProvider tabId={tabId!}>
+              <PromptPlaygroundChat formValues={{} as never} />
+            </TabIdProvider>
+          </PromptHostProvider>
+        </ChakraProvider>,
+      );
+
+      expect(renderCount.value).toBe(1);
+
+      // Opening a second tab changes `windows`/`activeTab`, neither of which
+      // this component selects, so it must not re-render.
+      act(() => {
+        store.getState().addTab({ data: createTabData() });
+      });
+
+      expect(renderCount.value).toBe(1);
     });
   });
 });

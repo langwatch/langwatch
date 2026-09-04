@@ -14,7 +14,7 @@ import { useDraggableTabsBrowserStore } from "./use-prompt-tabs-browser-store";
  */
 export function useUrlParamToOpenNewTab() {
   const { project } = usePromptProject();
-  const { addTab } = useDraggableTabsBrowserStore(({ addTab }) => ({ addTab }));
+  const addTab = useDraggableTabsBrowserStore((state) => state.addTab);
   const { selectedPromptId } = usePromptIdQueryParam();
   const trpc = promptApi.useUtils();
 

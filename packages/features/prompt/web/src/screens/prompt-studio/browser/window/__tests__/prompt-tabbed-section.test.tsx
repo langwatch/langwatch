@@ -8,8 +8,9 @@
  * - Layout mode switching (horizontal/vertical)
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { Profiler } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type Variable, VariablesSection } from "../../../../../surfaces/variables";
@@ -603,6 +604,46 @@ describe("PromptTabbedSection Layout Modes", () => {
 
       await user.click(screen.getByRole("tab", { name: /variables/i }));
       expect(screen.getByText(/variables are substituted into the prompt/i)).toBeInTheDocument();
+    });
+  });
+
+  describe("when the store updates something the section did not select", () => {
+    /** @scenario "The prompt tabbed section stays put on an unrelated store update" */
+    it("does not re-render on an unrelated store update", () => {
+      const store = getStoreForTesting({ projectId: TEST_PROJECT_ID, capabilities });
+      const tabId = store.getState().windows[0]?.tabs[0]?.id;
+      tabIdRef.current = tabId!;
+
+      let renderCount = 0;
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <PromptHostProvider value={testHost}>
+            <FormWrapper>
+              <Profiler id="PromptTabbedSection" onRender={() => (renderCount += 1)}>
+                <PromptTabbedSection
+                  layoutMode="vertical"
+                  isPromptExpanded={true}
+                  onPositionChange={vi.fn()}
+                  onDragEnd={vi.fn()}
+                  onToggle={vi.fn()}
+                />
+              </Profiler>
+            </FormWrapper>
+          </PromptHostProvider>
+        </ChakraProvider>,
+      );
+
+      const renderCountAfterMount = renderCount;
+
+      // A second, unrelated tab is added; this section only selects the
+      // current tab's variableValues and the updateTabData action, so an
+      // addition elsewhere must not re-render it beyond whatever mount
+      // itself already triggered.
+      act(() => {
+        store.getState().addTab({ data: createTabData() });
+      });
+
+      expect(renderCount).toBe(renderCountAfterMount);
     });
   });
 

@@ -23,6 +23,10 @@ import type { LayoutMode } from "../../../../surfaces/prompt-layout";
 /** The default "input" variable is locked - cannot be removed or renamed */
 const LOCKED_VARIABLES = new Set(["input"]);
 
+/** Stable fallback so the selector below returns the same reference when a
+ * tab has no persisted variable values yet, instead of a fresh object. */
+const EMPTY_VARIABLE_VALUES: Record<string, string> = {};
+
 /** Info tooltips for special variables */
 const VARIABLE_INFO: Record<string, string> = {
   input: "This value comes from the Conversation tab input",
@@ -64,13 +68,12 @@ export function PromptTabbedSection({
   const demonstrations = form.watch("version.configData.demonstrations");
 
   // Get variable values from persisted store
-  const { storedVariableValues, updateTabData } = useDraggableTabsBrowserStore((state) => {
-    const tabData = state.getByTabId(tabId);
-    return {
-      storedVariableValues: tabData?.variableValues ?? {},
-      updateTabData: state.updateTabData,
-    };
-  });
+  const storedVariableValues = useDraggableTabsBrowserStore(
+    (state) => state.getByTabId(tabId)?.variableValues ?? EMPTY_VARIABLE_VALUES,
+  );
+  const updateTabData = useDraggableTabsBrowserStore(
+    (state) => state.updateTabData,
+  );
 
   const formValues = form.watch();
   const hasInputs = inputs.length > 0;
