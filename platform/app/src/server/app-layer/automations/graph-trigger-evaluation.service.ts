@@ -31,9 +31,10 @@ import { buildGraphAlertTemplateContext } from "@langwatch/automations/templatin
 import { createLogger } from "@langwatch/observability";
 import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
 import type { CustomGraph, Project, Trigger } from "~/generated/prisma/client";
-import type {
-  SeriesInputType,
-  TimeseriesInputType,
+import {
+  type SeriesInputType,
+  seriesInput as seriesInputSchema,
+  type TimeseriesInputType,
 } from "~/server/analytics/registry";
 import type { TimeseriesResult } from "~/server/analytics/types";
 import { buildSeriesName } from "~/server/app-layer/analytics/repositories/_timeseries-row-parser";
@@ -294,15 +295,31 @@ export async function evaluateGraphTrigger({
   const endDate = now;
   const startDate = new Date(endDate.getTime() - timePeriod * 60 * 1000);
 
-  const seriesInput: SeriesInputType = {
-    metric: series.metric as SeriesInputType["metric"],
-    aggregation: series.aggregation as SeriesInputType["aggregation"],
+  // Stored graph JSON never went through the request schema; parse instead of
+  // asserting, so a pairing the metric's `allowedAggregations` forbids skips
+  // this trigger with a named reason rather than failing in ClickHouse — a
+  // configuration fault must not reach the caller's failure count (see the
+  // oversized-result skip below for why a throw would quarantine the lane).
+  const parsedSeries = seriesInputSchema.safeParse({
+    metric: series.metric,
+    aggregation: series.aggregation,
     key: series.key,
     subkey: series.subkey,
-    pipeline: series.pipeline as SeriesInputType["pipeline"],
-    filters: series.filters as SeriesInputType["filters"],
+    pipeline: series.pipeline,
+    filters: series.filters,
     asPercent: series.asPercent,
-  };
+  });
+  if (!parsedSeries.success) {
+    return skipped({
+      triggerId,
+      projectId,
+      reason,
+      detail: `invalid series configuration: ${
+        parsedSeries.error.issues[0]?.message ?? "schema mismatch"
+      }`,
+    });
+  }
+  const seriesInput: SeriesInputType = parsedSeries.data;
   const timeseriesInput: TimeseriesInputType = {
     projectId,
     startDate: startDate.getTime(),
