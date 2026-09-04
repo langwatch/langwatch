@@ -500,6 +500,21 @@ Feature: The run dialog
     And only then does the caller hear that the run started
     And the run drawer stays open, because no dialog tears down over it
 
+  @integration
+  Scenario: A run of several scenarios opens the results of the run it started
+    Given the run dialog open on a test suite with an agent chosen
+    When the run is queued
+    Then the caller hears the address segment of the plan the run joined
+    And the page opens the Results tab on that plan, on that run
+    And no "Run scheduled" toast is shown, because the results are on screen
+
+  @integration
+  Scenario: A run of one scenario opens in the run drawer
+    Given the run dialog open on one scenario with an agent chosen
+    When the run is queued
+    Then the run drawer opens on that scenario's run
+    And the page does not move to the Results tab
+
   # --- Parameters the chosen agent cannot read ---
   #
   # A run resolves its values against the scenarios of the run plus the agent

@@ -72,6 +72,8 @@ export type RunStartedInfo = {
   batchRunId: string;
   /** The run set of the plan the batch landed in, known at queue time. */
   scenarioSetId: string;
+  /** The address segment of the plan the batch landed in. */
+  planSlug: string;
   /** Set when the run covers one scenario: the case whose run to watch. */
   scenarioId?: string;
   /** Set when the run covers one scenario: the agent it went against. */

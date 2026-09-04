@@ -289,6 +289,7 @@ describe("<RunDialog/>", () => {
       jobCount: 1,
       suiteId: "plan_1",
       planName: "Refunds prod-agent",
+      planSlug: "refunds-prod-agent",
       created: true,
     });
     mockSuitesUpdate.mockResolvedValue({});
@@ -994,7 +995,13 @@ describe("<RunDialog/>", () => {
     });
     // A test suite is only a grouping: no run option is written onto it.
     expect(mockSuitesUpdate).not.toHaveBeenCalled();
-    expect(onRunStarted).toHaveBeenCalled();
+    // The caller hears where the run landed: the plan's address segment and
+    // the batch, which is what the Results tab opens on.
+    expect(onRunStarted).toHaveBeenCalledWith({
+      batchRunId: "batch_new",
+      scenarioSetId: "__internal__plan_1__suite",
+      planSlug: "refunds-prod-agent",
+    });
   });
 
   /** @scenario "A suite remembers the parameter overrides of its last run" */
@@ -1467,6 +1474,7 @@ describe("run entries on the Scenarios tab", () => {
       jobCount: 1,
       suiteId: "plan_1",
       planName: "Refunds prod-agent",
+      planSlug: "refunds-prod-agent",
       created: true,
     });
   });
@@ -1513,8 +1521,8 @@ describe("run entries on the Scenarios tab", () => {
     expect(mockOpenDrawer).not.toHaveBeenCalled();
   });
 
-  /** @scenario "A run started from the rail appears in the sidebar without a page change" */
-  it("starts a suite run from the rail without changing the address, holding a place for it", async () => {
+  /** @scenario "A run started from the rail opens on the run it started" */
+  it("starts a suite run from the rail, opens its results and holds a place for it", async () => {
     const user = userEvent.setup();
     render(<TestCasesTab />, { wrapper: Wrapper });
 
@@ -1530,9 +1538,14 @@ describe("run entries on the Scenarios tab", () => {
     await user.click(within(dialog).getByTestId("run-dialog-run"));
 
     await waitFor(() => expect(mockSuitesRunPlan).toHaveBeenCalled());
-    // No navigation: the placeholder is what announces the run. The runs rail
-    // renders it from this same store value (see the run plan detail tests).
-    expect(mockRouterPush).not.toHaveBeenCalled();
+    // The page opens the Results tab on the plan the run joined and on the
+    // run itself. The placeholder announces the run there until the first
+    // result lands: the runs rail renders it from this same store value (see
+    // the run plan detail tests).
+    await waitFor(() => expect(mockRouterPush).toHaveBeenCalled());
+    expect(mockRouterPush.mock.calls[0]![1]).toBe(
+      "/test-project/agent-testing/results/refunds-prod-agent/batch_new",
+    );
     expect(useAgentTestingStore.getState().pendingRun?.batchRunId).toBe(
       "batch_new",
     );
@@ -1616,6 +1629,7 @@ describe("the run name", () => {
       jobCount: 1,
       suiteId: "plan_1",
       planName: "Refunds prod-agent",
+      planSlug: "refunds-prod-agent",
       created: true,
     });
   });
@@ -2030,6 +2044,7 @@ describe("what the run covers", () => {
       jobCount: 2,
       suiteId: "plan_1",
       planName: "2 scenarios prod-agent",
+      planSlug: "refunds-prod-agent",
       created: true,
     });
     mockScenariosGetAll.mockReturnValue({
@@ -2255,6 +2270,7 @@ describe("the chips that add a run option", () => {
       jobCount: 1,
       suiteId: "plan_1",
       planName: "Refunds prod-agent",
+      planSlug: "refunds-prod-agent",
       created: true,
     });
   });
@@ -2353,6 +2369,7 @@ describe("the comparison", () => {
       jobCount: 1,
       suiteId: "plan_1",
       planName: "Refunds prod-agent",
+      planSlug: "refunds-prod-agent",
       created: true,
     });
   });
