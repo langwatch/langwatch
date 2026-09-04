@@ -971,6 +971,23 @@ app.kubernetes.io/instance: {{ .Release.Name }}
            app Secret under LWQL_CLICKHOUSE_PASSWORD / LWQL_POSTGRES_READER_PASSWORD. */}}
 {{- if .Values.clickhouse.chartManaged }}
 {{- $lwql := .Values.clickhouse.lwqlAccessModel | default dict }}
+{{- /* The four non-secret halves of the restricted connection. With
+       LWQL_SELF_PROVISION off (chart-managed), lwqlConnectionFromEnv requires
+       ALL of URL, USER, DATABASE and TENANT_SETTING alongside the password, and
+       returns null on any missing one — so emitting only the passwords refused
+       every query. These four are the SAME values the subchart provisions the
+       langwatch_lwql identity with, sourced once (helpers below) so the query
+       side can never disagree with the provisioned side. The URL carries no
+       credentials or path: username, password and database are passed
+       separately by the client. */}}
+- name: LWQL_CLICKHOUSE_URL
+  value: {{ include "langwatch.lwql.inClusterClickhouseUrl" . | quote }}
+- name: LWQL_CLICKHOUSE_USER
+  value: {{ include "langwatch.lwql.restrictedUser" . | quote }}
+- name: LWQL_DATABASE
+  value: {{ $lwql.database | default "langwatch" | quote }}
+- name: LWQL_TENANT_SETTING
+  value: {{ include "langwatch.lwql.tenantSetting" . | quote }}
 - name: LWQL_CLICKHOUSE_PASSWORD
   valueFrom:
     secretKeyRef:
@@ -1297,6 +1314,26 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- else -}}
     {{- include "langwatch.clickhouse.secretName" . -}}
   {{- end -}}
+{{- end -}}
+
+{{/* LangWatchQL restricted-connection constants for chart-managed ClickHouse.
+
+     The identity name and the tenant setting are NOT chart values: the
+     clickhouse-serverless image bakes them into the access-model config it
+     renders (langwatch_lwql user, custom_api_key_hash setting — see the
+     subchart README and infra/clickhouse-serverless/internal/render), and the
+     app carries the exact same pair as LWQL_CONNECTION_DEFAULTS
+     (platform/app/src/server/analytics/lwql/connection.ts). They are constants
+     of the access model, so they live in ONE place here rather than being
+     retyped at each env var, and any change to the baked identity changes with
+     them. The in-cluster URL mirrors the CLICKHOUSE_URL host the chart already
+     dials ({{ .Release.Name }}-clickhouse:8123), stripped of credentials and
+     database path — the client is handed user, password and database
+     separately. */}}
+{{- define "langwatch.lwql.restrictedUser" -}}langwatch_lwql{{- end -}}
+{{- define "langwatch.lwql.tenantSetting" -}}custom_api_key_hash{{- end -}}
+{{- define "langwatch.lwql.inClusterClickhouseUrl" -}}
+  {{- printf "http://%s-clickhouse:8123" .Release.Name -}}
 {{- end -}}
 
 {{/* ============================================================ */}}

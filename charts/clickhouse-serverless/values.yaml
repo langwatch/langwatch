@@ -185,9 +185,12 @@ lwqlAccessModel:
   existingSecret: ""
   # Key holding the langwatch_lwql user password (SHA256-hashed at boot).
   passwordSecretKey: lwql_password
-  # PostgreSQL bridge for the lwql_postgres named collection. The collection is
-  # rendered only when host is set AND the password key is present in the Secret
-  # (the reader password cannot be hashed — ClickHouse dials PostgreSQL with it).
+  # PostgreSQL bridge for the lwql_postgres named collection. host EMPTY
+  # auto-derives to the parent langwatch chart's own PostgreSQL Service
+  # (<release>-postgresql — see clickhouse-serverless.lwqlPgHost), so the
+  # collection renders on the default chart-managed path; set host to point at
+  # an external PostgreSQL. The password key must be present in the Secret (the
+  # reader password cannot be hashed — ClickHouse dials PostgreSQL with it).
   postgres:
     host: ""
     port: 5432

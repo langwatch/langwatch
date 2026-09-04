@@ -42,6 +42,22 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- end -}}
 {{- end -}}
 
+{{/* Effective host for the lwql_postgres bridge (ClickHouse -> PostgreSQL).
+     An explicit lwqlAccessModel.postgres.host wins (required for an external
+     PostgreSQL). Empty auto-derives to the langwatch chart's own PostgreSQL
+     Service (<release>-postgresql, the same name the app's DATABASE_URL dials),
+     so the named collection renders and works out of the box on the default
+     chart-managed path instead of being silently omitted. Rendering it here is
+     the only place the release name is in scope — a parent values.yaml cannot
+     compose it. */}}
+{{- define "clickhouse-serverless.lwqlPgHost" -}}
+  {{- if .Values.lwqlAccessModel.postgres.host -}}
+    {{- tpl .Values.lwqlAccessModel.postgres.host . -}}
+  {{- else -}}
+    {{- printf "%s-postgresql" .Release.Name -}}
+  {{- end -}}
+{{- end -}}
+
 {{/* ServiceAccount name */}}
 {{- define "clickhouse-serverless.serviceAccountName" -}}
   {{- if .Values.serviceAccount.name -}}

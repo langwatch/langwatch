@@ -1876,6 +1876,12 @@ clickhouse:
   lwqlAccessModel:
     ## @param clickhouse.lwqlAccessModel.enabled [default: true] Render the LangWatchQL access model (langwatch_lwql user, lwql_restricted profile, row policies, lwql_postgres named collection) as ClickHouse config for chart-managed ClickHouse.
     enabled: true
+    # ClickHouse database that holds the LangWatchQL objects. Single source of
+    # truth: the clickhouse-serverless subchart renders the access model into
+    # this database, and the app/workers read it back via LWQL_DATABASE (both
+    # resolve this same value). Matches the app's own `langwatch` default.
+    ## @param clickhouse.lwqlAccessModel.database [default: langwatch] Database holding the LangWatchQL objects; the subchart provisions here and the app queries here (LWQL_DATABASE).
+    database: langwatch
     # Design C: whoever owns the ClickHouse server owns the LangWatchQL access
     # model, so for chart-managed ClickHouse the LWQL passwords live in the
     # ClickHouse credentials Secret — the one templates/clickhouse/url-secret.yaml
@@ -1891,7 +1897,24 @@ clickhouse:
     existingSecret: ""
     ## @param clickhouse.lwqlAccessModel.passwordSecretKey [string, default: lwql_password] Key holding the langwatch_lwql user password. Matches the subchart's default projection and the key url-secret.yaml writes.
     passwordSecretKey: lwql_password
+    # lwql_postgres named collection — the ClickHouse -> PostgreSQL bridge that
+    # backs the api-key -> tenant map. It must reach the SAME PostgreSQL the app
+    # dials via DATABASE_URL. When this chart manages PostgreSQL
+    # (postgresql.chartManaged: true, the default) the subchart auto-derives
+    # `host` to the chart's own Service (<release>-postgresql) — the one place
+    # the release name is in scope — so the collection renders and works out of
+    # the box; `database` and `user` default here to the chart-managed
+    # PostgreSQL's own defaults (postgresql.auth.database / user `postgres`).
+    # EXTERNAL PostgreSQL (postgresql.chartManaged: false): the chart cannot know
+    # your PostgreSQL address, so you MUST set host/database/user (and the reader
+    # password key) to your instance, or LangWatchQL provisioning fails.
     postgres:
+      ## @param clickhouse.lwqlAccessModel.postgres.host [string, default: ""] PostgreSQL host the lwql_postgres bridge dials. Empty auto-derives to the chart-managed PostgreSQL Service (<release>-postgresql); set explicitly for an external PostgreSQL.
+      host: ""
+      ## @param clickhouse.lwqlAccessModel.postgres.database [default: langwatch] PostgreSQL database the bridge reads (matches postgresql.auth.database). Set for an external PostgreSQL.
+      database: langwatch
+      ## @param clickhouse.lwqlAccessModel.postgres.user [default: postgres] PostgreSQL user the bridge connects as (matches the chart-managed PostgreSQL user). Set for an external PostgreSQL.
+      user: postgres
       ## @param clickhouse.lwqlAccessModel.postgres.passwordSecretKey [string, default: lwql_pg_password] Key holding the lwql_postgres reader password. Matches the subchart's default projection; only mounted when clickhouse.lwqlAccessModel.postgres.host is set.
       passwordSecretKey: lwql_pg_password
 

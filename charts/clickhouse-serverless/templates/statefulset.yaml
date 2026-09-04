@@ -178,12 +178,16 @@ spec:
               value: "/mnt/secrets/lwql/lwql_password"
             - name: CLICKHOUSE_LWQL_DATABASE
               value: {{ .Values.lwqlAccessModel.database | quote }}
-            {{- if .Values.lwqlAccessModel.postgres.host }}
-            # lwql_postgres named collection (the ClickHouse -> PostgreSQL bridge).
+            {{- $lwqlPgHost := include "clickhouse-serverless.lwqlPgHost" . }}
+            {{- if $lwqlPgHost }}
+            # lwql_postgres named collection (the ClickHouse -> PostgreSQL
+            # bridge). Host auto-derives to the langwatch chart's own PostgreSQL
+            # Service when unset — see clickhouse-serverless.lwqlPgHost. Set
+            # lwqlAccessModel.postgres.host to point at an external PostgreSQL.
             - name: CLICKHOUSE_LWQL_PG_PASSWORD_FILE
               value: "/mnt/secrets/lwql/lwql_pg_password"
             - name: CLICKHOUSE_LWQL_PG_HOST
-              value: {{ .Values.lwqlAccessModel.postgres.host | quote }}
+              value: {{ $lwqlPgHost | quote }}
             - name: CLICKHOUSE_LWQL_PG_PORT
               value: {{ .Values.lwqlAccessModel.postgres.port | quote }}
             - name: CLICKHOUSE_LWQL_PG_DATABASE
@@ -322,7 +326,7 @@ spec:
             items:
               - key: {{ .Values.lwqlAccessModel.passwordSecretKey }}
                 path: lwql_password
-              {{- if .Values.lwqlAccessModel.postgres.host }}
+              {{- if include "clickhouse-serverless.lwqlPgHost" . }}
               - key: {{ .Values.lwqlAccessModel.postgres.passwordSecretKey }}
                 path: lwql_pg_password
               {{- end }}

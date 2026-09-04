@@ -487,16 +487,36 @@ test_lwql() {
     http://localhost:5560/api/v1/query)
   assert_eq "query endpoint refuses unauthenticated" "$http_code" "401"
 
-  # Idempotence: for chart-managed ClickHouse the app owns none of the access
-  # model, so re-invoking its provision task is a fail-closed no-op — it must
-  # exit 0 and disturb neither the key-map rows nor the renderer-owned identity.
-  local rows_before rows_after
+  # For chart-managed ClickHouse the clickhouse-serverless subchart owns the
+  # ACCESS MODEL (identity, profile, row policies, lwql_postgres), while the app
+  # owns the LangWatchQL VIEWS: the ClickHouse views over its own tables, the
+  # PostgreSQL approved views, and the api-key -> tenant backfill. Re-invoking the
+  # app's provision task must run that app-owned half IDEMPOTENTLY: exit 0,
+  # actually provision, and disturb neither the key-map rows nor the
+  # renderer-owned identity.
+  local rows_before rows_after provision_out
   rows_before=$(ch_query "$pod" "SELECT count() FROM langwatch.lwql_api_key_tenant_map")
-  if kc exec "$app_pod" -- sh -c 'cd /app/platform/app && pnpm run lwql:provision' >/dev/null 2>&1; then
+  if provision_out=$(kc exec "$app_pod" -- sh -c 'cd /app/platform/app && pnpm run lwql:provision' 2>&1); then
     pass "re-running lwql:provision succeeds"
   else
-    fail "re-running lwql:provision failed"
+    fail "re-running lwql:provision failed:
+$provision_out"
   fi
+  # Non-vacuity guard (review 5115397477): before the LWQL_* connection was wired
+  # to the app pod, lwqlConnectionFromEnv returned null and this task logged
+  # "LWQL not configured, skipping" and did nothing — every assertion here passed
+  # against a feature that never ran. If that line reappears, the connection env
+  # regressed and this whole suite is meaningless, so fail on it explicitly.
+  if printf '%s' "$provision_out" | grep -qiE 'LWQL not configured, skipping|skipping provisioning this boot'; then
+    fail "lwql:provision skipped as unconfigured — the full LWQL_* connection is not wired to the app pod (regression of the P1 fix)"
+  else
+    pass "lwql:provision ran (did not skip as unconfigured)"
+  fi
+  # Proof the provisioning path EXECUTED, not merely that it exited 0: the app
+  # creates its catalog views in the LWQL database. `traces` is the canonical
+  # entry (platform/app/src/server/analytics/lwql/catalog/lwqlViews.ts).
+  assert_eq "app-owned LWQL view langwatch.traces provisioned" \
+    "$(ch_query "$pod" "SELECT count() FROM system.tables WHERE database='langwatch' AND name='traces' AND engine='View'")" "1"
   rows_after=$(ch_query "$pod" "SELECT count() FROM langwatch.lwql_api_key_tenant_map")
   assert_eq "key-map rows unchanged after re-provisioning" "$rows_after" "$rows_before"
   assert_eq "still exactly one restricted user" \

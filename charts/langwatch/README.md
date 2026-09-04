@@ -218,9 +218,21 @@ not redundant — a duplicate named collection blocks server boot with
 repair statement (including `DROP ... IF EXISTS`) with ClickHouse error 495.
 
 - **`clickhouse.chartManaged: true` (default):** the `clickhouse-serverless`
-  subchart renders `langwatch_lwql`, `lwql_restricted`, the row policies, and
-  `lwql_postgres` as config at pod boot. The application issues no LWQL DDL
-  on this path.
+  subchart owns the **access model** — it renders `langwatch_lwql`,
+  `lwql_restricted`, the row policies, and the `lwql_postgres` named collection
+  as config at pod boot, and the app touches none of it. The app still
+  provisions its own **catalog views** and the api-key→tenant map, and QUERIES
+  as the restricted identity: the chart wires the full restricted connection
+  onto the app and workers — `LWQL_CLICKHOUSE_URL` (the in-cluster ClickHouse
+  Service), `LWQL_CLICKHOUSE_USER` (`langwatch_lwql`), `LWQL_DATABASE`,
+  `LWQL_TENANT_SETTING` (`custom_api_key_hash`) and the two passwords —
+  *without* `LWQL_SELF_PROVISION`. All five are required together;
+  `LWQL_SELF_PROVISION` is off so the subchart stays the only owner of the
+  access-model entity names. The `lwql_postgres` bridge defaults to the chart's
+  own PostgreSQL out of the box (`clickhouse.lwqlAccessModel.postgres.host`
+  auto-derives to `<release>-postgresql`, with `database`/`user` from the
+  chart-managed PostgreSQL); an **external PostgreSQL** must set
+  `clickhouse.lwqlAccessModel.postgres.{host,database,user}` explicitly.
 - **`clickhouse.chartManaged: false` (BYO / external ClickHouse):** the chart
   cannot render config into a server it does not run, so the application
   self-provisions the same objects via SQL DDL at startup, and fails closed
