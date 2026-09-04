@@ -1,6 +1,13 @@
 export { computeSpanCost } from "./services/trace-span-cost-matching.service";
 export { ClickHouseTraceAdapter } from "./adapters/clickhouse.trace.adapter";
 export { TraceCanonicalisationService } from "./services/trace-canonicalisation.service";
+/**
+ * The platform's retention policy in the shape the ClickHouse package asks
+ * for. Exported because Evaluation's own ClickHouse repository takes the same
+ * floor port, and a second floor would let a trace and the evaluations behind
+ * it disagree about how far back a project's rows go.
+ */
+export { createRetentionFloorService } from "./services/trace-retention-floor.service";
 export { NullTraceListAdapter } from "./adapters/null-trace-list.adapter";
 export {
   EventingTracePipelineAdapter,

@@ -203,6 +203,7 @@ import {
 import { ApiExperimentRunAbsenceReport } from "./api-experiment-run.composition";
 import { composeApiExperimentFindOrCreate } from "../features/experiment/experiment-init-rest.mount";
 import { composeApiTraceReadStack } from "./api-trace-read-stack.composition";
+import { composeApiEvaluationReads } from "./api-evaluation-read.composition";
 import {
   apiEntitlementAbsenceReport,
   composeApiPlanProvider,
@@ -920,15 +921,33 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     });
     this.composedGatewayGroup = this.composeGatewayGroup(options, authz, queueInfrastructure);
     const database = this.composedDatabase?.connection;
+    // Present whenever the record is: the flag store is the product-group
+    // half's, and a process without that half composes no collaborators at all.
+    const featureFlags = this.composedProductGroup?.featureFlagService;
     const features = ApiTrpcFeaturesComposition.tryCompose({
       // What a feature composes ITSELF out of, built once here and handed to
       // every `compose<Feature>()` the record's literal names. The AuthZ
       // service is the SAME one the REST doors authorize through: a permission
       // probe inside a resolver must answer what the declared check on the
       // same procedure would have.
-      infrastructure: database
-        ? { prisma: database.client, authz, audit: this.options.audit }
-        : undefined,
+      infrastructure:
+        database && featureFlags
+          ? {
+              prisma: database.client,
+              authz,
+              // The SAME plan provider every allowance banner reads, and the
+              // SAME flag store `featureFlag.*` answers from. Both are the
+              // process's, not any one feature's, so a gate and the surface
+              // beside it cannot disagree.
+              plans: this.resolvePlanProvider(options),
+              featureFlags,
+              // One variable, one meaning: `IS_SAAS` is what decides whether
+              // this installation bills through Stripe, read from the one leaf
+              // that already carries it rather than from a second of its own.
+              saasBilling: options.config.infrastructure.modelProvider.isSaas,
+              audit: this.options.audit,
+            }
+          : undefined,
       // One literal, checked against the real type each half returns. A
       // process missing any of the ten composes none of the record — see
       // {@link composeApiTrpcCollaborators}.
@@ -2971,6 +2990,19 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
           plans: this.resolvePlanProvider(options),
           dataRetention,
           topics,
+          // The evaluations behind a trace, on the SAME ClickHouse and the
+          // SAME retention cascade the trace itself is read through. Every
+          // single-trace read asks for them, so a stack composed without one
+          // answered a 500 rather than a trace.
+          ...(this.composedClickHouse
+            ? {
+                evaluations: composeApiEvaluationReads({
+                  resolveClickHouseClient: this.composedClickHouse.resolveClient,
+                  dataRetention,
+                  processName: options.config.serviceName,
+                }),
+              }
+            : {}),
           modelProviders: this.resolveModelProviders(options, encryption),
           // Where a resolved model executes: the NLP engine's
           // OpenAI-compatible proxy, the same one every other feature key
@@ -3142,13 +3174,16 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   /**
    * The gateway-group half, over this process's own graph.
    *
-   * It needs four things nothing else on this composition can stand in for: the
-   * evaluator service a guardrail runs, the monitor directory an attachment
-   * names, this process's ClickHouse — where the spend ledger is projected —
-   * and its flag store, which the `/` landing decision reads the governance
-   * rollout from. Absent any of them there is no gateway to administer, so the
-   * half is absent and the seal names it rather than mounting twenty-two
+   * It needs three things nothing else on this composition can stand in for:
+   * the evaluator service a guardrail runs, the monitor directory an
+   * attachment names, and this process's ClickHouse, where the spend ledger is
+   * projected. Absent any of them there is no gateway to administer, so the
+   * half is absent and the seal names it rather than mounting twenty
    * namespaces over the gap.
+   *
+   * The flag store used to gate it as well, because the `/` landing decision
+   * read the governance rollout from it. That decision composes itself now, so
+   * a process with no flag store still administers its gateway.
    */
   private composeGatewayGroup(
     options: ApiRuntimeCompositionOptions,
@@ -3157,9 +3192,8 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   ): ApiGatewayGroupCollaborators | undefined {
     const database = this.composedDatabase?.connection;
     const tenancy = this.composedTenancy;
-    const featureFlags = this.composedProductGroup?.featureFlagService;
     const evaluators = this.composedExecution?.evaluators;
-    if (!database || !tenancy || !featureFlags || !evaluators) return undefined;
+    if (!database || !tenancy || !evaluators) return undefined;
 
     // A host's ledger wins: a process handed the product graph already holds
     // one, and a second over the same receipt table would be a second takeover
@@ -3178,20 +3212,12 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // surface read: a guardrail attachment and the monitor page it points at
       // must agree about what one runs.
       monitors: this.resolveMonitors(database.client, evaluators),
-      featureFlags,
-      // The SAME plan provider every allowance banner reads, for the landing
-      // decision's Enterprise test.
-      plans: this.resolvePlanProvider(options),
       github: this.resolveGithub(options, database.client, queueInfrastructure, tenancy),
       // The SAME ClickHouse the charted reads and the traces run on: the
       // gateway ledger is a projection in that instance, and a second
       // connection would be a second pool.
       clickhouse: this.resolveGatewayClickHouse(),
       virtualKeyPepper: options.config.virtualKeyPepper,
-      // One variable, one meaning: `IS_SAAS` is what decides whether this
-      // installation bills through Stripe, and it is read from the one leaf
-      // that already carries it rather than from a second of its own.
-      saasBilling: options.config.infrastructure.modelProvider.isSaas,
       // A host's ledger wins: a process handed the product graph already holds
       // one, and a second over the same table would be a second takeover clock
       // racing the first one's claims. Otherwise this process's own.

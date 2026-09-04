@@ -7,10 +7,20 @@ import {
 } from "@langwatch/authz-contract";
 import { TRPCError } from "@trpc/server";
 import type { ApiActor, ApiAuditEvent, ApiHttpOptions, ApiRequestContext } from "./api.application";
+import type { ApiTrpcSession } from "./app-trpc/app-trpc.context";
 
-/** Authenticates a web request without coupling the API process to a session implementation. */
+/**
+ * Authenticates a web request without coupling the API process to a session
+ * implementation.
+ *
+ * The whole session rather than the actor id, because the two halves of the
+ * request read different parts of the same fact: authorization decides on
+ * `user.id`, and the surfaces that RENDER the person read their name, picture
+ * and impersonator. Resolving the session and answering only the id left every
+ * packaged surface refusing a caller this process had just verified.
+ */
 export abstract class ApiAuthenticationPort {
-  abstract authenticate(request: Request): Promise<ApiActor | null>;
+  abstract authenticate(request: Request): Promise<ApiTrpcSession | null>;
 }
 
 /** Records one completed API mutation at the process boundary. */
@@ -85,7 +95,8 @@ export class ApiRequestPolicy {
   ) {}
 
   async createContext(request: Request): Promise<ApiRequestContext> {
-    const authenticated = await this.authentication.authenticate(request);
+    const session = await this.authentication.authenticate(request);
+    const authenticated: ApiActor | null = session ? { id: session.user.id } : null;
     const actor = (): ApiActor => {
       if (!authenticated) {
         throw new TRPCError({ code: "UNAUTHORIZED" });
@@ -105,6 +116,11 @@ export class ApiRequestPolicy {
 
     return {
       actor,
+      // Answers null where `actor()` refuses: the declared authorization check
+      // and the request logger both have to describe an anonymous caller
+      // rather than throw on one.
+      tryActor: () => authenticated,
+      session,
       can,
       authorize: async (permission, target) => {
         await this.authorization.authorizeProject({

@@ -11,6 +11,7 @@ import type { UserService } from "@langwatch/user-contract";
 import { ApiUserAvatarStorageAdapter } from "../features/user/user-avatar-storage.adapter";
 import type { ApiBrowserSessionConfig } from "../platform/config/api.config";
 import { ApiAuthenticationPort } from "../api-request.policy";
+import type { ApiTrpcSession } from "../app-trpc/app-trpc.context";
 import {
   announceApiBetterAuthAbsences,
   composeApiBetterAuth,
@@ -407,7 +408,7 @@ export class AuthSessionApiAuthenticationAdapter extends ApiAuthenticationPort {
     super();
   }
 
-  async authenticate(request: Request): Promise<{ id: string } | null> {
+  async authenticate(request: Request): Promise<ApiTrpcSession | null> {
     try {
       const verified = await this.sessions.tryResolveVerifiedSession(request);
       if (!verified) return null;
@@ -423,7 +424,7 @@ export class AuthSessionApiAuthenticationAdapter extends ApiAuthenticationPort {
         );
         return null;
       }
-      return { id: session.user.id };
+      return session;
     } catch (error) {
       logger.error({ error }, "Browser-session resolution failed; treating request as anonymous");
       return null;

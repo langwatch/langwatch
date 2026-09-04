@@ -551,7 +551,13 @@ export class ApiApplication<TRecord extends TRPCCreateRouterOptions = AppTrpcFea
         },
         actor: (ctx) => {
           const context = ctx as unknown as ApiTrpcContext;
-          return context.tryActor?.() ?? undefined;
+          const actor = context.tryActor?.();
+          if (!actor) return undefined;
+          // The id is the IMPERSONATED person's, which is what authorization
+          // decides on; the real administrator behind them is stamped beside
+          // it so an audit row says who actually did this.
+          const impersonatorId = context.session?.user.impersonator?.id;
+          return impersonatorId ? { id: actor.id, impersonatorId } : actor;
         },
       },
       audit: {

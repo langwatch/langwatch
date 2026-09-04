@@ -15,9 +15,13 @@
  *                      writes before the caller sees the transcript.
  *   publicEnv          the signed-out door, on the PUBLIC procedure.
  */
+import { AuthService } from "@langwatch/auth-contract";
+import type { BrowserSession, VerifiedBrowserSession } from "@langwatch/auth-contract";
 import { AuthApp } from "@langwatch/auth-server";
 import type {
   AuthzGetDecisionInput,
+  AuthzPermission,
+  AuthzScopeLineageInput,
   AuthzScopeLineageResult,
   AuthzService,
   PermissionDecision,
@@ -31,12 +35,17 @@ import {
   MissingSecretService,
   NoApiTrpcFeatures,
 } from "../../api.application";
-import { ApiAuditPort } from "../../api-request.policy";
+import { ApiAuditPort, ApiAuthorizationPort, ApiRequestPolicy } from "../../api-request.policy";
+import {
+  AuthSessionApiAuthenticationAdapter,
+  BetterAuthBrowserSessionTransportAdapter,
+} from "../api-auth.composition";
 import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context";
 import {
   ApiTrpcFeaturesComposition,
   LoggedApiTrpcFeaturesAbsence,
 } from "../api-trpc-features.composition";
+import { stubInfrastructureEntitlements } from "./api-trpc-collaborators.test-halves";
 
 /**
  * The namespaces `createAppTrpcFeatures` mounts, as the wire names them.
@@ -316,8 +325,6 @@ function testCollaborators(overrides: Record<string, unknown> = {}) {
     // with only what the record reads while it is BUILT. Their own suite is
     // what proves they answer.
     gateway: { virtualKeys: { virtualKeyBudgetInput: anySchema } },
-    governanceHome: stub("governanceHome"),
-    saasBilling: false,
     github: stub("github"),
     scenarios: stub("scenarios"),
     langy: stub("langy"),
@@ -345,7 +352,7 @@ function composeApplication(
   const prisma = testPrisma();
   const audit = new RecordingAudit();
   const features = ApiTrpcFeaturesComposition.tryCompose({
-    infrastructure: { prisma: prisma.client, authz: testAuthz(), audit },
+    infrastructure: { ...stubInfrastructureEntitlements(), prisma: prisma.client, authz: testAuthz(), audit },
     collaborators: testCollaborators(),
   });
   if (!features) throw new Error("the record refused to compose against its test collaborators");
@@ -467,7 +474,7 @@ describe("given an API process with no collaborators for the record", () => {
     const warn = vi.fn();
 
     const features = ApiTrpcFeaturesComposition.tryCompose({
-      infrastructure: { prisma: {} as unknown as PrismaClient, authz: testAuthz(), audit: undefined },
+      infrastructure: { ...stubInfrastructureEntitlements(), prisma: {} as unknown as PrismaClient, authz: testAuthz(), audit: undefined },
       collaborators: undefined,
       report: LoggedApiTrpcFeaturesAbsence.create({ warn }),
     });
@@ -518,5 +525,180 @@ describe("given a process that opened no infrastructure for the record", () => {
 
     expect(features).toBeUndefined();
     expect(warn).toHaveBeenCalledWith({ reason: "no-database" }, expect.any(String));
+  });
+});
+
+
+/**
+ * The signed-in caller, in the two shapes the process holds them: what Better
+ * Auth verifies off the cookie, and what the Auth service resolves from it.
+ */
+const verifiedSession: VerifiedBrowserSession = {
+  session: { id: "session-1", expiresAt: new Date("2026-12-01T00:00:00.000Z") },
+  user: { id: "user-1", name: "Ada", email: "ada@example.test" },
+};
+
+const resolvedSession: BrowserSession = {
+  user: { id: "user-1", name: "Ada", email: "ada@example.test", image: null },
+  expires: "2026-12-01T00:00:00.000Z",
+  sessionId: "session-1",
+};
+
+/** What the Auth service resolves when an administrator is acting as somebody. */
+const impersonatedSession: BrowserSession = {
+  user: {
+    id: "user-2",
+    name: "Grace",
+    email: "grace@example.test",
+    image: null,
+    impersonator: { id: "user-1", name: "Ada", email: "ada@example.test", image: null },
+  },
+  expires: "2026-12-01T00:00:00.000Z",
+  sessionId: "session-1",
+};
+
+class SessionResolvingAuthService extends AuthService {
+  constructor(private readonly resolved: BrowserSession | null) {
+    super();
+  }
+
+  async tryResolveBrowserSession(input: {
+    verified: VerifiedBrowserSession | null;
+  }): Promise<BrowserSession | null> {
+    return input.verified ? this.resolved : null;
+  }
+
+  async revokeAllBrowserSessions(): Promise<void> {}
+  async revokeBrowserSession(): Promise<void> {}
+  async revokeOtherBrowserSessions(): Promise<void> {}
+}
+
+/** Permits everything: the refusal path is the declared check's own suite. */
+class PermittingAuthorization extends ApiAuthorizationPort {
+  async can(_input: {
+    userId: string;
+    permission: AuthzPermission;
+    projectId: string;
+  }): Promise<boolean> {
+    return true;
+  }
+
+  async authorizeProject(_input: {
+    userId: string;
+    permission: AuthzPermission;
+    projectId: string;
+  }): Promise<void> {}
+
+  async checkScopeLineage(_input: AuthzScopeLineageInput): Promise<AuthzScopeLineageResult> {
+    return { kind: "consistent" };
+  }
+}
+
+/**
+ * The application behind the REAL request policy, rather than a hand-written
+ * context: what F1 broke lived between the auth adapter and the context, so a
+ * test that supplies its own context cannot see it.
+ */
+function composeSessionApplication(options: {
+  verified: VerifiedBrowserSession | null;
+  getAllForUser: (...args: never[]) => Promise<unknown[]>;
+  session?: BrowserSession;
+}) {
+  const features = ApiTrpcFeaturesComposition.tryCompose({
+    infrastructure: {
+      ...stubInfrastructureEntitlements(),
+      prisma: testPrisma().client,
+      authz: testAuthz(),
+      audit: new RecordingAudit(),
+    },
+    collaborators: testCollaborators({
+      application: testApplication({
+        organizations: { getAllForUser: options.getAllForUser },
+      }),
+      organization: stub("organization", {
+        signUpDataSchema: anySchema,
+        isCustomRole: () => false,
+        demoProject: () => ({ userId: "demo-user", projectId: "demo-project" }),
+      }),
+    }),
+  });
+  if (!features) throw new Error("the record refused to compose against its test collaborators");
+
+  const policy = ApiRequestPolicy.create({
+    authentication: AuthSessionApiAuthenticationAdapter.create({
+      auth: new SessionResolvingAuthService(options.session ?? resolvedSession),
+      sessions: BetterAuthBrowserSessionTransportAdapter.create({
+        handler: () =>
+          Promise.reject(new Error("These tests resolve sessions; they route no auth request.")),
+        api: { getSession: async () => options.verified },
+      }),
+    }),
+    authorization: new PermittingAuthorization(),
+  });
+
+  return ApiApplication.create({
+    agents: new MissingAgentService(),
+    secrets: new MissingSecretService(),
+    features,
+    http: policy.asHttpOptions(),
+  });
+}
+
+describe("given a browser session this process has already verified", () => {
+  describe("when a packaged surface reads the signed-in person off the context", () => {
+    /** @scenario "A verified browser session reaches the surfaces that render the person" */
+    it("reaches the organization service instead of refusing the caller", async () => {
+      const getAllForUser = vi.fn(async () => []);
+      const application = composeSessionApplication({ verified: verifiedSession, getAllForUser });
+
+      const { status, body } = await callTrpc(application, "organization.getAll", {
+        isDemo: false,
+      });
+
+      expect(status).toBe(200);
+      expect(body).toMatchObject({ result: { data: { json: [] } } });
+      expect(getAllForUser).toHaveBeenCalledWith(
+        expect.objectContaining({ isDemo: false }),
+        expect.objectContaining({ id: "user-1" }),
+      );
+    });
+  });
+
+  describe("when an administrator is acting as that person", () => {
+    /** @scenario "An impersonated session reaches the surface as the impersonated person" */
+    it("reaches the service as the impersonated person, carrying the real administrator", async () => {
+      const getAllForUser = vi.fn(async () => []);
+      const application = composeSessionApplication({
+        verified: verifiedSession,
+        getAllForUser,
+        session: impersonatedSession,
+      });
+
+      const { status } = await callTrpc(application, "organization.getAll", { isDemo: false });
+
+      expect(status).toBe(200);
+      expect(getAllForUser).toHaveBeenCalledWith(
+        expect.objectContaining({ isDemo: false }),
+        expect.objectContaining({
+          id: "user-2",
+          impersonator: expect.objectContaining({ id: "user-1" }),
+        }),
+      );
+    });
+  });
+
+  describe("when no cookie verifies the caller", () => {
+    /** @scenario "An anonymous caller stays refused by the same surface" */
+    it("keeps the same surface unauthorized and never reaches the service", async () => {
+      const getAllForUser = vi.fn(async () => []);
+      const application = composeSessionApplication({ verified: null, getAllForUser });
+
+      const { body } = await callTrpc(application, "organization.getAll", { isDemo: false });
+
+      expect(body).toMatchObject({
+        error: { json: { data: { code: "UNAUTHORIZED" } } },
+      });
+      expect(getAllForUser).not.toHaveBeenCalled();
+    });
   });
 });

@@ -12,14 +12,20 @@ import {
   ApiAuthorizationPort,
   ApiRequestPolicy,
 } from "../api-request.policy";
+import type { ApiTrpcSession } from "../app-trpc/app-trpc.context";
 
 class TestAuthentication extends ApiAuthenticationPort {
-  constructor(private readonly actor: { id: string } | null) {
+  constructor(private readonly session: ApiTrpcSession | null) {
     super();
   }
 
-  readonly authenticate = vi.fn(async (_request: Request) => this.actor);
+  readonly authenticate = vi.fn(async (_request: Request) => this.session);
 }
+
+const signedIn: ApiTrpcSession = {
+  user: { id: "user-1", name: "Ada", email: "ada@example.test" },
+  sessionId: "session-1",
+};
 
 class TestAuthorization extends ApiAuthorizationPort {
   readonly can = vi.fn(
@@ -41,7 +47,7 @@ class TestAudit extends ApiAuditPort {
 
 describe("ApiRequestPolicy", () => {
   it("injects the authenticated actor and delegates project checks to the named AuthZ port", async () => {
-    const authentication = new TestAuthentication({ id: "user-1" });
+    const authentication = new TestAuthentication(signedIn);
     const authorization = new TestAuthorization();
     const policy = ApiRequestPolicy.create({ authentication, authorization });
     const context = await policy.createContext(new Request("https://api.example.test/api/trpc"));
@@ -81,7 +87,7 @@ describe("ApiRequestPolicy", () => {
       entries: [],
     });
     const policy = ApiRequestPolicy.create({
-      authentication: new TestAuthentication({ id: "user-1" }),
+      authentication: new TestAuthentication(signedIn),
       authorization,
     });
     const context = await policy.createContext(new Request("https://api.example.test/api/trpc"));
@@ -97,7 +103,7 @@ describe("ApiRequestPolicy", () => {
   it("exposes its audit port through the HTTP options exactly once", async () => {
     const audit = new TestAudit();
     const policy = ApiRequestPolicy.create({
-      authentication: new TestAuthentication({ id: "user-1" }),
+      authentication: new TestAuthentication(signedIn),
       authorization: new TestAuthorization(),
       audit,
     });

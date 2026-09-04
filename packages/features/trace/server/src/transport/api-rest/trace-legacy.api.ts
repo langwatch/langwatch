@@ -16,7 +16,6 @@
  */
 import { handlerManagedAuth } from "@langwatch/api";
 import type { AppRestSecurity, SecuredApp } from "@langwatch/api/rest";
-import { createLogger } from "@langwatch/observability";
 import type {
   Evaluation,
   Span,
@@ -35,8 +34,6 @@ import {
   toLLMModeTrace,
 } from "#services/trace-formatting.service";
 import { formatSpansDigest } from "#services/trace-readable-span.service";
-
-const logger = createLogger("langwatch:api:trace-legacy");
 
 const AUTH_REASON = "project API key / public share resolved in-handler";
 
@@ -162,64 +159,56 @@ export function createTraceLegacyRestApp<
     }
     const { project, markUsed } = auth;
 
-    try {
-      const traceId = c.req.param("id");
-      const formatParam = c.req.query("format");
-      const llmMode = c.req.query("llmMode") === "true" || c.req.query("llmMode") === "1";
-      const format = formatParam ?? (llmMode ? "digest" : "json");
+    // No catch-all here: an unanticipated failure is the shared error
+    // renderer's to answer, which degrades it to the generic unknown plus the
+    // request's trace id. Rendering it here put the internal message, the
+    // absolute source paths and the stack frames in front of a customer.
+    const traceId = c.req.param("id");
+    const formatParam = c.req.query("format");
+    const llmMode = c.req.query("llmMode") === "true" || c.req.query("llmMode") === "1";
+    const format = formatParam ?? (llmMode ? "digest" : "json");
 
-      c.header("Deprecation", "true");
-      c.header("Link", `</api/traces/${traceId}?format=${format}>; rel="successor-version"`);
+    c.header("Deprecation", "true");
+    c.header("Link", `</api/traces/${traceId}?format=${format}>; rel="successor-version"`);
 
-      const protections = await ports.getProtections({ projectId: project.id });
-      // `readTrace` resolves offloaded values in full (#4991) — the same
-      // `{ full: true }` this handler used to pass for itself.
-      const trace = await ports.traces().readTrace({
-        projectId: project.id,
-        traceId,
-        protections,
-      });
-      if (!trace) {
-        return c.json({ message: "Trace not found." }, 404);
-      }
-
-      const evaluationsMap = await ports.traces().readEvaluations({
-        projectId: project.id,
-        traceIds: [traceId],
-        protections,
-      });
-      const evaluations = evaluationsMap[traceId] ?? [];
-
-      markUsed();
-
-      if (format === "digest") {
-        return c.json({
-          trace_id: traceId,
-          formatted_trace: formatSpansDigest(trace.spans ?? []),
-          timestamps: trace.timestamps,
-          metadata: trace.metadata,
-          evaluations,
-        });
-      }
-
-      const asciiTree = generateAsciiTree(trace.spans);
-
-      return c.json({
-        ...trace,
-        evaluations,
-        ascii_tree: asciiTree,
-      });
-    } catch (error) {
-      logger.error({ error, path: "/api/trace/:id" }, "legacy trace read failed");
-      return c.json(
-        {
-          message: "Internal Server Error",
-          error: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-        },
-        500,
-      );
+    const protections = await ports.getProtections({ projectId: project.id });
+    // `readTrace` resolves offloaded values in full (#4991) — the same
+    // `{ full: true }` this handler used to pass for itself.
+    const trace = await ports.traces().readTrace({
+      projectId: project.id,
+      traceId,
+      protections,
+    });
+    if (!trace) {
+      return c.json({ message: "Trace not found." }, 404);
     }
+
+    const evaluationsMap = await ports.traces().readEvaluations({
+      projectId: project.id,
+      traceIds: [traceId],
+      protections,
+    });
+    const evaluations = evaluationsMap[traceId] ?? [];
+
+    markUsed();
+
+    if (format === "digest") {
+      return c.json({
+        trace_id: traceId,
+        formatted_trace: formatSpansDigest(trace.spans ?? []),
+        timestamps: trace.timestamps,
+        metadata: trace.metadata,
+        evaluations,
+      });
+    }
+
+    const asciiTree = generateAsciiTree(trace.spans);
+
+    return c.json({
+      ...trace,
+      evaluations,
+      ascii_tree: asciiTree,
+    });
   });
 
   // ---------- POST /api/trace/:id/share ----------

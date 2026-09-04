@@ -16,6 +16,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceLogRecordReader } from "../claude-code-log-enrichment.service";
 import type { NormalizedSpan, Span, Trace } from "@langwatch/trace-contract";
+import type { EvaluationService } from "@langwatch/evaluation-contract";
 import type { Protections } from "@langwatch/trace-server";
 
 const {
@@ -150,11 +151,24 @@ const CLAUDE_LOG_ROWS = [
   ),
 ];
 
+function refusingEvaluations(): EvaluationService {
+  return new Proxy(
+    {},
+    {
+      get: () => () => {
+        throw new Error("this test reads no evaluation behind a trace");
+      },
+    },
+  ) as EvaluationService;
+}
+
 function makeService(getLogsByTraceId: TraceLogRecordReader["getLogsByTraceId"]): TraceService {
   return TraceService.create({
     prisma: {} as never,
     traceCanonicalisation: {} as TraceCanonicalisationService,
     logRecordStorage: { getLogsByTraceId } as unknown as TraceLogRecordReader,
+    // The enrichment join reads no evaluation; a refusing double proves it.
+    evaluationService: refusingEvaluations(),
   });
 }
 

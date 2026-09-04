@@ -198,7 +198,7 @@ export class TraceService {
     },
     private readonly blobResolutionDeps?: BlobResolutionDeps,
     logRecordStorage?: TraceLogRecordReader,
-    private evaluationService?: EvaluationService,
+    private readonly evaluationService: EvaluationService,
     private readonly retentionResolver?: DataRetentionService,
     private readonly annotationService?: AnnotationService,
   ) {
@@ -353,7 +353,8 @@ export class TraceService {
     filterConditions?: TraceLegacyFilterConditions | undefined;
     blobResolutionDeps?: BlobResolutionDeps;
     logRecordStorage?: TraceLogRecordReader;
-    evaluationService?: EvaluationService;
+    /** Required: every single-trace read resolves the evaluations behind it. */
+    evaluationService: EvaluationService;
     retentionResolver?: DataRetentionService;
     annotationService?: AnnotationService;
   }): TraceService {
@@ -367,14 +368,6 @@ export class TraceService {
       retentionResolver,
       annotationService,
     );
-  }
-
-  /** Completes the intentional Evaluation execution/read cycle at boot. */
-  connectEvaluations(evaluations: EvaluationService): void {
-    if (this.evaluationService && this.evaluationService !== evaluations) {
-      throw new Error("TraceService EvaluationService is already connected");
-    }
-    this.evaluationService = evaluations;
   }
 
   /**
@@ -664,7 +657,7 @@ export class TraceService {
         attributes: { "tenant.id": projectId, "trace.count": traceIds.length },
       },
       async () => {
-        const result = await this.evaluations().findTraceEvaluations({
+        const result = await this.evaluationService.findTraceEvaluations({
           tenantId: projectId,
           traceIds,
         });
@@ -699,19 +692,12 @@ export class TraceService {
         },
       },
       async () => {
-        return this.evaluations().tryGetInputs({
+        return this.evaluationService.tryGetInputs({
           tenantId: projectId,
           evaluationId,
         });
       },
     );
-  }
-
-  private evaluations(): EvaluationService {
-    if (!this.evaluationService) {
-      throw new Error("TraceService requires EvaluationService for evaluation reads");
-    }
-    return this.evaluationService;
   }
 
   /**

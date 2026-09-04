@@ -598,7 +598,10 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
       ...(options.filterConditions ? { filterConditions: options.filterConditions } : {}),
       blobResolutionDeps,
       logRecordStorage: this.composeLogRecords(),
-      ...(options.evaluations ? { evaluationService: options.evaluations } : {}),
+      // The SAME rule the list beside it follows: a composed capability where
+      // the process has one, and a refusal by name where it does not. Left
+      // absent, every single-trace read threw a plain Error and answered a 500.
+      evaluationService: options.evaluations ?? this.refusingEvaluations(),
       retentionResolver: options.dataRetention,
     });
 
