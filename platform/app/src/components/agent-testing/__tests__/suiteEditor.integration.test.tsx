@@ -569,9 +569,10 @@ describe("the suite editor drawer", () => {
       );
       await act(async () => {
         await (
-          flowCallbacksStore.evaluatorEditor!.onSave as (
-            saved: { id: string; name: string },
-          ) => Promise<boolean>
+          flowCallbacksStore.evaluatorEditor!.onSave as (saved: {
+            id: string;
+            name: string;
+          }) => Promise<boolean>
         )(evaluator);
       });
     };
@@ -592,7 +593,10 @@ describe("the suite editor drawer", () => {
       expect(draft()?.evaluators[0]).toMatchObject({
         evaluatorId: "eval_sql",
         mappings: {
-          expected_output: { sourceId: "scenario", path: ["fields", "golden_sql"] },
+          expected_output: {
+            sourceId: "scenario",
+            path: ["fields", "golden_sql"],
+          },
         },
       });
       const [reset, editor] = mockOpenDrawer.mock.calls;
