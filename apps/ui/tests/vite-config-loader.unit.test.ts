@@ -108,7 +108,7 @@ describe("given the apps/ui Vite config", () => {
           );
         expect(inject).toBeDefined();
         const html = await (
-          inject as { transformIndexHtml: (html: string) => string | Promise<string> }
+          inject as unknown as { transformIndexHtml: (html: string) => string | Promise<string> }
         ).transformIndexHtml("<html><head></head><body></body></html>");
         const content = new RegExp(`name="${PUBLIC_APP_CONFIG_META_NAME}" content="([^"]+)"`).exec(
           html,

@@ -5,12 +5,11 @@
  */
 
 import { authApi } from "@langwatch/auth-web/screens/auth";
-import { uiFeatureApi, type UiFeatureApiBinding } from "../../behavior/ui-feature-transport";
+import { uiFeature } from "../../behavior/ui-feature";
 import { authPageLoaders } from "./ui/sections/auth-routes";
 
-export const authApiBinding: UiFeatureApiBinding = uiFeatureApi({
+export const authFeature = uiFeature({
   name: "@langwatch/auth-web",
   api: authApi,
+  loaders: authPageLoaders,
 });
-
-export { authPageLoaders };

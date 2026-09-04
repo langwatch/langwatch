@@ -40,7 +40,7 @@ describe("given the browser builds its client from the API process's own router"
     it("addresses the request to the name the server mounts it under", async () => {
       const wiring = transport([[resultOf({ hasPassword: true })]]);
 
-      await wiring.client.user.hasPassword.query();
+      await wiring.client.user.hasPassword.query({});
 
       expect(wiring.requests).toHaveLength(1);
       const sent = new URL(wiring.requests[0]!, "http://localhost");

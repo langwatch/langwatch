@@ -1,12 +1,11 @@
 /** Topic Clustering: single screen in `@langwatch/topic-web`. */
 
 import { topicApi } from "@langwatch/topic-web/screens/topic-clustering";
-import { uiFeatureApi, type UiFeatureApiBinding } from "../../behavior/ui-feature-transport";
+import { uiFeature } from "../../behavior/ui-feature";
 import { topicPageLoaders } from "./ui/sections/topic-routes";
 
-export const topicApiBinding: UiFeatureApiBinding = uiFeatureApi({
+export const topicFeature = uiFeature({
   name: "@langwatch/topic-web",
   api: topicApi,
+  loaders: topicPageLoaders,
 });
-
-export { topicPageLoaders };

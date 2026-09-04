@@ -341,7 +341,7 @@ export function NavigationHostSection({
       // Opens a drawer by name against this application's composed registry.
       // The command catalogue names other families' drawers; none of them is
       // the navigation package's to import, and none has to be — the
-      // catalogue carries the name, `installed-ui-drawers` carries the
+      // catalogue carries the name, `installed-ui-features` carries the
       // components, and this is where the two meet.
       openDrawer: openDrawerByName,
       // NO LIVE-CHAT BUBBLE. The Crisp script is loaded by `platform/app`, and

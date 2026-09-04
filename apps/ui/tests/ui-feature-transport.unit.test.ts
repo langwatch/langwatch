@@ -1,8 +1,8 @@
-import type { FeatureApiClient } from "@langwatch/platform-api-client";
 import type { QueryClient } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
-import { createUiFeatureApiClient, uiFeatureApi } from "../src/behavior/ui-feature-transport";
+import { uiFeature } from "../src/behavior/ui-feature";
+import { createUiFeatureApiClient } from "../src/behavior/ui-feature-transport";
 
 type Call = { url: string; method: string };
 
@@ -100,18 +100,18 @@ describe("given a feature package's typed hooks", () => {
       const Provider = ({
         children,
       }: {
-        client: FeatureApiClient<PromptApiMap>;
+        client: PromptApiMap;
         queryClient: QueryClient;
         children: ReactNode;
       }) => children;
 
-      const binding = uiFeatureApi<PromptApiMap>({
+      const feature = uiFeature<PromptApiMap, Record<string, never>>({
         name: "@langwatch/prompt-web",
         api: { Provider },
       });
 
-      expect(binding.name).toBe("@langwatch/prompt-web");
-      expect(binding.Provider).toBe(Provider);
+      expect(feature.api?.name).toBe("@langwatch/prompt-web");
+      expect(feature.api?.Provider).toBe(Provider);
     });
   });
 });

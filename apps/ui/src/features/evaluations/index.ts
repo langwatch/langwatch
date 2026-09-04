@@ -4,6 +4,10 @@
  * installed client, to avoid a second tRPC client over the same cache keys.
  */
 
+import { uiFeature } from "../../behavior/ui-feature";
 import { evaluationPageLoaders } from "./ui/sections/evaluation-routes";
 
-export { evaluationPageLoaders };
+export const evaluationsFeature = uiFeature({
+  name: "@langwatch/ui/features/evaluations",
+  loaders: evaluationPageLoaders,
+});

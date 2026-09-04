@@ -1,21 +1,19 @@
 /** Datasets: two screens, four overlays and the spreadsheet editor, all in `@langwatch/dataset-web`. */
 
 import { datasetApi } from "@langwatch/dataset-web/screens/datasets";
-import { lazyDrawer, type UiDrawerRegistry } from "@langwatch/ui-drawer";
-import { uiFeatureApi, type UiFeatureApiBinding } from "../../behavior/ui-feature-transport";
+import { lazyDrawer } from "@langwatch/ui-drawer";
+import { uiFeature } from "../../behavior/ui-feature";
 import { datasetPageLoaders } from "./ui/sections/dataset-routes";
 
-export const datasetApiBinding: UiFeatureApiBinding = uiFeatureApi({
+export const datasetFeature = uiFeature({
   name: "@langwatch/dataset-web",
   api: datasetApi,
+  loaders: datasetPageLoaders,
+  /** The drawers this family serves, by the name the address uses. */
+  drawers: {
+    selectDataset: lazyDrawer({
+      factory: () => import("./ui/sections/dataset-drawers"),
+      key: "SelectDatasetDrawer",
+    }),
+  },
 });
-
-/** The drawers this family serves, by the name the address uses. */
-export const datasetDrawers: UiDrawerRegistry = {
-  selectDataset: lazyDrawer({
-    factory: () => import("./ui/sections/dataset-drawers"),
-    key: "SelectDatasetDrawer",
-  }),
-};
-
-export { datasetPageLoaders };

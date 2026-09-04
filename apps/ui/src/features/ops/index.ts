@@ -5,21 +5,19 @@
  */
 
 import { opsApi } from "@langwatch/ops-web/screens/ops";
-import { lazyDrawer, type UiDrawerRegistry } from "@langwatch/ui-drawer";
-import { uiFeatureApi, type UiFeatureApiBinding } from "../../behavior/ui-feature-transport";
+import { lazyDrawer } from "@langwatch/ui-drawer";
+import { uiFeature } from "../../behavior/ui-feature";
 import { opsPageLoaders } from "./ui/sections/ops-routes";
 
-export const opsApiBinding: UiFeatureApiBinding = uiFeatureApi({
+export const opsFeature = uiFeature({
   name: "@langwatch/ops-web",
   api: opsApi,
+  loaders: opsPageLoaders,
+  /** The drawers this family serves, by the name the address uses. */
+  drawers: {
+    foundry: lazyDrawer({
+      factory: () => import("./ui/sections/ops-drawers"),
+      key: "FoundryDrawer",
+    }),
+  },
 });
-
-/** The drawers this family serves, by the name the address uses. */
-export const opsDrawers: UiDrawerRegistry = {
-  foundry: lazyDrawer({
-    factory: () => import("./ui/sections/ops-drawers"),
-    key: "FoundryDrawer",
-  }),
-};
-
-export { opsPageLoaders };

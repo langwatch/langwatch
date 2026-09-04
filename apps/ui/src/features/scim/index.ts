@@ -4,12 +4,11 @@
  */
 
 import { scimApi } from "@langwatch/enterprise-scim-web/screens/scim";
-import { uiFeatureApi, type UiFeatureApiBinding } from "../../behavior/ui-feature-transport";
+import { uiFeature } from "../../behavior/ui-feature";
 import { scimPageLoaders } from "./ui/sections/scim-routes";
 
-export const scimApiBinding: UiFeatureApiBinding = uiFeatureApi({
+export const scimFeature = uiFeature({
   name: "@langwatch/enterprise-scim-web",
   api: scimApi,
+  loaders: scimPageLoaders,
 });
-
-export { scimPageLoaders };

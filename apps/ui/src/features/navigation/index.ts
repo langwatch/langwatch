@@ -5,13 +5,13 @@
  */
 
 import { navigationApi } from "@langwatch/navigation-web/screens/landing";
-import { uiFeatureApi, type UiFeatureApiBinding } from "../../behavior/ui-feature-transport";
+import { uiFeature } from "../../behavior/ui-feature";
 import { navigationPageLoaders } from "./ui/sections/navigation-routes";
 
-export const navigationApiBinding: UiFeatureApiBinding = uiFeatureApi({
+export const navigationFeature = uiFeature({
   name: "@langwatch/navigation-web",
   api: navigationApi,
+  loaders: navigationPageLoaders,
 });
 
-export { navigationPageLoaders };
 export { NavigationHostSection } from "./ui/sections/navigation-host";

@@ -5,12 +5,11 @@
  */
 
 import { onboardingApi } from "@langwatch/onboarding-web/screens/onboarding";
-import { uiFeatureApi, type UiFeatureApiBinding } from "../../behavior/ui-feature-transport";
+import { uiFeature } from "../../behavior/ui-feature";
 import { onboardingPageLoaders } from "./ui/sections/onboarding-routes";
 
-export const onboardingApiBinding: UiFeatureApiBinding = uiFeatureApi({
+export const onboardingFeature = uiFeature({
   name: "@langwatch/onboarding-web",
   api: onboardingApi,
+  loaders: onboardingPageLoaders,
 });
-
-export { onboardingPageLoaders };

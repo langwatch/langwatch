@@ -192,7 +192,7 @@ vi.mock("../src/features/ops/ui/sections/ops-host", passThroughOpsHost);
 vi.mock("../src/features/gateway/ui/sections/gateway-host", passThroughHostComponent);
 vi.mock("../src/features/automations/ui/sections/automations-host", passThroughHostComponent);
 
-import { installedUiDrawers } from "../src/features/installed-ui-drawers";
+import { installedUiDrawers } from "../src/features/installed-ui-features";
 
 // This package runs without vitest globals, so testing-library never registers
 // its own auto-cleanup: without this one case's drawer is still in the document

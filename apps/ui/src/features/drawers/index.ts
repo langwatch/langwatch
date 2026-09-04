@@ -1,6 +1,6 @@
 /**
  * The drawer half of the application chrome. `@langwatch/ui-drawer` owns the
- * framework and names no drawer; composition lives in `installed-ui-drawers.ts`.
+ * framework and names no drawer; composition lives in `installed-ui-features.ts`.
  * This feature holds what is neither: the trace funnel and `open` coercion.
  */
 

@@ -1,6 +1,6 @@
 /**
  * The trace drawer, mounted above every page rather than through
- * `installed-ui-drawers.ts` — its URL-to-store sync must outlive
+ * `installed-ui-features.ts` — its URL-to-store sync must outlive
  * `?drawer.open=` (see `ui-family-move-manifests.md`). Lazy-loaded.
  */
 

@@ -5,12 +5,11 @@
  */
 
 import { billingApi } from "@langwatch/enterprise-billing-web/screens/billing";
-import { uiFeatureApi, type UiFeatureApiBinding } from "../../behavior/ui-feature-transport";
+import { uiFeature } from "../../behavior/ui-feature";
 import { billingPageLoaders } from "./ui/sections/billing-routes";
 
-export const billingApiBinding: UiFeatureApiBinding = uiFeatureApi({
+export const billingFeature = uiFeature({
   name: "@langwatch/enterprise-billing-web",
   api: billingApi,
+  loaders: billingPageLoaders,
 });
-
-export { billingPageLoaders };

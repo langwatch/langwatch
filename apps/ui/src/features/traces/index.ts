@@ -4,23 +4,21 @@
  */
 
 import { traceApi } from "@langwatch/trace-web/screens/traces";
-import { lazyDrawer, type UiDrawerRegistry } from "@langwatch/ui-drawer";
-
-import { uiFeatureApi, type UiFeatureApiBinding } from "../../behavior/ui-feature-transport";
+import { lazyDrawer } from "@langwatch/ui-drawer";
+import { uiFeature } from "../../behavior/ui-feature";
 import { tracePageLoaders } from "./ui/sections/routes";
 
-export const traceApiBinding: UiFeatureApiBinding = uiFeatureApi({
+export const traceFeature = uiFeature({
   name: "@langwatch/trace-web",
   api: traceApi,
+  loaders: tracePageLoaders,
+  /** The drawers this family serves, by the name the address uses. */
+  drawers: {
+    addDatasetRecord: lazyDrawer({
+      factory: () => import("./ui/sections/trace-drawers"),
+      key: "AddDatasetRecordDrawer",
+    }),
+  },
 });
 
-/** The drawers this family serves, by the name the address uses. */
-export const traceDrawers: UiDrawerRegistry = {
-  addDatasetRecord: lazyDrawer({
-    factory: () => import("./ui/sections/trace-drawers"),
-    key: "AddDatasetRecordDrawer",
-  }),
-};
-
-export { tracePageLoaders };
 export { UiTraceDrawerMount } from "./ui/sections/trace-drawer-mount";

@@ -4,6 +4,10 @@
  * already-installed `apiKeyApi`.
  */
 
+import { uiFeature } from "../../behavior/ui-feature";
 import { authorizePageLoaders } from "./ui/sections/authorize-routes";
 
-export { authorizePageLoaders };
+export const authorizeFeature = uiFeature({
+  name: "@langwatch/ui/features/authorize",
+  loaders: authorizePageLoaders,
+});

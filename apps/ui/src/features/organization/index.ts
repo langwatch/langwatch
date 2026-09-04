@@ -5,25 +5,23 @@
  */
 
 import { organizationApi } from "@langwatch/organization-web/screens/organization";
-import { lazyDrawer, type UiDrawerRegistry } from "@langwatch/ui-drawer";
-import { uiFeatureApi, type UiFeatureApiBinding } from "../../behavior/ui-feature-transport";
+import { lazyDrawer } from "@langwatch/ui-drawer";
+import { uiFeature } from "../../behavior/ui-feature";
 import { organizationPageLoaders } from "./ui/sections/organization-routes";
 
-export const organizationApiBinding: UiFeatureApiBinding = uiFeatureApi({
+export const organizationFeature = uiFeature({
   name: "@langwatch/organization-web",
   api: organizationApi,
+  loaders: organizationPageLoaders,
+  /** The drawers this family serves, by the name the address uses. */
+  drawers: {
+    inviteMember: lazyDrawer({
+      factory: () => import("./ui/sections/organization-drawers"),
+      key: "InviteMemberDrawer",
+    }),
+    createTeam: lazyDrawer({
+      factory: () => import("./ui/sections/organization-drawers"),
+      key: "CreateTeamDrawer",
+    }),
+  },
 });
-
-/** The drawers this family serves, by the name the address uses. */
-export const organizationDrawers: UiDrawerRegistry = {
-  inviteMember: lazyDrawer({
-    factory: () => import("./ui/sections/organization-drawers"),
-    key: "InviteMemberDrawer",
-  }),
-  createTeam: lazyDrawer({
-    factory: () => import("./ui/sections/organization-drawers"),
-    key: "CreateTeamDrawer",
-  }),
-};
-
-export { organizationPageLoaders };

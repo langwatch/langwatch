@@ -5,13 +5,13 @@
  */
 
 import { homeApi } from "@langwatch/project-web/screens/home";
-import { uiFeatureApi, type UiFeatureApiBinding } from "../../behavior/ui-feature-transport";
+import { uiFeature } from "../../behavior/ui-feature";
 import { homePageLoaders } from "./ui/sections/home-routes";
 
-export const homeApiBinding: UiFeatureApiBinding = uiFeatureApi({
+export const homeFeature = uiFeature({
   name: "@langwatch/project-web",
   api: homeApi,
+  loaders: homePageLoaders,
 });
 
-export { homePageLoaders };
 export { ProjectHomeHostSection } from "./ui/sections/home-host";

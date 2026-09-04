@@ -1,131 +1,141 @@
 /**
  * What this package serves itself: `createUiApplication` merges the host's
  * install over this standing declaration. Sits at the features root — this
- * registry and the package entry are the only places allowed to import a feature.
+ * registry and the package entry are the only places allowed to import a
+ * feature.
+ *
+ * Also the drawer half `installed-ui-drawers.ts` used to own on its own:
+ * `installUiFeatures` merges every feature's `drawers` the same way it
+ * merges `loaders`, and this is where the composed registry, the open
+ * rewrite rule and the drawer hooks now live.
  */
 
+import { createDrawerPreloader, installDrawerOpenRewrite, useDrawer } from "@langwatch/ui-drawer";
+import { warmChunk } from "../behavior/chunk-reload";
 import { BrowserUiFeedback } from "../behavior/ui-feedback";
+import { installUiFeatures } from "../behavior/ui-feature";
 import { useBrowserUiSession } from "../behavior/ui-session";
-import type { UiFeatureInstall } from "../ui/sections/ui-application";
-import { agentApiBinding, agentPageLoaders } from "./agent";
-import { analyticsApiBinding, analyticsPageLoaders } from "./analytics";
-import { apiKeyApiBinding, apiKeyPageLoaders } from "./api-key";
-import { annotationApiBinding, annotationPageLoaders } from "./annotation";
-import { annotationScoresApiBinding, annotationScoresPageLoaders } from "./annotation-scores";
-import { authApiBinding, authPageLoaders } from "./auth";
-import { authorizePageLoaders } from "./authorize";
-import { authzApiBinding, authzPageLoaders } from "./authz";
-import { billingApiBinding, billingPageLoaders } from "./billing";
-import { chromePageLoaders } from "./chrome";
-import { automationsAllPageLoaders, automationsApiBinding } from "./automations";
-import { dataPrivacyApiBinding, dataPrivacyPageLoaders } from "./data-privacy";
-import { dataRetentionApiBinding, dataRetentionPageLoaders } from "./data-retention";
-import { datasetApiBinding, datasetPageLoaders } from "./dataset";
-import { evaluationPageLoaders } from "./evaluations";
-import { evaluatorApiBinding, evaluatorPageLoaders } from "./evaluator";
-import { experimentPageLoaders } from "./experiments";
-import { gatewayApiBinding, gatewayPageLoaders } from "./gateway";
-import { githubApiBinding, githubPageLoaders } from "./github";
-import { governanceApiBinding, governancePageLoaders } from "./governance";
-import { homeApiBinding, homePageLoaders } from "./home";
-import { langyApiBinding, langyPageLoaders } from "./langy";
-import { licensingApiBinding, licensingPageLoaders } from "./licensing";
-import { modelProviderApiBinding, modelProviderPageLoaders } from "./model-provider";
-import { navigationApiBinding, navigationPageLoaders } from "./navigation";
-import { notificationApiBinding, notificationPageLoaders } from "./notification";
-import { monitorApiBinding, monitorPageLoaders } from "./monitor";
-import { onboardingApiBinding, onboardingPageLoaders } from "./onboarding";
-import { opsApiBinding, opsPageLoaders } from "./ops";
-import { organizationApiBinding, organizationPageLoaders } from "./organization";
-import { projectApiBinding, projectPageLoaders } from "./project";
-import { promptApiBinding, promptPageLoaders } from "./prompt";
-import { scimApiBinding, scimPageLoaders } from "./scim";
-import { secretApiBinding, secretPageLoaders } from "./secret";
-import { simulationsApiBinding, simulationsPageLoaders } from "./simulations";
-import { topicApiBinding, topicPageLoaders } from "./topic";
-import { traceApiBinding, tracePageLoaders } from "./traces";
-import { workflowApiBinding, workflowPageLoaders } from "./workflows";
-import { personalWorkspaceApiBindings, personalWorkspacePageLoaders } from "./personal-workspace";
+import { agentFeature } from "./agent";
+import { analyticsFeature } from "./analytics";
+import { annotationFeature } from "./annotation";
+import { annotationScoresFeature } from "./annotation-scores";
+import { apiKeyFeature } from "./api-key";
+import { authFeature } from "./auth";
+import { authorizeFeature } from "./authorize";
+import { authzFeature } from "./authz";
+import { automationsFeature } from "./automations";
+import { billingFeature } from "./billing";
+import { chromeFeature } from "./chrome";
+import { dataPrivacyFeature } from "./data-privacy";
+import { dataRetentionFeature } from "./data-retention";
+import { datasetFeature } from "./dataset";
+import { routeTraceDrawerForV2 } from "./drawers";
+import { evaluationsFeature } from "./evaluations";
+import { evaluatorFeature } from "./evaluator";
+import { experimentsFeature } from "./experiments";
+import { gatewayFeature } from "./gateway";
+import { githubFeature } from "./github";
+import { governanceFeature } from "./governance";
+import { homeFeature } from "./home";
+import { langyFeature } from "./langy";
+import { licensingFeature } from "./licensing";
+import { modelProviderFeature } from "./model-provider";
+import { monitorFeature } from "./monitor";
+import { navigationFeature } from "./navigation";
+import { notificationFeature } from "./notification";
+import { onboardingFeature } from "./onboarding";
+import { opsFeature } from "./ops";
+import { organizationFeature } from "./organization";
+import { codingAgentFeature, personalWorkspaceFeature } from "./personal-workspace";
+import { projectFeature } from "./project";
+import { promptFeature } from "./prompt";
+import { scimFeature } from "./scim";
+import { secretFeature } from "./secret";
+import { simulationsFeature } from "./simulations";
+import { topicFeature } from "./topic";
+import { traceFeature } from "./traces";
+import { workflowFeature } from "./workflows";
 
-export const installedUiFeatures: UiFeatureInstall = {
-  loaders: {
-    ...agentPageLoaders,
-    ...analyticsPageLoaders,
-    ...annotationPageLoaders,
-    ...annotationScoresPageLoaders,
-    ...apiKeyPageLoaders,
-    ...authPageLoaders,
-    ...authorizePageLoaders,
-    ...authzPageLoaders,
-    ...billingPageLoaders,
-    ...chromePageLoaders,
-    ...automationsAllPageLoaders,
-    ...dataPrivacyPageLoaders,
-    ...dataRetentionPageLoaders,
-    ...datasetPageLoaders,
-    ...evaluationPageLoaders,
-    ...evaluatorPageLoaders,
-    ...experimentPageLoaders,
-    ...gatewayPageLoaders,
-    ...githubPageLoaders,
-    ...governancePageLoaders,
-    ...homePageLoaders,
-    ...langyPageLoaders,
-    ...licensingPageLoaders,
-    ...modelProviderPageLoaders,
-    ...navigationPageLoaders,
-    ...notificationPageLoaders,
-    ...monitorPageLoaders,
-    ...onboardingPageLoaders,
-    ...opsPageLoaders,
-    ...organizationPageLoaders,
-    ...projectPageLoaders,
-    ...promptPageLoaders,
-    ...scimPageLoaders,
-    ...secretPageLoaders,
-    ...simulationsPageLoaders,
-    ...topicPageLoaders,
-    ...tracePageLoaders,
-    ...workflowPageLoaders,
-    ...personalWorkspacePageLoaders,
-  },
-  apis: [
-    agentApiBinding,
-    analyticsApiBinding,
-    annotationApiBinding,
-    annotationScoresApiBinding,
-    apiKeyApiBinding,
-    authApiBinding,
-    authzApiBinding,
-    automationsApiBinding,
-    billingApiBinding,
-    dataPrivacyApiBinding,
-    dataRetentionApiBinding,
-    datasetApiBinding,
-    evaluatorApiBinding,
-    gatewayApiBinding,
-    githubApiBinding,
-    governanceApiBinding,
-    homeApiBinding,
-    langyApiBinding,
-    licensingApiBinding,
-    modelProviderApiBinding,
-    monitorApiBinding,
-    navigationApiBinding,
-    notificationApiBinding,
-    onboardingApiBinding,
-    opsApiBinding,
-    organizationApiBinding,
-    projectApiBinding,
-    promptApiBinding,
-    scimApiBinding,
-    secretApiBinding,
-    simulationsApiBinding,
-    topicApiBinding,
-    traceApiBinding,
-    workflowApiBinding,
-    ...personalWorkspaceApiBindings,
-  ],
+/** Every feature this package installs. Order is preserved into `apis`. */
+const features = [
+  agentFeature,
+  analyticsFeature,
+  annotationFeature,
+  annotationScoresFeature,
+  apiKeyFeature,
+  authFeature,
+  authorizeFeature,
+  authzFeature,
+  automationsFeature,
+  billingFeature,
+  chromeFeature,
+  dataPrivacyFeature,
+  dataRetentionFeature,
+  datasetFeature,
+  evaluationsFeature,
+  evaluatorFeature,
+  experimentsFeature,
+  gatewayFeature,
+  githubFeature,
+  governanceFeature,
+  homeFeature,
+  langyFeature,
+  licensingFeature,
+  modelProviderFeature,
+  monitorFeature,
+  navigationFeature,
+  notificationFeature,
+  onboardingFeature,
+  opsFeature,
+  organizationFeature,
+  personalWorkspaceFeature,
+  codingAgentFeature,
+  projectFeature,
+  promptFeature,
+  scimFeature,
+  secretFeature,
+  simulationsFeature,
+  topicFeature,
+  traceFeature,
+  workflowFeature,
+] as const;
+
+export const installedUiFeatures = installUiFeatures({
+  features,
   capabilities: { feedback: BrowserUiFeedback.create() },
   session: useBrowserUiSession,
-};
+});
+
+/** Every drawer this application answers, one map composed from every feature's own. */
+export const installedUiDrawers = installedUiFeatures.drawers;
+
+/** Every drawer name this application answers. */
+export type UiInstalledDrawer = keyof typeof installedUiDrawers;
+
+/**
+ * The one rule the framework takes as an install: every trace open lands on
+ * the Trace Explorer drawer, whichever name the call site spelled.
+ *
+ * Registered at module scope rather than from a component, because the rule
+ * has to be in force for a `traceDetails` open that happens before anything
+ * the chrome renders has mounted — a deep link, or a notification the
+ * reader followed.
+ */
+installDrawerOpenRewrite(routeTraceDrawerForV2);
+
+/**
+ * The navigator, told which registry it is addressing.
+ *
+ * `openDrawer("evaluatorHistory", { evaluatorId })` is checked against the
+ * drawer's own props at the call site, which is what `platform/app` got
+ * from `keyof typeof drawers` and what a composed registry keeps.
+ */
+export const useUiDrawer = () => useDrawer<typeof installedUiDrawers>();
+
+const preloader = createDrawerPreloader({ registry: installedUiDrawers, warm: warmChunk });
+
+/** Fetch a drawer's code now. */
+export const preloadUiDrawer = preloader.preload;
+
+/** Fetch the drawers this screen opens, once the browser is idle. */
+export const usePreloadUiDrawer = preloader.usePreload;

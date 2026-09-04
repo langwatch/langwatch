@@ -6,7 +6,7 @@
  * addressed rather than mounted — two of them by openers outside this family —
  * so a screen names one and this function writes the address the rest of the
  * product already produces. `llmModelCost` is registered in
- * `installed-ui-drawers.ts` now; the other two are not, and
+ * `installed-ui-features.ts` now; the other two are not, and
  * `dev/docs/plans/core-application-feature-extraction-plan.md` records why.
  *
  * Getting that address wrong is silent in both directions: a missing

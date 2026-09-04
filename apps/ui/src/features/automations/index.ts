@@ -5,31 +5,29 @@
  */
 
 import { automationApi } from "@langwatch/automation-web/screens/automations";
-import { lazyDrawer, type UiDrawerRegistry } from "@langwatch/ui-drawer";
-import { uiFeatureApi, type UiFeatureApiBinding } from "../../behavior/ui-feature-transport";
-import { automationsPageLoaders } from "./ui/sections/automations-routes";
+import { lazyDrawer } from "@langwatch/ui-drawer";
+import { uiFeature } from "../../behavior/ui-feature";
+import { automationsPageLoaders as automationsOwnPageLoaders } from "./ui/sections/automations-routes";
 import { unsubscribePageLoaders } from "./ui/sections/unsubscribe-routes";
 
-export const automationsApiBinding: UiFeatureApiBinding = uiFeatureApi({
-  name: "@langwatch/automation-web",
-  api: automationApi,
-});
-
-/** The drawers this family serves, by the name the address uses. */
-export const automationsDrawers: UiDrawerRegistry = {
-  automation: lazyDrawer({
-    factory: () => import("./ui/sections/automations-drawers"),
-    key: "AutomationDrawer",
-  }),
-  viewAutomation: lazyDrawer({
-    factory: () => import("./ui/sections/automations-drawers"),
-    key: "ViewAutomationDrawer",
-  }),
-};
-
-export const automationsAllPageLoaders = {
-  ...automationsPageLoaders,
+const automationsPageLoaders = {
+  ...automationsOwnPageLoaders,
   ...unsubscribePageLoaders,
 };
 
-export { automationsPageLoaders, unsubscribePageLoaders };
+export const automationsFeature = uiFeature({
+  name: "@langwatch/automation-web",
+  api: automationApi,
+  loaders: automationsPageLoaders,
+  /** The drawers this family serves, by the name the address uses. */
+  drawers: {
+    automation: lazyDrawer({
+      factory: () => import("./ui/sections/automations-drawers"),
+      key: "AutomationDrawer",
+    }),
+    viewAutomation: lazyDrawer({
+      factory: () => import("./ui/sections/automations-drawers"),
+      key: "ViewAutomationDrawer",
+    }),
+  },
+});

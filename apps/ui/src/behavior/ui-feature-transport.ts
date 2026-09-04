@@ -140,24 +140,3 @@ export type UiFeatureApiBinding = {
   readonly name: string;
   readonly Provider: UiFeatureApiProvider;
 };
-
-/**
- * Erases a feature's typed client Provider to the untyped prop the shell
- * mounts every feature with. `TClient` stays unconstrained on purpose: this
- * is the one place allowed to erase either client shape.
- */
-export function uiFeatureApi<TClient>({
-  name,
-  api,
-}: {
-  name: string;
-  api: {
-    Provider: ComponentType<{
-      client: TClient;
-      queryClient: QueryClient;
-      children: ReactNode;
-    }>;
-  };
-}): UiFeatureApiBinding {
-  return { name, Provider: api.Provider as UiFeatureApiProvider };
-}

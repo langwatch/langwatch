@@ -4,9 +4,13 @@
  * host chrome shared by every family, so no feature web package may own it.
  */
 
+import { uiFeature } from "../../behavior/ui-feature";
 import { chromePageLoaders } from "./ui/sections/chrome-routes";
 
-export { chromePageLoaders };
+export const chromeFeature = uiFeature({
+  name: "@langwatch/ui/features/chrome",
+  loaders: chromePageLoaders,
+});
 
 /**
  * The two switchers, and nothing else from the layout module — `ui-app-chrome`

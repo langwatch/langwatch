@@ -135,7 +135,7 @@ function QueueEditorDrawer({ queueId }: { queueId?: string }) {
   );
 }
 
-vi.mock("../src/features/installed-ui-drawers", () => ({
+vi.mock("../src/features/installed-ui-features", () => ({
   installedUiDrawers: { queueEditor: QueueEditorDrawer },
 }));
 

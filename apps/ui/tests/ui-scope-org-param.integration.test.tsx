@@ -27,7 +27,7 @@ const ORGANIZATIONS = [
 
 const ROUTE_PATHS = ["/me", "/settings", "/gateway/virtual-keys"];
 
-const query = vi.fn(() => Promise.resolve(ORGANIZATIONS as unknown));
+const query = vi.fn((_path: string) => Promise.resolve(ORGANIZATIONS as unknown));
 
 /** Answers `organization.getAll` and refuses everything a page has no business asking here. */
 class RecordedUiRpc extends UiRpcPort {

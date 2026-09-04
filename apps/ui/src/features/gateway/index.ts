@@ -4,21 +4,19 @@
  */
 
 import { gatewayApi } from "@langwatch/gateway-web/screens/gateway";
-import { lazyDrawer, type UiDrawerRegistry } from "@langwatch/ui-drawer";
-import { uiFeatureApi, type UiFeatureApiBinding } from "../../behavior/ui-feature-transport";
+import { lazyDrawer } from "@langwatch/ui-drawer";
+import { uiFeature } from "../../behavior/ui-feature";
 import { gatewayPageLoaders } from "./ui/sections/gateway-routes";
 
-export const gatewayApiBinding: UiFeatureApiBinding = uiFeatureApi({
+export const gatewayFeature = uiFeature({
   name: "@langwatch/gateway-web",
   api: gatewayApi,
+  loaders: gatewayPageLoaders,
+  /** The drawers this family serves, by the name the address uses. */
+  drawers: {
+    routingPolicy: lazyDrawer({
+      factory: () => import("./ui/sections/gateway-drawers"),
+      key: "RoutingPolicyDrawer",
+    }),
+  },
 });
-
-/** The drawers this family serves, by the name the address uses. */
-export const gatewayDrawers: UiDrawerRegistry = {
-  routingPolicy: lazyDrawer({
-    factory: () => import("./ui/sections/gateway-drawers"),
-    key: "RoutingPolicyDrawer",
-  }),
-};
-
-export { gatewayPageLoaders };

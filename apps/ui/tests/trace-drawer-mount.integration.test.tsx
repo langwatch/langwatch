@@ -121,7 +121,7 @@ vi.mock("../src/features/navigation", () => ({
   ),
 }));
 
-vi.mock("../src/features/installed-ui-drawers", () => ({
+vi.mock("../src/features/installed-ui-features", () => ({
   installedUiDrawers: {},
 }));
 

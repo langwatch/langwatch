@@ -120,7 +120,7 @@ vi.mock("../src/features/traces", () => ({
 // The other composed registry the layout route reads. Both of them import every
 // feature in the package, which is the graph this suite is deliberately not
 // about — the drawer half has its own suite in `chrome-drawer.integration`.
-vi.mock("../src/features/installed-ui-drawers", () => ({
+vi.mock("../src/features/installed-ui-features", () => ({
   installedUiDrawers: {},
 }));
 

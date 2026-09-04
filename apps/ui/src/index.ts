@@ -44,12 +44,12 @@ export {
 export {
   createUiFeatureApiClient,
   UI_TRPC_ENDPOINT,
-  uiFeatureApi,
   type UiFeatureApiBinding,
   type UiFeatureApiClientOptions,
   type UiFeatureApiProvider,
   type UiFeatureApiTransport,
 } from "./behavior/ui-feature-transport";
+export { installUiFeatures, uiFeature, type UiFeature } from "./behavior/ui-feature";
 export { createRouterUiNavigation, useRouterUiNavigation } from "./behavior/ui-router-navigation";
 export { useUiOrgQueryParamSelection } from "./behavior/ui-scope-org-param";
 export {

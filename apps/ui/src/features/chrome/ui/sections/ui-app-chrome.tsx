@@ -7,7 +7,7 @@
 import { NavigationShell, useNavigationTracking } from "@langwatch/navigation-web/chrome";
 import { CurrentDrawer } from "@langwatch/ui-drawer";
 import { Outlet, useMatches } from "react-router";
-import { installedUiDrawers } from "../../../installed-ui-drawers";
+import { installedUiDrawers } from "../../../installed-ui-features";
 import { NavigationHostSection } from "../../../navigation";
 import { UiTraceDrawerMount } from "../../../traces";
 import { useUiOrgQueryParamSelection } from "../../../../behavior/ui-scope-org-param";
