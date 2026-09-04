@@ -63,17 +63,17 @@ import {
   lwqlViewSourceColumns,
 } from "../catalog/types";
 import {
-  DEFAULT_POSTGRES_ENGINE_POOL_SIZE,
-  postgresApprovedViewStatement,
-  postgresEngineTableStatement,
-} from "./postgresMapping";
-import {
   KEY_MAP_COLUMNS,
   type LangWatchQLNames,
   type LangWatchQLTable,
   lwqlGrantStatement,
   lwqlRowPolicyStatement,
 } from "./accessModel";
+import {
+  DEFAULT_POSTGRES_ENGINE_POOL_SIZE,
+  postgresApprovedViewStatement,
+  postgresEngineTableStatement,
+} from "./postgresMapping";
 
 /**
  * The strategy the shipped views use where a catalog entry pins none of its

@@ -147,9 +147,7 @@ export function checkPoolSizeForSelfProvisionLock(
   if (!databaseUrl) return;
   let connectionLimit: string | null;
   try {
-    connectionLimit = new URL(databaseUrl).searchParams.get(
-      "connection_limit",
-    );
+    connectionLimit = new URL(databaseUrl).searchParams.get("connection_limit");
   } catch {
     return;
   }
