@@ -4,7 +4,7 @@
  * A run plan is anything a person can open to read runs: a stored plan, or an
  * external set that a code run writes into. Both are addressed by a slug and
  * both point at one scenario set, so the rest of the Results tab reads one
- * shape. A test suite is a folder of scenarios and never a row of this list;
+ * shape. A test suite is a group of scenarios and never a row of this list;
  * the plans that run it are.
  *
  * Everything here is pure, so the list rules can be read and tested without a
@@ -35,6 +35,25 @@ import { RESULTS_SEGMENT } from "../useAgentTestingRouting";
  */
 export const CLI_EPHEMERAL_LABEL = "cli-ephemeral";
 
+/** The suite fields the run plan rule reads. */
+export type StoredSuite = { kind?: string | null; labels: string[] };
+
+/**
+ * The suites of a project that are run plans.
+ *
+ * A test suite is a group of scenarios and never a row of the Test Runs list,
+ * and the throwaway suites `scenario run` makes are deleted again. Every
+ * surface that counts or lists run plans reads this one rule, so the number
+ * beside the Results tab can never disagree with the rows under it.
+ */
+export function toRunPlanSuites<T extends StoredSuite>(suites: T[]): T[] {
+  return suites.filter(
+    (suite) =>
+      suite.kind !== "test_suite" &&
+      !suite.labels.includes(CLI_EPHEMERAL_LABEL),
+  );
+}
+
 export type RunPlanKind = "suite" | "external";
 
 /**
@@ -43,9 +62,9 @@ export type RunPlanKind = "suite" | "external";
  */
 export type RunPlanScopeKind =
   | "all"
-  | "folders"
+  | "test_suites"
   | "labels"
-  | "cases"
+  | "scenarios"
   | "external";
 
 /** How the last run of a plan went, in the shape every source can supply. */
@@ -103,7 +122,7 @@ export type RunPlanSuite = {
 /**
  * What a run plan covers, in words.
  *
- * The plan reads its stored rule, with the suites of a `folders` scope named
+ * The plan reads its stored rule, with the suites of a `test_suites` scope named
  * rather than counted, because "Checkout, Refunds" answers the question and
  * "2 suites" does not.
  *
@@ -121,8 +140,8 @@ export function suiteScopeLabel({
   switch (scope.mode) {
     case "all":
       return "All scenarios";
-    case "folders": {
-      const named = scope.folderIds
+    case "test_suites": {
+      const named = scope.testSuiteIds
         .map((id) => suiteNames.get(id))
         .filter((name): name is string => !!name);
       if (named.length === 0) return "No suite";
@@ -132,7 +151,7 @@ export function suiteScopeLabel({
       if (scope.labels.length === 0) return "No label";
       return `Labelled ${scope.labels.join(", ")}`;
     }
-    case "cases": {
+    case "scenarios": {
       const count = suite.scenarioIds.length;
       return count === 1 ? "1 scenario" : `${count} scenarios`;
     }
@@ -150,6 +169,14 @@ export function suiteScopeKind(suite: RunPlanSuite): RunPlanScopeKind {
  * target. The code chose both, so both read the same way.
  */
 export const CODE_RUN_LABEL = "From code";
+
+/**
+ * How the target of a run from code is named. The code pointed the run at its
+ * own agent, so the platform holds no target for it, and the run reads under
+ * the default target the same way a run without a set reads under the
+ * default set. Surfaces that list it mark it with the from-code badge.
+ */
+export const CODE_TARGET_NAME = "default";
 
 export function toExternalPlanSlug(scenarioSetId: string): string {
   return `${EXTERNAL_SET_PREFIX}${scenarioSetId}`;
@@ -219,7 +246,7 @@ export function buildRunPlans({
   suiteSummaries,
   externalSets,
 }: {
-  /** The stored run plans, which are the custom rows and never the folders. */
+  /** The stored run plans, which are the plan rows and never the test suites. */
   plans: RunPlanSuite[];
   /** Every suite name of the project, keyed by id. */
   suiteNames: ReadonlyMap<string, string>;
@@ -227,22 +254,20 @@ export function buildRunPlans({
   suiteSummaries: Record<string, SuiteRunSummary>;
   externalSets: ExternalSetSummary[];
 }): RunPlan[] {
-  const suitePlans: RunPlan[] = plans
-    .filter((suite) => !suite.labels.includes(CLI_EPHEMERAL_LABEL))
-    .map((suite) => {
-      const summary = suiteSummaries[suite.id];
-      return {
-        slug: suite.slug,
-        name: suite.name,
-        kind: "suite" as const,
-        scenarioSetId: getSuiteSetId(suite.id),
-        suiteId: suite.id,
-        caseCount: suite.scenarioIds.length,
-        lastRun: summary ? toLastRun(summary) : null,
-        scopeLabel: suiteScopeLabel({ suite, suiteNames }),
-        scopeKind: suiteScopeKind(suite),
-      };
-    });
+  const suitePlans: RunPlan[] = toRunPlanSuites(plans).map((suite) => {
+    const summary = suiteSummaries[suite.id];
+    return {
+      slug: suite.slug,
+      name: suite.name,
+      kind: "suite" as const,
+      scenarioSetId: getSuiteSetId(suite.id),
+      suiteId: suite.id,
+      caseCount: suite.scenarioIds.length,
+      lastRun: summary ? toLastRun(summary) : null,
+      scopeLabel: suiteScopeLabel({ suite, suiteNames }),
+      scopeKind: suiteScopeKind(suite),
+    };
+  });
 
   const externalPlans: RunPlan[] = externalSets.map((set) => ({
     slug: toExternalPlanSlug(set.scenarioSetId),

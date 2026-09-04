@@ -1,0 +1,23 @@
+{
+  "name": "connected-agent-example",
+  "version": "1.0.0",
+  "description": "A support agent connected to LangWatch simulations with connectAgent",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx support-agent.ts"
+  },
+  "keywords": [],
+  "author": "LangWatch",
+  "license": "MIT",
+  "dependencies": {
+    "@ai-sdk/openai": "^2.0.6",
+    "ai": "^5.0.52",
+    "langwatch": "file:../../",
+    "zod": "^4.0.14"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.2"
+  }
+}

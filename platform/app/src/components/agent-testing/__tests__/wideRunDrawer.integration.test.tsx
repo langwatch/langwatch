@@ -57,7 +57,7 @@ vi.mock("~/utils/api", () => ({
         getBatchRunData: { fetch: vi.fn(async () => ({ runs: [] })) },
       },
       suites: {
-        folders: { getAll: { invalidate: vi.fn() } },
+        testSuites: { getAll: { invalidate: vi.fn() } },
         getById: { invalidate: vi.fn() },
       },
     }),
@@ -83,7 +83,7 @@ vi.mock("~/utils/api", () => ({
       runPlan: {
         useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
       },
-      folders: { getAll: { useQuery: emptyQuery } },
+      testSuites: { getAll: { useQuery: emptyQuery } },
     },
     agents: { getAll: { useQuery: () => ({ data: [] }) } },
     prompts: { getAllPromptsForProject: { useQuery: () => ({ data: [] }) } },
@@ -363,10 +363,10 @@ describe("the wide run detail drawer", () => {
     assertContent();
   });
 
-  /** @scenario "The drawer header opens the case editor from one labelled button" */
-  /** @scenario "The drawer header offers Open Scenario for the scenario that ran" */
-  /** @scenario "The drawer offers Open Scenario for that case" */
-  it("offers one Open Scenario button that opens the case editor", async () => {
+  /** @scenario "The drawer header opens the scenario editor from one labelled button" */
+  /** @scenario "The drawer header offers Edit Scenario for the scenario that ran" */
+  /** @scenario "The drawer offers Edit Scenario for that scenario" */
+  it("offers one Edit Scenario button that opens the scenario editor", async () => {
     const user = userEvent.setup();
     renderWide();
 
@@ -377,7 +377,7 @@ describe("the wide run detail drawer", () => {
       screen.queryByRole("button", { name: "Edit scenario" }),
     ).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Open Scenario" }));
+    await user.click(screen.getByRole("button", { name: "Edit Scenario" }));
 
     expect(mockOpenDrawer).toHaveBeenCalledWith("agentTestingCaseEditor", {
       scenarioId: "case_1",
@@ -396,9 +396,17 @@ describe("the wide run detail drawer", () => {
     const view = renderWide();
 
     expect(screen.getByTestId("run-verdict-pending")).toHaveTextContent(
-      "The conversation is running",
+      "Waiting for more turns to define a verdict",
+    );
+    expect(screen.getByTestId("run-verdict-pending")).not.toContainElement(
+      screen.queryByRole("progressbar"),
     );
     expect(screen.getByText("I want my money back")).toBeInTheDocument();
+    // The user has spoken, so the agent is the one being waited for.
+    expect(screen.getByTestId("conversation-typing")).toHaveAttribute(
+      "data-typing-role",
+      "assistant",
+    );
 
     setRunState(
       makeRunState({
@@ -418,6 +426,9 @@ describe("the wide run detail drawer", () => {
 
     expect(screen.getByText("Let me check the order")).toBeInTheDocument();
     expect(screen.getByTestId("run-verdict-pending")).toBeInTheDocument();
+    // The judge reads the agent's answer next, and it writes no message, so
+    // nothing is drawn for it.
+    expect(screen.queryByTestId("conversation-typing")).not.toBeInTheDocument();
   });
 
   /** @scenario "A run that is still going shows the conversation growing beside empty results" */
@@ -471,6 +482,164 @@ describe("the wide run detail drawer", () => {
     expect(screen.getAllByText(/stays polite/).length).toBeGreaterThan(0);
   });
 
+  /** @scenario "A verdict with no criteria reads the judge's reasoning" */
+  it("reads the reasoning of a scripted verdict that has no criteria", () => {
+    setRunState(
+      makeRunState({
+        status: ScenarioRunStatus.SUCCESS,
+        results: {
+          verdict: Verdict.SUCCESS,
+          metCriteria: [],
+          unmetCriteria: [],
+          reasoning: "The agent answered",
+        },
+      }),
+    );
+    renderWide();
+
+    expect(screen.queryByTestId("run-verdict-pending")).not.toBeInTheDocument();
+    expect(screen.getByText("The agent answered")).toBeInTheDocument();
+  });
+
+  // --- A run that failed before it reached a verdict ---
+
+  /**
+   * The shape the scenario runner stores when a run fails: its own error, its
+   * message and its stack, as one JSON string in the run's error field.
+   */
+  const RUNNER_FAILURE_STACK = [
+    "Error: [UserSimulatorAgent] Error: No response content from LLM",
+    "    at ScenarioExecution.callAgent (/app/node_modules/@langwatch/scenario/dist/index.js:12358:13)",
+    "    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)",
+  ].join("\n");
+
+  const RUNNER_FAILURE = JSON.stringify({
+    name: "Error",
+    message: "[UserSimulatorAgent] Error: No response content from LLM",
+    stack: RUNNER_FAILURE_STACK,
+  });
+
+  function setFailedRunState() {
+    setRunState(
+      makeRunState({
+        status: ScenarioRunStatus.ERROR,
+        results: {
+          verdict: Verdict.FAILURE,
+          metCriteria: [],
+          unmetCriteria: [],
+          reasoning:
+            "Scenario failed with error: [UserSimulatorAgent] Error: No response content from LLM",
+          error: RUNNER_FAILURE,
+        },
+      }),
+    );
+  }
+
+  /** @scenario "A failed run reads a named failure instead of a stack" */
+  it("names the failure and holds the stack back", () => {
+    setFailedRunState();
+    renderWide();
+
+    expect(screen.getByTestId("run-verdict-error")).toHaveTextContent(
+      "Model answered with no text",
+    );
+    expect(screen.getByTestId("run-verdict-error-message")).toHaveTextContent(
+      /plays the simulated user/,
+    );
+    expect(screen.getByTestId("run-verdict-error-hint")).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("run-verdict-error-detail"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/ScenarioExecution\.callAgent/)).toBeNull();
+  });
+
+  /** @scenario "A failed run does not read its own failure twice" */
+  it("does not read the failure twice when the reasoning restates it", () => {
+    setFailedRunState();
+    renderWide();
+
+    expect(screen.queryByTestId("run-verdict-reasoning")).toBeNull();
+  });
+
+  /** @scenario "The detail of a failure is one click away" */
+  it("reads the stack in a monospace block once More info is clicked", async () => {
+    const user = userEvent.setup();
+    setFailedRunState();
+    renderWide();
+
+    await user.click(screen.getByTestId("run-verdict-error-toggle"));
+
+    const detail = screen.getByTestId("run-verdict-error-detail");
+    expect(detail).toHaveTextContent(/ScenarioExecution\.callAgent/);
+    // The line breaks the runner recorded are kept rather than collapsed.
+    expect(detail.textContent).toContain("\n");
+    expect(detail).toHaveStyle({ overflow: "auto" });
+    expect(screen.getByTestId("run-verdict-error-toggle")).toHaveTextContent(
+      "Hide details",
+    );
+  });
+
+  /** @scenario "A run that failed before anyone spoke says so" */
+  it("says the simulation failed rather than waiting, on a run with no messages", () => {
+    setRunState(
+      makeRunState({
+        status: ScenarioRunStatus.ERROR,
+        messages: [],
+        results: {
+          verdict: Verdict.FAILURE,
+          metCriteria: [],
+          unmetCriteria: [],
+          error: RUNNER_FAILURE,
+        },
+      }),
+    );
+    renderWide();
+
+    expect(screen.getByTestId("scenario-run-failed-empty")).toHaveTextContent(
+      "Simulation failed",
+    );
+    expect(screen.queryByText("Waiting for the first message")).toBeNull();
+  });
+
+  /** @scenario "A queued run reads the whole drawer with a spinner" */
+  it("reads a spinner beside the queued line, in the whole layout", () => {
+    setRunState(
+      makeRunState({
+        status: ScenarioRunStatus.QUEUED,
+        messages: [],
+        results: { verdict: null, metCriteria: [], unmetCriteria: [] },
+      }),
+    );
+    renderWide();
+
+    const queued = screen.getByTestId("wide-drawer-queued");
+    expect(queued).toHaveTextContent("Queued");
+    expect(
+      queued.parentElement?.querySelector(".chakra-spinner"),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("wide-drawer-side-by-side")).toBeInTheDocument();
+    expect(screen.getByTestId("run-verdict-pending")).toHaveTextContent(
+      "Waiting for the run to start",
+    );
+  });
+
+  /** @scenario "A queued run reads the whole drawer with a spinner" */
+  it("draws the stand-in once the read answers that no run exists yet", () => {
+    // The record is written after the job goes out, so the first read of a
+    // queued run answers NOT_FOUND. That is the ordinary case rather than a
+    // failure, and the drawer must still draw the queued run.
+    setRunState(undefined, { data: { code: "NOT_FOUND" } });
+    renderWide();
+
+    expect(screen.getByTestId("wide-drawer-queued")).toHaveTextContent(
+      "Queued",
+    );
+    expect(screen.getByTestId("wide-drawer-side-by-side")).toBeInTheDocument();
+    expect(screen.getByTestId("run-verdict-pending")).toHaveTextContent(
+      "Waiting for the run to start",
+    );
+  });
+
   /** @scenario "The criteria appear the moment the run settles" */
   it("reads the stored run again when the run settles without criteria", () => {
     vi.useFakeTimers();
@@ -491,6 +660,36 @@ describe("the wide run detail drawer", () => {
       expect(mockInvalidateRunState).toHaveBeenCalledWith({
         scenarioRunId: "run_1",
       });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  /** @scenario "The criteria appear the moment the run settles" */
+  it("stops reading again once a scripted run answers with a verdict", () => {
+    vi.useFakeTimers();
+    try {
+      // A scripted run, such as the ping an agent test sends, is judged by
+      // its script and answers with a verdict and a reasoning and no criteria
+      // at all. Its results are there, so there is nothing to wait for.
+      setRunState(
+        makeRunState({
+          status: ScenarioRunStatus.SUCCESS,
+          results: {
+            verdict: Verdict.SUCCESS,
+            reasoning: "The agent answered the ping.",
+            metCriteria: [],
+            unmetCriteria: [],
+          },
+        }),
+      );
+      renderWide();
+
+      act(() => {
+        vi.advanceTimersByTime(10_000);
+      });
+
+      expect(mockInvalidateRunState).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
     }
@@ -531,7 +730,7 @@ describe("the wide run detail drawer", () => {
     const failed = within(panel).getByTestId("run-verdict-failed-criteria");
     expect(within(passed).getByText("Passed criteria")).toBeInTheDocument();
     expect(within(failed).getByText("Failed criteria")).toBeInTheDocument();
-    // The two rows in the passed section keep the order the case declares.
+    // The two rows in the passed section keep the order the scenario declares.
     const passedText = passed.textContent ?? "";
     expect(passedText.indexOf("stays polite")).toBeLessThan(
       passedText.indexOf("offers the refund"),
@@ -541,10 +740,10 @@ describe("the wide run detail drawer", () => {
       within(failed).getByText("names the refund window"),
     ).toBeInTheDocument();
     expect(within(failed).queryByText("stays polite")).not.toBeInTheDocument();
-    // Passed sits above failed.
+    // Failed sits above passed: it is what the reader opened the run for.
     const text = panel.textContent ?? "";
-    expect(text.indexOf("Passed criteria")).toBeLessThan(
-      text.indexOf("Failed criteria"),
+    expect(text.indexOf("Failed criteria")).toBeLessThan(
+      text.indexOf("Passed criteria"),
     );
     // Icons match: two green checks, one red cross.
     expect(panel.querySelectorAll("svg.lucide-circle-check")).toHaveLength(2);
@@ -698,10 +897,10 @@ describe("the wide run detail drawer", () => {
   // --- The version the run used ---
 
   /** @scenario "The run detail drawer shows the version the run used" */
-  it("reads the version the run recorded, not the version the case is at now", () => {
+  it("reads the version the run recorded, not the version the scenario is at now", () => {
     renderWide();
 
-    // The run recorded v3; the case is at v6 now.
+    // The run recorded v3; the scenario is at v6 now.
     expect(screen.getByTestId("case-version-3")).toBeInTheDocument();
     expect(screen.queryByTestId("case-version-6")).not.toBeInTheDocument();
   });
@@ -716,7 +915,7 @@ describe("the wide run detail drawer", () => {
 
     await user.click(screen.getByTestId("run-drawer-version"));
 
-    // The history belongs to the case, so the chip is a fact of the run and
+    // The history belongs to the scenario, so the chip is a fact of the run and
     // opens nothing.
     expect(mockOpenDrawer).not.toHaveBeenCalledWith(
       "scenarioVersionHistory",

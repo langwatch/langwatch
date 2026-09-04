@@ -1,5 +1,5 @@
 /**
- * URL-routed wrapper of the Agent Testing case editor drawer.
+ * URL-routed wrapper of the Agent Testing scenario editor drawer.
  *
  * The drawer reads its target from the address bar, so a shared link, a
  * browser back and a Save & Run flow all resolve to the same open drawer.
@@ -37,31 +37,31 @@ export { CASE_EDITOR_DRAWER };
  * `setFlowCallbacks`.
  */
 export type AgentTestingCaseEditorDrawerProps = {
-  /** The case being edited, or absent for a new one. */
+  /** The scenario being edited, or absent for a new one. */
   scenarioId?: string;
-  /** The suite a new case starts in. */
-  folderId?: string;
-  /** "true" opens the case with its version history strip open. */
+  /** The suite a new scenario starts in. */
+  testSuiteId?: string;
+  /** "true" opens the scenario with its version history strip open. */
   showHistory?: string;
-  /** Called when a case is saved. `shouldRunAfterSave` is true for Save & Run. */
+  /** Called when a scenario is saved. `shouldRunAfterSave` is true for Save & Run. */
   onSaved?: (saved: Scenario, options: { shouldRunAfterSave: boolean }) => void;
 };
 
 function useEditorSuites(projectId: string): TestSuiteEntry[] {
-  const { data: folders } = api.suites.folders.getAll.useQuery(
+  const { data: testSuites } = api.suites.testSuites.getAll.useQuery(
     { projectId },
     { enabled: !!projectId },
   );
 
   return useMemo<TestSuiteEntry[]>(
     () =>
-      (folders ?? []).map((folder) => ({
-        id: folder.id,
-        name: folder.name,
-        slug: folder.slug,
+      (testSuites ?? []).map((testSuite) => ({
+        id: testSuite.id,
+        name: testSuite.name,
+        slug: testSuite.slug,
         caseCount: 0,
       })),
-    [folders],
+    [testSuites],
   );
 }
 
@@ -75,7 +75,7 @@ export function AgentTestingCaseEditorDrawer(
 
   const isOpen = drawerOpen(CASE_EDITOR_DRAWER);
   const scenarioId = params.scenarioId ?? null;
-  const folderId = params.folderId ?? null;
+  const testSuiteId = params.testSuiteId ?? null;
   const showHistory = params.showHistory === "true";
 
   const suites = useEditorSuites(projectId);
@@ -98,7 +98,7 @@ export function AgentTestingCaseEditorDrawer(
     open: isOpen,
     projectId,
     scenarioId,
-    folderId,
+    testSuiteId,
     onSaved,
   });
 

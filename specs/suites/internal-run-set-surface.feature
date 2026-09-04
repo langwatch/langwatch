@@ -7,7 +7,7 @@ Feature: The internal run set of a project
     A scenario run started without naming a run set is filed in an internal run
     set that belongs to the project. That set already exists, it already reads
     with a friendly name instead of its raw address on the v1 simulations page,
-    and each of its batches already carries the name of the test case that ran.
+    and each of its batches already carries the name of the scenario that ran.
 
     The rules that decide whether an address is internal are in
     specs/scenarios/internal-set-namespace.feature and are not repeated here.
@@ -27,14 +27,14 @@ Feature: The internal run set of a project
 
   @unit
   Scenario: A scenario run that names no run set goes to the internal run set
-    Given a test case and a target
+    Given a scenario and a target
     When a run is started without naming a run set
     Then the run is filed in the internal run set of the project
     And no run plan record is created for it
 
   @unit
   Scenario: A batch of the internal run set carries the name of the scenario that ran
-    Given a run of the test case "Angry refund request" that names no run set
+    Given a run of the scenario "Angry refund request" that names no run set
     When the batch is read back
     Then the batch holds exactly one entry
     And the entry is named "Angry refund request"

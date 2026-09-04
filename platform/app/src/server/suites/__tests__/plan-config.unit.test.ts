@@ -8,14 +8,16 @@ import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import {
   configurationKey,
+  duplicateSuiteTargets,
   normalizePlanScope,
   scopeKey,
   sortSuiteTargets,
 } from "../plan-config";
+import { targetSortKey } from "../target-key";
 import type { SuiteTarget } from "../types";
 
-/** A Prisma stand-in that answers only the folder read the normalise makes. */
-function prismaWithFolders(ids: string[]): PrismaClient {
+/** A Prisma stand-in that answers only the test suite read the normalise makes. */
+function prismaWithTestSuites(ids: string[]): PrismaClient {
   return {
     simulationSuite: {
       findMany: vi.fn(async () => ids.map((id) => ({ id }))),
@@ -24,26 +26,26 @@ function prismaWithFolders(ids: string[]): PrismaClient {
 }
 
 describe("normalizePlanScope", () => {
-  describe("when the scope names every folder of the project", () => {
+  describe("when the scope names every test suite of the project", () => {
     /** @scenario "Naming every suite of the project resolves to the same plan as running everything" */
     it("becomes the all scope", async () => {
       const scope = await normalizePlanScope({
         projectId: "project-1",
-        scope: { mode: "folders", folderIds: ["b", "a"] },
-        prisma: prismaWithFolders(["a", "b"]),
+        scope: { mode: "test_suites", testSuiteIds: ["b", "a"] },
+        prisma: prismaWithTestSuites(["a", "b"]),
       });
 
       expect(scope).toEqual({ mode: "all" });
     });
 
     /** @scenario "An archived suite does not have to be named for a scope to be exhaustive" */
-    it("ignores archived folders, which hold no active scenario", async () => {
-      // The read is already filtered to non-archived folders, so an archived
+    it("ignores archived test suites, which hold no active scenario", async () => {
+      // The read is already filtered to non-archived test suites, so an archived
       // one never reaches the comparison.
-      const prisma = prismaWithFolders(["active"]);
+      const prisma = prismaWithTestSuites(["active"]);
       const scope = await normalizePlanScope({
         projectId: "project-1",
-        scope: { mode: "folders", folderIds: ["active"] },
+        scope: { mode: "test_suites", testSuiteIds: ["active"] },
         prisma,
       });
 
@@ -56,35 +58,35 @@ describe("normalizePlanScope", () => {
     });
   });
 
-  describe("when the scope names some but not all folders", () => {
-    /** @scenario "A scope naming some but not all suites stays a folders scope" */
-    it("stays a folders scope naming those folders", async () => {
+  describe("when the scope names some but not all test suites", () => {
+    /** @scenario "A scope naming some but not all suites stays a test suites scope" */
+    it("stays a test suites scope naming those test suites", async () => {
       const scope = await normalizePlanScope({
         projectId: "project-1",
-        scope: { mode: "folders", folderIds: ["b", "a"] },
-        prisma: prismaWithFolders(["a", "b", "c"]),
+        scope: { mode: "test_suites", testSuiteIds: ["b", "a"] },
+        prisma: prismaWithTestSuites(["a", "b", "c"]),
       });
 
-      expect(scope).toEqual({ mode: "folders", folderIds: ["a", "b"] });
+      expect(scope).toEqual({ mode: "test_suites", testSuiteIds: ["a", "b"] });
     });
   });
 
-  describe("when the scope names no folder", () => {
-    /** @scenario "A folders scope naming no suite is not treated as everything" */
-    it("stays a folders scope naming none", async () => {
+  describe("when the scope names no test suite", () => {
+    /** @scenario "A test suites scope naming no suite is not treated as everything" */
+    it("stays a test suites scope naming none", async () => {
       const scope = await normalizePlanScope({
         projectId: "project-1",
-        scope: { mode: "folders", folderIds: [] },
-        prisma: prismaWithFolders(["a", "b"]),
+        scope: { mode: "test_suites", testSuiteIds: [] },
+        prisma: prismaWithTestSuites(["a", "b"]),
       });
 
-      expect(scope).toEqual({ mode: "folders", folderIds: [] });
+      expect(scope).toEqual({ mode: "test_suites", testSuiteIds: [] });
     });
   });
 
-  describe("when the scope is not a folders scope", () => {
+  describe("when the scope is not a test suites scope", () => {
     it("leaves it alone", async () => {
-      const prisma = prismaWithFolders(["a"]);
+      const prisma = prismaWithTestSuites(["a"]);
       expect(
         await normalizePlanScope({
           projectId: "project-1",
@@ -108,6 +110,147 @@ describe("sortSuiteTargets", () => {
         sortSuiteTargets([dev, prod]),
       );
       expect(sortSuiteTargets([prod, dev])).toEqual([dev, prod]);
+    });
+  });
+
+  describe("when the same agent appears twice with different overrides", () => {
+    /** @scenario "The same agent twice with different parameters is two targets" */
+    it("keeps both, the plain one first, in one order every run", () => {
+      const plain: SuiteTarget = { type: "http", referenceId: "prod-agent" };
+      const mini: SuiteTarget = {
+        type: "http",
+        referenceId: "prod-agent",
+        runParameters: { model: "gpt-5-mini" },
+      };
+
+      expect(sortSuiteTargets([mini, plain])).toEqual([plain, mini]);
+      expect(sortSuiteTargets([plain, mini])).toEqual([plain, mini]);
+      // The readable string, never the hash: the run dialog sorts by the same
+      // one, so the columns keep the order the dialog showed.
+      expect(targetSortKey(mini)).toBe("http:prod-agent|model=gpt-5-mini");
+      expect(targetSortKey(plain)).toBe("http:prod-agent|");
+    });
+  });
+});
+
+describe("duplicateSuiteTargets", () => {
+  describe("when two targets share a key", () => {
+    /** @scenario "Two identical targets are refused" */
+    it("names the repeated one", () => {
+      const twice: SuiteTarget = {
+        type: "http",
+        referenceId: "prod-agent",
+        runParameters: { model: "gpt-5-mini" },
+      };
+
+      expect(duplicateSuiteTargets([twice, { ...twice }])).toEqual([twice]);
+    });
+  });
+
+  describe("when the same agent appears with different overrides", () => {
+    /** @scenario "The same agent twice with different parameters is two targets" */
+    it("reports nothing", () => {
+      expect(
+        duplicateSuiteTargets([
+          { type: "http", referenceId: "prod-agent" },
+          {
+            type: "http",
+            referenceId: "prod-agent",
+            runParameters: { model: "gpt-5-mini" },
+          },
+        ]),
+      ).toEqual([]);
+    });
+  });
+
+  describe("when one override holds the separators the readable key writes", () => {
+    /** @scenario "A value holding a comma and an equals sign does not fake a second target" */
+    it("keeps two targets whose pairs read alike apart", () => {
+      expect(
+        duplicateSuiteTargets([
+          {
+            type: "http",
+            referenceId: "prod-agent",
+            runParameters: { a: "b,c=d" },
+          },
+          {
+            type: "http",
+            referenceId: "prod-agent",
+            runParameters: { a: "b", c: "d" },
+          },
+        ]),
+      ).toEqual([]);
+    });
+  });
+});
+
+describe("configurationKey", () => {
+  describe("when a target carries overrides", () => {
+    it("keys the variant apart from the plain target", () => {
+      const config = {
+        scope: { mode: "all" } as const,
+        repeatCount: 1,
+        simulatorModel: null,
+        judgeModel: null,
+      };
+      const plain = configurationKey({
+        config: {
+          ...config,
+          targets: [{ type: "http", referenceId: "prod-agent" }],
+        },
+      });
+      const variant = configurationKey({
+        config: {
+          ...config,
+          targets: [
+            {
+              type: "http",
+              referenceId: "prod-agent",
+              runParameters: { model: "gpt-5-mini" },
+            },
+          ],
+        },
+      });
+
+      expect(variant).not.toBe(plain);
+    });
+  });
+
+  describe("when one target's override holds a comma and an equals sign", () => {
+    /** @scenario "A value holding a comma and an equals sign does not fake a second target" */
+    it("keys it apart from the target whose pairs read alike", () => {
+      const config = {
+        scope: { mode: "all" } as const,
+        repeatCount: 1,
+        simulatorModel: null,
+        judgeModel: null,
+      };
+      const oneValue = configurationKey({
+        config: {
+          ...config,
+          targets: [
+            {
+              type: "http",
+              referenceId: "prod-agent",
+              runParameters: { a: "b,c=d" },
+            },
+          ],
+        },
+      });
+      const twoValues = configurationKey({
+        config: {
+          ...config,
+          targets: [
+            {
+              type: "http",
+              referenceId: "prod-agent",
+              runParameters: { a: "b", c: "d" },
+            },
+          ],
+        },
+      });
+
+      expect(oneValue).not.toBe(twoValues);
     });
   });
 });
@@ -141,24 +284,34 @@ describe("configurationKey", () => {
 describe("scopeKey", () => {
   describe("when two hand-picked scopes cover different scenarios", () => {
     it("tells them apart, which the scope shape alone cannot", () => {
-      const first = scopeKey({ scope: { mode: "cases" }, scenarioIds: ["a"] });
-      const second = scopeKey({ scope: { mode: "cases" }, scenarioIds: ["b"] });
+      const first = scopeKey({
+        scope: { mode: "scenarios" },
+        scenarioIds: ["a"],
+      });
+      const second = scopeKey({
+        scope: { mode: "scenarios" },
+        scenarioIds: ["b"],
+      });
 
       expect(first).not.toBe(second);
     });
 
     it("reads the same list in either order as one scope", () => {
       expect(
-        scopeKey({ scope: { mode: "cases" }, scenarioIds: ["b", "a"] }),
-      ).toBe(scopeKey({ scope: { mode: "cases" }, scenarioIds: ["a", "b"] }));
+        scopeKey({ scope: { mode: "scenarios" }, scenarioIds: ["b", "a"] }),
+      ).toBe(
+        scopeKey({ scope: { mode: "scenarios" }, scenarioIds: ["a", "b"] }),
+      );
     });
   });
 
-  describe("when the scope is a folders scope", () => {
-    it("reads the same folders in either order as one scope", () => {
+  describe("when the scope is a test suites scope", () => {
+    it("reads the same test suites in either order as one scope", () => {
       expect(
-        scopeKey({ scope: { mode: "folders", folderIds: ["b", "a"] } }),
-      ).toBe(scopeKey({ scope: { mode: "folders", folderIds: ["a", "b"] } }));
+        scopeKey({ scope: { mode: "test_suites", testSuiteIds: ["b", "a"] } }),
+      ).toBe(
+        scopeKey({ scope: { mode: "test_suites", testSuiteIds: ["a", "b"] } }),
+      );
     });
   });
 });

@@ -16,11 +16,11 @@ import {
 /**
  * The kinds of SimulationSuite.
  *
- * "custom" is a hand-assembled run plan; "folder" is a suite that groups
- * scenarios through Scenario.folderId. A string column plus this const union,
- * not a Prisma enum: adding a kind must not need a database migration.
+ * "run_plan" is a hand-assembled plan; "test_suite" is a suite that groups
+ * scenarios through Scenario.testSuiteId. A string column plus this const
+ * union, not a Prisma enum: adding a kind must not need a database migration.
  */
-export const SUITE_KINDS = ["folder", "custom"] as const;
+export const SUITE_KINDS = ["test_suite", "run_plan"] as const;
 export type SuiteKind = (typeof SUITE_KINDS)[number];
 
 /** Type guard: narrows a stored string to SuiteKind. */
@@ -29,7 +29,12 @@ export function isSuiteKind(value: string): value is SuiteKind {
 }
 
 const suiteTargetFields = z.object({
-  type: z.enum(["prompt", "http", "code", "workflow"]),
+  type: z.enum(["prompt", "http", "code", "workflow", "connected"]),
+  /**
+   * The id of the prompt or agent. A connected target may also say
+   * `<name>@<environment>`, which the run resolves to the agent id before
+   * anything is scheduled (see `resolveConnectedTargetReferences`).
+   */
   referenceId: z.string(),
   /**
    * Bindings from a scenario source to this target's declared inputs.
@@ -42,11 +47,15 @@ const suiteTargetFields = z.object({
    */
   scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
   /**
-   * The parameter overrides the last run of this suite used, so the next run
-   * dialog opens on the same values for everyone on the team.
+   * The parameter overrides this target runs with, merged over the values
+   * supplied for the run as a whole. The target's values win.
+   *
+   * They are part of the target's identity: one agent may appear twice in a
+   * run with different overrides, and each is its own target with its own
+   * key and its own column. See `target-key.ts`.
    *
    * Secret parameters are never kept here: their values are typed once per
-   * run and travel with the run alone.
+   * run and travel with the run alone. A target naming one is refused.
    */
   runParameters: runParameterValuesSchema.optional(),
   /**
@@ -85,7 +94,12 @@ export const suiteTargetSchema = suiteTargetFields.superRefine(
 export type SuiteTarget = z.infer<typeof suiteTargetSchema>;
 
 /** Agent target types — every suite target type except "prompt". Must stay in sync with suiteTargetSchema. */
-export const SUITE_AGENT_TARGET_TYPES = ["http", "code", "workflow"] as const;
+export const SUITE_AGENT_TARGET_TYPES = [
+  "http",
+  "code",
+  "workflow",
+  "connected",
+] as const;
 export type SuiteAgentTargetType = (typeof SUITE_AGENT_TARGET_TYPES)[number];
 
 /** Type guard: narrows `type` to `SuiteAgentTargetType`. */

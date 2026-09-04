@@ -3,6 +3,10 @@ Feature: Agent REST API
   I want full CRUD access to agents via REST endpoints
   So that I can programmatically manage agent definitions without the UI
 
+  # The agents family is served on the versioned API framework under
+  # /api/v1/agents. The list, create, get, update and delete endpoints keep
+  # /api/agents as a deprecated alias with the same behavior.
+
   Background:
     Given a project with a valid API key in the X-Auth-Token header
 
@@ -11,7 +15,7 @@ Feature: Agent REST API
   @integration
   Scenario: List agents returns paginated non-archived agents
     Given the project has 3 agents and 1 archived agent
-    When I call GET /api/agents
+    When I call GET /api/v1/agents
     Then I receive a paginated response with 3 agents
     And each agent includes id, name, type, config, createdAt, and updatedAt
     And the archived agent is not included
@@ -19,36 +23,36 @@ Feature: Agent REST API
   @integration
   Scenario: List agents with page and limit parameters
     Given the project has 15 agents
-    When I call GET /api/agents?page=2&limit=5
+    When I call GET /api/v1/agents?page=2&limit=5
     Then I receive 5 agents from the second page
     And the response includes pagination metadata with total count
 
   @integration
   Scenario: List agents returns empty array for project with no agents
-    When I call GET /api/agents
+    When I call GET /api/v1/agents
     Then I receive a paginated response with 0 agents
 
   # ── Create Agent ─────────────────────────────────────────────
 
   @integration
   Scenario: Create an agent with name, type, and config
-    When I call POST /api/agents with name "My Agent", type "signature", and a valid config
+    When I call POST /api/v1/agents with name "My Agent", type "signature", and a valid config
     Then a new agent is created with status 201
     And the response includes the agent id, name, type, and config
 
   @integration
   Scenario: Create an agent validates config against type schema
-    When I call POST /api/agents with type "signature" and an invalid config
+    When I call POST /api/v1/agents with type "signature" and an invalid config
     Then the request fails with 422 Unprocessable Entity
 
   @integration
   Scenario: Create an agent requires a name
-    When I call POST /api/agents without a name
+    When I call POST /api/v1/agents without a name
     Then the request fails with 422 Unprocessable Entity
 
   @integration
   Scenario: Create an agent requires a type
-    When I call POST /api/agents without a type
+    When I call POST /api/v1/agents without a type
     Then the request fails with 422 Unprocessable Entity
 
   # ── Get Single Agent ─────────────────────────────────────────
@@ -56,13 +60,13 @@ Feature: Agent REST API
   @integration
   Scenario: Get an agent by id
     Given an agent with id "agent_abc123" exists
-    When I call GET /api/agents/agent_abc123
+    When I call GET /api/v1/agents/agent_abc123
     Then I receive the agent details
     And the response includes id, name, type, and config
 
   @integration
   Scenario: Get agent returns 404 for non-existent id
-    When I call GET /api/agents/agent_doesnotexist
+    When I call GET /api/v1/agents/agent_doesnotexist
     Then the request fails with 404 Not Found
 
   # ── Update Agent ─────────────────────────────────────────────
@@ -70,33 +74,42 @@ Feature: Agent REST API
   @integration
   Scenario: Update an agent name
     Given an agent with id "agent_abc123" exists
-    When I call PATCH /api/agents/agent_abc123 with name "Updated Name"
+    When I call PATCH /api/v1/agents/agent_abc123 with name "Updated Name"
     Then the agent is updated
     And the response reflects the updated name
 
   @integration
   Scenario: Update an agent config
     Given an agent with id "agent_abc123" exists
-    When I call PATCH /api/agents/agent_abc123 with a new config
+    When I call PATCH /api/v1/agents/agent_abc123 with a new config
     Then the agent config is updated
 
   @integration
   Scenario: Update a non-existent agent returns 404
-    When I call PATCH /api/agents/agent_ghost with name "Whatever"
+    When I call PATCH /api/v1/agents/agent_ghost with name "Whatever"
     Then the request fails with 404 Not Found
+
+  # The update is partial under either verb, so a caller reaching for the one
+  # we did not route should not meet a 404 that reads as a missing agent.
+  @integration
+  Scenario: Update an agent with PUT
+    Given an agent with id "agent_abc123" exists
+    When I call PUT /api/v1/agents/agent_abc123 with name "Renamed By Put"
+    Then the agent is updated
+    And the response reflects the updated name
 
   # ── Delete (Archive) Agent ───────────────────────────────────
 
   @integration
   Scenario: Delete an agent archives it
     Given an agent with id "agent_abc123" exists
-    When I call DELETE /api/agents/agent_abc123
+    When I call DELETE /api/v1/agents/agent_abc123
     Then the agent is soft-deleted with an archivedAt timestamp
-    And subsequent GET /api/agents/agent_abc123 returns 404
+    And subsequent GET /api/v1/agents/agent_abc123 returns 404
 
   @integration
   Scenario: Delete a non-existent agent returns 404
-    When I call DELETE /api/agents/agent_nope
+    When I call DELETE /api/v1/agents/agent_nope
     Then the request fails with 404 Not Found
 
   # ── Authentication ─────────────────────────────────────────────
@@ -110,3 +123,29 @@ Feature: Agent REST API
   Scenario: Request with invalid API key returns 401
     When I call any agent endpoint with an invalid X-Auth-Token
     Then the request fails with 401 Unauthorized
+
+  # ── Deprecated alias ─────────────────────────────────────────
+
+  @integration
+  Scenario: The alias answers the endpoints that predate the move
+    Given an agent exists
+    When I list, read, update and archive it through /api/agents
+    Then each call answers as /api/v1/agents does
+
+  @integration
+  Scenario: Every alias response carries the deprecation headers
+    When I call GET /api/agents
+    Then the response carries the header Deprecation set to true
+    And the response carries a successor-version link to /api/v1/agents
+
+  @integration
+  Scenario: A refused alias request still carries the deprecation headers
+    When I call GET /api/agents/agent_nope
+    Then the request fails with 404 agent_not_found
+    And the response carries the header Deprecation set to true
+
+  @integration
+  Scenario: The endpoints added with the move answer only under /api/v1
+    Given an agent exists
+    When I call POST /api/agents/{id}/test, POST /api/agents/{id}/call and GET /api/agents/connect/poll
+    Then each request fails with 404 Not Found

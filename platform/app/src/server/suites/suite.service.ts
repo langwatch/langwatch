@@ -15,15 +15,23 @@ import type {
   SimulationSuite,
 } from "~/generated/prisma/client";
 import type {
+  ParametersByTargetKey,
   SuiteRunResult,
   SuiteRunService,
 } from "~/server/app-layer/suites/suite-run.service";
 import { isUniqueConstraintError } from "~/server/utils/prismaErrors";
 import { slugify } from "~/utils/slugify";
-import { AgentRepository } from "../agents/agent.repository";
+import {
+  type AgentIdentityRow,
+  AgentRepository,
+} from "../agents/agent.repository";
 import { LlmConfigRepository } from "../prompt-config/repositories/llm-config.repository";
 import { ScenarioNotFoundError } from "../scenarios/errors";
-import type { RunParameterValues } from "../scenarios/parameters";
+import {
+  parseScenarioParameterDefinitions,
+  partitionParameterDefinitions,
+  type RunParameterValues,
+} from "../scenarios/parameters";
 import { resolveRunParameters } from "../scenarios/resolve-run-parameters";
 import type { RunActor } from "../scenarios/run-actor";
 import {
@@ -34,6 +42,13 @@ import {
   ScenarioRepository,
   type ScenarioRunConfig,
 } from "../scenarios/scenario.repository";
+import {
+  agentParameterDefinitionsOf,
+  assertConnectedAgentsRunnable,
+  isAgentUnseen,
+  ownerNamesOf,
+  resolveConnectedReferences,
+} from "./connected-targets";
 import { RUN_ALL_SUITE_LABEL, RUN_ALL_SUITE_NAME } from "./constants";
 import {
   AllScenariosArchivedError,
@@ -46,7 +61,11 @@ import {
   SuiteScopeNotAllowedError,
   SuiteTargetsRequiredError,
 } from "./errors";
-import { normalizePlanScope, sortSuiteTargets } from "./plan-config";
+import {
+  duplicateSuiteTargets,
+  normalizePlanScope,
+  sortSuiteTargets,
+} from "./plan-config";
 import { derivePlanName } from "./plan-name";
 import { withPlanNameLock } from "./plan-name-lock";
 import { isDynamicScope, parseSuiteScope, type SuiteScope } from "./scope";
@@ -57,6 +76,13 @@ import {
   SuiteRepository,
   type UpdateSuiteInput,
 } from "./suite.repository";
+import {
+  declaredDefaults,
+  targetKeyOf,
+  targetLabelOf,
+  targetLabels,
+  withCanonicalOverrides,
+} from "./target-key";
 import {
   isSuiteAgentTargetType,
   parseSuiteTargets,
@@ -83,6 +109,8 @@ type ResolvedTargetReferences = {
   active: SuiteTarget[];
   archived: SuiteTarget[];
   missing: SuiteTarget[];
+  /** The agent rows the active targets name, by id. */
+  agentsById: Map<string, AgentIdentityRow>;
 };
 
 /** What a run's scenario and target references resolved to. */
@@ -92,6 +120,8 @@ type ResolvedRunReferences = {
   scenarioVersionMap: Map<string, number>;
   scenarioConfigs: ScenarioRunConfig[];
   activeTargets: SuiteTarget[];
+  /** The agent rows the active targets name, by id. */
+  agentsById: Map<string, AgentIdentityRow>;
   skippedArchived: SuiteRunResult["skippedArchived"];
 };
 
@@ -102,40 +132,114 @@ type ResolvedRunReferences = {
 type PreparedRun = {
   /** The scenarios the run covers, archived ones included. */
   scenarioIds: string[];
-  /** The targets the run reaches, in stored order. */
+  /**
+   * The targets the run reaches, in stored order, each with its overrides
+   * canonical: a value equal to the declared default is no override.
+   */
   targets: SuiteTarget[];
   references: ResolvedRunReferences;
-  parametersByScenarioId: Map<string, RunParameterValues>;
+  parametersByTargetKey: ParametersByTargetKey;
   secretParametersByScenarioId: Map<string, RunSecretCiphertext>;
 };
 
+const TARGET_DUPLICATE_REFUSAL =
+  "Two targets are the same agent with the same parameters.";
+
+const TARGET_SECRET_REFUSAL =
+  "A secret parameter is supplied once for the run, not per target.";
+
+/** One refusal against the targets field, before anything is read or written. */
+function refuseTargets(message: string): never {
+  throw new ValidationError(message, {
+    meta: { fieldErrors: { targets: [message] } },
+  });
+}
+
 /**
- * Resolves the values each scenario of a run reads, split into the plain ones
- * the child reads as `params` and the secret ones it reads as `secrets`.
+ * Refuses a target whose overrides name a secret parameter.
  *
- * The secrets are encrypted here, at the last point that holds them in clear,
- * so the queued event and everything folded from it carry ciphertext. Only
- * scenarios that resolved at least one secret get an entry.
+ * A secret value is typed once per run and travels with the run alone. A
+ * target's overrides are stored on the plan row in clear, so a secret among
+ * them would be written down where everyone who can open the plan reads it.
  */
-async function resolveParameterMaps(params: {
+function assertNoSecretOverrides(params: {
   scenarios: readonly ScenarioRunConfig[];
+  targets: readonly SuiteTarget[];
+}): void {
+  const secretNames = new Set(
+    params.scenarios.flatMap((scenario) =>
+      partitionParameterDefinitions(
+        parseScenarioParameterDefinitions(scenario.parameters),
+      ).secret.map((definition) => definition.name),
+    ),
+  );
+  if (secretNames.size === 0) return;
+  const offending = params.targets.some((target) =>
+    Object.keys(target.runParameters ?? {}).some((name) =>
+      secretNames.has(name),
+    ),
+  );
+  if (offending) refuseTargets(TARGET_SECRET_REFUSAL);
+}
+
+/**
+ * Resolves the values each scenario of a run reads, once per target, split
+ * into the plain ones the child reads as `params` and the secret ones it
+ * reads as `secrets`.
+ *
+ * A target's overrides are merged over the run's values, the target winning,
+ * and each merged set is checked the way the run's values are: a name neither
+ * a scenario nor the target's own agent declares is refused. Two targets with
+ * one key resolve once.
+ *
+ * The secrets are run-level, so every target resolves the same ones. They are
+ * encrypted here, at the last point that holds them in clear, so the queued
+ * event and everything folded from it carry ciphertext. Only scenarios that
+ * resolved at least one secret get an entry.
+ */
+async function resolveParametersPerTarget(params: {
+  scenarios: readonly ScenarioRunConfig[];
+  targets: readonly SuiteTarget[];
+  /** The agent rows the targets name, for what each declares on its own. */
+  agentsById: ReadonlyMap<string, AgentIdentityRow>;
   values?: RunParameterValues;
 }): Promise<{
-  parametersByScenarioId: Map<string, RunParameterValues>;
+  parametersByTargetKey: ParametersByTargetKey;
   secretParametersByScenarioId: Map<string, RunSecretCiphertext>;
 }> {
-  const resolved = await resolveRunParameters({
-    scenarios: params.scenarios,
-    values: params.values,
-  });
-  return {
-    parametersByScenarioId: new Map(
-      [...resolved].map(([scenarioId, scenarioParameters]) => [
-        scenarioId,
-        scenarioParameters.parameters,
-      ]),
-    ),
-    secretParametersByScenarioId: new Map(
+  assertNoSecretOverrides(params);
+
+  const parametersByTargetKey: ParametersByTargetKey = new Map();
+  let secretParametersByScenarioId: Map<string, RunSecretCiphertext> | null =
+    null;
+
+  for (const target of params.targets) {
+    const targetKey = targetKeyOf(target);
+    if (parametersByTargetKey.has(targetKey)) continue;
+
+    const agent = params.agentsById.get(target.referenceId);
+    const resolved = await resolveRunParameters({
+      scenarios: params.scenarios,
+      targetDefinitions: agentParameterDefinitionsOf(agent),
+      targetLabel: agent
+        ? targetLabelOf({
+            name: agent.name,
+            environment: agent.environment,
+            differingNames: new Set(),
+          })
+        : undefined,
+      values: { ...params.values, ...target.runParameters },
+    });
+    parametersByTargetKey.set(
+      targetKey,
+      new Map(
+        [...resolved].map(([scenarioId, scenarioParameters]) => [
+          scenarioId,
+          scenarioParameters.parameters,
+        ]),
+      ),
+    );
+    secretParametersByScenarioId ??= new Map(
       [...resolved]
         .filter(
           ([, scenarioParameters]) =>
@@ -145,7 +249,12 @@ async function resolveParameterMaps(params: {
           scenarioId,
           encryptRunSecretValues(scenarioParameters.secretParameters),
         ]),
-    ),
+    );
+  }
+
+  return {
+    parametersByTargetKey,
+    secretParametersByScenarioId: secretParametersByScenarioId ?? new Map(),
   };
 }
 
@@ -183,7 +292,7 @@ function refuseExecutionFields(params: {
 const PLAN_EXECUTION_REFUSAL =
   "A run plan runs its stored configuration. Send a new configuration to run-plans/run.";
 
-const FOLDER_EXECUTION_REFUSAL =
+const TEST_SUITE_EXECUTION_REFUSAL =
   "A test suite holds what it collects, not how a run of it is executed. Send the targets, the repeat count and the models with the run.";
 
 /**
@@ -191,27 +300,27 @@ const FOLDER_EXECUTION_REFUSAL =
  *
  * A scope and a member list are both a second answer to what the suite
  * collects, which its own filing already decides: a scope is a rule over the
- * whole project, and a member list is derived from `Scenario.folderId` by
- * reconcileFolderMembership and nothing else, so a direct write here would
+ * whole project, and a member list is derived from `Scenario.testSuiteId` by
+ * reconcileTestSuiteMembership and nothing else, so a direct write here would
  * fork the two sides of that invariant.
  *
  * The execution settings are refused for the same reason one step along: they
  * say how a run is executed, the run plan a run resolves already holds them,
- * and a copy on the folder row is a second answer with nothing saying which
+ * and a copy on the test suite row is a second answer with nothing saying which
  * one the next run reads.
  */
-function assertFolderUpdate(data: UpdateSuiteInput): void {
+function assertTestSuiteUpdate(data: UpdateSuiteInput): void {
   if (data.scope !== undefined && data.scope !== null) {
     throw new SuiteScopeNotAllowedError();
   }
   if (data.scenarioIds !== undefined) {
     throw new ValidationError(
-      "A folder's scenarios are managed by filing scenarios into it",
+      "A test suite's scenarios are managed by filing scenarios into it",
       {
         meta: {
           fieldErrors: {
             scenarioIds: [
-              "A folder's scenarios are managed by filing scenarios into it",
+              "A test suite's scenarios are managed by filing scenarios into it",
             ],
           },
         },
@@ -222,9 +331,26 @@ function assertFolderUpdate(data: UpdateSuiteInput): void {
   if (execution.length > 0) {
     refuseExecutionFields({
       fields: execution,
-      message: FOLDER_EXECUTION_REFUSAL,
+      message: TEST_SUITE_EXECUTION_REFUSAL,
     });
   }
+}
+
+/**
+ * The plan name the caller asked for, trimmed; nothing when the caller sent
+ * none and the run derives its own.
+ *
+ * A name that holds only blanks is refused: it reads as no name at all on
+ * every screen the plan appears on.
+ */
+function readRequestedPlanName(name: string | undefined): string | undefined {
+  const trimmed = name?.trim();
+  if (name !== undefined && !trimmed) {
+    throw new ValidationError("A run needs a name", {
+      meta: { fieldErrors: { name: ["A run needs a name"] } },
+    });
+  }
+  return trimmed;
 }
 
 /**
@@ -240,7 +366,7 @@ export type RunPlanConfigInput = {
   simulatorModel?: string | null;
   judgeModel?: string | null;
   /**
-   * The scenarios a hand-picked scope covers. A `cases` scope names no
+   * The scenarios a hand-picked scope covers. A `scenarios` scope names no
    * scenario in the rule itself, so the plan runs what it stores here.
    */
   scenarioIds?: string[];
@@ -301,10 +427,10 @@ export class SuiteService {
   /**
    * Lists the project's suites of the given kinds.
    *
-   * The default is deliberately "custom" only: every caller that predates
-   * folders, the v1 run plan list and the public suites endpoint, names no
-   * kind, and must never see a folder row (an empty folder would render 0/0
-   * there and refuse to run). A caller that wants folders says so.
+   * The default is deliberately "run_plan" only: every caller that predates
+   * test suites, the v1 run plan list and the public suites endpoint, names no
+   * kind, and must never see a test suite row (an empty test suite would render 0/0
+   * there and refuse to run). A caller that wants test suites says so.
    */
   async getAll(params: {
     projectId: string;
@@ -324,7 +450,7 @@ export class SuiteService {
         logger.debug({ projectId: params.projectId }, "Fetching all suites");
         const result = await this.repository.findAll({
           projectId: params.projectId,
-          kinds: params.kinds ?? ["custom"],
+          kinds: params.kinds ?? ["run_plan"],
           ...(params.includeArchived !== undefined && {
             includeArchived: params.includeArchived,
           }),
@@ -336,20 +462,20 @@ export class SuiteService {
   }
 
   /**
-   * Creates an empty folder. Unlike a custom run plan, a folder starts with
+   * Creates an empty test suite. Unlike a run plan, a test suite starts with
    * no scenarios and no targets: scenarios arrive through filing, targets
    * through the run dialog.
    *
-   * Folder and plan slugs share one per-project namespace, so a name another
+   * Test suite and plan slugs share one per-project namespace, so a name another
    * suite already uses gets a numeric suffix instead of a refusal: a person
-   * naming a folder must not be blocked by a run plan they may not even see.
+   * naming a test suite must not be blocked by a run plan they may not even see.
    */
-  async createFolder(params: {
+  async createTestSuite(params: {
     projectId: string;
     name: string;
   }): Promise<SimulationSuite> {
     return tracer.withActiveSpan(
-      "SuiteService.createFolder",
+      "SuiteService.createTestSuite",
       {
         kind: SpanKind.INTERNAL,
         attributes: {
@@ -360,8 +486,8 @@ export class SuiteService {
         const name = params.name.trim();
         const baseSlug = slugify(name);
         if (!name || !baseSlug) {
-          throw new ValidationError("A folder needs a name", {
-            meta: { fieldErrors: { name: ["A folder needs a name"] } },
+          throw new ValidationError("A test suite needs a name", {
+            meta: { fieldErrors: { name: ["A test suite needs a name"] } },
           });
         }
         const initialSlug = await this.generateUniqueSlug({
@@ -375,7 +501,7 @@ export class SuiteService {
               projectId: params.projectId,
               name,
               slug,
-              kind: "folder",
+              kind: "test_suite",
               scenarioIds: [],
               targets: [],
               repeatCount: 1,
@@ -393,95 +519,95 @@ export class SuiteService {
     );
   }
 
-  async getAllFolders(params: {
+  async getAllTestSuites(params: {
     projectId: string;
   }): Promise<SimulationSuite[]> {
-    return this.getAll({ projectId: params.projectId, kinds: ["folder"] });
+    return this.getAll({ projectId: params.projectId, kinds: ["test_suite"] });
   }
 
   /**
-   * One folder with the cases filed in it, named.
+   * One test suite with the scenarios filed in it, named.
    *
-   * The names come from the folder's `scenarioIds`, which
-   * reconcileFolderMembership keeps as the folder's active members, and the
-   * order of that list is the order the detail view reads. Archived cases are
-   * left out: an archived folder keeps a snapshot for a later restore, and it
-   * may name cases archived since.
+   * The names come from the test suite's `scenarioIds`, which
+   * reconcileTestSuiteMembership keeps as the test suite's active members, and the
+   * order of that list is the order the detail view reads. Archived scenarios are
+   * left out: an archived test suite keeps a snapshot for a later restore, and it
+   * may name scenarios archived since.
    */
-  async getFolderDetail(params: {
+  async getTestSuiteDetail(params: {
     projectId: string;
-    folderId: string;
+    testSuiteId: string;
   }): Promise<SimulationSuite & { scenarios: { id: string; name: string }[] }> {
     return tracer.withActiveSpan(
-      "SuiteService.getFolderDetail",
+      "SuiteService.getTestSuiteDetail",
       {
         kind: SpanKind.INTERNAL,
         attributes: {
           "tenant.id": params.projectId,
-          "suite.id": params.folderId,
+          "suite.id": params.testSuiteId,
         },
       },
       async (span) => {
-        const folder = await this.repository.findById({
-          id: params.folderId,
+        const testSuite = await this.repository.findById({
+          id: params.testSuiteId,
           projectId: params.projectId,
         });
-        if (folder?.kind !== "folder") {
+        if (testSuite?.kind !== "test_suite") {
           throw new SuiteNotFoundError();
         }
         const rows =
-          folder.scenarioIds.length > 0
+          testSuite.scenarioIds.length > 0
             ? await this.scenarioRepository.findActiveNamesByIds({
-                ids: folder.scenarioIds,
+                ids: testSuite.scenarioIds,
                 projectId: params.projectId,
               })
             : [];
         const nameById = new Map(rows.map((row) => [row.id, row.name]));
-        const scenarios = folder.scenarioIds.flatMap((id) => {
+        const scenarios = testSuite.scenarioIds.flatMap((id) => {
           const name = nameById.get(id);
           return name === undefined ? [] : [{ id, name }];
         });
         span.setAttribute("result.count", scenarios.length);
-        return { ...folder, scenarios };
+        return { ...testSuite, scenarios };
       },
     );
   }
 
   /**
-   * Renames a folder. The slug stays as it was: run history routes and the
-   * folder's internal run set are addressed through it, so a rename must not
+   * Renames a test suite. The slug stays as it was: run history routes and the
+   * test suite's internal run set are addressed through it, so a rename must not
    * break either.
    */
-  async renameFolder(params: {
+  async renameTestSuite(params: {
     projectId: string;
-    folderId: string;
+    testSuiteId: string;
     name: string;
   }): Promise<SimulationSuite> {
     return tracer.withActiveSpan(
-      "SuiteService.renameFolder",
+      "SuiteService.renameTestSuite",
       {
         kind: SpanKind.INTERNAL,
         attributes: {
           "tenant.id": params.projectId,
-          "suite.id": params.folderId,
+          "suite.id": params.testSuiteId,
         },
       },
       async () => {
         const name = params.name.trim();
         if (!name) {
-          throw new ValidationError("A folder needs a name", {
-            meta: { fieldErrors: { name: ["A folder needs a name"] } },
+          throw new ValidationError("A test suite needs a name", {
+            meta: { fieldErrors: { name: ["A test suite needs a name"] } },
           });
         }
-        const folder = await this.repository.findById({
-          id: params.folderId,
+        const testSuite = await this.repository.findById({
+          id: params.testSuiteId,
           projectId: params.projectId,
         });
-        if (folder?.kind !== "folder") {
+        if (testSuite?.kind !== "test_suite") {
           throw new SuiteNotFoundError();
         }
         return await this.repository.update({
-          id: params.folderId,
+          id: params.testSuiteId,
           projectId: params.projectId,
           data: { name },
         });
@@ -490,49 +616,49 @@ export class SuiteService {
   }
 
   /**
-   * Archives a folder and every scenario filed in it, in one transaction.
+   * Archives a test suite and every scenario filed in it, in one transaction.
    *
-   * Constraint: the folder's scenarioIds is NOT recomputed here. The archived
-   * folder keeps the membership it had as a readable snapshot, which is what
+   * Constraint: the test suite's scenarioIds is NOT recomputed here. The archived
+   * test suite keeps the membership it had as a readable snapshot, which is what
    * a future restore needs. This is the one place the membership invariant is
-   * deliberately suspended (see server/suites/folder-membership.ts).
+   * deliberately suspended (see server/suites/test-suite-membership.ts).
    *
-   * Idempotent: archiving an archived folder keeps its original archive time
+   * Idempotent: archiving an archived test suite keeps its original archive time
    * and touches no scenario.
    */
-  async archiveFolder(params: {
+  async archiveTestSuite(params: {
     projectId: string;
-    folderId: string;
+    testSuiteId: string;
   }): Promise<SimulationSuite> {
     return tracer.withActiveSpan(
-      "SuiteService.archiveFolder",
+      "SuiteService.archiveTestSuite",
       {
         kind: SpanKind.INTERNAL,
         attributes: {
           "tenant.id": params.projectId,
-          "suite.id": params.folderId,
+          "suite.id": params.testSuiteId,
         },
       },
       async () => {
         return await this.prisma.$transaction(async (tx) => {
-          const folder = await tx.simulationSuite.findFirst({
+          const testSuite = await tx.simulationSuite.findFirst({
             where: {
-              id: params.folderId,
+              id: params.testSuiteId,
               projectId: params.projectId,
-              kind: "folder",
+              kind: "test_suite",
             },
             select: { id: true },
           });
-          if (!folder) {
+          if (!testSuite) {
             throw new SuiteNotFoundError();
           }
-          await this.scenarioRepository.archiveManyByFolder({
+          await this.scenarioRepository.archiveManyByTestSuite({
             projectId: params.projectId,
-            folderId: params.folderId,
+            testSuiteId: params.testSuiteId,
             tx,
           });
           const archived = await this.repository.archive({
-            id: params.folderId,
+            id: params.testSuiteId,
             projectId: params.projectId,
             tx,
           });
@@ -597,9 +723,9 @@ export class SuiteService {
           throw new SuiteNotFoundError();
         }
         const data: UpdateSuiteInput = { ...params.data };
-        if (existing.kind === "folder") {
-          assertFolderUpdate(data);
-          // A folder rename keeps its slug (see renameFolder), so no re-slug.
+        if (existing.kind === "test_suite") {
+          assertTestSuiteUpdate(data);
+          // A test suite rename keeps its slug (see renameTestSuite), so no re-slug.
         } else if (params.data.name) {
           const slug = slugify(params.data.name);
           await this.ensureSlugAvailable({
@@ -711,7 +837,7 @@ export class SuiteService {
    *
    * @returns The batch run ID, job count, and any skipped archived references
    * @throws {ValidationError} if a custom row is run with execution settings
-   * @throws {SuiteTargetsRequiredError} if a folder is run with no target
+   * @throws {SuiteTargetsRequiredError} if a test suite is run with no target
    * @throws {InvalidScenarioReferencesError} if any scenario references are missing (deleted)
    * @throws {InvalidTargetReferencesError} if any target references are missing (deleted)
    * @throws {AllScenariosArchivedError} if all scenarios are archived
@@ -730,15 +856,15 @@ export class SuiteService {
     idempotencyKey: string;
     batchRunId?: string;
     /**
-     * The name of the run plan a folder run resolves. Derived from the scope
-     * and the targets when the caller sends none. Read by folder runs only.
+     * The name of the run plan a test suite run resolves. Derived from the scope
+     * and the targets when the caller sends none. Read by test suite runs only.
      */
     name?: string;
-    /** The targets a folder run goes against. */
+    /** The targets a test suite run goes against. */
     targets?: SuiteTarget[];
-    /** How many times a folder run repeats each pairing. */
+    /** How many times a test suite run repeats each pairing. */
     repeatCount?: number;
-    /** Model overrides for a folder run. */
+    /** Model overrides for a test suite run. */
     simulatorModel?: string | null;
     judgeModel?: string | null;
     /** Values supplied for the run, overriding each scenario's own defaults. */
@@ -753,11 +879,11 @@ export class SuiteService {
      */
     actor?: RunActor;
   }): Promise<SuiteRunResult> {
-    if (params.suite.kind === "folder") {
+    if (params.suite.kind === "test_suite") {
       const { suite, ...rest } = params;
       return this.runTestSuite({
         ...rest,
-        folderId: suite.id,
+        testSuiteId: suite.id,
         targets: params.targets ?? [],
       });
     }
@@ -792,6 +918,7 @@ export class SuiteService {
           targets,
           readScenarioIds: () => this.readRunMembership({ suite, projectId }),
           parameters: params.parameters,
+          actor: params.actor,
         });
 
         const result = await this.scheduleRun({
@@ -832,8 +959,12 @@ export class SuiteService {
    * @throws {InvalidTargetReferencesError} if any target references are missing (deleted)
    * @throws {AllScenariosArchivedError} if all scenarios are archived
    * @throws {AllTargetsArchivedError} if all targets are archived
+   * @throws {AgentOwnerOnlyError} if a target is a personal development agent
+   *   of someone other than the actor
    * @throws {ScenarioParameterUnknownError} if a supplied parameter name is
-   *   declared by no scenario in the run
+   *   declared by no scenario in the run and by no target's agent
+   * @throws {ScenarioParameterOptionInvalidError} if a supplied value is
+   *   outside the options a parameter declares
    * @throws {ScenarioParameterMissingError} if a scenario's text reads a
    *   parameter the run resolved no value for
    * @throws {ScenarioSecretParameterMissingError} if a declared secret has no
@@ -847,32 +978,83 @@ export class SuiteService {
     targets: SuiteTarget[];
     readScenarioIds: () => Promise<string[]>;
     parameters?: RunParameterValues;
+    /** The person starting the run; what a personal agent is matched against. */
+    actor: RunActor | undefined;
   }): Promise<PreparedRun> {
-    // A suite with no target at all, a folder before its first run,
+    // A suite with no target at all, a test suite before its first run,
     // is refused before anything is resolved or scheduled.
     if (params.targets.length === 0) {
       throw new SuiteTargetsRequiredError();
     }
+    // A connected agent may be named `<name>@<environment>`; from here on
+    // every target names an id, so two spellings of one agent fold together.
+    const namedTargets = await resolveConnectedReferences({
+      targets: params.targets,
+      projectId: params.projectId,
+      actor: params.actor,
+      agents: this.agentRepository,
+    });
+    // Two targets with one key would run the same thing twice under one
+    // column. Refused here, before any read, so no plan row is touched.
+    if (duplicateSuiteTargets(namedTargets).length > 0) {
+      refuseTargets(TARGET_DUPLICATE_REFUSAL);
+    }
 
     const scenarioIds = await params.readScenarioIds();
-    const references = await this.resolveReferences({
+    const resolved = await this.resolveReferences({
       scenarioIds,
       projectId: params.projectId,
       organizationId: params.organizationId,
-      targets: params.targets,
+      targets: namedTargets,
+    });
+    await assertConnectedAgentsRunnable({
+      agents: [...resolved.agentsById.values()],
+      actor: params.actor,
+      users: this.prisma,
     });
 
-    const { parametersByScenarioId, secretParametersByScenarioId } =
-      await resolveParameterMaps({
+    // The identity of a target is its overrides, and a value equal to the
+    // declared default is no override. The scenarios say what the defaults
+    // are, then the targets' own agents, so the canonical set is known here
+    // and not before: it is what the key, the sort, the name and the stamp
+    // all read.
+    const defaults = declaredDefaults([
+      ...resolved.scenarioConfigs.flatMap((scenario) =>
+        parseScenarioParameterDefinitions(scenario.parameters),
+      ),
+      ...resolved.activeTargets.flatMap((target) =>
+        agentParameterDefinitionsOf(
+          resolved.agentsById.get(target.referenceId),
+        ),
+      ),
+    ]);
+    const targets = sortSuiteTargets(
+      withCanonicalOverrides({ targets: namedTargets, defaults }),
+    );
+    // Two targets that differ only by a typed default are one target.
+    if (duplicateSuiteTargets(targets).length > 0) {
+      refuseTargets(TARGET_DUPLICATE_REFUSAL);
+    }
+    const references = {
+      ...resolved,
+      activeTargets: sortSuiteTargets(
+        withCanonicalOverrides({ targets: resolved.activeTargets, defaults }),
+      ),
+    };
+
+    const { parametersByTargetKey, secretParametersByScenarioId } =
+      await resolveParametersPerTarget({
         scenarios: references.scenarioConfigs,
+        targets: references.activeTargets,
+        agentsById: references.agentsById,
         values: params.parameters,
       });
 
     return {
       scenarioIds,
-      targets: params.targets,
+      targets,
       references,
-      parametersByScenarioId,
+      parametersByTargetKey,
       secretParametersByScenarioId,
     };
   }
@@ -899,7 +1081,7 @@ export class SuiteService {
       skippedArchived: prepared.references.skippedArchived,
       idempotencyKey: params.idempotencyKey,
       batchRunId: params.batchRunId,
-      parametersByScenarioId: prepared.parametersByScenarioId,
+      parametersByTargetKey: prepared.parametersByTargetKey,
       secretParametersByScenarioId: prepared.secretParametersByScenarioId,
       note: params.note,
       actor: params.actor,
@@ -912,11 +1094,11 @@ export class SuiteService {
    * The scenarios a run of a stored plan covers.
    *
    * A plan covers what its scope says. A dynamic scope is resolved against
-   * the project as it is right now and written back onto the plan, so a case
+   * the project as it is right now and written back onto the plan, so a scenario
    * written after the plan runs without the plan being edited. A plan with no
-   * scope, or one of mode "cases", runs the scenarioIds it stores.
+   * scope, or one of mode "scenarios", runs the scenarioIds it stores.
    *
-   * @throws {SuiteScopeEmptyError} when a dynamic scope covers no case.
+   * @throws {SuiteScopeEmptyError} when a dynamic scope covers no scenario.
    */
   private async readRunMembership(params: {
     suite: SimulationSuite;
@@ -948,7 +1130,7 @@ export class SuiteService {
    * (never by name, since a person may name their own plan "All scenarios"). Its
    * scenarioIds are refreshed to all active scenarios at each run, and the
    * targets chosen in the run dialog are persisted onto it so the next run
-   * preselects them. It is a kind "custom" suite, so v1 lists it as an
+   * preselects them. It is a kind "run_plan" suite, so v1 lists it as an
    * ordinary run plan and its history lands in its own internal run set.
    */
   async runAll(params: {
@@ -1004,7 +1186,7 @@ export class SuiteService {
                 projectId: params.projectId,
                 name: RUN_ALL_SUITE_NAME,
                 slug,
-                kind: "custom",
+                kind: "run_plan",
                 scenarioIds: activeScenarioIds,
                 targets: params.targets ?? [],
                 repeatCount: 1,
@@ -1090,12 +1272,7 @@ export class SuiteService {
         },
       },
       async (span) => {
-        const requestedName = params.name?.trim();
-        if (params.name !== undefined && !requestedName) {
-          throw new ValidationError("A run needs a name", {
-            meta: { fieldErrors: { name: ["A run needs a name"] } },
-          });
-        }
+        const requestedName = readRequestedPlanName(params.name);
 
         // Normalised before the plan is matched and before anything is
         // stored, so hand-picking every suite and pressing Run all reach one
@@ -1119,11 +1296,14 @@ export class SuiteService {
               scenarioIds: params.config.scenarioIds ?? [],
             }),
           parameters: params.parameters,
+          actor: params.actor,
         });
         span.setAttribute("suite.scenario_count", prepared.scenarioIds.length);
 
         // Derived only once the run holds up, so a refused run reads no names
-        // it will not use.
+        // it will not use. The prepared targets carry the canonical
+        // overrides, so the name and the stored config read the same target
+        // the run was stamped with.
         const name =
           requestedName ??
           (await this.defaultPlanName({
@@ -1131,7 +1311,7 @@ export class SuiteService {
             organizationId: params.organizationId,
             scope,
             scenarioIds: params.config.scenarioIds ?? [],
-            targets,
+            targets: prepared.targets,
           }));
 
         const { suite, created } = await this.resolvePlanByName({
@@ -1139,7 +1319,7 @@ export class SuiteService {
           name,
           config: params.config,
           scope,
-          targets,
+          targets: prepared.targets,
           scenarioIds: prepared.scenarioIds,
         });
         span.setAttribute("suite.id", suite.id);
@@ -1176,12 +1356,12 @@ export class SuiteService {
    * that names no target is refused before anything is read: there is no
    * stored row to fall back to, by design.
    *
-   * @see specs/suites/folder-run-plan-reuse.feature
+   * @see specs/suites/test-suite-run-plan-reuse.feature
    */
   async runTestSuite(params: {
     projectId: string;
     organizationId: string;
-    folderId: string;
+    testSuiteId: string;
     targets: SuiteTarget[];
     /** Derived from the suite's name and the targets when absent. */
     name?: string;
@@ -1199,11 +1379,11 @@ export class SuiteService {
     if (params.targets.length === 0) {
       throw new SuiteTargetsRequiredError();
     }
-    const folder = await this.repository.findById({
-      id: params.folderId,
+    const testSuite = await this.repository.findById({
+      id: params.testSuiteId,
       projectId: params.projectId,
     });
-    if (folder?.kind !== "folder") {
+    if (testSuite?.kind !== "test_suite") {
       throw new SuiteNotFoundError();
     }
     return this.runPlan({
@@ -1211,7 +1391,7 @@ export class SuiteService {
       organizationId: params.organizationId,
       ...(params.name !== undefined && { name: params.name }),
       config: {
-        scope: { mode: "folders", folderIds: [params.folderId] },
+        scope: { mode: "test_suites", testSuiteIds: [params.testSuiteId] },
         targets: params.targets,
         ...(params.repeatCount !== undefined && {
           repeatCount: params.repeatCount,
@@ -1234,18 +1414,18 @@ export class SuiteService {
   }
 
   /**
-   * Starts a run of one test case, addressed by its id.
+   * Starts a run of one scenario, addressed by its id.
    *
-   * The same path as a suite run, over a hand-picked scope of one case. The
-   * case is checked first so an id that names nothing is refused as a missing
-   * case rather than as a plan whose scope covers nothing.
+   * The same path as a suite run, over a hand-picked scope of one scenario. The
+   * scenario is checked first so an id that names nothing is refused as a missing
+   * scenario rather than as a plan whose scope covers nothing.
    */
   async runScenario(params: {
     projectId: string;
     organizationId: string;
     scenarioId: string;
     targets: SuiteTarget[];
-    /** Derived from the case's name and the targets when absent. */
+    /** Derived from the scenario's name and the targets when absent. */
     name?: string;
     repeatCount?: number;
     simulatorModel?: string | null;
@@ -1270,7 +1450,7 @@ export class SuiteService {
       organizationId: params.organizationId,
       ...(params.name !== undefined && { name: params.name }),
       config: {
-        scope: { mode: "cases" },
+        scope: { mode: "scenarios" },
         scenarioIds: [params.scenarioId],
         targets: params.targets,
         ...(params.repeatCount !== undefined && {
@@ -1305,7 +1485,7 @@ export class SuiteService {
     projectId: string;
     organizationId: string;
     scope: SuiteScope;
-    /** The cases a hand-picked scope covers; read by that scope alone. */
+    /** The scenarios a hand-picked scope covers; read by that scope alone. */
     scenarioIds: string[];
     targets: SuiteTarget[];
   }): Promise<string> {
@@ -1321,13 +1501,20 @@ export class SuiteService {
         organizationId: params.organizationId,
       }),
     ]);
+    // Stored order, so the name reads the columns in the order the results
+    // show them. A target the project no longer names reads as its id, an
+    // agent that appears more than once reads with the parameters that tell
+    // its targets apart, and a connected agent reads with its environment
+    // and, when personal, its owner.
     return derivePlanName({
       scopeLabel,
-      // Stored order, so the name reads the columns in the order the results
-      // show them. A target the project no longer names reads as its id.
-      targetLabels: sortSuiteTargets(params.targets).map(
-        (target) => targetNames[target.referenceId] ?? target.referenceId,
-      ),
+      targetLabels: targetLabels({
+        targets: sortSuiteTargets(params.targets),
+        nameOf: (target) =>
+          targetNames[target.referenceId]?.name ?? target.referenceId,
+        environmentOf: (target) => targetNames[target.referenceId]?.environment,
+        ownerNameOf: (target) => targetNames[target.referenceId]?.ownerName,
+      }),
     });
   }
 
@@ -1350,12 +1537,12 @@ export class SuiteService {
         return scope.labels.length === 0
           ? RUN_ALL_SUITE_NAME
           : scope.labels.join(", ");
-      case "folders":
-        return this.folderScopeLabel({
+      case "test_suites":
+        return this.testSuiteScopeLabel({
           projectId: params.projectId,
-          folderIds: scope.folderIds,
+          testSuiteIds: scope.testSuiteIds,
         });
-      case "cases":
+      case "scenarios":
         return this.caseScopeLabel({
           projectId: params.projectId,
           scenarioIds: params.scenarioIds,
@@ -1367,20 +1554,20 @@ export class SuiteService {
    * One or two test suites read by name, more read as a count: a name listing
    * five suites is no longer a name.
    */
-  private async folderScopeLabel(params: {
+  private async testSuiteScopeLabel(params: {
     projectId: string;
-    folderIds: string[];
+    testSuiteIds: string[];
   }): Promise<string> {
-    if (params.folderIds.length === 0) return RUN_ALL_SUITE_NAME;
-    if (params.folderIds.length > 2) {
-      return `${params.folderIds.length} test suites`;
+    if (params.testSuiteIds.length === 0) return RUN_ALL_SUITE_NAME;
+    if (params.testSuiteIds.length > 2) {
+      return `${params.testSuiteIds.length} test suites`;
     }
     const rows = await this.repository.findNamesByIds({
-      ids: params.folderIds,
+      ids: params.testSuiteIds,
       projectId: params.projectId,
     });
     const nameById = new Map(rows.map((row) => [row.id, row.name]));
-    const names = params.folderIds.flatMap((id) => {
+    const names = params.testSuiteIds.flatMap((id) => {
       const name = nameById.get(id);
       return name === undefined ? [] : [name];
     });
@@ -1388,9 +1575,9 @@ export class SuiteService {
   }
 
   /**
-   * One hand-picked case reads by its own name, several as a count.
+   * One hand-picked scenario reads by its own name, several as a count.
    *
-   * A count in place of the one name would name every single-case run of one
+   * A count in place of the one name would name every single-scenario run of one
    * agent the same thing, and they would all stack onto one run plan.
    */
   private async caseScopeLabel(params: {
@@ -1414,10 +1601,10 @@ export class SuiteService {
    *
    * A hand-picked scope runs the list the caller sent. Every other scope is a
    * rule over the project and is resolved against it now, so the run covers
-   * the cases of this moment. What comes back is also what the plan is written
-   * with, which is how the plan reads back with the cases its run covered.
+   * the scenarios of this moment. What comes back is also what the plan is written
+   * with, which is how the plan reads back with the scenarios its run covered.
    *
-   * @throws {SuiteScopeEmptyError} when a dynamic scope covers no case.
+   * @throws {SuiteScopeEmptyError} when a dynamic scope covers no scenario.
    */
   private async readPlanMembership(params: {
     projectId: string;
@@ -1445,7 +1632,7 @@ export class SuiteService {
    * its own slug.
    *
    * Its name, because a name is what a plan is: the match is made trimmed and
-   * without case, so writing the caller's spelling back would rename "Nightly"
+   * without scenario, so writing the caller's spelling back would rename "Nightly"
    * to "nightly" the first time somebody typed it that way, and a plan whose
    * name was only ever suggested would rename itself on every run.
    *
@@ -1520,7 +1707,7 @@ export class SuiteService {
               projectId: params.projectId,
               name: params.name,
               slug,
-              kind: "custom",
+              kind: "run_plan",
               labels: [],
               ...storedConfig,
             },
@@ -1576,7 +1763,12 @@ export class SuiteService {
       organizationId,
     });
 
-    return { scenarios, targets: targetNames };
+    return {
+      scenarios,
+      targets: Object.fromEntries(
+        Object.entries(targetNames).map(([id, row]) => [id, row.name]),
+      ),
+    };
   }
 
   /**
@@ -1590,7 +1782,12 @@ export class SuiteService {
     targets: SuiteTarget[];
     projectId: string;
     organizationId: string;
-  }): Promise<Record<string, string>> {
+  }): Promise<
+    Record<
+      string,
+      { name: string; environment?: string | null; ownerName?: string | null }
+    >
+  > {
     const { targets, projectId, organizationId } = params;
 
     const agentIds = targets
@@ -1613,9 +1810,26 @@ export class SuiteService {
         : Promise.resolve([]),
     ]);
 
-    const names: Record<string, string> = {};
-    for (const row of agentRows) names[row.id] = row.name;
-    for (const row of promptRows) names[row.id] = row.name;
+    const ownerNames = await ownerNamesOf({
+      agents: agentRows.map((row) => ({
+        ownerUserId: row.ownerUserId ?? null,
+      })),
+      users: this.prisma,
+    });
+    const names: Record<
+      string,
+      { name: string; environment?: string | null; ownerName?: string | null }
+    > = {};
+    for (const row of agentRows) {
+      names[row.id] = {
+        name: row.name,
+        environment: row.environment,
+        ownerName: row.ownerUserId
+          ? (ownerNames.get(row.ownerUserId) ?? null)
+          : null,
+      };
+    }
+    for (const row of promptRows) names[row.id] = { name: row.name };
     return names;
   }
 
@@ -1751,6 +1965,7 @@ export class SuiteService {
       scenarioVersionMap,
       scenarioConfigs,
       activeTargets: targetResolution.active,
+      agentsById: targetResolution.agentsById,
       skippedArchived: {
         scenarios: scenarioResolution.archived,
         targets: targetResolution.archived.map((t) => t.referenceId),
@@ -1817,6 +2032,7 @@ export class SuiteService {
           })
         : [];
     const agentMap = new Map(agentRows.map((r) => [r.id, r]));
+    const agentsById = new Map<string, AgentIdentityRow>();
 
     // Batch prompt targets
     const promptExistingIds =
@@ -1836,10 +2052,11 @@ export class SuiteService {
       const row = agentMap.get(target.referenceId);
       if (!row) {
         missing.push(target);
-      } else if (row.archivedAt) {
+      } else if (row.archivedAt || isAgentUnseen(row)) {
         archived.push(target);
       } else {
         active.push(target);
+        agentsById.set(row.id, row);
       }
     }
 
@@ -1851,6 +2068,6 @@ export class SuiteService {
       }
     }
 
-    return { active, archived, missing };
+    return { active, archived, missing, agentsById };
   }
 }

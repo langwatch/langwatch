@@ -32,9 +32,10 @@ import { SimulationRunStateRepositoryClickHouse } from "~/server/event-sourcing/
 import type { QueueRunCommandData } from "~/server/event-sourcing/pipelines/simulation-processing/schemas/commands";
 import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
 import { encryptRunSecretValues } from "~/server/scenarios/run-secret-values";
+import { targetKeyOf } from "~/server/suites/target-key";
 import { SimulationClickHouseRepository } from "../../simulations/repositories/simulation.clickhouse.repository";
 import { NullSuiteRunReadRepository } from "../repositories/suite-run.repository";
-import { SuiteRunService } from "../suite-run.service";
+import { SuiteRunService, type SuiteRunTarget } from "../suite-run.service";
 
 const tenantId = `test-suite-params-${nanoid()}`;
 
@@ -80,7 +81,10 @@ async function queuedCommandFor(params: {
   secretParameters?: Record<string, string>;
   simulatorModel?: string | null;
   judgeModel?: string | null;
+  /** The target the run goes against; a plain "agent-1" when not given. */
+  target?: SuiteRunTarget;
 }): Promise<QueueRunCommandData> {
+  const target = params.target ?? { type: "http", referenceId: "agent-1" };
   const queued: QueueRunCommandData[] = [];
   const service = new SuiteRunService(new NullSuiteRunReadRepository(), {
     startSuiteRun: async () => {},
@@ -95,14 +99,19 @@ async function queuedCommandFor(params: {
     activeScenarioIds: [params.scenarioId],
     scenarioNameMap: new Map([[params.scenarioId, "Refund flow"]]),
     scenarioVersionMap: new Map([[params.scenarioId, 1]]),
-    activeTargets: [{ type: "http", referenceId: "agent-1" }],
+    activeTargets: [target],
     repeatCount: 1,
     skippedArchived: { scenarios: [], targets: [] },
     idempotencyKey: `idem-${nanoid()}`,
     simulatorModel: params.simulatorModel ?? null,
     judgeModel: params.judgeModel ?? null,
     ...(params.parameters && {
-      parametersByScenarioId: new Map([[params.scenarioId, params.parameters]]),
+      parametersByTargetKey: new Map([
+        [
+          targetKeyOf(target),
+          new Map([[params.scenarioId, params.parameters]]),
+        ],
+      ]),
     }),
     ...(params.secretParameters && {
       secretParametersByScenarioId: new Map([
@@ -191,7 +200,42 @@ describe("Feature: recording a run's resolved parameters", () => {
       });
 
       expect(run!.metadata).toMatchObject({
-        langwatch: { targetReferenceId: "agent-1" },
+        langwatch: { targetReferenceId: "agent-1", targetKey: "agent-1" },
+      });
+    });
+  });
+
+  describe("given a run started against a target carrying overrides", () => {
+    /** @scenario "The target key and its parameters read back off the stored run" */
+    it("reads the target key and the overrides back off the run", async () => {
+      const scenarioId = `scenario-${nanoid()}`;
+      const target: SuiteRunTarget = {
+        type: "http",
+        referenceId: "agent-1",
+        runParameters: { model: "gpt-5-mini" },
+      };
+      const command = await queuedCommandFor({
+        scenarioId,
+        target,
+        parameters: { model: "gpt-5-mini", region: "eu-central" },
+      });
+
+      await recordQueuedRun(command);
+
+      const run = await readRepository.getScenarioRunData({
+        projectId: tenantId,
+        scenarioRunId: command.scenarioRunId,
+      });
+
+      const targetKey = targetKeyOf(target);
+      expect(targetKey).not.toBe("agent-1");
+      expect(run!.metadata).toMatchObject({
+        langwatch: {
+          targetReferenceId: "agent-1",
+          targetKey,
+          targetParameters: { model: "gpt-5-mini" },
+        },
+        parameters: { model: "gpt-5-mini", region: "eu-central" },
       });
     });
   });
@@ -283,6 +327,7 @@ describe("Feature: recording a run's resolved parameters", () => {
         langwatch: {
           targetReferenceId: "agent-1",
           targetType: "http",
+          targetKey: "agent-1",
           scenarioVersion: 1,
         },
       });

@@ -186,6 +186,19 @@ describe("AgentCodeEditorDrawer", () => {
       });
     });
 
+    it("opens the session key guidance from a focusable control", async () => {
+      renderDrawer();
+
+      await waitFor(() => {
+        expect(screen.getByText("Python Code")).toBeInTheDocument();
+      });
+      const help = screen.getByRole("button", {
+        name: "More about session keys",
+      });
+      help.focus();
+      expect(help).toHaveFocus();
+    });
+
     it("displays default input and output variables", async () => {
       renderDrawer();
 

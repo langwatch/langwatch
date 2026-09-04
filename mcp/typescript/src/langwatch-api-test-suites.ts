@@ -2,13 +2,13 @@ import { makeRequest } from "./langwatch-api.js";
 import type {
   RunParameters,
   RunPlanRunResult,
-  RunPlanTarget,
 } from "./langwatch-api-run-plans.js";
+import type { RunPlanTargetWire } from "./schemas/run-plan.js";
 
 /**
  * Client for `/api/v1/test-suites`.
  *
- * A test suite is a folder of scenarios: a name and the cases filed in it.
+ * A test suite groups scenarios: a name and the scenarios filed in it.
  * Running one is sugar over a run plan, so the run returns the same result a
  * run plan does.
  */
@@ -85,19 +85,20 @@ export async function archiveTestSuite(
  * creates or joins the run plan named "<suite name> <target name>" when no
  * name is sent.
  */
-export async function runTestSuite(
-  id: string,
-  data: {
-    targets: RunPlanTarget[];
-    name?: string;
-    repeatCount?: number;
-    simulatorModel?: string | null;
-    judgeModel?: string | null;
-    parameters?: RunParameters;
-    note?: string;
-    idempotencyKey?: string;
-  },
-): Promise<RunPlanRunResult> {
+export async function runTestSuite({
+  id,
+  ...data
+}: {
+  id: string;
+  targets: RunPlanTargetWire[];
+  name?: string;
+  repeatCount?: number;
+  simulatorModel?: string | null;
+  judgeModel?: string | null;
+  parameters?: RunParameters;
+  note?: string;
+  idempotencyKey?: string;
+}): Promise<RunPlanRunResult> {
   return makeRequest(
     "POST",
     `/api/v1/test-suites/${encodeURIComponent(id)}/run`,

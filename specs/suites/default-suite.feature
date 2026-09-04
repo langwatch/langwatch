@@ -4,13 +4,13 @@ Feature: Every scenario belongs to a test suite
   So that no surface has to render or explain a loose scenario
 
   Background: the invariant, and where each half of it lives.
-    A scenario belongs to exactly one suite. `Scenario.folderId` stays a
-    nullable column, because an archived scenario keeps the folder it had for a
-    later restore and a code-pushed scenario has no row at all. The invariant is
-    enforced by the service on the write path, not by the column.
+    A scenario belongs to exactly one suite. `Scenario.testSuiteId` stays a
+    nullable column, because an archived scenario keeps the test suite it had
+    for a later restore and a code-pushed scenario has no row at all. The
+    invariant is enforced by the service on the write path, not by the column.
 
     Existing projects are brought to the invariant by one migration, which
-    creates a `Default` folder-kind suite for each project that still holds an
+    creates a `Default` test suite for each project that still holds an
     unfiled active scenario and files those scenarios into it. Default is an
     ordinary suite after that: it can be renamed, archived and run like any
     other.
@@ -25,7 +25,7 @@ Feature: Every scenario belongs to a test suite
   Scenario: The migration files every unfiled active scenario into a new Default suite
     Given a project holding two scenarios with no suite and one scenario already filed in "Refunds"
     When the Default suite migration runs
-    Then the project holds a suite named "Default" of kind folder
+    Then the project holds a suite named "Default" of kind test suite
     And the two unfiled scenarios are filed in it
     And the scenario in "Refunds" is left where it was
 
@@ -55,7 +55,7 @@ Feature: Every scenario belongs to a test suite
   Scenario: A scenario created with no suite is filed into Default
     Given a project that holds no suite
     When a scenario is created with no suite named
-    Then a suite named "Default" of kind folder is created
+    Then a suite named "Default" of kind test suite is created
     And the scenario is filed in it
 
   @integration
@@ -76,7 +76,7 @@ Feature: Every scenario belongs to a test suite
   Scenario: A Default suite created while another suite already owns the slug takes a numbered slug
     Given a project holding a run plan whose slug is "default"
     When a scenario is created with no suite named
-    Then a suite named "Default" of kind folder is created
+    Then a suite named "Default" of kind test suite is created
     And its slug is not "default"
 
   @integration

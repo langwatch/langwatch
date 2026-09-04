@@ -5,7 +5,7 @@ Feature: The Results tab
 
   Background: three levels.
     The Results tab opens on a list titled "Test Runs". Each row is a run plan.
-    A test suite is a folder of scenarios and is never a row: the run plans
+    A test suite is a group of scenarios and is never a row: the run plans
     that run it are. There is no bucket row that collects runs belonging to no
     plan either: a single scenario run gets a run plan of its own, so iterating
     on one scenario reads as run 1, run 2, run 3 against that agent.
@@ -50,6 +50,21 @@ Feature: The Results tab
     Given a run plan whose last run passed three of three
     When the Test Runs list is read
     Then its row carries the pass rate of that last run
+
+  @integration
+  Scenario: A window that holds runs of no plan still reads the whole tab
+    Given a project with no run plan and runs inside the window
+    When the Results tab is opened
+    Then the filter row and the period picker read
+    And the "No runs yet" state does not read
+    And the count in the header of the list matches the runs the window holds
+
+  @integration
+  Scenario: The plan table says when the runs of the window belong to no plan
+    Given a project with no run plan and runs inside the window
+    When the Test Runs list is read
+    Then the table says those runs were started outside a run plan
+    And it points at the scenario and target groupings, which list them
 
   # --- The columns of the plan table ---
 
@@ -261,11 +276,12 @@ Feature: The Results tab
     And choosing it narrows the list by its key
 
   @integration
-  Scenario: A run from code reads From code for its target and its scope
+  Scenario: A run from code reads default for its target and From code for its scope
     Given a set that runs from code
     When its row and its runs are read
     Then the scope reads "From code"
-    And the target reads "From code"
+    And the target reads "default"
+    And the Target grouping row for it reads "default" with the from code mark
 
   @integration
   Scenario: Choosing a run inside an opened row lands on its plan at that run
@@ -273,6 +289,33 @@ Feature: The Results tab
     When that run is chosen
     Then the page lands on the plan "Nightly" open on that run
     And not on the newest run of the plan
+
+  @integration
+  Scenario: A target named by a run from code reads that name with the from code mark
+    Given a run from code that reported the agent "AcmeSupportAgent"
+    When "Target" is chosen in Group by
+    Then the row for it reads "AcmeSupportAgent"
+    And it carries the from code mark
+    And it does not read the key its runs fold under
+
+  @integration
+  Scenario: The Targets column reads the agent name a run from code reported
+    Given a set that runs from code whose runs reported the agent "AcmeSupportAgent"
+    When its row is read on the list of run plans
+    Then the Targets cell reads "AcmeSupportAgent"
+
+  @integration
+  Scenario: The Target filter lists the targets named by runs from code
+    Given a target named by a run from code inside the window
+    When the Target filter is opened
+    Then that target is offered under the name the run reported
+    And choosing it narrows the list by its key
+
+  @integration
+  Scenario: A run line reads the agent name its run reported
+    Given a target row opened onto the runs behind it
+    When a run line is read
+    Then it names the agent the run reported
 
   @integration
   Scenario: A run of a set that runs from code opens the row the list draws for it
@@ -286,6 +329,17 @@ Feature: The Results tab
     When "Target" is chosen in Group by
     Then one row reads "dev-agent" and one row reads "prod-agent"
     And each row reads the pass rate of that agent alone
+
+  # The mark is the icon the agents page draws for the same agent, so a target
+  # reads as the agent a person knows from that page. It carries a colour only
+  # in a comparison, where the colour is what tells one target from another.
+
+  @integration
+  Scenario: A target row is marked with the kind of agent behind it
+    Given runs against a connected agent and against an HTTP agent
+    When "Target" is chosen in Group by
+    Then each row is marked with the kind of its own agent
+    And the marks carry no colour
 
   @integration
   Scenario: Grouping by none reads the flat list
@@ -415,28 +469,28 @@ Feature: The Results tab
 
   @integration
   Scenario: The results read as a table by default
-    Given a finished run of three cases against one target
+    Given a finished run of three scenarios against one target
     When the run is selected
-    Then a table lists one row per case and target pair
+    Then a table lists one row per scenario and target pair
     And each row shows the verdict, the duration and the cost
 
   @integration
   Scenario: A row that has not settled shows no time and no cost
-    Given a run whose first case is still running
+    Given a run whose first scenario is still running
     When the results table is read
     Then the time and cost cell of that row is empty
-    And the cell fills in once the case reaches its verdict
+    And the cell fills in once the scenario reaches its verdict
 
   @integration
   Scenario: The row menu of a result opens the editor of the scenario
-    Given a finished run of one case
+    Given a finished run of one scenario
     When the row menu of the result is opened
     Then it offers "Edit scenario"
     And choosing it opens the editor of that scenario
 
   @integration
   Scenario: The row menu of a result runs the scenario again on its own
-    Given a finished run of one case
+    Given a finished run of one scenario
     When the row menu of the result is opened
     Then it offers "Open the conversation"
     And it offers "Rerun this scenario"
@@ -566,6 +620,14 @@ Feature: The Results tab
     And each model reads with the icon of its provider
 
   @integration
+  Scenario: Every label of the block sits beside its value
+    Given the run settings block is shown on a run with both models recorded
+    When the "Simulator model" and "Judge model" rows are read
+    Then each label sits beside its value and not under it
+    And a model row stands as tall as the "Started" row
+    And the icon of the provider does not push the row open
+
+  @integration
   Scenario: The first row of the block says when the run started and who started it
     Given a run started in the app by the person now reading it
     When "Show run settings" is chosen
@@ -639,7 +701,7 @@ Feature: The Results tab
   Scenario: A run that is still going updates without a reload
     Given a run that is queued and starting
     When its results are open
-    Then each case moves from queued to running to its verdict as it happens
+    Then each scenario moves from queued to running to its verdict as it happens
     And no manual reload is needed
 
   @integration
@@ -659,22 +721,22 @@ Feature: The Results tab
   # --- Stopping ---
 
   @integration
-  Scenario: One case in a running batch can be stopped on its own
-    Given a run in which one case is still running
+  Scenario: One scenario in a running batch can be stopped on its own
+    Given a run in which one scenario is still running
     When Stop is chosen on that row
-    Then that case stops
-    And the other cases keep running
+    Then that scenario stops
+    And the other scenarios keep running
 
   @integration
   Scenario: A whole running batch can be stopped at once
-    Given a run with several cases queued and running
+    Given a run with several scenarios queued and running
     When Stop all is chosen for the run
-    Then every queued and running case stops
-    And cases that already finished keep their verdict
+    Then every queued and running scenario stops
+    And scenarios that already finished keep their verdict
 
   @integration
-  Scenario: Stop is not offered for a case that already finished
-    Given a run in which every case finished
+  Scenario: Stop is not offered for a scenario that already finished
+    Given a run in which every scenario finished
     When the results are read
     Then no Stop control is offered
 
@@ -703,6 +765,15 @@ Feature: The Results tab
     Then an empty state says there is no run in this period
     And it offers to widen the period
 
+  @integration
+  Scenario: A run opened before its first scenario reports reads as waiting
+    Given a URL that names a run of the plan the window does not hold yet
+    When the plan is opened
+    Then the results column says it is waiting for the first result
+    And it does not say there is no run in this period
+    And the runs rail shows the run as starting
+    And it still offers to widen the period, for an old link
+
   # --- Loading and gating ---
 
   @integration
@@ -719,11 +790,18 @@ Feature: The Results tab
     Then the skeleton reads no more
     And the empty "no runs yet" state reads on the tab
 
+  @integration
+  Scenario: The empty state of the tab offers a wider period
+    Given a project with no run plan and no run inside the window
+    When the Results tab is opened
+    Then the "No runs yet" state offers the next wider period
+    And choosing it widens the window
+
   # --- Stalled runs ---
 
   @integration
   Scenario: A run that stopped reporting reads as stalled
     Given a run that stopped reporting long ago
     When the results are read
-    Then that case reads as stalled with a warning mark
+    Then that scenario reads as stalled with a warning mark
     And it is treated as finished for the counts

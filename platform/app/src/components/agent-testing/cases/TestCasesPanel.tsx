@@ -1,5 +1,5 @@
 /**
- * The cases panel of the Scenarios tab, wired to the tab model.
+ * The scenarios panel of the Scenarios tab, wired to the tab model.
  *
  * @see specs/features/agent-testing/cases-table.feature
  */
@@ -18,7 +18,7 @@ export function TestCasesPanel({ model }: { model: TestCasesTabModel }) {
     () =>
       selectedSuite
         ? data.cases
-            .filter((testCase) => testCase.folderId === selectedSuite.id)
+            .filter((testCase) => testCase.testSuiteId === selectedSuite.id)
             .map((testCase) => testCase.id)
         : [],
     [data.cases, selectedSuite],
@@ -52,7 +52,6 @@ export function TestCasesPanel({ model }: { model: TestCasesTabModel }) {
       onEdit={open.openEditor}
       onDuplicate={caseMutations.duplicateCase}
       onMoveToSuite={caseMutations.moveCaseToSuite}
-      onOpenLastRun={open.openLastRun}
       onArchive={caseMutations.setCaseToArchive}
       onOpenExternalCase={() =>
         base.selectPlan(toExternalPlanSlug(view.externalSetId))

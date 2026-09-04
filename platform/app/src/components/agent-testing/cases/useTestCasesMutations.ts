@@ -3,7 +3,7 @@
  * to close itself when it lands.
  *
  * @see specs/features/agent-testing/cases-table.feature
- * @see specs/suites/suite-folders.feature
+ * @see specs/suites/test-suites.feature
  */
 
 import { useCallback, useState } from "react";
@@ -22,7 +22,7 @@ function useCasesInvalidate(projectId: string): () => void {
   const utils = api.useUtils();
   return useCallback(() => {
     void utils.scenarios.getAll.invalidate({ projectId });
-    void utils.suites.folders.getAll.invalidate({ projectId });
+    void utils.suites.testSuites.getAll.invalidate({ projectId });
   }, [utils, projectId]);
 }
 
@@ -45,32 +45,32 @@ export function useSuiteMutations({
 }): SuiteMutations {
   const invalidate = useCasesInvalidate(projectId);
 
-  const create = api.suites.folders.create.useMutation({
-    onSuccess: (folder) => {
+  const create = api.suites.testSuites.create.useMutation({
+    onSuccess: (testSuite) => {
       invalidate();
-      selectSuite({ kind: "suite", slug: folder.slug });
+      selectSuite({ kind: "suite", slug: testSuite.slug });
     },
     onError: toastOnError("Couldn't create the test suite"),
   });
 
-  const rename = api.suites.folders.rename.useMutation({
-    onSuccess: (folder) => {
+  const rename = api.suites.testSuites.rename.useMutation({
+    onSuccess: (testSuite) => {
       invalidate();
       // A rename moves the slug, so the address of the open suite moves with
       // it. Without this the page would hold a slug nothing answers to.
-      if (folder.id === selectedSuiteId) {
-        selectSuite({ kind: "suite", slug: folder.slug });
+      if (testSuite.id === selectedSuiteId) {
+        selectSuite({ kind: "suite", slug: testSuite.slug });
       }
     },
     onError: toastOnError("Couldn't rename the test suite"),
   });
 
-  const archive = api.suites.folders.archive.useMutation({
+  const archive = api.suites.testSuites.archive.useMutation({
     onSuccess: (_result, variables) => {
       invalidate();
       // The suite the address named is gone, so the tab falls back to the
       // first suite that is left.
-      if (variables.folderId === selectedSuiteId) {
+      if (variables.testSuiteId === selectedSuiteId) {
         selectSuite({ kind: "suite", slug: null });
       }
     },
@@ -81,13 +81,14 @@ export function useSuiteMutations({
     isArchiving: archive.isPending,
     createSuite: (name) => create.mutate({ projectId, name }),
     renameSuite: ({ suiteId, name }) =>
-      rename.mutate({ projectId, folderId: suiteId, name }),
-    archiveSuite: (suiteId) => archive.mutate({ projectId, folderId: suiteId }),
+      rename.mutate({ projectId, testSuiteId: suiteId, name }),
+    archiveSuite: (suiteId) =>
+      archive.mutate({ projectId, testSuiteId: suiteId }),
   };
 }
 
 export type CaseMutations = {
-  /** The case the archive dialog is open on, if any. */
+  /** The scenario the archive dialog is open on, if any. */
   caseToArchive: TestCase | null;
   setCaseToArchive: (testCase: TestCase | null) => void;
   isArchiving: boolean;
@@ -116,7 +117,7 @@ export function useCaseMutations(projectId: string): CaseMutations {
     onError: toastOnError("Couldn't duplicate the scenario"),
   });
 
-  const move = api.scenarios.moveToFolder.useMutation({
+  const move = api.scenarios.moveToTestSuite.useMutation({
     onSuccess: invalidate,
     onError: toastOnError("Couldn't move the scenario"),
   });
@@ -132,6 +133,6 @@ export function useCaseMutations(projectId: string): CaseMutations {
     duplicateCase: (testCase) =>
       duplicate.mutate({ projectId, scenarioId: testCase.id }),
     moveCaseToSuite: (testCase, suiteId) =>
-      move.mutate({ projectId, scenarioId: testCase.id, folderId: suiteId }),
+      move.mutate({ projectId, scenarioId: testCase.id, testSuiteId: suiteId }),
   };
 }

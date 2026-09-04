@@ -15,20 +15,22 @@ export const createScenarioCommand = async (
     situation: string;
     criteria?: string;
     labels?: string;
-    folder?: string;
+    testSuite?: string;
   },
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
-  // The folder is resolved before anything is created, so a folder that names
-  // nothing leaves no half-filed scenario behind.
-  let folderId: string | undefined;
-  let folderName: string | undefined;
-  if (options.folder !== undefined) {
+  // The test suite is resolved before anything is created, so a reference that
+  // names nothing leaves no half-filed scenario behind.
+  let testSuiteId: string | undefined;
+  let testSuiteName: string | undefined;
+  if (options.testSuite !== undefined) {
     try {
-      const folder = await resolveSuiteReference({ reference: options.folder });
-      folderId = folder.id;
-      folderName = folder.name;
+      const testSuite = await resolveSuiteReference({
+        reference: options.testSuite,
+      });
+      testSuiteId = testSuite.id;
+      testSuiteName = testSuite.name;
     } catch (error) {
       if (error instanceof SuiteReferenceError) {
         console.error(chalk.red(`Error: ${error.message}`));
@@ -54,12 +56,12 @@ export const createScenarioCommand = async (
       situation: options.situation,
       criteria,
       labels,
-      ...(folderId !== undefined && { folderId }),
+      ...(testSuiteId !== undefined && { testSuiteId }),
     });
 
     spinner.succeed(
-      folderName
-        ? `Created scenario "${chalk.cyan(scenario.name)}" in folder "${chalk.cyan(folderName)}" ${chalk.gray(`(id: ${scenario.id})`)}`
+      testSuiteName
+        ? `Created scenario "${chalk.cyan(scenario.name)}" in test suite "${chalk.cyan(testSuiteName)}" ${chalk.gray(`(id: ${scenario.id})`)}`
         : `Created scenario "${chalk.cyan(scenario.name)}" ${chalk.gray(`(id: ${scenario.id})`)}`,
     );
 

@@ -4,6 +4,7 @@ import type { Project } from "~/generated/prisma/client";
 import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import { useRouter } from "~/utils/compat/next-router";
 import { useFeatureFlag } from "../hooks/useFeatureFlag";
+import { useLegacySimulationsPreference } from "../hooks/useLegacySimulationsPreference";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { api } from "../utils/api";
 import { featureIcons } from "../utils/featureIcons";
@@ -257,6 +258,10 @@ function TestSection({
   const agentTestingFlagLoading = workspaceLoading
     ? true
     : flagReadCanRun && flagReadLoading;
+  // A person who clicked "go back" on the new-simulations callout reads the
+  // Simulations group on this browser while the flag stays on for the rest
+  // of the project.
+  const legacyPreferred = useLegacySimulationsPreference(project?.id);
 
   return (
     <SidebarSection
@@ -265,7 +270,8 @@ function TestSection({
       showExpanded={showExpanded}
       projectId={project?.id}
     >
-      {agentTestingFlagLoading ? null : agentTestingEnabled ? (
+      {agentTestingFlagLoading ? null : agentTestingEnabled &&
+        !legacyPreferred ? (
         <PageMenuLink
           path={projectRoutes.agent_testing.path}
           icon={featureIcons.agent_testing.icon}

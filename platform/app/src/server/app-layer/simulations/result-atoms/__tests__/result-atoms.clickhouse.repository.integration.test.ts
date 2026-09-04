@@ -12,8 +12,10 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "../../../../event-sourcing/__tests__/integration/testContainers";
+import { targetKeyOf } from "../../../../suites/target-key";
 import type { ResultsFilter } from "../atom.types";
 import {
+  MAX_RUN_TARGETS,
   MAX_TREND_POINTS,
   ResultAtomsClickHouseRepository,
 } from "../result-atoms.clickhouse.repository";
@@ -36,10 +38,13 @@ function makeRow({
   traceIds = [],
   traceMetricsJson = "",
   targetReferenceId,
+  targetKey,
+  targetParameters,
   note,
   archivedAt = null,
   durationMs = "1500",
   name = "Refund Flow",
+  agents,
 }: {
   scenarioId?: string;
   scenarioRunId?: string;
@@ -53,14 +58,27 @@ function makeRow({
   traceIds?: string[];
   traceMetricsJson?: string;
   targetReferenceId?: string;
+  /** The key the platform stamped; left out on a run recorded before it existed. */
+  targetKey?: string;
+  /** The overrides of the target; left out on a target with none. */
+  targetParameters?: Record<string, string | number | boolean>;
   note?: string;
   archivedAt?: Date | null;
   durationMs?: string | null;
   name?: string | null;
+  /** What the code that pushed the run reported about who took part in it. */
+  agents?: { name: string; role: "agent" | "user" | "judge" }[];
 }) {
   const metadata: Record<string, unknown> = {};
-  if (targetReferenceId) metadata.langwatch = { targetReferenceId };
+  if (targetReferenceId) {
+    metadata.langwatch = {
+      targetReferenceId,
+      ...(targetKey !== undefined && { targetKey }),
+      ...(targetParameters !== undefined && { targetParameters }),
+    };
+  }
   if (note) metadata.note = note;
+  if (agents) metadata.agents = agents;
 
   return {
     ProjectionId: `proj-${nanoid()}`,
@@ -773,6 +791,347 @@ describe("filters", () => {
 
       expect(atoms).toHaveLength(1);
       expect(atoms[0]?.ScenarioRunId).toBe(failedRunId);
+    });
+  });
+});
+
+describe("the target of a run that reports its agents", () => {
+  const reported = [
+    { name: "AcmeSupportAgent", role: "agent" as const },
+    { name: "UserSimulatorAgent", role: "user" as const },
+    { name: "JudgeAgent", role: "judge" as const },
+  ];
+
+  describe("given a run pushed from code that reports an agent", () => {
+    /** @scenario "A run that reports its agents names its target by the agent it tested" */
+    it("keys the target by the agent name and leaves the simulator and the judge out", async () => {
+      const setId = `set-${nanoid(6)}`;
+      await insertRows([
+        makeRow({
+          batchRunId: `batch-${nanoid(6)}`,
+          scenarioSetId: setId,
+          agents: reported,
+        }),
+      ]);
+
+      const { atoms } = await repo.findAtoms({
+        filter: baseFilter({ scenarioSetIds: [setId] }),
+        limit: 10,
+      });
+
+      expect(atoms).toHaveLength(1);
+      expect(atoms[0]?.TargetKey).toBe("code:acmesupportagent");
+      expect(atoms[0]?.TargetName).toBe("AcmeSupportAgent");
+      expect(atoms[0]?.Trigger).toBe("code");
+    });
+  });
+
+  describe("given two runs that report the same agent", () => {
+    /** @scenario "Two runs of one agent name fold under one target" */
+    it("folds them under one target group", async () => {
+      const setId = `set-${nanoid(6)}`;
+      await insertRows([
+        makeRow({
+          batchRunId: `batch-${nanoid(6)}`,
+          scenarioSetId: setId,
+          agents: reported,
+        }),
+        makeRow({
+          batchRunId: `batch-${nanoid(6)}`,
+          scenarioSetId: setId,
+          agents: reported,
+        }),
+      ]);
+
+      const groups = await repo.aggregateGroups({
+        filter: baseFilter({ scenarioSetIds: [setId] }),
+        groupBy: "target",
+      });
+
+      expect(groups).toHaveLength(1);
+      expect(groups[0]?.GroupKey).toBe("code:acmesupportagent");
+      expect(groups[0]?.TargetName).toBe("AcmeSupportAgent");
+      expect(groups[0]?.Atoms).toBe("2");
+    });
+  });
+
+  describe("given a run that reports no agent", () => {
+    /** @scenario "A run that reports no agent stays under the unknown target" */
+    it("keeps it under the unknown key with no target name", async () => {
+      const setId = `set-${nanoid(6)}`;
+      await insertRows([
+        makeRow({
+          batchRunId: `batch-${nanoid(6)}`,
+          scenarioSetId: setId,
+          agents: [{ name: "UserSimulatorAgent", role: "user" }],
+        }),
+      ]);
+
+      const { atoms } = await repo.findAtoms({
+        filter: baseFilter({ scenarioSetIds: [setId] }),
+        limit: 10,
+      });
+
+      expect(atoms[0]?.TargetKey).toBe("unknown");
+      expect(atoms[0]?.TargetName).toBe("");
+    });
+  });
+
+  describe("given a run started on the platform that also reports an agent", () => {
+    /** @scenario "A run started on the platform keeps its platform target" */
+    it("keeps the reference id the platform stamped", async () => {
+      const setId = `set-${nanoid(6)}`;
+      await insertRows([
+        makeRow({
+          batchRunId: `batch-${nanoid(6)}`,
+          scenarioSetId: setId,
+          targetReferenceId: "agent_dev",
+          agents: reported,
+        }),
+      ]);
+
+      const { atoms } = await repo.findAtoms({
+        filter: baseFilter({ scenarioSetIds: [setId] }),
+        limit: 10,
+      });
+
+      expect(atoms[0]?.TargetKey).toBe("agent_dev");
+      expect(atoms[0]?.Trigger).toBe("app");
+    });
+  });
+});
+
+describe("the target of a run whose target carries parameters", () => {
+  const overrides = { model: "gpt-5-mini" };
+  const variantKey = targetKeyOf({
+    referenceId: "prod-agent",
+    runParameters: overrides,
+  });
+
+  describe("given one run against an agent and against the same agent with overrides", () => {
+    /** @scenario "A target with parameter overrides is its own target" */
+    it("gives each its own atom, keyed apart, the variant carrying its overrides", async () => {
+      const setId = `set-${nanoid(6)}`;
+      const batchRunId = `batch-${nanoid(6)}`;
+      await insertRows([
+        makeRow({
+          batchRunId,
+          scenarioSetId: setId,
+          targetReferenceId: "prod-agent",
+          targetKey: "prod-agent",
+        }),
+        makeRow({
+          batchRunId,
+          scenarioSetId: setId,
+          targetReferenceId: "prod-agent",
+          targetKey: variantKey,
+          targetParameters: overrides,
+        }),
+      ]);
+
+      const { atoms } = await repo.findAtoms({
+        filter: baseFilter({ scenarioSetIds: [setId] }),
+        limit: 10,
+      });
+
+      expect(atoms).toHaveLength(2);
+      const byKey = new Map(atoms.map((atom) => [atom.TargetKey, atom]));
+      expect(variantKey).not.toBe("prod-agent");
+      expect(byKey.get("prod-agent")?.TargetParameters).toBe("");
+      expect(JSON.parse(byKey.get(variantKey)?.TargetParameters ?? "")).toEqual(
+        overrides,
+      );
+    });
+
+    /** @scenario "The overview groups a parameter variant apart from its agent" */
+    it("folds them into two target groups, the variant carrying its overrides", async () => {
+      const setId = `set-${nanoid(6)}`;
+      const batchRunId = `batch-${nanoid(6)}`;
+      await insertRows([
+        makeRow({
+          batchRunId,
+          scenarioSetId: setId,
+          targetReferenceId: "prod-agent",
+          targetKey: "prod-agent",
+          status: "SUCCESS",
+        }),
+        makeRow({
+          batchRunId,
+          scenarioSetId: setId,
+          targetReferenceId: "prod-agent",
+          targetKey: variantKey,
+          targetParameters: overrides,
+          status: "FAILED",
+        }),
+      ]);
+
+      const groups = await repo.aggregateGroups({
+        filter: baseFilter({ scenarioSetIds: [setId] }),
+        groupBy: "target",
+      });
+
+      expect(groups).toHaveLength(2);
+      const byKey = new Map(groups.map((group) => [group.GroupKey, group]));
+      expect(byKey.get("prod-agent")?.TargetParameters).toBe("");
+      expect(Number(byKey.get("prod-agent")?.Passed)).toBe(1);
+      expect(JSON.parse(byKey.get(variantKey)?.TargetParameters ?? "")).toEqual(
+        overrides,
+      );
+      expect(Number(byKey.get(variantKey)?.Passed)).toBe(0);
+    });
+
+    it("keeps a filter on the variant's key to the variant alone", async () => {
+      const setId = `set-${nanoid(6)}`;
+      const batchRunId = `batch-${nanoid(6)}`;
+      await insertRows([
+        makeRow({
+          batchRunId,
+          scenarioSetId: setId,
+          targetReferenceId: "prod-agent",
+          targetKey: "prod-agent",
+        }),
+        makeRow({
+          batchRunId,
+          scenarioSetId: setId,
+          targetReferenceId: "prod-agent",
+          targetKey: variantKey,
+          targetParameters: overrides,
+        }),
+      ]);
+
+      const { atoms } = await repo.findAtoms({
+        filter: baseFilter({
+          scenarioSetIds: [setId],
+          targetKeys: [variantKey],
+        }),
+        limit: 10,
+      });
+
+      expect(atoms.map((atom) => atom.TargetKey)).toEqual([variantKey]);
+    });
+  });
+
+  describe("given a run recorded before target keys were stamped", () => {
+    /** @scenario "An old run with no target key keeps its reference id as key" */
+    it("keys under its reference id, with no target parameters", async () => {
+      const setId = `set-${nanoid(6)}`;
+      await insertRows([
+        makeRow({
+          batchRunId: `batch-${nanoid(6)}`,
+          scenarioSetId: setId,
+          targetReferenceId: "prod-agent",
+        }),
+      ]);
+
+      const { atoms } = await repo.findAtoms({
+        filter: baseFilter({ scenarioSetIds: [setId] }),
+        limit: 10,
+      });
+
+      expect(atoms[0]?.TargetKey).toBe("prod-agent");
+      expect(atoms[0]?.TargetParameters).toBe("");
+    });
+  });
+});
+
+describe("findRunTargets", () => {
+  describe("given a variant of a stored target, a plain run of it, and a run from code", () => {
+    /** @scenario "The run targets list carries parameter variants" */
+    it("lists the variant with its reference id and overrides, the code target, and not the plain run", async () => {
+      const setId = `set-${nanoid(6)}`;
+      const overrides = { model: "gpt-5-mini" };
+      const variantKey = targetKeyOf({
+        referenceId: "prod-agent",
+        runParameters: overrides,
+      });
+      await insertRows([
+        makeRow({
+          batchRunId: `batch-${nanoid(6)}`,
+          scenarioSetId: setId,
+          targetReferenceId: "prod-agent",
+          targetKey: variantKey,
+          targetParameters: overrides,
+        }),
+        makeRow({
+          batchRunId: `batch-${nanoid(6)}`,
+          scenarioSetId: setId,
+          targetReferenceId: "prod-agent",
+          targetKey: "prod-agent",
+        }),
+        makeRow({
+          batchRunId: `batch-${nanoid(6)}`,
+          scenarioSetId: setId,
+          agents: [{ name: "AcmeSupportAgent", role: "agent" }],
+        }),
+      ]);
+
+      const rows = await repo.findRunTargets(
+        baseFilter({ scenarioSetIds: [setId] }),
+      );
+
+      expect(rows.map((row) => row.TargetKey)).toEqual([
+        variantKey,
+        "code:acmesupportagent",
+      ]);
+      expect(rows[0]).toMatchObject({
+        Name: "",
+        ReferenceId: "prod-agent",
+      });
+      expect(JSON.parse(rows[0]?.TargetParameters ?? "")).toEqual(overrides);
+      expect(rows[1]).toMatchObject({
+        Name: "AcmeSupportAgent",
+        ReferenceId: "",
+        TargetParameters: "",
+      });
+    });
+  });
+
+  describe("given runs from code, one naming no agent, and a platform run", () => {
+    /** @scenario "The targets named by runs from code are listed for the filter" */
+    it("lists the named agents in name order and leaves the rest out", async () => {
+      const setId = `set-${nanoid(6)}`;
+      await insertRows([
+        makeRow({
+          batchRunId: `batch-${nanoid(6)}`,
+          scenarioSetId: setId,
+          agents: [{ name: "AcmeSupportAgent", role: "agent" }],
+        }),
+        makeRow({
+          batchRunId: `batch-${nanoid(6)}`,
+          scenarioSetId: setId,
+          agents: [{ name: "AcmeBillingAgent", role: "agent" }],
+        }),
+        makeRow({
+          batchRunId: `batch-${nanoid(6)}`,
+          scenarioSetId: setId,
+        }),
+        makeRow({
+          batchRunId: `batch-${nanoid(6)}`,
+          scenarioSetId: setId,
+          targetReferenceId: "agent_dev",
+          agents: [{ name: "PlatformAgent", role: "agent" }],
+        }),
+      ]);
+
+      const rows = await repo.findRunTargets(
+        baseFilter({ scenarioSetIds: [setId] }),
+      );
+
+      expect(rows).toEqual([
+        {
+          TargetKey: "code:acmebillingagent",
+          Name: "AcmeBillingAgent",
+          ReferenceId: "",
+          TargetParameters: "",
+        },
+        {
+          TargetKey: "code:acmesupportagent",
+          Name: "AcmeSupportAgent",
+          ReferenceId: "",
+          TargetParameters: "",
+        },
+      ]);
+      expect(rows.length).toBeLessThanOrEqual(MAX_RUN_TARGETS);
     });
   });
 });

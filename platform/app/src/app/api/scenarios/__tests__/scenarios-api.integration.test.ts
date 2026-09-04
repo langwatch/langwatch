@@ -24,6 +24,7 @@ describe("Scenarios API", () => {
   let helpers: {
     api: {
       put: (path: string, body: unknown) => Response | Promise<Response>;
+      patch: (path: string, body: unknown) => Response | Promise<Response>;
       post: (path: string, body: unknown) => Response | Promise<Response>;
       get: (path: string) => Response | Promise<Response>;
       delete: (path: string) => Response | Promise<Response>;
@@ -75,6 +76,12 @@ describe("Scenarios API", () => {
         put: (path: string, body: unknown) =>
           app.request(path, {
             method: "PUT",
+            headers: createAuthHeaders(testApiKey),
+            body: JSON.stringify(body),
+          }),
+        patch: (path: string, body: unknown) =>
+          app.request(path, {
+            method: "PATCH",
             headers: createAuthHeaders(testApiKey),
             body: JSON.stringify(body),
           }),
@@ -280,15 +287,15 @@ describe("Scenarios API", () => {
     });
   });
 
-  describe("folderId over the public scenarios endpoint", () => {
-    async function createFolder(name: string) {
+  describe("testSuiteId over the public scenarios endpoint", () => {
+    async function createTestSuite(name: string) {
       return prisma.simulationSuite.create({
         data: {
           id: `suite_${nanoid()}`,
           projectId: testProjectId,
           name,
           slug: `${name.toLowerCase()}-${nanoid(6)}`,
-          kind: "folder",
+          kind: "test_suite",
           scenarioIds: [],
           targets: [],
           labels: [],
@@ -296,39 +303,39 @@ describe("Scenarios API", () => {
       });
     }
 
-    describe("when a scenario is created with a folderId", () => {
-      it("files it there and reports folderId on the response", async () => {
-        const folder = await createFolder("Refunds");
+    describe("when a scenario is created with a testSuiteId", () => {
+      it("files it there and reports testSuiteId on the response", async () => {
+        const testSuite = await createTestSuite("Refunds");
 
         const res = await helpers.api.post("/api/scenarios", {
-          name: "Refund case",
+          name: "Refund scenario",
           situation: "A customer wants a refund",
-          folderId: folder.id,
+          testSuiteId: testSuite.id,
         });
 
         expect(res.status).toBe(201);
         const body = await res.json();
-        expect(body.folderId).toBe(folder.id);
+        expect(body.testSuiteId).toBe(testSuite.id);
 
         const stored = await prisma.simulationSuite.findFirst({
-          where: { id: folder.id, projectId: testProjectId },
+          where: { id: testSuite.id, projectId: testProjectId },
         });
         expect(stored?.scenarioIds).toEqual([body.id]);
       });
     });
 
-    describe("when a scenario is updated with folderId null", () => {
+    describe("when a scenario is updated with testSuiteId null", () => {
       it("files it into the Default suite", async () => {
-        const folder = await createFolder("Refunds");
+        const testSuite = await createTestSuite("Refunds");
         const created = await helpers.api.post("/api/scenarios", {
-          name: "Refund case",
+          name: "Refund scenario",
           situation: "s",
-          folderId: folder.id,
+          testSuiteId: testSuite.id,
         });
         const { id } = await created.json();
 
         const res = await helpers.api.put(`/api/scenarios/${id}`, {
-          folderId: null,
+          testSuiteId: null,
         });
 
         expect(res.status).toBe(200);
@@ -337,31 +344,31 @@ describe("Scenarios API", () => {
         const defaultSuite = await prisma.simulationSuite.findFirst({
           where: {
             projectId: testProjectId,
-            kind: "folder",
+            kind: "test_suite",
             name: DEFAULT_SUITE_NAME,
           },
         });
-        expect(body.folderId).toBe(defaultSuite?.id);
+        expect(body.testSuiteId).toBe(defaultSuite?.id);
         expect(defaultSuite?.scenarioIds).toEqual([id]);
 
         const stored = await prisma.simulationSuite.findFirst({
-          where: { id: folder.id, projectId: testProjectId },
+          where: { id: testSuite.id, projectId: testProjectId },
         });
         expect(stored?.scenarioIds).toEqual([]);
       });
     });
 
-    describe("when the folderId names no active folder", () => {
-      it("refuses with scenario_folder_not_found", async () => {
+    describe("when the testSuiteId names no active test suite", () => {
+      it("refuses with scenario_test_suite_not_found", async () => {
         const res = await helpers.api.post("/api/scenarios", {
-          name: "Refund case",
+          name: "Refund scenario",
           situation: "s",
-          folderId: "suite_missing",
+          testSuiteId: "suite_missing",
         });
 
         expect(res.status).toBe(404);
         const body = await res.json();
-        expect(body.error).toBe("scenario_folder_not_found");
+        expect(body.error).toBe("scenario_test_suite_not_found");
       });
     });
   });
@@ -493,6 +500,114 @@ describe("Scenarios API", () => {
         expect(res.status).toBe(404);
         const body = await res.json();
         expect(body).toHaveProperty("error");
+      });
+    });
+  });
+
+  describe("given model overrides and turn limits over REST", () => {
+    describe("when creating with model overrides and turn limits", () => {
+      /** @scenario "Create over REST accepts model overrides and turn limits" */
+      it("carries the values back on create and on read", async () => {
+        const res = await helpers.api.post("/api/scenarios", {
+          name: "Overrides Scenario",
+          situation: "User asks for a refund",
+          simulatorModel: "openai/gpt-5-mini",
+          judgeModel: "openai/gpt-5-mini",
+          maxTurns: 8,
+          minTurns: 2,
+        });
+
+        expect(res.status).toBe(201);
+        const created = await res.json();
+        expect(created).toMatchObject({
+          simulatorModel: "openai/gpt-5-mini",
+          judgeModel: "openai/gpt-5-mini",
+          maxTurns: 8,
+          minTurns: 2,
+        });
+
+        const readRes = await helpers.api.get(`/api/scenarios/${created.id}`);
+        expect(readRes.status).toBe(200);
+        const read = await readRes.json();
+        expect(read).toMatchObject({
+          simulatorModel: "openai/gpt-5-mini",
+          judgeModel: "openai/gpt-5-mini",
+          maxTurns: 8,
+          minTurns: 2,
+        });
+      });
+    });
+
+    describe("when updating an override to null", () => {
+      /** @scenario "Update over REST clears a model override with null" */
+      it("clears the stored override", async () => {
+        const createRes = await helpers.api.post("/api/scenarios", {
+          name: "Clear Override Scenario",
+          situation: "User asks for help",
+          simulatorModel: "openai/gpt-5-mini",
+        });
+        const created = await createRes.json();
+
+        const updateRes = await helpers.api.put(
+          `/api/scenarios/${created.id}`,
+          { simulatorModel: null },
+        );
+        expect(updateRes.status).toBe(200);
+        const updated = await updateRes.json();
+        expect(updated.simulatorModel).toBeNull();
+
+        const readRes = await helpers.api.get(`/api/scenarios/${created.id}`);
+        const read = await readRes.json();
+        expect(read.simulatorModel).toBeNull();
+      });
+    });
+
+    describe("when the override has no provider prefix", () => {
+      /** @scenario "REST rejects a model override with no provider prefix" */
+      it("rejects the create with a validation error", async () => {
+        const res = await helpers.api.post("/api/scenarios", {
+          name: "Bad Model Scenario",
+          situation: "User asks for help",
+          simulatorModel: "latest",
+        });
+
+        expect(res.status).toBe(422);
+      });
+    });
+  });
+
+  describe("PATCH /api/scenarios/:id", () => {
+    describe("when the scenario exists", () => {
+      /** @scenario "PATCH updates a scenario the same way PUT does" */
+      it("updates the scenario like PUT does", async () => {
+        const scenario = await prisma.scenario.create({
+          data: {
+            projectId: testProjectId,
+            name: "Patch Me",
+            situation: "Original situation",
+            criteria: [],
+            labels: [],
+          },
+        });
+
+        const res = await helpers.api.patch(`/api/scenarios/${scenario.id}`, {
+          name: "Patched Name",
+        });
+
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.name).toBe("Patched Name");
+        expect(body.situation).toBe("Original situation");
+      });
+    });
+
+    describe("when the scenario does not exist", () => {
+      it("returns 404", async () => {
+        const res = await helpers.api.patch("/api/scenarios/nonexistent-id", {
+          name: "New Name",
+        });
+
+        expect(res.status).toBe(404);
       });
     });
   });

@@ -1,5 +1,5 @@
 /**
- * The line above the cases table: the suite that is open, how many scenarios
+ * The line above the scenarios table: the suite that is open, how many scenarios
  * it holds, the label filter and the entry points that write.
  *
  * The way into a recent run sits here too, between "New scenario" and
@@ -13,10 +13,11 @@
  * @see specs/features/agent-testing/cases-table.feature
  */
 
-import { Badge, HStack, Icon, Spacer, Text } from "@chakra-ui/react";
+import { HStack, Icon, Spacer, Text } from "@chakra-ui/react";
 import { Folder, FolderCode, Play, Plus } from "lucide-react";
 import { LabelFilterDropdown } from "~/components/scenarios/LabelFilterDropdown";
 import { FG_MUTED } from "../shared/design";
+import { FromCodeBadge } from "../shared/FromCodeBadge";
 import { SmallButton } from "../shared/SmallButton";
 import type { CasesPanelProps } from "./CasesPanel";
 import { RecentRunsMenu } from "./RecentRunsMenu";
@@ -87,16 +88,7 @@ function CasesPanelIdentity(props: CasesPanelHeaderProps) {
       <Text fontSize="11.5px" color={FG_MUTED}>
         {props.caseCount} {props.caseCount === 1 ? "scenario" : "scenarios"}
       </Text>
-      {props.isExternal && (
-        <Badge
-          size="xs"
-          variant="subtle"
-          colorPalette="gray"
-          title="Defined and run from your codebase; results land here"
-        >
-          from code
-        </Badge>
-      )}
+      {props.isExternal && <FromCodeBadge />}
     </>
   );
 }

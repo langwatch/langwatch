@@ -21,8 +21,14 @@ type GetAllResponse = {
  * not a project route, so deriving the slug from the URL was non-deterministic
  * across runs (and 404s when the governance flag gating /me is off). The API is
  * authoritative regardless of persona.
+ *
+ * `E2E_PROJECT_SLUG` names one project instead, for a local run against a
+ * project of your choice, for example a fresh one with no data.
  */
 export async function getProjectSlug(page: Page): Promise<string> {
+  const pinned = process.env.E2E_PROJECT_SLUG;
+  if (pinned) return pinned;
+
   const response = await page.request.get(
     "/api/trpc/organization.getAll?batch=1&input=" +
       encodeURIComponent(JSON.stringify({ "0": { json: {} } })),

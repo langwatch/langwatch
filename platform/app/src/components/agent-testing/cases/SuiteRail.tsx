@@ -7,18 +7,18 @@
  * stay in the panel that owns them.
  *
  * @see specs/features/agent-testing/suites-rail.feature
- * @see specs/suites/suite-folders.feature
+ * @see specs/suites/test-suites.feature
  */
 
-import { VStack } from "@chakra-ui/react";
+import { Box, VStack } from "@chakra-ui/react";
 import { useCallback, useState } from "react";
 import type {
   Period,
   PeriodMode,
   RelativePresetKey,
 } from "~/components/PeriodSelector";
+import { NewSimulationsCallout } from "~/components/suites/NewSimulationsCallout";
 import { SuiteArchiveDialog } from "~/components/suites/SuiteArchiveDialog";
-import { VoiceAgentsCallout } from "~/components/suites/VoiceAgentsCallout";
 import type { AgentTestingSelection } from "../useAgentTestingRouting";
 import { SuiteRailFooter } from "./SuiteRailFooter";
 import { SuiteRailSections } from "./SuiteRailSections";
@@ -49,6 +49,8 @@ export type SuiteRailProps = {
   canManage: boolean;
   /** The last run of every suite that has one, keyed by suite id. */
   lastRunBySuiteId: ReadonlyMap<string, SuiteLastRun>;
+  /** The scenarios filed under every suite, which its recent runs are read from. */
+  scenarioIdsBySuiteId: ReadonlyMap<string, string[]>;
   collapsed: boolean;
   onToggleCollapsed: () => void;
   onSelect: (selection: AgentTestingSelection) => void;
@@ -57,7 +59,6 @@ export type SuiteRailProps = {
   onNewTestCase: (suiteId: string) => void;
   onRunSuite: (suiteId: string) => void;
   onRenameSuite: (suiteId: string) => void;
-  onOpenLastRun: (suite: TestSuiteEntry) => void;
   onArchiveSuite: (suiteId: string) => void;
   isArchiving?: boolean;
   period: Period;
@@ -89,7 +90,11 @@ export function SuiteRail(props: SuiteRailProps) {
     >
       <SuiteRailSections {...props} onRequestArchive={setSuiteToArchive} />
 
-      {!collapsed && <VoiceAgentsCallout />}
+      {!collapsed && (
+        <Box paddingX={3}>
+          <NewSimulationsCallout target="scenarios" />
+        </Box>
+      )}
 
       <SuiteRailFooter {...props} />
 

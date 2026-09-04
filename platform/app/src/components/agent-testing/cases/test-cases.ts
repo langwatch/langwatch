@@ -5,7 +5,7 @@
  * tested without a router or a query.
  *
  * @see specs/features/agent-testing/cases-table.feature
- * @see specs/scenarios/scenario-folder-assignment.feature
+ * @see specs/scenarios/scenario-test-suite-assignment.feature
  */
 
 /** A scenario as the table reads it. */
@@ -13,11 +13,11 @@ export type TestCase = {
   id: string;
   name: string;
   labels: string[];
-  folderId: string | null;
+  testSuiteId: string | null;
   createdAt: Date;
-  /** The person who last saved the case, when the project knows their name. */
+  /** The person who last saved the scenario, when the project knows their name. */
   lastUpdatedById: string | null;
-  /** The stored version of the case; each save moves it up by one. */
+  /** The stored version of the scenario; each save moves it up by one. */
   version?: number;
 };
 
@@ -59,7 +59,7 @@ export function orderSuitesDefaultFirst(
   return [...suites.filter(isDefault), ...suites.filter((s) => !isDefault(s))];
 }
 
-/** The cases that carry at least one of the chosen labels. */
+/** The scenarios that carry at least one of the chosen labels. */
 export function filterCasesByLabels(
   cases: TestCase[],
   activeLabels: string[],
@@ -70,7 +70,7 @@ export function filterCasesByLabels(
   );
 }
 
-/** Every label used by any of the cases, in reading order. */
+/** Every label used by any of the scenarios, in reading order. */
 export function collectLabels(cases: TestCase[]): string[] {
   const labels = new Set<string>();
   for (const testCase of cases) {

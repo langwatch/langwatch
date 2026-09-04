@@ -14,20 +14,23 @@ import type { AgentTestingSelection } from "./useAgentTestingRouting";
 import { useAgentTestingStore } from "./useAgentTestingStore";
 
 /** The id of the suite the address names, or nothing for any other selection. */
-export function useSelectedSuiteFolderId(
+export function useSelectedSuiteTestSuiteId(
   selection: AgentTestingSelection,
 ): string | null {
   const { project } = useOrganizationTeamProject();
 
   // The rail reads the same list, so this is the cached copy rather than a
   // second read. It is only here to turn the address of a suite into its id.
-  const { data: folders } = api.suites.folders.getAll.useQuery(
+  const { data: testSuites } = api.suites.testSuites.getAll.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project?.id },
   );
 
   if (selection.kind !== "suite") return null;
-  return folders?.find((folder) => folder.slug === selection.slug)?.id ?? null;
+  return (
+    testSuites?.find((testSuite) => testSuite.slug === selection.slug)?.id ??
+    null
+  );
 }
 
 /**

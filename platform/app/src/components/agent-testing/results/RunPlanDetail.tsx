@@ -65,7 +65,7 @@ export function RunPlanDetail(props: RunPlanDetailProps) {
       <RunsSidebar
         runs={batches}
         selectedBatchRunId={selection.selectedBatch?.batchRunId ?? null}
-        pendingBatchRunId={pendingBatchRunId}
+        pendingBatchRunId={pendingBatchRunId ?? selection.awaitedBatchRunId}
         onSelectRun={props.onSelectRun}
         onBack={props.onBack}
         periodControls={props}

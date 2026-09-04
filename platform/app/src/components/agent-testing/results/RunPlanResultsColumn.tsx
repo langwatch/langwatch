@@ -46,6 +46,7 @@ export function RunPlanResultsColumn({
     isRunSettingsShown,
     toggleRunSettings,
     runDialog,
+    targets,
   } = useRunPlanResultsColumn({ plan, batches, selection, periodControls });
 
   return (
@@ -73,6 +74,7 @@ export function RunPlanResultsColumn({
         {isRunSettingsShown && runSettings ? (
           <RunSettingsBlock
             settings={runSettings}
+            targets={targets}
             startedLabel={runStartedLabel}
             startedByLabel={runStartedByLabel}
           />
@@ -82,6 +84,7 @@ export function RunPlanResultsColumn({
           plan={plan}
           batches={batches}
           selection={selection}
+          targets={targets}
           cancel={cancel}
           viewMode={viewMode}
           periodControls={periodControls}

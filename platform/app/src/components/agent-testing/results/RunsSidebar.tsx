@@ -12,6 +12,7 @@
 
 import { Box, Button, Text, VStack } from "@chakra-ui/react";
 import { ArrowLeft } from "lucide-react";
+import { NewSimulationsCallout } from "~/components/suites/NewSimulationsCallout";
 import { FG_MUTED } from "../shared/design";
 import { AgentTestingPeriodPicker } from "../shared/PeriodPicker";
 import type { PeriodControls } from "./period-controls";
@@ -27,7 +28,10 @@ export type RunsSidebarProps = {
     "batchRuns" | "totalBatchCount" | "hasMore" | "loadMore" | "isLoading"
   >;
   selectedBatchRunId: string | null;
-  /** A run of this plan that was just started and has no rows yet. */
+  /**
+   * A run of this plan that has no rows yet: one just started from this page,
+   * or one the address names before its first scenario has reported.
+   */
   pendingBatchRunId: string | null;
   onSelectRun: (batchRunId: string) => void;
   onBack: () => void;
@@ -119,7 +123,6 @@ export function RunsSidebar({
       height="full"
       paddingX={3}
       paddingY={4}
-      overflow="auto"
       data-testid="agent-testing-runs-sidebar"
     >
       <Button
@@ -137,20 +140,26 @@ export function RunsSidebar({
         <ArrowLeft size={13} /> Results
       </Button>
 
-      {isPendingShown ? <PendingEntry /> : null}
+      {/* Only the list scrolls: the announcement and the period picker stay
+          in reach however long the run history grows. */}
+      <VStack align="stretch" gap={1} flex={1} minHeight={0} overflow="auto">
+        {isPendingShown ? <PendingEntry /> : null}
 
-      <RunsList
-        runs={runs}
-        selectedBatchRunId={selectedBatchRunId}
-        onSelectRun={onSelectRun}
-        isPendingShown={isPendingShown}
-      />
+        <RunsList
+          runs={runs}
+          selectedBatchRunId={selectedBatchRunId}
+          onSelectRun={onSelectRun}
+          isPendingShown={isPendingShown}
+        />
+      </VStack>
 
-      <Box flex={1} minHeight={4} />
+      <NewSimulationsCallout target="runs" />
 
       <Box paddingLeft={1} paddingTop={4}>
         <AgentTestingPeriodPicker
           period={periodControls.period}
+          periodMode={periodControls.periodMode}
+          setPeriod={periodControls.setPeriod}
           setRelativePeriod={periodControls.setRelativePeriod}
           compact
         />

@@ -103,7 +103,7 @@ class AgentsFacade:
         if limit is not None:
             params["limit"] = limit
 
-        response = self._http().get("/api/agents", params=params)
+        response = self._http().get("/api/v1/agents", params=params)
         _raise_for_status(response, operation="list")
         return response.json()
 
@@ -117,7 +117,7 @@ class AgentsFacade:
         Returns:
             Dictionary containing the agent data.
         """
-        response = self._http().get(f"/api/agents/{_quote(agent_id)}")
+        response = self._http().get(f"/api/v1/agents/{_quote(agent_id)}")
         _raise_for_status(response, operation="get")
         return response.json()
 
@@ -141,7 +141,7 @@ class AgentsFacade:
         if config is not None:
             body.update(config)
 
-        response = self._http().post("/api/agents", json=body)
+        response = self._http().post("/api/v1/agents", json=body)
         _raise_for_status(response, operation="create")
         return response.json()
 
@@ -163,7 +163,7 @@ class AgentsFacade:
         """
         body = params or {}
         response = self._http().patch(
-            f"/api/agents/{_quote(agent_id)}", json=body
+            f"/api/v1/agents/{_quote(agent_id)}", json=body
         )
         _raise_for_status(response, operation="update")
         return response.json()
@@ -178,6 +178,6 @@ class AgentsFacade:
         Returns:
             Dictionary with deletion result.
         """
-        response = self._http().delete(f"/api/agents/{_quote(agent_id)}")
+        response = self._http().delete(f"/api/v1/agents/{_quote(agent_id)}")
         _raise_for_status(response, operation="delete")
         return response.json()

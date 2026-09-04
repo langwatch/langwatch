@@ -15,7 +15,7 @@
 
 import { createLogger } from "@langwatch/observability";
 import { type ChildProcess, spawn } from "child_process";
-import { tryGetApp } from "../app-layer/app";
+import { getApp, tryGetApp } from "../app-layer/app";
 import { resolveAppPackageRoot } from "../appPackageRoot";
 import {
   createContextFromJobData,
@@ -43,9 +43,11 @@ import type {
   ExecutionJobData,
   ScenarioExecutionPool,
 } from "./execution/execution-pool";
-import type {
-  ChildProcessJobData,
-  ScenarioExecutionResult,
+import {
+  type ChildProcessJobData,
+  type ScenarioAgentInstance,
+  ScenarioAgentInstanceSchema,
+  type ScenarioExecutionResult,
 } from "./execution/types";
 import { CHILD_PROCESS, SCENARIO_WORKER } from "./scenario.constants";
 import { ScenarioService } from "./scenario.service";
@@ -71,10 +73,26 @@ export interface FailureEmitter {
   ensureFailureEventsEmitted(params: FailureEventParams): Promise<void>;
 }
 
-/** Dependencies for the scenario processor's failure handling */
+/** The connected agent instance that answered a run. */
+export interface ServedAgentInstance {
+  hostname: string;
+  label: string | null;
+}
+
+/** Writes the instance that served a run onto the run's record. */
+export interface AgentInstanceRecorder {
+  recordAgentInstance(params: {
+    projectId: string;
+    scenarioRunId: string;
+    agentInstance: ServedAgentInstance;
+  }): Promise<void>;
+}
+
+/** Dependencies for the scenario processor's job outcome handling */
 export interface ProcessorDependencies {
   scenarioLookup: ScenarioLookup;
   failureEmitter: FailureEmitter;
+  agentInstanceRecorder: AgentInstanceRecorder;
 }
 
 // ============================================================================
@@ -96,7 +114,49 @@ export function createProcessorDependencies(): ProcessorDependencies {
       ensureFailureEventsEmitted: (params) =>
         failureHandler.ensureFailureEventsEmitted(params),
     },
+    agentInstanceRecorder: {
+      recordAgentInstance: ({ projectId, scenarioRunId, agentInstance }) =>
+        getApp().simulations.recordAgentInstance({
+          tenantId: projectId,
+          scenarioRunId,
+          agentInstance,
+          occurredAt: Date.now(),
+        }),
+    },
   };
+}
+
+/**
+ * Handle a job that ran to the end: record which connected agent instance
+ * answered it, when one did.
+ *
+ * The run's own finished event comes from the child through the SDK; the
+ * instance is what the parent learns from the child's result line, so it is
+ * recorded here, after the child exits. A failure to record it is logged and
+ * not raised: the run is complete, and the instance is a detail of it.
+ */
+export async function handleSucceededJobResult({
+  jobData,
+  result,
+  deps,
+}: {
+  jobData: ExecutionJobData;
+  result: ScenarioExecutionResult;
+  deps: ProcessorDependencies;
+}): Promise<void> {
+  if (!result.agentInstance) return;
+  try {
+    await deps.agentInstanceRecorder.recordAgentInstance({
+      projectId: jobData.projectId,
+      scenarioRunId: jobData.scenarioRunId,
+      agentInstance: result.agentInstance,
+    });
+  } catch (err) {
+    logger.warn(
+      { err, scenarioRunId: jobData.scenarioRunId },
+      "Could not record the agent instance that served the run",
+    );
+  }
 }
 
 // ============================================================================
@@ -123,7 +183,9 @@ export async function handleFailedJobResult(
     batchRunId: jobData.batchRunId,
     scenarioRunId: jobData.scenarioRunId,
     error,
-    name: scenario?.name,
+    // A run with no scenario row (an agent test) keeps the name it was
+    // queued with.
+    name: scenario?.name ?? jobData.scenarioName,
     description: scenario?.situation,
     target: jobData.target,
   });
@@ -229,6 +291,8 @@ export interface ChildProcessResult {
   success: boolean;
   error?: string;
   reasoning?: string;
+  /** The connected agent instance that answered the run, when one did. */
+  agentInstance?: ScenarioAgentInstance;
 }
 
 /** Parse a single stdout line as the runner's result, or null if it isn't one. */
@@ -250,7 +314,21 @@ function parseResultLine(line: string): ChildProcessResult | null {
     ...(typeof record.reasoning === "string"
       ? { reasoning: record.reasoning }
       : {}),
+    ...(agentInstanceOf(record.agentInstance) ?? {}),
   };
+}
+
+/**
+ * The instance the line names, when the line names a whole one.
+ *
+ * Parsed against the shared schema rather than probed field by field, so the
+ * value the recorder receives is one the run's own result schema accepts.
+ */
+function agentInstanceOf(
+  value: unknown,
+): { agentInstance: ScenarioAgentInstance } | null {
+  const parsed = ScenarioAgentInstanceSchema.safeParse(value);
+  return parsed.success ? { agentInstance: parsed.data } : null;
 }
 
 /**
@@ -403,6 +481,7 @@ export async function executeScenarioRun(
         { success: true, totalDurationMs, childDurationMs },
         "Scenario job completed",
       );
+      await handleSucceededJobResult({ jobData, result, deps });
     } else if (result.cancelled) {
       jobLogger.info("Scenario job cancelled by user");
       await handleCancelledJobResult(jobData, result.error, deps);
@@ -552,8 +631,12 @@ async function spawnScenarioChildProcess(
         return;
       }
 
-      log("info", "Scenario completed successfully", { exitCode: code });
-      resolve({ success: true });
+      const served = parseChildProcessResult(stdout)?.agentInstance;
+      log("info", "Scenario completed successfully", {
+        exitCode: code,
+        ...(served ? { agentInstance: served } : {}),
+      });
+      resolve({ success: true, ...(served ? { agentInstance: served } : {}) });
     });
 
     child.on("error", (error) => {

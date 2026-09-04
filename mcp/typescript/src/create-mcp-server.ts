@@ -17,6 +17,7 @@ import { handleExperimentResults } from "./tools/get-experiment-results.js";
 import { handleExperimentListRuns } from "./tools/list-experiment-runs.js";
 import { handleExperimentList } from "./tools/list-experiments.js";
 import { handleRunExperiment, handleExperimentStatus } from "./tools/run-experiment.js";
+import { handleTestAgent } from "./tools/test-agent.js";
 
 const modelSchema = z
   .string()
@@ -365,7 +366,7 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
 
   server.tool(
     "platform_get_prompt",
-    "Get a specific prompt from the LangWatch platform by ID or handle, including messages, model config, and version history.",
+    "Get a specific prompt from the LangWatch platform by ID or handle, including messages, model config, and version history. Use format: 'json' for the full raw API payload, or 'digest' (default) for a formatted summary.",
     {
       idOrHandle: z.string().describe("Prompt ID or handle"),
       version: z
@@ -376,6 +377,12 @@ NOTE: Prompts can be managed two ways. Determine which approach the user needs:
         'Fetch the version pointed to by this tag (e.g., "production", "staging"). ' +
         'Alternatively, use shorthand in idOrHandle: "pizza-prompt:production"'
       ),
+      format: z
+        .enum(["digest", "json"])
+        .optional()
+        .describe(
+          "Output format: 'digest' (default, AI-readable) or 'json' (full raw data)"
+        ),
     },
     withToolLogging("platform_get_prompt", async (params) => {
       if (params.version != null && params.tag) {
@@ -533,7 +540,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
         .array(z.string())
         .optional()
         .describe("Tags for organizing and filtering scenarios"),
-      folderId: z
+      testSuiteId: z
         .string()
         .nullish()
         .describe(
@@ -557,7 +564,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     "platform_list_scenarios",
     "List all scenarios on the LangWatch platform. Returns AI-readable digest by default.",
     {
-      folderId: z
+      testSuiteId: z
         .string()
         .optional()
         .describe("Only the scenarios filed in this test suite"),
@@ -617,7 +624,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
         .array(z.string())
         .optional()
         .describe("Updated labels"),
-      folderId: z
+      testSuiteId: z
         .string()
         .nullish()
         .describe(
@@ -659,12 +666,12 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
   // --- Platform Run Plan Tools (require API key) ---
   // A run plan is what you run, and its NAME identifies it: running a name
   // that exists replaces that plan's configuration, running a new name
-  // creates the plan. Test suites are folders of scenarios; running one is
+  // creates the plan. A test suite groups scenarios; running one is
   // sugar that creates or joins the plan "<suite name> <target name>".
 
   server.tool(
     "platform_run_plan",
-    "Run scenarios against targets. The plan name identifies the run plan: an existing name is re-run with the configuration you send here, a new name creates the plan. Configuration is the scope, the targets, the repeat count and the models; parameters, the note and the idempotency key belong to this run alone.",
+    "Run scenarios against targets. The plan name identifies the run plan: an existing name is re-run with the configuration you send here, a new name creates the plan. Configuration is the scope, the targets, the repeat count and the models; parameters, the note and the idempotency key belong to this run alone. Send more than one target to compare them in the same run, and give a target its own parameters to compare one agent on two models.",
     {
       name: z
         .string()
@@ -673,22 +680,26 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
           "The run plan to run. An existing name is replaced with this configuration, a new name creates the plan. Omit to let the server name it after the suite and the target.",
         ),
       scope: runPlanScopeSchema.describe(
-        "What the plan covers: every case in the project, the cases filed in given test suites, the cases carrying given labels, or the hand-picked list in scenarioIds.",
+        "What the plan covers: every scenario in the project, the scenarios filed in given test suites, the scenarios carrying given labels, or the hand-picked list in scenarioIds.",
       ),
       scenarioIds: z
         .array(z.string())
         .optional()
-        .describe("The cases to run. Read only when scope.mode is 'cases'."),
+        .describe(
+          "The scenarios to run. Read only when scope.mode is 'scenarios'.",
+        ),
       targets: z
         .array(runPlanTargetSchema)
-        .describe("What to run the cases against."),
+        .describe(
+          "What to run the scenarios against. Every target runs every scenario, and the results show one column for each, so this is how one run compares two agents or one agent on two models.",
+        ),
       repeatCount: z
         .number()
         .int()
         .min(1)
         .max(5)
         .optional()
-        .describe("How many times to run each case against each target (1 to 5, default 1)"),
+        .describe("How many times to run each scenario against each target (1 to 5, default 1)"),
       simulatorModel: z
         .string()
         .optional()
@@ -699,7 +710,9 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
         .describe("Model that judges the criteria. Omit for the project default."),
       parameters: runParametersSchema
         .optional()
-        .describe("Values for the parameters the scenarios declare, by name."),
+        .describe(
+          "Values for the parameters the scenarios declare, by name. They apply to every target; a target that names the same parameter overrides them for itself.",
+        ),
       note: z
         .string()
         .max(200)
@@ -801,11 +814,11 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
   );
 
   // --- Platform Test Suite Tools (require API key) ---
-  // A test suite is a folder of scenarios: a name and the cases filed in it.
+  // A test suite groups scenarios: a name and the scenarios filed in it.
 
   server.tool(
     "platform_list_test_suites",
-    "List the test suites of the project. A test suite is a folder of scenarios.",
+    "List the test suites of the project. A test suite groups scenarios.",
     {
       format: z
         .enum(["digest", "json"])
@@ -825,7 +838,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
 
   server.tool(
     "platform_create_test_suite",
-    "Create a test suite, the folder scenarios are filed in. File a scenario in it by passing the suite ID as folderId on platform_create_scenario or platform_update_scenario.",
+    "Create a test suite. A test suite groups scenarios: file a scenario in it by passing the suite ID as testSuiteId on platform_create_scenario or platform_update_scenario.",
     {
       name: z.string().describe("Test suite name"),
     },
@@ -896,12 +909,14 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
 
   server.tool(
     "platform_run_test_suite",
-    "Run every scenario of a test suite against targets. This creates or joins the run plan named '<suite name> <target name>' unless you send a name of your own.",
+    "Run every scenario of a test suite against targets. This creates or joins the run plan named '<suite name> <target name>' unless you send a name of your own. Send more than one target to compare them in the same run, and give a target its own parameters to compare one agent on two models.",
     {
       id: z.string().describe("The test suite ID to run"),
       targets: z
         .array(runPlanTargetSchema)
-        .describe("What to run the scenarios against."),
+        .describe(
+          "What to run the scenarios against. Every target runs every scenario, and the results show one column for each.",
+        ),
       name: z
         .string()
         .optional()
@@ -914,7 +929,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
         .min(1)
         .max(5)
         .optional()
-        .describe("How many times to run each case against each target (1 to 5, default 1)"),
+        .describe("How many times to run each scenario against each target (1 to 5, default 1)"),
       simulatorModel: z
         .string()
         .optional()
@@ -925,7 +940,9 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
         .describe("Model that judges the criteria. Omit for the project default."),
       parameters: runParametersSchema
         .optional()
-        .describe("Values for the parameters the scenarios declare, by name."),
+        .describe(
+          "Values for the parameters the scenarios declare, by name. They apply to every target; a target that names the same parameter overrides them for itself.",
+        ),
       note: z
         .string()
         .max(200)
@@ -1136,7 +1153,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
 
   server.tool(
     "platform_list_agents",
-    "List all agents in the LangWatch project with their names, types, and IDs.",
+    "List all agents in the LangWatch project with their names, types and IDs. A connected agent (one that registered itself from code with connectAgent or connect_agent) also shows its environment, whether it is online, how many instances are connected, and its owner.",
     {},
     withToolLogging("platform_list_agents", async () => {
       requireApiKey();
@@ -1149,7 +1166,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
 
   server.tool(
     "platform_get_agent",
-    "Get detailed information about a specific agent by its ID, including its configuration.",
+    "Get detailed information about a specific agent by its ID, including its configuration. A connected agent also shows its environment, status, the run parameters it declared (with options and defaults) and the instances connected right now.",
     {
       id: z.string().describe("The agent ID"),
     },
@@ -1164,7 +1181,7 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
 
   server.tool(
     "platform_create_agent",
-    "Create a new agent. Supported types: 'signature' (LLM prompt), 'code' (Python), 'workflow' (sub-workflow), 'http' (external API).",
+    "Create a new agent. Supported types: 'signature' (LLM prompt), 'code' (Python), 'workflow' (sub-workflow), 'http' (external API). A 'connected' agent is not created here: it registers itself from code, with connectAgent from langwatch/agent in TypeScript or langwatch.connect_agent in Python, and appears in the list once that process runs.",
     {
       name: z.string().describe("Agent name"),
       type: z.enum(["signature", "code", "workflow", "http"]).describe("Agent type"),
@@ -1216,16 +1233,47 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
 
   server.tool(
     "platform_run_agent",
-    "Execute an agent with JSON input. HTTP agents call their configured URL directly; workflow-linked agents execute via the workflow engine.",
+    "Run one turn of an agent. A connected agent runs through the platform relay on a live instance: give `message` (one user turn) or `input` with a `messages` list, plus `parameters` and `threadId` to continue a conversation. HTTP agents call their configured URL directly; workflow-linked agents execute via the workflow engine.",
     {
       id: z.string().describe("The agent ID to run"),
-      input: z.string().optional().describe("Input data as a JSON object string"),
+      input: z
+        .string()
+        .optional()
+        .describe(
+          "Input data as a JSON object string. For a connected agent it is the relay body: messages (OpenAI style), and optionally threadId, session and params.",
+        ),
+      message: z
+        .string()
+        .optional()
+        .describe("One user message to send to a connected agent, instead of input"),
+      parameters: z
+        .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
+        .optional()
+        .describe("Run parameter values for a connected agent, by name"),
+      threadId: z
+        .string()
+        .optional()
+        .describe("Continue a conversation on a connected agent"),
     },
     withToolLogging("platform_run_agent", async (params) => {
       requireApiKey();
       const { handleRunAgent } = await import("./tools/run-agent.js");
       return {
         content: [{ type: "text", text: await handleRunAgent(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_test_agent",
+    "Test an agent with one scripted scenario run: the user sends \"ping\", the agent answers, and the run succeeds when the answer arrives. No model is used, and no scenario, run plan or test suite is added to the project. Answers at once with the scenario run id to follow with platform_get_simulation_run; the run itself is asynchronous.",
+    {
+      id: z.string().describe("The agent ID to test"),
+    },
+    withToolLogging("platform_test_agent", async (params) => {
+      requireApiKey();
+      return {
+        content: [{ type: "text", text: await handleTestAgent(params) }],
       };
     })
   );

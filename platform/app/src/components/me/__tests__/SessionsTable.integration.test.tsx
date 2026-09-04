@@ -413,12 +413,12 @@ describe("the personal Sessions table", () => {
       renderTable();
 
       expect(screen.getByText("#4218")).toBeInTheDocument();
-      expect(screen.getByText("#4220")).toBeInTheDocument();
-      expect(screen.queryByText("#4221")).not.toBeInTheDocument();
+      expect(screen.getByText("#4221")).toBeInTheDocument();
+      expect(screen.queryByText("#4222")).not.toBeInTheDocument();
 
-      await user.hover(screen.getByText("+2"));
+      await user.hover(screen.getByText("+1"));
       expect(
-        await screen.findByText("#4221 Pull request 4221"),
+        await screen.findByText("#4222 Pull request 4222"),
       ).toBeInTheDocument();
     });
   });

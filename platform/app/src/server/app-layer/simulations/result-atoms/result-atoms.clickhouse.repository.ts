@@ -2,10 +2,12 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { RUN_NOTE_EXPR } from "../repositories/simulation.clickhouse.repository";
 import type { ResultsFilter, ResultsGroupBy } from "./atom.types";
+import { UNKNOWN_TARGET_KEY } from "./atom.types";
 import {
   ATOM_SORT_KEY,
   atomScopeSql,
   buildAtomFilters,
+  CODE_TARGET_NAME_EXPR,
   COST_NUMERIC_EXPR,
   COST_SOURCE_EXPR,
   COST_UNKNOWN_EXPR,
@@ -14,6 +16,8 @@ import {
   OUTCOME_EXPR,
   SCENARIO_KEY_EXPR,
   TARGET_KEY_EXPR,
+  TARGET_PARAMETERS_EXPR,
+  TARGET_REF_EXPR,
   TRIGGER_EXPR,
   trendKeyExpr,
 } from "./atom-sql";
@@ -46,6 +50,10 @@ export interface RawAtomRow {
   DurationMs: string;
   Note: string;
   TargetKey: string;
+  /** The raw overrides of the run's target, or '' when it carried none. */
+  TargetParameters: string;
+  /** The agent name the run reported, or '' when it reported none. */
+  TargetName: string;
   Trigger: string;
   CostUsd: string;
   CostSource: string;
@@ -65,6 +73,10 @@ export interface RawGroupRow {
   GroupKey: string;
   /** The name the newest run of the group carries, or '' when it carries none. */
   Name: string;
+  /** The agent name the newest run reported, or '' when it reported none. */
+  TargetName: string;
+  /** The raw overrides of the group's target, or '' when it carried none. */
+  TargetParameters: string;
   Atoms: string;
   Passed: string;
   Settled: string;
@@ -89,6 +101,20 @@ export interface RawTrendRow {
 export interface RawCodeScenarioRow {
   ScenarioKey: string;
   Name: string;
+}
+
+/**
+ * One target the stored lists cannot name, as the filter lists it: a target
+ * a run from code named, or a stored target run with parameter overrides.
+ */
+export interface RawRunTargetRow {
+  TargetKey: string;
+  /** The agent name the run reported, or '' for a platform target. */
+  Name: string;
+  /** The stored reference id, or '' for a target named from code. */
+  ReferenceId: string;
+  /** The raw overrides of the target, or '' when it carried none. */
+  TargetParameters: string;
 }
 
 /** One bucket of the pass-rate-over-time chart. */
@@ -124,6 +150,9 @@ interface AtomCursor {
  */
 /** How many scenarios that ran from code the filter lists at most. */
 export const MAX_CODE_SCENARIOS = 500;
+
+/** How many targets the window names beyond the stored lists, at most. */
+export const MAX_RUN_TARGETS = 500;
 
 export class ResultAtomsClickHouseRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
@@ -194,6 +223,8 @@ export class ResultAtomsClickHouseRepository {
          ifNull(toString(DurationMs), '') AS DurationMs,
          ${RUN_NOTE_EXPR} AS Note,
          ${TARGET_KEY_EXPR} AS TargetKey,
+         ${TARGET_PARAMETERS_EXPR} AS TargetParameters,
+         ${CODE_TARGET_NAME_EXPR} AS TargetName,
          ${TRIGGER_EXPR} AS Trigger,
          ${COST_VALUE_EXPR} AS CostUsd,
          ${COST_SOURCE_EXPR} AS CostSource,
@@ -300,6 +331,8 @@ export class ResultAtomsClickHouseRepository {
       `SELECT
          GroupKey,
          argMax(Name, RunAt)                     AS Name,
+         argMax(TargetName, RunAt)               AS TargetName,
+         argMax(TargetParameters, RunAt)         AS TargetParameters,
          toString(count())                       AS Atoms,
          toString(countIf(Outcome = 'passed'))   AS Passed,
          toString(countIf(Outcome != 'pending')) AS Settled,
@@ -316,6 +349,8 @@ export class ResultAtomsClickHouseRepository {
            BatchRunId,
            ScenarioId,
            ${TARGET_KEY_EXPR} AS TargetKey,
+           ${CODE_TARGET_NAME_EXPR} AS TargetName,
+           ${TARGET_PARAMETERS_EXPR} AS TargetParameters,
            ${ATOM_SORT_KEY} AS RunAt,
            ${OUTCOME_EXPR} AS Outcome,
            ${COST_NUMERIC_EXPR} AS CostUsd,
@@ -359,6 +394,52 @@ export class ResultAtomsClickHouseRepository {
         tenantId: filter.projectId,
         ...filters.params,
         atomCodeScenarios: String(MAX_CODE_SCENARIOS),
+      },
+    );
+  }
+
+  /**
+   * The targets the window names that the stored agent and prompt lists
+   * cannot, one per key: a target a run from code named, under the name its
+   * newest run reported, and a stored target run with parameter overrides,
+   * under its reference id and those overrides.
+   *
+   * Neither has a row of its own in Postgres, so the window is the only place
+   * they can be listed from. A run from code that named no agent is left out:
+   * it groups under the `unknown` key, which the page already reads as the
+   * default target. A platform run with no overrides is left out too: the
+   * agent list already names it.
+   */
+  async findRunTargets(filter: ResultsFilter): Promise<RawRunTargetRow[]> {
+    if (isEmptyScope(filter)) return [];
+    const filters = buildAtomFilters(filter);
+    return this.queryRows<RawRunTargetRow>(
+      `SELECT
+         TargetKey,
+         argMax(Name, RunAt)             AS Name,
+         argMax(ReferenceId, RunAt)      AS ReferenceId,
+         argMax(TargetParameters, RunAt) AS TargetParameters
+       FROM (
+         SELECT
+           ${TARGET_KEY_EXPR} AS TargetKey,
+           ${CODE_TARGET_NAME_EXPR} AS Name,
+           ${TARGET_REF_EXPR} AS ReferenceId,
+           ${TARGET_PARAMETERS_EXPR} AS TargetParameters,
+           ${ATOM_SORT_KEY} AS RunAt
+         ${atomScopeSql(filters)}
+           AND (
+             (${TRIGGER_EXPR} = 'code'
+               AND ${TARGET_KEY_EXPR} != '${UNKNOWN_TARGET_KEY}')
+             OR ${TARGET_PARAMETERS_EXPR} != ''
+           )
+       )
+       GROUP BY TargetKey
+       ORDER BY Name ASC, ReferenceId ASC, TargetKey ASC
+       LIMIT {atomRunTargets:UInt32}`,
+      {
+        tenantId: filter.projectId,
+        ...filters.params,
+        atomRunTargets: String(MAX_RUN_TARGETS),
       },
     );
   }

@@ -59,6 +59,7 @@ describe("the actor stamp on a queued suite run", () => {
       expect(metadata.langwatch).toEqual({
         targetReferenceId: "agent-1",
         targetType: "http",
+        targetKey: "agent-1",
         scenarioVersion: 4,
         actorId: "user_abc",
         actorLabel: "user",
@@ -81,6 +82,7 @@ describe("the actor stamp on a queued suite run", () => {
       expect(langwatch).toEqual({
         targetReferenceId: "agent-1",
         targetType: "http",
+        targetKey: "agent-1",
         scenarioVersion: 4,
       });
     });

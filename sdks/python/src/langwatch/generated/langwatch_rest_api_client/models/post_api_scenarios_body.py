@@ -27,8 +27,14 @@ class PostApiScenariosBody:
             each with an optional description and default. A run supplies values for these names, readable from the
             scenario's own text as params.NAME. A parameter marked secret carries no default: its value is supplied per run,
             encrypted, delivered to the target as secrets.NAME, and never readable from the scenario's own text.
-        folder_id (None | str | Unset): The test suite (folder) to file this scenario in. It must name a non-archived
-            folder of the same project. null unfiles the scenario.
+        simulator_model (None | str | Unset): Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the
+            project default.
+        judge_model (None | str | Unset): Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default.
+        max_turns (int | None | Unset): Maximum conversation turns for a run of this scenario. Null uses the default.
+        min_turns (int | None | Unset): Minimum conversation turns before the judge may end the run. Null uses the
+            default.
+        test_suite_id (None | str | Unset): The test suite to file this scenario in. It must name a non-archived test
+            suite of the same project. null files the scenario into the project's Default test suite.
     """
 
     name: str
@@ -36,7 +42,11 @@ class PostApiScenariosBody:
     criteria: list[str] | Unset = UNSET
     labels: list[str] | Unset = UNSET
     parameters: list[PostApiScenariosBodyParametersItem] | Unset = UNSET
-    folder_id: None | str | Unset = UNSET
+    simulator_model: None | str | Unset = UNSET
+    judge_model: None | str | Unset = UNSET
+    max_turns: int | None | Unset = UNSET
+    min_turns: int | None | Unset = UNSET
+    test_suite_id: None | str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -59,11 +69,35 @@ class PostApiScenariosBody:
                 parameters_item = parameters_item_data.to_dict()
                 parameters.append(parameters_item)
 
-        folder_id: None | str | Unset
-        if isinstance(self.folder_id, Unset):
-            folder_id = UNSET
+        simulator_model: None | str | Unset
+        if isinstance(self.simulator_model, Unset):
+            simulator_model = UNSET
         else:
-            folder_id = self.folder_id
+            simulator_model = self.simulator_model
+
+        judge_model: None | str | Unset
+        if isinstance(self.judge_model, Unset):
+            judge_model = UNSET
+        else:
+            judge_model = self.judge_model
+
+        max_turns: int | None | Unset
+        if isinstance(self.max_turns, Unset):
+            max_turns = UNSET
+        else:
+            max_turns = self.max_turns
+
+        min_turns: int | None | Unset
+        if isinstance(self.min_turns, Unset):
+            min_turns = UNSET
+        else:
+            min_turns = self.min_turns
+
+        test_suite_id: None | str | Unset
+        if isinstance(self.test_suite_id, Unset):
+            test_suite_id = UNSET
+        else:
+            test_suite_id = self.test_suite_id
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -79,8 +113,16 @@ class PostApiScenariosBody:
             field_dict["labels"] = labels
         if parameters is not UNSET:
             field_dict["parameters"] = parameters
-        if folder_id is not UNSET:
-            field_dict["folderId"] = folder_id
+        if simulator_model is not UNSET:
+            field_dict["simulatorModel"] = simulator_model
+        if judge_model is not UNSET:
+            field_dict["judgeModel"] = judge_model
+        if max_turns is not UNSET:
+            field_dict["maxTurns"] = max_turns
+        if min_turns is not UNSET:
+            field_dict["minTurns"] = min_turns
+        if test_suite_id is not UNSET:
+            field_dict["testSuiteId"] = test_suite_id
 
         return field_dict
 
@@ -106,14 +148,50 @@ class PostApiScenariosBody:
 
                 parameters.append(parameters_item)
 
-        def _parse_folder_id(data: object) -> None | str | Unset:
+        def _parse_simulator_model(data: object) -> None | str | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
             return cast(None | str | Unset, data)
 
-        folder_id = _parse_folder_id(d.pop("folderId", UNSET))
+        simulator_model = _parse_simulator_model(d.pop("simulatorModel", UNSET))
+
+        def _parse_judge_model(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        judge_model = _parse_judge_model(d.pop("judgeModel", UNSET))
+
+        def _parse_max_turns(data: object) -> int | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(int | None | Unset, data)
+
+        max_turns = _parse_max_turns(d.pop("maxTurns", UNSET))
+
+        def _parse_min_turns(data: object) -> int | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(int | None | Unset, data)
+
+        min_turns = _parse_min_turns(d.pop("minTurns", UNSET))
+
+        def _parse_test_suite_id(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        test_suite_id = _parse_test_suite_id(d.pop("testSuiteId", UNSET))
 
         post_api_scenarios_body = cls(
             name=name,
@@ -121,7 +199,11 @@ class PostApiScenariosBody:
             criteria=criteria,
             labels=labels,
             parameters=parameters,
-            folder_id=folder_id,
+            simulator_model=simulator_model,
+            judge_model=judge_model,
+            max_turns=max_turns,
+            min_turns=min_turns,
+            test_suite_id=test_suite_id,
         )
 
         post_api_scenarios_body.additional_properties = d

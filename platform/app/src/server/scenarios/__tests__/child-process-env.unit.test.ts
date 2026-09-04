@@ -62,6 +62,27 @@ describe("buildChildProcessEnv", () => {
       }
     });
 
+    it("forwards the nlpgo engine's own ceiling so the client deadline can derive from it", () => {
+      // The adapters in the child derive their fetch deadline from this
+      // exact env var name (`resolveFloorFetchTimeoutMs` in
+      // `../../nlpgo/timeouts.ts`), the same one nlpgo itself reads.
+      // Without this entry the client deadline could silently drift below
+      // the engine's ceiling again — the production bug this fixes.
+      const previous = process.env.NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS;
+      process.env.NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS = "900";
+      try {
+        expect(
+          buildChildProcessEnv({}).NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS,
+        ).toBe("900");
+      } finally {
+        if (previous === undefined) {
+          delete process.env.NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS;
+        } else {
+          process.env.NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS = previous;
+        }
+      }
+    });
+
     it("drops variables with no value rather than passing them as undefined", () => {
       const env = buildChildProcessEnv({ SOME_UNSET_VAR: undefined });
 

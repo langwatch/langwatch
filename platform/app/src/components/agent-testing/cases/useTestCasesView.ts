@@ -1,11 +1,11 @@
 /**
  * What the Scenarios tab shows: the suite that is open, the rows under it, the
- * label filter, and the cases of an external set.
+ * label filter, and the scenarios of an external set.
  *
  * One suite is always open. Which one is resolved in a single expression: the
  * suite the address names, or the first of the rail. That one expression is
  * what serves an address naming no suite, an address naming a suite that was
- * archived, and the ordinary case, so none of them needs a branch of its own.
+ * archived, and the ordinary scenario, so none of them needs a branch of its own.
  *
  * @see specs/features/agent-testing/cases-table.feature
  */
@@ -64,7 +64,7 @@ export function useTestCasesView({
 
   const visibleCases = useMemo(() => {
     const held = cases.filter(
-      (testCase) => testCase.folderId === selectedSuite?.id,
+      (testCase) => testCase.testSuiteId === selectedSuite?.id,
     );
     return filterCasesByLabels(held, activeLabels);
   }, [cases, selectedSuite, activeLabels]);

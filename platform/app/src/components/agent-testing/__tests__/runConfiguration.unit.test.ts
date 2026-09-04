@@ -3,6 +3,7 @@
  * apart in the run name dropdown.
  *
  * @see specs/features/agent-testing/run-dialog.feature
+ * @see specs/features/agent-testing/comparison-mode.feature
  */
 
 import { describe, expect, it } from "vitest";
@@ -15,6 +16,8 @@ import {
   type RunConfiguration,
   type RunConfigurationEntry,
   scopeKeyOf,
+  sortedTargetLabels,
+  sortTargets,
 } from "../run/run-configuration";
 
 const TARGET_LABELS = new Map([
@@ -26,7 +29,7 @@ function configuration(
   overrides: Partial<RunConfiguration> = {},
 ): RunConfiguration {
   return {
-    scope: { mode: "folders", folderIds: ["folder_refunds"] },
+    scope: { mode: "test_suites", testSuiteIds: ["test_suite_refunds"] },
     targets: [{ type: "http", referenceId: "agent_dev" }],
     repeatCount: 1,
     simulatorModel: null,
@@ -125,8 +128,8 @@ describe("configurationKeyOf", () => {
 describe("scopeKeyOf", () => {
   describe("when two hand-picked scopes hold different scenarios", () => {
     it("keeps them apart", () => {
-      expect(scopeKeyOf({ mode: "cases", caseIds: ["a"] })).not.toBe(
-        scopeKeyOf({ mode: "cases", caseIds: ["b"] }),
+      expect(scopeKeyOf({ mode: "scenarios", scenarioIds: ["a"] })).not.toBe(
+        scopeKeyOf({ mode: "scenarios", scenarioIds: ["b"] }),
       );
     });
   });
@@ -137,8 +140,8 @@ describe("normaliseRunScope", () => {
     it("reads as all scenarios", () => {
       expect(
         normaliseRunScope({
-          scope: { mode: "folders", folderIds: ["one", "two"] },
-          allFolderIds: ["one", "two"],
+          scope: { mode: "test_suites", testSuiteIds: ["one", "two"] },
+          allTestSuiteIds: ["one", "two"],
         }),
       ).toEqual({ mode: "all" });
     });
@@ -148,10 +151,10 @@ describe("normaliseRunScope", () => {
     it("stays a suite scope", () => {
       expect(
         normaliseRunScope({
-          scope: { mode: "folders", folderIds: ["one"] },
-          allFolderIds: ["one", "two"],
+          scope: { mode: "test_suites", testSuiteIds: ["one"] },
+          allTestSuiteIds: ["one", "two"],
         }),
-      ).toEqual({ mode: "folders", folderIds: ["one"] });
+      ).toEqual({ mode: "test_suites", testSuiteIds: ["one"] });
     });
   });
 });
@@ -232,13 +235,13 @@ describe("configurationsForScope", () => {
       const other = entry({
         planId: "plan_2",
         configuration: configuration({
-          scope: { mode: "folders", folderIds: ["folder_other"] },
+          scope: { mode: "test_suites", testSuiteIds: ["test_suite_other"] },
         }),
       });
 
       const found = configurationsForScope({
         entries: [refunds, other],
-        scope: { mode: "folders", folderIds: ["folder_refunds"] },
+        scope: { mode: "test_suites", testSuiteIds: ["test_suite_refunds"] },
       });
 
       expect(found.map((found) => found.planId)).toEqual(["plan_1"]);
@@ -258,7 +261,7 @@ describe("configurationsForScope", () => {
 
       const found = configurationsForScope({
         entries: [older, newer],
-        scope: { mode: "folders", folderIds: ["folder_refunds"] },
+        scope: { mode: "test_suites", testSuiteIds: ["test_suite_refunds"] },
       });
 
       expect(found).toHaveLength(1);
@@ -280,10 +283,158 @@ describe("configurationsForScope", () => {
 
       const found = configurationsForScope({
         entries: [older, newer],
-        scope: { mode: "folders", folderIds: ["folder_refunds"] },
+        scope: { mode: "test_suites", testSuiteIds: ["test_suite_refunds"] },
       });
 
       expect(found.map((entry) => entry.planId)).toEqual(["plan_2", "plan_1"]);
+    });
+  });
+});
+
+describe("sortedTargetLabels", () => {
+  const byReferenceId = (target: { referenceId: string }) => target.referenceId;
+
+  describe("when a comparison holds two different agents", () => {
+    /** @scenario "A target of a comparison is named after its agent" */
+    it("names each after its agent", () => {
+      expect(
+        sortedTargetLabels({
+          targets: [
+            { type: "http", referenceId: "agent_dev" },
+            { type: "http", referenceId: "agent_prod" },
+          ],
+          targetLabels: TARGET_LABELS,
+          fallbackLabel: byReferenceId,
+        }),
+      ).toEqual(["dev-agent", "prod-agent"]);
+    });
+  });
+
+  describe("when the same agent appears twice with different parameters", () => {
+    /** @scenario "The same agent twice is named with the parameters that differ" */
+    it("names each with the parameters that differ, and leaves a shared value out", () => {
+      expect(
+        deriveRunName({
+          scopeLabel: "Refunds",
+          targetLabels: sortedTargetLabels({
+            targets: [
+              {
+                type: "http",
+                referenceId: "agent_dev",
+                runParameters: { locale: "de", model: "gpt-5" },
+              },
+              {
+                type: "http",
+                referenceId: "agent_dev",
+                runParameters: { locale: "de", model: "gpt-5-mini" },
+              },
+            ],
+            targetLabels: TARGET_LABELS,
+            fallbackLabel: byReferenceId,
+          }),
+        }),
+      ).toBe("Refunds dev-agent · model=gpt-5 vs dev-agent · model=gpt-5-mini");
+    });
+
+    /** @scenario "A repeated agent that carries none of the differing parameters keeps its bare name" */
+    it("keeps the bare name for the target that carries none of the differing parameters", () => {
+      expect(
+        sortedTargetLabels({
+          targets: [
+            {
+              type: "http",
+              referenceId: "agent_dev",
+              runParameters: { locale: "de" },
+            },
+            {
+              type: "http",
+              referenceId: "agent_dev",
+              runParameters: { locale: "de", plan: "pro" },
+            },
+          ],
+          targetLabels: TARGET_LABELS,
+          fallbackLabel: byReferenceId,
+        }),
+      ).toEqual(["dev-agent", "dev-agent · plan=pro"]);
+    });
+
+    it("sorts the keys inside a label", () => {
+      expect(
+        sortedTargetLabels({
+          targets: [
+            {
+              type: "http",
+              referenceId: "agent_dev",
+              runParameters: { plan: "pro", locale: "de" },
+            },
+            { type: "http", referenceId: "agent_dev" },
+          ],
+          targetLabels: TARGET_LABELS,
+          fallbackLabel: byReferenceId,
+        }),
+      ).toEqual(["dev-agent", "dev-agent · locale=de, plan=pro"]);
+    });
+  });
+
+  describe("when the targets were picked in another order", () => {
+    /** @scenario "Targets are sorted by agent and then by parameters" */
+    it("reads them by agent and then by parameters", () => {
+      expect(
+        sortedTargetLabels({
+          targets: [
+            { type: "http", referenceId: "agent_prod" },
+            {
+              type: "http",
+              referenceId: "agent_dev",
+              runParameters: { model: "b" },
+            },
+            {
+              type: "http",
+              referenceId: "agent_dev",
+              runParameters: { model: "a" },
+            },
+          ],
+          targetLabels: TARGET_LABELS,
+          fallbackLabel: byReferenceId,
+        }),
+      ).toEqual(["dev-agent · model=a", "dev-agent · model=b", "prod-agent"]);
+    });
+  });
+
+  describe("when the project no longer offers the agent", () => {
+    it("reads the fallback", () => {
+      expect(
+        sortedTargetLabels({
+          targets: [{ type: "http", referenceId: "agent_gone" }],
+          targetLabels: TARGET_LABELS,
+          fallbackLabel: () => "a removed agent",
+        }),
+      ).toEqual(["a removed agent"]);
+    });
+  });
+});
+
+describe("sortTargets", () => {
+  describe("when the same agent appears twice with different parameters", () => {
+    /** @scenario "Targets are sorted by agent and then by parameters" */
+    it("keeps both and orders them by their parameters", () => {
+      const sorted = sortTargets([
+        {
+          type: "http",
+          referenceId: "agent_dev",
+          runParameters: { model: "b" },
+        },
+        {
+          type: "http",
+          referenceId: "agent_dev",
+          runParameters: { model: "a" },
+        },
+      ]);
+
+      expect(sorted.map((target) => target.runParameters?.model)).toEqual([
+        "a",
+        "b",
+      ]);
     });
   });
 });

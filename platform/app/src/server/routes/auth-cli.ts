@@ -895,7 +895,11 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
     let cliApiKey: string | undefined;
     let cliApiKeyId: string | undefined;
     let cliApiKeyScope:
-      | { kind: "organization" | "projects"; project_ids: string[] }
+      | {
+          kind: "organization" | "projects";
+          project_ids: string[];
+          permissions: string[];
+        }
       | undefined;
     if (record.key_selection) {
       // Same normalization the other label paths use, and the user-chosen
@@ -949,6 +953,7 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
       cliApiKeyScope = {
         kind: minted.scope.kind,
         project_ids: minted.scope.projectIds,
+        permissions: minted.permissions,
       };
     }
 

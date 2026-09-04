@@ -19,15 +19,15 @@ They bind as the implementation phases land.
 
 | File | Phase that binds it |
 |------|---------------------|
-| suite-folders.feature | WS1 phase 2 (folders). Revised: a test suite holds a name and its scenarios only, and carries no execution settings |
-| folder-run-plan-reuse.feature | WS1 phase 2 (folders), plus WS3 for the v2 Results list. Revised: a suite run resolves the run plan by name instead of reusing a plan bound to the folder |
-| folder-membership-invariant.feature | WS1 phase 2 (folders) |
+| test-suites.feature | WS1 phase 2 (test suites). Revised: a test suite holds a name and its scenarios only, and carries no execution settings |
+| test-suite-run-plan-reuse.feature | WS1 phase 2 (test suites), plus WS3 for the v2 Results list. Revised: a suite run resolves the run plan by name instead of reusing a plan bound to the test suite |
+| test-suite-membership-invariant.feature | WS1 phase 2 (test suites) |
 | run-notes.feature | WS1 phase 1 (notes), plus WS3/WS4 for the surfaces |
 | run-note-metadata-convention.feature | WS1 phase 1 (notes) |
 | internal-run-set-surface.feature | Existing behavior; the v2 rows bind in WS3 |
 | run-plan-identity-by-name.feature | WS1. Revised: the name is the plan's identity, so a run under a name that exists replaces that plan's configuration and joins its history |
-| default-suite.feature | WS1 phase 2 (folders): every project gets a `Default` suite on migration |
-| run-plan-dynamic-scopes.feature | WS1: the scope modes `all`, `folders`, `labels` and `cases` |
+| default-suite.feature | WS1 phase 2 (test suites): every project gets a `Default` suite on migration |
+| run-plan-dynamic-scopes.feature | WS1: the scope modes `all`, `test_suites`, `labels` and `scenarios` |
 | one-off-runs-surface.feature | WS3: a single scenario run is a named plan like any other |
 
 The surfaces outside `specs/suites/` carry their own files, listed here so the

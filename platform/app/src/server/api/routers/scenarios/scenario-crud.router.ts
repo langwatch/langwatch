@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { fireScenarioCreatedNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { modelOverrideSchema } from "~/server/modelProviders/modelOverrideSchema";
 import { trackServerEvent } from "~/server/posthog";
 import { ScenarioNotFoundError } from "~/server/scenarios/errors";
 import { scenarioParameterDefinitionsSchema } from "~/server/scenarios/parameters";
@@ -19,16 +20,16 @@ const createScenarioSchema = projectSchema.extend({
   labels: z.array(z.string()).default([]),
   // Optional per-scenario model overrides; null clears back to the project
   // default (scenarios.user_simulator / scenarios.judge).
-  simulatorModel: z.string().nullish(),
-  judgeModel: z.string().nullish(),
+  simulatorModel: modelOverrideSchema.nullish(),
+  judgeModel: modelOverrideSchema.nullish(),
   // The parameters the scenario declares, each with an optional description
   // and default. A run supplies values for these names.
   parameters: scenarioParameterDefinitionsSchema.optional(),
   // Turn config (ADR-015); null clears back to SDK default.
   maxTurns: z.number().int().min(1).max(100).nullish(),
   minTurns: z.number().int().min(0).max(100).nullish(),
-  // The folder (test suite) this case is filed in; absent or null = unfiled.
-  folderId: z.string().nullish(),
+  // The test suite this scenario is filed in; absent or null files it into Default.
+  testSuiteId: z.string().nullish(),
 });
 
 const updateScenarioSchema = projectSchema.extend({
@@ -37,13 +38,13 @@ const updateScenarioSchema = projectSchema.extend({
   situation: z.string().optional(),
   criteria: z.array(z.string()).optional(),
   labels: z.array(z.string()).optional(),
-  simulatorModel: z.string().nullish(),
-  judgeModel: z.string().nullish(),
+  simulatorModel: modelOverrideSchema.nullish(),
+  judgeModel: modelOverrideSchema.nullish(),
   parameters: scenarioParameterDefinitionsSchema.optional(),
   maxTurns: z.number().int().min(1).max(100).nullish(),
   minTurns: z.number().int().min(0).max(100).nullish(),
-  // Absent = keep the current folder; null = unfile; a folder id = move.
-  folderId: z.string().nullish(),
+  // Absent = keep the current test suite; null = unfile; a test suite id = move.
+  testSuiteId: z.string().nullish(),
   // The version the editor loaded. When sent, a save against any other
   // version is refused with scenario_stale_version instead of overwriting
   // the newer save. Absent = save over whatever is there.
@@ -199,12 +200,12 @@ export const scenarioCrudRouter = createTRPCRouter({
       }
     }),
 
-  moveToFolder: protectedProcedure
+  moveToTestSuite: protectedProcedure
     .input(
       projectSchema.extend({
         scenarioId: z.string(),
-        // A folder id files the case there; null unfiles it.
-        folderId: z.string().nullable(),
+        // A test suite id files the scenario there; null unfiles it.
+        testSuiteId: z.string().nullable(),
       }),
     )
     .permission("scenarios:manage")
@@ -213,17 +214,17 @@ export const scenarioCrudRouter = createTRPCRouter({
         {
           projectId: input.projectId,
           scenarioId: input.scenarioId,
-          folderId: input.folderId,
+          testSuiteId: input.testSuiteId,
         },
-        "Moving scenario to folder",
+        "Moving scenario to test suite",
       );
 
       const service = ScenarioService.create(ctx.prisma);
       try {
-        return await service.moveToFolder({
+        return await service.moveToTestSuite({
           scenarioId: input.scenarioId,
           projectId: input.projectId,
-          folderId: input.folderId,
+          testSuiteId: input.testSuiteId,
         });
       } catch (error) {
         if (error instanceof ScenarioNotFoundError) {

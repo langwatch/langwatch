@@ -9,7 +9,7 @@ import { resolveSuiteId } from "./resolveSuite";
 /**
  * Reads one test suite, named by ID or by name.
  *
- * @see specs/features/suite-cli.feature
+ * @see specs/features/test-suite-cli.feature
  */
 export const getTestSuiteCommand = async (
   reference: string,

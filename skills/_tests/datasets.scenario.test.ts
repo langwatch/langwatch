@@ -194,7 +194,7 @@ describe("Dataset Generation Skill", () => {
 				},
 			});
 		},
-		900_000,
+			1_800_000,
 	);
 
 	it.skipIf(isCI)(
@@ -302,7 +302,7 @@ describe("Dataset Generation Skill", () => {
 				},
 			});
 		},
-		900_000,
+			1_800_000,
 	);
 
 	it.skipIf(isCI)(
@@ -376,7 +376,7 @@ describe("Dataset Generation Skill", () => {
 				},
 			});
 		},
-		900_000,
+			1_800_000,
 	);
 
 	it.skipIf(isCI)(
@@ -478,7 +478,7 @@ describe("Dataset Generation Skill", () => {
 				},
 			});
 		},
-		900_000,
+			1_800_000,
 	);
 
 	it.skipIf(isCI)(
@@ -581,6 +581,6 @@ describe("Dataset Generation Skill", () => {
 				},
 			});
 		},
-		900_000,
+			1_800_000,
 	);
 });

@@ -2400,6 +2400,7 @@ export function createTestApp(overrides?: TestAppOverrides): App {
         textMessageStart: noop,
         textMessageEnd: noop,
         finishRun: noop,
+        recordAgentInstance: noop,
         cancelRun: noop,
         deleteRun: noop,
         computeRunMetrics: noop,

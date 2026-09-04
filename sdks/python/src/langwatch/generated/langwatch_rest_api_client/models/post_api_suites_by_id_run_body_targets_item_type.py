@@ -3,6 +3,7 @@ from enum import Enum
 
 class PostApiSuitesByIdRunBodyTargetsItemType(str, Enum):
     CODE = "code"
+    CONNECTED = "connected"
     HTTP = "http"
     PROMPT = "prompt"
     WORKFLOW = "workflow"

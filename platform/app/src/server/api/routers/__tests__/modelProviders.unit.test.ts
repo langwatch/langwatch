@@ -3,6 +3,7 @@ import { MASKED_KEY_PLACEHOLDER } from "../../../../utils/constants";
 import { isSecretCredentialField } from "../../../../utils/modelProviderHelpers";
 import type { CustomModelEntry } from "../../../modelProviders/customModel.schema";
 import { customModelUpdateInputSchema } from "../../../modelProviders/customModel.schema";
+import { expandLatestAlias } from "../../../modelProviders/latestAliases";
 import type { MaybeStoredModelProvider } from "../../../modelProviders/registry";
 import {
   getModelMetadataForFrontend,
@@ -328,6 +329,41 @@ describe("prepareLitellmParams", () => {
       });
 
       expect(result.api_base).toBe("https://custom-llm.example.com/v1");
+    });
+  });
+
+  describe("when the model is a latest alias", () => {
+    /** @scenario "The LiteLLM params carry the concrete model for an alias" */
+    it("names the model the alias currently resolves to", async () => {
+      vi.stubEnv("OPENAI_API_KEY", "test-key");
+
+      const modelProvider = createMockProvider("openai");
+      const result = await prepareLitellmParams({
+        model: "openai/latest-mini",
+        modelProvider,
+        projectId: "test-project",
+      });
+
+      // The catalog decides what the alias means today, so the expectation
+      // reads the same resolver instead of pinning a model that retires.
+      const resolved = expandLatestAlias("openai/latest-mini");
+      expect(resolved).not.toBe("openai/latest-mini");
+      expect(result.model).toBe(resolved);
+      expect(result.model).not.toContain("latest");
+    });
+
+    /** @scenario "A concrete model id is not rewritten" */
+    it("passes a concrete model id through unchanged", async () => {
+      vi.stubEnv("OPENAI_API_KEY", "test-key");
+
+      const modelProvider = createMockProvider("openai");
+      const result = await prepareLitellmParams({
+        model: "openai/gpt-5-mini",
+        modelProvider,
+        projectId: "test-project",
+      });
+
+      expect(result.model).toBe("openai/gpt-5-mini");
     });
   });
 });

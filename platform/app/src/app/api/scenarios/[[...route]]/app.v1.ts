@@ -6,6 +6,7 @@ import type { Scenario } from "~/generated/prisma/client";
 import { requires, type SecuredApp } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { prisma } from "~/server/db";
+import { modelOverrideSchema } from "~/server/modelProviders/modelOverrideSchema";
 import { ScenarioNotFoundError } from "~/server/scenarios/errors";
 import {
   parseScenarioParameterDefinitions,
@@ -14,6 +15,11 @@ import {
 } from "~/server/scenarios/parameters";
 import { ScenarioService } from "~/server/scenarios/scenario.service";
 import type { ScenarioActor } from "~/server/scenarios/scenario-versioning";
+import {
+  readTestingInterface,
+  scenarioEditorPath,
+  type TestingInterface,
+} from "~/server/suites/platform-path";
 import type { AuthMiddlewareVariables } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
@@ -29,11 +35,50 @@ const scenarioResponseSchema = z.object({
   criteria: z.array(z.string()),
   labels: z.array(z.string()),
   parameters: z.array(scenarioParameterDefinitionSchema),
-  folderId: z
+  /**
+   * The five fields below are optional in the document, not in the answer:
+   * every server sends them. They arrived after clients were generated from
+   * this family, and a client that reads one as required fails against a
+   * server that predates it.
+   *
+   * @see specs/api-reference/legacy-response-fields-optional.feature
+   */
+  simulatorModel: z
     .string()
     .nullable()
+    .optional()
     .describe(
-      "The test suite (folder) this scenario is filed in, or null when unfiled.",
+      "The model that plays the user, or null for the project default. Absent on servers that predate model overrides on this family.",
+    ),
+  judgeModel: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(
+      "The model that judges the run, or null for the project default. Absent on servers that predate model overrides on this family.",
+    ),
+  maxTurns: z
+    .number()
+    .int()
+    .nullable()
+    .optional()
+    .describe(
+      "The most conversation turns a run of this scenario takes, or null for the default. Absent on servers that predate turn limits on this family.",
+    ),
+  minTurns: z
+    .number()
+    .int()
+    .nullable()
+    .optional()
+    .describe(
+      "The fewest conversation turns before the judge may end a run, or null for the default. Absent on servers that predate turn limits on this family.",
+    ),
+  testSuiteId: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(
+      "The test suite this scenario is filed in, or null when unfiled. Absent on servers that predate test suites.",
     ),
 });
 
@@ -47,7 +92,7 @@ const scenarioVersionSummarySchema = z.object({
     .string()
     .nullable()
     .describe(
-      "Which surface wrote the version: user, api, cli or langy. Null on the synthesized Created entry of a case saved before versions were recorded.",
+      "Which surface wrote the version: user, api, cli or langy. Null on the synthesized Created entry of a scenario saved before versions were recorded.",
     ),
   authorId: z
     .string()
@@ -63,7 +108,7 @@ const scenarioVersionSummarySchema = z.object({
   isSynthesized: z
     .boolean()
     .describe(
-      "True on the Created entry a case saved before versions were recorded shows. It has no stored snapshot, so it cannot be read back.",
+      "True on the Created entry a scenario saved before versions were recorded shows. It has no stored snapshot, so it cannot be read back.",
     ),
 });
 
@@ -96,7 +141,9 @@ const scenarioVersionDetailResponseSchema = scenarioVersionSummarySchema.extend(
         maxTurns: z.number().nullable(),
         minTurns: z.number().nullable(),
       })
-      .describe("The editable content of the case as this version saved it."),
+      .describe(
+        "The editable content of the scenario as this version saved it.",
+      ),
   },
 );
 
@@ -117,8 +164,17 @@ const versionPathSchema = z.object({
 const parametersDescription =
   "The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME. A parameter marked secret carries no default: its value is supplied per run, encrypted, delivered to the target as secrets.NAME, and never readable from the scenario's own text.";
 
-const folderIdDescription =
-  "The test suite (folder) to file this scenario in. It must name a non-archived folder of the same project. null unfiles the scenario.";
+const testSuiteIdDescription =
+  "The test suite to file this scenario in. It must name a non-archived test suite of the same project. null files the scenario into the project's Default test suite.";
+
+const simulatorModelDescription =
+  "Model for the simulated user, e.g. openai/gpt-5-mini. Null uses the project default.";
+const judgeModelDescription =
+  "Model for the judge, e.g. openai/gpt-5-mini. Null uses the project default.";
+const maxTurnsDescription =
+  "Maximum conversation turns for a run of this scenario. Null uses the default.";
+const minTurnsDescription =
+  "Minimum conversation turns before the judge may end the run. Null uses the default.";
 
 const createScenarioSchema = z.object({
   name: z.string().min(1, "name is required"),
@@ -128,7 +184,25 @@ const createScenarioSchema = z.object({
   parameters: scenarioParameterDefinitionsSchema
     .optional()
     .describe(parametersDescription),
-  folderId: z.string().nullish().describe(folderIdDescription),
+  simulatorModel: modelOverrideSchema
+    .nullish()
+    .describe(simulatorModelDescription),
+  judgeModel: modelOverrideSchema.nullish().describe(judgeModelDescription),
+  maxTurns: z
+    .number()
+    .int()
+    .min(1)
+    .max(100)
+    .nullish()
+    .describe(maxTurnsDescription),
+  minTurns: z
+    .number()
+    .int()
+    .min(0)
+    .max(100)
+    .nullish()
+    .describe(minTurnsDescription),
+  testSuiteId: z.string().nullish().describe(testSuiteIdDescription),
 });
 
 const updateScenarioSchema = z.object({
@@ -139,8 +213,39 @@ const updateScenarioSchema = z.object({
   parameters: scenarioParameterDefinitionsSchema
     .optional()
     .describe(parametersDescription),
-  folderId: z.string().nullish().describe(folderIdDescription),
+  simulatorModel: modelOverrideSchema
+    .nullish()
+    .describe(simulatorModelDescription),
+  judgeModel: modelOverrideSchema.nullish().describe(judgeModelDescription),
+  maxTurns: z
+    .number()
+    .int()
+    .min(1)
+    .max(100)
+    .nullish()
+    .describe(maxTurnsDescription),
+  minTurns: z
+    .number()
+    .int()
+    .min(0)
+    .max(100)
+    .nullish()
+    .describe(minTurnsDescription),
+  testSuiteId: z.string().nullish().describe(testSuiteIdDescription),
 });
+
+/**
+ * The fields the caller named. The schema marks every field optional, and a
+ * field the body omits stays out of the update, so a PATCH never overwrites a
+ * value the caller did not send. A null is a value: it clears the field.
+ */
+function scenarioUpdateData(
+  body: z.infer<typeof updateScenarioSchema>,
+): Partial<z.infer<typeof updateScenarioSchema>> {
+  return Object.fromEntries(
+    Object.entries(body).filter(([, value]) => value !== undefined),
+  ) as Partial<z.infer<typeof updateScenarioSchema>>;
+}
 
 /**
  * Who a version row written through this surface names as its author.
@@ -165,7 +270,11 @@ function toScenarioResponse(scenario: Scenario) {
     criteria: scenario.criteria,
     labels: scenario.labels,
     parameters: parseScenarioParameterDefinitions(scenario.parameters),
-    folderId: scenario.folderId,
+    simulatorModel: scenario.simulatorModel,
+    judgeModel: scenario.judgeModel,
+    maxTurns: scenario.maxTurns,
+    minTurns: scenario.minTurns,
+    testSuiteId: scenario.testSuiteId,
   };
 }
 
@@ -207,18 +316,39 @@ function registerListScenariosRoute(
 
       const service = getService();
       const scenarios = await service.getAll({ projectId: project.id });
+      const ui = await readTestingInterface({
+        projectId: project.id,
+        organizationId: c.get("apiKeyOrganizationId"),
+      });
 
       return c.json(
         scenarios.map((s) => ({
           ...toScenarioResponse(s),
-          platformUrl: platformUrl({
+          platformUrl: scenarioPlatformUrl({
             projectSlug: project.slug,
-            path: `/simulations/scenarios?drawer.open=scenarioEditor&drawer.scenarioId=${s.id}`,
+            scenarioId: s.id,
+            ui,
           }),
         })),
       );
     },
   );
+}
+
+/** Where a scenario opens, in the interface the project reads. */
+function scenarioPlatformUrl({
+  projectSlug,
+  scenarioId,
+  ui,
+}: {
+  projectSlug: string;
+  scenarioId: string;
+  ui: TestingInterface;
+}): string {
+  return platformUrl({
+    projectSlug,
+    path: scenarioEditorPath({ ui, scenarioId }),
+  });
 }
 
 /** Read one scenario by id. */
@@ -264,9 +394,13 @@ function registerGetScenarioRoute(
 
       return c.json({
         ...toScenarioResponse(scenario),
-        platformUrl: platformUrl({
+        platformUrl: scenarioPlatformUrl({
           projectSlug: project.slug,
-          path: `/simulations/scenarios?drawer.open=scenarioEditor&drawer.scenarioId=${scenario.id}`,
+          scenarioId: scenario.id,
+          ui: await readTestingInterface({
+            projectId: project.id,
+            organizationId: c.get("apiKeyOrganizationId"),
+          }),
         }),
       });
     },
@@ -319,7 +453,15 @@ function registerCreateScenarioRoute(
           criteria: body.criteria,
           labels: body.labels,
           ...(body.parameters !== undefined && { parameters: body.parameters }),
-          ...(body.folderId !== undefined && { folderId: body.folderId }),
+          ...(body.testSuiteId !== undefined && {
+            testSuiteId: body.testSuiteId,
+          }),
+          ...(body.simulatorModel !== undefined && {
+            simulatorModel: body.simulatorModel,
+          }),
+          ...(body.judgeModel !== undefined && { judgeModel: body.judgeModel }),
+          ...(body.maxTurns !== undefined && { maxTurns: body.maxTurns }),
+          ...(body.minTurns !== undefined && { minTurns: body.minTurns }),
         },
         { actor: actorFromRequest(c) },
       );
@@ -327,9 +469,13 @@ function registerCreateScenarioRoute(
       return c.json(
         {
           ...toScenarioResponse(scenario),
-          platformUrl: platformUrl({
+          platformUrl: scenarioPlatformUrl({
             projectSlug: project.slug,
-            path: `/simulations/scenarios?drawer.open=scenarioEditor&drawer.scenarioId=${scenario.id}`,
+            scenarioId: scenario.id,
+            ui: await readTestingInterface({
+              projectId: project.id,
+              organizationId: c.get("apiKeyOrganizationId"),
+            }),
           }),
         },
         201,
@@ -341,11 +487,27 @@ function registerCreateScenarioRoute(
   // it, so no existing caller changes.
 }
 
-/** Update a scenario in place. */
+/**
+ * Update a scenario in place. PUT and PATCH register the same handler:
+ * both apply a partial update, so a client using either verb gets the
+ * same behavior instead of a 404 on one of them.
+ */
 function registerUpdateScenarioRoute(
   secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
 ): void {
-  secured.access(requires("scenarios:update")).put(
+  for (const verb of ["put", "patch"] as const) {
+    registerUpdateScenarioVerb({ secured, verb });
+  }
+}
+
+function registerUpdateScenarioVerb({
+  secured,
+  verb,
+}: {
+  secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>;
+  verb: "put" | "patch";
+}): void {
+  secured.access(requires("scenarios:update"))[verb](
     "/:id",
     describeRoute({
       description: "Update an existing scenario",
@@ -387,22 +549,19 @@ function registerUpdateScenarioRoute(
       const scenario = await service.update({
         id,
         projectId: project.id,
-        data: {
-          ...(body.name !== undefined && { name: body.name }),
-          ...(body.situation !== undefined && { situation: body.situation }),
-          ...(body.criteria !== undefined && { criteria: body.criteria }),
-          ...(body.labels !== undefined && { labels: body.labels }),
-          ...(body.parameters !== undefined && { parameters: body.parameters }),
-          ...(body.folderId !== undefined && { folderId: body.folderId }),
-        },
+        data: scenarioUpdateData(body),
         options: { actor: actorFromRequest(c) },
       });
 
       return c.json({
         ...toScenarioResponse(scenario),
-        platformUrl: platformUrl({
+        platformUrl: scenarioPlatformUrl({
           projectSlug: project.slug,
-          path: `/simulations/scenarios?drawer.open=scenarioEditor&drawer.scenarioId=${scenario.id}`,
+          scenarioId: scenario.id,
+          ui: await readTestingInterface({
+            projectId: project.id,
+            organizationId: c.get("apiKeyOrganizationId"),
+          }),
         }),
       });
     },

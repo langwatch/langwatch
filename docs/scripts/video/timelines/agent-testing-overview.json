@@ -1,0 +1,235 @@
+{
+  "input": "../../../../.claude/tmp/video/raw3/page@cebffb4956154281fff14ad371fcba5a.webm",
+  "output": "../../../media/videos/agent-testing-overview.webm",
+  "fps": 30,
+  "page": {
+    "width": 1440,
+    "height": 900
+  },
+  "size": {
+    "width": 1664,
+    "height": 1040
+  },
+  "frame": {
+    "background": "backgrounds/default.webp",
+    "fit": "native"
+  },
+  "quality": {
+    "crf": 38,
+    "cpuUsed": 2
+  },
+  "cut": {
+    "speed": 2,
+    "segments": [
+      [
+        17.2,
+        29.6
+      ],
+      [
+        31.6,
+        39.2
+      ],
+      [
+        152.5,
+        156.2
+      ],
+      [
+        158.8,
+        164.0
+      ],
+      [
+        168.5,
+        174.0
+      ],
+      [
+        417.2,
+        425.0
+      ],
+      [
+        427.5,
+        434.0
+      ],
+      [
+        498.5,
+        506.3
+      ],
+      [
+        508.2,
+        517.4
+      ]
+    ]
+  },
+  "cursor": {
+    "start": {
+      "x": 308,
+      "y": 264
+    }
+  },
+  "beats": [
+    {
+      "t": 0.945,
+      "x": 308,
+      "y": 196,
+      "zoom": 1,
+      "note": "open the Refunds suite, the opener stays wide"
+    },
+    {
+      "t": 2.095,
+      "x": 598,
+      "y": 272,
+      "zoom": 1.8,
+      "hold": 0.35,
+      "note": "open the scenario"
+    },
+    {
+      "t": 5.615,
+      "x": 1407,
+      "y": 33,
+      "zoom": 1,
+      "note": "close the editor"
+    },
+    {
+      "t": 6.265,
+      "x": 1361,
+      "y": 137,
+      "zoom": 1.9,
+      "hold": 0.15,
+      "pause": {
+        "before": 0.9,
+        "after": 1.0
+      },
+      "note": "Run suite, a corner, so it earns the zoom. The pause holds the frame while the camera zooms and the cursor settles on the button, then again while the camera pans onto the dialog"
+    },
+    {
+      "t": 6.9,
+      "x": 909,
+      "y": 439,
+      "zoomAt": {
+        "x": 720,
+        "y": 445
+      },
+      "zoom": 1.9,
+      "hold": 1.35,
+      "note": "pick the target, the camera pans onto the dialog instead of zooming out"
+    },
+    {
+      "t": 9.88,
+      "x": 932,
+      "y": 650,
+      "zoomAt": {
+        "x": 720,
+        "y": 445
+      },
+      "zoom": 1.9,
+      "hold": 0.2,
+      "note": "Run 3 scenarios, the camera holds on the dialog. The take stands still for 1.4s before this click, so 1.25s of it is dropped",
+      "skip": 1.25
+    },
+    {
+      "t": 11.045,
+      "x": 790,
+      "y": 219,
+      "zoom": 1,
+      "note": "open the first run"
+    },
+    {
+      "t": 13.2,
+      "x": 640,
+      "y": 600,
+      "zoom": 1,
+      "click": false,
+      "note": "follow the conversation"
+    },
+    {
+      "t": 18.05,
+      "x": 1150,
+      "y": 236,
+      "zoomAt": {
+        "x": 1270,
+        "y": 300
+      },
+      "zoom": 1.8,
+      "hold": 0.1,
+      "click": false,
+      "arc": 0,
+      "note": "the verdict, the payoff. The cursor reads the criteria back, one line at a time"
+    },
+    {
+      "t": 18.55,
+      "x": 1380,
+      "y": 236,
+      "zoomAt": {
+        "x": 1270,
+        "y": 300
+      },
+      "zoom": 1.8,
+      "hold": 0.1,
+      "click": false,
+      "arc": 0,
+      "note": "sweep along the first criterion"
+    },
+    {
+      "t": 19.0,
+      "x": 1150,
+      "y": 288,
+      "zoomAt": {
+        "x": 1270,
+        "y": 300
+      },
+      "zoom": 1.8,
+      "hold": 0.1,
+      "click": false,
+      "arc": 0,
+      "note": "typewriter reset to the start of the second criterion"
+    },
+    {
+      "t": 19.45,
+      "x": 1395,
+      "y": 288,
+      "zoomAt": {
+        "x": 1270,
+        "y": 300
+      },
+      "zoom": 1.8,
+      "hold": 0.1,
+      "out": 0.5,
+      "click": false,
+      "arc": 0,
+      "note": "sweep along the second criterion, then the camera eases out"
+    },
+    {
+      "t": 20.05,
+      "x": 1407,
+      "y": 33,
+      "zoom": 1,
+      "note": "close the drawer"
+    },
+    {
+      "t": 24.15,
+      "x": 267,
+      "y": 135,
+      "zoom": 1,
+      "note": "back to Results, the tab beside it is already the open one"
+    },
+    {
+      "t": 28.15,
+      "x": 396,
+      "y": 490,
+      "zoom": 1.8,
+      "hold": 0.4,
+      "note": "open the comparison"
+    },
+    {
+      "t": 30.6,
+      "x": 760,
+      "y": 620,
+      "zoom": 1,
+      "click": false,
+      "note": "read the table"
+    },
+    {
+      "t": 32.2,
+      "hide": true
+    }
+  ]
+}

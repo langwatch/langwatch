@@ -104,6 +104,10 @@ func defaultConfig() Config {
 			// don't see the inbound stream torn down mid-call. Owner
 			// anchored both at 12min (under Lambda's 15min cap with
 			// margin for the outer connection to drain).
+			//
+			// Counterpart: NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_DEFAULT_SECONDS in
+			// platform/app/src/server/nlpgo/timeouts.ts, which bounds every
+			// code-block ceiling the platform will accept. Change both together.
 			StreamIdleTimeoutSeconds: 720,
 			// 10min: raised from 60s because 60s was breaking legitimate
 			// user code blocks. Kept strictly below StreamIdleTimeoutSeconds
@@ -111,6 +115,12 @@ func defaultConfig() Config {
 			// block emits no SSE events while it runs and a ceiling at or
 			// above the idle timeout would race the stream shutting down
 			// mid-run.
+			//
+			// Counterpart: NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_DEFAULT_SECONDS in
+			// platform/app/src/server/nlpgo/timeouts.ts, from which the platform
+			// DERIVES its client fetch deadline. This is the number production
+			// actually runs — cmd/root.go always passes it to newCodeExecutor, so
+			// the codeblock.New fallback never fires. Change both together.
 			CodeBlockTimeoutSeconds: 600,
 			// 12min for every block that calls out of the process, for the
 			// same reason the idle timeout above is 12min: a customer agent

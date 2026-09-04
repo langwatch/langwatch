@@ -1,12 +1,15 @@
 /**
- * LangWatchQL analytics SQL — the mounted app.
+ * Analytics SQL — the mounted app.
  *
- * `basePath` is `/api/v1/projects` because issue #6480 names the endpoints
- * under it; the directory this file sits in is only where the repo keeps route
- * modules, and carries no routing meaning. The routes themselves are in
- * `./app.v1.ts` (query and schema) and `./app.charts.v1.ts` (saved charts) —
- * one family, because both are behind the same experimental switch and both
- * publish their refusals through the same error handler.
+ * `basePath` is `/api/v1/projects` because issue #6480 named the original
+ * LangWatchQL REST endpoints under it; the directory this file sits in is
+ * only where the repo keeps route modules, and carries no routing meaning.
+ * The raw-LWQL routes those endpoints served (query and schema) were removed
+ * by issue #7565 — the REST domain endpoint `POST /api/v1/query`
+ * supersedes them. What remains here is `./app.charts.v1.ts`: the saved
+ * workbench chart routes, and `./app.dashboard-widgets.v1.ts`: the dashboard
+ * widget routes — both publish their refusals through the same canonical
+ * error handler this app still wires.
  *
  * Project-scoped rather than service-scoped: these endpoints authenticate with
  * a customer's API key and must resolve a project and its RBAC, which is what
@@ -18,7 +21,6 @@ import { createProjectApp } from "~/server/api/security";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { registerSavedWorkbenchChartRoutes } from "./app.charts.v1";
 import { registerDashboardWidgetRoutes } from "./app.dashboard-widgets.v1";
-import { registerLangWatchQLRoutes } from "./app.v1";
 
 patchZodOpenapi();
 
@@ -29,7 +31,6 @@ const secured = createProjectApp({
   errorEnvelope: "canonical",
 });
 
-registerLangWatchQLRoutes(secured);
 registerSavedWorkbenchChartRoutes(secured);
 registerDashboardWidgetRoutes(secured);
 

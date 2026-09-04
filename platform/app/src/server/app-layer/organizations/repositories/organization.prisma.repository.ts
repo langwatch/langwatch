@@ -47,6 +47,7 @@ import {
 } from "../errors";
 import type {
   AuditLogFilters,
+  BillingOrganizationLookup,
   CreateAndAssignInput,
   CreateAndAssignResult,
   CreateForProvisioningInput,
@@ -54,7 +55,6 @@ import type {
   EnrichedAuditLog,
   FullyLoadedOrganization,
   MemberTeamBinding,
-  OrganizationForBilling,
   OrganizationMemberSummary,
   OrganizationMemberWithUser,
   OrganizationProvisioningSummary,
@@ -515,11 +515,17 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
 
   async getOrganizationForBilling(
     organizationId: string,
-  ): Promise<OrganizationForBilling | null> {
-    return this.prisma.organization.findFirst({
-      where: { id: organizationId, pricingModel: PricingModel.SEAT_EVENT },
+  ): Promise<BillingOrganizationLookup> {
+    // The pricing model is SELECTED rather than filtered on, so one query
+    // still answers both questions. Filtering on it made a non-usage-billed
+    // organization indistinguishable from an absent row, and the only way to
+    // tell them apart afterwards would have been a second query on the exact
+    // path this lookup is trying to keep cheap.
+    const organization = await this.prisma.organization.findFirst({
+      where: { id: organizationId },
       select: {
         id: true,
+        pricingModel: true,
         stripeCustomerId: true,
         subscriptions: {
           where: {
@@ -532,6 +538,14 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         },
       },
     });
+
+    if (!organization) return { outcome: "not_found" };
+    if (organization.pricingModel !== PricingModel.SEAT_EVENT) {
+      return { outcome: "not_usage_billed" };
+    }
+
+    const { pricingModel: _pricingModel, ...forBilling } = organization;
+    return { outcome: "usage_billed", organization: forBilling };
   }
 
   async createAndAssign(

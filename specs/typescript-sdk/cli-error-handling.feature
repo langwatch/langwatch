@@ -44,6 +44,22 @@ Feature: CLI error handling
     Then the CLI output includes the word "network" or "ECONNREFUSED" or "unreachable"
     And the CLI exits with status 1
 
+  # A missing dataset used to be reported as a network error at status 0,
+  # with "Check your network connection" as the advice for a wrong slug.
+  @unit
+  Scenario: A missing dataset is reported as not found, not as a network error
+    Given a dataset command is given a slug that does not exist
+    When the command reports its failure
+    Then the error document carries the code "not_found" and status 404
+    And the suggestions speak of the slug, not of the network
+
+  @unit
+  Scenario: A dataset plan limit is reported with its own code
+    Given a dataset command runs into the plan limit
+    When the command reports its failure
+    Then the error document carries the code "plan_limit_reached" and status 403
+    And the limit type and the usage stand in the meta
+
   @integration @unimplemented
   Scenario Outline: Common error conditions map to actionable messages for every CLI command
     Given the API responds with status <status> for command "<command>"

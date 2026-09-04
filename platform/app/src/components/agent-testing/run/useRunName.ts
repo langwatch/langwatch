@@ -14,18 +14,18 @@
  */
 
 import { useCallback, useMemo, useRef, useState } from "react";
-import type { TargetValue } from "~/components/scenarios/TargetSelector";
 import type { PromptEntry } from "./PromptPicker";
 import type { RunNameOption } from "./RunNameField";
-import type { ScopeFolder, ScopeScenario } from "./RunScopeSection";
+import type { ScopeScenario, ScopeTestSuite } from "./RunScopeSection";
 import type { RunDialogAgent } from "./RunTargetPicker";
 import {
   deriveRunName,
   describeConfigurations,
   type RunConfigurationEntry,
   type RunScope,
+  sortedTargetLabels,
 } from "./run-configuration";
-import type { RunDialogSubject } from "./run-dialog-types";
+import type { RunDialogSubject, RunTarget } from "./run-dialog-types";
 
 /** What one target is called, for the derived name and the dropdown rows. */
 export function buildTargetLabels({
@@ -36,7 +36,7 @@ export function buildTargetLabels({
   prompts: readonly PromptEntry[];
 }): Map<string, string> {
   return new Map<string, string>([
-    ...agents.map((agent) => [agent.id, agent.name] as const),
+    ...agents.map((agent) => [agent.id, agent.label ?? agent.name] as const),
     // A prompt with no handle yet reads as its id rather than as nothing.
     ...prompts.map(
       (prompt) => [prompt.id, prompt.handle ?? prompt.id] as const,
@@ -53,36 +53,37 @@ export function buildTargetLabels({
 export function scopeLabelOf({
   subject,
   scope,
-  folders,
+  testSuites,
   scenarios,
 }: {
   subject: RunDialogSubject;
   scope: RunScope;
-  folders: readonly ScopeFolder[];
+  testSuites: readonly ScopeTestSuite[];
   scenarios: readonly ScopeScenario[];
 }): string {
   if (subject.kind === "suite" || subject.kind === "case") return subject.name;
   if (scope.mode === "all") return "All scenarios";
-  if (scope.mode === "folders") return folderScopeLabel({ scope, folders });
+  if (scope.mode === "test_suites")
+    return testSuiteScopeLabel({ scope, testSuites });
   if (scope.mode === "labels") {
     return scope.labels.length === 0
       ? "All scenarios"
       : scope.labels.join(", ");
   }
-  return caseScopeLabel({ scope, scenarios });
+  return scenarioScopeLabel({ scope, scenarios });
 }
 
 /** The test suites a scope names, or how many of them there are. */
-function folderScopeLabel({
+function testSuiteScopeLabel({
   scope,
-  folders,
+  testSuites,
 }: {
-  scope: Extract<RunScope, { mode: "folders" }>;
-  folders: readonly ScopeFolder[];
+  scope: Extract<RunScope, { mode: "test_suites" }>;
+  testSuites: readonly ScopeTestSuite[];
 }): string {
-  const names = scope.folderIds.flatMap((folderId) => {
-    const folder = folders.find((entry) => entry.id === folderId);
-    return folder ? [folder.name] : [];
+  const names = scope.testSuiteIds.flatMap((testSuiteId) => {
+    const testSuite = testSuites.find((entry) => entry.id === testSuiteId);
+    return testSuite ? [testSuite.name] : [];
   });
   if (names.length === 0) return "All scenarios";
   if (names.length <= 2) return names.join(", ");
@@ -97,31 +98,43 @@ function folderScopeLabel({
  * every single-scenario run of that agent the same thing and they all resolve
  * onto one run plan.
  */
-function caseScopeLabel({
+function scenarioScopeLabel({
   scope,
   scenarios,
 }: {
-  scope: Extract<RunScope, { mode: "cases" }>;
+  scope: Extract<RunScope, { mode: "scenarios" }>;
   scenarios: readonly ScopeScenario[];
 }): string {
-  if (scope.caseIds.length === 0) return "All scenarios";
-  if (scope.caseIds.length === 1) {
-    const only = scenarios.find((entry) => entry.id === scope.caseIds[0]);
+  if (scope.scenarioIds.length === 0) return "All scenarios";
+  if (scope.scenarioIds.length === 1) {
+    const only = scenarios.find((entry) => entry.id === scope.scenarioIds[0]);
     // The scenario list is still on its way, or holds no scenario of that id.
     return only?.name ?? "Selected scenario";
   }
-  return `${scope.caseIds.length} scenarios`;
+  return `${scope.scenarioIds.length} scenarios`;
 }
 
-/** The targets of the run, in the order the derived name reads them. */
+/**
+ * The targets of the run, in the order the derived name reads them: the order
+ * the run plan sorts them in, so the name is the plan's name whichever row
+ * was picked first.
+ */
 function labelsOfTargets({
   targets,
   targetLabels,
 }: {
-  targets: readonly NonNullable<TargetValue>[];
+  targets: readonly RunTarget[];
   targetLabels: ReadonlyMap<string, string>;
 }): string[] {
-  return targets.map((target) => targetLabels.get(target.id) ?? target.id);
+  return sortedTargetLabels({
+    targets: targets.map((target) => ({
+      type: target.type,
+      referenceId: target.id,
+      ...(target.runParameters ? { runParameters: target.runParameters } : {}),
+    })),
+    targetLabels,
+    fallbackLabel: (target) => target.referenceId,
+  });
 }
 
 export function useRunName({
@@ -137,7 +150,7 @@ export function useRunName({
   /** The name of the stored run plan the dialog opened on, if it opened on one. */
   planName: string | null;
   scopeLabel: string;
-  targets: readonly NonNullable<TargetValue>[];
+  targets: readonly RunTarget[];
   targetLabels: ReadonlyMap<string, string>;
   /** The configurations this scope ran with, newest first. */
   entries: readonly RunConfigurationEntry[];

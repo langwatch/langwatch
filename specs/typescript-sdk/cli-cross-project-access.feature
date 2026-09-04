@@ -79,3 +79,16 @@ Feature: CLI cross-project access with the user-scoped login key
       When the user runs `langwatch whoami`
       Then the output names the organization and states whether the login key
         covers the whole organization or a subset of projects
+
+    @integration
+    Scenario: whoami states the login key's permissions
+      Given the login recorded the permission slugs the key was minted with
+      When the user runs `langwatch whoami`
+      Then the output lists those permission slugs, so a 403 on a command the
+        key does not cover can be read off the login instead of discovered
+
+    @integration
+    Scenario: whoami stays silent about permissions the login never recorded
+      Given the login predates the permissions field
+      When the user runs `langwatch whoami`
+      Then no permissions line is printed

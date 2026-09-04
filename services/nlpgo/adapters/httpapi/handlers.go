@@ -671,6 +671,10 @@ func versionHandler(version string) http.HandlerFunc {
 // httpblock.DefaultTimeout: the stream must outlive the slowest single
 // agent HTTP call, or a customer running a long agent backend loses the
 // inbound stream mid-call.
+//
+// Counterpart: NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_DEFAULT_SECONDS in
+// platform/app/src/server/nlpgo/timeouts.ts, which bounds every code-block
+// ceiling the platform will accept. Change both together.
 const DefaultStreamIdleTimeout = 720 * time.Second
 
 // streamIdleTimeout returns the silence budget for one stream. A

@@ -32,17 +32,33 @@ export function handleDatasetCommandError({
   context: string;
 }): never {
   if (error instanceof DatasetNotFoundError) {
-    // The "Not found:" prefix stays inside the message so the failSpinner
-    // headline keeps it: "Failed to <context>: Not found: <detail>".
+    // Keep the type as a handled error. Wrapped in a plain Error it would be
+    // read as `network_error` at status 0, and a wrong slug would tell the
+    // caller to check their network connection.
     failSpinner({
       spinner,
-      error: new Error(`Not found: ${error.message}`),
+      error: {
+        isLangWatchHandledError: true,
+        code: "not_found",
+        message: `Not found: ${error.message}`,
+        httpStatus: 404,
+      },
       action: context,
     });
   } else if (error instanceof DatasetPlanLimitError) {
     failSpinner({
       spinner,
-      error: new Error(`Plan limit reached: ${error.message}`),
+      error: {
+        isLangWatchHandledError: true,
+        code: "plan_limit_reached",
+        message: `Plan limit reached: ${error.message}`,
+        httpStatus: 403,
+        meta: {
+          limitType: error.limitType,
+          ...(error.current !== undefined ? { current: error.current } : {}),
+          ...(error.max !== undefined ? { max: error.max } : {}),
+        },
+      },
       action: context,
     });
     if (error.current !== undefined && error.max !== undefined) {

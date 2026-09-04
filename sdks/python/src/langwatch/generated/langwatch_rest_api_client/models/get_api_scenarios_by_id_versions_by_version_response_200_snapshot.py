@@ -17,7 +17,7 @@ T = TypeVar("T", bound="GetApiScenariosByIdVersionsByVersionResponse200Snapshot"
 
 @_attrs_define
 class GetApiScenariosByIdVersionsByVersionResponse200Snapshot:
-    """The editable content of the case as this version saved it.
+    """The editable content of the scenario as this version saved it.
 
     Attributes:
         name (str):

@@ -20,7 +20,7 @@ import type { SuiteKind } from "./types";
 /**
  * The client a repository write runs on: the repository's own PrismaClient by
  * default, or the caller's transaction client when the write must land with
- * other writes (a folder archive cascade) or not at all.
+ * other writes (a test suite archive cascade) or not at all.
  */
 type SuiteWriteClient = Pick<Prisma.TransactionClient, "simulationSuite">;
 
@@ -195,7 +195,7 @@ export class SuiteRepository {
 
   /**
    * Slugs of non-archived suites whose slug starts with the prefix.
-   * Feeds the numeric-suffix retry that keeps folder and plan slugs unique
+   * Feeds the numeric-suffix retry that keeps test suite and plan slugs unique
    * inside their shared per-project namespace.
    */
   async findSlugsByPrefix(params: {
@@ -217,14 +217,14 @@ export class SuiteRepository {
   /**
    * The run plan this name resolves to, or null.
    *
-   * A run plan is identified by its NAME, compared trimmed and without case.
+   * A run plan is identified by its NAME, compared trimmed and without scenario.
    * `name` carries no unique constraint and never has, so a project may already
    * hold two plans of one name: the most recently used one wins, and the
    * ordering is total so the answer does not move between reads. Every run
    * through this path replaces the matched plan's config, which moves
    * `updatedAt`, so "most recently used" is what a person means by the name.
    *
-   * Skipped on purpose: archived plans, folders, and the command line's
+   * Skipped on purpose: archived plans, test suites, and the command line's
    * throwaway suites, which it archives as soon as the run is queued.
    *
    * @see specs/suites/run-plan-identity-by-name.feature
@@ -237,7 +237,7 @@ export class SuiteRepository {
     return (params.tx ?? this.prisma).simulationSuite.findFirst({
       where: {
         projectId: params.projectId,
-        kind: "custom",
+        kind: "run_plan",
         archivedAt: null,
         name: { equals: params.name.trim(), mode: "insensitive" },
         NOT: { labels: { has: CLI_EPHEMERAL_LABEL } },
@@ -249,7 +249,7 @@ export class SuiteRepository {
   /**
    * The names of the given suites, archived ones included.
    *
-   * Feeds the name a run plan is derived under, which reads the folders its
+   * Feeds the name a run plan is derived under, which reads the test suites its
    * scope covers. Only the id and the name, because that is all a name needs.
    */
   async findNamesByIds(params: {

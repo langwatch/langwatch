@@ -440,23 +440,25 @@ describe("FoldProjectionExecutor.executeBatch", () => {
         init: batchInit,
         apply: batchApply,
       });
+      // Batch's earliest occurredAt (1000) is before the checkpoint (5000).
+      const events = [makeEvent(1000, "r1"), makeEvent(2000, "r2")];
+      // The event log already holds the delivered events AND the event that
+      // set the checkpoint: a read that cannot account for the checkpoint is
+      // refused as incomplete rather than replayed.
       foldDef.eventLoader = vi
         .fn()
         .mockResolvedValue([
-          makeEvent(1000, "r1"),
-          makeEvent(2000, "r2"),
+          ...events,
           makeEvent(3000, "r3"),
+          makeEvent(5000, "old"),
         ]);
-
-      // Batch's earliest occurredAt (1000) is before the checkpoint (5000).
-      const events = [makeEvent(1000, "b1"), makeEvent(2000, "b2")];
 
       const result = await executor.executeBatch(foldDef, events, context);
 
       expect(foldDef.eventLoader).toHaveBeenCalledOnce();
       // Re-folded purely from the loaded history, not the stale checkpoint.
-      expect(result.count).toBe(3);
-      expect(result.seen).toEqual(["r1", "r2", "r3"]);
+      expect(result.count).toBe(4);
+      expect(result.seen).toEqual(["r1", "r2", "r3", "old"]);
       expect(store.store).toHaveBeenCalledTimes(1);
     });
 

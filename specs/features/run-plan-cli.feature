@@ -8,6 +8,11 @@ Feature: Run Plan CLI Commands
   name creates the plan. A configuration is a scope, one or more targets, a
   repeat count, a simulator model and a judge model.
 
+  A target is what to run against plus the parameter values that target alone
+  runs with, written as a query string after its reference id. The same agent
+  named twice with different values is two targets, which is how one agent is
+  compared on two models.
+
   Background:
     Given I have a valid LANGWATCH_API_KEY configured
 
@@ -25,7 +30,7 @@ Feature: Run Plan CLI Commands
   @unit
   Scenario: Run the scenarios filed in a test suite
     Given my project has a test suite "Refunds"
-    When I run "langwatch run-plan run --suite Refunds --target http:agent_abc"
+    When I run "langwatch run-plan run --test-suite Refunds --target http:agent_abc"
     Then the test suite name is resolved to its ID
     And the run is scheduled with a scope of that test suite
 
@@ -39,13 +44,44 @@ Feature: Run Plan CLI Commands
   Scenario: Run named scenarios
     Given my project has scenarios "scenario_1" and "scenario_2"
     When I run "langwatch run-plan run --scenario scenario_1 --scenario scenario_2 --target http:agent_abc"
-    Then the run is scheduled with a scope of the named cases
+    Then the run is scheduled with a scope of the named scenarios
     And the two scenario IDs travel with the configuration
+
+  @unit
+  Scenario: Run against a connected agent by id
+    When I run "langwatch run-plan run --all --target connected:agent_abc"
+    Then the run is scheduled against the connected agent
+
+  @unit
+  Scenario: Run against a connected agent by name and environment
+    When I run "langwatch run-plan run --all --target connected:support-agent@production"
+    Then the target reference id is support-agent@production
+    And the platform resolves it to the agent row of that name and environment
+
+  @unit
+  Scenario: A connected target carries its own parameters
+    When I run "langwatch run-plan run --all --target 'connected:support-agent@production?model=gpt-5'"
+    Then the target reference id is support-agent@production
+    And the target carries the model value
 
   @unit
   Scenario: Run against more than one target
     When I run "langwatch run-plan run --all --target http:agent_abc --target prompt:prompt_xyz"
     Then the run is scheduled against both targets
+
+  @unit
+  Scenario: A target carries its own parameters after a question mark
+    When I run "langwatch run-plan run --all --target 'http:agent_abc?model=gpt-5' --target 'http:agent_abc?model=gpt-5-mini'"
+    Then the run is scheduled against two targets that name the same agent
+    And each target carries the model value written after its question mark
+    And the values are percent-decoded and read as the type they look like
+    And a value given here wins over the same name given with --param
+
+  @unit
+  Scenario: A reference id that holds a question mark is percent-decoded
+    When I run "langwatch run-plan run --all --target 'http:agent%3Fabc?model=gpt-5'"
+    Then the run is scheduled against the agent named "agent?abc"
+    And the target carries the model value
 
   @unit
   Scenario: Run under a name that names an existing plan
@@ -94,7 +130,7 @@ Feature: Run Plan CLI Commands
   @unit
   Scenario: Run with no scope flag
     When I run "langwatch run-plan run --target http:agent_abc"
-    Then I see an error that one of --all, --suite, --label or --scenario is needed
+    Then I see an error that one of --all, --test-suite, --label or --scenario is needed
     And no run is scheduled
 
   @unit
@@ -110,15 +146,39 @@ Feature: Run Plan CLI Commands
     And no run is scheduled
 
   @unit
+  Scenario: Run with a target whose question mark carries nothing
+    When I run "langwatch run-plan run --all --target 'http:agent_abc?'"
+    Then I see an error that the question mark carries no parameters
+    And no run is scheduled
+
+  @unit
+  Scenario: Run with a target parameter that is not a pair
+    When I run "langwatch run-plan run --all --target 'http:agent_abc?model'"
+    Then I see an error that each target parameter reads as key=value
+    And no run is scheduled
+
+  @unit
+  Scenario: Run with a target holding a second question mark
+    When I run "langwatch run-plan run --all --target 'http:agent_abc?ask=what?'"
+    Then I see an error that a question mark must be percent-encoded as %3F
+    And no run is scheduled
+
+  @unit
   Scenario: Run with a note over two hundred characters
     When I run "langwatch run-plan run --all --target http:agent_abc --note '<201 characters>'"
     Then I see an error that the note is too long
     And no run is scheduled
 
   @unit
-  Scenario: Run a suite name that names nothing
+  Scenario: The old --suite flag is still accepted
+    When I run "langwatch run-plan run --help"
+    Then "--test-suite" is listed
+    And "--suite" is still read, and is not listed
+
+  @unit
+  Scenario: Run a test suite name that names nothing
     Given my project has no test suite named "Refunds"
-    When I run "langwatch run-plan run --suite Refunds --target http:agent_abc"
+    When I run "langwatch run-plan run --test-suite Refunds --target http:agent_abc"
     Then I see an error that the test suite was not found
     And no run is scheduled
 
@@ -144,6 +204,46 @@ Feature: Run Plan CLI Commands
     When I run "langwatch run-plan run --all --target http:agent_abc --wait"
     Then the CLI does not poll
     And I see that nothing was scheduled
+
+  # ==========================================================================
+  # run-plan run machine-readable output
+  #
+  # A machine caller reads stdout. Whichever way the run ends, it must find one
+  # document there and nothing else. Human output stays as it is.
+  # ==========================================================================
+
+  @unit
+  Scenario: Run with machine-readable output
+    When I run "langwatch run-plan run --all --target http:agent_abc" asking for JSON output
+    Then exactly one machine-readable document is printed on stdout
+    And it carries the batch run ID, the job count and a scheduled outcome
+
+  @unit
+  Scenario: Wait with machine-readable output
+    When I run "langwatch run-plan run --all --target http:agent_abc --wait" asking for JSON output
+    Then the CLI polls until every run of the batch has stopped
+    And exactly one final document carries the per-run results, the tallies and the outcome
+    And the exit code is nonzero when any run failed
+
+  @unit
+  Scenario: A timed-out wait still emits the machine-readable document
+    Given a run whose jobs never complete
+    When the wait times out
+    Then the final document names the timeout outcome
+    And the exit code is nonzero
+
+  @unit
+  Scenario: A dead status endpoint still emits the machine-readable document
+    Given a run whose status endpoint keeps failing
+    When the wait gives up
+    Then the final document names the poll failure outcome
+    And the exit code is nonzero
+
+  @unit
+  Scenario: Waiting in human mode prints no machine document
+    When I run "langwatch run-plan run --all --target http:agent_abc --wait" with the default output
+    Then the progress and completion lines stay human-readable
+    And no JSON document is printed
 
   # ==========================================================================
   # run-plan list, get, archive

@@ -10,6 +10,9 @@
  * A refusal the server can name reads inside the dialog. Only failures with
  * nothing structured to say fall back to a toast.
  *
+ * A run that is queued closes the dialog first and opens the drawer after,
+ * never both at once: see `run` below.
+ *
  * @see specs/features/agent-testing/run-dialog.feature
  * @see specs/features/agent-testing/live-single-scenario-run.feature
  * @see specs/suites/run-plan-identity-by-name.feature
@@ -17,6 +20,7 @@
 
 import { generate } from "@langwatch/ksuid";
 import { useCallback, useRef } from "react";
+import { flushSync } from "react-dom";
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
 import { useModelProvidersSettings } from "~/hooks/useModelProvidersSettings";
 import { writeScenarioTarget } from "~/hooks/useScenarioTarget";
@@ -77,8 +81,8 @@ export type BatchRunInput = RunDialogSubmitInput & {
  * is an ordinary plan run.
  */
 function soleScenarioOf(scope: RunScope): string | null {
-  if (scope.mode !== "cases" || scope.caseIds.length !== 1) return null;
-  return scope.caseIds[0] ?? null;
+  if (scope.mode !== "scenarios" || scope.scenarioIds.length !== 1) return null;
+  return scope.scenarioIds[0] ?? null;
 }
 
 /**
@@ -147,14 +151,14 @@ function runStartedInfoOf({
 function useQueuePlanRun(input: BatchRunInput) {
   const runPlan = api.suites.runPlan.useMutation();
   const { projectId, target, noteInput, runParameters, suiteTargets } = input;
-  const { onRunStarted, runName, scope, scopedScenarioIds } = input;
+  const { runName, scope, scopedScenarioIds } = input;
   const { repeatCount, simulatorModel, judgeModel } = input;
   const setLastRunTarget = useAgentTestingStore(
     (state) => state.setLastRunTarget,
   );
 
   const queuePlanRun = useCallback(
-    async (attempt: RunAttempt) => {
+    async (attempt: RunAttempt): Promise<RunStartedInfo> => {
       const soleScenarioId = soleScenarioOf(scope);
       rememberTarget({ projectId, target, soleScenarioId, setLastRunTarget });
       const result = await runPlan.mutateAsync({
@@ -164,7 +168,9 @@ function useQueuePlanRun(input: BatchRunInput) {
           scope: toSuiteScope(scope),
           // Only a hand-picked scope names its scenarios; every other one
           // resolves against the project at run time.
-          ...(scope.mode === "cases" ? { scenarioIds: scopedScenarioIds } : {}),
+          ...(scope.mode === "scenarios"
+            ? { scenarioIds: scopedScenarioIds }
+            : {}),
           targets: suiteTargets ?? [],
           repeatCount,
           simulatorModel,
@@ -175,14 +181,12 @@ function useQueuePlanRun(input: BatchRunInput) {
         note: noteInput,
         parameters: runParameters,
       });
-      onRunStarted(
-        runStartedInfoOf({
-          batchRunId: result.batchRunId ?? attempt.batchRunId,
-          suiteId: result.suiteId,
-          soleScenarioId,
-          target,
-        }),
-      );
+      return runStartedInfoOf({
+        batchRunId: result.batchRunId ?? attempt.batchRunId,
+        suiteId: result.suiteId,
+        soleScenarioId,
+        target,
+      });
     },
     [
       projectId,
@@ -196,7 +200,6 @@ function useQueuePlanRun(input: BatchRunInput) {
       judgeModel,
       noteInput,
       runParameters,
-      onRunStarted,
       setLastRunTarget,
       runPlan,
     ],
@@ -207,7 +210,7 @@ function useQueuePlanRun(input: BatchRunInput) {
 
 /** Starts the run the dialog holds, and holds the attempt behind it. */
 export function useBatchRun(input: BatchRunInput) {
-  const { subject, projectId, onClose, surfaceError } = input;
+  const { subject, projectId, onClose, onRunStarted, surfaceError } = input;
   const { setInlineError, setMissingProvider } = input;
   const { takeRunAttempt, clearRunAttempt } = useRunAttempt();
   const { queuePlanRun, isPlanPending } = useQueuePlanRun(input);
@@ -242,9 +245,15 @@ export function useBatchRun(input: BatchRunInput) {
     }
     const attempt = takeRunAttempt(attemptKey);
     try {
-      await queuePlanRun(attempt);
+      const started = await queuePlanRun(attempt);
       clearRunAttempt();
-      onClose();
+      // The dialog goes first, and it is gone before the drawer opens. A
+      // dialog that tears down over a drawer that has just opened is read as
+      // an interaction outside that drawer, and the drawer closes itself on
+      // the run it was opened for. flushSync is what makes "first" mean the
+      // commit and not the queue.
+      flushSync(() => onClose());
+      onRunStarted(started);
     } catch (error) {
       surfaceError(error);
     }
@@ -257,6 +266,7 @@ export function useBatchRun(input: BatchRunInput) {
     clearRunAttempt,
     queuePlanRun,
     onClose,
+    onRunStarted,
     setInlineError,
     setMissingProvider,
     surfaceError,

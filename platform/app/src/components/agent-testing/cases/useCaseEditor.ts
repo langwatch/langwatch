@@ -1,7 +1,7 @@
 /**
  * The state and the writes of the scenario editor.
  *
- * The editor is one dialog with one draft in it. It reads the stored case when
+ * The editor is one dialog with one draft in it. It reads the stored scenario when
  * it opens on one, and it saves with the version it read, so a save over
  * somebody else's newer save is refused rather than written.
  *
@@ -42,7 +42,7 @@ export type CaseDraft = {
   labels: string[];
   /** The declared parameters as one `name=value` line. */
   parameters: string;
-  folderId: string | null;
+  testSuiteId: string | null;
   simulatorModel: string | null;
   judgeModel: string | null;
   maxTurns: number | null;
@@ -55,14 +55,14 @@ const EMPTY_DRAFT: CaseDraft = {
   criteria: "",
   labels: [],
   parameters: "",
-  folderId: null,
+  testSuiteId: null,
   simulatorModel: null,
   judgeModel: null,
   maxTurns: null,
   minTurns: null,
 };
 
-/** What a stored case reads as in the editor. */
+/** What a stored scenario reads as in the editor. */
 function draftFromScenario(scenario: Scenario): CaseDraft {
   return {
     title: scenario.name,
@@ -72,7 +72,7 @@ function draftFromScenario(scenario: Scenario): CaseDraft {
     parameters: formatParameterLine(
       parseScenarioParameterDefinitions(scenario.parameters),
     ),
-    folderId: scenario.folderId,
+    testSuiteId: scenario.testSuiteId,
     simulatorModel: scenario.simulatorModel,
     judgeModel: scenario.judgeModel,
     maxTurns: scenario.maxTurns,
@@ -91,10 +91,10 @@ export function criteriaOf(draft: CaseDraft): string[] {
 export type CaseEditorState = {
   draft: CaseDraft;
   setDraft: (update: Partial<CaseDraft>) => void;
-  /** True while the stored case is being read. */
+  /** True while the stored scenario is being read. */
   isLoading: boolean;
   isSaving: boolean;
-  /** The version of the case this draft was read from. */
+  /** The version of the scenario this draft was read from. */
   version: number | null;
   /** Set when somebody else saved a newer version while this one was open. */
   staleVersion: number | null;
@@ -107,7 +107,7 @@ export type CaseEditorState = {
 };
 
 /**
- * The draft the dialog holds. It is seeded once per case the dialog opens on,
+ * The draft the dialog holds. It is seeded once per scenario the dialog opens on,
  * so a background refetch cannot overwrite what somebody is typing, and the
  * version it was seeded from travels with it so a save cannot refer to a
  * newer one.
@@ -115,18 +115,18 @@ export type CaseEditorState = {
 function useCaseDraft({
   open,
   scenarioId,
-  folderId,
+  testSuiteId,
   scenario,
 }: {
   open: boolean;
   scenarioId: string | null;
-  folderId: string | null;
+  testSuiteId: string | null;
   scenario: Scenario | undefined;
 }) {
   const [draft, setDraftState] = useState<CaseDraft>(EMPTY_DRAFT);
   const [version, setVersion] = useState<number | null>(null);
   // Rises on every seeding, so what follows the draft knows it was replaced
-  // even when the case reads at the version it read before.
+  // even when the scenario reads at the version it read before.
   const [seedCount, setSeedCount] = useState(0);
 
   const seed = open ? (scenarioId ?? "new") : null;
@@ -144,16 +144,16 @@ function useCaseDraft({
   useEffect(() => {
     if (!open) return;
     if (!scenarioId) {
-      setDraftState({ ...EMPTY_DRAFT, folderId });
+      setDraftState({ ...EMPTY_DRAFT, testSuiteId });
       setVersion(null);
       setSeedCount((count) => count + 1);
       return;
     }
     if (seededFrom) seedFrom(seededFrom);
-    // The draft follows the case the dialog opened on, not every answer of a
+    // The draft follows the scenario the dialog opened on, not every answer of a
     // refetch, so `seed` is what re-seeds it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [seed, seededFrom?.id, folderId]);
+  }, [seed, seededFrom?.id, testSuiteId]);
 
   const setDraft = useCallback(
     (update: Partial<CaseDraft>) =>
@@ -179,7 +179,7 @@ function useCaseWrites({
 
   const invalidate = useCallback(() => {
     void utils.scenarios.getAll.invalidate({ projectId });
-    void utils.suites.folders.getAll.invalidate({ projectId });
+    void utils.suites.testSuites.getAll.invalidate({ projectId });
   }, [utils, projectId]);
 
   const createMutation = api.scenarios.create.useMutation({
@@ -234,7 +234,7 @@ function savePayload({
       line: draft.parameters,
       existing: existingParameters,
     }),
-    folderId: draft.folderId,
+    testSuiteId: draft.testSuiteId,
     simulatorModel: draft.simulatorModel,
     judgeModel: draft.judgeModel,
     maxTurns: draft.maxTurns,
@@ -252,7 +252,7 @@ function useCaseProblem(draft: CaseDraft): string | null {
   }, [draft]);
 }
 
-/** Sends the draft: an update when it came from a stored case, else a create. */
+/** Sends the draft: an update when it came from a stored scenario, else a create. */
 function useCaseSave({
   problem,
   projectId,
@@ -312,15 +312,15 @@ export function useCaseEditor({
   open,
   projectId,
   scenarioId,
-  folderId,
+  testSuiteId,
   onSaved,
 }: {
   open: boolean;
   projectId: string;
-  /** The case being edited, or nothing for a new one. */
+  /** The scenario being edited, or nothing for a new one. */
   scenarioId: string | null;
-  /** The suite a new case starts in. */
-  folderId: string | null;
+  /** The suite a new scenario starts in. */
+  testSuiteId: string | null;
   onSaved: (saved: Scenario, options: { shouldRunAfterSave: boolean }) => void;
 }): CaseEditorState {
   // Which button started the save. The answer of the mutation is read by a
@@ -339,7 +339,7 @@ export function useCaseEditor({
   const { draft, setDraft, version, seedCount, seedFrom } = useCaseDraft({
     open,
     scenarioId,
-    folderId,
+    testSuiteId,
     scenario,
   });
 

@@ -1,13 +1,13 @@
 /**
  * The one place a run plan's scope becomes a list of scenarios.
  *
- * A dynamic scope is a rule, so the list it means changes as cases are
+ * A dynamic scope is a rule, so the list it means changes as scenarios are
  * written, filed, labelled and archived. It is resolved when the run starts,
  * and the plan's `scenarioIds` cache is refreshed from the same read, inside
  * the same transaction, so what the plan reads back is what the run covered.
  *
  * The suite's row lock comes first, before the read that decides what to
- * write, for the reason it does in folder-membership.ts: two runs of the same
+ * write, for the reason it does in test-suite-membership.ts: two runs of the same
  * plan would otherwise each write a list from a read the other has already
  * moved past.
  *
@@ -27,8 +27,8 @@ export type ScopeMembershipClient = Pick<
  * Resolves a dynamic scope to the project's matching active scenario ids and
  * writes the result onto the plan, under the plan's row lock.
  *
- * Static scopes never reach here: a plan of mode "cases" already holds its
- * list, and a folder's membership is `Scenario.folderId`.
+ * Static scopes never reach here: a plan of mode "scenarios" already holds its
+ * list, and a test suite's membership is `Scenario.testSuiteId`.
  */
 export async function resolveAndCacheScope({
   projectId,
@@ -73,7 +73,9 @@ export async function readScopeScenarioIds({
     where: {
       projectId,
       archivedAt: null,
-      ...(scope.mode === "folders" && { folderId: { in: scope.folderIds } }),
+      ...(scope.mode === "test_suites" && {
+        testSuiteId: { in: scope.testSuiteIds },
+      }),
       ...(scope.mode === "labels" && { labels: { hasSome: scope.labels } }),
     },
     select: { id: true },

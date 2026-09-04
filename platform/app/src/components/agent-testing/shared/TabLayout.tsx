@@ -14,9 +14,9 @@
 import { Box, HStack } from "@chakra-ui/react";
 
 /**
- * How wide the shared left rail reads. Cases uses this for the suites rail,
+ * How wide the shared left rail reads. Scenarios uses this for the suites rail,
  * Results uses this for the runs sidebar, and the plans list uses this for the
- * invisible spacer that keeps the table lined up with the cases table.
+ * invisible spacer that keeps the table lined up with the scenarios table.
  */
 export const AGENT_TESTING_RAIL_WIDTH = 218;
 

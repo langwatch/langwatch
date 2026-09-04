@@ -9,6 +9,7 @@ import type { ResultsFilter } from "../atom.types";
 import type {
   RawAtomRow,
   RawGroupRow,
+  RawRunTargetRow,
   RawTrendRow,
   ResultAtomsClickHouseRepository,
 } from "../result-atoms.clickhouse.repository";
@@ -29,6 +30,7 @@ interface FakeData {
   atoms?: RawAtomRow[];
   series?: { Bucket: string; Passed: string; Settled: string }[];
   totals?: Record<string, string> | null;
+  runTargets?: RawRunTargetRow[];
 }
 
 function makeRepo(data: FakeData) {
@@ -54,6 +56,7 @@ function makeRepo(data: FakeData) {
       .mockResolvedValue({ atoms: data.atoms ?? [], hasMore: false }),
     findRunOrdinals: vi.fn().mockResolvedValue([]),
     findCodeScenarios: vi.fn().mockResolvedValue([]),
+    findRunTargets: vi.fn().mockResolvedValue(data.runTargets ?? []),
   } as unknown as ResultAtomsClickHouseRepository;
 }
 
@@ -73,6 +76,8 @@ function makePrisma({
 const group = (over: Partial<RawGroupRow> = {}): RawGroupRow => ({
   GroupKey: "key",
   Name: "",
+  TargetName: "",
+  TargetParameters: "",
   Atoms: "2",
   Passed: "1",
   Settled: "2",
@@ -368,6 +373,159 @@ describe("getOverview", () => {
   });
 });
 
+describe("getRunTargets", () => {
+  describe("given a target a run from code named", () => {
+    /** @scenario "The targets named by runs from code are listed for the filter" */
+    it("lists it under the name the run reported, pointing at no stored row", async () => {
+      const service = new ResultAtomsService(
+        makeRepo({
+          runTargets: [
+            {
+              TargetKey: "code:acmesupportagent",
+              Name: "AcmeSupportAgent",
+              ReferenceId: "",
+              TargetParameters: "",
+            },
+          ],
+        }),
+        makePrisma(),
+      );
+
+      const targets = await service.getRunTargets({
+        projectId: "proj",
+        startDate,
+      });
+
+      expect(targets).toEqual([
+        {
+          key: "code:acmesupportagent",
+          referenceId: null,
+          parameters: null,
+          name: "AcmeSupportAgent",
+        },
+      ]);
+    });
+  });
+
+  describe("given a stored target run with overrides", () => {
+    /** @scenario "The run targets list carries parameter variants" */
+    it("lists the variant under its key with the reference id and the overrides", async () => {
+      const service = new ResultAtomsService(
+        makeRepo({
+          runTargets: [
+            {
+              TargetKey: "prod-agent#0123abcd",
+              Name: "",
+              ReferenceId: "prod-agent",
+              TargetParameters: JSON.stringify({ model: "gpt-5-mini" }),
+            },
+          ],
+        }),
+        makePrisma(),
+      );
+
+      const targets = await service.getRunTargets({
+        projectId: "proj",
+        startDate,
+      });
+
+      expect(targets).toEqual([
+        {
+          key: "prod-agent#0123abcd",
+          referenceId: "prod-agent",
+          parameters: { model: "gpt-5-mini" },
+          name: "prod-agent#0123abcd",
+        },
+      ]);
+    });
+  });
+});
+
+describe("the target parameters of an atom", () => {
+  const atom = (over: Partial<RawAtomRow> = {}): RawAtomRow => ({
+    SetId: "set-1",
+    BatchRunId: "batch-1",
+    ScenarioRunId: "run-1",
+    ScenarioId: "scen-1",
+    ScenarioKey: "scen-1",
+    ScenarioName: "",
+    Status: "SUCCESS",
+    Outcome: "passed",
+    RunAt: String(now),
+    DurationMs: "",
+    Note: "",
+    TargetKey: "prod-agent",
+    TargetParameters: "",
+    TargetName: "",
+    Trigger: "app",
+    CostUsd: "0",
+    CostSource: "none",
+    SortKey: String(now),
+    ...over,
+  });
+
+  describe("given an atom whose target carried overrides", () => {
+    /** @scenario "A target with parameter overrides is its own target" */
+    it("reads them back as an object", async () => {
+      const service = new ResultAtomsService(
+        makeRepo({
+          atoms: [
+            atom({
+              TargetKey: "prod-agent#0123abcd",
+              TargetParameters: JSON.stringify({ model: "gpt-5-mini" }),
+            }),
+          ],
+        }),
+        makePrisma(),
+      );
+
+      const { atoms } = await service.getAtoms({ filter, limit: 10 });
+
+      expect(atoms[0]?.targetKey).toBe("prod-agent#0123abcd");
+      expect(atoms[0]?.targetParameters).toEqual({ model: "gpt-5-mini" });
+    });
+  });
+
+  describe("given an atom whose target carried none", () => {
+    /** @scenario "An old run with no target key keeps its reference id as key" */
+    it("reads null, never an empty object", async () => {
+      const service = new ResultAtomsService(
+        makeRepo({ atoms: [atom()] }),
+        makePrisma(),
+      );
+
+      const { atoms } = await service.getAtoms({ filter, limit: 10 });
+
+      expect(atoms[0]?.targetKey).toBe("prod-agent");
+      expect(atoms[0]?.targetParameters).toBeNull();
+    });
+  });
+
+  describe("given a target group whose target carried overrides", () => {
+    /** @scenario "The overview groups a parameter variant apart from its agent" */
+    it("carries them on the group, and on no other grouping", async () => {
+      const variant = group({
+        GroupKey: "prod-agent#0123abcd",
+        TargetKeys: ["prod-agent#0123abcd"],
+        TargetParameters: JSON.stringify({ model: "gpt-5-mini" }),
+      });
+      const byTarget = await new ResultAtomsService(
+        makeRepo({ groups: [variant] }),
+        makePrisma(),
+      ).getOverview({ filter, groupBy: "target" });
+      const byScenario = await new ResultAtomsService(
+        makeRepo({ groups: [variant] }),
+        makePrisma(),
+      ).getOverview({ filter, groupBy: "scenario" });
+
+      expect(byTarget.groups[0]?.targetParameters).toEqual({
+        model: "gpt-5-mini",
+      });
+      expect(byScenario.groups[0]?.targetParameters).toBeNull();
+    });
+  });
+});
+
 describe("getAtoms", () => {
   describe("given an atom whose cost was never measured", () => {
     /**
@@ -388,6 +546,8 @@ describe("getAtoms", () => {
         DurationMs: "",
         Note: "",
         TargetKey: "unknown",
+        TargetName: "",
+        TargetParameters: "",
         Trigger: "code",
         CostUsd: "",
         CostSource: "unknown",
@@ -404,6 +564,52 @@ describe("getAtoms", () => {
       expect(atoms[0]?.costSource).toBe("unknown");
       expect(atoms[0]?.note).toBeNull();
       expect(atoms[0]?.durationMs).toBeNull();
+    });
+  });
+});
+
+describe("the target of a group", () => {
+  describe("when a run from code reported the agent it tested", () => {
+    /** @scenario "Two runs of one agent name fold under one target" */
+    it("reads the group under that agent name", async () => {
+      const service = new ResultAtomsService(
+        makeRepo({
+          groups: [
+            group({
+              GroupKey: "code:acmesupportagent",
+              TargetName: "AcmeSupportAgent",
+              TargetParameters: "",
+              RunCount: "2",
+            }),
+          ],
+        }),
+        makePrisma(),
+      );
+
+      const overview = await service.getOverview({ filter, groupBy: "target" });
+
+      expect(overview.groups).toHaveLength(1);
+      expect(overview.groups[0]).toMatchObject({
+        key: "code:acmesupportagent",
+        title: "AcmeSupportAgent",
+      });
+    });
+  });
+
+  describe("when the run reported no agent", () => {
+    /**
+     * The client names a platform reference id from its own target map, so a
+     * group that reported nothing has to keep its key as its title.
+     */
+    it("keeps the key as the title", async () => {
+      const service = new ResultAtomsService(
+        makeRepo({ groups: [group({ GroupKey: "agent_dev" })] }),
+        makePrisma(),
+      );
+
+      const overview = await service.getOverview({ filter, groupBy: "target" });
+
+      expect(overview.groups[0]?.title).toBe("agent_dev");
     });
   });
 });
@@ -450,7 +656,7 @@ describe("bucketSecondsFor", () => {
 
 describe("the shape of an atom", () => {
   describe("given a scenario that sits in a suite and carries labels", () => {
-    /** @scenario "An atom names its scenario and leaves the folder and the labels out" */
+    /** @scenario "An atom names its scenario and leaves the test suite and the labels out" */
     it("names the scenario and carries neither the folder nor the labels", async () => {
       const service = new ResultAtomsService(
         makeRepo({
@@ -468,6 +674,8 @@ describe("the shape of an atom", () => {
               DurationMs: "1500",
               Note: "",
               TargetKey: "agent_dev",
+              TargetName: "",
+              TargetParameters: "",
               Trigger: "app",
               CostUsd: "0.01",
               CostSource: "run",
@@ -487,7 +695,7 @@ describe("the shape of an atom", () => {
       const atom = page.atoms[0]!;
 
       expect(atom.scenarioId).toBe("scen-1");
-      expect(atom).not.toHaveProperty("folderId");
+      expect(atom).not.toHaveProperty("testSuiteId");
       expect(atom).not.toHaveProperty("labels");
     });
   });

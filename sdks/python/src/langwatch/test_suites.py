@@ -1,9 +1,10 @@
 """
-API facade for test suites, the folders that group agent test scenarios.
+API facade for test suites, the groups that hold agent test scenarios.
 
-A test suite is a name and the cases filed under it. Running one is sugar over
-a run plan: the caller sends the targets, and the platform derives the plan
-name from the suite and the target unless the caller names the plan itself.
+A test suite is a name and the scenarios filed under it. Running one is sugar
+over a run plan: the caller sends the targets, and the platform derives the
+plan name from the suite and the target unless the caller names the plan
+itself.
 
 Uses httpx via the generated REST API client for HTTP transport.
 
@@ -136,20 +137,20 @@ class TestSuitesFacade:
         note: Optional[str] = None,
         idempotency_key: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Run every case filed under a test suite.
+        """Run every scenario filed under a test suite.
 
         Args:
             test_suite_id: The test suite to run.
-            targets: What to run the cases against, as
+            targets: What to run the scenarios against, as
                 ``{"type": "prompt"|"http"|"code"|"workflow", "referenceId": ...}``.
             name: The run plan's name. Left out, the platform derives it from
                 the suite name and the target name.
-            repeat_count: How many times to run each case, 1 to 5.
+            repeat_count: How many times to run each scenario, 1 to 5.
             simulator_model: The model that plays the user.
             judge_model: The model that grades the run.
-            parameters: Constants applied to every case in the run, e.g.
-                ``{"account_tier": "gold"}``. A value here overrides the case's
-                own default for that name.
+            parameters: Constants applied to every scenario in the run, e.g.
+                ``{"account_tier": "gold"}``. A value here overrides the
+                scenario's own default for that name.
             note: One short line saying why this ran, up to 200 characters.
             idempotency_key: Repeat it to make a retry join the first run
                 rather than start a second one.

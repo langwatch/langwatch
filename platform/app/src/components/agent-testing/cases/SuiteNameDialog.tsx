@@ -6,7 +6,7 @@
  * one. The same dialog creates one and renames one.
  *
  * @see specs/features/agent-testing/suites-rail.feature
- * @see specs/suites/suite-folders.feature
+ * @see specs/suites/test-suites.feature
  */
 
 import { Button, Input, Text } from "@chakra-ui/react";

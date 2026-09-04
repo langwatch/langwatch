@@ -14,7 +14,7 @@ import type { TestCase, TestSuiteEntry } from "./test-cases";
 import { useOpenLiveRun } from "./useOpenLiveRun";
 
 /**
- * The run dialog subject of a whole suite, with the cases it holds.
+ * The run dialog subject of a whole suite, with the scenarios it holds.
  *
  * A test suite carries no run option of its own, so the subject brings none.
  * The dialog then preselects from the newest run plan of the suite, which is
@@ -32,7 +32,7 @@ function runSubjectForSuite({
     suiteId: suite.id,
     name: suite.name,
     scenarioIds: cases
-      .filter((testCase) => testCase.folderId === suite.id)
+      .filter((testCase) => testCase.testSuiteId === suite.id)
       .map((testCase) => testCase.id),
     initialTarget: null,
     persistedTarget: null,
@@ -40,7 +40,7 @@ function runSubjectForSuite({
 }
 
 /**
- * What happens the moment a run is queued. Shared by the table and the case
+ * What happens the moment a run is queued. Shared by the table and the scenario
  * editor, so a run started from either one opens the same way.
  *
  * The run set is always the one of the plan the run joined, so the drawer and
@@ -66,7 +66,7 @@ export function useRunStartedHandler(): (info: RunStartedInfo) => void {
 }
 
 export type CaseRunActions = {
-  /** The suite or case the run dialog is open on, if any. */
+  /** The suite or scenario the run dialog is open on, if any. */
   runSubject: RunDialogSubject | null;
   closeRunDialog: () => void;
   onRunStarted: (info: RunStartedInfo) => void;

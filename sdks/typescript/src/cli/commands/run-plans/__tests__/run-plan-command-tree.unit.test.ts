@@ -3,7 +3,7 @@
  * surface header every one of their requests carries.
  *
  * Spec: specs/features/run-plan-cli.feature
- * Spec: specs/features/suite-cli.feature
+ * Spec: specs/features/test-suite-cli.feature
  */
 import { describe, expect, it, vi } from "vitest";
 
@@ -54,13 +54,25 @@ describe("the run plan and test suite commands, given the CLI command tree", () 
     ]);
   });
 
-  /** @scenario "The suite group holds no folder subgroup" */
-  it("registers the suite group with no folder subgroup", () => {
-    const suite = groupNamed("suite");
+  /** @scenario "The old --suite flag is still accepted" */
+  it("keeps --suite on run-plan run, read but not listed", () => {
+    const run = groupNamed("run-plan")!.commands.find(
+      (command) => command.name() === "run",
+    )!;
+    const longFlags = run.options.map((option) => option.long);
 
-    expect(suite).toBeDefined();
-    const subcommands = suite!.commands.map((command) => command.name());
-    expect(subcommands).not.toContain("folder");
+    expect(longFlags).toContain("--test-suite");
+    expect(longFlags).toContain("--suite");
+    expect(run.helpInformation()).toContain("--test-suite");
+    expect(run.helpInformation()).not.toContain("--suite ");
+  });
+
+  /** @scenario "The test suite group holds no nested group" */
+  it("registers the test-suite group with no nested group", () => {
+    const testSuite = groupNamed("test-suite");
+
+    expect(testSuite).toBeDefined();
+    const subcommands = testSuite!.commands.map((command) => command.name());
     expect(subcommands).toEqual([
       "list",
       "create",
@@ -69,12 +81,22 @@ describe("the run plan and test suite commands, given the CLI command tree", () 
       "archive",
       "run",
     ]);
+    expect(
+      subcommands.filter((name) => name !== "run").flatMap((name) =>
+        testSuite!.commands
+          .find((command) => command.name() === name)!
+          .commands.map((child) => child.name()),
+      ),
+    ).toEqual([]);
   });
 
-  /** @scenario "The suite group holds no folder subgroup" */
-  it("registers no top-level folder group", () => {
+  /** @scenario "The old suite name still runs" */
+  it("keeps suite as an alias of the test-suite group", () => {
+    const testSuite = groupNamed("test-suite");
+
+    expect(testSuite!.aliases()).toContain("suite");
     expect(program.commands.map((command) => command.name())).not.toContain(
-      "folder",
+      "suite",
     );
   });
 

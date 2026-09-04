@@ -23,6 +23,14 @@ Feature: Secret run parameters
     When the scenario is saved
     Then the save is rejected before the scenario is stored
 
+  # An option list holds the accepted values in clear on the scenario row, and
+  # a refusal repeats them to the caller, so it is refused like a default.
+  @unit
+  Scenario: A parameter declared secret cannot list options
+    Given a scenario declaring "api_token" as secret with the option "credential"
+    When the scenario is saved
+    Then the save is rejected before the scenario is stored
+
   # --- Starting a run ---
 
   @unit

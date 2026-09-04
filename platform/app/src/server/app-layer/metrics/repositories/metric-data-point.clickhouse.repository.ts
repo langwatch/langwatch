@@ -7,6 +7,7 @@ import {
 } from "~/server/event-sourcing/pipelines/metric-processing/rollup";
 import {
   comparePoints,
+  type MetricRollupSourcePoint,
   type MetricSequencePoint,
 } from "~/server/event-sourcing/pipelines/metric-processing/rollup/sequence";
 import { METRIC_ROLLUP_INTERVAL_MS } from "~/server/event-sourcing/pipelines/metric-processing/schemas/constants";
@@ -24,10 +25,10 @@ import type {
   SeriesTotalByPointAttribute,
 } from "./metric-data-point.repository";
 import {
-  AUTHORITATIVE_SELECT,
-  fromRaw,
+  fromRollupRow,
   fromSeekRow,
-  type RawMetricRow,
+  ROLLUP_SELECT,
+  type RollupSourceRow,
   rawRow,
   rollupRow,
   SEEK_SELECT,
@@ -72,6 +73,56 @@ const SEEKS_PER_QUERY = 64;
  * without crossing this one first.
  */
 const SUCCESSOR_PARAM_BUDGET_CHARS = 3500;
+
+/**
+ * How far behind a bucket the first predecessor seek looks before the second
+ * one widens to the retention window.
+ *
+ * An hour, which is two orders of magnitude more than the rollup interval and
+ * so covers any series still being written to, however coarsely it is scraped.
+ * It is a latency/partition trade and nothing depends on the exact value: too
+ * small only sends more buckets into the second pass, too large only widens
+ * the first, and either way the pair reads the same range and the fold sees
+ * the same predecessor.
+ */
+const PREDECESSOR_LOOKBACK_MS = 60 * 60 * 1000;
+
+/**
+ * The seeks whose predecessor the near pass failed to find.
+ *
+ * A bucket whose near pass returned nothing in [start - lookbackMs, start) has
+ * no stored point in that window at all — the branch returns the newest there
+ * is — so whatever precedes it is older than the window, and only then is the
+ * wide seek worth its partitions.
+ *
+ * A row from a neighbouring affected bucket answers this just as well: if
+ * anything at all sits in the window, then the newest thing in it does too,
+ * and that is precisely what the near seek returned. So the check is against
+ * every point the pass collected, indexed by series to keep it off the
+ * seeks × points path.
+ */
+function seeksWithoutPredecessor({
+  seeks,
+  points,
+  lookbackMs,
+}: {
+  seeks: readonly { seriesId: string; start: number }[];
+  points: Iterable<MetricRollupSourcePoint>;
+  lookbackMs: number;
+}): { seriesId: string; start: number }[] {
+  const seenBySeries = new Map<string, number[]>();
+  for (const point of points) {
+    const times = seenBySeries.get(point.seriesId);
+    if (times) times.push(point.timeUnixMs);
+    else seenBySeries.set(point.seriesId, [point.timeUnixMs]);
+  }
+  return seeks.filter(
+    ({ seriesId, start }) =>
+      !(seenBySeries.get(seriesId) ?? []).some(
+        (timeUnixMs) => timeUnixMs < start && timeUnixMs >= start - lookbackMs,
+      ),
+  );
+}
 
 /**
  * The successor read's whole statement, emitted once at module load rather than
@@ -605,7 +656,6 @@ export class MetricDataPointClickHouseRepository
     const authoritative = await this.pointsForAffectedBuckets({
       affectedBySeries,
       tenantId: points[0]!.tenantId,
-      organizationId: points[0]!.organizationId,
       retentionDays,
     });
 
@@ -771,29 +821,45 @@ export class MetricDataPointClickHouseRepository
    * narrow ranges rather than one span: a late point and a distant next sample
    * would otherwise scan every partition between them only to discard the rows.
    *
-   * The predecessor seek is bounded below by the series' retention window: a
-   * predecessor older than that is expired (or about to be), and the fold
-   * already treats an absent predecessor as a reset/gap. Without the bound a
-   * sparse series pays a reverse scan across every partition — including
-   * S3-tiered cold storage — hunting for a row that no longer matters.
+   * The predecessor is sought in two passes, near before far, because the far
+   * pass is the expensive one and a bucket in a series that is being written to
+   * does not need it. The first pass looks back
+   * {@link PREDECESSOR_LOOKBACK_MS}; the second looks from there to the edge of
+   * retention, and only for the buckets the first pass left without a
+   * predecessor. The two ranges abut and do not overlap, so their union is the
+   * single retention-wide range this replaced — the same rows, reached without
+   * making every bucket pay the wide read.
+   *
+   * Two cases do reach the far pass every time, and both are bounded. A series
+   * whose first points are arriving has no predecessor at any distance, so its
+   * buckets fall through and the wide seek returns nothing; under series churn
+   * this is the common path, not the rare one, and it costs one extra round
+   * trip on top of what the single-pass read already cost. A gap longer than
+   * the near window is the other, and it is the case the far pass exists for.
+   * Neither is a regression, but neither is rare either.
+   *
+   * What the wide read costs is partitions. The table partitions by ISO week,
+   * so a retention-wide reverse seek opens every weekly part the series appears
+   * in — on the default retention, seven of them — to return one row. An hour
+   * of lookback opens one, or two across a week boundary. A live series is
+   * resolved by the near pass; only a series with an hour-wide hole in it pays
+   * for the far one, and it pays exactly what it paid before.
    */
   private async pointsForAffectedBuckets({
     affectedBySeries,
     tenantId,
-    organizationId,
     retentionDays,
   }: {
     affectedBySeries: ReadonlyMap<string, ReadonlySet<number>>;
     tenantId: string;
-    organizationId: string;
     retentionDays: number;
-  }): Promise<Map<string, CanonicalMetricDataPoint[]>> {
+  }): Promise<Map<string, MetricRollupSourcePoint[]>> {
     const seeks = [...affectedBySeries].flatMap(([seriesId, buckets]) =>
       [...buckets]
         .sort((a, b) => a - b)
         .map((start) => ({ seriesId, start }) as const),
     );
-    const found = new Map<string, CanonicalMetricDataPoint[]>();
+    const found = new Map<string, MetricRollupSourcePoint[]>();
     if (seeks.length === 0) return found;
 
     const client = await this.resolveClient(tenantId);
@@ -801,8 +867,75 @@ export class MetricDataPointClickHouseRepository
     // the ranges overlap by design; the fold needs each point exactly once.
     // Identity is (series, point) because one query now spans many series, and
     // a point id is only ever unique within its own.
-    const unique = new Map<string, CanonicalMetricDataPoint>();
+    const unique = new Map<string, MetricRollupSourcePoint>();
 
+    const retentionMs = retentionDays * 24 * 60 * 60 * 1000;
+    // A retention window shorter than the near pass would make that pass read
+    // past the edge of retention, so the near pass never reaches further than
+    // retention does and the far pass has nothing left to cover.
+    const nearMs = Math.min(PREDECESSOR_LOOKBACK_MS, retentionMs);
+
+    await this.readAffectedBuckets({
+      client,
+      tenantId,
+      seeks,
+      unique,
+      predecessor: { fromMs: nearMs, toMs: 0 },
+      shouldReadBucketRows: true,
+    });
+
+    const unresolved =
+      nearMs >= retentionMs
+        ? []
+        : seeksWithoutPredecessor({
+            seeks,
+            points: unique.values(),
+            lookbackMs: nearMs,
+          });
+    if (unresolved.length > 0) {
+      await this.readAffectedBuckets({
+        client,
+        tenantId,
+        seeks: unresolved,
+        unique,
+        predecessor: { fromMs: retentionMs, toMs: nearMs },
+        shouldReadBucketRows: false,
+      });
+    }
+
+    for (const point of unique.values()) {
+      const existing = found.get(point.seriesId);
+      if (existing) existing.push(point);
+      else found.set(point.seriesId, [point]);
+    }
+    return found;
+  }
+
+  /**
+   * One pass of the affected-bucket read, collecting into `unique`.
+   *
+   * `predecessor` is the half-open window behind each bucket start the reverse
+   * seek may look in, as distances rather than instants so both bounds stay
+   * shared scalars however many buckets the chunk holds. `shouldReadBucketRows` is
+   * off for a pass that only widens the predecessor search: those buckets'
+   * own rows are already in hand, and re-reading them would double the
+   * statement to return what it just returned.
+   */
+  private async readAffectedBuckets({
+    client,
+    tenantId,
+    seeks,
+    unique,
+    predecessor,
+    shouldReadBucketRows,
+  }: {
+    client: Awaited<ReturnType<ClickHouseClientResolver>>;
+    tenantId: string;
+    seeks: readonly { seriesId: string; start: number }[];
+    unique: Map<string, MetricRollupSourcePoint>;
+    predecessor: { fromMs: number; toMs: number };
+    shouldReadBucketRows: boolean;
+  }): Promise<void> {
     // Half the cap, and the divisor is a size bound rather than a
     // statement-count one: the successor read emits one statement whatever its
     // chunk holds, so there is no statement ceiling left here to match. What
@@ -811,35 +944,39 @@ export class MetricDataPointClickHouseRepository
     // characters of `param_*` entries - inside the client's own 4096-character
     // ceiling on them, where 64 buckets would be half as far outside it again.
     for (const chunk of chunked(seeks, Math.floor(SEEKS_PER_QUERY / 2))) {
-      // Two shared scalars replace the per-seek end and cutoff bounds: both
-      // were derived from the bucket start, so the server can derive them too
-      // and the parameter fan-out halves without the statement changing shape.
+      // Shared scalars replace the per-seek end and cutoff bounds: all were
+      // derived from the bucket start, so the server can derive them too and
+      // the parameter fan-out stays at two per bucket whatever the chunk holds.
       const params: Record<string, unknown> = {
         tenantId,
         bucketMs: METRIC_ROLLUP_INTERVAL_MS,
-        retentionMs: retentionDays * 24 * 60 * 60 * 1000,
+        lookbackFromMs: predecessor.fromMs,
+        lookbackToMs: predecessor.toMs,
       };
       const selects = chunk.flatMap(({ seriesId, start }, index) => {
         params[`series${index}`] = seriesId;
         params[`from${index}`] = start;
         // Both branches keep a seek per bucket rather than folding into one
         // joined statement the way the successor read does. The predecessor
-        // branch is why: its lower bound is the retention window, and a join
-        // can only apply a per-seek bound after the rows are read, so the
-        // single-row reverse index seek would become a read of every point in
-        // the series across that whole window — the memory class #6493 fixed.
+        // branch is why: its bounds are per-seek, and a join can only apply
+        // those after the rows are read, so the single-row reverse index seek
+        // would become a read of every point in the series across the whole
+        // window - the memory class #6493 fixed.
         // The successor read folds safely because every bound there is the
-        // chunk's own span. AUTHORITATIVE_SELECT is everything the fold reads
-        // without the payload column, which is what made these FINAL reads
-        // memory-heavy.
-        return [
-          `(SELECT ${AUTHORITATIVE_SELECT}
+        // chunk's own span. ROLLUP_SELECT is exactly what the fold reads and
+        // nothing else: FINAL materialises every selected column for every row
+        // a granule covers, so a column the fold ignores is decompressed
+        // millions of times to be discarded.
+        const predecessorSeek = `(SELECT ${ROLLUP_SELECT}
             FROM metric_data_points FINAL
             WHERE TenantId = {tenantId:String} AND SeriesId = {series${index}:String}
-              AND metric_data_points.TimeUnixMs < fromUnixTimestamp64Milli({from${index}:Int64})
-              AND metric_data_points.TimeUnixMs >= fromUnixTimestamp64Milli({from${index}:Int64} - {retentionMs:Int64})
-            ORDER BY metric_data_points.TimeUnixMs DESC, TimeUnixNano DESC, PointId DESC LIMIT 1)`,
-          `(SELECT ${AUTHORITATIVE_SELECT}
+              AND metric_data_points.TimeUnixMs < fromUnixTimestamp64Milli({from${index}:Int64} - {lookbackToMs:Int64})
+              AND metric_data_points.TimeUnixMs >= fromUnixTimestamp64Milli({from${index}:Int64} - {lookbackFromMs:Int64})
+            ORDER BY metric_data_points.TimeUnixMs DESC, TimeUnixNano DESC, PointId DESC LIMIT 1)`;
+        if (!shouldReadBucketRows) return [predecessorSeek];
+        return [
+          predecessorSeek,
+          `(SELECT ${ROLLUP_SELECT}
             FROM metric_data_points FINAL
             WHERE TenantId = {tenantId:String} AND SeriesId = {series${index}:String}
               AND metric_data_points.TimeUnixMs >= fromUnixTimestamp64Milli({from${index}:Int64})
@@ -852,21 +989,9 @@ export class MetricDataPointClickHouseRepository
         query_params: params,
         format: "JSONEachRow",
       });
-      for (const row of await result.json<
-        Omit<RawMetricRow, "CanonicalPayload">
-      >()) {
-        unique.set(
-          `${row.SeriesId}\u0000${row.PointId}`,
-          fromRaw({ row, organizationId }),
-        );
+      for (const row of await result.json<RollupSourceRow>()) {
+        unique.set(`${row.SeriesId}\u0000${row.PointId}`, fromRollupRow(row));
       }
     }
-
-    for (const point of unique.values()) {
-      const existing = found.get(point.seriesId);
-      if (existing) existing.push(point);
-      else found.set(point.seriesId, [point]);
-    }
-    return found;
   }
 }

@@ -123,3 +123,11 @@ Feature: The previous configurations of a scope, read back from the runs
     Given a run plan whose runs carried no note
     When the list of previous configurations is read
     Then the entry says no note was used
+
+  @integration
+  Scenario: A configuration restores the parameters of each target
+    Given a plan run against "prod-agent" and against "prod-agent" with the override "model=gpt-5-mini"
+    When the configurations of that scope are read
+    Then one configuration is listed
+    And it names both targets, the variant carrying the override "model=gpt-5-mini"
+    And its run parameters hold the run-level values without the override

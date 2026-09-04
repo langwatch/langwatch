@@ -5,6 +5,7 @@ import {
 import type {
   SimulationMessageSnapshotEvent,
   SimulationProcessingEvent,
+  SimulationRunAgentInstanceRecordedEvent,
   SimulationRunCancelRequestedEvent,
   SimulationRunDeletedEvent,
   SimulationRunFinishedEvent,
@@ -56,6 +57,12 @@ export function isSimulationRunMetricsComputedEvent(
   event: SimulationProcessingEvent,
 ): event is SimulationRunMetricsComputedEvent {
   return event.type === SIMULATION_RUN_EVENT_TYPES.METRICS_COMPUTED;
+}
+
+export function isSimulationRunAgentInstanceRecordedEvent(
+  event: SimulationProcessingEvent,
+): event is SimulationRunAgentInstanceRecordedEvent {
+  return event.type === SIMULATION_RUN_EVENT_TYPES.AGENT_INSTANCE_RECORDED;
 }
 
 export function isSimulationRunCancelRequestedEvent(

@@ -2,7 +2,7 @@
  * The run plans of the open project, read from the two places a plan lives:
  * the stored run plans, and the external sets a code run writes into.
  *
- * A test suite is a folder of scenarios, so it is never a row of the Test Runs
+ * A test suite is a group of scenarios, so it is never a row of the Test Runs
  * list. Its rows are read all the same, because a plan whose scope names test
  * suites reads them by name.
  *
@@ -13,7 +13,7 @@ import { useMemo } from "react";
 import type { Period } from "~/components/PeriodSelector";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { buildRunPlans, type RunPlan } from "./run-plans";
+import { buildRunPlans, type RunPlan, toRunPlanSuites } from "./run-plans";
 
 export type UseRunPlansResult = {
   plans: RunPlan[];
@@ -32,11 +32,11 @@ export function useRunPlans({ period }: { period: Period }): UseRunPlansResult {
   const startDate = period.startDate.getTime();
   const endDate = period.endDate.getTime();
 
-  // Both kinds: the custom rows are the plans, and the folders are read only
+  // Both kinds: the run plan rows are the plans, and the test suites are read only
   // for the names a plan's scope may point at.
   const { data: suites, isLoading: isSuitesLoading } =
     api.suites.getAll.useQuery(
-      { projectId, kinds: ["custom", "folder"] },
+      { projectId, kinds: ["run_plan", "test_suite"] },
       { enabled: !!project },
     );
 
@@ -51,10 +51,7 @@ export function useRunPlans({ period }: { period: Period }): UseRunPlansResult {
       { enabled: !!project },
     );
 
-  const storedPlans = useMemo(
-    () => (suites ?? []).filter((suite) => suite.kind !== "folder"),
-    [suites],
-  );
+  const storedPlans = useMemo(() => toRunPlanSuites(suites ?? []), [suites]);
 
   const plans = useMemo(
     () =>

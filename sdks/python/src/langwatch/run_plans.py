@@ -1,7 +1,7 @@
 """
 API facade for run plans, the named configurations agent test runs execute under.
 
-A run plan is a name plus a configuration: the scope of cases to run, the
+A run plan is a name plus a configuration: the scope of scenarios to run, the
 targets to run them against, the repeat count and the two simulation models.
 The name is the identity, so running under the name of an existing plan
 replaces that plan's configuration and running under a new name creates one.
@@ -52,7 +52,7 @@ class RunPlansFacade:
         targets: List[Dict[str, Any]],
         name: Optional[str] = None,
         scope: str = "all",
-        folder_ids: Optional[List[str]] = None,
+        test_suite_ids: Optional[List[str]] = None,
         labels: Optional[List[str]] = None,
         scenario_ids: Optional[List[str]] = None,
         repeat_count: Optional[int] = None,
@@ -65,22 +65,23 @@ class RunPlansFacade:
         """Start a run, creating or replacing the plan the name resolves to.
 
         Args:
-            targets: What to run the cases against, as
+            targets: What to run the scenarios against, as
                 ``{"type": "prompt"|"http"|"code"|"workflow", "referenceId": ...}``.
             name: The plan's name. A name already in use replaces that plan's
                 configuration; a new one creates a plan. Left out, the platform
                 names the plan itself.
-            scope: What the plan covers: ``all``, ``folders``, ``labels`` or
-                ``cases``. Every mode but ``all`` needs its own list.
-            folder_ids: The test suites to run, for ``scope="folders"``.
-            labels: The labels the cases carry, for ``scope="labels"``.
-            scenario_ids: The cases to run, for ``scope="cases"``.
-            repeat_count: How many times to run each case, 1 to 5.
+            scope: What the plan covers: ``all``, ``test_suites``, ``labels``
+                or ``scenarios``. Every mode but ``all`` needs its own list.
+            test_suite_ids: The test suites to run, for
+                ``scope="test_suites"``.
+            labels: The labels the scenarios carry, for ``scope="labels"``.
+            scenario_ids: The scenarios to run, for ``scope="scenarios"``.
+            repeat_count: How many times to run each scenario, 1 to 5.
             simulator_model: The model that plays the user.
             judge_model: The model that grades the run.
-            parameters: Constants applied to every case in the run, e.g.
-                ``{"account_tier": "gold"}``. A value here overrides the case's
-                own default for that name.
+            parameters: Constants applied to every scenario in the run, e.g.
+                ``{"account_tier": "gold"}``. A value here overrides the
+                scenario's own default for that name.
             note: One short line saying why this ran, up to 200 characters.
             idempotency_key: Repeat it to make a retry join the first run
                 rather than start a second one.
@@ -92,7 +93,7 @@ class RunPlansFacade:
         config: Dict[str, Any] = {
             "scope": build_scope(
                 scope,
-                folder_ids=folder_ids,
+                test_suite_ids=test_suite_ids,
                 labels=labels,
                 scenario_ids=scenario_ids,
             ),
@@ -132,7 +133,7 @@ class RunPlansFacade:
 
         Args:
             run_plan_id: The plan to run.
-            parameters: Constants applied to every case in this run.
+            parameters: Constants applied to every scenario in this run.
             note: One short line saying why this ran, up to 200 characters.
             idempotency_key: Repeat it to make a retry join the first run.
 

@@ -1,7 +1,7 @@
 Feature: Scenario Editor
   As a LangWatch user
   I want to create and edit scenario specifications
-  So that I can define behavioral test cases for my agents
+  So that I can define behavioral scenarios for my agents
 
   Background:
     Given I am logged into project "my-project"

@@ -72,6 +72,75 @@ Feature: Agent dev tunnel
     Then that agent shows a local tunnel badge
     And agents without the marker show no badge
 
+  # Session resilience: the session must never strand the agent pointing at a
+  # dead tunnel. Signals, crashes and tunnel failures all restore the previous
+  # URL, and a health monitor watches the tunnel while the session runs.
+
+  Scenario: A hangup signal restores the previous URL like an interrupt
+    Given a dev tunnel session that repointed the agent
+    When the terminal sends a hangup signal
+    Then the agent URL is restored to the previous URL
+    And the session exits cleanly
+
+  Scenario: A crash inside the session restores best-effort and exits nonzero
+    Given a dev tunnel session that repointed the agent
+    When an unexpected error crashes the session
+    Then the session tries to restore the previous URL
+    And the session exits with a nonzero code
+
+  Scenario: A second shutdown during restore does not restore twice
+    Given a dev tunnel session whose restore is in flight
+    When a second shutdown arrives
+    Then the agent is restored exactly once
+    And both shutdowns finish
+
+  Scenario: A tunnel error ends the session like a tunnel exit
+    Given a dev tunnel session that repointed the agent
+    When the tunnel reports an error
+    Then the agent URL is restored to the previous URL
+    And the session ends with a nonzero code
+
+  Scenario: An unhealthy tunnel is re-provisioned in place
+    Given a dev tunnel session whose tunnel stops answering
+    When the health check fails three times in a row
+    Then a replacement tunnel is provisioned
+    And the agent is pointed at the replacement tunnel URL
+
+  Scenario: A probe that never answers does not stop the health monitor
+    Given a dev tunnel session whose tunnel accepts the probe and never answers
+    When the probe passes its own timeout
+    Then the probe counts as a failure
+    And the health monitor keeps running and provisions a replacement tunnel
+
+  Scenario: A failed re-provision restores the agent and ends the session
+    Given a dev tunnel session whose tunnel stops answering
+    When provisioning a replacement tunnel fails
+    Then the agent URL is restored to the previous URL
+    And the session ends with a nonzero code
+
+  Scenario: A bring-your-own tunnel only warns when unhealthy
+    Given a dev tunnel session running over a caller-supplied tunnel URL
+    When the health check fails three times in a row
+    Then the session warns that the tunnel stopped answering
+    And no replacement tunnel is provisioned
+
+  Scenario: A bring-your-own tunnel session stays up instead of exiting at once
+    Given a dev tunnel session running over a caller-supplied tunnel URL
+    When the session has repointed the agent and printed its banner
+    Then the command keeps running until a signal ends it
+    And the agent URL is restored to the previous URL when it does
+
+  Scenario: A stale stash from a crashed session is restored before a new tunnel
+    Given an agent still carrying a dead tunnel URL from a crashed session
+    When a new dev tunnel session starts
+    Then the agent is first restored to the original URL
+    And only then pointed at the fresh tunnel
+
+  Scenario: Healthy checks refresh the tunnel heartbeat
+    Given a dev tunnel session that repointed the agent
+    When a health check finds the tunnel healthy
+    Then the tunnel marker's heartbeat time is refreshed
+
   # `--agent` is optional: the session reuses the agent remembered for the
   # directory, auto-picks a lone HTTP agent, and offers an interactive picker
   # over several. The scenarios below pin the edges of that selection.

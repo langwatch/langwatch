@@ -493,10 +493,15 @@ const esFoldRefoldTotal = new Counter({
  * `declined` — the projection set `refoldOnOutOfOrder: false`, so the batch was
  * applied on top instead (the events are never lost; only the replay is skipped).
  * `unavailable` — no eventLoader was wired, so a re-fold was impossible.
+ * `incomplete` — the history read did not account for the state's applied
+ * events even after retries (replica read lag), so the replay was abandoned
+ * and the batch applied on top of the loaded state instead. Counted in
+ * addition to `performed` (the attempt); a sustained rate means the event
+ * log replica lags further than the re-fold retries wait.
  */
 export const incrementEsFoldRefoldTotal = (
   projectionName: string,
-  outcome: "performed" | "declined" | "unavailable",
+  outcome: "performed" | "declined" | "unavailable" | "incomplete",
 ) => esFoldRefoldTotal.labels(projectionName, outcome).inc();
 
 register.removeSingleMetric("es_fold_refold_on_miss_total");

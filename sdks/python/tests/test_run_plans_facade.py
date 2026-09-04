@@ -107,15 +107,19 @@ def test_run_defaults_to_the_all_scope():
     assert (calls[0][2] or {})["config"]["scope"] == {"mode": "all"}
 
 
-# @scenario "A folder scope carries the folder ids the caller named"
-def test_run_with_a_folder_scope_carries_the_folder_ids():
+# @scenario "A test suite scope carries the test suite ids the caller named"
+def test_run_with_a_test_suite_scope_carries_the_test_suite_ids():
     facade, calls = recorder()
 
-    facade.run(targets=[TARGET], scope="folders", folder_ids=["fold_1", "fold_2"])
+    facade.run(
+        targets=[TARGET],
+        scope="test_suites",
+        test_suite_ids=["suite_1", "suite_2"],
+    )
 
     assert (calls[0][2] or {})["config"]["scope"] == {
-        "mode": "folders",
-        "folderIds": ["fold_1", "fold_2"],
+        "mode": "test_suites",
+        "testSuiteIds": ["suite_1", "suite_2"],
     }
 
 
@@ -131,16 +135,18 @@ def test_run_with_a_label_scope_carries_the_labels():
     }
 
 
-# @scenario "A hand-picked scope carries the case ids as the configuration's scenario ids"
-def test_run_with_a_cases_scope_sends_the_ids_beside_the_scope():
+# @scenario "A hand-picked scope carries the scenario ids beside the mode"
+def test_run_with_a_scenarios_scope_sends_the_ids_beside_the_scope():
     facade, calls = recorder()
 
     facade.run(
-        targets=[TARGET], scope="cases", scenario_ids=["scenario_1", "scenario_2"]
+        targets=[TARGET],
+        scope="scenarios",
+        scenario_ids=["scenario_1", "scenario_2"],
     )
 
     config = (calls[0][2] or {})["config"]
-    assert config["scope"] == {"mode": "cases"}
+    assert config["scope"] == {"mode": "scenarios"}
     assert config["scenarioIds"] == ["scenario_1", "scenario_2"]
 
 
@@ -171,12 +177,12 @@ def test_run_sends_parameters_note_and_idempotency_key_outside_the_config():
     assert set(body["config"]) == {"scope", "targets"}
 
 
-# @scenario "A folder scope with no folder ids is refused before the request"
-def test_a_folder_scope_without_folder_ids_is_refused_locally():
+# @scenario "A test suite scope with no test suite ids is refused before the request"
+def test_a_test_suite_scope_without_test_suite_ids_is_refused_locally():
     facade, calls = recorder()
 
-    with pytest.raises(ValueError, match="folder_ids"):
-        facade.run(targets=[TARGET], scope="folders")
+    with pytest.raises(ValueError, match="test_suite_ids"):
+        facade.run(targets=[TARGET], scope="test_suites")
 
     assert calls == []
 
@@ -191,12 +197,12 @@ def test_a_label_scope_without_labels_is_refused_locally():
     assert calls == []
 
 
-# @scenario "A hand-picked scope with no case ids is refused before the request"
-def test_a_cases_scope_without_scenario_ids_is_refused_locally():
+# @scenario "A hand-picked scope with no scenario ids is refused before the request"
+def test_a_scenarios_scope_without_scenario_ids_is_refused_locally():
     facade, calls = recorder()
 
     with pytest.raises(ValueError, match="scenario_ids"):
-        facade.run(targets=[TARGET], scope="cases")
+        facade.run(targets=[TARGET], scope="scenarios")
 
     assert calls == []
 
@@ -205,7 +211,7 @@ def test_a_cases_scope_without_scenario_ids_is_refused_locally():
 def test_an_unknown_scope_mode_is_refused_locally():
     facade, calls = recorder()
 
-    with pytest.raises(ValueError, match="all, folders, labels, cases"):
+    with pytest.raises(ValueError, match="all, test_suites, labels, scenarios"):
         facade.run(targets=[TARGET], scope="everything")
 
     assert calls == []

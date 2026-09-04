@@ -95,7 +95,11 @@ interface ExchangeSuccess {
   refresh_token: string;
   personal_project?: { id: string; api_key: string };
   cli_api_key?: string;
-  cli_api_key_scope?: { kind: string; project_ids: string[] };
+  cli_api_key_scope?: {
+    kind: string;
+    project_ids: string[];
+    permissions?: string[];
+  };
 }
 
 async function mintDeviceCode(): Promise<{
@@ -424,7 +428,18 @@ describe("CLI login user-scoped key, given a device-session flow", () => {
       expect(result.cli_api_key_scope).toEqual({
         kind: "organization",
         project_ids: [],
+        permissions: [...defaultCliKeyPermissions()].sort(),
       });
+    });
+
+    /** @scenario "the exchange reports the permissions the key was minted with" */
+    it("reports the minted permissions so whoami can print the grain", async () => {
+      const key = await mintedKeyFor({
+        userId: ADMIN_ID,
+        deviceLabel: HOSTNAME,
+      });
+      const permissions = await keyPermissions(key!.id);
+      expect(result.cli_api_key_scope!.permissions).toEqual(permissions);
     });
 
     /** @scenario "the organization-management permissions are off by default" */
@@ -504,6 +519,7 @@ describe("CLI login user-scoped key, given a device-session flow", () => {
       expect(result.cli_api_key_scope).toEqual({
         kind: "projects",
         project_ids: [PROJECT_A_ID],
+        permissions: ["traces:view"],
       });
     });
   });

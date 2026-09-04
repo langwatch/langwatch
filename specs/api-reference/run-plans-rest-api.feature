@@ -76,6 +76,17 @@ Feature: The run plans REST API
     Then the response is 422 with the code suite_targets_required
     And nothing is scheduled
 
+  Scenario: A run plan model that is not a provider/model id is refused
+    Given the project holds one scenario and one agent
+    When I run a configuration whose simulator model is "latest"
+    Then the response is 422 with the code validation_error
+    And a reason names the field config.simulatorModel
+    And nothing is scheduled
+    # A model id needs its provider prefix, for example openai/gpt-5-mini. A
+    # virtual alias such as openai/latest has the same shape and is accepted,
+    # and the run expands it at execution time. See
+    # specs/scenarios/simulation-run-model-resolution.feature.
+
   Scenario: Running a stored run plan again runs the configuration it holds
     Given the project holds a run plan over one scenario and one agent
     When I run that run plan by its id

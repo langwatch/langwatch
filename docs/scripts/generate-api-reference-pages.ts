@@ -29,7 +29,7 @@ interface EndpointGroup {
   /**
    * `METHOD /path` keys, in the order a reader should meet them.
    *
-   * The default sort is CRUD-shaped — list, create, get, update, delete — which
+   * The default sort is CRUD-shaped (list, create, get, update, delete), which
    * is right for a resource but wrong for a family that is a sequence of steps.
    * A group whose overview describes a lifecycle sets this so the sidebar and
    * the prose agree; anything the list omits falls in behind, still sorted the
@@ -77,8 +77,8 @@ const UNDOCUMENTED_CALLER_IDENTITY =
 const UNDOCUMENTED_MODEL_DEFAULTS =
   "Not yet documented in the API reference: the default-model cascade routes have no reference pages yet.";
 
-const UNDOCUMENTED_LWQL_ANALYTICS_SQL =
-  "Not yet documented in the API reference: the LangWatchQL analytics SQL routes require the analytics:view permission and have no reference pages yet.";
+const UNDOCUMENTED_SAVED_WORKBENCH_CHARTS =
+  "Not yet documented in the API reference: the saved workbench chart routes require the analytics:view permission and have no reference pages yet.";
 
 /**
  * Spec paths that deliberately get no reference page, each with the reason it
@@ -86,7 +86,7 @@ const UNDOCUMENTED_LWQL_ANALYTICS_SQL =
  * entry, and the generator fails when one is owned by neither.
  */
 const SKIP_PATHS: Record<string, string> = {
-  "/": "Not an API route: the prompts app serves the spec's root path, so there is nothing to document.",
+  "/": "Not an API route: the prompts app serves the spec's root path, which has no content to document.",
   "/api/trace/search":
     "Retired surface, intentionally undocumented: superseded by /api/traces/search.",
   "/api/trace/{id}":
@@ -103,16 +103,12 @@ const SKIP_PATHS: Record<string, string> = {
   "/api/me/usage": UNDOCUMENTED_CALLER_IDENTITY,
   "/api/model-defaults": UNDOCUMENTED_MODEL_DEFAULTS,
   "/api/model-defaults/{id}": UNDOCUMENTED_MODEL_DEFAULTS,
-  "/api/v1/projects/{projectId}/analytics/query/clickhouse":
-    UNDOCUMENTED_LWQL_ANALYTICS_SQL,
-  "/api/v1/projects/{projectId}/analytics/schema":
-    UNDOCUMENTED_LWQL_ANALYTICS_SQL,
   "/api/v1/projects/{projectId}/analytics/charts":
-    UNDOCUMENTED_LWQL_ANALYTICS_SQL,
+    UNDOCUMENTED_SAVED_WORKBENCH_CHARTS,
   "/api/v1/projects/{projectId}/analytics/charts/{chartId}":
-    UNDOCUMENTED_LWQL_ANALYTICS_SQL,
+    UNDOCUMENTED_SAVED_WORKBENCH_CHARTS,
   "/api/v1/projects/{projectId}/analytics/charts/{chartId}/placement":
-    UNDOCUMENTED_LWQL_ANALYTICS_SQL,
+    UNDOCUMENTED_SAVED_WORKBENCH_CHARTS,
 };
 
 const ENDPOINT_GROUPS: EndpointGroup[] = [
@@ -229,26 +225,26 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
     dirName: "test-suites",
     pathPrefixes: ["/api/v1/test-suites"],
     overviewDescription:
-      "Organise agent tests. A test suite is a folder of scenarios; the targets a run goes against are sent with the run. Create, read, rename, archive and run test suites.",
+      "Organise agent tests. A test suite groups scenarios; the targets a run goes against are sent with the run. Create, read, rename, archive and run test suites.",
   },
   {
     name: "Suites",
     dirName: "suites",
     pathPrefixes: ["/api/suites"],
     overviewDescription:
-      "Manage test suites (run plans) that group scenarios for batch execution. Create, update, duplicate, and trigger suite runs. Deprecated: this family is a frozen alias. New integrations use Run Plans (/api/v1/run-plans) and Test Suites (/api/v1/test-suites).",
+      "Deprecated. The /api/suites family is a frozen alias. New integrations use Run Plans and Test Suites.",
   },
   {
     name: "Agents",
     dirName: "agents",
-    pathPrefixes: ["/api/agents"],
+    pathPrefixes: ["/api/v1/agents"],
     overviewDescription:
       "Manage AI agent configurations. Create, update, and organize agents that are tracked and evaluated in LangWatch.",
   },
   {
     name: "Coding Agents",
     dirName: "coding-agents",
-    pathPrefixes: ["/api/coding-agent"],
+    pathPrefixes: ["/api/v1/coding-agent", "/api/coding-agent"],
     overviewDescription:
       "Read what a coding agent session did and what it cost. Walk one session's events call by call, with the tokens, cost and compactions of each, or roll a whole pull request up into sessions, tokens and cost per project, user and agent.",
   },
@@ -298,6 +294,13 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
     pathPrefixes: ["/api/analytics"],
     overviewDescription:
       "Query analytics timeseries data with metrics, aggregations, and filters.",
+  },
+  {
+    name: "Query",
+    dirName: "query",
+    pathPrefixes: ["/api/v1/query"],
+    overviewDescription:
+      "Run a read-only LangWatchQL SELECT over your project's analytics datasets, or discover which datasets and columns your key can query.",
   },
   {
     name: "Secrets",
@@ -643,7 +646,7 @@ function main() {
   const owners = resolveOwners(Object.keys(spec.paths));
 
   // A hand-written page is named as a string, so a rename or a typo would drop
-  // it out of the sidebar silently — the same failure this generator exists to
+  // it out of the sidebar silently: the same failure this generator exists to
   // prevent. Check every one of them against the filesystem up front.
   const declaredExtras = [
     ...INTRO_GROUP.pages,
@@ -744,7 +747,7 @@ function main() {
         ? "key names an operation"
         : "keys name operations";
     console.error(
-      `ERROR: ${misownedOrder.length} endpointOrder ${noun} the declaring group does not own, so the key sorts nothing:`,
+      `ERROR: ${misownedOrder.length} endpointOrder ${noun} the declaring group does not own, so the key sorts no entries:`,
     );
     for (const entry of misownedOrder.sort()) console.error(`  ${entry}`);
     console.error(

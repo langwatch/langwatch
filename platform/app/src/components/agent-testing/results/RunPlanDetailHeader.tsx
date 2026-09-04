@@ -223,8 +223,6 @@ function HeaderActions({
           colorPalette="blue"
           height="32px"
           minHeight="32px"
-          background={undefined}
-          borderColor="transparent"
           onClick={onRunPlan}
           data-testid="run-plan-button"
         >

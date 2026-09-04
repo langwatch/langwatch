@@ -1,6 +1,6 @@
 {
   "name": "langwatch",
-  "version": "1.10.0",
+  "version": "1.12.0",
   "description": "LangWatch TypeScript/JavaScript SDK. Interact with the full LangWatch API and use the LangWatch OpenTelemetry SDK to instrument your application. For more information, see https://docs.langwatch.ai/integration/typescript/guide",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -43,6 +43,11 @@
       "types": "./dist/observability-sdk/instrumentation/langchain/index.d.ts",
       "require": "./dist/observability-sdk/instrumentation/langchain/index.js",
       "import": "./dist/observability-sdk/instrumentation/langchain/index.mjs"
+    },
+    "./agent": {
+      "types": "./dist/agent/index.d.ts",
+      "require": "./dist/agent/index.js",
+      "import": "./dist/agent/index.mjs"
     }
   },
   "repository": {
@@ -85,6 +90,7 @@
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^26.2.0",
     "@types/prompts": "^2.4.9",
+    "@types/ws": "^8.18.1",
     "@vercel/otel": "^1.13.0",
     "@vitest/coverage-v8": "^4.1.0",
     "dotenv-cli": "^11.0.0",
@@ -128,6 +134,7 @@
     "openapi-fetch": "^0.17.0",
     "ora": "^9.3.0",
     "prompts": "^2.4.2",
+    "ws": "^8.21.0",
     "xksuid": "^0.0.4",
     "zod": "^4.0.14"
   },

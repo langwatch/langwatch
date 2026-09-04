@@ -31,7 +31,7 @@ Feature: The run note travels in the run metadata
 
   @integration
   Scenario: Every run of a batch carries the note stamped at queue time
-    Given a run plan with three test cases and two targets
+    Given a run plan with three scenarios and two targets
     When the plan is run with a note
     Then all six queued runs carry the same note
     And the note is present before any run finishes

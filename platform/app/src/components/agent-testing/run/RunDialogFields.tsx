@@ -10,13 +10,17 @@
  */
 
 import { Box, VStack } from "@chakra-ui/react";
+import { useEffect, useRef } from "react";
 import { HandledErrorAlert } from "~/features/errors";
 import { CustomizeChips } from "../shared/CustomizeChips";
+import { FieldLabel } from "../shared/DialogFields";
+import { CompareAgentsSection } from "./CompareAgentsSection";
 import { MissingProviderNotice } from "./MissingProviderNotice";
+import { OfflineTargetsNotice } from "./OfflineTargetsNotice";
+import { ParameterRowsEditor } from "./ParameterRowsEditor";
 import { RunNameField } from "./RunNameField";
 import { RunNoteField } from "./RunNoteField";
 import {
-  CompareTargetsSection,
   RepeatCountSection,
   SimulationModelsSection,
 } from "./RunOptionSections";
@@ -60,7 +64,9 @@ function AddedBlocks({
         />
       )}
 
-      {form.showParams && <RunParametersSection form={form} isBusy={isBusy} />}
+      {form.showParams && !form.showCompare && (
+        <RunParametersSection form={form} isBusy={isBusy} />
+      )}
 
       {form.showNote && (
         <RunNoteField
@@ -76,16 +82,91 @@ function AddedBlocks({
   );
 }
 
-/** What the dialog says when the run cannot start, or did not. */
+/**
+ * The targets of a comparison, and under them the secrets the scope declares:
+ * a secret is run-level, so one block serves every target.
+ *
+ * The block stands even while it holds nothing. A comparison replaces the
+ * parameter section, so its "Add secret parameter" control is the only way
+ * into an ad hoc secret, and hiding the block on an empty one would make a
+ * person leave the comparison to type a secret.
+ */
+function ComparisonBlocks({
+  form,
+  isBusy,
+}: {
+  form: RunDialogForm;
+  isBusy: boolean;
+}) {
+  return (
+    <>
+      <CompareAgentsSection
+        rows={form.compareRows}
+        agents={form.scenarioAgents}
+        onChangeRow={form.updateCompareRow}
+        onAddRow={form.addCompareRow}
+        canAddRow={form.canAddCompareRow}
+        onRemoveRow={form.removeCompareRow}
+        onRemove={form.removeComparison}
+        hasDuplicates={form.hasDuplicateCompareRows}
+        defaults={form.parameterDefaults}
+        definitions={form.parameterDefinitions}
+        declaredParametersOf={form.declaredParametersOf}
+        parameterError={form.parameterError}
+        isBusy={isBusy}
+      />
+      <VStack align="stretch" gap={0} data-testid="run-dialog-compare-secrets">
+        <FieldLabel>Secret parameters</FieldLabel>
+        <ParameterRowsEditor
+          rows={form.parameterRows}
+          onChangeRow={form.updateParameterRow}
+          onAddRow={form.addSecretParameterRow}
+          onRemoveRow={form.removeParameterRow}
+          declaredSecrets={form.secretDefinitions}
+          secretValues={form.secretValues}
+          onChangeSecretValue={form.setSecretValue}
+          definitions={form.parameterDefinitions}
+          disabled={isBusy}
+          secretOnly
+        />
+      </VStack>
+    </>
+  );
+}
+
+/**
+ * What the dialog says when the run cannot start, or did not.
+ *
+ * The alert stands at the foot of a body that scrolls, so a refusal on a
+ * dialog with several blocks open lands out of view and the run reads as one
+ * that did nothing at all. It is brought into view the moment it appears.
+ */
 function RunDialogNotices({ form }: { form: RunDialogForm }) {
+  const alert = useRef<HTMLDivElement>(null);
+  const { inlineError } = form;
+
+  useEffect(() => {
+    if (inlineError == null) return;
+    alert.current?.scrollIntoView?.({ block: "nearest" });
+  }, [inlineError]);
+
   return (
     <>
       {form.missingProvider && <MissingProviderNotice />}
 
-      {form.inlineError != null && (
-        <Box data-testid="run-dialog-error">
+      <OfflineTargetsNotice
+        agents={form.scenarioAgents}
+        targets={
+          form.showCompare
+            ? form.compareRows.map((row) => row.target)
+            : [form.target]
+        }
+      />
+
+      {inlineError != null && (
+        <Box ref={alert} data-testid="run-dialog-error">
           <HandledErrorAlert
-            error={form.inlineError}
+            error={inlineError}
             fallbackTitle="Couldn't start the run"
           />
         </Box>
@@ -115,33 +196,24 @@ export function RunDialogFields({
         isBusy={isBusy}
       />
 
-      <TargetSection
-        mode={form.mode}
-        agents={form.scenarioAgents}
-        prompts={form.publishedPrompts}
-        target={form.target}
-        onSelect={form.setTarget}
-        onRemovePromptPicker={form.removePromptPicker}
-        onSetupAgent={form.handleSetupAgent}
-      />
-
-      {form.showCompare && form.mode === "agents" && (
-        <CompareTargetsSection
+      {form.showCompare ? (
+        <ComparisonBlocks form={form} isBusy={isBusy} />
+      ) : (
+        <TargetSection
+          mode={form.mode}
           agents={form.scenarioAgents}
-          primary={form.target}
-          compareTarget={form.compareTarget}
-          onSelect={form.setCompareTarget}
-          onRemove={() => {
-            form.setShowCompare(false);
-            form.setCompareTarget(null);
-          }}
+          prompts={form.publishedPrompts}
+          target={form.target}
+          onSelect={form.setTarget}
+          onRemovePromptPicker={form.removePromptPicker}
+          onSetupAgent={form.handleSetupAgent}
         />
       )}
 
       {form.isScopePicked && (
         <RunScopeSection
           scope={form.scope}
-          folders={form.folders}
+          testSuites={form.testSuites}
           scenarios={form.scopeScenarios}
           onChange={form.setScope}
         />

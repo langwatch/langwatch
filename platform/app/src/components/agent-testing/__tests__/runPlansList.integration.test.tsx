@@ -28,6 +28,7 @@ import {
   type RunPlanSuite,
 } from "../results/run-plans";
 import { PASS_RATE_BAR_OPACITY } from "../shared/pass-rate-color";
+import type { TargetKind } from "../shared/TargetMark";
 
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({ query: {}, push: vi.fn(), isReady: true }),
@@ -50,7 +51,7 @@ function makeSuite(overrides: Partial<RunPlanSuite> = {}): RunPlanSuite {
     slug: "checkout",
     scenarioIds: ["scen_1", "scen_2", "scen_3"],
     labels: [],
-    scope: { mode: "cases" },
+    scope: { mode: "scenarios" },
     ...overrides,
   };
 }
@@ -79,6 +80,7 @@ function makeGroup(overrides: Partial<ResultGroup> = {}): ResultGroup {
     scenarioCount: 3,
     lastRunAt: NOW,
     targetKeys: ["agent_dev"],
+    targetParameters: null,
     trend: [
       { key: "run_1", passRate: 100 },
       { key: "run_2", passRate: 100 },
@@ -93,6 +95,11 @@ const TARGET_NAMES: Record<string, string> = {
   agent_prod: "prod-agent",
 };
 
+const TARGET_KINDS: Record<string, TargetKind> = {
+  agent_dev: "connected",
+  agent_prod: "http",
+};
+
 function renderRows(
   rows: PlanRowModel[],
   overrides: Partial<React.ComponentProps<typeof PlanRowsTable>> = {},
@@ -101,6 +108,7 @@ function renderRows(
     rows,
     days: 30,
     resolveTargetName: (key) => TARGET_NAMES[key] ?? key,
+    resolveTargetKind: (key) => TARGET_KINDS[key] ?? "unknown",
     onSelectPlan: vi.fn(),
     onEditPlan: vi.fn(),
     onArchivePlan: vi.fn(),
@@ -113,24 +121,24 @@ function renderRows(
 /**
  * The run plans of a project, built the way the Results tab builds them.
  *
- * `folders` are the test suites: never rows of the list, but named by a plan
+ * `test suites` are the test suites: never rows of the list, but named by a plan
  * whose scope points at them.
  */
 function plansOf({
   plans = [],
-  folders = [],
+  testSuites = [],
   suiteSummaries = {},
   externalSets = [],
 }: {
   plans?: RunPlanSuite[];
-  folders?: { id: string; name: string }[];
+  testSuites?: { id: string; name: string }[];
   suiteSummaries?: Record<string, SuiteRunSummary>;
   externalSets?: ExternalSetSummary[];
 }): RunPlan[] {
   return buildRunPlans({
     plans,
     suiteNames: new Map(
-      [...plans, ...folders].map((suite) => [suite.id, suite.name]),
+      [...plans, ...testSuites].map((suite) => [suite.id, suite.name]),
     ),
     suiteSummaries,
     externalSets,
@@ -303,10 +311,13 @@ describe("the Test Runs list", () => {
           id: "suite_2",
           name: "Everything nightly",
           slug: "nightly",
-          scope: { mode: "folders", folderIds: ["suite_1", "folder_refunds"] },
+          scope: {
+            mode: "test_suites",
+            testSuiteIds: ["suite_1", "test_suite_refunds"],
+          },
         }),
       ],
-      folders: [{ id: "folder_refunds", name: "Refunds" }],
+      testSuites: [{ id: "test_suite_refunds", name: "Refunds" }],
     });
 
     renderRows(planRowsOf(plans));
@@ -335,7 +346,7 @@ describe("the Test Runs list", () => {
           id: "suite_2",
           name: "Nightly",
           slug: "nightly",
-          scope: { mode: "folders", folderIds: ["folder_refunds"] },
+          scope: { mode: "test_suites", testSuiteIds: ["test_suite_refunds"] },
         }),
         makeSuite({
           id: "suite_3",
@@ -347,10 +358,10 @@ describe("the Test Runs list", () => {
           id: "suite_4",
           name: "Picked",
           slug: "picked",
-          scope: { mode: "cases" },
+          scope: { mode: "scenarios" },
         }),
       ],
-      folders: [{ id: "folder_refunds", name: "Refunds" }],
+      testSuites: [{ id: "test_suite_refunds", name: "Refunds" }],
     });
 
     renderRows(planRowsOf(plans));
@@ -677,7 +688,7 @@ describe("the run plans of a project", () => {
   /** @scenario "The Scope column says what the plan covers" */
   it("reads a hand-picked scope as how many scenarios it holds", () => {
     const plans = plansOf({
-      plans: [makeSuite({ scope: { mode: "cases" } })],
+      plans: [makeSuite({ scope: { mode: "scenarios" } })],
       suiteSummaries: {},
       externalSets: [],
     });

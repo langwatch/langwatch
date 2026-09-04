@@ -1,6 +1,9 @@
 /**
  * The row menu of one test suite in the rail.
  *
+ * The recent runs of the suite hang off it as a submenu, holding the same runs
+ * the button above the table holds, narrowed to the scenarios of this suite.
+ *
  * Every action carries the icon it carries in the scenario row menu, so the
  * same action reads the same way wherever the tab offers it.
  *
@@ -10,18 +13,23 @@
 
 import { Button } from "@chakra-ui/react";
 import { MoreVertical } from "lucide-react";
+import type { Period } from "~/components/PeriodSelector";
 import { Menu } from "~/components/ui/menu";
 import { MenuActionLabel, type MenuActionName } from "./MenuActionLabel";
+import { RecentRunsSubmenu } from "./RecentRunsMenu";
 import type { TestSuiteEntry } from "./test-cases";
 
 export type SuiteRailMenuProps = {
   suite: TestSuiteEntry;
   canManage: boolean;
   hasRun: boolean;
+  /** The window the recent runs of the suite are read over. */
+  period: Period;
+  /** The scenarios filed under the suite, which are what its runs covered. */
+  scenarioIds: string[];
   onNewTestCase: (suiteId: string) => void;
   onRunSuite: (suiteId: string) => void;
   onRenameSuite: (suiteId: string) => void;
-  onOpenLastRun: (suite: TestSuiteEntry) => void;
   onArchiveSuite: () => void;
 };
 
@@ -84,10 +92,11 @@ export function SuiteRailMenu({
   suite,
   canManage,
   hasRun,
+  period,
+  scenarioIds,
   onNewTestCase,
   onRunSuite,
   onRenameSuite,
-  onOpenLastRun,
   onArchiveSuite,
 }: SuiteRailMenuProps) {
   return (
@@ -124,13 +133,7 @@ export function SuiteRailMenu({
           </SuiteMenuItem>
         )}
         {hasRun && (
-          <SuiteMenuItem
-            value="open-last-run"
-            action="openLastRun"
-            onChoose={() => onOpenLastRun(suite)}
-          >
-            Open last run
-          </SuiteMenuItem>
+          <RecentRunsSubmenu period={period} scenarioIds={scenarioIds} />
         )}
         {canManage && (
           <SuiteMenuItem

@@ -10,7 +10,7 @@ import { resolveSuiteId } from "./resolveSuite";
  * Archives a test suite. The scenarios filed in it are archived with it, in
  * one step, because the suite is where they live.
  *
- * @see specs/features/suite-cli.feature
+ * @see specs/features/test-suite-cli.feature
  */
 export const archiveTestSuiteCommand = async (
   reference: string,

@@ -119,7 +119,14 @@ spec:
               value: {{ join "," . | quote }}
             {{- end }}
 
+            # Ceiling on how long a workflow code block may run before nlpgo
+            # kills it. Range-checked inside the helper, which is also what the
+            # app and workers read, so all three carry the same checked number.
+            - name: NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS
+              value: {{ include "langwatch.codeBlockTimeoutSeconds" . | quote }}
+
             {{- with .Values.langwatch_nlp.extraEnvs}}
+            {{- include "langwatch.assertNoReservedTimeoutEnvs" (dict "envs" . "path" "langwatch_nlp.extraEnvs") }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
 
