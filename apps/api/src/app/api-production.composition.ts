@@ -67,6 +67,11 @@ import {
 import { readAgentPresence } from "@langwatch/agent-server";
 import { ApiUpgradeRouter } from "../api-upgrade-router";
 import {
+  composeFeatureFlagFeature,
+  refusingFeatureFlagFeature,
+  type ComposedFeatureFlagFeature,
+} from "../features/feature-flag/feature-flag.composition";
+import {
   composeAnalyticsFeature,
   refusingAnalyticsFeature,
   type ComposedAnalyticsFeature,
@@ -588,6 +593,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    */
   private composedUsageEnforcement: UsageService | undefined;
   private composedAnalytics!: ComposedAnalyticsFeature;
+  private composedFeatureFlag!: ComposedFeatureFlagFeature;
   private composedIdentity: ApiIdentityCollaborators | undefined;
   /**
    * The identity ledgers' event stack, or none.
@@ -851,6 +857,16 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // process's OWN ClickHouse and the second, restricted identity a member's
     // submitted SQL runs as. Both are this composition's to open, so the record
     // below can be satisfied without a host handing them in.
+    // The process's ONE rollout store, composed before every feature that
+    // gates on a flag. Two of them used to exist — the analytics half built one
+    // and the product-group half another — so a rollout had two objects
+    // answering it in a single process.
+    this.composedFeatureFlag = this.composedDatabase?.connection
+      ? composeFeatureFlagFeature({
+          prisma: this.composedDatabase.connection.client,
+          config: options.config.featureFlags,
+        })
+      : refusingFeatureFlagFeature();
     this.composedAnalytics = this.composeAnalytics(options, authz);
     // The person half of the same record: the two signed-out doors, the
     // signed-in person's account and credentials, their organization's
@@ -963,27 +979,23 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       encryption,
     });
     const database = this.composedDatabase?.connection;
-    // Present whenever the record is: the flag store is the product-group
-    // half's, and a process without that half composes no collaborators at all.
-    const featureFlags = this.composedProductGroup?.featureFlagService;
-    const infrastructure =
-      database && featureFlags
-        ? {
-            prisma: database.client,
-            authz,
-            // The SAME plan provider every allowance banner reads, and the
-            // SAME flag store `featureFlag.*` answers from. Both are the
-            // process's, not any one feature's, so a gate and the surface
-            // beside it cannot disagree.
-            plans: this.resolvePlanProvider(options),
-            featureFlags,
-            // One variable, one meaning: `IS_SAAS` is what decides whether
-            // this installation bills through Stripe, read from the one leaf
-            // that already carries it rather than from a second of its own.
-            saasBilling: options.config.infrastructure.modelProvider.isSaas,
-            audit: this.options.audit,
-          }
-        : undefined;
+    const infrastructure = database
+      ? {
+          prisma: database.client,
+          authz,
+          // The SAME plan provider every allowance banner reads, and the SAME
+          // flag store `featureFlag.*` answers from. Both are the process's,
+          // not any one feature's, so a gate and the surface beside it cannot
+          // disagree.
+          plans: this.resolvePlanProvider(options),
+          featureFlags: this.composedFeatureFlag.service,
+          // One variable, one meaning: `IS_SAAS` is what decides whether this
+          // installation bills through Stripe, read from the one leaf that
+          // already carries it rather than from a second of its own.
+          saasBilling: options.config.infrastructure.modelProvider.isSaas,
+          audit: this.options.audit,
+        }
+      : undefined;
     // The AI Gateway, composed HERE rather than inside the record: its
     // application is read by `ctx.app`, by the two public REST families and by
     // the six tRPC namespaces, so the process composes it once and hands each
@@ -1014,6 +1026,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // refusing gateway stands in rather than a second condition here.
       composed: {
         analytics: this.composedAnalytics,
+        featureFlag: this.composedFeatureFlag,
         gateway: this.composedGateway,
         langy: this.composedLangy,
         ops: this.composedOps,
@@ -2393,7 +2406,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     return composeApiLangyRest({
       langy: this.composedLangy.app,
       apiKeys: tenancy.apiKeys,
-      featureFlags: this.composedProductGroup?.featureFlagService,
+      featureFlags: this.composedFeatureFlag.service,
       // The guarded client this process already opened, read through the two
       // fields the actor bridge selects. A second directory would be a second
       // answer to "who owns this key".
@@ -2430,7 +2443,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       apiKeys: tenancy.apiKeys,
       organizations: this.composedIdentity?.application.organizations,
       authz,
-      featureFlags: this.composedProductGroup?.featureFlagService,
+      featureFlags: this.composedFeatureFlag.service,
       publicBaseUrl,
     });
   }
@@ -2452,7 +2465,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       auth: auth?.auth,
       apiKeys: tenancy.apiKeys,
       prisma: this.composedDatabase?.connection.client,
-      featureFlags: this.composedProductGroup?.featureFlagService,
+      featureFlags: this.composedFeatureFlag.service,
     });
   }
 
@@ -2661,7 +2674,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       prisma: database.client,
       authz,
       projects,
-      featureFlags: options.config.featureFlags,
+      featureFlags: this.composedFeatureFlag.service,
       resolveClickHouseClient: this.composedClickHouse?.resolveClient ?? null,
       langWatchQL: options.config.infrastructure.clickhouse.langwatchQl,
       resources: options.resources,
@@ -2829,7 +2842,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       authz,
       organizations,
       projects,
-      featureFlags: options.config.featureFlags,
+      featureFlags: this.composedFeatureFlag.service,
       grants,
       datasets: execution.datasets,
       experimentLookup: execution.experimentLookup,
@@ -3210,13 +3223,13 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   ): ApiOrgGroupCollaborators | undefined {
     const database = this.composedDatabase?.connection;
     const tenancy = this.composedTenancy;
-    const featureFlags = this.composedProductGroup?.featureFlagService;
+    const featureFlags = this.composedFeatureFlag.service;
     const traceGroup = this.composedTraceGroup;
     // The evaluator service the execution half composed, for the monitor
     // directory below: taken rather than built so a monitor's evaluator and
     // the `evaluators.*` surface cannot disagree about what one runs.
     const evaluators = this.composedExecution?.evaluators;
-    if (!database || !tenancy || !featureFlags || !traceGroup || !evaluators) return undefined;
+    if (!database || !tenancy || !traceGroup || !evaluators) return undefined;
 
     return composeApiOrgGroupCollaborators({
       prisma: database.client,

@@ -41,6 +41,7 @@ import { ApiAuditPort } from "../../../api-request.policy";
 import { ApiApplication, MissingAgentService, MissingSecretService } from "../../../api.application";
 import { LWQL_FLAG } from "@langwatch/analytics-server";
 import { composeAnalyticsFeature } from "../analytics.composition";
+import { composeFeatureFlagFeature } from "../../feature-flag/feature-flag.composition";
 import {
   ApiTrpcFeaturesComposition,
   composeApiTrpcCollaborators,
@@ -175,10 +176,14 @@ function composeApplication(options: { clickhouse?: boolean; workbenchEnabled?: 
     prisma: prisma.client,
     authz: testAuthz(),
     projects: testProjects(),
-    featureFlags: {
-      overrides: new Map(),
-      forceEnabled: new Set(options.workbenchEnabled === true ? [LWQL_FLAG] : []),
-    },
+    // The process's ONE rollout store, as the root composes it and hands it in.
+    featureFlags: composeFeatureFlagFeature({
+      prisma: prisma.client,
+      config: {
+        overrides: new Map(),
+        forceEnabled: new Set(options.workbenchEnabled === true ? [LWQL_FLAG] : []),
+      },
+    }).service,
     resolveClickHouseClient: options.clickhouse === false ? null : clickhouse.resolveClient,
     langWatchQL: undefined,
     resources: testResources(),

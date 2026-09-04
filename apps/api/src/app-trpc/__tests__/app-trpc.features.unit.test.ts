@@ -35,6 +35,7 @@ import { composeGatewayFeature } from "../../features/gateway/gateway.compositio
 import { refusingLangyFeature } from "../../features/langy/langy.composition";
 import { refusingDataRetentionFeature } from "../../features/data-retention/data-retention.composition";
 import { refusingAnalyticsFeature } from "../../features/analytics/analytics.composition";
+import { refusingFeatureFlagFeature } from "../../features/feature-flag/feature-flag.composition";
 import { refusingMonitorFeature } from "../../features/monitor/monitor.composition";
 import { refusingScenarioFeature } from "../../features/scenario/scenario.composition";
 import { refusingStoredObjectFeature } from "../../features/stored-object/stored-object.composition";
@@ -298,6 +299,7 @@ function buildFeatures() {
       ops: refusingOpsFeature(),
       scenario: refusingScenarioFeature(),
       analytics: refusingAnalyticsFeature(),
+      featureFlag: refusingFeatureFlagFeature(),
       dataRetention: refusingDataRetentionFeature(),
       monitor: refusingMonitorFeature(),
       storedObject: refusingStoredObjectFeature(),

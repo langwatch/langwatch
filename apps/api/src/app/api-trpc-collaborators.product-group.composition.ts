@@ -61,12 +61,7 @@ import {
 } from "@langwatch/dataset-server";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import { EvaluatorApp, type EvaluatorTrpcPorts } from "@langwatch/evaluator-server";
-import type { FeatureFlagConfig, FeatureFlagService } from "@langwatch/feature-flag-contract";
-import {
-  FeatureFlagCachePort,
-  PostgresFeatureFlagAdapter,
-  type FeatureFlagCacheSlot,
-} from "@langwatch/feature-flag-server";
+import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { WorkflowApp } from "@langwatch/workflow-server";
 import { TRPCError } from "@trpc/server";
@@ -163,8 +158,13 @@ export type ApiProductGroupCollaboratorsOptions = Readonly<{
    * behind its model.
    */
   modelProviders?: ModelProviderService;
-  /** This deployment's flag configuration, as the flag service reads it. */
-  featureFlags: FeatureFlagConfig;
+  /**
+   * The process's ONE rollout store, composed by the feature-flag feature.
+   *
+   * Taken rather than built: this half used to build one and the analytics half
+   * another, so a rollout had two objects answering it in one process.
+   */
+  featureFlags: FeatureFlagService;
   /**
    * The dataset service the execution half already composed.
    *
@@ -247,27 +247,6 @@ export type ApiProductGroupCollaborators = Readonly<{
   teamPorts: TeamTrpcPorts;
 }>;
 
-/**
- * The flag cache, absent.
- *
- * Every read goes to Postgres. That is the correct default for a process with
- * no shared cache rather than a degradation: a cached flag on one process and
- * an uncached one on another is a rollout that answers two different ways at
- * the same instant, which is worse than answering slowly.
- */
-class UncachedApiFeatureFlags extends FeatureFlagCachePort {
-  tryGet(_key: string): Promise<FeatureFlagCacheSlot | undefined> {
-    return Promise.resolve(undefined);
-  }
-
-  set(_key: string, _slot: FeatureFlagCacheSlot): Promise<void> {
-    return Promise.resolve();
-  }
-
-  delete(_key: string): Promise<void> {
-    return Promise.resolve();
-  }
-}
 
 /** Composes the product-group half from this process's own graph. */
 export function composeApiProductGroupCollaborators(
@@ -277,12 +256,7 @@ export function composeApiProductGroupCollaborators(
 
   const authzApp = AuthzApp.create({ permissions: options.authz });
 
-  const featureFlagService = PostgresFeatureFlagAdapter.create({
-    database: options.prisma,
-    cache: new UncachedApiFeatureFlags(),
-    config: options.featureFlags,
-    now: () => Date.now(),
-  });
+  const featureFlagService = options.featureFlags;
 
   const promptApp = PromptApp.create({
     prompts: PostgresPromptAdapter.create({

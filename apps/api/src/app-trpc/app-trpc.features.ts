@@ -77,7 +77,6 @@ import {
   createPublicEnvTrpcProcedure,
 } from "../features/auth/auth-trpc.mount";
 import { createAuthzTrpcRouter } from "../features/authz/authz-trpc.mount";
-import { createFeatureFlagTrpcRouter } from "../features/feature-flag/feature-flag-trpc.mount";
 import {
   createBatchRecordTrpcRouter,
   createDatasetRecordTrpcRouter,
@@ -676,7 +675,7 @@ export function createAppTrpcFeatures<
     // exact tenant target it was asked for inside the package's own resolver,
     // which is not the scope id the input carries. The mount declares that
     // claim once for the whole surface.
-    featureFlag: createFeatureFlagTrpcRouter(mount),
+    featureFlag: composed.featureFlag.router(mount),
     graphs: analyticsRouters.graphs,
     group: createGroupTrpcRouter({ ...mount, ports: ports.group }),
     // The GitHub App an organization connected, and the pull requests its

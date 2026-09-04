@@ -62,6 +62,7 @@ import {
   composeApiTrpcCollaborators,
 } from "../api-trpc-features.composition";
 import { composeApiProductGroupCollaborators } from "../api-trpc-collaborators.product-group.composition";
+import { composeFeatureFlagFeature } from "../../features/feature-flag/feature-flag.composition";
 import {
   stubApplicationSlices,
   stubComposedFeatures,
@@ -238,7 +239,11 @@ function composeApplication(options: { customRolePlan?: undefined } = {}) {
     } as unknown as AuthzGrantsService,
     organizations: {} as unknown as OrganizationService,
     projects,
-    featureFlags: { overrides: new Map(), forceEnabled: new Set() },
+    // The process's ONE rollout store, as the root composes it and hands it in.
+    featureFlags: composeFeatureFlagFeature({
+      prisma: prisma.client,
+      config: { overrides: new Map(), forceEnabled: new Set() },
+    }).service,
     // The REAL dataset service, over the same double: what this pins is that
     // `dataset.*` answers from the service the execution half composed rather
     // than from a second one built here.

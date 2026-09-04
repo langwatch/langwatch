@@ -23,6 +23,7 @@ import { createGatewayTrpcRouters } from "../../features/gateway/gateway-trpc.mo
 import { refusingLangyFeature } from "../../features/langy/langy.composition";
 import { refusingOpsFeature } from "../../features/ops/ops.composition";
 import { refusingAnalyticsFeature } from "../../features/analytics/analytics.composition";
+import { refusingFeatureFlagFeature } from "../../features/feature-flag/feature-flag.composition";
 import { refusingDataRetentionFeature } from "../../features/data-retention/data-retention.composition";
 import { refusingMonitorFeature } from "../../features/monitor/monitor.composition";
 import { refusingScenarioFeature } from "../../features/scenario/scenario.composition";
@@ -270,6 +271,7 @@ export function stubComposedFeatures(): ComposedApiFeatures {
     ops: refusingOpsFeature(),
     scenario: refusingScenarioFeature(),
     analytics: refusingAnalyticsFeature(),
+    featureFlag: refusingFeatureFlagFeature(),
     dataRetention: refusingDataRetentionFeature(),
     monitor: refusingMonitorFeature(),
     storedObject: refusingStoredObjectFeature(),

@@ -79,12 +79,7 @@ import {
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
 import { PrismaDataPrivacyResolutionAdapter } from "@langwatch/data-privacy-server";
-import type { FeatureFlagConfig, FeatureFlagService } from "@langwatch/feature-flag-contract";
-import {
-  FeatureFlagCachePort,
-  PostgresFeatureFlagAdapter,
-  type FeatureFlagCacheSlot,
-} from "@langwatch/feature-flag-server";
+import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -120,8 +115,14 @@ export type AnalyticsFeatureCollaborators = Readonly<{
   authz: AuthzService;
   /** Resolves a project's organization, for the rollout gate's targeting. */
   projects: ProjectService;
-  /** This deployment's environment overrides for the rollout flags. */
-  featureFlags: FeatureFlagConfig;
+  /**
+   * The process's ONE rollout store, composed by the feature-flag feature.
+   *
+   * Taken rather than built: the workbench gate and the browser's own flag read
+   * must never disagree about whether an account is inside the rollout, and
+   * this half used to build a second `PostgresFeatureFlagAdapter` of its own.
+   */
+  featureFlags: FeatureFlagService;
   /** The application's own ClickHouse, or `null` where the process composed none. */
   resolveClickHouseClient: ((tenantId: string) => Promise<ClickHouseClient>) | null;
   /** The restricted identity a member's own SQL runs as. */
@@ -224,12 +225,7 @@ export function composeAnalyticsFeature(
   });
   options.resources.own("API LangWatchQL identity", () => langWatchQL.close());
 
-  const featureFlags = PostgresFeatureFlagAdapter.create({
-    database: options.prisma,
-    cache: new UncachedFeatureFlags(),
-    config: options.featureFlags,
-    now: () => Date.now(),
-  });
+  const featureFlags = options.featureFlags;
 
   const analytics = AnalyticsApp.create({
     analytics: AnalyticsAdapter.create({
@@ -503,25 +499,6 @@ const NO_GRAPH_ALERTS: DashboardGraphAlertLookup = {
   tryGetByCustomGraphId: () => Promise.resolve(null),
 };
 
-/**
- * Reads every flag straight through to Postgres.
- *
- * The cache the platform app puts here is Redis, and this process composes its
- * Redis for the queue rather than for flags. A read per gate check is the
- * honest cost of that; a cache that never returned a hit and pretended to be
- * one would be worse, because it would look like the flag store is cached.
- */
-class UncachedFeatureFlags extends FeatureFlagCachePort {
-  tryGet(_key: string): Promise<FeatureFlagCacheSlot | undefined> {
-    return Promise.resolve(undefined);
-  }
-  set(_key: string, _slot: FeatureFlagCacheSlot): Promise<void> {
-    return Promise.resolve();
-  }
-  delete(_key: string): Promise<void> {
-    return Promise.resolve();
-  }
-}
 
 /**
  * What one member may read of a project's content, as LangWatchQL's catalogue

@@ -60,6 +60,7 @@ import { composeGatewayFeature } from "../gateway.composition";
 import { refusingLangyFeature } from "../../langy/langy.composition";
 import { refusingDataRetentionFeature } from "../../data-retention/data-retention.composition";
 import { refusingAnalyticsFeature } from "../../analytics/analytics.composition";
+import { refusingFeatureFlagFeature } from "../../feature-flag/feature-flag.composition";
 import { refusingMonitorFeature } from "../../monitor/monitor.composition";
 import { refusingScenarioFeature } from "../../scenario/scenario.composition";
 import { refusingStoredObjectFeature } from "../../stored-object/stored-object.composition";
@@ -218,6 +219,7 @@ function composeApplication(overrides: { saasBilling?: boolean; enterprise?: unk
       ops: refusingOpsFeature(),
       scenario: refusingScenarioFeature(),
       analytics: refusingAnalyticsFeature(),
+      featureFlag: refusingFeatureFlagFeature(),
       dataRetention: refusingDataRetentionFeature(),
       monitor: refusingMonitorFeature(),
       storedObject: refusingStoredObjectFeature(),
