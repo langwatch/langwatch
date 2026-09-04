@@ -72,12 +72,20 @@ CREATE UNIQUE INDEX "IngestionSourceKeyCoverage_one_open_bill_key"
     WHERE "validTo" IS NULL;
 
 -- +-------------------------------------------------------------------------+
--- | The row's organization must be its key's organization                    |
+-- | The row's organization must be the organization of BOTH ends            |
 -- +-------------------------------------------------------------------------+
--- relationMode = "prisma" means "virtualKeyId" is not a real foreign key, so
--- nothing here would otherwise stop a coverage row naming one organization
--- while the key it points at belongs to another - which is one organization's
--- bill claiming another's spend.
+-- relationMode = "prisma" means neither "virtualKeyId" nor "ingestionSourceId"
+-- is a real foreign key, so nothing here would otherwise stop a coverage row
+-- naming one organization while the key or the bill it points at belongs to
+-- another - which is one organization's bill claiming another's spend.
+--
+-- Two triggers rather than two composite foreign keys, because the repo does
+-- not have real foreign keys to add one to: relationMode = "prisma" is a
+-- whole-schema choice, and a composite key here would also need a
+-- (organizationId, id) unique index on each parent that exists for no other
+-- reason. A cascade is deliberately not part of either: dropping coverage
+-- discards which bill paid for which key and when, and the IRREVERSIBLE note
+-- at the foot of this file is about exactly that.
 CREATE OR REPLACE FUNCTION "ingestion_source_key_coverage_key_org_check"()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -109,6 +117,38 @@ CREATE TRIGGER "IngestionSourceKeyCoverage_key_org_check"
     BEFORE INSERT OR UPDATE OF "virtualKeyId", "organizationId" ON "IngestionSourceKeyCoverage"
     FOR EACH ROW EXECUTE FUNCTION "ingestion_source_key_coverage_key_org_check"();
 
+-- The same check on the other end of the row. Without it a coverage row can
+-- name another organization's connected bill, and that organization's spend is
+-- then attributed to a bill its owner never mapped - the same hazard as the key
+-- side, reached from the opposite direction.
+CREATE OR REPLACE FUNCTION "ingestion_source_key_coverage_source_org_check"()
+RETURNS TRIGGER AS $$
+DECLARE
+    source_org TEXT;
+BEGIN
+    -- A plain SELECT, and the asymmetry with the key check above is deliberate.
+    -- That one takes FOR KEY SHARE to close a race with its own AFTER DELETE
+    -- trigger on "VirtualKey"; no such trigger exists on "IngestionSource", so
+    -- there is no delete-side statement here for a share lock to serialise
+    -- against, and taking one anyway would add a third row to the lock order
+    -- for nothing.
+    SELECT "organizationId" INTO source_org FROM "IngestionSource" WHERE "id" = NEW."ingestionSourceId";
+    IF source_org IS NULL THEN
+        RAISE EXCEPTION 'Connected bill % does not exist, so it cannot be recorded as covering a gateway key.', NEW."ingestionSourceId"
+            USING ERRCODE = 'foreign_key_violation';
+    END IF;
+    IF source_org <> NEW."organizationId" THEN
+        RAISE EXCEPTION 'Connected bill % belongs to a different organization than the coverage row naming it.', NEW."ingestionSourceId"
+            USING ERRCODE = 'foreign_key_violation';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER "IngestionSourceKeyCoverage_source_org_check"
+    BEFORE INSERT OR UPDATE OF "ingestionSourceId", "organizationId" ON "IngestionSourceKeyCoverage"
+    FOR EACH ROW EXECUTE FUNCTION "ingestion_source_key_coverage_source_org_check"();
+
 -- The same absence of real foreign keys means nothing removes coverage when its
 -- key is deleted. An orphaned open row holds that key's one open slot forever,
 -- so a key later created with the same id could never be covered by anything.
@@ -138,6 +178,8 @@ CREATE TRIGGER "VirtualKey_drop_coverage_on_delete"
 -- Repair goes forward, in a new migration.
 --   DROP TRIGGER "VirtualKey_drop_coverage_on_delete" ON "VirtualKey";
 --   DROP FUNCTION "ingestion_source_key_coverage_drop_orphans"();
+--   DROP TRIGGER "IngestionSourceKeyCoverage_source_org_check" ON "IngestionSourceKeyCoverage";
+--   DROP FUNCTION "ingestion_source_key_coverage_source_org_check"();
 --   DROP TRIGGER "IngestionSourceKeyCoverage_key_org_check" ON "IngestionSourceKeyCoverage";
 --   DROP FUNCTION "ingestion_source_key_coverage_key_org_check"();
 --   DROP TABLE "IngestionSourceKeyCoverage";

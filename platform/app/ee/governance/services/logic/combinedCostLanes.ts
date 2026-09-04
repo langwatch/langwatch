@@ -117,7 +117,9 @@ export function combineProviderDay(
     return {
       ...base,
       total: coveredGateway && { ...coveredGateway, basis: "estimated" },
-      split: coveredGateway && splitOf(coveredGateway.amountNano, null),
+      split:
+        coveredGateway &&
+        splitOf({ meteredNano: coveredGateway.amountNano, billNano: null }),
       metered: unmappedGateway,
       ineligibleReason: null,
     };
@@ -134,7 +136,10 @@ export function combineProviderDay(
       ...base,
       total,
       split: null,
-      metered: addSameCurrency(coveredGateway, unmappedGateway),
+      metered: addSameCurrency({
+        first: coveredGateway,
+        second: unmappedGateway,
+      }),
       ineligibleReason: COVERAGE_INELIGIBLE.CROSS_CURRENCY,
     };
   }
@@ -145,7 +150,10 @@ export function combineProviderDay(
   return {
     ...base,
     total,
-    split: splitOf(coveredGateway?.amountNano ?? 0n, bill.amountNano),
+    split: splitOf({
+      meteredNano: coveredGateway?.amountNano ?? 0n,
+      billNano: bill.amountNano,
+    }),
     metered: unmappedGateway,
     ineligibleReason: null,
   };
@@ -162,7 +170,13 @@ export function combineProviderDay(
  * unallocated, and the metering that ran anyway shows up as the variance. That
  * is what keeps `attributed + unallocated` equal to the total in every branch.
  */
-function splitOf(meteredNano: bigint, billNano: bigint | null): BillSplit {
+function splitOf({
+  meteredNano,
+  billNano,
+}: {
+  meteredNano: bigint;
+  billNano: bigint | null;
+}): BillSplit {
   if (billNano === null) {
     return {
       attributedNano: meteredNano,
@@ -189,10 +203,13 @@ function splitOf(meteredNano: bigint, billNano: bigint | null): BillSplit {
  * always the gateway's. The check is the guard that keeps that assumption from
  * quietly becoming a wrong sum if the gateway ever prices in two.
  */
-function addSameCurrency(
-  first: CurrencyAmount,
-  second: CurrencyAmount | null,
-): CurrencyAmount {
+function addSameCurrency({
+  first,
+  second,
+}: {
+  first: CurrencyAmount;
+  second: CurrencyAmount | null;
+}): CurrencyAmount {
   if (second === null || second.currencyCode !== first.currencyCode) {
     return first;
   }

@@ -58,7 +58,7 @@ describe("Feature: the total shown is the bill, and gateway detail splits it", (
     });
   });
 
-  describe("when metering ran above the bill", () => {
+  describe("given a bill and gateway spend that runs past it", () => {
     /** @scenario "Gateway spend above the bill is shown as a variance, never subtracted" */
     it("keeps the bill as the total and reports the overrun beside it", () => {
       const combined = combineProviderDay(
@@ -132,7 +132,7 @@ describe("Feature: the total shown is the bill, and gateway detail splits it", (
     });
   });
 
-  describe("when the bill and its keys are priced in different currencies", () => {
+  describe("given a bill and its keys priced in different currencies", () => {
     /** @scenario "A bill and its keys in different currencies are not combined" */
     it("reports both lanes in their own currency and shows no split", () => {
       const combined = combineProviderDay(

@@ -45,6 +45,14 @@ Feature: Every dollar has one home
       Then the record is refused
       # Nothing else would stop it: these are not real foreign keys.
 
+    @integration
+    Scenario: Coverage cannot name another organization's bill
+      Given a connected bill belonging to another organization
+      When coverage naming that bill is recorded
+      Then the record is refused
+      # The same misattribution as the scenario above, reached from the other
+      # end of the row.
+
     @unit
     Scenario: Coverage naming a key that is not there is refused in words
       When an administrator records coverage for a gateway key that no longer exists

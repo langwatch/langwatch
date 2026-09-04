@@ -100,6 +100,25 @@ const makeKey = async (params: { id: string; organizationId: string }) => {
   });
 };
 
+/**
+ * A connected bill for the coverage rows to name.
+ *
+ * Real rows rather than fabricated ids, because the row-to-source trigger reads
+ * them: the mapping's two ends are both checked against the row's own
+ * organization, and a made-up bill id is refused exactly as a made-up key is.
+ */
+const makeSource = async (params: { id: string; organizationId: string }) => {
+  await prisma.ingestionSource.create({
+    data: {
+      id: params.id,
+      organizationId: params.organizationId,
+      sourceType: "otel_generic",
+      name: `--test-${params.id}`,
+      ingestSecretHash: `hash_${params.id}`,
+    },
+  });
+};
+
 const utc = (day: string) => new Date(`${day}T00:00:00.000Z`);
 
 const repo = new IngestionSourceKeyCoverageRepository();
@@ -109,9 +128,17 @@ describe("Feature: every dollar has one home", () => {
   const ownKeyId = `vk_${ns}_own`;
   const foreignKeyId = `vk_${ns}_foreign`;
 
+  const foreignSourceId = `bill_other_${ns}`;
+
   beforeAll(async () => {
     await makeKey({ id: ownKeyId, organizationId });
     await makeKey({ id: foreignKeyId, organizationId: otherOrganizationId });
+    await makeSource({ id: `bill_1_${ns}`, organizationId });
+    await makeSource({ id: `bill_2_${ns}`, organizationId });
+    await makeSource({
+      id: foreignSourceId,
+      organizationId: otherOrganizationId,
+    });
   });
 
   afterAll(() =>
@@ -120,6 +147,8 @@ describe("Feature: every dollar has one home", () => {
       ["ingestionSourceKeyCoverage", { organizationId: otherOrganizationId }],
       ["virtualKey", { organizationId }],
       ["virtualKey", { organizationId: otherOrganizationId }],
+      ["ingestionSource", { organizationId }],
+      ["ingestionSource", { organizationId: otherOrganizationId }],
     ]),
   );
 
@@ -337,6 +366,41 @@ describe("Feature: every dollar has one home", () => {
           organizationId,
           ingestionSourceId: `bill_1_${ns}`,
           virtualKeyId: `vk_${ns}_missing`,
+          validFrom: utc("2026-03-01"),
+        })
+        .catch((error: unknown) => error);
+
+      expect((refused as { code?: string }).code).toBe(
+        PRISMA_FOREIGN_KEY_VIOLATION,
+      );
+    });
+  });
+
+  describe("given a connected bill belonging to another organization", () => {
+    // The mirror of the key check, and the reason it exists: without it one
+    // organization's key can be recorded as paid for by another organization's
+    // bill, which is the same misattribution reached from the other end.
+    it("refuses coverage naming that bill", async () => {
+      const refused = await repo
+        .open(prisma, {
+          organizationId,
+          ingestionSourceId: foreignSourceId,
+          virtualKeyId: ownKeyId,
+          validFrom: utc("2026-03-01"),
+        })
+        .catch((error: unknown) => error);
+
+      expect((refused as { code?: string }).code).toBe(
+        PRISMA_FOREIGN_KEY_VIOLATION,
+      );
+    });
+
+    it("refuses coverage naming a bill that does not exist", async () => {
+      const refused = await repo
+        .open(prisma, {
+          organizationId,
+          ingestionSourceId: `bill_missing_${ns}`,
+          virtualKeyId: ownKeyId,
           validFrom: utc("2026-03-01"),
         })
         .catch((error: unknown) => error);

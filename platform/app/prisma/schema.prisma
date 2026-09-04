@@ -5254,9 +5254,9 @@ model IdentityMatchSuggestion {
 ///
 /// None of its rules are expressible here, so all of them live in the
 /// migration: a one-open-bill partial unique index, a CHECK that the validity
-/// range is non-empty, and a trigger tying the row to its key's own
-/// organization (`relationMode = "prisma"` means there are no real foreign keys
-/// to do it).
+/// range is non-empty, and a trigger on each end tying the row to the
+/// organization of the key and of the bill it names (`relationMode = "prisma"`
+/// means there are no real foreign keys to do it).
 model IngestionSourceKeyCoverage {
   id                String    @id @default(nanoid())
   organizationId    String
