@@ -55,8 +55,6 @@ import type { ApiTrpcFeatureApplication } from "./app-trpc.context";
 import type { DataRetentionTrpcPolicy } from "@langwatch/data-retention-server";
 import type { MonitorTrpcPorts } from "@langwatch/monitor-server";
 import type { CodingAgentTrpcPorts } from "@langwatch/coding-agent-server";
-import type { LangyEgressTrpcPorts, LangyTrpcPorts } from "@langwatch/langy-server";
-import type { LangyTrpcGates } from "../features/langy/langy-trpc.mount";
 import type { OpsTrpcPorts } from "@langwatch/ops-server";
 import type { ScenarioTrpcPorts } from "@langwatch/scenario-server";
 import type { AuthzPermission } from "@langwatch/authz-contract";
@@ -313,16 +311,6 @@ export type ApiTrpcCollaborators<
 
   /** The two fire-and-forget signals a new test case triggers, and where a failure in either goes. */
   scenarios: ScenarioTrpcPorts;
-  /** The message and warm budgets, the product-analytics sink, and the agent-to-page UI-action channel. */
-  langy: LangyTrpcPorts;
-  /** The two Langy gates every customer-facing procedure carries, already built. */
-  langyGates: LangyTrpcGates;
-  /** The audit trail an egress allow-list change is recorded on. */
-  langyEgress: LangyEgressTrpcPorts;
-  /** The pipeline registry, the event-log search window, the Grafana deep links and the migrations runner. */
-  ops: OpsTrpcPorts;
-  /** The operator gate, already built. */
-  opsCheck(input: { permission: AuthzPermission; throwOnDeny?: boolean }): AppTrpcDeclaredCheck;
 
   /**
    * The retention policy: who may write an override at a scope, which values

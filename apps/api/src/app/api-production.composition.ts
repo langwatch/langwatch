@@ -276,6 +276,22 @@ import {
 import { composeApiGithubRest } from "../features/github/github-rest.mount";
 import { refusingGithubService } from "../features/github/github.composition";
 import { composeApiAdminRest } from "../features/ops/admin-rest.mount";
+import {
+  composeApiAgentPipelines,
+  LoggedApiAgentPipelinesAbsence,
+  type ApiAgentPipelines,
+} from "./api-agent-pipelines.composition";
+import {
+  composeLangyFeature,
+  refusingLangyFeature,
+  type ComposedLangyFeature,
+} from "../features/langy/langy.composition";
+import {
+  composeOpsFeature,
+  LoggedApiOpsAbsence,
+  refusingOpsFeature,
+  type ComposedOpsFeature,
+} from "../features/ops/ops.composition";
 import { composeApiAuthCliDeviceFlow } from "../features/auth/auth-cli-device-flow-rest.mount";
 import { composeApiAuthRest } from "../features/auth/auth-rest.mount";
 import { composeApiGovernanceCliRest } from "../features/enterprise/governance-cli-rest.mount";
@@ -587,6 +603,9 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private composedOrganizationInvites: ApiOrganizationInvites | undefined;
   private resolvedOrganizationInvites = false;
   private composedGateway!: ComposedGatewayFeature;
+  private composedOps!: ComposedOpsFeature;
+  private composedLangy!: ComposedLangyFeature;
+  private composedAgentPipelines!: ApiAgentPipelines;
   /**
    * The process's ONE `Idempotency-Key` receipt ledger, or none.
    *
@@ -890,6 +909,17 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // other half opened — this process's ClickHouse, the queue's Redis, the
     // broadcast fabric presence publishes on, and the agent, user and project
     // directories the tenancy and identity halves built.
+    // The three agent-side pipelines, registered PRODUCER-only on this
+    // process's own Eventing. Registered HERE rather than inside either
+    // feature: the scenario half sends the eight simulation commands and the
+    // suite run's start, the Langy feature sends all sixteen conversation
+    // writes, and one definition must be registered exactly once whichever of
+    // them composes.
+    this.composedAgentPipelines = composeApiAgentPipelines({
+      eventing: this.composedEventing?.eventSourcing,
+      processName: options.config.serviceName,
+      report: LoggedApiAgentPipelinesAbsence.create(createLogger(options.config.serviceName)),
+    });
     this.composedAgentGroup = this.composeAgentGroup(
       options,
       authz,
@@ -948,6 +978,16 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         ? this.resolveGithub(options, database.client, queueInfrastructure, tenancy)
         : refusingGithubService();
     this.composedGateway = this.composeGateway(options, infrastructure);
+    // The back office, composed from the shared infrastructure plus the three
+    // other features it names: the people a row is about, the session an
+    // impersonation is started against, and the projects a scheduled job is
+    // scoped to. It used to ride inside the agent half, which cost every
+    // operator surface whenever a scenario collaborator was missing.
+    this.composedOps = this.composeOps(options, infrastructure, tenancy);
+    // The conversation panel and the egress allow-list beside it. It used to
+    // ride inside the agent half, so a process missing any scenario
+    // collaborator lost both Langy surfaces with it.
+    this.composedLangy = this.composeLangy(options, infrastructure, tenancy, queueInfrastructure);
     const features = ApiTrpcFeaturesComposition.tryCompose({
       // What a feature composes ITSELF out of, built once above and handed to
       // every `compose<Feature>()` the record's literal names.
@@ -955,7 +995,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // The features whose doors are not only tRPC, composed before the mount
       // existed. Absent infrastructure there is no record either, so the
       // refusing gateway stands in rather than a second condition here.
-      composed: { gateway: this.composedGateway },
+      composed: {
+        gateway: this.composedGateway,
+        langy: this.composedLangy,
+        ops: this.composedOps,
+      },
       // One literal, checked against the real type each half returns. A
       // process missing any of the nine composes none of the record — see
       // {@link composeApiTrpcCollaborators}.
@@ -978,6 +1022,8 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         {
           gateway: this.composedGateway.app,
           github,
+          langy: this.composedLangy.app,
+          ops: this.composedOps.app,
           ...composeEnterpriseGovernanceApplication(this.options.enterprise),
         },
         LoggedApiCollaboratorGap.create(createLogger(options.config.serviceName)),
@@ -1395,7 +1441,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // application the `ops.*` namespace answers from, and the one session pair
     // every other handler-managed door reads.
     const adminRest = composeApiAdminRest({
-      ops: this.composedAgentGroup?.ops,
+      ops: this.composedOps.app,
       session: this.composedAuth?.compose(),
     });
     // The two halves of `/api/auth/cli`. The device grant is this process's
@@ -2317,7 +2363,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       authz,
     });
     return composeApiLangyRest({
-      langy: this.composedAgentGroup?.langy,
+      langy: this.composedLangy.app,
       apiKeys: tenancy.apiKeys,
       featureFlags: this.composedProductGroup?.featureFlagService,
       // The guarded client this process already opened, read through the two
@@ -2851,7 +2897,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // and the browser's own flag read must never disagree about whether an
     // account is inside the rollout.
     const featureFlags = this.composedProductGroup?.featureFlagService;
-    if (!database || !tenancy || !agents || !identity || !auth || !encryption || !featureFlags) {
+    if (!database || !tenancy || !agents || !identity || !auth || !featureFlags) {
       return undefined;
     }
 
@@ -2896,40 +2942,22 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
           legacyDefaultModel: options.config.infrastructure.execution.defaultModel,
         },
       },
-      auth: auth.auth,
       // The SAME user directory the browser-session boundary composed: a run's
       // author and the person the session names must be one answer.
       users: auth.users,
       projects: tenancy.projects,
-      organizations: tenancy.organizations,
-      featureFlags,
       // The broadcast fabric presence already publishes on, read off the
-      // identity half rather than composed again: all three of this half's
-      // subscriptions and every presence event ride ONE emitter per tenant.
+      // identity half rather than composed again: this half's subscription and
+      // every presence event ride ONE emitter per tenant.
       broadcast: identity.application.broadcast,
       encryption,
       // The SAME routed ClickHouse the charted reads and the trace half use.
       resolveClickHouseClient: this.composedClickHouse?.resolveClient ?? null,
-      // The install's own SHARED endpoint, off the same connection, for the
-      // one read that is nobody's tenant: the operator searches `event_log`
-      // across tenants, so there is no id to route on. Null on a deployment
-      // with only private routes, and the explorer says so by name.
-      eventLogClient: this.composedClickHouse?.resolveSharedClient() ?? null,
       redis: queueInfrastructure?.redis ?? null,
-      // The SAME producer-only Eventing the trace and evaluation halves send
-      // on. This half registers three more definitions against it — simulation,
-      // suite run and Langy conversation — so a scenario run and a Langy write
-      // reach the worker that drains them.
-      eventing: this.composedEventing?.eventSourcing,
+      // The senders the root registered, shared with the Langy feature: one
+      // registration per definition, whatever composes over it.
+      pipelines: this.composedAgentPipelines,
       defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
-      demoProjectId: options.config.authz.demoProjectId,
-      // The SAME allow-list the identity half already parsed and published as
-      // `config.opsSidebarEmails`. Taken rather than re-read: the operator gate
-      // and the menu that shows the operator link must never disagree about who
-      // is staff.
-      adminEmails: identity.application.config.opsSidebarEmails ?? [],
-      audit: this.options.audit,
-      rateLimit: (request) => this.rateLimiter.consume(request),
       processName: options.config.serviceName,
       report: LoggedApiAgentGroupAbsence.create(createLogger(options.config.serviceName)),
     });
@@ -3187,6 +3215,74 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         : {}),
       ...(this.options.enterprise ? { enterprise: this.options.enterprise } : {}),
       processName: options.config.serviceName,
+    });
+  }
+
+  /**
+   * The Langy feature, over this process's own graph.
+   *
+   * One peer: the project directory the rollout gate resolves an organization
+   * through. Absent the shared infrastructure or that directory, both Langy
+   * namespaces still mount and refuse by name, so the packaged Langy REST
+   * family never has to branch on whether `ctx.app.langy` exists.
+   */
+  private composeLangy(
+    options: ApiRuntimeCompositionOptions,
+    infrastructure: ApiTrpcInfrastructure | undefined,
+    tenancy: ApiTenancyComposition | undefined,
+    queueInfrastructure: ApiQueueInfrastructure | undefined,
+  ): ComposedLangyFeature {
+    const identity = this.composedIdentity;
+    if (!infrastructure || !tenancy || !identity) return refusingLangyFeature();
+
+    return composeLangyFeature({
+      infrastructure,
+      peers: { projects: tenancy.projects },
+      // The senders the root registered, shared with the scenario half.
+      commands: this.composedAgentPipelines.langyConversations,
+      redis: queueInfrastructure?.redis ?? null,
+      // The SAME fabric presence already publishes on: both live channels ride
+      // one emitter per tenant rather than a second of their own.
+      broadcast: identity.application.broadcast,
+      demoProjectId: options.config.authz.demoProjectId,
+      rateLimit: (request) => this.rateLimiter.consume(request),
+      processName: options.config.serviceName,
+    });
+  }
+
+  /**
+   * The operator back office, over this process's own graph.
+   *
+   * Three peers and nothing else: the user directory a back-office row names,
+   * the browser session an impersonation is started and stopped against, and
+   * the project directory a scheduled job is scoped to. Absent any of them the
+   * namespace still mounts and refuses by name, so no other surface's staff
+   * check has to branch on whether `ctx.app.ops` exists.
+   */
+  private composeOps(
+    options: ApiRuntimeCompositionOptions,
+    infrastructure: ApiTrpcInfrastructure | undefined,
+    tenancy: ApiTenancyComposition | undefined,
+  ): ComposedOpsFeature {
+    const auth = this.composedAuth?.compose();
+    const identity = this.composedIdentity;
+    if (!infrastructure || !auth || !tenancy || !identity) return refusingOpsFeature();
+
+    return composeOpsFeature({
+      infrastructure,
+      peers: { users: auth.users, auth: auth.auth, projects: tenancy.projects },
+      // The SAME allow-list the identity half already parsed and published as
+      // `config.opsSidebarEmails`. Taken rather than re-read: the operator gate
+      // and the menu that shows the operator link must never disagree about who
+      // is staff.
+      adminEmails: identity.application.config.opsSidebarEmails ?? [],
+      // The install's own SHARED endpoint, for the one read that is nobody's
+      // tenant: the operator searches `event_log` across tenants, so there is
+      // no id to route on. Null on a deployment with only private routes, and
+      // the explorer says so by name.
+      eventLogClient: this.composedClickHouse?.resolveSharedClient() ?? null,
+      eventing: this.composedEventing?.eventSourcing,
+      report: LoggedApiOpsAbsence.create(createLogger(options.config.serviceName)),
     });
   }
 

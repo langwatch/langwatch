@@ -17,9 +17,6 @@
  *   langy.list              the composed `PostgresLangyAdapter`'s conversation
  *                           projection, narrowed to the caller
  *   langyEgress.get         the same Langy application, through both gates
- *   ops.getScope            the operator gate resolving this process's own
- *                           admin allow-list, including the probe variant that
- *                           REPORTS "no access" instead of refusing
  *   setupSkills.getPrompt   the moved catalogue, answering a real skill body
  *
  * And the three subscriptions, driven end to end over the real `/api/sse` lane
@@ -29,8 +26,7 @@
  * Finally the named absences, because an absence nobody can observe is
  * indistinguishable from a stub: with no queue registered, starting a scenario
  * run and starting a Langy turn are refused BY NAME rather than silently
- * dropped, and a caller who is not on the allow-list is refused by the operator
- * gate rather than shown the back office.
+ * dropped.
  */
 import type { EventEmitter } from "node:events";
 import { EventEmitter as NodeEventEmitter } from "node:events";
@@ -65,7 +61,12 @@ import {
   ApiTrpcFeaturesComposition,
   composeApiTrpcCollaborators,
 } from "../api-trpc-features.composition";
-import { composeApiAgentGroupCollaborators } from "../api-trpc-collaborators.agent-group.composition";
+import {
+  ApiAgentGroupAbsenceReport,
+  composeApiAgentGroupCollaborators,
+} from "../api-trpc-collaborators.agent-group.composition";
+import { composeApiAgentPipelines } from "../api-agent-pipelines.composition";
+import { composeLangyFeature } from "../../features/langy/langy.composition";
 import { stub, stubApplicationSlices, stubComposedFeatures, stubInfrastructureEntitlements, testHalves } from "./api-trpc-collaborators.test-halves";
 
 const SESSION_USER = {
@@ -211,33 +212,13 @@ function producerEventing() {
   return { eventSourcing, storedEvents };
 }
 
-/**
- * The install's shared ClickHouse endpoint, as the event-log explorer reaches
- * it: one `query` call, and the SQL it was handed recorded so the test can say
- * which table the composed repository read.
- */
-type FakeEventLogClient = {
-  asked: string[];
-  query: (params: { query: string }) => Promise<{ json(): Promise<unknown> }>;
-};
-
-function eventLogClient(rows: unknown[]): FakeEventLogClient {
-  const asked: string[] = [];
-  return {
-    asked,
-    query: async ({ query }) => {
-      asked.push(query);
-      return { json: async () => rows };
-    },
-  };
-}
-
 function composeApplication(
   options: {
     langyEnabled?: boolean;
-    adminEmails?: readonly string[];
     eventing?: EventSourcing;
-    eventLogClient?: FakeEventLogClient;
+    /** Unset, which is the shape the cipher's own absence is driven from. */
+    encryption?: null;
+    report?: ApiAgentGroupAbsenceReport;
   } = {},
 ) {
   const prisma = testPrisma();
@@ -252,6 +233,33 @@ function composeApplication(
     tryGetById: vi.fn(async () => ({ id: PROJECT_ID, apiKey: "project-api-key" })),
   } as unknown as ProjectService;
 
+  // Registered once, as the process registers them, and shared by the scenario
+  // half and the Langy feature below.
+  const pipelines = composeApiAgentPipelines({
+    eventing: options.eventing,
+    processName: "langwatch-api-test",
+  });
+  const featureFlags = testFeatureFlags(options.langyEnabled ?? true);
+  const infrastructure = {
+    ...stubInfrastructureEntitlements(),
+    prisma: prisma.client,
+    authz,
+    featureFlags,
+    audit: undefined,
+  };
+  const langy = composeLangyFeature({
+    infrastructure,
+    peers: { projects },
+    commands: pipelines.langyConversations,
+    // No Redis, which is a real deployment shape: the live turn buffer is
+    // absent and the browser falls back to the Postgres conversation read.
+    redis: null,
+    broadcast,
+    demoProjectId: "demo-project",
+    rateLimit: async () => ({ allowed: true, resetAt: Date.now() + 60_000 }),
+    processName: "langwatch-api-test",
+  });
+
   const group = composeApiAgentGroupCollaborators({
     prisma: prisma.client,
     authz,
@@ -264,23 +272,19 @@ function composeApplication(
         throw new AgentNotFoundError(id, projectId);
       },
     }),
-    auth: stub<AuthService>("auth"),
     users: stub<UserService>("users"),
     projects,
-    organizations: stub<OrganizationService>("organizations"),
-    featureFlags: testFeatureFlags(options.langyEnabled ?? true),
     broadcast,
-    encryption: {
-      encrypt: (plaintext: string) => `enc:${plaintext}`,
-      decrypt: (ciphertext: string) => ciphertext.replace(/^enc:/, ""),
-    } as unknown as SecretEncryptionPort,
+    encryption:
+      options.encryption === null
+        ? undefined
+        : ({
+            encrypt: (plaintext: string) => `enc:${plaintext}`,
+            decrypt: (ciphertext: string) => ciphertext.replace(/^enc:/, ""),
+          } as unknown as SecretEncryptionPort),
     // No ClickHouse and no Redis, which is a real deployment shape: the run
     // reader answers the empty set and the live turn buffer is absent.
     resolveClickHouseClient: null,
-    // The operator's event log is the one read here that is nobody's tenant,
-    // so it takes the install's shared endpoint rather than the resolver
-    // above. Absent by default: the explorer then refuses by name.
-    eventLogClient: (options.eventLogClient ?? null) as never,
     redis: null,
     // The four verticals a scenario RUN is prepared against, and the three
     // deployment facts its child is booted with. Doubles at the PORTS: what
@@ -297,22 +301,22 @@ function composeApplication(
         legacyDefaultModel: "openai/gpt-5-mini",
       },
     },
-    // Absent by default, which is a real deployment shape: with no queue every
-    // agent-side write refuses by name. The suite below composes one where the
-    // enqueued command is the thing under test.
-    eventing: options.eventing,
+    pipelines,
     defaultRetentionDays: 49,
     demoProjectId: "demo-project",
-    adminEmails: options.adminEmails ?? [SESSION_USER.email],
     audit: undefined,
     rateLimit: async () => ({ allowed: true, resetAt: Date.now() + 60_000 }),
     processName: "langwatch-api-test",
+    ...(options.report ? { report: options.report } : {}),
   });
 
   const features = ApiTrpcFeaturesComposition.tryCompose({
-      composed: stubComposedFeatures(),
-    infrastructure: { ...stubInfrastructureEntitlements(), prisma: prisma.client, authz, audit: undefined },
-    collaborators: composeApiTrpcCollaborators(testHalves({ agentGroup: group }), stubApplicationSlices()),
+    composed: { ...stubComposedFeatures(), langy },
+    infrastructure,
+    collaborators: composeApiTrpcCollaborators(testHalves({ agentGroup: group }), {
+      ...stubApplicationSlices(),
+      langy: langy.app,
+    }),
   });
   if (!features) throw new Error("the record refused to compose against its collaborators");
 
@@ -509,15 +513,6 @@ describe("given the API process composed the agent-group half from its own graph
       });
 
       expect(status).toBe(200);
-    });
-
-    it("resolves the operator scope from this process's own allow-list", async () => {
-      const { application } = composeApplication();
-
-      const { status, body } = await callTrpc(application, "ops.getScope", {});
-
-      expect(status).toBe(200);
-      expect(body).toMatchObject({ result: { data: { json: { scope: { kind: "platform" } } } } });
     });
 
     it("serves a setup skill's body from the catalogue that moved with the feature", async () => {
@@ -753,73 +748,6 @@ describe("given the API process composed the agent-group half from its own graph
       expect(JSON.stringify(body)).toContain("langy_agent_unavailable");
     });
 
-    it("reads the scheduled-job store rather than refusing it by name", async () => {
-      const { application } = composeApplication();
-
-      const { status, body } = await callTrpc(application, "ops.listScheduledJobs", {
-        limit: 20,
-      });
-
-      // Before the store was composed this refused with the operator-runtime
-      // error. An empty list is the honest answer for a deployment that has
-      // scheduled nothing; a refusal was not.
-      expect(status).toBe(200);
-      expect(JSON.stringify(body)).not.toContain("scheduled-job store");
-    });
-
-    /** @scenario "The operator searches the event log through the composed explorer" */
-    it("searches the event log rather than refusing it by name", async () => {
-      const client = eventLogClient([
-        {
-          aggregateId: "conversation-42",
-          aggregateType: "langy-conversation",
-          tenantId: PROJECT_ID,
-          eventCount: "7",
-          lastEventTime: "1756800000000",
-        },
-      ]);
-      const { application } = composeApplication({ eventLogClient: client });
-
-      const { status, body } = await callTrpc(application, "ops.searchAggregates", {
-        query: "conversation-42",
-      });
-
-      expect(status).toBe(200);
-      // The composed repository's own read, on the shared endpoint: before it
-      // was composed, every method of the explorer refused by name.
-      expect(client.asked).toHaveLength(1);
-      expect(client.asked[0]).toContain("FROM event_log");
-      expect(JSON.stringify(body)).toContain("conversation-42");
-      expect(JSON.stringify(body)).not.toContain("the event-log explorer");
-    });
-
-    /** @scenario "An install with no shared endpoint refuses the search by name" */
-    it("names the event-log explorer when this deployment has no shared endpoint", async () => {
-      const { application } = composeApplication();
-
-      const { status, body } = await callTrpc(application, "ops.searchAggregates", {
-        query: "conversation-42",
-      });
-
-      // A deployment holding only private routes has no install-wide event log
-      // to search, and refusing beats answering the empty set, which would read
-      // as "this install has recorded nothing". The capability NAME reaches the
-      // log rather than the wire — tRPC replaces a handled message with its
-      // code slug — so what is observable here is the refusal itself.
-      expect(status).toBeGreaterThanOrEqual(400);
-      expect(JSON.stringify(body)).toContain("service_unavailable");
-    });
-
-    it("keeps a caller who is not on the allow-list out of the operator surface", async () => {
-      const { application } = composeApplication({ adminEmails: ["someone-else@acme.test"] });
-
-      const { body } = await callTrpc(application, "ops.getScope", {});
-
-      // The PROBE variant: it reports "no access" rather than refusing, which is
-      // what lets the global menu poll it on every page load.
-      expect(body).toMatchObject({ result: { data: { json: { scope: { kind: "none" } } } } });
-    });
-
     it("keeps a project outside the Langy rollout dark rather than empty", async () => {
       const { application } = composeApplication({ langyEnabled: false });
 
@@ -831,5 +759,45 @@ describe("given the API process composed the agent-group half from its own graph
       expect(status).toBeGreaterThanOrEqual(400);
       expect(JSON.stringify(body)).toContain("langy_not_enabled");
     });
+  });
+});
+
+describe("given a deployment that configured no stored-secret encryption key", () => {
+  /** @scenario "The scenario surfaces still answer" */
+  it("still serves the scenario surfaces", async () => {
+    const { application, prisma } = composeApplication({ encryption: null });
+
+    const { status } = await callTrpc(application, "scenarios.getAll", { projectId: PROJECT_ID });
+
+    expect(status).toBe(200);
+    expect(prisma.scenario.findMany).toHaveBeenCalled();
+  });
+
+  /** @scenario "The surfaces that never read the cipher are untouched" */
+  it("still mounts and serves the five namespaces that never read the cipher", async () => {
+    const { application } = composeApplication({ encryption: null });
+
+    const mounted = Object.keys(
+      (application.trpc as unknown as { _def: { record: Record<string, unknown> } })._def.record,
+    );
+
+    expect(mounted).toEqual(expect.arrayContaining(["suites", "langy", "langyEgress", "ops"]));
+    const { status } = await callTrpc(application, "suites.getAll", { projectId: PROJECT_ID });
+    expect(status).toBe(200);
+  });
+
+  /** @scenario "The absence is named once at boot rather than once per request" */
+  it("names the absent cipher at boot, and names what it costs", () => {
+    const absent: string[] = [];
+    composeApplication({
+      encryption: null,
+      report: new (class extends ApiAgentGroupAbsenceReport {
+        absent(capability: string): void {
+          absent.push(capability);
+        }
+      })(),
+    });
+
+    expect(absent).toContain("scenario-secrets");
   });
 });

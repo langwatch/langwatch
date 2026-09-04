@@ -53,6 +53,8 @@ import {
 } from "../../../app/api-trpc-features.composition";
 import { composeEnterpriseGovernanceApplication } from "../../enterprise/enterprise-governance.composition";
 import { composeGatewayFeature } from "../gateway.composition";
+import { refusingLangyFeature } from "../../langy/langy.composition";
+import { refusingOpsFeature } from "../../ops/ops.composition";
 import { stub, stubApplicationSlices, stubInfrastructureEntitlements, testHalves } from "../../../app/__tests__/api-trpc-collaborators.test-halves";
 
 const SESSION_USER = { id: "user-1", name: "Sam Rivers", email: "sam@acme.test", role: "ADMIN" };
@@ -196,7 +198,7 @@ function composeApplication(overrides: { saasBilling?: boolean; enterprise?: unk
   });
 
   const features = ApiTrpcFeaturesComposition.tryCompose({
-    composed: { gateway },
+    composed: { gateway, langy: refusingLangyFeature(), ops: refusingOpsFeature() },
     infrastructure,
     collaborators: composeApiTrpcCollaborators(testHalves(), {
       ...stubApplicationSlices(),

@@ -11,8 +11,21 @@
  * one place the process names them for the record.
  */
 import type { ComposedGatewayFeature } from "../features/gateway/gateway.composition";
+import type { ComposedLangyFeature } from "../features/langy/langy.composition";
+import type { ComposedOpsFeature } from "../features/ops/ops.composition";
 
 export type ComposedApiFeatures = Readonly<{
   /** Six namespaces, one `ctx.app` slice and two REST families over one application. */
   gateway: ComposedGatewayFeature;
+  /**
+   * Two namespaces and the `ctx.app.langy` slice the packaged Langy REST family
+   * reads. Here rather than in the record's literal for that last reason.
+   */
+  langy: ComposedLangyFeature;
+  /**
+   * One namespace behind its own operator chain, plus the `ctx.app.ops` slice
+   * every other surface's staff check reads. Here rather than in the record's
+   * literal because that slice is read by surfaces this feature does not own.
+   */
+  ops: ComposedOpsFeature;
 }>;

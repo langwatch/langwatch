@@ -355,11 +355,6 @@ export function createApiTrpcPorts<
     enterprise: collaborators.enterprise,
 
     scenarios: collaborators.scenarios,
-    langy: collaborators.langy,
-    langyGates: collaborators.langyGates,
-    langyEgress: collaborators.langyEgress,
-    ops: collaborators.ops,
-    opsCheck: collaborators.opsCheck,
 
 
     /**

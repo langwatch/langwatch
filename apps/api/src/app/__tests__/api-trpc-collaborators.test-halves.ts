@@ -22,6 +22,8 @@ import type { ApiAgentGroupCollaborators } from "../api-trpc-collaborators.agent
 import type { ApiAnalyticsCollaborators } from "../api-trpc-collaborators.analytics.composition";
 import type { ApiExecutionCollaborators } from "../api-trpc-collaborators.execution.composition";
 import { createGatewayTrpcRouters } from "../../features/gateway/gateway-trpc.mount";
+import { refusingLangyFeature } from "../../features/langy/langy.composition";
+import { refusingOpsFeature } from "../../features/ops/ops.composition";
 import type { ComposedApiFeatures } from "../../app-trpc/app-trpc.composed";
 import type { ApiIdentityCollaborators } from "../api-trpc-collaborators.identity.composition";
 import type { ApiOrgGroupCollaborators } from "../api-trpc-collaborators.org-group.composition";
@@ -294,6 +296,10 @@ export function stubApplicationSlices(): ApiTrpcFeatureApplicationSlices {
   return {
     gateway: stub("app.gateway"),
     github: stub("app.github"),
+    langy: stub("app.langy"),
+    // Answers rather than refuses: several namespaces that are NOT the surface
+    // under test still gate on `ctx.app.ops.isAdmin()` at call time.
+    ops: stub("app.ops", { isAdmin: () => true }),
     governance: stub("app.governance"),
     governanceApp: stub("app.governanceApp"),
     sessionPolicy: stub("app.sessionPolicy"),
@@ -302,8 +308,9 @@ export function stubApplicationSlices(): ApiTrpcFeatureApplicationSlices {
 }
 
 /**
- * The gateway feature, as a suite that drives another one supplies it: the six
- * namespaces build on the real parsers and every call refuses.
+ * The features composed ahead of the mount, as a suite that drives another one
+ * supplies them: the namespaces build on the real parsers and every call
+ * refuses.
  */
 export function stubComposedFeatures(): ComposedApiFeatures {
   return {
@@ -316,6 +323,8 @@ export function stubComposedFeatures(): ComposedApiFeatures {
           ports: { virtualKeys: { virtualKeyBudgetInput: anySchema } },
         }),
     },
+    langy: refusingLangyFeature(),
+    ops: refusingOpsFeature(),
   };
 }
 

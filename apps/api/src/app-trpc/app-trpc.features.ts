@@ -20,7 +20,6 @@ import type { ComposedApiFeatures } from "./app-trpc.composed";
 import type { AnalyticsReadInput, AnalyticsTimeseriesInput } from "@langwatch/analytics-contract";
 import type { AnalyticsTrpcPorts, LangWatchQLTrpcPorts } from "@langwatch/analytics-server";
 import type { AnnotationTrpcPorts } from "@langwatch/annotation-server";
-import type { TrpcApiMount } from "@langwatch/api/trpc";
 
 import type { EmailSuppressionTrpcPorts } from "@langwatch/automation-server";
 
@@ -57,9 +56,7 @@ import type {
 
 import type { EvaluatorTrpcPorts } from "@langwatch/evaluator-server";
 import type { ExperimentTrpcPorts } from "@langwatch/experiment-server";
-import type { BugReportTrpcPorts, OpsTrpcPorts } from "@langwatch/ops-server";
-import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contract";
-import type { LangyEgressTrpcPorts, LangyTrpcPorts } from "@langwatch/langy-server";
+import type { BugReportTrpcPorts } from "@langwatch/ops-server";
 import type { ScenarioTrpcPorts } from "@langwatch/scenario-server";
 
 import type {
@@ -78,7 +75,6 @@ import type { IdentityTrpcPorts, UserTrpcPorts } from "@langwatch/user-server";
 import type { WorkflowOptimizationTrpcPorts, WorkflowTrpcPorts } from "@langwatch/workflow-server";
 
 import type { ZodTypeAny } from "zod";
-import type { AppTrpcDeclaredCheck, AppTrpcPolicyKit } from "./app-trpc.policy-kit";
 
 import {
   createAnalyticsTrpcRouter,
@@ -119,7 +115,7 @@ import {
 import { createEvaluatorTrpcRouter } from "../features/evaluator/evaluator-trpc.mount";
 import { createExperimentTrpcRouter } from "../features/experiment/experiment-trpc.mount";
 import { createExportTrpcRouter } from "../features/export/export-trpc.mount";
-import { createBugReportTrpcRouter, createOpsTrpcRouter } from "../features/ops/ops-trpc.mount";
+import { createBugReportTrpcRouter } from "../features/ops/ops-trpc.mount";
 import { createPresenceTrpcRouter } from "../features/presence/presence-trpc.mount";
 import {
   createGroupTrpcRouter,
@@ -164,11 +160,6 @@ import {
 } from "../features/enterprise/enterprise-trpc.mount";
 import { createEnterpriseGovernanceTrpcRouters } from "../features/enterprise/enterprise-governance-trpc.mount";
 import { composeGovernanceHomeTrpcRouter } from "../features/enterprise/governance-home.composition";
-import {
-  createLangyEgressTrpcRouter,
-  createLangyTrpcRouter,
-  type LangyTrpcGates,
-} from "../features/langy/langy-trpc.mount";
 import { createSetupSkillsTrpcRouter } from "../features/langy/setup-skills-trpc.mount";
 import { createScenarioTrpcRouter } from "../features/scenario/scenario-trpc.mount";
 import { createSuiteTrpcRouter } from "../features/suite/suite-trpc.mount";
@@ -257,16 +248,6 @@ export interface AppTrpcFeaturePorts<
   monitors: MonitorTrpcPorts;
   /** The two fire-and-forget signals a new test case triggers, and where a failure in either goes. */
   scenarios: ScenarioTrpcPorts;
-  /** The message and warm budgets, the product-analytics sink, and the agent-to-page UI-action channel. */
-  langy: LangyTrpcPorts;
-  /** The two Langy gates every customer-facing procedure carries, already built. */
-  langyGates: LangyTrpcGates;
-  /** The audit trail an egress allow-list change is recorded on. */
-  langyEgress: LangyEgressTrpcPorts;
-  /** The pipeline registry, the event-log search window, the Grafana deep links and the migrations runner. */
-  ops: OpsTrpcPorts;
-  /** The operator gate, already built. */
-  opsCheck(input: { permission: AuthzPermission; throwOnDeny?: boolean }): AppTrpcDeclaredCheck;
   /** The forty-six answers `organization.*` needs from this deployment. */
   organization: OrganizationTrpcPorts<TSignUpDataSchema>;
   /** The audit-log read's own `kind: "custom"` check, already built. */
@@ -600,6 +581,7 @@ export function createAppTrpcFeatures<
 }) {
   const { mount, composed, infrastructure, ports } = options;
   const gateway = composed.gateway.router(mount);
+  const langyRouters = composed.langy.routers(mount);
   const governance = createEnterpriseGovernanceTrpcRouters(mount);
   const enterprise = createEnterpriseTrpcRouters({ ...mount, ports: ports.enterprise });
   const billing = createEnterpriseBillingTrpcRouters({
@@ -680,20 +662,11 @@ export function createAppTrpcFeatures<
     // Carries `onConversationUpdate` and `onTurnStream`. In the record rather
     // than beside it: a subscription mounted beside the record would be
     // callable over `/api/trpc` and un-watchable over `/api/sse`.
-    langy: createLangyTrpcRouter({ ...mount, ports: ports.langy, gates: ports.langyGates }),
+    langy: langyRouters.langy,
     // Beside the conversation surface because both carry the same two gates
     // and the same application; the wire name stays `langyEgress`.
-    langyEgress: createLangyEgressTrpcRouter({
-      ...mount,
-      ports: ports.langyEgress,
-      gates: ports.langyGates,
-    }),
-    ops: createOpsTrpcRouter({
-      root: mount.root,
-      protectedProcedure: mount.protectedProcedure,
-      policy: opsPolicyKit(mount.middlewares, ports.opsCheck),
-      ports: ports.ops,
-    }),
+    langyEgress: langyRouters.langyEgress,
+    ops: composed.ops.router(mount),
     // Carries `onSimulationUpdate`, for the same reason.
     scenarios: createScenarioTrpcRouter({ ...mount, ports: ports.scenarios }),
     // Takes no ports: the catalogue is a compiled artifact the Langy package
@@ -877,37 +850,3 @@ export function createAppTrpcFeatures<
  * back as `unknown`.
  */
 export type AppTrpcFeatureRecord = ReturnType<typeof createAppTrpcFeatures>;
-
-/**
- * The operator chain, assembled from the process's own middlewares plus the
- * one gate a declaration cannot describe.
- *
- * Everything but `checkOpsPermission` is the SAME middleware every other
- * procedure on this root carries — the tracer, the logger, the handled-error
- * shaping, the scope-lineage guard, the fail-closed backstop and the audit
- * row — read straight off the mount rather than restated, so the operator
- * surface cannot drift into a chain of its own.
- */
-function opsPolicyKit(
-  middlewares: TrpcApiMount<never, never, never>["middlewares"],
-  opsCheck: (input: { permission: AuthzPermission; throwOnDeny?: boolean }) => AppTrpcDeclaredCheck,
-): AppTrpcPolicyKit {
-  return {
-    tracerMiddleware: middlewares.tracer,
-    loggerMiddleware: middlewares.logger,
-    handledErrorMiddleware: middlewares.handledError,
-    enforcePermissionCheck: middlewares.enforceCheck,
-    auditLogMutations: middlewares.auditMutations,
-    scopeLineageGuard: (declaration) =>
-      middlewares.scopeLineageGuard(declaration as AuthzDeclaration),
-    checkDeclaredPermission: ({ permission }) =>
-      middlewares.declaredCheck({ kind: "permission", permission }),
-    declaredNoPermission: ({ reason, allow }) =>
-      middlewares.declaredCheck({
-        kind: "no-permission",
-        reason,
-        ...(allow ? { allow: { ...allow } } : {}),
-      }),
-    checkOpsPermission: opsCheck,
-  };
-}

@@ -47,6 +47,7 @@
  * deployment absences, which is exactly what this file's absence is NOT.
  */
 import type { EventSourcing } from "@langwatch/eventing";
+import type { Logger } from "@langwatch/observability";
 import { HandledError } from "@langwatch/handled-error";
 import {
   createLangyConversationProducerPipeline,
@@ -96,6 +97,24 @@ class ApiAgentPipelineUnavailableError extends HandledError {
 export abstract class ApiAgentPipelinesAbsenceReport {
   /** No Eventing: every agent-side write refuses rather than queuing nothing. */
   abstract withoutQueue(): void;
+}
+
+/** Writes the absence to the process log, once, at composition time. */
+export class LoggedApiAgentPipelinesAbsence extends ApiAgentPipelinesAbsenceReport {
+  static create(logger: Pick<Logger, "warn">): LoggedApiAgentPipelinesAbsence {
+    return new LoggedApiAgentPipelinesAbsence(logger);
+  }
+
+  private constructor(private readonly logger: Pick<Logger, "warn">) {
+    super();
+  }
+
+  withoutQueue(): void {
+    this.logger.warn(
+      { capability: "agent-commands" },
+      "API process holds no command queue, so it registered no simulation, suite or Langy conversation pipeline: starting a scenario run, cancelling one, starting a suite run, and every conversation write refuse by name. Reading runs, suites, conversations and messages is unaffected, and every live channel still streams.",
+    );
+  }
 }
 
 export type ApiAgentPipelinesOptions = Readonly<{

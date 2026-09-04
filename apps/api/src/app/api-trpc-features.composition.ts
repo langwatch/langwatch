@@ -346,7 +346,14 @@ export type ApiTrpcCollaboratorHalves = Readonly<{
  */
 export type ApiTrpcFeatureApplicationSlices = Pick<
   ApiTrpcFeatureApplication,
-  "gateway" | "github" | "governance" | "governanceApp" | "sessionPolicy" | "webhooks"
+  | "gateway"
+  | "github"
+  | "governance"
+  | "governanceApp"
+  | "langy"
+  | "ops"
+  | "sessionPolicy"
+  | "webhooks"
 >;
 
 /**
@@ -417,12 +424,6 @@ export function composeApiTrpcCollaborators(
       planProvider: traceGroup.planProvider,
       scenarios: agentGroup.scenarios,
       suites: agentGroup.suites,
-      langy: agentGroup.langy,
-      // Overwrites the identity half's narrower `isAdmin` reader in this same
-      // slot on purpose: the operator SURFACE reads the whole application,
-      // and the SSO connection door (which gates on the staff list rather
-      // than `ops:*`) is satisfied by it unchanged.
-      ops: agentGroup.ops,
       ...orgGroup.application,
       monitors: productInfra.monitorApp,
       storedObjectApp: productInfra.storedObjectApp,
@@ -471,11 +472,6 @@ export function composeApiTrpcCollaborators(
     limits: traceGroup.ports.limits,
 
     scenarios: agentGroup.ports.scenarios,
-    langy: agentGroup.ports.langy,
-    langyGates: agentGroup.ports.langyGates,
-    langyEgress: agentGroup.ports.langyEgress,
-    ops: agentGroup.ports.ops,
-    opsCheck: agentGroup.ports.opsCheck,
 
     organization: orgGroup.organization,
     organizationAuditLogCheck: orgGroup.organizationAuditLogCheck,

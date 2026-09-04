@@ -1,51 +1,45 @@
 /**
- * The AGENT GROUP half of {@link ApiTrpcCollaborators}: the six surfaces an
- * agent is written, watched and driven through.
+ * The SCENARIO half of {@link ApiTrpcCollaborators}: the three surfaces an
+ * agent's test cases are written, watched and driven through.
  *
  *   scenarios.*    the test cases a project defines and the runs they produced
  *   suites.*       the folders and suites those cases are grouped into
- *   langy.*        the conversation panel, its two live channels and the
- *                  turn-start commands behind them
- *   langyEgress.*  the allow-list bounding what the agent may reach
- *   ops.*          the operator back office the queues those runs travel on are
- *                  read through
  *   setupSkills.*  the instructions an empty state hands a coding agent
  *
  * They are one composition because they are one graph: a scenario run IS an
- * agent conversation scored against a criterion, a Langy turn IS an agent
- * conversation the customer is in, and both are read back through the same
- * three connections this process already holds — its Prisma client, its
- * ClickHouse routing and the queue's Redis.
+ * agent conversation scored against a criterion, and it is read back through
+ * the two connections this process already holds — its Prisma client and its
+ * ClickHouse routing.
+ *
+ * The conversation panel and the operator back office used to be here too, on
+ * the argument that a Langy turn is an agent conversation and that the queues a
+ * run travels on are read through the back office. Neither is being one graph:
+ * both compose themselves now, from the shared infrastructure and the peers
+ * they name.
  *
  * ## This half OVERLAYS
  *
  * Like the analytics, execution and product-group halves, and unlike
  * {@link composeApiProductCollaborators}, it folds onto a base and passes an
  * absent base through untouched. It can genuinely be missing: a process with no
- * database resolves no scenario, no suite and no conversation, and a panel
- * answering "no conversations" there would tell a customer their history was
- * gone.
+ * database resolves no scenario and no suite, and a list answering "no
+ * scenarios" there would tell a customer their work was gone.
  *
  * ## What answers for real, and what refuses by name
  *
  * Every READ answers for real, off this process's own graph. A scenario and its
  * folders are Prisma rows; a simulation run and its messages are ClickHouse
- * rows on the same routed connection the charted reads use; a Langy
- * conversation's spine and its messages are the Postgres projections the worker
- * writes; a live turn's tokens are the durable Redis buffer the worker appends
- * to. All three subscriptions stream, because the emitters behind them are this
- * process's own.
+ * rows on the same routed connection the charted reads use. The live simulation
+ * subscription streams, because the emitter behind it is this process's own.
  *
- * Every WRITE that has to enqueue work ENQUEUES IT, on the three pipelines
- * `api-agent-pipelines.composition.ts` registers PRODUCER-only against this
- * process's own Eventing: the eight simulation commands, the suite run's start
- * and all sixteen Langy conversation commands. The worker drains them. Both the
- * simulation and the Langy definition declare a process manager, and the
- * runtime declines to RUN those by name rather than refusing the whole pipeline
- * — producing a command and running a process manager were never the same
- * decision. With no queue at all, every one of those writes refuses by name
- * instead: never a silent no-op, which would leave a customer watching a run
- * that was never queued.
+ * Every WRITE that has to enqueue work ENQUEUES IT, on the pipelines the root
+ * registers PRODUCER-only against this process's own Eventing: the eight
+ * simulation commands and the suite run's start. The worker drains them. The
+ * simulation definition declares a process manager, and the runtime declines to
+ * RUN it by name rather than refusing the whole pipeline — producing a command
+ * and running a process manager were never the same decision. With no queue at
+ * all, every one of those writes refuses by name instead: never a silent no-op,
+ * which would leave a customer watching a run that was never queued.
  *
  * Preparing a scenario run ANSWERS. Its target is resolved through ten other
  * verticals' services, and this process holds all ten: six it composes here —
@@ -55,68 +49,12 @@
  * What it still refuses is SUBMITTING the run, and that one is honest: the
  * in-process execution pool is the worker's, and the outbox retries the
  * execute where a pool exists.
- *
- * One write still refuses even with a queue, and it is a DEPLOYMENT absence
- * rather than a framework one: starting a Langy turn dispatches to the agent
- * manager over HTTP, so a process with no Langy configuration answers the
- * feature's own `langy_agent_unavailable`. Renaming, forking, archiving and
- * importing into a conversation are pure commands and answer for real.
- *
- * The OPERATOR back office answers for most of itself now. The half that needs
- * only Postgres — the admin allow-list, the impersonation ledger, the
- * back-office user, organization and project reads and the scheduled-job store
- * — is package-owned and composed. So is the EVENT-LOG EXPLORER, over the
- * install's own shared ClickHouse endpoint and the pipeline definitions this
- * process registered: `event_log` is read ACROSS tenants, which is why it takes
- * the shared endpoint rather than the tenant-keyed resolver every other read
- * here runs on. Two refuse by name, and for different reasons — see
- * {@link unavailableOperatorRuntime}.
  */
-import type { ClickHouseClient } from "@clickhouse/client";
 import { MAX_CALL_TIMEOUT_MS } from "@langwatch/agent-contract";
 import type { AgentService } from "@langwatch/agent-contract";
-import type { AuthService } from "@langwatch/auth-contract";
-import {
-  declareAuthzMiddleware,
-  type AuthzPermission,
-  type AuthzService,
-} from "@langwatch/authz-contract";
-import type { FeatureFlagService, FeatureFlagTarget } from "@langwatch/feature-flag-contract";
-import type { EventSourcing } from "@langwatch/eventing";
-import { PrismaScheduledJobStore } from "@langwatch/eventing/server";
-import { HandledError, NotFoundError } from "@langwatch/handled-error";
-import {
-  FeatureFlagLangyUiActionSurfaceAdapter,
-  LangyApp,
-  LangyTokenBuffer,
-  LangyTurnAccessStore,
-  LangyTurnHandoffStore,
-  LangyUiActionCatalogPort,
-  LangyUiActionService,
-  PostgresLangyAdapter,
-  type LangyEgressTrpcPorts,
-  type LangyTrpcPorts,
-  type LangyTurnTechnicalPorts,
-  type LangyUiActionDefinition,
-  type UiActionRedis,
-} from "@langwatch/langy-server";
-import { LangyNotEnabledError, renderLangyTurnContext } from "@langwatch/langy-contract";
+import type { AuthzService } from "@langwatch/authz-contract";
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
-import {
-  OpsApp,
-  PostgresOpsAdapter,
-  AdminAuditSink,
-  EventExplorerClickHouseRepository,
-  EventExplorerService,
-  EventingOpsIntrospectionAdapter,
-  NoopSchedulerWakeService,
-  type OpsCapability,
-  type OpsEventExplorer,
-  type OpsProcessExplorer,
-  type OpsReplayRunner,
-  type OpsTrpcPorts,
-} from "@langwatch/ops-server";
-import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PresenceEmitterPort } from "@langwatch/presence-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
@@ -173,28 +111,10 @@ import type {
 import type { UserService } from "@langwatch/user-contract";
 import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
-import {
-  composeApiAgentPipelines,
-  type ApiAgentPipelines,
-} from "./api-agent-pipelines.composition";
-import type { ApiTrpcPortsContext } from "../app-trpc/app-trpc.context";
-import type { ApiAuditPort } from "../api-request.policy";
-import type { AppTrpcDeclaredCheck } from "../app-trpc/app-trpc.policy-kit";
-import type { LangyTrpcGates } from "../features/langy/langy-trpc.mount";
+import type { ApiAgentPipelines } from "./api-agent-pipelines.composition";
 import { ApiAgentTestConnectedDispatchAdapter } from "../features/agent/agent-test-connected-dispatch.adapter";
 import { ApiAgentTestOwnershipAdapter } from "../features/agent/agent-test-ownership.adapter";
 
-/**
- * The rollout flag the authoritative Langy gate is read from.
- *
- * A literal rather than an import, and for the reason the analytics half states
- * about its metric registry: the two modules that declare this key —
- * `@langwatch/langy-web` and `@langwatch/trace-web` — are BROWSER packages, and
- * no server module may value-import one. The key is the deployment's flag name
- * on the wire, so restating it here is restating a wire constant, not forking a
- * decision.
- */
-const LANGY_RELEASE_FLAG = "release_langy_enabled";
 
 /**
  * The ksuid resource prefixes a scenario and a run are persisted under.
@@ -233,7 +153,9 @@ class ApiAgentGroupUnavailableError extends HandledError {
 /** Reports each absence in this half, with what it costs. */
 export abstract class ApiAgentGroupAbsenceReport {
   abstract absent(
-    capability: "run-commands" | "turn-commands" | "operator-runtime" | "live-buffer",
+    capability:
+      | "live-buffer"
+      | "scenario-secrets",
   ): void;
 }
 
@@ -247,20 +169,20 @@ export class LoggedApiAgentGroupAbsence extends ApiAgentGroupAbsenceReport {
     super();
   }
 
-  absent(capability: "run-commands" | "turn-commands" | "operator-runtime" | "live-buffer"): void {
+  absent(
+    capability:
+      | "live-buffer"
+      | "scenario-secrets",
+  ): void {
     this.logger.warn({ capability }, CONSEQUENCE[capability]);
   }
 }
 
 const CONSEQUENCE = {
-  "run-commands":
-    "API process holds no command queue, so it registered no simulation or suite pipeline: starting a scenario run, cancelling one and starting a suite run all refuse by name. Reading runs, suites and their messages is unaffected, and the live simulation subscription still streams.",
-  "turn-commands":
-    "API process holds no command queue, so it registered no Langy conversation pipeline: starting a turn, continuing one, renaming, forking and deleting a conversation all refuse by name. Reading conversations and messages is unaffected, and both live channels still stream.",
-  "operator-runtime":
-    "API process composed no operator runtime: the process-manager fleet and the projection replay runner refuse by name. The event-log explorer, the scheduled-job store, the admin allow-list, the impersonation ledger and the back-office reads answer for real.",
   "live-buffer":
-    "API process holds no Redis: the Langy turn stream yields nothing and the browser falls back to the Postgres conversation read, tab presence is per-process, and the operator's queue views report nothing.",
+    "API process holds no Redis: scenario tab presence is per-process rather than shared, so two browsers on one project do not see each other's open tabs.",
+  "scenario-secrets":
+    "API process composed no stored-secret cipher: reading or writing a scenario's own stored secret refuses by name. Every other scenario read and write, and the suites beside them, are unaffected.",
 } as const;
 
 /**
@@ -309,16 +231,10 @@ export type ApiAgentGroupCollaboratorsOptions = Readonly<{
    * nobody else can see.
    */
   scenarioExecution: ApiScenarioExecutionCollaborators;
-  /** The Auth service the back-office user reads resolve a person through. */
-  auth: AuthService;
   /** The user directory, as the browser-session boundary already composed it. */
   users: UserService;
   /** The project directory the tenancy graph composed. */
   projects: ProjectService;
-  /** The organization directory, for the operator's back-office search. */
-  organizations: OrganizationService;
-  /** This deployment's flag store, which the Langy rollout gate reads. */
-  featureFlags: FeatureFlagService;
   /**
    * The broadcast fabric presence already publishes on.
    *
@@ -332,67 +248,45 @@ export type ApiAgentGroupCollaboratorsOptions = Readonly<{
    *
    * The SAME one: a scenario's stored secret is written by one tier and read by
    * the other, so a second cipher here would be a second key.
+   *
+   * Absent where the deployment configured no stored-secret key. That used to
+   * take this whole half — six namespaces — off the wire; it now costs exactly
+   * the scenario reads and writes that touch a stored secret, which refuse by
+   * name. Nothing else in this graph reads it.
    */
-  encryption: SecretEncryptionPort;
+  encryption: SecretEncryptionPort | undefined;
   /** The same routed ClickHouse the charted reads run on; absent is a real shape. */
   resolveClickHouseClient:
     | ((projectId: string) => Promise<SimulationReadClient & SuiteClickHouseClient>)
     | null;
-  /**
-   * The install's own SHARED ClickHouse endpoint, for the one read here that is
-   * nobody's tenant: the operator's event-log explorer.
-   *
-   * A client rather than a resolver because there is no id to route on —
-   * `event_log` is searched across tenants, and the operator picking a tenant
-   * afterwards is a predicate, not a route. Absent (a deployment with only
-   * private routes, or none at all) the explorer refuses by name rather than
-   * answering the empty set, which would read as "this install has no events".
-   */
-  eventLogClient: ClickHouseClient | null;
-  /** The queue's own Redis. The token buffer, tab presence and the ops queues share it. */
+  /** The queue's own Redis, which tab presence rides. */
   redis: RedisConnection | null;
   /** The number the event store already stamps its own rows with. */
   defaultRetentionDays: number;
-  /** The one project whose read access is granted to every authenticated user. */
-  demoProjectId: string | undefined;
-  /** The deployment's operator allow-list, as configuration states it. */
-  adminEmails: readonly string[];
-  /** The process's audit trail; an egress change and a back-office write both land on it. */
-  audit: ApiAuditPort | undefined;
-  /** The shared counter the two Langy budgets meter through. */
-  rateLimit: (input: {
-    key: string;
-    windowSeconds: number;
-    max: number;
-  }) => Promise<{ allowed: boolean; resetAt: number }>;
   /**
-   * The producer-only eventing runtime the three agent-side pipelines are
-   * registered on, so a scenario run, a suite run and a Langy conversation
-   * write reach the worker that drains them. Absent refuses all three by name.
+   * The agent-side command senders this process registered producer-only, so a
+   * scenario run and a suite run reach the worker that drains them. Registered
+   * by the root rather than here: the Langy feature dispatches on the same
+   * runtime and is no longer composed beside this half.
    */
-  eventing: EventSourcing | undefined;
+  pipelines: ApiAgentPipelines;
   /** Names this process in every refusal below. */
   processName: string;
   report?: ApiAgentGroupAbsenceReport;
 }>;
 
 /**
- * The six tRPC ports {@link ApiTrpcCollaborators} mounts individually.
+ * The tRPC ports {@link ApiTrpcCollaborators} mounts individually.
  *
  * Nested here rather than flattened onto {@link ApiAgentGroupCollaborators}
- * itself: this half also carries the `scenarios`, `langy` and `ops`
- * APPLICATION slices under those exact names, and a port and an application
- * slice cannot share one key on one object. `composeApiTrpcCollaborators`
+ * itself: this half also carries the `scenarios` APPLICATION slice under that
+ * exact name, and a port and an application slice cannot share one key on one
+ * object. `composeApiTrpcCollaborators`
  * (`api-trpc-features.composition.ts`) reads `ports.*` into the flat record
  * and the application slices into `application` beside them.
  */
 type ApiAgentGroupPorts = Readonly<{
   scenarios: ScenarioTrpcPorts;
-  langy: LangyTrpcPorts;
-  langyGates: LangyTrpcGates;
-  langyEgress: LangyEgressTrpcPorts;
-  ops: OpsTrpcPorts;
-  opsCheck(input: { permission: AuthzPermission; throwOnDeny?: boolean }): AppTrpcDeclaredCheck;
 }>;
 
 /** The application slices and the port group this half owns, composed together. */
@@ -427,10 +321,6 @@ export type ApiAgentGroupCollaborators = Readonly<{
   agentTestService: AgentTestService;
   /** For `ctx.app.suites`. */
   suites: SuiteApp;
-  /** For `ctx.app.langy` — the same application both Langy doors read. */
-  langy: LangyApp;
-  /** For `ctx.app.ops`. */
-  ops: OpsApp;
 }>;
 
 /** Composes the agent-group half from this process's own graph. */
@@ -439,26 +329,7 @@ export function composeApiAgentGroupCollaborators(
 ): ApiAgentGroupCollaborators {
   const logger = createLogger(`${options.processName}:agent-group`);
 
-  // The three agent-side pipelines, registered PRODUCER-only on this process's
-  // own Eventing. Composed FIRST because every write below dispatches on them:
-  // the eight simulation commands, the suite run's start, and all sixteen
-  // conversation commands.
-  const pipelines = composeApiAgentPipelines({
-    eventing: options.eventing,
-    processName: options.processName,
-    report: {
-      withoutQueue: () => {
-        options.report?.absent("run-commands");
-        options.report?.absent("turn-commands");
-      },
-    },
-  });
-  // Two of the four are still absent, and the event-log explorer is no longer
-  // one of them — see `composeEventExplorer`. The report stays unconditional
-  // because both remaining legs are unconditional: this process runs no
-  // process managers whatever it is configured with, and no `OpsReplayRuntimePort`
-  // exists in the tree for any process to compose.
-  options.report?.absent("operator-runtime");
+  const pipelines = options.pipelines;
   if (!options.redis) options.report?.absent("live-buffer");
 
   const simulations = composeSimulations(options, pipelines);
@@ -549,9 +420,6 @@ export function composeApiAgentGroupCollaborators(
     maxCallTimeoutMs: MAX_CALL_TIMEOUT_MS,
   });
 
-  const langyApp = composeLangy(options, pipelines);
-  const opsApp = composeOps(options, logger);
-
   return {
     scenarios: scenarioApp,
     scenarioService: scenarios,
@@ -559,15 +427,8 @@ export function composeApiAgentGroupCollaborators(
     simulations,
     agentTestService,
     suites: suiteApp,
-    langy: langyApp,
-    ops: opsApp,
     ports: {
       scenarios: composeScenarioPorts(logger),
-      langy: composeLangyPorts(options, langyApp),
-      langyGates: composeLangyGates(options),
-      langyEgress: composeLangyEgressPorts(options),
-      ops: composeOpsPorts(),
-      opsCheck: composeOpsCheck(opsApp),
     },
   };
 }
@@ -695,6 +556,55 @@ class ApiScenarioSecretCipher extends ScenarioSecretCipherPort {
 }
 
 /**
+ * The cipher a scenario's stored secret is written and read under, or a
+ * refusal by name.
+ *
+ * Refusing here rather than at the composition, which is the whole narrowing:
+ * an unset stored-secret key used to mean this half composed nothing and six
+ * namespaces left the wire — the scenarios and their runs, the suites, both
+ * Langy surfaces and the operator back office — because ONE store in the graph
+ * happened to hold a cipher. Nothing but a scenario's own secret reads it, so
+ * nothing but a scenario's own secret should lose anything.
+ */
+function composeScenarioSecretCipher(
+  options: ApiAgentGroupCollaboratorsOptions,
+): ScenarioSecretCipherPort {
+  if (options.encryption) return new ApiScenarioSecretCipher(options.encryption);
+  options.report?.absent("scenario-secrets");
+  return new UnavailableApiScenarioSecretCipher();
+}
+
+/** A scenario secret this deployment can neither write nor read. */
+class UnavailableApiScenarioSecretCipher extends ScenarioSecretCipherPort {
+  encrypt(): string {
+    throw new ScenarioSecretsUnavailableError();
+  }
+
+  decrypt(): string {
+    throw new ScenarioSecretsUnavailableError();
+  }
+}
+
+/**
+ * Raised rather than answered with a blank, because a blank is worse: an agent
+ * run handed an empty credential fails against the provider with a message
+ * about the provider, and the person reading it has no way back to the missing
+ * deployment key.
+ */
+class ScenarioSecretsUnavailableError extends HandledError {
+  declare readonly code: "service_unavailable";
+
+  constructor() {
+    super(
+      "service_unavailable",
+      "This deployment cannot store or read scenario secrets, because it has no encryption key configured.",
+      { httpStatus: 503, fault: "platform" },
+    );
+    this.name = "ScenarioSecretsUnavailableError";
+  }
+}
+
+/**
  * Tab presence, without Redis.
  *
  * Every answer is "nobody is here", which is the truth for a process that
@@ -765,7 +675,7 @@ function composeScenarioExecution(
       // The SAME cipher the scenario service writes a stored secret with: a
       // run's secret parameters are decrypted here and encrypted there, and a
       // second cipher would be a second key.
-      secretCipher: new ApiScenarioSecretCipher(options.encryption),
+      secretCipher: composeScenarioSecretCipher(options),
       config,
       scenarios: composed.scenarios,
       suites: composed.suites,
@@ -809,500 +719,4 @@ function composeScenarioPorts(logger: Logger): ScenarioTrpcPorts {
       logger.error({ error }, "a scenario side effect failed");
     },
   };
-}
-
-// ---------------------------------------------------------------------------
-// Langy
-// ---------------------------------------------------------------------------
-
-/**
- * The Langy application, over the Postgres projections the worker writes and
- * the Redis buffer it appends to.
- *
- * `events` is `null` rather than this process's event store, deliberately: the
- * store here is {@link EventStoreProducerOnly}, which holds no readable log, so
- * a conversation's durable event page is answered from the projections instead.
- */
-function composeLangy(
-  options: ApiAgentGroupCollaboratorsOptions,
-  pipelines: ApiAgentPipelines,
-): LangyApp {
-  const adapter = PostgresLangyAdapter.create({ database: options.prisma });
-  const redis = options.redis;
-
-  const turns: LangyTurnTechnicalPorts = {
-    // Resolving the model a turn runs on refuses rather than inventing one: a
-    // guessed model bills a customer's key against a provider they did not
-    // choose. The worker composition makes the same call for its title
-    // generator, and for the same reason.
-    models: {
-      resolve: () => Promise.reject(new ApiAgentGroupUnavailableError("Resolving the Langy model")),
-    },
-    // No agent manager on a web process: dispatching is the worker's.
-    worker: null,
-    tokenBuffer: redis ? LangyTokenBuffer.create({ redis }) : null,
-    permits: {
-      reserve: () =>
-        Promise.reject(new ApiAgentGroupUnavailableError("Reserving a Langy pull-request permit")),
-      release: () => Promise.resolve(),
-      check: () =>
-        Promise.reject(new ApiAgentGroupUnavailableError("Reading the Langy pull-request budget")),
-    },
-    // Zero rather than a number: with no permit store there is no budget to
-    // spend, and a positive cap would advertise one.
-    perDayPrCap: 0,
-    sessionKeys: {
-      mint: () => Promise.reject(new ApiAgentGroupUnavailableError("Minting a Langy session key")),
-      revoke: () => Promise.resolve(),
-    },
-    // The one turn port that answers for real here: rendering the composer's
-    // context chips is pure, and the contract package owns it.
-    context: { render: renderLangyTurnContext },
-    uiActionSurface: FeatureFlagLangyUiActionSurfaceAdapter.create(options.featureFlags),
-    metrics: { count: () => undefined },
-    accessStore: redis ? LangyTurnAccessStore.create({ redis }) : null,
-    handoffStore: redis ? LangyTurnHandoffStore.create({ redis }) : null,
-  };
-
-  const service = adapter.build({
-    turns,
-    credentials: {
-      sessionKeys: {
-        mint: () =>
-          Promise.reject(new ApiAgentGroupUnavailableError("Minting a Langy session key")),
-        revokeManaged: () => Promise.resolve("refused" as const),
-      },
-      virtualKeys: {
-        provision: () =>
-          Promise.reject(new ApiAgentGroupUnavailableError("Provisioning a Langy virtual key")),
-      },
-      github: {
-        enabled: false,
-        mintTurnToken: () => Promise.resolve(null),
-      },
-      runtime: {
-        workerCallbackUrl: undefined,
-        workerGatewayBaseUrl: undefined,
-        mirrorProjectId: undefined,
-      },
-    },
-    commands: pipelines.langyConversations,
-    events: null,
-    ...(redis ? { feedbackPromptRedis: redis } : {}),
-  });
-
-  return LangyApp.create({
-    langy: service,
-    redis: redis as unknown as Parameters<typeof LangyApp.create>[0]["redis"],
-    broadcast: options.broadcast,
-  });
-}
-
-/**
- * The two Langy budgets, the analytics sink and the UI-action channel.
- *
- * The budgets meter through the SAME counter the public REST surface and the
- * identity half's throttles use, so a caller has one budget per rule rather
- * than one per surface. They fail OPEN when the counter has no Redis, which is
- * the behaviour the platform host pinned: a chat that stops working because the
- * cache is down is worse than an unmetered minute.
- */
-function composeLangyPorts(
-  options: ApiAgentGroupCollaboratorsOptions,
-  langy: LangyApp,
-): LangyTrpcPorts {
-  const logger = createLogger(`${options.processName}:langy`);
-  const uiActions = () =>
-    new LangyUiActionService({
-      redis: options.redis as unknown as UiActionRedis,
-      conversations: {
-        findByIdVisible: (args) => langy.tryFindVisible(args),
-      },
-      buffer: LangyTokenBuffer.create({ redis: options.redis }),
-      actions: new UnavailableApiLangyUiActionCatalog(),
-    });
-
-  const budget = (input: { userId: string; projectId: string }, key: string, max: number) =>
-    options
-      .rateLimit({ key: `${key}:${input.projectId}:${input.userId}`, windowSeconds: 60, max })
-      .then(({ allowed }) => ({ allowed }))
-      .catch(() => ({ allowed: true }));
-
-  return {
-    // 30 messages a minute and 60 warms, the two budgets the platform host set.
-    // Restated here because they are this process's policy rather than Langy's,
-    // and the module that held them is one this migration deletes.
-    checkMessageRateLimit: (input) => budget(input, "langy:rl:msg", 30),
-    checkWarmRateLimit: (input) => budget(input, "langy:rl:warm", 60),
-    recordProductEvent: ({ userId, projectId, event }) => {
-      logger.info(
-        { userId, projectId, event },
-        "langy product event not recorded: this process composes no product-analytics sink",
-      );
-    },
-    uiActions: {
-      claim: (input) => uiActions().claim(input),
-      complete: (input) => uiActions().complete(input),
-    },
-  };
-}
-
-/**
- * The page-action catalogue, absent.
- *
- * The only catalogue that exists is the experiments workbench's, and it is a
- * browser module: a Langy server package may not reach it and neither may this
- * composition root. Every kind therefore reads as unknown, which refuses a
- * DISPATCH by name. The two procedures this record mounts — `claimUiAction` and
- * `completeUiAction` — never consult it, so the page half of the channel works
- * whole.
- */
-class UnavailableApiLangyUiActionCatalog extends LangyUiActionCatalogPort {
-  tryFind(_kind: string): LangyUiActionDefinition | null {
-    return null;
-  }
-}
-
-/**
- * The two gates every customer-facing Langy procedure carries, built here
- * because neither is a permission.
- */
-function composeLangyGates(options: ApiAgentGroupCollaboratorsOptions) {
-  /**
-   * Refuses the demo project outright.
-   *
-   * `project:view` is granted to every authenticated user on the demo project,
-   * so a permission check alone would expose whatever Langy chat somebody left
-   * there. The server never runs Langy on the demo project, so the refusal is
-   * explicit and it runs BEFORE the rollout gate.
-   */
-  const refuseDemoProject = async ({
-    input,
-    next,
-  }: {
-    input: { projectId?: string };
-    next: () => unknown;
-  }) => {
-    if (options.demoProjectId && input.projectId === options.demoProjectId) {
-      throw new NotFoundError("not_found", "Langy", input.projectId);
-    }
-    return next();
-  };
-
-  /**
-   * The authoritative internal-only rollout decision, LAST in the chain so
-   * membership is always proven by RBAC before the flag is read.
-   *
-   * The organization is resolved from the project rather than read off the
-   * input: every project-scoped procedure carries only a `projectId`, and
-   * evaluating an ORG-targeted rule with no organization at all is what made an
-   * opted-in account read as "not enabled".
-   */
-  const enforceLangyAccess = async ({
-    ctx,
-    input,
-    next,
-  }: {
-    ctx: unknown;
-    input: { projectId?: string; organizationId?: string };
-    next: () => unknown;
-  }) => {
-    const userId = (ctx as ApiTrpcPortsContext).actor().id;
-    const organizationId =
-      input.organizationId ??
-      (input.projectId ? await options.projects.getOrganizationId(input.projectId) : undefined);
-
-    const target: FeatureFlagTarget = input.projectId
-      ? {
-          kind: "project",
-          userId,
-          projectId: input.projectId,
-          ...(organizationId ? { organizationId } : {}),
-        }
-      : organizationId
-        ? { kind: "organization", userId, organizationId }
-        : { kind: "user", userId };
-
-    if (!(await options.featureFlags.isEnabled(LANGY_RELEASE_FLAG, target))) {
-      // A typed handled error, not a bare NOT_FOUND: the client tells a rollout
-      // gate apart from a load failure by the code on the wire.
-      throw new LangyNotEnabledError();
-    }
-    return next();
-  };
-
-  return { refuseDemoProject, enforceLangyAccess };
-}
-
-/** The audit trail an egress allow-list change is recorded on. */
-function composeLangyEgressPorts(options: ApiAgentGroupCollaboratorsOptions): LangyEgressTrpcPorts {
-  const audit = options.audit;
-  const logger = createLogger(`${options.processName}:langy-egress`);
-  return {
-    recordAudit: async (entry) => {
-      if (!audit) {
-        logger.warn(
-          { projectId: entry.projectId, action: entry.action },
-          "langy egress change not audited: this process composed no audit sink",
-        );
-        return;
-      }
-      // Awaited rather than fired and forgotten: an allow-list change is a
-      // network policy, and the record of who widened it is part of the write.
-      try {
-        await audit.record(entry as unknown as Parameters<ApiAuditPort["record"]>[0]);
-      } catch (error) {
-        logger.error({ error, action: entry.action }, "langy egress audit failed");
-      }
-    },
-  };
-}
-
-// ---------------------------------------------------------------------------
-// The operator back office
-// ---------------------------------------------------------------------------
-
-/**
- * The operator application, over the Postgres half of the operations capability.
- *
- * `redis` is deliberately NOT passed. The adapter's own invariant is that a
- * Redis connection demands a queue payload decoder, and decoding a queued job's
- * payload needs the tiered blob store — Redis blobs plus the project's own
- * object storage — which the stored-object vertical has not moved. Passing
- * Redis without the decoder throws at build; passing a decoder that cannot read
- * offloaded payloads would render a queue view that silently omits the large
- * jobs. So the queue and blob views take the package's own no-Redis form and
- * the absence is reported.
- */
-function composeOps(options: ApiAgentGroupCollaboratorsOptions, logger: Logger): OpsApp {
-  const operations = PostgresOpsAdapter.create({
-    adminEmails: options.adminEmails,
-    database: options.prisma,
-    audit: new ApiOpsAuditSink(options.audit, logger),
-    users: options.users,
-    auth: options.auth,
-    scheduler: {
-      repository: new PrismaScheduledJobStore(options.prisma),
-      // The scheduler's own polling backstop preserves correctness without a
-      // wake, which is what makes the noop the package's answer rather than a
-      // degradation this root invented.
-      wake: NoopSchedulerWakeService.create(),
-      projects: options.projects,
-    },
-  }).build();
-
-  return OpsApp.create({
-    ops: Object.assign(operations, {
-      eventExplorer: composeEventExplorer(options),
-      managerExplorer: unavailableOperatorRuntime<OpsProcessExplorer>("the process-manager fleet"),
-      replay: unavailableOperatorRuntime<OpsReplayRunner>("the projection replay runner"),
-      snapshots: null,
-    }) as OpsCapability,
-    featureFlags: options.featureFlags,
-    projects: options.projects,
-  });
-}
-
-/**
- * The event-log explorer, over the install's own shared endpoint.
- *
- * Two collaborators, and this process holds both. The REPOSITORY takes one
- * client because its three reads are cross-tenant by design — "which
- * aggregates exist", "which match this string", "what happened to this one" —
- * and the shared endpoint is the install's own event log. A tenant-keyed
- * resolver cannot serve them: there is no project id until the operator has
- * already found the aggregate.
- *
- * The INTROSPECTION half is read off the pipeline definitions this process
- * registered, resolved lazily on every call because the agent-side pipelines
- * are registered by this same composition a few lines above. Producer-only
- * registration keeps the definition WHOLE — the runtime declines to RUN the
- * managers, it does not drop the declaration — so the projections an operator
- * picks in the replay wizard are the same names the worker folds under. A
- * process that registered none answers an empty list, which is the true answer
- * rather than a missing one.
- */
-function composeEventExplorer(options: ApiAgentGroupCollaboratorsOptions): OpsEventExplorer {
-  const client = options.eventLogClient;
-  if (!client) return unavailableOperatorRuntime<OpsEventExplorer>("the event-log explorer");
-
-  return new EventExplorerService(
-    new EventExplorerClickHouseRepository(client),
-    EventingOpsIntrospectionAdapter.create(() => options.eventing?.definitions ?? []),
-  );
-}
-
-/**
- * One operator explorer, refused by name on every method.
- *
- * A Proxy rather than twenty-seven written stand-ins: these three types are
- * structural views over the operations vocabulary, so what this file has to say
- * about them is one sentence — "this process has none" — and writing it out per
- * method would bury that in boilerplate a new method would silently escape.
- *
- * Two callers are left, and what each waits on is NOT the same thing:
- *
- *   - the PROCESS-MANAGER FLEET wants `ManagerExplorerService` over
- *     `PrismaProcessStore`, `ProcessOpsPrismaRepository` and an introspection
- *     adapter. Every part exists; what is unsettled is whether a PRODUCER-ONLY
- *     process should render a fleet at all — it runs none of the machines the
- *     table lists, and the rows would be the worker's. That is a decision, not
- *     a wiring gap, and it is deliberately left open.
- *   - the REPLAY RUNNER is the one genuine absence: `OpsReplayRuntimePort` has
- *     no implementation anywhere in the tree, so `ReplayService` cannot be
- *     constructed at all.
- *
- * The EVENT-LOG EXPLORER used to be a third. It waited on an accessor for the
- * shared endpoint, which `ApiClickHouseInfrastructure` now publishes as
- * `resolveSharedClient`; it is composed by {@link composeEventExplorer} and
- * refuses only where a deployment has no shared endpoint to read.
- */
-function unavailableOperatorRuntime<T>(capability: string): T {
-  return new Proxy(
-    {},
-    {
-      get: () => () => Promise.reject(new ApiAgentGroupUnavailableError(capability)),
-      has: () => true,
-    },
-  ) as T;
-}
-
-/** Bridges the operations package's audit sink onto this process's trail. */
-class ApiOpsAuditSink extends AdminAuditSink {
-  constructor(
-    private readonly audit: ApiAuditPort | undefined,
-    private readonly logger: Logger,
-  ) {
-    super();
-  }
-
-  async record(entry: {
-    userId: string;
-    action: string;
-    args?: unknown;
-    req?: unknown;
-  }): Promise<void> {
-    if (!this.audit) {
-      this.logger.warn(
-        { action: entry.action },
-        "operator action not audited: this process composed no audit sink",
-      );
-      return;
-    }
-    await this.audit.record(entry as unknown as Parameters<ApiAuditPort["record"]>[0]);
-  }
-}
-
-/**
- * The four operator ports, each answering for the PROCESS rather than for the
- * operations service.
- *
- * Three of them describe a runtime this process does not run: it registers no
- * pipelines (its Eventing is producer-only), it holds no Grafana configuration,
- * and it runs no system migrations. Each says so by name or by an explicit
- * "none", rather than by an empty list that reads as "nothing is registered".
- */
-function composeOpsPorts(): OpsTrpcPorts {
-  return {
-    // An explicitly empty registry, not a refusal: this process genuinely
-    // registers no projections and no subscribers, so "none" is the true
-    // answer rather than a missing one.
-    listPipelineRegistrations: () => ({ projections: [], eventSubscribers: [] }),
-    getEventLogSearchWindow: () => ({
-      searchLookbackDays: OPS_EVENT_LOG_LOOKBACK_DAYS,
-      // Null is "we cannot say", which is the honest answer for a process that
-      // reads no table TTL configuration.
-      hotTierDays: null,
-      hotTierEnvVar: null,
-    }),
-    tryGetGrafanaLinkConfig: () => null,
-    systemMigrations: unavailableOperatorRuntime<OpsTrpcPorts["systemMigrations"]>(
-      "The system-migrations runner",
-    ),
-  };
-}
-
-/**
- * The platform-tier operator gate.
- *
- * Custom rather than a permission, and declared as such so the router sweep
- * counts it: it resolves the deployment's admin allow-list into an ops scope no
- * procedure input carries. Two details it must keep, because both are
- * load-bearing:
- *
- *  - the IMPERSONATOR's own grant carries through. An impersonation session
- *    rewrites the session user to the customer being debugged, so reading only
- *    that identity would hide the operator surface at exactly the moment an
- *    admin opened it to look at somebody's account.
- *  - `throwOnDeny: false` REPORTS "no access" instead of refusing, which is
- *    what lets the global menu poll the scope on every page load.
- */
-function composeOpsCheck(ops: OpsApp) {
-  return ({
-    permission,
-    throwOnDeny = true,
-  }: {
-    permission: AuthzPermission;
-    throwOnDeny?: boolean;
-  }) =>
-    declareAuthzMiddleware(
-      {
-        kind: "custom",
-        reason:
-          "platform-tier operator check: resolves the admin allow-list into an ops scope no procedure input carries",
-        permissions: [permission],
-      },
-      async ({ ctx, next }: { ctx: unknown; next: () => Promise<unknown> }) => {
-        const context = ctx as {
-          session?: {
-            user?: { email?: string | null; impersonator?: { email?: string | null } };
-          } | null;
-          opsScope?: { kind: "platform" | "none" };
-          permissionChecked?: boolean;
-        };
-        const user = context.session?.user;
-        if (!user) throw new ApiAgentGroupUnauthenticatedError();
-
-        const scope: { kind: "platform" | "none" } =
-          ops.isAdmin({ email: user.email }) || ops.isAdmin({ email: user.impersonator?.email })
-            ? { kind: "platform" }
-            : { kind: "none" };
-
-        if (scope.kind === "none" && throwOnDeny) {
-          throw new ApiOperatorForbiddenError();
-        }
-
-        context.opsScope = scope;
-        // The fail-closed backstop reads this: without it the chain would
-        // refuse a procedure this check just passed.
-        context.permissionChecked = true;
-        return next();
-      },
-    );
-}
-
-/** The operator surface reached without a signed-in session. */
-class ApiAgentGroupUnauthenticatedError extends HandledError {
-  declare readonly code: "unauthorized";
-
-  constructor() {
-    super("unauthorized", "Sign in to reach the operator surface.", {
-      httpStatus: 401,
-      fault: "customer",
-    });
-    this.name = "ApiAgentGroupUnauthenticatedError";
-  }
-}
-
-/** A signed-in caller who is not on the deployment's operator allow-list. */
-class ApiOperatorForbiddenError extends HandledError {
-  declare readonly code: "forbidden";
-
-  constructor() {
-    super("forbidden", "You do not have permission to access ops resources.", {
-      httpStatus: 403,
-      fault: "customer",
-    });
-    this.name = "ApiOperatorForbiddenError";
-  }
 }
