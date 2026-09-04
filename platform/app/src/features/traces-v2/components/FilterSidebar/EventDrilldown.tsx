@@ -99,6 +99,7 @@ const MetricGroup: React.FC<{
           <MetricValueRow
             key={v.value}
             value={v.value}
+            displayKey={displayKey}
             count={v.count}
             maxCount={maxCount}
             state={state}
@@ -119,19 +120,30 @@ const MetricGroup: React.FC<{
  */
 const MetricValueRow: React.FC<{
   value: string;
+  displayKey: string;
   count: number;
   maxCount: number;
   state: "neutral" | "include" | "exclude";
   onClick: () => void;
-}> = ({ value, count, maxCount, state, onClick }) => {
+}> = ({ value, displayKey, count, maxCount, state, onClick }) => {
   const active = state !== "neutral";
   const palette = state === "exclude" ? "red" : "blue";
   const fillPct =
     maxCount > 0 ? Math.max((count / maxCount) * 100, MIN_VISIBLE_FILL_PCT) : 0;
+  // The key qualifies the value because an event can carry several metrics,
+  // and two of them may offer the same value ("1" under both `vote` and
+  // `rating`). The state word says which way the filter points: "active"
+  // alone reads identically for an included and an excluded value.
+  const stateLabel =
+    state === "include"
+      ? "included"
+      : state === "exclude"
+        ? "excluded"
+        : "click to filter";
   return (
     <RowButton
       type="button"
-      aria-label={`${value} — ${active ? "active" : "click to filter"}`}
+      aria-label={`${displayKey} ${value} — ${stateLabel}`}
       data-state={state}
       position="relative"
       width="full"

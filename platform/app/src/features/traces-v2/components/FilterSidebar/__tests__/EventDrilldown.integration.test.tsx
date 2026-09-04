@@ -103,6 +103,49 @@ describe("EventDrilldown", () => {
           "include",
         );
       });
+
+      it("names the row included, distinctly from an excluded one", () => {
+        renderDrilldown({
+          ast: parse("event.attribute.event.metrics.vote:-1"),
+        });
+
+        expect(
+          screen.getByRole("button", { name: "vote -1 — included" }),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: "vote 1 — click to filter" }),
+        ).toBeInTheDocument();
+      });
+    });
+
+    describe("when a vote value is excluded in the query", () => {
+      it("names the row excluded rather than merely active", () => {
+        renderDrilldown({
+          ast: parse("NOT event.attribute.event.metrics.vote:-1"),
+        });
+
+        expect(
+          screen.getByRole("button", { name: "vote -1 — excluded" }),
+        ).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("given two metric groups that share a value", () => {
+    it("qualifies each value with its metric key so the names stay distinct", () => {
+      renderDrilldown({
+        item: buildItem([
+          { key: "event.metrics.vote", values: [{ value: "1", count: 4 }] },
+          { key: "event.metrics.rating", values: [{ value: "1", count: 2 }] },
+        ]),
+      });
+
+      expect(
+        screen.getByRole("button", { name: "vote 1 — click to filter" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "rating 1 — click to filter" }),
+      ).toBeInTheDocument();
     });
   });
 });
