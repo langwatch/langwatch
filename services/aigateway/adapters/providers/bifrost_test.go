@@ -661,60 +661,34 @@ func TestCredentialToBifrostKey_Azure_EndpointFromApiBase(t *testing.T) {
 	}
 }
 
-// A provider with no AZURE_OPENAI_API_VERSION configured sends no
-// x-litellm-api_version, so gatewayproxy never writes Extra["api_version"].
-// APIVersion must then stay NIL, because nil is precisely what makes Bifrost
-// apply its own AzureAPIVersionDefault ("2024-10-21",
-// bifrost/core/providers/azure/types.go) at azure.go's
-// `if apiVersion == nil` fallback. validateKeyConfig never checks APIVersion,
-// so nil is safe — an unset version is not a misconfiguration.
-//
-// The ok-guard in credentialToBifrostKey is what preserves that. Assigning
-// unconditionally would store a non-nil EnvVar wrapping "", Bifrost's nil check
-// would not fire, and the request URL would carry `?api-version=` — the same
-// empty-value shape as the endpoint bug this PR exists to fix, but failing at
-// Azure instead of at the config check. Pinned here so a refactor that drops the
-// guard fails loudly rather than silently emitting an empty api-version.
-func TestCredentialToBifrostKey_Azure_NoAPIVersion_StaysNilSoBifrostDefaults(t *testing.T) {
+// bifrost v1.5 removed the per-key AzureKeyConfig.APIVersion field: the Azure
+// provider now injects its own api-version (DefaultAzureAPIVersion for classic
+// /deployments/ routes, "preview" for the responses API) and only when the
+// query is absent, so the empty-`?api-version=` shape #5760 guarded against is
+// structurally unreachable. The adapter therefore emits no api-version at all;
+// the caller-supplied api_version override is no longer forwarded (see the
+// bifrost/core v1.5.17 bump, GO-2026-6320). What remains adapter-owned for
+// Azure is the endpoint (dual-named endpoint/api_base) and the model->deployment
+// map, which v1.5 moved onto Key.Aliases and resolves via Aliases.Resolve.
+func TestCredentialToBifrostKey_Azure_EndpointAndDeploymentsMapToKey(t *testing.T) {
 	cred := domain.Credential{
 		ID:            "mp-azure",
 		ProviderID:    domain.ProviderAzure,
 		APIKey:        "az-key",
 		Extra:         map[string]string{"api_base": "https://acme.openai.azure.com"},
-		DeploymentMap: map[string]string{"gpt-5-mini": "gpt-5-mini"},
+		DeploymentMap: map[string]string{"gpt-5-mini": "gpt5mini-deploy"},
 	}
 	key := credentialToBifrostKey(cred, bfschemas.Azure)
 
 	if key.AzureKeyConfig == nil {
 		t.Fatal("AzureKeyConfig is nil: Azure keys require an endpoint config")
 	}
-	if key.AzureKeyConfig.APIVersion != nil {
-		t.Fatalf("AzureKeyConfig.APIVersion = %q, want nil so Bifrost applies its "+
-			"own AzureAPIVersionDefault; a non-nil empty version skips that default "+
-			"and sends `?api-version=` (#5760)", key.AzureKeyConfig.APIVersion.Val)
+	if got := key.AzureKeyConfig.Endpoint.Val; got != "https://acme.openai.azure.com" {
+		t.Fatalf("AzureKeyConfig.Endpoint = %q, want the api_base endpoint (#5760)", got)
 	}
-}
-
-// The counterpart: an explicitly configured api_version must still win, so the
-// nil-means-default rule above cannot be satisfied by simply never setting it.
-func TestCredentialToBifrostKey_Azure_ExplicitAPIVersionWins(t *testing.T) {
-	cred := domain.Credential{
-		ID:         "mp-azure",
-		ProviderID: domain.ProviderAzure,
-		APIKey:     "az-key",
-		Extra: map[string]string{
-			"api_base":    "https://acme.openai.azure.com",
-			"api_version": "2025-04-01-preview",
-		},
-		DeploymentMap: map[string]string{"gpt-5-mini": "gpt-5-mini"},
-	}
-	key := credentialToBifrostKey(cred, bfschemas.Azure)
-
-	if key.AzureKeyConfig.APIVersion == nil {
-		t.Fatal("AzureKeyConfig.APIVersion is nil, want the configured api_version")
-	}
-	if got := key.AzureKeyConfig.APIVersion.Val; got != "2025-04-01-preview" {
-		t.Fatalf("AzureKeyConfig.APIVersion = %q, want %q", got, "2025-04-01-preview")
+	if got := key.Aliases.Resolve("gpt-5-mini"); got != "gpt5mini-deploy" {
+		t.Fatalf("Aliases.Resolve(gpt-5-mini) = %q, want the mapped deployment; "+
+			"v1.5 resolves model->deployment via Key.Aliases", got)
 	}
 }
 
