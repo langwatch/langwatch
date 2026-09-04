@@ -544,6 +544,7 @@ function readFailedToolCalls(message: PartsView): FailedToolCall[] {
       presentation: presentLangyToolError({
         title: described.title,
         errorText: part.errorText ?? part.output,
+        toolName: name,
       }),
       order: index,
     });
