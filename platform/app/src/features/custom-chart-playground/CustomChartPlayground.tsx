@@ -60,6 +60,8 @@ function toWidget(row: {
 const showError = (title: string) =>
   toaster.create({ title, type: "error", duration: 3000 });
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: top-level playground component wiring several independent hooks/handlers (query state, execution, save, navigation); the branches don't interact.
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: top-level playground component assembling several independently-scoped panels.
 export function CustomChartPlayground({
   projectId,
   projectSlug,

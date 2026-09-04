@@ -135,6 +135,7 @@ export function DashboardWidgetCodeEditor({
   const updateDecorations = useRef(() => {
     // placeholder until the real implementation is assigned below
   });
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: walks the editor model line-by-line applying several independent decoration rules; the branches don't interact.
   updateDecorations.current = () => {
     const ed = editorRef.current;
     if (!ed || language !== "sql") return;

@@ -84,6 +84,8 @@ interface GraphCardMenuProps {
   isDeleting: boolean;
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: menu wires several independent optional actions (edit/size/granularity/delete) behind guard checks; the branches don't interact.
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: one menu component rendering several independent, non-interacting action items.
 export function GraphCardMenu({
   graphId,
   projectId,

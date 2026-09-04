@@ -97,6 +97,7 @@ interface DashboardWidgetCardProps {
   isSaving: boolean;
 }
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: one card component rendering the widget's header, chart frame, and menu together.
 export function DashboardWidgetCard({
   widget,
   projectId,

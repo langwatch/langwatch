@@ -53,6 +53,7 @@ export interface SandboxedChartFrameProps {
   maxHeight?: number;
 }
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: one component wiring the iframe, bridge lifecycle, and render states together.
 export function SandboxedChartFrame({
   code,
   executeQuery,

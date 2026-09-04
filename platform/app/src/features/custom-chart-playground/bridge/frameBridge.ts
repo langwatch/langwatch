@@ -80,6 +80,7 @@ export interface FrameBridge {
   dispose(): void;
 }
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: one factory wiring the iframe's postMessage handlers and lifecycle together; splitting it would scatter closured state.
 export function createFrameBridge(
   options: CreateFrameBridgeOptions,
 ): FrameBridge {

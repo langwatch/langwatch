@@ -116,6 +116,7 @@ function buildClause(field: string, value: string | string[]): string | null {
  * `startDate`/`endDate` (handled separately for `from`/`to`), and anything
  * unresolvable to a known liqe field (warn-and-drop).
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: loops params applying independent per-key resolution/escaping rules; the branches don't interact.
 function buildLiqeQuery(params: Readonly<Record<string, unknown>>): string {
   const clauses: string[] = [];
   for (const [key, value] of Object.entries(params)) {

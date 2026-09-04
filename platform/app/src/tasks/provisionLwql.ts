@@ -170,6 +170,7 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: linear top-to-bottom provisioning sequence (Postgres views, grants, ClickHouse objects); splitting it would scatter the ordering it depends on.
 export default async function execute() {
   const connection = lwqlConnectionFromEnv();
   if (!connection) {
@@ -216,6 +217,7 @@ export default async function execute() {
     throw error;
   }
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: linear sequence of independent ClickHouse statement executions; the branches don't interact.
   await withAdminClickHouseClient(async (client) => {
     const statements = productionClickHouseObjectStatements({
       names,

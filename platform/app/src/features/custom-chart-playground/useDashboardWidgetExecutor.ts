@@ -67,6 +67,7 @@ export interface DashboardWidgetExecutorOverrides {
   readonly granularitySeconds?: LangWatchQLGranularityStep;
 }
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: one hook assembling the query executor, standalone runner, and their shared last-run state; splitting it would scatter closured state.
 export function useDashboardWidgetExecutor(
   projectId: string,
   queries: DashboardWidgetQuery[],
@@ -106,7 +107,9 @@ export function useDashboardWidgetExecutor(
           timeWindow: pageWindow,
           granularitySeconds,
         },
-        { signal },
+        // `execute` requires a signal; callers without one (e.g. `runStandalone`)
+        // get a fresh controller's signal, which simply never aborts.
+        { signal: signal ?? new AbortController().signal },
       );
       return toChartQueryResult(result);
     },

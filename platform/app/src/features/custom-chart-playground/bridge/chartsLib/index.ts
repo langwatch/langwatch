@@ -407,6 +407,7 @@ export interface AreaTimeseriesProps {
   height?: number;
 }
 
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: one component computing series geometry and rendering the SVG chart together.
 export function AreaTimeseries({
   data,
   x,
@@ -1151,6 +1152,7 @@ interface InferredShape {
   y: string[];
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: enumerates independent shape-detection rules over the data's columns; the branches don't interact.
 function inferShape(
   data: Row[],
   x?: string,
@@ -1192,6 +1194,7 @@ function inferShape(
  * `kind`/`x`/`y`/`series`) and renders it. See the file header and the
  * per-kind rules in the module docstring at the top of this file.
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: dispatches on kind/x/y/series through independent fallback checks; the branches don't interact.
 export function LwqlChart({
   data,
   kind,
