@@ -6,11 +6,14 @@ One forward pass of the program is one full scenario: a simulated customer, the
 agent with its four tools, and a judge scoring the conversation against that
 scenario's criteria.
 
-The agent starts with short instructions and one deliberately weak tool
-description: `check_return_eligibility` does not say which `reason` values it
-accepts, so the untrained agent calls it with free text, gets a `ValueError`
-back and retries. That retry is visible in the transcript, the metric turns it
-into written feedback, and the optimizer rewrites the tool description.
+The agent starts with short instructions and two deliberately weak tool
+descriptions: neither `check_return_eligibility` nor `create_return` says which
+`reason` codes the returns system accepts (`defective`, `incorrect_item`,
+`not_as_expected`, `remorse`), and the codes are not the words a customer uses.
+The untrained agent sends `damaged`, gets a `ValueError` back that lists the
+codes, and retries. That retry is an extra step in the transcript, the metric
+turns it into written feedback, and the optimizer rewrites the tool
+descriptions.
 
 The guide for this example: https://langwatch.ai/docs/improve-your-agent/optimize-with-dspy
 
@@ -19,8 +22,8 @@ The guide for this example: https://langwatch.ai/docs/improve-your-agent/optimiz
 - `agent.py`: the `SupportSignature`, the four tools over an in-memory store of
   three orders, `build_agent()`, and `ReActAdapter`, which runs one turn of the
   agent inside a scenario and captures the DSPy trace.
-- `scenarios.py`: the six scenarios as `dspy.Example`s, with criteria and a turn
-  budget each.
+- `scenarios.py`: the six scenarios as `dspy.Example`s, with criteria and a step
+  budget each (a step is one reply or one tool call).
 - `program.py`: `ScenarioProgram`, the `scenario_metric`, and `evaluate_suite`,
   which runs all six scenarios and prints the table.
 - `optimize_gepa.py`: the GEPA run. GEPA reads the metric's written feedback.

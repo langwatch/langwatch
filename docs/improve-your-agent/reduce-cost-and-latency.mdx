@@ -5,7 +5,7 @@ keywords: langwatch, reduce cost, reduce latency, cheaper model, model compariso
 description: Run the same test suite on two models side by side, read the pass rate, the cost and the reply latency of each, and keep the cheaper model only where the pass rate holds.
 ---
 
-The cost of an agent is the tokens per turn times the turns per conversation times the price of the model. Latency is not that product: it also depends on tool time, prompt caching and how fast the provider answers, so it has to be measured rather than derived. The model is the lever with the largest effect and the largest risk, so it is the one to test first, with the suite as the gate and both numbers read off the comparison run.
+The cost of an agent is the tokens per turn times the turns per conversation times the price of the model. Latency also depends on tool time, prompt caching and the provider's speed, so measure it on a run instead of deriving it. Test the model first: it is the lever with the largest effect on both numbers and the largest risk to quality, and one comparison run of the suite gives you the pass rate, the cost and the latency of each model side by side.
 
 ## Step 1: Declare the model as a run parameter
 
@@ -58,7 +58,7 @@ langwatch test-suite run "Returns" \
   --wait
 ```
 
-`--repeat 3` runs every scenario three times per target, so one lucky pass does not decide.
+`--repeat 3` runs every scenario three times per target, so the result does not rest on one lucky pass.
 
 <Frame caption="The run dialog with the same agent on two rows and a different model on each.">
 <img className="block" src="/images/agent-testing/run-dialog-compare.png" alt="The run dialog with two targets and the Run button counting both" />
@@ -66,22 +66,22 @@ langwatch test-suite run "Returns" \
 
 ## Step 3: Read the comparison
 
-The run detail has one column per model. The four charts above the table are the decision: **Pass rate**, **Total cost**, **Average reply latency** and **Pass rate over runs**.
+The run detail has one column per model. Decide from the four charts above the table: **Pass rate**, **Total cost**, **Average reply latency** and **Pass rate over runs**.
 
 <Frame caption="One column per model. The pass rate must hold; the cost and the latency should drop.">
 <img className="block" src="/images/agent-testing/comparison-run-detail.png" alt="A comparison run with one column per target, the four charts and the matrix of results" />
 </Frame>
 
-Keep the cheaper model when its pass rate equals the baseline's across the repeats. When it fails one scenario and passes the rest, open that conversation: a cheaper model most often fails the scenario that needs reasoning across several tool results, and passes the lookups. Route by intent in your code, or keep the larger model, and rerun.
+Keep the cheaper model when its pass rate equals the baseline's across the repeats. When it fails one scenario and passes the rest, open that conversation and read which criterion failed. Then route that kind of request to the larger model in your code, or keep the larger model for everything, and rerun.
 
 ## Step 4: The other levers
 
 After the model, in order of effect:
 
 - **Turns.** Every avoided turn removes a whole prompt from the bill. See [Reduce turns](/improve-your-agent/reduce-turns).
-- **Context size.** The system prompt, the tool list and the history are paid on every turn. Open a trace and read the input tokens of the first and the last call of the conversation. The `context-sweet-spot` skill measures where a larger context stops paying for itself.
+- **Context size.** The system prompt, the tool list and the history are paid on every turn. Open a trace and read the input tokens of the first and the last call of the conversation, then shorten the prompt or trim the history and compare.
 - **Prompt caching.** The providers charge cached input tokens at a fraction of the price. Keep the static part of the prompt first and identical across calls.
-- **Provider.** The `provider-cost-comparison` skill prices your real usage mix against other providers from your traces.
+- **Provider.** The `provider-cost-comparison` skill prices the traffic in your traces on other providers and tells you whether one is cheaper.
 
 Every lever gets the same gate: a comparison run of the suite before you keep it.
 
@@ -98,7 +98,6 @@ and tell me whether gpt-5-mini holds the pass rate. If it fails a scenario, tell
 
 ```bash
 npx skills add langwatch/skills/agent-improve
-npx skills add langwatch/skills/context-sweet-spot
 npx skills add langwatch/skills/provider-cost-comparison
 ```
 

@@ -9,7 +9,7 @@ description: Make your agent faster, cheaper and shorter without making it worse
 
 The agent improvement loop is the process of changing an agent and proving that the change did not lower its quality. Quality is a test suite of [scenarios](/agent-testing/scenarios) that pass on the agent you trust today. Turns, tokens, cost and latency are metrics you push down while that suite keeps passing.
 
-An agent has no single expected output to score. A conversation can end well after three turns or after ten, and a tool can fail twice and still get the right answer at the end. So a metric alone cannot tell you the agent got worse. The judge in a scenario can: it reads the whole conversation and the agent's traces, passes or fails each criterion and writes why.
+The suite is the gate because an agent has no single expected output to compare against. The same request can end well after three turns or after ten, and after one tool call or four. The judge in a scenario reads the whole conversation and the agent's traces, passes or fails each criterion you wrote, and writes the reasoning for the verdict. The turns, the cost and the latency of the same run tell you whether the change paid off.
 
 ## The loop
 
@@ -24,12 +24,12 @@ Repeat from step 3. Put the suite in CI so a later change cannot undo the gain: 
 
 ## Where the changes come from
 
-The scenario results point at the change. A failing criterion cites the turn and the trace that broke it. A passing scenario that took ten turns has a conversation you can read, and the tool retries in it are the first hypothesis.
+Start from the results of the last run. For a failed criterion, read the judge's reasoning, which quotes the turn, and open the trace of that turn. For a scenario that passed in ten turns, open the conversation and look for the same tool called twice in a row: that retry is the first hypothesis to test.
 
 Two engines run the loop for you:
 
-- **Guided.** Langy, or your own coding agent with the LangWatch skills, reads the results and the traces, proposes one change, applies it, reruns the suite and compares. You review the change as a pull request. See [Prompt optimization with Langy](/langy/prompt-optimization) for the prompt case.
-- **Algorithmic.** A DSPy optimizer rewrites the instructions and the tool descriptions and scores every candidate by running the suite. The judge's reasoning is the feedback the optimizer learns from. See [Optimize with DSPy](/improve-your-agent/optimize-with-dspy).
+- **Guided.** Langy, or your own coding agent with the LangWatch skills, reads the results and the traces, proposes one change and opens it as a pull request. The suite runs in your CI on that pull request, so you review the diff and the result together. See [Prompt optimization with Langy](/langy/prompt-optimization) for the prompt case.
+- **Algorithmic.** A DSPy optimizer rewrites the instructions and the tool descriptions and scores every candidate by running the suite. GEPA also reads the judge's reasoning as the feedback for the next candidate. See [Optimize with DSPy](/improve-your-agent/optimize-with-dspy).
 
 Use the guided engine when the change is in code, in a tool or in the harness. Use the algorithmic engine when the change is in text and you have the budget to run the suite fifty times.
 
@@ -56,4 +56,4 @@ Use the guided engine when the change is in code, in a tool or in the harness. U
   </Card>
 </CardGroup>
 
-<Info>**Also check:** [Agent testing](/agent-testing/overview) (how a scenario runs), [Connect your agent](/agent-testing/connect-your-agent) (one decorator, so the suite runs against your real code), [Skills directory](/skills/directory) (the `agent-improve` and `agent-performance` skills for your coding agent).</Info>
+<Info>**Also check:** [Agent testing](/agent-testing/overview) (how a scenario runs), [Connect your agent](/agent-testing/connect-your-agent) (one decorator, so the suite runs against your real code), [Skills directory](/skills/directory) (the `agent-improve` and `scenarios` skills for your coding agent).</Info>

@@ -1,9 +1,10 @@
 """The ACME returns and support agent, as a `dspy.ReAct` module.
 
 The signature instructions and the tool descriptions are short on purpose. They
-are what the optimizers rewrite. `check_return_eligibility` in particular does
-not say which reasons it accepts, so an untrained agent calls it with free-text
-reasons, gets a rejection and retries.
+are what the optimizers rewrite. Neither `check_return_eligibility` nor
+`create_return` says which `reason` codes the returns system accepts, and the
+codes are not the words a customer uses, so an untrained agent sends `damaged`,
+gets a rejection back and retries.
 
 Environment:
     OPENAI_API_KEY      the key the agent and the simulation use
@@ -21,7 +22,7 @@ from typing import Any
 import scenario
 import dspy
 
-REASONS = ("damaged", "wrong_item", "not_as_described", "changed_mind")
+REASONS = ("defective", "incorrect_item", "not_as_expected", "remorse")
 REFUND_METHODS = ("original_payment", "store_credit")
 RETURN_WINDOW_DAYS = 30
 
@@ -84,9 +85,7 @@ def lookup_order(order_id: str) -> str:
 def check_return_eligibility(order_id: str, reason: str) -> str:
     """Check if an order can be returned."""
     if reason not in REASONS:
-        raise ValueError(
-            "reason must be one of: damaged, wrong_item, not_as_described, changed_mind"
-        )
+        raise ValueError(f"reason must be one of: {', '.join(REASONS)}")
 
     order = ORDERS.get(order_id.strip())
     if order is None:
@@ -105,15 +104,11 @@ def check_return_eligibility(order_id: str, reason: str) -> str:
 
 
 def create_return(order_id: str, reason: str, refund_method: str) -> str:
-    """Create a return for an eligible order. `reason` is one of: damaged, wrong_item, not_as_described, changed_mind. `refund_method` is one of: original_payment, store_credit."""
+    """Create a return for an eligible order."""
     if reason not in REASONS:
-        raise ValueError(
-            "reason must be one of: damaged, wrong_item, not_as_described, changed_mind"
-        )
+        raise ValueError(f"reason must be one of: {', '.join(REASONS)}")
     if refund_method not in REFUND_METHODS:
-        raise ValueError(
-            "refund_method must be one of: original_payment, store_credit"
-        )
+        raise ValueError(f"refund_method must be one of: {', '.join(REFUND_METHODS)}")
 
     order = ORDERS.get(order_id.strip())
     if order is None:

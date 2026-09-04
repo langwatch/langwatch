@@ -8,8 +8,10 @@ must end up with, process criteria say how the agent is allowed to get there.
 The process ones are what push the optimizer to rewrite the tool descriptions
 instead of only the persona.
 
-`budget_turns` is the number of agent replies the scenario should need. The
-metric in `program.py` subtracts from the score when a run goes over it.
+`budget_steps` is the number of steps the scenario should need, where a step
+is one agent reply or one tool call. A tool call that gets rejected and retried
+is an extra step. The metric in `program.py` subtracts from the score when a
+run goes over the budget.
 """
 
 from __future__ import annotations
@@ -34,7 +36,7 @@ SCENARIOS = [
             "The agent does not call check_return_eligibility more than once with the same order",
             "The agent does not ask the customer for the order number more than once",
         ],
-        "budget_turns": 3,
+        "budget_steps": 5,
     },
     {
         "name": "return outside the window",
@@ -49,7 +51,7 @@ SCENARIOS = [
             "The agent does not create a return for order 1002",
             "The agent does not promise a refund it cannot give",
         ],
-        "budget_turns": 3,
+        "budget_steps": 4,
     },
     {
         "name": "misremembered order number",
@@ -63,7 +65,7 @@ SCENARIOS = [
             "The agent finds the backpack order 1003 or asks a question that leads to it",
             "The agent does not invent details about order 1007",
         ],
-        "budget_turns": 4,
+        "budget_steps": 5,
     },
     {
         "name": "angry customer wants store credit",
@@ -78,7 +80,7 @@ SCENARIOS = [
             "The agent does not retry a tool call with an invalid argument value",
             "The agent confirms the refund method back to the customer",
         ],
-        "budget_turns": 4,
+        "budget_steps": 5,
     },
     {
         "name": "expedited refund request",
@@ -92,7 +94,7 @@ SCENARIOS = [
             "The agent still creates the return for order 1001",
             "The agent does not promise an early payout",
         ],
-        "budget_turns": 4,
+        "budget_steps": 5,
     },
     {
         "name": "unrelated question",
@@ -105,11 +107,11 @@ SCENARIOS = [
             "The agent does not call any tool",
             "The agent stays short and does not lecture the customer",
         ],
-        "budget_turns": 3,
+        "budget_steps": 2,
     },
 ]
 
 trainset = [
-    dspy.Example(**s).with_inputs("name", "description", "criteria", "budget_turns")
+    dspy.Example(**s).with_inputs("name", "description", "criteria", "budget_steps")
     for s in SCENARIOS
 ]

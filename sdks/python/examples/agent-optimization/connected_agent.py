@@ -8,13 +8,13 @@ it as `connected:returns-agent@<environment>`.
 Two tool contracts ship in one file, picked by an environment variable, so a
 comparison run has a real before and after side:
 
-    RETURNS_AGENT_TOOL_DESCRIPTIONS=weak      the description of
-        `check_return_eligibility` does not say which `reason` values it takes,
-        and the parameter is a free-text string. The model guesses, the tool
-        rejects the call, the agent retries.
+    RETURNS_AGENT_TOOL_DESCRIPTIONS=weak      neither `check_return_eligibility`
+        nor `create_return` says which `reason` codes the returns system takes,
+        and the parameter is a free-text string. The model sends `damaged`, the
+        tool rejects the call, the agent retries.
 
-    RETURNS_AGENT_TOOL_DESCRIPTIONS=explicit  the description lists the accepted
-        values and the schema carries them as an enum. Default.
+    RETURNS_AGENT_TOOL_DESCRIPTIONS=explicit  the descriptions list the accepted
+        codes and the schema carries them as an enum. Default.
 
 Run one process per environment to compare the two:
 
@@ -61,12 +61,20 @@ SYSTEM_PROMPT = (
     "Help the customer with orders and returns."
 )
 
-WEAK_ELIGIBILITY_DESCRIPTION = "Check if an order can be returned."
+REASON_CODES = ", ".join(REASONS)
+REFUND_METHOD_CODES = ", ".join(REFUND_METHODS)
 
+WEAK_ELIGIBILITY_DESCRIPTION = "Check if an order can be returned."
 EXPLICIT_ELIGIBILITY_DESCRIPTION = (
-    "Check if an order can be returned. `reason` is one of: damaged, wrong_item, "
-    "not_as_described, changed_mind. Returns the return window and whether the "
-    "order is still inside it."
+    f"Check if an order can be returned. `reason` is one of: {REASON_CODES}. "
+    "Returns the return window and whether the order is still inside it."
+)
+
+WEAK_CREATE_RETURN_DESCRIPTION = "Create a return for an eligible order."
+EXPLICIT_CREATE_RETURN_DESCRIPTION = (
+    f"Create a return for an eligible order. `reason` is one of: {REASON_CODES}. "
+    f"`refund_method` is one of: {REFUND_METHOD_CODES}. Returns the RMA number "
+    "and where the refund goes."
 )
 
 
@@ -77,6 +85,11 @@ def _tool_schemas() -> list[dict[str, Any]]:
         {"type": "string"}
         if weak
         else {"type": "string", "enum": list(REASONS)}
+    )
+    refund_method_property: dict[str, Any] = (
+        {"type": "string"}
+        if weak
+        else {"type": "string", "enum": list(REFUND_METHODS)}
     )
 
     return [
@@ -116,19 +129,16 @@ def _tool_schemas() -> list[dict[str, Any]]:
             "function": {
                 "name": "create_return",
                 "description": (
-                    "Create a return for an eligible order. `reason` is one of: "
-                    "damaged, wrong_item, not_as_described, changed_mind. "
-                    "`refund_method` is one of: original_payment, store_credit."
+                    WEAK_CREATE_RETURN_DESCRIPTION
+                    if weak
+                    else EXPLICIT_CREATE_RETURN_DESCRIPTION
                 ),
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "order_id": {"type": "string"},
-                        "reason": {"type": "string", "enum": list(REASONS)},
-                        "refund_method": {
-                            "type": "string",
-                            "enum": list(REFUND_METHODS),
-                        },
+                        "reason": reason_property,
+                        "refund_method": refund_method_property,
                     },
                     "required": ["order_id", "reason", "refund_method"],
                 },
@@ -175,7 +185,7 @@ def _run_tool(name: str, arguments: str) -> str:
         return f"{type(error).__name__}: {error}"
 
 
-@langwatch.connect_agent(name="returns-agent", concurrency=6)
+@langwatch.connect_agent(name="returns-agent")
 @langwatch.trace(name="returns_agent")
 def returns_agent(
     messages: list[langwatch.Message],
@@ -187,9 +197,7 @@ def returns_agent(
     `messages` is the full conversation. `model` and `plan` are run parameters
     the platform sets per run: `plan` is appended to the system prompt, so an
     optimizer or a run can try a different set of instructions without a code
-    change. `concurrency=6` on the decorator lets the six scenarios of one run
-    reach this process at the same time; a development agent takes one call at
-    a time otherwise.
+    change.
     """
     client = OpenAI()
     langwatch.get_current_trace().autotrack_openai_calls(client)

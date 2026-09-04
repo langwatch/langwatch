@@ -5,22 +5,22 @@ keywords: langwatch, tool calls, tool optimization, tool description, function c
 description: Catch a tool the agent calls wrong or retries, change the tool contract so the model gets it right the first time, and assert on the tool calls in your scenarios.
 ---
 
-A tool call goes wrong in two ways: the agent calls the wrong tool, or it calls the right tool with arguments the tool rejects. The second is the common one, and it is silent: the agent retries with new wording until the call succeeds, the conversation ends well, and the only trace of the problem is three failed calls in the trace and five extra seconds of latency.
+A tool call goes wrong in two ways: the agent calls the wrong tool, or it calls the right tool with arguments the tool rejects. The second is the common one, and it is silent: the agent retries with new wording until the call succeeds, the conversation ends well, and the only sign of the problem is the failed calls in the trace and the extra turns they cost.
 
 ## How a bad tool call shows up
 
-- **As a failed criterion.** The judge reads the agent's traces, so a criterion such as `The agent creates the return` fails when the call never succeeded, and the reasoning cites the tool and its error.
+- **As a failed criterion.** The judge reads the agent's traces, so a criterion such as `The agent creates the return` fails when the call never succeeded. Read the tool and its error in the judge's reasoning.
 - **As a passing scenario with retries inside it.** The verdict is green and the conversation took eight turns. Open the conversation, then the trace link on the run: the tool span appears three times, the first two with an error.
 
-<Frame caption="The trace link on a run. The judge read this trace; you can too.">
+<Frame caption="The trace link on a run opens the agent's trace for that conversation, the same trace the judge read.">
 <img className="block" src="/images/agent-testing/run-drawer-trace-link.png" alt="The conversation drawer of a run with the link to the agent's trace" />
 </Frame>
 
-To make the second case fail on its own, add a criterion for the process, not only the outcome: `The agent does not call check_return_eligibility more than once for the same order`.
+To make the second case fail on its own, add a criterion on the process as well as the outcome: `The agent does not call check_return_eligibility more than once for the same order`.
 
 ## Step 1: Read the error the model saw
 
-Open the failed tool span in the trace and read its output. What the model saw decides what it did next. `invalid input` sends the model into guessing. `reason must be one of: damaged, wrong_item, not_as_described, changed_mind` lets it fix the call on the next try, and with the values in the tool description it gets the first call right.
+Open the failed tool span in the trace and read its output. The model sees only that output. After `invalid input` it guesses. After `reason must be one of: defective, incorrect_item, not_as_expected, remorse` it fixes the call on the next try, and with the same values in the tool description it gets the first call right.
 
 ## Step 2: Change the tool contract
 
@@ -30,7 +30,7 @@ In order of yield:
 2. **Return an error the model can act on.** The error names the parameter and the accepted values.
 3. **Validate at the boundary.** Reject the call before it reaches your service, with the same message.
 4. **One tool per job.** A tool that needs three calls to return one answer gets merged into one call, or a second tool returns the answer in one step.
-5. **Cap the retries in the harness.** After the second failure on the same tool the agent escalates or asks the user. A fourth try is never the fix.
+5. **Cap the retries in the harness.** After the second failure on the same tool the agent escalates or asks the user.
 
 The difference in the tool itself:
 
@@ -41,12 +41,12 @@ def check_return_eligibility(order_id: str, reason: str) -> str:
 ```
 
 ```python
-REASONS = ("damaged", "wrong_item", "not_as_described", "changed_mind")
+REASONS = ("defective", "incorrect_item", "not_as_expected", "remorse")
 
 def check_return_eligibility(order_id: str, reason: str) -> str:
     """Check if an order can be returned.
 
-    reason must be one of: damaged, wrong_item, not_as_described, changed_mind.
+    reason must be one of: defective, incorrect_item, not_as_expected, remorse.
     Returns the return window and whether the order is inside it.
     """
     if reason not in REASONS:

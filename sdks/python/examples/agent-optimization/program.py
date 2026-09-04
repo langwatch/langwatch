@@ -37,11 +37,7 @@ TOOL_ARGUMENT_HINT = (
 
 
 def _count_agent_turns(messages: list[dict[str, Any]]) -> int:
-    """Count the agent's replies to the customer.
-
-    Tool calls are assistant messages too, so they are excluded: a turn is a
-    message the customer actually reads.
-    """
+    """Count the agent's replies to the customer: assistant messages with text."""
     return sum(
         1
         for message in messages
@@ -50,6 +46,21 @@ def _count_agent_turns(messages: list[dict[str, Any]]) -> int:
         and isinstance(message.get("content"), str)
         and message["content"].strip()
     )
+
+
+def _count_agent_steps(messages: list[dict[str, Any]]) -> int:
+    """Count the agent's steps: every reply plus every tool call.
+
+    In a ReAct agent each step is one model call, so a tool call that gets
+    rejected and retried costs the same as an extra reply. This is the number
+    the metric budgets.
+    """
+    tool_calls = sum(
+        len(message.get("tool_calls") or [])
+        for message in messages
+        if message.get("role") == "assistant"
+    )
+    return _count_agent_turns(messages) + tool_calls
 
 
 class ScenarioProgram(dspy.Module):
@@ -62,7 +73,7 @@ class ScenarioProgram(dspy.Module):
         name: str,
         description: str,
         criteria: list[str],
-        budget_turns: int,
+        budget_steps: int,
     ) -> dspy.Prediction:
         adapter = ReActAdapter(self.agent)
 
@@ -99,13 +110,14 @@ class ScenarioProgram(dspy.Module):
             failed=list(result.failed_criteria or []),
             reasoning=result.reasoning or "",
             turns=_count_agent_turns(messages),
+            steps=_count_agent_steps(messages),
             messages=messages,
         )
 
 
-def _turn_penalty(turns: int, budget_turns: int) -> float:
-    over = max(0, turns - budget_turns)
-    return 0.5 * over / budget_turns
+def _step_penalty(steps: int, budget_steps: int) -> float:
+    over = max(0, steps - budget_steps)
+    return 0.5 * over / budget_steps
 
 
 def _retried_after_argument_rejection(messages: list[dict[str, Any]]) -> bool:
@@ -134,10 +146,11 @@ def _build_feedback(gold: dspy.Example, pred: dspy.Prediction, score: float) -> 
         lines.append("Judge: " + pred.reasoning.strip())
 
     lines.append(
-        f"The agent used {pred.turns} turns against a budget of {gold.budget_turns}."
+        f"The agent used {pred.steps} steps against a budget of {gold.budget_steps} "
+        f"(replies: {pred.turns}, tool calls: {pred.steps - pred.turns})."
     )
-    if pred.turns > gold.budget_turns:
-        lines.append("Reaching the same outcome in fewer turns scores higher.")
+    if pred.steps > gold.budget_steps:
+        lines.append("Reaching the same outcome in fewer steps scores higher.")
 
     if _retried_after_argument_rejection(pred.messages):
         lines.append(TOOL_ARGUMENT_HINT)
@@ -158,7 +171,7 @@ def scenario_metric(
     """Score one scenario run.
 
     A failed scenario is 0. A passed one starts at 1 and loses half a point per
-    budget of overspent turns, floored at 0.
+    budget of overspent steps, floored at 0.
 
     Returns a plain float for plain evaluation, and a `dspy.Prediction` carrying
     the score plus written feedback when an optimizer asks for feedback.
@@ -166,7 +179,7 @@ def scenario_metric(
     if not pred.success:
         score = 0.0
     else:
-        score = max(0.0, min(1.0, 1 - _turn_penalty(pred.turns, gold.budget_turns)))
+        score = max(0.0, min(1.0, 1 - _step_penalty(pred.steps, gold.budget_steps)))
 
     if pred_name is None and trace is None:
         return score
@@ -207,7 +220,8 @@ def evaluate_suite(program: dspy.Module, label: str, run_id: str) -> dict[str, A
                 "scenario": example.name,
                 "passed": bool(getattr(prediction, "success", False)),
                 "turns": getattr(prediction, "turns", 0),
-                "budget": example.budget_turns,
+                "steps": getattr(prediction, "steps", 0),
+                "budget": example.budget_steps,
                 "score": float(score),
             }
         )
@@ -218,11 +232,13 @@ def evaluate_suite(program: dspy.Module, label: str, run_id: str) -> dict[str, A
     average_score = sum(row["score"] for row in rows) / total if total else 0.0
 
     print(f"\n=== {label} (batch {batch_run_id}) ===")
-    print(f"{'scenario':<34}{'result':<9}{'turns':<7}{'budget':<8}{'score':>6}")
+    print(
+        f"{'scenario':<34}{'result':<9}{'turns':<7}{'steps':<7}{'budget':<8}{'score':>6}"
+    )
     for row in rows:
         print(
             f"{row['scenario']:<34}{'pass' if row['passed'] else 'fail':<9}"
-            f"{row['turns']:<7}{row['budget']:<8}{row['score']:>6.2f}"
+            f"{row['turns']:<7}{row['steps']:<7}{row['budget']:<8}{row['score']:>6.2f}"
         )
     print(
         f"pass rate {passed}/{total} ({pass_rate:.0%}), "

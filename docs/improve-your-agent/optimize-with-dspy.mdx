@@ -5,7 +5,7 @@ keywords: langwatch, dspy, gepa, miprov2, prompt optimization, tool optimization
 description: A DSPy optimizer rewrites your agent's instructions and tool descriptions and scores every candidate by running your scenario suite, with the judge's reasoning as its feedback.
 ---
 
-A DSPy optimizer needs a program and a metric. For an agent, the program is a `dspy.ReAct` module whose instructions contain every tool description, so rewriting the instructions rewrites the tool descriptions. The metric runs one scenario against the candidate and scores the verdict, with a penalty for every turn over the budget. GEPA reads the judge's reasoning as text feedback, so it learns why a candidate failed, not only that it did.
+A DSPy optimizer needs a program and a metric. For an agent, the program is a `dspy.ReAct` module whose instructions contain every tool description, so rewriting the instructions rewrites the tool descriptions. The metric runs one scenario against the candidate and scores the verdict, with a penalty for every step over the budget, where a step is one reply or one tool call. GEPA takes the judge's reasoning as text feedback for the next candidate.
 
 The runnable example is in the SDK repository: [`sdks/python/examples/agent-optimization`](https://github.com/langwatch/langwatch/tree/main/sdks/python/examples/agent-optimization).
 
@@ -49,13 +49,13 @@ class ReActAdapter(scenario.AgentAdapter):
         return trajectory_to_messages(prediction)
 ```
 
-`trajectory_to_messages` turns the ReAct trajectory into `tool_calls` and `tool` messages followed by the answer, so the judge sees every tool call and every rejected argument, not only the reply. Both helpers are in the example's `agent.py`.
+`trajectory_to_messages` turns the ReAct trajectory into `tool_calls` and `tool` messages followed by the answer, so the judge sees the tool calls and the rejected arguments as well as the reply. Both helpers are in the example's `agent.py`.
 
 The tool descriptions come from the docstrings. `dspy.ReAct` writes them into the instructions of its `react` predictor, and that predictor is what the optimizer rewrites.
 
 ## Step 2: One example per scenario
 
-Each `dspy.Example` is one scenario: the situation, the criteria and a turn budget.
+Each `dspy.Example` is one scenario: the situation, the criteria and a step budget. A rejected tool call that the agent retries is an extra step.
 
 ```python
 SCENARIOS = [
@@ -67,13 +67,13 @@ SCENARIOS = [
             "The agent confirms the refund method",
             "The agent does not call check_return_eligibility more than once for the same order",
         ],
-        budget_turns=4,
+        budget_steps=5,
     ),
     ...
 ]
 
 trainset = [
-    dspy.Example(**s).with_inputs("name", "description", "criteria", "budget_turns")
+    dspy.Example(**s).with_inputs("name", "description", "criteria", "budget_steps")
     for s in SCENARIOS
 ]
 ```
@@ -88,7 +88,7 @@ class ScenarioProgram(dspy.Module):
         super().__init__()
         self.agent = agent  # named predictors: agent.react, agent.extract
 
-    def forward(self, name, description, criteria, budget_turns):
+    def forward(self, name, description, criteria, budget_steps):
         result = asyncio.run(scenario.run(
             name=name,
             description=description,
@@ -100,31 +100,31 @@ class ScenarioProgram(dspy.Module):
                 scenario.JudgeAgent(criteria=criteria, model="openai/gpt-5-mini"),
             ],
         ))
-        # a turn is a reply the customer reads: assistant messages without tool calls
-        turns = count_agent_turns(result.messages)
+        # a step is one reply or one tool call; each one is a model call
+        steps = count_agent_steps(result.messages)
         return dspy.Prediction(
             success=result.success,
             passed=result.passed_criteria,
             failed=result.failed_criteria,
             reasoning=result.reasoning,
-            turns=turns,
+            steps=steps,
         )
 
 
 def scenario_metric(gold, pred, trace=None, pred_name=None, pred_trace=None):
-    over = max(0, pred.turns - gold.budget_turns) / gold.budget_turns
+    over = max(0, pred.steps - gold.budget_steps) / gold.budget_steps
     score = 0.0 if not pred.success else max(0.0, min(1.0, 1 - 0.5 * over))
     if pred_name is None and trace is None:
         return score  # MIPROv2 and Evaluate take a number
     feedback = (
         f"Judge verdict: {'PASS' if pred.success else 'FAIL'}. {pred.reasoning}\n"
         f"Unmet criteria: {pred.failed or 'none'}\n"
-        f"Agent turns: {pred.turns}, budget {gold.budget_turns}."
+        f"Agent steps: {pred.steps}, budget {gold.budget_steps}."
     )
     return dspy.Prediction(score=score, feedback=feedback)  # GEPA reads the text
 ```
 
-A failed scenario scores zero. A passed scenario scores one, minus half a point per budget of extra turns. The pass gate comes first; the turn budget is the objective under it. When a tool rejected its arguments during the conversation, the example's feedback adds one line that says so, which is the hint GEPA needs to rewrite that tool's description.
+A failed scenario scores zero. A passed scenario scores one, minus half a point per budget of extra steps. The pass gate comes first; the step budget is the objective under it. When a tool rejected its arguments during the conversation, the example's feedback adds one line that says so, which is the hint GEPA needs to rewrite that tool's description.
 
 `scenario.run` executes the conversation on its own thread. The example's `forward` also copies the DSPy trace of that thread into the calling thread, because GEPA reads the trace of the thread that called the program.
 
@@ -183,7 +183,7 @@ Zero demos keeps the change to the instructions: MIPROv2 proposes instruction ca
   </Tab>
 </Tabs>
 
-Run the suite once before and once after with `dspy.Evaluate(devset=trainset, metric=scenario_metric, num_threads=3)`, so the before and after pass rates and turns come from the same scenarios. The example's `evaluate_suite` prints that table. To run the example:
+Run the suite once before and once after with `dspy.Evaluate(devset=trainset, metric=scenario_metric, num_threads=3)`, so the before and after pass rates and steps come from the same scenarios. The example's `evaluate_suite` prints that table. To run the example:
 
 ```bash
 cd sdks/python/examples/agent-optimization
@@ -196,16 +196,16 @@ Both scripts print the before and after table, then every instruction the optimi
 
 ## Step 5: Read the result in LangWatch
 
-- **Experiments** shows the optimization run: one point per trial with its score, and the instructions of each candidate. A MIPROv2 run appears through `langwatch.dspy.init`; the GEPA example logs each candidate through a callback in `optimize_gepa.py`. See [DSPy visualization](/dspy-visualization/quickstart).
+- **Experiments** shows the optimization run: one point per candidate that raised the best score, with the score and the instructions of that candidate. A MIPROv2 run appears through `langwatch.dspy.init`; the GEPA example logs each candidate through a callback in `optimize_gepa.py`. See [DSPy visualization](/dspy-visualization/quickstart).
 - **Agent Testing** shows every simulation the optimizer ran, in the `dspy-optimization` set. The example groups the baseline pass and the final pass into their own batches, `<run id>-baseline` and `<run id>-best`, and prints both links, so you open the conversations of the optimized agent next to the original ones.
 
-The payoff is the diff of the instructions. The optimized `check_return_eligibility` description lists the accepted reasons and says what the tool returns, because every candidate that guessed the reason paid for it in turns.
+Compare the instructions before and after: both scripts print every instruction the optimizer changed, and the tool descriptions are part of them.
 
 ## Limits
 
 - The optimizer changes text: the instructions and the tool descriptions. A tool that needs a different schema, a missing tool or a harness cap stays a code change. See [Fix tool calls](/improve-your-agent/fix-tool-calls).
 - A scenario is not deterministic. The simulated user words the situation differently on every run, and a candidate can pass once and fail once. Evaluate the baseline and the final program twice before you compare them, and use `--repeat` on the platform for the same reason.
-- The score counts the agent's turns. The cost of the simulated user and the judge is not in the score.
+- The score counts the agent's steps. The cost of the simulated user and the judge is not in the score.
 - DSPy is Python. A TypeScript agent runs the guided loop instead: see [Reduce turns](/improve-your-agent/reduce-turns).
 
 <Info>**Also check:** [Optimization algorithms](/improve-your-agent/algorithms) (which optimizer to pick), [Scenarios in code](/agent-testing/scenarios-in-code), [DSPy visualization](/dspy-visualization/quickstart) (how a run appears in Experiments).</Info>
