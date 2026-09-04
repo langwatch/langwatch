@@ -27,6 +27,10 @@ import {
   parseLangyFeedbackDirective,
 } from "../logic/langyFeedbackDirective";
 import { langyPlan } from "../logic/langyPlan";
+import {
+  linkPullRequestReferences,
+  pullRequestLinksFromToolParts,
+} from "../logic/langyPullRequestLinks";
 import { questionToolCardParts } from "../logic/langyQuestionTool";
 import {
   foldReasoningTitles,
@@ -243,6 +247,17 @@ function MessageContentImpl({
   // survives a refresh), and skips a `gh pr create` that FAILED — a PR that did
   // not open must never render as one that did.
   const prs = isUser ? [] : githubPrsFromToolParts(message.parts);
+  // "Opened pull request #1" is how Langy names a pull request, and the reader
+  // had the number and no way through to it. The URLs come from the same tool
+  // parts the card reads — the sandbox's `github.open_pr` receipt, or the
+  // stdout of the developer's own `gh pr create` on the local path.
+  const pullRequestLinks = useMemo(
+    () =>
+      isUser
+        ? new Map<number, string>()
+        : pullRequestLinksFromToolParts(message.parts),
+    [isUser, message.parts],
+  );
   // Tool-call activity for the assistant turn: activity cards, each labelled by
   // what the call is DOING ("Searching traces", "Using the GitHub skill"), plus
   // the in-flight and settled domain-capability cards. Counts toward "has
@@ -405,6 +420,7 @@ function MessageContentImpl({
               isRecorded={isRecorded}
               hasActivity={hasActivityRecord}
               projectSlug={project?.slug ?? null}
+              pullRequestLinks={pullRequestLinks}
               choicesTimeline={choicesTimeline}
               onChoiceSelect={onChoiceSelect}
               onVerifyDerivedCard={onVerifyDerivedCard}
@@ -530,6 +546,8 @@ interface AnswerBlockContext {
   hasActivity: boolean;
   firstTextIndex: number;
   projectSlug: string | null;
+  /** Pull-request number → URL, from this message's own tool calls. */
+  pullRequestLinks: Map<number, string>;
   choicesTimeline?: LangyChoicesTimelineEntry[];
   onChoiceSelect?: (a: {
     selection: LangyChoiceSelection;
@@ -571,14 +589,17 @@ function AnswerRun({
     return isRecorded ? null : langyAnswerSegmentsFromText(text);
   }, [isStreaming, isRecorded, parts, text]);
   const cleaned = parseLangyFeedbackDirective(text).cleanedText;
-  const display = stripToolNarration({
-    text: isStreaming
-      ? cleaned
-      : stripReasoningTitles({
-          text: cleaned,
-          hasActivity: context.hasActivity,
-        }),
-    hasActivity: context.hasActivity,
+  const display = linkPullRequestReferences({
+    text: stripToolNarration({
+      text: isStreaming
+        ? cleaned
+        : stripReasoningTitles({
+            text: cleaned,
+            hasActivity: context.hasActivity,
+          }),
+      hasActivity: context.hasActivity,
+    }),
+    links: context.pullRequestLinks,
   });
 
   if (segments) {
@@ -678,6 +699,7 @@ function AnswerSegment({
           text={segment.text}
           isFirst={index === context.firstTextIndex}
           hasActivity={context.hasActivity}
+          pullRequestLinks={context.pullRequestLinks}
         />
       );
     case "card":
@@ -718,22 +740,27 @@ function ProseSegment({
   text,
   isFirst,
   hasActivity,
+  pullRequestLinks,
 }: {
   text: string;
   isFirst: boolean;
   hasActivity: boolean;
+  pullRequestLinks: Map<number, string>;
 }) {
   const cleaned = parseLangyFeedbackDirective(text).cleanedText;
-  const display = isFirst
-    ? stripToolNarration({
-        // The reply's leading reasoning headlines fold into the receipt (the
-        // message-level fold already collected them from the full text); the
-        // first prose segment starts with the same leading edge, so it peels
-        // the same headlines before rendering.
-        text: stripReasoningTitles({ text: cleaned, hasActivity }),
-        hasActivity,
-      })
-    : cleaned;
+  const display = linkPullRequestReferences({
+    text: isFirst
+      ? stripToolNarration({
+          // The reply's leading reasoning headlines fold into the receipt (the
+          // message-level fold already collected them from the full text); the
+          // first prose segment starts with the same leading edge, so it peels
+          // the same headlines before rendering.
+          text: stripReasoningTitles({ text: cleaned, hasActivity }),
+          hasActivity,
+        })
+      : cleaned,
+    links: pullRequestLinks,
+  });
   if (!display) return null;
   return (
     <Box

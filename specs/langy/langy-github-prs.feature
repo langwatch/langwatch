@@ -115,6 +115,18 @@ Feature: Langy opens GitHub PRs via the installed GitHub App
     Then the steps card says the pull request was opened
     And the card does not say Langy is working on it
 
+  @unit
+  Scenario: A pull request number in the reply links to the pull request
+    Given a turn whose tool call printed the URL of pull request 1
+    When Langy's reply names pull request 1 by its number
+    Then the number is a link to that pull request
+
+  @unit
+  Scenario: A number with no pull request behind it stays plain text
+    Given a turn that opened no pull request
+    When Langy's reply names a number
+    Then the number is left as it was
+
   @integration
   Scenario: A finished turn that never opened a pull request says so plainly
     Given a finished turn whose steps card reached the pushed step only
