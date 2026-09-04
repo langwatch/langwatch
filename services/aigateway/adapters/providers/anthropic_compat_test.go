@@ -535,7 +535,7 @@ func TestCredentialToBifrostKey_AnthropicCompatUsesPlainAPIKey(t *testing.T) {
 		APIKey:     "sk-ant",
 		Extra:      map[string]string{"base_url": "http://vllm:8000"},
 	}
-	key := credentialToBifrostKey(cred, mapProvider(cred))
+	key := credentialToBifrostKey(cred, mapProvider(cred), nil)
 
 	if key.Value.Val != "sk-ant" {
 		t.Fatalf("key.Value = %q, want the credential's API key", key.Value.Val)

@@ -782,7 +782,7 @@ One deployment with several pods is one row and several instances. The platform 
 
 | Setting | What it does |
 |---|---|
-| `concurrency` | How many calls one instance takes at the same time. Default 1 in `development`, 4 elsewhere. When every instance is full, the platform waits and retries within the call's deadline. |
+| `concurrency` | How many calls one instance takes at the same time. Default 10. When every instance is full, the platform waits and retries within the call's deadline. |
 | `instance_label` (`instanceLabel`) | A name for this instance in the instances table, for example the pod name. Also read from `LANGWATCH_AGENT_INSTANCE_LABEL`. |
 | `enabled` | Whether this process connects. It takes any boolean, so one expression decides which deployments connect: `enabled=os.environ.get("APP_ENV") != "production" and not os.environ.get("CI")` connects everywhere but production and CI. Without the argument the default is true, and false when `CI` is set. An `enabled` argument replaces that rule, so keep the `CI` half unless a CI job is deliberately the target. |
 | `LANGWATCH_AGENT_CONNECT=0` | Turns the connection off for a deployment without a code change. |
@@ -848,7 +848,7 @@ The decorator never stops the application from starting. Every problem is one wa
     | `enabled` | `True`, `False` under `CI` | Whether this process connects at all. Takes any boolean, and replaces the `CI` default rather than adding to it. |
     | `instance_label` | none | A name for this instance in the instances table. |
     | `timeout` | `120` seconds | How long one call may take. The ceiling is 300 seconds. |
-    | `concurrency` | `1` in `development`, `4` elsewhere | Calls this instance takes at the same time. |
+    | `concurrency` | `10` | Calls this instance takes at the same time. |
     | `sticky` | `False` | Keep every turn of one conversation on one instance. |
     | `api_key` | `LANGWATCH_API_KEY` | The project key the connection authenticates with. |
     | `endpoint` | `LANGWATCH_ENDPOINT` | Which LangWatch instance to connect to. |
@@ -867,7 +867,7 @@ The decorator never stops the application from starting. Every problem is one wa
     | `enabled` | `true`, `false` under `CI` | Whether this process connects at all. Takes any boolean, and replaces the `CI` default rather than adding to it. |
     | `instanceLabel` | none | A name for this instance in the instances table. |
     | `timeoutMs` | `120000` | How long one call may take. The ceiling is 300000. |
-    | `concurrency` | `1` in `development`, `4` elsewhere | Calls this instance takes at the same time. |
+    | `concurrency` | `10` | Calls this instance takes at the same time. |
     | `sticky` | `false` | Keep every turn of one conversation on one instance. |
     | `apiKey` | `LANGWATCH_API_KEY` | The project key the connection authenticates with. |
     | `endpoint` | `LANGWATCH_ENDPOINT` | Which LangWatch instance to connect to. |
@@ -915,7 +915,7 @@ The run settings also record which instance served each run, so a result from a 
 | The run is refused with `agent_offline` | No instance was connected when the run started. | Start the agent process, then run again. |
 | The run is refused with `agent_owner_only` | The agent registered under `development` with a personal key, so it belongs to one person. | Run it as its owner, or register it under a shared environment name. |
 | A turn fails with `agent_call_timeout` | The function took longer than the agent's timeout. | Raise `timeout`, up to 300 seconds, or make the agent answer faster. |
-| A turn fails with `agent_busy` | Every instance was already running as many calls as it accepts. | Raise `concurrency`, or start more instances. |
+| A turn fails with `agent_busy` | Every instance was already running as many calls as it accepts. | Raise `concurrency` above its default of 10, or start more instances. |
 | Trace-dependent criteria come back inconclusive | The agent reports its traces to a different project, or it reports none at all. | Point the agent's tracing at the project that runs the scenarios. |
 
 ## Next steps

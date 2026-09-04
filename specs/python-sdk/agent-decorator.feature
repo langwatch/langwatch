@@ -328,6 +328,12 @@ Feature: Python SDK connect_agent decorator
     Then the function is cancelled and no result is sent for it
 
   @unit
+  Scenario: A connected agent takes ten calls at once unless told otherwise
+    Given a decorated function with no concurrency argument
+    Then it registers with ten calls at once, in every environment
+    And a concurrency argument replaces that number
+
+  @unit
   Scenario: A call past the concurrency limit answers agent_busy
     Given concurrency=1 and one call in flight
     When a second call arrives
