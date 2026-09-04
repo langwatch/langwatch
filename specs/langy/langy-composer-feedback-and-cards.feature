@@ -109,6 +109,13 @@ Feature: Langy composer, feedback, and card polish
       Then no message is sent
       And the message is still in the field
 
+    @unit
+    Scenario: A failed send gives back only what the customer typed
+      Given a send that failed
+      Then the message field gets the text back when the customer typed it
+      And it gets nothing back when the panel sent that message itself
+      And it gets nothing back when the customer has started writing something else
+
     @integration
     Scenario: The kept message sends once the turn ends
       Given a message typed during a turn that has now ended

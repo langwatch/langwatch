@@ -102,6 +102,7 @@ import {
 import { langyChoicesTimeline } from "../logic/langyChoicesTimeline";
 import { resolveComposerModel } from "../logic/langyComposerModel";
 import { mergeContextChips } from "../logic/langyContextChips";
+import { langyDraftToRestore } from "../logic/langyDraftRecovery";
 import { catchUpConversationFold } from "../logic/langyDurableCatchUp";
 import {
   explainLangyError,
@@ -382,6 +383,16 @@ function dispatchUiActionToPage({
 interface LangySidecarProps {
   proposalHandlersRef?: React.RefObject<ProposalHandlers>;
   actionHandlersRef?: React.RefObject<LangyUiActionHandlers>;
+}
+
+/** How one send behaves beyond its text. */
+interface LangySendOptions {
+  /**
+   * Give the text back to the composer if the send fails. True for anything
+   * the reader typed, false for a message the panel sends on their behalf:
+   * they never wrote it, so they must not be left holding it.
+   */
+  keepOnFailure?: boolean;
 }
 
 export function LangySidecar({
@@ -787,6 +798,8 @@ function LangyPanel({
   const turnContextRef = useRef<LangyTurnRequestContext | null>(null);
   // The text of the send in flight, held so a failure can hand it back.
   const lastSentTextRef = useRef<string | null>(null);
+  // Cleared the moment the turn is dispatched (see `onIds`): from then on the
+  // text is a bubble in the transcript, not a draft anybody is owed.
 
   // Navigate instructions already acted on, keyed by turnId+href
   // (`navigateDedupKey`) — `onTurnStream` yields bare entries with no id, so a
@@ -840,6 +853,11 @@ function LangyPanel({
           // The turn was dispatched: adopt the conversation + turn and enter the
           // `active` phase (which also clears the previous turn's live signals).
           useLangyStore.getState().beginTurn({ conversationId, turnId });
+          // The words are a bubble on screen now, so they are no longer a
+          // draft to hand back. Without this, a failure LATER in the turn put
+          // the question the reader had already asked back in the composer,
+          // where it read as unsent.
+          lastSentTextRef.current = null;
           // A fresh turn — clear the previous turn's navigate dedup too.
           navigatedInstructionsRef.current = new Set();
           uiActionSeenRef.current = new Set();
@@ -1735,14 +1753,18 @@ function LangyPanel({
   // The transport needs current context and recovery state, but the composer
   // must not receive a new callback on every streamed token. Keep its public
   // callback stable and refresh only the implementation it delegates to.
-  const sendImplementationRef = useRef<(text: string) => Promise<void>>(
-    async () => undefined,
-  );
+  const sendImplementationRef = useRef<
+    (text: string, options?: LangySendOptions) => Promise<void>
+  >(async () => undefined);
   const send = useCallback(
-    (text: string) => sendImplementationRef.current(text),
+    (text: string, options?: LangySendOptions) =>
+      sendImplementationRef.current(text, options),
     [],
   );
-  sendImplementationRef.current = async (text: string) => {
+  sendImplementationRef.current = async (
+    text: string,
+    { keepOnFailure = true }: LangySendOptions = {},
+  ) => {
     if (!text.trim() || !projectId || isBusy) return;
     // `/feedback` is a client command, not a message: it summons the rating
     // card under the latest answer (bypassing the backend cadence — the user
@@ -1769,7 +1791,11 @@ function LangyPanel({
     // routes failures to useChat's `error` channel — so the catch below can
     // never be the only thing that gives the text back. The effect watching
     // `error` restores from here (see restoreDraftOnFailure).
-    lastSentTextRef.current = text;
+    //
+    // Only what the READER typed is remembered. A message the panel sends on
+    // their behalf (the code access re-ask) is not theirs to get back, and
+    // restoring it left them staring at a sentence they never wrote.
+    lastSentTextRef.current = keepOnFailure ? text : null;
     try {
       // No per-send body: the custom transport sources projectId + conversation
       // + model + page-context + skills from `turnContextRef` (getContext) at
@@ -1796,14 +1822,16 @@ function LangyPanel({
    *
    * Losing typed text is the worst failure a composer has: the turn broke AND
    * the person has to retype the question to find out whether it will break
-   * again. Restores only when the field is empty — if they have already started
-   * typing a follow-up, that is theirs and we do not overwrite it.
+   * again. What counts as their words, and what does not, is
+   * `langyDraftToRestore`.
    */
   const restoreDraftOnFailure = useCallback(() => {
-    const text = lastSentTextRef.current;
-    if (!text) return;
+    const text = langyDraftToRestore({
+      sentText: lastSentTextRef.current,
+      draft: useLangyStore.getState().draft,
+    });
     lastSentTextRef.current = null;
-    if (!useLangyStore.getState().draft.trim()) setDraft(text);
+    if (text) setDraft(text);
   }, [setDraft]);
   /**
    * Walking away from the current conversation — New chat, switching, deleting
@@ -2297,13 +2325,18 @@ function LangyPanel({
   const [reAskCodeAccess, setReAskCodeAccess] = useState(false);
   const askCodeAccessAgain = useCallback(() => {
     setReAskCodeAccess(true);
-    if (isBusy) handleStop();
-  }, [isBusy, handleStop]);
+    // The DURABLE phase decides, not this browser's stream: `isBusy` goes
+    // false the moment a silent worker stops pushing frames, and sending then
+    // was refused with "Langy is still replying" while the turn ran on. Stop
+    // it first, and the effect below waits for the stop to land.
+    if (isBusy || turnActive) handleStop();
+  }, [isBusy, turnActive, handleStop]);
   useEffect(() => {
-    if (!reAskCodeAccess || isBusy) return;
+    if (!reAskCodeAccess || isBusy || turnActive) return;
     setReAskCodeAccess(false);
-    void send(LANGY_CODE_ACCESS_ASK_AGAIN);
-  }, [reAskCodeAccess, isBusy, send]);
+    // Nobody typed this, so a failed send must not put it in the composer.
+    void send(LANGY_CODE_ACCESS_ASK_AGAIN, { keepOnFailure: false });
+  }, [reAskCodeAccess, isBusy, turnActive, send]);
 
   // Answer a choices card: the selection is the NEXT USER MESSAGE — a typed
   // part the record binds by blockId, plus the readable "Chose: X" the model
