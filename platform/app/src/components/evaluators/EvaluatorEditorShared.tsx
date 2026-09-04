@@ -11,15 +11,14 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Switch } from "~/components/ui/switch";
 import debounce from "lodash-es/debounce";
 import { ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FormProvider, type UseFormReturn, useForm } from "react-hook-form";
 import { z } from "zod";
-
 import DynamicZodForm from "~/components/checks/DynamicZodForm";
 import { Link } from "~/components/ui/link";
+import { Switch } from "~/components/ui/switch";
 import { Tooltip } from "~/components/ui/tooltip";
 import type {
   AvailableSource,

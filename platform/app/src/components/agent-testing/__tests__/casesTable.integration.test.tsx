@@ -30,9 +30,12 @@ import type { AgentTestingSelection } from "../useAgentTestingRouting";
 
 const suiteRunDataQuery = vi.hoisted(() => vi.fn());
 const suitesGetAllQuery = vi.hoisted(() => vi.fn());
+const mockEvaluatorsGetAll = vi.hoisted(() => vi.fn());
 
 vi.mock("~/utils/api", () => ({
   api: {
+    // The evaluator pills under the suite name read the saved evaluators.
+    evaluators: { getAll: { useQuery: mockEvaluatorsGetAll } },
     suites: {
       // Every run of the v2 dialog is queued under a plan name.
       runPlan: {
@@ -87,18 +90,24 @@ const DEFAULT_SUITE: TestSuiteEntry = {
   name: "Default",
   slug: "default",
   caseCount: 1,
+  fields: [],
+  evaluators: [],
 };
 const REFUNDS: TestSuiteEntry = {
   id: "suite_refunds",
   name: "Refunds",
   slug: "refunds",
   caseCount: 2,
+  fields: [],
+  evaluators: [],
 };
 const CHECKOUT: TestSuiteEntry = {
   id: "suite_checkout",
   name: "Checkout",
   slug: "checkout",
   caseCount: 1,
+  fields: [],
+  evaluators: [],
 };
 
 function makeCase(overrides: Partial<TestCase> = {}): TestCase {
@@ -162,7 +171,7 @@ function panelProps(
     onMoveToSuite: vi.fn(),
     onArchive: vi.fn(),
     onOpenExternalCase: vi.fn(),
-    onRenameSuite: vi.fn(),
+    onEditSuite: vi.fn(),
     ...overrides,
   };
 }
@@ -324,6 +333,7 @@ describe("the scenarios table", () => {
     suitesGetAllQuery.mockReset();
     suiteRunDataQuery.mockReturnValue({ data: undefined, isLoading: false });
     suitesGetAllQuery.mockReturnValue({ data: RUN_PLANS });
+    mockEvaluatorsGetAll.mockReturnValue({ data: [], isLoading: false });
   });
 
   // --- Which suite is open ---
@@ -701,52 +711,144 @@ describe("the scenarios table", () => {
     expect(screen.queryByText("Late refund")).not.toBeInTheDocument();
   });
 
-  // --- Renaming the open suite ---
+  // --- Editing the open suite ---
 
   describe("given the suite Refunds is open", () => {
-    /** @scenario "The name of the open suite carries a rename control" */
-    it("offers a rename control beside the name that opens the name dialog", async () => {
+    /** @scenario "Edit suite sits between New scenario and Run suite above the table" */
+    it("offers Edit suite between New scenario and Run suite, which opens the suite editor", async () => {
       const user = userEvent.setup();
       const { props } = renderPanel({ cases: [makeCase()] });
 
-      const rename = screen.getByRole("button", { name: "Rename test suite" });
-      // It sits with the name, not among the actions at the far end of the line.
-      expect(rename.parentElement).toHaveTextContent("Refunds");
+      const header = screen.getByTestId("edit-suite-button").parentElement;
+      const labels = Array.from(header?.querySelectorAll("button") ?? [])
+        .map((button) => button.textContent)
+        .filter((label) => !!label);
+      expect(labels).toEqual([
+        "New scenario",
+        "Edit suite",
+        "Open recent run",
+        "Run suite",
+      ]);
 
-      await user.click(rename);
-      expect(props.onRenameSuite).toHaveBeenCalled();
+      await user.click(screen.getByRole("button", { name: "Edit suite" }));
+      expect(props.onEditSuite).toHaveBeenCalledWith();
     });
 
-    /** @scenario "The rename control is reachable from the keyboard" */
-    it("takes keyboard focus, so it is not offered on hover alone", () => {
-      renderPanel({ cases: [makeCase()] });
+    /** @scenario "A person with read-only access is offered no Edit suite" */
+    it("offers no Edit suite to a person with read-only access", () => {
+      renderPanel({ cases: [makeCase()], canManage: false });
 
-      const rename = screen.getByRole("button", { name: "Rename test suite" });
-      rename.focus();
-
-      expect(document.activeElement).toBe(rename);
-      expect(rename).not.toHaveAttribute("tabindex", "-1");
-      expect(rename).not.toHaveAttribute("aria-hidden");
-    });
-
-    /** @scenario "No Edit suite button sits above the table" */
-    it("offers no Edit suite button above the table", () => {
-      renderPanel({ cases: [makeCase()] });
-
-      expect(screen.queryByText("Edit suite")).not.toBeInTheDocument();
+      expect(screen.getByText("Refunds")).toBeInTheDocument();
       expect(
         screen.queryByRole("button", { name: "Edit suite" }),
       ).not.toBeInTheDocument();
     });
 
-    /** @scenario "A person with read-only access is offered no rename control" */
-    it("offers no rename control to a person with read-only access", () => {
-      renderPanel({ cases: [makeCase()], canManage: false });
+    /** @scenario "A suite with nothing declared shows no chips row" */
+    it("shows no chips row and counts the scenarios alone when nothing is declared", () => {
+      renderPanel({ cases: [makeCase()] });
 
-      expect(screen.getByText("Refunds")).toBeInTheDocument();
       expect(
-        screen.queryByRole("button", { name: "Rename test suite" }),
+        screen.queryByTestId("suite-declarations-row"),
       ).not.toBeInTheDocument();
+      expect(screen.getByTestId("cases-panel-count-line")).toHaveTextContent(
+        "1 scenario",
+      );
+    });
+
+    /** @scenario "The header lists the fields and the evaluators of the open suite" */
+    /** @scenario "Choosing a header chip opens the suite editor" */
+    it("lists the fields and the evaluators under the name, and opens the editor from a chip", async () => {
+      const user = userEvent.setup();
+      mockEvaluatorsGetAll.mockReturnValue({
+        data: [
+          {
+            id: "eval_sql",
+            name: "SQL Query Equivalence",
+            type: "evaluator",
+            config: { evaluatorType: "ragas/sql_query_equivalence" },
+            fields: [
+              { identifier: "output", type: "str" },
+              { identifier: "expected_output", type: "str" },
+            ],
+            outputFields: [{ identifier: "passed", type: "bool" }],
+          },
+        ],
+        isLoading: false,
+      });
+      const { props } = renderPanel({
+        cases: [makeCase()],
+        suite: {
+          ...REFUNDS,
+          fields: [
+            { identifier: "golden_sql", type: "text" },
+            { identifier: "attempts", type: "number" },
+          ],
+          evaluators: [
+            {
+              id: "att_1",
+              evaluatorId: "eval_sql",
+              required: true,
+              mappings: {
+                output: {
+                  type: "source",
+                  sourceId: "conversation",
+                  path: ["last_agent_message"],
+                },
+              },
+            },
+          ],
+        },
+      });
+
+      const fields = screen.getByTestId("suite-fields-group");
+      expect(within(fields).getByText("Fields")).toBeInTheDocument();
+      expect(
+        within(fields).getByTestId("suite-field-chip-golden_sql"),
+      ).toHaveTextContent("golden_sql");
+      expect(
+        within(fields).getByTestId("suite-field-chip-attempts"),
+      ).toHaveTextContent("attempts");
+
+      const evaluators = screen.getByTestId("suite-evaluators-group");
+      const pill = within(evaluators).getByTestId("evaluator-pill-att_1");
+      expect(pill).toHaveTextContent("SQL Query Equivalence");
+      expect(
+        within(pill).getByTestId("evaluator-pill-required-att_1"),
+      ).toBeInTheDocument();
+      // expected_output reads nothing yet, so the pill carries the alert.
+      expect(pill).toHaveAttribute("data-missing", "true");
+      expect(
+        within(pill).getByTestId("evaluator-pill-alert-att_1"),
+      ).toBeInTheDocument();
+
+      expect(screen.getByTestId("cases-panel-count-line")).toHaveTextContent(
+        "1 scenario · 2 fields · 1 evaluator",
+      );
+
+      await user.click(screen.getByTestId("suite-field-chip-golden_sql"));
+      expect(props.onEditSuite).toHaveBeenLastCalledWith();
+      await user.click(pill);
+      expect(props.onEditSuite).toHaveBeenLastCalledWith("att_1");
+    });
+
+    /** @scenario "The header shows a group only when it has something to list" */
+    it("shows the Fields group alone when the suite declares no evaluator", () => {
+      renderPanel({
+        cases: [makeCase()],
+        suite: {
+          ...REFUNDS,
+          fields: [{ identifier: "golden_sql", type: "text" }],
+        },
+      });
+
+      expect(screen.getByTestId("suite-fields-group")).toBeInTheDocument();
+      expect(
+        screen.queryByTestId("suite-evaluators-group"),
+      ).not.toBeInTheDocument();
+      expect(screen.getByTestId("cases-panel-count-line")).toHaveTextContent(
+        "1 scenario · 1 field",
+      );
     });
   });
 
@@ -771,12 +873,16 @@ describe("the scenarios table", () => {
       renderPanel({ cases: [makeCase()] });
 
       const header = screen.getByTestId("recent-runs-trigger").parentElement;
-      // The rename control beside the suite name carries an icon and no words.
       const labels = Array.from(header?.querySelectorAll("button") ?? [])
         .map((button) => button.textContent)
         .filter((label) => !!label);
 
-      expect(labels).toEqual(["New scenario", "Open recent run", "Run suite"]);
+      expect(labels).toEqual([
+        "New scenario",
+        "Edit suite",
+        "Open recent run",
+        "Run suite",
+      ]);
     });
 
     /** @scenario "A run of one scenario of the suite is offered above the table" */

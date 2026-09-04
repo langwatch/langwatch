@@ -35,7 +35,16 @@ export type OpenScenarioEvaluatorEditorParams = {
   ctx: ScenarioMappingContext;
   /** True for a run plan, which offers no scenario field to map to. */
   planLevel?: boolean;
-  onMappingChange: (input: string, mapping: ScenarioMapping | undefined) => void;
+  /**
+   * How the editor joins the drawer stack. Replacing the current entry is
+   * what a pick from the evaluator list asks for, so back from the editor
+   * lands on the caller and not on the list.
+   */
+  navigation?: { replaceCurrentInStack?: boolean };
+  onMappingChange: (
+    input: string,
+    mapping: ScenarioMapping | undefined,
+  ) => void;
   onRequiredChange: (required: boolean) => void;
   onRemove: () => void;
 };
@@ -65,6 +74,7 @@ export function useOpenScenarioEvaluatorEditor(): (
       evaluator,
       ctx,
       planLevel,
+      navigation,
       onMappingChange,
       onRequiredChange,
       onRemove,
@@ -86,10 +96,11 @@ export function useOpenScenarioEvaluatorEditor(): (
             onMappingChange: handleMappingChange,
           }),
         });
-        openDrawer("codeEvaluatorEditor", {
-          evaluatorId: evaluator.id,
-          mappingsConfig,
-        });
+        openDrawer(
+          "codeEvaluatorEditor",
+          { evaluatorId: evaluator.id, mappingsConfig },
+          navigation,
+        );
         return;
       }
 
@@ -100,15 +111,19 @@ export function useOpenScenarioEvaluatorEditor(): (
         onRequiredChange,
         onRemove,
       });
-      openDrawer("evaluatorEditor", {
-        evaluatorId: evaluator.id,
-        evaluatorType: evaluatorTypeOf(evaluator),
-        mappingsConfig,
-        gate: {
-          required: attachment.required,
-          canRequire: evaluatorCanRequire(evaluator),
+      openDrawer(
+        "evaluatorEditor",
+        {
+          evaluatorId: evaluator.id,
+          evaluatorType: evaluatorTypeOf(evaluator),
+          mappingsConfig,
+          gate: {
+            required: attachment.required,
+            canRequire: evaluatorCanRequire(evaluator),
+          },
         },
-      });
+        navigation,
+      );
     },
     [openDrawer],
   );

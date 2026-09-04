@@ -20,6 +20,8 @@ import {
   useDrawerParams,
 } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { parseEvaluatorAttachments } from "~/server/scenarios/evaluator-attachments";
+import { parseSuiteFieldDefinitions } from "~/server/scenarios/suite-fields";
 import { api } from "~/utils/api";
 import { CaseModal } from "./CaseModal";
 // The key lives in a component-free module so a static importer never pulls
@@ -60,6 +62,8 @@ function useEditorSuites(projectId: string): TestSuiteEntry[] {
         name: testSuite.name,
         slug: testSuite.slug,
         caseCount: 0,
+        fields: parseSuiteFieldDefinitions(testSuite.fields),
+        evaluators: parseEvaluatorAttachments(testSuite.evaluators),
       })),
     [testSuites],
   );

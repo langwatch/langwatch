@@ -74,7 +74,9 @@ function Harness({
   onRemove?: () => void;
   onMappingChange?: (identifier: string, mapping: unknown) => void;
 }) {
-  const form = useForm({ defaultValues: { name: "SQL Equivalence", settings: {} } });
+  const form = useForm({
+    defaultValues: { name: "SQL Equivalence", settings: {} },
+  });
   const controller = {
     form,
     evaluatorId: "eval_sql",
@@ -301,10 +303,7 @@ describe("the evaluator editor on a scenario attachment", () => {
     it("lists Conversation, Scenario and Trace, and the suite fields under Scenario", async () => {
       const user = userEvent.setup();
       render(
-        <Harness
-          gate={{ required: true, canRequire: true }}
-          required={true}
-        />,
+        <Harness gate={{ required: true, canRequire: true }} required={true} />,
         { wrapper: Wrapper },
       );
 
@@ -334,7 +333,9 @@ describe("the evaluator editor on a scenario attachment", () => {
 
       await user.click(screen.getByRole("button", { name: "Open" }));
 
-      expect(mockOpenDrawer).toHaveBeenCalledWith("evaluatorEditor", {
+      const [drawer, props] = mockOpenDrawer.mock.calls[0]!;
+      expect(drawer).toBe("evaluatorEditor");
+      expect(props).toEqual({
         evaluatorId: "eval_sql",
         evaluatorType: "ragas/sql_query_equivalence",
         mappingsConfig: {
@@ -351,16 +352,14 @@ describe("the evaluator editor on a scenario attachment", () => {
       // The drawer reads its callbacks by name; a picked source lands on the
       // attachment in the run's own mapping shape.
       const callbacks = flowCallbacksStore.evaluatorEditor!;
-      (
-        callbacks.onMappingChange as (
-          input: string,
-          mapping: unknown,
-        ) => void
-      )("expected_output", {
-        type: "source",
-        sourceId: "scenario",
-        path: ["fields", "golden_sql"],
-      });
+      (callbacks.onMappingChange as (input: string, mapping: unknown) => void)(
+        "expected_output",
+        {
+          type: "source",
+          sourceId: "scenario",
+          path: ["fields", "golden_sql"],
+        },
+      );
       expect(onMappingChange).toHaveBeenCalledWith("expected_output", {
         type: "source",
         sourceId: "scenario",
@@ -386,7 +385,9 @@ describe("the evaluator editor on a scenario attachment", () => {
 
       await user.click(screen.getByRole("button", { name: "Open" }));
 
-      expect(mockOpenDrawer).toHaveBeenCalledWith("codeEvaluatorEditor", {
+      const [drawer, props] = mockOpenDrawer.mock.calls[0]!;
+      expect(drawer).toBe("codeEvaluatorEditor");
+      expect(props).toEqual({
         evaluatorId: "eval_sql",
         mappingsConfig: expect.objectContaining({
           initialMappings: ATTACHMENT.mappings,

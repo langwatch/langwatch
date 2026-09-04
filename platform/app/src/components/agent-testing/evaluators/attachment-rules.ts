@@ -33,8 +33,7 @@ export type AttachableEvaluator = Pick<
 export function evaluatorTypeOf(
   evaluator: Pick<AttachableEvaluator, "config">,
 ): string | undefined {
-  return (evaluator.config as { evaluatorType?: string } | null)
-    ?.evaluatorType;
+  return (evaluator.config as { evaluatorType?: string } | null)?.evaluatorType;
 }
 
 /**
@@ -55,7 +54,9 @@ export function evaluatorCanRequire(
 export function evaluatorFitsPlanLevel(
   evaluator: Pick<AttachableEvaluator, "fields">,
 ): boolean {
-  return !evaluator.fields.some((field) => isExpectedLikeInput(field.identifier));
+  return !evaluator.fields.some((field) =>
+    isExpectedLikeInput(field.identifier),
+  );
 }
 
 /**
