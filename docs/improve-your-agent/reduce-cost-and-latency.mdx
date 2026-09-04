@@ -5,7 +5,7 @@ keywords: langwatch, reduce cost, reduce latency, cheaper model, model compariso
 description: Run the same test suite on two models side by side, read the pass rate, the cost and the reply latency of each, and keep the cheaper model only where the pass rate holds.
 ---
 
-The cost of an agent is the tokens per turn times the turns per conversation times the price of the model. Latency follows the same three factors. The model is the lever with the largest effect and the largest risk, so it is the one to test first, with the suite as the gate.
+The cost of an agent is the tokens per turn times the turns per conversation times the price of the model. Latency is not that product: it also depends on tool time, prompt caching and how fast the provider answers, so it has to be measured rather than derived. The model is the lever with the largest effect and the largest risk, so it is the one to test first, with the suite as the gate and both numbers read off the comparison run.
 
 ## Step 1: Declare the model as a run parameter
 

@@ -5,7 +5,7 @@ keywords: langwatch, reduce turns, agent turns, tool retries, agent latency, sce
 description: Find why a tool-using agent takes ten turns for a task that needs three, change the cause, and prove with the test suite that the answers did not get worse.
 ---
 
-A turn is one reply from your agent, with the tool calls it made before that reply. An agent that takes ten turns for a return request costs three times what a three-turn agent costs and keeps the customer waiting three times as long. The extra turns have a small number of causes, and each one is visible in a scenario run.
+A turn is one reply from your agent, with the tool calls it made before that reply. An agent that takes ten turns for a return request does more model calls and more tool calls than a three-turn agent, so cutting the turns can lower both the cost and the wait, by how much only a comparison run can tell you. The extra turns have a few causes, and each one is visible in a scenario run.
 
 ## What you need
 

@@ -19,7 +19,7 @@ Every algorithm below takes a program, a set of examples and a metric, and retur
 | GEPA | Rewrites the instructions from text feedback, keeps a Pareto front of candidates | A metric that returns a score and feedback text | Set `max_metric_calls`, 40 to 60 | Through the callback in the example | The judge's reasoning is the feedback, which is the scenario case |
 | SIMBA | Rewrites instructions and examples from self-reflection over mini-batches | A metric | About 60 with `max_steps=4` | No | Larger example sets, where mini-batches pay off |
 
-All DSPy optimizers rewrite the instructions of every predictor in the program. On a `dspy.ReAct` program the instructions contain the tool descriptions, so each of them optimizes the tools as well. See [Optimize with DSPy](/improve-your-agent/optimize-with-dspy).
+The instruction optimizers above (COPRO, MIPROv2, GEPA, SIMBA) rewrite the instructions of every predictor in the program. On a `dspy.ReAct` program the instructions contain the tool descriptions, so those optimizers change the tools as well. `BootstrapFewShot` and `BootstrapFewShotWithRandomSearch` leave the instructions alone and only add demonstrations. See [Optimize with DSPy](/improve-your-agent/optimize-with-dspy).
 
 ## Which one
 

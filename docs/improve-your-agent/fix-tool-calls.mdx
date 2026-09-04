@@ -69,6 +69,7 @@ The agent creates the return and confirms the refund method
 In code, a script step checks the conversation state directly. `has_tool_call` checks that the agent called a tool; a plain function counts the calls:
 
 ```python
+import pytest
 import scenario
 
 def eligibility_checked_once(state: scenario.ScenarioState):
@@ -81,20 +82,23 @@ def eligibility_checked_once(state: scenario.ScenarioState):
     ]
     assert len(calls) == 1, f"check_return_eligibility was called {len(calls)} times"
 
-result = await scenario.run(
-    name="damaged item refund",
-    description="The customer received a damaged blender, order 1001, and wants a refund.",
-    agents=[ReturnsAgent(), scenario.UserSimulatorAgent(), scenario.JudgeAgent(criteria=[
-        "The agent creates the return",
-        "The agent confirms the refund method",
-    ])],
-    script=[
-        scenario.user(),
-        scenario.agent(),
-        eligibility_checked_once,
-        scenario.proceed(),
-    ],
-)
+@pytest.mark.asyncio
+async def test_damaged_item_refund():
+    result = await scenario.run(
+        name="damaged item refund",
+        description="The customer received a damaged blender, order 1001, and wants a refund.",
+        agents=[ReturnsAgent(), scenario.UserSimulatorAgent(), scenario.JudgeAgent(criteria=[
+            "The agent creates the return",
+            "The agent confirms the refund method",
+        ])],
+        script=[
+            scenario.user(),
+            scenario.agent(),
+            eligibility_checked_once,
+            scenario.proceed(),
+        ],
+    )
+    assert result.success
 ```
 
 See [Scenarios in code](/agent-testing/scenarios-in-code) for the adapter and the script steps.
