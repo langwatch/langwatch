@@ -63,6 +63,9 @@ import {
 } from "../api-trpc-features.composition";
 import { composeApiProductGroupCollaborators } from "../api-trpc-collaborators.product-group.composition";
 import { composeFeatureFlagFeature } from "../../features/feature-flag/feature-flag.composition";
+import { composeDatasetFeature } from "../../features/dataset/dataset.composition";
+import { composeEvaluatorFeature } from "../../features/evaluator/evaluator.composition";
+import { composePromptFeature } from "../../features/prompt/prompt.composition";
 import {
   stubApplicationSlices,
   stubComposedFeatures,
@@ -224,15 +227,43 @@ function composeApplication(options: { customRolePlan?: undefined } = {}) {
 
   const datasets = PostgresDatasetAdapter.create({ database: prisma.client }).build();
 
+  const infrastructure = {
+    ...stubInfrastructureEntitlements(),
+    prisma: prisma.client,
+    authz,
+    audit: undefined,
+  };
+
+  const evaluators = {
+    getAllWithFields: vi.fn(async () => [
+      { id: "evaluator-1", name: "Toxicity", projectId: PROJECT_ID },
+    ]),
+  } as never;
+
+  // The three features that moved out of this half, composed the way the root
+  // composes them and handed in beside it.
+  const dataset = composeDatasetFeature({
+    infrastructure,
+    peers: {
+      // The REAL dataset service, over the same double: what this pins is that
+      // `dataset.*` answers from the service the execution half composed rather
+      // than from a second one built here.
+      datasets,
+      experimentLookup: {
+        getById: async () => ({ name: null }),
+        tryGetBySlug: async () => null,
+      },
+    },
+  });
+  const evaluator = composeEvaluatorFeature({
+    infrastructure,
+    peers: { evaluators, workflows: {} as never },
+  });
+  const prompt = composePromptFeature({ infrastructure, peers: { projects } });
+
   const group = composeApiProductGroupCollaborators({
     prisma: prisma.client,
     authz,
-    evaluators: {
-      getAllWithFields: vi.fn(async () => [
-        { id: "evaluator-1", name: "Toxicity", projectId: PROJECT_ID },
-      ]),
-    } as never,
-    workflows: {} as never,
     grants: {
       attachBindings: vi.fn(async () => undefined),
       invalidateOrganization: vi.fn(async () => undefined),
@@ -244,25 +275,12 @@ function composeApplication(options: { customRolePlan?: undefined } = {}) {
       prisma: prisma.client,
       config: { overrides: new Map(), forceEnabled: new Set() },
     }).service,
-    // The REAL dataset service, over the same double: what this pins is that
-    // `dataset.*` answers from the service the execution half composed rather
-    // than from a second one built here.
-    datasets,
-    experimentLookup: {
-      getById: async () => ({ name: null }),
-      tryGetBySlug: async () => null,
-    },
     ...options,
   });
 
   const features = ApiTrpcFeaturesComposition.tryCompose({
-    composed: stubComposedFeatures(),
-    infrastructure: {
-      ...stubInfrastructureEntitlements(),
-      prisma: prisma.client,
-      authz,
-      audit: undefined,
-    },
+    composed: { ...stubComposedFeatures(), dataset, evaluator, prompt },
+    infrastructure,
     collaborators: composeApiTrpcCollaborators(
       testHalves({
         productGroup: group,
@@ -280,7 +298,12 @@ function composeApplication(options: { customRolePlan?: undefined } = {}) {
           application: { ...stubOrgGroupHalf().application, projects },
         } as never,
       }),
-      stubApplicationSlices(),
+      {
+        ...stubApplicationSlices(),
+        dataset: dataset.app,
+        evaluatorApp: evaluator.app,
+        prompts: prompt.app,
+      },
     ),
   });
   if (!features) throw new Error("the record refused to compose against its collaborators");
@@ -299,7 +322,7 @@ function composeApplication(options: { customRolePlan?: undefined } = {}) {
     },
   });
 
-  return { application, prisma, authz, organizations, projects, group };
+  return { application, prisma, authz, organizations, projects, group, evaluator };
 }
 
 async function callTrpc(
@@ -479,10 +502,10 @@ describe("given an API process composed with the product-group half of the recor
 
   describe("when a workflow evaluator is replicated without a saved graph version", () => {
     it("refuses rather than writing a structurally broken replica", async () => {
-      const { group } = composeApplication();
+      const { evaluator } = composeApplication();
 
       await expect(
-        group.evaluatorPorts.replicateEvaluatorWorkflow({} as never, {
+        evaluator.ports.replicateEvaluatorWorkflow({} as never, {
           workflowId: "workflow-1",
           sourceProjectId: PROJECT_ID,
           targetProjectId: "project-2",

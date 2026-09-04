@@ -306,6 +306,9 @@ export type ApiTrpcFeatureApplicationSlices = Pick<
   ApiTrpcFeatureApplication,
   | "analytics"
   | "dashboard"
+  | "dataset"
+  | "evaluatorApp"
+  | "featureFlags"
   | "gateway"
   | "github"
   | "governance"
@@ -313,6 +316,7 @@ export type ApiTrpcFeatureApplicationSlices = Pick<
   | "langy"
   | "monitors"
   | "ops"
+  | "prompts"
   | "scenarios"
   | "sessionPolicy"
   | "storedObjectApp"
@@ -367,13 +371,9 @@ export function composeApiTrpcCollaborators(
       experiments: execution.experiments,
       evaluations: execution.evaluations,
       authzApp: productGroup.authzApp,
-      dataset: productGroup.datasetApp,
-      evaluatorApp: productGroup.evaluatorApp,
-      featureFlags: productGroup.featureFlagService,
       permissions: productGroup.permissions,
       // `projects` is the ORG group's: `...orgGroup.application` below carries
       // it and overwrote the product group's reader in this slot, silently.
-      prompts: productGroup.promptApp,
       roles: productGroup.roleApp,
       traces: traceGroup.traces,
       share: traceGroup.share,
@@ -402,12 +402,8 @@ export function composeApiTrpcCollaborators(
     experiments: execution.experimentPorts,
     evaluations: execution.evaluationPorts,
 
-    batchRecord: productGroup.batchRecordPorts,
-    evaluators: productGroup.evaluatorPorts,
     role: productGroup.rolePorts,
-    dataset: productGroup.datasetPorts,
     home: productGroup.homePorts,
-    prompts: productGroup.promptPorts,
     team: productGroup.teamPorts,
 
     traces: traceGroup.ports.traces,

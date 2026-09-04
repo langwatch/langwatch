@@ -67,6 +67,21 @@ import {
 import { readAgentPresence } from "@langwatch/agent-server";
 import { ApiUpgradeRouter } from "../api-upgrade-router";
 import {
+  composeDatasetFeature,
+  refusingDatasetFeature,
+  type ComposedDatasetFeature,
+} from "../features/dataset/dataset.composition";
+import {
+  composeEvaluatorFeature,
+  refusingEvaluatorFeature,
+  type ComposedEvaluatorFeature,
+} from "../features/evaluator/evaluator.composition";
+import {
+  composePromptFeature,
+  refusingPromptFeature,
+  type ComposedPromptFeature,
+} from "../features/prompt/prompt.composition";
+import {
   composeFeatureFlagFeature,
   refusingFeatureFlagFeature,
   type ComposedFeatureFlagFeature,
@@ -594,6 +609,9 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private composedUsageEnforcement: UsageService | undefined;
   private composedAnalytics!: ComposedAnalyticsFeature;
   private composedFeatureFlag!: ComposedFeatureFlagFeature;
+  private composedDataset!: ComposedDatasetFeature;
+  private composedEvaluator!: ComposedEvaluatorFeature;
+  private composedPrompt!: ComposedPromptFeature;
   private composedIdentity: ApiIdentityCollaborators | undefined;
   /**
    * The identity ledgers' event stack, or none.
@@ -969,7 +987,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // graph, so each composes itself and a deployment missing one keeps the
     // other two.
     this.composedStoredObject = this.composeStoredObject(options);
-    this.composedMonitor = this.composeMonitor(options);
     // The `Idempotency-Key` receipt ledger, over the SAME database every keyed
     // create writes its resource to and the SAME cipher every other at-rest
     // secret is written under. Composed before the gateway because its three
@@ -1011,6 +1028,51 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // impersonation is started against, and the projects a scheduled job is
     // scoped to. It used to ride inside the agent half, which cost every
     // operator surface whenever a scenario collaborator was missing.
+    // A project's datasets, its evaluators and its prompt library. All three
+    // used to ride inside the product-group half; each takes only the shared
+    // infrastructure and the peers it names.
+    this.composedDataset =
+      infrastructure && this.composedExecution
+        ? composeDatasetFeature({
+            infrastructure,
+            peers: {
+              // Taken rather than built so a project's rows have ONE service:
+              // the workflow and experiment applications read them through the
+              // same one, and two would let `dataset.getAll` disagree with an
+              // experiment's own row read.
+              datasets: this.composedExecution.datasets,
+              experimentLookup: this.composedExecution.experimentLookup,
+            },
+          })
+        : refusingDatasetFeature();
+    this.composedEvaluator =
+      infrastructure && this.composedExecution
+        ? composeEvaluatorFeature({
+            infrastructure,
+            peers: {
+              evaluators: this.composedExecution.evaluators,
+              workflows: this.composedExecution.workflows,
+              ...(this.composedModelProviders
+                ? { modelProviders: this.composedModelProviders }
+                : {}),
+            },
+          })
+        : refusingEvaluatorFeature();
+    this.composedPrompt =
+      infrastructure && tenancy
+        ? composePromptFeature({
+            infrastructure,
+            peers: {
+              projects: tenancy.projects,
+              ...(this.composedModelProviders
+                ? { modelProviders: this.composedModelProviders }
+                : {}),
+            },
+          })
+        : refusingPromptFeature();
+    // After the evaluator feature, whose replication ports a monitor copy
+    // carries: one answer to what copying an evaluator does to the graph.
+    this.composedMonitor = this.composeMonitor(options);
     this.composedOps = this.composeOps(options, infrastructure, tenancy);
     this.composedDataRetention = this.composeDataRetention(options, infrastructure);
     // The conversation panel and the egress allow-list beside it. It used to
@@ -1027,6 +1089,9 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       composed: {
         analytics: this.composedAnalytics,
         featureFlag: this.composedFeatureFlag,
+        dataset: this.composedDataset,
+        evaluator: this.composedEvaluator,
+        prompt: this.composedPrompt,
         gateway: this.composedGateway,
         langy: this.composedLangy,
         ops: this.composedOps,
@@ -1054,6 +1119,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         {
           analytics: this.composedAnalytics.analytics,
           dashboard: this.composedAnalytics.dashboard,
+          dataset: this.composedDataset.app,
+          evaluatorApp: this.composedEvaluator.app,
+          featureFlags: this.composedFeatureFlag.service,
+          prompts: this.composedPrompt.app,
           gateway: this.composedGateway.app,
           github,
           langy: this.composedLangy.app,
@@ -1510,7 +1579,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // applications would let the public door and the dashboard disagree about
     // what a metric means, and two prompt services about what a project holds.
     const analytics = this.composedAnalytics.analytics;
-    const prompts = this.composedProductGroup?.promptApp.promptService;
+    const prompts = this.composedPrompt.app.promptService;
     // The governed-SQL family. Every collaborator is the analytics half's own,
     // so the API key's door and the workbench's door run one validator against
     // one catalogue; the saved charts sit on the same Dashboard application
@@ -2826,16 +2895,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     const database = this.composedDatabase?.connection;
     const projects = this.composedTenancy?.projects;
     const organizations = this.composedTenancy?.organizations;
-    // The dataset service the execution half composed. Taken rather than built
-    // so a project's rows have ONE service: the workflow and experiment
-    // applications read them through the same one, and two would let
-    // `dataset.getAll` disagree with an experiment's own row read.
-    const execution = this.composedExecution;
     // The grant ledger custom-role bindings are written through: the SAME one
     // the AuthZ service reads decisions from, so a role granted here is a role
     // the next request's check can see.
     const grants = this.composedAuthz?.grants;
-    if (!database || !projects || !organizations || !execution || !grants) return undefined;
+    if (!database || !projects || !organizations || !grants) return undefined;
 
     return composeApiProductGroupCollaborators({
       prisma: database.client,
@@ -2844,11 +2908,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       projects,
       featureFlags: this.composedFeatureFlag.service,
       grants,
-      datasets: execution.datasets,
-      experimentLookup: execution.experimentLookup,
-      evaluators: execution.evaluators,
-      workflows: execution.workflows,
-      ...(this.composedModelProviders ? { modelProviders: this.composedModelProviders } : {}),
     });
   }
 
@@ -2891,14 +2950,16 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    */
   private composeMonitor(options: ApiRuntimeCompositionOptions): ComposedMonitorFeature {
     const execution = this.composedExecution;
-    const productGroup = this.composedProductGroup;
-    if (!execution || !productGroup) return refusingMonitorFeature();
+    if (!execution) return refusingMonitorFeature();
 
     return composeMonitorFeature({
       peers: {
         monitors: execution.monitors,
         evaluators: execution.evaluators,
-        evaluatorReplication: productGroup.evaluatorPorts,
+        // The evaluator feature's own ports: a monitor copy carries its
+        // evaluator and that evaluator's workflow with it, and a second
+        // replication would be a second answer to what copying one does.
+        evaluatorReplication: this.composedEvaluator.ports,
       },
       resolveClickHouseClient: this.composedClickHouse?.resolveClient ?? null,
       report: LoggedApiMonitorAbsence.create(createLogger(options.config.serviceName)),

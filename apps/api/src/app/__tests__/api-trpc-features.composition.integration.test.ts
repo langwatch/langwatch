@@ -222,15 +222,12 @@ function testCollaborators(overrides: Record<string, unknown> = {}) {
   return {
     application: testApplication(),
     annotation: stub("annotation"),
-    batchRecord: stub("batchRecord"),
     auth: testAuthApp(),
     bugReports: {
       getAll: async () => bugReportPage,
       getById: async () => null,
     },
     dataPrivacy: stub("dataPrivacy"),
-    dataset: stub("dataset"),
-    evaluators: stub("evaluators"),
     evaluations: stub("evaluations", { mappingsSchema: anySchema }),
     experiments: stub("experiments", { workbenchStateSchema: anySchema }),
     group: stub("group"),
@@ -239,7 +236,6 @@ function testCollaborators(overrides: Record<string, unknown> = {}) {
     integrationsChecks: stub("integrationsChecks"),
     joinRequests: stub("joinRequests"),
     onboarding: stub("onboarding", { signUpDataSchema: anySchema }),
-    prompts: stub("prompts"),
     role: stub("role", { customRolePermission: anySchema }),
     team: stub("team"),
     /**

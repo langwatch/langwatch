@@ -14,6 +14,9 @@ import type { ComposedGatewayFeature } from "../features/gateway/gateway.composi
 import type { ComposedLangyFeature } from "../features/langy/langy.composition";
 import type { ComposedOpsFeature } from "../features/ops/ops.composition";
 import type { ComposedAnalyticsFeature } from "../features/analytics/analytics.composition";
+import type { ComposedDatasetFeature } from "../features/dataset/dataset.composition";
+import type { ComposedEvaluatorFeature } from "../features/evaluator/evaluator.composition";
+import type { ComposedPromptFeature } from "../features/prompt/prompt.composition";
 import type { ComposedFeatureFlagFeature } from "../features/feature-flag/feature-flag.composition";
 import type { ComposedDataRetentionFeature } from "../features/data-retention/data-retention.composition";
 import type { ComposedMonitorFeature } from "../features/monitor/monitor.composition";
@@ -49,6 +52,15 @@ export type ComposedApiFeatures = Readonly<{
    * reads. Composed before every feature that gates on a flag.
    */
   featureFlag: ComposedFeatureFlagFeature;
+  /** Two namespaces and the `ctx.app.dataset` slice the dataset REST family reads. */
+  dataset: ComposedDatasetFeature;
+  /**
+   * One namespace, the `ctx.app.evaluatorApp` slice, and the replication ports
+   * the monitor feature takes as its peer.
+   */
+  evaluator: ComposedEvaluatorFeature;
+  /** One namespace and the `ctx.app.prompts` slice two other doors read. */
+  prompt: ComposedPromptFeature;
   /** One namespace, over the policy this process supplies the packaged rules. */
   dataRetention: ComposedDataRetentionFeature;
   /** One namespace and the `ctx.app.monitors` slice the monitor REST family reads. */

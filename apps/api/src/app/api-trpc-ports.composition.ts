@@ -286,11 +286,8 @@ export function createApiTrpcPorts<
         }),
     },
 
-    batchRecord: collaborators.batchRecord,
 
-    dataset: collaborators.dataset,
 
-    evaluators: collaborators.evaluators,
 
 
     group: collaborators.group,
@@ -320,7 +317,6 @@ export function createApiTrpcPorts<
      */
     prisma,
 
-    prompts: collaborators.prompts,
 
     role: collaborators.role,
 

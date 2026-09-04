@@ -35,6 +35,9 @@ import { composeGatewayFeature } from "../../features/gateway/gateway.compositio
 import { refusingLangyFeature } from "../../features/langy/langy.composition";
 import { refusingDataRetentionFeature } from "../../features/data-retention/data-retention.composition";
 import { refusingAnalyticsFeature } from "../../features/analytics/analytics.composition";
+import { refusingDatasetFeature } from "../../features/dataset/dataset.composition";
+import { refusingEvaluatorFeature } from "../../features/evaluator/evaluator.composition";
+import { refusingPromptFeature } from "../../features/prompt/prompt.composition";
 import { refusingFeatureFlagFeature } from "../../features/feature-flag/feature-flag.composition";
 import { refusingMonitorFeature } from "../../features/monitor/monitor.composition";
 import { refusingScenarioFeature } from "../../features/scenario/scenario.composition";
@@ -123,9 +126,7 @@ function refusingPorts(): AppTrpcFeaturePorts<
 
   return {
     annotation: refuseEvery("annotation"),
-    batchRecord: refuseEvery("batchRecord"),
     bugReports: refuseEvery("bugReports"),
-    dataset: refuseEvery("dataset"),
     auth: refuseEvery("auth"),
     dataPrivacy: refuseEvery("dataPrivacy"),
     // Read while the two writes are BUILT — the policy chain lifts each
@@ -143,7 +144,6 @@ function refusingPorts(): AppTrpcFeaturePorts<
       ...(refuseEvery("experiments") as object),
       workbenchStateSchema: z.object({ rows: z.array(z.unknown()) }),
     } as never,
-    evaluators: refuseEvery("evaluators"),
     group: refuseEvery("group"),
     home: refuseEvery("home"),
     identity: refuseEvery("identity"),
@@ -157,7 +157,6 @@ function refusingPorts(): AppTrpcFeaturePorts<
       signUpDataSchema: testSignUpDataSchema,
     } as never,
     prisma: refuseEvery("prisma"),
-    prompts: refuseEvery("prompts"),
     role: {
       ...(refuseEvery("role") as object),
       customRolePermission: z.string(),
@@ -300,6 +299,9 @@ function buildFeatures() {
       scenario: refusingScenarioFeature(),
       analytics: refusingAnalyticsFeature(),
       featureFlag: refusingFeatureFlagFeature(),
+      dataset: refusingDatasetFeature(),
+      evaluator: refusingEvaluatorFeature(),
+      prompt: refusingPromptFeature(),
       dataRetention: refusingDataRetentionFeature(),
       monitor: refusingMonitorFeature(),
       storedObject: refusingStoredObjectFeature(),

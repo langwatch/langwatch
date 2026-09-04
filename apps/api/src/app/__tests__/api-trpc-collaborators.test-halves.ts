@@ -23,6 +23,9 @@ import { createGatewayTrpcRouters } from "../../features/gateway/gateway-trpc.mo
 import { refusingLangyFeature } from "../../features/langy/langy.composition";
 import { refusingOpsFeature } from "../../features/ops/ops.composition";
 import { refusingAnalyticsFeature } from "../../features/analytics/analytics.composition";
+import { refusingDatasetFeature } from "../../features/dataset/dataset.composition";
+import { refusingEvaluatorFeature } from "../../features/evaluator/evaluator.composition";
+import { refusingPromptFeature } from "../../features/prompt/prompt.composition";
 import { refusingFeatureFlagFeature } from "../../features/feature-flag/feature-flag.composition";
 import { refusingDataRetentionFeature } from "../../features/data-retention/data-retention.composition";
 import { refusingMonitorFeature } from "../../features/monitor/monitor.composition";
@@ -111,18 +114,10 @@ export function stubExecutionHalf(): ApiExecutionCollaborators {
 export function stubProductGroupHalf(): ApiProductGroupCollaborators {
   return stub<ApiProductGroupCollaborators>("productGroup", {
     authzApp: stub("app.authzApp"),
-    datasetApp: stub("app.dataset"),
-    evaluatorApp: stub("app.evaluatorApp"),
-    featureFlagService: stub("app.featureFlags"),
     permissions: stub("app.permissions"),
     projectReads: stub("app.projects", { getOrganizationId: async () => "organization-1" }),
-    promptApp: stub("app.prompts"),
     roleApp: stub("app.roles"),
-    batchRecordPorts: stub("batchRecord"),
-    datasetPorts: stub("dataset"),
-    evaluatorPorts: stub("evaluators"),
     homePorts: stub("home"),
-    promptPorts: stub("prompts"),
     rolePorts: stub("role", { customRolePermission: anySchema }),
     teamPorts: stub("team"),
   });
@@ -236,6 +231,9 @@ export function stubApplicationSlices(): ApiTrpcFeatureApplicationSlices {
     github: stub("app.github"),
     analytics: stub("app.analytics"),
     dashboard: stub("app.dashboard"),
+    dataset: stub("app.dataset"),
+    evaluatorApp: stub("app.evaluatorApp"),
+    featureFlags: stub("app.featureFlags", { isEnabled: async () => true }),
     langy: stub("app.langy"),
     monitors: stub("app.monitors"),
     scenarios: stub("app.scenarios"),
@@ -244,6 +242,7 @@ export function stubApplicationSlices(): ApiTrpcFeatureApplicationSlices {
     // Answers rather than refuses: several namespaces that are NOT the surface
     // under test still gate on `ctx.app.ops.isAdmin()` at call time.
     ops: stub("app.ops", { isAdmin: () => true }),
+    prompts: stub("app.prompts"),
     governance: stub("app.governance"),
     governanceApp: stub("app.governanceApp"),
     sessionPolicy: stub("app.sessionPolicy"),
@@ -272,6 +271,9 @@ export function stubComposedFeatures(): ComposedApiFeatures {
     scenario: refusingScenarioFeature(),
     analytics: refusingAnalyticsFeature(),
     featureFlag: refusingFeatureFlagFeature(),
+    dataset: refusingDatasetFeature(),
+    evaluator: refusingEvaluatorFeature(),
+    prompt: refusingPromptFeature(),
     dataRetention: refusingDataRetentionFeature(),
     monitor: refusingMonitorFeature(),
     storedObject: refusingStoredObjectFeature(),

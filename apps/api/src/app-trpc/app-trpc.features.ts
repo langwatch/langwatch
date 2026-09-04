@@ -23,7 +23,6 @@ import type { EmailSuppressionTrpcPorts } from "@langwatch/automation-server";
 
 import type { CodingAgentTrpcPorts } from "@langwatch/coding-agent-server";
 
-import type { BatchRecordTrpcPorts, DatasetTrpcPorts } from "@langwatch/dataset-server";
 
 import type { AuthApp } from "@langwatch/auth-server";
 import type { DataPrivacyTrpcPorts } from "@langwatch/data-privacy-server";
@@ -46,7 +45,6 @@ import type {
   TracesV2TrpcPorts,
 } from "@langwatch/trace-server";
 
-import type { EvaluatorTrpcPorts } from "@langwatch/evaluator-server";
 import type { ExperimentTrpcPorts } from "@langwatch/experiment-server";
 import type { BugReportTrpcPorts } from "@langwatch/ops-server";
 
@@ -60,7 +58,6 @@ import type {
 
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { HomeTrpcPorts, IntegrationsChecksTrpcPorts } from "@langwatch/project-server";
-import type { PromptTrpcPorts } from "@langwatch/prompt-server";
 
 import type { IdentityTrpcPorts, UserTrpcPorts } from "@langwatch/user-server";
 import type { WorkflowOptimizationTrpcPorts, WorkflowTrpcPorts } from "@langwatch/workflow-server";
@@ -77,11 +74,7 @@ import {
   createPublicEnvTrpcProcedure,
 } from "../features/auth/auth-trpc.mount";
 import { createAuthzTrpcRouter } from "../features/authz/authz-trpc.mount";
-import {
-  createBatchRecordTrpcRouter,
-  createDatasetRecordTrpcRouter,
-  createDatasetTrpcRouter,
-} from "../features/dataset/dataset-trpc.mount";
+import { createDatasetRecordTrpcRouter } from "../features/dataset/dataset-trpc.mount";
 import { createDashboardTrpcRouter } from "../features/dashboard/dashboard-trpc.mount";
 import {
   createDataPrivacyTrpcRouter,
@@ -91,7 +84,6 @@ import {
   createEvaluationTrpcRouter,
   type EvaluationMountPorts,
 } from "../features/evaluation/evaluation-trpc.mount";
-import { createEvaluatorTrpcRouter } from "../features/evaluator/evaluator-trpc.mount";
 import { createExperimentTrpcRouter } from "../features/experiment/experiment-trpc.mount";
 import { createExportTrpcRouter } from "../features/export/export-trpc.mount";
 import { createBugReportTrpcRouter } from "../features/ops/ops-trpc.mount";
@@ -117,10 +109,7 @@ import {
   type AutomationMountPorts,
 } from "../features/automation/automation-trpc.mount";
 import { createCodingAgentTrpcRouter } from "../features/coding-agent/coding-agent-trpc.mount";
-import {
-  createPromptTagTrpcRouter,
-  createPromptTrpcRouter,
-} from "../features/prompt/prompt-trpc.mount";
+import { createPromptTagTrpcRouter } from "../features/prompt/prompt-trpc.mount";
 import {
   createRoleBindingTrpcRouter,
   createRoleTrpcRouter,
@@ -253,23 +242,12 @@ export interface AppTrpcFeaturePorts<
    */
   annotation: TAnnotationPorts;
   /**
-   * The two batch-evaluation rollups. The PROCESS's rather than the dataset
-   * package's because the table is: `BatchEvaluation` records what an
-   * experiment run scored, and the dataset it ran against is a join.
-   */
-  batchRecord: BatchRecordTrpcPorts<unknown, unknown>;
-  /**
    * The support inbox and the audit trail every read of it is written to. The
    * reports themselves are a global table with no tenant column, filed against
    * the product by `langwatch report` and the MCP tool, so the process reads
    * them the way it reads any other back-office resource.
    */
   bugReports: BugReportTrpcPorts<TBugReportPage, TBugReport>;
-  /**
-   * The permission probe a dataset COPY runs against the SOURCE project, which
-   * the declared check on the procedure never covered.
-   */
-  dataset: DatasetTrpcPorts;
   /**
    * The composed auth application BOTH signed-out doors answer from — the
    * front door and `publicEnv` beside it. One instance rather than two,
@@ -306,13 +284,6 @@ export interface AppTrpcFeaturePorts<
    * `prisma` below.
    */
   evaluations: EvaluationMountPorts<TMappingsIn, TMappingsOut>;
-  /**
-   * The workflow behind a WORKFLOW evaluator: its linked row, the monitors
-   * running it, and the copy that replicates its graph into another project.
-   * A studio graph is Workflow's, and the evaluator package never reaches into
-   * one — so all six are the process's.
-   */
-  evaluators: EvaluatorTrpcPorts;
   /**
    * The workflow, monitor and identity collaborators an experiment still
    * reaches through the application while those verticals are drained.
@@ -361,12 +332,6 @@ export interface AppTrpcFeaturePorts<
    * every caller.
    */
   prisma: PrismaClient;
-  /**
-   * The lifecycle signal a project's first prompt fires. The whole port,
-   * because everything else `prompts.*` needs is a row read the process
-   * answers off `ctx.app.prompts`.
-   */
-  prompts: PromptTrpcPorts;
   /**
    * The organization probe a role-scoped check runs, the Enterprise plan gate
    * a custom role clears, and the permission vocabulary its entries are parsed
@@ -493,6 +458,7 @@ export function createAppTrpcFeatures<
   const langyRouters = composed.langy.routers(mount);
   const scenarioRouters = composed.scenario.routers(mount);
   const analyticsRouters = composed.analytics.routers(mount);
+  const datasetRouters = composed.dataset.routers(mount);
   const governance = createEnterpriseGovernanceTrpcRouters(mount);
   const enterprise = createEnterpriseTrpcRouters({ ...mount, ports: ports.enterprise });
   const billing = createEnterpriseBillingTrpcRouters({
@@ -638,14 +604,14 @@ export function createAppTrpcFeatures<
     // AuthZ service every declared check on this root already runs on, so a
     // second one here would be a second answer to one question.
     authz: createAuthzTrpcRouter(mount),
-    batchRecord: createBatchRecordTrpcRouter({ ...mount, ports: ports.batchRecord }),
+    batchRecord: datasetRouters.batchRecord,
     bugReports: createBugReportTrpcRouter({ ...mount, ports: ports.bugReports }),
     dashboards: createDashboardTrpcRouter(mount),
     // A project's datasets and the rows inside them: two wire names for one
     // application, because the rows are only reachable through the dataset
     // that holds them and a second service over them could disagree about
     // what one contains.
-    dataset: createDatasetTrpcRouter({ ...mount, ports: ports.dataset }),
+    dataset: datasetRouters.dataset,
     datasetRecord: createDatasetRecordTrpcRouter(mount),
     dataPrivacy: createDataPrivacyTrpcRouter({
       ...mount,
@@ -660,7 +626,7 @@ export function createAppTrpcFeatures<
     // The evaluators a project defines, beside the `evaluations.*` surface
     // that RUNS them. Two namespaces, two owners, one wire: an evaluator is a
     // definition and an evaluation is a result.
-    evaluators: createEvaluatorTrpcRouter({ ...mount, ports: ports.evaluators }),
+    evaluators: composed.evaluator.router(mount),
     experiments: createExperimentTrpcRouter({ ...mount, ports: ports.experiments }),
     // The two export-progress relays. This one surface owns its procedures
     // rather than delegating to a feature package — one relay over a channel
@@ -718,7 +684,7 @@ export function createAppTrpcFeatures<
     // catalogue those prompts are labelled from. One package, two wire names,
     // because the catalogue is the ORGANIZATION's and the library is the
     // project's — and only one of them takes a port.
-    prompts: createPromptTrpcRouter({ ...mount, ports: ports.prompts }),
+    prompts: composed.prompt.router(mount),
     promptTags: createPromptTagTrpcRouter(mount),
     // Custom role definitions, and the bindings that hand them out. Two wire
     // names for one application, because who holds a role and what that role

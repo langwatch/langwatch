@@ -52,20 +52,8 @@ import {
   type AuthzService,
 } from "@langwatch/authz-contract";
 import { AuthzApp, KsuidAuthzBindingIdAdapter } from "@langwatch/authz-server";
-import type { DatasetService } from "@langwatch/dataset-contract";
-import {
-  DatasetApp,
-  type BatchRecordTrpcPorts,
-  type DatasetExperimentLookup,
-  type DatasetTrpcPorts,
-} from "@langwatch/dataset-server";
-import type { EvaluatorService } from "@langwatch/evaluator-contract";
-import { EvaluatorApp, type EvaluatorTrpcPorts } from "@langwatch/evaluator-server";
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
 import { HandledError } from "@langwatch/handled-error";
-import type { WorkflowApp } from "@langwatch/workflow-server";
-import { TRPCError } from "@trpc/server";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import { assertNoPersonalTeamScope, type TeamTrpcPorts } from "@langwatch/organization-server";
@@ -76,7 +64,6 @@ import {
   type HomeTrpcPorts,
   type RecentItem,
 } from "@langwatch/project-server";
-import { PostgresPromptAdapter, PromptApp, type PromptTrpcPorts } from "@langwatch/prompt-server";
 import type { RoleBindingScopeType, RoleService } from "@langwatch/role-contract";
 import {
   PostgresRoleAdapter,
@@ -124,13 +111,6 @@ export abstract class ApiCustomRolePlanGatePort {
   }): Promise<void>;
 }
 
-/**
- * The product signal a project's new prompt fires, for a deployment that has
- * one. Fire and forget: it may never fail a create.
- */
-export abstract class ApiPromptNurturingPort {
-  abstract afterPromptCreated(input: { projectId: string; userId?: string | null }): void;
-}
 
 export type ApiProductGroupCollaboratorsOptions = Readonly<{
   /** The one guarded connection every row read below runs on. */
@@ -149,46 +129,12 @@ export type ApiProductGroupCollaboratorsOptions = Readonly<{
   /** The project directory the tenancy graph composed. */
   projects: ProjectService;
   /**
-   * The model gateway a stored prompt's model reference is resolved against.
-   *
-   * Optional: a prompt row reads and writes without it, and the adapter's own
-   * contract treats an absent gateway as "no provider metadata" rather than a
-   * failure. The `prompts` namespace therefore mounts on a deployment with no
-   * gateway; what it cannot do there is annotate a version with the provider
-   * behind its model.
-   */
-  modelProviders?: ModelProviderService;
-  /**
    * The process's ONE rollout store, composed by the feature-flag feature.
    *
    * Taken rather than built: this half used to build one and the analytics half
    * another, so a rollout had two objects answering it in one process.
    */
   featureFlags: FeatureFlagService;
-  /**
-   * The dataset service the execution half already composed.
-   *
-   * Taken rather than built, and that is the whole point: the workflow and
-   * experiment applications read a project's rows through this same service,
-   * and a second one here would let `dataset.getAll` and an experiment's own
-   * row read disagree about what a dataset contains.
-   */
-  datasets: DatasetService;
-  /** The experiment lookup a dataset resolves a borrowed name through. */
-  experimentLookup: DatasetExperimentLookup;
-  /**
-   * The evaluator service the execution half already composed. Taken rather
-   * than built, for the same reason the dataset service is: the workflow
-   * application publishes evaluators through this one.
-   */
-  evaluators: EvaluatorService;
-  /**
-   * The workflow application a WORKFLOW evaluator's graph is replicated
-   * through. The studio DSL, its dataset references and its version history
-   * are Workflow's, and neither the evaluator nor the monitor package reaches
-   * into them.
-   */
-  workflows: WorkflowApp;
   /**
    * The grant ledger custom-role bindings are written through.
    *
@@ -199,26 +145,18 @@ export type ApiProductGroupCollaboratorsOptions = Readonly<{
   grants: AuthzGrantsService;
   /** The Enterprise plan gate, where the deployment composed one. */
   customRolePlan?: ApiCustomRolePlanGatePort;
-  /** The nurturing sink, where the deployment composed one. */
-  promptNurturing?: ApiPromptNurturingPort;
 }>;
 
 /** The application slices and the port groups this half owns, composed together. */
 export type ApiProductGroupCollaborators = Readonly<{
   /** For `ctx.app.authzApp`. */
   authzApp: AuthzApp;
-  /** For `ctx.app.dataset`. */
-  datasetApp: DatasetApp;
-  /** For `ctx.app.evaluatorApp`. */
-  evaluatorApp: EvaluatorApp;
   /** For `ctx.app.featureFlags`. */
   featureFlagService: FeatureFlagService;
   /** For `ctx.app.permissions`. */
   permissions: Pick<AuthzService, "hasPermission">;
   /** For `ctx.app.projects`. */
   projectReads: Readonly<{ getOrganizationId(projectId: string): Promise<string> }>;
-  /** For `ctx.app.prompts`. */
-  promptApp: PromptApp;
   /** For `ctx.app.roles` — the same application both role surfaces read. */
   roleApp: RoleApp;
   /**
@@ -231,16 +169,8 @@ export type ApiProductGroupCollaborators = Readonly<{
    * on write and silently dropped on acceptance.
    */
   roles: RoleService;
-  /** The `batchRecord` entry of {@link ApiTrpcCollaborators}. */
-  batchRecordPorts: BatchRecordTrpcPorts<unknown, unknown>;
-  /** The `dataset` entry. */
-  datasetPorts: DatasetTrpcPorts;
-  /** The `evaluators` entry. */
-  evaluatorPorts: EvaluatorTrpcPorts;
   /** The `home` entry. */
   homePorts: HomeTrpcPorts;
-  /** The `prompts` entry. */
-  promptPorts: PromptTrpcPorts;
   /** The `role` entry. */
   rolePorts: RoleTrpcPorts;
   /** The `team` entry. */
@@ -257,14 +187,6 @@ export function composeApiProductGroupCollaborators(
   const authzApp = AuthzApp.create({ permissions: options.authz });
 
   const featureFlagService = options.featureFlags;
-
-  const promptApp = PromptApp.create({
-    prompts: PostgresPromptAdapter.create({
-      database: options.prisma,
-      ...(options.modelProviders ? { modelProvider: options.modelProviders } : {}),
-    }).build(),
-    projects: options.projects,
-  });
 
   const recentItems = PostgresRecentItemsAdapter.create({ database: options.prisma }).build();
 
@@ -283,67 +205,13 @@ export function composeApiProductGroupCollaborators(
     authzGrants: options.grants,
   });
 
-  const datasetApp = DatasetApp.create({
-    dataset: options.datasets,
-    experiments: options.experimentLookup,
-  });
-
-  const evaluatorApp = EvaluatorApp.create({
-    evaluators: options.evaluators,
-    // The gateway resolves a project's default and embeddings models when an
-    // evaluator is created without naming them. With none composed the
-    // evaluator package's own rule applies — the caller must name the model —
-    // which is a narrower surface rather than a wrong answer.
-    ...(options.modelProviders ? { modelProviders: options.modelProviders } : {}),
-  } as Parameters<typeof EvaluatorApp.create>[0]);
-
   return {
     authzApp,
-    datasetApp,
-    evaluatorApp,
     featureFlagService,
     permissions: options.authz,
     projectReads: options.projects,
-    promptApp,
     roleApp,
     roles,
-    /**
-     * The two batch-evaluation rollups, read off this process's own connection.
-     *
-     * They are the HOST's rather than the dataset package's because the table
-     * is: `BatchEvaluation` records what an experiment run scored, and the
-     * dataset it ran against is a join rather than the subject.
-     */
-    batchRecordPorts: {
-      summariseByExperiment: (_ctx, { projectId }) =>
-        options.prisma.batchEvaluation.groupBy({
-          by: ["experimentId", "datasetSlug"],
-          where: { projectId },
-          _count: { experimentId: true },
-          _sum: { cost: true },
-          _avg: { score: true },
-        }),
-      listByExperiment: (_ctx, { projectId, experimentId }) =>
-        options.prisma.batchEvaluation.findMany({
-          where: { projectId, experimentId },
-          include: { dataset: true },
-        }),
-    },
-    datasetPorts: {
-      /**
-       * A copy reads a SECOND project — the source — that the declared check on
-       * the procedure never covered, so the source is probed separately before
-       * anything is read from it. Answered by the one AuthZ service this
-       * process authorizes with.
-       */
-      probeProjectPermission: (ctx, projectId, permission) =>
-        options.authz.hasPermission({
-          userId: (ctx as unknown as ApiTrpcPortsContext).actor().id,
-          permission,
-          projectId,
-        }),
-    },
-    evaluatorPorts: composeEvaluatorPorts(options),
     homePorts: {
       /**
        * The strip walks this process's own audit trail and then hydrates each
@@ -355,19 +223,6 @@ export function composeApiProductGroupCollaborators(
         _ctx,
         input: Readonly<{ userId: string; projectId: string; limit: number }>,
       ): Promise<RecentItem[]> => recentItems.getRecentItems(input),
-    },
-    promptPorts: {
-      afterPromptCreated: (input) => {
-        const nurturing = options.promptNurturing;
-        if (!nurturing) {
-          logger.debug(
-            { projectId: input.projectId },
-            "no prompt nurturing sink is composed: the lifecycle signal for this prompt is not sent",
-          );
-          return;
-        }
-        nurturing.afterPromptCreated(input);
-      },
     },
     rolePorts: {
       probeOrganizationPermission: (ctx, organizationId, permission) =>
@@ -519,98 +374,3 @@ class OrgExclusivePermissionScopeError extends HandledError {
   }
 }
 
-/**
- * Everything an evaluator reaches that the evaluator package does not own.
- *
- * Four of the six are row reads on the process's own connection — the linked
- * workflow, the monitors running this evaluator, their deletion, and archiving
- * the graph. The other two REPLICATE that graph into another project, which is
- * the workflow application's copy: its dataset copier, its DSL rewrite, its
- * version parentage. None of it belongs to an evaluator.
- */
-function composeEvaluatorPorts(options: ApiProductGroupCollaboratorsOptions): EvaluatorTrpcPorts {
-  const { prisma, workflows } = options;
-
-  const deleteReplicatedWorkflow = async (
-    _ctx: unknown,
-    { workflowId, projectId }: Readonly<{ workflowId: string; projectId: string }>,
-  ): Promise<void> => {
-    // `deleteMany` rather than `delete` so the multitenancy guard accepts the
-    // project scope: a bare `{ id }` delete is rejected and the rollback below
-    // silently no-ops.
-    await prisma.workflow.deleteMany({ where: { id: workflowId, projectId } });
-  };
-
-  return {
-    findLinkedWorkflow: (_ctx, { workflowId, projectId }) =>
-      prisma.workflow.findFirst({
-        where: { id: workflowId, projectId, archivedAt: null },
-        select: { id: true, name: true },
-      }),
-    findMonitorsUsingEvaluator: (_ctx, { evaluatorId, projectId }) =>
-      prisma.monitor.findMany({
-        where: { evaluatorId, projectId },
-        select: { id: true, name: true },
-      }),
-    deleteMonitorsUsingEvaluator: (_ctx, { evaluatorId, projectId }) =>
-      prisma.monitor.deleteMany({ where: { evaluatorId, projectId } }),
-    archiveLinkedWorkflow: (_ctx, { workflowId, projectId }) =>
-      prisma.workflow.update({
-        where: { id: workflowId, projectId },
-        data: { archivedAt: new Date() },
-      }),
-    replicateEvaluatorWorkflow: async (ctx, { workflowId, sourceProjectId, targetProjectId }) => {
-      const workflow = await prisma.workflow.findFirst({
-        where: { id: workflowId, projectId: sourceProjectId, archivedAt: null },
-        include: { latestVersion: true },
-      });
-
-      // Refused rather than copied: an evaluator created against a graph with
-      // no saved version is a structurally broken replica, and the break only
-      // shows up when somebody runs it.
-      if (!workflow?.latestVersion?.dsl) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Cannot replicate a workflow evaluator without a saved workflow version",
-        });
-      }
-
-      const { workflowId: newWorkflowId, dsl } = await workflows.copyStudioWorkflow({
-        workflow: {
-          id: workflow.id,
-          name: workflow.name,
-          icon: workflow.icon,
-          description: workflow.description,
-          isEvaluator: workflow.isEvaluator,
-          isComponent: workflow.isComponent,
-          latestVersion: workflow.latestVersion,
-        },
-        targetProjectId,
-        sourceProjectId,
-        copiedFromWorkflowId: workflowId,
-      } as Parameters<WorkflowApp["copyStudioWorkflow"]>[0]);
-
-      try {
-        await workflows.saveStudioVersion(
-          {
-            projectId: targetProjectId,
-            workflowId: newWorkflowId,
-            dsl,
-            autoSaved: false,
-            commitMessage: "Copied from " + workflow.name,
-          },
-          { id: (ctx as unknown as ApiTrpcPortsContext).actor().id },
-        );
-      } catch (saveError) {
-        await deleteReplicatedWorkflow(ctx, {
-          workflowId: newWorkflowId,
-          projectId: targetProjectId,
-        }).catch(() => undefined);
-        throw saveError;
-      }
-
-      return newWorkflowId;
-    },
-    deleteReplicatedWorkflow,
-  };
-}

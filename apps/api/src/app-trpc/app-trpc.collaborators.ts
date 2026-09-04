@@ -29,8 +29,6 @@
 import type { AnnotationTrpcPorts } from "@langwatch/annotation-server";
 import type { AuthApp } from "@langwatch/auth-server";
 import type { DataPrivacyTrpcPorts } from "@langwatch/data-privacy-server";
-import type { EvaluatorTrpcPorts } from "@langwatch/evaluator-server";
-import type { BatchRecordTrpcPorts, DatasetTrpcPorts } from "@langwatch/dataset-server";
 import type { ExperimentTrpcPorts } from "@langwatch/experiment-server";
 import type { BugReportTrpcPorts } from "@langwatch/ops-server";
 import type { EmailSuppressionTrpcPorts } from "@langwatch/automation-server";
@@ -42,7 +40,6 @@ import type {
   TeamTrpcPorts,
 } from "@langwatch/organization-server";
 import type { HomeTrpcPorts, IntegrationsChecksTrpcPorts } from "@langwatch/project-server";
-import type { PromptTrpcPorts } from "@langwatch/prompt-server";
 import type { RoleTrpcPorts } from "../features/role/role-trpc.mount";
 import type { IdentityTrpcPorts, UserTrpcPorts } from "@langwatch/user-server";
 import type { WorkflowOptimizationTrpcPorts, WorkflowTrpcPorts } from "@langwatch/workflow-server";
@@ -168,18 +165,7 @@ export type ApiTrpcCollaborators<
   /** The composed auth application both signed-out doors answer from. */
   auth: AuthApp;
 
-  /**
-   * The two batch-evaluation rollups. They are the PROCESS's rather than the
-   * dataset package's because the table is: `BatchEvaluation` records what an
-   * experiment run scored, and the dataset it ran against is a join.
-   */
-  batchRecord: BatchRecordTrpcPorts<unknown, unknown>;
 
-  /**
-   * The permission probe a dataset COPY runs against the source project — the
-   * second project the declared check on the procedure never covered.
-   */
-  dataset: DatasetTrpcPorts;
 
   /** The support inbox itself; the audit trail beside it is this process's. */
   bugReports: Omit<BugReportTrpcPorts<TBugReportPage, TBugReport>, "recordAudit">;
@@ -188,13 +174,6 @@ export type ApiTrpcCollaborators<
 
   evaluations: EvaluationMountPorts<TMappingsIn, TMappingsOut>;
 
-  /**
-   * The workflow behind a WORKFLOW evaluator: its linked row, the monitors
-   * running it, and the copy that replicates its graph into another project.
-   * All of it is the host's, because a studio graph is Workflow's and the
-   * evaluator package never reaches into one.
-   */
-  evaluators: EvaluatorTrpcPorts;
 
   experiments: Omit<ExperimentTrpcPorts<TWorkbenchState>, ApiOwnedExperimentPorts>;
 
@@ -216,12 +195,6 @@ export type ApiTrpcCollaborators<
 
   onboarding: OnboardingTrpcPorts<TSignUpDataSchema>;
 
-  /**
-   * The lifecycle signal a project's new prompt fires. The whole entry, because
-   * it is the whole port: everything else `prompts.*` needs is a row read on
-   * `ctx.app.prompts`.
-   */
-  prompts: PromptTrpcPorts;
 
   /**
    * The organization probe a role-scoped check runs — the role's organization
