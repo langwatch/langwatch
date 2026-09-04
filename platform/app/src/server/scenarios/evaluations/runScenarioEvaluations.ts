@@ -242,18 +242,15 @@ function processedFieldsOf(
   ScenarioEvaluationResult,
   "status" | "passed" | "score" | "label" | "details" | "cost"
 > {
+  // The runner spells an absent value as null; the stored result leaves it out.
   const status =
-    result.passed === undefined
-      ? "scored"
-      : result.passed
-        ? "passed"
-        : "failed";
+    result.passed == null ? "scored" : result.passed ? "passed" : "failed";
   return {
     status,
-    ...(result.passed !== undefined && { passed: result.passed }),
-    ...(result.score !== undefined && { score: result.score }),
-    ...(result.label !== undefined && { label: result.label }),
-    ...(result.details !== undefined && { details: result.details }),
+    ...(result.passed != null && { passed: result.passed }),
+    ...(result.score != null && { score: result.score }),
+    ...(result.label != null && { label: result.label }),
+    ...(result.details != null && { details: result.details }),
     ...(result.cost && { cost: result.cost }),
   };
 }
@@ -283,7 +280,7 @@ export function toScenarioEvaluationResult({
       return {
         ...base,
         status: "skipped",
-        ...(result.details !== undefined && { details: result.details }),
+        ...(result.details != null && { details: result.details }),
       };
     case "error":
       return { ...base, status: "error", details: result.details };

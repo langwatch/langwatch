@@ -444,6 +444,28 @@ describe("toScenarioEvaluationResult", () => {
       }),
     );
   });
+
+  /** @scenario "A result with no label and no details is recorded without them" */
+  it("leaves out a label and details the runner spelled as null", () => {
+    const result = toScenarioEvaluationResult({
+      ...base,
+      result: {
+        ...processed({ passed: true, score: 1 }),
+        label: null,
+        details: null,
+      } as never,
+    });
+    expect(result).toEqual({
+      evaluatorId: "eval-1",
+      name: "Judge",
+      required: false,
+      status: "passed",
+      passed: true,
+      score: 1,
+    });
+    expect("label" in result).toBe(false);
+    expect("details" in result).toBe(false);
+  });
 });
 
 describe("checkTypeOf", () => {

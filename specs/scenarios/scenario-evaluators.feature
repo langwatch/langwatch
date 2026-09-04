@@ -67,6 +67,11 @@ Feature: Evaluators run on scenario runs
     And a result with passed true records passed, and passed false records failed
 
   @unit
+  Scenario: A result with no label and no details is recorded without them
+    Given an evaluator result whose label and details are null
+    Then the run records the result with neither a label nor details
+
+  @unit
   Scenario: Stored inputs are cut to two thousand characters
     Given a resolved input longer than two thousand characters
     Then the recorded result stores the first two thousand characters of it
