@@ -10,7 +10,7 @@ A tool call goes wrong in two ways: the agent calls the wrong tool, or it calls 
 ## How a bad tool call shows up
 
 - **As a failed criterion.** The judge reads the agent's traces, so a criterion such as `The agent creates the return` fails when the call never succeeded. Read the tool and its error in the judge's reasoning.
-- **As a passing scenario with retries inside it.** The verdict is green and the conversation took eight turns. Open the conversation, then the trace link on the run: the tool span appears three times, the first two with an error.
+- **As a passing scenario with retries inside it.** The verdict is green and the conversation is one reply, but the trace behind that reply holds six model calls. Open the conversation, then **View trace** on the turn: the same tool call appears twice in a row in the model calls, the first one followed by the error text as its result. When your tools are traced, they also appear as their own spans.
 
 <Frame caption="The trace link on a run opens the agent's trace for that conversation, the same trace the judge read.">
 <img className="block" src="/images/improve-your-agent/run-drawer-trace-link.png" alt="The conversation drawer of a failed scenario, with the View trace link on the turn and the agent reply below it" />
@@ -20,7 +20,7 @@ To make the second case fail on its own, add a criterion on the process as well 
 
 ## Step 1: Read the error the model saw
 
-Open the failed tool span in the trace and read its output. The model sees only that output. After `invalid input` it guesses. After `reason must be one of: defective, incorrect_item, not_as_expected, remorse` it fixes the call on the next try, and with the same values in the tool description it gets the first call right.
+Open the model call that came after the failed tool call and read the tool result in its input. The model sees only that text. After `invalid input` it guesses. After `reason must be one of: defective, incorrect_item, not_as_expected, remorse` it fixes the call on the next try, and with the same values in the tool description it gets the first call right.
 
 ## Step 2: Change the tool contract
 
@@ -54,7 +54,7 @@ def check_return_eligibility(order_id: str, reason: str) -> str:
     ...
 ```
 
-The model reads the docstring as the tool description. The first version makes it guess the value of `reason`; the second makes the first call succeed.
+The model reads the docstring as the tool description. The first version makes it guess the value of `reason`; the second makes the first call succeed. Every closed parameter needs the same treatment: in the example, `refund_method` on `create_return` was rejected as often as `reason`.
 
 ## Step 3: Assert on the tool calls
 
@@ -114,7 +114,7 @@ langwatch test-suite run "Returns" \
   --wait
 ```
 
-The changed side passes the new criteria, and its **Average reply latency** is lower by the time the retries took. Keep the criteria: they are the regression test for this tool.
+The changed side passes the new criteria, and the trace behind each reply holds fewer model calls: in the example, three instead of five for the damaged blender return. Keep the criteria: they are the regression test for this tool. The **Total cost** and **Average reply latency** charts move more between two runs of the same agent than the removed retries move them, so read those two from a run with `--repeat 3`.
 
 ## Do it with Langy
 
@@ -139,6 +139,7 @@ npx skills add langwatch/skills/agent-improve
 
 - **The agent still retries.** The values are in the docstring and the model does not use them: move them into the schema as an enum, or into the error message.
 - **The criterion fails on a scenario that should not call the tool.** Scope the criterion to the situation: `When the customer asks for a return, the agent calls ...`. The judge reads the condition.
-- **The tool span is missing from the trace.** The tool runs outside the traced function. See [Linking your traces](/agent-testing/linking-your-traces).
+- **There are no tool spans in the trace.** The tools are not instrumented. The rejected call is still visible as the tool result in the input of the next model call, which is what the judge reads. To get a span per tool call, decorate the tool functions: see [Linking your traces](/agent-testing/linking-your-traces).
+- **The judge calls a criterion about the tool calls inconclusive.** The trace arrived after the judge's thirty-second wait, or the project's data privacy policy redacts the tool names and contents from it. Rerun the scenario, and check the policy.
 
 <Info>**Also check:** [Reduce turns](/improve-your-agent/reduce-turns), [Optimize with DSPy](/improve-your-agent/optimize-with-dspy) (an optimizer rewrites the tool descriptions for you), the Scenario guide on [testing tool calls](https://scenario.langwatch.ai/testing-guides/tool-calling).</Info>

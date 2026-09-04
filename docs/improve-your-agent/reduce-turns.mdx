@@ -5,22 +5,23 @@ keywords: langwatch, reduce turns, agent turns, tool retries, agent latency, sce
 description: Find why a tool-using agent takes ten turns for a task that needs three, change the cause, and prove with the test suite that the answers did not get worse.
 ---
 
-A turn is one reply from your agent, with the tool calls it made before that reply. Ten turns for a return request are ten model calls plus their tool calls, so fewer turns means lower cost and a shorter wait for the customer. Measure both on a comparison run rather than derive them. The causes of extra turns are listed below in the order to check them, and each one shows in the conversation of a scenario run.
+A turn is one reply from your agent. Before each reply the agent makes one or more model calls, and every tool call is one of them, so a rejected tool call that the agent retries costs a model call even when the reply count stays at one. Count both: the replies in the conversation and the model calls in the trace behind each reply. The causes of extra turns and extra calls are listed below in the order to check them.
 
 ## What you need
 
 - Your agent [connected to LangWatch](/agent-testing/connect-your-agent), so the suite runs against your real code and the judge reads your traces.
 - A [test suite](/agent-testing/test-suites) of five to ten scenarios that pass today. Take the situations from real conversations, and put the long ones in.
+- The agent registered with `concurrency` of at least 3 in the `development` environment, or three instances of it: a run executes three scenarios at once, and a development agent takes one call at a time by default, so the other two calls wait and can end as `agent_busy`.
 
 ## Step 1: Measure the baseline
 
-Run the suite once and keep the run as the baseline.
+Run the suite once against the agent as it runs today and keep the run as the baseline. In the example, that is the `production` environment.
 
 ```bash
-langwatch test-suite run "Returns" --target connected:returns-agent@development --wait
+langwatch test-suite run "Returns" --target connected:returns-agent@production --wait
 ```
 
-The run header shows the pass rate, the total duration and the total cost of the run. Hover it for **Avg Agent Latency** and **Avg Agent Cost**, each with percentiles. Open the conversation with the highest **Time · cost** in the table. Count the agent's replies, then read the judge's reasoning under the verdict to find the turn where the agent looped.
+The run header shows the pass rate, the total duration and the total cost of the run. Hover it for **Avg Agent Latency** and **Avg Agent Cost**, each with percentiles. Open the conversations in order of **Time · cost**. In each one, count the agent's replies, press **View trace** on a turn and count the model calls behind that reply, then read the judge's reasoning under the verdict. A conversation with one reply and six model calls is the retry case; a conversation with three replies is the customer arguing or the agent asking.
 
 <Frame caption="The run detail, with Time · cost per scenario. The row with the highest value is the first conversation to open.">
 <img className="block" src="/images/improve-your-agent/run-detail-table.png" alt="The run detail of the baseline run: the header with the pass rate, the duration and the cost, and one row per scenario with its verdict and its time and cost" />
@@ -47,7 +48,7 @@ langwatch test-suite run "Returns" \
   --wait
 ```
 
-The run detail shows one column per target with the pass rate, the cost and the latency of each, and four charts above them: **Pass rate**, **Total cost**, **Average reply latency** and **Pass rate over runs**. Keep the change when the pass rate holds and the latency and the cost went down. When a criterion fails on the changed side, read the judge's reasoning for the turn the agent skipped.
+The run detail shows one column per target with the pass rate, the total duration and the cost of each, and four charts above them: **Pass rate**, **Total cost**, **Average reply latency** and **Pass rate over runs**. Keep the change when the pass rate holds or rises and the model calls per conversation went down. Read the cost and the latency only from a run with `--repeat 3`: over six scenarios run once, both move more between two runs of the same agent than a removed retry moves them. When a criterion fails on the changed side, read the judge's reasoning for the turn the agent skipped.
 
 <Frame caption="A comparison run: one column per target, and the charts above the table.">
 <img className="block" src="/images/improve-your-agent/comparison-run-detail.png" alt="A comparison run of the returns agent in production against development: the four charts, one column per target with its pass rate, duration and cost, and one row per scenario" />
@@ -63,7 +64,7 @@ Run the suite on every pull request that touches the agent, so a later change ca
 langwatch test-suite run "Returns" --target connected:returns-agent@staging --wait
 ```
 
-The command exits 1 when a scenario fails. See [Run from CI](/agent-testing/run-from-ci).
+The command exits 1 when a scenario fails, and `--wait` gives up after ten minutes; a suite with repeats can take longer, so poll the batch yourself for those. See [Run from CI](/agent-testing/run-from-ci).
 
 ## Do it with Langy
 
@@ -95,6 +96,7 @@ The skill gathers the evidence with the `langwatch` CLI, presents ranked hypothe
 
 - **The pass rate dropped.** Revert the change. Read the reasoning of the failed criterion for the turn where the agent stopped doing something it did before, such as confirming the refund method before it created the return.
 - **The turns did not move.** The cause is in a tool, not in the prompt: the agent retries because the tool still rejects the input. Fix the tool contract first.
+- **A criterion about the agent's behaviour is inconclusive, with `no agent spans arrived` in the reasoning.** The judge waits thirty seconds for the trace after the conversation ends. Under load the trace arrives later and the judge reads an empty one. Rerun the scenario. If the trace shows `[REDACTED]` for the tool names and contents, the data privacy policy of the project hides them from the judge as well: see [Linking your traces](/agent-testing/linking-your-traces).
 - **The latency dropped and the cost did not.** The agent takes fewer turns with longer prompts. Read the token count on the trace, and shorten the context: see [Reduce cost and latency](/improve-your-agent/reduce-cost-and-latency).
 
 <Info>**Also check:** [Compare agents](/agent-testing/compare-agents), [Results](/agent-testing/results), [Linking your traces](/agent-testing/linking-your-traces) (what the judge reads).</Info>

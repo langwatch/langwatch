@@ -66,13 +66,15 @@ langwatch test-suite run "Returns" \
 
 ## Step 3: Read the comparison
 
-The run detail has one column per model. Decide from the four charts above the table: **Pass rate**, **Total cost**, **Average reply latency** and **Pass rate over runs**.
+The run detail has one column per target. The column of the declared default model is labelled with the agent only, the other one with `model=gpt-5-mini`. Decide from the four charts above the table: **Pass rate**, **Total cost**, **Average reply latency** and **Pass rate over runs**.
 
 <Frame caption="One column per model. The pass rate must hold; the cost and the latency should drop.">
 <img className="block" src="/images/improve-your-agent/model-comparison-run-detail.png" alt="A comparison run of the same agent on gpt-5 and on gpt-5-mini, with the four charts and one column per model" />
 </Frame>
 
 Keep the cheaper model when its pass rate equals the baseline's across the repeats. When it fails one scenario and passes the rest, open that conversation and read which criterion failed. Then route that kind of request to the larger model in your code, or keep the larger model for everything, and rerun.
+
+For example, on the six-scenario Returns suite of the example with three repeats, gpt-5-mini answered a conversation in 28 seconds against 54 seconds for gpt-5 and cost $0.036 against $0.046, and it failed the scenario where the customer gives a wrong order number twice out of three, because it never asked the question that leads to the right order.
 
 ## Step 4: The other levers
 
@@ -110,5 +112,6 @@ npx skills add langwatch/skills/provider-cost-comparison
 - **The cost reads "across 3 of 6 runs".** The runs without a cost have no traces linked. See [Linking your traces](/agent-testing/linking-your-traces).
 - **The pass rate is the same and the cost went up.** The cheaper model took more turns. Read the turns in the conversations before you decide, and see [Reduce turns](/improve-your-agent/reduce-turns).
 - **The option list does not show the model.** The agent connected before the parameter was added. Restart the agent process; the platform reads the parameters when it connects.
+- **Runs end as `agent_busy` on the development side.** A development agent takes one call at a time by default and the run sends three. Register it with `concurrency=3` or start three instances.
 
 <Info>**Also check:** [Compare agents](/agent-testing/compare-agents), [Run parameters](/agent-testing/run-parameters), [Results](/agent-testing/results).</Info>
