@@ -60,7 +60,9 @@ describe("a card's Edit menu item", () => {
       const editItem = await screen.findByText("Open in playground");
       await user.click(editItem);
 
-      expect(push).toHaveBeenCalledWith("/proj/dev/custom-chart-playground");
+      expect(push).toHaveBeenCalledWith(
+        "/dev/custom-chart-playground?project=proj",
+      );
     });
   });
 

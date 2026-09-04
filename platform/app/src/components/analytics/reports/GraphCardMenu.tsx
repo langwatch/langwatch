@@ -163,7 +163,7 @@ export function GraphCardMenu({
   const editUrl = isWorkbenchChart
     ? `/${projectSlug}/analytics/query`
     : isDashboardWidget
-      ? `/${projectSlug}/dev/custom-chart-playground`
+      ? `/dev/custom-chart-playground?project=${projectSlug}`
       : `/${projectSlug}/analytics/custom/${graphId}${dashboardId ? `?dashboard=${dashboardId}` : ""}`;
 
   return (
