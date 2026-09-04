@@ -375,6 +375,18 @@ Rule: A revoked ingest key heals itself
     Then no new key is minted
     And the user is told to run langwatch instrument again
 
+  # Asking is part of the repair, so an answer that never arrives stops it.
+  # Minting on a platform that did not respond would replace a key a person
+  # may have revoked on purpose, on the strength of nothing.
+
+  @unit
+  Scenario: A status call that does not answer ends the heal
+    Given a signed-in CLI whose cached personal key the collector answers 401 to
+    And a platform whose key status call does not answer inside its deadline
+    When the hook runs
+    Then no new key is minted
+    And the window is spent, so the next session asks again later
+
   @unit
   Scenario: A key the cap retired is re-minted
     Given a signed-in CLI whose cached key the platform says the cap retired

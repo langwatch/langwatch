@@ -14,6 +14,7 @@ import { PersonalWorkspaceService } from "@ee/governance/services/personalWorksp
 import type { Redis } from "ioredis";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { ApiKeyRepository } from "~/server/api-key/api-key.repository";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { TokenResolver } from "~/server/api-key/token-resolver";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
@@ -68,6 +69,25 @@ async function describeKey(
     status: string;
     revocation_cause?: string | null;
   };
+}
+
+async function revoke({
+  token,
+  cause,
+}: {
+  token: string;
+  cause?: "cap";
+}): Promise<void> {
+  const key = await prisma.apiKey.findFirstOrThrow({
+    where: { lookupId: lookupIdOf(token) },
+  });
+  await ApiKeyService.create(prisma).revoke({
+    id: key.id,
+    callerUserId: USER_ID,
+    callerIsAdmin: false,
+    organizationId: ORG_ID,
+    cause,
+  });
 }
 
 async function liveKeysFor(sourceType: string) {
@@ -233,43 +253,63 @@ describe("POST /api/auth/cli/governance/ingestion-key for the personal workspace
   });
 
   describe("given keys the person and the platform each revoked", () => {
-    /** @scenario "The CLI can ask what became of its own key" */
-    it("answers with the cause, live for a live key, unknown for a stranger's", async () => {
-      const apiKeys = ApiKeyService.create(prisma);
-      const byPerson = await mintPersonal("opencode");
-      const byCap = await mintPersonal("opencode");
-      const live = await mintPersonal("opencode");
-      const revoke = async (token: string, cause?: "cap") => {
-        const key = await prisma.apiKey.findFirstOrThrow({
-          where: { lookupId: lookupIdOf(token) },
-        });
-        await apiKeys.revoke({
-          id: key.id,
-          callerUserId: USER_ID,
-          callerIsAdmin: false,
-          organizationId: ORG_ID,
-          cause,
-        });
-      };
-      // The API-keys page names no cause; the cap names itself.
-      await revoke(byPerson.token);
-      await revoke(byCap.token, "cap");
+    describe("when the CLI asks what became of a lookup id", () => {
+      /** @scenario "The CLI can ask what became of its own key" */
+      it("answers with the cause, live for a live key, unknown for a stranger's", async () => {
+        const byPerson = await mintPersonal("opencode");
+        const byCap = await mintPersonal("opencode");
+        const live = await mintPersonal("opencode");
+        // The API-keys page names no cause; the cap names itself.
+        await revoke({ token: byPerson.token });
+        await revoke({ token: byCap.token, cause: "cap" });
 
-      expect(await describeKey(lookupIdOf(byPerson.token))).toMatchObject({
-        status: "revoked",
-        revocation_cause: "user",
+        expect(await describeKey(lookupIdOf(byPerson.token))).toMatchObject({
+          status: "revoked",
+          revocation_cause: "user",
+        });
+        expect(await describeKey(lookupIdOf(byCap.token))).toMatchObject({
+          status: "revoked",
+          revocation_cause: "cap",
+        });
+        expect(await describeKey(lookupIdOf(live.token))).toMatchObject({
+          status: "live",
+          revocation_cause: null,
+        });
+        expect(await describeKey("nosuchlookupid00")).toEqual({
+          lookup_id: "nosuchlookupid00",
+          status: "unknown",
+        });
       });
-      expect(await describeKey(lookupIdOf(byCap.token))).toMatchObject({
-        status: "revoked",
-        revocation_cause: "cap",
-      });
-      expect(await describeKey(lookupIdOf(live.token))).toMatchObject({
-        status: "live",
-        revocation_cause: null,
-      });
-      expect(await describeKey("nosuchlookupid00")).toEqual({
-        lookup_id: "nosuchlookupid00",
-        status: "unknown",
+    });
+
+    describe("when the cap writes into a key a person has just revoked", () => {
+      /** @scenario "The first revocation decides the recorded cause" */
+      it("keeps the person's cause, so the CLI leaves the key dead", async () => {
+        const contested = await mintPersonal("opencode");
+        const key = await prisma.apiKey.findFirstOrThrow({
+          where: { lookupId: lookupIdOf(contested.token) },
+        });
+        const revokedAt = new Date();
+
+        await revoke({ token: contested.token });
+
+        // The cap read this key live a moment before the person's revoke
+        // landed, so its write arrives at a row that is already revoked. The
+        // service guard cannot close that window, because the read it guards
+        // on happened first; the repository's own fence is what does.
+        await ApiKeyRepository.create(prisma).revoke({
+          id: key.id,
+          cause: "cap",
+        });
+
+        const after = await prisma.apiKey.findUniqueOrThrow({
+          where: { id: key.id },
+        });
+        expect(after.revocationCause).toBe("user");
+        // The losing write did not move the moment of death either.
+        expect(after.revokedAt?.getTime()).toBeLessThan(
+          revokedAt.getTime() + 60_000,
+        );
       });
     });
   });

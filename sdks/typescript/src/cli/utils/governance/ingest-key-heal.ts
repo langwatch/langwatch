@@ -70,6 +70,14 @@ const REAL_DEPS: HealDeps = {
   installTelemetryWiring,
 };
 
+/**
+ * How long the healer waits for the platform to say what became of the key.
+ * The hook runs on the session's critical path and fetch has no timeout of
+ * its own, so a connection that opens and never answers would hold the
+ * session open. Matches the deadline the hook posts its own record with.
+ */
+const DESCRIBE_TIMEOUT_MS = 3_000;
+
 /** The wiring tool slug for each agent the hook runs for. */
 const TOOL_BY_AGENT: Record<string, string> = {
   claude_code: "claude",
@@ -93,10 +101,10 @@ const TOOL_BY_AGENT: Record<string, string> = {
  * platform's own revocations, a rotation or the cap, are re-minted.
  *
  * Reports a failure once it has gone to the platform and not come back with a
- * wired tool that this device can recognise again: a server that says the
- * cached key is still live, in which case the 401 means something else, or a
- * key that minted but could not be written into the cache or into the tool's
- * wiring.
+ * wired tool that this device can recognise again: a status call that did not
+ * answer inside its deadline, a server that says the cached key is still
+ * live, in which case the 401 means something else, or a key that minted but
+ * could not be written into the cache or into the tool's wiring.
  */
 export async function healRevokedIngestKey({
   agent,
@@ -123,7 +131,14 @@ export async function healRevokedIngestKey({
 
   const lookupId = extractLookupIdFromToken(cached);
   if (lookupId) {
-    const described = await deps.describeIngestionKey(cfg, lookupId);
+    // A platform that does not answer is not a platform that said "re-mint".
+    // The one revocation the device must not mint past is a person's, so a
+    // status call that times out or errors ends the heal rather than falling
+    // through to the mint; the next session asks again once the window is up.
+    const described = await deps
+      .describeIngestionKey(cfg, lookupId, { timeoutMs: DESCRIBE_TIMEOUT_MS })
+      .catch(() => null);
+    if (!described) return { status: "failed" };
     if (described.status === "revoked" && described.revocationCause === "user") {
       return { status: "withheld" };
     }

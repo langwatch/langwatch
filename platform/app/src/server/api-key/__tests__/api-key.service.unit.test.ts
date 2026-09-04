@@ -64,6 +64,8 @@ vi.mock("@langwatch/observability", () => ({
  * stays as an alias so the cases read the same stubs either way.
  */
 function createMockPrisma() {
+  /** What the fenced revoke wrote, so the read-back returns the same row. */
+  const revokeState: { row: Record<string, unknown> | null } = { row: null };
   const client = {
     apiKey: {
       create: vi.fn().mockResolvedValue({
@@ -90,6 +92,18 @@ function createMockPrisma() {
       update: vi.fn().mockImplementation(async (args: any) => {
         const created = await client.apiKey.create.mock.results.at(-1)?.value;
         return { ...(created ?? { id: args.where.id }), ...args.data };
+      }),
+      // A revoke writes through the fenced updateMany and reads the row back.
+      updateMany: vi.fn().mockImplementation(async (args: any) => {
+        revokeState.row = { ...(revokeState.row ?? {}), ...args.data };
+        return { count: 1 };
+      }),
+      findUniqueOrThrow: vi.fn().mockImplementation(async (args: any) => {
+        const created = await client.apiKey.create.mock.results.at(-1)?.value;
+        return {
+          ...(created ?? { id: args.where.id }),
+          ...(revokeState.row ?? {}),
+        };
       }),
     },
     roleBinding: {
@@ -409,7 +423,7 @@ describe("ApiKeyService", () => {
     describe("when owner revokes their own key", () => {
       it("sets revokedAt", async () => {
         prisma.apiKey.findUnique.mockResolvedValue(existingKey);
-        prisma._mockTx.apiKey.update.mockResolvedValue({
+        prisma._mockTx.apiKey.findUniqueOrThrow.mockResolvedValue({
           ...existingKey,
           revokedAt: new Date(),
         });
@@ -421,9 +435,11 @@ describe("ApiKeyService", () => {
           organizationId: "org_1",
         });
 
-        expect(prisma._mockTx.apiKey.update).toHaveBeenCalledWith(
+        // Fenced on the row still being live, so a second revocation cannot
+        // restate the cause the first one recorded.
+        expect(prisma._mockTx.apiKey.updateMany).toHaveBeenCalledWith(
           expect.objectContaining({
-            where: { id: "ak_1" },
+            where: { id: "ak_1", revokedAt: null },
             data: expect.objectContaining({ revokedAt: expect.any(Date) }),
           }),
         );
@@ -432,7 +448,7 @@ describe("ApiKeyService", () => {
       /** @scenario "A revoke from the API keys page records a person as its cause" */
       it("records a person as the cause when none is given", async () => {
         prisma.apiKey.findUnique.mockResolvedValue(existingKey);
-        prisma._mockTx.apiKey.update.mockResolvedValue({
+        prisma._mockTx.apiKey.findUniqueOrThrow.mockResolvedValue({
           ...existingKey,
           revokedAt: new Date(),
         });
@@ -444,7 +460,7 @@ describe("ApiKeyService", () => {
           organizationId: "org_1",
         });
 
-        expect(prisma._mockTx.apiKey.update).toHaveBeenCalledWith(
+        expect(prisma._mockTx.apiKey.updateMany).toHaveBeenCalledWith(
           expect.objectContaining({
             data: expect.objectContaining({ revocationCause: "user" }),
           }),
@@ -453,7 +469,7 @@ describe("ApiKeyService", () => {
 
       it("records the cause the platform names", async () => {
         prisma.apiKey.findUnique.mockResolvedValue(existingKey);
-        prisma._mockTx.apiKey.update.mockResolvedValue({
+        prisma._mockTx.apiKey.findUniqueOrThrow.mockResolvedValue({
           ...existingKey,
           revokedAt: new Date(),
         });
@@ -466,7 +482,7 @@ describe("ApiKeyService", () => {
           cause: "cap",
         });
 
-        expect(prisma._mockTx.apiKey.update).toHaveBeenCalledWith(
+        expect(prisma._mockTx.apiKey.updateMany).toHaveBeenCalledWith(
           expect.objectContaining({
             data: expect.objectContaining({ revocationCause: "cap" }),
           }),
@@ -495,7 +511,7 @@ describe("ApiKeyService", () => {
           ...existingKey,
           userId: null,
         });
-        prisma._mockTx.apiKey.update.mockResolvedValue({
+        prisma._mockTx.apiKey.findUniqueOrThrow.mockResolvedValue({
           ...existingKey,
           userId: null,
           revokedAt: new Date(),
@@ -508,7 +524,7 @@ describe("ApiKeyService", () => {
           organizationId: "org_1",
         });
 
-        expect(prisma._mockTx.apiKey.update).toHaveBeenCalled();
+        expect(prisma._mockTx.apiKey.updateMany).toHaveBeenCalled();
       });
     });
 
@@ -564,7 +580,7 @@ describe("ApiKeyService", () => {
         };
         prisma.apiKey.findUnique.mockResolvedValue(keyWithCustomRole);
         prisma._mockTx.apiKey.findUnique.mockResolvedValue(keyWithCustomRole);
-        prisma._mockTx.apiKey.update.mockResolvedValue({
+        prisma._mockTx.apiKey.findUniqueOrThrow.mockResolvedValue({
           ...existingKey,
           revokedAt: new Date(),
         });
@@ -600,7 +616,7 @@ describe("ApiKeyService", () => {
         };
         prisma.apiKey.findUnique.mockResolvedValue(keyWithCustomRole);
         prisma._mockTx.apiKey.findUnique.mockResolvedValue(keyWithCustomRole);
-        prisma._mockTx.apiKey.update.mockResolvedValue({
+        prisma._mockTx.apiKey.findUniqueOrThrow.mockResolvedValue({
           ...existingKey,
           revokedAt: new Date(),
         });
@@ -644,7 +660,7 @@ describe("ApiKeyService", () => {
         };
         prisma.apiKey.findUnique.mockResolvedValue(keyWithSharedRole);
         prisma._mockTx.apiKey.findUnique.mockResolvedValue(keyWithSharedRole);
-        prisma._mockTx.apiKey.update.mockResolvedValue({
+        prisma._mockTx.apiKey.findUniqueOrThrow.mockResolvedValue({
           ...existingKey,
           revokedAt: new Date(),
         });
@@ -679,7 +695,7 @@ describe("ApiKeyService", () => {
         };
         prisma.apiKey.findUnique.mockResolvedValue(keyWithAdminOnly);
         prisma._mockTx.apiKey.findUnique.mockResolvedValue(keyWithAdminOnly);
-        prisma._mockTx.apiKey.update.mockResolvedValue({
+        prisma._mockTx.apiKey.findUniqueOrThrow.mockResolvedValue({
           ...existingKey,
           revokedAt: new Date(),
         });

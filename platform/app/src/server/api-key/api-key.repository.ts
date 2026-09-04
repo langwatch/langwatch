@@ -354,6 +354,19 @@ export class ApiKeyRepository {
     });
   }
 
+  /**
+   * Marks a key revoked, recording why, and never overwrites a cause already
+   * on the row.
+   *
+   * The fence on `revokedAt` is what makes the cause the FIRST revocation's,
+   * not the last writer's. A person revoking a key from the API-keys page and
+   * the personal ingest-key cap retiring the same key can reach here at the
+   * same moment: both read a live row, and without the fence the later update
+   * decides the cause. A `"cap"` written over a `"user"` is the one that
+   * matters, because the CLI re-mints a key the cap retired and leaves a key
+   * a person revoked dead. Losing the race returns the row that stands, so
+   * the key is dead either way and the first decision is the one recorded.
+   */
   async revoke({
     id,
     cause,
@@ -361,10 +374,11 @@ export class ApiKeyRepository {
     id: string;
     cause: ApiKeyRevocationCause;
   }): Promise<ApiKey> {
-    return this.prisma.apiKey.update({
-      where: { id },
+    await this.prisma.apiKey.updateMany({
+      where: { id, revokedAt: null },
       data: { revokedAt: new Date(), revocationCause: cause },
     });
+    return this.prisma.apiKey.findUniqueOrThrow({ where: { id } });
   }
 
   async updateLastUsedAt({ id }: { id: string }): Promise<void> {

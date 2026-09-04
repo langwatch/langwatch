@@ -110,6 +110,8 @@ describe("healRevokedIngestKey", () => {
       expect(d.describeIngestionKey).toHaveBeenCalledWith(
         expect.anything(),
         CACHED_LOOKUP_ID,
+        // A hook on the session's critical path never waits indefinitely.
+        expect.objectContaining({ timeoutMs: expect.any(Number) }),
       );
       expect(d.resolveLiveIngestionKey).not.toHaveBeenCalled();
       expect(d.installTelemetryWiring).not.toHaveBeenCalled();
@@ -134,6 +136,33 @@ describe("healRevokedIngestKey", () => {
 
       expect(healed.status).toBe("healed");
       expect(d.resolveLiveIngestionKey).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("given a platform whose status call does not answer", () => {
+    /** @scenario "A status call that does not answer ends the heal" */
+    it("reports a failure rather than minting past a decision it cannot read", async () => {
+      const d = deps({
+        describeIngestionKey: vi
+          .fn()
+          .mockRejectedValue(
+            Object.assign(new Error("The operation was aborted"), {
+              name: "TimeoutError",
+            }),
+          ),
+      });
+
+      const healed = await healRevokedIngestKey({
+        agent: "claude_code",
+        rejectedToken: CACHED,
+        deps: d,
+      });
+
+      // Minting here would replace a key a person may have revoked on
+      // purpose, decided on a platform answer that never arrived.
+      expect(healed).toEqual({ status: "failed" });
+      expect(d.resolveLiveIngestionKey).not.toHaveBeenCalled();
+      expect(d.saveConfig).not.toHaveBeenCalled();
     });
   });
 

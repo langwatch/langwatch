@@ -202,6 +202,17 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
     And a key that is still live answers live
     And a lookup id that names none of jane's keys answers unknown
 
+  # A person's revoke and the cap can land on one key at the same moment. The
+  # cause is what the CLI reads to decide whether it may mint a replacement,
+  # so the first revocation keeps it: a "cap" written over a "user" would let
+  # a device mint its way past the decision made on the API-keys page.
+
+  @integration @ingest-api-key @issue @personal
+  Scenario: The first revocation decides the recorded cause
+    Given a personal key a person revoked
+    When the cap's revocation, which read the key live, lands after it
+    Then the key still names "user" as the cause
+
   # ---------------------------------------------------------------------------
   # Ingest-only RBAC — the genuinely-write-only guarantee
   # ---------------------------------------------------------------------------
