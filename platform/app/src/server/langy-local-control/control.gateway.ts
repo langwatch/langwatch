@@ -22,6 +22,7 @@ import { createLogger } from "@langwatch/observability";
 import { WebSocket, WebSocketServer } from "ws";
 import type { UpgradeRouter } from "~/server/websockets/upgrade-router";
 import { PRESENCE_HEARTBEAT_MS } from "./constants";
+import type { PresenceHeartbeat } from "./presence";
 import {
   type CliFrame,
   cliFrameSchema,
@@ -52,6 +53,14 @@ interface LiveSocket {
   pongs: number;
   ping: NodeJS.Timeout | null;
   heartbeat: NodeJS.Timeout | null;
+  /** What the last heartbeat did, so a change is said once and not per beat. */
+  presence: PresenceHeartbeat | null;
+  /**
+   * Set once the platform told this command line the folder is disconnected.
+   * The heartbeat stops there: the record is meant to be gone, and a beat that
+   * wrote it back would undo the panel's own disconnect.
+   */
+  released: boolean;
 }
 
 export interface ControlGatewayOptions {
@@ -169,11 +178,16 @@ export class LocalControlGateway {
       pongs: 0,
       ping: null,
       heartbeat: null,
+      presence: null,
+      released: false,
     };
     this.sockets.add(live);
     live.unsubscribe = await this.core.subscribe(
       registered.session,
-      (platformFrame) => this.send(ws, platformFrame),
+      (platformFrame) => {
+        if (platformFrame.type === "disconnect") live.released = true;
+        this.send(ws, platformFrame);
+      },
     );
 
     ws.on("message", (data) => void this.onFrame(live, data));
@@ -266,10 +280,36 @@ export class LocalControlGateway {
     // expires on its own. Without this the folder read offline thirty seconds
     // after it connected, with the command line still connected and healthy.
     live.heartbeat = setInterval(() => {
+      if (live.released) return;
       if (live.socket.readyState !== WebSocket.OPEN) return;
-      void this.core.heartbeat(live.session);
+      void this.beat(live);
     }, this.pingIntervalMs);
     live.heartbeat.unref();
+  }
+
+  /**
+   * One heartbeat, and a line the first time its answer changes.
+   *
+   * A restored record is worth saying once: it means this process stopped for
+   * longer than the record lives, which is also what a slow local call turns
+   * into for everything else on the pod.
+   */
+  private async beat(live: LiveSocket): Promise<void> {
+    const outcome = await this.core.heartbeat(live.session);
+    if (outcome === live.presence) return;
+    live.presence = outcome;
+    if (outcome === "restored") {
+      logger.info(
+        { conversationId: live.session.conversationId },
+        "the folder record had lapsed while its socket stayed open, written again",
+      );
+    }
+    if (outcome === "replaced") {
+      logger.info(
+        { conversationId: live.session.conversationId },
+        "a newer connection holds this conversation, this socket stops refreshing the folder",
+      );
+    }
   }
 
   /**

@@ -51,6 +51,7 @@ import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { CONTROL_CONNECT_PATH, LocalControlGateway } from "../control.gateway";
 import { LocalControlLongPoll } from "../control.long-poll";
+import { presenceKey } from "../keys";
 import { LOCAL_CONTROL_PROTOCOL_VERSION } from "../protocol";
 import {
   createLocalControlRuntime,
@@ -876,6 +877,57 @@ describe("given a folder whose socket dropped", () => {
 
     second.cli.close();
     await second.cli.closed();
+  });
+});
+
+describe("given a command that outlives the folder record", () => {
+  /** @scenario "A pause on the platform does not disconnect a live folder" */
+  it("writes the record again from the open socket, and the next call runs", async () => {
+    const key = await approvedSessionKey(podA);
+    const { cli } = await shareFolder(podA, key);
+    const call = await podA.runtime.dispatcher.start({
+      projectId,
+      conversationId,
+      turnId,
+      call: { tool: "local_bash", params: { command: "uv run pytest" } },
+      timeoutMs: 600_000,
+    });
+    await cli.next("call");
+    cli.send({ type: "ack", callId: call.callId });
+
+    // What a pod that stopped for longer than the record lives leaves behind:
+    // the key is gone, and no clock of its own ran while it went. The socket,
+    // the command line and the command are untouched.
+    await connection.del(presenceKey(conversationId));
+    expect(await podA.runtime.presence.read(conversationId)).toBeNull();
+
+    await expect
+      .poll(() => podA.runtime.presence.read(conversationId), {
+        timeout: 5_000,
+      })
+      .not.toBeNull();
+    const restored = await podA.runtime.presence.read(conversationId);
+    expect(restored?.workspace.root).toBe("/Users/dev/acme-app");
+    expect(restored?.instanceId).toBe(cli.instanceId);
+
+    cli.send({
+      type: "result",
+      callId: call.callId,
+      ok: true,
+      text: "2 passed",
+    });
+    const next = await podA.runtime.dispatcher.start({
+      projectId,
+      conversationId,
+      turnId,
+      call: { tool: "local_ls", params: { path: "." } },
+      timeoutMs: 30_000,
+    });
+    const frame = await cli.next("call");
+    expect(frame.call).toMatchObject({ callId: next.callId });
+
+    cli.close();
+    await cli.closed();
   });
 });
 

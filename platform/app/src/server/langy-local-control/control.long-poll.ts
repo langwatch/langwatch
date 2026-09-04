@@ -64,6 +64,12 @@ export class LocalControlLongPoll {
       queue: PlatformFrame[];
       unsubscribe: Unsubscribe;
       lastSeenAt: number;
+      /**
+       * Set once the platform told this command line the folder is
+       * disconnected. A poll after that stops refreshing the record, which is
+       * meant to be gone.
+       */
+      released: boolean;
     }
   >();
 
@@ -104,19 +110,22 @@ export class LocalControlLongPoll {
 
     const token = `lcs_${nanoid(24)}`;
     const queue: PlatformFrame[] = [];
-    const unsubscribe = await this.core.subscribe(
+    const entry = {
+      session: registered.session,
+      queue,
+      unsubscribe: (async () => undefined) as Unsubscribe,
+      lastSeenAt: Date.now(),
+      released: false,
+    };
+    entry.unsubscribe = await this.core.subscribe(
       registered.session,
       (platformFrame) => {
+        if (platformFrame.type === "disconnect") entry.released = true;
         if (queue.length >= MAX_FRAMES_PER_POLL) queue.shift();
         queue.push(platformFrame);
       },
     );
-    this.sessions.set(token, {
-      session: registered.session,
-      queue,
-      unsubscribe,
-      lastSeenAt: Date.now(),
-    });
+    this.sessions.set(token, entry);
 
     await this.core.afterRegister(registered.session);
     for (const envelope of await this.core.pendingCalls(registered.session)) {
@@ -157,7 +166,7 @@ export class LocalControlLongPoll {
     const until = Date.now() + this.holdMs;
     for (;;) {
       entry.lastSeenAt = Date.now();
-      await this.core.heartbeat(entry.session);
+      if (!entry.released) await this.core.heartbeat(entry.session);
       if (entry.queue.length > 0) {
         return { ok: true, frames: entry.queue.splice(0, entry.queue.length) };
       }
@@ -195,6 +204,9 @@ export class LocalControlLongPoll {
     const entry = this.sessions.get(token);
     if (!entry) return { ok: false };
     entry.lastSeenAt = Date.now();
+    // A command line that writes is as alive as one that polls, and a long
+    // call means it writes far more often than it polls.
+    if (!entry.released) await this.core.heartbeat(entry.session);
     for (const frame of frames) {
       switch (frame.type) {
         case "ack":

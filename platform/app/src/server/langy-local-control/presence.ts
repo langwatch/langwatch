@@ -34,6 +34,13 @@ export const connectedWorkspaceSchema = z.object({
 });
 export type ConnectedWorkspace = z.infer<typeof connectedWorkspaceSchema>;
 
+/**
+ * What one heartbeat did: it moved the record on, it wrote a lapsed record
+ * back, or it found the conversation shared by a newer connection and left it
+ * alone.
+ */
+export type PresenceHeartbeat = "refreshed" | "restored" | "replaced";
+
 export interface LocalPresenceOptions {
   store: AgentStateStore;
   now?: () => number;
@@ -61,21 +68,30 @@ export class LocalWorkspacePresence {
   }
 
   /**
-   * Refreshes the record on a heartbeat. A heartbeat from an instance that no
-   * longer holds the record is ignored, so a socket that lost the folder to a
-   * newer share cannot keep the old one alive.
+   * Refreshes the record on a heartbeat, and writes it again when it is gone.
+   *
+   * The record lives thirty seconds and the heartbeat runs every ten, so three
+   * missed beats lose it. The platform can miss three: a pod that pauses for
+   * half a minute, under load or under a stop-the-world pause, stops every
+   * clock it owns at once while the socket, the command line and the command
+   * itself are all still there. The connection is the fact, so a heartbeat
+   * from a live connection writes the record back rather than reading the
+   * lapse as a folder that went away.
+   *
+   * A heartbeat from an instance that no longer holds the record still writes
+   * nothing: a socket that lost the folder to a newer share cannot take it
+   * back, which is why "replaced" is answered rather than restored.
    */
-  async heartbeat({
-    conversationId,
-    instanceId,
-  }: {
-    conversationId: string;
-    instanceId: string;
-  }): Promise<boolean> {
-    const current = await this.read(conversationId);
-    if (!current || current.instanceId !== instanceId) return false;
-    await this.register({ ...current, lastSeenAt: this.now() });
-    return true;
+  async heartbeat(workspace: ConnectedWorkspace): Promise<PresenceHeartbeat> {
+    const current = await this.read(workspace.conversationId);
+    if (current && current.instanceId !== workspace.instanceId) {
+      return "replaced";
+    }
+    await this.register({
+      ...(current ?? workspace),
+      lastSeenAt: this.now(),
+    });
+    return current ? "refreshed" : "restored";
   }
 
   /** The folder connected to this conversation, or nothing when none is. */

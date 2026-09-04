@@ -104,6 +104,14 @@ Feature: Langy works in a folder shared from the developer's machine
       And a call made during the gap is delivered after the reconnect
 
     @integration
+    Scenario: A pause on the platform does not disconnect a live folder
+      Given a connected folder running a command that takes minutes
+      When LangWatch pauses for longer than the folder record lives
+      Then the open connection writes the record back
+      And the command's result is still delivered
+      And the next call runs in the folder instead of asking for code access again
+
+    @integration
     Scenario: Ctrl-C disconnects at once, not when a heartbeat expires
       Given a connected folder
       When the CLI exits

@@ -37,7 +37,11 @@ import { workspaceNudgeSchema } from "./call.dispatcher";
 import { PRESENCE_HEARTBEAT_MS } from "./constants";
 import type { ControlRequestService } from "./control-request.service";
 import { workspaceChannel } from "./keys";
-import type { ConnectedWorkspace, LocalWorkspacePresence } from "./presence";
+import type {
+  ConnectedWorkspace,
+  LocalWorkspacePresence,
+  PresenceHeartbeat,
+} from "./presence";
 import {
   type CallEnvelope,
   LOCAL_CONTROL_PROTOCOL_VERSION,
@@ -46,6 +50,7 @@ import {
   type PlatformFrame,
   type RegisterFrame,
   type ResultFrame,
+  type WorkspaceInfo,
 } from "./protocol";
 import type { UserWaitService } from "./user-wait.service";
 
@@ -70,6 +75,10 @@ export interface ControlSession {
   apiKeyId: string;
   workspaceName: string;
   hostname: string;
+  /** When this connection registered, so a heartbeat can write the record back. */
+  connectedAt: number;
+  /** The folder itself, for the same reason. */
+  workspace: WorkspaceInfo;
 }
 
 export type AuthenticateOutcome =
@@ -314,6 +323,8 @@ export class LocalControlSessionCore {
       apiKeyId: credential.apiKeyId,
       workspaceName: frame.workspace.name,
       hostname: frame.instance.hostname,
+      connectedAt: now,
+      workspace: frame.workspace,
     };
 
     // The skip choice is the developer's, and the model behind it is the
@@ -400,11 +411,21 @@ export class LocalControlSessionCore {
     }
   }
 
-  /** Keeps presence alive for one socket. */
-  async heartbeat(session: ControlSession): Promise<void> {
-    await this.presence.heartbeat({
+  /**
+   * Keeps presence alive for one connection, and writes the record back when
+   * it lapsed while the connection was open (`PresenceHeartbeat`).
+   */
+  async heartbeat(session: ControlSession): Promise<PresenceHeartbeat> {
+    return await this.presence.heartbeat({
       conversationId: session.conversationId,
+      projectId: session.projectId,
+      userId: session.userId,
+      requestId: session.requestId,
       instanceId: session.instanceId,
+      hostname: session.hostname,
+      connectedAt: session.connectedAt,
+      lastSeenAt: this.now(),
+      workspace: session.workspace,
     });
   }
 
