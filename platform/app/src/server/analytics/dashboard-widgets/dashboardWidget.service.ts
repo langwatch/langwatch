@@ -246,19 +246,12 @@ export class DashboardWidgetService {
       const data: Prisma.CustomGraphUpdateManyMutationInput = {};
       if (input.name !== undefined) data.name = input.name;
 
-      // A partial definition update keeps the untouched half: `code` alone must
-      // not blank the stored queries, nor `queries` alone the stored code. The
-      // `graph` column is one JSON blob, so the surviving side is read back and
-      // re-merged inside the transaction rather than overwritten.
       if (input.code !== undefined || input.queries !== undefined) {
-        const current = await tx.customGraph.findFirst({
-          where: { id, projectId, kind: DASHBOARD_SRCDOC_CHART_KIND },
-        });
-        if (!current) throw new DashboardWidgetNotFoundError();
-        const { definition } = this.present(current);
-        data.graph = graphOf({
-          code: input.code ?? definition.code,
-          queries: input.queries ?? definition.queries,
+        data.graph = await this.mergeDefinitionUpdate({
+          tx,
+          id,
+          projectId,
+          input,
         });
       }
 
@@ -269,6 +262,39 @@ export class DashboardWidgetService {
       if (result.count === 0) throw new DashboardWidgetNotFoundError();
     });
     return this.getById({ id, projectId });
+  }
+
+  /**
+   * Reads back the stored definition and re-merges it with a partial update.
+   *
+   * A partial definition update keeps the untouched half: `code` alone must
+   * not blank the stored queries, nor `queries` alone the stored code. The
+   * `graph` column is one JSON blob, so the surviving side is read back and
+   * re-merged inside the caller's transaction rather than overwritten.
+   *
+   * @throws {DashboardWidgetNotFoundError} when the widget is not in this
+   *   transaction's project scope.
+   */
+  private async mergeDefinitionUpdate({
+    tx,
+    id,
+    projectId,
+    input,
+  }: {
+    tx: Prisma.TransactionClient;
+    id: string;
+    projectId: string;
+    input: Partial<DashboardWidgetDefinitionInput>;
+  }): Promise<Prisma.CustomGraphUpdateManyMutationInput["graph"]> {
+    const current = await tx.customGraph.findFirst({
+      where: { id, projectId, kind: DASHBOARD_SRCDOC_CHART_KIND },
+    });
+    if (!current) throw new DashboardWidgetNotFoundError();
+    const { definition } = this.present(current);
+    return graphOf({
+      code: input.code ?? definition.code,
+      queries: input.queries ?? definition.queries,
+    });
   }
 
   /**

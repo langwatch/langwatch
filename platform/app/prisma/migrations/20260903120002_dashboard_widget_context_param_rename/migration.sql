@@ -1,3 +1,7 @@
+-- IRREVERSIBLE: there is no down migration. The parameter names in stored
+-- widget JSON are rewritten from the old format to the namespaced form, and
+-- the application no longer reads the old parameter names.
+--
 -- Rename dashboard-widget reserved parameters to their namespaced form.
 --
 -- See dev/docs/adr/129-dashboard-context-vs-params.md: widget author code
