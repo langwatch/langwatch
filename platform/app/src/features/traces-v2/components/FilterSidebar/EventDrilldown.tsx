@@ -1,15 +1,11 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import type { LiqeQuery } from "liqe";
 import type React from "react";
+import { EVENT_METRICS_PREFIX } from "~/server/app-layer/traces/query-language/eventMetrics";
 import { getFacetValueState } from "~/server/app-layer/traces/query-language/queries";
 import { RowButton } from "./RowButton";
 import type { EventMetricValues, FacetItem } from "./types";
 import { formatCount } from "./utils";
-
-/** Storage prefix stripped from metric keys for DISPLAY only — filters and
- *  value lookups always use the full key. Matches the ingest mapper's
- *  `event.metrics.` prefix (see facets/events.ts on the server). */
-const EVENT_METRICS_DISPLAY_PREFIX = "event.metrics.";
 
 const MIN_VISIBLE_FILL_PCT = 4;
 
@@ -77,8 +73,8 @@ const MetricGroup: React.FC<{
   toggleFacet: EventDrilldownProps["toggleFacet"];
 }> = ({ metric, ast, toggleFacet }) => {
   const field = `event.attribute.${metric.key}`;
-  const displayKey = metric.key.startsWith(EVENT_METRICS_DISPLAY_PREFIX)
-    ? metric.key.slice(EVENT_METRICS_DISPLAY_PREFIX.length)
+  const displayKey = metric.key.startsWith(EVENT_METRICS_PREFIX)
+    ? metric.key.slice(EVENT_METRICS_PREFIX.length)
     : metric.key;
   const maxCount = Math.max(...metric.values.map((v) => v.count), 0);
 

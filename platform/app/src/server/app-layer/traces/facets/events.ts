@@ -3,25 +3,13 @@ import type {
   FacetQueryContext,
   QueryBuilderCategoricalDef,
 } from "../facet-registry";
+import {
+  EVENT_METRIC_SEP,
+  EVENT_METRICS_PREFIX,
+} from "../query-language/eventMetrics";
 import { baseParams, buildTimeWhere, KEY_DISCOVERY_SETTINGS } from "./helpers";
 
-/**
- * Prefix the ingest mapper gives event metric attributes (see
- * `event-attrs.mapper.ts`): a thumbs_up_down event's vote lands as
- * `Events.Attributes['event.metrics.vote']`. Only these entries feed the
- * per-event drilldown — non-metric attributes stay in the Event attributes
- * section.
- */
-const EVENT_METRICS_PREFIX = "event.metrics.";
-
-/**
- * Composite-key separator for the metric buckets: `sumMap` needs scalar keys,
- * so (metric key, stored value) pairs are joined with the ASCII unit
- * separator (0x1F) — a control char that can't appear in either half. The
- * SQL emits it via `char(31)`; the repo's facet-row mapper splits on this
- * constant.
- */
-export const EVENT_METRIC_SEP = String.fromCharCode(31);
+export { EVENT_METRIC_SEP, EVENT_METRICS_PREFIX };
 
 /** Per-event cap on (metric key, value) buckets returned to the sidebar. */
 const METRIC_VALUES_TOP_N = 10;
