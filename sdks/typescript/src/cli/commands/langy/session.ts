@@ -60,7 +60,8 @@ export interface LangySession {
 interface PendingPermission {
   call: LocalCall;
   summary: string;
-  pattern: string;
+  /** Every pattern an "allow this pattern" answer grants for this call. */
+  patterns: string[];
 }
 
 export function startLangySession(options: LangySessionOptions): LangySession {
@@ -215,7 +216,7 @@ export function startLangySession(options: LangySessionOptions): LangySession {
       pending.set(call.callId, {
         call,
         summary: decision.summary,
-        pattern: decision.pattern,
+        patterns: decision.patterns,
       });
       client.send({
         type: "permission_required",
@@ -225,6 +226,9 @@ export function startLangySession(options: LangySessionOptions): LangySession {
         pattern: decision.pattern,
         reason: decision.reason,
         skipOffered: true,
+        ...(decision.segments === undefined
+          ? {}
+          : { segments: decision.segments }),
       });
       ui.permissionAsked({
         summary: decision.summary,
@@ -247,9 +251,12 @@ export function startLangySession(options: LangySessionOptions): LangySession {
     pending.delete(callId);
     ui.permissionAnswered({
       summary: waiting.summary,
+      patterns: waiting.patterns,
       decision: decision as PermissionDecision,
     });
-    if (decision === "allow_pattern") grants.add(waiting.pattern);
+    if (decision === "allow_pattern") {
+      for (const pattern of waiting.patterns) grants.add(pattern);
+    }
     if (decision === "allow_once" || decision === "allow_pattern") {
       void execute(waiting.call);
       return;

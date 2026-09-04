@@ -249,6 +249,25 @@ export const resultFrameSchema = versioned.extend({
 export type ResultFrame = z.infer<typeof resultFrameSchema>;
 
 /**
+ * One segment of a shell command chain, as the card lists it.
+ *
+ * A chain that stages, commits and pushes is one call and three segments. A
+ * card that offered a single pattern granted the first segment's pattern and
+ * ran the rest under it, so the segments travel with the ask: the reader sees
+ * every part, and an "allow this pattern" answer covers exactly the segments
+ * that are not read-only.
+ */
+export const commandSegmentSchema = z.object({
+  /** The segment as the developer wrote it. */
+  command: z.string().max(4000),
+  /** The pattern a session grant for this segment would carry. */
+  pattern: z.string().max(500),
+  /** True when the segment runs on its own, so the answer is not about it. */
+  readOnly: z.boolean(),
+});
+export type CommandSegment = z.infer<typeof commandSegmentSchema>;
+
+/**
  * The CLI needs the developer's answer before it runs the call. The panel
  * renders a card with these fields; the platform answers with `permission`.
  */
@@ -263,6 +282,8 @@ export const permissionRequiredFrameSchema = versioned.extend({
   reason: z.string().max(500),
   /** True when the model may be offered the skip toggle on this card. */
   skipOffered: z.boolean(),
+  /** Set for a command: every segment of the chain, in the order it runs. */
+  segments: z.array(commandSegmentSchema).max(50).optional(),
 });
 export type PermissionRequiredFrame = z.infer<
   typeof permissionRequiredFrameSchema

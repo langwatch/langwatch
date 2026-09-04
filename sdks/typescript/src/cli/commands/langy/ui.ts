@@ -107,6 +107,48 @@ export function shorten(text: string, max: number): string {
   return `${words.replace(/[\s.,;:!?-]+$/, "")}\u2026`;
 }
 
+/** The width the terminal wraps at when it cannot report its own. */
+export const DEFAULT_TERMINAL_WIDTH = 80;
+
+/** How wide the terminal is right now, with a floor a word still fits in. */
+export function terminalWidth(
+  columns: number | undefined = process.stdout.columns,
+): number {
+  if (columns === undefined || !Number.isFinite(columns) || columns < 20) {
+    return DEFAULT_TERMINAL_WIDTH;
+  }
+  return Math.floor(columns);
+}
+
+/**
+ * `text` broken into lines no wider than `width`, on spaces.
+ *
+ * The terminal wrapped the approve question in the middle of a word ("is
+ * requesting cont / rol over"), because the shell wraps on the column and not
+ * on the text. A word longer than the width, a path or a url, keeps its own
+ * line rather than being cut.
+ */
+export function wrapWords(text: string, width: number): string[] {
+  const lines: string[] = [];
+  for (const paragraph of text.split("\n")) {
+    let line = "";
+    for (const word of paragraph.split(/ +/).filter((entry) => entry !== "")) {
+      if (line === "") {
+        line = word;
+        continue;
+      }
+      if (line.length + 1 + word.length <= width) {
+        line = `${line} ${word}`;
+        continue;
+      }
+      lines.push(line);
+      line = word;
+    }
+    lines.push(line);
+  }
+  return lines;
+}
+
 /**
  * The reason a failure reads as. The full text still goes back to Langy, which
  * is what acts on it; the terminal only says what stopped.
@@ -167,6 +209,29 @@ export function decisionWords(decision: PermissionDecision): string {
   }
 }
 
+/**
+ * The one line an answer produces.
+ *
+ * The ask already printed the command in full, and a pull request chain with
+ * its own body filled two thirds of the terminal. Printing it again on the
+ * answer filled the rest, so the answer names the patterns it granted instead,
+ * which is also the thing there was nowhere else to read.
+ */
+export function answerLine({
+  summary,
+  patterns,
+  decision,
+}: {
+  summary: string;
+  patterns: string[];
+  decision: PermissionDecision;
+}): string {
+  if (decision === "allow_pattern" && patterns.length > 0) {
+    return `Allowed for this session: ${patterns.join(", ")}.`;
+  }
+  return `${shorten(summary, MAX_TARGET_LENGTH)}: ${decisionWords(decision)}.`;
+}
+
 export interface LangyUi {
   connected: (input: {
     root: string;
@@ -180,6 +245,7 @@ export interface LangyUi {
   permissionAsked: (input: { summary: string; conversationUrl: string }) => void;
   permissionAnswered: (input: {
     summary: string;
+    patterns: string[];
     decision: PermissionDecision;
   }) => void;
   policyChanged: (input: { skipPermissions: boolean }) => void;
@@ -232,13 +298,18 @@ export function createUi(writer: UiWriter = consoleWriter): LangyUi {
         `${bullet} ${callLine(call)} ${chalk.red(`failed: ${shortReason(message)}`)}`,
       ),
     permissionAsked: ({ summary, conversationUrl }) => {
+      // The command prints in full, once, wrapped where the words end. This
+      // is the only place the developer reads what they are approving.
+      const width = terminalWidth();
+      for (const line of wrapWords(`Langy asked to run ${summary}`, width - 2)) {
+        writer.line(chalk.yellow(`  ${line}`));
+      }
       writer.line(
-        chalk.yellow(`  Langy asked to run ${summary}.`) +
-          ` Answer in the LangWatch panel: ${chalk.cyan(conversationUrl)}`,
+        `  Answer in the LangWatch panel: ${chalk.cyan(conversationUrl)}`,
       );
     },
-    permissionAnswered: ({ summary, decision }) =>
-      writer.line(chalk.gray(`  ${summary}: ${decisionWords(decision)}.`)),
+    permissionAnswered: ({ summary, patterns, decision }) =>
+      writer.line(chalk.gray(`  ${answerLine({ summary, patterns, decision })}`)),
     policyChanged: ({ skipPermissions }) =>
       writer.line(
         skipPermissions

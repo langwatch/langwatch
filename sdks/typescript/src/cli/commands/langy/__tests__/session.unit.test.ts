@@ -297,6 +297,57 @@ describe("given a folder connected to a Langy conversation", () => {
       expect(socket.sentOf("permission_required")).toHaveLength(1);
     });
 
+    /** @scenario "A long command is printed once" */
+    it("prints the command in full on the ask and the patterns on the answer", async () => {
+      start();
+      await settle();
+      register();
+      lines.length = 0;
+
+      const chain =
+        'git add app.py && git commit -m "feat: add tracing" && git push -u origin HEAD';
+      socket.deliver(
+        callFrame({ tool: "local_bash", params: { command: chain } }),
+      );
+      await settle();
+
+      const [asked] = socket.sentOf("permission_required");
+      expect(asked!.segments).toHaveLength(3);
+      const askText = lines.join("\n");
+      expect(askText.replace(/\n\s+/g, " ")).toContain(chain);
+
+      lines.length = 0;
+      socket.deliver({
+        type: "permission",
+        callId: "call-1",
+        decision: "allow_pattern",
+      });
+      await waitUntil(() => socket.sentOf("result").length === 1, {
+        what: "the allowed chain to answer",
+      });
+      const answer = lines.filter((line) => line.includes("Allowed"));
+      expect(answer).toHaveLength(1);
+      expect(answer[0]).toContain("git add, git commit, git push");
+      expect(answer[0]).not.toContain("feat: add tracing");
+
+      // The grant covers every segment the card named, so the next chain of
+      // the same shape runs with no card.
+      socket.deliver({
+        ...callFrame({ tool: "local_bash", params: { command: "x" } }),
+        call: {
+          ...callFrame({
+            tool: "local_bash",
+            params: { command: 'git add README.md && git commit -m "docs"' },
+          }).call,
+          callId: "call-2",
+        },
+      });
+      await waitUntil(() => socket.sentOf("result").length === 2, {
+        what: "the covered chain to answer with no second card",
+      });
+      expect(socket.sentOf("permission_required")).toHaveLength(1);
+    });
+
     /** @scenario "A grant lives with the session, not with the conversation" */
     it("forgets the grant when the command line is started again", async () => {
       start();

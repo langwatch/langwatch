@@ -90,6 +90,20 @@ describe("given a folder shared with a Langy conversation", () => {
         expect(bash(command), command).toEqual({ kind: "run" });
       }
     });
+
+    /** @scenario "The GitHub CLI sign-in check runs at once" */
+    it("runs the GitHub CLI sign-in check and its version at once", () => {
+      for (const command of ["gh auth status", "gh --version", "gh version"]) {
+        expect(bash(command), command).toEqual({ kind: "run" });
+      }
+      for (const command of [
+        "gh pr create --title x",
+        "gh auth login",
+        "gh repo clone acme/support",
+      ]) {
+        expect(bash(command).kind, command).toBe("ask");
+      }
+    });
   });
 
   describe("when Langy writes or edits a file inside the folder", () => {
@@ -115,7 +129,117 @@ describe("given a folder shared with a Langy conversation", () => {
       if (decision.kind !== "ask") return;
       expect(decision.summary).toBe("git status && pnpm typecheck");
       expect(decision.pattern).toBe("pnpm typecheck");
-      expect(decision.reason).toContain("pnpm typecheck");
+      expect(decision.segments).toEqual([
+        { command: "git status", pattern: "git status", readOnly: true },
+        { command: "pnpm typecheck", pattern: "pnpm typecheck", readOnly: false },
+      ]);
+    });
+
+    /** @scenario "A command chain is split into its segments" */
+    it("lists every segment of the chain with the pattern it would grant", () => {
+      const chain = [
+        "git add app.py README.md",
+        'git commit -m "feat: add tracing"',
+        "git push -u origin HEAD",
+        'gh pr create --base main --title "Add tracing"',
+      ].join(" && ");
+      const decision = bash(chain);
+      expect(decision.kind).toBe("ask");
+      if (decision.kind !== "ask") return;
+      expect(decision.segments).toEqual([
+        {
+          command: "git add app.py README.md",
+          pattern: "git add",
+          readOnly: false,
+        },
+        {
+          command: 'git commit -m "feat: add tracing"',
+          pattern: "git commit",
+          readOnly: false,
+        },
+        {
+          command: "git push -u origin HEAD",
+          pattern: "git push",
+          readOnly: false,
+        },
+        {
+          command: 'gh pr create --base main --title "Add tracing"',
+          pattern: "gh pr",
+          readOnly: false,
+        },
+      ]);
+      expect(decision.patterns).toEqual([
+        "git add",
+        "git commit",
+        "git push",
+        "gh pr",
+      ]);
+    });
+
+    /** @scenario "A pattern grant covers exactly the segments the card named" */
+    it("runs a later chain whose segments the grants all cover, and asks otherwise", () => {
+      const grants = ["git add", "git commit", "git push", "gh pr"];
+      expect(
+        bash('git add . && git commit -m "wip" && git push', { grants }),
+      ).toEqual({ kind: "run" });
+
+      const wider = bash("git add . && git tag -d v1", { grants });
+      expect(wider.kind).toBe("ask");
+      if (wider.kind !== "ask") return;
+      expect(wider.pattern).toBe("git tag");
+      expect(wider.segments?.map((segment) => segment.command)).toEqual([
+        "git add .",
+        "git tag -d v1",
+      ]);
+    });
+
+    /** @scenario "The reason says what the command changes" */
+    it("reads as one sentence about what changes, with no command quoted", () => {
+      const table: Array<{ command: string; reason: string }> = [
+        {
+          command: "pnpm typecheck",
+          reason: "This runs the project's own checks.",
+        },
+        { command: "rm -rf build", reason: "This writes files in the folder." },
+        {
+          command: "git commit -m done",
+          reason: "This changes the git repository.",
+        },
+        {
+          command: "git fetch origin",
+          reason: "This reaches the network.",
+        },
+        {
+          command: "uv sync && uv run pytest -s",
+          reason:
+            "This installs packages and runs the project's own checks.",
+        },
+        {
+          command:
+            'git add . && git commit -m "feat: x" && git push -u origin HEAD',
+          reason: "This changes the git repository and reaches the network.",
+        },
+        {
+          command: "ls -la > listing.txt",
+          reason: "This writes files in the folder.",
+        },
+        {
+          command: "python -m compileall src",
+          reason: "This runs the project's own checks.",
+        },
+        {
+          command: "cat $(ls)",
+          reason:
+            "This runs a command substitution, so what it does is not knowable before it runs.",
+        },
+      ];
+      for (const row of table) {
+        const decision = bash(row.command);
+        expect(decision.kind, row.command).toBe("ask");
+        if (decision.kind !== "ask") continue;
+        expect(decision.reason, row.command).toBe(row.reason);
+        expect(decision.reason, row.command).not.toContain('"');
+      }
     });
 
     it("judges every separator the shell has", () => {
@@ -135,12 +259,12 @@ describe("given a folder shared with a Langy conversation", () => {
     it("asks", () => {
       const withExec = bash("find . -name '*.py' -exec rm {} ;");
       expect(withExec.kind).toBe("ask");
-      if (withExec.kind === "ask") expect(withExec.reason).toContain("-exec");
+      if (withExec.kind === "ask") expect(withExec.reason).toContain("writes files");
 
       const redirected = bash("ls -la > listing.txt");
       expect(redirected.kind).toBe("ask");
       if (redirected.kind === "ask") {
-        expect(redirected.reason).toContain("redirects");
+        expect(redirected.reason).toContain("writes files");
       }
 
       for (const command of [
@@ -177,7 +301,7 @@ describe("given a folder shared with a Langy conversation", () => {
         const decision = bash(command);
         expect(decision.kind, command).toBe("ask");
         if (decision.kind === "ask") {
-          expect(decision.reason).toContain("names its program by path");
+          expect(decision.segments?.[0]?.readOnly).toBe(false);
         }
       }
     });
@@ -370,6 +494,23 @@ describe("given a folder shared with a Langy conversation", () => {
       }
       expect(isSecretFileName("app.py")).toBe(false);
       expect(isSecretFileName(".env")).toBe(true);
+    });
+
+    /** @scenario "A committed example environment file is not a secret" */
+    it("runs a read of a committed example environment file at once", () => {
+      for (const name of [
+        ".env.example",
+        ".env.sample",
+        ".env.template",
+        ".env.dist",
+        ".env.EXAMPLE",
+      ]) {
+        expect(isSecretFileName(name), name).toBe(false);
+        expect(at({ tool: "local_read", params: { path: name } }), name).toEqual(
+          { kind: "run" },
+        );
+      }
+      expect(isSecretFileName(".env.example.local")).toBe(true);
     });
 
     it("asks for a write to a secret file too", () => {

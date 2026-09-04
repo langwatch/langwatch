@@ -257,7 +257,10 @@ describe("the CLI local control protocol, given the platform's contract module",
       ).toEqual(["protocol"]);
     });
 
-    it("permission_required carries the same keys", () => {
+    it("permission_required carries the same keys, segments included", () => {
+      expect(sorted(cliKeys({ source: cli, name: "CommandSegment" }))).toEqual(
+        sorted(platformKeys({ source: platform, schema: "commandSegmentSchema" })),
+      );
       expect(
         sorted(
           withoutType(

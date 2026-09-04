@@ -17,6 +17,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type {
+  CommandSegment,
   LocalCallErrorCode,
   LocalToolCall,
 } from "../../../agent/local-control-protocol";
@@ -24,7 +25,17 @@ import type {
 /** What the CLI does with one call. */
 export type PolicyDecision =
   | { kind: "run" }
-  | { kind: "ask"; summary: string; pattern: string; reason: string }
+  | {
+      kind: "ask";
+      summary: string;
+      /** The pattern the first segment that is not read-only would grant. */
+      pattern: string;
+      /** Every pattern an "allow this pattern" answer covers. */
+      patterns: string[];
+      reason: string;
+      /** Set for a command: every segment of the chain, in the order it runs. */
+      segments?: CommandSegment[];
+    }
   | { kind: "refuse"; code: LocalCallErrorCode; message: string };
 
 export interface PolicyInput {
@@ -121,6 +132,20 @@ const GIT_WRITE_ARGUMENTS: ReadonlySet<string> = new Set([
   "set-branches",
 ]);
 
+/**
+ * The `gh` invocations that only read, written out in full.
+ *
+ * The sign-in check is the one Langy reached for most, and the answer is
+ * already in the register frame as `ghAuthenticated`. It still cost a card in
+ * every filmed run, so the check itself runs, and the skill says the workspace
+ * facts are the answer. Everything else `gh` does reaches GitHub and asks.
+ */
+export const READ_ONLY_GH_ARGUMENTS: readonly (readonly string[])[] = [
+  ["auth", "status"],
+  ["--version"],
+  ["version"],
+];
+
 /** Toolchains that may answer their version and nothing else. */
 export const VERSION_ONLY_COMMANDS: ReadonlySet<string> = new Set([
   "node",
@@ -166,6 +191,13 @@ const DIRECTORY_FLAGS: ReadonlySet<string> = new Set([
   "--directory",
 ]);
 
+/**
+ * Environment files that are committed on purpose and carry placeholders
+ * rather than values. Reading one is the normal first step of instrumenting a
+ * project, so it must not spend a card.
+ */
+const EXAMPLE_ENV_FILE = /^\.env\.(example|sample|template|dist)$/i;
+
 /** Files that may hold secrets, so a read of one asks. */
 const SECRET_FILE_PATTERNS: readonly RegExp[] = [
   /^\.env$/,
@@ -182,6 +214,7 @@ const SECRET_FILE_PATTERNS: readonly RegExp[] = [
 
 /** True when the file name is one a secret usually lives in. */
 export function isSecretFileName(name: string): boolean {
+  if (EXAMPLE_ENV_FILE.test(name)) return false;
   return SECRET_FILE_PATTERNS.some((pattern) => pattern.test(name));
 }
 
@@ -393,57 +426,213 @@ const isEnvironmentAssignment = (token: string): boolean =>
   /^[A-Za-z_][A-Za-z0-9_]*=/.test(token);
 
 /**
- * Why this part is not read-only, or null when it is. The message is the
- * `reason` the permission card shows, so it names the part.
+ * True when this part runs on its own, with no card.
+ *
+ * The classification is the whole answer. What the part does with the machine
+ * is a separate question, answered by `effectOf`, because the card's reason
+ * says what changes rather than repeating the command back.
  */
-function readOnlyRefusal(part: CommandPart): string | null {
+function isReadOnlyPart(part: CommandPart): boolean {
   const [name, ...args] = part.tokens;
-  const quoted = `"${part.text}"`;
-  if (name === undefined || name === "") return `${quoted} is empty`;
-  if (isEnvironmentAssignment(name)) {
-    return `${quoted} sets environment variables before the command`;
-  }
-  if (part.hasRedirect) return `${quoted} redirects to or from a file`;
-  const writeFlag = args.find((argument) => WRITE_FLAGS.has(argument));
-  if (writeFlag) return `${quoted} uses ${writeFlag}, which runs or removes files`;
-  if (namesAPath(name)) {
-    return `${quoted} names its program by path, so it is not read-only`;
-  }
-  if (args.some((argument) => DIRECTORY_FLAGS.has(argument))) {
-    return `${quoted} points at another directory`;
-  }
+  if (name === undefined || name === "") return false;
+  if (isEnvironmentAssignment(name)) return false;
+  if (part.hasRedirect) return false;
+  if (args.some((argument) => WRITE_FLAGS.has(argument))) return false;
+  if (namesAPath(name)) return false;
+  if (args.some((argument) => DIRECTORY_FLAGS.has(argument))) return false;
 
   if (name === "git") {
     const subcommand = args.find((argument) => !argument.startsWith("-"));
-    if (subcommand === undefined) {
-      return VERSION_ARGUMENTS.has(args[0] ?? "")
-        ? null
-        : `${quoted} is not a read-only git command`;
-    }
-    if (!READ_ONLY_GIT_SUBCOMMANDS.has(subcommand)) {
-      return `${quoted} is not a read-only git command`;
-    }
-    const write = args.find((argument) => GIT_WRITE_ARGUMENTS.has(argument));
-    if (write) return `${quoted} uses ${write}, which changes the repository`;
-    return null;
+    if (subcommand === undefined) return VERSION_ARGUMENTS.has(args[0] ?? "");
+    if (!READ_ONLY_GIT_SUBCOMMANDS.has(subcommand)) return false;
+    return !args.some((argument) => GIT_WRITE_ARGUMENTS.has(argument));
+  }
+
+  if (name === "gh") {
+    return READ_ONLY_GH_ARGUMENTS.some(
+      (allowed) => allowed.join(" ") === args.join(" "),
+    );
   }
 
   if (VERSION_ONLY_COMMANDS.has(name)) {
-    const asked = args.length === 1 && VERSION_ARGUMENTS.has(args[0]!);
-    return asked ? null : `${quoted} runs ${name}, which is not read-only`;
+    return args.length === 1 && VERSION_ARGUMENTS.has(args[0]!);
   }
 
-  if (!READ_ONLY_COMMANDS.has(name)) {
-    return `${quoted} is not in the read-only set`;
-  }
+  if (!READ_ONLY_COMMANDS.has(name)) return false;
 
   // `env` and `printenv` print the environment with no operand and run
   // whatever they are given with one.
-  if ((name === "env" || name === "printenv") && args.some((a) => !a.startsWith("-"))) {
-    return `${quoted} runs a command through ${name}`;
+  if (name === "env" || name === "printenv") {
+    return !args.some((argument) => !argument.startsWith("-"));
   }
 
-  return null;
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// What a command changes
+// ---------------------------------------------------------------------------
+
+/**
+ * What one part of a command does to the machine.
+ *
+ * The card's reason used to restate the command (`"git fetch origin" is not a
+ * read-only git command`), which tells the reader nothing they cannot see in
+ * the command itself, and for a chain it named one segment. The reason is
+ * built from these classes instead, so it says what the answer allows.
+ */
+export type CommandEffect =
+  | "writes_files"
+  | "changes_repository"
+  | "reaches_network"
+  | "installs_packages"
+  | "runs_checks"
+  | "runs_program";
+
+/** The clause each class contributes to the reason sentence. */
+const EFFECT_CLAUSES: Record<CommandEffect, string> = {
+  writes_files: "writes files in the folder",
+  changes_repository: "changes the git repository",
+  reaches_network: "reaches the network",
+  installs_packages: "installs packages",
+  runs_checks: "runs the project's own checks",
+  runs_program: "runs a program that is not read-only",
+};
+
+/** The order the clauses read in, whatever order the segments run in. */
+const EFFECT_ORDER: readonly CommandEffect[] = [
+  "writes_files",
+  "changes_repository",
+  "installs_packages",
+  "reaches_network",
+  "runs_checks",
+  "runs_program",
+];
+
+/** Git subcommands that talk to a remote. */
+const GIT_NETWORK_SUBCOMMANDS: ReadonlySet<string> = new Set([
+  "push",
+  "pull",
+  "fetch",
+  "clone",
+  "submodule",
+]);
+
+/** Commands whose whole purpose is a request to another machine. */
+const NETWORK_COMMANDS: ReadonlySet<string> = new Set([
+  "curl",
+  "wget",
+  "ssh",
+  "scp",
+  "rsync",
+  "gh",
+  "docker",
+  "npx",
+]);
+
+/** The verbs that make a package manager fetch and install. */
+const INSTALL_VERBS: ReadonlySet<string> = new Set([
+  "install",
+  "add",
+  "sync",
+  "ci",
+  "update",
+  "upgrade",
+  "get",
+]);
+
+/** Package managers, which install with a verb and run scripts without one. */
+const PACKAGE_MANAGERS: ReadonlySet<string> = new Set([
+  "npm",
+  "pnpm",
+  "yarn",
+  "bun",
+  "pip",
+  "pip3",
+  "uv",
+  "poetry",
+  "cargo",
+  "go",
+  "brew",
+]);
+
+/** Tokens that name a check the project runs on itself. */
+const CHECK_TOKENS: ReadonlySet<string> = new Set([
+  "test",
+  "tests",
+  "typecheck",
+  "lint",
+  "check",
+  "pytest",
+  "vitest",
+  "jest",
+  "mypy",
+  "ruff",
+  "eslint",
+  "tsc",
+  "compileall",
+]);
+
+/** Commands that create, move or remove files. */
+const FILE_WRITE_COMMANDS: ReadonlySet<string> = new Set([
+  "rm",
+  "mv",
+  "cp",
+  "mkdir",
+  "rmdir",
+  "touch",
+  "chmod",
+  "chown",
+  "ln",
+  "tee",
+  "sed",
+  "truncate",
+]);
+
+/** What one part of a command changes. */
+export function effectOf(part: CommandPart): CommandEffect {
+  const [name, ...args] = part.tokens;
+  if (name === undefined || name === "") return "runs_program";
+  if (part.hasRedirect) return "writes_files";
+  if (args.some((argument) => WRITE_FLAGS.has(argument))) return "writes_files";
+
+  const verb = args.find((argument) => !argument.startsWith("-"));
+
+  if (name === "git") {
+    if (verb !== undefined && GIT_NETWORK_SUBCOMMANDS.has(verb)) {
+      return "reaches_network";
+    }
+    return "changes_repository";
+  }
+  if (PACKAGE_MANAGERS.has(name) && verb !== undefined && INSTALL_VERBS.has(verb)) {
+    return "installs_packages";
+  }
+  if (args.some((argument) => CHECK_TOKENS.has(argument))) return "runs_checks";
+  if (CHECK_TOKENS.has(name)) return "runs_checks";
+  if (NETWORK_COMMANDS.has(name)) return "reaches_network";
+  if (FILE_WRITE_COMMANDS.has(name)) return "writes_files";
+  return "runs_program";
+}
+
+/**
+ * The reason the card shows: one sentence about what the answer allows.
+ *
+ * It never quotes the command, because the card already renders it and every
+ * segment beside it. A quoted command was also where the stray quote came
+ * from, on a chain whose own message carried one.
+ */
+export function reasonFor(parts: CommandPart[]): string {
+  const effects = new Set(parts.map(effectOf));
+  const clauses = EFFECT_ORDER.filter((effect) => effects.has(effect)).map(
+    (effect) => EFFECT_CLAUSES[effect],
+  );
+  if (clauses.length === 0) return "This runs a command that is not read-only.";
+  const last = clauses[clauses.length - 1]!;
+  const sentence =
+    clauses.length === 1
+      ? last
+      : `${clauses.slice(0, -1).join(", ")} and ${last}`;
+  return `This ${sentence}.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -589,7 +778,8 @@ function decideFileTool({
         kind: "ask",
         summary: `${verb} ${target}`,
         pattern: `${call.tool} ${target}`,
-        reason: `${name} may hold secrets`,
+        patterns: [`${call.tool} ${target}`],
+        reason: `${name} may hold secrets, so it is not read for you without an answer.`,
       };
     }
   }
@@ -632,33 +822,50 @@ function decideBash({
       kind: "ask",
       summary: command,
       pattern: "* *",
-      reason: `"${command}" could not be read as a command`,
+      patterns: ["* *"],
+      reason: "This could not be read as a command, so what it does is unknown.",
+      segments: [{ command, pattern: "* *", readOnly: false }],
     };
   }
+
+  const segments: CommandSegment[] = parsed.parts.map((part) => ({
+    command: part.text,
+    pattern: grantPatternFor(part.tokens),
+    readOnly: !parsed.hasSubstitution && isReadOnlyPart(part),
+  }));
 
   if (parsed.hasSubstitution) {
-    const first = parsed.parts[0]!;
     return {
       kind: "ask",
       summary: command,
-      pattern: grantPatternFor(first.tokens),
-      reason: `"${command}" runs a command substitution, so what it does is not knowable here`,
+      pattern: segments[0]!.pattern,
+      patterns: segments.map((segment) => segment.pattern),
+      reason:
+        "This runs a command substitution, so what it does is not knowable before it runs.",
+      segments,
     };
   }
 
-  for (const part of parsed.parts) {
-    const refusal = readOnlyRefusal(part);
-    if (refusal === null) continue;
-    if (grantsAllow({ tokens: part.tokens, grants })) continue;
-    return {
-      kind: "ask",
-      summary: command,
-      pattern: grantPatternFor(part.tokens),
-      reason: refusal,
-    };
-  }
+  const writing = parsed.parts.filter((part) => !isReadOnlyPart(part));
+  const unanswered = writing.filter(
+    (part) => !grantsAllow({ tokens: part.tokens, grants }),
+  );
+  if (unanswered.length === 0) return { kind: "run" };
 
-  return { kind: "run" };
+  // The answer covers every segment the card lists, not only the first one:
+  // a chain that stages, commits and pushes granted `git add` and ran the
+  // rest under it.
+  const patterns = [
+    ...new Set(writing.map((part) => grantPatternFor(part.tokens))),
+  ];
+  return {
+    kind: "ask",
+    summary: command,
+    pattern: grantPatternFor(unanswered[0]!.tokens),
+    patterns,
+    reason: reasonFor(writing),
+    segments,
+  };
 }
 
 /**

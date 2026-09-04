@@ -202,6 +202,24 @@ export interface LocalResultFrame {
   error?: LocalCallError;
 }
 
+/**
+ * One segment of a shell command chain, as the card lists it.
+ *
+ * A chain that stages, commits and pushes is one call and three segments. A
+ * card that offered a single pattern granted the first segment's pattern and
+ * ran the rest under it, so the segments travel with the ask: the reader sees
+ * every part, and an "allow this pattern" answer covers exactly the segments
+ * that are not read-only.
+ */
+export interface CommandSegment {
+  /** The segment as the developer wrote it. */
+  command: string;
+  /** The pattern a session grant for this segment would carry. */
+  pattern: string;
+  /** True when the segment runs on its own, so the answer is not about it. */
+  readOnly: boolean;
+}
+
 export interface LocalPermissionRequiredFrame {
   type: "permission_required";
   protocol: typeof LOCAL_CONTROL_PROTOCOL_VERSION;
@@ -214,6 +232,8 @@ export interface LocalPermissionRequiredFrame {
   reason: string;
   /** True when the model may be offered the skip toggle on this card. */
   skipOffered: boolean;
+  /** Set for a command: every segment of the chain, in the order it runs. */
+  segments?: CommandSegment[];
 }
 
 export interface LocalDeregisterFrame {

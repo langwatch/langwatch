@@ -42,6 +42,12 @@ Feature: The CLI decides what Langy may run on the developer's machine
       Then the whole command asks for permission
 
     @unit
+    Scenario: The GitHub CLI sign-in check runs at once
+      When Langy asks the GitHub CLI whether it is signed in, or for its version
+      Then the command runs at once
+      And every other GitHub CLI command still asks
+
+    @unit
     Scenario: A read-only command with a write flag or a redirect asks
       When Langy runs a find with an exec flag, or a listing redirected into a file
       Then the command asks for permission
@@ -74,6 +80,26 @@ Feature: The CLI decides what Langy may run on the developer's machine
       Given I allowed the package manager pattern for this session
       When Langy runs another command with the same package manager
       Then the command runs without a card
+
+    @unit
+    Scenario: A command chain is split into its segments
+      When Langy runs a chain that stages, commits, pushes and opens a pull request
+      Then one permission card asks about the whole chain
+      And the card lists every segment of the chain with the pattern that segment would grant
+      And a segment that is read-only is marked as such
+
+    @unit
+    Scenario: A pattern grant covers exactly the segments the card named
+      Given I allowed the pattern of a chain that stages, commits and pushes
+      When Langy runs another chain whose segments are all covered
+      Then the chain runs without a card
+      And a chain with one segment outside those patterns asks again
+
+    @unit
+    Scenario: The reason says what the command changes
+      When a command asks for permission
+      Then the reason is one sentence naming what it changes, such as writing files, changing the repository, reaching the network, installing packages or running the project's own checks
+      And the reason does not quote the command back
 
     @unit
     Scenario: A grant follows the command name and its first argument
@@ -148,6 +174,12 @@ Feature: The CLI decides what Langy may run on the developer's machine
       When Langy reads an environment file, a private key or a credentials file inside the folder
       Then a permission card is rendered
       And the card says the file may hold secrets
+
+    @unit
+    Scenario: A committed example environment file is not a secret
+      When Langy reads an environment file with an example, sample, template or dist suffix
+      Then the read runs at once
+      And no permission card is rendered
 
     @integration
     Scenario: Langy explains a refusal instead of retrying it
