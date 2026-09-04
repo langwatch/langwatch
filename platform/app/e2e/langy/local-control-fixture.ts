@@ -85,6 +85,24 @@ const sleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
+ * The model key the demo applications need, from the environment or from the
+ * app's own `.env`, which is where this checkout keeps it.
+ */
+function openaiKey(): string {
+  const fromEnvironment = process.env.OPENAI_API_KEY;
+  if (fromEnvironment) return fromEnvironment;
+  try {
+    const dotenv = readFileSync(
+      path.join(REPO_ROOT, "platform", "app", ".env"),
+      "utf8",
+    );
+    return /^OPENAI_API_KEY=(.*)$/m.exec(dotenv)?.[1]?.trim() ?? "";
+  } catch {
+    return "";
+  }
+}
+
+/**
  * Polls until `read` answers something truthy, then returns it.
  *
  * Every wait in this file goes through here so a timeout says what it was
@@ -1442,6 +1460,10 @@ export interface DemoApp {
  * launcher would leave them out of the shell Langy restarts the application
  * in, so the new process would come up with no way to reach the platform and
  * the agent would never register the change.
+ *
+ * The model key is one of them. Without it the demo's own tests cannot pass in
+ * the shared folder whatever Langy writes, so a scenario that asks Langy to
+ * run the checks would only ever prove that it tried.
  */
 export async function startDemoApp({
   repo,
@@ -1460,6 +1482,7 @@ export async function startDemoApp({
       `LANGWATCH_ENDPOINT=${APP_BASE}`,
       `LANGWATCH_API_KEY=${apiKey}`,
       "LANGWATCH_AGENT_CONNECT=1",
+      `OPENAI_API_KEY=${openaiKey()}`,
       "",
     ].join("\n"),
     "utf8",
