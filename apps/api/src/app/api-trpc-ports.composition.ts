@@ -292,7 +292,6 @@ export function createApiTrpcPorts<
 
     group: collaborators.group,
 
-    home: collaborators.home,
 
     identity: collaborators.identity,
 
@@ -318,9 +317,7 @@ export function createApiTrpcPorts<
     prisma,
 
 
-    role: collaborators.role,
 
-    team: collaborators.team,
 
     traces: collaborators.traces,
     tracesV2: collaborators.tracesV2,

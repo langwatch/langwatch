@@ -145,9 +145,15 @@ import {
   type ComposedScenarioFeature,
 } from "../features/scenario/scenario.composition";
 import {
-  composeApiProductGroupCollaborators,
-  type ApiProductGroupCollaborators,
-} from "./api-trpc-collaborators.product-group.composition";
+  composeRoleFeature,
+  refusingRoleFeature,
+  type ComposedRoleFeature,
+} from "../features/role/role.composition";
+import {
+  composeHomeFeature,
+  refusingHomeFeature,
+  type ComposedHomeFeature,
+} from "../features/project/home.composition";
 import {
   composeDataRetentionFeature,
   LoggedApiDataRetentionAbsence,
@@ -625,7 +631,8 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private composedExecution: ApiExecutionCollaborators | undefined;
   private composedProduct: ApiProductCollaborators | undefined;
   private composedTraceGroup: ApiTraceGroupCollaborators | undefined;
-  private composedProductGroup: ApiProductGroupCollaborators | undefined;
+  private composedRole!: ComposedRoleFeature;
+  private composedHome!: ComposedHomeFeature;
 
   private composedDataRetention!: ComposedDataRetentionFeature;
   private composedMonitor!: ComposedMonitorFeature;
@@ -944,17 +951,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
             : {}),
         })
       : undefined;
-    // The product-group half: the surfaces a member reaches to RUN the product
-    // rather than to look at what it recorded. It folds on rather than seeding,
-    // because it needs the tenancy graph that the seed above does not.
-    this.composedProductGroup = this.composeProductGroup(options, authz);
-    // The invitation half, composed here rather than inside the org-group half
-    // because BOTH doors need it: `organization.*` administers invitations over
-    // tRPC and `/api/organization/{id}/invites` over REST, and the REST doors
-    // are composed further down. Everything it stands on — the grant ledger,
-    // the role service, the plan provider and this process's connection — is
-    // open by this line.
-    this.resolveOrganizationInvites(options);
     // The agent half: the test cases and conversations an agent is written,
     // watched and driven through. It composes LAST because it reads what every
     // other half opened — this process's ClickHouse, the queue's Redis, the
@@ -972,6 +968,41 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       report: LoggedApiAgentPipelinesAbsence.create(createLogger(options.config.serviceName)),
     });
     this.composedScenario = this.composeScenario(options, authz, queueInfrastructure, encryption);
+    const database = this.composedDatabase?.connection;
+    const infrastructure = database
+      ? {
+          prisma: database.client,
+          authz,
+          // The SAME plan provider every allowance banner reads, and the SAME
+          // flag store `featureFlag.*` answers from. Both are the process's,
+          // not any one feature's, so a gate and the surface beside it cannot
+          // disagree.
+          plans: this.resolvePlanProvider(options),
+          featureFlags: this.composedFeatureFlag.service,
+          // One variable, one meaning: `IS_SAAS` is what decides whether this
+          // installation bills through Stripe, read from the one leaf that
+          // already carries it rather than from a second of its own.
+          saasBilling: options.config.infrastructure.modelProvider.isSaas,
+          audit: this.options.audit,
+        }
+      : undefined;
+    // The roles a member is granted and the strip of what they last opened.
+    // Both used to ride inside the product-group half, so a process missing any
+    // one of its six collaborators lost every role surface with it.
+    this.composedRole =
+      infrastructure && this.composedAuthz
+        ? composeRoleFeature({ infrastructure, grants: this.composedAuthz.grants })
+        : refusingRoleFeature();
+    this.composedHome = infrastructure
+      ? composeHomeFeature({ infrastructure })
+      : refusingHomeFeature();
+    // The invitation half, composed here rather than inside the org-group half
+    // because BOTH doors need it: `organization.*` administers invitations over
+    // tRPC and `/api/organization/{id}/invites` over REST, and the REST doors
+    // are composed further down. Everything it stands on — the grant ledger,
+    // the role service, the plan provider and this process's connection — is
+    // open by this line.
+    this.resolveOrganizationInvites(options);
     // The org-group half: the nine surfaces a TENANT is administered through —
     // its members and their bindings, its projects' own lifecycle, the coding
     // agents inside them, the automations they fire, and the four Enterprise
@@ -995,24 +1026,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       database: this.composedDatabase?.connection.client,
       encryption,
     });
-    const database = this.composedDatabase?.connection;
-    const infrastructure = database
-      ? {
-          prisma: database.client,
-          authz,
-          // The SAME plan provider every allowance banner reads, and the SAME
-          // flag store `featureFlag.*` answers from. Both are the process's,
-          // not any one feature's, so a gate and the surface beside it cannot
-          // disagree.
-          plans: this.resolvePlanProvider(options),
-          featureFlags: this.composedFeatureFlag.service,
-          // One variable, one meaning: `IS_SAAS` is what decides whether this
-          // installation bills through Stripe, read from the one leaf that
-          // already carries it rather than from a second of its own.
-          saasBilling: options.config.infrastructure.modelProvider.isSaas,
-          audit: this.options.audit,
-        }
-      : undefined;
     // The AI Gateway, composed HERE rather than inside the record: its
     // application is read by `ctx.app`, by the two public REST families and by
     // the six tRPC namespaces, so the process composes it once and hands each
@@ -1097,6 +1110,8 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         ops: this.composedOps,
         scenario: this.composedScenario,
         dataRetention: this.composedDataRetention,
+        home: this.composedHome,
+        role: this.composedRole,
         monitor: this.composedMonitor,
         storedObject: this.composedStoredObject,
       },
@@ -1108,7 +1123,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
           product: this.composedProduct,
           identity: this.composedIdentity,
           execution: this.composedExecution,
-          productGroup: this.composedProductGroup,
           traceGroup: this.composedTraceGroup,
           orgGroup: this.composedOrgGroup,
         },
@@ -1118,6 +1132,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         // composes it, or by that feature's named refusal.
         {
           analytics: this.composedAnalytics.analytics,
+          authzApp: this.composedRole.authzApp,
           dashboard: this.composedAnalytics.dashboard,
           dataset: this.composedDataset.app,
           evaluatorApp: this.composedEvaluator.app,
@@ -1128,6 +1143,8 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
           langy: this.composedLangy.app,
           ops: this.composedOps.app,
           monitors: this.composedMonitor.app,
+          permissions: authz,
+          roles: this.composedRole.app,
           scenarios: this.composedScenario.scenarios,
           storedObjectApp: this.composedStoredObject.app,
           suites: this.composedScenario.suites,
@@ -1975,7 +1992,9 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       enterpriseGovernance: composeEnterpriseGovernanceApplication(this.options.enterprise),
       identity: this.composedIdentity,
       orgGroup: this.composedOrgGroup,
-      productGroup: this.composedProductGroup,
+      dataset: this.composedDataset,
+      evaluator: this.composedEvaluator,
+      role: this.composedRole,
       monitor: this.composedMonitor,
       storedObject: this.composedStoredObject,
       plans,
@@ -2873,45 +2892,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   }
 
   /**
-   * Composes the product-group half of the collaborator set.
-   *
-   * Two gates, and both are structural rather than optional capabilities: the
-   * guarded client every row read below runs on, and the tenancy graph the
-   * organization and project directories come out of. A host that injected its
-   * own api-key and organization pair composed no tenancy here, so it holds the
-   * collaborator set whole and hands it in rather than having this half built
-   * for it.
-   *
-   * The model gateway is passed through where the process resolved one: a
-   * stored prompt version records the model it was written against, and the
-   * gateway is what turns that reference into the provider behind it. Its
-   * absence costs that annotation and nothing else, which is why it does not
-   * gate.
-   */
-  private composeProductGroup(
-    options: ApiRuntimeCompositionOptions,
-    authz: AuthzService,
-  ): ApiProductGroupCollaborators | undefined {
-    const database = this.composedDatabase?.connection;
-    const projects = this.composedTenancy?.projects;
-    const organizations = this.composedTenancy?.organizations;
-    // The grant ledger custom-role bindings are written through: the SAME one
-    // the AuthZ service reads decisions from, so a role granted here is a role
-    // the next request's check can see.
-    const grants = this.composedAuthz?.grants;
-    if (!database || !projects || !organizations || !grants) return undefined;
-
-    return composeApiProductGroupCollaborators({
-      prisma: database.client,
-      authz,
-      organizations,
-      projects,
-      featureFlags: this.composedFeatureFlag.service,
-      grants,
-    });
-  }
-
-  /**
    * The object store, over this process's own graph.
    *
    * One thing gates it: the database, because the BYOC route lookup is a row
@@ -3585,8 +3565,8 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
 
     const database = this.composedDatabase?.connection;
     const grants = this.composedAuthz?.grants;
-    const roles = this.composedProductGroup?.roles;
-    if (!database || !grants || !roles) return undefined;
+    const roles = this.composedRole.roles;
+    if (!database || !grants) return undefined;
 
     this.composedOrganizationInvites = composeApiOrganizationInvites({
       prisma: database.client,

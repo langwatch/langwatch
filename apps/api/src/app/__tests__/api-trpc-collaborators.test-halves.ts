@@ -29,12 +29,13 @@ import { refusingPromptFeature } from "../../features/prompt/prompt.composition"
 import { refusingFeatureFlagFeature } from "../../features/feature-flag/feature-flag.composition";
 import { refusingDataRetentionFeature } from "../../features/data-retention/data-retention.composition";
 import { refusingMonitorFeature } from "../../features/monitor/monitor.composition";
+import { refusingHomeFeature } from "../../features/project/home.composition";
+import { refusingRoleFeature } from "../../features/role/role.composition";
 import { refusingScenarioFeature } from "../../features/scenario/scenario.composition";
 import { refusingStoredObjectFeature } from "../../features/stored-object/stored-object.composition";
 import type { ComposedApiFeatures } from "../../app-trpc/app-trpc.composed";
 import type { ApiIdentityCollaborators } from "../api-trpc-collaborators.identity.composition";
 import type { ApiOrgGroupCollaborators } from "../api-trpc-collaborators.org-group.composition";
-import type { ApiProductGroupCollaborators } from "../api-trpc-collaborators.product-group.composition";
 import type { ApiProductCollaborators } from "../api-trpc-collaborators.product.composition";
 import type { ApiTraceGroupCollaborators } from "../api-trpc-collaborators.trace-group.composition";
 
@@ -108,18 +109,6 @@ export function stubExecutionHalf(): ApiExecutionCollaborators {
     },
     experimentPorts: stub("experiments", { workbenchStateSchema: anySchema }),
     evaluationPorts: stub("evaluations", { mappingsSchema: anySchema }),
-  });
-}
-
-export function stubProductGroupHalf(): ApiProductGroupCollaborators {
-  return stub<ApiProductGroupCollaborators>("productGroup", {
-    authzApp: stub("app.authzApp"),
-    permissions: stub("app.permissions"),
-    projectReads: stub("app.projects", { getOrganizationId: async () => "organization-1" }),
-    roleApp: stub("app.roles"),
-    homePorts: stub("home"),
-    rolePorts: stub("role", { customRolePermission: anySchema }),
-    teamPorts: stub("team"),
   });
 }
 
@@ -230,6 +219,9 @@ export function stubApplicationSlices(): ApiTrpcFeatureApplicationSlices {
     gateway: stub("app.gateway"),
     github: stub("app.github"),
     analytics: stub("app.analytics"),
+    authzApp: stub("app.authzApp"),
+    permissions: stub("app.permissions"),
+    roles: stub("app.roles"),
     dashboard: stub("app.dashboard"),
     dataset: stub("app.dataset"),
     evaluatorApp: stub("app.evaluatorApp"),
@@ -276,6 +268,8 @@ export function stubComposedFeatures(): ComposedApiFeatures {
     prompt: refusingPromptFeature(),
     dataRetention: refusingDataRetentionFeature(),
     monitor: refusingMonitorFeature(),
+    home: refusingHomeFeature(),
+    role: refusingRoleFeature(),
     storedObject: refusingStoredObjectFeature(),
   };
 }
@@ -294,7 +288,6 @@ export function testHalves(
     product: stubProductHalf(),
     identity: stubIdentityHalf(broadcast),
     execution: stubExecutionHalf(),
-    productGroup: stubProductGroupHalf(),
     traceGroup: stubTraceGroupHalf(),
     orgGroup: stubOrgGroupHalf(),
     ...overrides,

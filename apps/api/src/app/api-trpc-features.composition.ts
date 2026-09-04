@@ -32,7 +32,6 @@ import { createApiTrpcPorts } from "./api-trpc-ports.composition";
 import type { ApiExecutionCollaborators } from "./api-trpc-collaborators.execution.composition";
 import type { ApiIdentityCollaborators } from "./api-trpc-collaborators.identity.composition";
 import type { ApiOrgGroupCollaborators } from "./api-trpc-collaborators.org-group.composition";
-import type { ApiProductGroupCollaborators } from "./api-trpc-collaborators.product-group.composition";
 import {
   type ApiProductCollaborators,
   type ApiTrpcCollaboratorGapReport,
@@ -268,13 +267,13 @@ export class LoggedApiTrpcFeaturesAbsence extends ApiTrpcCollaboratorsAbsence {
 }
 
 /**
- * The six halves {@link composeApiTrpcCollaborators} reads into one flat
+ * The five halves {@link composeApiTrpcCollaborators} reads into one flat
  * {@link ApiTrpcCollaborators} record. Each is `undefined` exactly when the
  * process composed nothing for it — see that half's own composing function
  * for why it can be missing.
  */
 /**
- * The same six once every one of them is present.
+ * The same five once every one of them is present.
  *
  * `Required<>` is not this: it strips the `?` a member does not have and leaves
  * the `| undefined` a member does, so the whole record read below stayed
@@ -288,7 +287,6 @@ export type ApiTrpcCollaboratorHalves = Readonly<{
   product: ApiProductCollaborators | undefined;
   identity: ApiIdentityCollaborators | undefined;
   execution: ApiExecutionCollaborators | undefined;
-  productGroup: ApiProductGroupCollaborators | undefined;
   traceGroup: ApiTraceGroupCollaborators | undefined;
   orgGroup: ApiOrgGroupCollaborators | undefined;
 }>;
@@ -305,6 +303,7 @@ export type ApiTrpcCollaboratorHalves = Readonly<{
 export type ApiTrpcFeatureApplicationSlices = Pick<
   ApiTrpcFeatureApplication,
   | "analytics"
+  | "authzApp"
   | "dashboard"
   | "dataset"
   | "evaluatorApp"
@@ -316,7 +315,9 @@ export type ApiTrpcFeatureApplicationSlices = Pick<
   | "langy"
   | "monitors"
   | "ops"
+  | "permissions"
   | "prompts"
+  | "roles"
   | "scenarios"
   | "sessionPolicy"
   | "storedObjectApp"
@@ -325,13 +326,13 @@ export type ApiTrpcFeatureApplicationSlices = Pick<
 >;
 
 /**
- * Reads all six collaborator halves into ONE flat {@link ApiTrpcCollaborators}
+ * Reads all five collaborator halves into ONE flat {@link ApiTrpcCollaborators}
  * record, or refuses by name.
  *
  * All-or-nothing, replacing the ten `withApi*Collaborators` folds and the
  * runtime `sealApiTrpcCollaborators` check those folds needed: a process
  * missing any half composes none of the record, named, rather than mounting
- * the other five over a gap. No cast to an erased type anywhere in this
+ * the other four over a gap. No cast to an erased type anywhere in this
  * function — every `half.field` access below is checked against the real,
  * concrete type each `compose*` function already returns, so a half's return
  * type drifting from what this literal expects is a compile error here
@@ -358,7 +359,6 @@ export function composeApiTrpcCollaborators(
     product,
     identity,
     execution,
-    productGroup,
     traceGroup,
     orgGroup,
   } = halves as ComposedApiTrpcCollaboratorHalves;
@@ -370,11 +370,8 @@ export function composeApiTrpcCollaborators(
       workflows: execution.workflows,
       experiments: execution.experiments,
       evaluations: execution.evaluations,
-      authzApp: productGroup.authzApp,
-      permissions: productGroup.permissions,
       // `projects` is the ORG group's: `...orgGroup.application` below carries
       // it and overwrote the product group's reader in this slot, silently.
-      roles: productGroup.roleApp,
       traces: traceGroup.traces,
       share: traceGroup.share,
       dataRetention: traceGroup.dataRetention,
@@ -402,9 +399,6 @@ export function composeApiTrpcCollaborators(
     experiments: execution.experimentPorts,
     evaluations: execution.evaluationPorts,
 
-    role: productGroup.rolePorts,
-    home: productGroup.homePorts,
-    team: productGroup.teamPorts,
 
     traces: traceGroup.ports.traces,
     tracesV2: traceGroup.ports.tracesV2,

@@ -51,7 +51,9 @@ import type { ComposedAnalyticsFeature } from "../features/analytics/analytics.c
 import type { ApiExecutionCollaborators } from "./api-trpc-collaborators.execution.composition";
 import type { ApiIdentityCollaborators } from "./api-trpc-collaborators.identity.composition";
 import type { ApiOrgGroupCollaborators } from "./api-trpc-collaborators.org-group.composition";
-import type { ApiProductGroupCollaborators } from "./api-trpc-collaborators.product-group.composition";
+import type { ComposedDatasetFeature } from "../features/dataset/dataset.composition";
+import type { ComposedEvaluatorFeature } from "../features/evaluator/evaluator.composition";
+import type { ComposedRoleFeature } from "../features/role/role.composition";
 import type { ComposedMonitorFeature } from "../features/monitor/monitor.composition";
 import type { ComposedStoredObjectFeature } from "../features/stored-object/stored-object.composition";
 import type { ApiAuthzComposition } from "./api-authz.composition";
@@ -108,7 +110,9 @@ export type ApiPackagedRestCompositionOptions = Readonly<{
   enterpriseGovernance: EnterpriseGovernanceApplication;
   identity: ApiIdentityCollaborators | undefined;
   orgGroup: ApiOrgGroupCollaborators | undefined;
-  productGroup: ApiProductGroupCollaborators | undefined;
+  dataset: ComposedDatasetFeature;
+  evaluator: ComposedEvaluatorFeature;
+  role: ComposedRoleFeature;
   monitor: ComposedMonitorFeature;
   storedObject: ComposedStoredObjectFeature;
   plans: PlanProvider | undefined;
@@ -209,14 +213,10 @@ export function composeApiPackagedRest(
         },
       }),
       dashboard: () => options.analytics.dashboard,
-      ...(options.productGroup
-        ? {
-            datasets: () => options.productGroup!.datasetApp,
-            evaluators: () => options.productGroup!.evaluatorApp,
-            permissions: () => options.authz,
-            roles: () => options.productGroup!.roles,
-          }
-        : {}),
+      datasets: () => options.dataset.app,
+      evaluators: () => options.evaluator.app,
+      permissions: () => options.authz,
+      roles: () => options.role.roles,
       ...(options.execution ? { experiments: () => options.execution!.experiments } : {}),
       governance: () => options.enterpriseGovernance.governanceApp,
       webhooks: () => options.enterpriseGovernance.webhooks,

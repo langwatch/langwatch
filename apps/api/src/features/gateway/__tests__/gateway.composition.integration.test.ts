@@ -68,6 +68,8 @@ import { refusingMonitorFeature } from "../../monitor/monitor.composition";
 import { refusingScenarioFeature } from "../../scenario/scenario.composition";
 import { refusingStoredObjectFeature } from "../../stored-object/stored-object.composition";
 import { refusingOpsFeature } from "../../ops/ops.composition";
+import { refusingHomeFeature } from "../../project/home.composition";
+import { refusingRoleFeature } from "../../role/role.composition";
 import {
   stub,
   stubApplicationSlices,
@@ -228,6 +230,8 @@ function composeApplication(overrides: { saasBilling?: boolean; enterprise?: unk
       prompt: refusingPromptFeature(),
       dataRetention: refusingDataRetentionFeature(),
       monitor: refusingMonitorFeature(),
+      home: refusingHomeFeature(),
+      role: refusingRoleFeature(),
       storedObject: refusingStoredObjectFeature(),
     },
     infrastructure,

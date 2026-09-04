@@ -53,11 +53,10 @@ import type {
   JoinRequestTrpcPorts,
   OnboardingTrpcPorts,
   OrganizationTrpcPorts,
-  TeamTrpcPorts,
 } from "@langwatch/organization-server";
 
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { HomeTrpcPorts, IntegrationsChecksTrpcPorts } from "@langwatch/project-server";
+import type { IntegrationsChecksTrpcPorts } from "@langwatch/project-server";
 
 import type { IdentityTrpcPorts, UserTrpcPorts } from "@langwatch/user-server";
 import type { WorkflowOptimizationTrpcPorts, WorkflowTrpcPorts } from "@langwatch/workflow-server";
@@ -94,10 +93,8 @@ import {
   createOnboardingTrpcRouter,
   createOrganizationTrpcRouter,
   createPersonalWorkspaceFeaturesTrpcRouter,
-  createTeamTrpcRouter,
 } from "../features/organization/organization-trpc.mount";
 import {
-  createHomeTrpcRouter,
   createIntegrationsChecksTrpcRouter,
   createProjectTrpcRouter,
   type ProjectTrpcChecks,
@@ -110,11 +107,7 @@ import {
 } from "../features/automation/automation-trpc.mount";
 import { createCodingAgentTrpcRouter } from "../features/coding-agent/coding-agent-trpc.mount";
 import { createPromptTagTrpcRouter } from "../features/prompt/prompt-trpc.mount";
-import {
-  createRoleBindingTrpcRouter,
-  createRoleTrpcRouter,
-  type RoleTrpcPorts,
-} from "../features/role/role-trpc.mount";
+import { createRoleBindingTrpcRouter } from "../features/role/role-trpc.mount";
 import { composeGithubTrpcRouter } from "../features/github/github.composition";
 import { createIdentityTrpcRouter, createUserTrpcRouter } from "../features/user/user-trpc.mount";
 import {
@@ -291,13 +284,6 @@ export interface AppTrpcFeaturePorts<
   experiments: ExperimentTrpcPorts<TWorkbenchState>;
   /** The Enterprise plan gate behind groups, read out of the billing store. */
   group: GroupTrpcPorts;
-  /**
-   * The home screen's recent-activity strip: the process's own audit trail,
-   * hydrated one entity at a time so each row carries the name and the link it
-   * renders as. Five verticals' rows behind one read, which is why it is the
-   * application's rather than the project's.
-   */
-  home: HomeTrpcPorts;
   /** The verification ceremony that spends the caller's own record. */
   identity: IdentityTrpcPorts;
   /**
@@ -332,21 +318,6 @@ export interface AppTrpcFeaturePorts<
    * every caller.
    */
   prisma: PrismaClient;
-  /**
-   * The organization probe a role-scoped check runs, the Enterprise plan gate
-   * a custom role clears, and the permission vocabulary its entries are parsed
-   * against. All three are the deployment's: the role's organization is a row
-   * loaded by its id, the plan lives in a billing store, and the vocabulary is
-   * the AuthZ registry this deployment evaluates.
-   */
-  role: RoleTrpcPorts;
-  /**
-   * The organization-administration probe the two member reads widen or narrow
-   * each row with — not a gate, so a caller who cannot manage still gets the
-   * team — and the Enterprise plan gate a member list assigning a custom role
-   * has to clear.
-   */
-  team: TeamTrpcPorts;
   /**
    * The deployment's own answers behind the signed-in person's account: its
    * auth provider and passkey policy, its Auth0 tenant, its password hashing,
@@ -459,6 +430,7 @@ export function createAppTrpcFeatures<
   const scenarioRouters = composed.scenario.routers(mount);
   const analyticsRouters = composed.analytics.routers(mount);
   const datasetRouters = composed.dataset.routers(mount);
+  const roleRouters = composed.role.routers(mount);
   const governance = createEnterpriseGovernanceTrpcRouters(mount);
   const enterprise = createEnterpriseTrpcRouters({ ...mount, ports: ports.enterprise });
   const billing = createEnterpriseBillingTrpcRouters({
@@ -649,7 +621,7 @@ export function createAppTrpcFeatures<
     // infrastructure: one namespace, two answers nobody else owns, and no
     // graph shared with anything beside it.
     github: composeGithubTrpcRouter({ mount, infrastructure }),
-    home: createHomeTrpcRouter({ ...mount, ports: ports.home }),
+    home: composed.home.router(mount),
     identity: createIdentityTrpcRouter({ ...mount, ports: ports.identity }),
     integrationsChecks: createIntegrationsChecksTrpcRouter({
       ...mount,
@@ -689,9 +661,9 @@ export function createAppTrpcFeatures<
     // Custom role definitions, and the bindings that hand them out. Two wire
     // names for one application, because who holds a role and what that role
     // grants are the same question asked from two ends.
-    role: createRoleTrpcRouter({ ...mount, ports: ports.role }),
+    role: roleRouters.role,
     roleBinding: createRoleBindingTrpcRouter(mount),
-    team: createTeamTrpcRouter({ ...mount, ports: ports.team }),
+    team: roleRouters.team,
     // The signed-in person's own account. The process merges the Enterprise
     // /me dashboard reads into the same namespace, so `user.*` answers from
     // two owners on one wire name.

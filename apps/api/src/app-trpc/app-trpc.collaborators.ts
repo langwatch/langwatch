@@ -37,10 +37,8 @@ import type {
   JoinRequestTrpcPorts,
   OnboardingTrpcPorts,
   OrganizationTrpcPorts,
-  TeamTrpcPorts,
 } from "@langwatch/organization-server";
-import type { HomeTrpcPorts, IntegrationsChecksTrpcPorts } from "@langwatch/project-server";
-import type { RoleTrpcPorts } from "../features/role/role-trpc.mount";
+import type { IntegrationsChecksTrpcPorts } from "@langwatch/project-server";
 import type { IdentityTrpcPorts, UserTrpcPorts } from "@langwatch/user-server";
 import type { WorkflowOptimizationTrpcPorts, WorkflowTrpcPorts } from "@langwatch/workflow-server";
 import type { ZodTypeAny } from "zod";
@@ -179,13 +177,6 @@ export type ApiTrpcCollaborators<
 
   group: GroupTrpcPorts;
 
-  /**
-   * The home screen's recent-activity strip: this process's own audit trail,
-   * hydrated with the name and link each entity it names renders as. Five
-   * verticals' rows behind one read, which is nobody's service but the
-   * application's.
-   */
-  home: HomeTrpcPorts;
 
   identity: IdentityTrpcPorts;
 
@@ -196,19 +187,7 @@ export type ApiTrpcCollaborators<
   onboarding: OnboardingTrpcPorts<TSignUpDataSchema>;
 
 
-  /**
-   * The organization probe a role-scoped check runs — the role's organization
-   * is a row loaded by its id, so no procedure input names it — plus the
-   * Enterprise plan gate a custom role has to clear and the permission
-   * vocabulary its entries are parsed against.
-   */
-  role: RoleTrpcPorts;
 
-  /**
-   * The organization-administration probe the two member reads widen or narrow
-   * a row with, and the Enterprise plan gate a custom-role assignment clears.
-   */
-  team: TeamTrpcPorts;
 
   /** The legacy grid's two shared input schemas, the precondition engine, the span digest and redactions. */
   traces: TracesTrpcPorts<TListInput, TListInputRaw, TFilterInput, TFilterInputRaw, TPrecondition>;

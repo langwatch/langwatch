@@ -17,6 +17,8 @@ import type { ComposedAnalyticsFeature } from "../features/analytics/analytics.c
 import type { ComposedDatasetFeature } from "../features/dataset/dataset.composition";
 import type { ComposedEvaluatorFeature } from "../features/evaluator/evaluator.composition";
 import type { ComposedPromptFeature } from "../features/prompt/prompt.composition";
+import type { ComposedHomeFeature } from "../features/project/home.composition";
+import type { ComposedRoleFeature } from "../features/role/role.composition";
 import type { ComposedFeatureFlagFeature } from "../features/feature-flag/feature-flag.composition";
 import type { ComposedDataRetentionFeature } from "../features/data-retention/data-retention.composition";
 import type { ComposedMonitorFeature } from "../features/monitor/monitor.composition";
@@ -61,6 +63,13 @@ export type ComposedApiFeatures = Readonly<{
   evaluator: ComposedEvaluatorFeature;
   /** One namespace and the `ctx.app.prompts` slice two other doors read. */
   prompt: ComposedPromptFeature;
+  /** One namespace: the strip of entities a person recently opened. */
+  home: ComposedHomeFeature;
+  /**
+   * Two namespaces, the `ctx.app.roles` and `ctx.app.authzApp` slices, and the
+   * role service the invitation half asks about assignable custom roles.
+   */
+  role: ComposedRoleFeature;
   /** One namespace, over the policy this process supplies the packaged rules. */
   dataRetention: ComposedDataRetentionFeature;
   /** One namespace and the `ctx.app.monitors` slice the monitor REST family reads. */

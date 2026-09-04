@@ -40,6 +40,8 @@ import { refusingEvaluatorFeature } from "../../features/evaluator/evaluator.com
 import { refusingPromptFeature } from "../../features/prompt/prompt.composition";
 import { refusingFeatureFlagFeature } from "../../features/feature-flag/feature-flag.composition";
 import { refusingMonitorFeature } from "../../features/monitor/monitor.composition";
+import { refusingHomeFeature } from "../../features/project/home.composition";
+import { refusingRoleFeature } from "../../features/role/role.composition";
 import { refusingScenarioFeature } from "../../features/scenario/scenario.composition";
 import { refusingStoredObjectFeature } from "../../features/stored-object/stored-object.composition";
 import { refusingOpsFeature } from "../../features/ops/ops.composition";
@@ -304,6 +306,8 @@ function buildFeatures() {
       prompt: refusingPromptFeature(),
       dataRetention: refusingDataRetentionFeature(),
       monitor: refusingMonitorFeature(),
+      home: refusingHomeFeature(),
+      role: refusingRoleFeature(),
       storedObject: refusingStoredObjectFeature(),
     },
     // The features that compose themselves take this rather than a ports

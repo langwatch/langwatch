@@ -19,7 +19,10 @@ import { composeApiPackagedRest } from "../api-packaged-rest.composition";
 import type { ApiPackagedRestCompositionOptions } from "../api-packaged-rest.composition";
 import type { ApiTraceIngestComposition } from "../api-trace-ingest.composition";
 import { refusingAnalyticsFeature } from "../../features/analytics/analytics.composition";
+import { refusingDatasetFeature } from "../../features/dataset/dataset.composition";
+import { refusingEvaluatorFeature } from "../../features/evaluator/evaluator.composition";
 import { refusingMonitorFeature } from "../../features/monitor/monitor.composition";
+import { refusingRoleFeature } from "../../features/role/role.composition";
 import { refusingScenarioFeature } from "../../features/scenario/scenario.composition";
 import { refusingStoredObjectFeature } from "../../features/stored-object/stored-object.composition";
 
@@ -55,7 +58,9 @@ function composeGuard(usageLimit: ApiTraceIngestComposition["usageLimit"] | unde
     enterpriseGovernance: composeEnterpriseGovernanceApplication(undefined),
     identity: undefined,
     orgGroup: undefined,
-    productGroup: undefined,
+    dataset: refusingDatasetFeature(),
+    evaluator: refusingEvaluatorFeature(),
+    role: refusingRoleFeature(),
     plans: undefined,
     publicBaseUrl: undefined,
     rateLimit: async () => ({ allowed: true, resetAt: 0 }),
