@@ -115,6 +115,5 @@ npx skills add langwatch/skills/provider-cost-comparison
 - **The cost reads "across 3 of 6 runs".** The runs without a cost have no traces linked: see [Linking your traces](/agent-testing/linking-your-traces).
 - **The pass rate is the same and the cost went up.** The cheaper model took more turns, so check the reply counts in the conversations before you decide, and see [Reduce turns](/improve-your-agent/reduce-turns).
 - **The option list does not show the model.** The agent connected before the parameter was added. Restart the agent process, because the platform reads the parameters when it connects.
-- **Runs end as `agent_busy` on the development side.** A development agent takes one call at a time by default and the run sends three at once, so register it with `concurrency=3` or start three instances.
 
 <Info>**Also check:** [Compare agents](/agent-testing/compare-agents), [Run parameters](/agent-testing/run-parameters), [Results](/agent-testing/results).</Info>

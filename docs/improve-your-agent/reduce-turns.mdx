@@ -12,7 +12,6 @@ A turn is one reply from your agent, and behind each reply there are one or more
 - Your agent [connected to LangWatch](/agent-testing/connect-your-agent), so the suite runs against your real code and the judge reads your traces.
 - A [test suite](/agent-testing/test-suites) of five to ten scenarios that pass today. Take the situations from real conversations, and put the long ones in.
 - [Langy](/langy/chat), or a coding agent with the `langwatch` CLI installed and `LANGWATCH_API_KEY` set, so it can read the runs.
-- If you run the suite against the `development` environment, register the agent with `concurrency` of at least 3 or start three instances, because a run executes three scenarios at once while a development agent takes one call at a time by default, and the other two calls can end as `agent_busy`.
 
 ## Step 1: Measure the baseline
 
