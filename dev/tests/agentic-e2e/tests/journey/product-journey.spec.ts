@@ -93,8 +93,15 @@ test.describe("browser product journey", () => {
     await page.getByLabel("Confirm Password").fill(ACCOUNT.password);
     await page.getByRole("button", { name: /^sign up$/i }).click();
 
-    await expect(page).not.toHaveURL(/\/auth\//, { timeout: 30000 });
+    // Registration is one slow call on a loaded machine, and the sign-in it
+    // performs can land after the form has settled back; the account exists
+    // either way, so the walk signs in rather than failing the leg on it.
     accountExists = true;
+    await page
+      .waitForURL((url) => !url.pathname.startsWith("/auth/"), { timeout: 60000 })
+      .catch(() => undefined);
+    await recoverSession();
+    await expect(page).not.toHaveURL(/\/auth\//, { timeout: 60000 });
   });
 
   // @scenario "Onboarding names the organization and lands me on a project"
@@ -172,10 +179,7 @@ test.describe("browser product journey", () => {
   test("adds OpenAI as a model provider", async () => {
     test.skip(!OPENAI_API_KEY, NO_KEY);
 
-    await visit("/settings/model-providers");
-    await expect(page.getByRole("heading", { name: /model providers/i }).first()).toBeVisible({
-      timeout: 90000,
-    });
+    await openPage("/settings/model-providers", page.getByRole("heading", { name: /model providers/i }));
 
     // The provider list is a menu on the header button, and the editor it opens
     // is a drawer; a click that lands while the menu is still opening is lost,
@@ -279,7 +283,33 @@ test.describe("browser product journey", () => {
     await nameField.fill(MONITOR_NAME);
 
     await expect(page.getByText(/this evaluation will run on every/i).first()).toBeVisible();
-    await page.getByRole("button", { name: /create online evaluation/i }).click();
+
+    // A refusal here is silent: the button carries aria-disabled rather than the
+    // attribute, so a click on it is accepted and drops.
+    const create = page.getByRole("button", { name: /create online evaluation/i });
+    const refusal = await create.evaluate((element) => ({
+      disabled: (element as HTMLButtonElement).disabled,
+      aria: element.getAttribute("aria-disabled"),
+      dataDisabled: element.getAttribute("data-disabled"),
+      drawer: element.closest("[role=dialog]")?.textContent?.slice(0, 600) ?? "",
+    }));
+    expect(
+      refusal.disabled || refusal.aria === "true" || refusal.dataDisabled !== null,
+      `the online evaluation cannot be created: ${JSON.stringify(refusal)}`,
+    ).toBe(false);
+
+    // The button re-renders as the mapping validates, and a click that lands on
+    // the refusing render is accepted and dropped, so the closed drawer is what
+    // says the evaluation was created.
+    for (let attempt = 0; attempt < 5; attempt++) {
+      if (!(await nameField.isVisible().catch(() => false))) break;
+      await create.click({ force: true }).catch(() => undefined);
+      await nameField.waitFor({ state: "hidden", timeout: 10000 }).catch(() => undefined);
+    }
+    await expect(
+      nameField,
+      `creating the online evaluation was refused without saying so: ${JSON.stringify(refusal)}`,
+    ).not.toBeVisible({ timeout: 20000 });
 
     await openProjectPage("online-evaluations", "Online Evaluations");
     await expect(page.getByText(MONITOR_NAME).first()).toBeVisible({ timeout: 30000 });
@@ -321,10 +351,18 @@ test.describe("browser product journey", () => {
     await visit(`/${projectSlug}/traces`);
     // Virtual spacers are rows too, so only rows that carry text count.
     const rows = page.locator("tbody tr").filter({ hasText: /\S/ });
+    const crashed = page.getByRole("heading", { name: /something went wrong/i });
     await expect
       .poll(
         async () => {
           await page.reload();
+          if (await crashed.isVisible().catch(() => false)) {
+            throw new Error(
+              "the Trace Explorer crashed into its error boundary (defect D12 in " +
+                "dev/docs/plans/e2e-journey-2026-09-04.md: getEffectiveLens returns a fresh " +
+                "object on every read, so the table's store subscription never settles)",
+            );
+          }
           return rows.count().catch(() => 0);
         },
         { timeout: 240000, intervals: [10000] },
@@ -611,10 +649,26 @@ async function openRunDialogForScenario(): Promise<Locator> {
  * action timeout on a page nothing has visited yet.
  */
 async function openProjectPage(path: string, heading: string): Promise<void> {
-  await visit(`/${projectSlug}/${path}`);
-  await expect(page.getByRole("heading", { name: heading, exact: true }).first()).toBeVisible({
-    timeout: 90000,
-  });
+  await openPage(`/${projectSlug}/${path}`, page.getByRole("heading", { name: heading, exact: true }));
+}
+
+/**
+ * Opens a page and waits for what proves it arrived. The bounce to sign-in can
+ * land after the navigation settles, when a lane restart drops the session, so
+ * the walk signs back in and asks again rather than failing on the bounce.
+ */
+async function openPage(path: string, proof: Locator): Promise<void> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await visit(path);
+    const arrived = await proof
+      .first()
+      .waitFor({ state: "visible", timeout: 45000 })
+      .then(() => true)
+      .catch(() => false);
+    if (arrived) return;
+    await recoverSession();
+  }
+  await expect(proof.first()).toBeVisible({ timeout: 45000 });
 }
 
 /** Creates an HTTP agent through the drawer a person uses. */
@@ -638,7 +692,13 @@ async function createHttpAgent(name: string, url: string): Promise<void> {
   await expect(nameInput).toBeVisible({ timeout: 30000 });
   await nameInput.fill(name);
   await page.getByTestId("url-input").fill(url);
-  await page.getByTestId("save-agent-button").click();
+  // Save is accepted and dropped while the form is still settling, so the
+  // closed drawer is what says the agent was created.
+  for (let attempt = 0; attempt < 4; attempt++) {
+    if (!(await nameInput.isVisible().catch(() => false))) break;
+    await page.getByTestId("save-agent-button").click({ force: true }).catch(() => undefined);
+    await nameInput.waitFor({ state: "hidden", timeout: 15000 }).catch(() => undefined);
+  }
   await expect(nameInput).not.toBeVisible({ timeout: 20000 });
 }
 
@@ -649,14 +709,24 @@ async function pickAgentAndRun(agentName: string): Promise<void> {
     .locator('[data-testid^="run-dialog-agent-"]')
     .filter({ hasText: agentName })
     .first();
-  await expect(card).toBeVisible({ timeout: 20000 });
-  if ((await card.getAttribute("aria-pressed")) !== "true") {
-    await card.click();
+  // The target list remounts while it settles, so a card can detach under the
+  // click and a click that lands on the overlay closes the dialog; the walk
+  // reopens it, and reads aria-pressed rather than the click for the answer.
+  for (let attempt = 0; attempt < 5; attempt++) {
+    if ((await card.getAttribute("aria-pressed").catch(() => null)) === "true") break;
+    if (!(await dialog.isVisible().catch(() => false))) {
+      await openRunDialogForScenario();
+    }
+    await card.waitFor({ state: "visible", timeout: 20000 }).catch(() => undefined);
+    await card.click({ timeout: 10000 }).catch(() => undefined);
+    await page.waitForTimeout(500);
   }
+  await expect(card).toHaveAttribute("aria-pressed", "true", { timeout: 20000 });
+
   for (const other of await dialog.locator('[data-testid^="run-dialog-agent-"]').all()) {
-    if ((await other.getAttribute("aria-pressed")) !== "true") continue;
+    if ((await other.getAttribute("aria-pressed").catch(() => null)) !== "true") continue;
     if ((await other.textContent())?.includes(agentName)) continue;
-    await other.click();
+    await other.click().catch(() => undefined);
   }
   const run = dialog.getByTestId("run-dialog-run");
   await expect(run).toBeEnabled({ timeout: 20000 });

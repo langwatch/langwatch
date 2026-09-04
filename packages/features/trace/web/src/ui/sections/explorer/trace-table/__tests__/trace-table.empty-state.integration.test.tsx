@@ -59,8 +59,8 @@ vi.mock("../../../../../behavior/view.store", () => ({
       activeLensId: "all-traces",
       sort: { columnId: "timestamp", direction: "desc" },
     }),
-  getEffectiveLens: (s: { activeLensId: string }) => ({
-    id: s.activeLensId,
+  useEffectiveLens: () => ({
+    id: "all-traces",
     label: "All traces",
     grouping: mockGrouping,
     columns: [],

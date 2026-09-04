@@ -27,6 +27,15 @@ Rule: Trace table page layout
     Given the user is authenticated with "traces:view" permission
     And the project has traces
 
+  # The lens the table renders is derived from several store slices. Read
+  # through a selector that built a fresh object per call, the snapshot never
+  # settled and the explorer crashed into its error boundary on every load.
+  @unit
+  Scenario: The trace table's lens subscription settles
+    Given the view store has not changed between two renders
+    When the table reads its effective lens
+    Then it receives the same lens object both times
+
   Scenario: Three-panel layout renders on Observe page
     When the Observe page loads
     Then the filter sidebar is on the left

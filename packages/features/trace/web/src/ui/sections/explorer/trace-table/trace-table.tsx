@@ -7,7 +7,7 @@ import {
 } from "../hooks/use-session-groups";
 import { useTraceList } from "../hooks/use-trace-list";
 import type { PageCursor } from "../../../../index";
-import { getEffectiveLens, rowKindForGrouping, useViewStore } from "../../../../index";
+import { rowKindForGrouping, useEffectiveLens } from "../../../../index";
 import { ConversationLensBody } from "./conversation-lens-body";
 import { EmptyFilterState } from "./empty-filter-state";
 import { GroupLensBody } from "./group-lens-body";
@@ -99,7 +99,7 @@ export const TraceTable: React.FC = () => {
   // (specs/traces-v2/sessions-lens.feature). The hook only queries while the
   // by-conversation grouping is active.
   const sessions = useSessionGroups();
-  const activeLens = useViewStore(getEffectiveLens);
+  const activeLens = useEffectiveLens();
 
   if (!activeLens) return <EmptyFilterState />;
 

@@ -1,4 +1,6 @@
+import { useMemo } from "react";
 import { create } from "zustand";
+import { useShallow } from "zustand/react/shallow";
 import { getCurrentFilterText, useFilterStore } from "./filter.store";
 import {
   LENS_CAPABILITIES,
@@ -55,6 +57,24 @@ export function getEffectiveLens(state: {
     columns: state.columnOrder.length > 0 ? state.columnOrder : lens.columns,
     addons: reconcileAddons(lens.addons, capability),
   };
+}
+
+/**
+ * The effective lens as a stable subscription: the slices are compared
+ * shallowly and the derived object is memoised, so the store snapshot
+ * settles instead of re-rendering the table forever.
+ */
+export function useEffectiveLens(): LensConfig | null {
+  const slices = useViewStore(
+    useShallow((state) => ({
+      allLenses: state.allLenses,
+      activeLensId: state.activeLensId,
+      sort: state.sort,
+      grouping: state.grouping,
+      columnOrder: state.columnOrder,
+    })),
+  );
+  return useMemo(() => getEffectiveLens(slices), [slices]);
 }
 
 export function rowKindForGrouping(grouping: GroupingMode): RowKind {
