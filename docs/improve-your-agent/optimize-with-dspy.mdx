@@ -13,7 +13,7 @@ The runnable example is in the SDK repository: [`sdks/python/examples/agent-opti
 
 - Python 3.10 or later. In the example folder, `uv sync` installs everything. In your own project, `pip install "langwatch[dspy]" langwatch-scenario`, and import `scenario` before `dspy` in every module: in the other order dspy 3.3 fails while loading numpy.
 - `OPENAI_API_KEY` for the agent, the simulated user and the judge, and `LANGWATCH_API_KEY` so the optimization run and the simulations appear in LangWatch.
-- Five to ten scenarios. One optimization run executes each of them several times: budget about fifty scenario runs, twenty to thirty minutes and a few dollars.
+- Five to ten scenarios. One optimization run executes each of them several times. The MIPROv2 run of the example below took 64 scenario runs, 42 minutes and $0.93, with `gpt-5-mini` as the agent, the simulated user and the judge and `gpt-5` writing the instruction candidates.
 
 ## Step 1: Wrap the agent as a DSPy module
 
@@ -200,6 +200,32 @@ Both scripts print the before and after table, then every instruction the optimi
 - **Agent Testing** shows every simulation the optimizer ran, in the `dspy-optimization` set. The example groups the baseline pass and the final pass into their own batches, `<run id>-baseline` and `<run id>-best`, and prints both links, so you open the conversations of the optimized agent next to the original ones.
 
 Compare the instructions before and after: both scripts print every instruction the optimizer changed, and the tool descriptions are part of them.
+
+## What one MIPROv2 run of the example showed
+
+The run used `num_candidates=4` and `num_trials=6` on the six scenarios, with the agent, the simulated user and the judge on `gpt-5-mini` and `gpt-5` as the proposer.
+
+| | |
+|---|---|
+| Scenario runs | 64: the baseline pass, 10 to bootstrap traces for the proposer, 42 over seven trials, the final pass |
+| Wall clock | 42 minutes |
+| Cost | $0.93, of which $0.41 for the 18 proposer calls |
+| Best trial score | 83% on trial 5, from 65% for the default program on trial 1 |
+| Pass rate before and after, re-evaluated | 4 of 6 both times |
+| Steps over the suite before and after | 24, then 18 |
+
+The optimizer never saw the tool code. It read the rejected calls in the traces and wrote this into the `react` instructions:
+
+```text
+- Normalize the customer's freeform reason to one of the allowed codes before checking eligibility:
+  - damaged/broken/doesn't work → defective
+  - wrong item/received different item → incorrect_item
+  - not as described/doesn't fit/changed preference → not_as_expected
+  - changed my mind/no longer want it → remorse
+- Call check_return_eligibility(order_id, reason) at most once per order.
+```
+
+That is the tool description fix from [Fix tool calls](/improve-your-agent/fix-tool-calls), found by search. The damaged blender return went from 5 steps to 4 and from failed to passed. The scenario where the customer asks for a recipe failed before and after: the agent answers the recipe instead of saying it only helps with orders, and no candidate instruction changed that. One scenario, the angry customer, passed before and failed after. The best trial's 83% did not repeat on the final pass, which is the non-determinism in the Limits below.
 
 ## Limits
 
