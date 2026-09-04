@@ -50,9 +50,39 @@ export const BLOCKED_CLOUD_DOMAINS = [
 
   // Generic internal domains (catch-all for misconfigured services)
   ".internal",
+
+  // On-premise suffixes. Blocked by default, but unlike the cloud domains
+  // above these MAY be lifted per-host via ALLOWED_PROXY_HOSTS — see
+  // ALLOWLISTABLE_LOCAL_SUFFIXES below.
   ".local",
   ".localhost",
 ];
+
+/**
+ * Suffixes an operator may re-enable for a specific hostname through the
+ * ALLOWED_PROXY_HOSTS allowlist.
+ *
+ * `.local` (mDNS) and `.localhost` name on-premise infrastructure, not cloud
+ * infrastructure: they carry no ambient credentials the way a cloud metadata
+ * service or an internal cloud endpoint does. An operator running LangWatch
+ * inside their own datacentre needs to reach `llm.corp.local`, and today the
+ * cloud-domain block rejects it even when they name that exact host in
+ * ALLOWED_PROXY_HOSTS.
+ *
+ * Everything else in BLOCKED_CLOUD_DOMAINS stays unconditional. Allowlisting
+ * `metadata.google.internal` or `s3.amazonaws.com` must keep failing.
+ * Those are the SSRF targets the block exists for.
+ *
+ * A host whose name also matches a cloud pattern once these suffixes are
+ * stripped stays blocked no matter what. `grafana.internal.local` reduces to
+ * `grafana.internal`, which hits `.internal`, so it can never be allowlisted.
+ * An on-premise DNS zone that collides with `.internal` is unreachable by
+ * design. Rename the zone or front it with a name that does not.
+ *
+ * Narrow by design: extend only with suffixes that are meaningless outside a
+ * private network.
+ */
+export const ALLOWLISTABLE_LOCAL_SUFFIXES = [".local", ".localhost"];
 
 /**
  * Cloud metadata endpoint hostnames and IPs to block.
