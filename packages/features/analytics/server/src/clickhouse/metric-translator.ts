@@ -11,7 +11,115 @@ import type {
   PipelineAggregationTypes,
 } from "../types";
 import { randomUUID } from "node:crypto";
-import { type CHTable, getFieldMapping, qualifiedColumn, tableAliases } from "./field-mappings";
+import { ValidationError } from "@langwatch/handled-error";
+import {
+  type CHTable,
+  fieldMappings,
+  getFieldMapping,
+  qualifiedColumn,
+  tableAliases,
+} from "./field-mappings";
+
+/**
+ * The metric keys each category translator below has an expression for.
+ *
+ * These arrays type the `metric` parameter of the translator they name, and
+ * those switches carry no `default` branch, so a case label absent from its
+ * array does not compile and an array entry with no case label does not
+ * either. The enumeration cannot drift from the SQL it stands for.
+ */
+export const METADATA_METRIC_KEYS = [
+  "metadata.trace_id",
+  "metadata.user_id",
+  "metadata.thread_id",
+  "metadata.span_type",
+] as const;
+
+export const PERFORMANCE_METRIC_KEYS = [
+  "performance.completion_time",
+  "performance.first_token",
+  "performance.total_cost",
+  "performance.cost_billed",
+  "performance.cost_non_billed",
+  "performance.prompt_tokens",
+  "performance.completion_tokens",
+  "performance.total_tokens",
+  "performance.cache_read_tokens",
+  "performance.cache_write_tokens",
+  "performance.reasoning_tokens",
+  "performance.total_processed_tokens",
+  "performance.tokens_per_second",
+  "spans.metrics.prompt_tokens",
+  "spans.metrics.completion_tokens",
+] as const;
+
+export const EVALUATION_METRIC_KEYS = [
+  "evaluations.evaluation_score",
+  "evaluations.evaluation_pass_rate",
+  "evaluations.evaluation_runs",
+] as const;
+
+export const EVENT_METRIC_KEYS = [
+  "events.event_type",
+  "events.event_score",
+  "events.event_details",
+] as const;
+
+export const SENTIMENT_METRIC_KEYS = ["sentiment.thumbs_up_down"] as const;
+
+export const THREADS_METRIC_KEYS = ["threads.average_duration_per_thread"] as const;
+
+type MetadataMetricKey = (typeof METADATA_METRIC_KEYS)[number];
+type PerformanceMetricKey = (typeof PERFORMANCE_METRIC_KEYS)[number];
+type EvaluationMetricKey = (typeof EVALUATION_METRIC_KEYS)[number];
+type EventMetricKey = (typeof EVENT_METRIC_KEYS)[number];
+type SentimentMetricKey = (typeof SENTIMENT_METRIC_KEYS)[number];
+type ThreadsMetricKey = (typeof THREADS_METRIC_KEYS)[number];
+
+function memberOf<T extends string>(keys: readonly T[]) {
+  const set: ReadonlySet<string> = new Set<string>(keys);
+  return (metric: string): metric is T => set.has(metric);
+}
+
+const isMetadataMetricKey = memberOf(METADATA_METRIC_KEYS);
+const isPerformanceMetricKey = memberOf(PERFORMANCE_METRIC_KEYS);
+const isEvaluationMetricKey = memberOf(EVALUATION_METRIC_KEYS);
+const isEventMetricKey = memberOf(EVENT_METRIC_KEYS);
+const isSentimentMetricKey = memberOf(SENTIMENT_METRIC_KEYS);
+const isThreadsMetricKey = memberOf(THREADS_METRIC_KEYS);
+
+/**
+ * Every metric key the translator can compile: the six category enumerations
+ * above plus the directly mapped fields. A key outside this set has no
+ * expression, so it is refused rather than compiled into SQL.
+ */
+export const KNOWN_METRIC_KEYS: ReadonlySet<string> = new Set<string>([
+  ...METADATA_METRIC_KEYS,
+  ...PERFORMANCE_METRIC_KEYS,
+  ...EVALUATION_METRIC_KEYS,
+  ...EVENT_METRIC_KEYS,
+  ...SENTIMENT_METRIC_KEYS,
+  ...THREADS_METRIC_KEYS,
+  ...Object.keys(fieldMappings),
+]);
+
+export function isKnownMetricKey(metric: string): boolean {
+  return KNOWN_METRIC_KEYS.has(metric);
+}
+
+/**
+ * Refuse a metric the translator has no expression for, naming the series the
+ * caller sent it in. The rejected text is never echoed back or compiled.
+ */
+export function unknownMetricError(index: number): ValidationError {
+  return new ValidationError("Unknown analytics metric", {
+    meta: {
+      fieldErrors: {
+        [`series.${index}.metric`]: ["This metric is not one of the supported analytics metrics."],
+      },
+    },
+  });
+}
 
 /**
  * Maximum thread session duration in milliseconds (3 hours).
@@ -214,8 +322,17 @@ function translateArrayAggregation(
   }
 }
 
+/** Reduce a caller-supplied alias part to characters legal in an identifier. */
+function sanitizeAliasPart(value: string): string {
+  return value.replace(/[^a-zA-Z0-9]/g, "_");
+}
+
 /**
- * Build alias for a metric aggregation
+ * Build alias for a metric aggregation.
+ *
+ * Every caller-supplied part is reduced to `[a-zA-Z0-9_]` before it joins the
+ * alias, so no part of an alias can close an expression or open a clause even
+ * if a caller reaches this without passing the metric enumeration first.
  */
 export function buildMetricAlias(
   index: number,
@@ -224,9 +341,9 @@ export function buildMetricAlias(
   key?: string,
   subkey?: string,
 ): string {
-  const parts = [index.toString(), metric.replace(/\./g, "_"), aggregation];
-  if (key) parts.push(key.replace(/[^a-zA-Z0-9]/g, "_"));
-  if (subkey) parts.push(subkey.replace(/[^a-zA-Z0-9]/g, "_"));
+  const parts = [index.toString(), sanitizeAliasPart(metric), aggregation];
+  if (key) parts.push(sanitizeAliasPart(key));
+  if (subkey) parts.push(sanitizeAliasPart(subkey));
   return parts.join("__");
 }
 
@@ -246,35 +363,38 @@ export function translateMetric(
   key?: string,
   subkey?: string,
 ): MetricTranslation {
+  if (!isKnownMetricKey(metric)) {
+    throw unknownMetricError(index);
+  }
+
   const alias = buildMetricAlias(index, metric, aggregation, key, subkey);
   const requiredJoins: CHTable[] = [];
 
   // Handle specific metric categories
-  if (metric.startsWith("metadata.")) {
+  if (metric.startsWith("metadata.") && isMetadataMetricKey(metric)) {
     return translateMetadataMetric(metric, aggregation, alias, requiredJoins);
   }
 
-  if (metric.startsWith("performance.")) {
+  if (metric.startsWith("performance.") && isPerformanceMetricKey(metric)) {
     return translatePerformanceMetric(metric, aggregation, alias, requiredJoins);
   }
 
-  if (metric.startsWith("evaluations.")) {
+  if (metric.startsWith("evaluations.") && isEvaluationMetricKey(metric)) {
     return translateEvaluationMetric(metric, aggregation, alias, requiredJoins, key);
   }
 
-  if (metric.startsWith("events.")) {
+  if (metric.startsWith("events.") && isEventMetricKey(metric)) {
     return translateEventMetric(metric, aggregation, alias, requiredJoins, key, subkey);
   }
 
-  if (metric.startsWith("sentiment.")) {
+  if (metric.startsWith("sentiment.") && isSentimentMetricKey(metric)) {
     return translateSentimentMetric(metric, aggregation, alias, requiredJoins);
   }
 
-  if (metric.startsWith("threads.")) {
+  if (metric.startsWith("threads.") && isThreadsMetricKey(metric)) {
     return translateThreadsMetric(metric, aggregation, alias, requiredJoins);
   }
 
-  // Default: try to map directly
   const mapping = getFieldMapping(metric);
   if (mapping) {
     const column = qualifiedColumn(metric);
@@ -289,20 +409,14 @@ export function translateMetric(
     };
   }
 
-  // Fallback for unknown metrics
-  return {
-    selectExpression: `count() AS ${alias}`,
-    alias,
-    requiredJoins,
-    params: {},
-  };
+  throw unknownMetricError(index);
 }
 
 /**
  * Translate metadata metrics (trace_id, user_id, thread_id, span_type)
  */
 function translateMetadataMetric(
-  metric: string,
+  metric: MetadataMetricKey,
   aggregation: AggregationTypes,
   alias: string,
   requiredJoins: CHTable[],
@@ -377,13 +491,6 @@ function translateMetadataMetric(
         params: {},
       };
 
-    default:
-      return {
-        selectExpression: `count() AS ${alias}`,
-        alias,
-        requiredJoins,
-        params: {},
-      };
   }
 }
 
@@ -399,7 +506,7 @@ function translateMetadataMetric(
  * to the raw `translateSimpleAggregation(col, aggregation, alias, mode)` form.
  */
 function translatePerformanceMetric(
-  metric: string,
+  metric: PerformanceMetricKey,
   aggregation: AggregationTypes,
   alias: string,
   requiredJoins: CHTable[],
@@ -568,13 +675,6 @@ function translatePerformanceMetric(
         params: {},
       };
 
-    default:
-      return {
-        selectExpression: `count() AS ${alias}`,
-        alias,
-        requiredJoins,
-        params: {},
-      };
   }
 }
 
@@ -582,7 +682,7 @@ function translatePerformanceMetric(
  * Translate evaluation metrics
  */
 function translateEvaluationMetric(
-  metric: string,
+  metric: EvaluationMetricKey,
   aggregation: AggregationTypes,
   alias: string,
   requiredJoins: CHTable[],
@@ -644,13 +744,6 @@ function translateEvaluationMetric(
         params,
       };
 
-    default:
-      return {
-        selectExpression: `count() AS ${alias}`,
-        alias,
-        requiredJoins,
-        params,
-      };
   }
 }
 
@@ -658,7 +751,7 @@ function translateEvaluationMetric(
  * Translate event metrics (event_type, event_score, event_details)
  */
 function translateEventMetric(
-  metric: string,
+  metric: EventMetricKey,
   aggregation: AggregationTypes,
   alias: string,
   requiredJoins: CHTable[],
@@ -740,13 +833,6 @@ function translateEventMetric(
           `(aggregation=${aggregation}, metricKey=${metricKey ?? "undefined"})`,
       );
 
-    default:
-      return {
-        selectExpression: `count() AS ${alias}`,
-        alias,
-        requiredJoins,
-        params: {},
-      };
   }
 }
 
@@ -765,7 +851,7 @@ function translateEventMetric(
  * neutral/missing values that would skew aggregation results.
  */
 function translateSentimentMetric(
-  metric: string,
+  metric: SentimentMetricKey,
   aggregation: AggregationTypes,
   alias: string,
   requiredJoins: CHTable[],
@@ -816,13 +902,6 @@ function translateSentimentMetric(
       };
     }
 
-    default:
-      return {
-        selectExpression: `count() AS ${alias}`,
-        alias,
-        requiredJoins,
-        params: {},
-      };
   }
 }
 
@@ -830,7 +909,7 @@ function translateSentimentMetric(
  * Translate threads metrics (average_duration_per_thread)
  */
 function translateThreadsMetric(
-  metric: string,
+  metric: ThreadsMetricKey,
   aggregation: AggregationTypes,
   alias: string,
   requiredJoins: CHTable[],
@@ -856,13 +935,6 @@ function translateThreadsMetric(
         },
       };
 
-    default:
-      return {
-        selectExpression: `count() AS ${alias}`,
-        alias,
-        requiredJoins,
-        params: {},
-      };
   }
 }
 
@@ -878,6 +950,10 @@ export function translatePipelineAggregation(
   key?: string,
   subkey?: string,
 ): MetricTranslation {
+  if (!isKnownMetricKey(metric)) {
+    throw unknownMetricError(index);
+  }
+
   const ts = tableAliases.trace_summaries;
   const alias = buildMetricAlias(index, metric, aggregation, key, subkey);
 

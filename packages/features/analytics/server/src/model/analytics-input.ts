@@ -80,8 +80,11 @@ export type SharedFiltersInput = z.infer<typeof sharedFiltersInputSchema>;
  * keys. The registry that enumerated them was presentation-coupled — every
  * entry carried a colour set and a number formatter — and it stayed with the
  * browser surface that renders those. What decides whether a metric is real is
- * the metric translator, which refuses a key it has no expression for, so the
- * narrowing is where the meaning is rather than duplicated at the wire.
+ * the metric translator's `KNOWN_METRIC_KEYS`, which it checks before it
+ * compiles anything: a key it has no expression for raises a
+ * `validation_error` naming the series, and never reaches the SQL. `groupBy`
+ * is a lookup into an enumerated registry of expression builders, so an
+ * unknown key selects the default expression rather than being interpolated.
  */
 export const seriesInputSchema = z.object({
   metric: z.string().min(1),
