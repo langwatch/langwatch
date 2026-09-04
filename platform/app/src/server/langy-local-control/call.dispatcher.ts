@@ -231,6 +231,10 @@ export class LocalCallDispatcher {
    * Holds the turn open for another heartbeat window, and says on the panel
    * what the machine is doing, at most once per keepalive window.
    *
+   * A call that answers in under a heartbeat interval says nothing: its tool
+   * card is already on screen and a line that appears and goes reads as a
+   * flicker. Only a call worth waiting for explains itself.
+   *
    * The activity line is gated on a key of its own rather than on the call
    * record. Two replicas polling one call would otherwise write a line each,
    * and a write onto the record could put a call that has just answered back
@@ -244,6 +248,9 @@ export class LocalCallDispatcher {
       turnId: call.turnId,
       now: this.now(),
     });
+    if (this.now() - call.createdAt < LANGY_LIVENESS.HEARTBEAT_INTERVAL_MS) {
+      return;
+    }
     const firstOfWindow = await this.store.setIfAbsent(
       callKeepaliveKey(call.callId),
       String(this.now()),
