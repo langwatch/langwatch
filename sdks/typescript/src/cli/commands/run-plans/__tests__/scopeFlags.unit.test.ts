@@ -53,6 +53,13 @@ describe("parseTargets()", () => {
       ]);
     });
 
+    /** @scenario "Run against a connected agent by name alone" */
+    it("passes a connected name with no environment through as the reference id", () => {
+      expect(parseTargets(["connected:support-agent"])).toEqual([
+        { type: "connected", referenceId: "support-agent" },
+      ]);
+    });
+
     /** @scenario "Run against a connected agent by name and environment" */
     it("passes a connected name@environment through as the reference id", () => {
       expect(parseTargets(["connected:support-agent@production"])).toEqual([

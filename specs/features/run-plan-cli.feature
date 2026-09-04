@@ -53,6 +53,12 @@ Feature: Run Plan CLI Commands
     Then the run is scheduled against the connected agent
 
   @unit
+  Scenario: Run against a connected agent by name alone
+    When I run "langwatch run-plan run --all --target connected:support-agent"
+    Then the target reference id is support-agent
+    And the platform resolves it to the agent in development, or to the one other environment it is online in
+
+  @unit
   Scenario: Run against a connected agent by name and environment
     When I run "langwatch run-plan run --all --target connected:support-agent@production"
     Then the target reference id is support-agent@production

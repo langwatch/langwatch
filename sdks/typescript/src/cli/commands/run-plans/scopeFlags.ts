@@ -112,8 +112,9 @@ export function describeScope(scope: RunPlanScope | null | undefined): string {
 
 /**
  * The target types a run may go against. A `connected` target names an
- * agent by id, or by `<name>@<environment>`; the platform resolves the
- * second form, so it is passed through as the reference id.
+ * agent by `<name>` (the agent in development, or the one other environment
+ * it is online in), by `<name>@<environment>`, or by id; the platform
+ * resolves the names, so they are passed through as the reference id.
  */
 const TARGET_TYPES = [
   "prompt",
@@ -218,7 +219,7 @@ export function parseTargets(
   if (!targetStrings || targetStrings.length === 0) {
     console.error(
       chalk.red(
-        "Error: --target is required. Give at least one, as <type>:<referenceId> (for example connected:agent_abc123 or connected:support-agent@production).",
+        "Error: --target is required. Give at least one, as <type>:<referenceId> (for example connected:support-agent, connected:support-agent@production or connected:agent_abc123).",
       ),
     );
     process.exit(1);
@@ -229,7 +230,7 @@ export function parseTargets(
     if (colonIndex === -1) {
       console.error(
         chalk.red(
-          `Error: invalid target "${value}". Use <type>:<referenceId>, for example connected:agent_abc123 or connected:support-agent@production.`,
+          `Error: invalid target "${value}". Use <type>:<referenceId>, for example connected:support-agent, connected:support-agent@production or connected:agent_abc123.`,
         ),
       );
       process.exit(1);
