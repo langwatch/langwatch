@@ -39,7 +39,6 @@ import type { ApiKeyService } from "@langwatch/api-key-contract";
 import type { GithubService } from "@langwatch/github-contract";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
-import type { PrismaConnection } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { ShareService } from "@langwatch/share-contract";
@@ -186,9 +185,7 @@ function composeApplication(options: { withInvitations?: boolean } = {}) {
   });
 
   const features = ApiTrpcFeaturesComposition.tryCompose({
-    database: { client: prisma.client } as unknown as PrismaConnection,
-    authz,
-    audit: undefined,
+    infrastructure: { prisma: prisma.client, authz, audit: undefined },
     collaborators: composeApiTrpcCollaborators(
       testHalves({
         orgGroup: group,

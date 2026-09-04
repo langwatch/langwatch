@@ -29,7 +29,6 @@
  */
 import type { AuthzCanBatchByIdsInput, AuthzService } from "@langwatch/authz-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
-import type { PrismaConnection } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ModelCostProjectPort } from "@langwatch/model-provider-server";
 import { PostgresModelProviderEvidenceAdapter } from "@langwatch/model-provider-server";
@@ -410,9 +409,7 @@ function composeApplication() {
   if (!collaborators) throw new Error("the collaborator set was incomplete");
 
   const features = ApiTrpcFeaturesComposition.tryCompose({
-    database: { client: prisma.client } as unknown as PrismaConnection,
-    authz: testAuthz(),
-    audit,
+    infrastructure: { prisma: prisma.client, authz: testAuthz(), audit },
     collaborators,
   });
   if (!features) throw new Error("the record refused to compose against its collaborators");

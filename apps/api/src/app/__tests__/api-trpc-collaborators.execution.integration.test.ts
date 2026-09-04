@@ -38,7 +38,6 @@ import type {
 import type { AgentService } from "@langwatch/agent-contract";
 import type { EventSourcing } from "@langwatch/eventing";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
-import type { PrismaConnection } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it, vi } from "vitest";
 import { ApiAuditPort } from "../../api-request.policy";
@@ -407,11 +406,13 @@ function composeApplication(
   });
 
   const features = ApiTrpcFeaturesComposition.tryCompose({
-    database: { client: prisma.client } as unknown as PrismaConnection,
-    authz: testAuthz(),
-    audit: new (class extends ApiAuditPort {
-      async record(): Promise<void> {}
-    })(),
+    infrastructure: {
+      prisma: prisma.client,
+      authz: testAuthz(),
+      audit: new (class extends ApiAuditPort {
+        async record(): Promise<void> {}
+      })(),
+    },
     collaborators: composeApiTrpcCollaborators(testHalves({ execution })),
   });
   if (!features) throw new Error("the record refused to compose against its collaborators");

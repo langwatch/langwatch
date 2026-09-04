@@ -19,7 +19,6 @@
 import { EventEmitter } from "node:events";
 import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { PrismaConnection } from "@langwatch/prisma-client";
 import type { PresenceEmitterPort } from "@langwatch/presence-server";
 import type { ProjectService } from "@langwatch/project-contract";
 import { TraceApp, type TraceAppDependencies } from "@langwatch/trace-server";
@@ -259,9 +258,7 @@ function subscriptionSecurity() {
 function composeApplication() {
   const { broadcast, emitterFor } = testBroadcast();
   const features = ApiTrpcFeaturesComposition.tryCompose({
-    database: { client: {} as unknown as PrismaClient } as unknown as PrismaConnection,
-    authz: testAuthz(),
-    audit: undefined,
+    infrastructure: { prisma: {} as unknown as PrismaClient, authz: testAuthz(), audit: undefined },
     collaborators: composeApiTrpcCollaborators(
       testHalves({ traceGroup: testTraceGroupHalf(broadcast) }, broadcast),
     ),
@@ -740,9 +737,7 @@ describe("given an API process that composed the real observability collaborator
     const collaborators = composeApiTrpcCollaborators(testHalves({ traceGroup: group }, broadcast));
 
     const features = ApiTrpcFeaturesComposition.tryCompose({
-      database: { client: {} as unknown as PrismaClient } as unknown as PrismaConnection,
-      authz: testAuthz(),
-      audit: undefined,
+      infrastructure: { prisma: {} as unknown as PrismaClient, authz: testAuthz(), audit: undefined },
       collaborators,
     });
     if (!features) throw new Error("the record refused to compose against its real collaborators");
@@ -1094,9 +1089,7 @@ describe("given the anonymous share read composed on this process", () => {
     const collaborators = composeApiTrpcCollaborators(testHalves({ traceGroup: group }, broadcast));
 
     const features = ApiTrpcFeaturesComposition.tryCompose({
-      database: { client: {} as unknown as PrismaClient } as unknown as PrismaConnection,
-      authz: testAuthz(),
-      audit: undefined,
+      infrastructure: { prisma: {} as unknown as PrismaClient, authz: testAuthz(), audit: undefined },
       collaborators,
     });
     if (!features) throw new Error("the record refused to compose against its collaborators");

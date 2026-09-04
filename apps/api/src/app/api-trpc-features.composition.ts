@@ -19,10 +19,9 @@ import type { AnalyticsReadInput, AnalyticsTimeseriesInput } from "@langwatch/an
 import { LiteMemberRestrictedError, type AuthzService } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
-import type { PrismaConnection } from "@langwatch/prisma-client";
 import type { ZodTypeAny } from "zod";
-import type { ApiAuditPort } from "../api-request.policy";
 import { ApiTrpcFeaturesPort, type ApiTrpcFeatureMount } from "../api.application";
+import type { ApiTrpcInfrastructure } from "../app-trpc/app-trpc.infrastructure";
 import {
   ApiTrpcCollaboratorsAbsence,
   type ApiTrpcCollaborators,
@@ -45,8 +44,13 @@ import {
 import type { ApiTraceGroupCollaborators } from "./api-trpc-collaborators.trace-group.composition";
 
 /**
- * Everything the record is composed from, with the two halves it can be
- * missing left nullable.
+ * Everything the record is composed from: the shared infrastructure a feature
+ * composes ITSELF out of, and the collaborators the features that have not
+ * moved onto it yet are still reached through.
+ *
+ * Both are nullable, and each says something different when it is missing. No
+ * infrastructure means this process opened no database or no permission
+ * service; no collaborators means it composed none of what the record reaches.
  */
 export type ApiTrpcFeaturesCompositionOptions<
   TBugReport,
@@ -64,9 +68,7 @@ export type ApiTrpcFeaturesCompositionOptions<
   TTimeseriesInputWire,
   TReadInputWire,
 > = Readonly<{
-  database: PrismaConnection | undefined;
-  authz: AuthzService | undefined;
-  audit: ApiAuditPort | undefined;
+  infrastructure: ApiTrpcInfrastructure | undefined;
   collaborators:
     | ApiTrpcCollaborators<
         TBugReport,
@@ -131,15 +133,13 @@ export class ApiTrpcFeaturesComposition<
   /**
    * Composes the record only when this process has BOTH halves of it.
    *
-   * The database is not negotiable: forty of the ports are row reads, and a
-   * record mounted over a missing connection is twenty-two namespaces that all
-   * answer the same 500. The collaborator set is not negotiable for the reason
-   * its own docblock gives.
-   *
-   * AuthZ is checked here as well even though the production composition would
-   * already have stopped: a host driving this composition directly (a test, a
-   * second deployment shape) must not be able to mount authorized surfaces
-   * over a permission service that does not exist.
+   * The INFRASTRUCTURE is not negotiable. Its connection is what forty of the
+   * ports read rows on, and a record mounted over a missing one is twenty-two
+   * namespaces that all answer the same 500; its permission service is what
+   * every authorized surface on this root resolves through, and a host driving
+   * this composition directly — a test, a second deployment shape — must not
+   * be able to mount those surfaces over a service that does not exist. The
+   * collaborator set is not negotiable for the reason its own docblock gives.
    */
   static tryCompose<
     TBugReport,
@@ -191,8 +191,8 @@ export class ApiTrpcFeaturesComposition<
         TReadInputWire
       >
     | undefined {
-    const { database, authz, collaborators } = options;
-    if (!database || !authz) {
+    const { infrastructure, collaborators } = options;
+    if (!infrastructure) {
       options.report?.absent("no-database");
       return undefined;
     }
@@ -200,15 +200,16 @@ export class ApiTrpcFeaturesComposition<
       options.report?.absent("no-collaborators");
       return undefined;
     }
-    return new ApiTrpcFeaturesComposition(database.client, authz, options.audit, collaborators);
+    return new ApiTrpcFeaturesComposition(infrastructure, collaborators);
   }
 
   readonly application: ApiTrpcFeatureApplication;
 
+  /** The permission service the policy chain resolves every decision through. */
+  readonly authorization: AuthzService;
+
   private constructor(
-    private readonly prisma: PrismaConnection["client"],
-    readonly authorization: AuthzService,
-    private readonly audit: ApiAuditPort | undefined,
+    private readonly infrastructure: ApiTrpcInfrastructure,
     private readonly collaborators: ApiTrpcCollaborators<
       TBugReport,
       TBugReportPage,
@@ -228,6 +229,7 @@ export class ApiTrpcFeaturesComposition<
   ) {
     super();
     this.application = collaborators.application;
+    this.authorization = infrastructure.authz;
   }
 
   /**
@@ -262,17 +264,13 @@ export class ApiTrpcFeaturesComposition<
 
   build(mount: ApiTrpcFeatureMount): AppTrpcFeatureRecord {
     const ports = createApiTrpcPorts({
-      prisma: this.prisma,
-      authz: this.authorization,
-      audit: this.audit,
+      prisma: this.infrastructure.prisma,
+      authz: this.infrastructure.authz,
+      audit: this.infrastructure.audit,
       mount,
       collaborators: this.collaborators,
     });
-    return createAppTrpcFeatures({
-      mount,
-      infrastructure: { prisma: this.prisma, audit: this.audit },
-      ports,
-    });
+    return createAppTrpcFeatures({ mount, infrastructure: this.infrastructure, ports });
   }
 
   private readonly logger: Pick<Logger, "error"> = createLogger("langwatch:api:trpc");

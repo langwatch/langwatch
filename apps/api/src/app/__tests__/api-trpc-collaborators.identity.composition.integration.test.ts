@@ -47,7 +47,6 @@ import {
 } from "@langwatch/identity-server";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { PrismaConnection } from "@langwatch/prisma-client";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { UserService } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -220,9 +219,7 @@ function composeApplication(
   const client = overrides.prismaClient ?? prisma.client;
 
   const features = ApiTrpcFeaturesComposition.tryCompose({
-    database: { client } as unknown as PrismaConnection,
-    authz: testAuthz(),
-    audit,
+    infrastructure: { prisma: client, authz: testAuthz(), audit },
     collaborators: composeApiTrpcCollaborators(
       testHalves({ identity: composeIdentityHalf(client, grants, overrides.eventing) }),
     ),

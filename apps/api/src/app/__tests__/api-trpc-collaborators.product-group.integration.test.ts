@@ -51,7 +51,6 @@ import type {
   PermissionDecision,
 } from "@langwatch/authz-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
-import type { PrismaConnection } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { PostgresDatasetAdapter } from "@langwatch/dataset-server";
 import type { ProjectService } from "@langwatch/project-contract";
@@ -249,9 +248,7 @@ function composeApplication(options: { customRolePlan?: undefined } = {}) {
   });
 
   const features = ApiTrpcFeaturesComposition.tryCompose({
-    database: { client: prisma.client } as unknown as PrismaConnection,
-    authz,
-    audit: undefined,
+    infrastructure: { prisma: prisma.client, authz, audit: undefined },
     collaborators: composeApiTrpcCollaborators(
       testHalves({
         productGroup: group,

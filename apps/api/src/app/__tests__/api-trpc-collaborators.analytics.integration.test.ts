@@ -32,7 +32,6 @@ import type {
   AuthzService,
   PermissionDecision,
 } from "@langwatch/authz-contract";
-import type { PrismaConnection } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { ResourceScope } from "@langwatch/runtime-composition";
@@ -180,11 +179,13 @@ function composeApplication(options: { clickhouse?: boolean; workbenchEnabled?: 
   });
 
   const features = ApiTrpcFeaturesComposition.tryCompose({
-    database: { client: prisma.client } as unknown as PrismaConnection,
-    authz: testAuthz(),
-    audit: new (class extends ApiAuditPort {
-      async record(): Promise<void> {}
-    })(),
+    infrastructure: {
+      prisma: prisma.client,
+      authz: testAuthz(),
+      audit: new (class extends ApiAuditPort {
+        async record(): Promise<void> {}
+      })(),
+    },
     collaborators: composeApiTrpcCollaborators(testHalves({ analytics })),
   });
   if (!features) throw new Error("the record refused to compose against its collaborators");

@@ -919,13 +919,16 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       encryption,
     });
     this.composedGatewayGroup = this.composeGatewayGroup(options, authz, queueInfrastructure);
+    const database = this.composedDatabase?.connection;
     const features = ApiTrpcFeaturesComposition.tryCompose({
-      database: this.composedDatabase?.connection,
-      // The SAME AuthZ service the REST doors authorize through: a permission
+      // What a feature composes ITSELF out of, built once here and handed to
+      // every `compose<Feature>()` the record's literal names. The AuthZ
+      // service is the SAME one the REST doors authorize through: a permission
       // probe inside a resolver must answer what the declared check on the
       // same procedure would have.
-      authz,
-      audit: this.options.audit,
+      infrastructure: database
+        ? { prisma: database.client, authz, audit: this.options.audit }
+        : undefined,
       // One literal, checked against the real type each half returns. A
       // process missing any of the ten composes none of the record — see
       // {@link composeApiTrpcCollaborators}.

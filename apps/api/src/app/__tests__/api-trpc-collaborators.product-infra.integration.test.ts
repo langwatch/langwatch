@@ -50,7 +50,6 @@ import type { AuthzService } from "@langwatch/authz-contract";
 import type { DataRetentionService } from "@langwatch/data-retention-contract";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import { PostgresMonitorAdapter } from "@langwatch/monitor-server";
-import type { PrismaConnection } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it, vi } from "vitest";
 import { ApiApplication, MissingAgentService, MissingSecretService } from "../../api.application";
@@ -434,9 +433,7 @@ function composeApplication(
   const composed = composeHalf(options);
 
   const features = ApiTrpcFeaturesComposition.tryCompose({
-    database: { client: composed.prisma.client } as unknown as PrismaConnection,
-    authz: composed.authz,
-    audit: undefined,
+    infrastructure: { prisma: composed.prisma.client, authz: composed.authz, audit: undefined },
     collaborators: composeApiTrpcCollaborators(testHalves({ productInfra: composed.half })),
   });
   if (!features) throw new Error("the record refused to compose against its collaborators");

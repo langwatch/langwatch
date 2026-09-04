@@ -23,7 +23,6 @@ import type {
   PermissionDecision,
 } from "@langwatch/authz-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { PrismaConnection } from "@langwatch/prisma-client";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import {
@@ -172,7 +171,7 @@ class RecordingAudit extends ApiAuditPort {
   }
 }
 
-function testApplication(): ApiTrpcFeatureApplication {
+function testApplication(overrides: Record<string, unknown> = {}): ApiTrpcFeatureApplication {
   return {
     ...stub<ApiTrpcFeatureApplication>("app"),
     dashboard: {
@@ -182,6 +181,7 @@ function testApplication(): ApiTrpcFeatureApplication {
     monitors: stub("app.monitors"),
     storedObjectApp: stub("app.storedObjectApp"),
     config: { opsSidebarEmails: ["staff@langwatch.ai"] },
+    ...overrides,
   } as unknown as ApiTrpcFeatureApplication;
 }
 
@@ -207,7 +207,7 @@ function testAuthApp(): AuthApp {
   });
 }
 
-function testCollaborators() {
+function testCollaborators(overrides: Record<string, unknown> = {}) {
   return {
     application: testApplication(),
     analytics: {
@@ -333,6 +333,7 @@ function testCollaborators() {
       lifecycle: stub("workflows.lifecycle"),
       optimization: stub("workflows.optimization"),
     },
+    ...overrides,
   } as never;
 }
 
@@ -344,9 +345,7 @@ function composeApplication(
   const prisma = testPrisma();
   const audit = new RecordingAudit();
   const features = ApiTrpcFeaturesComposition.tryCompose({
-    database: { client: prisma.client } as unknown as PrismaConnection,
-    authz: testAuthz(),
-    audit,
+    infrastructure: { prisma: prisma.client, authz: testAuthz(), audit },
     collaborators: testCollaborators(),
   });
   if (!features) throw new Error("the record refused to compose against its test collaborators");
@@ -468,9 +467,7 @@ describe("given an API process with no collaborators for the record", () => {
     const warn = vi.fn();
 
     const features = ApiTrpcFeaturesComposition.tryCompose({
-      database: { client: {} as unknown as PrismaClient } as unknown as PrismaConnection,
-      authz: testAuthz(),
-      audit: undefined,
+      infrastructure: { prisma: {} as unknown as PrismaClient, authz: testAuthz(), audit: undefined },
       collaborators: undefined,
       report: LoggedApiTrpcFeaturesAbsence.create({ warn }),
     });
@@ -503,14 +500,18 @@ describe("given an API process with no collaborators for the record", () => {
   });
 });
 
-describe("given a process with a database but no AuthZ service", () => {
+/**
+ * The infrastructure is one object, so "a connection but no permission
+ * service" is no longer a state a caller can reach: `ApiTrpcInfrastructure`
+ * requires both, and the production root builds it only when it holds both.
+ * What is left to pin at runtime is the refusal itself.
+ */
+describe("given a process that opened no infrastructure for the record", () => {
   it("refuses the record rather than mounting authorized surfaces over nothing", () => {
     const warn = vi.fn();
 
     const features = ApiTrpcFeaturesComposition.tryCompose({
-      database: { client: {} as unknown as PrismaClient } as unknown as PrismaConnection,
-      authz: undefined,
-      audit: undefined,
+      infrastructure: undefined,
       collaborators: testCollaborators(),
       report: LoggedApiTrpcFeaturesAbsence.create({ warn }),
     });

@@ -44,7 +44,6 @@ import type {
 import { createInitialUIState } from "@langwatch/experiment-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
-import type { PrismaConnection } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -327,11 +326,13 @@ function composeApplication(options: { redis?: RedisConnection | null } = {}) {
   });
 
   const features = ApiTrpcFeaturesComposition.tryCompose({
-    database: { client: prisma.client } as unknown as PrismaConnection,
-    authz: testAuthz(),
-    audit: new (class extends ApiAuditPort {
-      async record(): Promise<void> {}
-    })(),
+    infrastructure: {
+      prisma: prisma.client,
+      authz: testAuthz(),
+      audit: new (class extends ApiAuditPort {
+        async record(): Promise<void> {}
+      })(),
+    },
     collaborators: composeApiTrpcCollaborators(testHalves({ execution })),
   });
   if (!features) throw new Error("the record refused to compose against its collaborators");
