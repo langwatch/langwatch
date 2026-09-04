@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { AnnotationsApiError } from "@/client-sdk/services/annotations/annotations-api.service";
+import { setOutputFormat } from "../../../utils/errorOutput";
 
 vi.mock("@/client-sdk/services/annotations/annotations-api.service", async (importOriginal) => {
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
@@ -195,6 +196,52 @@ describe("createAnnotationCommand()", () => {
         isThumbsUp: false,
         email: undefined,
       });
+    });
+  });
+
+  // The server rejects either omission with a 400 (routes/annotations.ts), so
+  // the command refuses before spending a round trip — through the shared
+  // error port, so `--format json` still gets a document on stdout rather
+  // than a bare exit code and an ANSI sentence on stderr.
+  describe("when a required flag is missing under --format json", () => {
+    const stdoutDocument = () =>
+      JSON.parse(
+        vi
+          .mocked(console.log)
+          .mock.calls.map((call) => String(call[0]))
+          .join("\n"),
+      ) as { ok: boolean; error: { kind: string; message: string } };
+
+    beforeEach(() => {
+      setOutputFormat("json");
+    });
+
+    afterEach(() => {
+      setOutputFormat("text");
+    });
+
+    it("refuses --comment omission without calling the API", async () => {
+      await expect(
+        createAnnotationCommand("trace_abc", { thumbsUp: true }),
+      ).rejects.toThrow(ProcessExitError);
+
+      expect(mockCreate).not.toHaveBeenCalled();
+      const document = stdoutDocument();
+      expect(document.ok).toBe(false);
+      expect(document.error.kind).toBe("validation_error");
+      expect(document.error.message).toContain("--comment is required");
+    });
+
+    it("refuses a missing rating without calling the API", async () => {
+      await expect(
+        createAnnotationCommand("trace_abc", { comment: "No rating" }),
+      ).rejects.toThrow(ProcessExitError);
+
+      expect(mockCreate).not.toHaveBeenCalled();
+      const document = stdoutDocument();
+      expect(document.ok).toBe(false);
+      expect(document.error.kind).toBe("validation_error");
+      expect(document.error.message).toContain("--thumbs-up");
     });
   });
 });

@@ -23,14 +23,9 @@ export const listAnnotationsCommand = async (options: {
   const spinner = createSpinner(label).start();
 
   try {
-    const result = options.traceId
+    const annotations = options.traceId
       ? await service.getByTrace(options.traceId)
       : await service.getAll();
-
-    // Handle both array and {data: [...]} response shapes
-    const annotations = Array.isArray(result)
-      ? result
-      : (result as unknown as { data: typeof result }).data ?? [];
 
     spinner.succeed(
       `Found ${annotations.length} annotation${annotations.length !== 1 ? "s" : ""}`,
