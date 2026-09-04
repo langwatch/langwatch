@@ -41,7 +41,13 @@ import {
   readCliErrorDocument,
 } from "@langwatch/langy";
 import type { UIMessage } from "ai";
-import { Braces, Check, ChevronRight, Layers3 } from "lucide-react";
+import {
+  AlertCircle,
+  Braces,
+  Check,
+  ChevronRight,
+  Layers3,
+} from "lucide-react";
 import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
@@ -734,6 +740,14 @@ export function LangyActivityParts({
   // knows the part it came from, so the render is a stable sort on that: a
   // failure lands exactly where it happened, and the receipt for the steps
   // before it stays before it. See {@link Sequenced}.
+  // A step that failed and was then followed by the turn's own reply is a step
+  // the turn RECOVERED from. A filmed run left three red cards standing for
+  // three self-corrected probes — a flag the command did not take, then the same
+  // command without it — beside a reply that had gone on to open a pull request.
+  // Nothing is hidden: a recovered failure folds to one line that opens into the
+  // same card. A turn that is still running, or one that never got to a reply,
+  // keeps its failures where they are.
+  const answerIndex = lastAnswerTextIndex(view);
   const rows: Array<{ key: string; order: number; node: ReactNode }> = [
     ...failures.map(({ id, call, presentation, order }) => ({
       key: `failure:${id}`,
@@ -743,6 +757,7 @@ export function LangyActivityParts({
           call={call}
           presentation={presentation}
           devMode={devMode}
+          recovered={!live && answerIndex > order}
         />
       ),
     })),
@@ -1403,12 +1418,24 @@ function FailedToolCallRow({
   call,
   presentation,
   devMode,
+  recovered = false,
 }: {
   call: ToolCall;
   presentation: LangyToolErrorPresentation;
   devMode: boolean;
+  /**
+   * The turn went on to answer after this step failed. The card folds to one
+   * line, which opens into the same card — a recovered step is process record,
+   * and the turn's own reply is the account of what happened.
+   */
+  recovered?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  // A plan limit is never folded: it is not a step that failed, it is a
+  // decision the reader can change, and its card is the way to change it.
+  if (recovered && !presentation.limit) {
+    return <RecoveredToolFailureRow presentation={presentation} />;
+  }
   return (
     <VStack align="stretch" gap={1}>
       <Box position="relative">
@@ -1441,6 +1468,51 @@ function FailedToolCallRow({
         ) : null}
       </Box>
       {devMode && open ? <RawCallJson call={call} /> : null}
+    </VStack>
+  );
+}
+
+/**
+ * A step that failed and that the turn then recovered from, as one line.
+ *
+ * Quiet, not gone. The same card is one click away, and the failure keeps its
+ * place in the transcript — it just stops competing with the answer the turn
+ * went on to give.
+ */
+function RecoveredToolFailureRow({
+  presentation,
+}: {
+  presentation: LangyToolErrorPresentation;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <VStack align="stretch" gap={2}>
+      <chakra.button
+        type="button"
+        width="full"
+        textAlign="left"
+        cursor="pointer"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+      >
+        <HStack gap={2}>
+          <Box color="fg.subtle" display="flex" flexShrink={0}>
+            <AlertCircle size={11} aria-hidden="true" />
+          </Box>
+          <Text textStyle="xs" color="fg.subtle" flex={1} truncate>
+            {presentation.title}, and Langy carried on
+          </Text>
+          <Box
+            color="fg.subtle"
+            display="flex"
+            transform={open ? "rotate(90deg)" : undefined}
+            transition="transform 150ms ease"
+          >
+            <ChevronRight size={12} />
+          </Box>
+        </HStack>
+      </chakra.button>
+      {open ? <LangyToolErrorCard presentation={presentation} /> : null}
     </VStack>
   );
 }
