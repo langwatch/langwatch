@@ -35,6 +35,7 @@ export { predefinedEventTypes, predefinedEventsSchemas } from "./trace-tracked-e
 export * from "./trace-evaluation.contract";
 export * from "./trace-format.schemas";
 export * from "./trace-full-read.contract";
+export * from "./event-metrics";
 export * from "./trace-derived-event";
 export * from "./trace-list.repository";
 export * from "./trace-list-view";

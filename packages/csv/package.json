@@ -1,0 +1,43 @@
+{
+  "name": "@langwatch/csv",
+  "version": "0.0.1",
+  "private": true,
+  "description": "The one rule every CSV LangWatch writes has to apply: the spreadsheet formula guard, plus the browser-side CSV download writer that applies it.",
+  "keywords": [
+    "langwatch",
+    "csv",
+    "formula-injection"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "src"
+  ],
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./download": {
+      "types": "./src/download-csv.ts",
+      "default": "./src/download-csv.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "papaparse": "^5.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "@types/papaparse": "^5.5.2",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  }
+}

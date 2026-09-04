@@ -24,7 +24,6 @@ import {
   getCoreRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import Parse from "papaparse";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Check, Download, Edit2, Plus, Trash2, Upload, X } from "react-feather";
 import { useStore } from "zustand";
@@ -40,6 +39,7 @@ import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-cont
 import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
 import { api } from "@langwatch/workflow-web/studio-host/api";
 import { AddRowsFromCSVModal } from "../add-rows-from-csv-modal";
+import { downloadCsv } from "@langwatch/csv/download";
 import {
   type AutosaveState,
   type DatasetTableContextValue,
@@ -591,20 +591,15 @@ export function DatasetEditorTable({
       }
     }
 
-    const csv = Parse.unparse({
+    downloadCsv({
       fields: exportColumns.map((col) => col.name),
-      data: exportRecords.map((record) => exportColumns.map((col) => record[col.name] ?? "")),
+      rows: exportRecords.map((record) =>
+        exportColumns.map((col) => record[col.name] ?? ""),
+      ),
+      fileName: `${
+        datasetName?.toLowerCase().replace(/ /g, "_") ?? "draft_dataset"
+      }.csv`,
     });
-
-    const url = window.URL.createObjectURL(new Blob([csv]));
-    const link = document.createElement("a");
-    link.href = url;
-    const fileName = `${datasetName?.toLowerCase().replace(/ /g, "_") ?? "draft_dataset"}.csv`;
-    link.setAttribute("download", fileName);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
   }, [columns, datasetId, datasetName, downloadDataset, project?.id, store]);
 
   // "Add row" only appends an empty row at the bottom. It must not steal focus

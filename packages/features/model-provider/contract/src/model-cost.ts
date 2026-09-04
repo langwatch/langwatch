@@ -13,6 +13,8 @@ const ATTR = {
   audioSeconds: "gen_ai.usage.audio_seconds",
   inputAudioTokens: "gen_ai.usage.input_audio_tokens",
   outputAudioTokens: "gen_ai.usage.output_audio_tokens",
+  inputImageTokens: "gen_ai.usage.input_image_tokens",
+  outputImageTokens: "gen_ai.usage.output_image_tokens",
   customInputRate: "langwatch.model.inputCostPerToken",
   customOutputRate: "langwatch.model.outputCostPerToken",
   customCacheReadRate: "langwatch.model.cacheReadCostPerToken",
@@ -54,6 +56,12 @@ export const estimateCost = (input: {
   cacheCreation1hTokens: number;
   inputAudioTokens: number;
   outputAudioTokens: number;
+  // Image tokens, billed at their own rates by the token-priced image
+  // models. DISJOINT from `inputTokens` / `outputTokens`, the same
+  // exclusive split as the audio buckets, so each token prices once. There
+  // is no text fallback: a model with no image rate prices them at zero.
+  inputImageTokens?: number;
+  outputImageTokens?: number;
   inputCharacters?: number;
   audioSeconds?: number;
 }): number | undefined => {
@@ -67,7 +75,9 @@ export const estimateCost = (input: {
     !!rate.cacheCreationCostPerToken ||
     !!rate.cacheCreation1hCostPerToken ||
     !!rate.inputAudioCostPerToken ||
-    !!rate.outputAudioCostPerToken;
+    !!rate.outputAudioCostPerToken ||
+    !!rate.inputImageCostPerToken ||
+    !!rate.outputImageCostPerToken;
   if (!hasAnyRate) return undefined;
 
   const inputRate = rate.inputCostPerToken ?? 0;
@@ -85,6 +95,8 @@ export const estimateCost = (input: {
     input.outputTokens * outputRate +
     input.inputAudioTokens * inputAudioRate +
     input.outputAudioTokens * outputAudioRate +
+    (input.inputImageTokens ?? 0) * (rate.inputImageCostPerToken ?? 0) +
+    (input.outputImageTokens ?? 0) * (rate.outputImageCostPerToken ?? 0) +
     input.cacheReadTokens * cacheReadRate +
     cacheWrite1h * cacheCreation1hRate +
     (cacheWriteTotal - cacheWrite1h) * cacheCreationRate +
@@ -210,10 +222,43 @@ export const estimateModelCost = (
   const audioSeconds = Math.max(0, coerceToNumber(attrs[ATTR.audioSeconds]) ?? 0);
   const inputAudioTokens = Math.max(0, coerceToNumber(attrs[ATTR.inputAudioTokens]) ?? 0);
   const outputAudioTokens = Math.max(0, coerceToNumber(attrs[ATTR.outputAudioTokens]) ?? 0);
+  // Image token counts, the same disjoint split as the audio buckets. A
+  // generated 1024x1024 image is about 1600 output image tokens at $30 to
+  // $40 per million, which is most of what an image call costs.
+  const inputImageTokens = Math.max(0, coerceToNumber(attrs[ATTR.inputImageTokens]) ?? 0);
+  const outputImageTokens = Math.max(0, coerceToNumber(attrs[ATTR.outputImageTokens]) ?? 0);
+
+  const responseModel = attrs[ATTR.responseModel];
+  const requestModel = attrs[ATTR.requestModel];
+  const resolvedModel =
+    parsed.model ??
+    (typeof responseModel === "string" ? responseModel : undefined) ??
+    (typeof requestModel === "string" ? requestModel : undefined);
 
   const customInputRate = coerceToNumber(attrs[ATTR.customInputRate]);
   const customOutputRate = coerceToNumber(attrs[ATTR.customOutputRate]);
   if (customInputRate !== null || customOutputRate !== null) {
+    const customCacheReadRate = coerceToNumber(attrs[ATTR.customCacheReadRate]);
+    const customCacheCreationRate = coerceToNumber(attrs[ATTR.customCacheCreationRate]);
+    const customCacheCreation1hRate = coerceToNumber(attrs[ATTR.customCacheCreation1hRate]);
+
+    // A custom rule states text and cache rates and has no image rates to
+    // state, so the registry's image rates fill those two buckets: the
+    // override prices what it names, the registry prices the pixels. An
+    // override whose every rate is zero is a deliberate "this model is free"
+    // and takes no fill, or a free model would start charging for images.
+    const overridePricesSomething = [
+      customInputRate,
+      customOutputRate,
+      customCacheReadRate,
+      customCacheCreationRate,
+      customCacheCreation1hRate,
+    ].some((rate) => (rate ?? 0) > 0);
+    const registryImageRates =
+      overridePricesSomething && resolvedModel
+        ? matchModelCost(resolvedModel, staticCosts)
+        : undefined;
+
     return (
       estimateCost({
         rate: {
@@ -221,11 +266,11 @@ export const estimateModelCost = (
           regex: "",
           inputCostPerToken: customInputRate ?? 0,
           outputCostPerToken: customOutputRate ?? 0,
-          cacheReadCostPerToken: coerceToNumber(attrs[ATTR.customCacheReadRate]) ?? undefined,
-          cacheCreationCostPerToken:
-            coerceToNumber(attrs[ATTR.customCacheCreationRate]) ?? undefined,
-          cacheCreation1hCostPerToken:
-            coerceToNumber(attrs[ATTR.customCacheCreation1hRate]) ?? undefined,
+          cacheReadCostPerToken: customCacheReadRate ?? undefined,
+          cacheCreationCostPerToken: customCacheCreationRate ?? undefined,
+          cacheCreation1hCostPerToken: customCacheCreation1hRate ?? undefined,
+          inputImageCostPerToken: registryImageRates?.inputImageCostPerToken,
+          outputImageCostPerToken: registryImageRates?.outputImageCostPerToken,
         },
         inputTokens,
         outputTokens,
@@ -234,6 +279,8 @@ export const estimateModelCost = (
         cacheCreation1hTokens,
         inputAudioTokens,
         outputAudioTokens,
+        inputImageTokens,
+        outputImageTokens,
       }) ?? 0
     );
   }
@@ -241,12 +288,6 @@ export const estimateModelCost = (
   const explicitCost = coerceToNumber(attrs[ATTR.explicitCost]);
   if (explicitCost !== null && explicitCost > 0) return explicitCost;
 
-  const responseModel = attrs[ATTR.responseModel];
-  const requestModel = attrs[ATTR.requestModel];
-  const resolvedModel =
-    parsed.model ??
-    (typeof responseModel === "string" ? responseModel : undefined) ??
-    (typeof requestModel === "string" ? requestModel : undefined);
   const hasUsage =
     inputTokens > 0 ||
     outputTokens > 0 ||
@@ -256,7 +297,9 @@ export const estimateModelCost = (
     inputCharacters > 0 ||
     audioSeconds > 0 ||
     inputAudioTokens > 0 ||
-    outputAudioTokens > 0;
+    outputAudioTokens > 0 ||
+    inputImageTokens > 0 ||
+    outputImageTokens > 0;
   if (resolvedModel && hasUsage) {
     const matched = matchModelCost(resolvedModel, staticCosts);
     if (matched) {
@@ -269,6 +312,8 @@ export const estimateModelCost = (
         cacheCreation1hTokens,
         inputAudioTokens,
         outputAudioTokens,
+        inputImageTokens,
+        outputImageTokens,
         inputCharacters,
         audioSeconds,
       });

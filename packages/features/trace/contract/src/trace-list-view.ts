@@ -11,7 +11,11 @@
  * makes that move type-preserving.
  */
 import type { EvaluationSummary } from "@langwatch/evaluation-contract";
-import type { FacetValueAggregates, TraceListCursor } from "./trace-list.repository";
+import type {
+  EventMetricValues,
+  FacetValueAggregates,
+  TraceListCursor,
+} from "./trace-list.repository";
 import type { TraceMediaRef } from "./trace-media-ref";
 
 export interface TraceListItem {
@@ -107,6 +111,9 @@ export interface CategoricalFacetDescriptor {
     label?: string;
     count: number;
     aggregates?: FacetValueAggregates;
+    /** Set only on the event facet: per-metric-key value tallies for the
+     *  inline drilldown (see {@link EventMetricValues}). */
+    eventMetrics?: EventMetricValues[];
   }[];
   totalDistinct: number;
 }

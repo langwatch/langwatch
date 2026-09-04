@@ -15,7 +15,7 @@ A CI job starts a test suite, stores the batch id from the response, then polls 
 langwatch test-suite run "Checkout regression" --target http:agent_abc123 --wait
 ```
 
-`--wait` polls until the batch is complete and exits non-zero when a run failed, which is what fails the job. The test suite is named by its id or by its name.
+`--wait` polls until the batch is complete, for up to ten minutes, and exits non-zero when a run failed, which is what fails the job. A batch that needs longer, such as a suite with repeats, is polled with the batch endpoint below. The test suite is named by its id or by its name.
 
 Add `--format json` (or `-o json`) to get one final document on stdout instead of the progress lines. It contains `outcome`, `tallies` and the per-run `results`, so a job step can read the verdict without parsing prose.
 

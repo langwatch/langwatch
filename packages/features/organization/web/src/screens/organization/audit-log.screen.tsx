@@ -37,6 +37,7 @@ import { ContactSalesBlock } from "@langwatch/enterprise-billing-web";
 import type { EnrichedAuditLog } from "@langwatch/organization-contract";
 import { formatDistanceToNow } from "date-fns";
 import { ArrowLeft, Download, Search } from "lucide-react";
+import { neutralizeFormula, neutralizeRows } from "@langwatch/csv";
 import Parse from "papaparse";
 import { useMemo, useState } from "react";
 import { organizationApi, type AuditLogFilters } from "../../behavior/organization-api";
@@ -205,9 +206,16 @@ export default function AuditLogScreen() {
         collected.push(...batch.auditLogs);
       }
 
+      // Both halves are guarded: an audit row carries the actor's name and the
+      // arguments they passed, and a heading is fixed text only until somebody
+      // renames a column.
+      const { fields, data } = auditLogCsvTable(collected);
       host.download({
         fileName: auditLogFileName(new Date()),
-        contents: Parse.unparse(auditLogCsvTable(collected)),
+        contents: Parse.unparse({
+          fields: fields.map(neutralizeFormula),
+          data: neutralizeRows(data),
+        }),
         mediaType: "text/csv",
       });
     } catch (error) {

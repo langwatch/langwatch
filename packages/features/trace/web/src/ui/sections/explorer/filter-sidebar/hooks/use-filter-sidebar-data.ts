@@ -627,6 +627,14 @@ function buildFacetItems(cat: CategoricalSection, synthetic: boolean): FacetItem
   const aggregates = new Map(
     cat.topValues.filter((v) => v.aggregates !== undefined).map((v) => [v.value, v.aggregates!]),
   );
+  // Event-only — same forwarding pattern as `aggregates`: per-event metric
+  // value tallies ride the discover payload so the event drilldown never
+  // fires its own query.
+  const eventMetrics = new Map(
+    cat.topValues
+      .filter((v) => v.eventMetrics !== undefined)
+      .map((v) => [v.value, v.eventMetrics!]),
+  );
   const orderedValues = orderValues({
     defaults: FACET_DEFAULTS[cat.key],
     fallback: cat.topValues.map((v) => v.value),
@@ -642,6 +650,7 @@ function buildFacetItems(cat: CategoricalSection, synthetic: boolean): FacetItem
     dimmed,
     synthetic,
     aggregates: aggregates.get(value),
+    eventMetrics: eventMetrics.get(value),
   }));
 }
 

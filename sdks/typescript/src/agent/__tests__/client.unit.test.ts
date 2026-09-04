@@ -338,7 +338,7 @@ describe("the agent client, given a fake platform", () => {
               model: { type: "string", enum: ["gpt-5", "gpt-5-mini"], default: "gpt-5-mini" },
             },
           },
-          concurrency: 1,
+          concurrency: 10,
           timeoutMs: 30_000,
         },
       ]);
@@ -353,7 +353,8 @@ describe("the agent client, given a fake platform", () => {
 
     /** @scenario "The environment is the explicit option first" */
     /** @scenario "The instance label comes from the option or LANGWATCH_AGENT_INSTANCE_LABEL" */
-    it("names the explicit environment and the label from the variable", async () => {
+    /** @scenario "The agent takes ten calls at once unless told otherwise" */
+    it("names the explicit environment and the label from the variable, and keeps the default concurrency", async () => {
       vi.stubEnv("LANGWATCH_AGENT_ENVIRONMENT", "staging");
       vi.stubEnv("LANGWATCH_AGENT_INSTANCE_LABEL", "green");
       define(async () => "ok", { environment: "production" });
@@ -362,7 +363,7 @@ describe("the agent client, given a fake platform", () => {
       const register = await connection.nextFrame<RegisterFrame>("register");
 
       expect(register.agents[0]?.environment).toBe("production");
-      expect(register.agents[0]?.concurrency).toBe(4);
+      expect(register.agents[0]?.concurrency).toBe(10);
       expect(register.instance.label).toBe("green");
     });
   });
@@ -544,10 +545,13 @@ describe("the agent client, given a fake platform", () => {
       const gate = new Promise<void>((resolve) => {
         release = resolve;
       });
-      const { connection } = await connectSupport(async () => {
-        await gate;
-        return "first";
-      });
+      const { connection } = await connectSupport(
+        async () => {
+          await gate;
+          return "first";
+        },
+        { concurrency: 1 },
+      );
 
       connection.send(callFrame({ callId: "call_1" }));
       await connection.nextFrame("ack");
@@ -669,6 +673,7 @@ describe("the agent client, given a fake platform", () => {
       const handler = vi.fn(async () => "ok");
       const { connection } = await connectSupport(handler, {
         parameters: gatedParameters(gate) as never,
+        concurrency: 1,
       });
 
       connection.send(callFrame({ callId: "call_1" }));

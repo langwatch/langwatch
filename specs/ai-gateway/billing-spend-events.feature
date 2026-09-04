@@ -181,6 +181,12 @@ Feature: Billing spend events, one durable record per gateway request
       Then nothing is reported, because zero is the right answer
 
     @unit
+    Scenario: The image count is display only and never a billable quantity
+      Given an image request that reported an image count and no tokens
+      When it rates at zero
+      Then nothing is reported, because the count prices nothing on its own
+
+    @unit
     Scenario: The failed payload keeps the full error taxonomy
       When a fail command is serialized
       Then the error class and http status ride verbatim

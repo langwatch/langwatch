@@ -63,6 +63,7 @@
     "@dnd-kit/utilities": "3.2.2",
     "@emotion/react": "^11.14.0",
     "@hookform/resolvers": "^5.4.0",
+    "@langwatch/csv": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/observability": "workspace:*",

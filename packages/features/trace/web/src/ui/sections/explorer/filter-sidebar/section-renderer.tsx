@@ -8,6 +8,7 @@ import type { NumericMode } from "../../../../index";
 import { NONE_TOGGLE_VALUE } from "../../../../index";
 import { AttributesSection } from "./attributes-section";
 import { EvaluatorDrilldown } from "./evaluator-drilldown";
+import { EventDrilldown } from "./event-drilldown";
 import { FacetSection } from "./facet-section";
 import { RangeSection } from "./range-section";
 import type {
@@ -56,6 +57,47 @@ interface SectionRendererProps {
   setNumericMode: (args: { field: string; mode: NumericMode }) => void;
 }
 
+/**
+ * The trailing chevron that expands an INACTIVE row's inline drilldown
+ * (evaluator breakdown, event metric breakdown). Rendered as a sibling of
+ * the row button so a click here never toggles the facet — stopPropagation
+ * guards against any outer container handler too.
+ */
+const ExpandChevron: React.FC<{
+  isExpanded: boolean;
+  onToggleExpand: () => void;
+  /** Noun for the aria-label: "Show/Hide <subject> breakdown". */
+  subject: string;
+}> = ({ isExpanded, onToggleExpand, subject }) => (
+  <Box
+    as="button"
+    aria-label={`${isExpanded ? "Hide" : "Show"} ${subject} breakdown`}
+    aria-expanded={isExpanded}
+    display="flex"
+    alignItems="center"
+    justifyContent="center"
+    flexShrink={0}
+    width="20px"
+    height="20px"
+    borderRadius="sm"
+    cursor="pointer"
+    color="fg.subtle"
+    background="transparent"
+    border="none"
+    onClick={(e: React.MouseEvent) => {
+      e.stopPropagation();
+      onToggleExpand();
+    }}
+    _hover={{ color: "fg.muted", background: "bg.muted" }}
+  >
+    <Box
+      as={isExpanded ? ChevronDown : ChevronRight}
+      width="12px"
+      height="12px"
+    />
+  </Box>
+);
+
 const SectionRendererInner: React.FC<SectionRendererProps> = ({
   section,
   ast,
@@ -89,77 +131,19 @@ const SectionRendererInner: React.FC<SectionRendererProps> = ({
     // ACTIVE evaluator row — verdict pills, score range, label flag —
     // sourced from the `aggregates` the discover endpoint already
     // attached to each evaluator value. No second query.
+    // Event section mirrors the evaluator pattern with its own payload:
+    // per-event metric values (thumbs_up_down → vote 1 / -1) ride the
+    // discover response as `eventMetrics`; the drilldown emits plain
+    // top-level `event.attribute.<key>` toggles. No second query.
     const renderActiveRowExtras =
-      section.key === "evaluator"
+      section.key === "event"
         ? (item: FacetItem) =>
-            item.aggregates ? (
-              <EvaluatorDrilldown
-                item={item}
-                ast={ast}
-                toggleSubFilter={({ field, value }) =>
-                  toggleEvaluatorSubFilter({
-                    evaluatorId: item.value,
-                    field,
-                    value,
-                  })
-                }
-                setScoreRange={({ from, to }) =>
-                  setEvaluatorScoreRange({
-                    evaluatorId: item.value,
-                    from,
-                    to,
-                  })
-                }
-                removeScoreRange={() => removeEvaluatorScoreRange({ evaluatorId: item.value })}
-              />
+            item.eventMetrics ? (
+              <EventDrilldown item={item} ast={ast} toggleFacet={toggleFacet} />
             ) : null
-        : undefined;
-
-    // INACTIVE evaluator rows also get a drilldown affordance: a small
-    // chevron expand toggle. It renders inline at the row's trailing edge
-    // (via the `trailing` slot) rather than as a full-width strip beneath
-    // the row — clicking it browses verdict/score options before
-    // committing to the evaluator filter. When the user then picks a
-    // verdict or score range, the evaluator toggle fires first so the
-    // selected criteria applies correctly.
-    const renderInactiveRowExtras =
-      section.key === "evaluator"
-        ? (item: FacetItem, isExpanded: boolean, onToggleExpand: () => void) => {
-            if (!item.aggregates) return null;
-            // Picking a verdict / score / label on an inactive evaluator
-            // also enables the `evaluator:<id>` anchor — the group mutation
-            // adds it automatically, so no explicit activation wrapper is
-            // needed here.
-            return {
-              trailing: (
-                <Box
-                  as="button"
-                  aria-label={isExpanded ? "Hide evaluator breakdown" : "Show evaluator breakdown"}
-                  aria-expanded={isExpanded}
-                  display="flex"
-                  alignItems="center"
-                  justifyContent="center"
-                  flexShrink={0}
-                  width="20px"
-                  height="20px"
-                  borderRadius="sm"
-                  cursor="pointer"
-                  color="fg.subtle"
-                  background="transparent"
-                  border="none"
-                  // Sibling of the row button, so a click here never
-                  // toggles the facet — stopPropagation guards against
-                  // any outer container handler too.
-                  onClick={(e: React.MouseEvent) => {
-                    e.stopPropagation();
-                    onToggleExpand();
-                  }}
-                  _hover={{ color: "fg.muted", background: "bg.muted" }}
-                >
-                  <Box as={isExpanded ? ChevronDown : ChevronRight} width="12px" height="12px" />
-                </Box>
-              ),
-              below: isExpanded ? (
+        : section.key === "evaluator"
+          ? (item: FacetItem) =>
+              item.aggregates ? (
                 <EvaluatorDrilldown
                   item={item}
                   ast={ast}
@@ -179,10 +163,88 @@ const SectionRendererInner: React.FC<SectionRendererProps> = ({
                   }
                   removeScoreRange={() => removeEvaluatorScoreRange({ evaluatorId: item.value })}
                 />
+              ) : null
+          : undefined;
+
+    // INACTIVE evaluator rows also get a drilldown affordance: a small
+    // chevron expand toggle. It renders inline at the row's trailing edge
+    // (via the `trailing` slot) rather than as a full-width strip beneath
+    // the row — clicking it browses verdict/score options before
+    // committing to the evaluator filter. When the user then picks a
+    // verdict or score range, the evaluator toggle fires first so the
+    // selected criteria applies correctly.
+    const renderInactiveRowExtras =
+      section.key === "event"
+        ? (
+            item: FacetItem,
+            isExpanded: boolean,
+            onToggleExpand: () => void,
+          ) => {
+            // No metrics on this event type → no expand affordance (same
+            // gating the evaluator applies via `aggregates`).
+            if (!item.eventMetrics) return null;
+            return {
+              trailing: (
+                <ExpandChevron
+                  isExpanded={isExpanded}
+                  onToggleExpand={onToggleExpand}
+                  subject="event metric"
+                />
+              ),
+              below: isExpanded ? (
+                <EventDrilldown
+                  item={item}
+                  ast={ast}
+                  toggleFacet={toggleFacet}
+                />
               ) : null,
             };
           }
-        : undefined;
+        : section.key === "evaluator"
+          ? (
+              item: FacetItem,
+              isExpanded: boolean,
+              onToggleExpand: () => void,
+            ) => {
+              if (!item.aggregates) return null;
+              // Picking a verdict / score / label on an inactive evaluator
+              // also enables the `evaluator:<id>` anchor — the group mutation
+              // adds it automatically, so no explicit activation wrapper is
+              // needed here.
+              return {
+                trailing: (
+                  <ExpandChevron
+                    isExpanded={isExpanded}
+                    onToggleExpand={onToggleExpand}
+                    subject="evaluator"
+                  />
+                ),
+                below: isExpanded ? (
+                  <EvaluatorDrilldown
+                    item={item}
+                    ast={ast}
+                    toggleSubFilter={({ field, value }) =>
+                      toggleEvaluatorSubFilter({
+                        evaluatorId: item.value,
+                        field,
+                        value,
+                      })
+                    }
+                    setScoreRange={({ from, to }) =>
+                      setEvaluatorScoreRange({
+                        evaluatorId: item.value,
+                        from,
+                        to,
+                      })
+                    }
+                    removeScoreRange={() =>
+                      removeEvaluatorScoreRange({ evaluatorId: item.value })
+                    }
+                  />
+                ) : null,
+              };
+            }
+          : undefined;
 
     const facetSection = (
       <FacetSection
@@ -291,6 +353,7 @@ const SectionRendererInner: React.FC<SectionRendererProps> = ({
       title={label}
       icon={icon}
       keys={keys}
+      filterPrefix={filterPrefix}
       displayStripPrefix={displayStripPrefix}
       emptyDocsHref={emptyDocsHref}
       getValueState={(attrKey, value) => getFacetValueState(ast, fieldFor(attrKey), value)}

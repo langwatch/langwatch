@@ -41,7 +41,7 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { Download, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
-import Papa from "papaparse";
+import { downloadCsv } from "@langwatch/csv/download";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "zustand";
 import { datasetApi } from "../../behavior/dataset-api";
@@ -460,22 +460,13 @@ export function DatasetEditorTable({
     const exportColumns = toEditorColumns(full.columnTypes);
     const exportRecords = toEditorRecords(toEntryRecords(full.datasetRecords), full.columnTypes);
 
-    const csv = Papa.unparse({
+    downloadCsv({
       fields: exportColumns.map((column) => column.name),
-      data: exportRecords.map((record) => exportColumns.map((column) => record[column.name] ?? "")),
+      rows: exportRecords.map((record) =>
+        exportColumns.map((column) => record[column.name] ?? ""),
+      ),
+      fileName: `${datasetName?.toLowerCase().replace(/ /g, "_") ?? "dataset"}.csv`,
     });
-
-    const url = window.URL.createObjectURL(new Blob([csv]));
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute(
-      "download",
-      `${datasetName?.toLowerCase().replace(/ /g, "_") ?? "dataset"}.csv`,
-    );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
   }, [datasetId, datasetName, downloadDataset, host, project?.id]);
 
   // "Add row" only appends an empty row at the bottom. It must not steal focus

@@ -56,4 +56,12 @@ export class NullTraceListAdapter implements TraceListRepository {
   async findAttributeValues(): Promise<CategoricalFacetResult> {
     return { values: [], totalDistinct: 0 };
   }
+
+  async findEventAttributeValues(): Promise<CategoricalFacetResult> {
+    return { values: [], totalDistinct: 0 };
+  }
+
+  async findSpanAttributeValues(): Promise<CategoricalFacetResult> {
+    return { values: [], totalDistinct: 0 };
+  }
 }

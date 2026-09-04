@@ -18,6 +18,13 @@ interface AttributesSectionProps {
   title: string;
   keys: AttributeKey[];
   icon?: React.ElementType;
+  /**
+   * Prefix this section's filters are written with (`attribute`,
+   * `event.attribute`, `span.attribute`). Threaded to each key row so the
+   * lazy value lookup queries the SAME facet key the filter click writes —
+   * the server routes the prefix to the matching attribute store.
+   */
+  filterPrefix?: string;
   /** Active filter state per `<prefix>.<key>:<value>` */
   getValueState: (attrKey: string, value: string) => FacetValueState;
   /** Active state for `none:<prefix>.<key>` */
@@ -52,6 +59,7 @@ const AttributesSectionInner: React.FC<AttributesSectionProps> = ({
   title,
   keys,
   icon,
+  filterPrefix,
   getValueState,
   getNoneActive,
   onToggleValue,
@@ -167,6 +175,7 @@ const AttributesSectionInner: React.FC<AttributesSectionProps> = ({
               <AttributeKeyRow
                 key={key.value}
                 attrKey={key.value}
+                filterPrefix={filterPrefix}
                 displayLabel={stripPrefix(key.value, displayStripPrefix)}
                 count={key.count}
                 getValueState={getValueState}

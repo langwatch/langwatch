@@ -79,3 +79,13 @@ Feature: Tracked-event validation answers the caller
     Given a process that registered no trace command queue
     When the mounted paths are enumerated
     Then neither tracked-event URL is served
+
+  # A metric key survives into the event drilldown's composite-key encoding
+  # (`<key>\x1F<value>`). A key carrying that separator itself makes the
+  # split ambiguous, so the value silently disappears from the explorer
+  # instead of failing loudly. Reject it here instead.
+  @unit
+  Scenario: Ingest rejects a metric key carrying the unit separator
+    Given an event whose metric key contains the ASCII unit separator
+    When the payload is validated
+    Then the event is rejected

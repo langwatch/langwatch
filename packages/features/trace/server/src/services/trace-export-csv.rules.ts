@@ -5,6 +5,11 @@
  * Full mode: one row per span with trace fields denormalized (repeated per row).
  *
  * Uses PapaParse for RFC 4180-compliant CSV generation.
+ *
+ * Every heading and every cell goes through the shared formula guard on the way
+ * out. Trace input and output are whatever the instrumented application sent,
+ * and an evaluator's display name is chosen in the project and lands in the
+ * header row — so both halves of the file are somebody's typing.
  */
 
 import Parse from "papaparse";
@@ -18,6 +23,7 @@ import type {
   Trace,
 } from "@langwatch/trace-contract";
 import { RESERVED_METADATA_KEYS } from "./trace-export-columns.rules";
+import { neutralizeFormula, neutralizeRows } from "@langwatch/csv";
 
 /**
  * RFC 4180 line ending, stated explicitly rather than relying on PapaParse's
@@ -72,7 +78,12 @@ export function serializeTracesToSummaryCsv({
   const headers = buildSummaryHeaders({ evaluatorNames });
   const rows = traces.map((trace) => buildSummaryRow({ trace, evaluatorNames }));
 
-  return Parse.unparse({ fields: headers, data: rows }, { newline: CSV_NEWLINE }) + CSV_NEWLINE;
+  return (
+    Parse.unparse(
+      { fields: headers.map(neutralizeFormula), data: neutralizeRows(rows) },
+      { newline: CSV_NEWLINE },
+    ) + CSV_NEWLINE
+  );
 }
 
 function buildSummaryHeaders({ evaluatorNames }: { evaluatorNames: string[] }): string[] {
@@ -186,7 +197,12 @@ export function serializeTracesToFullCsv({
     }
   }
 
-  return Parse.unparse({ fields: headers, data: rows }, { newline: CSV_NEWLINE }) + CSV_NEWLINE;
+  return (
+    Parse.unparse(
+      { fields: headers.map(neutralizeFormula), data: neutralizeRows(rows) },
+      { newline: CSV_NEWLINE },
+    ) + CSV_NEWLINE
+  );
 }
 
 function buildFullHeaders({ evaluatorNames }: { evaluatorNames: string[] }): string[] {

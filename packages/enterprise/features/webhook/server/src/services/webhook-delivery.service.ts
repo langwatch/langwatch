@@ -33,6 +33,9 @@ export type SpendUsage = {
   output_audio_tokens: number;
   input_chars: number;
   audio_ms: number;
+  input_image_tokens: number;
+  output_image_tokens: number;
+  image_count: number;
 };
 
 export const EMPTY_SPEND_USAGE: SpendUsage = {
@@ -46,6 +49,9 @@ export const EMPTY_SPEND_USAGE: SpendUsage = {
   output_audio_tokens: 0,
   input_chars: 0,
   audio_ms: 0,
+  input_image_tokens: 0,
+  output_image_tokens: 0,
+  image_count: 0,
 };
 
 type SpendAttributionData = {
@@ -242,6 +248,9 @@ const spendUsagePayloadSchema = z.object({
   output_audio_tokens: z.number().int().min(0).default(0),
   input_chars: z.number().int().min(0).default(0),
   audio_ms: z.number().int().min(0).default(0),
+  input_image_tokens: z.number().int().min(0).default(0),
+  output_image_tokens: z.number().int().min(0).default(0),
+  image_count: z.number().int().min(0).default(0),
 });
 
 /** Everything the deliver executor needs to rate, build the envelope, and

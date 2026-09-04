@@ -2,7 +2,8 @@
 
 The decorated object stays callable with the original signature, so unit
 tests and local scenario runs use it as before. It also answers `.call(input)`
-for the scenario library and `.invoke(call)` for the connection client.
+and `.role` for the scenario library, and `.invoke(call)` for the connection
+client.
 """
 
 from __future__ import annotations
@@ -23,8 +24,7 @@ from .schema import TURN_FIELDS, AgentSignature, analyze_signature
 
 DEFAULT_TIMEOUT_SECONDS = 120
 MAX_TIMEOUT_SECONDS = 300
-DEFAULT_CONCURRENCY_DEVELOPMENT = 1
-DEFAULT_CONCURRENCY_SHARED = 4
+DEFAULT_CONCURRENCY = 10
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -121,11 +121,7 @@ class ConnectedAgent:
         self.concurrency = (
             concurrency
             if concurrency is not None and concurrency > 0
-            else (
-                DEFAULT_CONCURRENCY_DEVELOPMENT
-                if self.environment == "development"
-                else DEFAULT_CONCURRENCY_SHARED
-            )
+            else DEFAULT_CONCURRENCY
         )
         self.sticky = sticky
         self.api_key = api_key
@@ -151,6 +147,29 @@ class ConnectedAgent:
     @property
     def timeout_ms(self) -> int:
         return int(self.timeout * 1000)
+
+    @property
+    def role(self) -> Any:
+        """The role the scenario executor reads to pick the agent under test.
+
+        `ScenarioExecutor._next_agent_for_role` compares enum members, so
+        this returns the member itself; the string value would never match.
+        The scenario package is an optional dependency, so it is imported here
+        rather than at module load, and its value stands in without it.
+
+        Only an absent package falls back. Python names the top-level package
+        when it is the missing one, so any other name, `scenario.types`
+        included, means the package is installed and broken, and that is
+        raised: standing in for it would leave the executor unable to match
+        the role and fail somewhere far from the cause.
+        """
+        try:
+            from scenario.types import AgentRole
+        except ModuleNotFoundError as missing:
+            if missing.name != "scenario":
+                raise
+            return "Agent"
+        return AgentRole.AGENT
 
     def registration(self) -> AgentRegistration:
         frame: AgentRegistration = {
@@ -285,7 +304,9 @@ def connect_agent(
             `LANGWATCH_AGENT_CONNECT=0` always disables.
         instance_label: Names this process; also `LANGWATCH_AGENT_INSTANCE_LABEL`.
         timeout: Seconds one call may take, default 120, at most 300.
-        concurrency: Calls in flight per process, default 1 in development and 4 elsewhere.
+        concurrency: Calls in flight per process, default 10. A test suite sends
+            several scenarios at once; the ceiling is there because the model
+            providers rate limit the calls behind them.
         sticky: Keep one conversation on one process.
         api_key, endpoint, project_id: Override the SDK configuration.
         transport: `websocket` (default, falls back to HTTP when the upgrade

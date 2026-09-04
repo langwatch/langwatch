@@ -466,6 +466,14 @@ export const modelCostRateSchema = z
     cacheCreation1hCostPerToken: z.number().optional(),
     inputAudioCostPerToken: z.number().optional(),
     outputAudioCostPerToken: z.number().optional(),
+    // Per-token rates for image tokens on the token-billed image models.
+    // OpenAI bills gpt-image output image tokens at $30 to $40 per million
+    // against $5 for text input, so an image priced off a flat token total
+    // comes out a fraction of what it cost. The counts these price are
+    // disjoint from the text token counts and, unlike the audio rates,
+    // there is no text fallback.
+    inputImageCostPerToken: z.number().optional(),
+    outputImageCostPerToken: z.number().optional(),
     inputCostPerCharacter: z.number().optional(),
     inputCostPerSecond: z.number().optional(),
   })

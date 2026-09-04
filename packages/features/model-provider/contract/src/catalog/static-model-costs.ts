@@ -68,6 +68,8 @@ export function getStaticModelCostRates(): readonly ModelCostRate[] {
           cacheCreation1hCostPerToken: resolveCacheWrite1hRate(modelId, model.pricing),
           inputAudioCostPerToken: model.pricing.audioCostPerToken,
           outputAudioCostPerToken: resolveAudioOutputRate(modelId, model.pricing),
+          inputImageCostPerToken: model.pricing.imageCostPerToken,
+          outputImageCostPerToken: model.pricing.imageOutputCostPerToken,
           inputCostPerCharacter: model.pricing.inputCostPerCharacter,
           inputCostPerSecond: model.pricing.inputCostPerSecond,
         },
@@ -94,13 +96,17 @@ function hasPrice(pricing: {
   inputCostPerCharacter?: number;
   inputCostPerSecond?: number;
   audioCostPerToken?: number;
+  imageCostPerToken?: number;
+  imageOutputCostPerToken?: number;
 }): boolean {
   return (
     pricing.inputCostPerToken != null ||
     pricing.outputCostPerToken != null ||
     pricing.inputCostPerCharacter != null ||
     pricing.inputCostPerSecond != null ||
-    pricing.audioCostPerToken != null
+    pricing.audioCostPerToken != null ||
+    pricing.imageCostPerToken != null ||
+    pricing.imageOutputCostPerToken != null
   );
 }
 

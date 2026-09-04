@@ -44,7 +44,7 @@ export class AnnotationsApiService {
   async getAll(): Promise<AnnotationResponse[]> {
     const { data, error } = await this.apiClient.GET("/api/v1/annotations");
     if (error) this.handleApiError("fetch all annotations", error);
-    return data;
+    return data.data;
   }
 
   async get(id: string): Promise<AnnotationResponse> {
@@ -52,7 +52,7 @@ export class AnnotationsApiService {
       params: { path: { id } },
     });
     if (error) this.handleApiError(`fetch annotation with ID "${id}"`, error);
-    return data;
+    return data.data;
   }
 
   async getByTrace(traceId: string): Promise<AnnotationResponse[]> {
@@ -60,7 +60,7 @@ export class AnnotationsApiService {
       params: { path: { id: traceId } },
     });
     if (error) this.handleApiError(`fetch annotations for trace "${traceId}"`, error);
-    return data;
+    return data.data;
   }
 
   async create(traceId: string, params: CreateAnnotationBody): Promise<AnnotationResponse> {
@@ -69,7 +69,7 @@ export class AnnotationsApiService {
       body: params,
     });
     if (error) this.handleApiError("create annotation", error);
-    return data;
+    return data.data;
   }
 
   async delete(id: string): Promise<{ status?: string; message?: string }> {

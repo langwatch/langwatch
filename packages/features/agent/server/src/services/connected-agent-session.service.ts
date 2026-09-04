@@ -13,9 +13,7 @@ import {
   type AgentService,
   CALL_KEY_SLACK_SECONDS,
   DEFAULT_CALL_TIMEOUT_MS,
-  DEFAULT_CONCURRENCY_DEVELOPMENT,
-  DEFAULT_CONCURRENCY_SHARED,
-  DEVELOPMENT_ENVIRONMENT,
+  DEFAULT_CONCURRENCY,
   MAX_CALL_TIMEOUT_MS,
   PROTOCOL_VERSION,
   RESULT_TTL_SECONDS,
@@ -167,11 +165,7 @@ export class AgentSessionCore {
       label: frame.instance.label ?? null,
       podId: this.runtime.podId,
       connectedAt: this.now(),
-      maxConcurrency:
-        frame.instance.maxConcurrency ??
-        (agents.every((agent) => agent.environment === DEVELOPMENT_ENVIRONMENT)
-          ? DEFAULT_CONCURRENCY_DEVELOPMENT
-          : DEFAULT_CONCURRENCY_SHARED),
+      maxConcurrency: frame.instance.maxConcurrency ?? DEFAULT_CONCURRENCY,
     };
     const session: SessionInfo = {
       instanceId: frame.instance.id,

@@ -218,6 +218,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
         SELECT ${SPEND_ROW_COLUMNS}, SettleReason, PodId, PodSeq,
                TokensCacheWrite1h, TokensInputAudio, TokensOutputAudio,
                CharsInput, AudioMS,
+               TokensInputImage, TokensOutputImage, ImageCount,
                Version, CreatedAt, LastEventOccurredAt, EventTimestamp
         FROM ${TABLE} FINAL
         WHERE TenantId = {tenantId:String}
@@ -835,6 +836,9 @@ export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
       TokensOutputAudio: quantities.output_audio_tokens,
       CharsInput: quantities.input_chars,
       AudioMS: quantities.audio_ms,
+      TokensInputImage: quantities.input_image_tokens,
+      TokensOutputImage: quantities.output_image_tokens,
+      ImageCount: quantities.image_count,
     };
   }
 
@@ -863,6 +867,9 @@ export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
       quantity("TokensInputAudio"),
       quantity("TokensOutputAudio"),
       quantity("TokensCacheWrite1h"),
+      quantity("TokensInputImage"),
+      quantity("TokensOutputImage"),
+      quantity("ImageCount"),
     ];
     const outcome = row.status === "confirmed" || row.status === "failed";
     if (!outcome && !measured.some((value) => value > 0)) return null;
@@ -877,6 +884,9 @@ export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
       output_audio_tokens: quantity("TokensOutputAudio"),
       input_chars: quantity("CharsInput"),
       audio_ms: quantity("AudioMS"),
+      input_image_tokens: quantity("TokensInputImage"),
+      output_image_tokens: quantity("TokensOutputImage"),
+      image_count: quantity("ImageCount"),
     };
   }
 }

@@ -115,6 +115,7 @@ func NewBifrostRouter(ctx context.Context, opts BifrostOptions) (*BifrostRouter,
 		Account: &account{
 			anthropicCompat: compatEndpoints,
 			openAIBaseURL:   opts.OpenAIBackendURL,
+			logger:          opts.Logger,
 		},
 		InitialPoolSize: pool,
 		Logger:          &bifrostLogger{logger: opts.Logger},
@@ -249,6 +250,12 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 	// translated first (anthropic_codex.go): raw-forwarding an Anthropic body
 	// would be rejected before it ever left the gateway.
 	if cred.ProviderID == domain.ProviderOpenAICodex {
+		// The codex backend serves the Responses dialect only, so an image
+		// request has no route on this lane and must not reach dispatchCodex,
+		// which would send it as a Responses call.
+		if err := imageEndpointOnCodex(ctx, req.Type); err != nil {
+			return nil, err
+		}
 		if req.Type == domain.RequestTypeMessages {
 			return r.dispatchMessagesTranslatedCodex(ctx, req, model, cred)
 		}
@@ -271,6 +278,14 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 
 	if req.Type == domain.RequestTypeTranscription {
 		return r.dispatchTranscription(ctx, req, provider, model, cred)
+	}
+
+	if req.Type == domain.RequestTypeImageGeneration {
+		return r.dispatchImageGeneration(ctx, req, provider, model, cred)
+	}
+
+	if req.Type == domain.RequestTypeImageEdit {
+		return r.dispatchImageEdit(ctx, req, provider, model, cred)
 	}
 
 	if req.Type == domain.RequestTypePassthrough {
@@ -319,12 +334,8 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 		// present. Clients like claude-code / OpenAI SDK need the real
 		// provider error envelope (rate-limit hints, overload signals,
 		// billing errors) to surface correctly.
-		if rawBody, status, ok := rawResponseFromBifrostError(berr); ok {
-			return &domain.Response{
-				Body:       rawBody,
-				StatusCode: status,
-				Headers:    forwardableUpstreamHeaders(bifrostResponseHeaders(bfCtx)),
-			}, nil
+		if answer, ok := r.responseFromBifrostError(berr, bfCtx, req.Type); ok {
+			return answer, nil
 		}
 		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
 	}
@@ -440,12 +451,8 @@ func (r *BifrostRouter) dispatchResponses(
 
 	resp, berr := r.bf.ResponsesRequest(bfCtx, bfReq)
 	if berr != nil {
-		if rawBody, status, ok := rawResponseFromBifrostError(berr); ok {
-			return &domain.Response{
-				Body:       rawBody,
-				StatusCode: status,
-				Headers:    forwardableUpstreamHeaders(bifrostResponseHeaders(bfCtx)),
-			}, nil
+		if answer, ok := r.responseFromBifrostError(berr, bfCtx, req.Type); ok {
+			return answer, nil
 		}
 		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
 	}
@@ -495,12 +502,8 @@ func (r *BifrostRouter) dispatchEmbeddings(
 
 	resp, berr := r.bf.EmbeddingRequest(bfCtx, bfReq)
 	if berr != nil {
-		if rawBody, status, ok := rawResponseFromBifrostError(berr); ok {
-			return &domain.Response{
-				Body:       rawBody,
-				StatusCode: status,
-				Headers:    forwardableUpstreamHeaders(bifrostResponseHeaders(bfCtx)),
-			}, nil
+		if answer, ok := r.responseFromBifrostError(berr, bfCtx, req.Type); ok {
+			return answer, nil
 		}
 		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
 	}
@@ -617,6 +620,15 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 	model := req.Model
 	if req.Resolved != nil {
 		model = req.Resolved.ModelID
+	}
+
+	// The image routes answer with one JSON body, so no credential and no
+	// provider lane streams them. This sits above every provider-specific
+	// branch below, which return before any lane-neutral check further down.
+	if req.Type == domain.RequestTypeImageGeneration || req.Type == domain.RequestTypeImageEdit {
+		return nil, herr.New(ctx, domain.ErrBadRequest, herr.M{
+			"message": "streaming image generation is not supported",
+		})
 	}
 
 	// Codex bypasses Bifrost entirely: a direct SSE proxy to OpenAI's codex
@@ -828,12 +840,8 @@ func (r *BifrostRouter) dispatchPassthrough(
 
 	resp, berr := r.bf.Passthrough(bfCtx, provider, bfReq)
 	if berr != nil {
-		if rawBody, status, ok := rawResponseFromBifrostError(berr); ok {
-			return &domain.Response{
-				Body:       rawBody,
-				StatusCode: status,
-				Headers:    forwardableUpstreamHeaders(bifrostResponseHeaders(bfCtx)),
-			}, nil
+		if answer, ok := r.responseFromBifrostError(berr, bfCtx, req.Type); ok {
+			return answer, nil
 		}
 		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
 	}
@@ -1004,27 +1012,172 @@ func extractRawResponseBytes(raw interface{}) ([]byte, bool) {
 	}
 }
 
+// rawUpstreamBody is the provider's own response bytes carried on a
+// BifrostError, with the HTTP status the gateway forwards them under and the
+// usage read from them.
+type rawUpstreamBody struct {
+	body   []byte
+	status int
+	usage  domain.Usage
+	// parseFailure is set when the provider answered 2xx and Bifrost could
+	// not decode the body into its schema. The body is a valid provider
+	// answer in that case, and the status is 200.
+	parseFailure error
+}
+
 // rawResponseFromBifrostError peels the provider's native response bytes
-// off a BifrostError — populated by Bifrost when the dispatch context
-// carries BifrostContextKeySendBackRawResponse=true (raw-forward paths).
-// Lets the gateway pass through Anthropic / OpenAI / etc. error
-// envelopes verbatim instead of masking them as a generic 504
-// provider_timeout, which is what clients like claude-code / codex
-// expect to parse (rate-limit hints, overload signals, billing errors
-// etc. ride in the provider-native error shape).
-func rawResponseFromBifrostError(berr *bfschemas.BifrostError) ([]byte, int, bool) {
+// off a BifrostError. Bifrost attaches them when the dispatch context carries
+// BifrostContextKeySendBackRawResponse=true (raw-forward paths). Returns
+// ok=false when no body rides on the error.
+//
+// Three cases decide the status:
+//
+//   - The provider answered with a non-2xx status: that status and body are
+//     forwarded as they are, so clients like claude-code / codex read the
+//     provider's own error envelope (rate-limit hints, overload signals,
+//     billing errors).
+//   - The provider answered 2xx and Bifrost failed to decode the body into
+//     its schema (ErrProviderResponseUnmarshal, no status): the body is the
+//     provider's complete answer and goes out as HTTP 200, with the usage
+//     read back from the raw JSON so the request is still metered. A schema
+//     gap in the engine must not turn a good answer into a 502 with zero
+//     spend.
+//   - Anything else with no status: 502.
+func rawResponseFromBifrostError(berr *bfschemas.BifrostError, reqType domain.RequestType) (rawUpstreamBody, bool) {
 	if berr == nil {
-		return nil, 0, false
+		return rawUpstreamBody{}, false
 	}
 	body, ok := extractRawResponseBytes(berr.ExtraFields.RawResponse)
 	if !ok {
-		return nil, 0, false
+		return rawUpstreamBody{}, false
 	}
-	status := http.StatusBadGateway
-	if berr.StatusCode != nil && *berr.StatusCode > 0 {
-		status = *berr.StatusCode
+	if status := bfStatus(berr); status > 0 {
+		return rawUpstreamBody{body: body, status: status}, true
 	}
-	return body, status, true
+	if parseFailure, ok := bfSchemaParseFailure(berr); ok {
+		return rawUpstreamBody{
+			body:         body,
+			status:       http.StatusOK,
+			usage:        usageFromRawJSON(body, reqType),
+			parseFailure: parseFailure,
+		}, true
+	}
+	return rawUpstreamBody{body: body, status: http.StatusBadGateway}, true
+}
+
+// bfSchemaParseFailure reports whether a BifrostError is the engine's own
+// failure to decode a provider 2xx body (providers/utils HandleProviderResponse
+// sets ErrProviderResponseUnmarshal with no status). The returned error is the
+// decoder's message, which names the field that did not fit.
+func bfSchemaParseFailure(berr *bfschemas.BifrostError) (error, bool) {
+	if berr == nil || berr.Error == nil || bfStatus(berr) > 0 {
+		return nil, false
+	}
+	if berr.Error.Message != bfschemas.ErrProviderResponseUnmarshal {
+		return nil, false
+	}
+	if berr.Error.Error != nil {
+		return berr.Error.Error, true
+	}
+	return errors.New(berr.Error.Message), true
+}
+
+// responseFromBifrostError turns a BifrostError that carries the provider's
+// own body into the response the gateway forwards. ok=false means no body
+// rides on the error, and the caller classifies it with errFromBifrost.
+func (r *BifrostRouter) responseFromBifrostError(
+	berr *bfschemas.BifrostError,
+	bfCtx *bfschemas.BifrostContext,
+	reqType domain.RequestType,
+) (*domain.Response, bool) {
+	raw, ok := rawResponseFromBifrostError(berr, reqType)
+	if !ok {
+		return nil, false
+	}
+	if raw.parseFailure != nil && r.logger != nil {
+		r.logger.Warn("provider 2xx body did not fit the engine schema, forwarded as-is",
+			zap.String("provider", string(berr.ExtraFields.Provider)),
+			zap.String("model", berr.ExtraFields.OriginalModelRequested),
+			zap.Int("prompt_tokens", raw.usage.PromptTokens),
+			zap.Int("completion_tokens", raw.usage.CompletionTokens),
+			zap.Error(raw.parseFailure))
+	}
+	return &domain.Response{
+		Body:       raw.body,
+		StatusCode: raw.status,
+		Usage:      raw.usage,
+		Headers:    forwardableUpstreamHeaders(bifrostResponseHeaders(bfCtx)),
+	}, true
+}
+
+// usageFromRawJSON reads the usage block off a provider body the engine could
+// not decode. It covers the three OpenAI wire shapes the raw-forward lanes
+// carry: Responses (input_tokens / output_tokens), chat completions
+// (prompt_tokens / completion_tokens) and images (input_tokens / output_tokens
+// with image_tokens and text_tokens details). Image counts are taken out of
+// the totals on the same terms extractImageUsage states.
+func usageFromRawJSON(body []byte, reqType domain.RequestType) domain.Usage {
+	isImage := reqType == domain.RequestTypeImageGeneration || reqType == domain.RequestTypeImageEdit
+	usage := gjson.GetBytes(body, "usage")
+	if !usage.IsObject() {
+		if isImage {
+			return domain.Usage{ImageCount: imageCountFromRawJSON(body)}
+		}
+		return domain.Usage{}
+	}
+	u := domain.Usage{
+		PromptTokens:     firstInt(usage, "input_tokens", "prompt_tokens"),
+		CompletionTokens: firstInt(usage, "output_tokens", "completion_tokens"),
+		TotalTokens:      int(usage.Get("total_tokens").Int()),
+		CacheReadTokens: firstInt(usage,
+			"input_tokens_details.cached_tokens", "prompt_tokens_details.cached_tokens"),
+		ReasoningTokens: firstInt(usage,
+			"output_tokens_details.reasoning_tokens", "completion_tokens_details.reasoning_tokens"),
+	}
+	if u.TotalTokens == 0 {
+		u.TotalTokens = u.PromptTokens + u.CompletionTokens
+	}
+	split := domain.ImageTokenSplit{
+		InputImage:  int(usage.Get("input_tokens_details.image_tokens").Int()),
+		InputText:   int(usage.Get("input_tokens_details.text_tokens").Int()),
+		OutputImage: int(usage.Get("output_tokens_details.image_tokens").Int()),
+		OutputText:  int(usage.Get("output_tokens_details.text_tokens").Int()),
+	}
+	if isImage {
+		u.ImageCount = imageCountFromRawJSON(body)
+		if !usage.Get("output_tokens_details").IsObject() {
+			// An image model answers in image tokens. With no breakdown
+			// stated, the whole output total is the image side, on the same
+			// terms extractImageUsage applies to a decoded response.
+			split.OutputImage = u.CompletionTokens
+		}
+	}
+	if split == (domain.ImageTokenSplit{}) {
+		return u
+	}
+	return u.SplitImageTokens(split)
+}
+
+// imageCountFromRawJSON counts the images on a provider body the engine could
+// not decode. The images ride in the "data" array of the OpenAI images shape,
+// which is what extractImageUsage counts on a decoded response.
+func imageCountFromRawJSON(body []byte) int {
+	data := gjson.GetBytes(body, "data")
+	if !data.IsArray() {
+		return 0
+	}
+	return len(data.Array())
+}
+
+// firstInt returns the first of the paths that resolves to a number under
+// the usage object, zero when none does.
+func firstInt(usage gjson.Result, paths ...string) int {
+	for _, path := range paths {
+		if v := usage.Get(path); v.Exists() && v.Type == gjson.Number {
+			return int(v.Int())
+		}
+	}
+	return 0
 }
 
 // --- Bifrost Account (multi-tenant credential provider) ---
@@ -1051,6 +1204,9 @@ type account struct {
 	// openAIBaseURL redirects bifrost's native OpenAI provider to a local
 	// server in tests. Empty in production. See BifrostOptions.OpenAIBackendURL.
 	openAIBaseURL string
+	// logger is passed to credentialToBifrostKey for the dropped
+	// api_version warning. May be nil.
+	logger *zap.Logger
 }
 
 func (a *account) GetConfiguredProviders() ([]bfschemas.ModelProvider, error) {
@@ -1062,7 +1218,7 @@ func (a *account) GetKeysForProvider(ctx context.Context, provider bfschemas.Mod
 	if cred.ID == "" {
 		return nil, fmt.Errorf("no credential on context for provider %s", provider)
 	}
-	key := credentialToBifrostKey(cred, provider)
+	key := credentialToBifrostKey(cred, provider, a.logger)
 	return []bfschemas.Key{key}, nil
 }
 
@@ -1078,6 +1234,15 @@ const ProviderRequestTimeoutSeconds = 14 * 60
 
 func (a *account) GetConfigForProvider(provider bfschemas.ModelProvider) (*bfschemas.ProviderConfig, error) {
 	cfg := &bfschemas.ProviderConfig{}
+	// bifrost v1.5 gates verbatim provider bytes behind SendBackRawRequest/Response
+	// (default false); without them it returns only its normalized response and
+	// drops the provider's native error/response body. The gateway forwards
+	// provider bodies byte-for-byte (rawResponseFromBifrostError, the raw-forward
+	// stream paths), so it needs both on for every provider — v1.4 always made the
+	// raw bytes available. Per-request BifrostContextKeySendBackRaw* overrides
+	// still layer on top of this for the paths that set them.
+	cfg.SendBackRawRequest = true
+	cfg.SendBackRawResponse = true
 	// Every provider is sized explicitly, standard ones included. A zero here
 	// is not "no opinion": CheckAndSetDefaults at the bottom of this function
 	// replaces it with bifrost's own 1000 workers and 5000-slot queue, and
@@ -1129,21 +1294,40 @@ func (a *account) GetConfigForProvider(provider bfschemas.ModelProvider) (*bfsch
 		// unblocks outbound-delta diagnosis (headers, body) when a
 		// provider-side behavior (e.g. Anthropic cache) fires on direct
 		// curl but not through the gateway. Do NOT set in production.
+		// bifrost v1.5 typed ProxyConfig.URL as *EnvVar (value/env_var/from_env).
+		proxyURLEnv := envVar(proxyURL)
 		cfg.ProxyConfig = &bfschemas.ProxyConfig{
 			Type: bfschemas.HTTPProxy,
-			URL:  proxyURL,
+			URL:  &proxyURLEnv,
 		}
 	}
 	cfg.CheckAndSetDefaults()
 	return cfg, nil
 }
 
-// credentialToBifrostKey converts a domain.Credential into bifrost's Key format.
-func credentialToBifrostKey(cred domain.Credential, provider bfschemas.ModelProvider) bfschemas.Key {
+// credentialToBifrostKey converts a domain.Credential into bifrost's Key
+// format. logger may be nil (e.g. bare tests); used only to warn on a
+// dropped api_version override.
+// warnIgnoredAzureAPIVersion logs when a caller supplied an Azure api_version
+// override that bifrost v1.5 no longer forwards. logger may be nil.
+func warnIgnoredAzureAPIVersion(cred domain.Credential, logger *zap.Logger) {
+	if v := cred.Extra["api_version"]; v != "" && logger != nil {
+		logger.Warn("azure api_version override is ignored: bifrost v1.5 sets api-version itself",
+			zap.String("api_version", v))
+	}
+}
+
+func credentialToBifrostKey(cred domain.Credential, provider bfschemas.ModelProvider, logger *zap.Logger) bfschemas.Key {
 	k := bfschemas.Key{
 		ID:     cred.ID,
 		Name:   cred.ID,
 		Weight: 1,
+		// bifrost v1.5 flipped the empty-whitelist meaning: []=deny-all,
+		// ["*"]=allow-all (was allow-all when empty in v1.4). GetKeysForProvider
+		// hands bifrost one credential the gateway already selected by its own
+		// model-eligibility gating, so this key must serve whatever model was
+		// dispatched — an explicit ["*"] restores the v1.4 pass-through.
+		Models: bfschemas.WhiteList{"*"},
 	}
 
 	switch provider {
@@ -1157,15 +1341,16 @@ func credentialToBifrostKey(cred domain.Credential, provider bfschemas.ModelProv
 		// with an empty endpoint → Bifrost "endpoint not set" (#5760). Mirrors the
 		// dual-name tolerance credBaseURL already applies to vLLM.
 		endpoint := credExtra(cred, "endpoint", "api_base")
-		cfg := &bfschemas.AzureKeyConfig{
-			Endpoint:    envVar(endpoint),
-			Deployments: cred.DeploymentMap,
+		// bifrost v1.5 dropped the per-key api-version field; the Azure
+		// provider now injects its own and a caller-supplied override is
+		// no longer forwarded (see the warning below).
+		warnIgnoredAzureAPIVersion(cred, logger)
+		// bifrost v1.5 moved model->deployment mapping off AzureKeyConfig onto
+		// Key.Aliases, resolved uniformly via Aliases.Resolve.
+		k.Aliases = bfschemas.KeyAliases(cred.DeploymentMap)
+		k.AzureKeyConfig = &bfschemas.AzureKeyConfig{
+			Endpoint: envVar(endpoint),
 		}
-		if apiVersion, ok := cred.Extra["api_version"]; ok {
-			v := envVar(apiVersion)
-			cfg.APIVersion = &v
-		}
-		k.AzureKeyConfig = cfg
 
 	case bfschemas.Bedrock:
 		// Two nlpgo routes feed Bedrock creds under different key names: the
@@ -1173,10 +1358,11 @@ func credentialToBifrostKey(cred domain.Credential, provider bfschemas.ModelProv
 		// access_key / secret_key / session_token / region, while the
 		// gatewayproxy (/go/proxy) keeps the litellm aws_* names. Accept both
 		// so neither route lands here with empty credentials.
+		// bifrost v1.5 moved model->deployment mapping onto Key.Aliases (see Azure).
+		k.Aliases = bfschemas.KeyAliases(cred.DeploymentMap)
 		cfg := &bfschemas.BedrockKeyConfig{
-			AccessKey:   envVar(credExtra(cred, "access_key", "aws_access_key_id")),
-			SecretKey:   envVar(credExtra(cred, "secret_key", "aws_secret_access_key")),
-			Deployments: cred.DeploymentMap,
+			AccessKey: envVar(credExtra(cred, "access_key", "aws_access_key_id")),
+			SecretKey: envVar(credExtra(cred, "secret_key", "aws_secret_access_key")),
 		}
 		if st := credExtra(cred, "session_token", "aws_session_token"); st != "" {
 			v := envVar(st)

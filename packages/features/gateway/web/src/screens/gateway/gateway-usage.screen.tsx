@@ -26,6 +26,8 @@ import {
   YAxis,
 } from "recharts";
 
+import { neutralizeRows } from "@langwatch/csv";
+
 import AiGatewayLayout from "../../ui/sections/gateway-layout";
 import {
   resolveTracesHrefForKey,
@@ -201,7 +203,10 @@ function GatewayUsagePage() {
     for (const m of data.byModel) {
       rows.push(["model", m.model, "", Number(m.totalUsd).toFixed(6), m.requests]);
     }
-    const csv = Parse.unparse(rows);
+    // Sectioned: the file carries several header rows and blank separators, so
+    // there is no single `fields` list to pass and every row is guarded in
+    // place. Virtual key and model names are typed by whoever created them.
+    const csv = Parse.unparse(neutralizeRows(rows));
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement("a");

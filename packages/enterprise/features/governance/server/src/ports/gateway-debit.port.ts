@@ -16,6 +16,9 @@ export type GatewaySpendUsage = {
   output_audio_tokens: number;
   input_chars: number;
   audio_ms: number;
+  input_image_tokens: number;
+  output_image_tokens: number;
+  image_count: number;
 };
 
 export type GatewaySpendAttribution = {

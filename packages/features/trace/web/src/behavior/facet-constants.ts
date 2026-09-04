@@ -574,4 +574,9 @@ export const COMFORTABLE_DEFAULT_SECTIONS: ReadonlySet<string> = new Set([
   "cost",
   "tokens",
   "evaluator",
+  // Feedback events (thumbs_up_down and friends) must be filterable with
+  // zero configuration — the event facet and its attribute keys are part
+  // of the default set. Span attributes stay behind "+ Add facet".
+  "event",
+  EVENT_ATTRIBUTES_SECTION_KEY,
 ]);

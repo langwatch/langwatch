@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.1](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.12.0...typescript-sdk@v1.12.1) (2026-09-04)
+
+
+### Bug Fixes
+
+* **sdk-ts:** annotations methods return what their signatures promise ([#7865](https://github.com/langwatch/langwatch/issues/7865)) ([0730c99](https://github.com/langwatch/langwatch/commit/0730c99bde6763e1e22a0aa4c8f0471c3e9627b0))
+
 ## [1.12.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.11.0...typescript-sdk@v1.12.0) (2026-09-01)
 
 ### Features

@@ -1,6 +1,5 @@
 import { Alert, HStack, Skeleton, Spacer, Table, Tabs, Text, VStack } from "@chakra-ui/react";
 import numeral from "numeral";
-import Parse from "papaparse";
 import React, { useEffect, useRef, useState } from "react";
 import { Download, ExternalLink, MoreVertical } from "react-feather";
 import { showErrorToast } from "@langwatch/workflow-web/studio-host/errors";
@@ -10,6 +9,7 @@ import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
 import { api } from "@langwatch/workflow-web/studio-host/api";
 import { BatchEvaluationV2EvaluationResult } from "./batch-evaluation-v2-evaluation-result";
 import { getEvaluationColumns } from "../../../../model/experiments/BatchEvaluationV2/utils";
+import { downloadCsv } from "@langwatch/csv/download";
 
 export const useBatchEvaluationResults = ({
   project,
@@ -274,26 +274,20 @@ export const useBatchEvaluationDownloadCSV = ({
       return row;
     });
 
-    const csvBlob = Parse.unparse({
-      fields: csvHeaders,
-      data: csvData,
-    });
-
-    const url = window.URL.createObjectURL(new Blob([csvBlob]));
-
-    const link = document.createElement("a");
-    link.href = url;
     // Non-null per the `isDownloadCSVEnabled` guard above (the early
     // throw on line 208 ensures `run.data` is populated by the time we
     // get here). `getRun` returns `ExperimentRunWithItems | null` since
     // PR #3483 to handle the cold-start window where the row hasn't
     // been folded into ClickHouse yet — see service comment.
-    const formattedDate = new Date(run.data!.timestamps.createdAt).toISOString().split("T")[0];
-    const fileName = `${formattedDate}_${experiment.name}_${runId}.csv`;
-    link.setAttribute("download", fileName);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+    const formattedDate = new Date(run.data!.timestamps.createdAt)
+      .toISOString()
+      .split("T")[0];
+
+    downloadCsv({
+      fields: csvHeaders,
+      rows: csvData,
+      fileName: `${formattedDate}_${experiment.name}_${runId}.csv`,
+    });
   };
 
   return { downloadCSV, isDownloadCSVEnabled };

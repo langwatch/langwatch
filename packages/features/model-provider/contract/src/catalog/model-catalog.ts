@@ -53,7 +53,7 @@ export const modelCatalogEntrySchema = z
     supportedParameters: z.array(z.string()),
     defaultParameters: z.record(z.string(), z.unknown()).nullable(),
     modality: z.string(),
-    mode: z.enum(["chat", "embedding", "audio"]),
+    mode: z.enum(["chat", "embedding", "audio", "image"]),
     description: z.string().optional(),
     supportsImageInput: z.boolean(),
     supportsAudioInput: z.boolean(),
@@ -179,7 +179,7 @@ export function hasVariantSuffix(modelId: string): boolean {
   );
 }
 
-export const allLitellmModels: Record<string, { mode: "chat" | "embedding" | "audio" }> =
+export const allLitellmModels: Record<string, { mode: "chat" | "embedding" | "audio" | "image" }> =
   Object.fromEntries(
     Object.entries(llmModels.models)
       .filter(([id]) => !hasVariantSuffix(id))

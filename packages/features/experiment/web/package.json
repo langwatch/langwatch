@@ -71,6 +71,7 @@
     "@emotion/react": "^11.14.0",
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/csv": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/dataset-web": "workspace:*",
     "@langwatch/design-system": "workspace:*",

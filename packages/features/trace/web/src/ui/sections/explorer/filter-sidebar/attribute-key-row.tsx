@@ -10,6 +10,7 @@ import { formatCount } from "./utils";
 
 export const AttributeKeyRow = memo(function AttributeKeyRow({
   attrKey,
+  filterPrefix,
   displayLabel,
   count,
   getValueState,
@@ -18,6 +19,12 @@ export const AttributeKeyRow = memo(function AttributeKeyRow({
   onToggleNone,
 }: {
   attrKey: string;
+  /**
+   * Prefix the enclosing section writes filters with (`attribute`,
+   * `event.attribute`, `span.attribute`). The value lookup must query the
+   * same facet key, or this row lists values from the wrong store.
+   */
+  filterPrefix?: string;
   /**
    * Text shown for this key. Defaults to `attrKey`; the Metadata section
    * passes the `metadata.`-stripped form. Display-only — `attrKey` still
@@ -31,7 +38,11 @@ export const AttributeKeyRow = memo(function AttributeKeyRow({
   onToggleNone: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const { values, isLoading } = useAttributeValues(attrKey, open);
+  const { values, isLoading } = useAttributeValues({
+    attrKey,
+    enabled: open,
+    filterPrefix,
+  });
 
   const activeCount = useMemo(() => {
     const valueActive = values.filter((v) => getValueState(attrKey, v.value) !== "neutral").length;

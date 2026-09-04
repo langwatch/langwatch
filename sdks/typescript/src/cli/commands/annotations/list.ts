@@ -23,16 +23,13 @@ export const listAnnotationsCommand = async (options: {
   const spinner = createSpinner(label).start();
 
   try {
-    const result = options.traceId
+    const annotations = options.traceId
       ? await service.getByTrace(options.traceId)
       : await service.getAll();
 
-    // Handle both array and {data: [...]} response shapes
-    const annotations = Array.isArray(result)
-      ? result
-      : ((result as unknown as { data: typeof result }).data ?? []);
-
-    spinner.succeed(`Found ${annotations.length} annotation${annotations.length !== 1 ? "s" : ""}`);
+    spinner.succeed(
+      `Found ${annotations.length} annotation${annotations.length !== 1 ? "s" : ""}`,
+    );
 
     return {
       data: annotations,
@@ -42,7 +39,9 @@ export const listAnnotationsCommand = async (options: {
           console.log(chalk.gray("No annotations found."));
           console.log(chalk.gray("Create one with:"));
           console.log(
-            chalk.cyan('  langwatch annotation create <traceId> --comment "Great response!"'),
+            chalk.cyan(
+              '  langwatch annotation create <traceId> --comment "Great response!" --thumbs-up',
+            ),
           );
           return;
         }
@@ -68,7 +67,9 @@ export const listAnnotationsCommand = async (options: {
 
         console.log();
         console.log(
-          chalk.gray(`Use ${chalk.cyan("langwatch annotation get <id>")} to view full details`),
+          chalk.gray(
+            `Use ${chalk.cyan("langwatch annotation get <id>")} to view full details`,
+          ),
         );
       },
     };

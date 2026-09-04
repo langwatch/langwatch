@@ -27,6 +27,7 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/csv": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/enterprise-billing-web": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
