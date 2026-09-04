@@ -8,6 +8,10 @@ import type { RawOutputFlags } from "../../utils/output";
 import { createCliRunPlansService } from "./cli-run-plans-service";
 import { createCliTestSuitesService } from "../test-suites/cli-test-suites-service";
 import {
+  type EvaluatorFlagRef,
+  readEvaluators,
+} from "../test-suites/evaluatorFlags";
+import {
   buildScope,
   parseRepeat,
   parseTargets,
@@ -25,6 +29,10 @@ export interface RunPlanRunOptions extends ScopeOptions, RawOutputFlags {
   note?: string;
   idempotencyKey?: string;
   wait?: boolean;
+  /** `--evaluator <id|slug>`, in the order written, each with its gate flag. */
+  evaluators?: EvaluatorFlagRef[];
+  /** `--evaluators-json <file|json>`: the plan's full attachment list. */
+  evaluatorsJson?: string;
 }
 
 /**
@@ -51,6 +59,13 @@ export const runRunPlanCommand = async (
     options,
     createCliTestSuitesService(),
   );
+  // A plan evaluator reads the conversation and the trace, never a scenario
+  // field: the plan may cover scenarios from suites with different fields.
+  const evaluators = await readEvaluators({
+    options,
+    fields: [],
+    planLevel: true,
+  });
 
   const service = createCliRunPlansService();
   const spinner = createSpinner("Scheduling run...").start();
@@ -67,6 +82,7 @@ export const runRunPlanCommand = async (
           ? { simulatorModel: options.simulatorModel }
           : {}),
         ...(options.judgeModel ? { judgeModel: options.judgeModel } : {}),
+        ...(evaluators !== undefined ? { evaluators } : {}),
       },
       ...(options.idempotencyKey
         ? { idempotencyKey: options.idempotencyKey }

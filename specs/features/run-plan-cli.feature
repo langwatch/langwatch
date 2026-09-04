@@ -65,6 +65,19 @@ Feature: Run Plan CLI Commands
     And the target carries the model value
 
   @unit
+  Scenario: Run with a plan evaluator
+    Given the project holds the evaluator "pii-leak-scanner" with the input input
+    When I run "langwatch run-plan run --all --target http:agent_abc --evaluator pii-leak-scanner"
+    Then the configuration carries that evaluator, reading the first user message
+    And no mapping names a scenario field
+
+  @unit
+  Scenario: Read a run plan shows its evaluators
+    Given a run plan with one evaluator attached
+    When I run "langwatch run-plan get <id>"
+    Then I see the evaluator with its gate and every mapping
+
+  @unit
   Scenario: Run against more than one target
     When I run "langwatch run-plan run --all --target http:agent_abc --target prompt:prompt_xyz"
     Then the run is scheduled against both targets

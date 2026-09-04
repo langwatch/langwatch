@@ -160,6 +160,8 @@ COPY platform/app/src/server/tracer/types.ts             /src/platform/app/src/s
 COPY platform/app/src/server/filters/types.ts            /src/platform/app/src/server/filters/types.ts
 COPY platform/app/src/server/evaluations/types.ts        /src/platform/app/src/server/evaluations/types.ts
 COPY platform/app/src/server/evaluations/evaluators.native.ts /src/platform/app/src/server/evaluations/evaluators.native.ts
+COPY platform/app/src/server/scenarios/suite-fields.ts    /src/platform/app/src/server/scenarios/suite-fields.ts
+COPY platform/app/src/server/scenarios/evaluator-attachments.ts /src/platform/app/src/server/scenarios/evaluator-attachments.ts
 COPY platform/app/src/server/modelProviders/llmModels.json /src/platform/app/src/server/modelProviders/llmModels.json
 COPY packages/redaction/src                           /src/packages/redaction/src
 COPY platform/app/src/app/api/openapiLangWatch.json      /src/platform/app/src/app/api/openapiLangWatch.json
