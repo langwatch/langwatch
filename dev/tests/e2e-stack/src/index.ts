@@ -33,6 +33,10 @@ function findRepoRoot(): string {
 export const REPO_ROOT = findRepoRoot();
 
 const SEED_FILE = resolve(REPO_ROOT, "packages/prisma-client/prisma/seed.ts");
+const API_KEY_TOKENS_FILE = resolve(
+  REPO_ROOT,
+  "packages/features/api-key/contract/src/api-key.tokens.ts",
+);
 
 /** A stack a suite can talk to, and the way to put it back down. */
 export type RunningStack = Readonly<{
@@ -237,11 +241,15 @@ export async function startStack(options: StartStackOptions): Promise<RunningSta
       PORT: String(port),
       LANGWATCH_ENDPOINT: baseUrl,
       BLOCK_LOCAL_HTTP_CALLS: "false",
+      // The Go engine defaults to :5561, which every worktree shares; one
+      // stack losing that race takes the whole run down with it, so this slot
+      // keeps its own port and stops it with the rest of the group.
+      LANGWATCH_NLP_SERVICE: `http://localhost:${port + 1}`,
       ...options.env,
     },
   });
 
-  const ports = [port, apiPort, workerPort];
+  const ports = [port, apiPort, workerPort, port + 1, port + 3];
   const stop = () => stopGroup(child, ports);
 
   let boots = true;
@@ -284,7 +292,10 @@ export type SeededProject = Readonly<{
   teamId: string;
   projectId: string;
   projectSlug: string;
+  /** The project's own ingestion key, the one an SDK reads from the environment. */
   apiKey: string;
+  /** The organization-scoped access token, for the management families. */
+  organizationApiKey: string;
   adminEmail: string;
   adminPassword: string;
 }>;
@@ -313,7 +324,26 @@ export function seededProject(): SeededProject {
     projectId: seedConstant(source, "PROJECT_ID"),
     projectSlug: seedConstant(source, "PROJECT_SLUG"),
     apiKey: seedConstant(source, "DEFAULT_INGESTION_KEY"),
+    organizationApiKey: seededOrganizationToken(source),
     adminEmail: seedConstant(source, "ADMIN_EMAIL"),
     adminPassword: seedConstant(source, "ADMIN_PASSWORD"),
   };
+}
+
+/**
+ * The seed builds its private access token from the contract's prefix and two
+ * of its own constants, so this composes it the same way rather than repeating
+ * the literal.
+ */
+function seededOrganizationToken(seedSource: string): string {
+  const tokens = readFileSync(API_KEY_TOKENS_FILE, "utf8");
+  const prefix = /^export const API_KEY_PREFIX = "([^"]*)";/m.exec(tokens)?.[1];
+  if (!prefix) {
+    throw new Error(
+      `API_KEY_PREFIX is no longer a top-level string constant in ${API_KEY_TOKENS_FILE}`,
+    );
+  }
+  const lookupId = seedConstant(seedSource, "PRIVATE_TOKEN_LOOKUP_ID");
+  const secret = seedConstant(seedSource, "PRIVATE_TOKEN_SECRET");
+  return `${prefix}${lookupId}_${secret}`;
 }

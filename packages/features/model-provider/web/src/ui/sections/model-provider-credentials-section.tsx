@@ -107,6 +107,9 @@ export const CredentialsSection = ({
                     }
                   }}
                   type={isPassword ? "password" : "text"}
+                  // The label above is a styled Text, not a real label element,
+                  // so the field carries its own accessible name.
+                  aria-label={key}
                   autoComplete="off"
                   placeholder={isOptional ? "optional" : undefined}
                   width="full"

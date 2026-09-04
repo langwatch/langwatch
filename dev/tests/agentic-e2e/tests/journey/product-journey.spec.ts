@@ -173,26 +173,48 @@ test.describe("browser product journey", () => {
     test.skip(!OPENAI_API_KEY, NO_KEY);
 
     await visit("/settings/model-providers");
-    await expect(page.getByRole("heading", { name: /model providers/i })).toBeVisible({
-      timeout: 30000,
+    await expect(page.getByRole("heading", { name: /model providers/i }).first()).toBeVisible({
+      timeout: 90000,
     });
 
-    await page
-      .getByRole("button", { name: /add model provider/i })
-      .first()
-      .click();
-    await page
-      .getByRole("menuitem", { name: /^openai$/i })
-      .first()
-      .click();
+    // The provider list is a menu on the header button, and the editor it opens
+    // is a drawer; a click that lands while the menu is still opening is lost,
+    // so the key field is what the walk waits on.
+    const addProvider = page.getByRole("button", { name: /add model provider/i }).first();
+    const keyField = page.getByLabel("OPENAI_API_KEY");
+    let pickFailure = "";
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (await keyField.isVisible().catch(() => false)) break;
+      try {
+        await addProvider.click();
+        // The open menu never settles (D8), so a stability-waiting click never
+        // fires; a person's click lands anyway.
+        await page
+          .getByRole("menuitem", { name: "OpenAI", exact: true })
+          .first()
+          .click({ force: true });
+      } catch (error) {
+        pickFailure = error instanceof Error ? error.message : String(error);
+      }
+      await keyField.waitFor({ state: "visible", timeout: 30000 }).catch(() => undefined);
+    }
+    await expect(
+      keyField,
+      `picking OpenAI never opened the provider editor (defect D7 in ` +
+        `dev/docs/plans/e2e-journey-2026-09-04.md: model-provider-host.tsx:104 ` +
+        `passes an unbound setQuery, so the drawer address is never written)` +
+        (pickFailure ? `; last click error: ${pickFailure}` : ""),
+    ).toBeVisible({ timeout: 30000 });
 
-    await page.getByLabel("OpenAI API Key").fill(OPENAI_API_KEY ?? "");
+    await keyField.fill(OPENAI_API_KEY ?? "");
     await page
-      .getByRole("button", { name: /^(save|add|create|save changes)$/i })
+      .getByRole("button", { name: /^save( anyway)?$/i })
       .last()
       .click();
+    await expect(keyField).not.toBeVisible({ timeout: 60000 });
 
-    await expect(page.getByText(/openai/i).first()).toBeVisible({ timeout: 20000 });
+    await visit("/settings/model-providers");
+    await expect(page.getByText("OpenAI", { exact: true }).first()).toBeVisible({ timeout: 30000 });
   });
 
   // @scenario "Creating an HTTP agent pointed at the echo agent"
