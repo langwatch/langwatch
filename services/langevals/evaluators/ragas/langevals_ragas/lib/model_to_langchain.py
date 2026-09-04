@@ -10,6 +10,38 @@ from langchain_core.language_models.chat_models import (
 import litellm
 
 
+class RawResponse:
+    """A completion the way the OpenAI client returns it with headers attached.
+
+    langchain_openai reads completions through `with_raw_response.create()`
+    and then calls `parse()` on what comes back; the litellm client has no
+    transport headers to give, so this carries the completion and none.
+    """
+
+    def __init__(self, response):
+        self._response = response
+        self.headers: dict = {}
+
+    def parse(self):
+        return self._response
+
+
+class RawResponses:
+    def __init__(self, client: "LitellmCompletion"):
+        self._client = client
+
+    def create(self, *args, **kwargs):
+        return RawResponse(self._client.create(*args, **kwargs))
+
+
+class AsyncRawResponses:
+    def __init__(self, client: "AsyncLitellmCompletion"):
+        self._client = client
+
+    async def create(self, *args, **kwargs):
+        return RawResponse(await self._client.create(*args, **kwargs))
+
+
 class LitellmCompletion:
     exception: Optional[Exception] = None
     temperature: float = 0
@@ -36,10 +68,18 @@ class LitellmCompletion:
             self.exception = e
             raise e
 
+    @property
+    def with_raw_response(self) -> RawResponses:
+        return RawResponses(self)
+
 
 class AsyncLitellmCompletion(LitellmCompletion):
     async def create(self, *args, **kwargs):
         return super().create(*args, **kwargs)
+
+    @property
+    def with_raw_response(self) -> AsyncRawResponses:
+        return AsyncRawResponses(self)
 
 
 def model_to_langchain(
