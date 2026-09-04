@@ -165,9 +165,12 @@ SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 -- +goose Down
 
 -- Down migrations are intentionally commented out to prevent accidental data
--- loss. To roll back, uncomment and run manually. The rows are pulled from
--- providers with a 30-day lookback, so anything older than that window is
--- gone for good once the table drops.
+-- loss. To roll back, uncomment and run manually.
+--
+-- The rows are rebuildable — this table is a fold projection over the
+-- append-only money-event log — but only by a full replay, so an unattended
+-- `goose down` takes the governance cost screen to zero rows until someone
+-- runs that replay. That is an outage, not a rollback.
 
 -- +goose StatementBegin
 -- DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.governance_cost_rollup_1d;
