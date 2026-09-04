@@ -1096,7 +1096,7 @@ func (r *BifrostRouter) responseFromBifrostError(
 	if raw.parseFailure != nil && r.logger != nil {
 		r.logger.Warn("provider 2xx body did not fit the engine schema, forwarded as-is",
 			zap.String("provider", string(berr.ExtraFields.Provider)),
-			zap.String("model", berr.ExtraFields.ModelRequested),
+			zap.String("model", berr.ExtraFields.OriginalModelRequested),
 			zap.Int("prompt_tokens", raw.usage.PromptTokens),
 			zap.Int("completion_tokens", raw.usage.CompletionTokens),
 			zap.Error(raw.parseFailure))
@@ -1230,6 +1230,15 @@ const ProviderRequestTimeoutSeconds = 14 * 60
 
 func (a *account) GetConfigForProvider(provider bfschemas.ModelProvider) (*bfschemas.ProviderConfig, error) {
 	cfg := &bfschemas.ProviderConfig{}
+	// bifrost v1.5 gates verbatim provider bytes behind SendBackRawRequest/Response
+	// (default false); without them it returns only its normalized response and
+	// drops the provider's native error/response body. The gateway forwards
+	// provider bodies byte-for-byte (rawResponseFromBifrostError, the raw-forward
+	// stream paths), so it needs both on for every provider — v1.4 always made the
+	// raw bytes available. Per-request BifrostContextKeySendBackRaw* overrides
+	// still layer on top of this for the paths that set them.
+	cfg.SendBackRawRequest = true
+	cfg.SendBackRawResponse = true
 	// Every provider is sized explicitly, standard ones included. A zero here
 	// is not "no opinion": CheckAndSetDefaults at the bottom of this function
 	// replaces it with bifrost's own 1000 workers and 5000-slot queue, and
@@ -1281,9 +1290,11 @@ func (a *account) GetConfigForProvider(provider bfschemas.ModelProvider) (*bfsch
 		// unblocks outbound-delta diagnosis (headers, body) when a
 		// provider-side behavior (e.g. Anthropic cache) fires on direct
 		// curl but not through the gateway. Do NOT set in production.
+		// bifrost v1.5 typed ProxyConfig.URL as *EnvVar (value/env_var/from_env).
+		proxyURLEnv := envVar(proxyURL)
 		cfg.ProxyConfig = &bfschemas.ProxyConfig{
 			Type: bfschemas.HTTPProxy,
-			URL:  proxyURL,
+			URL:  &proxyURLEnv,
 		}
 	}
 	cfg.CheckAndSetDefaults()
@@ -1296,6 +1307,12 @@ func credentialToBifrostKey(cred domain.Credential, provider bfschemas.ModelProv
 		ID:     cred.ID,
 		Name:   cred.ID,
 		Weight: 1,
+		// bifrost v1.5 flipped the empty-whitelist meaning: []=deny-all,
+		// ["*"]=allow-all (was allow-all when empty in v1.4). GetKeysForProvider
+		// hands bifrost one credential the gateway already selected by its own
+		// model-eligibility gating, so this key must serve whatever model was
+		// dispatched — an explicit ["*"] restores the v1.4 pass-through.
+		Models: bfschemas.WhiteList{"*"},
 	}
 
 	switch provider {
@@ -1309,15 +1326,17 @@ func credentialToBifrostKey(cred domain.Credential, provider bfschemas.ModelProv
 		// with an empty endpoint → Bifrost "endpoint not set" (#5760). Mirrors the
 		// dual-name tolerance credBaseURL already applies to vLLM.
 		endpoint := credExtra(cred, "endpoint", "api_base")
-		cfg := &bfschemas.AzureKeyConfig{
-			Endpoint:    envVar(endpoint),
-			Deployments: cred.DeploymentMap,
+		// bifrost v1.5 moved model->deployment mapping off AzureKeyConfig onto
+		// Key.Aliases, resolved uniformly via Aliases.Resolve. api-version is no
+		// longer a per-key field: the Azure provider injects its own
+		// (DefaultAzureAPIVersion for classic /deployments/, "preview" for the
+		// responses API), and only when absent — so the empty-api-version shape
+		// #5760 guarded against is unreachable, but a caller-supplied api_version
+		// override is no longer forwarded.
+		k.Aliases = bfschemas.KeyAliases(cred.DeploymentMap)
+		k.AzureKeyConfig = &bfschemas.AzureKeyConfig{
+			Endpoint: envVar(endpoint),
 		}
-		if apiVersion, ok := cred.Extra["api_version"]; ok {
-			v := envVar(apiVersion)
-			cfg.APIVersion = &v
-		}
-		k.AzureKeyConfig = cfg
 
 	case bfschemas.Bedrock:
 		// Two nlpgo routes feed Bedrock creds under different key names: the
@@ -1325,10 +1344,11 @@ func credentialToBifrostKey(cred domain.Credential, provider bfschemas.ModelProv
 		// access_key / secret_key / session_token / region, while the
 		// gatewayproxy (/go/proxy) keeps the litellm aws_* names. Accept both
 		// so neither route lands here with empty credentials.
+		// bifrost v1.5 moved model->deployment mapping onto Key.Aliases (see Azure).
+		k.Aliases = bfschemas.KeyAliases(cred.DeploymentMap)
 		cfg := &bfschemas.BedrockKeyConfig{
-			AccessKey:   envVar(credExtra(cred, "access_key", "aws_access_key_id")),
-			SecretKey:   envVar(credExtra(cred, "secret_key", "aws_secret_access_key")),
-			Deployments: cred.DeploymentMap,
+			AccessKey: envVar(credExtra(cred, "access_key", "aws_access_key_id")),
+			SecretKey: envVar(credExtra(cred, "secret_key", "aws_secret_access_key")),
 		}
 		if st := credExtra(cred, "session_token", "aws_session_token"); st != "" {
 			v := envVar(st)
