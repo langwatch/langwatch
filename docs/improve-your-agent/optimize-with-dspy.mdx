@@ -11,7 +11,7 @@ The runnable example is in the SDK repository: [`sdks/python/examples/agent-opti
 
 ## What you need
 
-- Python 3.10 or later, `pip install "langwatch[dspy]" langwatch-scenario`.
+- Python 3.10 or later. In the example folder, `uv sync` installs everything. In your own project, `pip install "langwatch[dspy]" langwatch-scenario`, and import `scenario` before `dspy` in every module: in the other order dspy 3.3 fails while loading numpy.
 - `OPENAI_API_KEY` for the agent, the simulated user and the judge, and `LANGWATCH_API_KEY` so the optimization run and the simulations appear in LangWatch.
 - Five to ten scenarios. One optimization run executes each of them several times: budget about fifty scenario runs, twenty to thirty minutes and a few dollars.
 
@@ -38,20 +38,18 @@ def build_agent() -> dspy.ReAct:
     )
 
 class ReActAdapter(scenario.AgentAdapter):
-    def __init__(self, program: dspy.Module):
+    def __init__(self, program: dspy.ReAct):
         self.program = program
 
-    async def call(self, input: scenario.AgentInput) -> str:
-        prior = [m for m in input.messages[:-1] if m["role"] in ("user", "assistant")]
-        history = dspy.History(messages=[
-            {"question": user["content"], "answer": assistant["content"]}
-            for user, assistant in zip(prior[0::2], prior[1::2])
-        ])
+    async def call(self, input: scenario.AgentInput) -> scenario.AgentReturnTypes:
+        history = history_from(input.messages[:-1])  # the question and answer pairs so far
         prediction = await self.program.acall(
             history=history, question=input.last_new_user_message_str()
         )
-        return prediction.answer
+        return trajectory_to_messages(prediction)
 ```
+
+`trajectory_to_messages` turns the ReAct trajectory into `tool_calls` and `tool` messages followed by the answer, so the judge sees every tool call and every rejected argument, not only the reply. Both helpers are in the example's `agent.py`.
 
 The tool descriptions come from the docstrings. `dspy.ReAct` writes them into the instructions of its `react` predictor, and that predictor is what the optimizer rewrites.
 
@@ -91,7 +89,7 @@ class ScenarioProgram(dspy.Module):
         self.agent = agent  # named predictors: agent.react, agent.extract
 
     def forward(self, name, description, criteria, budget_turns):
-        result = scenario.run(
+        result = asyncio.run(scenario.run(
             name=name,
             description=description,
             max_turns=12,
@@ -99,10 +97,11 @@ class ScenarioProgram(dspy.Module):
             agents=[
                 ReActAdapter(self.agent),
                 scenario.UserSimulatorAgent(),
-                scenario.JudgeAgent(criteria=criteria, model="openai/gpt-5"),
+                scenario.JudgeAgent(criteria=criteria, model="openai/gpt-5-mini"),
             ],
-        )
-        turns = sum(1 for m in result.messages if m["role"] == "assistant")
+        ))
+        # a turn is a reply the customer reads: assistant messages without tool calls
+        turns = count_agent_turns(result.messages)
         return dspy.Prediction(
             success=result.success,
             passed=result.passed_criteria,
@@ -125,7 +124,9 @@ def scenario_metric(gold, pred, trace=None, pred_name=None, pred_trace=None):
     return dspy.Prediction(score=score, feedback=feedback)  # GEPA reads the text
 ```
 
-A failed scenario scores zero. A passed scenario scores one, minus half a point per budget of extra turns. The pass gate comes first; the turn budget is the objective under it.
+A failed scenario scores zero. A passed scenario scores one, minus half a point per budget of extra turns. The pass gate comes first; the turn budget is the objective under it. When a tool rejected its arguments during the conversation, the example's feedback adds one line that says so, which is the hint GEPA needs to rewrite that tool's description.
+
+`scenario.run` executes the conversation on its own thread. The example's `forward` also copies the DSPy trace of that thread into the calling thread, because GEPA reads the trace of the thread that called the program.
 
 ## Step 4: Run the optimizer
 
@@ -173,16 +174,25 @@ optimizer = dspy.MIPROv2(
 langwatch.dspy.init(experiment="returns-agent-scenarios", optimizer=optimizer)
 
 optimized = optimizer.compile(
-    program, trainset=trainset, valset=trainset, num_trials=6, requires_permission_to_run=False
+    program, trainset=trainset, valset=trainset, num_trials=6, minibatch=False
 )
-optimized.save("optimized_agent.json")
+optimized.save("optimized_agent_mipro.json")
 ```
 
-Zero demos keeps the change to the instructions: MIPROv2 proposes instruction candidates and searches over their combinations. `langwatch.dspy.init` records every trial.
+Zero demos keeps the change to the instructions: MIPROv2 proposes instruction candidates and searches over their combinations. `minibatch=False` evaluates the whole suite on every trial, because the default minibatch is larger than six scenarios. `langwatch.dspy.init` records every trial.
   </Tab>
 </Tabs>
 
-Run the suite once before and once after with `dspy.Evaluate(devset=trainset, metric=scenario_metric, num_threads=3)`, so the before and after pass rates and turns come from the same scenarios. The example's `evaluate_suite` prints that table.
+Run the suite once before and once after with `dspy.Evaluate(devset=trainset, metric=scenario_metric, num_threads=3)`, so the before and after pass rates and turns come from the same scenarios. The example's `evaluate_suite` prints that table. To run the example:
+
+```bash
+cd sdks/python/examples/agent-optimization
+uv sync
+uv run optimize_gepa.py
+uv run optimize_mipro.py
+```
+
+Both scripts print the before and after table, then every instruction the optimizer changed.
 
 ## Step 5: Read the result in LangWatch
 

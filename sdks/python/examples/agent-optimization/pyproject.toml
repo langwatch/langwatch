@@ -1,0 +1,14 @@
+[project]
+name = "agent-optimization-example"
+version = "0.1.0"
+description = "Optimize a DSPy ReAct agent with scenario simulations as the metric"
+requires-python = ">=3.10,<3.14"
+dependencies = [
+    "langwatch[dspy]>=1.3.1,<2",
+    "langwatch-scenario>=1.3.0,<2",
+    "python-dotenv>=1.0.1",
+    "openai>=1.88.0",
+]
+
+[tool.uv]
+package = false
