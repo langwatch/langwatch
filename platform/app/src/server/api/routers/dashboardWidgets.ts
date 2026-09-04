@@ -27,8 +27,8 @@ import {
   dashboardWidgetQuerySchema,
 } from "~/server/analytics/dashboardWidgetDefinition";
 
-import { enforceCustomChartPlaygroundEnabled } from "../dashboardWidgetAccessMiddleware";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { enforceCustomChartPlaygroundEnabled } from "./dashboardWidgetAccessMiddleware";
 
 const layoutSchema = z.object({
   gridColumn: z.number().min(0).max(1),
