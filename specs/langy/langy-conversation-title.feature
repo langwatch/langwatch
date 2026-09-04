@@ -68,6 +68,25 @@ Feature: Langy conversation titles are derived, then generated once by a cheap m
     Then the title is left unchanged
     And the turn's outcome is unaffected
 
+  @unit
+  Scenario: A model failure is retried instead of losing the title
+    Given the title model fails on a provider blip
+    When the title is generated
+    Then the failure is raised so the process outbox retries it
+    And the turn's outcome is unaffected
+
+  @unit
+  Scenario: A project with no model for titles is not retried
+    Given the project has no model configured for titles
+    When the title is generated
+    Then no title is produced and nothing is retried
+
+  @unit
+  Scenario: A conversation with nothing to read is not retried
+    Given a conversation whose transcript holds no text
+    When the title is generated
+    Then no title is produced and nothing is retried
+
   # ============================================================================
   # A manual rename always wins
   # ============================================================================
