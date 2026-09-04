@@ -1972,11 +1972,18 @@ Rule: Event rows drill down into their metric values
 
   Scenario: Expanding the thumbs_up_down row shows its vote values with counts
     When the user expands the "thumbs_up_down" row in the Event name section
-    Then the drilldown lists "vote" values "1" and "-1" with their counts
+    Then the drilldown lists "vote" values "thumbs up" and "thumbs down" with their counts
     And no additional facet query is fired by the expansion
 
+  # The vote is stored as 1 / 0 / -1, which reads as nothing in a sidebar.
+  # Only the label is humanised — the value the filter carries stays the
+  # stored string, so the round-trip is unaffected.
+  Scenario: A metric value with no human name shows its stored string
+    Given "thumbs_up_down" events also carry "event.metrics.latency_bucket" with value "p95"
+    Then the drilldown lists that value as "p95"
+
   Scenario: Clicking a vote value applies a single event-attribute filter
-    When the user clicks the vote value "-1" in the thumbs_up_down drilldown
+    When the user clicks the vote value shown as "thumbs down" in the thumbs_up_down drilldown
     Then the search bar shows "@event.attribute.event.metrics.vote:-1"
     And no other clause is added to the query
 

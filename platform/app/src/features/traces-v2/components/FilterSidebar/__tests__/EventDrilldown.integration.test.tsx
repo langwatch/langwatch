@@ -61,13 +61,29 @@ afterEach(cleanup);
 describe("EventDrilldown", () => {
   describe("given a thumbs_up_down item with vote metrics from the discover payload", () => {
     /** @scenario "Expanding the thumbs_up_down row shows its vote values with counts" */
-    it("renders each stored value verbatim with its count", () => {
+    it("names each vote in words, with its count", () => {
       renderDrilldown();
 
-      expect(screen.getByText("1")).toBeInTheDocument();
-      expect(screen.getByText("-1")).toBeInTheDocument();
+      expect(screen.getByText("thumbs up")).toBeInTheDocument();
+      expect(screen.getByText("thumbs down")).toBeInTheDocument();
       expect(screen.getByText("12")).toBeInTheDocument();
       expect(screen.getByText("3")).toBeInTheDocument();
+      // The bare codes never reach the user.
+      expect(screen.queryByText("-1")).not.toBeInTheDocument();
+    });
+
+    /** @scenario "A metric value with no human name shows its stored string" */
+    it("keeps a value with no human name as its stored string", () => {
+      renderDrilldown({
+        item: buildItem([
+          {
+            key: "event.metrics.latency_bucket",
+            values: [{ value: "p95", count: 4 }],
+          },
+        ]),
+      });
+
+      expect(screen.getByText("p95")).toBeInTheDocument();
     });
 
     it("strips the event.metrics. prefix from the group header only", () => {
@@ -82,7 +98,8 @@ describe("EventDrilldown", () => {
       it("toggles a single top-level event.attribute field with the verbatim value", () => {
         const { toggleFacet } = renderDrilldown();
 
-        fireEvent.click(screen.getByText("-1"));
+        // Reads "thumbs down", filters on the stored "-1".
+        fireEvent.click(screen.getByText("thumbs down"));
 
         expect(toggleFacet).toHaveBeenCalledTimes(1);
         expect(toggleFacet).toHaveBeenCalledWith({
@@ -98,10 +115,9 @@ describe("EventDrilldown", () => {
           ast: parse("event.attribute.event.metrics.vote:-1"),
         });
 
-        expect(screen.getByRole("button", { name: /-1/ })).toHaveAttribute(
-          "data-state",
-          "include",
-        );
+        expect(
+          screen.getByRole("button", { name: /thumbs down/ }),
+        ).toHaveAttribute("data-state", "include");
       });
 
       it("names the row included, distinctly from an excluded one", () => {
@@ -110,10 +126,12 @@ describe("EventDrilldown", () => {
         });
 
         expect(
-          screen.getByRole("button", { name: "vote -1 — included" }),
+          screen.getByRole("button", { name: "vote thumbs down — included" }),
         ).toBeInTheDocument();
         expect(
-          screen.getByRole("button", { name: "vote 1 — click to filter" }),
+          screen.getByRole("button", {
+            name: "vote thumbs up — click to filter",
+          }),
         ).toBeInTheDocument();
       });
     });
@@ -125,26 +143,26 @@ describe("EventDrilldown", () => {
         });
 
         expect(
-          screen.getByRole("button", { name: "vote -1 — excluded" }),
+          screen.getByRole("button", { name: "vote thumbs down — excluded" }),
         ).toBeInTheDocument();
       });
     });
   });
 
-  describe("given two metric groups that share a value", () => {
+  describe("given two metric groups that share a stored value", () => {
     it("qualifies each value with its metric key so the names stay distinct", () => {
       renderDrilldown({
         item: buildItem([
-          { key: "event.metrics.vote", values: [{ value: "1", count: 4 }] },
           { key: "event.metrics.rating", values: [{ value: "1", count: 2 }] },
+          { key: "event.metrics.stars", values: [{ value: "1", count: 4 }] },
         ]),
       });
 
       expect(
-        screen.getByRole("button", { name: "vote 1 — click to filter" }),
+        screen.getByRole("button", { name: "rating 1 — click to filter" }),
       ).toBeInTheDocument();
       expect(
-        screen.getByRole("button", { name: "rating 1 — click to filter" }),
+        screen.getByRole("button", { name: "stars 1 — click to filter" }),
       ).toBeInTheDocument();
     });
   });

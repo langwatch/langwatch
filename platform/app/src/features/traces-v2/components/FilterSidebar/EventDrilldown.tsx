@@ -1,7 +1,10 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import type { LiqeQuery } from "liqe";
 import type React from "react";
-import { EVENT_METRICS_PREFIX } from "~/server/app-layer/traces/query-language/eventMetrics";
+import {
+  EVENT_METRICS_PREFIX,
+  eventMetricValueLabel,
+} from "~/server/app-layer/traces/query-language/eventMetrics";
 import { getFacetValueState } from "~/server/app-layer/traces/query-language/queries";
 import { RowButton } from "./RowButton";
 import type { EventMetricValues, FacetItem } from "./types";
@@ -25,13 +28,14 @@ interface EventDrilldownProps {
 
 /**
  * Inline drilldown rendered under an event-name row (thumbs_up_down →
- * vote values 1 / -1 with counts). Renders purely from `item.eventMetrics`,
- * which the discover endpoint already attached — no query of its own,
- * mirroring EvaluatorDrilldown.
+ * "thumbs up" / "thumbs down" with counts). Renders purely from
+ * `item.eventMetrics`, which the discover endpoint already attached — no
+ * query of its own, mirroring EvaluatorDrilldown.
  *
- * Values are shown and filtered verbatim as stored: a stored "1" becomes
- * `event.attribute.event.metrics.vote:1`, character for character, so the
- * filter round-trips against the string the ingest wrote.
+ * Labels are humanised, values are not. A row reads "thumbs down" but emits
+ * `event.attribute.event.metrics.vote:-1` — the stored string character for
+ * character, so the filter round-trips against what ingest actually wrote.
+ * Anything without a human name (custom metrics) shows its stored string.
  */
 export const EventDrilldown: React.FC<EventDrilldownProps> = ({
   item,
@@ -57,6 +61,7 @@ export const EventDrilldown: React.FC<EventDrilldownProps> = ({
         {metrics.map((metric) => (
           <MetricGroup
             key={metric.key}
+            eventType={item.value}
             metric={metric}
             ast={ast}
             toggleFacet={toggleFacet}
@@ -68,10 +73,11 @@ export const EventDrilldown: React.FC<EventDrilldownProps> = ({
 };
 
 const MetricGroup: React.FC<{
+  eventType: string;
   metric: EventMetricValues;
   ast: LiqeQuery;
   toggleFacet: EventDrilldownProps["toggleFacet"];
-}> = ({ metric, ast, toggleFacet }) => {
+}> = ({ eventType, metric, ast, toggleFacet }) => {
   const field = `event.attribute.${metric.key}`;
   const displayKey = metric.key.startsWith(EVENT_METRICS_PREFIX)
     ? metric.key.slice(EVENT_METRICS_PREFIX.length)
@@ -95,6 +101,11 @@ const MetricGroup: React.FC<{
           <MetricValueRow
             key={v.value}
             value={v.value}
+            displayValue={eventMetricValueLabel({
+              eventType,
+              metricKey: metric.key,
+              value: v.value,
+            })}
             displayKey={displayKey}
             count={v.count}
             maxCount={maxCount}
@@ -115,13 +126,16 @@ const MetricGroup: React.FC<{
  * AST clause rather than an evaluator group.
  */
 const MetricValueRow: React.FC<{
+  /** The stored string — what the filter is built from. */
   value: string;
+  /** What the user reads: "thumbs down" where the wire says "-1". */
+  displayValue: string;
   displayKey: string;
   count: number;
   maxCount: number;
   state: "neutral" | "include" | "exclude";
   onClick: () => void;
-}> = ({ value, displayKey, count, maxCount, state, onClick }) => {
+}> = ({ value, displayValue, displayKey, count, maxCount, state, onClick }) => {
   const active = state !== "neutral";
   const palette = state === "exclude" ? "red" : "blue";
   const fillPct =
@@ -139,7 +153,7 @@ const MetricValueRow: React.FC<{
   return (
     <RowButton
       type="button"
-      aria-label={`${displayKey} ${value} — ${stateLabel}`}
+      aria-label={`${displayKey} ${displayValue} — ${stateLabel}`}
       data-state={state}
       position="relative"
       width="full"
@@ -186,7 +200,7 @@ const MetricValueRow: React.FC<{
       )}
       <HStack justify="space-between" gap={1} paddingRight={1.5}>
         <Text textStyle="2xs" color="fg.muted" truncate>
-          {value}
+          {displayValue}
         </Text>
         <Text textStyle="2xs" color="fg.subtle" flexShrink={0}>
           {formatCount(count)}
