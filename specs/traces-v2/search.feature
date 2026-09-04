@@ -2002,6 +2002,20 @@ Rule: Event rows drill down into their metric values
     When the user expands the row and clicks the vote value shown as "thumbs down"
     Then the search bar shows "@event:thumbs_up_down @event.attribute.event.metrics.vote:-1"
 
+  # Known limitation, accepted: the anchor added above is not taken back when
+  # the metric clause is cleared. A click on an inactive row adds TWO clauses
+  # but the value's include/exclude/off cycle only ever removes ONE, so
+  # clearing the metric leaves "@event:thumbs_up_down" behind — an event
+  # filter the user never picked directly. Withdrawing it safely means
+  # tracking that WE added it and that no other metric under that event is
+  # still active; until then the leftover clause stays visible as an active
+  # Event name row and one click clears it.
+  @integration @unimplemented
+  Scenario: Clearing the metric leaves the event anchor it added behind
+    Given the user clicked a vote value on the inactive "thumbs_up_down" row
+    When the user cycles that same vote value back off
+    Then the search bar still shows "@event:thumbs_up_down"
+
   # Known limitation, accepted: once TWO DIFFERENT events are both active,
   # each one's attribute clause still ANDs as an independent trace-scoped
   # subquery — they may match different events in the same trace. Same-event
