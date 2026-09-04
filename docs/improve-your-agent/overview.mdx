@@ -16,31 +16,29 @@ So the loop starts with a definition of quality that you can run. That definitio
 | Step | What you do | Where |
 |---|---|---|
 | 1. Define quality | Write five to ten scenarios from real conversations, with the criteria the agent must meet. Run them on the model and prompt you trust. Every scenario passes: this is the baseline. | [Scenarios](/agent-testing/scenarios), [Test suites](/agent-testing/test-suites) |
-| 2. Measure | Read the pass rate, the cost and the reply latency of the baseline run. Open the longest conversation and count the turns. | [Results](/agent-testing/results) |
-| 3. Change one thing | A smaller model, a rewritten tool description, a tool that validates its input, a shorter prompt, a lower iteration cap. One change per run, so the result has one cause. | Your code |
+| 2. Measure | Read the pass rate, the cost and the reply latency of the baseline run. | [Results](/agent-testing/results) |
+| 3. Change one thing | Ask Langy or your coding agent to read the run and come back with a hypothesis and one change: a smaller model, a rewritten tool description, a tool that validates its input, a shorter prompt, a lower iteration cap. One change per run, so the result has one cause. | [Reduce turns](/improve-your-agent/reduce-turns) |
 | 4. Compare | Run the same suite against the changed agent, next to the baseline. Keep the change when the pass rate holds and the metric moved. | [Compare agents](/agent-testing/compare-agents) |
 
 Repeat from step 3, and put the suite in CI so a later change cannot undo the gain: see [Run from CI](/agent-testing/run-from-ci).
 
 ## Where the changes come from
 
-The hypotheses come out of the last run. When a criterion failed, the judge's reasoning quotes the turn where it happened, and the trace of that turn shows what the agent saw and did. When a scenario passed but took ten turns, open the conversation and look for the same tool called twice in a row, because that retry is almost always the first thing worth fixing.
-
-You do not have to run the loop by hand. Two engines run it for you:
+The hypotheses come out of the last run, and reading it is not your job. When a criterion failed, the judge's reasoning quotes the turn where it happened and the trace of that turn shows what the agent saw and did; when a scenario passed but took ten turns, the conversation usually shows the same tool called twice in a row. Two engines do that reading and propose the change for you:
 
 - **Guided.** Langy, or your own coding agent with the LangWatch skills, reads the results and the traces, proposes one change and opens it as a pull request. The suite then runs in your CI on that pull request, so you review the diff and the result together. See [Prompt optimization with Langy](/langy/prompt-optimization) for the prompt case.
 - **Algorithmic.** A DSPy optimizer rewrites the instructions and the tool descriptions and scores every candidate by running the suite, and GEPA also feeds the judge's reasoning back in as the feedback for the next candidate. See [Optimize with DSPy](/improve-your-agent/optimize-with-dspy).
 
-Use the guided engine when the change is in code, in a tool or in the harness, since no optimizer can touch those. Use the algorithmic engine when the change is in text and you have the budget to run the suite fifty or so times.
+Use the guided engine when the change is in code, in a tool or in the harness, since no optimizer can touch those, and when you want to review each change. Use the algorithmic engine when the change is in text and you have the budget to run the suite fifty or so times.
 
 ## Guides
 
 <CardGroup cols={2}>
   <Card title="Reduce turns" icon="arrow-down-short-wide" href="/improve-your-agent/reduce-turns">
-    Find why the agent takes ten turns for a three-turn task, change the cause, and prove the suite still passes.
+    Find out why your agent takes ten turns for a task that could be done in three, get the cause changed, and prove the suite still passes.
   </Card>
   <Card title="Fix tool calls" icon="wrench" href="/improve-your-agent/fix-tool-calls">
-    Catch a tool that the agent retries, rewrite the tool contract, and assert on the tool calls in the criteria.
+    Catch a tool your agent retries, get the tool contract fixed, and assert on the tool calls in the criteria.
   </Card>
   <Card title="Reduce cost and latency" icon="gauge-high" href="/improve-your-agent/reduce-cost-and-latency">
     Run the same suite on two models side by side and keep the cheaper one where the pass rate holds.

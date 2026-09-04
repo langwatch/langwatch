@@ -5,7 +5,7 @@ keywords: langwatch, reduce cost, reduce latency, cheaper model, model compariso
 description: Run the same test suite on two models side by side, read the pass rate, the cost and the reply latency of each, and keep the cheaper model only where the pass rate holds.
 ---
 
-The cost of an agent is the tokens per turn, times the turns per conversation, times the price of the model. Latency has more inputs than that, since tool time, prompt caching and the provider's speed all go into it, so measure it on a run instead of deriving it. Test the model first: it is the lever with the largest effect on both numbers and also the largest risk to quality, and one comparison run of the suite gives you the pass rate, the cost and the latency of each model side by side.
+The cost of your agent is the tokens per turn, times the turns per conversation, times the price of the model. Latency has more inputs than that, since tool time, prompt caching and the provider's speed all go into it, so measure it on a run instead of deriving it. Test the model first: it is the lever with the largest effect on both numbers and also the largest risk to quality, and one comparison run of the suite gives you the pass rate, the cost and the latency of each model side by side.
 
 ## Step 1: Declare the model as a run parameter
 
@@ -72,7 +72,7 @@ The run detail has one column per target: the column with the declared default m
 <img className="block" src="/images/improve-your-agent/model-comparison-run-detail.png" alt="A comparison run of the same agent on gpt-5 and on gpt-5-mini, with the four charts and one column per model" />
 </Frame>
 
-Keep the cheaper model when its pass rate equals the baseline's across the repeats. When it fails one scenario and passes the rest, open that conversation and read which criterion failed, then either route that kind of request to the larger model in your code or keep the larger model for everything, and rerun.
+Keep the cheaper model when its pass rate equals the baseline's across the repeats. When it fails one scenario and passes the rest, the failed criterion in that conversation says what the smaller model skipped, and the decision is either to route that kind of request to the larger model in your code or to keep the larger model for everything; ask Langy or your coding agent for the change, and rerun.
 
 For example, on the six-scenario Returns suite of the example with three repeats, gpt-5-mini answered a conversation in 28 seconds against 54 seconds for gpt-5 and cost $0.036 against $0.046, but it failed the scenario where the customer gives a wrong order number twice out of three times, because it never asked the question that leads to the right order.
 
@@ -81,22 +81,23 @@ For example, on the six-scenario Returns suite of the example with three repeats
 After the model, in order of effect:
 
 - **Turns.** Every avoided turn removes a whole prompt from the bill. See [Reduce turns](/improve-your-agent/reduce-turns).
-- **Context size.** The system prompt, the tool list and the history are paid for on every turn, so open a trace, read the input tokens of the first and the last call of the conversation, and then shorten the prompt or trim the history and compare.
+- **Context size.** The system prompt, the tool list and the history are paid for on every turn. The input tokens of the first and the last call of a conversation, on the trace, show how much of the bill is context; ask your agent to shorten the prompt or trim the history, and compare.
 - **Prompt caching.** Providers charge cached input tokens at a fraction of the price, and you get the cache by keeping the static part of the prompt first and identical across calls.
 - **Provider.** The `provider-cost-comparison` skill prices the traffic in your traces on other providers and tells you whether one of them would be cheaper.
 
 Every lever goes through the same gate: a comparison run of the suite before you keep it.
 
-## Do it with Langy
+## Let Langy or your coding agent run it
 
-Ask [Langy](/langy/chat):
+The whole loop above is one request. Ask [Langy](/langy/chat):
 
 ```text
 Run the Returns suite on returns-agent with model=gpt-5 and model=gpt-5-mini, three repeats each,
-and tell me whether gpt-5-mini holds the pass rate. If it fails a scenario, tell me which one and why.
+and tell me whether gpt-5-mini holds the pass rate. If it fails a scenario, tell me which one and why,
+and propose the change that keeps the cheaper model where it works.
 ```
 
-## Do it with your coding agent
+Or your coding agent, with the skills installed:
 
 ```bash
 npx skills add langwatch/skills/agent-improve
@@ -110,7 +111,7 @@ npx skills add langwatch/skills/provider-cost-comparison
 ## Common failures
 
 - **The cost reads "across 3 of 6 runs".** The runs without a cost have no traces linked: see [Linking your traces](/agent-testing/linking-your-traces).
-- **The pass rate is the same and the cost went up.** The cheaper model took more turns, so read the turns in the conversations before you decide, and see [Reduce turns](/improve-your-agent/reduce-turns).
+- **The pass rate is the same and the cost went up.** The cheaper model took more turns, so check the reply counts in the conversations before you decide, and see [Reduce turns](/improve-your-agent/reduce-turns).
 - **The option list does not show the model.** The agent connected before the parameter was added. Restart the agent process, because the platform reads the parameters when it connects.
 - **Runs end as `agent_busy` on the development side.** A development agent takes one call at a time by default and the run sends three at once, so register it with `concurrency=3` or start three instances.
 

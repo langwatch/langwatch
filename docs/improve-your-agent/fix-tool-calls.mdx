@@ -2,15 +2,15 @@
 title: Fix and Optimize Tool Calls
 sidebarTitle: Fix tool calls
 keywords: langwatch, tool calls, tool optimization, tool description, function calling, tool retries, scenarios, has_tool_call
-description: Catch a tool the agent calls wrong or retries, change the tool contract so the model gets it right the first time, and assert on the tool calls in your scenarios.
+description: Catch a tool your agent calls wrong or retries, get the tool contract fixed so the model gets it right the first time, and assert on the tool calls in your scenarios.
 ---
 
-A tool call goes wrong in two ways: the agent calls the wrong tool, or it calls the right tool with arguments the tool rejects. The second is the common one, and it is silent, because the agent retries with new wording until the call succeeds and the conversation still ends well; the only signs of the problem are the failed calls in the trace and the extra model calls they cost.
+A tool call goes wrong in two ways: your agent calls the wrong tool, or it calls the right tool with arguments the tool rejects. The second is the common one, and it is silent, because the agent retries with new wording until the call succeeds and the conversation still ends well; the only signs of the problem are the failed calls in the trace and the extra model calls they cost. Finding those calls and fixing the contract is work for Langy or your coding agent; your part is the suite, the criteria that catch the retries, and the review of the change.
 
 ## How a bad tool call shows up
 
-- **As a failed criterion.** The judge reads the agent's traces, so a criterion such as `The agent creates the return` fails when the call never succeeded, and the judge's reasoning tells you which tool and which error.
-- **As a passing scenario with retries inside it.** The verdict is green and the conversation is a single reply, but the trace behind that reply holds six model calls. Open the conversation and press **View trace** on the turn: you will see the same tool call twice in a row, the first one followed by the error text as its result. When your tools are traced, each call also appears as its own span.
+- **As a failed criterion.** The judge reads your agent's traces, so a criterion such as `The agent creates the return` fails when the call never succeeded, and the judge's reasoning tells you which tool and which error.
+- **As a passing scenario with retries inside it.** The verdict is green and the conversation is a single reply, but the trace behind that reply holds six model calls. Press **View trace** on the turn and you will see the same tool call twice in a row, the first one followed by the error text as its result. When your tools are traced, each call also appears as its own span.
 
 <Frame caption="The trace link on a run opens the agent's trace for that conversation, the same trace the judge read.">
 <img className="block" src="/images/improve-your-agent/run-drawer-trace-link.png" alt="The conversation drawer of a failed scenario, with the View trace link on the turn and the agent reply below it" />
@@ -18,21 +18,50 @@ A tool call goes wrong in two ways: the agent calls the wrong tool, or it calls 
 
 To make the second case fail on its own, add a criterion on the process as well as the outcome, such as `The agent does not call check_return_eligibility more than once for the same order`.
 
-## Step 1: Read the error the model saw
+## Step 1: Get the failed calls found and the contract fixed
 
-Open the model call that came after the failed tool call and read the tool result in its input, because that text is all the model ever sees of the failure. After `invalid input` it can only guess. After `reason must be one of: defective, incorrect_item, not_as_expected, remorse` it fixes the call on the next try, and with the same values in the tool description it gets the first call right.
+Run the suite once, then ask Langy or your coding agent to read the run and fix the tools:
 
-## Step 2: Change the tool contract
+<Tabs>
+  <Tab title="Langy">
+```text
+In the last run of the Returns suite, find every tool call that failed or was retried,
+tell me what the model saw as the error, and fix the tool descriptions and the error messages
+in a pull request so the first call succeeds.
+```
+  </Tab>
+  <Tab title="Your coding agent">
+```text
+Use the langwatch CLI to read the last run of the "Returns" test suite:
+`langwatch simulation-run list -f json` lists the runs, and
+`langwatch simulation-run get <run id> -f json --full` returns one conversation with its
+messages, tool calls, tool results and the judge's verdict.
+Find every tool call that a tool rejected and what the model saw as the error, then fix the
+tool descriptions, the parameter schemas and the error messages in the code so the first call
+succeeds. Tell me what you found before you change anything.
+```
 
-In order of yield:
+Or, with the skill installed:
 
-1. **Put the accepted values in the parameter description, or better, in the schema.** An enum in the schema removes the guess altogether; a description that lists the values is the next best thing.
-2. **Return an error the model can act on**, one that names the parameter and the accepted values.
-3. **Validate at the boundary**, so the call is rejected with that same message before it reaches your service.
+```bash
+npx skills add langwatch/skills/agent-improve
+```
+
+```text
+/agent-improve The returns-agent retries check_return_eligibility with different reasons. Read the traces of the last Returns run, fix the tool contract, and add a criterion that fails when the tool is called twice.
+```
+  </Tab>
+</Tabs>
+
+What comes back is a change to the tool contract, and it helps to know what a good one looks like when you review it. In order of yield:
+
+1. **The accepted values are in the parameter description, or better, in the schema.** An enum in the schema removes the guess altogether; a description that lists the values is the next best thing.
+2. **The error names the parameter and the accepted values**, so the model can act on it.
+3. **The call is validated at the boundary**, so it is rejected with that same message before it reaches your service.
 4. **One tool per job.** A tool that needs three calls to return one answer either gets merged into one call, or gets a second tool next to it that returns the answer in one step.
-5. **Cap the retries in the harness**, so after the second failure on the same tool the agent escalates or asks the user instead of trying a third time.
+5. **The retries are capped in the harness**, so after the second failure on the same tool the agent escalates or asks the user instead of trying a third time.
 
-The difference in the tool itself:
+For example, the difference in the tool itself:
 
 ```python
 def check_return_eligibility(order_id: str, reason: str) -> str:
@@ -56,7 +85,7 @@ def check_return_eligibility(order_id: str, reason: str) -> str:
 
 The model reads the docstring as the tool description, so the first version makes it guess the value of `reason` while the second makes the first call succeed. Every closed parameter needs the same treatment: in the example, `refund_method` on `create_return` was rejected as often as `reason` was.
 
-## Step 3: Assert on the tool calls
+## Step 2: Assert on the tool calls
 
 On the platform, write the tool calls into the criteria of the scenario:
 
@@ -103,7 +132,7 @@ async def test_damaged_item_refund():
 
 See [Scenarios in code](/agent-testing/scenarios-in-code) for the adapter and the script steps.
 
-## Step 4: Rerun and compare
+## Step 3: Rerun and compare
 
 Run the suite against the changed agent next to the baseline:
 
@@ -115,25 +144,6 @@ langwatch test-suite run "Returns" \
 ```
 
 The changed side passes the new criteria, and the trace behind each reply holds fewer model calls: in the example, three instead of five for the damaged blender return. Keep the criteria, because they are now the regression test for this tool. As on the other guides, the **Total cost** and **Average reply latency** charts move more between two runs of the same agent than the removed retries move them, so read those two from a run with `--repeat 3`.
-
-## Do it with Langy
-
-Ask [Langy](/langy/chat):
-
-```text
-In the last run of the Returns suite, find every tool call that failed or was retried,
-tell me what the model saw, and fix the tool descriptions and the error messages in a pull request.
-```
-
-## Do it with your coding agent
-
-```bash
-npx skills add langwatch/skills/agent-improve
-```
-
-```text
-/agent-improve The returns-agent retries check_return_eligibility with different reasons. Read the traces of the last Returns run, fix the tool contract, and add a criterion that fails when the tool is called twice.
-```
 
 ## Common failures
 

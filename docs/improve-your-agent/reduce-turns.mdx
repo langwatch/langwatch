@@ -2,44 +2,81 @@
 title: Reduce the Turns of an Agent
 sidebarTitle: Reduce turns
 keywords: langwatch, reduce turns, agent turns, tool retries, agent latency, scenarios, test suite, compare agents
-description: Find why a tool-using agent takes ten turns for a task that needs three, change the cause, and prove with the test suite that the answers did not get worse.
+description: Find out why your agent is taking ten turns for a task that looks like it could be done in three, change the cause, and prove with the test suite that the quality stayed the same or improved.
 ---
 
-A turn is one reply from your agent, and behind each reply there are one or more model calls, because every tool call the agent makes is a model call too. That is why a rejected tool call that the agent retries costs you a model call even when the reply count stays at one, and why you count both: the replies you see in the conversation, and the model calls in the trace behind each reply. The causes of extra replies and extra calls are listed below in the order worth checking them.
+A turn is one reply from your agent, and behind each reply there are one or more model calls, since every tool call is a model call too. So when a tool rejects a call and your agent retries it, you pay for another model call even though the reply count stays at one, and this guide counts both. The digging is not yours to do: you wire the suite up, run the commands below, and Langy or your coding agent reads the run, tells you the cause and proposes the change for you to review.
 
 ## What you need
 
 - Your agent [connected to LangWatch](/agent-testing/connect-your-agent), so the suite runs against your real code and the judge reads your traces.
 - A [test suite](/agent-testing/test-suites) of five to ten scenarios that pass today. Take the situations from real conversations, and put the long ones in.
-- The agent registered with `concurrency` of at least 3 in the `development` environment, or three instances of it, because a run executes three scenarios at once while a development agent takes one call at a time by default, so the other two calls wait and can end as `agent_busy`.
+- [Langy](/langy/chat), or a coding agent with the `langwatch` CLI installed and `LANGWATCH_API_KEY` set, so it can read the runs.
+- If you run the suite against the `development` environment, register the agent with `concurrency` of at least 3 or start three instances, because a run executes three scenarios at once while a development agent takes one call at a time by default, and the other two calls can end as `agent_busy`.
 
 ## Step 1: Measure the baseline
 
-Run the suite once against the agent as it runs today and keep that run as the baseline; in the example that is the `production` environment.
+Run the suite once against your agent as it runs today and keep that run as the baseline. In the example that is the `production` environment:
 
 ```bash
 langwatch test-suite run "Returns" --target connected:returns-agent@production --wait
 ```
 
-The run header shows the pass rate, the total duration and the total cost, and hovering it gives you **Avg Agent Latency** and **Avg Agent Cost** with percentiles. Open the conversations in order of **Time · cost**, and in each one count the agent's replies, press **View trace** on a turn to count the model calls behind that reply, and read the judge's reasoning under the verdict. The two shapes you will see are different problems: a conversation with one reply and six model calls is the retry case, while a conversation with three replies means the customer argued or the agent asked for something.
+The command prints the batch id, and the run header in LangWatch shows the pass rate, the total duration and the total cost. Hover the header for **Avg Agent Latency** and **Avg Agent Cost** with percentiles, and sort the table by **Time · cost** to see which conversations are the long ones.
 
-<Frame caption="The run detail, with Time · cost per scenario. The row with the highest value is the first conversation to open.">
+<Frame caption="The run detail, with Time · cost per scenario. The rows with the highest values are where the turns are.">
 <img className="block" src="/images/improve-your-agent/run-detail-table.png" alt="The run detail of the baseline run: the header with the pass rate, the duration and the cost, and one row per scenario with its verdict and its time and cost" />
 </Frame>
 
-## Step 2: Find the cause
+## Step 2: Get a hypothesis and one change
 
-Read the long conversation against this list, in order. The first match is the hypothesis.
+You do not go through the conversations yourself. Ask Langy, or your coding agent, to read the run and come back with the cause and a change:
 
-1. **The tool rejects the input and the agent retries with different wording.** The same tool appears two or three times in a row in the trace, each call with an error, because the tool description does not say which values it accepts. See [Fix tool calls](/improve-your-agent/fix-tool-calls).
-2. **The agent asks the user for something a tool could answer.** For example, it asks for the order date when `lookup_order` already returns it, because the tool description does not say what the tool returns.
-3. **The agent calls tools one per turn**, so three lookups take three turns. Either the model supports parallel tool calls and the harness has them off, or the prompt tells the agent to check one thing at a time.
-4. **The agent narrates before it acts.** "Let me check that for you" is a whole turn with no tool call and no answer in it. Tell the agent in the prompt to act first and answer once.
-5. **The iteration cap is high**, so after the second failed tool call the agent keeps trying instead of escalating or asking. Cap the iterations in the harness and add a criterion for the escalation.
+<Tabs>
+  <Tab title="Langy">
+```text
+Reduce the number of turns of returns-agent on the Returns suite without failing any scenario.
+Read the last run, start from the longest conversations, tell me what causes the extra turns
+and the extra model calls, and open a pull request with one change for me to evaluate.
+```
 
-## Step 3: Change one cause and compare
+Langy reads the run and the traces with the `langwatch` CLI, explains the cause and opens a pull request with the change to the prompt, the tool description or the code. The suite runs in your CI on that pull request, and the result comes back on the pull request card in the chat.
+  </Tab>
+  <Tab title="Your coding agent">
+```text
+Use the langwatch CLI to read the last run of the "Returns" test suite:
+`langwatch simulation-run list -f json` lists the runs with their batch id, and
+`langwatch simulation-run get <run id> -f json --full` returns one conversation with its
+messages, the judge's verdict per criterion, the reasoning, and the cost.
+Start from the conversations with the most replies and the most tool calls, work out the main
+cause of the extra turns, tell me the hypothesis with the evidence, and make one change in the
+prompt, the tool descriptions or the code for me to evaluate. Change nothing else.
+```
 
-Make one change, then run the suite again as a comparison against the baseline target, so both sides appear in one run over the same scenarios:
+With the `agent-improve` skill installed, `/agent-improve` does the same with ranked hypotheses that it explains before it changes anything:
+
+```bash
+npx skills add langwatch/skills/agent-improve
+npx skills add langwatch/skills/scenarios
+```
+
+```text
+/agent-improve The returns-agent takes eight to ten turns on the Returns suite. Find the cause in the last run and reduce the turns without failing a scenario.
+```
+  </Tab>
+</Tabs>
+
+The hypothesis usually lands on one of a few causes, and it helps to recognise them when you read the proposal:
+
+- **A tool rejects the input and the agent retries with different wording**, because the tool description does not say which values it accepts. The fix is in the tool contract: see [Fix tool calls](/improve-your-agent/fix-tool-calls).
+- **The agent asks the user for something a tool already returns**, because the description does not say what the tool returns.
+- **The agent calls tools one per turn** when the model could call them in parallel, or the prompt tells it to check one thing at a time.
+- **The agent narrates before it acts**, spending a turn on "Let me check that for you".
+- **The iteration cap is high**, so after a failed call the agent keeps trying instead of escalating or asking.
+
+## Step 3: Compare
+
+Run the suite again with the changed agent next to the baseline, so both sides appear in one run over the same scenarios:
 
 ```bash
 langwatch test-suite run "Returns" \
@@ -48,13 +85,13 @@ langwatch test-suite run "Returns" \
   --wait
 ```
 
-The run detail shows one column per target with its pass rate, total duration and cost, and four charts above them: **Pass rate**, **Total cost**, **Average reply latency** and **Pass rate over runs**. Keep the change when the pass rate holds or rises and the model calls per conversation went down. Be careful with the cost and the latency charts on a single pass: over six scenarios run once, both move more between two runs of the same agent than a removed retry moves them, so read those two from a run with `--repeat 3`. When a criterion fails on the changed side, the judge's reasoning tells you which turn the agent skipped.
+The run detail shows one column per target with its pass rate, total duration and cost, and four charts above them: **Pass rate**, **Total cost**, **Average reply latency** and **Pass rate over runs**. Keep the change when the pass rate holds or rises and the model calls per conversation went down. Be careful with the cost and the latency charts on a single pass: over six scenarios run once, both move more between two runs of the same agent than a removed retry moves them, so read those two from a run with `--repeat 3`. When a criterion fails on the changed side, the judge's reasoning says which turn the agent skipped, and that goes back to your agent as the next prompt.
 
 <Frame caption="A comparison run: one column per target, and the charts above the table.">
 <img className="block" src="/images/improve-your-agent/comparison-run-detail.png" alt="A comparison run of the returns agent in production against development: the four charts, one column per target with its pass rate, duration and cost, and one row per scenario" />
 </Frame>
 
-To pin the gain, add a criterion that counts, such as `The agent completes the return within four replies`. The judge counts the replies in the conversation and fails the scenario when the agent takes more.
+To pin the gain, add a criterion that counts, such as `The agent completes the return within four replies`. The judge counts the replies in the conversation and fails the scenario when your agent takes more.
 
 ## Step 4: Keep it in CI
 
@@ -66,37 +103,11 @@ langwatch test-suite run "Returns" --target connected:returns-agent@staging --wa
 
 The command exits 1 when a scenario fails. `--wait` gives up after ten minutes, and a suite with repeats can take longer than that, so poll the batch yourself for those: see [Run from CI](/agent-testing/run-from-ci).
 
-## Do it with Langy
-
-Ask [Langy](/langy/chat):
-
-```text
-Reduce the number of turns of returns-agent on the Returns suite without failing any scenario.
-Start from the longest conversation in the last run, tell me the cause, and open a pull request with one change.
-```
-
-Langy reads the run and the traces with the `langwatch` CLI, tells you the cause and opens a pull request with the change to the prompt or the tool description. The suite runs in your CI on that pull request, and the result comes back on the pull request card in the chat.
-
-## Do it with your coding agent
-
-Install the skills once, then ask your coding agent the same thing:
-
-```bash
-npx skills add langwatch/skills/agent-improve
-npx skills add langwatch/skills/scenarios
-```
-
-```text
-/agent-improve The returns-agent takes eight to ten turns on the Returns suite. Find the cause in the last run and reduce the turns without failing a scenario.
-```
-
-The skill gathers the evidence with the `langwatch` CLI, presents ranked hypotheses and waits for you to pick one, then makes the change as a pull request together with the scenario test that proves it.
-
 ## Common failures
 
-- **The pass rate dropped.** Revert the change, then read the reasoning of the failed criterion: it points at the turn where the agent stopped doing something it did before, such as confirming the refund method before it created the return.
+- **The pass rate dropped.** Revert the change and hand the judge's reasoning of the failed criterion to your agent: it points at the turn where the agent stopped doing something it did before, such as confirming the refund method before it created the return.
 - **The turns did not move.** The cause is in a tool rather than in the prompt: the agent keeps retrying because the tool still rejects the input, so fix the tool contract first.
 - **A criterion about the agent's behaviour is inconclusive, with `no agent spans arrived` in the reasoning.** The judge waits thirty seconds for the trace after the conversation ends, and under load the trace arrives later than that, so the judge read an empty one. Rerun the scenario. If the trace shows `[REDACTED]` for the tool names and contents instead, the data privacy policy of the project hides them from the judge as well: see [Linking your traces](/agent-testing/linking-your-traces).
-- **The latency dropped and the cost did not.** The agent takes fewer turns but with longer prompts. Read the token count on the trace and shorten the context: see [Reduce cost and latency](/improve-your-agent/reduce-cost-and-latency).
+- **The latency dropped and the cost did not.** Your agent takes fewer turns but with longer prompts. Read the token count on the trace and shorten the context: see [Reduce cost and latency](/improve-your-agent/reduce-cost-and-latency).
 
 <Info>**Also check:** [Compare agents](/agent-testing/compare-agents), [Results](/agent-testing/results), [Linking your traces](/agent-testing/linking-your-traces) (what the judge reads).</Info>
