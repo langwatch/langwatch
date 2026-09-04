@@ -40,6 +40,12 @@ interface LwDashboardContext {
   readonly dashboardId?: string;
   readonly projectId?: string;
   readonly widgetName?: string;
+  /**
+   * When the dashboard last refreshed on its schedule (epoch ms), absent
+   * before the first refresh. Every scheduled refresh changes it, so a
+   * widget on \`useChartQuery\` re-runs its queries without doing anything.
+   */
+  readonly refreshedAt?: number;
 }
 
 /** A bound value for one of a query's declared parameters. */

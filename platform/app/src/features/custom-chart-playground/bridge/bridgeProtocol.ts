@@ -32,6 +32,12 @@ export interface ChartFrameDashboardContext {
   readonly dashboardId?: string;
   readonly projectId?: string;
   readonly widgetName?: string;
+  /**
+   * Epoch ms of the dashboard's last scheduled refresh, absent before the
+   * first. Changes on its own schedule while nothing else does, which is
+   * what makes a refresh tick a distinct context change for `useChartQuery`.
+   */
+  readonly refreshedAt?: number;
 }
 
 /**

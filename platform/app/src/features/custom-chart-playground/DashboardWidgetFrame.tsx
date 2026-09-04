@@ -17,23 +17,21 @@
  * runs at the executor's own default step.
  */
 
-import { Text } from "@chakra-ui/react";
+import { Box, Text } from "@chakra-ui/react";
 import { useMemo } from "react";
 
+import { useDashboardRefreshedAt } from "~/components/analytics/useDashboardAutoRefresh";
 import { usePeriodSelector } from "~/components/PeriodSelector";
 import { useColorMode } from "~/components/ui/color-mode";
 import { dashboardWidgetDefinitionSchema } from "~/server/analytics/dashboardWidgetDefinition";
 
 import type { ChartFrameDashboardContext } from "./bridge/bridgeProtocol";
+import { FrameDiagnosticBadge } from "./FrameDiagnosticBadge";
+import { declaredParamDefaults } from "./paramsSnapshot";
 import { SandboxedChartFrame } from "./SandboxedChartFrame";
 import { useDashboardWidgetChartNavigate } from "./useDashboardWidgetChartNavigate";
 import { useDashboardWidgetExecutor } from "./useDashboardWidgetExecutor";
-
-// The dashboard surfaces its own failures around the frame; the frame itself
-// has no separate log panel here, matching DashboardWidgetCard's reading.
-const noopLog = () => {
-  // Intentionally empty.
-};
+import { useFrameDiagnostic } from "./useFrameDiagnostic";
 
 export interface DashboardWidgetFrameProps {
   readonly id: string;
@@ -60,6 +58,7 @@ export function DashboardWidgetFrame({
 }: DashboardWidgetFrameProps) {
   const { colorMode } = useColorMode();
   const { period } = usePeriodSelector();
+  const refreshedAt = useDashboardRefreshedAt();
   const onNavigate = useDashboardWidgetChartNavigate(projectSlug);
 
   // Epoch milliseconds, not the `Date` objects `usePeriodSelector` hands
@@ -90,6 +89,8 @@ export function DashboardWidgetFrame({
   // Known host-side at this boundary; timezone reads the browser's own zone
   // the same way a widget's clock would. dashboardId/widgetName are optional
   // on the wire — omitted where a caller (e.g. the playground) has none.
+  // refreshedAt is the dashboard's scheduled-refresh clock: a new value is a
+  // context change the frame's useChartQuery re-runs on.
   const dashboardContext: ChartFrameDashboardContext = useMemo(
     () => ({
       timeWindow: hostParams.timeWindow,
@@ -100,24 +101,31 @@ export function DashboardWidgetFrame({
       projectId,
       dashboardId,
       widgetName,
+      ...(refreshedAt === undefined ? {} : { refreshedAt }),
     }),
-    [hostParams, colorMode, id, projectId, dashboardId, widgetName],
+    [
+      hostParams,
+      colorMode,
+      id,
+      projectId,
+      dashboardId,
+      widgetName,
+      refreshedAt,
+    ],
   );
 
-  // Every declared parameter's default, deduped by name across the widget's
-  // queries — LW.params has no other source of a value yet (no dashboard-side
+  // LW.params has no other source of a value yet (no dashboard-side
   // override UI).
-  const paramsSnapshot = useMemo(() => {
-    const defaults: Record<string, string | number | boolean> = {};
-    for (const query of definition.queries) {
-      for (const parameter of query.parameters ?? []) {
-        if (parameter.default !== undefined) {
-          defaults[parameter.name] = parameter.default;
-        }
-      }
-    }
-    return defaults;
-  }, [definition.queries]);
+  const paramsSnapshot = useMemo(
+    () => declaredParamDefaults(definition.queries),
+    [definition.queries],
+  );
+
+  // A compile or render error the widget reports is the code's own doing —
+  // shown on the card, never restarted.
+  const { diagnostic, onLog } = useFrameDiagnostic({
+    resetKey: definition.code,
+  });
 
   if (!parsed.success) {
     return (
@@ -128,15 +136,18 @@ export function DashboardWidgetFrame({
   }
 
   return (
-    <SandboxedChartFrame
-      key={id}
-      code={definition.code}
-      executeQuery={executeQuery}
-      dashboardContext={dashboardContext}
-      params={paramsSnapshot}
-      onLog={noopLog}
-      onNavigate={onNavigate}
-      maxHeight={maxHeight}
-    />
+    <Box position="relative">
+      <SandboxedChartFrame
+        key={id}
+        code={definition.code}
+        executeQuery={executeQuery}
+        dashboardContext={dashboardContext}
+        params={paramsSnapshot}
+        onLog={onLog}
+        onNavigate={onNavigate}
+        maxHeight={maxHeight}
+      />
+      <FrameDiagnosticBadge diagnostic={diagnostic} />
+    </Box>
   );
 }

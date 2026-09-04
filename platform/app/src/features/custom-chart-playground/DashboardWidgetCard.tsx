@@ -30,9 +30,12 @@ import type { DashboardWidgetQuery } from "~/server/analytics/dashboardWidgetDef
 import type { ChartFrameDashboardContext } from "./bridge/bridgeProtocol";
 import { DashboardWidgetEditDrawer } from "./DashboardWidgetEditDrawer";
 import { EditableWidgetName } from "./EditableWidgetName";
+import { FrameDiagnosticBadge } from "./FrameDiagnosticBadge";
+import { declaredParamDefaults } from "./paramsSnapshot";
 import { SandboxedChartFrame } from "./SandboxedChartFrame";
 import { useDashboardWidgetChartNavigate } from "./useDashboardWidgetChartNavigate";
 import { useDashboardWidgetExecutor } from "./useDashboardWidgetExecutor";
+import { useFrameDiagnostic } from "./useFrameDiagnostic";
 
 /** A dashboard widget as the grid renders it. */
 export interface DashboardWidget {
@@ -152,8 +155,12 @@ export function DashboardWidgetCard({
     return () => clearTimeout(timer);
   }, [draftCode, draftQueries]);
 
-  const { executeQuery, runStandalone, params: hostParams, lastRuns } =
-    useDashboardWidgetExecutor(projectId, previewQueries, { timeWindow });
+  const {
+    executeQuery,
+    runStandalone,
+    params: hostParams,
+    lastRuns,
+  } = useDashboardWidgetExecutor(projectId, previewQueries, { timeWindow });
   const onNavigate = useDashboardWidgetChartNavigate(projectSlug);
 
   // Known host-side at this boundary, mirroring DashboardWidgetFrame's own
@@ -169,22 +176,25 @@ export function DashboardWidgetCard({
       projectId,
       widgetName: widget.name,
     }),
-    [hostParams, colorMode, widget.id, widget.dashboardId, projectId, widget.name],
+    [
+      hostParams,
+      colorMode,
+      widget.id,
+      widget.dashboardId,
+      projectId,
+      widget.name,
+    ],
   );
 
   // Every declared parameter's default, deduped by name across the widget's
   // preview queries — mirrors DashboardWidgetFrame's own paramsSnapshot.
-  const paramsSnapshot = useMemo(() => {
-    const defaults: Record<string, string | number | boolean> = {};
-    for (const query of previewQueries) {
-      for (const parameter of query.parameters ?? []) {
-        if (parameter.default !== undefined) {
-          defaults[parameter.name] = parameter.default;
-        }
-      }
-    }
-    return defaults;
-  }, [previewQueries]);
+  const paramsSnapshot = useMemo(
+    () => declaredParamDefaults(previewQueries),
+    [previewQueries],
+  );
+
+  // A compile or render error the widget reports is shown on the card.
+  const { diagnostic, onLog } = useFrameDiagnostic({ resetKey: previewCode });
 
   const isDirty =
     draftName !== widget.name ||
@@ -306,17 +316,18 @@ export function DashboardWidgetCard({
               than one live iframe (and one LW.query dispatch) running the
               same preview at once. */}
           {!isDrawerOpen && (
-            <Box flex={1} minHeight={0}>
+            <Box flex={1} minHeight={0} position="relative">
               <SandboxedChartFrame
                 key={`${previewCode}\u0000${JSON.stringify(previewQueries)}`}
                 code={previewCode}
                 executeQuery={executeQuery}
                 dashboardContext={dashboardContext}
                 params={paramsSnapshot}
-                onLog={noopLog}
+                onLog={onLog}
                 onNavigate={onNavigate}
                 maxHeight={rowSpanHeight(widget.rowSpan)}
               />
+              <FrameDiagnosticBadge diagnostic={diagnostic} />
             </Box>
           )}
         </Card.Body>

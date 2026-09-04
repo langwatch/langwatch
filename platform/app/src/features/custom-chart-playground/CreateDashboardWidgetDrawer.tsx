@@ -14,14 +14,15 @@
  * "create a new chart" entry point that still works from a dashboard.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { useColorMode } from "~/components/ui/color-mode";
 import { toaster } from "~/components/ui/toaster";
 import type { DashboardWidgetQuery } from "~/server/analytics/dashboardWidgetDefinition";
 import { api } from "~/utils/api";
-
+import type { ChartFrameDashboardContext } from "./bridge/bridgeProtocol";
 import { DashboardWidgetEditDrawer } from "./DashboardWidgetEditDrawer";
+import { declaredParamDefaults } from "./paramsSnapshot";
 import { STARTER_WIDGET_CODE, STARTER_WIDGET_QUERIES } from "./presets";
 import { SandboxedChartFrame } from "./SandboxedChartFrame";
 import { useDashboardWidgetChartNavigate } from "./useDashboardWidgetChartNavigate";
@@ -92,8 +93,28 @@ export function CreateDashboardWidgetDrawer({
     return () => clearTimeout(timer);
   }, [draftCode, draftQueries]);
 
-  const { executeQuery, runStandalone, params, lastRuns } =
-    useDashboardWidgetExecutor(projectId, previewQueries);
+  const {
+    executeQuery,
+    runStandalone,
+    params: hostParams,
+    lastRuns,
+  } = useDashboardWidgetExecutor(projectId, previewQueries);
+
+  // Mirrors DashboardWidgetFrame's own dashboardContext build.
+  const dashboardContext: ChartFrameDashboardContext = useMemo(
+    () => ({
+      timeWindow: hostParams.timeWindow,
+      granularitySeconds: hostParams.granularitySeconds,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      theme: colorMode === "dark" ? "dark" : "light",
+      projectId,
+    }),
+    [hostParams, colorMode, projectId],
+  );
+  const paramsSnapshot = useMemo(
+    () => declaredParamDefaults(previewQueries),
+    [previewQueries],
+  );
 
   const handleSave = () => {
     createWidget.mutate(
@@ -143,8 +164,8 @@ export function CreateDashboardWidgetDrawer({
             key={`${previewCode} ${JSON.stringify(previewQueries)}`}
             code={previewCode}
             executeQuery={executeQuery}
-            params={params}
-            theme={colorMode === "dark" ? "dark" : "light"}
+            dashboardContext={dashboardContext}
+            params={paramsSnapshot}
             onLog={noopLog}
             onNavigate={onNavigate}
             maxHeight={DRAWER_PREVIEW_HEIGHT_PX}

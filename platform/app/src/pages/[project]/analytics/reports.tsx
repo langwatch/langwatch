@@ -9,6 +9,11 @@ import {
 } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
 import { useState } from "react";
+import { DashboardAutoRefreshMenu } from "~/components/analytics/DashboardAutoRefreshMenu";
+import {
+  DashboardRefreshedAtContext,
+  useDashboardAutoRefresh,
+} from "~/components/analytics/useDashboardAutoRefresh";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
 import { useFilterToggle } from "~/components/filters/FilterToggle";
 import GraphsLayout from "~/components/GraphsLayout";
@@ -40,6 +45,15 @@ function ReportsContent() {
   const activeDashboardId = urlDashboardId ?? getOrCreateFirst.data?.id;
 
   const [isAddChartOpen, setIsAddChartOpen] = useState(false);
+
+  // Scheduled refresh: widgets follow refreshedAt through their dashboard
+  // context; builder graphs and placed charts re-fetch through tRPC.
+  const utils = api.useUtils();
+  const autoRefresh = useDashboardAutoRefresh({
+    onTick: () => {
+      void utils.analytics.invalidate();
+    },
+  });
 
   // Fetch all dashboards to get current dashboard name
   const dashboardsQuery = api.dashboards.getAll.useQuery(
@@ -155,15 +169,21 @@ function ReportsContent() {
         onTitleSave: handleTitleSave,
       }}
       extraHeaderButtons={
-        project ? (
-          <Button
-            colorPalette="orange"
-            size="sm"
-            onClick={() => setIsAddChartOpen(true)}
-          >
-            <Plus /> Add chart
-          </Button>
-        ) : null
+        <>
+          <DashboardAutoRefreshMenu
+            option={autoRefresh.option}
+            onChange={autoRefresh.setOption}
+          />
+          {project ? (
+            <Button
+              colorPalette="orange"
+              size="sm"
+              onClick={() => setIsAddChartOpen(true)}
+            >
+              <Plus /> Add chart
+            </Button>
+          ) : null}
+        </>
       }
     >
       {/* The workbench builder's own save path is disabled while the
@@ -204,29 +224,31 @@ function ReportsContent() {
       )}
 
       {/* Main content */}
-      <HStack align="start" gap={6} width="full">
-        <Box flex={1}>
-          {graphsQuery.isLoading ? (
-            <Skeleton height="300px" />
-          ) : (
-            <ReportGrid
-              graphs={graphs}
-              projectSlug={project?.slug ?? ""}
-              projectId={projectId}
-              dashboardId={activeDashboardId ?? undefined}
-              onGraphDelete={handleGraphDelete}
-              onGraphGranularityChange={handleGraphGranularityChange}
-              onGraphsPlacementChange={handleGraphsPlacementChange}
-              deletingGraphId={
-                deleteGraph.isPending
-                  ? (deleteGraph.variables?.id ?? null)
-                  : null
-              }
-            />
-          )}
-        </Box>
-        {showFilters ? <FilterSidebar /> : null}
-      </HStack>
+      <DashboardRefreshedAtContext.Provider value={autoRefresh.refreshedAt}>
+        <HStack align="start" gap={6} width="full">
+          <Box flex={1}>
+            {graphsQuery.isLoading ? (
+              <Skeleton height="300px" />
+            ) : (
+              <ReportGrid
+                graphs={graphs}
+                projectSlug={project?.slug ?? ""}
+                projectId={projectId}
+                dashboardId={activeDashboardId ?? undefined}
+                onGraphDelete={handleGraphDelete}
+                onGraphGranularityChange={handleGraphGranularityChange}
+                onGraphsPlacementChange={handleGraphsPlacementChange}
+                deletingGraphId={
+                  deleteGraph.isPending
+                    ? (deleteGraph.variables?.id ?? null)
+                    : null
+                }
+              />
+            )}
+          </Box>
+          {showFilters ? <FilterSidebar /> : null}
+        </HStack>
+      </DashboardRefreshedAtContext.Provider>
     </GraphsLayout>
   );
 }

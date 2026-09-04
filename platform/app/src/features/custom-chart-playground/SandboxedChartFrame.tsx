@@ -7,12 +7,11 @@
  */
 
 import { Box, Button, Text, VStack } from "@chakra-ui/react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type {
   ChartFrameDashboardContext,
   ChartFrameParamsSnapshot,
-  ChartFrameTheme,
 } from "./bridge/bridgeProtocol";
 import {
   CHART_FRAME_MAX_HEIGHT_PX,
@@ -24,6 +23,10 @@ import type {
 } from "./bridge/frameBridge";
 import { createFrameBridge } from "./bridge/frameBridge";
 import { buildSrcdoc } from "./buildSrcdoc";
+import {
+  FRAME_RESTART_MAX_ATTEMPTS,
+  useFrameAutoRestart,
+} from "./useFrameAutoRestart";
 
 export interface SandboxedChartFrameProps {
   /** The widget's React/TSX source. The frame re-mounts whenever this changes. */
@@ -65,7 +68,10 @@ export function SandboxedChartFrame({
 }: SandboxedChartFrameProps) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [generation, setGeneration] = useState(0);
-  const [tornDown, setTornDown] = useState(false);
+  const remount = useCallback(() => setGeneration((n) => n + 1), []);
+  // A torn-down frame comes back on its own, with backoff; see the hook.
+  const restart = useFrameAutoRestart({ onRestart: remount });
+  const { noteTornDown, noteFrameMounted } = restart;
   // Fills the box the card gives it by default (a taller/wider card grows
   // the chart with it); a widget can still call LW.setHeight to size to its
   // own content instead, which is what onHeightChange below feeds.
@@ -105,14 +111,15 @@ export function SandboxedChartFrame({
       onHeightChange: setHeight,
       onNavigate: (target, navParams) =>
         onNavigateRef.current?.(target, navParams),
-      onTeardown: () => setTornDown(true),
+      onTeardown: noteTornDown,
     });
     bridgeRef.current = bridge;
+    noteFrameMounted();
     return () => {
       bridgeRef.current = null;
       bridge.dispose();
     };
-  }, [generation, srcdoc]);
+  }, [generation, srcdoc, noteTornDown, noteFrameMounted]);
 
   // Push dashboard context updates into the live frame without re-mounting it.
   useEffect(() => {
@@ -120,7 +127,7 @@ export function SandboxedChartFrame({
     bridgeRef.current?.postDashboardContextChange(dashboardContext);
   }, [dashboardContext]);
 
-  if (tornDown) {
+  if (restart.status !== "running") {
     return (
       <VStack
         align="center"
@@ -133,15 +140,11 @@ export function SandboxedChartFrame({
         padding={4}
       >
         <Text fontSize="13px" color="fg.muted">
-          The frame stopped responding and was torn down.
+          {restart.status === "exhausted"
+            ? `Restarted ${FRAME_RESTART_MAX_ATTEMPTS} times, still not responding.`
+            : "The chart stopped responding. Restarting…"}
         </Text>
-        <Button
-          size="sm"
-          onClick={() => {
-            setTornDown(false);
-            setGeneration((n) => n + 1);
-          }}
-        >
+        <Button size="sm" onClick={restart.restartNow}>
           Restart
         </Button>
       </VStack>
