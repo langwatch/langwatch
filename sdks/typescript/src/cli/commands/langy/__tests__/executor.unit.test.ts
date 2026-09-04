@@ -12,12 +12,14 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { BASH_OUTPUT_CAP_BYTES } from "../../../../agent/local-control-protocol";
 import { LocalCallFailure } from "../errors";
 import {
+  BASH_MAX_TIMEOUT_SECONDS,
   collapseProgressRedraws,
   excludeLogDirFromGit,
   killGroup,
   logPathFor,
   startCommand,
   timeoutMsFor,
+  timeoutSecondsFor,
 } from "../executor";
 
 const alive = (pid: number): boolean => {
@@ -160,17 +162,20 @@ describe("given a shared folder", () => {
   });
 
   describe("when a command passes its timeout", () => {
-    it("stops it and says the limit was passed", async () => {
+    /** @scenario "A command stopped at its time limit says the limit and how to raise it" */
+    it("stops it and says the limit it hit and the longest limit it may ask for", async () => {
       const command = startCommand({
         command: "sleep 30",
         root,
         callId: "call-5",
-        timeout: 0.3,
+        timeout: 1,
       });
       await expect(command.result).rejects.toBeInstanceOf(LocalCallFailure);
       await command.result.catch((error: LocalCallFailure) => {
         expect(error.code).toBe("timeout");
-        expect(error.message).toContain("limit");
+        expect(error.message).toBe(
+          `The command was stopped at its 1 second limit. To give it more time, ask for it again with a larger timeout parameter, which is in seconds and may go up to ${BASH_MAX_TIMEOUT_SECONDS}. The output so far is at ${command.logPath}.`,
+        );
       });
     });
 
@@ -179,6 +184,14 @@ describe("given a shared folder", () => {
       expect(timeoutMsFor(30)).toBe(30_000);
       expect(timeoutMsFor(3_600)).toBe(15 * 60 * 1000);
       expect(timeoutMsFor(0)).toBe(5 * 60 * 1000);
+    });
+
+    it("reports the clamped limit in whole seconds", () => {
+      expect(timeoutSecondsFor(undefined)).toBe(300);
+      expect(timeoutSecondsFor(30)).toBe(30);
+      expect(timeoutSecondsFor(0.4)).toBe(1);
+      expect(timeoutSecondsFor(3_600)).toBe(BASH_MAX_TIMEOUT_SECONDS);
+      expect(BASH_MAX_TIMEOUT_SECONDS).toBe(900);
     });
   });
 

@@ -242,6 +242,7 @@ describe("given a folder connected to a Langy conversation", () => {
       expect(asked).toBeDefined();
       expect(asked!.summary).toBe("pnpm typecheck");
       expect(asked!.pattern).toBe("pnpm typecheck");
+      expect(asked!.timeoutSeconds).toBe(300);
       expect(lines.join("\n")).toContain("Langy asked to run pnpm typecheck");
       expect(lines.join("\n")).toContain("Answer in the LangWatch panel");
       expect(lines.join("\n")).toContain(CONVERSATION.url);
@@ -257,6 +258,34 @@ describe("given a folder connected to a Langy conversation", () => {
       const [result] = socket.sentOf("result");
       expect(result!.ok).toBe(false);
       expect((result!.error as { code: string }).code).toBe("permission_denied");
+    });
+
+    it("carries the time limit of a command, and none for a file call", async () => {
+      start();
+      await settle();
+      register();
+
+      socket.deliver(
+        callFrame({
+          tool: "local_bash",
+          params: { command: "pnpm typecheck", timeout: 3_600 },
+        }),
+      );
+      await settle();
+      const [command] = socket.sentOf("permission_required");
+      expect(command!.timeoutSeconds).toBe(900);
+
+      socket.deliver({
+        ...callFrame({ tool: "local_read", params: { path: ".env" } }),
+        call: {
+          ...callFrame({ tool: "local_read", params: { path: ".env" } }).call,
+          callId: "call-2",
+        },
+      });
+      await settle();
+      const asks = socket.sentOf("permission_required");
+      expect(asks).toHaveLength(2);
+      expect(asks[1]!.timeoutSeconds).toBeUndefined();
     });
 
     /** @scenario "A session grant silences the next matching command" */

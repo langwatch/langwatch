@@ -60,12 +60,26 @@ export interface StartCommandInput {
   background?: boolean;
 }
 
+/** The longest limit a command may ask for, in whole seconds. */
+export const BASH_MAX_TIMEOUT_SECONDS = Math.round(BASH_MAX_TIMEOUT_MS / 1000);
+
 /** The timeout one command runs under, in milliseconds. */
 export function timeoutMsFor(seconds: number | undefined): number {
   if (seconds === undefined || !Number.isFinite(seconds) || seconds <= 0) {
     return BASH_DEFAULT_TIMEOUT_MS;
   }
   return Math.min(BASH_MAX_TIMEOUT_MS, Math.round(seconds * 1000));
+}
+
+const wholeSeconds = (ms: number): number => Math.max(1, Math.round(ms / 1000));
+
+/**
+ * The same limit in whole seconds, which is how the permission card names it
+ * and how the timeout message reads it back. A limit under a second still
+ * reads as one second, because zero would name no limit at all.
+ */
+export function timeoutSecondsFor(seconds: number | undefined): number {
+  return wholeSeconds(timeoutMsFor(seconds));
 }
 
 /** Where one call's log file lives inside the folder. */
@@ -338,7 +352,7 @@ function startForeground({
         reject(
           new LocalCallFailure({
             code: "timeout",
-            message: `The command passed its ${Math.round(limitMs / 1000)} second limit and was stopped. The output so far is at ${logPath}.`,
+            message: `The command was stopped at its ${wholeSeconds(limitMs)} second limit. To give it more time, ask for it again with a larger timeout parameter, which is in seconds and may go up to ${BASH_MAX_TIMEOUT_SECONDS}. The output so far is at ${logPath}.`,
           }),
         );
         return;

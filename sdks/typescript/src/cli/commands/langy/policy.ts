@@ -228,6 +228,13 @@ export interface CommandPart {
   text: string;
   /** Tokens with their quotes removed. */
   tokens: string[];
+  /**
+   * True at the index of a token the shell read as a whole quoted string
+   * literal. A token that mixes quoted and bare characters is not one.
+   */
+  quoted: boolean[];
+  /** True at the index of a token a redirect sends output to or reads from. */
+  redirectTarget: boolean[];
   /** The part sends output to a file or reads one in. */
   hasRedirect: boolean;
 }
@@ -254,25 +261,38 @@ export function parseCommand(command: string): ParsedCommand {
 
   let partStart = 0;
   let tokens: string[] = [];
+  let quoted: boolean[] = [];
+  let redirectTarget: boolean[] = [];
   let token = "";
   let tokenOpen = false;
+  let tokenQuoted = false;
+  let tokenBare = false;
+  let redirectPending = false;
   let hasRedirect = false;
   let index = 0;
 
   const endToken = () => {
     if (!tokenOpen) return;
     tokens.push(token);
+    quoted.push(tokenQuoted && !tokenBare);
+    redirectTarget.push(redirectPending);
     token = "";
     tokenOpen = false;
+    tokenQuoted = false;
+    tokenBare = false;
+    redirectPending = false;
   };
 
   const endPart = (end: number) => {
     endToken();
     const text = command.slice(partStart, end).trim();
     if (tokens.length > 0 || text !== "") {
-      parts.push({ text, tokens, hasRedirect });
+      parts.push({ text, tokens, quoted, redirectTarget, hasRedirect });
     }
     tokens = [];
+    quoted = [];
+    redirectTarget = [];
+    redirectPending = false;
     hasRedirect = false;
   };
 
@@ -284,6 +304,7 @@ export function parseCommand(command: string): ParsedCommand {
       const end = close === -1 ? command.length : close;
       token += command.slice(index + 1, end);
       tokenOpen = true;
+      tokenQuoted = true;
       index = end + 1;
       continue;
     }
@@ -304,6 +325,7 @@ export function parseCommand(command: string): ParsedCommand {
         cursor += 1;
       }
       tokenOpen = true;
+      tokenQuoted = true;
       index = cursor + 1;
       continue;
     }
@@ -311,6 +333,7 @@ export function parseCommand(command: string): ParsedCommand {
     if (char === "\\" && index + 1 < command.length) {
       token += command[index + 1];
       tokenOpen = true;
+      tokenBare = true;
       index += 2;
       continue;
     }
@@ -319,6 +342,7 @@ export function parseCommand(command: string): ParsedCommand {
       hasSubstitution = true;
       token += char;
       tokenOpen = true;
+      tokenBare = true;
       index += 1;
       continue;
     }
@@ -333,6 +357,7 @@ export function parseCommand(command: string): ParsedCommand {
     if (char === ">" || char === "<") {
       endToken();
       hasRedirect = true;
+      redirectPending = true;
       index += 1;
       continue;
     }
@@ -340,6 +365,7 @@ export function parseCommand(command: string): ParsedCommand {
     // `2>file` and `&>file`: the digit or ampersand belongs to the redirect.
     if (/[0-9&]/.test(char) && command[index + 1] === ">" && !tokenOpen) {
       hasRedirect = true;
+      redirectPending = true;
       index += 2;
       continue;
     }
@@ -361,6 +387,7 @@ export function parseCommand(command: string): ParsedCommand {
 
     token += char;
     tokenOpen = true;
+    tokenBare = true;
     index += 1;
   }
 
@@ -395,27 +422,46 @@ export function grantName(name: string): string {
   return INTERPRETER_ALIASES.get(name) ?? name;
 }
 
-/** The pattern "allow for this session" would grant for one command part. */
-export function grantPatternFor(tokens: string[]): string {
+/**
+ * The pattern "allow for this session" would grant for one command part.
+ *
+ * A quoted string is text the command prints or matches, so it never becomes
+ * the pattern: `printf '\nAPI_KEY=x\n' >> .env.example` would otherwise offer
+ * the whole literal on the button. The command name covers it instead.
+ */
+export function grantPatternFor({
+  tokens,
+  quoted = [],
+}: {
+  tokens: string[];
+  quoted?: boolean[];
+}): string {
   const name = tokens[0] ?? "";
   if (INTERPRETER_ALIASES.has(name)) return `${grantName(name)} *`;
-  const first = tokens.slice(1).find((token) => !token.startsWith("-"));
-  return first === undefined ? `${name} *` : `${name} ${first}`;
+  const first = tokens.findIndex(
+    (token, index) => index > 0 && !token.startsWith("-"),
+  );
+  if (first === -1 || quoted[first] === true) return `${name} *`;
+  return `${name} ${tokens[first]}`;
 }
 
 /** True when the session grants cover this command part. */
 export function grantsAllow({
   tokens,
+  quoted,
   grants,
 }: {
   tokens: string[];
+  quoted?: boolean[];
   grants: ReadonlySet<string>;
 }): boolean {
   const name = tokens[0];
   if (name === undefined || name === "") return false;
-  return (
-    grants.has(grantPatternFor(tokens)) || grants.has(`${grantName(name)} *`)
-  );
+  const pattern = grantPatternFor({
+    tokens,
+    ...(quoted === undefined ? {} : { quoted }),
+  });
+  return grants.has(pattern) || grants.has(`${grantName(name)} *`);
 }
 
 /** True when the token names a program by its path rather than by its name. */
@@ -700,7 +746,38 @@ const outsideMessage = ({
   resolved: string;
   root: string;
 }): string =>
-  `Only paths inside ${root} are allowed. "${target}" resolves to ${resolved}, which is outside it.`;
+  `Only paths inside ${root} are allowed. The argument "${target}" was read as a path, and it points at ${resolved}, which is outside the folder.`;
+
+/** Commands whose arguments are text to print rather than files to open. */
+const TEXT_PRINTING_COMMANDS: ReadonlySet<string> = new Set(["printf", "echo"]);
+
+/**
+ * Escape sequences and printf conversions. A path carries neither, so a quoted
+ * string that carries one is text whatever command reads it.
+ */
+const TEXT_MARKERS = /\\[ntrvfe0]|%[-+ #0-9.]*[sdiufgxXc%]/;
+
+/**
+ * True when a quoted argument is text the command prints or matches rather
+ * than a path it opens.
+ *
+ * `printf '\nDEFAULT=/etc/paths\n'` prints a format string, and reading it as
+ * a path refused a command that touches nothing. A quoted argument to any
+ * other command is still a path, so `cat '/etc/passwd'` stays refused.
+ */
+export function isTextArgument({
+  name,
+  token,
+  quoted,
+}: {
+  name: string;
+  token: string;
+  quoted: boolean;
+}): boolean {
+  if (!quoted) return false;
+  if (TEXT_PRINTING_COMMANDS.has(name)) return true;
+  return TEXT_MARKERS.test(token);
+}
 
 /**
  * True when a shell argument is worth checking against the folder boundary.
@@ -830,7 +907,7 @@ function decideBash({
 
   const segments: CommandSegment[] = parsed.parts.map((part) => ({
     command: part.text,
-    pattern: grantPatternFor(part.tokens),
+    pattern: grantPatternFor({ tokens: part.tokens, quoted: part.quoted }),
     readOnly: !parsed.hasSubstitution && isReadOnlyPart(part),
   }));
 
@@ -848,7 +925,7 @@ function decideBash({
 
   const writing = parsed.parts.filter((part) => !isReadOnlyPart(part));
   const unanswered = writing.filter(
-    (part) => !grantsAllow({ tokens: part.tokens, grants }),
+    (part) => !grantsAllow({ tokens: part.tokens, quoted: part.quoted, grants }),
   );
   if (unanswered.length === 0) return { kind: "run" };
 
@@ -856,12 +933,19 @@ function decideBash({
   // a chain that stages, commits and pushes granted `git add` and ran the
   // rest under it.
   const patterns = [
-    ...new Set(writing.map((part) => grantPatternFor(part.tokens))),
+    ...new Set(
+      writing.map((part) =>
+        grantPatternFor({ tokens: part.tokens, quoted: part.quoted }),
+      ),
+    ),
   ];
   return {
     kind: "ask",
     summary: command,
-    pattern: grantPatternFor(unanswered[0]!.tokens),
+    pattern: grantPatternFor({
+      tokens: unanswered[0]!.tokens,
+      quoted: unanswered[0]!.quoted,
+    }),
     patterns,
     reason: reasonFor(writing),
     segments,
@@ -870,12 +954,14 @@ function decideBash({
 
 /**
  * The path this part would leave the folder through, or null. Every argument
- * that looks like a path is checked, and the argument of `cd` and of a
- * directory flag is checked whatever it looks like.
+ * that looks like a path is checked, and the argument of `cd`, of a directory
+ * flag and of a redirect is checked whatever it looks like.
  *
  * The first token is the program, not a path the command reads: `/usr/bin/ls`
  * asks because it is not a bare name, which is a clearer answer than refusing
  * it for living outside the folder.
+ *
+ * A quoted string a command prints is text, so it is not checked at all.
  */
 function boundaryEscape({
   part,
@@ -888,10 +974,15 @@ function boundaryEscape({
   realpath?: (value: string) => string;
   homedir?: string;
 }): string | null {
+  const name = part.tokens[0] ?? "";
   const named = new Set<string>();
   for (let index = 0; index < part.tokens.length; index += 1) {
     const token = part.tokens[index]!;
     const next = part.tokens[index + 1];
+    if (part.redirectTarget[index] === true) {
+      named.add(token);
+      continue;
+    }
     if ((token === "cd" || DIRECTORY_FLAGS.has(token)) && next !== undefined) {
       named.add(next);
       continue;
@@ -901,7 +992,11 @@ function boundaryEscape({
       named.add(equals[1]!);
       continue;
     }
-    if (index > 0 && looksLikeAPath(token)) named.add(token);
+    if (index === 0) continue;
+    if (isTextArgument({ name, token, quoted: part.quoted[index] === true })) {
+      continue;
+    }
+    if (looksLikeAPath(token)) named.add(token);
   }
   for (const target of named) {
     const check = resolvePathInsideRoot({ target, root, realpath, homedir });

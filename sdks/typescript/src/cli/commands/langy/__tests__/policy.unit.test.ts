@@ -13,6 +13,7 @@ import {
   grantPatternFor,
   grantsAllow,
   isSecretFileName,
+  isTextArgument,
   looksLikeAPath,
   parseCommand,
   type PolicyDecision,
@@ -334,9 +335,13 @@ describe("given a folder shared with a Langy conversation", () => {
     });
 
     it("offers the name and its first argument as the pattern", () => {
-      expect(grantPatternFor(["pnpm", "typecheck"])).toBe("pnpm typecheck");
-      expect(grantPatternFor(["pnpm", "-r", "build"])).toBe("pnpm build");
-      expect(grantPatternFor(["make"])).toBe("make *");
+      expect(grantPatternFor({ tokens: ["pnpm", "typecheck"] })).toBe(
+        "pnpm typecheck",
+      );
+      expect(grantPatternFor({ tokens: ["pnpm", "-r", "build"] })).toBe(
+        "pnpm build",
+      );
+      expect(grantPatternFor({ tokens: ["make"] })).toBe("make *");
       expect(
         grantsAllow({ tokens: ["pnpm", "test"], grants: new Set(["pnpm *"]) }),
       ).toBe(true);
@@ -364,15 +369,21 @@ describe("given a folder shared with a Langy conversation", () => {
     });
 
     it("offers the interpreter as the pattern for every alias", () => {
-      expect(grantPatternFor(["python3", "-m", "compileall"])).toBe("python *");
-      expect(grantPatternFor(["nodejs", "server.js"])).toBe("node *");
-      expect(grantPatternFor(["pip3", "install", "-r", "reqs.txt"])).toBe(
+      expect(grantPatternFor({ tokens: ["python3", "-m", "compileall"] })).toBe(
+        "python *",
+      );
+      expect(grantPatternFor({ tokens: ["nodejs", "server.js"] })).toBe(
+        "node *",
+      );
+      expect(grantPatternFor({ tokens: ["pip3", "install", "-r", "reqs.txt"] })).toBe(
         "pip *",
       );
     });
 
     it("leaves every other command name alone", () => {
-      expect(grantPatternFor(["pnpm", "typecheck"])).toBe("pnpm typecheck");
+      expect(grantPatternFor({ tokens: ["pnpm", "typecheck"] })).toBe(
+        "pnpm typecheck",
+      );
       expect(
         grantsAllow({ tokens: ["go", "test"], grants: new Set(["python *"]) }),
       ).toBe(false);
@@ -448,6 +459,94 @@ describe("given a folder shared with a Langy conversation", () => {
     it("asks rather than refuses when the directory is inside the folder", () => {
       const decision = bash("cd packages/app && ls");
       expect(decision.kind).toBe("ask");
+    });
+  });
+
+  describe("when a command prints a quoted string", () => {
+    /** @scenario "A quoted string a command prints is not judged a path" */
+    it("reads the quoted string as text and keeps checking everything else", () => {
+      for (const command of [
+        "printf '/etc/passwd\\n'",
+        "echo '~/.ssh/config'",
+        "git status --porcelain && printf '\\nDEFAULT=/etc/paths\\n' && git diff",
+        'printf "/etc/hosts"',
+      ]) {
+        expect(bash(command).kind, command).not.toBe("refuse");
+      }
+
+      for (const command of [
+        "cat '/etc/passwd'",
+        "printf 'hello' > /etc/passwd",
+        "printf 'hello' > '/etc/passwd'",
+        "printf '%s\\n' ../other/notes.txt",
+      ]) {
+        const decision = bash(command);
+        expect(decision.kind, command).toBe("refuse");
+        if (decision.kind === "refuse") {
+          expect(decision.code, command).toBe("path_refused");
+        }
+      }
+    });
+
+    it("names the arguments a printing command reads as text", () => {
+      expect(
+        isTextArgument({ name: "printf", token: "/etc/passwd", quoted: true }),
+      ).toBe(true);
+      expect(
+        isTextArgument({ name: "echo", token: "~/.ssh/config", quoted: true }),
+      ).toBe(true);
+      expect(
+        isTextArgument({ name: "cat", token: "/etc/passwd", quoted: true }),
+      ).toBe(false);
+      expect(
+        isTextArgument({ name: "printf", token: "/etc/passwd", quoted: false }),
+      ).toBe(false);
+      // Escape sequences and conversions belong to text, never to a path.
+      expect(
+        isTextArgument({ name: "grep", token: "/etc/passwd\\n", quoted: true }),
+      ).toBe(true);
+      expect(
+        isTextArgument({ name: "grep", token: "%s/etc/passwd", quoted: true }),
+      ).toBe(true);
+    });
+
+    it("offers the command name rather than the quoted string as the pattern", () => {
+      expect(
+        grantPatternFor({
+          tokens: ["printf", "\\nLANGWATCH_API_KEY=x\\n", ".env.example"],
+          quoted: [false, true, false],
+        }),
+      ).toBe("printf *");
+      expect(
+        grantsAllow({
+          tokens: ["printf", "\\nLANGWATCH_API_KEY=x\\n", ".env.example"],
+          quoted: [false, true, false],
+          grants: new Set(["printf *"]),
+        }),
+      ).toBe(true);
+    });
+
+    it("carries the quoted arguments and the redirect targets of a part", () => {
+      const parsed = parseCommand("printf '/etc/passwd' > out.txt");
+      expect(parsed.parts[0]?.tokens).toEqual([
+        "printf",
+        "/etc/passwd",
+        "out.txt",
+      ]);
+      expect(parsed.parts[0]?.quoted).toEqual([false, true, false]);
+      expect(parsed.parts[0]?.redirectTarget).toEqual([false, false, true]);
+    });
+  });
+
+  describe("when a command is refused for naming a path outside the folder", () => {
+    /** @scenario "A refusal names the argument it judged a path" */
+    it("names the argument, where it points and the folder that is allowed", () => {
+      const decision = bash("cat /etc/passwd");
+      expect(decision.kind).toBe("refuse");
+      if (decision.kind !== "refuse") return;
+      expect(decision.message).toBe(
+        `Only paths inside ${ROOT} are allowed. The argument "/etc/passwd" was read as a path, and it points at /etc/passwd, which is outside the folder.`,
+      );
     });
   });
 

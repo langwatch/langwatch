@@ -19,7 +19,11 @@ import {
 } from "../../../agent/local-control-protocol";
 import type { AgentTransport, SocketFactory } from "../../../agent/transport";
 import { failureCode, failureMessage } from "./errors";
-import { startCommand, type RunningCommand } from "./executor";
+import {
+  startCommand,
+  timeoutSecondsFor,
+  type RunningCommand,
+} from "./executor";
 import {
   editFile,
   findFiles,
@@ -229,6 +233,10 @@ export function startLangySession(options: LangySessionOptions): LangySession {
         ...(decision.segments === undefined
           ? {}
           : { segments: decision.segments }),
+        // Only a command runs under a time limit, so only a command carries one.
+        ...(call.tool === "local_bash"
+          ? { timeoutSeconds: timeoutSecondsFor(call.params.timeout) }
+          : {}),
       });
       ui.permissionAsked({
         summary: decision.summary,

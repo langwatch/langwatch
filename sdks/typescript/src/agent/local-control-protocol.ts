@@ -234,6 +234,8 @@ export interface LocalPermissionRequiredFrame {
   skipOffered: boolean;
   /** Set for a command: every segment of the chain, in the order it runs. */
   segments?: CommandSegment[];
+  /** The seconds after which the command is stopped, for the card to name the limit. */
+  timeoutSeconds?: number;
 }
 
 export interface LocalDeregisterFrame {
