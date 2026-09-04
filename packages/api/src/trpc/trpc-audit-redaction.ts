@@ -1,11 +1,10 @@
 /**
  * What the audit trail is allowed to keep of a call's arguments.
  *
- * Moved here from the application unchanged, rules and keying included: the
- * scalar rule below is the only thing standing between a plaintext secret and
- * a durable, queryable table, and it is keyed by tRPC action path because the
- * field names it names are ordinary words other mutations use for harmless
- * things.
+ * These rules are all that stands between a plaintext secret and a durable,
+ * queryable table. Two of them: a field-name rule that applies to every action
+ * at every depth, and per-action lists for the fields whose names are ordinary
+ * words other mutations use for harmless things.
  */
 
 /**
@@ -44,7 +43,72 @@ const REDACTED_VALUE_FIELDS_BY_ACTION: Record<string, readonly string[]> = {
 const REDACTED_SCALAR_FIELDS_BY_ACTION: Record<string, readonly string[]> = {
   "secrets.create": ["value"],
   "secrets.update": ["value"],
+  "license.generate": ["privateKey"],
+  "license.upload": ["licenseKey"],
 };
+
+/**
+ * Field names that carry credential material whatever mutation they ride on.
+ *
+ * The per-action lists above cannot be complete: every new mutation that takes
+ * a key is a new row of plaintext until someone remembers to add it. This
+ * pattern is the standing rule, applied to every action and at every depth,
+ * and the lists stay for the fields whose names are ordinary words.
+ *
+ * `token` is singular on purpose — `maxTokens` and `promptTokens` are counts.
+ */
+const SENSITIVE_FIELD_NAME =
+  /(password|passphrase|privatekey|publickey|secretkey|sharedsecret|clientsecret|signingkey|apikey|accesskey|encryptionkey|licensekey|certificate|secret|token(?!s)|credential|slackwebhook|webhookurl|authorization|bearer)/;
+
+/** Whether a field's name says its value is credential material. */
+function isSensitiveFieldName(name: string): boolean {
+  return SENSITIVE_FIELD_NAME.test(name.toLowerCase().replace(/[^a-z0-9]/g, ""));
+}
+
+/**
+ * The depth the name rule walks to. A mutation input is a form, not a
+ * document; past this the cost of walking is real and the odds of a secret are
+ * not.
+ */
+const MAX_SCAN_DEPTH = 8;
+
+/**
+ * The same value with every sensitively-named field replaced, or undefined
+ * when the value holds no such field.
+ *
+ * Undefined is what keeps an input carrying no credentials out of the copy
+ * path, so the audit row stays the object the procedure received.
+ */
+function redactSensitiveNames(value: unknown, depth = 0): unknown {
+  if (depth >= MAX_SCAN_DEPTH || typeof value !== "object" || value === null) return undefined;
+
+  if (Array.isArray(value)) {
+    let changed = false;
+    const next = value.map((entry) => {
+      const redacted = redactSensitiveNames(entry, depth + 1);
+      if (redacted === undefined) return entry;
+      changed = true;
+      return redacted;
+    });
+    return changed ? next : undefined;
+  }
+
+  const record = value as Record<string, unknown>;
+  let next: Record<string, unknown> | undefined;
+  for (const [name, field] of Object.entries(record)) {
+    if (isSensitiveFieldName(name)) {
+      next ??= { ...record };
+      next[name] = redactObjectField(field) ?? "[redacted]";
+      continue;
+    }
+    const redacted = redactSensitiveNames(field, depth + 1);
+    if (redacted !== undefined) {
+      next ??= { ...record };
+      next[name] = redacted;
+    }
+  }
+  return next;
+}
 
 /** Keeps an object's field names, drops every value. */
 function redactValues(source: Record<string, unknown>): Record<string, string> {
@@ -104,26 +168,29 @@ export function redactAuditArgs({ input, action }: { input: unknown; action?: st
   if (typeof input !== "object" || input === null) return input;
 
   const record = input as Record<string, unknown>;
-  let redacted: Record<string, unknown> | undefined;
+  // The standing name rule runs first and at every depth; the action rules
+  // below then cover the fields whose names say nothing.
+  let redacted = redactSensitiveNames(record) as Record<string, unknown> | undefined;
+  const source = redacted ?? record;
 
   // Built lazily so input carrying no credentials is returned as-is rather
   // than copied — the audit row is then the object the procedure received.
   const replace = (field: string, value: unknown) => {
-    redacted ??= { ...record };
+    redacted ??= { ...source };
     redacted[field] = value;
   };
 
   for (const field of redactedObjectFieldsFor(action)) {
-    const value = redactObjectField(record[field]);
+    const value = redactObjectField(source[field]);
     if (value !== undefined) replace(field, value);
   }
 
   for (const field of (action ? REDACTED_SCALAR_FIELDS_BY_ACTION[action] : undefined) ?? []) {
-    if (record[field] !== undefined) replace(field, "[redacted]");
+    if (source[field] !== undefined) replace(field, "[redacted]");
   }
 
-  if (Array.isArray(record.extraHeaders)) {
-    replace("extraHeaders", redactHeaderValues(record.extraHeaders));
+  if (Array.isArray(source.extraHeaders)) {
+    replace("extraHeaders", redactHeaderValues(source.extraHeaders));
   }
 
   return redacted ?? input;

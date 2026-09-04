@@ -165,7 +165,8 @@ export function createWorkflowStudioRestApp<TSession extends WorkflowStudioRestS
         "code-completion failed",
       );
       ports.reportError?.(error, { projectId });
-      return c.json({ error: error instanceof Error ? error.message : String(error) }, 500);
+      // Generic on purpose (ADR-045): the cause is on the log line above.
+      return c.json({ error: "Code completion failed." }, 500);
     }
   });
 
@@ -204,11 +205,11 @@ export function createWorkflowStudioRestApp<TSession extends WorkflowStudioRestS
         }
         // A node reached dispatch with no model: fixable in the editor.
         if (error instanceof LlmModelNotSetError) {
-          return c.json({ error: error.message, cause: error.cause }, 422);
+          return c.json({ error: error.message }, 422);
         }
         logger.error({ error, projectId }, "error");
         ports.reportError?.(error, { projectId });
-        return c.json({ error: (error as Error).message }, 500);
+        return c.json({ error: "Could not prepare this event." }, 500);
       }
 
       if (!DISPATCHABLE_EVENT_TYPES.has(message.type)) {

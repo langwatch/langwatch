@@ -159,6 +159,15 @@ export type CollectorRestPorts = Readonly<{
 const COLLECTOR_MAX_BODY_BYTES = 10 * 1024 * 1024;
 
 /**
+ * What `partialSuccess.errorMessage` says about a span or an evaluation the
+ * pipeline refused. The pipeline's own strings name the datastore and its
+ * address, and this body reaches any project key, so the count and the action
+ * travel and the diagnosis stays on the log line.
+ */
+const SPAN_INGESTION_FAILED = "span ingestion failed, please retry";
+const EVALUATION_INGESTION_FAILED = "evaluation ingestion failed, please retry";
+
+/**
  * The REST collector, built against one process's security.
  *
  * `/api/collector` is a literal path nothing else claims, but it MUST be
@@ -614,7 +623,9 @@ export function createCollectorRestApp(options: {
         // resolved status — checking the allSettled "rejected" wrapper would
         // count every failure as a success. An unexpected rejection is still
         // treated as a failure defensively. "deduped" is a success, not an error.
-        const failureErrors = results
+        // The pipeline's own error strings go to the log below; what the
+        // caller is told is the count and that a retry is the action.
+        const failureDetails = results
           .map((r) => {
             if (r.status === "rejected") {
               return r.reason instanceof Error ? r.reason.message : String(r.reason);
@@ -622,6 +633,7 @@ export function createCollectorRestApp(options: {
             return r.value.status === "failed" ? (r.value.error ?? "span ingestion failed") : null;
           })
           .filter((e): e is string => e !== null);
+        const failureErrors = failureDetails.map(() => SPAN_INGESTION_FAILED);
         dispatchFailures = failureErrors.length;
         rejectedSpans += failureErrors.length;
         rejectionErrors = [...rejectionErrors, ...failureErrors];
@@ -630,8 +642,8 @@ export function createCollectorRestApp(options: {
             {
               projectId: project.id,
               traceId,
-              failureCount: failureErrors.length,
-              errors: failureErrors,
+              failureCount: failureDetails.length,
+              errors: failureDetails,
             },
             "Error dispatching collector spans to event sourcing",
           );
@@ -640,7 +652,7 @@ export function createCollectorRestApp(options: {
         // Catch synchronous errors (e.g., from buildResource)
         dispatchFailures = freshSpans.length;
         rejectedSpans += freshSpans.length;
-        rejectionErrors.push(error instanceof Error ? error.message : String(error));
+        rejectionErrors.push(SPAN_INGESTION_FAILED);
         logger.error(
           { error, projectId: project.id, traceId },
           "Error initializing event sourcing dispatch",
@@ -723,7 +735,7 @@ export function createCollectorRestApp(options: {
               });
             } catch (error) {
               rejectedEvaluations++;
-              evaluationErrors.push(error instanceof Error ? error.message : String(error));
+              evaluationErrors.push(EVALUATION_INGESTION_FAILED);
               logger.error(
                 {
                   error,

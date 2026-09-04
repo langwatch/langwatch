@@ -311,7 +311,7 @@ function verifyGatewaySignature(secretOf: () => string | undefined) {
           error: {
             type: "internal_error",
             code: "gateway_internal_secret_missing",
-            message: "LW_GATEWAY_INTERNAL_SECRET not configured on control-plane",
+            message: "Gateway internal authentication is not configured",
           },
         },
         500,

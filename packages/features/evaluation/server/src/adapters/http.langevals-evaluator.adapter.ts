@@ -99,15 +99,18 @@ export class HttpLangevalsEvaluatorAdapter extends EvaluationLangevalsPort {
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
         logger.warn({ url, timeoutMs: this.config.timeoutMs }, "Evaluator request timed out");
+        // The address dialled stays in the log line above: `meta` rides the
+        // experiment SSE stream to the browser, and it is a deployment's own
+        // internal service address.
         throw new EvaluatorExecutionError(`Evaluator timed out after ${this.config.timeoutMs}ms`, {
-          meta: { evaluatorType, url, timeoutMs: this.config.timeoutMs },
+          meta: { evaluatorType, timeoutMs: this.config.timeoutMs },
         });
       }
 
       if (error instanceof Error && error.message.includes("fetch failed")) {
         logger.warn({ error, url }, "Evaluator cannot be reached");
         throw new EvaluatorExecutionError("Evaluator cannot be reached", {
-          meta: { evaluatorType, url },
+          meta: { evaluatorType },
         });
       }
 

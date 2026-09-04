@@ -98,7 +98,6 @@ const legacyGraph = <T extends Graph>(graph: T) => ({ ...graph, kind: "builder" 
  */
 interface AlertActionParams {
   members?: string[];
-  slackWebhook?: string;
   seriesName?: string;
 }
 
@@ -236,6 +235,13 @@ export class GraphTrpcApi {
               operator: string;
               timePeriod: number;
             };
+            // Through the same port the list runs: a Slack incoming-webhook URL
+            // is a bearer credential, and hand-picking fields off the raw
+            // trigger is how it reached the browser from this read alone.
+            const visibleParams = ports.redactActionParams(
+              trigger.action,
+              (trigger.actionParams ?? {}) as Record<string, unknown>,
+            );
             alertData = {
               enabled: true,
               threshold: actionParams.threshold,
@@ -245,8 +251,7 @@ export class GraphTrpcApi {
               type: trigger.alertType,
               action: trigger.action,
               actionParams: {
-                members: actionParams.members,
-                slackWebhook: actionParams.slackWebhook,
+                members: visibleParams.members as string[] | undefined,
                 seriesName: actionParams.seriesName,
               },
               triggerId: trigger.id,

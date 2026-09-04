@@ -26,6 +26,7 @@ import {
   ANOMALY_RULE_SCOPES,
   ANOMALY_RULE_SEVERITIES,
   type GovernanceService,
+  redactDestinationConfig,
 } from "@langwatch/enterprise-governance-contract";
 import { isZodLikeError, ValidationError } from "@langwatch/handled-error";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
@@ -97,7 +98,11 @@ type AnomalyRuleRow = Readonly<{
   createdById: string | null;
 }>;
 
-function toDto(row: AnomalyRuleRow) {
+/**
+ * The wire shape of one rule. Exported so the redaction it applies can be
+ * tested without a router.
+ */
+export function toAnomalyRuleDto(row: AnomalyRuleRow) {
   return {
     id: row.id,
     organizationId: row.organizationId,
@@ -108,7 +113,9 @@ function toDto(row: AnomalyRuleRow) {
     severity: row.severity,
     ruleType: row.ruleType,
     thresholdConfig: (row.thresholdConfig as Record<string, unknown>) ?? {},
-    destinationConfig: (row.destinationConfig as Record<string, unknown>) ?? {},
+    // The shared secret signs the customer's own SIEM alerts: a reader is told
+    // one is set, never what it is. Writes still take the secret itself.
+    destinationConfig: redactDestinationConfig(row.destinationConfig),
     status: row.status,
     archivedAt: row.archivedAt,
     createdAt: row.createdAt,
@@ -154,11 +161,11 @@ export class AnomalyRulesTrpcApi {
 
     return trpc.router({
       list: view(organizationScope).query(async ({ ctx, input }) =>
-        (await ctx.app.governance.anomalyRuleList(input.organizationId)).map(toDto),
+        (await ctx.app.governance.anomalyRuleList(input.organizationId)).map(toAnomalyRuleDto),
       ),
 
       get: view(idAndOrg).query(async ({ ctx, input }) =>
-        toDto(
+        toAnomalyRuleDto(
           await ctx.app.governance.anomalyRuleGetById({
             id: input.id,
             organizationId: input.organizationId,
@@ -181,7 +188,7 @@ export class AnomalyRulesTrpcApi {
             status: input.status,
             actorUserId: ctx.actor().id,
           });
-          return toDto(created);
+          return toAnomalyRuleDto(created);
         } catch (err) {
           translateConfigValidationError(err, input.ruleType);
         }
@@ -202,14 +209,14 @@ export class AnomalyRulesTrpcApi {
             destinationConfig: input.destinationConfig,
             status: input.status,
           });
-          return toDto(updated);
+          return toAnomalyRuleDto(updated);
         } catch (err) {
           translateConfigValidationError(err, input.ruleType);
         }
       }),
 
       archive: manage(idAndOrg).mutation(async ({ ctx, input }) =>
-        toDto(
+        toAnomalyRuleDto(
           await ctx.app.governance.anomalyRuleArchive({
             id: input.id,
             organizationId: input.organizationId,

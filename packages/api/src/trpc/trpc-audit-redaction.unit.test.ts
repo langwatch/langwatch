@@ -133,6 +133,98 @@ describe("redactAuditArgs", () => {
     });
   });
 
+  describe("given a mutation that carries a key in a named field", () => {
+    describe("when it is recorded", () => {
+      /** @scenario "The licence signing private key is never persisted to the audit trail" */
+      it("keeps no part of the licence signing private key", () => {
+        const redacted = redactAuditArgs({
+          input: {
+            organizationId: "org-1",
+            privateKey:
+              "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANTheRealSigningKey\n-----END PRIVATE KEY-----",
+            organizationName: "Acme",
+            email: "ops@acme.example",
+            planType: "ENTERPRISE",
+            plan: { maxMembers: 50, canPublish: true, usageUnit: "traces" },
+          },
+          action: "license.generate",
+        }) as Record<string, unknown>;
+
+        expect(JSON.stringify(redacted)).not.toContain("TheRealSigningKey");
+        expect(JSON.stringify(redacted)).not.toContain("BEGIN PRIVATE KEY");
+        expect(redacted.privateKey).toBe("[redacted]");
+        expect(redacted.organizationName).toBe("Acme");
+        expect(redacted.planType).toBe("ENTERPRISE");
+      });
+
+      /** @scenario "An uploaded licence key is never persisted to the audit trail" */
+      it("keeps no part of an uploaded licence key", () => {
+        const redacted = redactAuditArgs({
+          input: { organizationId: "org-1", licenseKey: "eyJhbGciOiJSUzI1NiJ9.TheRealBearer" },
+          action: "license.upload",
+        }) as Record<string, unknown>;
+
+        expect(JSON.stringify(redacted)).not.toContain("TheRealBearer");
+        expect(redacted.organizationId).toBe("org-1");
+      });
+
+      /** @scenario "A credential is never persisted to the audit trail" */
+      it.each(["secrets.create", "secrets.update"])("redacts a secret value on %s", (action) => {
+        const redacted = redactAuditArgs({
+          input: { projectId: "proj-1", name: "STRIPE_KEY", value: "sk-live-TheRealSecret" },
+          action,
+        }) as Record<string, unknown>;
+
+        expect(JSON.stringify(redacted)).not.toContain("TheRealSecret");
+        expect(redacted.name).toBe("STRIPE_KEY");
+      });
+
+      // The per-action list can never be complete: the next mutation that
+      // takes a key writes plaintext until someone remembers to add it.
+      /** @scenario "A credential-named field is redacted on a mutation nobody listed" */
+      it.each([
+        "privateKey",
+        "apiKey",
+        "sharedSecret",
+        "clientSecret",
+        "accessToken",
+        "password",
+        "signingKey",
+        "licenseKey",
+        "slackWebhook",
+        "webhookUrl",
+        "credentials",
+        "authorization",
+      ])("redacts %s on an action with no rule of its own", (field) => {
+        const redacted = redactAuditArgs({
+          input: { projectId: "proj-1", [field]: "TheRealSecret" },
+          action: "someFeature.update",
+        }) as Record<string, unknown>;
+
+        expect(JSON.stringify(redacted)).not.toContain("TheRealSecret");
+        expect(redacted.projectId).toBe("proj-1");
+      });
+
+      /** @scenario "A credential nested inside an input object is redacted too" */
+      it("redacts a credential nested inside an object and inside a list", () => {
+        const redacted = redactAuditArgs({
+          input: {
+            projectId: "proj-1",
+            destinationConfig: {
+              destinations: [
+                { type: "webhook", url: "https://siem.example", sharedSecret: "TheRealSecret" },
+              ],
+            },
+          },
+          action: "anomalyRules.create",
+        });
+
+        expect(JSON.stringify(redacted)).not.toContain("TheRealSecret");
+        expect(JSON.stringify(redacted)).toContain("https://siem.example");
+      });
+    });
+  });
+
   describe("given input with no credentials in it", () => {
     describe("when it is recorded", () => {
       it("passes the arguments through untouched", () => {
@@ -155,6 +247,15 @@ describe("redactAuditArgs", () => {
         const input = { extraHeaders: null };
 
         expect(redactAuditArgs({ input })).toBe(input);
+      });
+
+      // Plural counts are numbers on nearly every model write; a name rule
+      // that ate them would redact the record instead of protecting it.
+      /** @scenario "A token count is not mistaken for a credential" */
+      it("leaves token counts alone", () => {
+        const input = { maxTokens: 4096, promptTokens: 12, completionTokens: 30 };
+
+        expect(redactAuditArgs({ input, action: "prompts.update" })).toBe(input);
       });
     });
   });

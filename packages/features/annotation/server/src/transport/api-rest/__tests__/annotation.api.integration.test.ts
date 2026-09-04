@@ -126,6 +126,33 @@ describe("given the annotations REST family", () => {
     });
   });
 
+  describe("when the store fails", () => {
+    /**
+     * The driver's own message names the host, the port and the database, and
+     * this body reaches any project key.
+     *
+     * @scenario "An annotation read failure returns no driver diagnostic"
+     */
+    it("answers a generic 500 and keeps the cause on the log line", async () => {
+      const driverMessage =
+        "Can't reach database server at `db.internal.langwatch:5432` (P1001)";
+      const api = mount({
+        app: annotationApp({
+          list: vi.fn(async () => {
+            throw new Error(driverMessage);
+          }),
+        }),
+      });
+
+      const response = await api.fetch("/api/annotations");
+
+      expect(response.status).toBe(500);
+      const body = await response.json();
+      expect(JSON.stringify(body)).not.toContain("db.internal.langwatch");
+      expect(body).toEqual({ status: "error", message: "Internal server error." });
+    });
+  });
+
   describe("when the credential is missing or refused", () => {
     it("publishes the refusal the port authored and never touches the service", async () => {
       const list = vi.fn(async () => []);
@@ -213,6 +240,7 @@ function passThroughSecurity(): AppRestSecurity {
     authorizeApiKeyCeiling: unreachable,
     authenticateOrganization: unreachable,
     authorizeOrganizationPermission: unreachable,
+    authorizeRouteTeamPermission: unreachable,
     authorizeRouteProjectPermission: unreachable,
     authenticateOrganizationThrowing: noop,
     authorizeOrganizationPermissionThrowing: unreachable,

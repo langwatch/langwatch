@@ -127,7 +127,9 @@ export function createOpsClickHouseExplainRestApp(options: {
         case "unavailable":
           return c.json({ message: "ClickHouse is not configured on this instance" }, 503);
         case "error":
-          return c.json({ message: `ClickHouse error: ${outcome.message}` }, 502);
+          // The engine's own prose names cluster internals; the explain
+          // service logs it.
+          return c.json({ message: "ClickHouse refused the EXPLAIN" }, 502);
         case "ok":
           return c.json({ type: built.type, rows: outcome.rows });
       }

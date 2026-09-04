@@ -1,4 +1,4 @@
-import { NotFoundError } from "@langwatch/handled-error";
+import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { z } from "zod";
 import { unsupportedGovernanceValue } from "./governance.errors";
 
@@ -113,6 +113,81 @@ export function safeParseDestinationConfig(
   }
   const result = destinationConfigSchema.safeParse(config);
   return result.success ? { ok: true, data: result.data } : { ok: false, error: result.error };
+}
+
+/**
+ * What a reader sees in place of a stored shared secret.
+ *
+ * The secret signs outbound SIEM alerts, so it never leaves the server; sent
+ * back on an update it means "keep the one already stored", which is what lets
+ * the editor round-trip a rule it was never shown the secret of.
+ */
+export const SHARED_SECRET_REDACTED = "[redacted]";
+
+/** The same config with every shared secret replaced by the marker. */
+export function redactDestinationConfig(config: unknown): Record<string, unknown> {
+  if (typeof config !== "object" || config === null || Array.isArray(config)) return {};
+  return redactSharedSecrets(config as Record<string, unknown>) as Record<string, unknown>;
+}
+
+// Walks the raw value rather than the parsed one: a config the strict schema
+// rejects still holds whatever was stored under that name.
+function redactSharedSecrets(value: unknown, depth = 0): unknown {
+  if (depth > 6 || typeof value !== "object" || value === null) return value;
+  if (Array.isArray(value)) return value.map((entry) => redactSharedSecrets(entry, depth + 1));
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).map(([name, field]) =>
+      name === "sharedSecret"
+        ? [name, SHARED_SECRET_REDACTED]
+        : [name, redactSharedSecrets(field, depth + 1)],
+    ),
+  );
+}
+
+/**
+ * The incoming config with each marker put back to the secret already stored
+ * for that destination, matched on its type and url.
+ *
+ * A marker naming a destination we hold no secret for is refused rather than
+ * stored: the alternative is signing a customer's alerts with the literal
+ * marker string.
+ */
+export function restoreKeptSharedSecrets({
+  incoming,
+  existing,
+}: {
+  incoming: Record<string, unknown>;
+  existing: unknown;
+}): Record<string, unknown> {
+  const stored = new Map<string, string>();
+  const storedDestinations = (existing as { destinations?: unknown } | null)?.destinations;
+  if (Array.isArray(storedDestinations)) {
+    for (const destination of storedDestinations) {
+      const { type, url, sharedSecret } = (destination ?? {}) as Record<string, unknown>;
+      if (typeof sharedSecret === "string" && sharedSecret !== SHARED_SECRET_REDACTED) {
+        stored.set(`${String(type)}\u0000${String(url)}`, sharedSecret);
+      }
+    }
+  }
+
+  const destinations = incoming.destinations;
+  if (!Array.isArray(destinations)) return incoming;
+
+  return {
+    ...incoming,
+    destinations: destinations.map((destination) => {
+      const entry = (destination ?? {}) as Record<string, unknown>;
+      if (entry.sharedSecret !== SHARED_SECRET_REDACTED) return destination;
+      const kept = stored.get(`${String(entry.type)}\u0000${String(entry.url)}`);
+      if (kept === undefined) {
+        throw new ValidationError(
+          "A destination sent with a redacted shared secret has no stored secret to keep; supply the secret itself",
+          { meta: { formErrors: ["Supply the shared secret for this destination"] } },
+        );
+      }
+      return { ...entry, sharedSecret: kept };
+    }),
+  };
 }
 
 export const SUPPORTED_RULE_TYPES = ["spend_spike"] as const;

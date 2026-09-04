@@ -202,10 +202,8 @@ export function createScenarioGenerateRestApp<
         }
 
         logger.error({ error }, "Error generating scenario");
-        return c.json(
-          { error: error instanceof Error ? error.message : "Failed to generate scenario" },
-          500,
-        );
+        // Generic on purpose (ADR-045): the cause is on the log line above.
+        return c.json({ error: "Failed to generate scenario" }, 500);
       }
     });
 

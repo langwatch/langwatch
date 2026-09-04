@@ -45,9 +45,12 @@ export class WorkflowEvaluationAdapter {
         status: "error",
         result: singleEvaluationResultSchema.parse({
           status: "error",
-          details: error instanceof Error ? error.message : "Workflow execution failed",
+          // No message and no stack off the caught error: this result is
+          // served back to the browser, and a Node stack carries absolute
+          // server paths.
+          details: "Workflow execution failed",
           error_type: "WORKFLOW_ERROR",
-          traceback: [error instanceof Error ? (error.stack ?? "") : ""],
+          traceback: [],
         }),
       };
     }

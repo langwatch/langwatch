@@ -546,12 +546,9 @@ export function createEvaluationsLegacyRestApp(options: {
               "internal server error processing batch evaluation",
             );
             ports.reportError?.(toError(error), { projectId: project.id });
-            return c.json(
-              {
-                error: error instanceof Error ? error.message : "Internal server error",
-              },
-              500,
-            );
+            // Generic on purpose (ADR-045): the detail is on the log line
+            // above, and a driver's own message names host, port and database.
+            return c.json({ error: "Internal server error" }, 500);
           }
         }
 

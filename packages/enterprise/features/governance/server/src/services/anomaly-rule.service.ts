@@ -6,6 +6,7 @@ import {
   AnomalyRuleNotFoundError,
   type AnomalyRule,
   type CreateAnomalyRuleInput,
+  restoreKeptSharedSecrets,
   unsupportedValue,
   type UpdateAnomalyRuleInput,
   validateDestinationConfig,
@@ -155,11 +156,16 @@ export class AnomalyRuleService {
     if (input.destinationConfig !== undefined) {
       // Same allow-empty rule as create: empty `{}` clears destinations
       // (back to log-only). Anything non-empty must round-trip the
-      // strict schema.
-      if (Object.keys(input.destinationConfig).length > 0) {
-        validateDestinationConfig(input.destinationConfig);
+      // strict schema. A reader is shown a marker in place of each shared
+      // secret, so a config sent back carrying one keeps the stored secret.
+      const destinationConfig = restoreKeptSharedSecrets({
+        incoming: input.destinationConfig,
+        existing: existing.destinationConfig,
+      });
+      if (Object.keys(destinationConfig).length > 0) {
+        validateDestinationConfig(destinationConfig);
       }
-      changes.destinationConfig = input.destinationConfig;
+      changes.destinationConfig = destinationConfig;
     }
     if (input.status !== undefined) changes.status = input.status;
     return this.repository.update(existing.id, changes);

@@ -156,10 +156,12 @@ export function createAnnotationsRestApp(options: {
       return c.json({ data: rows });
     } catch (e) {
       logger.error({ error: e, projectId: project.id }, "error fetching annotations");
+      // Generic on purpose (ADR-045): the detail is on the log line above, and
+      // a store's own message names the host, the port and the database.
       return c.json(
         {
           status: "error",
-          message: e instanceof Error ? e.message : "Internal server error.",
+          message: "Internal server error.",
         },
         500,
       );
@@ -192,7 +194,7 @@ export function createAnnotationsRestApp(options: {
       return c.json(
         {
           status: "error",
-          message: e instanceof Error ? e.message : "Internal server error.",
+          message: "Internal server error.",
         },
         500,
       );
@@ -216,7 +218,7 @@ export function createAnnotationsRestApp(options: {
       return c.json(
         {
           status: "error",
-          message: e instanceof Error ? e.message : "ID not found.",
+          message: "Internal server error.",
         },
         500,
       );
@@ -276,7 +278,7 @@ export function createAnnotationsRestApp(options: {
       return c.json(
         {
           status: "error",
-          message: e instanceof Error ? e.message : "Not found",
+          message: "Internal server error.",
         },
         500,
       );
@@ -310,7 +312,7 @@ export function createAnnotationsRestApp(options: {
       return c.json(
         {
           status: "error",
-          message: e instanceof Error ? e.message : "Internal server error.",
+          message: "Internal server error.",
         },
         500,
       );
@@ -393,7 +395,7 @@ export function createAnnotationsRestApp(options: {
       return c.json(
         {
           status: "error",
-          message: e instanceof Error ? e.message : "Internal server error.",
+          message: "Internal server error.",
         },
         500,
       );
