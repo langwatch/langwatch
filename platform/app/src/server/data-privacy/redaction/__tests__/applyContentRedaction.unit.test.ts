@@ -185,6 +185,82 @@ describe("redactAttributeNative", () => {
     });
   });
 
+  describe("given Better Auth observability attributes", () => {
+    describe("when an exact non-credential name holds an ordinary value", () => {
+      /** @scenario "Better Auth observability attributes keep non-sensitive values" */
+      it.each([
+        ["better_auth.hook.type", "create.before"],
+        ["better_auth.context", "plugin:bearer"],
+      ])("keeps %s holding %s", (key, value) => {
+        expect(
+          redactAttributeNative({ key, value, policy: policy({}) }).text,
+        ).toBe(value);
+      });
+    });
+
+    describe("when a sibling name says it holds a credential", () => {
+      /** @scenario "A credential attribute beside Better Auth observability attributes is still redacted" */
+      it("replaces an ordinary value by name", () => {
+        expect(
+          redactAttributeNative({
+            key: "better_auth.token",
+            value: "ordinary text",
+            policy: policy({}),
+          }).text,
+        ).toBe("[SECRET]");
+      });
+    });
+
+    describe("when an exempt name holds a secret", () => {
+      /** @scenario "A secret under a Better Auth observability attribute is still redacted" */
+      it("keeps the shape-only secret rules active", () => {
+        expect(
+          redactAttributeNative({
+            key: "better_auth.context",
+            value: SHAPED_TOKEN,
+            policy: policy({}),
+          }).text,
+        ).toBe("[SECRET]");
+      });
+
+      /** @scenario "A secret under a Better Auth observability attribute is still redacted" */
+      it("keeps vendor-specific secret rules active", () => {
+        const { text } = redactAttributeNative({
+          key: "better_auth.hook.type",
+          value: `sk-ant-${"A".repeat(40)}`,
+          policy: policy({}),
+        });
+        expect(text).toBe("[SECRET]");
+      });
+
+      /** @scenario "A secret under a Better Auth observability attribute is still redacted" */
+      it("keeps customer secret patterns active", () => {
+        const p = policy({ customPatterns: ["acme_live_[A-Za-z0-9]+"] });
+        expect(
+          redactAttributeNative({
+            key: "better_auth.context",
+            value: "acme_live_9f8e7d6c5b4a39281706",
+            policy: p,
+            compiledSecretPatterns: compilePolicySecretPatterns(p),
+          }).text,
+        ).toBe("[SECRET]");
+      });
+    });
+
+    describe("when an exempt name holds personal data", () => {
+      /** @scenario "Personal data under a Better Auth observability attribute is still redacted" */
+      it("keeps the personal-data pass active", () => {
+        expect(
+          redactAttributeNative({
+            key: "better_auth.context",
+            value: "test@example.com",
+            policy: policy({}),
+          }).text,
+        ).toBe("[EMAIL_ADDRESS]");
+      });
+    });
+  });
+
   describe("given an attribute whose name says it is an identifier", () => {
     describe("when the value is an id the product minted", () => {
       /** @scenario "An identifier attribute keeps the id it holds" */
