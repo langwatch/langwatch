@@ -322,7 +322,11 @@ jobs:
         id: llm
         if: steps.pr-data.outputs.oversized == 'false' && steps.path-check.outputs.blocked == 'false'
         env:
-          OPENAI_API_KEY: ${{ secrets.LOW_RISK_OPENAI_API_KEY }}
+          # OpenAI traffic rides the LangWatch AI Gateway: the key is a
+          # gateway virtual key, and the base URL env vars point the
+          # openai and langchain client families at it.
+          OPENAI_API_KEY: ${{ secrets.LOW_RISK_GATEWAY_VIRTUAL_KEY }}
+          OPENAI_BASE_URL: https://gateway.langwatch.ai/v1
         run: |
           POLICY=$(cat dev/docs/LOW_RISK_PULL_REQUESTS.md)
           PR_TITLE=$(cat /tmp/pr_title.txt)
@@ -365,7 +369,7 @@ jobs:
               ]
             }')
 
-          RESPONSE=$(curl -s --max-time 60 https://api.openai.com/v1/chat/completions \
+          RESPONSE=$(curl -s --max-time 60 "$OPENAI_BASE_URL/chat/completions" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $OPENAI_API_KEY" \
             -d "$PAYLOAD")
