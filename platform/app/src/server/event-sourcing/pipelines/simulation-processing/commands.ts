@@ -14,13 +14,15 @@ import {
 /**
  * All pure simulation-processing commands defined from event data schemas.
  *
- * computeRunMetrics and finishRun are not DEFINED here — they carry DI
- * (TraceSummaryStore/scheduleRetry and loadPriorEvents respectively) and stay
- * as manual classes under ./commands/. FinishRunCommand is surfaced from this
- * module so callers have one import site for the pipeline's commands.
+ * computeRunMetrics, finishRun and recordEvaluations are not DEFINED here:
+ * they carry DI (TraceSummaryStore/scheduleRetry and loadPriorEvents) and
+ * stay as manual classes under ./commands/. FinishRunCommand and
+ * RecordEvaluationsCommand are surfaced from this module so callers have one
+ * import site for the pipeline's commands.
  */
 
 export { FinishRunCommand } from "./commands/finishRun.command";
+export { RecordEvaluationsCommand } from "./commands/recordEvaluations.command";
 
 export const QueueRunCommand = defineCommand({
   commandType: "lw.simulation_run.queue",

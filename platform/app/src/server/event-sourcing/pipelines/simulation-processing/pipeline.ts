@@ -8,6 +8,7 @@ import {
   MessageSnapshotCommand,
   QueueRunCommand,
   RecordAgentInstanceCommand,
+  RecordEvaluationsCommand,
   StartRunCommand,
   TextMessageEndCommand,
   TextMessageStartCommand,
@@ -50,6 +51,8 @@ export interface SimulationProcessingPipelineDeps {
   simulationRunMetricsStore: AppendStore<SimulationRunMetricsProjectionRecord>;
   /** Pre-constructed with `loadPriorEvents` for ECST backfill. */
   finishRunCommand: FinishRunCommand;
+  /** Pre-constructed with `loadPriorEvents`, reads the run's verdict from its finished event. */
+  recordEvaluationsCommand: RecordEvaluationsCommand;
   computeRunMetricsCommand: ComputeRunMetricsCommand;
   /** Dispatch deps for the simulationRunExecution process manager (ADR-052). */
   simulationRunExecution: SimulationRunExecutionDispatchDeps;
@@ -85,6 +88,8 @@ export interface SimulationProcessingPipelineDeps {
  * - startRun: Emits SimulationRunStartedEvent when run begins
  * - messageSnapshot: Emits SimulationMessageSnapshotEvent for message updates
  * - finishRun: Emits SimulationRunFinishedEvent when run completes
+ * - recordEvaluations: Emits SimulationRunEvaluatedEvent with the evaluator
+ *   results of a finished run and the verdict after the gate
  * - recordAgentInstance: Emits SimulationRunAgentInstanceRecordedEvent with
  *   the connected agent instance that served the run
  * - deleteRun: Emits SimulationRunDeletedEvent for soft-delete
@@ -139,6 +144,11 @@ export function createSimulationProcessingPipeline(
     .withCommand("textMessageStart", TextMessageStartCommand)
     .withCommand("textMessageEnd", TextMessageEndCommand)
     .withCommandInstance("finishRun", FinishRunCommand, deps.finishRunCommand)
+    .withCommandInstance(
+      "recordEvaluations",
+      RecordEvaluationsCommand,
+      deps.recordEvaluationsCommand,
+    )
     .withCommand("recordAgentInstance", RecordAgentInstanceCommand)
     .withCommand("cancelRun", CancelRunCommand)
     .withCommand("deleteRun", DeleteRunCommand)

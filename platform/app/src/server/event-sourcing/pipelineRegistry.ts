@@ -197,6 +197,7 @@ import {
   ComputeRunMetricsCommand,
 } from "./pipelines/simulation-processing/commands/computeRunMetrics.command";
 import { FinishRunCommand } from "./pipelines/simulation-processing/commands/finishRun.command";
+import { RecordEvaluationsCommand } from "./pipelines/simulation-processing/commands/recordEvaluations.command";
 import { createSimulationProcessingPipeline } from "./pipelines/simulation-processing/pipeline";
 import type { SimulationRunExecutionCommands } from "./pipelines/simulation-processing/process-manager";
 import type { SimulationRunMetricsProjectionRecord } from "./pipelines/simulation-processing/projections/simulationRunMetrics.mapProjection";
@@ -1630,19 +1631,30 @@ export class PipelineRegistry {
         traceReadDerivation.deriveScenarioRoleMetrics(params),
     });
 
-    // ECST backfill: FinishRunCommand loads the run's prior events straight
-    // from the canonical event store (aggregateType "simulation_run").
+    // ECST backfill: FinishRunCommand and RecordEvaluationsCommand load the
+    // run's prior events straight from the canonical event store
+    // (aggregateType "simulation_run").
+    const loadSimulationRunEvents = async ({
+      tenantId,
+      scenarioRunId,
+    }: {
+      tenantId: string;
+      scenarioRunId: string;
+    }): Promise<readonly SimulationProcessingEvent[]> => {
+      const eventStore =
+        this.deps.eventSourcing.getEventStore<SimulationProcessingEvent>();
+      if (!eventStore) return [];
+      return eventStore.getEvents(
+        scenarioRunId,
+        { tenantId: createTenantId(tenantId) },
+        "simulation_run",
+      );
+    };
     const finishRunCommand = new FinishRunCommand({
-      loadPriorEvents: async ({ tenantId, scenarioRunId }) => {
-        const eventStore =
-          this.deps.eventSourcing.getEventStore<SimulationProcessingEvent>();
-        if (!eventStore) return [];
-        return eventStore.getEvents(
-          scenarioRunId,
-          { tenantId: createTenantId(tenantId) },
-          "simulation_run",
-        );
-      },
+      loadPriorEvents: loadSimulationRunEvents,
+    });
+    const recordEvaluationsCommand = new RecordEvaluationsCommand({
+      loadPriorEvents: loadSimulationRunEvents,
     });
 
     const simulationPipeline = this.deps.eventSourcing.register(
@@ -1651,6 +1663,7 @@ export class PipelineRegistry {
         simulationRunMetricsStore:
           this.deps.repositories.simulationRunMetricsStore,
         finishRunCommand,
+        recordEvaluationsCommand,
         computeRunMetricsCommand,
         simulationRunExecution: {
           getPool: () => scenarioExecutionPool.get(),
@@ -1677,6 +1690,7 @@ export class PipelineRegistry {
         suiteRunSync: {
           recordSuiteRunItemStarted: suiteRunCommands.recordSuiteRunItemStarted,
           completeSuiteRunItem: suiteRunCommands.completeSuiteRunItem,
+          regradeSuiteRunItem: suiteRunCommands.regradeSuiteRunItem,
         },
         traceMetricsSync: {
           computeRunMetrics: selfComputeRunMetrics.fn,

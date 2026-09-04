@@ -8,6 +8,7 @@ import type {
   SimulationRunAgentInstanceRecordedEvent,
   SimulationRunCancelRequestedEvent,
   SimulationRunDeletedEvent,
+  SimulationRunEvaluatedEvent,
   SimulationRunFinishedEvent,
   SimulationRunMetricsComputedEvent,
   SimulationRunQueuedEvent,
@@ -39,6 +40,12 @@ export function isSimulationRunFinishedEvent(
   event: SimulationProcessingEvent,
 ): event is SimulationRunFinishedEvent {
   return event.type === SIMULATION_RUN_EVENT_TYPES.FINISHED;
+}
+
+export function isSimulationRunEvaluatedEvent(
+  event: SimulationProcessingEvent,
+): event is SimulationRunEvaluatedEvent {
+  return event.type === SIMULATION_RUN_EVENT_TYPES.EVALUATED;
 }
 
 export function isSimulationTextMessageStartEvent(

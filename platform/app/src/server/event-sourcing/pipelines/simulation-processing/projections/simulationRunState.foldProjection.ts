@@ -1,6 +1,8 @@
 import { createLogger } from "@langwatch/observability";
 import { isRecord } from "~/server/app-layer/traces/canonicalisation/extractors/_guards";
 import { ValidationError } from "~/server/event-sourcing/services/errorHandling";
+import { gatedStatus } from "~/server/scenarios/scenario-evaluation-gate";
+import type { ScenarioEvaluationResult } from "~/server/scenarios/schemas/event-schemas";
 import type { Projection } from "../../../";
 import {
   AbstractFoldProjection,
@@ -13,6 +15,7 @@ import type {
   SimulationRunAgentInstanceRecordedEvent,
   SimulationRunCancelRequestedEvent,
   SimulationRunDeletedEvent,
+  SimulationRunEvaluatedEvent,
   SimulationRunFinishedEvent,
   SimulationRunMetricsComputedEvent,
   SimulationRunQueuedEvent,
@@ -25,6 +28,7 @@ import {
   SimulationRunAgentInstanceRecordedEventSchema,
   SimulationRunCancelRequestedEventSchema,
   SimulationRunDeletedEventSchema,
+  SimulationRunEvaluatedEventSchema,
   SimulationRunFinishedEventSchema,
   SimulationRunMetricsComputedEventSchema,
   SimulationRunQueuedEventSchema,
@@ -199,6 +203,11 @@ export interface SimulationRunStateData {
   MetCriteria: string[];
   UnmetCriteria: string[];
   Error: string | null;
+  /**
+   * One result per evaluator that ran on the scenario, in the order they
+   * were recorded. Stored as the `Evaluations.*` parallel arrays.
+   */
+  Evaluations: ScenarioEvaluationResult[];
   DurationMs: number | null;
   TotalCost: number | null;
   RoleCosts: Record<string, number[]>;
@@ -282,6 +291,33 @@ function isTerminalStatus(status: string): boolean {
 }
 
 /**
+ * The status a finished run reads with.
+ *
+ * An explicit TERMINAL status takes priority, otherwise the status derives
+ * from the verdict. The explicit status arrives from the scenario-events
+ * ingest route, whose schema types it as the full ScenarioRunStatus enum,
+ * non-terminal members included. Taking it at face value would write a
+ * non-terminal Status alongside FinishedAt, which is the one state nothing
+ * can recover: the orphan reconciler skips it (FinishedAt IS NULL) and no
+ * read-time status derivation remains to mask it.
+ *
+ * Shared with RecordEvaluationsCommand, which needs the status the run held
+ * after its finished event without reading the fold.
+ */
+export function finishedStatusOf({
+  explicitStatus,
+  verdict,
+}: {
+  explicitStatus: string | undefined;
+  verdict: string | null | undefined;
+}): string {
+  const explicit = explicitStatus?.toUpperCase();
+  if (explicit && isTerminalStatus(explicit)) return explicit;
+  if (verdict === "success") return "SUCCESS";
+  return "FAILURE";
+}
+
+/**
  * Whether the fold has seen an event that DEFINES the run, and so whether the
  * state is worth a `simulation_runs` row.
  *
@@ -310,6 +346,7 @@ const simulationRunEvents = [
   SimulationTextMessageStartEventSchema,
   SimulationTextMessageEndEventSchema,
   SimulationRunFinishedEventSchema,
+  SimulationRunEvaluatedEventSchema,
   SimulationRunMetricsComputedEventSchema,
   SimulationRunCancelRequestedEventSchema,
   SimulationRunAgentInstanceRecordedEventSchema,
@@ -359,6 +396,7 @@ export class SimulationRunStateFoldProjection
       MetCriteria: [],
       UnmetCriteria: [],
       Error: null,
+      Evaluations: [],
       DurationMs: null,
       TotalCost: null,
       RoleCosts: {},
@@ -608,25 +646,10 @@ export class SimulationRunStateFoldProjection
 
     const results = event.data.results;
     const verdict = results?.verdict ?? null;
-
-    // Derive status: an explicit TERMINAL status takes priority, otherwise
-    // derive from verdict. The explicit status arrives from the scenario-events
-    // ingest route, whose schema types it as the full ScenarioRunStatus enum —
-    // non-terminal members included. Taking it at face value would write a
-    // non-terminal Status alongside FinishedAt below, which is the one state
-    // nothing can recover: the orphan reconciler skips it (FinishedAt IS NULL)
-    // and no read-time status derivation remains to mask it.
-    let status: string;
-    const explicit = event.data.status?.toUpperCase();
-    if (explicit && isTerminalStatus(explicit)) {
-      status = explicit;
-    } else if (verdict === "success") {
-      status = "SUCCESS";
-    } else if (verdict === "failure" || verdict === "inconclusive") {
-      status = "FAILURE";
-    } else {
-      status = "FAILURE";
-    }
+    const status = finishedStatusOf({
+      explicitStatus: event.data.status,
+      verdict,
+    });
 
     return {
       ...state,
@@ -637,6 +660,10 @@ export class SimulationRunStateFoldProjection
       MetCriteria: results?.metCriteria ?? [],
       UnmetCriteria: results?.unmetCriteria ?? [],
       Error: results?.error ?? null,
+      // A scenario run from code sends its evaluations with the finished
+      // event. An evaluated event that folded before this one (business time
+      // can land it first) already wrote its results, which stay.
+      Evaluations: results?.evaluations ?? state.Evaluations,
       // Derived when the event does not carry it, which is every real run:
       // the SDK ingest path dispatches finishRun with results and status only.
       // Left underived, DurationMs was null for every run a customer actually
@@ -651,6 +678,25 @@ export class SimulationRunStateFoldProjection
           ? event.occurredAt - state.StartedAt
           : null),
       FinishedAt: event.occurredAt,
+    };
+  }
+
+  handleSimulationRunEvaluated(
+    event: SimulationRunEvaluatedEvent,
+    state: SimulationRunStateData,
+  ): SimulationRunStateData {
+    // A second record replaces the first: the evaluators ran again and the
+    // run holds one result per evaluator, never a history of them. The gate
+    // reads the state's own status, so a run that errored or was cancelled
+    // keeps that status whatever the evaluators said, and the judge's
+    // reasoning and criteria stay as the judge wrote them.
+    const verdict = event.data.verdict;
+    return {
+      ...state,
+      ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
+      Evaluations: event.data.evaluations,
+      Verdict: verdict ?? state.Verdict,
+      Status: gatedStatus({ status: state.Status, verdict }),
     };
   }
 
