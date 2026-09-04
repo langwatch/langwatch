@@ -19,7 +19,11 @@ const tracer = getLangWatchTracer("langwatch.langy.chat");
 export async function resolveLangyTurnBaseDependencies(args: {
   deps: Pick<
     LangyTurnServiceDeps,
-    "conversations" | "credentials" | "resolveModel" | "resolveHarness"
+    | "conversations"
+    | "credentials"
+    | "resolveModel"
+    | "resolveHarness"
+    | "resolveDeleteGate"
   >;
   projectId: string;
   userId: string;
@@ -122,6 +126,18 @@ export async function resolveLangyTurnBaseDependencies(args: {
   // compositions) means the manager's default harness.
   if (deps.resolveHarness) {
     credentials.harness = await deps.resolveHarness({
+      userId,
+      projectId,
+      organizationId: credentials.organizationId,
+    });
+  }
+  // Whether the worker registers the pre-execution delete gate (#7608),
+  // resolved once per turn alongside the harness. Contract: never throws (a
+  // flag-store blip falls back to ON inside the resolver). Absent resolver
+  // (tests, minimal compositions) leaves it unset, which the worker reads as
+  // ON — the fail-safe default.
+  if (deps.resolveDeleteGate) {
+    credentials.deleteGate = await deps.resolveDeleteGate({
       userId,
       projectId,
       organizationId: credentials.organizationId,

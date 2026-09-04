@@ -61,6 +61,24 @@ describe("parseConfig", () => {
     });
   });
 
+  describe("when the delete-gate flag is present (issue #7608)", () => {
+    it("parses an explicit false (gate off) and defaults to absent (gate on)", () => {
+      const off = parseConfig(JSON.stringify({ ...validConfig, deleteGateEnabled: false }));
+      expect(off.deleteGateEnabled).toBe(false);
+      const on = parseConfig(JSON.stringify({ ...validConfig, deleteGateEnabled: true }));
+      expect(on.deleteGateEnabled).toBe(true);
+      // Absent means ON at the session-wiring layer (fail-safe): the field is
+      // simply undefined here.
+      expect(parseConfig(JSON.stringify(validConfig)).deleteGateEnabled).toBeUndefined();
+    });
+
+    it("rejects a non-boolean value", () => {
+      expect(() =>
+        parseConfig(JSON.stringify({ ...validConfig, deleteGateEnabled: "yes" })),
+      ).toThrow(/deleteGateEnabled/);
+    });
+  });
+
   describe("when invalid input", () => {
     it("names the offending field", () => {
       expect(() =>

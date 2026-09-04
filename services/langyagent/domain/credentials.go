@@ -78,6 +78,16 @@ type Credentials struct {
 	// default: a control plane that predates harness selection keeps every
 	// running worker.
 	Harness string `json:"harness,omitempty"`
+	// DeleteGate is whether the pi worker registers the pre-execution delete
+	// gate (release_langy_delete_gate, issue #7608), resolved per project by the
+	// control plane and threaded through the envelope. Written into the worker
+	// config's deleteGateEnabled at provision. A pointer so absent (nil, a
+	// control plane that predates the flag) is distinct from an explicit false:
+	// nil leaves the field off the config and the worker defaults the gate ON
+	// (fail-safe), while false unregisters it. Deliberately NOT folded into the
+	// worker signature (see SignatureOf): a flip takes effect on the next
+	// warm/probe-MISS re-warm, not on a live worker.
+	DeleteGate *bool `json:"deleteGate,omitempty"`
 }
 
 // MirrorTier is the fidelity of the ADR-061 mirror copy, resolved per
