@@ -480,6 +480,12 @@ Feature: The Results tab
     And no manual reload is needed
 
   @integration
+  Scenario: A simulation update makes the results read again
+    Given the results page with its live stream connected, so it does not poll
+    When a simulation update arrives, the one the evaluators send after the last run finished included
+    Then the results overview and the result atoms are read again
+
+  @integration
   Scenario: A sidebar entry shows the number, the note, the age and the pass rate
     Given a run started with the note "switched judge to the stricter criterion"
     When the runs sidebar is read
