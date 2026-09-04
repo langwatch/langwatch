@@ -1,17 +1,11 @@
 import { useCallback, useEffect, useRef } from "react";
-import { useLocalStorage } from "usehooks-ts";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
-import {
-  type LastVisitedHomeKind,
-  resolveHomeDestination,
-} from "~/utils/resolveHomeDestination";
 import { readLastVisitedProduct } from "./logic/productMemory";
 import { resolveLandingDestination } from "./logic/resolveLandingDestination";
 import type { ProductId } from "./products";
 import { useLlmOpsProjectSlug } from "./useLlmOpsProjectSlug";
-import { useNavigationMode } from "./useNavigationMode";
 import { useReachableProducts } from "./useReachableProducts";
 
 /** What the server home resolver answered, flattened for the pickers. */
@@ -54,7 +48,6 @@ function toResolvedHome(query: {
 }
 
 interface LandingInput {
-  isV2: boolean;
   resolved: ResolvedHome;
   isReachableLoading: boolean;
   reachableProducts: ProductId[];
@@ -68,21 +61,16 @@ interface LandingInput {
    */
   projectHomeSlug: string | null;
   isOrgless: boolean;
-  lastVisitedHomeKind: LastVisitedHomeKind;
 }
 
 /**
- * Where `/` goes. In a new navigation mode the per-organization product
- * memory outranks the server resolver, which is the deliberate ADR-038
- * deviation; legacy mode keeps the persona resolver. Both fall through to
- * the same safety nets. Null means nothing has an answer yet, so the page
- * stays on the loading screen.
+ * Where `/` goes. The per-organization product memory outranks the
+ * server resolver, which is the deliberate ADR-038 deviation. Falls
+ * through to the safety nets. Null means nothing has an answer yet, so
+ * the page stays on the loading screen.
  */
 function landingDestination(input: LandingInput): string | null {
-  const picked = input.isV2
-    ? productLandingDestination(input)
-    : personaHomeDestination(input);
-  return picked ?? fallbackDestination(input);
+  return productLandingDestination(input) ?? fallbackDestination(input);
 }
 
 function productLandingDestination({
@@ -103,30 +91,7 @@ function productLandingDestination({
 }
 
 /**
- * The persona resolver picks the DEFAULT for a user with no history. On
- * top of that we honor the last-visited home so it sticks both ways: a
- * user whose persona default is /me still returns to the project they
- * last opened, and /me sticks for someone who last sat there. An explicit
- * picker pin (isOverride) always wins.
- */
-function personaHomeDestination({
-  resolved,
-  lastVisitedHomeKind,
-  projectHomeSlug,
-}: LandingInput): string | null {
-  if (!resolved.destination) return null;
-  return resolveHomeDestination({
-    resolverDestination: resolved.destination,
-    isOverride: resolved.isOverride,
-    intentPinned: resolved.isIntentPinned,
-    governanceUiEnabled: resolved.governanceUiEnabled,
-    lastVisitedHomeKind,
-    lastProjectSlug: projectHomeSlug,
-  });
-}
-
-/**
- * The safety nets, shared by both modes. A failed resolver keeps the
+ * The safety nets. A failed resolver keeps the
  * LLMOps majority on their project home, so a transient backend error
  * never strands them.
  *
@@ -188,30 +153,14 @@ export function useLandingRedirect(): void {
     { organizationId: organization?.id ?? "" },
     { enabled: !!organization?.id, staleTime: 60_000, retry: false },
   );
-  // Implicit home-kind preference written from MyLayout (personal) and
-  // useOrganizationTeamProject (project). Honored only when the user has
-  // no explicit pin via the picker, so /me AND the last-visited project
-  // both stick, without overriding the user's deliberate choice.
-  const [lastVisitedHomeKind] = useLocalStorage<LastVisitedHomeKind>(
-    "lastVisitedHomeKind",
-    "",
-  );
-  const navigationResolution = useNavigationMode();
-  const isV2 =
-    navigationResolution.status === "ready" &&
-    navigationResolution.mode !== "legacy";
-  // Legacy mode never reads the product list, and must not pay for the
-  // flag queries behind it.
   const { reachableProducts, isLoading: isReachableLoading } =
-    useReachableProducts({ enabled: isV2 });
+    useReachableProducts({ enabled: true });
   const llmOpsProjectSlug = useLlmOpsProjectSlug();
   const replaceOnce = useReplaceOnce();
 
   useEffect(() => {
-    if (navigationResolution.status === "loading") return;
     replaceOnce(
       landingDestination({
-        isV2,
         resolved: toResolvedHome(resolved),
         isReachableLoading,
         reachableProducts,
@@ -222,7 +171,6 @@ export function useLandingRedirect(): void {
         projectHomeSlug: llmOpsProjectSlug,
         isOrgless:
           !isLoading && !organization && (organizations?.length ?? 0) === 0,
-        lastVisitedHomeKind,
       }),
     );
   }, [
@@ -233,9 +181,6 @@ export function useLandingRedirect(): void {
     organizations,
     isLoading,
     replaceOnce,
-    lastVisitedHomeKind,
-    navigationResolution.status,
-    isV2,
     isReachableLoading,
     reachableProducts,
     llmOpsProjectSlug,

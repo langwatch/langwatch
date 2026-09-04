@@ -1,10 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * The two sidebar menu densities. The current chrome renders its menu
- * components outside any provider, so the comfortable size is the
- * default and cannot change under it; the navigation-v2 sidebars opt
- * into the compact size for their subtree.
+ * The product sidebars opt into the compact menu density for their
+ * subtree via SideMenuDensityProvider.
  *
  * Spec: specs/navigation/product-sidebars.feature
  */
@@ -66,25 +64,6 @@ describe("sidebar menu density", () => {
         fontWeight: "var(--chakra-font-weights-semibold)",
         // 0.09em of the 10px heading
         letterSpacing: "0.9px",
-      });
-    });
-  });
-
-  describe("when no density is asked for", () => {
-    /** @scenario "The current chrome keeps its own menu size" */
-    it("keeps the comfortable item and heading of the current chrome", () => {
-      renderMenu({ isCompact: false });
-
-      expect(screen.getByText("Home")).toHaveStyle({ fontSize: "14px" });
-      expect(itemRow()).toHaveStyle({
-        height: "32px",
-        gap: "var(--chakra-spacing-3)",
-        paddingInline: "var(--chakra-spacing-3)",
-      });
-      expect(screen.getByText("Observe")).toHaveStyle({
-        fontSize: "11px",
-        fontWeight: "var(--chakra-font-weights-medium)",
-        letterSpacing: "normal",
       });
     });
   });

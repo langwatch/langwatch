@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  *
  * The Agent Testing address is behind the release flag AND behind permission
- * to read test cases. The flag decides whether the address exists at all, and
+ * to read scenarios. The flag decides whether the address exists at all, and
  * it grants nothing on its own.
  *
  * @see specs/features/agent-testing/page-structure.feature
@@ -64,6 +64,7 @@ vi.mock("~/hooks/usePreloadDrawer", () => ({
 
 vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({ openDrawer: vi.fn(), setFlowCallbacks: vi.fn() }),
+  setFlowCallbacks: vi.fn(),
 }));
 
 vi.mock("~/hooks/useSimulationUpdateListener", () => ({
@@ -81,10 +82,16 @@ vi.mock("~/utils/api", () => ({
       },
     }),
     suites: {
+      // Every run of the v2 dialog is queued under a plan name.
+      runPlan: {
+        useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+      },
+      // The run dialog host reads the plan a stored run plan opens on.
+      getById: { useQuery: () => ({ data: undefined, isLoading: false }) },
       // Left unread, so the tab strip carries no count and the guard is the
       // only thing this file is checking.
       getAll: { useQuery: () => ({ data: undefined, isLoading: false }) },
-      folders: {
+      testSuites: {
         getAll: { useQuery: () => ({ data: [], isLoading: false }) },
       },
       update: { useMutation: () => ({ mutateAsync: vi.fn() }) },
@@ -102,6 +109,10 @@ vi.mock("~/utils/api", () => ({
       },
     },
     scenarios: {
+      // The run dialog reads the configurations its scope already ran with.
+      getRunConfigurations: {
+        useQuery: () => ({ data: [], isLoading: false }),
+      },
       getAll: { useQuery: () => ({ data: undefined, isLoading: false }) },
       getById: { useQuery: () => ({ data: undefined, isLoading: false }) },
       create: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
@@ -138,8 +149,6 @@ vi.mock("~/utils/compat/next-router", () => ({
   }),
 }));
 
-import { resolveSimulationsRedirect } from "~/components/suites/useSuiteRouting";
-import { legacyRedirectRoutes } from "~/legacyRedirects";
 import AgentTestingRoute from "../[project]/agent-testing/[[...path]]";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -179,15 +188,15 @@ describe("the Agent Testing address", () => {
         screen.getByRole("heading", { name: "Agent Testing" }),
       ).toBeInTheDocument();
       const tabNames = screen.getAllByRole("tab").map((tab) => tab.textContent);
-      expect(tabNames).toEqual(["Test cases", "Results"]);
+      expect(tabNames).toEqual(["Scenarios", "Results"]);
     });
 
-    describe("and the person may not read test cases", () => {
+    describe("and the person may not read scenarios", () => {
       beforeEach(() => {
         state.permitted = false;
       });
 
-      /** @scenario "A person without permission to read test cases cannot open the page" */
+      /** @scenario "A person without permission to read scenarios cannot open the page" */
       it("refuses the page, so the flag alone grants nothing", () => {
         render(<AgentTestingRoute />, { wrapper: Wrapper });
 
@@ -196,40 +205,6 @@ describe("the Agent Testing address", () => {
         ).toBeNull();
         expect(screen.getByText("Access Restricted")).toBeInTheDocument();
       });
-    });
-
-    /** @scenario "Old simulations addresses keep working" */
-    it("keeps every saved simulations address on the v1 pages", () => {
-      // The v1 catch-all resolves its own addresses; none of them may point
-      // at Agent Testing while the flag is on. `null` is not a pass by
-      // omission: it names an address the v1 route already serves as it
-      // stands, so every entry states what it expects.
-      const savedAddresses: {
-        segments: string[];
-        redirect: string | null;
-      }[] = [
-        { segments: [], redirect: null },
-        { segments: ["scenarios"], redirect: "/demo/simulations/scenarios" },
-        { segments: ["suites"], redirect: "/demo/simulations" },
-        { segments: ["run-plans", "checkout"], redirect: null },
-        {
-          segments: ["my-set", "batch_1", "run_1"],
-          redirect: "/demo/simulations/my-set/batch_1?openRun=run_1",
-        },
-      ];
-      for (const { segments, redirect: expected } of savedAddresses) {
-        const redirect = resolveSimulationsRedirect({
-          projectSlug: "demo",
-          segments,
-          query: {},
-        });
-        expect(redirect).toBe(expected);
-      }
-
-      // And no legacy redirect sends a simulations address there either.
-      for (const route of legacyRedirectRoutes) {
-        expect(route.path ?? "").not.toContain("agent-testing");
-      }
     });
   });
 });

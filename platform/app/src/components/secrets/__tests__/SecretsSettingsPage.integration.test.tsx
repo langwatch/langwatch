@@ -69,7 +69,7 @@ vi.mock("~/components/SettingsLayout", () => ({
   default: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
 }));
 
-vi.mock("~/components/DashboardLayout", () => ({
+vi.mock("~/components/ProjectSelector", () => ({
   ProjectSelector: () => <div data-testid="project-selector" />,
 }));
 

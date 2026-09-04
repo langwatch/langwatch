@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "test": "vitest",
+    "test:suite": "node _tests/scripts/run-scenario-suite.mjs",
+    "test:suite:all": "node _tests/scripts/run-scenario-suite.mjs --all",
     "compile": "tsx _compiler/compile.ts",
     "sync": "tsx _publish/sync.ts"
   },

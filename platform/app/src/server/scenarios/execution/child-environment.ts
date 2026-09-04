@@ -18,6 +18,10 @@ import os from "os";
 import path from "path";
 import { env } from "~/env.mjs";
 import {
+  NLP_FETCH_MAX_TIMEOUT_ENV,
+  NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS_ENV,
+} from "../../nlpgo/timeouts";
+import {
   encodeScenarioLogContext,
   SCENARIO_LOG_CONTEXT_ENV,
 } from "./child-logger";
@@ -89,6 +93,19 @@ export function buildChildProcessEnv(
       process.env.NODE_COMPILE_CACHE ?? SCENARIO_CHILD_COMPILE_CACHE_DIR,
     COREPACK_ENABLE_DOWNLOAD_PROMPT:
       process.env.COREPACK_ENABLE_DOWNLOAD_PROMPT,
+    // The platform's ceiling on how long a turn may hold a socket open, read
+    // by the code/workflow adapters INSIDE the child (`resolveMaxFetchTimeoutMs`
+    // in `../../nlpgo/timeouts.ts`). Forwarded raw: this allowlist is the only
+    // route from the operator's environment into the child, and the child runs
+    // under SKIP_ENV_VALIDATION, so `~/env.mjs` would apply no default here.
+    [NLP_FETCH_MAX_TIMEOUT_ENV]: process.env[NLP_FETCH_MAX_TIMEOUT_ENV],
+    // The nlpgo engine's own code-block execution ceiling. Both nlpgo itself
+    // AND the adapters in this child read this exact env var name
+    // (`resolveFloorFetchTimeoutMs` in `../../nlpgo/timeouts.ts`) so the
+    // client's fetch deadline can never independently drift below the
+    // engine's ceiling the way it did in the production bug this fixes.
+    [NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS_ENV]:
+      process.env[NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS_ENV],
     ...scenarioVars,
   };
 

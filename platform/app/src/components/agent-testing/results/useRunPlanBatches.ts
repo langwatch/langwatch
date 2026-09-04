@@ -80,11 +80,9 @@ function findSelectedBatch({
 }
 
 export function useSelectedBatch({
-  plan,
   batches,
   batchRunId,
 }: {
-  plan: RunPlan;
   batches: RunPlanBatches;
   batchRunId: string | null;
 }) {
@@ -115,12 +113,13 @@ export function useSelectedBatch({
 
   return {
     selectedBatch,
+    // The address names a run the window does not hold: one that has not
+    // reported its first scenario yet, or one older than the window.
+    awaitedBatchRunId: batchRunId && !selectedBatch ? batchRunId : null,
     summary,
     iterationMap,
     title: selectedBatch
       ? runTitle({
-          plan,
-          batch: selectedBatch,
           index: Math.max(selectedIndex, 0),
           totalCount: totalBatchCount,
           loadedCount: batchRuns.length,

@@ -53,7 +53,8 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
-
+import type { SourceType } from "../components/ingestionSourceCatalog";
+import { needsIngestSecret } from "../components/ingestionSourceCatalog";
 import { SourceEventsTable } from "../components/SourceEventsTable";
 import {
   type SourceEventsPager,
@@ -178,15 +179,19 @@ function SourceDetailHeader({
           >
             <Pencil size={14} /> Edit
           </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={onRotate}
-            loading={isRotating}
-            title="Mint a new ingestSecret (24h grace on the old one)"
-          >
-            <RotateCw size={14} /> Rotate secret
-          </Button>
+          {needsIngestSecret({
+            sourceType: source.sourceType as SourceType,
+          }) && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onRotate}
+              loading={isRotating}
+              title="Mint a new ingestSecret (24h grace on the old one)"
+            >
+              <RotateCw size={14} /> Rotate secret
+            </Button>
+          )}
           <Button
             size="sm"
             variant="ghost"
@@ -850,7 +855,7 @@ function SecretRevealModal({
     sourceType === "otel_generic" ||
     sourceType === "claude_cowork" ||
     sourceType === "claude_code";
-  const usesWebhookUrl = sourceType === "workato";
+  const usesWebhookUrl = sourceType === "workato" || sourceType === "s3_custom";
   const isClaudeCode = sourceType === "claude_code";
 
   // Claude Code's monitoring-usage doc requires CLAUDE_CODE_ENABLE_TELEMETRY=1

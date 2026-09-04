@@ -1,11 +1,11 @@
 /**
- * The optional blocks of the test case dialog: the parameters, the turn
+ * The optional blocks of the scenario dialog: the parameters, the turn
  * limits and the model overrides.
  *
  * The dialog asks its four questions and offers the rest as chips, the way the
  * run dialog does. A chip opens its block; the x on the block closes it again
- * and clears what it held. A stored case opens the blocks it already uses, so
- * nothing a case carries is hidden from the person editing it.
+ * and clears what it held. A stored scenario opens the blocks it already uses, so
+ * nothing a scenario carries is hidden from the person editing it.
  *
  * @see specs/features/agent-testing/cases-table.feature
  */
@@ -27,7 +27,7 @@ const NONE_OPEN: OpenBlocks = {
   models: false,
 };
 
-/** The blocks a draft already needs, so editing a case opens them. */
+/** The blocks a draft already needs, so editing a scenario opens them. */
 function blocksOf(draft: CaseDraft): OpenBlocks {
   return {
     parameters: draft.parameters.trim() !== "",

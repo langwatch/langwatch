@@ -1,0 +1,251 @@
+name: Boxd Golden Refresh
+
+# On every merge to main: fast-forward the boxd golden machine to main,
+# verify it is actually up and serving, then save the verified state as a
+# snapshot. The golden stays running as the standing staging environment;
+# the snapshot is the durable fork source for preview boxes.
+#
+# A red run of this workflow on main means staging is broken.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: boxd-golden-refresh
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  GOLDEN: langwatch-golden-v3
+  SNAPSHOT: langwatch-main
+  # Re-pin when boxd ships a new installer:
+  #   curl -fsSL https://boxd.sh/downloads/cli/install.sh | sha256sum
+  BOXD_INSTALLER_SHA256: 935d59706c090a6ed8276c6a8635b1e24b5d9748cf14625365bccd445ee16343
+  # Poll budgets, in seconds. They must sum to less than timeout-minutes below,
+  # with headroom for the gates and the snapshot save, so that a stuck refresh
+  # ends in this workflow's own diagnostics instead of a bare job cancellation.
+  # The numbers come from timing the real thing on the golden, not from guesses:
+  # a cold refresh (pnpm install + migrations) took ~31 min, and because that
+  # install replaces node_modules, the dev stack then rebuilds every SDK and
+  # bundle before it serves — a clean boot to /api/health 204 measured 27m28s.
+  REFRESH_WAIT_SECONDS: "2700" # 45 min
+  HEALTH_WAIT_SECONDS: "2700" # 45 min
+  SNAPSHOT_WAIT_SECONDS: "900" # 15 min
+
+jobs:
+  refresh-golden:
+    # BOXD_API_KEY can exec on the shared golden, so reaching it must not be
+    # something a branch can grant itself.
+    #
+    # The `if:` below is defence in depth ONLY. It cannot be the control on its
+    # own: workflow_dispatch runs the workflow definition from the ref you pick,
+    # so whoever dispatches a modified branch also gets to delete this line in
+    # the same commit. The credential has to be gated by something outside the
+    # file it protects.
+    #
+    # That gate is the environment: a repo admin must configure `boxd-golden`
+    # with a deployment branch rule of `main` only (and required reviewers), and
+    # hold BOXD_API_KEY as an environment secret rather than a repo secret. Then
+    # a dispatch from any other ref cannot read the credential at all, whatever
+    # the workflow file on that ref says.
+    environment: boxd-golden
+    # The repository check keeps this off forks. A fork pushing to its own main
+    # has neither the environment nor the credential, so the job could only ever
+    # fail there — and this workflow's whole contract is that a red run means
+    # staging is broken.
+    if: github.ref == 'refs/heads/main' && github.repository == 'langwatch/langwatch'
+    runs-on: ubuntu-latest
+    # 45 + 45 + 15 minutes of polling, plus room for the CLI install, the two
+    # HTTP gates and the SHA check.
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    steps:
+      # persist-credentials: false — nothing here talks to git after checkout,
+      # and the default would leave the workflow token in .git/config.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          sparse-checkout: .github
+          persist-credentials: false
+
+      # No BOXD_TOKEN in this step's environment: the installer is third-party
+      # code and must never run with the control-plane credential in scope.
+      # The downloaded script is checksum-verified before it executes.
+      - name: Install boxd CLI
+        run: |
+          set -euo pipefail
+          curl -fsSL --max-time 60 https://boxd.sh/downloads/cli/install.sh -o /tmp/boxd-install.sh
+          echo "$BOXD_INSTALLER_SHA256  /tmp/boxd-install.sh" | sha256sum -c -
+          sh /tmp/boxd-install.sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      # Everything the refresh writes goes in a private 0700 directory owned by
+      # the refresh user, not a world-writable path — a local user on the golden
+      # must not be able to pre-create or symlink a file we open. The names are
+      # run-scoped so an abandoned run's status can never be read as this run's.
+      - name: Per-run remote paths
+        run: |
+          RUN="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          DIR=/home/boxd/.golden-refresh
+          {
+            echo "REMOTE_DIR=$DIR"
+            echo "REMOTE_SCRIPT=$DIR/refresh.$RUN.sh"
+            echo "REMOTE_STATUS=$DIR/refresh.$RUN.status"
+            echo "REMOTE_LOG=$DIR/refresh.$RUN.log"
+            # Derived, so renaming the machine is a one-line change.
+            echo "GOLDEN_URL=https://${GOLDEN}.boxd.sh"
+          } >> "$GITHUB_ENV"
+
+      # No `boxd machine get --json` here: the machine record carries env and
+      # config that does not belong in a job log. The exec probe below proves
+      # both things this step needs — the machine is up and the channel works.
+      - name: Golden is running and exec channel works
+        env:
+          BOXD_TOKEN: ${{ secrets.BOXD_API_KEY }}
+        run: |
+          boxd machine exec --timeout 30 "$GOLDEN" -- echo exec-ok | grep -q exec-ok
+
+      - name: Launch refresh on golden (detached)
+        env:
+          BOXD_TOKEN: ${{ secrets.BOXD_API_KEY }}
+        run: |
+          B64=$(base64 -w0 .github/scripts/boxd-golden-refresh.sh)
+          boxd machine exec --timeout 60 "$GOLDEN" -- bash -c \
+            "mkdir -p $REMOTE_DIR && chmod 700 $REMOTE_DIR && echo $B64 | base64 -d > $REMOTE_SCRIPT && chmod +x $REMOTE_SCRIPT && rm -f $REMOTE_STATUS"
+          # setsid gives the refresh its own process group, so cleanup can kill
+          # the whole tree — pnpm, prisma and their children — rather than just
+          # the script. Those children inherit the lock fd, so leaving them
+          # alive would also leave the golden locked against the next run.
+          boxd machine exec --timeout 30 "$GOLDEN" -- bash -c \
+            "setsid nohup $REMOTE_SCRIPT '$GITHUB_SHA' '$REMOTE_STATUS' > $REMOTE_LOG 2>&1 & echo launched"
+
+      - name: Wait for refresh to finish
+        env:
+          BOXD_TOKEN: ${{ secrets.BOXD_API_KEY }}
+        run: |
+          # The remote log carries pnpm, prisma and dev-stack output from a
+          # machine that has real staging credentials in its .env — prisma
+          # prints DATABASE_URL, password included, in connection errors. Runner
+          # log masking only covers registered secrets, so strip inline URL
+          # credentials before any of it reaches this job's log.
+          tail_remote_log() {
+            boxd machine exec --timeout 60 "$GOLDEN" -- tail -50 "$REMOTE_LOG" 2>/dev/null \
+              | sed -E 's#([a-zA-Z][a-zA-Z0-9+.-]*://[^:/@[:space:]]+:)[^@[:space:]]+@#\1***@#g' \
+              || true
+          }
+          # The status is matched EXACTLY against this run's own sha. `S` is
+          # whatever the exec channel emitted, not just the file: a substring
+          # match would let the word "done" in a CLI banner end the wait while
+          # the refresh was still mid-flight, and the health gate would then run
+          # against the previous stack, which the script has not killed yet.
+          DEADLINE=$(( $(date +%s) + REFRESH_WAIT_SECONDS ))
+          while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+            S=$(boxd machine exec --timeout 30 "$GOLDEN" -- cat "$REMOTE_STATUS" 2>/dev/null || true)
+            S=$(printf '%s' "$S" | tr -d '\r' | tr '\n' ' ' | sed -E 's/^ +| +$//g')
+            case "$S" in
+              "done $GITHUB_SHA") echo "refresh done"; exit 0 ;;
+              "done "*)
+                echo "status names a different commit: [$S] — expected [done $GITHUB_SHA]"
+                tail_remote_log
+                exit 1 ;;
+              failed)
+                echo "refresh FAILED — log tail:"
+                tail_remote_log
+                exit 1 ;;
+            esac
+            sleep 20
+          done
+          echo "refresh timed out after ${REFRESH_WAIT_SECONDS}s — log tail:"
+          tail_remote_log
+          exit 1
+
+      - name: Wait for /api/health 204
+        run: |
+          DEADLINE=$(( $(date +%s) + HEALTH_WAIT_SECONDS ))
+          while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+            CODE=$(curl -sS --max-time 15 -o /dev/null -w '%{http_code}' "$GOLDEN_URL/api/health" || true)
+            echo "health: $CODE"
+            [ "$CODE" = "204" ] && exit 0
+            sleep 15
+          done
+          echo "app never became healthy within ${HEALTH_WAIT_SECONDS}s"
+          exit 1
+
+      # Scope of this gate, stated plainly: it proves the CHECKOUT on the golden
+      # is this commit. It does not prove the running process is serving bytes
+      # built from it — `pnpm dev` compiles lazily, so a stale build can answer
+      # while the working tree is current. What binds the serving process to the
+      # refresh is the port reclaim in the script (nothing from an older stack
+      # is left holding the app ports) plus the health and collector gates
+      # above. Asserting the sha back over HTTP would need the app to expose it;
+      # it does not today.
+      - name: Verify the golden's checkout is this exact commit
+        env:
+          BOXD_TOKEN: ${{ secrets.BOXD_API_KEY }}
+        run: |
+          DEPLOYED=$(boxd machine exec --timeout 30 "$GOLDEN" -- git -C /home/boxd/langwatch rev-parse HEAD | tr -d '[:space:]')
+          echo "deployed=$DEPLOYED expected=$GITHUB_SHA"
+          [ "$DEPLOYED" = "$GITHUB_SHA" ]
+
+      - name: Verify API auth layer is up (collector rejects unauthenticated)
+        run: |
+          CODE=$(curl -sS --max-time 15 -o /dev/null -w '%{http_code}' -X POST "$GOLDEN_URL/api/collector" -H 'Content-Type: application/json' -d '{}')
+          echo "collector unauthenticated: $CODE"
+          [ "$CODE" = "401" ]
+
+      - name: Save verified snapshot
+        env:
+          BOXD_TOKEN: ${{ secrets.BOXD_API_KEY }}
+        run: |
+          # `boxd snapshots save` gives up on its own client-side timeout while
+          # the snapshot is still being written — observed becoming ready about
+          # six minutes after the CLI returned an error. Treat the save as a
+          # request and poll for the result, so a slow snapshot is not reported
+          # as a failed refresh.
+          # The version/state columns are read positionally. Confirm the command
+          # works and its output still has the shape we parse before betting the
+          # 15-minute poll on it — otherwise a changed column layout shows up as
+          # a slow "did not become ready" instead of an obvious parse failure.
+          LIST=$(boxd snapshots list) || { echo "boxd snapshots list failed"; exit 1; }
+          printf '%s\n' "$LIST" | head -5
+          BEFORE=$(printf '%s\n' "$LIST" | awk -v n="$SNAPSHOT" '$1==n {print $2}')
+          echo "version before save: ${BEFORE:-none}"
+          boxd snapshots save "$GOLDEN" "$SNAPSHOT" --json \
+            || echo "save returned non-zero — polling for the snapshot to become ready"
+          DEADLINE=$(( $(date +%s) + SNAPSHOT_WAIT_SECONDS ))
+          while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+            ROW=$(boxd snapshots list | awk -v n="$SNAPSHOT" '$1==n {print $2, $3}')
+            echo "snapshot: ${ROW:-absent}"
+            # A new version in ready state is the only success: without the
+            # version check, an older ready snapshot would pass this gate while
+            # today's save was still pending.
+            case "$ROW" in
+              "$BEFORE "*) : ;;
+              *" ready") echo "snapshot ready"; boxd snapshots list; exit 0 ;;
+            esac
+            sleep 30
+          done
+          echo "snapshot did not become ready within ${SNAPSHOT_WAIT_SECONDS}s"
+          boxd snapshots list
+          exit 1
+
+      # A failed or cancelled run leaves the detached refresh — and everything
+      # pnpm and prisma started under it — running on the golden, holding the
+      # lock through the inherited fd. Kill this run's whole process group.
+      #
+      # Never delete the lock file: it is kernel-held, so killing the owner
+      # releases it, while removing it by hand would free it out from under a
+      # different run that was still working. The dev stack is in its own
+      # session (setsid in the script), so staging survives this cleanup.
+      - name: Stop this run's remote refresh on failure or cancellation
+        if: failure() || cancelled()
+        env:
+          BOXD_TOKEN: ${{ secrets.BOXD_API_KEY }}
+        run: |
+          PGID_FILE="${REMOTE_STATUS%.status}.pgid"
+          boxd machine exec --timeout 30 "$GOLDEN" -- bash -c \
+            "PGID=\$(cat $PGID_FILE 2>/dev/null); if [ -n \"\$PGID\" ]; then kill -9 -\"\$PGID\" 2>/dev/null && echo killed group \$PGID || echo 'group \$PGID already gone'; else echo 'no pgid recorded — refresh never started'; fi" || true

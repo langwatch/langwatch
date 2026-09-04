@@ -11,13 +11,13 @@ from ...models.post_api_prompts_by_id_sync_response_400 import PostApiPromptsByI
 from ...models.post_api_prompts_by_id_sync_response_401 import PostApiPromptsByIdSyncResponse401
 from ...models.post_api_prompts_by_id_sync_response_422 import PostApiPromptsByIdSyncResponse422
 from ...models.post_api_prompts_by_id_sync_response_500 import PostApiPromptsByIdSyncResponse500
-from ...types import UNSET, Response, Unset, safe_http_status
+from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
     id: str,
     *,
-    body: PostApiPromptsByIdSyncBody | Unset = UNSET,
+    body: PostApiPromptsByIdSyncBody,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -28,8 +28,7 @@ def _get_kwargs(
         ),
     }
 
-    if not isinstance(body, Unset):
-        _kwargs["json"] = body.to_dict()
+    _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -101,8 +100,8 @@ def _build_response(
 def sync_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiPromptsByIdSyncBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PostApiPromptsByIdSyncBody,
 ) -> Response[
     PostApiPromptsByIdSyncResponse200
     | PostApiPromptsByIdSyncResponse400
@@ -114,7 +113,7 @@ def sync_detailed(
 
     Args:
         id (str):
-        body (PostApiPromptsByIdSyncBody | Unset):
+        body (PostApiPromptsByIdSyncBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -139,8 +138,8 @@ def sync_detailed(
 def sync(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiPromptsByIdSyncBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PostApiPromptsByIdSyncBody,
 ) -> (
     PostApiPromptsByIdSyncResponse200
     | PostApiPromptsByIdSyncResponse400
@@ -153,7 +152,7 @@ def sync(
 
     Args:
         id (str):
-        body (PostApiPromptsByIdSyncBody | Unset):
+        body (PostApiPromptsByIdSyncBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -173,8 +172,8 @@ def sync(
 async def asyncio_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiPromptsByIdSyncBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PostApiPromptsByIdSyncBody,
 ) -> Response[
     PostApiPromptsByIdSyncResponse200
     | PostApiPromptsByIdSyncResponse400
@@ -186,7 +185,7 @@ async def asyncio_detailed(
 
     Args:
         id (str):
-        body (PostApiPromptsByIdSyncBody | Unset):
+        body (PostApiPromptsByIdSyncBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -209,8 +208,8 @@ async def asyncio_detailed(
 async def asyncio(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PostApiPromptsByIdSyncBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PostApiPromptsByIdSyncBody,
 ) -> (
     PostApiPromptsByIdSyncResponse200
     | PostApiPromptsByIdSyncResponse400
@@ -223,7 +222,7 @@ async def asyncio(
 
     Args:
         id (str):
-        body (PostApiPromptsByIdSyncBody | Unset):
+        body (PostApiPromptsByIdSyncBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

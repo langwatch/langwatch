@@ -307,6 +307,40 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
     Then push-mode sources appear under "Real-time streams"
     And pull-mode and s3-mode sources appear together under "Synced on a schedule"
 
+  # ---------------------------------------------------------------------------
+  # Source list — table layout, icons, and protocol column — #7617
+  # ---------------------------------------------------------------------------
+
+  @integration @source-list
+  Scenario: Each source row shows the vendor icon next to the name
+    Given configured sources of different types exist
+    When the admin views the source list
+    Then each row displays the SourceTypeIconGlyph for its source type
+    And the icon sits to the left of the source name
+
+  @integration @source-list
+  Scenario: Each source row shows its delivery protocol
+    Given configured sources of push, pull, and s3 modes exist
+    When the admin views the source list
+    Then push sources show the protocol label "OTel push"
+    And pull sources show the protocol label "API pull"
+    And s3 sources show the protocol label "S3 pull"
+
+  @integration @source-list @pull-source
+  Scenario: The rotate-secret button is hidden for non-push sources on the list
+    Given a pull-mode source exists
+    And a push-mode source exists
+    When the admin views the source list
+    Then the push source row shows a "Rotate secret" action
+    And the pull source row does not show a "Rotate secret" action
+
+  @integration @source-detail @pull-source
+  Scenario: The rotate-secret button is hidden for non-push sources on the detail page
+    Given a pull-mode source exists
+    When the admin opens that source's detail page
+    Then the page does not show a "Rotate secret" action
+    And the Edit and Archive actions remain available
+
   Scenario Outline: Admin adds a source by type
     When the admin clicks "Add source"
     And they pick "<source_type>"

@@ -275,17 +275,156 @@ Rule: The columns say what the reviewer needs to judge a row
     Given a row carries no comment
     Then its comments cell is empty
 
+  # A project that collects a dozen score types used to get a dozen columns,
+  # nearly all empty on any given row, which squeezed input and output into a
+  # strip and pushed the row's actions off the right edge.
   @integration
-  Scenario: One column per active score type
+  Scenario: Every score is folded into one Scores column
     Given the project has two active score types and one inactive one
-    Then the table carries a column for each active score type
+    Then the table carries one "Scores" column and no column per score type
+    And a score shows there as its type's name and the answer given
+    And every row has exactly one cell per column
+
+  @integration
+  Scenario: A score type can be given its own column
+    Given the project has two active score types
+    When the reviewer picks one of them in the columns menu
+    Then the table carries a column for that score type only
     And every row has exactly one cell per column
 
   @integration
   Scenario: Score types that are all inactive add no columns
     Given the project has score types and none of them is active
     Then the table carries no score column
+    And the columns menu offers none of them
     And every row has exactly as many cells as the header has columns
+
+Rule: The inbox can be narrowed to the queues being worked on
+
+  The inbox pools every queue the reviewer belongs to, which is what makes its
+  pending count trustworthy and its list a mix nobody asked for. The pick only
+  ever narrows: it is applied on top of the reach the reviewer already has, so
+  a queue id from anywhere else can subtract rows but never add one.
+
+  Background:
+    Given the user is authenticated with "annotations:view" permission
+    And the reviewer belongs to two queues
+
+  @integration
+  Scenario: The inbox reads every queue until one is picked
+    When the inbox renders
+    Then the queue control reads "All"
+    And the read asks for no particular queue
+
+  @integration
+  Scenario: The inbox narrows to the queues the reviewer picks
+    When the reviewer picks one queue
+    Then the read asks for that queue only
+    And the queue control names it
+
+  @integration
+  Scenario: A page that is one queue offers no queue filter
+    When a single queue's page renders
+    Then it carries no queue filter
+
+  # Narrowing the queues narrows the rows, so the page they were on may not
+  # exist any more: from page three, a queue with five items would show the
+  # empty state for a queue that plainly has work in it.
+  @integration
+  Scenario: Picking a queue takes the reviewer back to the first page
+    Given the reviewer is reading a later page of the inbox
+    When the reviewer picks one queue
+    Then the list goes back to the first page
+
+  # The filter lists the queues the reviewer can reach, and a non-member
+  # reaches one only through items assigned to them. Removing the last of those
+  # takes the queue out of their reach, so a cached list would keep offering a
+  # queue whose rows have all gone.
+  @integration
+  Scenario: The queue filter is refreshed when items leave a queue
+    When items are removed from a queue
+    Then the queue filter's list is read again
+
+  @unit
+  Scenario: A picked queue cannot widen what the reviewer may read
+    Given the reviewer may read only their own items
+    When they pick a queue they do not belong to
+    Then the read still asks only for their own items
+
+  # The read narrows to the reviewer's reach whatever the filter asks for, so a
+  # queue they cannot read is a pick that empties the list and reads as broken.
+  # Reach, not row count: a queue they are in that holds nothing pending is
+  # still offered, and picking it still shows an empty list. That empty is the
+  # status filter answering honestly.
+  @unit
+  Scenario: The queue filter only offers queues the reviewer can read
+    Given the project holds a queue the reviewer is not in
+    When the filter asks which queues it may offer
+    Then it is told only the queues whose items the reviewer can read
+
+  # Narrowing is opt-in because the pickers that put a trace into a queue, or
+  # invite people to one, target any queue the project has.
+  @unit
+  Scenario: A caller that does not ask to be narrowed is not narrowed
+    Given a caller that has not asked for the reviewer's queues only
+    When it asks which queues it may offer
+    Then it is told every queue the project has
+
+Rule: The reviewer chooses which columns the list shows
+
+  The list is read differently by different people, and one project's score
+  types are another's noise. The choice is per project and kept in the browser:
+  it is how one person likes to read the list, not something the project agrees
+  on.
+
+  Background:
+    Given the user is authenticated with "annotations:view" permission
+    And the annotations list shows rows
+
+  @integration
+  Scenario: A column the reviewer hides stays hidden
+    When the reviewer turns a column off in the columns menu
+    Then the table stops carrying it
+    And it is still off when they come back to the list
+
+  @integration
+  Scenario: A column added after the reviewer chose still appears
+    Given the reviewer has hidden a column
+    When the project gains a column that shows by default
+    Then that new column shows
+
+  # The button carries a tooltip as well as the menu. Both want to name the
+  # button as their own, and if the tooltip wins the menu has nothing left to
+  # measure against: it opens in the corner of the page, over the navigation.
+  #
+  # Where the menu lands is the behaviour that matters, and only a browser can
+  # see it — nothing about placement is observable without layout, so the
+  # scenario for it is parked rather than bound to a test that cannot look.
+  # What a test can hold is the cause: whether the button is still the menu's.
+  @integration
+  Scenario: The columns menu keeps the button as its own trigger
+    When the columns menu renders its button
+    Then the button belongs to the menu rather than to its tooltip
+
+  @e2e @unimplemented
+  Scenario: The columns menu opens under its button
+    When the reviewer opens the columns menu
+    Then it appears against the button they pressed
+    And not in the corner of the page over the navigation
+
+Rule: The row's actions are always within reach
+
+  Background:
+    Given the user is authenticated with "annotations:update" permission
+    And the annotations list shows rows
+
+  # Unpinned, the overflow menu is the last column of a table that can be wider
+  # than the page, so "View trace" and "Remove from queue" sit off screen behind
+  # a sideways scroll nobody thinks to make.
+  @integration
+  Scenario: The row's actions stay reachable however wide the table is
+    When the annotations list renders
+    Then the actions column is pinned to the edge of the table's own scroll
 
   @integration
   Scenario: Input and output stay behind the redaction marker
@@ -302,6 +441,7 @@ Rule: Every page carries the same header controls
   Scenario: A queue page filters by status
     When a queue page renders
     Then the header offers Pending, Completed and All
+    And the control names the status it is filtering by
 
   @integration
   Scenario: The all annotations page has no status filter

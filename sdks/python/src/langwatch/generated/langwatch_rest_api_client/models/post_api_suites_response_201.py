@@ -6,7 +6,14 @@ from typing import TYPE_CHECKING, Any, TypeVar, cast
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..models.post_api_suites_response_201_kind import PostApiSuitesResponse201Kind
+from ..types import UNSET, Unset
+
 if TYPE_CHECKING:
+    from ..models.post_api_suites_response_201_scope_type_0 import PostApiSuitesResponse201ScopeType0
+    from ..models.post_api_suites_response_201_scope_type_1 import PostApiSuitesResponse201ScopeType1
+    from ..models.post_api_suites_response_201_scope_type_2 import PostApiSuitesResponse201ScopeType2
+    from ..models.post_api_suites_response_201_scope_type_3 import PostApiSuitesResponse201ScopeType3
     from ..models.post_api_suites_response_201_targets_item import PostApiSuitesResponse201TargetsItem
 
 
@@ -28,6 +35,13 @@ class PostApiSuitesResponse201:
         created_at (str):
         updated_at (str):
         platform_url (str):
+        kind (PostApiSuitesResponse201Kind | Unset): custom is a hand-assembled run plan; folder is a test suite that
+            groups scenarios filed into it. Absent on servers that predate test suites.
+        scope (None | PostApiSuitesResponse201ScopeType0 | PostApiSuitesResponse201ScopeType1 |
+            PostApiSuitesResponse201ScopeType2 | PostApiSuitesResponse201ScopeType3 | Unset): What the run plan covers: all
+            (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying
+            any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a
+            scenario written later runs without editing the plan.
     """
 
     id: str
@@ -41,9 +55,23 @@ class PostApiSuitesResponse201:
     created_at: str
     updated_at: str
     platform_url: str
+    kind: PostApiSuitesResponse201Kind | Unset = UNSET
+    scope: (
+        None
+        | PostApiSuitesResponse201ScopeType0
+        | PostApiSuitesResponse201ScopeType1
+        | PostApiSuitesResponse201ScopeType2
+        | PostApiSuitesResponse201ScopeType3
+        | Unset
+    ) = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
+        from ..models.post_api_suites_response_201_scope_type_0 import PostApiSuitesResponse201ScopeType0
+        from ..models.post_api_suites_response_201_scope_type_1 import PostApiSuitesResponse201ScopeType1
+        from ..models.post_api_suites_response_201_scope_type_2 import PostApiSuitesResponse201ScopeType2
+        from ..models.post_api_suites_response_201_scope_type_3 import PostApiSuitesResponse201ScopeType3
+
         id = self.id
 
         name = self.name
@@ -70,6 +98,24 @@ class PostApiSuitesResponse201:
 
         platform_url = self.platform_url
 
+        kind: str | Unset = UNSET
+        if not isinstance(self.kind, Unset):
+            kind = self.kind.value
+
+        scope: dict[str, Any] | None | Unset
+        if isinstance(self.scope, Unset):
+            scope = UNSET
+        elif isinstance(self.scope, PostApiSuitesResponse201ScopeType0):
+            scope = self.scope.to_dict()
+        elif isinstance(self.scope, PostApiSuitesResponse201ScopeType1):
+            scope = self.scope.to_dict()
+        elif isinstance(self.scope, PostApiSuitesResponse201ScopeType2):
+            scope = self.scope.to_dict()
+        elif isinstance(self.scope, PostApiSuitesResponse201ScopeType3):
+            scope = self.scope.to_dict()
+        else:
+            scope = self.scope
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -87,11 +133,19 @@ class PostApiSuitesResponse201:
                 "platformUrl": platform_url,
             }
         )
+        if kind is not UNSET:
+            field_dict["kind"] = kind
+        if scope is not UNSET:
+            field_dict["scope"] = scope
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.post_api_suites_response_201_scope_type_0 import PostApiSuitesResponse201ScopeType0
+        from ..models.post_api_suites_response_201_scope_type_1 import PostApiSuitesResponse201ScopeType1
+        from ..models.post_api_suites_response_201_scope_type_2 import PostApiSuitesResponse201ScopeType2
+        from ..models.post_api_suites_response_201_scope_type_3 import PostApiSuitesResponse201ScopeType3
         from ..models.post_api_suites_response_201_targets_item import PostApiSuitesResponse201TargetsItem
 
         d = dict(src_dict)
@@ -127,6 +181,71 @@ class PostApiSuitesResponse201:
 
         platform_url = d.pop("platformUrl")
 
+        _kind = d.pop("kind", UNSET)
+        kind: PostApiSuitesResponse201Kind | Unset
+        if isinstance(_kind, Unset):
+            kind = UNSET
+        else:
+            kind = PostApiSuitesResponse201Kind(_kind)
+
+        def _parse_scope(
+            data: object,
+        ) -> (
+            None
+            | PostApiSuitesResponse201ScopeType0
+            | PostApiSuitesResponse201ScopeType1
+            | PostApiSuitesResponse201ScopeType2
+            | PostApiSuitesResponse201ScopeType3
+            | Unset
+        ):
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                scope_type_0 = PostApiSuitesResponse201ScopeType0.from_dict(data)
+
+                return scope_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                scope_type_1 = PostApiSuitesResponse201ScopeType1.from_dict(data)
+
+                return scope_type_1
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                scope_type_2 = PostApiSuitesResponse201ScopeType2.from_dict(data)
+
+                return scope_type_2
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                scope_type_3 = PostApiSuitesResponse201ScopeType3.from_dict(data)
+
+                return scope_type_3
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(
+                None
+                | PostApiSuitesResponse201ScopeType0
+                | PostApiSuitesResponse201ScopeType1
+                | PostApiSuitesResponse201ScopeType2
+                | PostApiSuitesResponse201ScopeType3
+                | Unset,
+                data,
+            )
+
+        scope = _parse_scope(d.pop("scope", UNSET))
+
         post_api_suites_response_201 = cls(
             id=id,
             name=name,
@@ -139,6 +258,8 @@ class PostApiSuitesResponse201:
             created_at=created_at,
             updated_at=updated_at,
             platform_url=platform_url,
+            kind=kind,
+            scope=scope,
         )
 
         post_api_suites_response_201.additional_properties = d

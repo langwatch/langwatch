@@ -126,4 +126,19 @@ describe("applyJq", () => {
       expect(applyJq(".nope", DATA)).toBeNull();
     });
   });
+  describe("when the expression asks for more than the subset does", () => {
+    /** @scenario "The built-in filter names the shell tools when it is asked for more" */
+    it.each([
+      ["[.results[] | {index, expected: .entry.l3}]"],
+      [".results[] | map(.id)"],
+      ['.["traces"]'],
+      // A typo rather than a reach for more power, but the caller still needs
+      // to be told where the rest of the work can be done.
+      [".traces..traceId"],
+    ])("names jq and python in the shell for %s", (expression) => {
+      expect(() => applyJq(expression, { results: [] })).toThrow(
+        /`jq` and `python` are both in your shell/,
+      );
+    });
+  });
 });

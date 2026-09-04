@@ -27,6 +27,7 @@ import {
 } from "../api/rbac";
 import { authzChecksFor } from "../app-layer/authz/checks";
 import { organizationOnAuthzEngine } from "../app-layer/authz/engine-gate";
+import { pMapLimited } from "../event-sourcing/replay/pMapLimited";
 import { CUSTOM_ROLE_KIND } from "../role/role-kind";
 import {
   MalformedCustomRolePermissionsError,
@@ -699,4 +700,96 @@ export async function resolveApiKeyPermission({
   }
 
   return legacyPermitted();
+}
+
+/**
+ * How many legacy per-scope decisions may be in flight at once in the batch
+ * below. Each decision runs several queries, so an unbounded fan-out across a
+ * large organization's projects demands the whole Prisma pool at once and
+ * times out every other acquire (P2024) — the failure the batch exists to
+ * remove. Four keeps the pool breathing while the legacy path lasts.
+ */
+const LEGACY_CEILING_BATCH_CONCURRENCY = 4;
+
+/**
+ * {@link resolveApiKeyPermission} for a SET of project scopes and a SET of
+ * permissions, without the per-project database fan-out.
+ *
+ * On an engine organization this is ONE grant collection — the key's
+ * snapshot, and its owner's where one exists — with permissions × projects
+ * decided purely against it (`canBatchPermissionsByIds`). Deciding per
+ * project opened a collector pass of several queries per project per
+ * permission; fanned out with `Promise.all` across a 50-project
+ * organization, that demanded 100+ connections at once, starved the pool,
+ * and turned the v1 pull-request usage rollup into a 10-second P2024 500.
+ *
+ * A legacy organization keeps the EXACT single-check semantics — each
+ * decision still runs the four-step legacy ceiling above, unchanged — but
+ * with bounded concurrency, so the fan-out hazard is gone there too. Not
+ * restated as a flat batch on purpose: the legacy walk is deprecated
+ * (ADR-110) and a reimplementation would be a second copy of the most
+ * security-sensitive logic in the app, drifting until the migration deletes
+ * it.
+ */
+export async function resolveApiKeyPermissionProjectBatch({
+  prisma,
+  apiKeyId,
+  userId,
+  organizationId,
+  projects,
+  permissions,
+}: {
+  prisma: PrismaClient;
+  apiKeyId: string;
+  userId: string | null;
+  organizationId: string;
+  projects: ReadonlyArray<{ projectId: string; teamId: string }>;
+  permissions: readonly Permission[];
+}): Promise<Map<Permission, Map<string, boolean>>> {
+  if (await organizationOnAuthzEngine({ prisma, organizationId })) {
+    const { byPermission } = await authzChecksFor(
+      prisma,
+    ).canBatchPermissionsByIds({
+      principal: { type: "apiKey", id: apiKeyId },
+      permissions,
+      organizationId,
+      teams: [],
+      projects: projects.map(({ projectId, teamId }) => ({
+        projectId,
+        teamId,
+      })),
+    });
+    return new Map(
+      permissions.map((permission) => [
+        permission,
+        byPermission.get(permission)?.projects ?? new Map<string, boolean>(),
+      ]),
+    );
+  }
+
+  const results = new Map<Permission, Map<string, boolean>>(
+    permissions.map((permission) => [permission, new Map()]),
+  );
+  await pMapLimited({
+    items: projects.flatMap((project) =>
+      permissions.map((permission) => ({ project, permission })),
+    ),
+    concurrency: LEGACY_CEILING_BATCH_CONCURRENCY,
+    fn: async ({ project, permission }) => {
+      const allowed = await resolveApiKeyPermission({
+        prisma,
+        apiKeyId,
+        userId,
+        organizationId,
+        scope: {
+          type: "project",
+          id: project.projectId,
+          teamId: project.teamId,
+        },
+        permission,
+      });
+      results.get(permission)?.set(project.projectId, allowed);
+    },
+  });
+  return results;
 }

@@ -8,14 +8,14 @@ from ...client import AuthenticatedClient, Client
 from ...models.patch_api_dataset_by_slug_or_id_records_by_record_id_body import (
     PatchApiDatasetBySlugOrIdRecordsByRecordIdBody,
 )
-from ...types import UNSET, Response, Unset, safe_http_status
+from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
     slug_or_id: str,
     record_id: str,
     *,
-    body: PatchApiDatasetBySlugOrIdRecordsByRecordIdBody | Unset = UNSET,
+    body: PatchApiDatasetBySlugOrIdRecordsByRecordIdBody,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -27,8 +27,7 @@ def _get_kwargs(
         ),
     }
 
-    if not isinstance(body, Unset):
-        _kwargs["json"] = body.to_dict()
+    _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -59,15 +58,15 @@ def sync_detailed(
     slug_or_id: str,
     record_id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PatchApiDatasetBySlugOrIdRecordsByRecordIdBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PatchApiDatasetBySlugOrIdRecordsByRecordIdBody,
 ) -> Response[Any]:
     """Update or create a record in a dataset
 
     Args:
         slug_or_id (str):
         record_id (str):
-        body (PatchApiDatasetBySlugOrIdRecordsByRecordIdBody | Unset):
+        body (PatchApiDatasetBySlugOrIdRecordsByRecordIdBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -94,15 +93,15 @@ async def asyncio_detailed(
     slug_or_id: str,
     record_id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PatchApiDatasetBySlugOrIdRecordsByRecordIdBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PatchApiDatasetBySlugOrIdRecordsByRecordIdBody,
 ) -> Response[Any]:
     """Update or create a record in a dataset
 
     Args:
         slug_or_id (str):
         record_id (str):
-        body (PatchApiDatasetBySlugOrIdRecordsByRecordIdBody | Unset):
+        body (PatchApiDatasetBySlugOrIdRecordsByRecordIdBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

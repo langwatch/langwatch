@@ -369,6 +369,9 @@ function persistDeviceSession(
 			cfg.cli_api_key_scope = {
 				kind: result.cli_api_key_scope.kind,
 				project_ids: result.cli_api_key_scope.project_ids ?? [],
+				...(Array.isArray(result.cli_api_key_scope.permissions)
+					? { permissions: result.cli_api_key_scope.permissions }
+					: {}),
 			};
 		}
 	}

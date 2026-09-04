@@ -20,7 +20,7 @@ const repoRoot = "../../../../../.."
 // publishedExamples maps a docs page to the example whose full text it carries.
 // The fence is found by its info string, `python <file name>`.
 var publishedExamples = map[string]string{
-	"docs/agent-simulations/authenticated-agents.mdx": "shared_session_code_agent.py",
+	"docs/agent-testing/authenticated-agents.mdx": "shared_session_code_agent.py",
 }
 
 func TestExamplesPublishedInTheDocsMatchTheCommittedFile(t *testing.T) {

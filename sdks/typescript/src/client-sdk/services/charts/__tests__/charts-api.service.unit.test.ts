@@ -1,10 +1,22 @@
-import { describe, expect, it, vi } from "vitest";
-import {
-  ChartsApiError,
-  ChartsApiService,
-} from "../charts-api.service";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 import { isLangWatchHandledError } from "@/internal/api/errors";
 import type { LangwatchApiClient } from "@/internal/api/client";
+
+/**
+ * The delegated query door has no path/body slot for project id (see
+ * `QueryApiService`'s doc comment), so a `projectId` config can only reach
+ * it through which client the door is built with. Proving that means
+ * catching the client-construction call itself — `clientWith` below fakes
+ * the transport, but that alone can't see which project a freshly-built
+ * client was scoped to.
+ */
+const createLangWatchApiClientMock = vi.hoisted(() => vi.fn());
+
+vi.mock("@/internal/api/client", () => ({
+  createLangWatchApiClient: createLangWatchApiClientMock,
+}));
+
+import { ChartsApiError, ChartsApiService } from "../charts-api.service";
 
 /**
  * The canonical REST envelope the analytics-sql chart family answers refusals
@@ -96,6 +108,64 @@ describe("ChartsApiService", () => {
       });
 
       await expect(service.delete("chart-1")).resolves.toBeUndefined();
+    });
+  });
+
+  describe("when the delegated query door resolves its client", () => {
+    beforeEach(() => {
+      createLangWatchApiClientMock.mockReset();
+    });
+
+    /**
+     * Regression coverage for the bug CodeRabbit flagged on
+     * `PRRT_kwDOKRXhvM6c3Oui`: `new ChartsApiService({ projectId: "A" })`
+     * did chart CRUD against project A, but its delegated `schema()` /
+     * `runQuery()` rode the api client's ambient project scope instead —
+     * which could be a different project, or none.
+     */
+    it("scopes the delegated query client to the configured projectId, not ambient scope", () => {
+      const schemaResult = { database: "analytics", datasets: [] };
+      createLangWatchApiClientMock.mockReturnValue(
+        clientWith({
+          data: schemaResult,
+          response: new Response(null, { status: 200 }),
+        }),
+      );
+
+      // No `langwatchApiClient` override — this is the real-world shape the
+      // bug hit: only `projectId` configured, so the family must build the
+      // query delegate's client itself rather than share `this.apiClient`
+      // (which never learned `configuredProjectId`, only ambient scope).
+      new ChartsApiService({ projectId: "configured-project" });
+
+      expect(createLangWatchApiClientMock).toHaveBeenCalledWith(
+        undefined,
+        undefined,
+        "configured-project",
+      );
+    });
+
+    it("reuses the caller-supplied client verbatim for the query delegate", async () => {
+      const schemaResult = { database: "analytics", datasets: [] };
+      const suppliedClient = clientWith({
+        data: schemaResult,
+        response: new Response(null, { status: 200 }),
+      });
+
+      const service = new ChartsApiService({
+        langwatchApiClient: suppliedClient,
+        projectId: "configured-project",
+      });
+      const result = await service.schema();
+
+      // The caller's own client is what runs the delegated call — the
+      // factory is never asked to build a second, freshly-scoped one.
+      expect(createLangWatchApiClientMock).not.toHaveBeenCalled();
+      expect(suppliedClient.GET).toHaveBeenCalledWith(
+        "/api/v1/query/schema",
+        {},
+      );
+      expect(result).toEqual(schemaResult);
     });
   });
 });

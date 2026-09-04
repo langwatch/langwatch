@@ -27,6 +27,51 @@ func (m *mockBreaker) Allow(id string) bool    { return !m.blocked[id] }
 func (m *mockBreaker) RecordSuccess(id string) { m.recorded[id] = "success" }
 func (m *mockBreaker) RecordFailure(id string) { m.recorded[id] = "failure" }
 
+// The breaker exists to answer "is this slot healthy", and only an outcome that
+// actually reached the slot can answer it. Crediting a success for a request
+// that never dialed force-closes an open circuit — RecordSuccess sets Closed
+// and truncates the failure window — so a provider that is genuinely down keeps
+// being dialed. Faulting the slot instead would open a circuit on a provider
+// that did nothing wrong.
+func TestRecordBreakerIgnoresOutcomesThatNeverReachedTheSlot(t *testing.T) {
+	for _, reason := range []Reason{ReasonContextDone, ReasonNotDialed} {
+		t.Run(string(reason), func(t *testing.T) {
+			breaker := newMockBreaker()
+
+			recordBreaker(breaker, "slot-1", reason)
+
+			if got, ok := breaker.recorded["slot-1"]; ok {
+				t.Fatalf("%s recorded %q on the breaker; it must record nothing", reason, got)
+			}
+		})
+	}
+}
+
+// The counterpart: an answered terminal 4xx DOES prove the slot alive, so it
+// must still credit a success. That distinction is why ReasonNotDialed exists,
+// and collapsing the two back together would otherwise be silent.
+func TestRecordBreakerStillCreditsAnAnsweredTerminalError(t *testing.T) {
+	breaker := newMockBreaker()
+
+	recordBreaker(breaker, "slot-1", ReasonNonRetryable)
+
+	if breaker.recorded["slot-1"] != "success" {
+		t.Fatalf("an answered terminal error must prove the slot alive, got %q",
+			breaker.recorded["slot-1"])
+	}
+}
+
+// A reason that ends the walk must not also be a retry trigger, or the walk
+// would dial the next slot for a failure it has already called terminal.
+func TestNotDialedNeitherRetriesNorOpensTheCircuit(t *testing.T) {
+	if defaultTriggers[ReasonNotDialed] {
+		t.Fatal("ReasonNotDialed must not trigger a retry")
+	}
+	if breakerFailureReasons[ReasonNotDialed] {
+		t.Fatal("ReasonNotDialed must not count toward opening the circuit")
+	}
+}
+
 var errRetryable = errors.New("retryable error")
 var errFatal = errors.New("fatal error")
 

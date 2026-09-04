@@ -82,11 +82,26 @@ func faultForCode(code herr.Code) Fault {
 		// so it is their fault in the only sense this attribution means: whose
 		// action fixes it. Counted per key too, which is what shows an
 		// operator a key wedged in a re-authenticate loop.
-		domain.ErrCodexSessionExpired:
+		domain.ErrCodexSessionExpired,
+		// The three terminal provider-setup failures. "Whose action fixes it"
+		// is the only question this attribution asks, and the answer for all
+		// three is the customer: re-paste the credential, or declare the model
+		// on the key. Reading them as provider faults — which is what they did
+		// while they wore provider_timeout — put a settings mistake on the warn
+		// line operators watch for provider outages, and left the customer
+		// looking at a provider status page for something only they can change.
+		domain.ErrProviderCredentialInvalid, domain.ErrProviderCredentialRejected,
+		domain.ErrProviderConfigInvalid:
 		return FaultCustomer
 	case domain.ErrProviderError, domain.ErrProviderTimeout,
+		domain.ErrProviderConnectionFailed,
 		domain.ErrChainExhausted, domain.ErrCircuitOpen:
 		return FaultProvider
+	case domain.ErrRequestAbandoned:
+		// Nobody's fault, and nothing to page for: the caller left. Info level,
+		// the same as a customer fault, but deliberately not counted as a
+		// client rejection — see recordClientReject.
+		return FaultCustomer
 	default:
 		// internal_error, auth_upstream_unavailable, anything unrecognized.
 		return FaultPlatform
@@ -127,6 +142,33 @@ func logRequestError(logger *zap.Logger, ctx context.Context, failure requestErr
 		)
 	}
 	logger.Log(failure.fault.level(), "gateway_request_failed", fields...)
+}
+
+// handledCause reads the underlying error a handled error was built from, for
+// the operator's half of the log line. The customer-facing message states what
+// happened and what to do; the cause states WHY, and only one of the two can be
+// both actionable and safe to show a customer.
+//
+// This closes the hole that made a production Vertex failure undiagnosable:
+// Bifrost splits a failure into a category ("error creating auth token source")
+// and a wrapped cause ("failed to parse auth credentials JSON: ..."), the
+// gateway carried only the category, and the category is the same string for
+// six different credential problems with different fixes.
+//
+// Capped and never quoted from a request body — a reason here is authored by
+// the engine or a provider SDK, not echoed from customer input.
+func handledCause(message string, e herr.E) string {
+	for _, reason := range e.Reasons {
+		if reason == nil {
+			continue
+		}
+		text := cappedReason(reason.Error())
+		if text == "" || strings.Contains(message, text) {
+			continue
+		}
+		return text
+	}
+	return ""
 }
 
 // upstreamReasonLimit caps the reason field: long enough for any provider's
@@ -198,7 +240,11 @@ func cappedReason(text string) string {
 // pin this counter and mute the alert it exists for, and that rejection is
 // already carried by gateway_rate_limit_denied_total.
 func recordClientReject(ctx context.Context, code herr.Code) {
-	if faultForCode(code) != FaultCustomer || code == domain.ErrRateLimited {
+	// domain.ErrRequestAbandoned is excluded alongside the rate limit: the
+	// caller disconnecting is not a rejection the gateway issued, and a client
+	// on a flaky network would otherwise read as one looping on bad bodies.
+	if faultForCode(code) != FaultCustomer ||
+		code == domain.ErrRateLimited || code == domain.ErrRequestAbandoned {
 		return
 	}
 	virtualKeyID := ""
@@ -236,6 +282,7 @@ func logWriteError(logger *zap.Logger, ctx context.Context, err error) {
 			fault:   faultForCode(e.Code),
 			code:    e.Code.String(),
 			message: msg,
+			reason:  handledCause(msg, e),
 		})
 		recordClientReject(ctx, e.Code)
 		return

@@ -101,7 +101,7 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     cursor: str | Unset = UNSET,
     limit: int | Unset = 50,
     external_id: str | Unset = UNSET,
@@ -122,7 +122,7 @@ def sync_detailed(
     Args:
         cursor (str | Unset):
         limit (int | Unset):  Default: 50.
-        external_id (str | Unset): Exact match on the resource's `external_id`.
+        external_id (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -147,7 +147,7 @@ def sync_detailed(
 
 def sync(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     cursor: str | Unset = UNSET,
     limit: int | Unset = 50,
     external_id: str | Unset = UNSET,
@@ -169,7 +169,7 @@ def sync(
     Args:
         cursor (str | Unset):
         limit (int | Unset):  Default: 50.
-        external_id (str | Unset): Exact match on the resource's `external_id`.
+        external_id (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -189,7 +189,7 @@ def sync(
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     cursor: str | Unset = UNSET,
     limit: int | Unset = 50,
     external_id: str | Unset = UNSET,
@@ -210,7 +210,7 @@ async def asyncio_detailed(
     Args:
         cursor (str | Unset):
         limit (int | Unset):  Default: 50.
-        external_id (str | Unset): Exact match on the resource's `external_id`.
+        external_id (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -233,7 +233,7 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     cursor: str | Unset = UNSET,
     limit: int | Unset = 50,
     external_id: str | Unset = UNSET,
@@ -255,7 +255,7 @@ async def asyncio(
     Args:
         cursor (str | Unset):
         limit (int | Unset):  Default: 50.
-        external_id (str | Unset): Exact match on the resource's `external_id`.
+        external_id (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

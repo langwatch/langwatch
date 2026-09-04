@@ -106,8 +106,8 @@ describe("the scope of a run plan over tRPC", () => {
   );
 
   describe("when the plan covers a rule", () => {
-    /** @scenario "A plan scoped to all test cases runs every active case" */
-    it("is created with no test case named", async () => {
+    /** @scenario "A plan keeps the scope it was given" */
+    it("is created with no scenario named", async () => {
       const plan = await caller.suites.create({
         projectId,
         name: `Everything ${nanoid(6)}`,
@@ -122,7 +122,7 @@ describe("the scope of a run plan over tRPC", () => {
       expect(plan.scenarioIds).toEqual([]);
     });
 
-    /** @scenario "A plan scoped to labels runs the cases carrying them" */
+    /** @scenario "A plan keeps the scope it was given" */
     it("takes a new rule on update", async () => {
       const plan = await caller.suites.create({
         projectId,
@@ -161,7 +161,7 @@ describe("the scope of a run plan over tRPC", () => {
     });
   });
 
-  describe("when the plan names its test cases", () => {
+  describe("when the plan names its scenarios", () => {
     /** @scenario "A plan scoped to a hand-picked list runs exactly that list" */
     it("refuses a plan that names none", async () => {
       await expect(
@@ -169,7 +169,7 @@ describe("the scope of a run plan over tRPC", () => {
           projectId,
           name: `Empty ${nanoid(6)}`,
           scenarioIds: [],
-          scope: { mode: "cases" },
+          scope: { mode: "scenarios" },
           targets: [],
           repeatCount: 1,
           labels: [],
@@ -209,10 +209,10 @@ describe("the scope of a run plan over tRPC", () => {
     });
   });
 
-  describe("when the suite is a test suite folder", () => {
+  describe("when the suite is a test suite", () => {
     /** @scenario "A test suite refuses a scope" */
     it("refuses the scope and keeps none", async () => {
-      const folder = await caller.suites.folders.create({
+      const testSuite = await caller.suites.testSuites.create({
         projectId,
         name: `Refunds ${nanoid(4)}`,
       });
@@ -220,13 +220,13 @@ describe("the scope of a run plan over tRPC", () => {
       await expect(
         caller.suites.update({
           projectId,
-          id: folder.id,
+          id: testSuite.id,
           scope: { mode: "all" },
         }),
       ).rejects.toMatchObject({ cause: { code: "suite_scope_not_allowed" } });
 
       const stored = await prisma.simulationSuite.findFirstOrThrow({
-        where: { id: folder.id, projectId },
+        where: { id: testSuite.id, projectId },
       });
       expect(stored.scope).toBeNull();
     });

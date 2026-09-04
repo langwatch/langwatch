@@ -1,5 +1,5 @@
 /**
- * Restoring an older version of a test case: the confirmation the reader gives
+ * Restoring an older version of a scenario: the confirmation the reader gives
  * first, and the write that follows.
  *
  * @see specs/scenarios/scenario-version-restore.feature

@@ -101,12 +101,12 @@ describe("the note of a batch", () => {
         makeRunRow({
           scenarioSetId,
           batchRunId,
-          metadata: { note: "switched judge to the stricter rubric" },
+          metadata: { note: "switched judge to the stricter criterion" },
         }),
         makeRunRow({
           scenarioSetId,
           batchRunId,
-          metadata: { note: "switched judge to the stricter rubric" },
+          metadata: { note: "switched judge to the stricter criterion" },
         }),
       ]);
 
@@ -117,7 +117,7 @@ describe("the note of a batch", () => {
       });
 
       const batch = result.batches.find((b) => b.batchRunId === batchRunId);
-      expect(batch?.note).toBe("switched judge to the stricter rubric");
+      expect(batch?.note).toBe("switched judge to the stricter criterion");
     });
 
     /** @scenario "The batch summary of one batch reports its note" */
@@ -235,7 +235,7 @@ describe("the note of a batch", () => {
         makeRunRow({
           scenarioSetId,
           batchRunId: noted,
-          metadata: { note: "before the rubric change" },
+          metadata: { note: "before the criterion change" },
         }),
         makeRunRow({ scenarioSetId, batchRunId: unnoted, metadata: null }),
       ]);
@@ -247,7 +247,7 @@ describe("the note of a batch", () => {
       });
 
       const byId = new Map(result.batches.map((b) => [b.batchRunId, b]));
-      expect(byId.get(noted)?.note).toBe("before the rubric change");
+      expect(byId.get(noted)?.note).toBe("before the criterion change");
       expect(byId.get(unnoted)?.note).toBeNull();
     });
   });

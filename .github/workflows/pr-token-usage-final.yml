@@ -1,0 +1,79 @@
+name: pr-token-usage-final
+
+# Refreshes the coding agent usage comment one last time, after a pull request
+# has merged.
+#
+# pr-token-usage refreshes on every push, so the last comment a pull request
+# carries describes the world as it was at its last commit. Work continues
+# after that commit: review agents read the diff, ask for changes and re-read
+# it, and a pull request approved as it stands never gets another push to
+# trigger a refresh. Those tokens were spent on that pull request and belonged
+# in its report, and nothing was going to put them there.
+#
+# A merge is the moment the total stops moving, so this runs on the push to
+# the default branch, finds the pull requests that merged into it, and
+# refreshes each one's comment a final time.
+#
+# It lives on `main` on purpose. A `pull_request: closed` trigger would run
+# the workflow file from the pull request's own branch, so no pull request
+# opened before this change landed would ever get its last refresh. A push
+# trigger always runs the version on the default branch.
+#
+# Deliberately non-blocking, like the workflow it completes: a LangWatch
+# outage logs a warning and the job stays green, and a push carrying no merged
+# pull request is a no-op.
+#
+# Spec: specs/ci/pr-token-usage.feature
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+# Each push carries a different pull request, so runs must not cancel one
+# another the way the per-pull-request workflow's do. Keyed on the commit, a
+# re-run of the same push still replaces rather than duplicates.
+concurrency:
+  group: pr-token-usage-final-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          sparse-checkout: .github/scripts
+          persist-credentials: false
+
+      # The same logic that is about to write the comment proves itself first;
+      # `node --test` with type stripping needs no install step.
+      - name: Test the comment builder
+        run: |
+          node --test --experimental-strip-types \
+            .github/scripts/pr-token-usage.test.ts \
+            .github/scripts/pr-token-usage-merged.test.ts
+
+      # Two things land just after a merge: the usage from a session that
+      # ended moments before it, and the per-pull-request run for the final
+      # commit, which may still be writing the comment this job is about to
+      # rewrite. Reading a minute later collects the first and stays behind
+      # the second, and this job blocks nothing while it waits.
+      - name: Let the last usage and the last per-pull-request run land
+        run: sleep 60
+
+      - name: Refresh the usage comment for every pull request this push merged
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LANGWATCH_API_KEY: ${{ secrets.LANGWATCH_PR_USAGE_API_KEY }}
+          PR_REPOSITORY: ${{ github.repository }}
+          PUSH_SHA: ${{ github.sha }}
+          # One push can land several merge commits, and only the last is
+          # `github.sha`. The range says which commits arrived, so a batch
+          # leaves none of its pull requests unrefreshed.
+          PUSH_BEFORE: ${{ github.event.before }}
+          PUSH_BRANCH: ${{ github.ref_name }}
+        run: node --experimental-strip-types .github/scripts/pr-token-usage-merged.ts

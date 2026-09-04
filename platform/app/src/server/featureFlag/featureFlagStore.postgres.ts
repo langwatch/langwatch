@@ -8,6 +8,7 @@ import {
   type FeatureFlagRules,
   parseRules,
   type RuleEvaluationContext,
+  readNeedsOrganizationAge,
 } from "./rules";
 
 /**
@@ -32,6 +33,11 @@ import {
  * fan-out (which is what drove the 2026-05 PostHog spike). "Not set"
  * stays a distinct state (null row) so a cache hit for an absent row
  * doesn't shadow a registry default with `false`.
+ *
+ * One rule kind needs more than the caller hands over: a "new users" rule
+ * compares the organization's creation date. That date is fetched here,
+ * lazily and only for a flag whose own rules ask for it, so no call site has
+ * to carry it and no flag without such a rule pays for a lookup.
  */
 type CachedRow = { enabled: boolean; rules: FeatureFlagRules } | null;
 type CacheSlot = { row: CachedRow };
@@ -39,6 +45,16 @@ type CacheSlot = { row: CachedRow };
 const CACHE_PREFIX = "feature_flag_store:v2:";
 const LOCAL_TTL_MS = 5_000;
 const LOCAL_MAX_KEYS = 5_000;
+
+/**
+ * An organization's creation date never changes, so this cache exists only
+ * to bound how many rows a pod holds, not to bound staleness. It is
+ * deliberately longer than the flag row's own window: an operator editing an
+ * age rule must see the new rule within a cache window, but the dates it
+ * compares against are immutable history.
+ */
+const ORG_CREATED_AT_TTL_MS = 10 * 60_000;
+const ORG_CREATED_AT_MAX_KEYS = 10_000;
 
 export class FeatureFlagStorePostgres {
   private readonly logger = createLogger("langwatch:feature-flag-store");
@@ -53,6 +69,13 @@ export class FeatureFlagStorePostgres {
     string,
     { row: CachedRow; expiresAt: number }
   >();
+  // Creation dates of organizations named by an age rule. Separate from
+  // `local` because it is keyed by organization rather than by flag, and
+  // because its entries outlive a flag-row cache window.
+  private readonly organizationCreatedAt = new Map<
+    string,
+    { createdAt: Date | null; expiresAt: number }
+  >();
 
   /**
    * Resolve `key` against the calling context. Returns `null` when no
@@ -66,8 +89,100 @@ export class FeatureFlagStorePostgres {
   ): Promise<boolean | null> {
     const row = await this.getRow(key);
     if (row === null) return null;
-    const ruleHit = evaluateRules(row.rules, ctx);
+    const ruleHit = evaluateRules(
+      row.rules,
+      await this.withOrganizationAge(row.rules, ctx),
+    );
     return ruleHit ?? row.enabled;
+  }
+
+  /**
+   * Fills in `organizationCreatedAt` for a read whose flag carries a "new
+   * users" rule, so the caller never has to know the rule exists.
+   *
+   * Every flag read would otherwise have to carry the organization's
+   * creation date, which means every call site — including the per-event
+   * kill-switch path — paying for a lookup no rule asks for. Instead the
+   * date is resolved here, only when this flag's own rules name it, and
+   * cached per organization. A flag with no age rule reads exactly what it
+   * read before.
+   */
+  private async withOrganizationAge(
+    rules: FeatureFlagRules,
+    ctx: RuleEvaluationContext,
+  ): Promise<RuleEvaluationContext> {
+    if (ctx.organizationCreatedAt !== undefined) return ctx;
+    if (!ctx.organizationId) return ctx;
+    if (!readNeedsOrganizationAge({ rules, ctx })) return ctx;
+    return {
+      ...ctx,
+      organizationCreatedAt: await this.getOrganizationCreatedAt(
+        ctx.organizationId,
+      ),
+    };
+  }
+
+  /**
+   * Reads an organization's creation date, memoised per pod. A failed read
+   * resolves to null, which matches no age rule — the same fail-closed
+   * choice the matcher makes for an unknown date, so a database blip cannot
+   * hand a rollout to organizations it excludes.
+   */
+  private async getOrganizationCreatedAt(
+    organizationId: string,
+  ): Promise<Date | null> {
+    const now = Date.now();
+    const cached = this.organizationCreatedAt.get(organizationId);
+    if (cached && cached.expiresAt > now) return cached.createdAt;
+    try {
+      const organization = await prisma.organization.findUnique({
+        where: { id: organizationId },
+        select: { createdAt: true },
+      });
+      const createdAt = organization?.createdAt ?? null;
+      this.rememberOrganizationCreatedAt(organizationId, createdAt, now);
+      return createdAt;
+    } catch (error) {
+      this.logger.warn(
+        {
+          organizationId,
+          error: error instanceof Error ? error.message : error,
+        },
+        "organization creation date lookup failed, age rules will not match",
+      );
+      // Deliberately not cached: a failed read is a blip, not an answer, and
+      // caching it would extend one bad minute across the whole TTL.
+      return null;
+    }
+  }
+
+  private rememberOrganizationCreatedAt(
+    organizationId: string,
+    createdAt: Date | null,
+    now: number,
+  ): void {
+    if (this.organizationCreatedAt.size >= ORG_CREATED_AT_MAX_KEYS) {
+      this.evictOrganizationCreatedAt(now);
+    }
+    this.organizationCreatedAt.set(organizationId, {
+      createdAt,
+      expiresAt: now + ORG_CREATED_AT_TTL_MS,
+    });
+  }
+
+  /**
+   * A Map iterates in insertion order, so the fallback here drops the oldest
+   * entry rather than the least recently used one. That is the intended
+   * trade: tracking recency would mean writing to the map on every read, and
+   * the entry being protected is a date that is only worth a query anyway.
+   */
+  private evictOrganizationCreatedAt(now: number): void {
+    for (const [id, entry] of this.organizationCreatedAt) {
+      if (entry.expiresAt <= now) this.organizationCreatedAt.delete(id);
+    }
+    if (this.organizationCreatedAt.size < ORG_CREATED_AT_MAX_KEYS) return;
+    const oldest = this.organizationCreatedAt.keys().next();
+    if (!oldest.done) this.organizationCreatedAt.delete(oldest.value);
   }
 
   /**

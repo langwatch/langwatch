@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { modelOverrideSchema } from "~/server/modelProviders/modelOverrideSchema";
 import { suiteScopeSchema } from "~/server/suites/scope";
 import { suiteTargetSchema } from "~/server/suites/types";
 
@@ -14,7 +15,7 @@ export const projectSchema = z.object({
 });
 
 /**
- * A run plan is created with the rule it covers, the cases it names, or both.
+ * A run plan is created with the rule it covers, the scenarios it names, or both.
  *
  * `scenarioIds` is required only for a plan that runs a hand-picked list,
  * which is what a plan with no scope also means. A dynamic scope resolves its
@@ -35,11 +36,11 @@ export const createSuiteSchema = projectSchema
     labels: z.array(z.string()).default([]),
     // Run-plan-wide model overrides; null = use the project default
     // (scenarios.user_simulator / scenarios.judge).
-    simulatorModel: z.string().nullish(),
-    judgeModel: z.string().nullish(),
+    simulatorModel: modelOverrideSchema.nullish(),
+    judgeModel: modelOverrideSchema.nullish(),
   })
   .superRefine((input, ctx) => {
-    const picksCases = !input.scope || input.scope.mode === "cases";
+    const picksCases = !input.scope || input.scope.mode === "scenarios";
     if (picksCases && input.scenarioIds.length === 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -58,6 +59,6 @@ export const updateSuiteSchema = projectSchema.extend({
   targets: z.array(suiteTargetSchema).optional(),
   repeatCount: z.number().int().min(1).max(100).optional(),
   labels: z.array(z.string()).optional(),
-  simulatorModel: z.string().nullish(),
-  judgeModel: z.string().nullish(),
+  simulatorModel: modelOverrideSchema.nullish(),
+  judgeModel: modelOverrideSchema.nullish(),
 });

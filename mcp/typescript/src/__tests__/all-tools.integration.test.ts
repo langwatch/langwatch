@@ -5,6 +5,11 @@ import {
   fetchDocumentation,
   resolveDocumentationUrl,
 } from "../documentation-fetch.js";
+import {
+  deleteAgent,
+  getAgent,
+  updateAgent,
+} from "../langwatch-api-agents.js";
 
 // --- Canned responses for every API endpoint ---
 
@@ -99,17 +104,13 @@ const CANNED_PROMPT_DETAIL = {
   id: "p1",
   handle: "greeting-bot",
   name: "Greeting Bot",
-  latestVersionNumber: 3,
-  versions: [
-    {
-      version: 3,
-      commitMessage: "Updated tone",
-      model: "openai/gpt-4o",
-      messages: [{ role: "system", content: "You are a friendly bot." }],
-    },
-    { version: 2, commitMessage: "Added greeting" },
-    { version: 1, commitMessage: "Initial version" },
-  ],
+  version: 3,
+  versionId: "ver_p1v3",
+  commitMessage: "Updated tone",
+  model: "openai/gpt-4o",
+  messages: [{ role: "system", content: "You are a friendly bot." }],
+  parameters: {},
+  tags: [{ name: "latest", versionId: "ver_p1v3" }],
 };
 
 const CANNED_PROMPT_CREATED = {
@@ -301,21 +302,34 @@ const CANNED_AGENT_DETAIL = {
   id: "agent_abc", name: "Test Agent", type: "http", config: { url: "http://example.com" }, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z",
 };
 
-const CANNED_SUITES_LIST = [
-  { id: "suite_abc", name: "Regression Suite", slug: "regression-suite", description: null, scenarioIds: ["scen_abc123"], targets: [{ type: "http", referenceId: "agent_abc" }], repeatCount: 1, labels: [], createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z" },
-];
-
-const CANNED_SUITE_DETAIL = {
-  id: "suite_abc", name: "Regression Suite", slug: "regression-suite", description: "A test suite", scenarioIds: ["scen_abc123"], targets: [{ type: "http", referenceId: "agent_abc" }], repeatCount: 1, labels: [], createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z",
+const CANNED_RUN_PLAN = {
+  id: "plan_abc", name: "Regression Plan", slug: "regression-plan", scope: { mode: "labels", labels: ["auth"] }, scenarioIds: ["scen_abc123"], targets: [{ type: "http", referenceId: "agent_abc" }], repeatCount: 2, simulatorModel: "openai/gpt-5-mini", judgeModel: null, labels: [], archivedAt: null, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z", platformUrl: "https://app.langwatch.ai/proj/agent-testing/results/regression-plan",
 };
 
-const CANNED_SUITE_CREATED = {
-  id: "suite_new", name: "New Suite", slug: "new-suite", description: null, scenarioIds: ["scen_abc123"], targets: [{ type: "http", referenceId: "agent_abc" }], repeatCount: 1, labels: [], createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z",
+const CANNED_RUN_PLANS_LIST = [CANNED_RUN_PLAN];
+
+const CANNED_RUN_PLAN_RUN = {
+  scheduled: true, batchRunId: "batch_123", setId: "set_456", jobCount: 2, skippedArchived: { scenarios: [], targets: [] }, items: [{ scenarioRunId: "run_1", scenarioId: "scen_abc123", target: { type: "http", referenceId: "agent_abc" }, name: "Test" }], runPlanId: "plan_abc", planName: "Regression Plan", created: true, platformUrl: "https://app.langwatch.ai/proj/agent-testing/results/regression-plan",
 };
 
-const CANNED_SUITE_RUN = {
-  scheduled: true, batchRunId: "batch_123", setId: "set_456", jobCount: 1, skippedArchived: { scenarios: [], targets: [] }, items: [{ scenarioRunId: "run_1", scenarioId: "scen_abc123", target: { type: "http", referenceId: "agent_abc" }, name: "Test" }],
+const CANNED_RUN_PLAN_RERUN = { ...CANNED_RUN_PLAN_RUN, created: false };
+
+const CANNED_TEST_SUITE = {
+  id: "suite_abc", name: "Checkout", slug: "checkout", scenarioIds: ["scen_abc123"], scenarioCount: 1, archivedAt: null, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z", platformUrl: "https://app.langwatch.ai/proj/agent-testing/suites/checkout",
 };
+
+const CANNED_TEST_SUITES_LIST = [CANNED_TEST_SUITE];
+
+const CANNED_TEST_SUITE_DETAIL = {
+  ...CANNED_TEST_SUITE,
+  scenarios: [{ id: "scen_abc123", name: "Login Flow Happy Path" }],
+};
+
+const CANNED_TEST_SUITE_CREATED = {
+  ...CANNED_TEST_SUITE, id: "suite_new", name: "New Suite", slug: "new-suite", scenarioIds: [], scenarioCount: 0,
+};
+
+const CANNED_TEST_SUITE_RENAMED = { ...CANNED_TEST_SUITE, name: "Checkout v2", slug: "checkout-v2" };
 
 const CANNED_SIMULATION_RUNS = {
   runs: [{ scenarioRunId: "run_abc", scenarioId: "scen_abc123", batchRunId: "batch_xyz", name: "Login Flow", status: "SUCCESS", durationInMs: 5200, totalCost: 0.0042, timestamp: 1700000000000, updatedAt: 1700000001000 }],
@@ -350,6 +364,15 @@ const CANNED_MODEL_PROVIDER_SET = {
 
 /** Track last request for each route so tests can assert on request body/params. */
 const lastRequests: Record<string, { method: string; url: string; body: string }> = {};
+
+/**
+ * Mutable prompt detail so the mock is stateful: a PUT updates it and the
+ * subsequent confirmation GET reflects the new version. Reset per test.
+ */
+let promptDetailState: typeof CANNED_PROMPT_DETAIL = { ...CANNED_PROMPT_DETAIL };
+beforeEach(() => {
+  promptDetailState = { ...CANNED_PROMPT_DETAIL };
+});
 
 function createMockServer(): Server {
   return createServer((req, res) => {
@@ -415,11 +438,39 @@ function createMockServer(): Server {
         method === "GET"
       ) {
         res.writeHead(200);
-        res.end(JSON.stringify(CANNED_PROMPT_DETAIL));
+        res.end(JSON.stringify(promptDetailState));
       } else if (
         url.match(/^\/api\/prompts\/[^/]+$/) &&
         method === "PUT"
       ) {
+        const parsed = JSON.parse(body) as {
+          commitMessage?: string;
+          model?: string;
+          messages?: Array<{ role: string; content: string }>;
+          tags?: string[];
+        };
+        const newVersionId = "ver_p1v4";
+        promptDetailState = {
+          ...promptDetailState,
+          version: 4,
+          versionId: newVersionId,
+          commitMessage: parsed.commitMessage ?? promptDetailState.commitMessage,
+          model: parsed.model ?? promptDetailState.model,
+          messages: parsed.messages ?? promptDetailState.messages,
+          tags:
+            parsed.tags === undefined
+              ? promptDetailState.tags.map((tag) =>
+                  tag.name === "latest"
+                    ? { name: "latest", versionId: newVersionId }
+                    : tag,
+                )
+              : [
+                  { name: "latest", versionId: newVersionId },
+                  ...parsed.tags
+                    .filter((name) => name !== "latest")
+                    .map((name) => ({ name, versionId: newVersionId })),
+                ],
+        };
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_PROMPT_UPDATED));
       }
@@ -493,42 +544,56 @@ function createMockServer(): Server {
         res.end(JSON.stringify(CANNED_MODEL_PROVIDER_SET));
       }
       // --- Agent endpoints ---
-      else if (url === "/api/agents" && method === "GET") {
+      else if (url === "/api/v1/agents" && method === "GET") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_AGENTS_LIST));
-      } else if (url === "/api/agents" && method === "POST") {
+      } else if (url === "/api/v1/agents" && method === "POST") {
         res.writeHead(201);
         res.end(JSON.stringify(CANNED_AGENT_DETAIL));
-      } else if (url?.match(/^\/api\/agents\/[^/]+$/) && method === "GET") {
+      } else if (url?.match(/^\/api\/v1\/agents\/[^/]+$/) && method === "GET") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_AGENT_DETAIL));
-      } else if (url?.match(/^\/api\/agents\/[^/]+$/) && method === "PATCH") {
+      } else if (url?.match(/^\/api\/v1\/agents\/[^/]+$/) && method === "PATCH") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_AGENT_DETAIL));
-      } else if (url?.match(/^\/api\/agents\/[^/]+$/) && method === "DELETE") {
+      } else if (url?.match(/^\/api\/v1\/agents\/[^/]+$/) && method === "DELETE") {
         res.writeHead(200);
         res.end(JSON.stringify({ id: "agent_abc", name: "Test Agent" }));
       }
-      // --- Suite endpoints ---
-      else if (url === "/api/suites" && method === "GET") {
+      // --- Run plan endpoints ---
+      else if (url === "/api/v1/run-plans/run" && method === "POST") {
         res.writeHead(200);
-        res.end(JSON.stringify(CANNED_SUITES_LIST));
-      } else if (url === "/api/suites" && method === "POST") {
+        res.end(JSON.stringify(CANNED_RUN_PLAN_RUN));
+      } else if (url?.match(/^\/api\/v1\/run-plans(\?.*)?$/) && method === "GET") {
+        res.writeHead(200);
+        res.end(JSON.stringify(CANNED_RUN_PLANS_LIST));
+      } else if (url?.match(/^\/api\/v1\/run-plans\/[^/]+\/run$/) && method === "POST") {
+        res.writeHead(200);
+        res.end(JSON.stringify(CANNED_RUN_PLAN_RERUN));
+      } else if (url?.match(/^\/api\/v1\/run-plans\/[^/]+$/) && method === "GET") {
+        res.writeHead(200);
+        res.end(JSON.stringify(CANNED_RUN_PLAN));
+      } else if (url?.match(/^\/api\/v1\/run-plans\/[^/]+$/) && method === "DELETE") {
+        res.writeHead(200);
+        res.end(JSON.stringify({ id: "plan_abc", archived: true }));
+      }
+      // --- Test suite endpoints ---
+      else if (url === "/api/v1/test-suites" && method === "GET") {
+        res.writeHead(200);
+        res.end(JSON.stringify(CANNED_TEST_SUITES_LIST));
+      } else if (url === "/api/v1/test-suites" && method === "POST") {
         res.writeHead(201);
-        res.end(JSON.stringify(CANNED_SUITE_CREATED));
-      } else if (url?.match(/^\/api\/suites\/[^/]+\/run$/) && method === "POST") {
+        res.end(JSON.stringify(CANNED_TEST_SUITE_CREATED));
+      } else if (url?.match(/^\/api\/v1\/test-suites\/[^/]+\/run$/) && method === "POST") {
         res.writeHead(200);
-        res.end(JSON.stringify(CANNED_SUITE_RUN));
-      } else if (url?.match(/^\/api\/suites\/[^/]+\/duplicate$/) && method === "POST") {
-        res.writeHead(201);
-        res.end(JSON.stringify(CANNED_SUITE_CREATED));
-      } else if (url?.match(/^\/api\/suites\/[^/]+$/) && method === "GET") {
+        res.end(JSON.stringify(CANNED_RUN_PLAN_RUN));
+      } else if (url?.match(/^\/api\/v1\/test-suites\/[^/]+$/) && method === "GET") {
         res.writeHead(200);
-        res.end(JSON.stringify(CANNED_SUITE_DETAIL));
-      } else if (url?.match(/^\/api\/suites\/[^/]+$/) && method === "PATCH") {
+        res.end(JSON.stringify(CANNED_TEST_SUITE_DETAIL));
+      } else if (url?.match(/^\/api\/v1\/test-suites\/[^/]+$/) && method === "PATCH") {
         res.writeHead(200);
-        res.end(JSON.stringify(CANNED_SUITE_DETAIL));
-      } else if (url?.match(/^\/api\/suites\/[^/]+$/) && method === "DELETE") {
+        res.end(JSON.stringify(CANNED_TEST_SUITE_RENAMED));
+      } else if (url?.match(/^\/api\/v1\/test-suites\/[^/]+$/) && method === "DELETE") {
         res.writeHead(200);
         res.end(JSON.stringify({ id: "suite_abc", archived: true }));
       }
@@ -1055,7 +1120,7 @@ describe("All MCP tools integration", () => {
   // =====================
   describe("platform_get_prompt", () => {
     describe("when prompt exists", () => {
-      it("returns formatted prompt details with messages and versions", async () => {
+      it("returns formatted prompt details with messages and deployments", async () => {
         const { handleGetPrompt } = await import(
           "../tools/get-prompt.js"
         );
@@ -1067,7 +1132,7 @@ describe("All MCP tools integration", () => {
         expect(result).toContain("gpt-4o");
         expect(result).toContain("You are a friendly bot.");
         expect(result).toContain("v3");
-        expect(result).toContain("## Version History");
+        expect(result).toContain("## Deployments");
         expect(result).toContain("Updated tone");
       });
     });
@@ -1090,6 +1155,70 @@ describe("All MCP tools integration", () => {
 
         expect(result).toContain("updated successfully");
         expect(result).toContain("Switch to mini");
+        expect(result).toContain("**Version**: v4");
+        expect(result).toContain("**Version ID**: ver_p1v4");
+      });
+    });
+
+    describe("when an update supplies only messages and a commit message", () => {
+      /** @scenario Carrying forward prior fields when an update supplies only messages and a commit message */
+      it("does not send fields that would wipe prior prompt configuration", async () => {
+        const { handleUpdatePrompt } = await import(
+          "../tools/update-prompt.js"
+        );
+        await handleUpdatePrompt({
+          idOrHandle: "greeting-bot",
+          messages: [{ role: "system", content: "You are a helpful bot." }],
+          commitMessage: "Only messages changed",
+        });
+
+        const req = lastRequests["PUT /api/prompts/greeting-bot"];
+        expect(req).toBeDefined();
+        const parsed = JSON.parse(req!.body);
+        expect(parsed).not.toHaveProperty("parameters");
+        expect(parsed).not.toHaveProperty("inputs");
+        expect(parsed).not.toHaveProperty("outputs");
+        expect(parsed).not.toHaveProperty("temperature");
+        expect(parsed).not.toHaveProperty("responseFormat");
+      });
+    });
+
+    describe("when an update omits tags", () => {
+      /** @scenario Tag-to-version mapping stays unchanged when an update omits tags */
+      it("does not send a tags field in the update request", async () => {
+        const { handleUpdatePrompt } = await import(
+          "../tools/update-prompt.js"
+        );
+        await handleUpdatePrompt({
+          idOrHandle: "greeting-bot",
+          model: "openai/gpt-4o",
+          commitMessage: "No tag change requested",
+        });
+
+        const req = lastRequests["PUT /api/prompts/greeting-bot"];
+        expect(req).toBeDefined();
+        const parsed = JSON.parse(req!.body);
+        expect(parsed).not.toHaveProperty("tags");
+      });
+    });
+
+    describe("when an update passes tags explicitly", () => {
+      /** @scenario Passing tags explicitly moves the tag to the new version */
+      it("sends the requested tags in the update request", async () => {
+        const { handleUpdatePrompt } = await import(
+          "../tools/update-prompt.js"
+        );
+        await handleUpdatePrompt({
+          idOrHandle: "greeting-bot",
+          model: "openai/gpt-4o",
+          commitMessage: "Deploy new version to production",
+          tags: ["production"],
+        });
+
+        const req = lastRequests["PUT /api/prompts/greeting-bot"];
+        expect(req).toBeDefined();
+        const parsed = JSON.parse(req!.body);
+        expect(parsed.tags).toEqual(["production"]);
       });
     });
   });
@@ -1443,58 +1572,150 @@ describe("All MCP tools integration", () => {
   });
 
   // =====================
-  // Suite Tools
+  // Run Plan Tools
   // =====================
-  describe("platform_list_suites", () => {
-    it("returns formatted suite list", async () => {
-      const { handleListSuites } = await import("../tools/list-suites.js");
-      const result = await handleListSuites({});
-
-      expect(result).toContain("Suites / Run Plans (1 total)");
-      expect(result).toContain("Regression Suite");
-    });
-  });
-
-  describe("platform_get_suite", () => {
-    it("returns suite details", async () => {
-      const { handleGetSuite } = await import("../tools/get-suite.js");
-      const result = await handleGetSuite({ id: "suite_abc" });
-
-      expect(result).toContain("Regression Suite");
-      expect(result).toContain("suite_abc");
-    });
-  });
-
-  describe("platform_create_suite", () => {
-    it("creates a suite and returns confirmation", async () => {
-      const { handleCreateSuite } = await import("../tools/create-suite.js");
-      const result = await handleCreateSuite({
-        name: "New Suite",
-        scenarioIds: ["scen_abc123"],
-        targets: JSON.stringify([{ type: "http", referenceId: "agent_abc" }]),
+  describe("platform_run_plan", () => {
+    it("runs a configuration and reports the plan it created", async () => {
+      const { handleRunPlan } = await import("../tools/run-plan.js");
+      const result = await handleRunPlan({
+        name: "Regression Plan",
+        scope: { mode: "labels", labels: ["auth"] },
+        targets: [{ type: "http", referenceId: "agent_abc" }],
+        repeatCount: 2,
+        note: "nightly regression",
       });
 
-      expect(result).toContain("created successfully");
-      expect(result).toContain("New Suite");
+      expect(result).toContain("Regression Plan");
+      expect(result).toContain("created and started");
+      expect(result).toContain("batch_123");
+      expect(result).toContain("**Jobs**: 2");
     });
   });
 
-  describe("platform_run_suite", () => {
-    it("triggers a suite run and returns batch info", async () => {
-      const { handleRunSuite } = await import("../tools/run-suite.js");
-      const result = await handleRunSuite({ id: "suite_abc" });
+  describe("platform_list_run_plans", () => {
+    it("returns formatted run plan list", async () => {
+      const { handleListRunPlans } = await import("../tools/list-run-plans.js");
+      const result = await handleListRunPlans({});
 
-      expect(result).toContain("scheduled successfully");
+      expect(result).toContain("Run Plans (1 total)");
+      expect(result).toContain("Regression Plan");
+    });
+  });
+
+  describe("platform_get_run_plan", () => {
+    it("returns the plan configuration", async () => {
+      const { handleGetRunPlan } = await import("../tools/get-run-plan.js");
+      const result = await handleGetRunPlan({ id: "plan_abc" });
+
+      expect(result).toContain("Regression Plan");
+      expect(result).toContain("plan_abc");
+      expect(result).toContain("labels: auth");
+    });
+  });
+
+  describe("platform_rerun_run_plan", () => {
+    it("runs the stored configuration again and reports it joined the plan", async () => {
+      const { handleRerunRunPlan } = await import(
+        "../tools/rerun-run-plan.js"
+      );
+      const result = await handleRerunRunPlan({ id: "plan_abc" });
+
+      expect(result).toContain("Regression Plan");
+      expect(result).toContain("configuration of this run");
       expect(result).toContain("batch_123");
     });
   });
 
-  describe("platform_archive_suite", () => {
-    it("archives the suite", async () => {
-      const { handleArchiveSuite } = await import("../tools/archive-suite.js");
-      const result = await handleArchiveSuite({ id: "suite_abc" });
+  describe("platform_archive_run_plan", () => {
+    it("archives the run plan", async () => {
+      const { handleArchiveRunPlan } = await import(
+        "../tools/archive-run-plan.js"
+      );
+      const result = await handleArchiveRunPlan({ id: "plan_abc" });
 
       expect(result).toContain("archived");
+      expect(result).toContain("plan_abc");
+    });
+  });
+
+  // =====================
+  // Test Suite Tools
+  // =====================
+  describe("platform_list_test_suites", () => {
+    it("returns formatted test suite list", async () => {
+      const { handleListTestSuites } = await import(
+        "../tools/list-test-suites.js"
+      );
+      const result = await handleListTestSuites({});
+
+      expect(result).toContain("Test Suites (1 total)");
+      expect(result).toContain("Checkout");
+    });
+  });
+
+  describe("platform_create_test_suite", () => {
+    it("creates a test suite and returns confirmation", async () => {
+      const { handleCreateTestSuite } = await import(
+        "../tools/create-test-suite.js"
+      );
+      const result = await handleCreateTestSuite({ name: "New Suite" });
+
+      expect(result).toContain("created");
+      expect(result).toContain("New Suite");
+      expect(result).toContain("suite_new");
+    });
+  });
+
+  describe("platform_get_test_suite", () => {
+    it("returns the suite with the scenarios filed in it", async () => {
+      const { handleGetTestSuite } = await import(
+        "../tools/get-test-suite.js"
+      );
+      const result = await handleGetTestSuite({ id: "suite_abc" });
+
+      expect(result).toContain("Checkout");
+      expect(result).toContain("Login Flow Happy Path");
+    });
+  });
+
+  describe("platform_rename_test_suite", () => {
+    it("renames the test suite", async () => {
+      const { handleRenameTestSuite } = await import(
+        "../tools/rename-test-suite.js"
+      );
+      const result = await handleRenameTestSuite({
+        id: "suite_abc",
+        name: "Checkout v2",
+      });
+
+      expect(result).toContain("Checkout v2");
+    });
+  });
+
+  describe("platform_archive_test_suite", () => {
+    it("archives the suite and says the filed scenarios went with it", async () => {
+      const { handleArchiveTestSuite } = await import(
+        "../tools/archive-test-suite.js"
+      );
+      const result = await handleArchiveTestSuite({ id: "suite_abc" });
+
+      expect(result).toContain("archived");
+      expect(result).toContain("scenarios filed in it");
+    });
+  });
+
+  describe("platform_run_test_suite", () => {
+    it("runs the suite against a target and reports the derived plan", async () => {
+      const { handleRunTestSuite } = await import(
+        "../tools/run-test-suite.js"
+      );
+      const result = await handleRunTestSuite({
+        id: "suite_abc",
+        targets: [{ type: "http", referenceId: "agent_abc" }],
+      });
+
+      expect(result).toContain("Regression Plan");
+      expect(result).toContain("batch_123");
     });
   });
 
@@ -1608,6 +1829,31 @@ describe("All MCP tools integration", () => {
       const result = await deleteSecret("secret_abc");
       expect(result.id).toBe("secret_abc");
       expect(result.deleted).toBe(true);
+    });
+  });
+
+  // =====================
+  // Agent Tools
+  // =====================
+  describe("platform_get_agent", () => {
+    it("returns one agent by id", async () => {
+      const agent = await getAgent("agent_abc");
+      expect(agent.id).toBe("agent_abc");
+      expect(agent.name).toBe("Test Agent");
+    });
+  });
+
+  describe("platform_update_agent", () => {
+    it("updates an agent and returns it", async () => {
+      const agent = await updateAgent({ id: "agent_abc", name: "Test Agent" });
+      expect(agent.id).toBe("agent_abc");
+    });
+  });
+
+  describe("platform_delete_agent", () => {
+    it("deletes an agent", async () => {
+      const result = await deleteAgent("agent_abc");
+      expect(result.id).toBe("agent_abc");
     });
   });
 

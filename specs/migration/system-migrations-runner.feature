@@ -134,10 +134,15 @@ Feature: Running system migrations across organizations
   # this axis: these migrations are rooted in the ORGANIZATION, and an
   # organization-rooted append is placed on that organization's own instance
   # by the routing. Leaving them out would strand exactly those customers on
-  # their legacy path forever. The user-rooted axis is the one that cannot
-  # place its events — a user tenant is neither a project nor an
-  # organization — and it excludes those members for that reason
-  # (specs/identity/identifier-model.feature).
+  # their legacy path forever.
+  #
+  # The user-rooted axis says the same thing now, and briefly did not. A user
+  # tenant could not be placed at all, so that axis excluded private-dataplane
+  # members rather than write somewhere wrong. It can be placed now — user
+  # data lands on the shared instance, whoever the person belongs to, because
+  # what those events record is how somebody signs in rather than any
+  # organization's data (specs/private-dataplane/clickhouse-routing.feature).
+  # So neither axis holds anyone back for having a dedicated data plane.
   @unit
   Scenario: An automatic cohort includes a private-dataplane organization
     Given a migration declared enrolled automatically

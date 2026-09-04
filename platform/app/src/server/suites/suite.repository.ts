@@ -14,13 +14,13 @@ import type {
   PrismaClient,
   SimulationSuite,
 } from "~/generated/prisma/client";
-import { ARCHIVED_SLUG_SUFFIX } from "./constants";
+import { ARCHIVED_SLUG_SUFFIX, CLI_EPHEMERAL_LABEL } from "./constants";
 import type { SuiteKind } from "./types";
 
 /**
  * The client a repository write runs on: the repository's own PrismaClient by
  * default, or the caller's transaction client when the write must land with
- * other writes (a folder archive cascade) or not at all.
+ * other writes (a test suite archive cascade) or not at all.
  */
 type SuiteWriteClient = Pick<Prisma.TransactionClient, "simulationSuite">;
 
@@ -37,7 +37,10 @@ export type UpdateSuiteInput = Partial<Omit<CreateSuiteInput, "projectId">>;
 export class SuiteRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async create(input: CreateSuiteInput): Promise<SimulationSuite> {
+  async create(
+    input: CreateSuiteInput,
+    options?: { tx?: SuiteWriteClient },
+  ): Promise<SimulationSuite> {
     return tracer.withActiveSpan(
       "SuiteRepository.create",
       {
@@ -54,7 +57,9 @@ export class SuiteRepository {
           { projectId: input.projectId, operation: "INSERT" },
           "Inserting suite",
         );
-        const result = await this.prisma.simulationSuite.create({
+        const result = await (
+          options?.tx ?? this.prisma
+        ).simulationSuite.create({
           data: {
             id: `suite_${nanoid()}`,
             ...input,
@@ -146,9 +151,17 @@ export class SuiteRepository {
     );
   }
 
+  /**
+   * The project's suites of the given kinds, newest first.
+   *
+   * Archived rows are left out unless the caller asks for them: a list that
+   * shows what is running now must not offer a plan somebody archived, while
+   * a history view has to resolve the plan a finished run belongs to.
+   */
   async findAll(params: {
     projectId: string;
     kinds: SuiteKind[];
+    includeArchived?: boolean;
   }): Promise<SimulationSuite[]> {
     return tracer.withActiveSpan(
       "SuiteRepository.findAll",
@@ -170,7 +183,7 @@ export class SuiteRepository {
           where: {
             projectId: params.projectId,
             kind: { in: params.kinds },
-            archivedAt: null,
+            ...(params.includeArchived !== true && { archivedAt: null }),
           },
           orderBy: { updatedAt: "desc" },
         });
@@ -182,14 +195,15 @@ export class SuiteRepository {
 
   /**
    * Slugs of non-archived suites whose slug starts with the prefix.
-   * Feeds the numeric-suffix retry that keeps folder and plan slugs unique
+   * Feeds the numeric-suffix retry that keeps test suite and plan slugs unique
    * inside their shared per-project namespace.
    */
   async findSlugsByPrefix(params: {
     projectId: string;
     slugPrefix: string;
+    tx?: SuiteWriteClient;
   }): Promise<string[]> {
-    const rows = await this.prisma.simulationSuite.findMany({
+    const rows = await (params.tx ?? this.prisma).simulationSuite.findMany({
       where: {
         projectId: params.projectId,
         slug: { startsWith: params.slugPrefix },
@@ -198,6 +212,54 @@ export class SuiteRepository {
       select: { slug: true },
     });
     return rows.map((row) => row.slug);
+  }
+
+  /**
+   * The run plan this name resolves to, or null.
+   *
+   * A run plan is identified by its NAME, compared trimmed and without scenario.
+   * `name` carries no unique constraint and never has, so a project may already
+   * hold two plans of one name: the most recently used one wins, and the
+   * ordering is total so the answer does not move between reads. Every run
+   * through this path replaces the matched plan's config, which moves
+   * `updatedAt`, so "most recently used" is what a person means by the name.
+   *
+   * Skipped on purpose: archived plans, test suites, and the command line's
+   * throwaway suites, which it archives as soon as the run is queued.
+   *
+   * @see specs/suites/run-plan-identity-by-name.feature
+   */
+  async findPlanByName(params: {
+    projectId: string;
+    name: string;
+    tx?: SuiteWriteClient;
+  }): Promise<SimulationSuite | null> {
+    return (params.tx ?? this.prisma).simulationSuite.findFirst({
+      where: {
+        projectId: params.projectId,
+        kind: "run_plan",
+        archivedAt: null,
+        name: { equals: params.name.trim(), mode: "insensitive" },
+        NOT: { labels: { has: CLI_EPHEMERAL_LABEL } },
+      },
+      orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }, { id: "desc" }],
+    });
+  }
+
+  /**
+   * The names of the given suites, archived ones included.
+   *
+   * Feeds the name a run plan is derived under, which reads the test suites its
+   * scope covers. Only the id and the name, because that is all a name needs.
+   */
+  async findNamesByIds(params: {
+    ids: string[];
+    projectId: string;
+  }): Promise<{ id: string; name: string }[]> {
+    return this.prisma.simulationSuite.findMany({
+      where: { id: { in: params.ids }, projectId: params.projectId },
+      select: { id: true, name: true },
+    });
   }
 
   /**

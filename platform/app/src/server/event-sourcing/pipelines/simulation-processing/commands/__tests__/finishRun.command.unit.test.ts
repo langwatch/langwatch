@@ -244,6 +244,109 @@ describe("FinishRunCommand", () => {
     });
   });
 
+  describe("when caller-supplied results carry an unclassified failure", () => {
+    const RAW_TRANSPORT_FAILURE =
+      "HTTP agent target agent.example.com could not be reached: " +
+      "TypeError: fetch failed: getaddrinfo ENOTFOUND agent.example.com";
+
+    async function finishWith(results: SimulationResults) {
+      const handler = new FinishRunCommand(makeDeps());
+      const events = await handler.handle(
+        makeCommand({ status: "ERROR", results }) as any,
+      );
+      return (events[0]!.data as { results?: SimulationResults }).results!;
+    }
+
+    /** @scenario "Caller-supplied results whose reasoning is the raw failure are classified before storage" */
+    it("classifies results whose reasoning is the raw failure itself", async () => {
+      const stored = await finishWith({
+        verdict: "failure",
+        reasoning: RAW_TRANSPORT_FAILURE,
+        metCriteria: [],
+        unmetCriteria: [],
+        error: RAW_TRANSPORT_FAILURE,
+      });
+
+      expect(stored.reasoning).not.toBe(RAW_TRANSPORT_FAILURE);
+      expect(stored.reasoning).not.toContain("TypeError");
+      expect(decodeScenarioError(stored.error)?.code).toBe(
+        ScenarioInfraErrorCode.PlatformUnreachable,
+      );
+    });
+
+    /** @scenario "Caller-supplied results with an error and no reasoning are classified before storage" */
+    it("classifies results that carry an error and no reasoning", async () => {
+      const stored = await finishWith({
+        verdict: "failure",
+        metCriteria: [],
+        unmetCriteria: [],
+        error: "connect ECONNREFUSED 127.0.0.1:8080",
+      });
+
+      expect(stored.reasoning).toBeDefined();
+      expect(stored.reasoning).not.toContain("ECONNREFUSED");
+      expect(decodeScenarioError(stored.error)?.code).toBe(
+        ScenarioInfraErrorCode.PlatformUnreachable,
+      );
+    });
+
+    /** @scenario "A cancelled run stores the inconclusive verdict, not a raw failure verdict" */
+    it("stores the inconclusive verdict for a cancelled run", async () => {
+      const handler = new FinishRunCommand(makeDeps());
+      const events = await handler.handle(
+        makeCommand({
+          status: "CANCELLED",
+          results: {
+            verdict: "failure",
+            metCriteria: [],
+            unmetCriteria: [],
+            error: RAW_TRANSPORT_FAILURE,
+          },
+        }) as any,
+      );
+      const stored = (events[0]!.data as { results?: SimulationResults })
+        .results!;
+
+      expect(stored.verdict).toBe("inconclusive");
+      expect(stored.reasoning).toBe("Cancelled by user");
+    });
+
+    /** @scenario "Results a judge wrote are stored untouched" */
+    it("leaves results a judge wrote alone", async () => {
+      const supplied: SimulationResults = {
+        verdict: "failure",
+        reasoning: "The agent never offered the refund window.",
+        metCriteria: ["was polite"],
+        unmetCriteria: ["offered a refund"],
+        error: "criteria not met",
+      };
+
+      expect(await finishWith(supplied)).toEqual(supplied);
+    });
+
+    /** @scenario "Passing results are never reclassified" */
+    it("leaves a passing verdict alone", async () => {
+      const supplied: SimulationResults = {
+        verdict: "success",
+        metCriteria: ["was polite"],
+        unmetCriteria: [],
+      };
+
+      expect(await finishWith(supplied)).toEqual(supplied);
+    });
+
+    it("leaves results carrying no error at all alone", async () => {
+      const supplied: SimulationResults = {
+        verdict: "inconclusive",
+        reasoning: "The judge could not decide.",
+        metCriteria: [],
+        unmetCriteria: [],
+      };
+
+      expect(await finishWith(supplied)).toEqual(supplied);
+    });
+  });
+
   describe("when the caller uses the static routing helpers", () => {
     it("keeps the routing/idempotency contract of the old pure command", () => {
       const payload = makeCommand().data;

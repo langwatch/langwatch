@@ -34,9 +34,20 @@ class PatchApiGatewayV1VirtualKeysByIdBody:
         name (str | Unset):
         description (None | str | Unset):
         scopes (list[PatchApiGatewayV1VirtualKeysByIdBodyScopesItem] | Unset):
-        trace_project_id (None | str | Unset):
+        trace_project_id (None | str | Unset): Where the key's traces and costs land. Omit it and the destination stays
+            exactly where it is, scope edits included. A value moves it, validated the way create validates it. Explicit
+            null does not clear it: it asks for the destination to be worked out again from what the key is now, under the
+            same rules create uses. It lands on the key's single project scope when exactly one names a live project, and
+            otherwise on the organization's oldest live governance project when there are no other live projects to choose
+            from. An organization with live projects that could have been named refuses with
+            `gateway_trace_project_ambiguous`, and one with no governance project to fall back on refuses with
+            `trace_project_required`.
         routing_policy_id (None | str | Unset):
         routing_mode (PatchApiGatewayV1VirtualKeysByIdBodyRoutingMode | Unset):
+        expires_at (None | str | Unset): When the key stops serving. Omit it and the stored date stays where it is; null
+            clears it, so the key never expires; a date moves it. A key whose date has already passed accepts this edit like
+            any other, which is how an expired key is put back in service without minting a new secret. A date in the past
+            is refused with `virtual_key_expiry_in_past`.
         budget (None | PatchApiGatewayV1VirtualKeysByIdBodyBudgetType0 | Unset):
         config (PatchApiGatewayV1VirtualKeysByIdBodyConfig | Unset):
         external_id (None | str | Unset):
@@ -49,6 +60,7 @@ class PatchApiGatewayV1VirtualKeysByIdBody:
     trace_project_id: None | str | Unset = UNSET
     routing_policy_id: None | str | Unset = UNSET
     routing_mode: PatchApiGatewayV1VirtualKeysByIdBodyRoutingMode | Unset = UNSET
+    expires_at: None | str | Unset = UNSET
     budget: None | PatchApiGatewayV1VirtualKeysByIdBodyBudgetType0 | Unset = UNSET
     config: PatchApiGatewayV1VirtualKeysByIdBodyConfig | Unset = UNSET
     external_id: None | str | Unset = UNSET
@@ -91,6 +103,12 @@ class PatchApiGatewayV1VirtualKeysByIdBody:
         if not isinstance(self.routing_mode, Unset):
             routing_mode = self.routing_mode.value
 
+        expires_at: None | str | Unset
+        if isinstance(self.expires_at, Unset):
+            expires_at = UNSET
+        else:
+            expires_at = self.expires_at
+
         budget: dict[str, Any] | None | Unset
         if isinstance(self.budget, Unset):
             budget = UNSET
@@ -128,6 +146,8 @@ class PatchApiGatewayV1VirtualKeysByIdBody:
             field_dict["routing_policy_id"] = routing_policy_id
         if routing_mode is not UNSET:
             field_dict["routing_mode"] = routing_mode
+        if expires_at is not UNSET:
+            field_dict["expires_at"] = expires_at
         if budget is not UNSET:
             field_dict["budget"] = budget
         if config is not UNSET:
@@ -200,6 +220,15 @@ class PatchApiGatewayV1VirtualKeysByIdBody:
         else:
             routing_mode = PatchApiGatewayV1VirtualKeysByIdBodyRoutingMode(_routing_mode)
 
+        def _parse_expires_at(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        expires_at = _parse_expires_at(d.pop("expires_at", UNSET))
+
         def _parse_budget(data: object) -> None | PatchApiGatewayV1VirtualKeysByIdBodyBudgetType0 | Unset:
             if data is None:
                 return data
@@ -247,6 +276,7 @@ class PatchApiGatewayV1VirtualKeysByIdBody:
             trace_project_id=trace_project_id,
             routing_policy_id=routing_policy_id,
             routing_mode=routing_mode,
+            expires_at=expires_at,
             budget=budget,
             config=config,
             external_id=external_id,

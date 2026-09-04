@@ -42,6 +42,27 @@ PATTERNS=$(cat <<'RULES'
 RULES
 )
 
+# GitHub reads an ::error line as a workflow command, so a value that reaches
+# one is percent-encoded first. A docs line holding a carriage return would
+# otherwise end the annotation early, and one holding a percent sign would read
+# as an encoded character. A property value carries a colon and a comma too,
+# which are what separate the properties.
+encode_data() {
+  local value="$1"
+  value="${value//%/%25}"
+  value="${value//$'\r'/%0D}"
+  value="${value//$'\n'/%0A}"
+  printf '%s' "$value"
+}
+
+encode_property() {
+  local value
+  value="$(encode_data "$1")"
+  value="${value//:/%3A}"
+  value="${value//,/%2C}"
+  printf '%s' "$value"
+}
+
 MODE="diff"
 if [[ "${1:-}" == "--all" ]]; then
   MODE="all"
@@ -85,7 +106,7 @@ for file in "${FILES[@]}"; do
     matches=$(echo "$cleaned" | grep -niE "$pattern") || rc=$?
     rc="${rc:-0}"
     if [[ $rc -gt 1 ]]; then
-      echo "::error file=$rel::grep failed (exit $rc) on pattern: $pattern"
+      echo "::error file=$(encode_property "$rel")::grep failed (exit $rc) on pattern: $(encode_data "$pattern")"
       ERRORS=$((ERRORS + 1))
       continue
     fi
@@ -93,7 +114,8 @@ for file in "${FILES[@]}"; do
       while IFS= read -r match; do
         lineno="${match%%:*}"
         text="${match#*:}"
-        echo "::error file=$rel,line=$lineno::$text  [$label]"
+        word=$(printf '%s' "$text" | grep -oiE "$pattern" | head -1)
+        echo "::error file=$(encode_property "$rel"),line=$lineno::The word \"$(encode_data "$word")\" is forbidden ($label). Read https://nexus.langwatch.ai/wiki/docs-writing-rules to learn how to write better docs. Load your nexus access skill to read it; if you do not have one or do not know how to access Nexus, ask your user for access so you can pass this CI check. Line: $(encode_data "$text")"
         ERRORS=$((ERRORS + 1))
       done <<< "$matches"
     fi

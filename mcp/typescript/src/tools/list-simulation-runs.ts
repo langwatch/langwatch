@@ -22,7 +22,7 @@ export async function handleListSimulationRuns(params: {
   const { runs } = result;
 
   if (runs.length === 0) {
-    return "No simulation runs found.\n\n> Run a suite first with `platform_run_suite` to create simulation runs.";
+    return "No simulation runs found.\n\n> Run scenarios first with `platform_run_plan` or `platform_run_test_suite` to create simulation runs.";
   }
 
   const lines: string[] = [];
@@ -39,6 +39,9 @@ export async function handleListSimulationRuns(params: {
     lines.push(`**Duration**: ${duration}`);
     if (run.totalCost) {
       lines.push(`**Cost**: $${run.totalCost.toFixed(4)}`);
+    }
+    if (run.note) {
+      lines.push(`**Note**: ${run.note}`);
     }
     lines.push("");
   }

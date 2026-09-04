@@ -104,7 +104,7 @@ The entire `langwatch` object is optional on metadata (SDK users never send it).
 ## Amendment (2026-08, Agent Testing v2): the `note` convention
 
 A run note is a short free text line that belongs to one batch run. It works
-like a commit message or a hypothesis: "switched judge to the stricter rubric",
+like a commit message or a hypothesis: "switched judge to the stricter criterion",
 "nightly regression after the retry fix". LangWatch shows it in the runs
 sidebar and in the run header, so a person can tell later what a run was for.
 

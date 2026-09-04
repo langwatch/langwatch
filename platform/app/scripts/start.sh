@@ -201,6 +201,29 @@ if [[ "$NODE_ENV" = "development" && "$LANGWATCH_SKIP_NLP" != "1" ]]; then
   fi
 fi
 
+# langyagent (Go agent manager). Bundled into pnpm dev so a chat with Langy in
+# a local app reaches a live manager instead of a dead port. The manager itself
+# is cheap: no database client, about 30 MB idle, and it spawns a worker only
+# when a person chats. The lane caps that pool to the local size.
+#
+# The decision has more branches than the lanes above, so it lives in
+# dev/scripts/lib/plan-langy-lane.sh: langyagent takes its listen port from
+# PORT, which is the app's here, and fails fast without its secret and roots.
+# Opt-out: LANGWATCH_SKIP_LANGY=1.
+START_LANGY_COMMAND=""
+if [[ "$NODE_ENV" = "development" ]]; then
+  . "$(dirname "$0")/../../../dev/scripts/lib/plan-langy-lane.sh"
+  plan_langy_lane "$(dirname "$0")/.." "$_APP_PORT"
+  if [ "$LANGY_LANE_DECISION" = "start" ]; then
+    START_LANGY_COMMAND=$(langy_lane_command "../.." "$LANGY_LANE_PORT")
+    echo "  ✓ langyagent: $LANGY_LANE_REASON"
+  elif [[ "$LANGY_LANE_REASON" == skipped* ]]; then
+    echo "  ! langyagent: $LANGY_LANE_REASON"
+  else
+    echo "  ✓ langyagent: $LANGY_LANE_REASON"
+  fi
+fi
+
 pnpm run start:prepare:db
 
 COMMANDS=()
@@ -221,6 +244,10 @@ if [ -n "$START_NLP_COMMAND" ]; then
   COMMANDS+=("$START_NLP_COMMAND")
   NAMES+=("nlpgo")
 fi
+if [ -n "$START_LANGY_COMMAND" ]; then
+  COMMANDS+=("$START_LANGY_COMMAND")
+  NAMES+=("langy")
+fi
 if [ -n "$START_APP_COMMAND" ]; then
   COMMANDS+=("$RUNTIME_ENV $START_APP_COMMAND")
   NAMES+=("api")
@@ -231,5 +258,5 @@ if [ ${#COMMANDS[@]} -eq 1 ]; then
   eval "$RUNTIME_ENV exec $START_APP_COMMAND"
 else
   NAMES_STR=$(IFS=,; echo "${NAMES[*]}")
-  concurrently --restart-tries -1 --names "$NAMES_STR" --prefix-colors "green,blue,yellow,magenta,cyan" "${COMMANDS[@]}"
+  concurrently --restart-tries -1 --names "$NAMES_STR" --prefix-colors "green,blue,yellow,magenta,red,cyan" "${COMMANDS[@]}"
 fi

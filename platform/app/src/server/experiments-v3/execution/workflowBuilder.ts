@@ -390,6 +390,13 @@ const buildTargetNode = (
           throw new Error(
             `Workflow agent target ${targetConfig.id} has no loaded workflow — it must be dispatched to executeWorkflowCell, not buildTargetNode`,
           );
+        case "connected":
+          // A connected agent runs in the customer's own process, reached
+          // through the relay by the scenario runner. An experiment cell has
+          // no node that speaks that protocol.
+          throw new Error(
+            `Connected agent target ${targetConfig.id} cannot run inside an experiment workflow`,
+          );
         default: {
           const _exhaustive: never = loadedData.agent.type;
           throw new Error(`Unknown agent type: ${_exhaustive}`);
@@ -780,7 +787,11 @@ export const buildSignatureNodeFromAgent = (
 const buildSignatureNodeParameters = (
   config: TypedAgent["config"],
 ): Field[] => {
-  const baseParams = config.parameters ?? [];
+  // Only the studio node kinds carry node fields as parameters; a connected
+  // agent's parameters are run parameter declarations, never node fields.
+  const baseParams = (
+    "sdk" in config ? [] : (config.parameters ?? [])
+  ) as Field[];
 
   // Start with existing parameters (may already have llm, instructions, messages)
   const resultParams: Field[] = [...baseParams];
@@ -865,7 +876,9 @@ export const buildCodeNodeFromAgent = (
       name: agent.name,
       inputs,
       outputs,
-      parameters: config.parameters ?? [],
+      // The caller dispatched on `agent.type === "code"`, so the parameters
+      // are the code node's own fields.
+      parameters: ("sdk" in config ? [] : (config.parameters ?? [])) as Field[],
       cls: "Code",
     },
   };

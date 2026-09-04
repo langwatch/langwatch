@@ -78,6 +78,21 @@ describe("given the ingestion-source catalog", () => {
     });
   });
 
+  describe("when a vendor's spend can only be read once", () => {
+    /** @scenario "Adding a second source for the same organization warns the admin" */
+    it("says in the OpenAI Admin blurb that a second source counts the spend twice", () => {
+      const option = SOURCE_TYPE_OPTIONS.find(
+        (o) => o.value === "openai_admin",
+      );
+
+      // The warning is the copy, not a guard: nothing refuses the second
+      // source, here or on any other vendor, so the admin reads it before
+      // choosing rather than being stopped after.
+      expect(option?.blurb).toMatch(/only ever create one per organization/i);
+      expect(option?.blurb).toMatch(/count the same spend twice/i);
+    });
+  });
+
   describe("when the modes fold into customer-facing groups", () => {
     /** @scenario "The configured-source list groups under the same two headings" */
     it("sends push to the real-time group and pull plus s3 to the scheduled group", () => {

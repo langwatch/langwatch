@@ -1,4 +1,4 @@
-import { chakra, HStack, Text, VStack } from "@chakra-ui/react";
+import { Badge, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
 
 import { Tooltip } from "~/components/ui/tooltip";
@@ -7,7 +7,7 @@ import type { SessionPullRequest } from "../sessionListRow";
 import { MissingValue } from "./MissingValue";
 
 /** How many pull requests a row names before the rest go behind a hover. */
-const MAX_LISTED_PULL_REQUESTS = 3;
+const MAX_LISTED_PULL_REQUESTS = 4;
 
 /**
  * What the session shipped. A session that lands a change, moves to the next
@@ -74,16 +74,17 @@ export const PullRequestsCell: React.FC<{
           positioning={{ placement: "left" }}
         >
           {/* The remaining numbers are written down nowhere else on this row,
-              so the hover has a tab stop behind it. */}
-          <Text
-            as="span"
-            fontSize="sm"
-            color="fg.muted"
+              so the hover has a tab stop behind it. Outline badge, the same
+              overflow pill the traces table uses. */}
+          <Badge
+            size="xs"
+            variant="outline"
+            flexShrink={0}
             cursor="help"
             tabIndex={0}
           >
             +{rest.length}
-          </Text>
+          </Badge>
         </Tooltip>
       ) : null}
     </HStack>

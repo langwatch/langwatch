@@ -1,7 +1,7 @@
 Feature: Scenario Library
   As a LangWatch user
   I want to browse and manage my scenarios
-  So that I can organize my behavioral test cases
+  So that I can organize my behavioral scenarios
 
   Background:
     Given I am logged into project "my-project"

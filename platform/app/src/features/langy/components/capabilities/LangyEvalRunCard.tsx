@@ -1,5 +1,5 @@
 /**
- * Evaluation-run capability card (`platform_run_experiment`, `platform_run_suite`,
+ * Evaluation-run capability card (`platform_run_experiment`, `platform_run_plan`,
  * `platform_experiment_results`, `platform_experiment_status`).
  *
  * Surfaces the outcome of a run — a status line plus any pass-rate / score the

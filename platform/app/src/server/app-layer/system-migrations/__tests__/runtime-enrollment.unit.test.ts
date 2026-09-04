@@ -289,7 +289,11 @@ describe("userMigrationPassCohort on cloud", () => {
   });
 
   describe("when an enrolled organization's member also belongs to a private-dataplane organization", () => {
-    it("keeps that member out, exactly as the organization cohort keeps the organization out", async () => {
+    // A user tenant resolves now — to the shared instance, whoever they
+    // belong to — so there is nothing left for this to protect against, and
+    // excluding these people would strand exactly them on the legacy path.
+    // Their enrolment reads like anybody else's.
+    it("admits that member, and admits them through their private-dataplane organization too", async () => {
       const backfill = IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME;
       stubs.enrollmentFindMany.mockResolvedValueOnce([
         { organizationId: "org_acme", migrationName: backfill },
@@ -298,6 +302,7 @@ describe("userMigrationPassCohort on cloud", () => {
       stubMemberships({
         user_sam: ["org_acme"],
         user_both: ["org_private", "org_acme"],
+        user_private_only: ["org_private"],
       });
 
       const cohort = await userMigrationPassCohort();
@@ -307,7 +312,13 @@ describe("userMigrationPassCohort on cloud", () => {
       ).resolves.toBe(true);
       await expect(
         cohort({ tenantId: "user_both", migrationName: backfill }),
-      ).resolves.toBe(false);
+      ).resolves.toBe(true);
+      // The enrolled private-dataplane organization is a real enrolment, not
+      // a filtered-out one: somebody who reaches the migration only through
+      // it is in the cohort.
+      await expect(
+        cohort({ tenantId: "user_private_only", migrationName: backfill }),
+      ).resolves.toBe(true);
     });
   });
 
@@ -336,20 +347,19 @@ describe("runSystemMigrationTargetedPass for a user-rooted migration", () => {
   });
 
   describe("when the named organization runs a private dataplane", () => {
-    it("refuses with migration_not_available_on_installation before touching any member", async () => {
-      // The same rule userMigrationPassCohort applies on a full pass: a
-      // private-dataplane organization's members' identity events must never
-      // land in the shared platform log, and enrollment alone does not
-      // enforce that.
+    // This used to refuse outright, because a member's identity events could
+    // not be placed anywhere. They can be now — on the shared instance, like
+    // every other user — so the operator's targeted lever reaches these
+    // organizations like any other, and the run gets as far as reading
+    // members rather than being turned away at the door.
+    it("runs rather than refusing, and reads the organization's members", async () => {
       await expect(
         runSystemMigrationTargetedPass({
           organizationId: "org_private",
           migrationName: IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME,
         }),
-      ).rejects.toMatchObject({
-        code: "migration_not_available_on_installation",
-      });
-      expect(stubs.organizationUserFindMany).not.toHaveBeenCalled();
+      ).resolves.toBeDefined();
+      expect(stubs.organizationUserFindMany).toHaveBeenCalled();
     });
   });
 });

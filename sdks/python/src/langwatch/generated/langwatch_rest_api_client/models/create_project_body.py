@@ -16,10 +16,10 @@ class CreateProjectBody:
     """
     Attributes:
         name (str): Project name
-        language (str): Programming language (e.g. python, typescript)
-        framework (str): Framework (e.g. langchain, vercel-ai, openai)
-        team_id (str | Unset): ID of an existing team to assign the project to
-        new_team_name (str | Unset): Name for a new team to create and assign the project to
+        language (str): Programming language, such as python or typescript
+        framework (str): Framework in use, such as langchain or openai
+        team_id (str | Unset): Id of an existing team to put the project in
+        new_team_name (str | Unset): Create a team with this name and put the project in it
     """
 
     name: str

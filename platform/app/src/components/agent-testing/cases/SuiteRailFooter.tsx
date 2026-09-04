@@ -24,6 +24,8 @@ export function SuiteRailFooter({
   collapsed,
   onToggleCollapsed,
   period,
+  periodMode,
+  setPeriod,
   setRelativePeriod,
 }: SuiteRailFooterProps) {
   return (
@@ -31,6 +33,8 @@ export function SuiteRailFooter({
       {!collapsed && (
         <AgentTestingPeriodPicker
           period={period}
+          periodMode={periodMode}
+          setPeriod={setPeriod}
           setRelativePeriod={setRelativePeriod}
           compact
         />

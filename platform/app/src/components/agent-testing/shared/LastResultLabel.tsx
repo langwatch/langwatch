@@ -1,5 +1,5 @@
 /**
- * What the last run of a test case said, in one line: "Passed (3/3)".
+ * What the last run of a scenario said, in one line: "Passed (3/3)".
  *
  * The verdict carries its own dot rather than an icon, so a column of rows
  * reads as one line of coloured text and the counts line up.

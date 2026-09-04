@@ -11,13 +11,13 @@ from ...models.patch_api_gateway_v1_budgets_by_id_response_400 import PatchApiGa
 from ...models.patch_api_gateway_v1_budgets_by_id_response_401 import PatchApiGatewayV1BudgetsByIdResponse401
 from ...models.patch_api_gateway_v1_budgets_by_id_response_403 import PatchApiGatewayV1BudgetsByIdResponse403
 from ...models.patch_api_gateway_v1_budgets_by_id_response_500 import PatchApiGatewayV1BudgetsByIdResponse500
-from ...types import UNSET, Response, Unset, safe_http_status
+from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
     id: str,
     *,
-    body: PatchApiGatewayV1BudgetsByIdBody | Unset = UNSET,
+    body: PatchApiGatewayV1BudgetsByIdBody,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -28,8 +28,7 @@ def _get_kwargs(
         ),
     }
 
-    if not isinstance(body, Unset):
-        _kwargs["json"] = body.to_dict()
+    _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -101,8 +100,8 @@ def _build_response(
 def sync_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PatchApiGatewayV1BudgetsByIdBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PatchApiGatewayV1BudgetsByIdBody,
 ) -> Response[
     PatchApiGatewayV1BudgetsByIdResponse200
     | PatchApiGatewayV1BudgetsByIdResponse400
@@ -117,7 +116,7 @@ def sync_detailed(
 
     Args:
         id (str):
-        body (PatchApiGatewayV1BudgetsByIdBody | Unset):
+        body (PatchApiGatewayV1BudgetsByIdBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -142,8 +141,8 @@ def sync_detailed(
 def sync(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PatchApiGatewayV1BudgetsByIdBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PatchApiGatewayV1BudgetsByIdBody,
 ) -> (
     PatchApiGatewayV1BudgetsByIdResponse200
     | PatchApiGatewayV1BudgetsByIdResponse400
@@ -159,7 +158,7 @@ def sync(
 
     Args:
         id (str):
-        body (PatchApiGatewayV1BudgetsByIdBody | Unset):
+        body (PatchApiGatewayV1BudgetsByIdBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -179,8 +178,8 @@ def sync(
 async def asyncio_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PatchApiGatewayV1BudgetsByIdBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PatchApiGatewayV1BudgetsByIdBody,
 ) -> Response[
     PatchApiGatewayV1BudgetsByIdResponse200
     | PatchApiGatewayV1BudgetsByIdResponse400
@@ -195,7 +194,7 @@ async def asyncio_detailed(
 
     Args:
         id (str):
-        body (PatchApiGatewayV1BudgetsByIdBody | Unset):
+        body (PatchApiGatewayV1BudgetsByIdBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -218,8 +217,8 @@ async def asyncio_detailed(
 async def asyncio(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PatchApiGatewayV1BudgetsByIdBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PatchApiGatewayV1BudgetsByIdBody,
 ) -> (
     PatchApiGatewayV1BudgetsByIdResponse200
     | PatchApiGatewayV1BudgetsByIdResponse400
@@ -235,7 +234,7 @@ async def asyncio(
 
     Args:
         id (str):
-        body (PatchApiGatewayV1BudgetsByIdBody | Unset):
+        body (PatchApiGatewayV1BudgetsByIdBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

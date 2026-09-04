@@ -200,7 +200,8 @@ func ResolveEndUser(ctx context.Context, call *Call) string {
 	switch call.Request.Type {
 	case domain.RequestTypeChat, domain.RequestTypeMessages,
 		domain.RequestTypeEmbeddings, domain.RequestTypeResponses,
-		domain.RequestTypeSpeech:
+		domain.RequestTypeSpeech, domain.RequestTypeImageGeneration,
+		domain.RequestTypeImageEdit:
 		if err := call.MaterializeBody(); err != nil {
 			return ""
 		}
@@ -211,7 +212,8 @@ func ResolveEndUser(ctx context.Context, call *Call) string {
 		// multipart form, not JSON, and a session mint declares a socket
 		// rather than a completion: none exposes the OpenAI `user` field
 		// this reads, so header-only attribution (resolved above) is all
-		// these types get.
+		// these types get. The image edit route is also multipart and still
+		// reads the field above, because its synthesized body states it.
 		return ""
 	}
 	return ""

@@ -33,6 +33,7 @@ function makeSummary(overrides: Partial<BatchSummary> = {}): BatchSummary {
     firstCompletedAt: 1500,
     allCompletedAt: null,
     note: null,
+    startedBy: null,
     ...overrides,
   };
 }

@@ -108,10 +108,14 @@ describe("scenarios version procedures", () => {
     );
   });
 
+  // A scenario created with no suite named is filed into the project's Default
+  // suite, which is created on that first write. The suite rows go with the
+  // scenarios, or the project delete below is refused by the relation to them.
   beforeEach(() =>
     cleanupTestRows(prisma, [
       ["scenarioVersion", { projectId: { in: [projectId, otherProjectId] } }],
       ["scenario", { projectId: { in: [projectId, otherProjectId] } }],
+      ["simulationSuite", { projectId: { in: [projectId, otherProjectId] } }],
     ]),
   );
 
@@ -119,6 +123,7 @@ describe("scenarios version procedures", () => {
     cleanupTestRows(prisma, [
       ["scenarioVersion", { projectId: { in: [projectId, otherProjectId] } }],
       ["scenario", { projectId: { in: [projectId, otherProjectId] } }],
+      ["simulationSuite", { projectId: { in: [projectId, otherProjectId] } }],
       ["project", { id: { in: [projectId, otherProjectId] } }],
       ["teamUser", { teamId }],
       ["organizationUser", { organizationId }],
@@ -186,8 +191,8 @@ describe("scenarios version procedures", () => {
       ).rejects.toMatchObject({ code: "FORBIDDEN" });
     });
 
-    /** @scenario "Version history of a case in another project is not readable" */
-    it("answers not found for a case of another project", async () => {
+    /** @scenario "Version history of a scenario in another project is not readable" */
+    it("answers not found for a scenario of another project", async () => {
       const scenario = await createCase();
 
       await expect(
@@ -289,7 +294,7 @@ describe("scenarios version procedures", () => {
     });
 
     /** @scenario "A viewer cannot restore a version" */
-    it("refuses a viewer's restore and leaves the case unchanged", async () => {
+    it("refuses a viewer's restore and leaves the scenario unchanged", async () => {
       const scenario = await createCase();
       await caller.scenarios.update({
         projectId,

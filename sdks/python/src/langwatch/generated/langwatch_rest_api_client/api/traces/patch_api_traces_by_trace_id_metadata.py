@@ -11,13 +11,13 @@ from ...models.patch_api_traces_by_trace_id_metadata_response_400 import PatchAp
 from ...models.patch_api_traces_by_trace_id_metadata_response_401 import PatchApiTracesByTraceIdMetadataResponse401
 from ...models.patch_api_traces_by_trace_id_metadata_response_422 import PatchApiTracesByTraceIdMetadataResponse422
 from ...models.patch_api_traces_by_trace_id_metadata_response_500 import PatchApiTracesByTraceIdMetadataResponse500
-from ...types import UNSET, Response, Unset, safe_http_status
+from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
     trace_id: str,
     *,
-    body: PatchApiTracesByTraceIdMetadataBody | Unset = UNSET,
+    body: PatchApiTracesByTraceIdMetadataBody,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -28,8 +28,7 @@ def _get_kwargs(
         ),
     }
 
-    if not isinstance(body, Unset):
-        _kwargs["json"] = body.to_dict()
+    _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -101,8 +100,8 @@ def _build_response(
 def sync_detailed(
     trace_id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PatchApiTracesByTraceIdMetadataBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PatchApiTracesByTraceIdMetadataBody,
 ) -> Response[
     PatchApiTracesByTraceIdMetadataResponse200
     | PatchApiTracesByTraceIdMetadataResponse400
@@ -118,7 +117,7 @@ def sync_detailed(
 
     Args:
         trace_id (str):
-        body (PatchApiTracesByTraceIdMetadataBody | Unset):
+        body (PatchApiTracesByTraceIdMetadataBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -143,8 +142,8 @@ def sync_detailed(
 def sync(
     trace_id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PatchApiTracesByTraceIdMetadataBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PatchApiTracesByTraceIdMetadataBody,
 ) -> (
     PatchApiTracesByTraceIdMetadataResponse200
     | PatchApiTracesByTraceIdMetadataResponse400
@@ -161,7 +160,7 @@ def sync(
 
     Args:
         trace_id (str):
-        body (PatchApiTracesByTraceIdMetadataBody | Unset):
+        body (PatchApiTracesByTraceIdMetadataBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -181,8 +180,8 @@ def sync(
 async def asyncio_detailed(
     trace_id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PatchApiTracesByTraceIdMetadataBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PatchApiTracesByTraceIdMetadataBody,
 ) -> Response[
     PatchApiTracesByTraceIdMetadataResponse200
     | PatchApiTracesByTraceIdMetadataResponse400
@@ -198,7 +197,7 @@ async def asyncio_detailed(
 
     Args:
         trace_id (str):
-        body (PatchApiTracesByTraceIdMetadataBody | Unset):
+        body (PatchApiTracesByTraceIdMetadataBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -221,8 +220,8 @@ async def asyncio_detailed(
 async def asyncio(
     trace_id: str,
     *,
-    client: AuthenticatedClient | Client,
-    body: PatchApiTracesByTraceIdMetadataBody | Unset = UNSET,
+    client: AuthenticatedClient,
+    body: PatchApiTracesByTraceIdMetadataBody,
 ) -> (
     PatchApiTracesByTraceIdMetadataResponse200
     | PatchApiTracesByTraceIdMetadataResponse400
@@ -239,7 +238,7 @@ async def asyncio(
 
     Args:
         trace_id (str):
-        body (PatchApiTracesByTraceIdMetadataBody | Unset):
+        body (PatchApiTracesByTraceIdMetadataBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

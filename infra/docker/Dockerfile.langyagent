@@ -218,8 +218,14 @@ FROM debian:bookworm-slim
 # grammar, so a bump means re-checking the command table in
 # services/langyagent/internal/assets/AGENTS.md.
 ARG LANGWATCH_CLI_VERSION=0.31.0
+# `jq` and `python-is-python3` are here because the agent reaches for them by
+# name. The CLI's own `--jq` is a small subset (dot paths and a terminal
+# `| length`) that reads an answer before it is written to disk; anything past
+# that belongs in the shell. Without these three names present, one session
+# lost `--jq`, then `jq`, then `python` in a row while `python3` sat installed
+# under a name it did not try.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl git ca-certificates python3 util-linux \
+    curl git ca-certificates python3 python-is-python3 jq util-linux \
     && rm -rf /var/lib/apt/lists/*
 # NOTE: `iptables` is no longer installed. The old loopback OWNER-match DROP
 # rule (services/langyagent/iptables.go) that closed the sibling-worker

@@ -76,6 +76,7 @@ export class SimulationRunService {
     cursor?: string;
     startDate?: number;
     endDate?: number;
+    shouldIncludeMessages?: boolean;
   }): Promise<{
     runs: ScenarioRunData[];
     nextCursor?: string;
@@ -118,7 +119,7 @@ export class SimulationRunService {
 
   /**
    * The latest run result per scenario inside the window, for the last-result
-   * cells of the test cases table. Kept separate from the scenario list read
+   * cells of the scenarios table. Kept separate from the scenario list read
    * so the list renders instantly and the cells stream in.
    */
   async getLastResultSummaries(params: {
@@ -137,6 +138,7 @@ export class SimulationRunService {
     startDate?: number;
     endDate?: number;
     sinceTimestamp?: number;
+    shouldIncludeMessages?: boolean;
   }) {
     return this.repository.getRunDataForAllSuites(params);
   }

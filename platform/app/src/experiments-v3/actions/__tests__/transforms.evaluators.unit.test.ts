@@ -33,6 +33,7 @@ describe("addEvaluator", () => {
       state: baseState(),
       payload: {
         evaluatorType: "langevals/exact_match",
+        name: "scored",
         dbEvaluatorId: "db-evaluator-3",
         inputs: [
           { identifier: "output", type: "str" },
@@ -65,6 +66,7 @@ describe("addEvaluator", () => {
       payload: {
         id: "evaluator_fixed",
         evaluatorType: "langevals/exact_match",
+        name: "scored",
         inputs: [{ identifier: "output", type: "str" }],
         mappings: {
           "ds-1": {
@@ -90,6 +92,7 @@ describe("addEvaluator", () => {
             payload: {
               id: "evaluator_1",
               evaluatorType: "langevals/exact_match",
+              name: "scored",
               inputs: [],
             },
           }),
@@ -107,6 +110,7 @@ describe("addEvaluator", () => {
           payload: {
             id: "evaluator_1",
             evaluatorType: "langevals/exact_match",
+            name: "scored",
             inputs: [],
           },
         }),
@@ -124,6 +128,7 @@ describe("addEvaluator", () => {
           payload: {
             id: "",
             evaluatorType: "langevals/exact_match",
+            name: "scored",
             inputs: [],
           },
         }),
@@ -137,6 +142,7 @@ describe("addEvaluator", () => {
         state: baseState(),
         payload: {
           evaluatorType: "langevals/exact_match",
+          name: "scored",
           inputs: [],
           comparison: comparisonConfig,
         },
@@ -165,6 +171,7 @@ describe("addEvaluator", () => {
           state,
           payload: {
             evaluatorType: "langevals/exact_match",
+            name: "scored",
             inputs: [],
             comparison: comparisonConfig,
           },
@@ -183,6 +190,7 @@ describe("addEvaluator", () => {
         state: baseState(),
         payload: {
           evaluatorType: COMPARISON_EVALUATOR_TYPE,
+          name: "scored",
           inputs: [],
           comparison: comparisonConfig,
         },
@@ -204,6 +212,7 @@ describe("addEvaluator", () => {
             state: baseState(),
             payload: {
               evaluatorType: "langevals/exact_matches",
+              name: "scored",
               inputs: [],
             },
           }),
@@ -221,7 +230,11 @@ describe("addEvaluator", () => {
     it("accepts a project's own evaluator, whose type carries a row id", () => {
       const { state } = addEvaluator({
         state: baseState(),
-        payload: { evaluatorType: "custom/evaluator_abc", inputs: [] },
+        payload: {
+          name: "scored",
+          evaluatorType: "custom/evaluator_abc",
+          inputs: [],
+        },
       });
 
       expect(state.evaluators[1]?.evaluatorType).toBe("custom/evaluator_abc");

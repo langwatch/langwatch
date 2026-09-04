@@ -109,7 +109,7 @@ def _build_response(
 def sync_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PostApiGatewayV1BudgetsByIdResetBody | Unset = UNSET,
     end_user_id: str | Unset = UNSET,
 ) -> Response[
@@ -129,8 +129,7 @@ def sync_detailed(
 
     Args:
         id (str):
-        end_user_id (str | Unset): Resets ONE end-user bucket on an attributed-user template,
-            leaving the template period untouched.
+        end_user_id (str | Unset):
         body (PostApiGatewayV1BudgetsByIdResetBody | Unset):
 
     Raises:
@@ -157,7 +156,7 @@ def sync_detailed(
 def sync(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PostApiGatewayV1BudgetsByIdResetBody | Unset = UNSET,
     end_user_id: str | Unset = UNSET,
 ) -> (
@@ -178,8 +177,7 @@ def sync(
 
     Args:
         id (str):
-        end_user_id (str | Unset): Resets ONE end-user bucket on an attributed-user template,
-            leaving the template period untouched.
+        end_user_id (str | Unset):
         body (PostApiGatewayV1BudgetsByIdResetBody | Unset):
 
     Raises:
@@ -201,7 +199,7 @@ def sync(
 async def asyncio_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PostApiGatewayV1BudgetsByIdResetBody | Unset = UNSET,
     end_user_id: str | Unset = UNSET,
 ) -> Response[
@@ -221,8 +219,7 @@ async def asyncio_detailed(
 
     Args:
         id (str):
-        end_user_id (str | Unset): Resets ONE end-user bucket on an attributed-user template,
-            leaving the template period untouched.
+        end_user_id (str | Unset):
         body (PostApiGatewayV1BudgetsByIdResetBody | Unset):
 
     Raises:
@@ -247,7 +244,7 @@ async def asyncio_detailed(
 async def asyncio(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: PostApiGatewayV1BudgetsByIdResetBody | Unset = UNSET,
     end_user_id: str | Unset = UNSET,
 ) -> (
@@ -268,8 +265,7 @@ async def asyncio(
 
     Args:
         id (str):
-        end_user_id (str | Unset): Resets ONE end-user bucket on an attributed-user template,
-            leaving the template period untouched.
+        end_user_id (str | Unset):
         body (PostApiGatewayV1BudgetsByIdResetBody | Unset):
 
     Raises:

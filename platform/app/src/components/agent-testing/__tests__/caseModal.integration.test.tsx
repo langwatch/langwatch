@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The test case dialog of the Agent Testing page: what it asks, what its
+ * The scenario dialog of the Agent Testing page: what it asks, what its
  * footer holds, what its chips open, and what Save and Run does.
  *
  * @see specs/features/agent-testing/cases-table.feature
@@ -18,14 +18,17 @@ import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentTestingCaseEditor } from "../cases/AgentTestingCaseEditor";
-import { useAgentTestingStore } from "../useAgentTestingStore";
+import { AgentTestingCaseEditorDrawer } from "../cases/AgentTestingCaseEditorDrawer";
+import { NO_RUN_YET_HINT } from "../cases/CaseRecentRunsButton";
 
 const mockCreate = vi.hoisted(() => vi.fn());
 const mockUpdate = vi.hoisted(() => vi.fn());
 const mockGetById = vi.hoisted(() => vi.fn());
-const mockFoldersGetAll = vi.hoisted(() => vi.fn());
+const mockAgentsGetAll = vi.hoisted(() => vi.fn());
+const mockTestSuitesGetAll = vi.hoisted(() => vi.fn());
 const mockListVersions = vi.hoisted(() => vi.fn());
 const mockOpenDrawer = vi.hoisted(() => vi.fn());
+const mockLastResults = vi.hoisted(() => vi.fn());
 
 const emptyQuery = vi.hoisted(() => () => ({
   data: undefined,
@@ -57,14 +60,25 @@ vi.mock("~/utils/api", () => ({
         getBatchRunData: { fetch: vi.fn(async () => ({ runs: [] })) },
       },
       suites: {
-        folders: { getAll: { invalidate: vi.fn() } },
+        testSuites: { getAll: { invalidate: vi.fn() } },
         getById: { invalidate: vi.fn() },
       },
     }),
     scenarios: {
+      // The run dialog reads the configurations its scope already ran with.
+      getRunConfigurations: {
+        useQuery: () => ({ data: [], isLoading: false }),
+      },
       getAll: { useQuery: emptyQuery },
       getById: { useQuery: mockGetById },
-      getLastResultSummaries: { useQuery: emptyQuery },
+      getLastResultSummaries: { useQuery: mockLastResults },
+      // The recent runs of the scenario are read only once the list is opened.
+      getSuiteRunData: {
+        useQuery: () => ({
+          data: { runs: [], scenarioSetIds: {} },
+          isLoading: false,
+        }),
+      },
       listVersions: { useQuery: mockListVersions },
       getVersion: { useQuery: emptyQuery },
       restoreVersion: {
@@ -74,13 +88,14 @@ vi.mock("~/utils/api", () => ({
       update: { useMutation: onSuccessOf(mockUpdate) },
     },
     suites: {
-      folders: { getAll: { useQuery: mockFoldersGetAll } },
+      testSuites: { getAll: { useQuery: mockTestSuitesGetAll } },
+      getAll: { useQuery: emptyQuery },
       getSummaries: { useQuery: emptyQuery },
       update: { useMutation: () => ({ mutateAsync: vi.fn() }) },
       run: { useMutation: () => ({ mutateAsync: vi.fn() }) },
-      runAll: { useMutation: () => ({ mutateAsync: vi.fn() }) },
+      runPlan: { useMutation: () => ({ mutateAsync: vi.fn() }) },
     },
-    agents: { getAll: { useQuery: () => ({ data: [] }) } },
+    agents: { getAll: { useQuery: mockAgentsGetAll } },
     prompts: { getAllPromptsForProject: { useQuery: () => ({ data: [] }) } },
     modelProvider: {
       listAllForProjectForFrontend: { useQuery: emptyQuery },
@@ -101,12 +116,30 @@ vi.mock("~/hooks/useCan", () => ({
   useCan: () => ({ can: () => true, isLoading: false, permissions: [] }),
 }));
 
+const mockDrawerParams = vi.hoisted(() => ({
+  current: {} as Record<string, string>,
+}));
+const mockDrawerOpenFor = vi.hoisted(() => ({ current: "" }));
+const flowCallbacksStore = vi.hoisted(
+  () => ({}) as Record<string, Record<string, unknown>>,
+);
+
 vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({
     openDrawer: mockOpenDrawer,
-    setFlowCallbacks: vi.fn(),
+    closeDrawer: () => {
+      mockDrawerOpenFor.current = "";
+    },
+    drawerOpen: (drawer: string) => drawer === mockDrawerOpenFor.current,
+    setFlowCallbacks: (drawer: string, callbacks: Record<string, unknown>) => {
+      flowCallbacksStore[drawer] = callbacks;
+    },
   }),
-  useDrawerParams: () => ({}),
+  useDrawerParams: () => mockDrawerParams.current,
+  getFlowCallbacks: (drawer: string) => flowCallbacksStore[drawer],
+  setFlowCallbacks: (drawer: string, callbacks: Record<string, unknown>) => {
+    flowCallbacksStore[drawer] = callbacks;
+  },
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
@@ -140,7 +173,7 @@ function storedCase(overrides: Record<string, unknown> = {}) {
     criteria: ["Refunds the second charge"],
     labels: [],
     parameters: null,
-    folderId: REFUNDS.id,
+    testSuiteId: REFUNDS.id,
     simulatorModel: null,
     judgeModel: null,
     maxTurns: null,
@@ -150,40 +183,129 @@ function storedCase(overrides: Record<string, unknown> = {}) {
   };
 }
 
-describe("the test case dialog", () => {
+function openDrawerAs(params: {
+  scenarioId?: string;
+  testSuiteId?: string;
+  showHistory?: string;
+}) {
+  mockDrawerParams.current = { ...params } as Record<string, string>;
+  mockDrawerOpenFor.current = "agentTestingCaseEditor";
+}
+
+describe("the scenario dialog", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockFoldersGetAll.mockReturnValue({ data: [REFUNDS], isLoading: false });
+    mockDrawerParams.current = {};
+    mockDrawerOpenFor.current = "";
+    mockTestSuitesGetAll.mockReturnValue({ data: [REFUNDS], isLoading: false });
     mockGetById.mockReturnValue({
       data: undefined,
       isLoading: false,
       refetch: vi.fn(),
     });
-    useAgentTestingStore.getState().closeCaseEditor();
+    mockLastResults.mockReturnValue({ data: [], isLoading: false });
+    mockAgentsGetAll.mockReturnValue({ data: [] });
   });
 
   afterEach(cleanup);
 
   const openNew = () => {
-    render(<AgentTestingCaseEditor />, { wrapper: Wrapper });
-    useAgentTestingStore.getState().openCaseEditor({ folderId: REFUNDS.id });
+    openDrawerAs({ testSuiteId: REFUNDS.id });
+    render(
+      <>
+        <AgentTestingCaseEditor />
+        <AgentTestingCaseEditorDrawer />
+      </>,
+      { wrapper: Wrapper },
+    );
   };
 
-  describe("when a new case is written", () => {
-    /** @scenario "New test case opens the case dialog straight away" */
+  describe("when a new scenario is written", () => {
+    /** @scenario "New scenario opens the scenario dialog straight away" */
     it("opens on the form itself, with no model-writing step first", async () => {
       openNew();
 
       const dialog = await screen.findByTestId("case-modal");
-      expect(await screen.findByText("New test case")).toBeInTheDocument();
+      expect(await screen.findByText("New scenario")).toBeInTheDocument();
       expect(screen.getByLabelText("Title")).toBeInTheDocument();
       expect(screen.getByLabelText("Test suite")).toBeInTheDocument();
       expect(screen.getByLabelText("Situation")).toBeInTheDocument();
-      expect(screen.getByLabelText("Rubrics")).toBeInTheDocument();
+      expect(screen.getByLabelText("Criteria")).toBeInTheDocument();
       expect(dialog.textContent).not.toMatch(/with AI|Langy/i);
     });
 
-    /** @scenario "The case dialog footer holds the labels, Save and Save and Run" */
+    /** @scenario "A block a chip opens reads under the criteria, not at the foot of the body" */
+    it("reads a block under the criteria and leaves only the chips at the foot", async () => {
+      const user = userEvent.setup();
+      openNew();
+      await screen.findByTestId("case-modal");
+
+      await user.click(screen.getByTestId("customize-chip-case-turns"));
+
+      const criteria = screen.getByLabelText("Criteria");
+      const block = await screen.findByTestId("case-turns-block");
+      const chips = screen.getByTestId("customize-case-chips");
+
+      // The block belongs to the scenario, so it reads where the reader was
+      // looking, and the chip row is what stays at the foot of the body.
+      expect(
+        criteria.compareDocumentPosition(block) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(
+        block.compareDocumentPosition(chips) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+
+      // Only the chip row is held at the foot. While the block shared that
+      // wrapper it was pushed down with the chips, which left the hole under a
+      // short scenario.
+      const pinnedToTheFoot = chips.parentElement;
+      expect(pinnedToTheFoot).not.toBeNull();
+      expect(pinnedToTheFoot!.contains(block)).toBe(false);
+    });
+
+    /** @scenario "Two open blocks read in the order their chips sit in" */
+    it("orders two open blocks the way their chips are ordered", async () => {
+      const user = userEvent.setup();
+      openNew();
+      await screen.findByTestId("case-modal");
+
+      await user.click(screen.getByTestId("customize-chip-case-parameters"));
+      await user.click(screen.getByTestId("customize-chip-case-models"));
+
+      const parameters = await screen.findByTestId("case-parameters-block");
+      const models = await screen.findByTestId("case-models-block");
+
+      expect(
+        parameters.compareDocumentPosition(models) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    /** @scenario "The situation and the criteria grow with what is written in them" */
+    it("lets the situation and the criteria grow, and caps them at three times their height", async () => {
+      openNew();
+      await screen.findByTestId("case-modal");
+
+      // Growing is the browser's job once the field asks for it, so what the
+      // dialog owns is the ask and the two heights: the height the field opens
+      // at, which a grown field would otherwise shrink under while it is empty,
+      // and the height it stops growing at.
+      for (const label of ["Situation", "Criteria"]) {
+        const field = screen.getByLabelText(label);
+        const style = window.getComputedStyle(field);
+
+        expect(field).toHaveAttribute("rows");
+        expect(style.resize).toBe("none");
+
+        const opensAt = Number.parseFloat(style.minHeight);
+        const stopsAt = Number.parseFloat(style.maxHeight);
+        expect(opensAt).toBeGreaterThan(0);
+        expect(stopsAt).toBeCloseTo(opensAt * 3, 0);
+      }
+    });
+
+    /** @scenario "The scenario dialog footer holds the labels, Save and Save and Run" */
     it("holds the labels on the left and the two save buttons on the right", async () => {
       openNew();
       await screen.findByTestId("case-modal");
@@ -206,7 +328,7 @@ describe("the test case dialog", () => {
       expect(screen.queryByTestId("case-models-block")).not.toBeInTheDocument();
 
       const chips = screen.getByTestId("customize-case-chips");
-      expect(chips).toHaveTextContent("Customize test case");
+      expect(chips).toHaveTextContent("Customize scenario");
       expect(
         within(chips).getByTestId("customize-chip-case-parameters"),
       ).toHaveTextContent("Add parameters");
@@ -244,21 +366,21 @@ describe("the test case dialog", () => {
       ).toBeInTheDocument();
     });
 
-    /** @scenario "Save and Run saves the case and then asks what to run it against" */
+    /** @scenario "Save and Run saves the scenario and then asks what to run it against" */
     it("saves first, then opens the run dialog for what it saved", async () => {
       const user = userEvent.setup();
       openNew();
       await screen.findByTestId("case-modal");
 
       await user.type(screen.getByLabelText("Title"), "Angry customer");
-      await user.type(screen.getByLabelText("Rubrics"), "Keeps a calm tone");
+      await user.type(screen.getByLabelText("Criteria"), "Keeps a calm tone");
       await user.click(screen.getByTestId("case-modal-save-and-run"));
 
       expect(mockCreate).toHaveBeenCalledWith(
         expect.objectContaining({
           name: "Angry customer",
           criteria: ["Keeps a calm tone"],
-          folderId: REFUNDS.id,
+          testSuiteId: REFUNDS.id,
         }),
       );
       await waitFor(() =>
@@ -267,9 +389,9 @@ describe("the test case dialog", () => {
     });
   });
 
-  describe("when a stored case is edited", () => {
-    /** @scenario "Editing a case opens the blocks it already uses" */
-    it("opens the blocks the stored case already carries", async () => {
+  describe("when a stored scenario is edited", () => {
+    /** @scenario "Editing a scenario opens the blocks it already uses" */
+    it("opens the blocks the stored scenario already carries", async () => {
       mockGetById.mockReturnValue({
         data: storedCase({
           parameters: [{ name: "customer_plan", defaultValue: "free" }],
@@ -278,21 +400,147 @@ describe("the test case dialog", () => {
         isLoading: false,
         refetch: vi.fn(),
       });
-      render(<AgentTestingCaseEditor />, { wrapper: Wrapper });
-      useAgentTestingStore.getState().openCaseEditor({ scenarioId: "case_1" });
+      openDrawerAs({ scenarioId: "case_1" });
+      render(
+        <>
+          <AgentTestingCaseEditor />
+          <AgentTestingCaseEditorDrawer />
+        </>,
+        { wrapper: Wrapper },
+      );
 
       expect(await screen.findByLabelText("Parameters")).toHaveValue(
         "customer_plan=free",
       );
       expect(screen.getByTestId("case-models-block")).toBeInTheDocument();
-      // Nothing the case does not use is opened: the turns stay on their chip.
+      // Nothing the scenario does not use is opened: the turns stay on their chip.
       expect(screen.queryByLabelText("Max turns")).not.toBeInTheDocument();
       expect(
         screen.getByTestId("customize-chip-case-turns"),
       ).toBeInTheDocument();
     });
 
-    /** @scenario "Editing a case names its version and opens the history" */
+    /** @scenario "The case editor offers the parameters the agents declare" */
+    it("offers the parameters the agents of the project declare", async () => {
+      const user = userEvent.setup();
+      mockAgentsGetAll.mockReturnValue({
+        data: [
+          {
+            id: "agent_connected",
+            name: "support-agent",
+            type: "connected",
+            config: {},
+            environment: "production",
+            owner: null,
+            parameters: [
+              {
+                name: "model",
+                type: "string",
+                options: ["gpt-5-mini", "gpt-5"],
+                defaultValue: "gpt-5-mini",
+              },
+            ],
+          },
+        ],
+      });
+      mockGetById.mockReturnValue({
+        data: storedCase({
+          parameters: [{ name: "customer_plan", defaultValue: "free" }],
+        }),
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+      openDrawerAs({ scenarioId: "case_1" });
+      render(
+        <>
+          <AgentTestingCaseEditor />
+          <AgentTestingCaseEditorDrawer />
+        </>,
+        { wrapper: Wrapper },
+      );
+
+      const line = await screen.findByLabelText("Parameters");
+      await user.click(line);
+      await user.type(line, ", mo");
+      const list = await screen.findByTestId(
+        "case-parameters-line-suggestions",
+      );
+      expect(
+        within(list).getByTestId("parameter-suggestion-key-model"),
+      ).toHaveTextContent("support-agent · production");
+
+      await user.keyboard("{Enter}");
+      expect(line).toHaveValue("customer_plan=free, model=");
+      expect(
+        within(await screen.findByTestId("case-parameters-line-suggestions"))
+          .getAllByRole("option")
+          .map((option) => option.textContent),
+      ).toEqual(["gpt-5-mini", "gpt-5"]);
+    });
+
+    /** @scenario "The editor turns the recent runs off on a scenario that never ran" */
+    it("turns the recent runs off, and says why, on a scenario that never ran", async () => {
+      const user = userEvent.setup();
+      mockGetById.mockReturnValue({
+        data: storedCase(),
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+      mockLastResults.mockReturnValue({ data: [], isLoading: false });
+      openDrawerAs({ scenarioId: "case_1" });
+      render(
+        <>
+          <AgentTestingCaseEditor />
+          <AgentTestingCaseEditorDrawer />
+        </>,
+        { wrapper: Wrapper },
+      );
+
+      const trigger = await screen.findByTestId("recent-runs-trigger");
+      expect(trigger).toBeDisabled();
+
+      // A disabled button dispatches no pointer event, so the reason is
+      // carried by the span around it.
+      await user.hover(trigger.parentElement!);
+      expect(await screen.findByText(NO_RUN_YET_HINT)).toBeInTheDocument();
+    });
+
+    /** @scenario "The editor offers a recent run of the scenario it is open on" */
+    it("offers the recent runs of that scenario beside its version", async () => {
+      const user = userEvent.setup();
+      mockGetById.mockReturnValue({
+        data: storedCase(),
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+      mockLastResults.mockReturnValue({
+        data: [{ scenarioId: "case_1", batchRunId: "batch_1" }],
+        isLoading: false,
+      });
+      openDrawerAs({ scenarioId: "case_1" });
+      render(
+        <>
+          <AgentTestingCaseEditor />
+          <AgentTestingCaseEditorDrawer />
+        </>,
+        { wrapper: Wrapper },
+      );
+
+      const trigger = await screen.findByTestId("recent-runs-trigger");
+      expect(trigger).not.toBeDisabled();
+      // It sits beside the version, which is the other thing the header says
+      // about the scenario being edited.
+      expect(
+        trigger.parentElement?.parentElement?.querySelector(
+          "[data-testid='case-modal-history']",
+        ),
+      ).not.toBeNull();
+
+      await user.click(trigger);
+      expect(await screen.findByTestId("recent-runs-list")).toBeInTheDocument();
+    });
+
+    /** @scenario "Editing a scenario names its version and opens the history" */
     /** @scenario "History opens a popover listing the versions newest first" */
     it("names the version in the header and opens the history beside it", async () => {
       const user = userEvent.setup();
@@ -316,16 +564,22 @@ describe("the test case dialog", () => {
         isError: false,
         refetch: vi.fn(),
       });
-      render(<AgentTestingCaseEditor />, { wrapper: Wrapper });
-      useAgentTestingStore.getState().openCaseEditor({ scenarioId: "case_1" });
+      openDrawerAs({ scenarioId: "case_1" });
+      render(
+        <>
+          <AgentTestingCaseEditor />
+          <AgentTestingCaseEditorDrawer />
+        </>,
+        { wrapper: Wrapper },
+      );
 
-      expect(await screen.findByText("Edit test case")).toBeInTheDocument();
+      expect(await screen.findByText("Edit scenario")).toBeInTheDocument();
       const history = screen.getByTestId("case-modal-history");
       expect(history).toHaveTextContent("v4 · History");
 
       await user.click(history);
 
-      // The history reads in place, and the case dialog stays open under it.
+      // The history reads in place, and the scenario dialog stays open under it.
       expect(
         await screen.findByTestId("scenario-version-history"),
       ).toBeInTheDocument();

@@ -76,8 +76,10 @@ def sync_detailed(
     r"""Create an API key
 
      Create a new API key. For service keys, pass keyType:\"service\". Optionally scope to specific
-    projects via projectIds (ADMIN on each). Omit projectIds for full org access. The plaintext token is
-    returned once — store it securely.
+    projects via projectIds (ADMIN on each). Omit projectIds for full org access. Pass assignedToUserId
+    to mint the key for another member, and permissionMode:\"restricted\" with a permissions list to
+    grant exactly those permissions. Minting a service key or a key for another member requires
+    organization admin rights. The plaintext token is returned once — store it securely.
 
     Args:
         body (CreateApiKeyBody):
@@ -109,8 +111,10 @@ def sync(
     r"""Create an API key
 
      Create a new API key. For service keys, pass keyType:\"service\". Optionally scope to specific
-    projects via projectIds (ADMIN on each). Omit projectIds for full org access. The plaintext token is
-    returned once — store it securely.
+    projects via projectIds (ADMIN on each). Omit projectIds for full org access. Pass assignedToUserId
+    to mint the key for another member, and permissionMode:\"restricted\" with a permissions list to
+    grant exactly those permissions. Minting a service key or a key for another member requires
+    organization admin rights. The plaintext token is returned once — store it securely.
 
     Args:
         body (CreateApiKeyBody):
@@ -137,8 +141,10 @@ async def asyncio_detailed(
     r"""Create an API key
 
      Create a new API key. For service keys, pass keyType:\"service\". Optionally scope to specific
-    projects via projectIds (ADMIN on each). Omit projectIds for full org access. The plaintext token is
-    returned once — store it securely.
+    projects via projectIds (ADMIN on each). Omit projectIds for full org access. Pass assignedToUserId
+    to mint the key for another member, and permissionMode:\"restricted\" with a permissions list to
+    grant exactly those permissions. Minting a service key or a key for another member requires
+    organization admin rights. The plaintext token is returned once — store it securely.
 
     Args:
         body (CreateApiKeyBody):
@@ -168,8 +174,10 @@ async def asyncio(
     r"""Create an API key
 
      Create a new API key. For service keys, pass keyType:\"service\". Optionally scope to specific
-    projects via projectIds (ADMIN on each). Omit projectIds for full org access. The plaintext token is
-    returned once — store it securely.
+    projects via projectIds (ADMIN on each). Omit projectIds for full org access. Pass assignedToUserId
+    to mint the key for another member, and permissionMode:\"restricted\" with a permissions list to
+    grant exactly those permissions. Minting a service key or a key for another member requires
+    organization admin rights. The plaintext token is returned once — store it securely.
 
     Args:
         body (CreateApiKeyBody):

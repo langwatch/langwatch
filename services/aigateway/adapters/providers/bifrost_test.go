@@ -54,15 +54,15 @@ func TestRawResponseFromBifrostError_UnmarshalFailure(t *testing.T) {
 		},
 	}
 
-	body, gotStatus, ok := rawResponseFromBifrostError(berr)
+	raw, ok := rawResponseFromBifrostError(berr, domain.RequestTypeResponses)
 	if !ok {
 		t.Fatalf("rawResponseFromBifrostError returned ok=false despite populated RawResponse")
 	}
-	if gotStatus != status {
-		t.Fatalf("status mismatch: got %d, want %d", gotStatus, status)
+	if raw.status != status {
+		t.Fatalf("status mismatch: got %d, want %d", raw.status, status)
 	}
-	if string(body) != `{"id":"resp_abc","object":"response"}` {
-		t.Fatalf("body mismatch: got %q", body)
+	if string(raw.body) != `{"id":"resp_abc","object":"response"}` {
+		t.Fatalf("body mismatch: got %q", raw.body)
 	}
 }
 
@@ -253,18 +253,23 @@ func TestErrFromBifrost_StatusWithoutRawBody(t *testing.T) {
 	}
 }
 
-// A zero status means no upstream HTTP response (transport failure / timeout):
-// keep the existing classification (provider_timeout), not a forwarded status.
+// A zero status means no upstream HTTP response, so there is nothing to
+// forward and the error is classified instead. It does NOT mean "timeout":
+// Bifrost stamps a genuine timeout with 504 and request_timed_out, and a
+// transport failure with its own network-error message. Reading a zero status
+// as a timeout is what put every credential and configuration failure on a
+// retryable 504 (see bifrost_error.go).
 func TestErrFromBifrost_NoStatusFallsBackToClassify(t *testing.T) {
 	berr := &bfschemas.BifrostError{
-		Error: &bfschemas.ErrorField{Message: "dial tcp: timeout"},
+		IsBifrostError: false,
+		Error:          &bfschemas.ErrorField{Message: bfNetworkErrorMessage + " (dial tcp: connection refused)"},
 	}
 	err := errFromBifrost(context.Background(), berr, nil)
 	if _, ok := err.(*domain.UpstreamError); ok {
 		t.Fatalf("transport failure must not become an UpstreamError")
 	}
-	if !herr.IsCode(err, domain.ErrProviderTimeout) {
-		t.Fatalf("expected provider_timeout, got %v", err)
+	if !herr.IsCode(err, domain.ErrProviderConnectionFailed) {
+		t.Fatalf("expected provider_connection_failed, got %v", err)
 	}
 }
 

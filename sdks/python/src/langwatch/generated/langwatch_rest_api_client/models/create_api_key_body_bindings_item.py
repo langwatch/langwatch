@@ -16,9 +16,10 @@ T = TypeVar("T", bound="CreateApiKeyBodyBindingsItem")
 class CreateApiKeyBodyBindingsItem:
     """
     Attributes:
-        role (CreateApiKeyBodyBindingsItemRole): Role to grant
-        scope_type (CreateApiKeyBodyBindingsItemScopeType): Scope level
-        scope_id (str): ID of the organization, team, or project
+        role (CreateApiKeyBodyBindingsItemRole): CUSTOM grants exactly the listed permissions and requires
+            permissionMode 'restricted'.
+        scope_type (CreateApiKeyBodyBindingsItemScopeType):
+        scope_id (str):
     """
 
     role: CreateApiKeyBodyBindingsItemRole

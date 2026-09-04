@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+	bashCommands,
 	copyFixtureToWorkDir,
 	createSkillTestWorkDir,
 	installSkillToWorkDir,
@@ -93,17 +94,32 @@ export const experimentWasCreatedOrAdvanced = ({
 		([id, runsCount]) => !before.has(id) || runsCount > (before.get(id) ?? 0),
 	);
 
+/**
+ * The shell commands the agent ran, one per line.
+ *
+ * Reads the Bash tool calls rather than the JSON of the whole transcript. A
+ * command that quotes an argument before the one under test, such as
+ * `export PATH="./bin:$PATH" && uv run script.py`, defeats a regex written
+ * over that JSON, and the check then misses a command the agent did run.
+ */
 export function executedCommandTranscript(state: {
 	messages: Array<{ content: unknown }>;
 }): string {
-	return state.messages
-		.map((message) =>
-			typeof message.content === "string"
-				? message.content
-				: JSON.stringify(message.content ?? ""),
-		)
-		.join("\n")
-		.replace(/\\/g, "");
+	return bashCommands(state as Parameters<typeof bashCommands>[0]).join("\n");
+}
+
+/**
+ * The Bash commands the agent ran, one entry each.
+ *
+ * Use this rather than the joined transcript whenever a check needs two
+ * tokens to belong to the SAME command: the joined form lets `a[\s\S]*b`
+ * match `a` in one command and `b` in another, which passes for a command
+ * the agent never ran.
+ */
+export function executedCommands(state: {
+	messages: Array<{ content: unknown }>;
+}): string[] {
+	return bashCommands(state as Parameters<typeof bashCommands>[0]);
 }
 
 export async function withExperimentWorkDir<T>({

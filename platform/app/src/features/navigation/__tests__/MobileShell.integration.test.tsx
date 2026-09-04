@@ -331,6 +331,7 @@ beforeEach(() => {
   trackEventMock.mockReset();
   commandBarOpenMock.mockReset();
   localStorage.clear();
+  localStorage.setItem("langwatch:navigation-mode:v1", "product-switcher");
   useNavigationModeStore.setState({ storedMode: "product-switcher" });
 });
 
