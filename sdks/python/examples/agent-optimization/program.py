@@ -178,9 +178,11 @@ def evaluate_suite(program: dspy.Module, label: str, run_id: str) -> dict[str, A
     """Run all six scenarios once and print the result table.
 
     Every scenario of one call shares a batch id, so the suite shows up as a
-    single batch on the Agent Testing page.
+    single batch on the Agent Testing page. The batch id is restored afterwards,
+    so the runs an optimizer makes while it compiles do not land in this batch.
     """
     batch_run_id = f"{run_id}-{label}"
+    previous_batch_run_id = os.environ.get("SCENARIO_BATCH_RUN_ID")
     os.environ["SCENARIO_BATCH_RUN_ID"] = batch_run_id
 
     evaluate = dspy.Evaluate(
@@ -190,7 +192,13 @@ def evaluate_suite(program: dspy.Module, label: str, run_id: str) -> dict[str, A
         display_table=False,
         display_progress=True,
     )
-    result = evaluate(program)
+    try:
+        result = evaluate(program)
+    finally:
+        if previous_batch_run_id is None:
+            os.environ.pop("SCENARIO_BATCH_RUN_ID", None)
+        else:
+            os.environ["SCENARIO_BATCH_RUN_ID"] = previous_batch_run_id
 
     rows = []
     for example, prediction, score in result.results:
