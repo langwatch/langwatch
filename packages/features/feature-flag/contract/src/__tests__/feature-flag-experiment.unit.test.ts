@@ -110,6 +110,15 @@ describe("findExperimentDefinitionViolations", () => {
     });
   });
 
+  describe("given an experiment marked publicAnonymous but absent from the allowlist", () => {
+    /** @scenario "A pre-authentication experiment must be on the public allowlist" */
+    it("reports it", () => {
+      expect(check({ ...good, experiment: PUBLIC_EXPERIMENT })).toEqual([
+        "release_ui_agent_testing_v2_enabled: a publicAnonymous experiment must be listed in PUBLIC_ANONYMOUS_FEATURE_FLAGS",
+      ]);
+    });
+  });
+
   describe("given catalogue versions that do not strictly increase", () => {
     /** @scenario "Catalogue versions must strictly increase" */
     it("reports the one that does not advance the watermark", () => {

@@ -149,6 +149,22 @@ describe("featureFlag target authorization", () => {
     expect(result.experiments[0]).not.toHaveProperty("organizationPolicy");
   });
 
+  /** @scenario "Setting a project policy requires the manage permission on that project" */
+  it("refuses to set a project policy without the manage permission on that project", async () => {
+    const { caller, featureFlags, hasPermission } = buildCaller();
+    hasPermission.mockResolvedValue(false);
+    const setExperimentTenantPolicy = vi.spyOn(featureFlags, "setExperimentTenantPolicy");
+
+    await expect(
+      caller.setExperimentTenantPolicy({
+        flag: FLAG,
+        scope: { kind: "project", projectId: PROJECT_ID },
+        policy: "disabled",
+      }),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(setExperimentTenantPolicy).not.toHaveBeenCalled();
+  });
+
   /** @scenario "Target rule context is derived from one canonical target" */
   it("passes the exact authorized project target to evaluation and experiment reads", async () => {
     const { caller, featureFlags } = buildCaller();

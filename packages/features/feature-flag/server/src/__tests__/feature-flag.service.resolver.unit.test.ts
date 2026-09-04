@@ -196,6 +196,28 @@ describe("FeatureFlagService", () => {
     });
   });
 
+  describe("given a default-off flag with an organization-scoped rule", () => {
+    describe("when a caller the rule does not name resolves the flag", () => {
+      /** @scenario "A rule cannot turn a default-off flag on fleet-wide" */
+      it("keeps the flag off", async () => {
+        const { service } = buildService();
+        await service.setRules({
+          key: SYSTEM_FLAG,
+          rules: [{ match: { organizationId: "org_lw" }, enabled: true }],
+          lastEditedBy: "operator-1",
+        });
+
+        const enabled = await service.isEnabled(SYSTEM_FLAG, {
+          kind: "organization",
+          userId: "user-1",
+          organizationId: "org_other",
+        });
+
+        expect(enabled).toBe(false);
+      });
+    });
+  });
+
   describe("given the force-enable list names a flag", () => {
     /** @scenario "The force-enable list turns a flag on for local development" */
     it("returns true even though the store disables it", async () => {

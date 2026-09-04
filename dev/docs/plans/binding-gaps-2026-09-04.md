@@ -88,3 +88,27 @@ behaviour unchanged. Two harnesses never made the port:
   with real project/API-key auth. Blocks `lwql-saved-charts` (17),
   `lwql-langy-authoring` (11), `dashboard-rest-api` (2). Achievable without
   ClickHouse; the suite-family harness is the model to follow.
+
+## Identity behaviours absent (found binding specs/identity, 2026-09-04 evening)
+
+- **Impersonation second factor.** Main's `ee/admin/impersonation.service.ts` refused
+  impersonation into an organization that requires a second factor unless the
+  operator had one (`cannot_impersonate_without_second_factor`). Today's
+  `packages/features/ops/server/src/services/impersonation.service.ts` has no such
+  check. Two scenarios in `specs/identity/mfa-and-session-shape.feature`.
+- **Per-user migration cohort.** Main's `userMigrationPassCohort` mapped organization
+  enrollment onto user membership; `ops.system-migration-cohort.ts` only decides at
+  organization level. `identifier-model.feature` "Organization enrollment is what puts
+  a user in the backfill's cohort".
+- **Reconciliation sweep on every migration pass.** Main composed
+  `identityNewbornReconciliation().runPass` into `runSystemMigrationPass`; today's
+  ops `system-migrations.service.ts` never calls the newborn reconciliation service,
+  so it exists unwired. `identity-storage-adapter.feature` "The reconciliation sweep
+  runs on every migration pass".
+
+## architecture-lint rules with a scenario but no implementation (8)
+
+Contract runtime acquisition, transport-neutral contracts, server browser deps for
+ordinary packages, composition-root-only server installers (+ its test exception),
+package-escape relative imports, sealed subpaths for backend packages, and the
+overview scenario. Bind or retire when the lint end-state is designed.

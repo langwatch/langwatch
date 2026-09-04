@@ -233,6 +233,7 @@ describe("combined contributor runtime", () => {
 });
 
 describe("Enterprise aggregate boundaries", () => {
+  /** @scenario Enterprise aggregate packages have fixed roles and names */
   it("accepts fixed packages, compatible feature surfaces, and matching apps", () => {
     enterpriseRoot();
     enterpriseFeature("billing", "contract");
@@ -263,6 +264,7 @@ describe("Enterprise aggregate boundaries", () => {
     expect(relevant).toEqual([]);
   });
 
+  /** @scenario Enterprise composition packages preserve runtime graphs */
   it("rejects cross-composition, incompatible surface, and mismatched app dependencies", () => {
     enterpriseRoot();
     enterpriseFeature("billing", "web");

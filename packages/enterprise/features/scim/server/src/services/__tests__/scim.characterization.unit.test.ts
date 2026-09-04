@@ -233,6 +233,7 @@ describe("SCIM characterization: provisioning invariants", () => {
     });
   });
 
+  /** @scenario Membership is no longer a fixed role written beside the grant */
   it("keeps grant reconciliation as the only membership-write path", async () => {
     const writer = new GrantsFake();
     const repo = repository({

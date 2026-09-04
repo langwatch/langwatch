@@ -341,6 +341,7 @@ describe("given a signed-out visitor", () => {
       expect(entry).toMatchObject({ enabled: true, decision: "anonymous-bucket" });
     });
 
+    /** @scenario "A signed-out browser reads a flag that opted into pre-authentication" */
     it("appears on the public map", async () => {
       const { service, makeAvailable } = harness({
         experiment: { ...EXPERIMENT, publicAnonymous: true },
