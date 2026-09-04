@@ -323,8 +323,8 @@ describe("GatewayService configuration bundle", () => {
           organizationId: "org_1",
           traceProjectId: "project_1",
           guardrailAttachments: [
-            { direction: "input", guardrailIds: ["guardrail_present", "guardrail_absent"] },
-            { direction: "output", guardrailIds: ["guardrail_absent"] },
+            { direction: "pre", guardrailIds: ["guardrail_present", "guardrail_absent"] },
+            { direction: "post", guardrailIds: ["guardrail_absent"] },
           ],
         });
 
@@ -334,7 +334,7 @@ describe("GatewayService configuration bundle", () => {
         // catalogue does not hold, so it leaves the bundle entirely rather
         // than travelling as an empty direction the gateway would enforce.
         expect(bundle.attachments).toEqual([
-          { direction: "input", guardrailIds: ["guardrail_present"] },
+          { direction: "pre", guardrailIds: ["guardrail_present"] },
         ]);
       });
 
@@ -348,7 +348,7 @@ describe("GatewayService configuration bundle", () => {
         const bundle = await service.loadConfigurationPersistence({
           organizationId: "org_1",
           traceProjectId: null,
-          guardrailAttachments: [{ direction: "input", guardrailIds: ["guardrail_present"] }],
+          guardrailAttachments: [{ direction: "pre", guardrailIds: ["guardrail_present"] }],
         });
 
         expect(bundle.cacheRules).toEqual([{ id: "rule_enabled" }]);

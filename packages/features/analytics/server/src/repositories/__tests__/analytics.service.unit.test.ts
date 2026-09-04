@@ -8,7 +8,7 @@ import type {
 } from "@langwatch/analytics-contract";
 import { AnalyticsService } from "../../services/analytics.service";
 import { AnalyticsAdapter } from "../../index";
-import { NullAnalyticsEvaluationRepository } from "../../testing";
+import { NullAnalyticsEvaluationRepository } from "../analytics-persistence.repository";
 import { AnalyticsRepository, type AnalyticsTimeseriesQuery } from "../analytics.repository";
 
 const input = (overrides: Partial<AnalyticsTimeseriesInput> = {}): AnalyticsTimeseriesInput => ({

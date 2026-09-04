@@ -114,7 +114,7 @@ async function clean(): Promise<void> {
 describe.skipIf(!databaseUrl)("PrismaProcessStore", () => {
   beforeAll(() => {
     prisma = database();
-    store = new PrismaProcessStore(prisma);
+    store = PrismaProcessStore.create({ database: prisma });
   });
 
   beforeEach(() => {

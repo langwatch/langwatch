@@ -61,7 +61,7 @@ describe.skipIf(!DB_URL)("process ops against a real Postgres", () => {
     prisma = connection.client as PrismaClient;
 
     fleet = new ProcessOpsPrismaRepository(prisma);
-    store = new PrismaProcessStore(prisma);
+    store = PrismaProcessStore.create({ database: prisma });
     service = new ManagerExplorerService({
       store,
       fleet,

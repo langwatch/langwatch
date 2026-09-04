@@ -47,6 +47,7 @@ describe("parseTimeseriesRows", () => {
       const result = parseTimeseriesRows({
         rows,
         series: [passRateSeries],
+        groupBy: undefined,
         timeScale: 1440,
       });
       const seriesName = buildSeriesName(passRateSeries, 0);
@@ -90,6 +91,7 @@ describe("parseTimeseriesRows", () => {
       const result = parseTimeseriesRows({
         rows,
         series: [passRateSeries, runsSeries],
+        groupBy: undefined,
         timeScale: 1440,
       });
       const passRateName = buildSeriesName(passRateSeries, 0);
@@ -122,6 +124,7 @@ describe("parseTimeseriesRows", () => {
       const result = parseTimeseriesRows({
         rows,
         series: [passRateSeries],
+        groupBy: undefined,
         timeScale: 1440,
       });
       const seriesName = buildSeriesName(passRateSeries, 0);
@@ -154,6 +157,7 @@ describe("parseTimeseriesRows", () => {
       const result = parseTimeseriesRows({
         rows,
         series: [passRateSeries, runsSeries],
+        groupBy: undefined,
         timeScale: 1440,
       });
       const runsName = buildSeriesName(runsSeries, 1);
@@ -247,6 +251,7 @@ describe("parseTimeseriesRows", () => {
       const result = parseTimeseriesRows({
         rows,
         series: [sumPerUser, avgPerUser],
+        groupBy: undefined,
         timeScale: 1440,
       });
       const sumName = buildSeriesName(sumPerUser, 0);

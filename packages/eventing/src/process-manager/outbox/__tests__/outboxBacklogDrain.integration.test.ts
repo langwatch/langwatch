@@ -76,7 +76,7 @@ function commit(batch: NewOutboxMessage[]): ProcessCommit<{ seeded: true }> {
 describe.skipIf(!databaseUrl)("outbox backlog drain under slow deliveries", () => {
   beforeAll(() => {
     prisma = database();
-    store = new PrismaProcessStore(prisma);
+    store = PrismaProcessStore.create({ database: prisma });
   });
 
   beforeEach(() => {

@@ -99,6 +99,15 @@ class StubInvitesPort implements BetterAuthPendingInvitePort {
 class StubAnnouncementsPort implements BetterAuthAnnouncementsPort {
   readonly trackServerEvent = vi.fn();
   readonly reportError = vi.fn();
+  announceSignup(): never {
+    throw new Error("StubAnnouncementsPort.announceSignup is not used by this test");
+  }
+  ssoAutoAddNurturing(): never {
+    throw new Error("StubAnnouncementsPort.ssoAutoAddNurturing is not used by this test");
+  }
+  sessionNurturing(): never {
+    throw new Error("StubAnnouncementsPort.sessionNurturing is not used by this test");
+  }
 }
 
 function organizationPrisma(organization: { id: string; ssoDomain: string } | null): PrismaClient {

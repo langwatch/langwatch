@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { type GatewayBudget, Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { GatewayBudgetClickHouseRepository } from "../../testing";
+import { GatewayBudgetClickHouseRepository } from "../../repositories/clickhouse/clickhouse.gateway-budget.repository";
 import { type LedgerEventRow } from "../../ports/gateway-budget-spend.port";
 import { PrismaGatewayAdapter } from "../../adapters/prisma.gateway.adapter";
 

@@ -8,6 +8,7 @@
  * @see specs/scenarios/scenario-version-restore.feature
  */
 import { describe, expect, it } from "vitest";
+import type { ScenarioUpdateInput } from "../scenario";
 import {
   buildSnapshotEnvelope,
   changedSnapshotFields,
@@ -73,17 +74,25 @@ describe("changedSnapshotFields", () => {
 });
 
 describe("touchesVersionedFields", () => {
+  const updateInput = (
+    overrides: Partial<Omit<ScenarioUpdateInput, "id" | "projectId">> = {},
+  ): ScenarioUpdateInput => ({
+    id: "scenario_1",
+    projectId: "project_1",
+    ...overrides,
+  });
+
   it("is true when an editable field is sent", () => {
-    expect(touchesVersionedFields({ situation: "New text" })).toBe(true);
+    expect(touchesVersionedFields(updateInput({ situation: "New text" }))).toBe(true);
   });
 
   it("is false for a test suite move", () => {
-    expect(touchesVersionedFields({ testSuiteId: "suite_1" })).toBe(false);
-    expect(touchesVersionedFields({ testSuiteId: null })).toBe(false);
+    expect(touchesVersionedFields(updateInput({ testSuiteId: "suite_1" }))).toBe(false);
+    expect(touchesVersionedFields(updateInput({ testSuiteId: null }))).toBe(false);
   });
 
   it("is false for an author stamp alone", () => {
-    expect(touchesVersionedFields({ lastUpdatedById: "user_1" })).toBe(false);
+    expect(touchesVersionedFields(updateInput({ lastUpdatedById: "user_1" }))).toBe(false);
   });
 });
 

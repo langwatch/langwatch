@@ -90,7 +90,7 @@ export class TestProjectService extends ProjectService {
   tryGetTraceDestination() {
     return this.unsupported();
   }
-  listTraceDestinations() {
+  listTraceDestinations(): ReturnType<ProjectService["listTraceDestinations"]> {
     return this.unsupported();
   }
 }

@@ -14,7 +14,7 @@ import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import { randomUUID } from "node:crypto";
 import { afterAll, describe, expect, it } from "vitest";
 import type { AnalyticsEvaluationRow } from "@langwatch/analytics-contract";
-import { ClickHouseAnalyticsEvaluationRepository } from "../testing";
+import { ClickHouseAnalyticsEvaluationRepository } from "../repositories/clickhouse/clickhouse.analytics-persistence.repository";
 
 const configuredClickHouseUrl = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
 const databaseUrl = configuredClickHouseUrl ? new URL(configuredClickHouseUrl) : null;

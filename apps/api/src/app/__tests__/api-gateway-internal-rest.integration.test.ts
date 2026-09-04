@@ -21,6 +21,7 @@
 import type { ApiKeyService } from "@langwatch/api-key-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { AppRestSecurity } from "@langwatch/api/rest";
+import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import { buildGatewayCanonicalString, computeGatewaySignature } from "@langwatch/gateway-server";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
@@ -92,12 +93,13 @@ function testSpendCommandSenders() {
 function testGuardrails(options?: {
   guardrails?: Array<{ id: string; evaluatorId: string; failureMode: string }>;
   monitors?: Array<{ id: string; evaluatorId: string; checkType: string; parameters: unknown }>;
-  runEvaluator?: ReturnType<typeof vi.fn>;
+  runEvaluator?: () => Promise<SingleEvaluationResult>;
 }) {
   const findMany = vi.fn(async () => options?.guardrails ?? []);
   const listEnabledGuardrailMonitors = vi.fn(async () => options?.monitors ?? []);
   const runEvaluator =
-    options?.runEvaluator ?? vi.fn(async () => ({ status: "processed" as const, passed: true }));
+    options?.runEvaluator ??
+    vi.fn(async (): Promise<SingleEvaluationResult> => ({ status: "processed", passed: true }));
   return { findMany, listEnabledGuardrailMonitors, runEvaluator };
 }
 
@@ -382,11 +384,13 @@ describe("the gateway internal control plane", () => {
         monitors: [
           { id: "mon_1", evaluatorId: "eval_1", checkType: "langevals/basic", parameters: {} },
         ],
-        runEvaluator: vi.fn(async () => ({
-          status: "processed" as const,
-          passed: false,
-          details: "PII detected: email",
-        })),
+        runEvaluator: vi.fn(
+          async (): Promise<SingleEvaluationResult> => ({
+            status: "processed",
+            passed: false,
+            details: "PII detected: email",
+          }),
+        ),
       });
       const app = composeFamily({ changes: testChangeEventRows(), guardrails });
 

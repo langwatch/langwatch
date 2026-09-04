@@ -201,7 +201,7 @@ function harness() {
     ports: {
       rateLimit: async () => ({ allowed: true, resetAt: 0 }),
       providers,
-      listSlackChannels: async () => ({ channels: [], gaps: [] }),
+      listSlackChannels: async () => ({ channels: [], error: null, gaps: [] }),
     },
   });
 

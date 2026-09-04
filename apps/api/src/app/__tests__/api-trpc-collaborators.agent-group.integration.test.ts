@@ -123,7 +123,7 @@ function testPrisma() {
   } as unknown as PrismaClient;
 
   const held = client as unknown as {
-    scenario: { findMany: ReturnType<typeof vi.fn> };
+    scenario: { findMany: ReturnType<typeof vi.fn>; findFirst: ReturnType<typeof vi.fn> };
     simulationSuite: { findMany: ReturnType<typeof vi.fn> };
     langyConversationProjection: { findMany: ReturnType<typeof vi.fn> };
   };

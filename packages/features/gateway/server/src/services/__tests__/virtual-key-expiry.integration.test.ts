@@ -24,7 +24,15 @@ import {
   toVirtualKeySnakeDto,
 } from "../../adapters/gateway-virtual-key-dto.adapter";
 import { VirtualKeyService } from "../virtual-key.service";
+import type { ProjectService } from "@langwatch/project-contract";
 import { TestProjectService } from "./support/test-project-service";
+
+/** A trace destination lookup that answers no archived projects, for keys created without one. */
+class NoTraceDestinationsProjectService extends TestProjectService {
+  listTraceDestinations(): ReturnType<ProjectService["listTraceDestinations"]> {
+    return Promise.resolve([]);
+  }
+}
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
@@ -130,7 +138,7 @@ describe.skipIf(!databaseUrl)("virtual key expiration dates (real PG)", () => {
       const dto = toVirtualKeySnakeDto({
         virtualKey: await service.getById(vk.id, ORG_ID).then((k) => k!),
         facts: await loadTraceDestinationFacts({
-          client: prisma,
+          projects: new NoTraceDestinationsProjectService(),
           virtualKeys: [vk],
         }),
       });
