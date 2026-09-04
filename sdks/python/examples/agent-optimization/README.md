@@ -63,3 +63,46 @@ dollars on `gpt-5-mini` plus the `gpt-5` reflection calls. Lower
 - **Agent Testing**, set `dspy-optimization`: every scenario run. The two suite
   evaluations arrive as the batches `<run_id>-baseline` and `<run_id>-best`, so
   the same six scenarios can be read side by side before and after.
+
+## The same agent as a connected agent
+
+`connected_agent.py` is the same ACME returns agent as a plain OpenAI
+tool-calling loop, registered with `@langwatch.connect_agent(name="returns-agent")`.
+It imports the four tools and the orders from `agent.py`, so the two files test
+the same behaviour. Use it when you want to run the suite from the platform or
+from the `langwatch` CLI instead of from DSPy.
+
+It declares two run parameters: `model`, a closed list of `gpt-5` and
+`gpt-5-mini`, and `plan`, free text appended to the system prompt.
+
+The tool contract is picked by an environment variable, so a comparison run has
+a real before and after side:
+
+| `RETURNS_AGENT_TOOL_DESCRIPTIONS` | `check_return_eligibility` |
+|---|---|
+| `weak` | The description does not name the accepted `reason` values and the parameter is a free-text string. The model guesses, the tool rejects the call, the agent retries. |
+| `explicit` (default) | The description lists the accepted values and the schema carries them as an enum. |
+
+Run one process per environment to compare the two:
+
+```bash
+APP_ENV=production RETURNS_AGENT_TOOL_DESCRIPTIONS=weak uv run connected_agent.py
+uv run connected_agent.py    # development, explicit
+```
+
+Both processes need `LANGWATCH_API_KEY` and `OPENAI_API_KEY`. Each one registers
+`returns-agent` in its own environment, and the platform shows both online.
+
+Create a test suite named `Returns` with the six scenarios of `scenarios.py`,
+then run it against either side:
+
+```bash
+langwatch test-suite run "Returns" --target connected:returns-agent@development --wait
+
+langwatch test-suite run "Returns" \
+  --target connected:returns-agent@production \
+  --target connected:returns-agent@development \
+  --wait
+```
+
+The guide for this file: https://langwatch.ai/docs/improve-your-agent/fix-tool-calls
