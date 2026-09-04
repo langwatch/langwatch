@@ -1,0 +1,59 @@
+---
+title: Improve Your Agent
+sidebarTitle: Overview
+keywords: langwatch, agent improvement, agent optimization, reduce turns, tool calls, cost, latency, scenarios, dspy, langy
+description: Make your agent faster, cheaper and shorter without making it worse, with a scenario test suite as the quality gate and one hypothesis at a time.
+---
+
+## What the improvement loop is
+
+The agent improvement loop is the process of changing an agent and proving that the change did not lower its quality. Quality is a test suite of [scenarios](/agent-testing/scenarios) that pass on the agent you trust today. Turns, tokens, cost and latency are metrics you push down while that suite keeps passing.
+
+An agent has no single expected output to score. A conversation can end well after three turns or after ten, and a tool can fail twice and still get the right answer at the end. So a metric alone cannot tell you the agent got worse. The judge in a scenario can: it reads the whole conversation and the agent's traces, passes or fails each criterion and writes why.
+
+## The loop
+
+| Step | What you do | Where |
+|---|---|---|
+| 1. Define quality | Write five to ten scenarios from real conversations, with the criteria the agent must meet. Run them on the model and prompt you trust. Every scenario passes: this is the baseline. | [Scenarios](/agent-testing/scenarios), [Test suites](/agent-testing/test-suites) |
+| 2. Measure | Read the pass rate, the cost and the reply latency of the baseline run. Open the longest conversation and count the turns. | [Results](/agent-testing/results) |
+| 3. Change one thing | A smaller model, a rewritten tool description, a tool that validates its input, a shorter prompt, a lower iteration cap. One change per run, so the result has one cause. | Your code |
+| 4. Compare | Run the same suite against the changed agent, next to the baseline. Keep the change when the pass rate holds and the metric moved. | [Compare agents](/agent-testing/compare-agents) |
+
+Repeat from step 3. Put the suite in CI so a later change cannot undo the gain: see [Run from CI](/agent-testing/run-from-ci).
+
+## Where the changes come from
+
+The scenario results point at the change. A failing criterion cites the turn and the trace that broke it. A passing scenario that took ten turns has a conversation you can read, and the tool retries in it are the first hypothesis.
+
+Two engines run the loop for you:
+
+- **Guided.** Langy, or your own coding agent with the LangWatch skills, reads the results and the traces, proposes one change, applies it, reruns the suite and compares. You review the change as a pull request. See [Prompt optimization with Langy](/langy/prompt-optimization) for the prompt case.
+- **Algorithmic.** A DSPy optimizer rewrites the instructions and the tool descriptions and scores every candidate by running the suite. The judge's reasoning is the feedback the optimizer learns from. See [Optimize with DSPy](/improve-your-agent/optimize-with-dspy).
+
+Use the guided engine when the change is in code, in a tool or in the harness. Use the algorithmic engine when the change is in text and you have the budget to run the suite fifty times.
+
+## Guides
+
+<CardGroup cols={2}>
+  <Card title="Reduce turns" icon="arrow-down-short-wide" href="/improve-your-agent/reduce-turns">
+    Find why the agent takes ten turns for a three-turn task, change the cause, and prove the suite still passes.
+  </Card>
+  <Card title="Fix tool calls" icon="wrench" href="/improve-your-agent/fix-tool-calls">
+    Catch a tool that the agent retries, rewrite the tool contract, and assert on the tool calls in the criteria.
+  </Card>
+  <Card title="Reduce cost and latency" icon="gauge-high" href="/improve-your-agent/reduce-cost-and-latency">
+    Run the same suite on two models side by side and keep the cheaper one where the pass rate holds.
+  </Card>
+  <Card title="Optimize with DSPy" icon="flask" href="/improve-your-agent/optimize-with-dspy">
+    Let an optimizer rewrite the instructions and the tool descriptions, scored by your scenarios.
+  </Card>
+  <Card title="Optimization algorithms" icon="table-list" href="/improve-your-agent/algorithms">
+    What each algorithm changes, what it needs, what it costs and when to use it.
+  </Card>
+  <Card title="Prompt optimization with Langy" icon="robot" href="/langy/prompt-optimization">
+    The same loop on a single prompt, on the experiments workbench, with a dataset and an evaluator.
+  </Card>
+</CardGroup>
+
+<Info>**Also check:** [Agent testing](/agent-testing/overview) (how a scenario runs), [Connect your agent](/agent-testing/connect-your-agent) (one decorator, so the suite runs against your real code), [Skills directory](/skills/directory) (the `agent-improve` and `agent-performance` skills for your coding agent).</Info>

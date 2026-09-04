@@ -61157,7 +61157,7 @@ keywords:
 
 Prompt optimization is a Langy skill that measures your prompt's current score, writes a better version, and proves the improvement with your evaluator and dataset. Open it from the **Optimize this prompt** menu item on any prompt column in the Experiments Workbench.
 
-<Info>**Also check:** [Ask Langy](/langy/chat) (other things you can ask), [Experiments overview](/evaluations/experiments/overview) (what the workbench is), [Evaluators](/evaluations/evaluators/overview) (the scoring functions Langy uses).</Info>
+<Info>**Also check:** [Ask Langy](/langy/chat) (other things you can ask), [Experiments overview](/evaluations/experiments/overview) (what the workbench is), [Evaluators](/evaluations/evaluators/overview) (the scoring functions Langy uses), [Improve your agent](/improve-your-agent/overview) (the same loop on a whole agent, with scenarios as the gate).</Info>
 
 <video
   controls

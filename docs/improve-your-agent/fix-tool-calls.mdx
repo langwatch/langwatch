@@ -1,0 +1,140 @@
+---
+title: Fix and Optimize Tool Calls
+sidebarTitle: Fix tool calls
+keywords: langwatch, tool calls, tool optimization, tool description, function calling, tool retries, scenarios, has_tool_call
+description: Catch a tool the agent calls wrong or retries, change the tool contract so the model gets it right the first time, and assert on the tool calls in your scenarios.
+---
+
+A tool call goes wrong in two ways: the agent calls the wrong tool, or it calls the right tool with arguments the tool rejects. The second is the common one, and it is silent: the agent retries with new wording until the call succeeds, the conversation ends well, and the only trace of the problem is three failed calls in the trace and five extra seconds of latency.
+
+## How a bad tool call shows up
+
+- **As a failed criterion.** The judge reads the agent's traces, so a criterion such as `The agent creates the return` fails when the call never succeeded, and the reasoning cites the tool and its error.
+- **As a passing scenario with retries inside it.** The verdict is green and the conversation took eight turns. Open the conversation, then the trace link on the run: the tool span appears three times, the first two with an error.
+
+<Frame caption="The trace link on a run. The judge read this trace; you can too.">
+<img className="block" src="/images/agent-testing/run-drawer-trace-link.png" alt="The conversation drawer of a run with the link to the agent's trace" />
+</Frame>
+
+To make the second case fail on its own, add a criterion for the process, not only the outcome: `The agent does not call check_return_eligibility more than once for the same order`.
+
+## Step 1: Read the error the model saw
+
+Open the failed tool span in the trace and read its output. What the model saw decides what it did next. `invalid input` sends the model into guessing. `reason must be one of: damaged, wrong_item, not_as_described, changed_mind` lets it fix the call on the next try, and with the values in the tool description it gets the first call right.
+
+## Step 2: Change the tool contract
+
+In order of yield:
+
+1. **Put the accepted values in the parameter description, or in the schema.** An enum in the schema removes the guess; a description that lists the values comes second.
+2. **Return an error the model can act on.** The error names the parameter and the accepted values.
+3. **Validate at the boundary.** Reject the call before it reaches your service, with the same message.
+4. **One tool per job.** A tool that needs three calls to return one answer gets merged into one call, or a second tool returns the answer in one step.
+5. **Cap the retries in the harness.** After the second failure on the same tool the agent escalates or asks the user. A fourth try is never the fix.
+
+The difference in the tool itself:
+
+```python
+def check_return_eligibility(order_id: str, reason: str) -> str:
+    """Check if an order can be returned."""
+    ...
+```
+
+```python
+REASONS = ("damaged", "wrong_item", "not_as_described", "changed_mind")
+
+def check_return_eligibility(order_id: str, reason: str) -> str:
+    """Check if an order can be returned.
+
+    reason must be one of: damaged, wrong_item, not_as_described, changed_mind.
+    Returns the return window and whether the order is inside it.
+    """
+    if reason not in REASONS:
+        raise ValueError(f"reason must be one of: {', '.join(REASONS)}")
+    ...
+```
+
+The model reads the docstring as the tool description. The first version makes it guess the value of `reason`; the second makes the first call succeed.
+
+## Step 3: Assert on the tool calls
+
+On the platform, write the tool calls into the criteria of the scenario:
+
+```text title="Criteria"
+The agent looks up the order before it answers
+The agent calls check_return_eligibility once, with one of the accepted reasons
+The agent creates the return and confirms the refund method
+```
+
+In code, a script step checks the conversation state directly. `has_tool_call` checks that the agent called a tool; a plain function counts the calls:
+
+```python
+import scenario
+
+def eligibility_checked_once(state: scenario.ScenarioState):
+    calls = [
+        call
+        for message in state.messages
+        if message["role"] == "assistant"
+        for call in (message.get("tool_calls") or [])
+        if call["function"]["name"] == "check_return_eligibility"
+    ]
+    assert len(calls) == 1, f"check_return_eligibility was called {len(calls)} times"
+
+result = await scenario.run(
+    name="damaged item refund",
+    description="The customer received a damaged blender, order 1001, and wants a refund.",
+    agents=[ReturnsAgent(), scenario.UserSimulatorAgent(), scenario.JudgeAgent(criteria=[
+        "The agent creates the return",
+        "The agent confirms the refund method",
+    ])],
+    script=[
+        scenario.user(),
+        scenario.agent(),
+        eligibility_checked_once,
+        scenario.proceed(),
+    ],
+)
+```
+
+See [Scenarios in code](/agent-testing/scenarios-in-code) for the adapter and the script steps.
+
+## Step 4: Rerun and compare
+
+Run the suite against the changed agent next to the baseline:
+
+```bash
+langwatch test-suite run "Returns" \
+  --target connected:returns-agent@production \
+  --target connected:returns-agent@development \
+  --wait
+```
+
+The changed side passes the new criteria, and its **Average reply latency** is lower by the time the retries took. Keep the criteria: they are the regression test for this tool.
+
+## Do it with Langy
+
+Ask [Langy](/langy/chat):
+
+```text
+In the last run of the Returns suite, find every tool call that failed or was retried,
+tell me what the model saw, and fix the tool descriptions and the error messages in a pull request.
+```
+
+## Do it with your coding agent
+
+```bash
+npx skills add langwatch/skills/agent-improve
+```
+
+```text
+/agent-improve The returns-agent retries check_return_eligibility with different reasons. Read the traces of the last Returns run, fix the tool contract, and add a criterion that fails when the tool is called twice.
+```
+
+## Common failures
+
+- **The agent still retries.** The values are in the docstring and the model does not use them: move them into the schema as an enum, or into the error message.
+- **The criterion fails on a scenario that should not call the tool.** Scope the criterion to the situation: `When the customer asks for a return, the agent calls ...`. The judge reads the condition.
+- **The tool span is missing from the trace.** The tool runs outside the traced function. See [Linking your traces](/agent-testing/linking-your-traces).
+
+<Info>**Also check:** [Reduce turns](/improve-your-agent/reduce-turns), [Optimize with DSPy](/improve-your-agent/optimize-with-dspy) (an optimizer rewrites the tool descriptions for you), the Scenario guide on [testing tool calls](https://scenario.langwatch.ai/testing-guides/tool-calling).</Info>

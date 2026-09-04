@@ -1,0 +1,100 @@
+---
+title: Reduce the Turns of an Agent
+sidebarTitle: Reduce turns
+keywords: langwatch, reduce turns, agent turns, tool retries, agent latency, scenarios, test suite, compare agents
+description: Find why a tool-using agent takes ten turns for a task that needs three, change the cause, and prove with the test suite that the answers did not get worse.
+---
+
+A turn is one reply from your agent, with the tool calls it made before that reply. An agent that takes ten turns for a return request costs three times what a three-turn agent costs and keeps the customer waiting three times as long. The extra turns have a small number of causes, and each one is visible in a scenario run.
+
+## What you need
+
+- Your agent [connected to LangWatch](/agent-testing/connect-your-agent), so the suite runs against your real code and the judge reads your traces.
+- A [test suite](/agent-testing/test-suites) of five to ten scenarios that pass today. Take the situations from real conversations, and put the long ones in.
+
+## Step 1: Measure the baseline
+
+Run the suite once and keep the run as the baseline.
+
+```bash
+langwatch test-suite run "Returns" --target connected:returns-agent@development --wait
+```
+
+The run header shows **Avg Agent Latency** and **Avg Agent Cost**. Sort the table by **Time · cost** and open the slowest conversation. Count the agent's replies, and read the judge's reasoning under the verdict: it cites the turn where the agent looped.
+
+<Frame caption="The run detail, with Time · cost per scenario. The slowest row is the first conversation to open.">
+<img className="block" src="/images/agent-testing/run-detail-table.png" alt="A run detail table with one row per scenario, the verdict, the evaluators and the time and cost of each" />
+</Frame>
+
+## Step 2: Find the cause
+
+Read the long conversation against this list, in order. The first match is the hypothesis.
+
+1. **A tool rejects the input and the agent retries with different wording.** The same tool appears two or three times in a row in the trace, each call with an error. The tool description does not state the accepted values. See [Fix tool calls](/improve-your-agent/fix-tool-calls).
+2. **The agent asks the user for what a tool could answer.** The agent asks for the order date when `lookup_order` returns it. The tool description does not say what the tool returns.
+3. **The agent calls tools one per turn.** Three lookups take three turns. The model supports parallel tool calls and the harness has them off, or the prompt tells the agent to check one thing at a time.
+4. **The agent narrates before it acts.** "Let me check that for you" is a turn with no tool call and no answer. Tell the agent in the prompt to act first and answer once.
+5. **A high iteration cap lets a confused agent wander.** After the second failed tool call the agent should escalate or ask, not try a fourth time. Cap the iterations in the harness and add a criterion for the escalation.
+
+## Step 3: Change one cause and compare
+
+Make one change. Run the suite again as a comparison against the baseline target, so both sides appear in one run with the same scenarios:
+
+```bash
+langwatch test-suite run "Returns" \
+  --target connected:returns-agent@production \
+  --target connected:returns-agent@development \
+  --wait
+```
+
+The run detail shows one column per target with the pass rate, the cost and the latency of each, and four charts above them: **Pass rate**, **Total cost**, **Average reply latency** and **Pass rate over runs**. Keep the change when the pass rate holds and the latency and the cost went down. When a criterion fails on the changed side, the judge's reasoning says which turn the agent skipped.
+
+<Frame caption="A comparison run: one column per target, and the charts above the table.">
+<img className="block" src="/images/agent-testing/comparison-run-detail.png" alt="A comparison run with one column per target, the four charts and the matrix of results" />
+</Frame>
+
+To pin the gain, add a criterion that counts: `The agent completes the return within four replies`. The judge counts the replies in the conversation and fails the scenario when the agent takes more.
+
+## Step 4: Keep it in CI
+
+Run the suite on every pull request that touches the agent, so a later change cannot bring the turns back:
+
+```bash
+langwatch test-suite run "Returns" --target connected:returns-agent@staging --wait
+```
+
+The command exits 1 when a scenario fails. See [Run from CI](/agent-testing/run-from-ci).
+
+## Do it with Langy
+
+Ask [Langy](/langy/chat):
+
+```text
+Reduce the number of turns of returns-agent on the Returns suite without failing any scenario.
+Start from the longest conversation in the last run, tell me the cause, and open a pull request with one change.
+```
+
+Langy reads the run, opens the conversation and its traces, names the cause, changes the prompt or the tool description in your repository and reruns the suite before it hands you the pull request.
+
+## Do it with your coding agent
+
+Install the skills once, then ask your coding agent the same thing:
+
+```bash
+npx skills add langwatch/skills/agent-improve
+npx skills add langwatch/skills/scenarios
+```
+
+```text
+/agent-improve The returns-agent takes eight to ten turns on the Returns suite. Find the cause in the last run and reduce the turns without failing a scenario.
+```
+
+The skill reads the runs and the traces through the `langwatch` CLI, forms a hypothesis, changes the code and reruns the suite.
+
+## Common failures
+
+- **The pass rate dropped.** Revert the change. The failed criterion cites the turn where the agent stopped doing something it did before, such as confirming the refund method before it created the return.
+- **The turns did not move.** The cause is in a tool, not in the prompt: the agent retries because the tool still rejects the input. Fix the tool contract first.
+- **The latency dropped and the cost did not.** The agent takes fewer turns with longer prompts. Read the token count on the trace, and shorten the context: see [Reduce cost and latency](/improve-your-agent/reduce-cost-and-latency).
+
+<Info>**Also check:** [Compare agents](/agent-testing/compare-agents), [Results](/agent-testing/results), [Linking your traces](/agent-testing/linking-your-traces) (what the judge reads).</Info>

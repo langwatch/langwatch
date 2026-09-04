@@ -1,0 +1,115 @@
+---
+title: Reduce Cost and Latency
+sidebarTitle: Reduce cost and latency
+keywords: langwatch, reduce cost, reduce latency, cheaper model, model comparison, run parameters, compare agents, context size, tokens
+description: Run the same test suite on two models side by side, read the pass rate, the cost and the reply latency of each, and keep the cheaper model only where the pass rate holds.
+---
+
+The cost of an agent is the tokens per turn times the turns per conversation times the price of the model. Latency follows the same three factors. The model is the lever with the largest effect and the largest risk, so it is the one to test first, with the suite as the gate.
+
+## Step 1: Declare the model as a run parameter
+
+A [connected agent](/agent-testing/connect-your-agent) declares its run parameters in the signature of the function. A `Literal` becomes a closed option list in the run dialog:
+
+<Tabs>
+  <Tab title="Python">
+```python
+from typing import Literal
+import langwatch
+
+@langwatch.connect_agent(name="returns-agent")
+def returns_agent(
+    messages: list[langwatch.Message],
+    model: Literal["gpt-5", "gpt-5-mini"] = "gpt-5",
+) -> str:
+    ...
+```
+  </Tab>
+  <Tab title="TypeScript">
+```typescript
+import { connectAgent } from "langwatch/agent";
+
+export const returnsAgent = connectAgent(
+  {
+    name: "returns-agent",
+    parameters: {
+      model: { options: ["gpt-5", "gpt-5-mini"], default: "gpt-5" },
+    },
+  },
+  async ({ messages, params }) => {
+    ...
+  },
+);
+```
+  </Tab>
+</Tabs>
+
+See [Run parameters](/agent-testing/run-parameters#parameters-declared-by-the-agent).
+
+## Step 2: Run the suite on both models in one run
+
+In the run dialog, click **Compare agents**, keep the same agent on both rows and set `model=gpt-5` on one and `model=gpt-5-mini` on the other. From the CLI, name the target twice with the parameter after the question mark:
+
+```bash
+langwatch test-suite run "Returns" \
+  --target 'connected:returns-agent@development?model=gpt-5' \
+  --target 'connected:returns-agent@development?model=gpt-5-mini' \
+  --repeat 3 \
+  --wait
+```
+
+`--repeat 3` runs every scenario three times per target, so one lucky pass does not decide.
+
+<Frame caption="The run dialog with the same agent on two rows and a different model on each.">
+<img className="block" src="/images/agent-testing/run-dialog-compare.png" alt="The run dialog with two targets and the Run button counting both" />
+</Frame>
+
+## Step 3: Read the comparison
+
+The run detail has one column per model. The four charts above the table are the decision: **Pass rate**, **Total cost**, **Average reply latency** and **Pass rate over runs**.
+
+<Frame caption="One column per model. The pass rate must hold; the cost and the latency should drop.">
+<img className="block" src="/images/agent-testing/comparison-run-detail.png" alt="A comparison run with one column per target, the four charts and the matrix of results" />
+</Frame>
+
+Keep the cheaper model when its pass rate equals the baseline's across the repeats. When it fails one scenario and passes the rest, open that conversation: a cheaper model most often fails the scenario that needs reasoning across several tool results, and passes the lookups. Route by intent in your code, or keep the larger model, and rerun.
+
+## Step 4: The other levers
+
+After the model, in order of effect:
+
+- **Turns.** Every avoided turn removes a whole prompt from the bill. See [Reduce turns](/improve-your-agent/reduce-turns).
+- **Context size.** The system prompt, the tool list and the history are paid on every turn. Open a trace and read the input tokens of the first and the last call of the conversation. The `context-sweet-spot` skill measures where a larger context stops paying for itself.
+- **Prompt caching.** The providers charge cached input tokens at a fraction of the price. Keep the static part of the prompt first and identical across calls.
+- **Provider.** The `provider-cost-comparison` skill prices your real usage mix against other providers from your traces.
+
+Every lever gets the same gate: a comparison run of the suite before you keep it.
+
+## Do it with Langy
+
+Ask [Langy](/langy/chat):
+
+```text
+Run the Returns suite on returns-agent with model=gpt-5 and model=gpt-5-mini, three repeats each,
+and tell me whether gpt-5-mini holds the pass rate. If it fails a scenario, tell me which one and why.
+```
+
+## Do it with your coding agent
+
+```bash
+npx skills add langwatch/skills/agent-improve
+npx skills add langwatch/skills/context-sweet-spot
+npx skills add langwatch/skills/provider-cost-comparison
+```
+
+```text
+/agent-improve Cut the cost per conversation of returns-agent. Start with a model comparison on the Returns suite, then the context size. Keep the pass rate.
+```
+
+## Common failures
+
+- **The cost reads "across 3 of 6 runs".** The runs without a cost have no traces linked. See [Linking your traces](/agent-testing/linking-your-traces).
+- **The pass rate is the same and the cost went up.** The cheaper model took more turns. Read the turns in the conversations before you decide, and see [Reduce turns](/improve-your-agent/reduce-turns).
+- **The option list does not show the model.** The agent connected before the parameter was added. Restart the agent process; the platform reads the parameters when it connects.
+
+<Info>**Also check:** [Compare agents](/agent-testing/compare-agents), [Run parameters](/agent-testing/run-parameters), [Results](/agent-testing/results).</Info>

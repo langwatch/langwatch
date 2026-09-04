@@ -141,6 +141,17 @@
             ]
           },
           {
+            "group": "Improve Your Agent",
+            "pages": [
+              "improve-your-agent/overview",
+              "improve-your-agent/reduce-turns",
+              "improve-your-agent/fix-tool-calls",
+              "improve-your-agent/reduce-cost-and-latency",
+              "improve-your-agent/optimize-with-dspy",
+              "improve-your-agent/algorithms"
+            ]
+          },
+          {
             "group": "Observability",
             "pages": [
               "observability/overview",
