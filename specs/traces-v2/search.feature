@@ -2009,7 +2009,11 @@ Rule: Event rows drill down into their metric values
   # filter the user never picked directly. Withdrawing it safely means
   # tracking that WE added it and that no other metric under that event is
   # still active; until then the leftover clause stays visible as an active
-  # Event name row and one click clears it.
+  # Event name row and one click clears it. This matches how the evaluator
+  # drilldown already behaves: buildGroupClause always emits the anchor first
+  # and returns it bare when every sub-condition is gone
+  # (evaluatorGroup.ts:216,229), so a cleared evaluator group leaves
+  # "@evaluator:X" behind in the same way.
   @integration @unimplemented
   Scenario: Clearing the metric leaves the event anchor it added behind
     Given the user clicked a vote value on the inactive "thumbs_up_down" row
