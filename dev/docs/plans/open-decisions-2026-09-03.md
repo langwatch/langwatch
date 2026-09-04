@@ -591,3 +591,11 @@ change.
 **Recommendation:** keep the flat body as the default for this branch; plan
 the envelope migration as its own ADR with a date version, after the
 restructure lands. Not decided.
+
+**Decision 20 resolved (2026-09-04, Alex):** every REST family serves at both
+`/api/v1/{thing}` and `/api/{thing}`; every document, SDK, CLI, MCP tool and
+docs page uses `/api/v1/{thing}`. ADR-002 §1 is amended: the dated and `latest`
+namespaces stay as additional mounts, the bare alias returns, and `/api/v1`
+becomes the canonical published prefix. The OpenAPI documents are unfrozen for
+exactly this regeneration. Order: route mounting and drift guard first, then
+document regeneration and docs, then the SDK, CLI and MCP clients.
