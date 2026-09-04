@@ -95,6 +95,7 @@ describe("GithubTrpcApi", () => {
      * when the router moved onto the API process, because the permission is
      * declared by this transport rather than by whoever mounts it.
      */
+    /** @scenario "Changing the organization's GitHub connection is admin-only" */
     it("demands the permission each procedure is declared with", () => {
       const asked: string[] = [];
       const trpc = initTRPC.context<TestContext>().create();

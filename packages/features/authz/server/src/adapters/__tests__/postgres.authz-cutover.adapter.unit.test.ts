@@ -48,6 +48,8 @@ describe("PostgresAuthzCutoverAdapter", () => {
     });
   });
 
+  /** @scenario "A cut-over organization is decided by the engine" */
+  /** @scenario "An organization that has not cut over is unchanged" */
   it.each([
     ["migrated", false],
     ["finalized", true],
@@ -60,6 +62,7 @@ describe("PostgresAuthzCutoverAdapter", () => {
     await expect(adapter.isOn({ organizationId: ORG_ID })).resolves.toBe(expected);
   });
 
+  /** @scenario "A failed migration-state read is reported" */
   it("reports a failed state read and fails safe to legacy", async () => {
     const error = new Error("pg is down");
     const reporter = new RecordingReporter();
@@ -115,6 +118,7 @@ describe("PostgresAuthzCutoverAdapter", () => {
     expect(findUnique).toHaveBeenCalledTimes(1);
   });
 
+  /** @scenario "Rolling back returns an organization to the legacy path within the gate's cache window" */
   it("observes rollback after the cache TTL", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-18T09:00:00.000Z"));

@@ -5,6 +5,7 @@ import {
   permissionGrantTiers,
   resolveDeclaredScope,
   type DeclarationError,
+  type PermissionScopeArg,
   type ValidatePermissionForInput,
 } from "../declaration";
 
@@ -270,6 +271,7 @@ describe("ValidatePermissionForInput", () => {
 
   describe("given an input naming no scope id the permission can use", () => {
     /** @scenario "Declaring a permission with no usable scope id in the input fails to compile" */
+    /** @scenario "A declaration that cannot resolve a scope from its input fails the sweep" */
     it("resolves to a declaration error", () => {
       type Result = ValidatePermissionForInput<"traces:view", { name: string }>;
       type _Refuses = Assert<Equal<Result extends DeclarationError<string> ? true : false, true>>;
@@ -307,6 +309,36 @@ describe("ValidatePermissionForInput", () => {
       // member-by-member rather than being refused as a whole.
       type _Compiles = Assert<Equal<Result, "project:update">>;
       expect(true satisfies _Compiles).toBe(true);
+    });
+  });
+});
+
+/**
+ * The imperative facade's own scope argument: exactly one id, at a tier the
+ * permission is grantable at. Backs `AuthzService.authorizePermission` and
+ * `hasPermission`, which read their scope from this type rather than from a
+ * validated tRPC input.
+ */
+describe("PermissionScopeArg", () => {
+  describe("given a permission grantable at the project tier", () => {
+    /** @scenario "An imperative check names its scope id to match the permission" */
+    it("accepts a matching projectId argument", () => {
+      type Arg = PermissionScopeArg<"traces:view">;
+      type _Compiles = Assert<{ projectId: string } extends Arg ? true : false>;
+      expect(true satisfies _Compiles).toBe(true);
+    });
+  });
+
+  describe("given an organization-only permission", () => {
+    /** @scenario "An imperative check names its scope id to match the permission" */
+    it("refuses a projectId argument, admitting only organizationId", () => {
+      type Arg = PermissionScopeArg<"governance:view">;
+      type _ProjectIdRefused = Assert<
+        { projectId: string } extends Arg ? false : true
+      >;
+      type _OrganizationIdAccepted = Assert<{ organizationId: string } extends Arg ? true : false>;
+      expect(true satisfies _ProjectIdRefused).toBe(true);
+      expect(true satisfies _OrganizationIdAccepted).toBe(true);
     });
   });
 });

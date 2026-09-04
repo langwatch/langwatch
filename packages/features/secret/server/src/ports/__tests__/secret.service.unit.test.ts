@@ -107,6 +107,7 @@ function createService(options?: {
 
 describe("SecretService", () => {
   /** @scenario "Product-owned secrets are hidden and immutable" */
+  /** @scenario "The stored Langy virtual-key secret is hidden and immutable" */
   it("never lists product-owned secrets", async () => {
     const { repository, service } = createService();
     repository.rows.push(row(), row({ id: "reserved", name: "LANGY_KEY" }));
@@ -127,6 +128,7 @@ describe("SecretService", () => {
     });
   });
 
+  /** @scenario "The stored Langy virtual-key secret is hidden and immutable" */
   it("reports reserved and missing rows as not found", async () => {
     const { repository, service } = createService();
     repository.rows.push(row({ id: "reserved", name: "LANGY_KEY" }));

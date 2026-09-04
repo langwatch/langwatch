@@ -713,6 +713,7 @@ describe("output validation", () => {
 // ---------------------------------------------------------------------------
 
 describe("permission declarations", () => {
+  /** @scenario "A service endpoint without an access declaration refuses to boot" */
   it("refuses an endpoint with neither a permission nor a written opt-out", () => {
     const service = createRawService({
       name: "test",
@@ -728,6 +729,7 @@ describe("permission declarations", () => {
     expect(() => service.build()).toThrow(/must declare exactly one/);
   });
 
+  /** @scenario "A service endpoint opting out of its permission check carries a written reason" */
   it("refuses a blank opt-out reason", () => {
     const service = createRawService({
       name: "test",

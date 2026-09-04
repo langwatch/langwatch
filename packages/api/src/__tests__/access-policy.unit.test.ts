@@ -1,3 +1,4 @@
+import type { AuthzPermission } from "@langwatch/authz-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -8,7 +9,22 @@ import {
   requires,
 } from "../access-policy.js";
 
+type Equal<Left, Right> =
+  (<Value>() => Value extends Left ? 1 : 2) extends <Value>() => Value extends Right ? 1 : 2
+    ? true
+    : false;
+type Assert<Value extends true> = Value;
+
 describe("access policy helpers", () => {
+  describe("when a route names a permission the registry does not list", () => {
+    /** @scenario "A route policy cannot name a permission outside the registry" */
+    it("is refused at the type level: requires() only accepts a registered permission", () => {
+      type RequiresParam = Parameters<typeof requires>[0];
+      type _RegistryClosed = Assert<Equal<RequiresParam, AuthzPermission>>;
+      expect(true satisfies _RegistryClosed).toBe(true);
+    });
+  });
+
   describe("when requiring a permission", () => {
     it("carries the permission on a permission-kind policy", () => {
       expect(requires("traces:view")).toEqual({

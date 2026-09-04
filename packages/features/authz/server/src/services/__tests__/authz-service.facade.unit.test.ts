@@ -31,6 +31,8 @@ describe("AuthzService portable facade", () => {
     expect(makeService().service).toBeInstanceOf(AuthzServiceContract);
   });
 
+  /** @scenario "A declared check decides exactly as the middleware it replaced" */
+  /** @scenario "A passing imperative check returns a proof, not a boolean" */
   it("routes declared and imperative checks through the same decision engine", async () => {
     const { service } = makeService({
       reader: makeReader({
@@ -59,6 +61,7 @@ describe("AuthzService portable facade", () => {
     });
   });
 
+  /** @scenario "An imperative denial throws before the caller can continue" */
   it("throws the portable denial when authorization fails", async () => {
     const { service } = makeService();
 
