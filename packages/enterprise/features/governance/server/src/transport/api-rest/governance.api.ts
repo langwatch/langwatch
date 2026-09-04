@@ -297,12 +297,16 @@ export function createGovernanceRestApp(options: {
     },
   );
 
-  secured.access(apiKeyPermission("aiTools:view")).get(
+  // The response carries the canonical `ottl_rules`, which is exactly what
+  // /ingestion-templates blanks and what /ingestion-templates/admin gates on
+  // aiTools:manage plus a user-bound caller. One row at a time is not a
+  // cheaper read of the same secret, so it is gated the same way.
+  secured.access(apiKeyPermission("aiTools:manage")).get(
     "/ingestion-templates/:id",
     describeRoute({
       summary: "Get ingestion template",
       description:
-        "Single-template lookup by id, scoped to the caller's organization. Cross-org probes collapse to 404 (no enumeration vector).",
+        "Single-template lookup by id, scoped to the caller's organization, including the canonical `ottl_rules`. Cross-org probes collapse to 404 (no enumeration vector). Members read the same row without `ottl_rules` from GET /ingestion-templates.",
       tags: ["Governance / Ingestion Templates"],
       responses: {
         ...baseResponses,
@@ -322,6 +326,7 @@ export function createGovernanceRestApp(options: {
         },
       },
     }),
+    requireUserBoundCaller,
     async (c) => {
       const row = await app().getIngestionTemplate({
         projectId: c.get("project").id,

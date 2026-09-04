@@ -48,6 +48,7 @@ const security = createAppRestSecurity({
   authorizeApiKeyCeiling: () => passthrough,
   authenticateOrganization: () => passthrough,
   authorizeOrganizationPermission: () => passthrough,
+  authorizeRouteTeamPermission: () => passthrough,
   authorizeRouteProjectPermission: () => passthrough,
 
   authenticateOrganizationThrowing: recording("auth"),

@@ -302,6 +302,8 @@ export class ApiRestSecurity {
         this.organizationAuthorization(permission, envelope),
       authorizeRouteProjectPermission: ({ permission, param, envelope }) =>
         this.routeProjectAuthorization(permission, param, envelope),
+      authorizeRouteTeamPermission: ({ permission, param, envelope }) =>
+        this.routeTeamAuthorization(permission, param, envelope),
 
       authenticateOrganizationThrowing: this.organizationAuthentication("throw"),
       authorizeOrganizationPermissionThrowing: (permission) =>
@@ -512,6 +514,37 @@ export class ApiRestSecurity {
         return this.refuse(context, new ApiRouteProjectNotFoundError(), envelope);
       }
       if (decision.outcome === "denied") {
+        return this.refuse(context, new ApiOrganizationPermissionError(permission), envelope);
+      }
+      return next();
+    };
+  }
+
+  /**
+   * RBAC at the scope of the team named in the route. The team id comes from
+   * the path parameter, and the organization from the credential — never from
+   * the request — so a team id belonging to another tenant is resolved against
+   * the caller's own organization, finds no bindings, and is refused.
+   */
+  private routeTeamAuthorization(
+    permission: AuthzPermission,
+    param: string,
+    envelope: Envelope,
+  ): MiddlewareHandler {
+    return async (context, next) => {
+      const teamId = context.req.param(param);
+      const organizationId = context.get("apiKeyOrganizationId") as string;
+      const allowed = teamId
+        ? await this.authz.hasApiKeyPermission({
+            apiKeyId: context.get("apiKeyId") as string,
+            userId: (context.get("apiKeyUserId") as string | null) ?? null,
+            organizationId,
+            scope: { type: "team", id: teamId },
+            permission,
+          })
+        : false;
+
+      if (!allowed) {
         return this.refuse(context, new ApiOrganizationPermissionError(permission), envelope);
       }
       return next();

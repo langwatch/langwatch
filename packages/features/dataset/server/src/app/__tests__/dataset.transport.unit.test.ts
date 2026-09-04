@@ -109,6 +109,7 @@ function testSecurity({ refuse = false } = {}): { security: AppRestSecurity; cha
     authorizeApiKeyCeiling: ({ permission }) => record(`ceiling:${permission}`),
     authenticateOrganization: () => record("authenticateOrganization"),
     authorizeOrganizationPermission: ({ permission }) => record(`authorizeOrg:${permission}`),
+    authorizeRouteTeamPermission: () => async (_c, next) => next(),
     authorizeRouteProjectPermission: ({ permission }) =>
       record(`authorizeRouteProject:${permission}`),
     authenticateOrganizationThrowing: record("authenticateOrganizationThrowing"),

@@ -447,11 +447,14 @@ export function registerPromptRoutes(
           });
         }
 
+        // The lookup above also matches org-scoped prompts a SIBLING project
+        // owns, so the row's own projectId is not the one the credential was
+        // authorized on. The write goes to the authorized project.
         const result = await service.assignTag({
           configId: config.id,
           versionId,
           tag,
-          projectId: config.projectId,
+          projectId: project.id,
           organizationId: organization.id,
         });
 

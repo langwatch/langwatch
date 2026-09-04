@@ -145,6 +145,7 @@ function spine(grants: readonly string[]) {
       },
     authenticateOrganization: () => async (_c, next) => next(),
     authorizeOrganizationPermission: () => async (_c, next) => next(),
+    authorizeRouteTeamPermission: () => async (_c, next) => next(),
     authorizeRouteProjectPermission: () => async (_c, next) => next(),
     authenticateOrganizationThrowing: async (_c, next) => next(),
     authorizeOrganizationPermissionThrowing: () => async (_c, next) => next(),
@@ -640,6 +641,41 @@ describe("createGovernanceRestApp", () => {
       expect(response.status).toBe(404);
       const body = (await response.json()) as { error: string };
       expect(body.error).toBe("template_not_found");
+    });
+
+    /**
+     * Finding H6 of the 2026-09-04 feature-surface security pass: the response
+     * carries the canonical OTTL that the member list blanks and the admin
+     * list gates, so reading one row cannot be the cheaper door to it.
+     * Spec: specs/security/resource-scope-permission-checks.feature
+     */
+    /** @scenario Reading one ingestion template demands the same permission as reading them all */
+    it("refuses a caller who may only view AI tools, and discloses no rules", async () => {
+      const templateGetByIdForOrg = vi.fn(async () => template({ id: "tmpl-5" }));
+      const { asUser, refusals } = buildApi({
+        grants: ["aiTools:view"],
+        governance: { templateGetByIdForOrg },
+      });
+
+      const response = await asUser("/api/governance/ingestion-templates/tmpl-5");
+
+      expect(response.status).toBe(403);
+      expect(await response.text()).not.toContain(template().ottlRules);
+      expect(refusals).toEqual(["aiTools:manage"]);
+      expect(templateGetByIdForOrg).not.toHaveBeenCalled();
+    });
+
+    /** @scenario A key with no user behind it cannot read an ingestion template by id */
+    it("refuses a legacy project key, which the ceiling alone lets through", async () => {
+      const templateGetByIdForOrg = vi.fn(async () => template({ id: "tmpl-6" }));
+      const { asProjectKey } = buildApi({ governance: { templateGetByIdForOrg } });
+
+      const response = await asProjectKey("/api/governance/ingestion-templates/tmpl-6");
+
+      expect(response.status).toBe(403);
+      const body = (await response.json()) as { error: { code: string } };
+      expect(body.error.code).toBe("user_token_required");
+      expect(templateGetByIdForOrg).not.toHaveBeenCalled();
     });
   });
 });

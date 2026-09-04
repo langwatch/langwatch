@@ -45,6 +45,7 @@ export function testRestSecurity(options?: {
     authorizeApiKeyCeiling: unreachable,
     authenticateOrganization: orgAuth ? () => orgAuth : unreachable,
     authorizeOrganizationPermission: orgPermission ? () => orgPermission : unreachable,
+    authorizeRouteTeamPermission: unreachable,
     authorizeRouteProjectPermission: unreachable,
     authenticateOrganizationThrowing: orgAuth ?? passThrough,
     authorizeOrganizationPermissionThrowing: unreachable,

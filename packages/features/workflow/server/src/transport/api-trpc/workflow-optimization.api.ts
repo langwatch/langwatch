@@ -17,7 +17,8 @@
  *                           so nothing keeps pointing at a workflow that no
  *                           longer offers itself.
  *
- * Reading takes `workflows:view`; every flag change takes `workflows:update`.
+ * Reading takes `workflows:view`; every flag change takes `workflows:update`;
+ * `chat` takes `workflows:manage`, because it executes the graph.
  *
  * Mounted at `optimization.*` rather than `workflows.*`: these procedures are
  * the optimization studio's, and the name is the one its pages have always
@@ -83,12 +84,16 @@ type OptimizationWorkflow = Readonly<{
  */
 export type WorkflowOptimizationTrpcPorts<TVersion, TComponent> = Readonly<{
   /**
-   * Runs the project's published workflow once, over the same public run
-   * endpoint an external caller would use, authenticated as the project.
+   * Runs the project's published workflow once, on the same service the public
+   * run endpoint dispatches through, under the scope this procedure checked.
    */
   runPublishedWorkflow(
     ctx: WorkflowOptimizationTrpcContext,
-    input: Readonly<{ workflowId: string; projectId: string; body: unknown }>,
+    input: Readonly<{
+      workflowId: string;
+      projectId: string;
+      body: Readonly<Record<string, unknown>>;
+    }>,
   ): Promise<unknown>;
   /** One workflow by id within a project, or null. */
   tryGetWorkflow(
@@ -145,7 +150,12 @@ export class WorkflowOptimizationTrpcApi {
     const { protected: procedure, policy } = procedures;
 
     return trpc.router({
-      chat: policy("workflows:view")(
+      /**
+       * Running a published workflow spends model budget and executes the
+       * graph's code and HTTP nodes, so it is gated on the same permission the
+       * public run endpoint declares — not on the permission to look at it.
+       */
+      chat: policy("workflows:manage")(
         procedure.input(
           workflowScopeSchema.extend({
             inputMessages: z.array(z.record(z.string(), z.string())),
@@ -156,7 +166,7 @@ export class WorkflowOptimizationTrpcApi {
           await ports.runPublishedWorkflow(ctx, {
             workflowId: input.workflowId,
             projectId: input.projectId,
-            body: input.inputMessages[0],
+            body: input.inputMessages[0] ?? {},
           }),
       ),
 

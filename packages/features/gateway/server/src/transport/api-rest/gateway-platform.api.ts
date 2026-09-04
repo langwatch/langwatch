@@ -63,6 +63,7 @@ import {
   PAGE_LIMIT_MAX,
 } from "../../adapters/gateway-wire-pagination.adapter";
 import type { GatewayVirtualKeyScope } from "../../ports/gateway-virtual-key.port";
+import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { GatewayActor, GatewayApp, GatewayVirtualKeyBudgetInput } from "#app/gateway.app";
 
 const logger = createLogger("langwatch:api:gateway-platform");
@@ -575,6 +576,26 @@ function actorForRequest(
   return app.actorForCredential({
     projectId: c.get("project").id,
     resolvedToken: c.get("resolvedToken"),
+  });
+}
+
+/**
+ * Budgets and cache rules are organization-owned rows that a project
+ * credential addresses by id, so every write on one reaches the whole tenant.
+ * The route's declared permission resolves at the caller's OWN project; this
+ * resolves the same permission at the organization the write acts on
+ * (security pass 2026-09-04, finding H12).
+ */
+async function authorizeOrganizationWide(
+  c: GatewayContext,
+  app: GatewayApp,
+  input: { organizationId: string; permission: AuthzPermission },
+): Promise<void> {
+  const { actor } = actorForRequest(c, app);
+  await app.authorizeOrganizationWideOperation({
+    actor,
+    organizationId: input.organizationId,
+    permission: input.permission,
   });
 }
 
@@ -1539,6 +1560,10 @@ export function createGatewayPlatformRestApp(options: {
       const { actorUserId } = actorForRequest(c, app);
       const service = app.budgetDecisions;
       try {
+        await authorizeOrganizationWide(c, app, {
+          organizationId,
+          permission: "gatewayBudgets:create",
+        });
         const outcome = await app.idempotency({
           operation: "gateway.v1.budgets.create",
           scopeId: project.id,
@@ -1613,6 +1638,10 @@ export function createGatewayPlatformRestApp(options: {
       const { actorUserId } = actorForRequest(c, app);
       const service = app.budgetDecisions;
       try {
+        await authorizeOrganizationWide(c, app, {
+          organizationId,
+          permission: "gatewayBudgets:update",
+        });
         const row = await service.update({
           id,
           organizationId,
@@ -1665,6 +1694,10 @@ export function createGatewayPlatformRestApp(options: {
       const { actorUserId } = actorForRequest(c, app);
       const service = app.budgetDecisions;
       try {
+        await authorizeOrganizationWide(c, app, {
+          organizationId,
+          permission: "gatewayBudgets:delete",
+        });
         const row = await service.archive({
           id,
           organizationId,
@@ -1733,6 +1766,10 @@ export function createGatewayPlatformRestApp(options: {
       const { actorUserId } = actorForRequest(c, app);
       const service = app.budgetDecisions;
       try {
+        await authorizeOrganizationWide(c, app, {
+          organizationId,
+          permission: "gatewayBudgets:update",
+        });
         const row = await service.reset({
           id,
           organizationId,
@@ -1934,6 +1971,10 @@ export function createGatewayPlatformRestApp(options: {
       const { actorUserId } = actorForRequest(c, app);
       const service = app.budgetDecisions;
       try {
+        await authorizeOrganizationWide(c, app, {
+          organizationId,
+          permission: "gatewayCacheRules:create",
+        });
         const outcome = await app.idempotency({
           operation: "gateway.v1.cache-rules.create",
           scopeId: project.id,
@@ -1989,6 +2030,10 @@ export function createGatewayPlatformRestApp(options: {
       const { actorUserId } = actorForRequest(c, app);
       const service = app.budgetDecisions;
       try {
+        await authorizeOrganizationWide(c, app, {
+          organizationId,
+          permission: "gatewayCacheRules:update",
+        });
         const row = await service.cacheRuleUpdate({
           id,
           organizationId,
@@ -2034,6 +2079,10 @@ export function createGatewayPlatformRestApp(options: {
       const { actorUserId } = actorForRequest(c, app);
       const service = app.budgetDecisions;
       try {
+        await authorizeOrganizationWide(c, app, {
+          organizationId,
+          permission: "gatewayCacheRules:delete",
+        });
         const row = await service.cacheRuleArchive({
           id,
           organizationId,

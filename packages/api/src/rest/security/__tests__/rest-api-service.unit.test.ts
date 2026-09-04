@@ -71,6 +71,8 @@ function recordingSpine() {
       record(`authorizeOrganizationPermission:${permission}:${envelope}`),
     authorizeRouteProjectPermission: ({ permission, param, envelope }) =>
       record(`authorizeRouteProjectPermission:${permission}:${param}:${envelope}`),
+    authorizeRouteTeamPermission: ({ permission, param, envelope }) =>
+      record(`authorizeRouteTeamPermission:${permission}:${param}:${envelope}`),
     authenticateOrganizationThrowing: record("authenticateOrganizationThrowing"),
     authorizeOrganizationPermissionThrowing: (permission) =>
       record(`authorizeOrganizationPermissionThrowing:${permission}`),

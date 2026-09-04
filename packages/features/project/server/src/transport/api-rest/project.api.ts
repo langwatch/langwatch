@@ -135,6 +135,8 @@ export function createProjectRestApp(options: {
 
   const secured = security.createOrgApp({
     basePath: "/api/projects",
+    // No derived twin: `/api/v1/projects` belongs to the LangWatch-QL family.
+    v1Alias: false,
   });
 
   secured.hono.onError(
@@ -249,20 +251,22 @@ export function createProjectRestApp(options: {
       },
     );
 
-  secured.access(requires("project:view")).get("/:id", describeRoute(GET_PROJECT), async (c) => {
-    const { id } = c.req.param();
-    const organization = c.get("organization");
+  secured
+    .access(requiresOnProject("project:view"))
+    .get("/:id", describeRoute(GET_PROJECT), async (c) => {
+      const { id } = c.req.param();
+      const organization = c.get("organization");
 
-    const project = await projects().tryGetWithTeam(id);
-    if (!project || project.team.organizationId !== organization.id) {
-      throw new NotFoundError("Project not found");
-    }
+      const project = await projects().tryGetWithTeam(id);
+      if (!project || project.team.organizationId !== organization.id) {
+        throw new NotFoundError("Project not found");
+      }
 
-    return c.json(projectResponse(project));
-  });
+      return c.json(projectResponse(project));
+    });
 
   secured
-    .access(requires("project:update"))
+    .access(requiresOnProject("project:update"))
     .patch(
       "/:id",
       describeRoute(UPDATE_PROJECT),
@@ -293,7 +297,7 @@ export function createProjectRestApp(options: {
     );
 
   secured
-    .access(requires("project:delete"))
+    .access(requiresOnProject("project:delete"))
     .delete("/:id", describeRoute(ARCHIVE_PROJECT), async (c) => {
       const { id } = c.req.param();
       const organization = c.get("organization");
@@ -344,7 +348,7 @@ export function createProjectRestApp(options: {
     });
 
   secured
-    .access(requires("project:manage"))
+    .access(requiresOnProject("project:manage"))
     .post("/:id/regenerate-api-key", describeRoute(REGENERATE_PROJECT_API_KEY), async (c) => {
       const { id } = c.req.param();
       const organization = c.get("organization");

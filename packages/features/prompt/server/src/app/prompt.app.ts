@@ -61,7 +61,7 @@ export interface PromptCaller {
 /** What the process composes this feature's application from. */
 export interface PromptAppDependencies {
   prompts: PromptService;
-  projects: Pick<ProjectService, "getOrganizationId">;
+  projects: Pick<ProjectService, "getOrganizationId" | "listIdsByOrganization">;
 }
 
 /** A tag name the organization's catalog does not accept. */
@@ -446,6 +446,16 @@ export class PromptApp {
     } catch (error) {
       asHandledTagError(error);
     }
+  }
+
+  /**
+   * Every project a tag operation reaches: the definition is one organization
+   * row and its assignments cascade across the whole organization, so this is
+   * the set a caller has to be allowed to act on, not just the one they named.
+   */
+  async projectsSharingTagCatalog(input: { projectId: string }): Promise<string[]> {
+    const organizationId = await this.organizationOf(input.projectId);
+    return this.dependencies.projects.listIdsByOrganization({ organizationId });
   }
 
   /** Renames a tag and every assignment that carries it. */

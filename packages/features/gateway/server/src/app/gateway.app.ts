@@ -774,4 +774,22 @@ export class GatewayApp {
     });
     return existing;
   }
+
+  /**
+   * The gate for a write that reaches the whole tenant — budgets and cache
+   * rules are organization-owned rows, addressed by id, that a project's
+   * credential can name whichever project they belong to. Checked at the
+   * organization, because that is the scope the write acts on.
+   */
+  async authorizeOrganizationWideOperation(input: {
+    actor: GatewayActor;
+    organizationId: string;
+    permission: AuthzPermission;
+  }): Promise<void> {
+    await this.dependencies.assertCanOperateOnAnyScope({
+      actor: input.actor,
+      scopes: [{ scopeType: "ORGANIZATION", scopeId: input.organizationId }],
+      permission: input.permission,
+    });
+  }
 }

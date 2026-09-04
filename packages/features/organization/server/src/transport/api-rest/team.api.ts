@@ -9,7 +9,7 @@ import type { Context } from "hono";
 import { describeRoute } from "hono-openapi";
 import { z } from "zod";
 
-import { requires } from "@langwatch/api";
+import { requires, requiresOnTeam } from "@langwatch/api";
 import {
   type AppRestOrganizationVariables,
   type AppRestSecurity,
@@ -138,7 +138,7 @@ export function createTeamsRestApp(options: {
       },
     );
 
-  secured.access(requires("team:view")).get(
+  secured.access(requiresOnTeam("team:view")).get(
     "/:id",
     describeRoute({
       description: "Get a team by its id",
@@ -157,7 +157,7 @@ export function createTeamsRestApp(options: {
     },
   );
 
-  secured.access(requires("team:manage")).patch(
+  secured.access(requiresOnTeam("team:manage")).patch(
     "/:id",
     describeRoute({
       description: "Update a team by its id",
@@ -179,7 +179,7 @@ export function createTeamsRestApp(options: {
     },
   );
 
-  secured.access(requires("team:manage")).delete(
+  secured.access(requiresOnTeam("team:manage")).delete(
     "/:id",
     describeRoute({
       description: "Archive a team (soft-delete)",
@@ -205,7 +205,7 @@ export function createTeamsRestApp(options: {
   // ── Members ────────────────────────────────────────────────────────────────
 
   secured
-    .access(requires("team:view"))
+    .access(requiresOnTeam("team:view"))
     .get("/:id/members", describeRoute({ description: "List members of a team" }), async (c) => {
       const { id } = c.req.param();
       const organization = c.get("organization");
@@ -233,7 +233,7 @@ export function createTeamsRestApp(options: {
     });
 
   secured
-    .access(requires("team:manage"))
+    .access(requiresOnTeam("team:manage"))
     .post(
       "/:id/members",
       describeRoute({ description: "Add a member to a team" }),
@@ -257,7 +257,7 @@ export function createTeamsRestApp(options: {
     );
 
   secured
-    .access(requires("team:manage"))
+    .access(requiresOnTeam("team:manage"))
     .delete(
       "/:id/members/:userId",
       describeRoute({ description: "Remove a member from a team" }),
@@ -280,7 +280,7 @@ export function createTeamsRestApp(options: {
   // ── Projects ───────────────────────────────────────────────────────────────
 
   secured
-    .access(requires("team:view"))
+    .access(requiresOnTeam("team:view"))
     .get("/:id/projects", describeRoute({ description: "List projects in a team" }), async (c) => {
       const { id } = c.req.param();
       const organization = c.get("organization");

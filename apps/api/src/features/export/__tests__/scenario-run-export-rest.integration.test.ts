@@ -67,6 +67,7 @@ describe("given the bulk scenario run export", () => {
   });
 
   describe("when the caller is signed in but may not view the project's simulations", () => {
+    /** @scenario "Export requires permission to view scenarios" */
     it("refuses with the forbidden code rather than the unauthenticated one", async () => {
       const countRunsForExport = vi.fn();
       const api = mount({ countRunsForExport, permitted: false });
@@ -138,6 +139,7 @@ function passThroughSecurity(): AppRestSecurity {
     authorizeApiKeyCeiling: unreachable,
     authenticateOrganization: unreachable,
     authorizeOrganizationPermission: unreachable,
+    authorizeRouteTeamPermission: unreachable,
     authorizeRouteProjectPermission: unreachable,
     authenticateOrganizationThrowing: noop,
     authorizeOrganizationPermissionThrowing: unreachable,

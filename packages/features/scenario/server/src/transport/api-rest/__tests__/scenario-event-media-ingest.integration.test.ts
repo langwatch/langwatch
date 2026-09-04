@@ -24,10 +24,7 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
-import {
-  createScenarioEventsRestApp,
-  type InlineMediaExtraction,
-} from "../scenario-event.api";
+import { createScenarioEventsRestApp, type InlineMediaExtraction } from "../scenario-event.api";
 
 const PROJECT = { id: "project-1", slug: "project-one" };
 const RUN_ID = "run-1";
@@ -179,6 +176,7 @@ function passThroughSecurity(): AppRestSecurity {
     authorizeApiKeyCeiling: () => noop,
     authenticateOrganization: () => noop,
     authorizeOrganizationPermission: () => noop,
+    authorizeRouteTeamPermission: () => noop,
     authorizeRouteProjectPermission: () => noop,
     authenticateOrganizationThrowing: noop,
     authorizeOrganizationPermissionThrowing: () => noop,

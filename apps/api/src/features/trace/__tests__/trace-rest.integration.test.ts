@@ -501,6 +501,7 @@ function passThroughSecurity(): AppRestSecurity {
     authorizeApiKeyCeiling: () => noop,
     authenticateOrganization: unreachable,
     authorizeOrganizationPermission: unreachable,
+    authorizeRouteTeamPermission: () => noop,
     authorizeRouteProjectPermission: () => noop,
     authenticateOrganizationThrowing: noop,
     authorizeOrganizationPermissionThrowing: unreachable,

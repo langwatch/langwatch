@@ -56,6 +56,7 @@ function spine() {
     authorizeApiKeyCeiling: () => passThrough,
     authenticateOrganization: () => passThrough,
     authorizeOrganizationPermission: () => passThrough,
+    authorizeRouteTeamPermission: () => passThrough,
     authorizeRouteProjectPermission: () => passThrough,
     authenticateOrganizationThrowing: passThrough,
     authorizeOrganizationPermissionThrowing: () => passThrough,

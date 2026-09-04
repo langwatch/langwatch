@@ -46,4 +46,5 @@ export {
   publicEndpoint,
   requires,
   requiresOnProject,
+  requiresOnTeam,
 } from "./access-policy.js";

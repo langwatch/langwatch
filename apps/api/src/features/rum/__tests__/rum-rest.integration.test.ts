@@ -137,6 +137,7 @@ function passThroughSecurity(): AppRestSecurity {
     authorizeApiKeyCeiling: unreachable,
     authenticateOrganization: unreachable,
     authorizeOrganizationPermission: unreachable,
+    authorizeRouteTeamPermission: unreachable,
     authorizeRouteProjectPermission: unreachable,
     authenticateOrganizationThrowing: noop,
     authorizeOrganizationPermissionThrowing: unreachable,

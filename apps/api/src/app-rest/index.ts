@@ -40,6 +40,7 @@ export {
   publicEndpoint,
   requires,
   requiresOnProject,
+  requiresOnTeam,
 } from "@langwatch/api";
 
 export {

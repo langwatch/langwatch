@@ -162,6 +162,7 @@ function spine(options: { granted?: readonly string[] } = {}) {
         }
         await next();
       },
+    authorizeRouteTeamPermission: () => async (_c, next) => next(),
     authorizeRouteProjectPermission: () => async (_c, next) => next(),
     authenticateOrganizationThrowing: async (_c, next) => next(),
     authorizeOrganizationPermissionThrowing: () => async (_c, next) => next(),
@@ -773,6 +774,36 @@ describe("createApiKeysRestApp", () => {
 
       expect(response.status).toBe(404);
       await expect(response.json()).resolves.toMatchObject({ error: "api_key_not_found" });
+    });
+
+    /**
+     * `getByIdForCaller` throws the SAME `ApiKeyNotFoundError` whether the id
+     * is genuinely unknown or names a key that exists but is not visible to
+     * this caller — so a real key another member owns cannot be probed for.
+     */
+    /** @scenario Fetching a key the caller may not read is indistinguishable from an unknown key */
+    it("answers a real key the caller may not read the same way as an unknown id", async () => {
+      const notFound = async (): Promise<ApiKeyDetail> => {
+        throw new ApiKeyNotFoundError("api-key-1");
+      };
+      const { send: sendUnreachable } = buildApi({
+        apiKeys: { getByIdForCaller: vi.fn(notFound), isOrgAdmin: vi.fn(async () => false) },
+      });
+      const { send: sendUnknown } = buildApi({
+        apiKeys: { getByIdForCaller: vi.fn(notFound), isOrgAdmin: vi.fn(async () => false) },
+      });
+
+      const unreachable = await sendUnreachable("/api/api-keys/api-key-1");
+      const unknown = await sendUnknown("/api/api-keys/api-key-missing");
+
+      expect(unreachable.status).toBe(unknown.status);
+      expect(unreachable.status).toBe(404);
+      const [unreachableBody, unknownBody] = await Promise.all([
+        unreachable.json(),
+        unknown.json(),
+      ]);
+      expect(unreachableBody).toEqual(unknownBody);
+      expect(unreachableBody).toMatchObject({ error: "api_key_not_found" });
     });
 
     it("records the read, which is a disclosure like the writes are", async () => {

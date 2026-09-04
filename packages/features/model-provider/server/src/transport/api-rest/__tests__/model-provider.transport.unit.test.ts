@@ -71,6 +71,7 @@ function testSecurity(): AppRestSecurity {
     authorizeApiKeyCeiling: () => pass,
     authenticateOrganization: () => pass,
     authorizeOrganizationPermission: () => pass,
+    authorizeRouteTeamPermission: () => pass,
     authorizeRouteProjectPermission: () => pass,
     authenticateOrganizationThrowing: pass,
     authorizeOrganizationPermissionThrowing: () => pass,
@@ -253,7 +254,10 @@ describe("the model-providers upsert route", () => {
       );
       // The answer is the re-read, never an echo of what was sent.
       expect(getForProject).toHaveBeenCalledWith({ projectId: "project-1" });
-      const body = (await response.json()) as Record<string, { customKeys: Record<string, string> }>;
+      const body = (await response.json()) as Record<
+        string,
+        { customKeys: Record<string, string> }
+      >;
       expect(body.openai?.customKeys.OPENAI_API_KEY).toBe(MASKED_KEY_PLACEHOLDER);
     });
   });

@@ -549,38 +549,20 @@ export function composeApiExecutionCollaborators(
       },
       optimization: {
         /**
-         * The studio's chat panel runs the project's published workflow over
-         * the SAME public run endpoint an external caller uses, authenticated
-         * as the project.
+         * The studio's chat panel runs the project's published workflow on the
+         * same service the public run endpoint dispatches through.
          *
-         * Deliberately an outbound call rather than an in-process one: what
-         * the panel exercises is what a customer's integration exercises, so a
-         * break in the public path is visible in the studio rather than only
-         * in a customer's logs.
+         * In-process on purpose. Re-entering the public door carrying the
+         * project's legacy key ran the request as a credential that bypasses
+         * every ceiling, so the caller's own permission stopped deciding what
+         * they could execute (security pass 2026-09-04, finding H9).
          */
-        runPublishedWorkflow: async (_ctx, input) => {
-          if (!options.publicBaseUrl) {
-            throw new ExecutionCapabilityUnavailableError(
-              "public base URL, so the studio cannot call its own workflow endpoint",
-            );
-          }
-          const project = await options.prisma.project.findFirst({
-            where: { id: input.projectId },
-            select: { apiKey: true },
-          });
-          const response = await fetch(
-            `${options.publicBaseUrl.replace(/\/$/, "")}/api/workflows/${input.workflowId}/run`,
-            {
-              method: "POST",
-              body: JSON.stringify(input.body),
-              headers: {
-                "Content-Type": "application/json",
-                ...(project?.apiKey ? { "x-auth-token": project.apiKey } : {}),
-              },
-            },
-          );
-          return await response.json();
-        },
+        runPublishedWorkflow: async (_ctx, input) =>
+          await workflows.run({
+            workflowId: input.workflowId,
+            projectId: input.projectId,
+            inputs: { ...input.body },
+          }),
       },
     },
 

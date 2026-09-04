@@ -263,6 +263,7 @@ function passThroughSecurity(): AppRestSecurity {
     authorizeApiKeyCeiling: () => noop,
     authenticateOrganization: () => asOrganization,
     authorizeOrganizationPermission: () => noop,
+    authorizeRouteTeamPermission: () => noop,
     authorizeRouteProjectPermission: () => noop,
     authenticateOrganizationThrowing: asOrganization,
     authorizeOrganizationPermissionThrowing: () => noop,

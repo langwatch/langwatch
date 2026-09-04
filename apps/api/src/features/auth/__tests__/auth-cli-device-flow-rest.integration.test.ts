@@ -27,7 +27,10 @@ import {
   CliDeviceSessionStorePort,
   type AuthCliDeviceFlowRestPorts,
 } from "@langwatch/auth-server";
+import { ApiKeyScopeViolationError } from "@langwatch/api-key-contract";
+import { HandledError } from "@langwatch/handled-error";
 import { Hono, type ErrorHandler } from "hono";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it } from "vitest";
 
 import { createApiProcessRestFeatures } from "../../../app-rest/app-rest.process-features";
@@ -95,7 +98,7 @@ describe("given a CLI starting a device login", () => {
       // The hostname is normalized on the way into the key name: an
       // unnormalized value would fail to match the previous login key on the
       // next login and leave credentials accumulating.
-      expect(world.mintedKeys).toEqual([{ deviceLabel: "bobs-macbook-pro" }]);
+      expect(world.mintedKeys).toEqual([{ deviceLabel: "bobs-macbook-pro", userId: USER_ID }]);
 
       // Single use: a replay mints nothing. The poll window is what answers
       // first here, because a SUCCESSFUL exchange deliberately leaves it
@@ -164,6 +167,165 @@ describe("given a CLI starting a device login", () => {
       expect(polled.status).toBe(408);
     });
   });
+
+  describe("when the CLI exchanges an approved device code for a scoped key", () => {
+    /** @scenario "exchange returns a user-owned scoped key" */
+    it("mints a key owned by the approving user in the sk-lw format", async () => {
+      const world = deviceFlowWorld({ mintToken: "sk-lw-lookup123_secretabc" });
+      const api = mount(world);
+
+      const grant = (await (await api.post("/api/auth/cli/device-code", {})).json()) as {
+        device_code: string;
+        user_code: string;
+      };
+      await api.post("/api/auth/cli/approve", {
+        user_code: grant.user_code,
+        organization_id: ORGANIZATION_ID,
+      });
+
+      const exchanged = await api.post("/api/auth/cli/exchange", {
+        device_code: grant.device_code,
+      });
+      expect(exchanged.status).toBe(200);
+      const session = (await exchanged.json()) as Record<string, unknown>;
+      expect(session.cli_api_key).toMatch(/^sk-lw-.+_.+$/);
+      expect(session.personal_project).toBeDefined();
+      expect(world.mintedKeys).toEqual([{ deviceLabel: "unknown-device", userId: USER_ID }]);
+    });
+  });
+
+  describe("when an approval is never exchanged", () => {
+    /** @scenario "an approval that is never exchanged mints nothing" */
+    it("mints no key for the login", async () => {
+      const world = deviceFlowWorld();
+      const api = mount(world);
+
+      const grant = (await (await api.post("/api/auth/cli/device-code", {})).json()) as {
+        user_code: string;
+      };
+      const approved = await api.post("/api/auth/cli/approve", {
+        user_code: grant.user_code,
+        organization_id: ORGANIZATION_ID,
+      });
+      expect(approved.status).toBe(200);
+
+      expect(world.mintedKeys).toEqual([]);
+    });
+  });
+
+  describe("when an approve request claims a binding above the caller's ceiling", () => {
+    /** @scenario "approve refuses bindings above the approving user's ceiling" */
+    it("refuses the approval with a handled scope-violation error", async () => {
+      const world = deviceFlowWorld({
+        validateSelectionError: () => new ApiKeyScopeViolationError("binding exceeds ceiling"),
+      });
+      const api = mount(world);
+
+      const grant = (await (await api.post("/api/auth/cli/device-code", {})).json()) as {
+        user_code: string;
+      };
+      const refused = await api.post("/api/auth/cli/approve", {
+        user_code: grant.user_code,
+        organization_id: ORGANIZATION_ID,
+        key_selection: {
+          bindings: [{ scope_type: "ORGANIZATION", scope_id: ORGANIZATION_ID }],
+          permissions: ["traces:view"],
+        },
+      });
+
+      expect(refused.status).toBe(403);
+      await expect(refused.json()).resolves.toMatchObject({ error: "api_key_scope_violation" });
+    });
+  });
+
+  describe("when the approver loses access between approve and exchange", () => {
+    /** @scenario "access lost between approve and exchange ends the login" */
+    it("answers a fatal access_denied and burns the device code", async () => {
+      const world = deviceFlowWorld({
+        mintError: () => new ApiKeyScopeViolationError("access changed since approval"),
+      });
+      const api = mount(world);
+
+      const grant = (await (await api.post("/api/auth/cli/device-code", {})).json()) as {
+        device_code: string;
+        user_code: string;
+      };
+      const approved = await api.post("/api/auth/cli/approve", {
+        user_code: grant.user_code,
+        organization_id: ORGANIZATION_ID,
+      });
+      expect(approved.status).toBe(200);
+
+      const exchanged = await api.post("/api/auth/cli/exchange", {
+        device_code: grant.device_code,
+      });
+      expect(exchanged.status).toBe(410);
+      await expect(exchanged.json()).resolves.toMatchObject({ error: "access_denied" });
+      expect(world.mintedKeys).toEqual([]);
+    });
+  });
+
+  describe("when an admin disables the member's seat before the refresh token is used", () => {
+    /** @scenario "a disabled member's session cannot be renewed" */
+    it("refuses the rotation with 401 and issues no new token pair", async () => {
+      const world = deviceFlowWorld();
+      const api = mount(world);
+
+      const grant = (await (await api.post("/api/auth/cli/device-code", {})).json()) as {
+        device_code: string;
+        user_code: string;
+      };
+      await api.post("/api/auth/cli/approve", {
+        user_code: grant.user_code,
+        organization_id: ORGANIZATION_ID,
+      });
+      const exchanged = (await (
+        await api.post("/api/auth/cli/exchange", { device_code: grant.device_code })
+      ).json()) as { refresh_token: string };
+
+      world.activeMembership = false;
+
+      const refreshed = await api.post("/api/auth/cli/refresh", {
+        refresh_token: exchanged.refresh_token,
+      });
+      expect(refreshed.status).toBe(401);
+      await expect(refreshed.json()).resolves.toMatchObject({ error: "invalid_grant" });
+
+      // The presented refresh token is revoked: a retry with the same token
+      // is refused again rather than answering "invalid_grant" from a still-live record.
+      const retried = await api.post("/api/auth/cli/refresh", {
+        refresh_token: exchanged.refresh_token,
+      });
+      expect(retried.status).toBe(401);
+    });
+  });
+
+  describe("when the CLI calls the logout endpoint", () => {
+    /** @scenario "logout revokes the CLI key" */
+    it("revokes the CLI key along with the device session tokens", async () => {
+      const world = deviceFlowWorld();
+      const api = mount(world);
+
+      const grant = (await (await api.post("/api/auth/cli/device-code", {})).json()) as {
+        device_code: string;
+        user_code: string;
+      };
+      await api.post("/api/auth/cli/approve", {
+        user_code: grant.user_code,
+        organization_id: ORGANIZATION_ID,
+      });
+      const exchanged = (await (
+        await api.post("/api/auth/cli/exchange", { device_code: grant.device_code })
+      ).json()) as { access_token: string; refresh_token: string };
+
+      const loggedOut = await api.post("/api/auth/cli/logout", {
+        access_token: exchanged.access_token,
+        refresh_token: exchanged.refresh_token,
+      });
+      expect(loggedOut.status).toBe(200);
+      expect(world.revokedForLogout).toEqual([{ apiKeyId: "apikey-1", userId: USER_ID }]);
+    });
+  });
 });
 
 // --------------------------------------------------------------------------
@@ -207,10 +369,18 @@ class InMemoryDeviceSessionStore extends CliDeviceSessionStorePort {
   }
 }
 
-function deviceFlowWorld() {
+function deviceFlowWorld(
+  overrides: {
+    mintToken?: string;
+    mintScope?: { kind: "organization" | "projects"; projectIds: string[] };
+    mintError?: () => Error;
+    validateSelectionError?: () => Error;
+  } = {},
+) {
   const world = {
     activeMembership: true,
-    mintedKeys: [] as Array<{ deviceLabel: string }>,
+    mintedKeys: [] as Array<{ deviceLabel: string; userId: string }>,
+    revokedForLogout: [] as Array<{ apiKeyId: string; userId: string }>,
     ports: undefined as unknown as AuthCliDeviceFlowRestPorts,
   };
 
@@ -239,17 +409,24 @@ function deviceFlowWorld() {
     session: () => Promise.resolve({ id: USER_ID, name: "Bob", email: "bob@example.test" }),
     apiKeys: () =>
       ({
-        mintCliLoginKey: (input: { deviceLabel: string }) => {
-          world.mintedKeys.push({ deviceLabel: input.deviceLabel });
+        mintCliLoginKey: (input: { userId: string; deviceLabel: string }) => {
+          if (overrides.mintError) return Promise.reject(overrides.mintError());
+          world.mintedKeys.push({ deviceLabel: input.deviceLabel, userId: input.userId });
           return Promise.resolve({
-            token: "lw_cli_minted",
+            token: overrides.mintToken ?? "lw_cli_minted",
             apiKeyId: "apikey-1",
-            scope: { kind: "organization" as const, projectIds: [] },
+            scope: overrides.mintScope ?? { kind: "organization" as const, projectIds: [] },
           });
         },
-        validateCliSelection: (input: { selection: unknown }) => Promise.resolve(input.selection),
+        validateCliSelection: (input: { selection: unknown }) => {
+          if (overrides.validateSelectionError) return Promise.reject(overrides.validateSelectionError());
+          return Promise.resolve(input.selection);
+        },
         tryResolveDefaultCliSelection: () => Promise.resolve({ bindings: [], permissions: [] }),
-        revokeCliLoginKeyForLogout: () => Promise.resolve(),
+        revokeCliLoginKeyForLogout: (input: { apiKeyId: string; userId: string }) => {
+          world.revokedForLogout.push({ apiKeyId: input.apiKeyId, userId: input.userId });
+          return Promise.resolve();
+        },
       }) as never,
     ensurePersonalWorkspace: () =>
       Promise.resolve({
@@ -298,8 +475,20 @@ function mount(world: ReturnType<typeof deviceFlowWorld>) {
   };
 }
 
-/** A failure here must be legible rather than swallowed into a generic 500. */
-const renderUnexpected: ErrorHandler = (error, c) => c.json({ error: String(error) }, 500);
+/**
+ * A failure here must be legible rather than swallowed into a generic 500.
+ * A `HandledError` thrown by a port (e.g. a ceiling violation) renders with
+ * its own code and status, matching the real canonical error handler.
+ */
+const renderUnexpected: ErrorHandler = (error, c) => {
+  if (error instanceof HandledError) {
+    return c.json(
+      { error: error.code, error_description: error.message, ...error.meta },
+      error.httpStatus as ContentfulStatusCode,
+    );
+  }
+  return c.json({ error: String(error) }, 500);
+};
 
 function passThroughSecurity(): AppRestSecurity {
   const noop = async (_c: unknown, next: () => Promise<void>) => {
@@ -319,6 +508,7 @@ function passThroughSecurity(): AppRestSecurity {
     authorizeApiKeyCeiling: unreachable,
     authenticateOrganization: unreachable,
     authorizeOrganizationPermission: unreachable,
+    authorizeRouteTeamPermission: unreachable,
     authorizeRouteProjectPermission: unreachable,
     authenticateOrganizationThrowing: noop,
     authorizeOrganizationPermissionThrowing: unreachable,

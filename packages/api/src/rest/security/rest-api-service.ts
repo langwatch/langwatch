@@ -18,6 +18,7 @@ import {
   type EndpointVariables,
   type MountedRoute,
 } from "../types.js";
+import { canonicalV1Path, undescribedStack } from "../v1-alias.js";
 import { registerRoutePolicy } from "./route-registry.js";
 
 /**
@@ -97,6 +98,15 @@ export interface RestApiServicePorts {
    * addressing one project at a time.
    */
   readonly authorizeRouteProjectPermission: (args: {
+    permission: AuthzPermission;
+    param: string;
+    envelope: ApiErrorEnvelope;
+  }) => MiddlewareHandler;
+  /**
+   * RBAC check at the scope of the team named in the route, for org apps
+   * addressing one team at a time.
+   */
+  readonly authorizeRouteTeamPermission: (args: {
     permission: AuthzPermission;
     param: string;
     envelope: ApiErrorEnvelope;
@@ -206,6 +216,13 @@ export class SecuredApp<E extends Env> {
   readonly hono: Hono<E>;
 
   private readonly basePath: string;
+  /** Whether this family publishes `/api/v1` twins of its routes. */
+  private readonly v1Alias: boolean;
+  /**
+   * The `/api/v1` scope its app-level middleware needs, or null. A family
+   * based at `/api` needs none: `/api/*` already covers `/api/v1/*`.
+   */
+  private readonly v1BasePath: string | null;
   private readonly family: string;
   private readonly strategy: AuthStrategy;
   private readonly errorEnvelope: ApiErrorEnvelope;
@@ -223,16 +240,23 @@ export class SecuredApp<E extends Env> {
     strategy: AuthStrategy;
     errorEnvelope?: ApiErrorEnvelope;
     credentialClass?: CredentialClass;
+    v1Alias?: boolean;
   }) {
     this.basePath = args.basePath;
+    this.v1Alias = args.v1Alias !== false;
+    this.v1BasePath = this.v1Alias ? canonicalV1Path(args.basePath) : null;
     this.family = familyFromBasePath(args.basePath);
     this.strategy = args.strategy;
     this.credentialClass = args.credentialClass;
     this.errorEnvelope = args.errorEnvelope ?? "legacy";
-    this.hono = new Hono<E>().basePath(args.basePath);
-    this.hono.use(args.ports.requestTracer({ name: this.family }));
-    this.hono.use(args.ports.requestLogger());
-    this.hono.use(args.ports.appContext);
+    // No Hono base path: the family registers absolute paths itself, because
+    // its routes answer under two prefixes and `basePath()` admits only one.
+    this.hono = new Hono<E>();
+    this.scoped(
+      args.ports.requestTracer({ name: this.family }),
+      args.ports.requestLogger(),
+      args.ports.appContext,
+    );
     // One shape per family, whichever layer refuses. A family can still
     // install its own onError to name its domain errors more precisely.
     this.hono.onError(
@@ -240,6 +264,17 @@ export class SecuredApp<E extends Env> {
         ? args.ports.canonicalErrorHandler
         : args.ports.legacyErrorHandler,
     );
+  }
+
+  /**
+   * App-level middleware, mounted once per prefix the family answers under.
+   * `/api` families need no v1 scope: `/api/*` already covers `/api/v1/*`.
+   */
+  private scoped(...handlers: MiddlewareHandler[]): void {
+    this.hono.use(`${this.basePath}/*`, ...handlers);
+    if (this.v1BasePath) {
+      this.hono.use(`${this.v1BasePath}/*`, ...handlers);
+    }
   }
 
   /**
@@ -275,12 +310,14 @@ export class SecuredApp<E extends Env> {
     const bind = (method: HttpVerb | "head" | "all") => {
       return ((path: string, ...handlers: MiddlewareHandler[]) => {
         const registeredPath = mergePath(this.basePath, path);
+        const aliasPath = this.v1Alias ? canonicalV1Path(registeredPath) : null;
         registerRoutePolicy({
           method: method.toUpperCase(),
           path: registeredPath,
           policy,
           family: this.family,
           credentialClass: this.publishedCredentialClass(policy),
+          ...(aliasPath ? { canonicalPath: aliasPath } : {}),
         });
         // Prepend the enforcement chain, then the caller's handlers. The
         // verb method's STATIC type is Hono's own, so validator + context
@@ -296,19 +333,30 @@ export class SecuredApp<E extends Env> {
         // what `generateOpenAPISpec` reads; the handler is decoration.
         // Asserted both ways in rest-api-service.unit.test.ts.
         const stack = [this.stampRoute(method, registeredPath), ...chain, ...handlers];
+        // The v1 twin: same stack, same policy, one logical route. Its copy
+        // carries no OpenAPI metadata, so the describer publishes the bare
+        // path once instead of the same operation twice.
+        if (aliasPath) {
+          const on = this.hono.on as unknown as (
+            method: string,
+            path: string,
+            ...handlers: MiddlewareHandler[]
+          ) => unknown;
+          on.call(this.hono, method === "all" ? "ALL" : method.toUpperCase(), aliasPath, ...undescribedStack(stack));
+        }
         if (method === "head") {
           const on = this.hono.on as unknown as (
             method: string,
             path: string,
             ...handlers: MiddlewareHandler[]
           ) => unknown;
-          return on.call(this.hono, "HEAD", path, ...stack);
+          return on.call(this.hono, "HEAD", registeredPath, ...stack);
         }
         const verb = this.hono[method] as unknown as (
           path: string,
           ...handlers: MiddlewareHandler[]
         ) => unknown;
-        return verb.call(this.hono, path, ...stack);
+        return verb.call(this.hono, registeredPath, ...stack);
       }) as SecuredVerbs<E>[HttpVerb];
     };
 
@@ -348,13 +396,13 @@ export class SecuredApp<E extends Env> {
    * a SecuredApp first if you must.
    */
   route(path: string, app: SecuredApp<Env>): this {
-    this.hono.route(path, app.hono);
+    this.hono.route(mergePath(this.basePath, path), app.hono);
     return this;
   }
 
   /** App-level middleware (tracer/logger are already applied). Does not create routes. */
   use(...handlers: MiddlewareHandler[]): this {
-    this.hono.use(...handlers);
+    this.scoped(...handlers);
     return this;
   }
 }
@@ -426,6 +474,15 @@ function orgStrategy(ports: RestApiServicePorts): AuthStrategy {
               envelope,
             }),
           ];
+        case "teamPermission":
+          return [
+            auth,
+            ports.authorizeRouteTeamPermission({
+              permission: policy.permission,
+              param: policy.param,
+              envelope,
+            }),
+          ];
         case "anyAuthenticated":
           return [auth];
         default:
@@ -476,6 +533,7 @@ function registerMountedRoute({ route, family }: { route: MountedRoute; family: 
     registerRoutePolicy({
       method: route.method,
       path: route.path,
+      ...(route.canonicalPath ? { canonicalPath: route.canonicalPath } : {}),
       policy,
       family,
       credentialClass: credentialClassFor({ scope: "organization", policy }),
@@ -502,6 +560,7 @@ function registerMountedRoute({ route, family }: { route: MountedRoute; family: 
   registerRoutePolicy({
     method: route.method,
     path: route.path,
+    ...(route.canonicalPath ? { canonicalPath: route.canonicalPath } : {}),
     policy: meta.policy,
     family,
     // The whole family authenticates with an organization-scoped key, so the
@@ -520,6 +579,12 @@ function registerMountedRoute({ route, family }: { route: MountedRoute; family: 
 /** Arguments common to every Hono-verb app factory. */
 interface SecuredAppArgs {
   basePath: string;
+  /**
+   * Set `false` to keep the family off `/api/v1`. Reserved for the surfaces
+   * that are not the published product API: the browser sign-in door and the
+   * deployment's own probes.
+   */
+  v1Alias?: boolean;
   /**
    * The error shape this family publishes. New families pass `canonical`;
    * the default keeps the families that predate the envelope answering
@@ -705,6 +770,7 @@ export function createRestApiService<
         strategy,
         ...(args.errorEnvelope ? { errorEnvelope: args.errorEnvelope } : {}),
         ...(args.credentialClass ? { credentialClass: args.credentialClass } : {}),
+        ...(args.v1Alias === false ? { v1Alias: false } : {}),
       });
     },
 

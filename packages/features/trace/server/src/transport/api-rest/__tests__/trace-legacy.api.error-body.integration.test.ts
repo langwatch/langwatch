@@ -46,6 +46,7 @@ function testSecurity(): AppRestSecurity {
     authorizeApiKeyCeiling: () => pass,
     authenticateOrganization: () => pass,
     authorizeOrganizationPermission: () => pass,
+    authorizeRouteTeamPermission: () => pass,
     authorizeRouteProjectPermission: () => pass,
     authenticateOrganizationThrowing: pass,
     authorizeOrganizationPermissionThrowing: () => pass,

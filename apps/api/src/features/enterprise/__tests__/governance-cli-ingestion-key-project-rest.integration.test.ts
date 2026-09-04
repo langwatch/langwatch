@@ -120,12 +120,73 @@ describe("given a project that belongs to another organization", () => {
   });
 });
 
+describe("given the organization turned direct OTLP off for a wrapped tool", () => {
+  describe("when a CLI asks for a key declaring that same tool's source type", () => {
+    /** @scenario "A tool whose organization forbids direct OTLP mints no ingestion key" */
+    it("refuses the mint and leaves the project without a new key", async () => {
+      const world = ingestionKeyWorld({ allowOtelDirect: false });
+      const api = mount(world);
+
+      const response = await api.post(
+        "/api/auth/cli/governance/ingestion-key",
+        { source_type: "claude_code", project: PROJECT_ID },
+        BEARER,
+      );
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({ error: "direct_otel_not_allowed" });
+      expect(world.mints).toEqual([]);
+      expect(world.policySlugsProbed).toEqual(["claude"]);
+    });
+  });
+
+  describe("when the caller declares a different tool the policy check reads by name", () => {
+    /** @scenario "The mint policy reads the tool the request declares" */
+    it("mints under the declared tool's own policy, not the disabled one", async () => {
+      const world = ingestionKeyWorld({ allowOtelDirect: false });
+      const api = mount(world);
+
+      const response = await api.post(
+        "/api/auth/cli/governance/ingestion-key",
+        { source_type: "codex", project: PROJECT_ID },
+        BEARER,
+      );
+
+      expect(response.status).toBe(201);
+      expect(world.mints).toEqual([{ projectId: PROJECT_ID, sourceType: "codex" }]);
+      expect(world.policySlugsProbed).toEqual(["codex"]);
+    });
+  });
+
+  describe("when the caller declares a source type no wrapped tool stamps", () => {
+    /** @scenario "A source type outside the wrapped-tool set mints ungoverned" */
+    it("mints, because templates and standalone apps share this route", async () => {
+      const world = ingestionKeyWorld({ allowOtelDirect: false });
+      const api = mount(world);
+
+      const response = await api.post(
+        "/api/auth/cli/governance/ingestion-key",
+        { source_type: "copilot_app", project: PROJECT_ID },
+        BEARER,
+      );
+
+      expect(response.status).toBe(201);
+      expect(world.mints).toEqual([{ projectId: PROJECT_ID, sourceType: "copilot_app" }]);
+      // Not a policed source type, so the policy is never consulted at all.
+      expect(world.policySlugsProbed).toEqual([]);
+    });
+  });
+});
+
 // --------------------------------------------------------------------------
 
-function ingestionKeyWorld(options: { permittedOnProject?: boolean } = {}) {
+function ingestionKeyWorld(
+  options: { permittedOnProject?: boolean; allowOtelDirect?: boolean } = {},
+) {
   const world = {
     lookups: [] as string[],
     mints: [] as Array<{ projectId: string; sourceType: string }>,
+    policySlugsProbed: [] as string[],
     ports: undefined as unknown as GovernanceCliRestPorts,
   };
 
@@ -172,7 +233,14 @@ function ingestionKeyWorld(options: { permittedOnProject?: boolean } = {}) {
     },
     governance: () =>
       ({
-        aiToolResolvePolicy: () => Promise.resolve({ allowVk: true, allowOtelDirect: true }),
+        aiToolResolvePolicy: (input: { slug: string }) => {
+          world.policySlugsProbed.push(input.slug);
+          // Only the organization's "claude" tile is turned off; every other
+          // tool's policy is untouched, exactly like the real per-tile config.
+          const allowOtelDirect =
+            input.slug === "claude" ? (options.allowOtelDirect ?? true) : true;
+          return Promise.resolve({ allowVk: true, allowOtelDirect });
+        },
         ingestionKeyIssueForProject: (input: { projectId: string; sourceType: string }) => {
           world.mints.push({ projectId: input.projectId, sourceType: input.sourceType });
           return Promise.resolve({ token: "ik-lw-minted-token", prefix: "ik-lw-minted" });
@@ -244,6 +312,7 @@ function passThroughSecurity(): AppRestSecurity {
     authorizeApiKeyCeiling: unreachable,
     authenticateOrganization: unreachable,
     authorizeOrganizationPermission: unreachable,
+    authorizeRouteTeamPermission: unreachable,
     authorizeRouteProjectPermission: unreachable,
     authenticateOrganizationThrowing: noop,
     authorizeOrganizationPermissionThrowing: unreachable,

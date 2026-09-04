@@ -140,6 +140,7 @@ function spine(options: { granted?: readonly string[] } = {}) {
         }
         await next();
       },
+    authorizeRouteTeamPermission: () => async (_c, next) => next(),
     authorizeRouteProjectPermission: () => async (_c, next) => next(),
     authenticateOrganizationThrowing: async (_c, next) => next(),
     authorizeOrganizationPermissionThrowing: () => async (_c, next) => next(),

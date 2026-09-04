@@ -115,6 +115,7 @@ describe("given a device session reading the Activity Monitor's sources", () => 
 
 describe("given a device session asking for a project's key", () => {
   describe("when the caller was offboarded after the token was minted", () => {
+    /** @scenario "POST /api/auth/cli/project-key applies the same membership boundary" */
     it("refuses and severs the presented session rather than waiting for it to expire", async () => {
       const world = governanceCliWorld({ activeMembership: false });
       const api = mount(world);
@@ -132,6 +133,7 @@ describe("given a device session asking for a project's key", () => {
   });
 
   describe("when an active member without project write asks for the key", () => {
+    /** @scenario "the project-key endpoint refuses a project the caller cannot write to" */
     it("answers 403 rather than handing back the shared write credential", async () => {
       const world = governanceCliWorld({ permitted: false });
       const api = mount(world);
@@ -145,6 +147,107 @@ describe("given a device session asking for a project's key", () => {
       });
     });
   });
+
+  describe("when the caller asks for their own personal project by slug", () => {
+    /** @scenario "the project-key endpoint returns the caller's own personal project key" */
+    it("returns the caller's own personal project key", async () => {
+      const world = governanceCliWorld({ projectIsPersonal: true, projectOwnerUserId: USER_ID });
+      const api = mount(world);
+
+      const response = await api.post("/api/auth/cli/project-key", { slug: "shared" }, BEARER);
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({
+        api_key: "shared-key",
+        project: { id: "project-shared", slug: "shared", name: "Shared" },
+      });
+    });
+  });
+
+  describe("when the caller asks for another user's personal project", () => {
+    /** @scenario "the project-key endpoint refuses another user's personal project" */
+    /** @scenario "the server still refuses a personal project that is not the caller's own" */
+    it("refuses outright without leaking the key, before any write check", async () => {
+      const world = governanceCliWorld({
+        projectIsPersonal: true,
+        projectOwnerUserId: "some-other-user",
+      });
+      const api = mount(world);
+
+      const response = await api.post("/api/auth/cli/project-key", { slug: "shared" }, BEARER);
+
+      expect(response.status).toBe(400);
+      const body = await response.json();
+      expect(body).toMatchObject({ error: "personal_project_not_allowed" });
+      expect(JSON.stringify(body)).not.toContain("shared-key");
+    });
+  });
+});
+
+describe("given a device session lazily resolving the personal project", () => {
+  describe("when the bearer is valid and the workspace already exists", () => {
+    /** @scenario "GET /api/auth/cli/personal-project returns the caller's personal project" */
+    it("returns the caller's personal project, ensured idempotently", async () => {
+      const world = governanceCliWorld();
+      const api = mount(world);
+
+      const response = await api.get("/api/auth/cli/personal-project", BEARER);
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({
+        project: {
+          id: "project-personal",
+          slug: "personal-bob",
+          name: "Bob",
+          api_key: "project-key",
+        },
+      });
+    });
+  });
+
+  describe("when the token's user was removed from the organization", () => {
+    /** @scenario "an offboarded user's pre-removal token cannot mint or return a personal key" */
+    it("refuses with 403, mints no workspace, and revokes the presented token", async () => {
+      const world = governanceCliWorld({ activeMembership: false });
+      const api = mount(world);
+
+      const response = await api.get("/api/auth/cli/personal-project", BEARER);
+
+      expect(response.status).toBe(403);
+      expect(world.ensureWorkspaceCalls).toBe(0);
+      expect(world.revokedSessions).toEqual([USER_ID]);
+    });
+  });
+
+  describe("when an admin disabled the token's membership to reclaim its seat", () => {
+    /** @scenario "a disabled member's pre-disable token cannot mint or return a personal key" */
+    it("refuses with 403, mints no workspace, and revokes the presented token", async () => {
+      // The fake's organizationUser lookup already filters disabledAt: null,
+      // so a disabled seat is indistinguishable from no row at all here.
+      const world = governanceCliWorld({ activeMembership: false });
+      const api = mount(world);
+
+      const response = await api.get("/api/auth/cli/personal-project", BEARER);
+
+      expect(response.status).toBe(403);
+      expect(world.ensureWorkspaceCalls).toBe(0);
+      expect(world.revokedSessions).toEqual([USER_ID]);
+    });
+  });
+
+  describe("when the token's user account is deactivated", () => {
+    /** @scenario "a deactivated user's token cannot mint or return a personal key" */
+    it("refuses with 403 and revokes the presented token", async () => {
+      const world = governanceCliWorld({ deactivated: true });
+      const api = mount(world);
+
+      const response = await api.get("/api/auth/cli/personal-project", BEARER);
+
+      expect(response.status).toBe(403);
+      expect(world.ensureWorkspaceCalls).toBe(0);
+      expect(world.revokedSessions).toEqual([USER_ID]);
+    });
+  });
 });
 
 // --------------------------------------------------------------------------
@@ -154,6 +257,9 @@ function governanceCliWorld(
     planType?: string;
     permitted?: boolean;
     activeMembership?: boolean;
+    deactivated?: boolean;
+    projectIsPersonal?: boolean;
+    projectOwnerUserId?: string | null;
   } = {},
 ) {
   const world = {
@@ -161,6 +267,7 @@ function governanceCliWorld(
     revokedSessions: [] as string[],
     sourceListReads: 0,
     planReads: 0,
+    ensureWorkspaceCalls: 0,
     ports: undefined as unknown as GovernanceCliRestPorts,
   };
 
@@ -173,7 +280,7 @@ function governanceCliWorld(
     user: {
       findUnique: () =>
         Promise.resolve({
-          deactivatedAt: null,
+          deactivatedAt: options.deactivated ? new Date("2026-01-01T00:00:00Z") : null,
           name: "Bob",
           email: "bob@example.test",
         }),
@@ -189,8 +296,8 @@ function governanceCliWorld(
           slug: "shared",
           name: "Shared",
           apiKey: "shared-key",
-          isPersonal: false,
-          ownerUserId: null,
+          isPersonal: options.projectIsPersonal ?? false,
+          ownerUserId: options.projectOwnerUserId ?? null,
         }),
     },
     organization: { findUnique: () => Promise.resolve({ supportContact: null }) },
@@ -224,7 +331,16 @@ function governanceCliWorld(
       }) as never,
     database: () => database as never,
     ensurePersonalWorkspace: () => {
-      throw new Error("unreachable in these scenarios");
+      world.ensureWorkspaceCalls += 1;
+      return Promise.resolve({
+        team: { id: "team-personal" },
+        project: {
+          id: "project-personal",
+          slug: "personal-bob",
+          name: "Bob",
+          apiKey: "project-key",
+        },
+      });
     },
     tryFindPersonalWorkspace: () => Promise.resolve(null),
     plans: () =>
@@ -299,6 +415,7 @@ function passThroughSecurity(): AppRestSecurity {
     authorizeApiKeyCeiling: unreachable,
     authenticateOrganization: unreachable,
     authorizeOrganizationPermission: unreachable,
+    authorizeRouteTeamPermission: unreachable,
     authorizeRouteProjectPermission: unreachable,
     authenticateOrganizationThrowing: noop,
     authorizeOrganizationPermissionThrowing: unreachable,

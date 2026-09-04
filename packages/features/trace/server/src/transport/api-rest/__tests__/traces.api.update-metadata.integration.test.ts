@@ -20,6 +20,8 @@ import {
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import type { ErrorHandler, MiddlewareHandler } from "hono";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
@@ -67,6 +69,7 @@ function testSecurity(): AppRestSecurity {
     authorizeApiKeyCeiling: () => pass,
     authenticateOrganization: () => pass,
     authorizeOrganizationPermission: () => pass,
+    authorizeRouteTeamPermission: () => pass,
     authorizeRouteProjectPermission: () => pass,
     authenticateOrganizationThrowing: pass,
     authorizeOrganizationPermissionThrowing: () => pass,
@@ -194,6 +197,34 @@ describe("given PATCH /api/traces/:traceId/metadata", () => {
       expect(res.status).toBe(200);
       const call = mockUpdateTraceMetadata.mock.calls[0]![0];
       expect(call.metadata).toEqual({ environment: "staging" });
+    });
+  });
+
+  describe("when checking API documentation", () => {
+    /** @scenario "API documentation includes the metadata update endpoint" */
+    it("has the update-metadata docs file", () => {
+      function repoRoot(): string {
+        let dir = __dirname;
+        while (!fs.existsSync(path.join(dir, "pnpm-workspace.yaml"))) {
+          const parent = path.dirname(dir);
+          if (parent === dir) throw new Error("no workspace root above this test");
+          dir = parent;
+        }
+        return dir;
+      }
+
+      const docsPath = path.join(
+        repoRoot(),
+        "docs/api-reference/traces/update-trace-metadata.mdx",
+      );
+      expect(fs.existsSync(docsPath), `expected the endpoint's docs page at ${docsPath}`).toBe(
+        true,
+      );
+
+      const content = fs.readFileSync(docsPath, "utf-8");
+      expect(content).toContain("Update trace metadata");
+      expect(content).toContain("PATCH");
+      expect(content).toContain("metadata");
     });
   });
 });

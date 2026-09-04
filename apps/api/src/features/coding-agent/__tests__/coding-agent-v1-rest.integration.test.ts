@@ -233,6 +233,7 @@ function passThroughSecurity(credential: {
     authorizeApiKeyCeiling: () => noop,
     authenticateOrganization: () => asOrganization,
     authorizeOrganizationPermission: () => noop,
+    authorizeRouteTeamPermission: () => noop,
     authorizeRouteProjectPermission: () => noop,
     authenticateOrganizationThrowing: noop,
     authorizeOrganizationPermissionThrowing: () => noop,

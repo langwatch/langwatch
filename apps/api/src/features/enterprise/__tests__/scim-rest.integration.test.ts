@@ -26,7 +26,7 @@
  * is what the provider parses; a bare 401 body would be logged by Okta or
  * Entra as a transport failure rather than an authentication one.
  */
-import { createHash } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 
 import { createAppRestSecurity, getRoutePolicy, type AppRestSecurity } from "@langwatch/api/rest";
 import {
@@ -295,28 +295,30 @@ describe("given the Auth0 log-stream intake", () => {
     });
   });
 
-  describe("when the presented secret does not match", () => {
+  describe("when the delivery is signed with another secret", () => {
     it("answers 401 and provisions nobody", async () => {
       const world = scimWorld();
       const api = mount(world.ports);
 
-      const response = await api.post("/api/webhooks/auth0-scim", auth0CreateEvent(), "wrong");
+      const response = await api.postSigned("/api/webhooks/auth0-scim", auth0CreateEvent(), {
+        secret: "wrong",
+        authorization: BEARER,
+      });
 
       expect(response.status).toBe(401);
       expect(world.users.created).toEqual([]);
     });
   });
 
-  describe("when Auth0 presents the configured secret", () => {
+  describe("when the delivery is signed with the configured secret and carries the directory token", () => {
     it("provisions the person through the same service the protocol routes use", async () => {
       const world = scimWorld();
       const api = mount(world.ports);
 
-      const response = await api.post(
-        "/api/webhooks/auth0-scim",
-        auth0CreateEvent(),
-        WEBHOOK_SECRET,
-      );
+      const response = await api.postSigned("/api/webhooks/auth0-scim", auth0CreateEvent(), {
+        secret: WEBHOOK_SECRET,
+        authorization: BEARER,
+      });
 
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({ received: true });
@@ -343,7 +345,12 @@ describe("given a deployment that composed no Enterprise application", () => {
       expect((await api.get("/api/scim/v2/Users", BEARER)).status).toBe(404);
       expect((await api.get("/api/scim/v2/ServiceProviderConfig")).status).toBe(404);
       expect(
-        (await api.post("/api/webhooks/auth0-scim", auth0CreateEvent(), WEBHOOK_SECRET)).status,
+        (
+          await api.postSigned("/api/webhooks/auth0-scim", auth0CreateEvent(), {
+            secret: WEBHOOK_SECRET,
+            authorization: BEARER,
+          })
+        ).status,
       ).toBe(404);
     });
   });
@@ -839,6 +846,25 @@ function mount(scim: ApiScimRestPorts | undefined) {
         },
         body: JSON.stringify(body),
       }),
+    /** A webhook delivery signed the way the provider signs it: HMAC over `t.body`. */
+    postSigned: (
+      path: string,
+      body: unknown,
+      options: { secret: string; authorization?: string },
+    ) => {
+      const raw = JSON.stringify(body);
+      const t = Math.floor(Date.now() / 1000);
+      const digest = createHmac("sha256", options.secret).update(`${t}.${raw}`).digest("hex");
+      return fetchAt(path, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-langwatch-signature": `t=${t},v1=${digest}`,
+          ...(options.authorization ? { authorization: options.authorization } : {}),
+        },
+        body: raw,
+      });
+    },
   };
 }
 
@@ -863,6 +889,7 @@ function passThroughSecurity(): AppRestSecurity {
     authorizeApiKeyCeiling: unreachable,
     authenticateOrganization: unreachable,
     authorizeOrganizationPermission: unreachable,
+    authorizeRouteTeamPermission: unreachable,
     authorizeRouteProjectPermission: unreachable,
     authenticateOrganizationThrowing: noop,
     authorizeOrganizationPermissionThrowing: unreachable,

@@ -108,6 +108,7 @@ function testSecurity(): { security: AppRestSecurity; chain: string[] } {
     authorizeApiKeyCeiling: ({ permission }) => record(`ceiling:${permission}`),
     authenticateOrganization: () => record("authenticateOrganization"),
     authorizeOrganizationPermission: ({ permission }) => record(`authorizeOrg:${permission}`),
+    authorizeRouteTeamPermission: () => async (_c, next) => next(),
     authorizeRouteProjectPermission: ({ permission }) =>
       record(`authorizeRouteProject:${permission}`),
     authenticateOrganizationThrowing: record("authenticateOrganizationThrowing"),
@@ -267,6 +268,7 @@ describe("createEvaluatorsRestApp", () => {
       });
     });
 
+    /** @scenario Updated settings take effect and the evaluator type is unchanged */
     it("keeps the canonical config shape on a settings-only update", async () => {
       const { hono, stub } = buildApi();
 

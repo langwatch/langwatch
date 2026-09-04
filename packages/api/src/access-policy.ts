@@ -20,6 +20,10 @@ import type { AuthzPermission } from "@langwatch/authz-contract";
  *                        passes (org bindings are ancestors of project scope);
  *                        a team- or project-scoped grant reaches only the
  *                        projects it was actually given.
+ *   - teamPermission    — the same idea one tier up: for org apps addressing
+ *                        one team, the permission is resolved at that team's
+ *                        scope, so a team-scoped grant reaches only its own
+ *                        team.
  *   - anyAuthenticated — any valid credential for the app's scope; no specific
  *                        permission. Use sparingly and only when the handler
  *                        itself does no privileged read/write.
@@ -37,6 +41,12 @@ export type AccessPolicy =
       readonly kind: "projectPermission";
       readonly permission: AuthzPermission;
       /** Route param naming the project. Defaults to `id`. */
+      readonly param: string;
+    }
+  | {
+      readonly kind: "teamPermission";
+      readonly permission: AuthzPermission;
+      /** Route param naming the team. Defaults to `id`. */
       readonly param: string;
     }
   | { readonly kind: "anyAuthenticated" }
@@ -217,6 +227,28 @@ export function requiresOnProject<P extends AuthzPermission>(
 }
 
 /**
+ * Require an RBAC permission at the scope of the team the route addresses, for
+ * org apps that operate on one team at a time. The project twin's reasoning
+ * applies unchanged: `requires(...)` resolves at organization scope, so a
+ * team-scoped binding could never pass and an org-wide grant reached every
+ * team in the org.
+ */
+export function requiresOnTeam<P extends AuthzPermission>(
+  permission: P,
+  options: { param?: string } = {},
+): {
+  readonly kind: "teamPermission";
+  readonly permission: P;
+  readonly param: string;
+} {
+  return {
+    kind: "teamPermission",
+    permission,
+    param: options.param ?? "id",
+  };
+}
+
+/**
  * Any valid credential for the app's scope is accepted; no specific permission
  * is checked. Reserve for routes whose handler performs no privileged action
  * beyond what authentication already proves (e.g. "whoami").
@@ -310,6 +342,7 @@ export function policyPermissions(policy: AccessPolicy): readonly AuthzPermissio
     case "permission":
     case "apiKeyPermission":
     case "projectPermission":
+    case "teamPermission":
       return [policy.permission];
     case "handlerManaged":
       return policy.permissions;
@@ -337,6 +370,8 @@ export function describeAccessPolicy(policy: AccessPolicy): string {
       return `requires ${policy.permission} (API-key ceiling; legacy project keys bypass)`;
     case "projectPermission":
       return `requires ${policy.permission} on the project in :${policy.param}`;
+    case "teamPermission":
+      return `requires ${policy.permission} on the team in :${policy.param}`;
     case "anyAuthenticated":
       return "any authenticated credential";
     case "public":

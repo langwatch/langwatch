@@ -218,6 +218,7 @@ function spine(
         }
         await next();
       },
+    authorizeRouteTeamPermission: () => async (_c, next) => next(),
     authorizeRouteProjectPermission:
       ({ permission, param }) =>
       async (c, next) => {
@@ -455,8 +456,8 @@ describe("createProjectRestApp", () => {
   });
 
   describe("when the collection is listed", () => {
+    /** @scenario Listing projects never discloses base keys */
     it("answers with the page and never discloses a base key", async () => {
-      /** @scenario Listing projects never discloses base keys */
       const listByOrganization = vi.fn(async () => page([project(), project({ id: "project_2" })]));
       const { send } = buildApi({
         projects: { listByOrganization },
@@ -918,6 +919,93 @@ describe("createProjectRestApp", () => {
 
       expect(response.status).toBe(404);
       expect(regenerateLegacyProjectKey).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * Finding H4 of the 2026-09-04 feature-surface security pass. These four
+   * routes each name ONE project, so the permission belongs at that project's
+   * scope; resolved at the organization's, one org-wide grant reached every
+   * project in the tenant and a per-project grant reached none.
+   * Spec: specs/security/resource-scope-permission-checks.feature
+   */
+  describe("given a credential whose grant covers one project and not its sibling", () => {
+    // Organization-wide grants stay held, so a check resolved at the
+    // organization would pass every route below: what refuses the sibling is
+    // the project scope, and nothing else.
+    const SCOPED = {
+      granted: ["project:view", "project:update", "project:delete", "project:manage"],
+      grantedOnProject: {
+        project_1: ["project:view", "project:update", "project:delete", "project:manage"],
+        project_2: [],
+      },
+    };
+
+    it("declares each by-id route at the route's own project scope", () => {
+      buildApi();
+
+      for (const [method, path, permission] of [
+        ["GET", "/api/projects/:id", "project:view"],
+        ["PATCH", "/api/projects/:id", "project:update"],
+        ["DELETE", "/api/projects/:id", "project:delete"],
+        ["POST", "/api/projects/:id/regenerate-api-key", "project:manage"],
+      ] as const) {
+        expect(getRoutePolicy(method, path)?.policy).toEqual({
+          kind: "projectPermission",
+          permission,
+          param: "id",
+        });
+      }
+    });
+
+    /** @scenario A project route resolves its permission at the project it names */
+    it("refuses to read a sibling project, and never reaches the service", async () => {
+      const tryGetWithTeam = vi.fn(async () => projectWithTeam());
+      const { send } = buildApi({ ...SCOPED, projects: { tryGetWithTeam } });
+
+      expect((await send("/api/projects/project_2")).status).toBe(403);
+      expect(tryGetWithTeam).not.toHaveBeenCalled();
+    });
+
+    it("refuses to update or archive a sibling project", async () => {
+      const update = vi.fn(async () => project());
+      const archive = vi.fn(async () => project());
+      const { send } = buildApi({ ...SCOPED, projects: { update, archive } });
+
+      expect(
+        (await send("/api/projects/project_2", { method: "PATCH", body: { name: "Renamed" } }))
+          .status,
+      ).toBe(403);
+      expect((await send("/api/projects/project_2", { method: "DELETE" })).status).toBe(403);
+      expect(update).not.toHaveBeenCalled();
+      expect(archive).not.toHaveBeenCalled();
+    });
+
+    /** @scenario Rotating a project's ingestion key is authorized on that project */
+    it("refuses to rotate a sibling project's ingestion key, and rotates nothing", async () => {
+      const regenerateLegacyProjectKey = vi.fn(async () => "sk-lw-rotated");
+      const { send } = buildApi({
+        ...SCOPED,
+        projects: { tryGetWithTeam: vi.fn(async () => projectWithTeam()) },
+        apiKeys: { regenerateLegacyProjectKey },
+      });
+
+      const response = await send("/api/projects/project_2/regenerate-api-key", {
+        method: "POST",
+      });
+
+      expect(response.status).toBe(403);
+      expect(await response.text()).not.toContain("sk-lw-rotated");
+      expect(regenerateLegacyProjectKey).not.toHaveBeenCalled();
+    });
+
+    it("still serves the project the grant does name", async () => {
+      const { send } = buildApi({
+        ...SCOPED,
+        projects: { tryGetWithTeam: vi.fn(async () => projectWithTeam()) },
+      });
+
+      expect((await send("/api/projects/project_1")).status).toBe(200);
     });
   });
 });

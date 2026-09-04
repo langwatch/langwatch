@@ -122,6 +122,7 @@ function descriptionOnlySecurity(): AppRestSecurity {
     authorizeApiKeyCeiling: () => noopMiddleware,
     authenticateOrganization: () => noopMiddleware,
     authorizeOrganizationPermission: () => noopMiddleware,
+    authorizeRouteTeamPermission: () => noopMiddleware,
     authorizeRouteProjectPermission: () => noopMiddleware,
     authenticateOrganizationThrowing: noopMiddleware,
     authorizeOrganizationPermissionThrowing: () => noopMiddleware,

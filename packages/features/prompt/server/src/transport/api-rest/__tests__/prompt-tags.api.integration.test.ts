@@ -45,7 +45,9 @@ function inMemoryTagDatabase() {
 
   const promptTag = {
     create: ({ data }: { data: Record<string, unknown> }) => {
-      if (rows.some((row) => row.organizationId === data.organizationId && row.name === data.name)) {
+      if (
+        rows.some((row) => row.organizationId === data.organizationId && row.name === data.name)
+      ) {
         return Promise.reject(new DuplicateTagError("Unique constraint failed"));
       }
       const row = {
@@ -132,6 +134,7 @@ function testSecurity(): AppRestSecurity {
     authorizeApiKeyCeiling: () => pass,
     authenticateOrganization: () => pass,
     authorizeOrganizationPermission: () => pass,
+    authorizeRouteTeamPermission: () => pass,
     authorizeRouteProjectPermission: () => pass,
     authenticateOrganizationThrowing: pass,
     authorizeOrganizationPermissionThrowing: () => pass,
