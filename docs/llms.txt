@@ -50,10 +50,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Compare Agents](https://langwatch.ai/docs/agent-testing/compare-agents.md): A comparison run sends every scenario to two or more targets in one run, so you see the pass rate, the cost and the latency of each side by side.
 - [Run from CI](https://langwatch.ai/docs/agent-testing/run-from-ci.md): Start a test suite from a CI job and wait for every run of the batch to finish.
 
-- [Voice Agent Testing](https://langwatch.ai/docs/agent-testing/voice-agents.md): Scenario tests voice agents end to end over real audio, with the same scenario.run() and the same judge you use for text.
-- [Red Teaming](https://langwatch.ai/docs/agent-testing/red-teaming.md): RedTeamAgent replaces the user simulator with a multi-turn attacker, in the same scenario.run() loop and the same judge as your functional tests.
-
-## Improve Your Agent
+### Improve your agent
 
 - [Improve Your Agent](https://langwatch.ai/docs/improve-your-agent/overview.md): Make your agent faster, cheaper and shorter without making it worse, with a scenario test suite as the quality gate and one hypothesis at a time.
 - [Reduce the Turns of an Agent](https://langwatch.ai/docs/improve-your-agent/reduce-turns.md): Find why a tool-using agent takes ten turns for a task that needs three, change the cause, and prove with the test suite that the answers did not get worse.
@@ -61,6 +58,9 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Reduce Cost and Latency](https://langwatch.ai/docs/improve-your-agent/reduce-cost-and-latency.md): Run the same test suite on two models side by side, read the pass rate, the cost and the reply latency of each, and keep the cheaper model only where the pass rate holds.
 - [Optimize with DSPy Using Scenarios as the Metric](https://langwatch.ai/docs/improve-your-agent/optimize-with-dspy.md): A DSPy optimizer rewrites your agent's instructions and tool descriptions and scores every candidate by running your scenario suite, with the judge's reasoning as its feedback.
 - [Optimization Algorithms](https://langwatch.ai/docs/improve-your-agent/algorithms.md): What each optimization algorithm changes, what it needs, how many suite runs it costs, and when to use it.
+
+- [Voice Agent Testing](https://langwatch.ai/docs/agent-testing/voice-agents.md): Scenario tests voice agents end to end over real audio, with the same scenario.run() and the same judge you use for text.
+- [Red Teaming](https://langwatch.ai/docs/agent-testing/red-teaming.md): RedTeamAgent replaces the user simulator with a multi-turn attacker, in the same scenario.run() loop and the same judge as your functional tests.
 
 ## Observability
 
