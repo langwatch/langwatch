@@ -83,7 +83,7 @@ import {
   type UiFailureNotice,
   type UiSuccessNotice,
 } from "../src/behavior/ui-capabilities";
-import { personalWorkspacePageLoaders } from "../src/features/personal-workspace";
+import { personalWorkspaceFeature } from "../src/features/personal-workspace";
 
 const FLAG = "release_ui_ai_governance_enabled";
 
@@ -144,7 +144,7 @@ function capabilities(session: UiSessionPort): UiCapabilities {
 }
 
 async function openPage(key: string, flags: Record<string, boolean | undefined>): Promise<void> {
-  const loader = personalWorkspacePageLoaders[key];
+  const loader = personalWorkspaceFeature.loaders[key];
   if (!loader) throw new Error(`no loader is registered for ${key}`);
   const Mounted = (await loader()).default;
   // The refusal fallbacks are Chakra, so a refused page needs a system even
@@ -173,7 +173,7 @@ afterEach(() => {
 
 describe("given the personal workspace is released for the organization", () => {
   it("opens every one of its addresses", async () => {
-    for (const key of Object.keys(personalWorkspacePageLoaders)) {
+    for (const key of Object.keys(personalWorkspaceFeature.loaders)) {
       await openPage(key, { [FLAG]: true });
       expect(screen.getByText("the personal page")).toBeDefined();
       cleanup();

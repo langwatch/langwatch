@@ -82,7 +82,8 @@ import {
   type UiFailureNotice,
   type UiSuccessNotice,
 } from "../src/behavior/ui-capabilities";
-import { annotationPageLoaders } from "../src/features/annotation";
+import { annotationFeature } from "../src/features/annotation";
+import { MemoryRouter } from "react-router";
 
 class SilentNavigation extends UiNavigationPort {
   navigate(): void {}
@@ -145,17 +146,19 @@ const WALKER_KEY = "pages/[project]/annotations/my-queue";
 const QUEUE_KEY = "pages/[project]/annotations/[slug]";
 
 async function openPage(key: string, permissions: readonly string[]): Promise<void> {
-  const loader = annotationPageLoaders[key];
+  const loader = annotationFeature.loaders[key];
   if (!loader) throw new Error(`no loader is registered for ${key}`);
   const Mounted = (await loader()).default;
   // The refusal fallbacks are Chakra, so a refused page needs a system even
   // though the page it refuses never renders.
   render(
-    <ChakraProvider value={defaultSystem}>
-      <UiCapabilityContextProvider value={capabilities(new AnsweringSession(permissions))}>
-        <Mounted />
-      </UiCapabilityContextProvider>
-    </ChakraProvider>,
+    <MemoryRouter>
+      <ChakraProvider value={defaultSystem}>
+        <UiCapabilityContextProvider value={capabilities(new AnsweringSession(permissions))}>
+          <Mounted />
+        </UiCapabilityContextProvider>
+      </ChakraProvider>
+    </MemoryRouter>,
   );
 }
 
@@ -240,7 +243,7 @@ describe("given the four keys map to four views", () => {
      * whole family.
      */
     it("registers every annotations key, the queue walker included", () => {
-      expect(Object.keys(annotationPageLoaders).sort()).toEqual(
+      expect(Object.keys(annotationFeature.loaders).sort()).toEqual(
         [INBOX_KEY, QUEUE_KEY, ALL_KEY, MINE_KEY, WALKER_KEY].sort(),
       );
     });

@@ -36,7 +36,10 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { navigationApi } from "@langwatch/navigation-web/screens/landing";
 import { NavigationShell } from "@langwatch/navigation-web/chrome";
-import { WithStubNavigationHost, type StubNavigationReadings } from "@langwatch/navigation-web/testing";
+import {
+  WithStubNavigationHost,
+  type StubNavigationReadings,
+} from "@langwatch/navigation-web/testing";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 import { useState } from "react";
@@ -110,8 +113,8 @@ import {
   type UiSuccessNotice,
 } from "../src/behavior/ui-capabilities";
 import type { UiPageLoaderRegistry } from "../src/behavior/ui-page-loaders";
-import { organizationPageLoaders } from "../src/features/organization";
-import { personalWorkspacePageLoaders } from "../src/features/personal-workspace";
+import { organizationFeature } from "../src/features/organization";
+import { personalWorkspaceFeature } from "../src/features/personal-workspace";
 
 class SilentNavigation extends UiNavigationPort {
   navigate(): void {}
@@ -256,13 +259,13 @@ describe("given the audit log page", () => {
   describe("when the reader may manage the organization", () => {
     /** @scenario Only an organization administrator may open the audit trail */
     it("opens", async () => {
-      await openPage(organizationPageLoaders, AUDIT_LOG_KEY, ["organization:manage"]);
+      await openPage(organizationFeature.loaders, AUDIT_LOG_KEY, ["organization:manage"]);
 
       expect(screen.getByText("the audit log page")).toBeDefined();
     });
 
     it("renders inside the settings chrome", async () => {
-      await openPage(organizationPageLoaders, AUDIT_LOG_KEY, ["organization:manage"]);
+      await openPage(organizationFeature.loaders, AUDIT_LOG_KEY, ["organization:manage"]);
 
       expect(screen.getByRole("link", { name: "General" })).toBeDefined();
     });
@@ -276,14 +279,14 @@ describe("given the audit log page", () => {
      */
     /** @scenario Only an organization administrator may open the audit trail */
     it("is refused, and named the grant it needs", async () => {
-      await openPage(organizationPageLoaders, AUDIT_LOG_KEY, ["organization:view"]);
+      await openPage(organizationFeature.loaders, AUDIT_LOG_KEY, ["organization:view"]);
 
       expect(screen.queryByText("the audit log page")).toBeNull();
       expect(screen.getByText(/organization:manage/)).toBeDefined();
     });
 
     it("still frames the refusal in the settings chrome", async () => {
-      await openPage(organizationPageLoaders, AUDIT_LOG_KEY, ["organization:view"]);
+      await openPage(organizationFeature.loaders, AUDIT_LOG_KEY, ["organization:view"]);
 
       expect(screen.getByRole("link", { name: "General" })).toBeDefined();
     });
@@ -291,7 +294,7 @@ describe("given the audit log page", () => {
 
   describe("when the reader holds a neighbouring administrator grant instead", () => {
     it("is still refused", async () => {
-      await openPage(organizationPageLoaders, AUDIT_LOG_KEY, ["project:manage"]);
+      await openPage(organizationFeature.loaders, AUDIT_LOG_KEY, ["project:manage"]);
 
       expect(screen.queryByText("the audit log page")).toBeNull();
     });
@@ -307,14 +310,14 @@ describe("given the sign-in methods page", () => {
      */
     /** @scenario Every signed-in reader can open their own sign-in methods */
     it("opens anyway, because it is about their own account", async () => {
-      await openPage(personalWorkspacePageLoaders, AUTHENTICATION_KEY, []);
+      await openPage(personalWorkspaceFeature.loaders, AUTHENTICATION_KEY, []);
 
       expect(screen.getByText("the authentication page")).toBeDefined();
     });
 
     /** @scenario Every signed-in reader can open their own sign-in methods */
     it("renders inside the settings chrome", async () => {
-      await openPage(personalWorkspacePageLoaders, AUTHENTICATION_KEY, []);
+      await openPage(personalWorkspaceFeature.loaders, AUTHENTICATION_KEY, []);
 
       expect(screen.getByRole("link", { name: "General" })).toBeDefined();
     });

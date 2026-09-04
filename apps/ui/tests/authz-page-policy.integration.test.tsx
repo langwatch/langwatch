@@ -32,7 +32,10 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { navigationApi } from "@langwatch/navigation-web/screens/landing";
 import { NavigationShell } from "@langwatch/navigation-web/chrome";
-import { WithStubNavigationHost, type StubNavigationReadings } from "@langwatch/navigation-web/testing";
+import {
+  WithStubNavigationHost,
+  type StubNavigationReadings,
+} from "@langwatch/navigation-web/testing";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 import { useState } from "react";
@@ -97,7 +100,7 @@ import {
   type UiFailureNotice,
   type UiSuccessNotice,
 } from "../src/behavior/ui-capabilities";
-import { authzPageLoaders } from "../src/features/authz";
+import { authzFeature } from "../src/features/authz";
 
 class SilentNavigation extends UiNavigationPort {
   navigate(): void {}
@@ -208,7 +211,7 @@ function shellReadings(pathname: string): StubNavigationReadings {
 }
 
 async function openPage(key: string, permissions: readonly string[]): Promise<void> {
-  const loader = authzPageLoaders[key];
+  const loader = authzFeature.loaders[key];
   if (!loader) throw new Error(`no loader is registered for ${key}`);
   const Mounted = (await loader()).default;
   // The address the page is served at, so the settings menu opens the group

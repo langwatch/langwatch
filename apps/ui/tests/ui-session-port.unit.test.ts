@@ -40,6 +40,7 @@ function sessionWith({
     settled: permissions !== void 0,
     flags,
     askFlag,
+    scopeHost: void 0,
   });
 }
 

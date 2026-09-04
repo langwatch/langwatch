@@ -27,7 +27,10 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { navigationApi } from "@langwatch/navigation-web/screens/landing";
 import { NavigationShell } from "@langwatch/navigation-web/chrome";
-import { WithStubNavigationHost, type StubNavigationReadings } from "@langwatch/navigation-web/testing";
+import {
+  WithStubNavigationHost,
+  type StubNavigationReadings,
+} from "@langwatch/navigation-web/testing";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 import { useState } from "react";
@@ -88,7 +91,7 @@ import {
   type UiFailureNotice,
   type UiSuccessNotice,
 } from "../src/behavior/ui-capabilities";
-import { githubPageLoaders } from "../src/features/github";
+import { githubFeature } from "../src/features/github";
 
 class SilentNavigation extends UiNavigationPort {
   navigate(): void {}
@@ -196,7 +199,7 @@ const SHELL_READINGS: StubNavigationReadings = {
 };
 
 async function openIntegrations(permissions: readonly string[]): Promise<void> {
-  const loader = githubPageLoaders[INTEGRATIONS_KEY];
+  const loader = githubFeature.loaders[INTEGRATIONS_KEY];
   if (!loader) throw new Error(`no loader is registered for ${INTEGRATIONS_KEY}`);
   const Mounted = (await loader()).default;
   render(

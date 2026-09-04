@@ -64,7 +64,8 @@ import {
   type UiFailureNotice,
   type UiSuccessNotice,
 } from "../src/behavior/ui-capabilities";
-import { promptPageLoaders } from "../src/features/prompt";
+import { promptFeature } from "../src/features/prompt";
+import { MemoryRouter } from "react-router";
 
 class SilentNavigation extends UiNavigationPort {
   navigate(): void {}
@@ -123,17 +124,19 @@ function capabilities(session: UiSessionPort): UiCapabilities {
 const PROMPT_PAGE_KEY = "pages/[project]/prompts";
 
 async function openPage(permissions: readonly string[]): Promise<void> {
-  const loader = promptPageLoaders[PROMPT_PAGE_KEY];
+  const loader = promptFeature.loaders[PROMPT_PAGE_KEY];
   if (!loader) throw new Error(`no loader is registered for ${PROMPT_PAGE_KEY}`);
   const Mounted = (await loader()).default;
   // The refusal fallbacks are Chakra, so a refused page needs a system even
   // though the page it refuses never renders.
   render(
-    <ChakraProvider value={defaultSystem}>
-      <UiCapabilityContextProvider value={capabilities(new AnsweringSession(permissions))}>
-        <Mounted />
-      </UiCapabilityContextProvider>
-    </ChakraProvider>,
+    <MemoryRouter>
+      <ChakraProvider value={defaultSystem}>
+        <UiCapabilityContextProvider value={capabilities(new AnsweringSession(permissions))}>
+          <Mounted />
+        </UiCapabilityContextProvider>
+      </ChakraProvider>
+    </MemoryRouter>,
   );
 }
 

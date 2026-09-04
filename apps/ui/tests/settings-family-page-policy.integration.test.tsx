@@ -39,7 +39,10 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { navigationApi } from "@langwatch/navigation-web/screens/landing";
 import { NavigationShell } from "@langwatch/navigation-web/chrome";
-import { WithStubNavigationHost, type StubNavigationReadings } from "@langwatch/navigation-web/testing";
+import {
+  WithStubNavigationHost,
+  type StubNavigationReadings,
+} from "@langwatch/navigation-web/testing";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 import { useState } from "react";
@@ -163,14 +166,14 @@ import {
   type UiSuccessNotice,
 } from "../src/behavior/ui-capabilities";
 import type { UiPageLoaderRegistry } from "../src/behavior/ui-page-loaders";
-import { annotationScoresPageLoaders } from "../src/features/annotation-scores";
-import { billingPageLoaders } from "../src/features/billing";
-import { licensingPageLoaders } from "../src/features/licensing";
-import { notificationPageLoaders } from "../src/features/notification";
-import { organizationPageLoaders } from "../src/features/organization";
-import { projectPageLoaders } from "../src/features/project";
-import { scimPageLoaders } from "../src/features/scim";
-import { topicPageLoaders } from "../src/features/topic";
+import { annotationScoresFeature } from "../src/features/annotation-scores";
+import { billingFeature } from "../src/features/billing";
+import { licensingFeature } from "../src/features/licensing";
+import { notificationFeature } from "../src/features/notification";
+import { organizationFeature } from "../src/features/organization";
+import { projectFeature } from "../src/features/project";
+import { scimFeature } from "../src/features/scim";
+import { topicFeature } from "../src/features/topic";
 
 class SilentNavigation extends UiNavigationPort {
   navigate(): void {}
@@ -228,14 +231,14 @@ function capabilities(session: UiSessionPort): UiCapabilities {
 
 /** Every settings key that left `platform/app` in this move, with its family. */
 const SETTINGS_LOADERS: UiPageLoaderRegistry = {
-  ...annotationScoresPageLoaders,
-  ...billingPageLoaders,
-  ...licensingPageLoaders,
-  ...notificationPageLoaders,
-  ...organizationPageLoaders,
-  ...projectPageLoaders,
-  ...scimPageLoaders,
-  ...topicPageLoaders,
+  ...annotationScoresFeature.loaders,
+  ...billingFeature.loaders,
+  ...licensingFeature.loaders,
+  ...notificationFeature.loaders,
+  ...organizationFeature.loaders,
+  ...projectFeature.loaders,
+  ...scimFeature.loaders,
+  ...topicFeature.loaders,
 };
 
 /**

@@ -88,7 +88,7 @@ import {
   type UiFailureNotice,
   type UiSuccessNotice,
 } from "../src/behavior/ui-capabilities";
-import { opsPageLoaders } from "../src/features/ops";
+import { opsFeature } from "../src/features/ops";
 
 class SilentNavigation extends UiNavigationPort {
   navigate(): void {}
@@ -145,7 +145,7 @@ function capabilities(session: UiSessionPort): UiCapabilities {
 }
 
 async function openPage(key: string, permissions: readonly string[]): Promise<void> {
-  const loader = opsPageLoaders[key];
+  const loader = opsFeature.loaders[key];
   if (!loader) throw new Error(`no loader is registered for ${key}`);
   const Mounted = (await loader()).default;
   // The refusal fallbacks are Chakra, so a refused page needs a system even

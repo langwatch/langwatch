@@ -14,7 +14,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { gatewayPageLoaders } from "../src/features/gateway";
+import { gatewayFeature } from "../src/features/gateway";
 import { uiRoutePageKeys } from "../src/behavior/ui-page-loaders";
 import { uiRouteTable } from "../src/model/ui-route-table";
 
@@ -25,11 +25,11 @@ describe("given the gateway pages this package now serves", () => {
         key.startsWith("pages/gateway/"),
       );
 
-      expect(gatewayKeys.sort()).toEqual(Object.keys(gatewayPageLoaders).sort());
+      expect(gatewayKeys.sort()).toEqual(Object.keys(gatewayFeature.loaders).sort());
     });
 
     it("registers nothing outside the gateway family", () => {
-      const stray = Object.keys(gatewayPageLoaders).filter(
+      const stray = Object.keys(gatewayFeature.loaders).filter(
         (key) => !key.startsWith("pages/gateway/"),
       );
 
@@ -37,13 +37,13 @@ describe("given the gateway pages this package now serves", () => {
     });
 
     it("leaves the bare /gateway address to the table's redirect row", () => {
-      expect(Object.keys(gatewayPageLoaders)).not.toContain("pages/gateway/index");
+      expect(Object.keys(gatewayFeature.loaders)).not.toContain("pages/gateway/index");
     });
   });
 
   describe("when a page is loaded", () => {
     it("hands back a component, so a navigation never resolves to nothing", async () => {
-      const loader = gatewayPageLoaders["pages/gateway/virtual-keys"];
+      const loader = gatewayFeature.loaders["pages/gateway/virtual-keys"];
 
       const module = await loader!();
 
@@ -51,7 +51,7 @@ describe("given the gateway pages this package now serves", () => {
     });
 
     it("wraps the screen rather than returning it bare", async () => {
-      const module = await gatewayPageLoaders["pages/gateway/virtual-keys"]!();
+      const module = await gatewayFeature.loaders["pages/gateway/virtual-keys"]!();
 
       // Both wrappers are named, and the order is the load-bearing part: the
       // host is outside the guard, so a refusal renders without one and a page

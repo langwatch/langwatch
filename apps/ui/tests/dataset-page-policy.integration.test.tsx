@@ -77,7 +77,8 @@ import {
   type UiFailureNotice,
   type UiSuccessNotice,
 } from "../src/behavior/ui-capabilities";
-import { datasetPageLoaders } from "../src/features/dataset";
+import { datasetFeature } from "../src/features/dataset";
+import { MemoryRouter } from "react-router";
 
 class SilentNavigation extends UiNavigationPort {
   navigate(): void {}
@@ -137,17 +138,19 @@ const LIST_PAGE_KEY = "pages/[project]/datasets";
 const EDITOR_PAGE_KEY = "pages/[project]/datasets/[id]";
 
 async function openPage(key: string, permissions: readonly string[]): Promise<void> {
-  const loader = datasetPageLoaders[key];
+  const loader = datasetFeature.loaders[key];
   if (!loader) throw new Error(`no loader is registered for ${key}`);
   const Mounted = (await loader()).default;
   // The refusal fallbacks are Chakra, so a refused page needs a system even
   // though the page it refuses never renders.
   render(
-    <ChakraProvider value={defaultSystem}>
-      <UiCapabilityContextProvider value={capabilities(new AnsweringSession(permissions))}>
-        <Mounted />
-      </UiCapabilityContextProvider>
-    </ChakraProvider>,
+    <MemoryRouter>
+      <ChakraProvider value={defaultSystem}>
+        <UiCapabilityContextProvider value={capabilities(new AnsweringSession(permissions))}>
+          <Mounted />
+        </UiCapabilityContextProvider>
+      </ChakraProvider>
+    </MemoryRouter>,
   );
 }
 

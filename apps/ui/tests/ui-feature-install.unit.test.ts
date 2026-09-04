@@ -110,8 +110,8 @@ function featureExportsOf(module: Record<string, unknown>): Record<string, unkno
 
 describe("given the feature directories under apps/ui/src/features", () => {
   describe("when the installed feature list is composed", () => {
+    /** @scenario "A new feature cannot be half-registered" */
     it("registers every exported feature value, so a new feature cannot be half-registered", () => {
-      /** @scenario "A new feature cannot be half-registered" */
       for (const [directory, module] of Object.entries(featureModules)) {
         const exported = featureExportsOf(module);
         expect(exported.length, `${directory}/index.ts exports no *Feature value`).toBeGreaterThan(
@@ -148,8 +148,8 @@ describe("given the feature directories under apps/ui/src/features", () => {
 
 describe("given two features whose loaders both answer the same page key", () => {
   describe("when they are composed with installUiFeatures", () => {
+    /** @scenario "Two features serving the same page key are refused by name" */
     it("throws, naming both features and the shared page key", () => {
-      /** @scenario "Two features serving the same page key are refused by name" */
       const loader = () => Promise.resolve({ default: () => null });
       const first = uiFeature({ name: "@langwatch/first-web", loaders: { shared: loader } });
       const second = uiFeature({ name: "@langwatch/second-web", loaders: { shared: loader } });
@@ -172,8 +172,8 @@ describe("given two features whose loaders both answer the same page key", () =>
 
 describe("given two features whose drawers both answer the same drawer name", () => {
   describe("when they are composed with installUiFeatures", () => {
+    /** @scenario "Two features serving the same drawer name are refused by name" */
     it("throws, naming both features and the shared drawer name", () => {
-      /** @scenario "Two features serving the same drawer name are refused by name" */
       const drawer = () => null;
       const first = uiFeature({ name: "@langwatch/first-web", drawers: { shared: drawer } });
       const second = uiFeature({ name: "@langwatch/second-web", drawers: { shared: drawer } });
@@ -196,8 +196,8 @@ describe("given two features whose drawers both answer the same drawer name", ()
 
 describe("given a feature built with no api binding", () => {
   describe("when it is composed with installUiFeatures", () => {
+    /** @scenario "A feature without an api still serves its pages" */
     it("contributes no Provider and its own page loaders still resolve", () => {
-      /** @scenario "A feature without an api still serves its pages" */
       const loader = () => Promise.resolve({ default: () => null });
       const feature = uiFeature({ name: "@langwatch/no-api-web", loaders: { onlyPage: loader } });
 

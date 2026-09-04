@@ -9,7 +9,8 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 const featuresRoot = path.resolve(import.meta.dirname, "../src/features");
-const UNBOUND_HANDOFF = /^\s+[A-Za-z]+:\s*(route|feedback|navigation|session|clipboard)\.[A-Za-z]+,?\s*$/;
+const UNBOUND_HANDOFF =
+  /^\s+[A-Za-z]+:\s*(route|feedback|navigation|session|clipboard)\.[A-Za-z]+,?\s*$/;
 
 function hostFiles(): string[] {
   return readdirSync(featuresRoot, { withFileTypes: true })

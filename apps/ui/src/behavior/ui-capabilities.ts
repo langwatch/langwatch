@@ -4,6 +4,7 @@
  * screen asks ports instead. Missing ports refuse loudly, never silently.
  */
 
+import type { UiScopeHostPort } from "@langwatch/ui-host/use-organization-team-project";
 import { createContext, useContext } from "react";
 
 /** The composition never filled this port, and something asked it to work. */
@@ -140,6 +141,16 @@ export abstract class UiSessionPort {
    * not-found fallback on every load's first frame. Screens use {@link isFeatureEnabled}.
    */
   abstract featureFlag(flag: string): boolean | undefined;
+
+  /**
+   * The scope as every feature's shared `useOrganizationTeamProject` reads it,
+   * or undefined when this session has no resolved scope to publish. Absent is
+   * a reading there, never a throw, which is what keeps a cross-feature
+   * component alive on a route its own host never mounted.
+   */
+  scopeHost(): UiScopeHostPort | undefined {
+    return void 0;
+  }
 
   /** Fail-closed: not yet answered reads the same as off. */
   isFeatureEnabled(flag: string): boolean {

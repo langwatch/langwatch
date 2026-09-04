@@ -32,7 +32,10 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { navigationApi } from "@langwatch/navigation-web/screens/landing";
 import { NavigationShell } from "@langwatch/navigation-web/chrome";
-import { WithStubNavigationHost, type StubNavigationReadings } from "@langwatch/navigation-web/testing";
+import {
+  WithStubNavigationHost,
+  type StubNavigationReadings,
+} from "@langwatch/navigation-web/testing";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 import { useState } from "react";
@@ -106,8 +109,8 @@ import {
   type UiSuccessNotice,
 } from "../src/behavior/ui-capabilities";
 import type { UiPageLoaderRegistry } from "../src/behavior/ui-page-loaders";
-import { dataPrivacyPageLoaders } from "../src/features/data-privacy";
-import { dataRetentionPageLoaders } from "../src/features/data-retention";
+import { dataPrivacyFeature } from "../src/features/data-privacy";
+import { dataRetentionFeature } from "../src/features/data-retention";
 
 class SilentNavigation extends UiNavigationPort {
   navigate(): void {}
@@ -251,13 +254,13 @@ afterEach(cleanup);
 describe("given the retention policies page", () => {
   describe("when the reader holds the grant it asks for", () => {
     it("opens", async () => {
-      await openPage(dataRetentionPageLoaders, RETENTION_KEY, ["project:view"]);
+      await openPage(dataRetentionFeature.loaders, RETENTION_KEY, ["project:view"]);
 
       expect(screen.getByText(/the retention policies page/)).toBeDefined();
     });
 
     it("renders inside the settings chrome, with the menu the reader navigated by", async () => {
-      await openPage(dataRetentionPageLoaders, RETENTION_KEY, ["project:view"]);
+      await openPage(dataRetentionFeature.loaders, RETENTION_KEY, ["project:view"]);
 
       expect(screen.getByRole("link", { name: "Data Retention" })).toBeDefined();
       expect(screen.getByRole("link", { name: "Data Privacy" })).toBeDefined();
@@ -266,14 +269,14 @@ describe("given the retention policies page", () => {
 
   describe("when the reader holds a neighbouring grant instead", () => {
     it("is refused, and named the grant it needs", async () => {
-      await openPage(dataRetentionPageLoaders, RETENTION_KEY, ["triggers:view"]);
+      await openPage(dataRetentionFeature.loaders, RETENTION_KEY, ["triggers:view"]);
 
       expect(screen.queryByText(/the retention policies page/)).toBeNull();
       expect(screen.getByText(/project:view/)).toBeDefined();
     });
 
     it("still frames the refusal in the settings chrome", async () => {
-      await openPage(dataRetentionPageLoaders, RETENTION_KEY, ["triggers:view"]);
+      await openPage(dataRetentionFeature.loaders, RETENTION_KEY, ["triggers:view"]);
 
       expect(screen.getByRole("link", { name: "General" })).toBeDefined();
     });
@@ -284,7 +287,7 @@ describe("given the retention policies page", () => {
       // The hierarchy that makes `project:manage` satisfy `project:view` is
       // applied by the server when it answers the effective permission set, not
       // by the guard: the guard asks for a name and gets a yes or a no.
-      await openPage(dataRetentionPageLoaders, RETENTION_KEY, ["project:update"]);
+      await openPage(dataRetentionFeature.loaders, RETENTION_KEY, ["project:update"]);
 
       expect(screen.queryByText(/the retention policies page/)).toBeNull();
     });
@@ -294,7 +297,7 @@ describe("given the retention policies page", () => {
 describe("given the data privacy page", () => {
   describe("when the reader holds the grant it asks for", () => {
     it("opens", async () => {
-      await openPage(dataPrivacyPageLoaders, PRIVACY_KEY, ["project:view"]);
+      await openPage(dataPrivacyFeature.loaders, PRIVACY_KEY, ["project:view"]);
 
       expect(screen.getByText(/the data privacy page/)).toBeDefined();
     });
@@ -302,7 +305,7 @@ describe("given the data privacy page", () => {
 
   describe("when the reader holds a neighbouring grant instead", () => {
     it("is refused, and named the grant it needs", async () => {
-      await openPage(dataPrivacyPageLoaders, PRIVACY_KEY, ["auditLog:view"]);
+      await openPage(dataPrivacyFeature.loaders, PRIVACY_KEY, ["auditLog:view"]);
 
       expect(screen.queryByText(/the data privacy page/)).toBeNull();
       expect(screen.getByText(/project:view/)).toBeDefined();

@@ -60,7 +60,8 @@ import {
   type UiFailureNotice,
   type UiSuccessNotice,
 } from "../src/behavior/ui-capabilities";
-import { gatewayPageLoaders } from "../src/features/gateway";
+import { gatewayFeature } from "../src/features/gateway";
+import { MemoryRouter } from "react-router";
 
 class SilentNavigation extends UiNavigationPort {
   navigate(): void {}
@@ -125,7 +126,7 @@ async function openPage(
   key: string,
   answers: { flags?: Record<string, boolean | undefined>; permissions?: readonly string[] },
 ): Promise<void> {
-  const loader = gatewayPageLoaders[key];
+  const loader = gatewayFeature.loaders[key];
   if (!loader) throw new Error(`no loader is registered for ${key}`);
   const Mounted = (await loader()).default;
   const session = new AnsweringSession({
@@ -135,11 +136,13 @@ async function openPage(
   // The refusal fallbacks are Chakra, so a refused page needs a system even
   // though the page it refuses never renders.
   render(
-    <ChakraProvider value={defaultSystem}>
-      <UiCapabilityContextProvider value={capabilities(session)}>
-        <Mounted />
-      </UiCapabilityContextProvider>
-    </ChakraProvider>,
+    <MemoryRouter>
+      <ChakraProvider value={defaultSystem}>
+        <UiCapabilityContextProvider value={capabilities(session)}>
+          <Mounted />
+        </UiCapabilityContextProvider>
+      </ChakraProvider>
+    </MemoryRouter>,
   );
 }
 

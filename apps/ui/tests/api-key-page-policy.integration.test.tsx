@@ -34,7 +34,10 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { navigationApi } from "@langwatch/navigation-web/screens/landing";
 import { NavigationShell } from "@langwatch/navigation-web/chrome";
-import { WithStubNavigationHost, type StubNavigationReadings } from "@langwatch/navigation-web/testing";
+import {
+  WithStubNavigationHost,
+  type StubNavigationReadings,
+} from "@langwatch/navigation-web/testing";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
 import { useState } from "react";
@@ -111,9 +114,9 @@ import {
   type UiFailureNotice,
   type UiSuccessNotice,
 } from "../src/behavior/ui-capabilities";
-import { apiKeyPageLoaders } from "../src/features/api-key";
+import { apiKeyFeature } from "../src/features/api-key";
 import { CLI_AUTH_DOCUMENT_TITLE } from "../src/features/api-key/ui/sections/api-key-routes";
-import { secretPageLoaders } from "../src/features/secret";
+import { secretFeature } from "../src/features/secret";
 
 class SilentNavigation extends UiNavigationPort {
   navigate(): void {}
@@ -171,7 +174,7 @@ function capabilities(session: UiSessionPort): UiCapabilities {
   };
 }
 
-const LOADERS = { ...apiKeyPageLoaders, ...secretPageLoaders };
+const LOADERS = { ...apiKeyFeature.loaders, ...secretFeature.loaders };
 
 /** A desktop viewport: `NavigationShell` draws phone chrome with none. */
 function useDesktopViewport() {
@@ -310,7 +313,7 @@ describe("given the CLI authorize key", () => {
 describe("given the three keys this change serves", () => {
   /** @scenario Every key the family claims is served by it */
   it("registers each of them exactly once, and nothing else", () => {
-    expect(Object.keys(apiKeyPageLoaders).sort()).toEqual([CLI_AUTH_KEY, API_KEYS_KEY]);
-    expect(Object.keys(secretPageLoaders)).toEqual([SECRETS_KEY]);
+    expect(Object.keys(apiKeyFeature.loaders).sort()).toEqual([CLI_AUTH_KEY, API_KEYS_KEY]);
+    expect(Object.keys(secretFeature.loaders)).toEqual([SECRETS_KEY]);
   });
 });

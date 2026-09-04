@@ -84,10 +84,11 @@ import {
   type UiSuccessNotice,
 } from "../src/behavior/ui-capabilities";
 import { uiRouteTable, type UiRouteDescriptor } from "../src/model/ui-route-table";
-import { evaluatorPageLoaders } from "../src/features/evaluator";
+import { evaluatorFeature } from "../src/features/evaluator";
 import { overlayQuery as evaluatorOverlayQuery } from "../src/features/evaluator/behavior/evaluator-overlay-address";
-import { monitorPageLoaders } from "../src/features/monitor";
+import { monitorFeature } from "../src/features/monitor";
 import { overlayQuery as monitorOverlayQuery } from "../src/features/monitor/behavior/monitor-open-overlay";
+import { MemoryRouter } from "react-router";
 
 class SilentNavigation extends UiNavigationPort {
   navigate(): void {}
@@ -150,17 +151,19 @@ const KEYS: ReadonlyArray<readonly [string, string]> = [
 ];
 
 async function openPage(key: string, permissions: readonly string[]): Promise<void> {
-  const loader = { ...evaluatorPageLoaders, ...monitorPageLoaders }[key];
+  const loader = { ...evaluatorFeature.loaders, ...monitorFeature.loaders }[key];
   if (!loader) throw new Error(`no loader is registered for ${key}`);
   const Mounted = (await loader()).default;
   // The refusal fallbacks are Chakra, so a refused page needs a system even
   // though the page it refuses never renders.
   render(
-    <ChakraProvider value={defaultSystem}>
-      <UiCapabilityContextProvider value={capabilities(new AnsweringSession(permissions))}>
-        <Mounted />
-      </UiCapabilityContextProvider>
-    </ChakraProvider>,
+    <MemoryRouter>
+      <ChakraProvider value={defaultSystem}>
+        <UiCapabilityContextProvider value={capabilities(new AnsweringSession(permissions))}>
+          <Mounted />
+        </UiCapabilityContextProvider>
+      </ChakraProvider>
+    </MemoryRouter>,
   );
 }
 

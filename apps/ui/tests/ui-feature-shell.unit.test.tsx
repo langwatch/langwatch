@@ -3,6 +3,10 @@ import { render } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
+import {
+  createUiScopeHost,
+  useOrganizationTeamProject,
+} from "@langwatch/ui-host/use-organization-team-project";
 import { UiSessionPort, useUiCapabilities } from "../src/behavior/ui-capabilities";
 import type {
   UiFeatureApiBinding,
@@ -30,6 +34,18 @@ class StubSession extends UiSessionPort {
 
   featureFlag(): boolean | undefined {
     return true;
+  }
+}
+
+/** A session that has resolved its scope and publishes it on the shared port. */
+class ScopedSession extends StubSession {
+  override scopeHost() {
+    return createUiScopeHost({
+      project: () => ({ id: "project_1", slug: "ada-project", name: "Ada's project" }),
+      organization: () => ({ id: "org_1", name: "Ada Ltd" }),
+      team: () => void 0,
+      hasPermission: (permission) => permission === "traces:read",
+    });
   }
 }
 
@@ -153,6 +169,55 @@ describe("given the shell apps/ui mounts around every routed page", () => {
 
       expect(mounts.map((mount) => mount.name)).toEqual(["prompt", "trace"]);
       expect(view.getByTestId("api-prompt").contains(view.getByTestId("api-trace"))).toBe(true);
+    });
+  });
+
+  describe("when a screen from any feature reads the shared organization, team and project hook", () => {
+    // @scenario "The application session publishes the scope every feature reads"
+    it("sees the project, the organization and the grants the session resolved", () => {
+      const shell = createUiFeatureShell({
+        apis: [],
+        capabilities: { session: new ScopedSession() },
+        transport: {} as UiFeatureApiTransport,
+      });
+
+      function Page() {
+        const scope = useOrganizationTeamProject();
+        return (
+          <div data-testid="scope">
+            {scope.project?.slug}|{scope.organization?.id}|
+            {String(scope.hasPermission("traces:read"))}|
+            {String(scope.hasPermission("traces:delete"))}
+          </div>
+        );
+      }
+
+      const view = renderShell(shell, <Page />);
+
+      expect(view.getByTestId("scope").textContent).toBe("ada-project|org_1|true|false");
+    });
+
+    // @scenario "A session with no resolved scope leaves the shared hook unresolved rather than throwing"
+    it("reads unresolved with no project and no grants when the session publishes no scope", () => {
+      const shell = createUiFeatureShell({
+        apis: [],
+        capabilities: { session: new StubSession() },
+        transport: {} as UiFeatureApiTransport,
+      });
+
+      function Page() {
+        const scope = useOrganizationTeamProject();
+        return (
+          <div data-testid="scope">
+            {String(scope.isResolved)}|{String(scope.project)}|
+            {String(scope.hasPermission("traces:read"))}
+          </div>
+        );
+      }
+
+      const view = renderShell(shell, <Page />);
+
+      expect(view.getByTestId("scope").textContent).toBe("false|undefined|false");
     });
   });
 });

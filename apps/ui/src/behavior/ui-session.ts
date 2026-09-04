@@ -5,6 +5,10 @@
  */
 
 import { permissionSatisfiedBy } from "@langwatch/authz-contract";
+import {
+  createUiScopeHost,
+  type UiScopeHostPort,
+} from "@langwatch/ui-host/use-organization-team-project";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { UiActiveScope, UiActor, UiFeedbackPort } from "./ui-capabilities";
@@ -122,6 +126,8 @@ export type BrowserUiSessionState = {
   readonly settled: boolean;
   readonly flags: ReadonlyMap<string, boolean>;
   readonly askFlag: (flag: string) => void;
+  /** The resolved scope on the port every feature's shared hook reads. */
+  readonly scopeHost: UiScopeHostPort | undefined;
 };
 
 /** The port over one render's worth of answers. */
@@ -155,6 +161,10 @@ export class BrowserUiSession extends UiSessionPort {
 
   isSettled(): boolean {
     return this.state.settled;
+  }
+
+  override scopeHost(): UiScopeHostPort | undefined {
+    return this.state.scopeHost;
   }
 
   featureFlag(flag: string): boolean | undefined {
@@ -309,6 +319,41 @@ export function useBrowserUiSession({
 
   const askFlag = useCallback((flag: string) => flagRequests.ask(flag), [flagRequests]);
 
+  // Published once the graph has answered, so a feature reading the shared
+  // scope sees "still arriving" rather than a project that is about to change.
+  const organization = resolved.organization;
+  const team = resolved.team;
+  const organizationRole = resolved.organizationRole;
+  const scopeHost = useMemo<UiScopeHostPort | undefined>(
+    () =>
+      organizations.isLoading && !project
+        ? void 0
+        : createUiScopeHost({
+            project: () =>
+              project
+                ? { id: project.id, slug: project.slug, name: project.name ?? project.slug }
+                : void 0,
+            organization: () =>
+              organization ? { id: organization.id, name: organization.name } : void 0,
+            team: () => (team ? { id: team.id, name: team.name } : void 0),
+            organizationRole: () => organizationRole,
+            hasPermission: (permission) =>
+              granted ? permissionSatisfiedBy({ granted, requested: permission }) : false,
+            isDemoProject: () => isDemo,
+            isLoading: () => !settled,
+          }),
+    [
+      organizations.isLoading,
+      project,
+      organization,
+      team,
+      organizationRole,
+      granted,
+      isDemo,
+      settled,
+    ],
+  );
+
   return useMemo(
     () =>
       BrowserUiSession.create({
@@ -321,7 +366,8 @@ export function useBrowserUiSession({
         settled,
         flags,
         askFlag,
+        scopeHost,
       }),
-    [actor, organizationId, project?.id, granted, settled, flags, askFlag],
+    [actor, organizationId, project?.id, granted, settled, flags, askFlag, scopeHost],
   );
 }

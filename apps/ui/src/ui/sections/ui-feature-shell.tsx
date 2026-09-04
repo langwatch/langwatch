@@ -18,6 +18,7 @@
  * none of it and keeps the refusing default.
  */
 
+import { UiScopeHostProvider } from "@langwatch/ui-host/use-organization-team-project";
 import { QueryClient, QueryClientContext, QueryClientProvider } from "@tanstack/react-query";
 import { useContext, useMemo, useState, type ReactNode } from "react";
 import {
@@ -95,7 +96,13 @@ export function createUiFeatureShell({
       [documentTitle, navigation, route, sessionPort],
     );
 
-    return <UiCapabilityContextProvider value={resolved}>{children}</UiCapabilityContextProvider>;
+    // The one scope host every feature's shared hook reads, on every route; a
+    // session with nothing resolved publishes none and the hook reads unresolved.
+    return (
+      <UiCapabilityContextProvider value={resolved}>
+        <UiScopeHostProvider value={resolved.session.scopeHost()}>{children}</UiScopeHostProvider>
+      </UiCapabilityContextProvider>
+    );
   }
 
   return function UiFeatureShell({ children }: { children: ReactNode }) {
