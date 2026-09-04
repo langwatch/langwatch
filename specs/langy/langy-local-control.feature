@@ -111,6 +111,14 @@ Feature: Langy works in a folder shared from the developer's machine
       And the command's result is still delivered
       And the next call runs in the folder instead of asking for code access again
 
+    @unit
+    Scenario: A call written while the folder registers is handed over once
+      Given a folder that has just registered
+      And a call written between the subscription and the scan of pending calls
+      When the connection is handed the call by both
+      Then the command line receives it once
+      And the id is forgotten when the result arrives
+
     @integration
     Scenario: Ctrl-C disconnects at once, not when a heartbeat expires
       Given a connected folder

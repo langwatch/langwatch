@@ -16,6 +16,7 @@ import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import type { Unsubscribe } from "~/server/connected-agents/state-store";
 import { CALL_POLL_HOLD_MS, POLL_INTERVAL_MS } from "./constants";
+import { DeliveredCalls } from "./delivered-calls";
 import {
   type CliFrame,
   LOCAL_CONTROL_PROTOCOL_VERSION,
@@ -116,11 +117,13 @@ export class LocalControlLongPoll {
       unsubscribe: (async () => undefined) as Unsubscribe,
       lastSeenAt: Date.now(),
       released: false,
+      delivered: new DeliveredCalls(),
     };
     entry.unsubscribe = await this.core.subscribe(
       registered.session,
       (platformFrame) => {
         if (platformFrame.type === "disconnect") entry.released = true;
+        if (!entry.delivered.admit(platformFrame)) return;
         if (queue.length >= MAX_FRAMES_PER_POLL) queue.shift();
         queue.push(platformFrame);
       },
@@ -129,11 +132,12 @@ export class LocalControlLongPoll {
 
     await this.core.afterRegister(registered.session);
     for (const envelope of await this.core.pendingCalls(registered.session)) {
-      queue.push({
+      const frame: PlatformFrame = {
         type: "call",
         protocol: LOCAL_CONTROL_PROTOCOL_VERSION,
         call: envelope,
-      });
+      };
+      if (entry.delivered.admit(frame)) queue.push(frame);
     }
     return { ok: true, token, reply: registered.reply };
   }

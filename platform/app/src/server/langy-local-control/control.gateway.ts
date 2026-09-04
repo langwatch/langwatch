@@ -22,6 +22,7 @@ import { createLogger } from "@langwatch/observability";
 import { WebSocket, WebSocketServer } from "ws";
 import type { UpgradeRouter } from "~/server/websockets/upgrade-router";
 import { PRESENCE_HEARTBEAT_MS } from "./constants";
+import { DeliveredCalls } from "./delivered-calls";
 import type { PresenceHeartbeat } from "./presence";
 import {
   type CliFrame,
@@ -50,6 +51,8 @@ interface LiveSocket {
   socket: WebSocket;
   session: ControlSession;
   unsubscribe: (() => Promise<void>) | null;
+  /** The calls this socket was handed, so none goes out twice. */
+  delivered: DeliveredCalls;
   pongs: number;
   ping: NodeJS.Timeout | null;
   heartbeat: NodeJS.Timeout | null;
@@ -175,6 +178,7 @@ export class LocalControlGateway {
       socket: ws,
       session: registered.session,
       unsubscribe: null,
+      delivered: new DeliveredCalls(),
       pongs: 0,
       ping: null,
       heartbeat: null,
@@ -186,6 +190,7 @@ export class LocalControlGateway {
       registered.session,
       (platformFrame) => {
         if (platformFrame.type === "disconnect") live.released = true;
+        if (!live.delivered.admit(platformFrame)) return;
         this.send(ws, platformFrame);
       },
     );
@@ -217,11 +222,12 @@ export class LocalControlGateway {
     // while this folder was away.
     await this.core.afterRegister(registered.session);
     for (const envelope of await this.core.pendingCalls(registered.session)) {
-      this.send(ws, {
+      const frame: PlatformFrame = {
         type: "call",
         protocol: LOCAL_CONTROL_PROTOCOL_VERSION,
         call: envelope,
-      });
+      };
+      if (live.delivered.admit(frame)) this.send(ws, frame);
     }
   }
 
@@ -236,6 +242,7 @@ export class LocalControlGateway {
         await this.core.ack(live.session, frame.callId);
         return;
       case "result":
+        live.delivered.settle(frame.callId);
         await this.core.result(live.session, frame);
         return;
       case "permission_required":
