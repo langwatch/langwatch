@@ -145,7 +145,7 @@ dev's CLI / agent  ──┐
 Closed SaaS (Cowork / Copilot / Workato / OpenAI / Claude / S3)
          │
          ├─ PUSH (OTel / webhook / S3 drop)
-         │      ▶  /api/ingest/<source-type>/<source-id>
+         │      ▶  /api/v1/ingest/<source-type>/<source-id>
          │             ─ validates IngestionSource ingestSecret
          │             ─ parses platform-specific shape
          │             ─ normalises into OCSF ActivityEvent class
@@ -269,8 +269,8 @@ What's on this branch today:
 What this iteration adds (D2 foundation):
 
 - 🚧 `IngestionSource` table + `trace_summaries.SourceType`/`SourceId` columns
-- 🚧 Generic OTel passthrough receiver (`/api/ingest/otel/<sourceId>`)
-- 🚧 Generic webhook receiver (`/api/ingest/webhook/<sourceId>`)
+- 🚧 Generic OTel passthrough receiver (`/api/v1/ingest/otel/<sourceId>`)
+- 🚧 Generic webhook receiver (`/api/v1/ingest/webhook/<sourceId>`)
 - 🚧 OCSF normalisation contract + skeleton adapter
 
 Deferred to follow-up iterations:

@@ -21,6 +21,7 @@ import {
   UNSERVED_AT_BASELINE,
 } from "../openapi-document.checker";
 import {
+  atCanonicalPaths,
   generateOpenApiDocument,
   type GeneratedOpenApiDocument,
   type OpenApiDocument,
@@ -36,49 +37,49 @@ import {
  * entries is also a list a person can read, where 287 operations is not.
  */
 const A_ROUTE_FROM_EVERY_MOUNTED_FAMILY = [
-  "/api/agent-cache/{name}",
+  "/api/v1/agent-cache/{name}",
   "/api/agents",
-  "/api/analytics",
-  "/api/api-keys",
+  "/api/v1/analytics",
+  "/api/v1/api-keys",
   "/api/coding-agent/pull-request-usage",
-  "/api/dashboards",
-  "/api/dataset",
-  "/api/dspy/log_steps",
-  "/api/evaluations/batch/log_results",
-  "/api/evaluators",
-  "/api/experiment/init",
-  "/api/experiments",
+  "/api/v1/dashboards",
+  "/api/v1/dataset",
+  "/api/v1/dspy/log_steps",
+  "/api/v1/evaluations/batch/log_results",
+  "/api/v1/evaluators",
+  "/api/v1/experiment/init",
+  "/api/v1/experiments",
   "/api/gateway/v1/budgets",
-  "/api/governance/ingestion-templates",
-  "/api/graphs",
-  "/api/groups",
-  "/api/guardrails/{evaluator}/evaluate",
-  "/api/me/project",
-  "/api/model-defaults",
-  "/api/model-providers",
-  "/api/monitors",
-  "/api/optimization/{workflowId}/{versionId}",
-  "/api/organization/2026-08-07/",
-  "/api/organizations",
+  "/api/v1/governance/ingestion-templates",
+  "/api/v1/graphs",
+  "/api/v1/groups",
+  "/api/v1/guardrails/{evaluator}/evaluate",
+  "/api/v1/me/project",
+  "/api/v1/model-defaults",
+  "/api/v1/model-providers",
+  "/api/v1/monitors",
+  "/api/v1/optimization/{workflowId}/{versionId}",
+  "/api/v1/organization/2026-08-07/",
+  "/api/v1/organizations",
   "/api/projects",
-  "/api/prompts",
-  "/api/role-bindings/2026-08-07/",
-  "/api/roles/2026-08-07/",
-  "/api/scenario-events",
-  "/api/scenarios",
-  "/api/scim-tokens/2026-08-07/",
+  "/api/v1/prompts",
+  "/api/v1/role-bindings/2026-08-07/",
+  "/api/v1/roles/2026-08-07/",
+  "/api/v1/scenario-events",
+  "/api/v1/scenarios",
+  "/api/v1/scim-tokens/2026-08-07/",
   "/api/scim/v2/Users",
   "/api/secret",
   "/api/secrets",
-  "/api/simulation-runs",
-  "/api/suites",
-  "/api/teams",
-  "/api/traces/search",
-  "/api/trigger/slack",
-  "/api/triggers",
+  "/api/v1/simulation-runs",
+  "/api/v1/suites",
+  "/api/v1/teams",
+  "/api/v1/traces/search",
+  "/api/v1/trigger/slack",
+  "/api/v1/triggers",
   "/api/v1/projects/{projectId}/analytics/charts",
   "/api/webhooks/v1/endpoints",
-  "/api/workflows",
+  "/api/v1/workflows",
 ] as const;
 
 let scratchDir: string;
@@ -143,6 +144,57 @@ describe("given the REST surface the API process mounts", () => {
       for (const { because } of generated.unpublishable) {
         expect(because).toContain("no security scheme an API client can satisfy");
       }
+    });
+
+    /** @scenario "A described route is published at its canonical v1 address" */
+    it("publishes a bare-mounted family under its /api/v1 address only", () => {
+      const described = Object.keys(generated.document.paths ?? {});
+
+      expect(described).toContain("/api/v1/prompts");
+      expect(described).not.toContain("/api/prompts");
+      expect(generated.operations).toContain("GET /api/v1/prompts");
+    });
+
+    /** @scenario "A path carrying its own version segment is published unchanged" */
+    it("leaves a path that already names a version segment alone", () => {
+      const described = Object.keys(generated.document.paths ?? {});
+
+      expect(described).toContain("/api/scim/v2/Users");
+      expect(described).toContain("/api/webhooks/v1/endpoints");
+      expect(described).toContain("/api/gateway/v1/budgets");
+      expect(described).not.toContain("/api/v1/scim/v2/Users");
+    });
+
+    /** @scenario "A family with no v1 twin keeps its bare address" */
+    it("keeps the bare address of a family opted out of the alias", () => {
+      const described = Object.keys(generated.document.paths ?? {});
+
+      // Each of these opted out because its v1 address belongs to ANOTHER
+      // family, so the bare path stays and the twin, where the document has
+      // one, is that other family's operation rather than this one's alias.
+      for (const path of [
+        "/api/agents",
+        "/api/secrets",
+        "/api/projects",
+        "/api/coding-agent/pull-request-usage",
+      ]) {
+        expect(described).toContain(path);
+        const twin = generated.document.paths?.[`/api/v1${path.slice("/api".length)}`];
+        if (!twin) continue;
+        expect((twin.get as { operationId?: string } | undefined)?.operationId).not.toBe(
+          (generated.document.paths?.[path]?.get as { operationId?: string } | undefined)
+            ?.operationId,
+        );
+      }
+    });
+
+    /** @scenario "Two families cannot publish at one canonical address" */
+    it("fails when a bare path publishes at an address another family declares", () => {
+      expect(() =>
+        atCanonicalPaths({
+          paths: { "/api/prompts": { get: {} }, "/api/v1/prompts": { get: {} } },
+        }),
+      ).toThrow("/api/v1/prompts");
     });
 
     /** @scenario "The generator writes only where the caller pointed it" */
@@ -248,7 +300,7 @@ describe("given the frozen document and the served surface", () => {
     /** @scenario "An operation whose enforced credential moved is reported as changed" */
     it("reports an operation whose published security requirement moved", async () => {
       const frozenPath = await writeFrozen({
-        paths: { "/api/prompts": { get: { security: [{ admin_api_key: [] }] } } },
+        paths: { "/api/v1/prompts": { get: { security: [{ admin_api_key: [] }] } } },
       });
 
       const report = await checkOpenApiDocument({
@@ -259,7 +311,7 @@ describe("given the frozen document and the served surface", () => {
 
       expect(report.changed).toEqual([
         {
-          operation: "GET /api/prompts",
+          operation: "GET /api/v1/prompts",
           documented: JSON.stringify([{ admin_api_key: [] }]),
           served: JSON.stringify([{ project_api_key: [] }]),
         },

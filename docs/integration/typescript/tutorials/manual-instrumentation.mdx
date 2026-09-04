@@ -373,7 +373,7 @@ const handle = setupObservability({
     // Send to Jaeger for debugging
     new BatchSpanProcessor(
       new JaegerExporter({
-        endpoint: "http://localhost:14268/api/traces",
+        endpoint: "http://localhost:14268/api/v1/traces",
       }),
     ),
     // Send to LangWatch for production monitoring

@@ -140,7 +140,7 @@ org_prompt = langwatch.prompts.create(
 <Tab title="REST API">
 ```bash
 # Create project-scoped prompt
-curl -X POST "https://app.langwatch.ai/api/prompts" \
+curl -X POST "https://app.langwatch.ai/api/v1/prompts" \
   -H "Content-Type: application/json" \
   -H "X-Auth-Token: your-api-key" \
   -d '{
@@ -154,7 +154,7 @@ curl -X POST "https://app.langwatch.ai/api/prompts" \
 
 # Create organization-scoped prompt
 
-curl -X POST "https://app.langwatch.ai/api/prompts" \
+curl -X POST "https://app.langwatch.ai/api/v1/prompts" \
  -H "Content-Type: application/json" \
  -H "X-Auth-Token: your-api-key" \
  -d '{

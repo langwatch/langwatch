@@ -28,26 +28,26 @@ Authorization: Bearer sk-lw-<id>_<secret>
 
 | Method   | Path                     | Description                                 |
 | -------- | ------------------------ | ------------------------------------------- |
-| `GET`    | `/api/roles/permissions` | The permission catalog roles are built from |
-| `GET`    | `/api/roles`             | List the organization's custom roles        |
-| `POST`   | `/api/roles`             | Create a custom role                        |
-| `GET`    | `/api/roles/{id}`        | Read one custom role                        |
-| `PATCH`  | `/api/roles/{id}`        | Update a custom role                        |
-| `DELETE` | `/api/roles/{id}`        | Delete a custom role                        |
+| `GET`    | `/api/v1/roles/permissions` | The permission catalog roles are built from |
+| `GET`    | `/api/v1/roles`             | List the organization's custom roles        |
+| `POST`   | `/api/v1/roles`             | Create a custom role                        |
+| `GET`    | `/api/v1/roles/{id}`        | Read one custom role                        |
+| `PATCH`  | `/api/v1/roles/{id}`        | Update a custom role                        |
+| `DELETE` | `/api/v1/roles/{id}`        | Delete a custom role                        |
 
 ## Permissions are `resource:action` keys
 
 Start at the catalog. It lists every resource with the actions it takes, and flags the resources that only mean anything at organization scope, which is worth knowing before you build a role a team-scoped binding can never fully grant.
 
 ```bash
-curl https://app.langwatch.ai/api/roles/permissions \
+curl https://app.langwatch.ai/api/v1/roles/permissions \
   -H "Authorization: Bearer sk-lw-..."
 ```
 
 Then create a role from the keys it gave you:
 
 ```bash
-curl -X POST https://app.langwatch.ai/api/roles \
+curl -X POST https://app.langwatch.ai/api/v1/roles \
   -H "Authorization: Bearer sk-lw-..." \
   -H "Content-Type: application/json" \
   -d '{

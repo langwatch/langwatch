@@ -182,6 +182,15 @@ export function createCodingAgentRestApp(options: {
 
   const secured = security.createProjectApp({ basePath: "/api/coding-agent" });
 
+  // The rollup alone gets no `/api/v1` twin: that address is declared by the
+  // organization-scoped v1 family (coding-agent-v1.api.ts), which answers the
+  // same question for a different credential. Its own app, so the rest of the
+  // family keeps the twin every REST family answers on.
+  const rollup = security.createProjectApp({
+    basePath: "/api/coding-agent",
+    v1Alias: false,
+  });
+
   // GET /sessions/:sessionId/events: one session's event sequence, in time
   // order: every model call with its context and cost, every compaction with
   // its before/after tokens, rate limits, tool runs, prompts. The raw material
@@ -296,7 +305,7 @@ export function createCodingAgentRestApp(options: {
   // GET /pull-request-usage: what one pull request cost in assistant usage,
   // across every project of the organization the CALLER may read. Numbers and
   // names only: no session title, no prompt, no file list.
-  secured.access(requires("traces:view")).get(
+  rollup.access(requires("traces:view")).get(
     "/pull-request-usage",
     describeRoute({
       summary: "Get pull request coding agent usage",
@@ -379,6 +388,8 @@ export function createCodingAgentRestApp(options: {
       return c.json(usage);
     },
   );
+
+  secured.hono.route("/", rollup.hono);
 
   return secured;
 }

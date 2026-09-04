@@ -485,7 +485,7 @@ For custom integrations, you can use the REST API directly:
 ### Start a Run
 
 ```bash
-curl -X POST "https://app.langwatch.ai/api/evaluations/v3/{slug}/run" \
+curl -X POST "https://app.langwatch.ai/api/v1/evaluations/v3/{slug}/run" \
   -H "X-Auth-Token: ${LANGWATCH_API_KEY}"
 ```
 
@@ -503,7 +503,7 @@ Response:
 ### Poll for Status
 
 ```bash
-curl "https://app.langwatch.ai/api/evaluations/v3/runs/{runId}" \
+curl "https://app.langwatch.ai/api/v1/evaluations/v3/runs/{runId}" \
   -H "X-Auth-Token: ${LANGWATCH_API_KEY}"
 ```
 
@@ -527,7 +527,7 @@ Response (completed):
 ### Fetch Results
 
 ```bash
-curl "https://app.langwatch.ai/api/evaluations/v3/runs/{runId}/results?experimentSlug={slug}" \
+curl "https://app.langwatch.ai/api/v1/evaluations/v3/runs/{runId}/results?experimentSlug={slug}" \
   -H "X-Auth-Token: ${LANGWATCH_API_KEY}"
 ```
 

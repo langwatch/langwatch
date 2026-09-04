@@ -60,11 +60,11 @@ staging = langwatch.prompts.get("pizza-prompt", tag="staging")
 ```bash
 # Using the tag query parameter
 curl -H "X-Auth-Token: $LANGWATCH_API_KEY" \
-  "https://app.langwatch.ai/api/prompts/pizza-prompt?tag=production"
+  "https://app.langwatch.ai/api/v1/prompts/pizza-prompt?tag=production"
 
 # Using shorthand syntax
 curl -H "X-Auth-Token: $LANGWATCH_API_KEY" \
-  "https://app.langwatch.ai/api/prompts/pizza-prompt:production"
+  "https://app.langwatch.ai/api/v1/prompts/pizza-prompt:production"
 ```
 
 ### MCP Tools
@@ -104,7 +104,7 @@ Beyond the built-in tags, you can create custom tags for your own deployment wor
 curl -X POST -H "X-Auth-Token: $LANGWATCH_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"name": "canary"}' \
-  "https://app.langwatch.ai/api/prompts/tags"
+  "https://app.langwatch.ai/api/v1/prompts/tags"
 ```
 
 **Via MCP tools:**
@@ -115,11 +115,11 @@ Use `platform_create_prompt_tag` to create a custom tag, then `platform_assign_p
 
 | Operation             | API Endpoint                       | MCP Tool                     |
 | --------------------- | ---------------------------------- | ---------------------------- |
-| List all tags         | `GET /api/prompts/tags`            | `platform_list_prompt_tags`  |
-| Create tag            | `POST /api/prompts/tags`           | `platform_create_prompt_tag` |
-| Rename tag            | `PUT /api/prompts/tags/{tag}`      | `platform_rename_prompt_tag` |
-| Delete tag            | `DELETE /api/prompts/tags/{tag}`   | `platform_delete_prompt_tag` |
-| Assign tag to version | `PUT /api/prompts/{id}/tags/{tag}` | `platform_assign_prompt_tag` |
+| List all tags         | `GET /api/v1/prompts/tags`            | `platform_list_prompt_tags`  |
+| Create tag            | `POST /api/v1/prompts/tags`           | `platform_create_prompt_tag` |
+| Rename tag            | `PUT /api/v1/prompts/tags/{tag}`      | `platform_rename_prompt_tag` |
+| Delete tag            | `DELETE /api/v1/prompts/tags/{tag}`   | `platform_delete_prompt_tag` |
+| Assign tag to version | `PUT /api/v1/prompts/{id}/tags/{tag}` | `platform_assign_prompt_tag` |
 
 <Note>
   Custom tag names must not be purely numeric and cannot be "latest". The `latest` tag is protected
@@ -249,11 +249,11 @@ Tag CRUD endpoints are **organization-scoped** (use an org-level API key). The a
 
 | Method   | Endpoint                     | Description                                          |
 | -------- | ---------------------------- | ---------------------------------------------------- |
-| `GET`    | `/api/prompts/tags`          | List all tags for the organization                   |
-| `POST`   | `/api/prompts/tags`          | Create a new tag (`{ "name": "canary" }`)            |
-| `PUT`    | `/api/prompts/tags/:tag`     | Rename a tag (`{ "name": "new-name" }`)              |
-| `DELETE` | `/api/prompts/tags/:tag`     | Delete a tag (cascades removal from all versions)    |
-| `PUT`    | `/api/prompts/:id/tags/:tag` | Assign a tag to a version (`{ "versionId": "..." }`) |
+| `GET`    | `/api/v1/prompts/tags`          | List all tags for the organization                   |
+| `POST`   | `/api/v1/prompts/tags`          | Create a new tag (`{ "name": "canary" }`)            |
+| `PUT`    | `/api/v1/prompts/tags/:tag`     | Rename a tag (`{ "name": "new-name" }`)              |
+| `DELETE` | `/api/v1/prompts/tags/:tag`     | Delete a tag (cascades removal from all versions)    |
+| `PUT`    | `/api/v1/prompts/:id/tags/:tag` | Assign a tag to a version (`{ "versionId": "..." }`) |
 
 ## CLI
 

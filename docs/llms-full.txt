@@ -310,7 +310,7 @@ Pick your language and start tracking:
 
 ---
 title: Choosing the right OTel endpoint
-description: LangWatch exposes two OpenTelemetry-shaped URLs. They share the same internal pipeline; the split is auth + routing convenience. Trace ingestion (`/api/otel/v1/traces`) authenticates as a project; governance ingestion (`/api/ingest/otel/:sourceId`) authenticates as an IngestionSource the org admin authored. Both land in the same trace store, distinguished by origin metadata.
+description: LangWatch exposes two OpenTelemetry-shaped URLs. They share the same internal pipeline; the split is auth + routing convenience. Trace ingestion (`/api/otel/v1/traces`) authenticates as a project; governance ingestion (`/api/v1/ingest/otel/:sourceId`) authenticates as an IngestionSource the org admin authored. Both land in the same trace store, distinguished by origin metadata.
 sidebarTitle: Trace vs governance ingestion
 ---
 
@@ -318,7 +318,7 @@ LangWatch accepts OTLP/HTTP at two distinct URLs. They share **everything that m
 
 ## At a glance
 
-|                          | `/api/otel/v1/traces` (existing, your apps)                                                   | `/api/ingest/otel/:sourceId` (governance, third-party platforms)                                                                                                                          |
+|                          | `/api/otel/v1/traces` (existing, your apps)                                                   | `/api/v1/ingest/otel/:sourceId` (governance, third-party platforms)                                                                                                                          |
 | ------------------------ | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Use it when**          | Your application emits LLM traces, you want them in the LangWatch trace viewer                | Your org runs a third-party AI platform (Claude Cowork, Workato, custom internal agents) and you want their audit data surfaced in LangWatch governance                                   |
 | **Auth**                 | LangWatch project API key, PAT, `X-Auth-Token` or `Authorization: Bearer <project-token>`     | IngestionSource bearer secret (`lw_is_<...>`), minted once via the secret-reveal modal                                                                                                    |
@@ -327,13 +327,13 @@ LangWatch accepts OTLP/HTTP at two distinct URLs. They share **everything that m
 | **Downstream consumers** | Trace viewer, evaluations, simulations, prompts, online evals, PII redaction, cost enrichment | Same trace viewer + log-detail pane (drill-down works regardless of origin) **plus** governance dashboard at `/governance`, anomaly detection, OCSF/SIEM forwarding                       |
 | **Plan accounting**      | Counts against the project's trace allowance                                                  | Counts against the org's governance audit-event allowance                                                                                                                                 |
 | **Source identity**      | Whoever holds the project key (typically your own apps)                                       | An IngestionSource the admin authored explicitly with per-platform config                                                                                                                 |
-| **Other shapes**         | OTLP only                                                                                     | OTLP **plus** webhook envelope (`/api/ingest/webhook/:id` for Workato + s3_custom callback mode) and pull-mode workers for compliance feeds (OpenAI, Anthropic, Microsoft Copilot Studio) |
+| **Other shapes**         | OTLP only                                                                                     | OTLP **plus** webhook envelope (`/api/v1/ingest/webhook/:id` for Workato + s3_custom callback mode) and pull-mode workers for compliance feeds (OpenAI, Anthropic, Microsoft Copilot Studio) |
 
 ## Decision tree
 
 **Are you instrumenting your own application?** (Python/TS SDK, OpenAI/Anthropic SDK auto-instrumentation, your own collector) → **`/api/otel/v1/traces`** with your project API key. See [Observability quickstart](/integration/quick-start).
 
-**Are you forwarding events from a third-party AI platform?** (Claude Cowork tenant, Workato workspace, Microsoft Copilot Studio, OpenAI Enterprise Compliance, custom S3 audit drops) → **`/api/ingest/otel/:sourceId`** (or `/webhook/:id` for non-OTLP feeds) with an IngestionSource bearer. The IngestionSource is created by an org admin under [Governance → Ingestion sources](/ai-governance/ingestion-sources/index). Per-platform setup pages: [Generic OTel](/ai-governance/ingestion-sources/otel-generic), [Claude Cowork](/ai-governance/ingestion-sources/claude-cowork), [Workato](/ai-governance/ingestion-sources/workato).
+**Are you forwarding events from a third-party AI platform?** (Claude Cowork tenant, Workato workspace, Microsoft Copilot Studio, OpenAI Enterprise Compliance, custom S3 audit drops) → **`/api/v1/ingest/otel/:sourceId`** (or `/webhook/:id` for non-OTLP feeds) with an IngestionSource bearer. The IngestionSource is created by an org admin under [Governance → Ingestion sources](/ai-governance/ingestion-sources/index). Per-platform setup pages: [Generic OTel](/ai-governance/ingestion-sources/otel-generic), [Claude Cowork](/ai-governance/ingestion-sources/claude-cowork), [Workato](/ai-governance/ingestion-sources/workato).
 
 **Are you driving an LLM call through the AI Gateway and want both?** That happens automatically, gateway requests already emit OTel traces back to the project that owns the virtual key, so your gateway traffic shows up in `/api/otel/v1/traces` semantics with no extra wiring. The governance endpoint is only for _external_ platforms LangWatch doesn't proxy.
 
@@ -353,7 +353,7 @@ The auth + tenancy split is what's actually different:
 
 - **Auth model**: A project API key authorises a specific project to write its own traces. An IngestionSource bearer authorises a specific _external system_ to push events into one slot the admin has provisioned for it. Different "who is allowed to do what?" questions.
 - **Tenancy resolution**: Trace data is partitioned per project. Governance data is org-scoped (the customer doesn't pick a project; the receiver routes it through a per-org hidden Governance Project the platform manages internally).
-- **Non-OTLP shapes**: The governance endpoint family also accepts webhook (`/api/ingest/webhook/:sourceId`) and pull-mode connectors. The webhook receiver normalises to OTLP `log_records` before handoff so the downstream pipeline only ever sees OTLP. The trace endpoint is OTLP-only.
+- **Non-OTLP shapes**: The governance endpoint family also accepts webhook (`/api/v1/ingest/webhook/:sourceId`) and pull-mode connectors. The webhook receiver normalises to OTLP `log_records` before handoff so the downstream pipeline only ever sees OTLP. The trace endpoint is OTLP-only.
 
 The internal-architecture decision behind this is captured in [ADR-018](https://github.com/langwatch/langwatch/blob/main/dev/docs/adr/018-governance-unified-observability-substrate.md): "governance ingestion is origin metadata on the existing unified observability substrate."
 
@@ -370,7 +370,7 @@ The internal-architecture decision behind this is captured in [ADR-018](https://
 ## Cross-references
 
 - [Observability quickstart](/integration/quick-start): set up `/api/otel/v1/traces` from a Python or TypeScript app.
-- [Governance → Ingestion sources](/ai-governance/ingestion-sources/index): set up `/api/ingest/otel/:sourceId` for an external platform.
+- [Governance → Ingestion sources](/ai-governance/ingestion-sources/index): set up `/api/v1/ingest/otel/:sourceId` for an external platform.
 - [Generic OTel ingestion source](/ai-governance/ingestion-sources/otel-generic): copy-paste curl that pushes a canonical 5-attribute body to the governance endpoint.
 - [Compliance architecture](/ai-gateway/governance/compliance-architecture): how the unified substrate underwrites SOC 2, ISO 27001, EU AI Act, GDPR, HIPAA-most-uses out of the box.
 - [Governance data retention](/ai-gateway/governance/retention): how long governance data is kept, and the scoped policies that decide it.
@@ -7887,7 +7887,7 @@ arrive, not a worker that polls.
 
 ```text
 ┌────────────────────────────────────────────────────────────────┐
-│  /api/ingest/otel/:sourceId  /api/ingest/webhook/:sourceId      │
+│  /api/v1/ingest/otel/:sourceId  /api/v1/ingest/webhook/:sourceId      │
 │  (Hono routes: auth, validate sourceId, parse body)             │
 └────────────────────────┬───────────────────────────────────────┘
                          │
@@ -7988,8 +7988,8 @@ The redesign ships as four slices, C0 through C3:
   ActivityEventRow shape.
 - New command: `RecordActivityEventCommand` wired into the
   pipeline.
-- Refactor `/api/ingest/otel/:sourceId` and
-  `/api/ingest/webhook/:sourceId` to call the command instead of
+- Refactor `/api/v1/ingest/otel/:sourceId` and
+  `/api/v1/ingest/webhook/:sourceId` to call the command instead of
   writing CH directly.
 - Map projection `activityEventStorage` writes to
   `gateway_activity_events` (replaces today's direct insert).
@@ -8308,13 +8308,13 @@ outside a browser.
 
 | Endpoint                                 | Purpose                                 | Success                                                                                                                             | Notable error states                                                                                                               |
 | ---------------------------------------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `POST /api/auth/cli/device-code`         | Mint a device-code + user-code pair     | `200` JSON `{ device_code, user_code, verification_uri, verification_uri_complete, expires_in, interval }`                          | `400 invalid_request`                                                                                                              |
-| `POST /api/auth/cli/exchange`            | Long-poll for approval                  | `200` JSON `{ access_token, refresh_token, expires_in, refresh_expires_in, user, organization, default_personal_vk }`               | `428 authorization_pending` (keep polling), `408 expired_token`, `410 access_denied`, `429 slow_down` (re-poll too fast, back off) |
-| `POST /api/auth/cli/refresh`             | Rotate access token                     | `200` JSON `{ access_token, refresh_token, expires_in, refresh_expires_in }` (refresh-token rotation, the old token is invalidated) | `401 invalid_grant` (CLI must wipe local state)                                                                                    |
-| `POST /api/auth/cli/logout`              | Revoke a refresh-token server-side      | `200 { ok: true }` (idempotent)                                                                                                     | None                                                                                                                               |
-| `GET /api/auth/cli/lookup?user_code=...` | Browser-side: verify a pasted user-code | `200 { user_code, status, created_at, expires_at }`                                                                                 | `401 unauthorized` (user must sign in first), `404 not_found`, `410 expired`                                                       |
-| `POST /api/auth/cli/approve`             | Browser-side: user clicks "Approve"     | `200 { ok, personal_vk_label, organization_id }`                                                                                    | `401 unauthorized`, `403 forbidden` (caller not in target org), `409 already_resolved`                                             |
-| `POST /api/auth/cli/deny`                | Browser-side: user clicks "Deny"        | `200 { ok }` (idempotent)                                                                                                           | `401 unauthorized`                                                                                                                 |
+| `POST /api/v1/auth/cli/device-code`         | Mint a device-code + user-code pair     | `200` JSON `{ device_code, user_code, verification_uri, verification_uri_complete, expires_in, interval }`                          | `400 invalid_request`                                                                                                              |
+| `POST /api/v1/auth/cli/exchange`            | Long-poll for approval                  | `200` JSON `{ access_token, refresh_token, expires_in, refresh_expires_in, user, organization, default_personal_vk }`               | `428 authorization_pending` (keep polling), `408 expired_token`, `410 access_denied`, `429 slow_down` (re-poll too fast, back off) |
+| `POST /api/v1/auth/cli/refresh`             | Rotate access token                     | `200` JSON `{ access_token, refresh_token, expires_in, refresh_expires_in }` (refresh-token rotation, the old token is invalidated) | `401 invalid_grant` (CLI must wipe local state)                                                                                    |
+| `POST /api/v1/auth/cli/logout`              | Revoke a refresh-token server-side      | `200 { ok: true }` (idempotent)                                                                                                     | None                                                                                                                               |
+| `GET /api/v1/auth/cli/lookup?user_code=...` | Browser-side: verify a pasted user-code | `200 { user_code, status, created_at, expires_at }`                                                                                 | `401 unauthorized` (user must sign in first), `404 not_found`, `410 expired`                                                       |
+| `POST /api/v1/auth/cli/approve`             | Browser-side: user clicks "Approve"     | `200 { ok, personal_vk_label, organization_id }`                                                                                    | `401 unauthorized`, `403 forbidden` (caller not in target org), `409 already_resolved`                                             |
+| `POST /api/v1/auth/cli/deny`                | Browser-side: user clicks "Deny"        | `200 { ok }` (idempotent)                                                                                                           | `401 unauthorized`                                                                                                                 |
 
 The browser approval surface is
 `https://<your-base-url>/cli/auth?user_code=XXXX-YYYY` (the
@@ -8523,7 +8523,7 @@ dev's CLI / agent  ──┐
 Closed SaaS (Cowork / Copilot / Workato / OpenAI / Claude / S3)
          │
          ├─ PUSH (OTel / webhook / S3 drop)
-         │      ▶  /api/ingest/<source-type>/<source-id>
+         │      ▶  /api/v1/ingest/<source-type>/<source-id>
          │             ─ validates IngestionSource ingestSecret
          │             ─ parses platform-specific shape
          │             ─ normalises into OCSF ActivityEvent class
@@ -8647,8 +8647,8 @@ What's on this branch today:
 What this iteration adds (D2 foundation):
 
 - 🚧 `IngestionSource` table + `trace_summaries.SourceType`/`SourceId` columns
-- 🚧 Generic OTel passthrough receiver (`/api/ingest/otel/<sourceId>`)
-- 🚧 Generic webhook receiver (`/api/ingest/webhook/<sourceId>`)
+- 🚧 Generic OTel passthrough receiver (`/api/v1/ingest/otel/<sourceId>`)
+- 🚧 Generic webhook receiver (`/api/v1/ingest/webhook/<sourceId>`)
 - 🚧 OCSF normalisation contract + skeleton adapter
 
 Deferred to follow-up iterations:
@@ -8917,7 +8917,7 @@ policy automatically. Revoking access is one click.
 │      claude     │                    ▼
 └────────┬────────┘           ┌──────────────────┐
          │                    │  LangWatch app   │
-         │  short-lived       │  /api/auth/cli/* │
+         │  short-lived       │  /api/v1/auth/cli/* │
          │  bearer (vk-lw-*)  │                  │
          ▼                    └────────┬─────────┘
 ┌──────────────────┐                   │ trust
@@ -9135,7 +9135,7 @@ Behind the scenes:
 1. The CLI ran an [RFC 8628 device-flow OAuth](https://datatracker.ietf.org/doc/html/rfc8628) handshake against the LangWatch control plane.
 2. Your browser ran the SSO flow your IT admin configured (Okta, Google Workspace, Azure AD, or password-only).
 3. LangWatch minted a **personal virtual key** scoped to your user identity, signed by the gateway, bound to your monthly budget, and audit-trailed per request.
-4. The CLI fetched your AI tools, inheritable providers, and budget from `/api/auth/cli/bootstrap` and rendered the ceremony you see above.
+4. The CLI fetched your AI tools, inheritable providers, and budget from `/api/v1/auth/cli/bootstrap` and rendered the ceremony you see above.
 
 Tokens persisted at `~/.langwatch/config.json` (mode 0600).
 
@@ -15126,7 +15126,7 @@ A rule that's persisted but unevaluated is intentional, admins can pre-stage rul
 
 ---
 title: Governance REST API
-description: Hono-mounted REST/JSON API at /api/governance/* with an auto-generated OpenAPI spec consumed by the TypeScript and Python SDKs. Every governance feature exposes the same CRUD verb set, sharing one service-layer source of truth with the dashboard tRPC procedures, no duplicated business logic, identical RBAC enforcement.
+description: Hono-mounted REST/JSON API at /api/v1/governance/* with an auto-generated OpenAPI spec consumed by the TypeScript and Python SDKs. Every governance feature exposes the same CRUD verb set, sharing one service-layer source of truth with the dashboard tRPC procedures, no duplicated business logic, identical RBAC enforcement.
 sidebarTitle: REST API
 ---
 
@@ -15153,9 +15153,9 @@ Both paths call into the same service-layer functions, there is no business-logi
 
 | Property    | Value                                                                                                                                                                                                                                                                              |
 | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Mount point | `/api/governance/<resource>`                                                                                                                                                                                                                                                       |
+| Mount point | `/api/v1/governance/<resource>`                                                                                                                                                                                                                                                       |
 | Spec        | Emitted into the canonical `openapiLangWatch.json` on the next spec regeneration, every governance route registers via the same `describeRoute` + `hono-openapi` pipeline as the rest of the public REST API                                                                       |
-| Auth        | Project API key, `Authorization: Bearer <projectApiKey>` or `X-Auth-Token`, same as `/api/dataset/*` and `/api/trace/*`. The org for the call derives from the project's team                                                                                                      |
+| Auth        | Project API key, `Authorization: Bearer <projectApiKey>` or `X-Auth-Token`, same as `/api/v1/dataset/*` and `/api/v1/trace/*`. The org for the call derives from the project's team                                                                                                      |
 | RBAC        | Per-route ceiling permission for PAT-authed callers (`aiTools:view` on reads, `aiTools:manage` on writes for ingestion-templates; analogous `<resource>:view`, `<resource>:manage` on other resources). Legacy project tokens bypass the ceiling, same model as `gateway-platform` |
 | Tenancy     | `organizationId` is derived from `project → team → organization`. Cross-org probes collapse to 404 at the service layer (no enumeration vector)                                                                                                                                    |
 | Wire shape  | Paths kebab-case, JSON fields snake_case (e.g. `ottl_rules`, `source_type`, `display_name`) per public-REST convention                                                                                                                                                             |
@@ -15166,18 +15166,18 @@ Governance resources expose the full CRUD set, `list`, `get`, `create`, `update`
 
 | Resource              | OpenAPI path group                                                                                    | Detail page                                                                          |
 | --------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| Anomaly rules         | `/api/governance/anomaly-rules`                                                                       | [Anomaly rules](/ai-governance/anomaly-rules)                                        |
-| Audit log (read-only) | `/api/governance/audit-log`                                                                           | [Audit log](/ai-governance/audit-log)                                                |
-| Gateway budgets       | `/api/governance/gateway-budgets`                                                                     | [Control plane](/ai-governance/control-plane)                                        |
-| Ingestion sources     | `/api/governance/ingestion-sources`                                                                   | [Ingestion sources](/ai-governance/ingestion-sources)                                |
-| Ingestion templates   | `/api/governance/ingestion-templates`                                                                 | [Ingestion templates](/ai-governance/ingestion-templates)                            |
-| Ingestion keys        | `/api/auth/cli/governance/ingestion-key` (mint) + tRPC `ingestionKey` (`list` / `install` / `rotate`) | [Ingestion templates](/ai-governance/ingestion-templates)                            |
-| Members               | `/api/governance/members`                                                                             | [Members and invites](/ai-governance/members-and-invites)                            |
-| Invites               | `/api/governance/invites`                                                                             | [Members and invites](/ai-governance/members-and-invites)                            |
-| Role bindings         | `/api/governance/role-bindings`                                                                       | [Roles and permissions](/ai-governance/roles-and-permissions)                        |
-| AI tool entries       | `/api/governance/ai-tool-entries`                                                                     | [Personas](/ai-governance/personas)                                                  |
-| Sessions              | `/api/governance/sessions`                                                                            | [No-spy mode](/ai-governance/no-spy-mode) (sessions live alongside in `/me/devices`) |
-| Virtual keys          | `/api/governance/virtual-keys`                                                                        | [Control plane](/ai-governance/control-plane)                                        |
+| Anomaly rules         | `/api/v1/governance/anomaly-rules`                                                                       | [Anomaly rules](/ai-governance/anomaly-rules)                                        |
+| Audit log (read-only) | `/api/v1/governance/audit-log`                                                                           | [Audit log](/ai-governance/audit-log)                                                |
+| Gateway budgets       | `/api/v1/governance/gateway-budgets`                                                                     | [Control plane](/ai-governance/control-plane)                                        |
+| Ingestion sources     | `/api/v1/governance/ingestion-sources`                                                                   | [Ingestion sources](/ai-governance/ingestion-sources)                                |
+| Ingestion templates   | `/api/v1/governance/ingestion-templates`                                                                 | [Ingestion templates](/ai-governance/ingestion-templates)                            |
+| Ingestion keys        | `/api/v1/auth/cli/governance/ingestion-key` (mint) + tRPC `ingestionKey` (`list` / `install` / `rotate`) | [Ingestion templates](/ai-governance/ingestion-templates)                            |
+| Members               | `/api/v1/governance/members`                                                                             | [Members and invites](/ai-governance/members-and-invites)                            |
+| Invites               | `/api/v1/governance/invites`                                                                             | [Members and invites](/ai-governance/members-and-invites)                            |
+| Role bindings         | `/api/v1/governance/role-bindings`                                                                       | [Roles and permissions](/ai-governance/roles-and-permissions)                        |
+| AI tool entries       | `/api/v1/governance/ai-tool-entries`                                                                     | [Personas](/ai-governance/personas)                                                  |
+| Sessions              | `/api/v1/governance/sessions`                                                                            | [No-spy mode](/ai-governance/no-spy-mode) (sessions live alongside in `/me/devices`) |
+| Virtual keys          | `/api/v1/governance/virtual-keys`                                                                        | [Control plane](/ai-governance/control-plane)                                        |
 
 `audit-log` is intentionally read-only (no create, update, delete), audit rows are emitted by other state-changing routes and are immutable by design.
 
@@ -15187,13 +15187,13 @@ The first surface to ship is `ingestion-templates` (Sergey's Lane B-1 commit). T
 
 | Verb                  | Method + path                                              | Returns                                                                    | RBAC             |
 | --------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------- |
-| `list`                | `GET /api/governance/ingestion-templates`                  | `{ data: IngestionTemplateDto[] }` (end-user shape, `ottl_rules` redacted) | `aiTools:view`   |
-| `admin-list`          | `GET /api/governance/ingestion-templates/admin`            | `{ data: IngestionTemplateDto[] }` (admin shape, includes `ottl_rules`)    | `aiTools:manage` |
-| `get`                 | `GET /api/governance/ingestion-templates/:id`              | `{ ingestion_template: IngestionTemplateDto }`                             | `aiTools:view`   |
-| `create`              | `POST /api/governance/ingestion-templates`                 | `{ ingestion_template: IngestionTemplateDto }` (201)                       | `aiTools:manage` |
-| `update-ottl-rules`   | `PATCH /api/governance/ingestion-templates/:id/ottl-rules` | `{ ingestion_template: IngestionTemplateDto }`                             | `aiTools:manage` |
-| `archive`             | `DELETE /api/governance/ingestion-templates/:id`           | `{ archived: true }` (soft-archive)                                        | `aiTools:manage` |
-| `clone-from-platform` | `POST /api/governance/ingestion-templates/clone`           | `{ ingestion_template: IngestionTemplateDto }`                             | `aiTools:manage` |
+| `list`                | `GET /api/v1/governance/ingestion-templates`                  | `{ data: IngestionTemplateDto[] }` (end-user shape, `ottl_rules` redacted) | `aiTools:view`   |
+| `admin-list`          | `GET /api/v1/governance/ingestion-templates/admin`            | `{ data: IngestionTemplateDto[] }` (admin shape, includes `ottl_rules`)    | `aiTools:manage` |
+| `get`                 | `GET /api/v1/governance/ingestion-templates/:id`              | `{ ingestion_template: IngestionTemplateDto }`                             | `aiTools:view`   |
+| `create`              | `POST /api/v1/governance/ingestion-templates`                 | `{ ingestion_template: IngestionTemplateDto }` (201)                       | `aiTools:manage` |
+| `update-ottl-rules`   | `PATCH /api/v1/governance/ingestion-templates/:id/ottl-rules` | `{ ingestion_template: IngestionTemplateDto }`                             | `aiTools:manage` |
+| `archive`             | `DELETE /api/v1/governance/ingestion-templates/:id`           | `{ archived: true }` (soft-archive)                                        | `aiTools:manage` |
+| `clone-from-platform` | `POST /api/v1/governance/ingestion-templates/clone`           | `{ ingestion_template: IngestionTemplateDto }`                             | `aiTools:manage` |
 
 A few resource-shape notes that generalise across the namespace:
 
@@ -15205,7 +15205,7 @@ The second resource to ship is `ingestion-keys` (Sergey's Lane B-2 commit at `52
 
 | Verb      | Method + path                                                          | Returns                                                                                                   | RBAC             |
 | --------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ---------------- |
-| `mint`    | `POST /api/auth/cli/governance/ingestion-key` (body `{ source_type }`) | `{ token: "sk-lw-…", prefix, endpoint }` (token returned exactly once)                                    | `aiTools:manage` |
+| `mint`    | `POST /api/v1/auth/cli/governance/ingestion-key` (body `{ source_type }`) | `{ token: "sk-lw-…", prefix, endpoint }` (token returned exactly once)                                    | `aiTools:manage` |
 | `list`    | tRPC `ingestionKey.list`                                               | `{ data: IngestionKeyDto[] }` (project-scoped; only the `sk-lw-` prefix is visible, never the full token) | `aiTools:manage` |
 | `install` | tRPC `ingestionKey.install`                                            | `{ key: ..., token: "sk-lw-…" }` (token returned exactly once)                                            | `aiTools:manage` |
 | `rotate`  | tRPC `ingestionKey.rotate`                                             | `{ key: ..., token: "sk-lw-…" }` (hard-cut rotation per spec, old token is invalid immediately)           | `aiTools:manage` |
@@ -15576,7 +15576,7 @@ If a source exists but no events have landed yet (status `awaiting_first_event`)
 ```text
 $ langwatch ingest tail brand-new-source-id
 No events for this source yet. Once your upstream platform starts
-sending OTel/audit logs to /api/ingest/* with the source's bearer
+sending OTel/audit logs to /api/v1/ingest/* with the source's bearer
 secret, events will land here.
 ```
 
@@ -15602,7 +15602,7 @@ The 401-on-expired-session path also clears the cached token, so the next invoca
 
 ## Error catalog
 
-The `langwatch login` flow itself can fail before the device-flow handshake completes if the org isn't configured for CLI sign-in. Each entry below names the error code returned by `/api/auth/cli/personal-virtual-keys/approve`, the human-readable hint shown to the developer, and the admin remediation.
+The `langwatch login` flow itself can fail before the device-flow handshake completes if the org isn't configured for CLI sign-in. Each entry below names the error code returned by `/api/v1/auth/cli/personal-virtual-keys/approve`, the human-readable hint shown to the developer, and the admin remediation.
 
 ### `409 no_default_routing_policy`
 
@@ -15653,7 +15653,7 @@ Three surfaces, one backend:
 | ------------------------------------------------------ | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Web `/governance` admin oversight                      | Governance admin in a browser   | tRPC: `api.governance.setupState`, `api.activityMonitor.*`, `api.ingestionSources.*`                                                                |
 | Web `/governance/ingestion-sources/:id` detail         | Per-source SRE                  | tRPC: `api.activityMonitor.eventsForSource`, `api.activityMonitor.sourceHealthMetrics`                                                              |
-| **CLI `governance status`, `ingest list/health/tail`** | **Terminal-first SRE, on-call** | **REST: `GET /api/auth/cli/governance/*`, Bearer adapter that imports the same service classes the tRPC procedures use, byte-for-byte matching IO** |
+| **CLI `governance status`, `ingest list/health/tail`** | **Terminal-first SRE, on-call** | **REST: `GET /api/v1/auth/cli/governance/*`, Bearer adapter that imports the same service classes the tRPC procedures use, byte-for-byte matching IO** |
 
 The REST endpoints reuse the existing `validateAccessToken()` Bearer helper that's been in production since the device-flow CLI shipped, so opening this surface doesn't introduce a new auth path. Per-account governance entitlement is enforced at the endpoint layer.
 
@@ -15700,7 +15700,7 @@ langwatch governance --help
 ```bash
 langwatch governance --help
 # Manage governance resources (ingestion templates, ingestion keys)
-# from the CLI. Mirrors the public REST surface at /api/governance/*, every
+# from the CLI. Mirrors the public REST surface at /api/v1/governance/*, every
 # mutating call lands an audit row with metadata.surface='cli'.
 #
 # Commands:
@@ -15763,7 +15763,7 @@ Resources expected to fold into the same namespace as their REST surfaces ship: 
 
 ## Audit emission
 
-Every state-changing CLI invocation emits an audit row with `AuditLog.metadata.surface = "cli"`. The CLI is a REST shell, it calls `/api/governance/*` and sends the `X-LangWatch-Surface: cli` request header. The Hono backend's `resolveSurfaceFromRequest` helper reads the header, validates it against the `GovernanceCallSurface` enum (in-process spoofing of `trpc`, `mcp` is rejected at the enum filter), and threads the value into the service-layer `surface` parameter Sergey wired at `fc6d54100`. The payload shape is identical to a Hono REST audit row apart from the surface field.
+Every state-changing CLI invocation emits an audit row with `AuditLog.metadata.surface = "cli"`. The CLI is a REST shell, it calls `/api/v1/governance/*` and sends the `X-LangWatch-Surface: cli` request header. The Hono backend's `resolveSurfaceFromRequest` helper reads the header, validates it against the `GovernanceCallSurface` enum (in-process spoofing of `trpc`, `mcp` is rejected at the enum filter), and threads the value into the service-layer `surface` parameter Sergey wired at `fc6d54100`. The payload shape is identical to a Hono REST audit row apart from the surface field.
 
 The header-validating Hono helper + the 7 mutation call-sites switching from hardcoded `'hono'` to `resolveSurfaceFromRequest(req)` ship in Lane-B's CLI scaffold at `ed51b0ea1`. The `X-LangWatch-Surface: cli` constant lives at `sdks/typescript/src/cli/utils/governance/surface.ts`.
 
@@ -15780,7 +15780,7 @@ The end state is that an agent can fully configure governance for a fresh org by
 langwatch governance ingestion-templates admin-list --json
 
 # 2. Clone the claude_code template into the org for customisation
-#    (POST /api/governance/ingestion-templates/clone, auto-derives org from the apiKey's project)
+#    (POST /api/v1/governance/ingestion-templates/clone, auto-derives org from the apiKey's project)
 langwatch governance ingestion-templates clone-from-platform \
     --source-template-id <platform-claude-code-id> \
     --json
@@ -15836,7 +15836,7 @@ This page maps each compliance framework you might need to the mechanisms in Lan
 
 ```
                   PUBLIC URLS (auth boundary)
-   /api/otel/v1/traces     /api/ingest/otel/:sourceId    /api/ingest/webhook/:sourceId
+   /api/otel/v1/traces     /api/v1/ingest/otel/:sourceId    /api/v1/ingest/webhook/:sourceId
        (project key)             (lw_is_* Bearer)              (lw_is_* Bearer)
               │                          │                            │
               ▼                          ▼                            ▼
@@ -16120,7 +16120,7 @@ the gateway's base URL injected:
 Dev terminal              LangWatch                  Provider
 ─────────────             ─────────                  ────────
 $ langwatch               app.langwatch.ai           api.anthropic.com
-  login --device  ◀──SSO──▶  /api/auth/cli/*
+  login --device  ◀──SSO──▶  /api/v1/auth/cli/*
   ↓ writes ~/.langwatch
   ↓ ANTHROPIC_AUTH_TOKEN=vk-lw-...
 
@@ -16282,8 +16282,8 @@ spendByUser, ingestionSourcesHealth, recentAnomalies}` tRPC
   - Tier 4. Seven `sourceType` values supported on the schema
     side (see Tier 3 above).
 - ✅ **`IngestionSourceService` + REST receivers + tRPC admin
-  router.** `POST /api/ingest/otel/:sourceId` (Tier 4 entry
-  point) and `POST /api/ingest/webhook/:sourceId` (Tier 3 push
+  router.** `POST /api/v1/ingest/otel/:sourceId` (Tier 4 entry
+  point) and `POST /api/v1/ingest/webhook/:sourceId` (Tier 3 push
   destination) accept events authenticated by a per-source
   `Bearer lw_is_*` secret, return 202, flip `lastEventAt` on the
   source. `api.ingestionSources.{list,get,create,update,
@@ -17220,7 +17220,7 @@ The configuration contract below lets admins pre-stage workspace keys; the match
 ## Currently implemented
 
 - **CRUD:** the source can be created via the admin composer at `/governance/ingestion-sources` and via `api.ingestionSources.create`. It appears in `langwatch ingest list` with status `awaiting_first_event`.
-- **Receiver:** none. There is no `/api/ingest/claude-compliance/:id` endpoint and the OTLP, webhook receivers reject `claude_compliance` sources with `400 wrong_endpoint`.
+- **Receiver:** none. There is no `/api/v1/ingest/claude-compliance/:id` endpoint and the OTLP, webhook receivers reject `claude_compliance` sources with `400 wrong_endpoint`.
 - **Poller:** none.
 - **Normaliser:** none.
 - **Status flip:** the source stays `awaiting_first_event` indefinitely until the poller ships.
@@ -17270,7 +17270,7 @@ Claude Cowork pushes telemetry over OTLP/HTTP. The receiver is wired and accepts
 
 ## Currently implemented
 
-- **Receiver:** `POST /api/ingest/otel/:sourceId`, same endpoint as [`otel_generic`](/ai-gateway/governance/ingestion-sources/otel-generic).
+- **Receiver:** `POST /api/v1/ingest/otel/:sourceId`, same endpoint as [`otel_generic`](/ai-gateway/governance/ingestion-sources/otel-generic).
 - **Auth:** `Authorization: Bearer lw_is_<secret>`.
 - **Body:** OTLP/HTTP JSON envelope (also accepts protobuf + gzip, deflate, brotli per the shared parser).
 - **OTLP shape:** Spans (lands in `recorded_spans` with origin metadata stamped). Same handoff path as `otel_generic`.
@@ -17289,7 +17289,7 @@ The one-time-reveal modal exposes:
 
 | Field         | Value                                                 |
 | ------------- | ----------------------------------------------------- |
-| OTLP URL      | `https://<your-langwatch>/api/ingest/otel/<sourceId>` |
+| OTLP URL      | `https://<your-langwatch>/api/v1/ingest/otel/<sourceId>` |
 | Bearer secret | `lw_is_<base64url>`                                   |
 
 In Anthropic's admin console: **Workspace → Telemetry**, paste the OTLP URL + the bearer header. Cowork starts pushing.
@@ -17595,7 +17595,7 @@ The configuration contract below lets admins pre-stage IAM trust policies and bu
 ## Currently implemented
 
 - **CRUD:** the source can be created via the admin composer at `/governance/ingestion-sources` and via `api.ingestionSources.create`. It appears in `langwatch ingest list` with status `awaiting_first_event`.
-- **Receiver:** none. There is no `/api/ingest/openai-compliance/:id` endpoint and the OTLP, webhook receivers reject `openai_compliance` sources with `400 wrong_endpoint`.
+- **Receiver:** none. There is no `/api/v1/ingest/openai-compliance/:id` endpoint and the OTLP, webhook receivers reject `openai_compliance` sources with `400 wrong_endpoint`.
 - **Puller:** none.
 - **Normaliser:** none.
 - **Status flip:** the source stays `awaiting_first_event` indefinitely until the puller ships.
@@ -17664,7 +17664,7 @@ sidebarTitle: Generic OTel
 
 ## Currently implemented
 
-- **Receiver:** `POST /api/ingest/otel/:sourceId` (also accepts `claude_cowork` sources, see [Anthropic Cowork](/ai-gateway/governance/ingestion-sources/claude-cowork)).
+- **Receiver:** `POST /api/v1/ingest/otel/:sourceId` (also accepts `claude_cowork` sources, see [Anthropic Cowork](/ai-gateway/governance/ingestion-sources/claude-cowork)).
 - **Auth:** `Authorization: Bearer lw_is_<secret>`.
 - **Body:** OTLP/HTTP JSON envelope (`resource_spans`, `scope_spans`, `spans`). `snake_case` and `camelCase` both accepted.
 - **OTLP shape:** Spans (parent-child + duration). Lands in `recorded_spans`.
@@ -17677,7 +17677,7 @@ After clicking Create on the composer, the one-time-reveal modal exposes:
 
 | Field         | Value                                                                  |
 | ------------- | ---------------------------------------------------------------------- |
-| OTLP URL      | `https://<your-langwatch>/api/ingest/otel/<sourceId>`                  |
+| OTLP URL      | `https://<your-langwatch>/api/v1/ingest/otel/<sourceId>`                  |
 | Bearer secret | `lw_is_<base64url>` (shown once, never returned by the list endpoints) |
 
 The composer also persists one optional config field:
@@ -17690,7 +17690,7 @@ In the upstream platform's OTLP exporter config:
 # OpenTelemetry Collector example
 exporters:
   otlphttp/langwatch:
-    endpoint: https://<your-langwatch>/api/ingest/otel/<sourceId>
+    endpoint: https://<your-langwatch>/api/v1/ingest/otel/<sourceId>
     headers:
       Authorization: Bearer lw_is_<secret>
 service:
@@ -17705,7 +17705,7 @@ service:
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 
 exporter = OTLPSpanExporter(
-    endpoint="https://<your-langwatch>/api/ingest/otel/<sourceId>",
+    endpoint="https://<your-langwatch>/api/v1/ingest/otel/<sourceId>",
     headers={"Authorization": "Bearer lw_is_<secret>"},
 )
 ```
@@ -17845,13 +17845,13 @@ sidebarTitle: Custom S3
 `s3_custom` is the catch-all for homegrown agent systems writing audit logs to an S3 bucket, internal agents, CI tools, custom orchestrators. The data plane has two intended ingestion modes:
 
 1. **S3 polling**: the configured bucket + prefix is polled on a cadence; new objects are fetched and parsed via a customer-supplied DSL.
-2. **Webhook callback**: the upstream system can POST to the same `/api/ingest/webhook/:id` endpoint Workato uses, when polling isn't acceptable.
+2. **Webhook callback**: the upstream system can POST to the same `/api/v1/ingest/webhook/:id` endpoint Workato uses, when polling isn't acceptable.
 
 Today, only the **callback mode** is wired. The S3 puller and the DSL parser are on the [adapter roadmap](/ai-governance/ingestion-sources/index#adapter-roadmap).
 
 ## Currently implemented
 
-- **Receiver (callback mode):** `POST /api/ingest/webhook/:sourceId`.
+- **Receiver (callback mode):** `POST /api/v1/ingest/webhook/:sourceId`.
 - **Auth:** `Authorization: Bearer lw_is_<secret>`.
 - **Body:** any JSON payload, typically one log line per request.
 - **Persistence:** envelope-only. One governance event with `eventType: agent.action`, the verbatim payload in `rawPayload`, and `actor`, `target`, `costUsd`, token counts unset (parser pending).
@@ -17888,7 +17888,7 @@ In callback mode, identical to the Workato envelope-only shape, see [Workato →
 In callback mode:
 
 ```bash
-curl -X POST https://<your-langwatch>/api/ingest/webhook/<sourceId> \
+curl -X POST https://<your-langwatch>/api/v1/ingest/webhook/<sourceId> \
   -H "Authorization: Bearer lw_is_<secret>" \
   -H "Content-Type: application/json" \
   -d '{"actor":"agent-42","action":"file.read","target":"/etc/secrets","ts":"2026-04-27T08:00:00Z"}'
@@ -17918,7 +17918,7 @@ Workato pushes job-completed webhooks. The receiver is wired and persists each d
 
 ## Currently implemented
 
-- **Receiver:** `POST /api/ingest/webhook/:sourceId`.
+- **Receiver:** `POST /api/v1/ingest/webhook/:sourceId`.
 - **Auth:** `Authorization: Bearer lw_is_<secret>`.
 - **Body:** any JSON payload (Workato's exact webhook envelope).
 - **Persistence:** one governance event per delivery, with `eventType: agent.action`, `actor`/`target` empty, and the verbatim payload in `rawPayload`. The CLI tail shows one row per Workato webhook hit and the per-source detail page lets you expand the row to see the raw envelope.
@@ -17936,7 +17936,7 @@ The one-time-reveal modal exposes:
 
 | Field         | Value                                                    |
 | ------------- | -------------------------------------------------------- |
-| Webhook URL   | `https://<your-langwatch>/api/ingest/webhook/<sourceId>` |
+| Webhook URL   | `https://<your-langwatch>/api/v1/ingest/webhook/<sourceId>` |
 | Bearer secret | `lw_is_<base64url>`                                      |
 
 In Workato: **Connection Profile → Webhook destination**, paste the webhook URL and add an `Authorization: Bearer lw_is_<secret>` header. Save.
@@ -17989,7 +17989,7 @@ Hit a Workato recipe that's connected to the webhook, you should see one event r
 If you want to dry-run without a Workato recipe:
 
 ```bash
-curl -X POST https://<your-langwatch>/api/ingest/webhook/<sourceId> \
+curl -X POST https://<your-langwatch>/api/v1/ingest/webhook/<sourceId> \
   -H "Authorization: Bearer lw_is_<secret>" \
   -H "Content-Type: application/json" \
   -d '{"event":"recipe.success","recipe_id":42,"timestamp":"2026-04-27T08:00:00Z"}'
@@ -18436,7 +18436,7 @@ sidebarTitle: MCP server
   register on every MCP session the hosted endpoint opens, through the session tool registrar bound
   in `apps/api/src/features/mcp/hosted-mcp.mount.ts`, via `registerGovernanceMcpTools(server, ctx)`,
   and call the governance services (`IngestionTemplateService`, `IngestionKeyService`, etc.)
-  directly with `surface: "mcp"`. They do NOT route through `/api/governance/*` over HTTP. Reason:
+  directly with `surface: "mcp"`. They do NOT route through `/api/v1/governance/*` over HTTP. Reason:
   it avoids the project-API-key vs PAT auth mismatch and matches Sergey's explicit
   `GovernanceCallSurface` contract at `fc6d54100` without needing Hono middleware changes.
   Cross-path uniformity (audit, RBAC, multitenancy) still holds by construction, the service layer
@@ -18494,7 +18494,7 @@ The pattern is `governance_<resource_with_underscores>_<verb_with_underscores>`,
 Governance MCP tools register inside LangWatch's existing MCP server (served on the same host that serves the dashboard), there is **no separate `langwatch mcp serve` binary**. Clients connect over HTTP using either streamable-HTTP at `/mcp` or SSE at `/sse`, and authenticate with one of:
 
 - **Project API key as Bearer** (`Authorization: Bearer <projectApiKey>`), the plain read tools work immediately. Sufficient to call `governance_*_list` and `governance_*_get`. Admin reads (`governance_*_admin_list`, which expose `ottlRules`) and every write tool require a user-bound session and reject a project-key-only caller.
-- **OAuth (PKCE) flow** at `/api/mcp/authorize` → `/oauth/token`, required for write tools and admin reads. The OAuth flow captures the user's id at authorize time, threads it through the session token cache, and surfaces it to governance tools as `ctx.callerUserId`. Without it, a write tool returns an `AUTH_REQUIRED:` error pointing the client at the OAuth flow.
+- **OAuth (PKCE) flow** at `/api/v1/mcp/authorize` → `/oauth/token`, required for write tools and admin reads. The OAuth flow captures the user's id at authorize time, threads it through the session token cache, and surfaces it to governance tools as `ctx.callerUserId`. Without it, a write tool returns an `AUTH_REQUIRED:` error pointing the client at the OAuth flow.
 
 ```jsonc
 // MCP client config, points at the LangWatch instance's MCP endpoint
@@ -18506,7 +18506,7 @@ Governance MCP tools register inside LangWatch's existing MCP server (served on 
       // Clients that speak the older SSE transport use
       // https://app.langwatch.ai/sse instead.
       // Read-only access: add Authorization: Bearer <projectApiKey>.
-      // Read+write access: complete the OAuth PKCE flow at /api/mcp/authorize.
+      // Read+write access: complete the OAuth PKCE flow at /api/v1/mcp/authorize.
     },
   },
 }
@@ -18520,7 +18520,7 @@ The 9 governance tools register via `registerGovernanceMcpTools(server, ctx)` fr
   (Vite), external MCP clients (e.g. Claude Code) hit `FRONTEND_PORT` (default `5560`) which proxies
   the seven MCP route prefixes through to the API port. Local Claude Code runbook: `claude mcp add
   langwatch http://localhost:5560/mcp` (or the OAuth flow at
-  `http://localhost:5560/api/mcp/authorize` for write tools). All 9 tools register over that proxy,
+  `http://localhost:5560/api/v1/mcp/authorize` for write tools). All 9 tools register over that proxy,
   read tools return the catalog with a project apiKey Bearer, and write tools return
   `AUTH_REQUIRED:` until the OAuth flow completes.
 </Note>
@@ -18537,7 +18537,7 @@ Governance tools enforce two distinct gates at the tool layer (`packages/enterpr
   "content": [
     {
       "type": "text",
-      "text": "AUTH_REQUIRED: this tool requires an OAuth-authenticated MCP session. Complete the OAuth flow at /api/mcp/authorize and reconnect.",
+      "text": "AUTH_REQUIRED: this tool requires an OAuth-authenticated MCP session. Complete the OAuth flow at /api/v1/mcp/authorize and reconnect.",
     },
   ],
 }
@@ -18562,7 +18562,7 @@ In both cases no record is created and no audit row is emitted (failed calls are
 The Path B mechanics (per `fc6d54100` + `7639b6c2b`):
 
 - **RBAC check happens at the MCP tool layer**, BEFORE the service call, the tool asks the same permission probe the tRPC and REST surfaces ask, `AuthzService.hasPermission` (`packages/features/authz/contract/src/authz.service.ts`, resolved against the built-in role sets in `packages/features/authz/contract/src/roles.ts`), and returns `FORBIDDEN:` early if the required permission is missing. Services trust the surface, they do not gate on the MCP-resolved scope a second time. This split is intentional: the MCP tool owns the RBAC contract for its surface; the service owns the multitenancy + business-logic contract.
-- **`callerUserId` flows from the OAuth session**, the OAuth PKCE flow at `/api/mcp/authorize` captures the user's id, threads it through the session token cache and `SessionState`, and surfaces it as `ctx.callerUserId`. For `IngestionKeyService.{install, rotate}` it's required (write tools reject with `AUTH_REQUIRED:` if absent). For `IngestionTemplateService` authoring methods (which take `callerUserId` for the audit trail), same plumbing.
+- **`callerUserId` flows from the OAuth session**, the OAuth PKCE flow at `/api/v1/mcp/authorize` captures the user's id, threads it through the session token cache and `SessionState`, and surfaces it as `ctx.callerUserId`. For `IngestionKeyService.{install, rotate}` it's required (write tools reject with `AUTH_REQUIRED:` if absent). For `IngestionTemplateService` authoring methods (which take `callerUserId` for the audit trail), same plumbing.
 - **Snake_case ↔ camelCase boundary**: MCP tool inputs use snake_case (`source_template_id`, `template_id`) per public-surface convention; the tool maps to camelCase (`sourceTemplateId`, `templateId`) before calling the service, since service signatures are camelCase. The mapping is the tool's job, not the service's.
 
 ## Audit emission
@@ -18585,7 +18585,7 @@ The contract is asserted at the application layer by `packages/enterprise/featur
 An agent connecting through the OAuth flow as an admin can fully configure governance through a sequence of MCP tool calls (the write tools below reject a project-key-only caller):
 
 1. `governance_ingestion_templates_list`, read existing platform templates
-2. `governance_ingestion_templates_clone_from_platform`, clone `claude_code` into the org (delegates to `POST /api/governance/ingestion-templates/clone`)
+2. `governance_ingestion_templates_clone_from_platform`, clone `claude_code` into the org (delegates to `POST /api/v1/governance/ingestion-templates/clone`)
 3. `governance_anomaly_rules_create`, rule on org spend > $100/day
 4. `governance_role_bindings_assign_to_user`, give a user `governance:view`
 5. `governance_audit_log_query`, verify steps 2–4 all emitted audit rows
@@ -19526,7 +19526,7 @@ Each session is identified by:
 ## How sessions get created
 
 Every successful `langwatch login --device` creates a new session. The
-first time the CLI POSTs `/api/auth/cli/exchange`, it sends a
+first time the CLI POSTs `/api/v1/auth/cli/exchange`, it sends a
 `client_info` block:
 
 ```json
@@ -20837,6 +20837,7 @@ State the headline numbers directly in the conversation too.
         </span>
       </div>
     </div>
+
   </div>
 </div>
 
@@ -21082,6 +21083,7 @@ Also state the top finding directly in the conversation, leading with the number
         </span>
       </div>
     </div>
+
   </div>
 </div>
 
@@ -26787,7 +26789,7 @@ When a message holds both a recording and text, LangWatch treats the text as the
 
 ## What happens to the bytes
 
-LangWatch moves the recording out of the span at ingestion. The bytes go into content-addressed object storage and the message part becomes a `/api/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
+LangWatch moves the recording out of the span at ingestion. The bytes go into content-addressed object storage and the message part becomes a `/api/v1/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
 
 Storage is addressed by SHA-256, so identical bytes are stored once. For example, a recording captured by a simulation and by the trace of the same call is one stored object, not two.
 
@@ -27001,7 +27003,7 @@ A part that names only a provider-hosted file, such as an OpenAI `file_id` with 
 
 ## What happens to the bytes
 
-LangWatch moves the document out of the span at ingestion. The bytes go into content-addressed object storage and the message part becomes a `/api/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
+LangWatch moves the document out of the span at ingestion. The bytes go into content-addressed object storage and the message part becomes a `/api/v1/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
 
 Storage is addressed by SHA-256, so identical bytes are stored once. For example, the same contract sent on ten traces costs one stored object.
 
@@ -27459,7 +27461,7 @@ Always set the media type. Without one, LangWatch leaves the bytes inline in the
 
 ## What happens to the bytes
 
-LangWatch moves the image out of the span at ingestion. The bytes go into content-addressed object storage and the message part becomes a `/api/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
+LangWatch moves the image out of the span at ingestion. The bytes go into content-addressed object storage and the message part becomes a `/api/v1/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
 
 Storage is addressed by SHA-256, so identical bytes are stored once. For example, the same picture sent on ten traces costs one stored object.
 
@@ -30021,7 +30023,7 @@ When a message holds both a recording and text, LangWatch treats the text as the
 
 ## What happens to the bytes
 
-LangWatch moves the recording out of the span at ingestion. The bytes go into content-addressed object storage and the message part becomes a `/api/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
+LangWatch moves the recording out of the span at ingestion. The bytes go into content-addressed object storage and the message part becomes a `/api/v1/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
 
 Storage is addressed by SHA-256, so identical bytes are stored once. For example, a recording captured by a simulation and by the trace of the same call is one stored object, not two.
 
@@ -30166,7 +30168,7 @@ A part that names only a provider-hosted file, such as an OpenAI `file_id` with 
 
 ## What happens to the bytes
 
-LangWatch moves the document out of the span at ingestion. The bytes go into content-addressed object storage and the message part becomes a `/api/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
+LangWatch moves the document out of the span at ingestion. The bytes go into content-addressed object storage and the message part becomes a `/api/v1/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
 
 Storage is addressed by SHA-256, so identical bytes are stored once. For example, the same contract sent on ten traces costs one stored object.
 
@@ -30301,7 +30303,7 @@ Always set the media type. Without one, LangWatch leaves the bytes inline in the
 
 ## What happens to the bytes
 
-LangWatch moves the image out of the span at ingestion. The bytes go into content-addressed object storage and the message part becomes a `/api/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
+LangWatch moves the image out of the span at ingestion. The bytes go into content-addressed object storage and the message part becomes a `/api/v1/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
 
 Storage is addressed by SHA-256, so identical bytes are stored once. For example, the same picture sent on ten traces costs one stored object.
 
@@ -31874,7 +31876,7 @@ const handle = setupObservability({
     // Send to Jaeger for debugging
     new BatchSpanProcessor(
       new JaegerExporter({
-        endpoint: "http://localhost:14268/api/traces",
+        endpoint: "http://localhost:14268/api/v1/traces",
       }),
     ),
     // Send to LangWatch for production monitoring
@@ -34705,7 +34707,7 @@ LANGWATCH_API_KEY="your_langwatch_api_key"
 LANGWATCH_ENDPOINT="https://app.langwatch.ai"
 
 # Use curl to send the POST request, e.g.:
-curl -X POST "$LANGWATCH_ENDPOINT/api/collector" \
+curl -X POST "$LANGWATCH_ENDPOINT/api/v1/collector" \
      -H "X-Auth-Token: $LANGWATCH_API_KEY" \
      -H "Content-Type: application/json" \
      -d @- <<EOF
@@ -36257,7 +36259,7 @@ const handle = setupObservability({
     // Send to Jaeger for debugging
     new BatchSpanProcessor(
       new JaegerExporter({
-        endpoint: "http://localhost:14268/api/traces",
+        endpoint: "http://localhost:14268/api/v1/traces",
       }),
     ),
     // Send to LangWatch for production monitoring
@@ -37235,7 +37237,7 @@ Pass a `str`, a `dict` or a `list` as the value. The SDK stores a `dict` or `lis
 
 Text that is a JSON object or array also comes back parsed, including an entry written over REST or by an older SDK. Any other text comes back unchanged.
 
-Also available over REST at [`/api/agent-cache/{name}`](/api-reference/agent-cache/get-entry).
+Also available over REST at [`/api/v1/agent-cache/{name}`](/api-reference/agent-cache/get-entry).
 
 ## Troubleshooting
 
@@ -37781,6 +37783,7 @@ Run it with `--target http:<agent-id>`, and follow Step 5 and Step 6 otherwise u
         </span>
       </div>
     </div>
+
   </div>
 </div>
 
@@ -39424,7 +39427,7 @@ The response has the values the CI job needs:
 To run a configuration of your own instead of a whole test suite, `POST /api/v1/run-plans/run` takes a `config` object with the scope, the targets, the repeat count and the two models. The scope is one of `{ "mode": "all" }`, `{ "mode": "test_suites", "testSuiteIds": [...] }`, `{ "mode": "labels", "labels": [...] }`, or `{ "mode": "scenarios" }` with `scenarioIds` beside it. `GET /api/v1/run-plans` lists the plans, and `POST /api/v1/run-plans/{id}/run` runs one again with its stored configuration.
 
 <Note>
-  The `/api/suites` family still answers and is deprecated. Move CI jobs to `/api/v1/test-suites`
+  The `/api/v1/suites` family still answers and is deprecated. Move CI jobs to `/api/v1/test-suites`
   and `/api/v1/run-plans`.
 </Note>
 
@@ -39501,10 +39504,10 @@ curl -X POST "https://app.langwatch.ai/api/v1/test-suites/suite_abc123/run" \
 
 ## Poll the batch
 
-`GET /api/simulation-runs/batches/{batchRunId}` answers with the counts of one batch:
+`GET /api/v1/simulation-runs/batches/{batchRunId}` answers with the counts of one batch:
 
 ```bash
-curl "https://app.langwatch.ai/api/simulation-runs/batches/batch_xyz789" \
+curl "https://app.langwatch.ai/api/v1/simulation-runs/batches/batch_xyz789" \
   -H "X-Auth-Token: ${LANGWATCH_API_KEY}"
 ```
 
@@ -39545,7 +39548,7 @@ Exit the CI job nonzero when `failCount` is above zero **or** `stalledCount` is 
 deadline=$(( $(date +%s) + 1800 ))
 while [ "$(date +%s)" -lt "$deadline" ]; do
   body=$(curl -s -w '\n%{http_code}' --connect-timeout 10 --max-time 30 \
-    "https://app.langwatch.ai/api/simulation-runs/batches/${BATCH_RUN_ID}" \
+    "https://app.langwatch.ai/api/v1/simulation-runs/batches/${BATCH_RUN_ID}" \
     -H "X-Auth-Token: ${LANGWATCH_API_KEY}")
   status=$(printf '%s' "$body" | tail -n1)
   summary=$(printf '%s' "$body" | sed '$d')
@@ -39650,7 +39653,7 @@ Open the scenario and click **Parameters**, next to **Labels** at the bottom of 
 
 A scenario can declare up to 20 parameters.
 
-The API accepts the same declarations: `POST /api/scenarios` and `PATCH /api/scenarios/{id}` take a `parameters` array of `{ name, description, defaultValue, secret }` objects.
+The API accepts the same declarations: `POST /api/v1/scenarios` and `PATCH /api/v1/scenarios/{id}` take a `parameters` array of `{ name, description, defaultValue, secret }` objects.
 
 ## Parameters declared by the agent
 
@@ -40506,7 +40509,7 @@ Langy, the assistant in the bottom corner of every page, writes and saves scenar
 
 ## Create scenarios from your editor
 
-Through the [LangWatch MCP integration](/integration/mcp), a coding assistant such as Claude Code or Cursor reads and writes the scenarios of your project. The REST API does the same: `POST /api/scenarios` creates one, `PATCH /api/scenarios/{id}` updates one. See the [Scenarios API reference](/api-reference/scenarios/overview).
+Through the [LangWatch MCP integration](/integration/mcp), a coding assistant such as Claude Code or Cursor reads and writes the scenarios of your project. The REST API does the same: `POST /api/v1/scenarios` creates one, `PATCH /api/v1/scenarios/{id}` updates one. See the [Scenarios API reference](/api-reference/scenarios/overview).
 
 ## Limits
 
@@ -42628,7 +42631,7 @@ prompt.parameters;
 ### REST API
 
 ```bash
-curl -s "https://app.langwatch.ai/api/prompts/qa-extractor" \
+curl -s "https://app.langwatch.ai/api/v1/prompts/qa-extractor" \
   -H "X-Auth-Token: $LANGWATCH_API_KEY" | jq .parameters
 ```
 
@@ -42667,7 +42670,7 @@ await langwatch.prompts.update("qa-extractor", {
 ### REST API
 
 ```bash
-curl -X PUT "https://app.langwatch.ai/api/prompts/qa-extractor" \
+curl -X PUT "https://app.langwatch.ai/api/v1/prompts/qa-extractor" \
   -H "X-Auth-Token: $LANGWATCH_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"parameters": {"max_search_iterations": 5, "confidence_threshold": 0.9}}'
@@ -42679,7 +42682,7 @@ curl -X PUT "https://app.langwatch.ai/api/prompts/qa-extractor" \
 - Restoring an older version restores that version's `parameters` too.
 - Tags (`production`, `staging`, custom) resolve to a version, so fetching by tag always returns the matching `parameters`.
 - Explicit updates (`PUT`, SDK `update`) always create a new version, even if the content is unchanged.
-- The sync endpoint (`POST /api/prompts/{id}/sync`, used by the CLI) compares content key-order independently: re-syncing the same parameters with keys in a different order reports `up_to_date` and does not create a new version.
+- The sync endpoint (`POST /api/v1/prompts/{id}/sync`, used by the CLI) compares content key-order independently: re-syncing the same parameters with keys in a different order reports `up_to_date` and does not create a new version.
 
 ## In the UI
 
@@ -42751,11 +42754,11 @@ staging = langwatch.prompts.get("pizza-prompt", tag="staging")
 ```bash
 # Using the tag query parameter
 curl -H "X-Auth-Token: $LANGWATCH_API_KEY" \
-  "https://app.langwatch.ai/api/prompts/pizza-prompt?tag=production"
+  "https://app.langwatch.ai/api/v1/prompts/pizza-prompt?tag=production"
 
 # Using shorthand syntax
 curl -H "X-Auth-Token: $LANGWATCH_API_KEY" \
-  "https://app.langwatch.ai/api/prompts/pizza-prompt:production"
+  "https://app.langwatch.ai/api/v1/prompts/pizza-prompt:production"
 ```
 
 ### MCP Tools
@@ -42795,7 +42798,7 @@ Beyond the built-in tags, you can create custom tags for your own deployment wor
 curl -X POST -H "X-Auth-Token: $LANGWATCH_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"name": "canary"}' \
-  "https://app.langwatch.ai/api/prompts/tags"
+  "https://app.langwatch.ai/api/v1/prompts/tags"
 ```
 
 **Via MCP tools:**
@@ -42806,11 +42809,11 @@ Use `platform_create_prompt_tag` to create a custom tag, then `platform_assign_p
 
 | Operation             | API Endpoint                       | MCP Tool                     |
 | --------------------- | ---------------------------------- | ---------------------------- |
-| List all tags         | `GET /api/prompts/tags`            | `platform_list_prompt_tags`  |
-| Create tag            | `POST /api/prompts/tags`           | `platform_create_prompt_tag` |
-| Rename tag            | `PUT /api/prompts/tags/{tag}`      | `platform_rename_prompt_tag` |
-| Delete tag            | `DELETE /api/prompts/tags/{tag}`   | `platform_delete_prompt_tag` |
-| Assign tag to version | `PUT /api/prompts/{id}/tags/{tag}` | `platform_assign_prompt_tag` |
+| List all tags         | `GET /api/v1/prompts/tags`            | `platform_list_prompt_tags`  |
+| Create tag            | `POST /api/v1/prompts/tags`           | `platform_create_prompt_tag` |
+| Rename tag            | `PUT /api/v1/prompts/tags/{tag}`      | `platform_rename_prompt_tag` |
+| Delete tag            | `DELETE /api/v1/prompts/tags/{tag}`   | `platform_delete_prompt_tag` |
+| Assign tag to version | `PUT /api/v1/prompts/{id}/tags/{tag}` | `platform_assign_prompt_tag` |
 
 <Note>
   Custom tag names must not be purely numeric and cannot be "latest". The `latest` tag is protected
@@ -42940,11 +42943,11 @@ Tag CRUD endpoints are **organization-scoped** (use an org-level API key). The a
 
 | Method   | Endpoint                     | Description                                          |
 | -------- | ---------------------------- | ---------------------------------------------------- |
-| `GET`    | `/api/prompts/tags`          | List all tags for the organization                   |
-| `POST`   | `/api/prompts/tags`          | Create a new tag (`{ "name": "canary" }`)            |
-| `PUT`    | `/api/prompts/tags/:tag`     | Rename a tag (`{ "name": "new-name" }`)              |
-| `DELETE` | `/api/prompts/tags/:tag`     | Delete a tag (cascades removal from all versions)    |
-| `PUT`    | `/api/prompts/:id/tags/:tag` | Assign a tag to a version (`{ "versionId": "..." }`) |
+| `GET`    | `/api/v1/prompts/tags`          | List all tags for the organization                   |
+| `POST`   | `/api/v1/prompts/tags`          | Create a new tag (`{ "name": "canary" }`)            |
+| `PUT`    | `/api/v1/prompts/tags/:tag`     | Rename a tag (`{ "name": "new-name" }`)              |
+| `DELETE` | `/api/v1/prompts/tags/:tag`     | Delete a tag (cascades removal from all versions)    |
+| `PUT`    | `/api/v1/prompts/:id/tags/:tag` | Assign a tag to a version (`{ "versionId": "..." }`) |
 
 ## CLI
 
@@ -43056,17 +43059,17 @@ Use the REST API to manage prompt versions:
 ```bash
 # Get all versions of a prompt
 curl --request GET \
-  --url "https://app.langwatch.ai/api/prompts/{prompt_handle}/versions" \
+  --url "https://app.langwatch.ai/api/v1/prompts/{prompt_handle}/versions" \
   --header "X-Auth-Token: your-api-key"
 
 # Retrieve prompts via the API to support versioning, evaluation workflows, and agent testing pipelines. (latest version)
 curl --request GET \
-  --url "https://app.langwatch.ai/api/prompts/{prompt_handle}" \
+  --url "https://app.langwatch.ai/api/v1/prompts/{prompt_handle}" \
   --header "X-Auth-Token: your-api-key"
 
 # Create a new version
 curl --request POST \
-  --url "https://app.langwatch.ai/api/prompts/{prompt_handle}/versions" \
+  --url "https://app.langwatch.ai/api/v1/prompts/{prompt_handle}/versions" \
   --header "X-Auth-Token: your-api-key" \
   --header "Content-Type: application/json" \
   --data '{
@@ -43085,7 +43088,7 @@ curl --request POST \
 
 # Get a specific version
 curl --request GET \
-  --url "https://app.langwatch.ai/api/prompts/{prompt_handle}?version=2" \
+  --url "https://app.langwatch.ai/api/v1/prompts/{prompt_handle}?version=2" \
   --header "X-Auth-Token: your-api-key"
 ```
 
@@ -43736,7 +43739,7 @@ You will need to obtain your JSON payload from the custom graph section in our a
 ```bash
 # Set your API key and endpoint URL
 API_KEY="your_langwatch_api_key"
-ENDPOINT="https://app.langwatch.ai/api/analytics"
+ENDPOINT="https://app.langwatch.ai/api/v1/analytics"
 
 # Use curl to send the POST request, e.g.:
 curl -X POST "$ENDPOINT" \
@@ -44687,7 +44690,7 @@ async function myLLMStep(userInput: string): Promise<string> {
 Send evaluation results directly via the collector API:
 
 ```bash
-curl -X POST "https://app.langwatch.ai/api/collector" \
+curl -X POST "https://app.langwatch.ai/api/v1/collector" \
      -H "X-Auth-Token: $LANGWATCH_API_KEY" \
      -H "Content-Type: application/json" \
      -d @- <<EOF
@@ -45563,7 +45566,7 @@ async function myLLMStep(userInput: string): Promise<string> {
 API_KEY="$LANGWATCH_API_KEY"
 
 # Call your saved evaluator
-curl -X POST "https://app.langwatch.ai/api/evaluations/evaluators/my-tone-checker/evaluate" \
+curl -X POST "https://app.langwatch.ai/api/v1/evaluations/evaluators/my-tone-checker/evaluate" \
      -H "X-Auth-Token: $API_KEY" \
      -H "Content-Type: application/json" \
      -d @- <<EOF
@@ -46157,7 +46160,7 @@ For custom integrations, you can use the REST API directly:
 ### Start a Run
 
 ```bash
-curl -X POST "https://app.langwatch.ai/api/evaluations/v3/{slug}/run" \
+curl -X POST "https://app.langwatch.ai/api/v1/evaluations/v3/{slug}/run" \
   -H "X-Auth-Token: ${LANGWATCH_API_KEY}"
 ```
 
@@ -46175,7 +46178,7 @@ Response:
 ### Poll for Status
 
 ```bash
-curl "https://app.langwatch.ai/api/evaluations/v3/runs/{runId}" \
+curl "https://app.langwatch.ai/api/v1/evaluations/v3/runs/{runId}" \
   -H "X-Auth-Token: ${LANGWATCH_API_KEY}"
 ```
 
@@ -46199,7 +46202,7 @@ Response (completed):
 ### Fetch Results
 
 ```bash
-curl "https://app.langwatch.ai/api/evaluations/v3/runs/{runId}/results?experimentSlug={slug}" \
+curl "https://app.langwatch.ai/api/v1/evaluations/v3/runs/{runId}/results?experimentSlug={slug}" \
   -H "X-Auth-Token: ${LANGWATCH_API_KEY}"
 ```
 
@@ -46487,7 +46490,7 @@ for index, row in evaluation.loop(df.iterrows()):
 Once you have a reliable image evaluator, you can call it directly via REST API for integration into any pipeline:
 
 ```bash
-curl -X POST "https://app.langwatch.ai/api/evaluations/evaluators/image-quality-scorer/evaluate" \
+curl -X POST "https://app.langwatch.ai/api/v1/evaluations/evaluators/image-quality-scorer/evaluate" \
      -H "X-Auth-Token: $LANGWATCH_API_KEY" \
      -H "Content-Type: application/json" \
      -d @- <<EOF
@@ -54138,6 +54141,7 @@ Do NOT consider the work complete without verifying. In order:
         </span>
       </div>
     </div>
+
   </div>
 </div>
 
@@ -54438,6 +54442,7 @@ Do NOT ask permission before Phase 1 and 2. Deliver value first. Do NOT ask gene
         </span>
       </div>
     </div>
+
   </div>
 </div>
 
@@ -54677,6 +54682,7 @@ For a guardrail:
         </span>
       </div>
     </div>
+
   </div>
 </div>
 
@@ -54784,6 +54790,7 @@ Do not recreate the companion skill's instructions from memory. Load the focused
         </span>
       </div>
     </div>
+
   </div>
 </div>
 
@@ -55825,6 +55832,7 @@ Do NOT ask permission before Phase 1 and 2. Deliver value first. Do NOT ask gene
         </span>
       </div>
     </div>
+
   </div>
 </div>
 
@@ -56274,6 +56282,7 @@ Run it with `--target http:<agent-id>`, and follow Step 5 and Step 6 otherwise u
         </span>
       </div>
     </div>
+
   </div>
 </div>
 
@@ -56524,6 +56533,7 @@ Run `langwatch prompt list` to confirm everything synced, or open the Prompts se
         </span>
       </div>
     </div>
+
   </div>
 </div>
 
@@ -57007,6 +57017,7 @@ Then propose: should we augment it, generate a complementary set, or start fresh
         </span>
       </div>
     </div>
+
   </div>
 </div>
 
@@ -57144,6 +57155,7 @@ Also state the top finding directly in the conversation, leading with the number
         </span>
       </div>
     </div>
+
   </div>
 </div>
 
@@ -57294,6 +57306,7 @@ State the headline numbers directly in the conversation too.
         </span>
       </div>
     </div>
+
   </div>
 </div>
 
@@ -58906,6 +58919,7 @@ Once tests are green, summarize what you delivered and suggest 2-3 domain-specif
         </span>
       </div>
     </div>
+
   </div>
 </div>
 
@@ -59136,6 +59150,7 @@ After executing:
         </span>
       </div>
     </div>
+
   </div>
 </div>
 
@@ -59322,6 +59337,7 @@ If the `agent-improve` skill is installed, offer it as the next step: it turns e
         </span>
       </div>
     </div>
+
   </div>
 </div>
 
@@ -59359,7 +59375,7 @@ If the `agent-improve` skill is installed, offer it as the next step: it turns e
         </span>
         <div className="lw-prompt-source">
 
-````text
+```text
 Where can I improve our agent development best practices?
 
 You are using LangWatch for your AI agent project. Follow these instructions.
@@ -59448,7 +59464,7 @@ After each improvement:
 - Do NOT give generic advice; every suggestion must be specific to this codebase
 - Do NOT overwhelm with 10 suggestions; pick the top 2-3
 - Do NOT skip running/verifying improvements
-````
+```
 
         </div>
       </div>
@@ -59460,6 +59476,7 @@ After each improvement:
         </span>
       </div>
     </div>
+
   </div>
 </div>
 
@@ -59612,6 +59629,7 @@ langwatch trace export --format jsonl --limit 50 -o traces.jsonl
         </span>
       </div>
     </div>
+
   </div>
 </div>
 
@@ -59768,6 +59786,7 @@ Pass `--agent` to any command for compact single-line JSON with colour and spinn
         </span>
       </div>
     </div>
+
   </div>
 </div>
 
@@ -59901,6 +59920,7 @@ langwatch experiment status <slug> -o json
         </span>
       </div>
     </div>
+
   </div>
 </div>
 
@@ -60068,6 +60088,7 @@ Run the evaluation, review results, fix issues, re-run until quality is acceptab
         </span>
       </div>
     </div>
+
   </div>
 </div>
 
@@ -60237,6 +60258,7 @@ Before using the dataset:
         </span>
       </div>
     </div>
+
   </div>
 </div>
 
@@ -60368,6 +60390,7 @@ If anything fails or confuses you while following this skill (broken commands, d
         </span>
       </div>
     </div>
+
   </div>
 </div>
 
@@ -60585,6 +60608,7 @@ Your harness, codebase and model decide which levers exist. Full guide: [Improvi
         </span>
       </div>
     </div>
+
   </div>
 </div>
 
@@ -60740,6 +60764,7 @@ Write scenarios where the agent makes a mistake and must recover:
         </span>
       </div>
     </div>
+
   </div>
 </div>
 
@@ -60896,6 +60921,7 @@ langwatch chart delete <chart-id>
         </span>
       </div>
     </div>
+
   </div>
 </div>
 
@@ -61089,6 +61115,7 @@ If the `agent-improve` skill is installed, offer it as the next step: it turns e
         </div>
       </div>
     </div>
+
   </div>
 </div>
 
@@ -62105,6 +62132,7 @@ Do NOT ask permission before Phase 1 and 2. Deliver value first. Do NOT ask gene
         </div>
       </div>
     </div>
+
   </div>
 </div>
 
@@ -62187,6 +62215,7 @@ Do not recreate the companion skill's instructions from memory. Load the focused
         </div>
       </div>
     </div>
+
   </div>
 </div>
 
@@ -64272,7 +64301,7 @@ Each SSO provider requires specific variables. See [SSO Configuration](/self-hos
 
 The dataplane S3 bucket is the general file-storage layer for all externalized byte content. Current consumers:
 
-- **Stored objects**: externalized byte content (audio, image, video, document) extracted from incoming events and dataset uploads. Bytes are content-addressed under `{projectId}/{sha256}` and served back via `GET /api/files/:id`.
+- **Stored objects**: externalized byte content (audio, image, video, document) extracted from incoming events and dataset uploads. Bytes are content-addressed under `{projectId}/{sha256}` and served back via `GET /api/v1/files/:id`.
 - **Dataset uploads**: persists rows uploaded through the dataset UI. Shares the same `S3_BUCKET_NAME` bucket.
 
 When `S3_BUCKET_NAME` is set, all consumers use that bucket. When it is not set, stored-objects fall back to the local filesystem at `LANGWATCH_LOCAL_STORAGE_PATH`. That is fine for single-replica installs, **not** for horizontally-scaled deployments (see warning below).
@@ -66737,7 +66766,7 @@ The `langwatch/clickhouse-serverless` Docker image is a performance-tweaked Clic
 - ClickHouse cold storage (tiered after TTL)
 - ClickHouse backups (full + incremental)
 - Dataset storage (optional)
-- **Stored objects**: externalized byte content (audio/image/video/document) content-addressed under `{projectId}/{sha256}` and served back via `GET /api/files/:id`.
+- **Stored objects**: externalized byte content (audio/image/video/document) content-addressed under `{projectId}/{sha256}` and served back via `GET /api/v1/files/:id`.
 
 ## Event Sourcing Pipeline
 
@@ -67061,16 +67090,16 @@ Fill in these fields:
 | ------------------------------------------------------ | ----------------------------------------------------------------------------------- |
 | App name                                               | `LangWatch Langy` (or per environment, e.g. `LangWatch Langy (dev)`)                |
 | Homepage URL                                           | `https://app.langwatch.ai` (or your control-plane URL)                              |
-| Setup URL                                              | `<BASE_URL>/api/github/setup`                                                       |
+| Setup URL                                              | `<BASE_URL>/api/v1/github/setup`                                                       |
 | Redirect on update                                     | ON (so re-configuring an install returns to the Setup URL)                          |
 | Request user authorization (OAuth) during installation | OFF. Langy is bot-authored, no user OAuth.                                          |
 | Webhook > Active                                       | ON (optional, see [Restricted networks](#restricted-networks))                      |
-| Webhook URL                                            | `<BASE_URL>/api/github/webhook`                                                     |
+| Webhook URL                                            | `<BASE_URL>/api/v1/github/webhook`                                                     |
 | Webhook secret                                         | Generate one (`openssl rand -hex 32`). You set it as `GITHUB_LANGY_WEBHOOK_SECRET`. |
 | Where can this GitHub App be installed?                | Any account (recommended) or only this org                                          |
 
 <Note>
-  `/api/github-langy/setup` and `/api/github-langy/webhook` are the earlier paths. They stay mounted
+  `/api/v1/github-langy/setup` and `/api/v1/github-langy/webhook` are the earlier paths. They stay mounted
   on the same handlers, so an App already registered with them keeps working. Use the paths above
   for a new registration.
 </Note>
@@ -67160,9 +67189,9 @@ Sessions are matched by the host their git remote reports, so an instance bound 
 
 ## Restricted networks
 
-GitHub must be able to reach `<BASE_URL>/api/github/webhook` to deliver webhooks. Many self-hosted instances sit behind a VPN or a private network, where that is not true.
+GitHub must be able to reach `<BASE_URL>/api/v1/github/webhook` to deliver webhooks. Many self-hosted instances sit behind a VPN or a private network, where that is not true.
 
-**The webhook is optional.** An instance with no inbound path connects and works. Connecting is a browser redirect through `/api/github/setup`, so only the admin's own browser has to reach the instance, not GitHub. You can leave **Webhook > Active** off, or leave it on and accept the failed deliveries.
+**The webhook is optional.** An instance with no inbound path connects and works. Connecting is a browser redirect through `/api/v1/github/setup`, so only the admin's own browser has to reach the instance, not GitHub. You can leave **Webhook > Active** off, or leave it on and accept the failed deliveries.
 
 What changes without webhooks:
 
@@ -67261,7 +67290,7 @@ With `GITHUB_LANGY_HOST` set to a GitHub Enterprise Server hostname, the control
 
 ## Inbound
 
-Everything above is outbound. The one inbound path GitHub uses is the webhook, delivered to `<BASE_URL>/api/github/webhook`.
+Everything above is outbound. The one inbound path GitHub uses is the webhook, delivered to `<BASE_URL>/api/v1/github/webhook`.
 
 It is optional. An instance GitHub cannot reach still connects and works, and reconciles late instead. For what changes, see [Restricted networks](/self-hosting/langy/github-app#restricted-networks).
 
@@ -70306,7 +70335,7 @@ The hybrid setup requires coordination with our team to configure the secure con
 
 ---
 title: "Claim a cache entry"
-openapi: "POST /api/agent-cache/{name}/claim"
+openapi: "POST /api/v1/agent-cache/{name}/claim"
 ---
 
 ---
@@ -70315,7 +70344,7 @@ openapi: "POST /api/agent-cache/{name}/claim"
 
 ---
 title: "Remove a cache entry"
-openapi: "DELETE /api/agent-cache/{name}"
+openapi: "DELETE /api/v1/agent-cache/{name}"
 ---
 
 ---
@@ -70324,7 +70353,7 @@ openapi: "DELETE /api/agent-cache/{name}"
 
 ---
 title: "Read a cache entry"
-openapi: "GET /api/agent-cache/{name}"
+openapi: "GET /api/v1/agent-cache/{name}"
 ---
 
 ---
@@ -70367,7 +70396,7 @@ credential, so agent code needs no key of its own.
 
 ---
 title: "Store a cache entry"
-openapi: "PUT /api/agent-cache/{name}"
+openapi: "PUT /api/v1/agent-cache/{name}"
 ---
 
 ---
@@ -70488,7 +70517,7 @@ openapi: "PATCH /api/v1/agents/{id}"
 
 ---
 title: "Create Timeseries"
-openapi: "POST /api/analytics/timeseries"
+openapi: "POST /api/v1/analytics/timeseries"
 ---
 
 ---
@@ -70510,7 +70539,7 @@ Query analytics timeseries data with metrics, aggregations, and filters.
 
 ---
 title: "Query analytics timeseries (legacy path)"
-openapi: "POST /api/analytics"
+openapi: "POST /api/v1/analytics"
 ---
 
 ---
@@ -70519,7 +70548,7 @@ openapi: "POST /api/analytics"
 
 ---
 title: "Create annotation for single trace"
-openapi: "POST /api/annotations/trace/{id}"
+openapi: "POST /api/v1/annotations/trace/{id}"
 ---
 
 ---
@@ -70528,7 +70557,7 @@ openapi: "POST /api/annotations/trace/{id}"
 
 ---
 title: "Delete single annotation"
-openapi: "DELETE /api/annotations/{id}"
+openapi: "DELETE /api/v1/annotations/{id}"
 ---
 
 ---
@@ -70537,7 +70566,7 @@ openapi: "DELETE /api/annotations/{id}"
 
 ---
 title: "Get annotations for a trace"
-openapi: "GET /api/annotations/trace/{id}"
+openapi: "GET /api/v1/annotations/trace/{id}"
 ---
 
 ---
@@ -70546,7 +70575,7 @@ openapi: "GET /api/annotations/trace/{id}"
 
 ---
 title: "Get annotations"
-openapi: "GET /api/annotations"
+openapi: "GET /api/v1/annotations"
 ---
 
 ---
@@ -70555,7 +70584,7 @@ openapi: "GET /api/annotations"
 
 ---
 title: "Get single annotation"
-openapi: "GET /api/annotations/{id}"
+openapi: "GET /api/v1/annotations/{id}"
 ---
 
 ---
@@ -70577,12 +70606,12 @@ To make a call to the Annotations API, you will need to pass through your LangWa
 
 #### Allowed Methods
 
-- `GET /api/annotations` - Get a list of annotations
-- `GET /api/annotations/:id` - Get a single annotation
-- `DELETE /api/annotations/:id` - Delete a single annotation
-- `PATCH /api/annotations/:id` - Update a single annotation
-- `GET /api/annotations/trace/:id` - Get the annotations for a single trace
-- `POST /api/annotations/trace/:id` - Create annotations for traces to support domain labeling, evaluation scoring, and agent testing workflows.
+- `GET /api/v1/annotations` - Get a list of annotations
+- `GET /api/v1/annotations/:id` - Get a single annotation
+- `DELETE /api/v1/annotations/:id` - Delete a single annotation
+- `PATCH /api/v1/annotations/:id` - Update a single annotation
+- `GET /api/v1/annotations/trace/:id` - Get the annotations for a single trace
+- `POST /api/v1/annotations/trace/:id` - Create annotations for traces to support domain labeling, evaluation scoring, and agent testing workflows.
 
 ---
 
@@ -70590,7 +70619,7 @@ To make a call to the Annotations API, you will need to pass through your LangWa
 
 ---
 title: "Patch single annotation"
-openapi: "PATCH /api/annotations/{id}"
+openapi: "PATCH /api/v1/annotations/{id}"
 ---
 
 ---
@@ -70599,7 +70628,7 @@ openapi: "PATCH /api/annotations/{id}"
 
 ---
 title: "Create API key"
-openapi: "POST /api/api-keys"
+openapi: "POST /api/v1/api-keys"
 ---
 
 ---
@@ -70608,7 +70637,7 @@ openapi: "POST /api/api-keys"
 
 ---
 title: "Get an API key"
-openapi: "GET /api/api-keys/{id}"
+openapi: "GET /api/v1/api-keys/{id}"
 ---
 
 ---
@@ -70617,7 +70646,7 @@ openapi: "GET /api/api-keys/{id}"
 
 ---
 title: "List API keys"
-openapi: "GET /api/api-keys"
+openapi: "GET /api/v1/api-keys"
 ---
 
 ---
@@ -70652,15 +70681,15 @@ Service keys are the exception, because they belong to nobody. A member credenti
 
 | Method   | Path                 | Description                                |
 | -------- | -------------------- | ------------------------------------------ |
-| `GET`    | `/api/api-keys`      | List API keys                              |
-| `POST`   | `/api/api-keys`      | Create a new API key                       |
-| `GET`    | `/api/api-keys/{id}` | Read one key and the access it carries     |
-| `PATCH`  | `/api/api-keys/{id}` | Update a key's name, description or access |
-| `DELETE` | `/api/api-keys/{id}` | Revoke an API key                          |
+| `GET`    | `/api/v1/api-keys`      | List API keys                              |
+| `POST`   | `/api/v1/api-keys`      | Create a new API key                       |
+| `GET`    | `/api/v1/api-keys/{id}` | Read one key and the access it carries     |
+| `PATCH`  | `/api/v1/api-keys/{id}` | Update a key's name, description or access |
+| `DELETE` | `/api/v1/api-keys/{id}` | Revoke an API key                          |
 
 ## Reading a key back
 
-`GET /api/api-keys/{id}` and `PATCH /api/api-keys/{id}` return the same body, and it contains every field a write accepts. `bindings` comes back in exactly the shape `POST` and `PATCH` take, so comparing what you asked for against what the key has is a comparison rather than a translation. The secret itself is never returned: it exists only in the create response.
+`GET /api/v1/api-keys/{id}` and `PATCH /api/v1/api-keys/{id}` return the same body, and it contains every field a write accepts. `bindings` comes back in exactly the shape `POST` and `PATCH` take, so comparing what you asked for against what the key has is a comparison rather than a translation. The secret itself is never returned: it exists only in the create response.
 
 A personal key belonging to somebody else is readable only with organization administrator membership plus `organization:manage`. Without both, the id answers 404 rather than 403, because a 403 would confirm the key exists. Service keys are the exception described above: a member credential with `organization:view` reads one by id.
 
@@ -70669,7 +70698,7 @@ A personal key belonging to somebody else is readable only with organization adm
 `PATCH` is partial at the field level: send `name` alone and only the name changes. `bindings`, when you send them, replace the key's bindings outright, so what you send is what the key has afterward.
 
 ```bash
-curl -X PATCH https://app.langwatch.ai/api/api-keys/<api_key_id> \
+curl -X PATCH https://app.langwatch.ai/api/v1/api-keys/<api_key_id> \
   -H "Authorization: Bearer sk-lw-..." \
   -H "Content-Type: application/json" \
   -d '{
@@ -70741,7 +70770,7 @@ A key can never grant more than the person or organization behind it already has
 
 ---
 title: "Revoke API key"
-openapi: "DELETE /api/api-keys/{id}"
+openapi: "DELETE /api/v1/api-keys/{id}"
 ---
 
 ---
@@ -70750,7 +70779,7 @@ openapi: "DELETE /api/api-keys/{id}"
 
 ---
 title: "Update an API key"
-openapi: "PATCH /api/api-keys/{id}"
+openapi: "PATCH /api/v1/api-keys/{id}"
 ---
 
 ---
@@ -70777,7 +70806,7 @@ openapi: "GET /api/v1/coding-agent/pull-request-usage"
 
 ---
 title: "List coding agent session events"
-openapi: "GET /api/coding-agent/sessions/{sessionId}/events"
+openapi: "GET /api/v1/coding-agent/sessions/{sessionId}/events"
 ---
 
 ---
@@ -70804,7 +70833,7 @@ The same data renders in the product on the [sessions](/coding-agents/sessions) 
 
 ---
 title: "Create a new dashboard"
-openapi: "POST /api/dashboards"
+openapi: "POST /api/v1/dashboards"
 ---
 
 ---
@@ -70813,7 +70842,7 @@ openapi: "POST /api/dashboards"
 
 ---
 title: "Delete a dashboard and its graphs"
-openapi: "DELETE /api/dashboards/{id}"
+openapi: "DELETE /api/v1/dashboards/{id}"
 ---
 
 ---
@@ -70822,7 +70851,7 @@ openapi: "DELETE /api/dashboards/{id}"
 
 ---
 title: "Get a dashboard by its id, including its graphs"
-openapi: "GET /api/dashboards/{id}"
+openapi: "GET /api/v1/dashboards/{id}"
 ---
 
 ---
@@ -70831,7 +70860,7 @@ openapi: "GET /api/dashboards/{id}"
 
 ---
 title: "List Dashboards"
-openapi: "GET /api/dashboards"
+openapi: "GET /api/v1/dashboards"
 ---
 
 ---
@@ -70853,7 +70882,7 @@ Manage custom analytics dashboards. Create, reorder, and organize dashboards wit
 
 ---
 title: "Rename a dashboard"
-openapi: "PATCH /api/dashboards/{id}"
+openapi: "PATCH /api/v1/dashboards/{id}"
 ---
 
 ---
@@ -70862,7 +70891,7 @@ openapi: "PATCH /api/dashboards/{id}"
 
 ---
 title: "Reorder dashboards"
-openapi: "PUT /api/dashboards/reorder"
+openapi: "PUT /api/v1/dashboards/reorder"
 ---
 
 ---
@@ -70871,7 +70900,7 @@ openapi: "PUT /api/dashboards/reorder"
 
 ---
 title: "Create Finalize"
-openapi: "POST /api/dataset/direct-upload/{datasetId}/finalize"
+openapi: "POST /api/v1/dataset/direct-upload/{datasetId}/finalize"
 ---
 
 ---
@@ -70880,7 +70909,7 @@ openapi: "POST /api/dataset/direct-upload/{datasetId}/finalize"
 
 ---
 title: "Create records in a dataset in batch"
-openapi: "POST /api/dataset/{slugOrId}/records"
+openapi: "POST /api/v1/dataset/{slugOrId}/records"
 ---
 
 ---
@@ -70889,7 +70918,7 @@ openapi: "POST /api/dataset/{slugOrId}/records"
 
 ---
 title: "Retry normalization of a failed or stuck dataset"
-openapi: "POST /api/dataset/direct-upload/{datasetId}/retry"
+openapi: "POST /api/v1/dataset/direct-upload/{datasetId}/retry"
 ---
 
 ---
@@ -70898,7 +70927,7 @@ openapi: "POST /api/dataset/direct-upload/{datasetId}/retry"
 
 ---
 title: "Upload a file"
-openapi: "POST /api/dataset/{slugOrId}/upload"
+openapi: "POST /api/v1/dataset/{slugOrId}/upload"
 ---
 
 ---
@@ -70907,7 +70936,7 @@ openapi: "POST /api/dataset/{slugOrId}/upload"
 
 ---
 title: "Create a new dataset"
-openapi: "POST /api/dataset"
+openapi: "POST /api/v1/dataset"
 ---
 
 ---
@@ -70916,7 +70945,7 @@ openapi: "POST /api/dataset"
 
 ---
 title: "Start a direct browser→S3 dataset upload"
-openapi: "POST /api/dataset/direct-upload"
+openapi: "POST /api/v1/dataset/direct-upload"
 ---
 
 ---
@@ -70925,7 +70954,7 @@ openapi: "POST /api/dataset/direct-upload"
 
 ---
 title: "Create a new dataset from an uploaded file"
-openapi: "POST /api/dataset/upload"
+openapi: "POST /api/v1/dataset/upload"
 ---
 
 ---
@@ -70934,7 +70963,7 @@ openapi: "POST /api/dataset/upload"
 
 ---
 title: "Archive a dataset"
-openapi: "DELETE /api/dataset/{slugOrId}"
+openapi: "DELETE /api/v1/dataset/{slugOrId}"
 ---
 
 ---
@@ -70943,7 +70972,7 @@ openapi: "DELETE /api/dataset/{slugOrId}"
 
 ---
 title: "Delete Direct Upload"
-openapi: "DELETE /api/dataset/direct-upload/{datasetId}"
+openapi: "DELETE /api/v1/dataset/direct-upload/{datasetId}"
 ---
 
 ---
@@ -70952,7 +70981,7 @@ openapi: "DELETE /api/dataset/direct-upload/{datasetId}"
 
 ---
 title: "Delete records from a dataset by IDs"
-openapi: "DELETE /api/dataset/{slugOrId}/records"
+openapi: "DELETE /api/v1/dataset/{slugOrId}/records"
 ---
 
 ---
@@ -70961,7 +70990,7 @@ openapi: "DELETE /api/dataset/{slugOrId}/records"
 
 ---
 title: "Evaluate a dataset"
-openapi: "POST /api/dataset/evaluate"
+openapi: "POST /api/v1/dataset/evaluate"
 ---
 
 ---
@@ -70970,7 +70999,7 @@ openapi: "POST /api/dataset/evaluate"
 
 ---
 title: "Get a dataset by its slug or id"
-openapi: "GET /api/dataset/{slugOrId}"
+openapi: "GET /api/v1/dataset/{slugOrId}"
 ---
 
 ---
@@ -70979,7 +71008,7 @@ openapi: "GET /api/dataset/{slugOrId}"
 
 ---
 title: "List records for a dataset"
-openapi: "GET /api/dataset/{slugOrId}/records"
+openapi: "GET /api/v1/dataset/{slugOrId}/records"
 ---
 
 ---
@@ -70988,7 +71017,7 @@ openapi: "GET /api/dataset/{slugOrId}/records"
 
 ---
 title: "List all non-archived datasets for the project"
-openapi: "GET /api/dataset"
+openapi: "GET /api/v1/dataset"
 ---
 
 ---
@@ -71010,7 +71039,7 @@ Manage datasets for evaluations, experiments, and fine-tuning. Create, update, u
 
 ---
 title: "Add dataset entries programmatically using the LangWatch API to build evaluation sets for LLM testing and agent validation."
-openapi: "POST /api/dataset/{slug}/entries"
+openapi: "POST /api/v1/dataset/{slug}/entries"
 ---
 
 ---
@@ -71019,7 +71048,7 @@ openapi: "POST /api/dataset/{slug}/entries"
 
 ---
 title: "Update a dataset by its slug or id"
-openapi: "PATCH /api/dataset/{slugOrId}"
+openapi: "PATCH /api/v1/dataset/{slugOrId}"
 ---
 
 ---
@@ -71028,7 +71057,7 @@ openapi: "PATCH /api/dataset/{slugOrId}"
 
 ---
 title: "Update or create a record in a dataset"
-openapi: "PATCH /api/dataset/{slugOrId}/records/{recordId}"
+openapi: "PATCH /api/v1/dataset/{slugOrId}/records/{recordId}"
 ---
 
 ---
@@ -71037,7 +71066,7 @@ openapi: "PATCH /api/dataset/{slugOrId}/records/{recordId}"
 
 ---
 title: "Update Staging"
-openapi: "PUT /api/dataset/direct-upload/staging/{uploadId}"
+openapi: "PUT /api/v1/dataset/direct-upload/staging/{uploadId}"
 ---
 
 ---
@@ -71046,7 +71075,7 @@ openapi: "PUT /api/dataset/direct-upload/staging/{uploadId}"
 
 ---
 title: "List the built-in evaluators"
-openapi: "GET /api/evaluations/list"
+openapi: "GET /api/v1/evaluations/list"
 ---
 
 ---
@@ -71070,11 +71099,11 @@ The `{evaluator}` segment takes any of three things:
 - the slug of a monitor configured in your project, which brings that monitor's saved settings with it
 - `evaluators/{slug|id}` for an evaluator you saved, including workflow and code evaluators
 
-`GET /api/evaluations/list` returns the built-in ids along with the `data` fields each one requires. For what an individual evaluator scores and which settings it accepts, see its page under Built-in Evaluators.
+`GET /api/v1/evaluations/list` returns the built-in ids along with the `data` fields each one requires. For what an individual evaluator scores and which settings it accepts, see its page under Built-in Evaluators.
 
 ## Guardrails
 
-`POST /api/guardrails/{evaluator}/evaluate` is the same call in gating mode. Every outcome carries `passed`, including a skip and an evaluator error, so a request you are guarding is never blocked by the guard itself failing. Check `passed` and let the request through when it is true.
+`POST /api/v1/guardrails/{evaluator}/evaluate` is the same call in gating mode. Every outcome carries `passed`, including a skip and an evaluator error, so a request you are guarding is never blocked by the guard itself failing. Check `passed` and let the request through when it is true.
 
 ---
 
@@ -71082,7 +71111,7 @@ The `{evaluator}` segment takes any of three things:
 
 ---
 title: "Report batch evaluation results"
-openapi: "POST /api/evaluations/batch/log_results"
+openapi: "POST /api/v1/evaluations/batch/log_results"
 ---
 
 ---
@@ -71091,7 +71120,7 @@ openapi: "POST /api/evaluations/batch/log_results"
 
 ---
 title: "Run a namespaced evaluator"
-openapi: "POST /api/evaluations/{evaluator}/{subpath}/evaluate"
+openapi: "POST /api/v1/evaluations/{evaluator}/{subpath}/evaluate"
 ---
 
 ---
@@ -71100,7 +71129,7 @@ openapi: "POST /api/evaluations/{evaluator}/{subpath}/evaluate"
 
 ---
 title: "Run an evaluator as a guardrail"
-openapi: "POST /api/guardrails/{evaluator}/evaluate"
+openapi: "POST /api/v1/guardrails/{evaluator}/evaluate"
 ---
 
 ---
@@ -71109,7 +71138,7 @@ openapi: "POST /api/guardrails/{evaluator}/evaluate"
 
 ---
 title: "Run an evaluator"
-openapi: "POST /api/evaluations/{evaluator}/evaluate"
+openapi: "POST /api/v1/evaluations/{evaluator}/evaluate"
 ---
 
 ---
@@ -71118,7 +71147,7 @@ openapi: "POST /api/evaluations/{evaluator}/evaluate"
 
 ---
 title: "Create a new evaluator"
-openapi: "POST /api/evaluators"
+openapi: "POST /api/v1/evaluators"
 ---
 
 ---
@@ -71127,7 +71156,7 @@ openapi: "POST /api/evaluators"
 
 ---
 title: "Archive an evaluator"
-openapi: "DELETE /api/evaluators/{id}"
+openapi: "DELETE /api/v1/evaluators/{id}"
 ---
 
 ---
@@ -71136,7 +71165,7 @@ openapi: "DELETE /api/evaluators/{id}"
 
 ---
 title: "Get a specific evaluator by ID or slug"
-openapi: "GET /api/evaluators/{idOrSlug}"
+openapi: "GET /api/v1/evaluators/{idOrSlug}"
 ---
 
 ---
@@ -71145,7 +71174,7 @@ openapi: "GET /api/evaluators/{idOrSlug}"
 
 ---
 title: "Get all evaluators for a project"
-openapi: "GET /api/evaluators"
+openapi: "GET /api/v1/evaluators"
 ---
 
 ---
@@ -71167,7 +71196,7 @@ Manage evaluator configurations for your project. Create, update, and organize e
 
 ---
 title: "Update an existing evaluator"
-openapi: "PUT /api/evaluators/{id}"
+openapi: "PUT /api/v1/evaluators/{id}"
 ---
 
 ---
@@ -71351,7 +71380,7 @@ To make a call to the Evaluators API, you will need to pass through your LangWat
 
 #### Allowed Methods
 
-- `POST /api/evaluations/{evaluator}/evaluate` - Run an evaluation using a specific evaluator
+- `POST /api/v1/evaluations/{evaluator}/evaluate` - Run an evaluation using a specific evaluator
 
 ## Evaluators List
 
@@ -71539,7 +71568,7 @@ Without unique names, all results would be grouped under the same auto-generated
 All evaluator endpoints follow a similar pattern:
 
 ```
-POST /api/evaluations/{evaluator_path}/evaluate
+POST /api/v1/evaluations/{evaluator_path}/evaluate
 ```
 
 Each evaluator accepts specific input parameters and settings. Refer to the individual evaluator documentation pages for detailed request/response schemas and examples.
@@ -71650,7 +71679,7 @@ openapi: post /langevals/valid_format/evaluate
 
 ---
 title: "Record a user event"
-openapi: "POST /api/events/track"
+openapi: "POST /api/v1/events/track"
 ---
 
 ---
@@ -71681,7 +71710,7 @@ openapi: "POST /api/track_event"
 
 ---
 title: "Create an experiment"
-openapi: "POST /api/experiment/init"
+openapi: "POST /api/v1/experiment/init"
 ---
 
 ---
@@ -71690,7 +71719,7 @@ openapi: "POST /api/experiment/init"
 
 ---
 title: "List an experiment's versions"
-openapi: "GET /api/experiments/{slug}/versions"
+openapi: "GET /api/v1/experiments/{slug}/versions"
 ---
 
 ---
@@ -71699,7 +71728,7 @@ openapi: "GET /api/experiments/{slug}/versions"
 
 ---
 title: "List experiments for the project"
-openapi: "GET /api/experiments"
+openapi: "GET /api/v1/experiments"
 ---
 
 ---
@@ -71708,7 +71737,7 @@ openapi: "GET /api/experiments"
 
 ---
 title: "List runs of an experiment"
-openapi: "GET /api/experiments/runs"
+openapi: "GET /api/v1/experiments/runs"
 ---
 
 ---
@@ -71730,7 +71759,7 @@ Create experiments, run them, and read their results over HTTP. Create an experi
 
 ---
 title: "Poll a run"
-openapi: "GET /api/experiments/runs/{runId}"
+openapi: "GET /api/v1/experiments/runs/{runId}"
 ---
 
 ---
@@ -71739,7 +71768,7 @@ openapi: "GET /api/experiments/runs/{runId}"
 
 ---
 title: "Create an experiment and its setup"
-openapi: "POST /api/experiments"
+openapi: "POST /api/v1/experiments"
 ---
 
 ---
@@ -71748,7 +71777,7 @@ openapi: "POST /api/experiments"
 
 ---
 title: "Read an experiment's setup"
-openapi: "GET /api/experiments/{slug}/workbench-state"
+openapi: "GET /api/v1/experiments/{slug}/workbench-state"
 ---
 
 ---
@@ -71757,7 +71786,7 @@ openapi: "GET /api/experiments/{slug}/workbench-state"
 
 ---
 title: "Read one experiment"
-openapi: "GET /api/experiments/{slug}"
+openapi: "GET /api/v1/experiments/{slug}"
 ---
 
 ---
@@ -71766,7 +71795,7 @@ openapi: "GET /api/experiments/{slug}"
 
 ---
 title: "Read run results"
-openapi: "GET /api/experiments/runs/{runId}/results"
+openapi: "GET /api/v1/experiments/runs/{runId}/results"
 ---
 
 ---
@@ -71775,7 +71804,7 @@ openapi: "GET /api/experiments/runs/{runId}/results"
 
 ---
 title: "Report DSPy optimizer steps"
-openapi: "POST /api/dspy/log_steps"
+openapi: "POST /api/v1/dspy/log_steps"
 ---
 
 ---
@@ -71784,7 +71813,7 @@ openapi: "POST /api/dspy/log_steps"
 
 ---
 title: "Restore an experiment version"
-openapi: "POST /api/experiments/{slug}/versions/{version}/restore"
+openapi: "POST /api/v1/experiments/{slug}/versions/{version}/restore"
 ---
 
 ---
@@ -71793,7 +71822,7 @@ openapi: "POST /api/experiments/{slug}/versions/{version}/restore"
 
 ---
 title: "Run an experiment"
-openapi: "POST /api/experiments/{slug}/run"
+openapi: "POST /api/v1/experiments/{slug}/run"
 ---
 
 ---
@@ -71802,7 +71831,7 @@ openapi: "POST /api/experiments/{slug}/run"
 
 ---
 title: "Save an experiment's setup"
-openapi: "PUT /api/experiments/{slug}/workbench-state"
+openapi: "PUT /api/v1/experiments/{slug}/workbench-state"
 ---
 
 ---
@@ -72079,7 +72108,7 @@ openapi: "PATCH /api/gateway/v1/virtual-keys/{id}"
 
 ---
 title: "Create a custom graph on a dashboard"
-openapi: "POST /api/graphs"
+openapi: "POST /api/v1/graphs"
 ---
 
 ---
@@ -72088,7 +72117,7 @@ openapi: "POST /api/graphs"
 
 ---
 title: "Delete a custom graph"
-openapi: "DELETE /api/graphs/{id}"
+openapi: "DELETE /api/v1/graphs/{id}"
 ---
 
 ---
@@ -72097,7 +72126,7 @@ openapi: "DELETE /api/graphs/{id}"
 
 ---
 title: "Get a custom graph by its ID"
-openapi: "GET /api/graphs/{id}"
+openapi: "GET /api/v1/graphs/{id}"
 ---
 
 ---
@@ -72106,7 +72135,7 @@ openapi: "GET /api/graphs/{id}"
 
 ---
 title: "List Graphs"
-openapi: "GET /api/graphs"
+openapi: "GET /api/v1/graphs"
 ---
 
 ---
@@ -72128,7 +72157,7 @@ Manage custom analytics graphs within dashboards. Create, update, and configure 
 
 ---
 title: "Update Graphs"
-openapi: "PATCH /api/graphs/{id}"
+openapi: "PATCH /api/v1/graphs/{id}"
 ---
 
 ---
@@ -72137,7 +72166,7 @@ openapi: "PATCH /api/graphs/{id}"
 
 ---
 title: "Add group binding"
-openapi: "POST /api/groups/{id}/bindings"
+openapi: "POST /api/v1/groups/{id}/bindings"
 ---
 
 ---
@@ -72146,7 +72175,7 @@ openapi: "POST /api/groups/{id}/bindings"
 
 ---
 title: "Add group member"
-openapi: "POST /api/groups/{id}/members"
+openapi: "POST /api/v1/groups/{id}/members"
 ---
 
 ---
@@ -72155,7 +72184,7 @@ openapi: "POST /api/groups/{id}/members"
 
 ---
 title: "Create group"
-openapi: "POST /api/groups"
+openapi: "POST /api/v1/groups"
 ---
 
 ---
@@ -72164,7 +72193,7 @@ openapi: "POST /api/groups"
 
 ---
 title: "Delete group"
-openapi: "DELETE /api/groups/{id}"
+openapi: "DELETE /api/v1/groups/{id}"
 ---
 
 ---
@@ -72173,7 +72202,7 @@ openapi: "DELETE /api/groups/{id}"
 
 ---
 title: "Get group"
-openapi: "GET /api/groups/{id}"
+openapi: "GET /api/v1/groups/{id}"
 ---
 
 ---
@@ -72182,7 +72211,7 @@ openapi: "GET /api/groups/{id}"
 
 ---
 title: "List group bindings"
-openapi: "GET /api/groups/{id}/bindings"
+openapi: "GET /api/v1/groups/{id}/bindings"
 ---
 
 ---
@@ -72191,7 +72220,7 @@ openapi: "GET /api/groups/{id}/bindings"
 
 ---
 title: "List groups"
-openapi: "GET /api/groups"
+openapi: "GET /api/v1/groups"
 ---
 
 ---
@@ -72200,7 +72229,7 @@ openapi: "GET /api/groups"
 
 ---
 title: "List group members"
-openapi: "GET /api/groups/{id}/members"
+openapi: "GET /api/v1/groups/{id}/members"
 ---
 
 ---
@@ -72239,27 +72268,27 @@ Authorization: Bearer sk-lw-<id>_<secret>
 
 | Method   | Path               | Description                                             |
 | -------- | ------------------ | ------------------------------------------------------- |
-| `GET`    | `/api/groups`      | List all groups in the organization                     |
-| `POST`   | `/api/groups`      | Create a new group (with optional members and bindings) |
-| `GET`    | `/api/groups/{id}` | Get group details with members and bindings             |
-| `PATCH`  | `/api/groups/{id}` | Rename a group                                          |
-| `DELETE` | `/api/groups/{id}` | Delete a group and all its memberships/bindings         |
+| `GET`    | `/api/v1/groups`      | List all groups in the organization                     |
+| `POST`   | `/api/v1/groups`      | Create a new group (with optional members and bindings) |
+| `GET`    | `/api/v1/groups/{id}` | Get group details with members and bindings             |
+| `PATCH`  | `/api/v1/groups/{id}` | Rename a group                                          |
+| `DELETE` | `/api/v1/groups/{id}` | Delete a group and all its memberships/bindings         |
 
 ### Members
 
 | Method   | Path                                | Description                  |
 | -------- | ----------------------------------- | ---------------------------- |
-| `GET`    | `/api/groups/{id}/members`          | List members of a group      |
-| `POST`   | `/api/groups/{id}/members`          | Add a member to a group      |
-| `DELETE` | `/api/groups/{id}/members/{userId}` | Remove a member from a group |
+| `GET`    | `/api/v1/groups/{id}/members`          | List members of a group      |
+| `POST`   | `/api/v1/groups/{id}/members`          | Add a member to a group      |
+| `DELETE` | `/api/v1/groups/{id}/members/{userId}` | Remove a member from a group |
 
 ### Role Bindings
 
 | Method   | Path                                    | Description                        |
 | -------- | --------------------------------------- | ---------------------------------- |
-| `GET`    | `/api/groups/{id}/bindings`             | List role bindings for a group     |
-| `POST`   | `/api/groups/{id}/bindings`             | Add a role binding to a group      |
-| `DELETE` | `/api/groups/{id}/bindings/{bindingId}` | Remove a role binding from a group |
+| `GET`    | `/api/v1/groups/{id}/bindings`             | List role bindings for a group     |
+| `POST`   | `/api/v1/groups/{id}/bindings`             | Add a role binding to a group      |
+| `DELETE` | `/api/v1/groups/{id}/bindings/{bindingId}` | Remove a role binding from a group |
 
 ## SCIM-Managed Groups
 
@@ -72275,7 +72304,7 @@ Groups provisioned from an identity provider via SCIM are marked with a `scimSou
 2. Create a group with initial members and role bindings:
 
 ```bash
-curl -X POST https://app.langwatch.ai/api/groups \
+curl -X POST https://app.langwatch.ai/api/v1/groups \
   -H "Authorization: Bearer sk-lw-..." \
   -H "Content-Type: application/json" \
   -d '{
@@ -72325,7 +72354,7 @@ Available roles: `ADMIN`, `MEMBER`, `VIEWER`, `CUSTOM` (requires `customRoleId`)
 
 ---
 title: "Remove group binding"
-openapi: "DELETE /api/groups/{id}/bindings/{bindingId}"
+openapi: "DELETE /api/v1/groups/{id}/bindings/{bindingId}"
 ---
 
 ---
@@ -72334,7 +72363,7 @@ openapi: "DELETE /api/groups/{id}/bindings/{bindingId}"
 
 ---
 title: "Remove group member"
-openapi: "DELETE /api/groups/{id}/members/{userId}"
+openapi: "DELETE /api/v1/groups/{id}/members/{userId}"
 ---
 
 ---
@@ -72343,7 +72372,7 @@ openapi: "DELETE /api/groups/{id}/members/{userId}"
 
 ---
 title: "Rename group"
-openapi: "PATCH /api/groups/{id}"
+openapi: "PATCH /api/v1/groups/{id}"
 ---
 
 ---
@@ -72352,7 +72381,7 @@ openapi: "PATCH /api/groups/{id}"
 
 ---
 title: "Create invites"
-openapi: "POST /api/organization/invites"
+openapi: "POST /api/v1/organization/invites"
 ---
 
 ---
@@ -72361,7 +72390,7 @@ openapi: "POST /api/organization/invites"
 
 ---
 title: "List invites"
-openapi: "GET /api/organization/invites"
+openapi: "GET /api/v1/organization/invites"
 ---
 
 ---
@@ -72398,9 +72427,9 @@ Authorization: Bearer sk-lw-<id>_<secret>
 
 | Method   | Path                             | Description                                      |
 | -------- | -------------------------------- | ------------------------------------------------ |
-| `GET`    | `/api/organization/invites`      | List pending invites with their acceptance links |
-| `POST`   | `/api/organization/invites`      | Create up to 50 invites in one batch             |
-| `DELETE` | `/api/organization/invites/{id}` | Revoke a pending invite                          |
+| `GET`    | `/api/v1/organization/invites`      | List pending invites with their acceptance links |
+| `POST`   | `/api/v1/organization/invites`      | Create up to 50 invites in one batch             |
+| `DELETE` | `/api/v1/organization/invites/{id}` | Revoke a pending invite                          |
 
 ## The acceptance link is part of the response
 
@@ -72441,7 +72470,7 @@ The refusals to expect:
 ## Typical flow
 
 ```bash
-curl -X POST https://app.langwatch.ai/api/organization/invites \
+curl -X POST https://app.langwatch.ai/api/v1/organization/invites \
   -H "Authorization: Bearer sk-lw-..." \
   -H "Content-Type: application/json" \
   -d '{
@@ -72458,10 +72487,10 @@ curl -X POST https://app.langwatch.ai/api/organization/invites \
 Someone who never accepts leaves a pending invite behind. List them, then revoke the ones that have gone stale:
 
 ```bash
-curl https://app.langwatch.ai/api/organization/invites \
+curl https://app.langwatch.ai/api/v1/organization/invites \
   -H "Authorization: Bearer sk-lw-..."
 
-curl -X DELETE https://app.langwatch.ai/api/organization/invites/<invite_id> \
+curl -X DELETE https://app.langwatch.ai/api/v1/organization/invites/<invite_id> \
   -H "Authorization: Bearer sk-lw-..."
 ```
 
@@ -72471,7 +72500,7 @@ curl -X DELETE https://app.langwatch.ai/api/organization/invites/<invite_id> \
 
 ---
 title: "Revoke invite"
-openapi: "DELETE /api/organization/invites/{id}"
+openapi: "DELETE /api/v1/organization/invites/{id}"
 ---
 
 ---
@@ -72480,7 +72509,7 @@ openapi: "DELETE /api/organization/invites/{id}"
 
 ---
 title: "Get member access"
-openapi: "GET /api/organization/members/{userId}/access"
+openapi: "GET /api/v1/organization/members/{userId}/access"
 ---
 
 ---
@@ -72489,7 +72518,7 @@ openapi: "GET /api/organization/members/{userId}/access"
 
 ---
 title: "Get member"
-openapi: "GET /api/organization/members/{userId}"
+openapi: "GET /api/v1/organization/members/{userId}"
 ---
 
 ---
@@ -72498,7 +72527,7 @@ openapi: "GET /api/organization/members/{userId}"
 
 ---
 title: "List members"
-openapi: "GET /api/organization/members"
+openapi: "GET /api/v1/organization/members"
 ---
 
 ---
@@ -72537,11 +72566,11 @@ Reading the list and a single member needs `organization:view`. Changing, removi
 
 | Method   | Path                                        | Permission            | Description                                                   |
 | -------- | ------------------------------------------- | --------------------- | ------------------------------------------------------------- |
-| `GET`    | `/api/organization/members`                 | `organization:view`   | List members with their role and status                       |
-| `GET`    | `/api/organization/members/{userId}`        | `organization:view`   | Read one member and the teams they reach                      |
-| `PATCH`  | `/api/organization/members/{userId}`        | `organization:manage` | Change the organization role, or disable and re-enable access |
-| `DELETE` | `/api/organization/members/{userId}`        | `organization:manage` | Remove a member from the organization and its teams           |
-| `GET`    | `/api/organization/members/{userId}/access` | `organization:manage` | Read everything the member can reach and where it comes from  |
+| `GET`    | `/api/v1/organization/members`                 | `organization:view`   | List members with their role and status                       |
+| `GET`    | `/api/v1/organization/members/{userId}`        | `organization:view`   | Read one member and the teams they reach                      |
+| `PATCH`  | `/api/v1/organization/members/{userId}`        | `organization:manage` | Change the organization role, or disable and re-enable access |
+| `DELETE` | `/api/v1/organization/members/{userId}`        | `organization:manage` | Remove a member from the organization and its teams           |
+| `GET`    | `/api/v1/organization/members/{userId}/access` | `organization:manage` | Read everything the member can reach and where it comes from  |
 
 Disabled members are left out of the list unless you pass `includeDisabled=true`.
 
@@ -72563,10 +72592,10 @@ Re-enabling a member takes a seat back, so it is checked against your plan and c
 
 ## The access breakdown
 
-`GET /api/organization/members/{userId}/access` answers the question an auditor asks: not what roles someone has, but what they can reach and why. It returns the organization role and its permissions, every group the member belongs to with the bindings that group carries, and the bindings held directly, each with the permissions it grants and the scope it grants them on.
+`GET /api/v1/organization/members/{userId}/access` answers the question an auditor asks: not what roles someone has, but what they can reach and why. It returns the organization role and its permissions, every group the member belongs to with the bindings that group carries, and the bindings held directly, each with the permissions it grants and the scope it grants them on.
 
 ```bash
-curl https://app.langwatch.ai/api/organization/members/user_abc123/access \
+curl https://app.langwatch.ai/api/v1/organization/members/user_abc123/access \
   -H "Authorization: Bearer sk-lw-..."
 ```
 
@@ -72574,17 +72603,17 @@ curl https://app.langwatch.ai/api/organization/members/user_abc123/access \
 
 ```bash
 # Who is in the organization
-curl "https://app.langwatch.ai/api/organization/members?includeDisabled=true" \
+curl "https://app.langwatch.ai/api/v1/organization/members?includeDisabled=true" \
   -H "Authorization: Bearer sk-lw-..."
 
 # Promote someone
-curl -X PATCH https://app.langwatch.ai/api/organization/members/user_abc123 \
+curl -X PATCH https://app.langwatch.ai/api/v1/organization/members/user_abc123 \
   -H "Authorization: Bearer sk-lw-..." \
   -H "Content-Type: application/json" \
   -d '{"role": "ADMIN"}'
 
 # Offboard: disable first, remove once the handover is done
-curl -X PATCH https://app.langwatch.ai/api/organization/members/user_abc123 \
+curl -X PATCH https://app.langwatch.ai/api/v1/organization/members/user_abc123 \
   -H "Authorization: Bearer sk-lw-..." \
   -H "Content-Type: application/json" \
   -d '{"disabled": true}'
@@ -72596,7 +72625,7 @@ curl -X PATCH https://app.langwatch.ai/api/organization/members/user_abc123 \
 
 ---
 title: "Remove member"
-openapi: "DELETE /api/organization/members/{userId}"
+openapi: "DELETE /api/v1/organization/members/{userId}"
 ---
 
 ---
@@ -72605,7 +72634,7 @@ openapi: "DELETE /api/organization/members/{userId}"
 
 ---
 title: "Update member"
-openapi: "PATCH /api/organization/members/{userId}"
+openapi: "PATCH /api/v1/organization/members/{userId}"
 ---
 
 ---
@@ -72614,7 +72643,7 @@ openapi: "PATCH /api/organization/members/{userId}"
 
 ---
 title: "List Model Providers"
-openapi: "GET /api/model-providers"
+openapi: "GET /api/v1/model-providers"
 ---
 
 ---
@@ -72636,7 +72665,7 @@ Manage model provider configurations (API keys for OpenAI, Anthropic, etc.) used
 
 ---
 title: "Create or update a model provider"
-openapi: "PUT /api/model-providers/{provider}"
+openapi: "PUT /api/v1/model-providers/{provider}"
 ---
 
 ---
@@ -72645,7 +72674,7 @@ openapi: "PUT /api/model-providers/{provider}"
 
 ---
 title: "Enable or disable a monitor"
-openapi: "POST /api/monitors/{id}/toggle"
+openapi: "POST /api/v1/monitors/{id}/toggle"
 ---
 
 ---
@@ -72654,7 +72683,7 @@ openapi: "POST /api/monitors/{id}/toggle"
 
 ---
 title: "Create a new online evaluation monitor"
-openapi: "POST /api/monitors"
+openapi: "POST /api/v1/monitors"
 ---
 
 ---
@@ -72663,7 +72692,7 @@ openapi: "POST /api/monitors"
 
 ---
 title: "Delete a monitor"
-openapi: "DELETE /api/monitors/{id}"
+openapi: "DELETE /api/v1/monitors/{id}"
 ---
 
 ---
@@ -72672,7 +72701,7 @@ openapi: "DELETE /api/monitors/{id}"
 
 ---
 title: "Get a monitor by its ID"
-openapi: "GET /api/monitors/{id}"
+openapi: "GET /api/v1/monitors/{id}"
 ---
 
 ---
@@ -72681,7 +72710,7 @@ openapi: "GET /api/monitors/{id}"
 
 ---
 title: "List Monitors"
-openapi: "GET /api/monitors"
+openapi: "GET /api/v1/monitors"
 ---
 
 ---
@@ -72703,7 +72732,7 @@ Manage online evaluation monitors that automatically evaluate traces as they arr
 
 ---
 title: "Update a monitor"
-openapi: "PATCH /api/monitors/{id}"
+openapi: "PATCH /api/v1/monitors/{id}"
 ---
 
 ---
@@ -72712,7 +72741,7 @@ openapi: "PATCH /api/monitors/{id}"
 
 ---
 title: "Get organization"
-openapi: "GET /api/organization"
+openapi: "GET /api/v1/organization"
 ---
 
 ---
@@ -72751,8 +72780,8 @@ Reading needs `organization:view`; updating needs `organization:manage`. A key w
 
 | Method  | Path                | Permission            | Description                             |
 | ------- | ------------------- | --------------------- | --------------------------------------- |
-| `GET`   | `/api/organization` | `organization:view`   | Read the organization profile           |
-| `PATCH` | `/api/organization` | `organization:manage` | Update part of the organization profile |
+| `GET`   | `/api/v1/organization` | `organization:view`   | Read the organization profile           |
+| `PATCH` | `/api/v1/organization` | `organization:manage` | Update part of the organization profile |
 
 Members and invites are families of their own: see [Members](/api-reference/members/overview) and [Invites](/api-reference/invites/overview).
 
@@ -72765,11 +72794,11 @@ Members and invites are families of their own: see [Members](/api-reference/memb
 
 ```bash
 # Read the profile
-curl https://app.langwatch.ai/api/organization \
+curl https://app.langwatch.ai/api/v1/organization \
   -H "Authorization: Bearer sk-lw-..."
 
 # Rename it and set a support contact, leaving everything else alone
-curl -X PATCH https://app.langwatch.ai/api/organization \
+curl -X PATCH https://app.langwatch.ai/api/v1/organization \
   -H "Authorization: Bearer sk-lw-..." \
   -H "Content-Type: application/json" \
   -d '{"name": "Acme", "supportContact": "support@acme.example"}'
@@ -72783,7 +72812,7 @@ Setting `traceSharingEnabled` to `false` revokes every trace share link already 
 
 ---
 title: "Update organization"
-openapi: "PATCH /api/organization"
+openapi: "PATCH /api/v1/organization"
 ---
 
 ---
@@ -72792,7 +72821,7 @@ openapi: "PATCH /api/organization"
 
 ---
 title: "Create an organization"
-openapi: "POST /api/organizations"
+openapi: "POST /api/v1/organizations"
 ---
 
 ---
@@ -72801,7 +72830,7 @@ openapi: "POST /api/organizations"
 
 ---
 title: "Get an organization"
-openapi: "GET /api/organizations/{id}"
+openapi: "GET /api/v1/organizations/{id}"
 ---
 
 ---
@@ -72810,7 +72839,7 @@ openapi: "GET /api/organizations/{id}"
 
 ---
 title: "List organizations"
-openapi: "GET /api/organizations"
+openapi: "GET /api/v1/organizations"
 ---
 
 ---
@@ -72836,7 +72865,7 @@ This is the one LangWatch API that exists before any organization does, which is
 Creating an organization hands back an organization admin API key along with it. That key is what the rest of the management APIs take, so a run can go from an empty deployment to a fully configured organization without a browser step:
 
 ```
-instance key  ->  POST /api/organizations  ->  organization + admin API key
+instance key  ->  POST /api/v1/organizations  ->  organization + admin API key
                                                      |
                                                      v
                       teams, groups, roles, role bindings, members,
@@ -72857,16 +72886,16 @@ Set the variable on the deployment, generate it the way you generate any other s
 
 | Method | Path                      | Description                                            |
 | ------ | ------------------------- | ------------------------------------------------------ |
-| `GET`  | `/api/organizations`      | List the organizations on this instance                |
-| `POST` | `/api/organizations`      | Create an organization and its bootstrap admin API key |
-| `GET`  | `/api/organizations/{id}` | Read one organization                                  |
+| `GET`  | `/api/v1/organizations`      | List the organizations on this instance                |
+| `POST` | `/api/v1/organizations`      | Create an organization and its bootstrap admin API key |
+| `GET`  | `/api/v1/organizations/{id}` | Read one organization                                  |
 
 There is no `DELETE`. Deleting an organization takes everything in it, so it stays a deliberate operation rather than one an automated run can reach.
 
 ## Creating an organization
 
 ```bash
-curl -X POST https://langwatch.acme.internal/api/organizations \
+curl -X POST https://langwatch.acme.internal/api/v1/organizations \
   -H "Authorization: Bearer $LANGWATCH_INSTANCE_ADMIN_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"name": "Acme", "slug": "acme", "adminApiKeyName": "Provisioning admin"}'
@@ -72886,7 +72915,7 @@ The slug is optional and is derived from the name when you leave it out. It is a
 
 ## Reading back
 
-`GET /api/organizations` and `GET /api/organizations/{id}` return the organizations on the instance, which is what lets a provisioning run check whether it has work to do before it does any. An id that does not exist answers 404.
+`GET /api/v1/organizations` and `GET /api/v1/organizations/{id}` return the organizations on the instance, which is what lets a provisioning run check whether it has work to do before it does any. An id that does not exist answers 404.
 
 ---
 
@@ -73028,7 +73057,7 @@ openapi: "PATCH /api/projects/{id}"
 
 ---
 title: "Restore a prompt to a previous version"
-openapi: "POST /api/prompts/{id}/versions/{versionId}/restore"
+openapi: "POST /api/v1/prompts/{id}/versions/{versionId}/restore"
 ---
 
 ---
@@ -73037,7 +73066,7 @@ openapi: "POST /api/prompts/{id}/versions/{versionId}/restore"
 
 ---
 title: "Sync/upsert a prompt with local content"
-openapi: "POST /api/prompts/{id}/sync"
+openapi: "POST /api/v1/prompts/{id}/sync"
 ---
 
 ---
@@ -73046,7 +73075,7 @@ openapi: "POST /api/prompts/{id}/sync"
 
 ---
 title: "Create prompt"
-openapi: "POST /api/prompts"
+openapi: "POST /api/v1/prompts"
 ---
 
 ---
@@ -73055,7 +73084,7 @@ openapi: "POST /api/prompts"
 
 ---
 title: "Create Tags"
-openapi: "POST /api/prompts/tags"
+openapi: "POST /api/v1/prompts/tags"
 ---
 
 ---
@@ -73064,7 +73093,7 @@ openapi: "POST /api/prompts/tags"
 
 ---
 title: "Delete prompt"
-openapi: "DELETE /api/prompts/{id}"
+openapi: "DELETE /api/v1/prompts/{id}"
 ---
 
 ---
@@ -73073,7 +73102,7 @@ openapi: "DELETE /api/prompts/{id}"
 
 ---
 title: "Delete Tags"
-openapi: "DELETE /api/prompts/tags/{tag}"
+openapi: "DELETE /api/v1/prompts/tags/{tag}"
 ---
 
 ---
@@ -73082,7 +73111,7 @@ openapi: "DELETE /api/prompts/tags/{tag}"
 
 ---
 title: "Get prompt versions"
-openapi: "GET /api/prompts/{id}/versions"
+openapi: "GET /api/v1/prompts/{id}/versions"
 ---
 
 ---
@@ -73091,7 +73120,7 @@ openapi: "GET /api/prompts/{id}/versions"
 
 ---
 title: "Get prompt"
-openapi: "GET /api/prompts/{id}"
+openapi: "GET /api/v1/prompts/{id}"
 ---
 
 ---
@@ -73100,7 +73129,7 @@ openapi: "GET /api/prompts/{id}"
 
 ---
 title: "Get prompts"
-openapi: "GET /api/prompts"
+openapi: "GET /api/v1/prompts"
 ---
 
 ---
@@ -73109,7 +73138,7 @@ openapi: "GET /api/prompts"
 
 ---
 title: "List Tags"
-openapi: "GET /api/prompts/tags"
+openapi: "GET /api/v1/prompts/tags"
 ---
 
 ---
@@ -73131,20 +73160,20 @@ To make a call to the Prompts API, you will need to pass through your LangWatch 
 
 #### Allowed Methods
 
-- `GET /api/prompts` - Get all prompts for a project
-- `POST /api/prompts` - Create a new prompt
-- `GET /api/prompts/:id` - Get a specific prompt
-- `PUT /api/prompts/:id` - Update a prompt
-- `DELETE /api/prompts/:id` - Delete a prompt
-- `GET /api/prompts/:id/versions` - Get all versions for a prompt
-- `POST /api/prompts/:id/versions` - Create a new version for a prompt
-- `GET /api/prompts/tags` - List all tags for the organization
-- `POST /api/prompts/tags` - Create a new tag
-- `PUT /api/prompts/tags/:tag` - Rename a tag
-- `DELETE /api/prompts/tags/:tag` - Delete a tag
-- `PUT /api/prompts/:id/tags/:tag` - Assign a tag to a prompt version
+- `GET /api/v1/prompts` - Get all prompts for a project
+- `POST /api/v1/prompts` - Create a new prompt
+- `GET /api/v1/prompts/:id` - Get a specific prompt
+- `PUT /api/v1/prompts/:id` - Update a prompt
+- `DELETE /api/v1/prompts/:id` - Delete a prompt
+- `GET /api/v1/prompts/:id/versions` - Get all versions for a prompt
+- `POST /api/v1/prompts/:id/versions` - Create a new version for a prompt
+- `GET /api/v1/prompts/tags` - List all tags for the organization
+- `POST /api/v1/prompts/tags` - Create a new tag
+- `PUT /api/v1/prompts/tags/:tag` - Rename a tag
+- `DELETE /api/v1/prompts/tags/:tag` - Delete a tag
+- `PUT /api/v1/prompts/:id/tags/:tag` - Assign a tag to a prompt version
 
-> **Auth scope:** Tag CRUD endpoints (`/api/prompts/tags*`) are organization-scoped, while tag assignment (`PUT /api/prompts/:id/tags/:tag`) is project-scoped.
+> **Auth scope:** Tag CRUD endpoints (`/api/v1/prompts/tags*`) are organization-scoped, while tag assignment (`PUT /api/v1/prompts/:id/tags/:tag`) is project-scoped.
 
 ---
 
@@ -73152,7 +73181,7 @@ To make a call to the Prompts API, you will need to pass through your LangWatch 
 
 ---
 title: "Rename a prompt tag definition"
-openapi: "PUT /api/prompts/tags/{tag}"
+openapi: "PUT /api/v1/prompts/tags/{tag}"
 ---
 
 ---
@@ -73161,7 +73190,7 @@ openapi: "PUT /api/prompts/tags/{tag}"
 
 ---
 title: "Update prompt"
-openapi: "PUT /api/prompts/{id}"
+openapi: "PUT /api/v1/prompts/{id}"
 ---
 
 ---
@@ -73170,7 +73199,7 @@ openapi: "PUT /api/prompts/{id}"
 
 ---
 title: "Assign a tag"
-openapi: "PUT /api/prompts/{id}/tags/{tag}"
+openapi: "PUT /api/v1/prompts/{id}/tags/{tag}"
 ---
 
 ---
@@ -73232,7 +73261,7 @@ openapi: "POST /api/v1/query"
 
 ---
 title: "Create role binding"
-openapi: "POST /api/role-bindings"
+openapi: "POST /api/v1/role-bindings"
 ---
 
 ---
@@ -73241,7 +73270,7 @@ openapi: "POST /api/role-bindings"
 
 ---
 title: "Delete role binding"
-openapi: "DELETE /api/role-bindings/{id}"
+openapi: "DELETE /api/v1/role-bindings/{id}"
 ---
 
 ---
@@ -73250,7 +73279,7 @@ openapi: "DELETE /api/role-bindings/{id}"
 
 ---
 title: "List role bindings"
-openapi: "GET /api/role-bindings"
+openapi: "GET /api/v1/role-bindings"
 ---
 
 ---
@@ -73293,10 +73322,10 @@ Authorization: Bearer sk-lw-<id>_<secret>
 
 | Method   | Path                      | Description                                   |
 | -------- | ------------------------- | --------------------------------------------- |
-| `GET`    | `/api/role-bindings`      | List bindings, filtered by principal or scope |
-| `POST`   | `/api/role-bindings`      | Grant one role to one principal at one scope  |
-| `PATCH`  | `/api/role-bindings/{id}` | Change the role a binding grants              |
-| `DELETE` | `/api/role-bindings/{id}` | Delete a binding                              |
+| `GET`    | `/api/v1/role-bindings`      | List bindings, filtered by principal or scope |
+| `POST`   | `/api/v1/role-bindings`      | Grant one role to one principal at one scope  |
+| `PATCH`  | `/api/v1/role-bindings/{id}` | Change the role a binding grants              |
+| `DELETE` | `/api/v1/role-bindings/{id}` | Delete a binding                              |
 
 `GET` filters on `userId`, `groupId`, `apiKeyId`, `scopeType` and `scopeId`, and pages with `offset` and `limit`. `limit` defaults to 50 and cannot exceed 200. `totalCount` counts the filtered set, not the organization.
 
@@ -73318,7 +73347,7 @@ A binding is identified by its principal, its role, and its scope. Creating the 
 
 ```bash
 # A group of engineers gets MEMBER on one team
-curl -X POST https://app.langwatch.ai/api/role-bindings \
+curl -X POST https://app.langwatch.ai/api/v1/role-bindings \
   -H "Authorization: Bearer sk-lw-..." \
   -H "Content-Type: application/json" \
   -d '{
@@ -73329,7 +73358,7 @@ curl -X POST https://app.langwatch.ai/api/role-bindings \
   }'
 
 # A CI key gets a narrow custom role on one project
-curl -X POST https://app.langwatch.ai/api/role-bindings \
+curl -X POST https://app.langwatch.ai/api/v1/role-bindings \
   -H "Authorization: Bearer sk-lw-..." \
   -H "Content-Type: application/json" \
   -d '{
@@ -73366,7 +73395,7 @@ A create response can carry `hasLegacyAccessNotice: true`. It means this is the 
 
 ---
 title: "Update role binding"
-openapi: "PATCH /api/role-bindings/{id}"
+openapi: "PATCH /api/v1/role-bindings/{id}"
 ---
 
 ---
@@ -73375,7 +73404,7 @@ openapi: "PATCH /api/role-bindings/{id}"
 
 ---
 title: "Create role"
-openapi: "POST /api/roles"
+openapi: "POST /api/v1/roles"
 ---
 
 ---
@@ -73384,7 +73413,7 @@ openapi: "POST /api/roles"
 
 ---
 title: "Delete role"
-openapi: "DELETE /api/roles/{id}"
+openapi: "DELETE /api/v1/roles/{id}"
 ---
 
 ---
@@ -73393,7 +73422,7 @@ openapi: "DELETE /api/roles/{id}"
 
 ---
 title: "Get role"
-openapi: "GET /api/roles/{id}"
+openapi: "GET /api/v1/roles/{id}"
 ---
 
 ---
@@ -73402,7 +73431,7 @@ openapi: "GET /api/roles/{id}"
 
 ---
 title: "List permissions"
-openapi: "GET /api/roles/permissions"
+openapi: "GET /api/v1/roles/permissions"
 ---
 
 ---
@@ -73411,7 +73440,7 @@ openapi: "GET /api/roles/permissions"
 
 ---
 title: "List roles"
-openapi: "GET /api/roles"
+openapi: "GET /api/v1/roles"
 ---
 
 ---
@@ -73448,26 +73477,26 @@ Authorization: Bearer sk-lw-<id>_<secret>
 
 | Method   | Path                     | Description                                 |
 | -------- | ------------------------ | ------------------------------------------- |
-| `GET`    | `/api/roles/permissions` | The permission catalog roles are built from |
-| `GET`    | `/api/roles`             | List the organization's custom roles        |
-| `POST`   | `/api/roles`             | Create a custom role                        |
-| `GET`    | `/api/roles/{id}`        | Read one custom role                        |
-| `PATCH`  | `/api/roles/{id}`        | Update a custom role                        |
-| `DELETE` | `/api/roles/{id}`        | Delete a custom role                        |
+| `GET`    | `/api/v1/roles/permissions` | The permission catalog roles are built from |
+| `GET`    | `/api/v1/roles`             | List the organization's custom roles        |
+| `POST`   | `/api/v1/roles`             | Create a custom role                        |
+| `GET`    | `/api/v1/roles/{id}`        | Read one custom role                        |
+| `PATCH`  | `/api/v1/roles/{id}`        | Update a custom role                        |
+| `DELETE` | `/api/v1/roles/{id}`        | Delete a custom role                        |
 
 ## Permissions are `resource:action` keys
 
 Start at the catalog. It lists every resource with the actions it takes, and flags the resources that only mean anything at organization scope, which is worth knowing before you build a role a team-scoped binding can never fully grant.
 
 ```bash
-curl https://app.langwatch.ai/api/roles/permissions \
+curl https://app.langwatch.ai/api/v1/roles/permissions \
   -H "Authorization: Bearer sk-lw-..."
 ```
 
 Then create a role from the keys it gave you:
 
 ```bash
-curl -X POST https://app.langwatch.ai/api/roles \
+curl -X POST https://app.langwatch.ai/api/v1/roles \
   -H "Authorization: Bearer sk-lw-..." \
   -H "Content-Type: application/json" \
   -d '{
@@ -73515,7 +73544,7 @@ A role that a role binding or a team assignment still points at cannot be delete
 
 ---
 title: "Update role"
-openapi: "PATCH /api/roles/{id}"
+openapi: "PATCH /api/v1/roles/{id}"
 ---
 
 ---
@@ -73582,7 +73611,7 @@ openapi: "POST /api/v1/run-plans/{id}/run"
 
 ---
 title: "Create Browser Tab"
-openapi: "POST /api/scenario-events/browser-tab"
+openapi: "POST /api/v1/scenario-events/browser-tab"
 ---
 
 ---
@@ -73591,7 +73620,7 @@ openapi: "POST /api/scenario-events/browser-tab"
 
 ---
 title: "Create a new scenario event"
-openapi: "POST /api/scenario-events"
+openapi: "POST /api/v1/scenario-events"
 ---
 
 ---
@@ -73600,7 +73629,7 @@ openapi: "POST /api/scenario-events"
 
 ---
 title: "Delete all events"
-openapi: "DELETE /api/scenario-events"
+openapi: "DELETE /api/v1/scenario-events"
 ---
 
 ---
@@ -73617,7 +73646,7 @@ description: "Create and manage scenario execution events to power the Simulatio
 The Simulations visualizer is powered by a single endpoint that receives events from your test runs. All events are sent via a `POST` request to the following endpoint:
 
 ```
-/api/scenario-events
+/api/v1/scenario-events
 ```
 
 The request body should be a JSON object representing one of the event types described below. These events allow LangWatch to reconstruct the entire history of your simulation sets, batches, and individual scenario runs.
@@ -73672,7 +73701,7 @@ This event marks the end of a scenario run and includes the final results.
 
 ---
 title: "Create a new scenario"
-openapi: "POST /api/scenarios"
+openapi: "POST /api/v1/scenarios"
 ---
 
 ---
@@ -73681,7 +73710,7 @@ openapi: "POST /api/scenarios"
 
 ---
 title: "Archive a scenario"
-openapi: "DELETE /api/scenarios/{id}"
+openapi: "DELETE /api/v1/scenarios/{id}"
 ---
 
 ---
@@ -73690,7 +73719,7 @@ openapi: "DELETE /api/scenarios/{id}"
 
 ---
 title: "Get a specific scenario by ID"
-openapi: "GET /api/scenarios/{id}"
+openapi: "GET /api/v1/scenarios/{id}"
 ---
 
 ---
@@ -73699,7 +73728,7 @@ openapi: "GET /api/scenarios/{id}"
 
 ---
 title: "List a scenario's versions"
-openapi: "GET /api/scenarios/{id}/versions"
+openapi: "GET /api/v1/scenarios/{id}/versions"
 ---
 
 ---
@@ -73708,7 +73737,7 @@ openapi: "GET /api/scenarios/{id}/versions"
 
 ---
 title: "Get all scenarios for a project"
-openapi: "GET /api/scenarios"
+openapi: "GET /api/v1/scenarios"
 ---
 
 ---
@@ -73730,7 +73759,7 @@ Manage test scenarios for agent simulations. Create, update, and organize scenar
 
 ---
 title: "Update an existing scenario"
-openapi: "PATCH /api/scenarios/{id}"
+openapi: "PATCH /api/v1/scenarios/{id}"
 ---
 
 ---
@@ -73739,7 +73768,7 @@ openapi: "PATCH /api/scenarios/{id}"
 
 ---
 title: "Read one scenario version"
-openapi: "GET /api/scenarios/{id}/versions/{version}"
+openapi: "GET /api/v1/scenarios/{id}/versions/{version}"
 ---
 
 ---
@@ -73748,7 +73777,7 @@ openapi: "GET /api/scenarios/{id}/versions/{version}"
 
 ---
 title: "Update an existing scenario"
-openapi: "PUT /api/scenarios/{id}"
+openapi: "PUT /api/v1/scenarios/{id}"
 ---
 
 ---
@@ -73757,7 +73786,7 @@ openapi: "PUT /api/scenarios/{id}"
 
 ---
 title: "Create SCIM token"
-openapi: "POST /api/scim-tokens"
+openapi: "POST /api/v1/scim-tokens"
 ---
 
 ---
@@ -73766,7 +73795,7 @@ openapi: "POST /api/scim-tokens"
 
 ---
 title: "List SCIM tokens"
-openapi: "GET /api/scim-tokens"
+openapi: "GET /api/v1/scim-tokens"
 ---
 
 ---
@@ -73801,16 +73830,16 @@ Authorization: Bearer sk-lw-<id>_<secret>
 
 | Method   | Path                    | Description                         |
 | -------- | ----------------------- | ----------------------------------- |
-| `GET`    | `/api/scim-tokens`      | List the organization's SCIM tokens |
-| `POST`   | `/api/scim-tokens`      | Mint a token, returned once         |
-| `DELETE` | `/api/scim-tokens/{id}` | Revoke a token                      |
+| `GET`    | `/api/v1/scim-tokens`      | List the organization's SCIM tokens |
+| `POST`   | `/api/v1/scim-tokens`      | Mint a token, returned once         |
+| `DELETE` | `/api/v1/scim-tokens/{id}` | Revoke a token                      |
 
 ## The value is returned once
 
 `POST` is the only response that ever contains the token itself. The list returns the id, the description, when it was created and when it was last used, and never the value or its hash. If the token is lost, mint a new one and revoke the old one.
 
 ```bash
-curl -X POST https://app.langwatch.ai/api/scim-tokens \
+curl -X POST https://app.langwatch.ai/api/v1/scim-tokens \
   -H "Authorization: Bearer sk-lw-..." \
   -H "Content-Type: application/json" \
   -d '{"description": "Okta production"}'
@@ -73836,7 +73865,7 @@ Entitlement is not only checked when a token is minted. If the Enterprise plan l
 
 ---
 title: "Revoke SCIM token"
-openapi: "DELETE /api/scim-tokens/{id}"
+openapi: "DELETE /api/v1/scim-tokens/{id}"
 ---
 
 ---
@@ -74125,7 +74154,7 @@ openapi: "PUT /api/secrets/{id}"
 
 ---
 title: "Get Batches"
-openapi: "GET /api/simulation-runs/batches/{batchRunId}"
+openapi: "GET /api/v1/simulation-runs/batches/{batchRunId}"
 ---
 
 ---
@@ -74134,7 +74163,7 @@ openapi: "GET /api/simulation-runs/batches/{batchRunId}"
 
 ---
 title: "Get a single simulation run by its ID"
-openapi: "GET /api/simulation-runs/{scenarioRunId}"
+openapi: "GET /api/v1/simulation-runs/{scenarioRunId}"
 ---
 
 ---
@@ -74143,7 +74172,7 @@ openapi: "GET /api/simulation-runs/{scenarioRunId}"
 
 ---
 title: "List batch summaries for a scenario set"
-openapi: "GET /api/simulation-runs/batches/list"
+openapi: "GET /api/v1/simulation-runs/batches/list"
 ---
 
 ---
@@ -74152,7 +74181,7 @@ openapi: "GET /api/simulation-runs/batches/list"
 
 ---
 title: "List Simulation Runs"
-openapi: "GET /api/simulation-runs"
+openapi: "GET /api/v1/simulation-runs"
 ---
 
 ---
@@ -74174,7 +74203,7 @@ Query simulation run results. List runs, get batch summaries, and retrieve indiv
 
 ---
 title: "Duplicate a suite"
-openapi: "POST /api/suites/{id}/duplicate"
+openapi: "POST /api/v1/suites/{id}/duplicate"
 ---
 
 ---
@@ -74183,7 +74212,7 @@ openapi: "POST /api/suites/{id}/duplicate"
 
 ---
 title: "Trigger a suite run"
-openapi: "POST /api/suites/{id}/run"
+openapi: "POST /api/v1/suites/{id}/run"
 ---
 
 ---
@@ -74192,7 +74221,7 @@ openapi: "POST /api/suites/{id}/run"
 
 ---
 title: "Create a new suite"
-openapi: "POST /api/suites"
+openapi: "POST /api/v1/suites"
 ---
 
 ---
@@ -74201,7 +74230,7 @@ openapi: "POST /api/suites"
 
 ---
 title: "Archive a suite"
-openapi: "DELETE /api/suites/{id}"
+openapi: "DELETE /api/v1/suites/{id}"
 ---
 
 ---
@@ -74210,7 +74239,7 @@ openapi: "DELETE /api/suites/{id}"
 
 ---
 title: "Get a suite"
-openapi: "GET /api/suites/{id}"
+openapi: "GET /api/v1/suites/{id}"
 ---
 
 ---
@@ -74219,7 +74248,7 @@ openapi: "GET /api/suites/{id}"
 
 ---
 title: "List all non-archived suites"
-openapi: "GET /api/suites"
+openapi: "GET /api/v1/suites"
 ---
 
 ---
@@ -74228,12 +74257,12 @@ openapi: "GET /api/suites"
 
 ---
 title: "Overview"
-description: "Deprecated. The /api/suites family is a frozen alias. New integrations use Run Plans and Test Suites."
+description: "Deprecated. The /api/v1/suites family is a frozen alias. New integrations use Run Plans and Test Suites."
 ---
 
 ## Intro
 
-Deprecated. The `/api/suites` family stays for the clients that already call it, and its shapes do not change. New integrations use [Run Plans](/api-reference/run-plans/overview) (`/api/v1/run-plans`) and [Test Suites](/api-reference/test-suites/overview) (`/api/v1/test-suites`). On this family, `kind: folder` names what the rest of the API calls a test suite, `kind: custom` names a run plan, and the scope `{ "mode": "folders", "folderIds": [...] }` is the same as `{ "mode": "test_suites", "testSuiteIds": [...] }` on `/api/v1/run-plans`. The scope `{ "mode": "cases" }` is `{ "mode": "scenarios" }` there.
+Deprecated. The `/api/v1/suites` family stays for the clients that already call it, and its shapes do not change. New integrations use [Run Plans](/api-reference/run-plans/overview) (`/api/v1/run-plans`) and [Test Suites](/api-reference/test-suites/overview) (`/api/v1/test-suites`). On this family, `kind: folder` names what the rest of the API calls a test suite, `kind: custom` names a run plan, and the scope `{ "mode": "folders", "folderIds": [...] }` is the same as `{ "mode": "test_suites", "testSuiteIds": [...] }` on `/api/v1/run-plans`. The scope `{ "mode": "cases" }` is `{ "mode": "scenarios" }` there.
 
 ---
 
@@ -74241,7 +74270,7 @@ Deprecated. The `/api/suites` family stays for the clients that already call it,
 
 ---
 title: "Update a suite"
-openapi: "PATCH /api/suites/{id}"
+openapi: "PATCH /api/v1/suites/{id}"
 ---
 
 ---
@@ -74250,7 +74279,7 @@ openapi: "PATCH /api/suites/{id}"
 
 ---
 title: "Add team member"
-openapi: "POST /api/teams/{id}/members"
+openapi: "POST /api/v1/teams/{id}/members"
 ---
 
 ---
@@ -74259,7 +74288,7 @@ openapi: "POST /api/teams/{id}/members"
 
 ---
 title: "Archive team"
-openapi: "DELETE /api/teams/{id}"
+openapi: "DELETE /api/v1/teams/{id}"
 ---
 
 ---
@@ -74268,7 +74297,7 @@ openapi: "DELETE /api/teams/{id}"
 
 ---
 title: "Create team"
-openapi: "POST /api/teams"
+openapi: "POST /api/v1/teams"
 ---
 
 ---
@@ -74277,7 +74306,7 @@ openapi: "POST /api/teams"
 
 ---
 title: "Get team"
-openapi: "GET /api/teams/{id}"
+openapi: "GET /api/v1/teams/{id}"
 ---
 
 ---
@@ -74286,7 +74315,7 @@ openapi: "GET /api/teams/{id}"
 
 ---
 title: "List team members"
-openapi: "GET /api/teams/{id}/members"
+openapi: "GET /api/v1/teams/{id}/members"
 ---
 
 ---
@@ -74295,7 +74324,7 @@ openapi: "GET /api/teams/{id}/members"
 
 ---
 title: "List team projects"
-openapi: "GET /api/teams/{id}/projects"
+openapi: "GET /api/v1/teams/{id}/projects"
 ---
 
 ---
@@ -74304,7 +74333,7 @@ openapi: "GET /api/teams/{id}/projects"
 
 ---
 title: "List teams"
-openapi: "GET /api/teams"
+openapi: "GET /api/v1/teams"
 ---
 
 ---
@@ -74336,15 +74365,15 @@ Project API keys (`X-Auth-Token`) cannot be used here — they lack organization
 
 | Method   | Path                               | Description                        |
 | -------- | ---------------------------------- | ---------------------------------- |
-| `GET`    | `/api/teams`                       | List all teams in the organization |
-| `POST`   | `/api/teams`                       | Create a new team                  |
-| `GET`    | `/api/teams/{id}`                  | Get team details                   |
-| `PATCH`  | `/api/teams/{id}`                  | Update a team                      |
-| `DELETE` | `/api/teams/{id}`                  | Archive a team (soft-delete)       |
-| `GET`    | `/api/teams/{id}/members`          | List team members                  |
-| `POST`   | `/api/teams/{id}/members`          | Add a member to the team           |
-| `DELETE` | `/api/teams/{id}/members/{userId}` | Remove a member from the team      |
-| `GET`    | `/api/teams/{id}/projects`         | List projects in the team          |
+| `GET`    | `/api/v1/teams`                       | List all teams in the organization |
+| `POST`   | `/api/v1/teams`                       | Create a new team                  |
+| `GET`    | `/api/v1/teams/{id}`                  | Get team details                   |
+| `PATCH`  | `/api/v1/teams/{id}`                  | Update a team                      |
+| `DELETE` | `/api/v1/teams/{id}`                  | Archive a team (soft-delete)       |
+| `GET`    | `/api/v1/teams/{id}/members`          | List team members                  |
+| `POST`   | `/api/v1/teams/{id}/members`          | Add a member to the team           |
+| `DELETE` | `/api/v1/teams/{id}/members/{userId}` | Remove a member from the team      |
+| `GET`    | `/api/v1/teams/{id}/projects`         | List projects in the team          |
 
 ## Errors
 
@@ -74366,12 +74395,12 @@ Every refusal carries a stable `code`. Branch on that, not on the message.
 ## Typical Flow
 
 1. Create an admin API key in Settings > API Keys with `team:manage` permission
-2. Call `POST /api/teams` with a team name
+2. Call `POST /api/v1/teams` with a team name
 3. Use the returned team `id` when creating projects via the Projects API, or later move an existing project by updating its `teamId`
 
 ```bash
 # Create team
-curl -X POST https://app.langwatch.ai/api/teams \
+curl -X POST https://app.langwatch.ai/api/v1/teams \
   -H "Authorization: Bearer sk-lw-..." \
   -H "Content-Type: application/json" \
   -d '{"name": "Engineering"}'
@@ -74389,7 +74418,7 @@ curl -X POST https://app.langwatch.ai/api/projects \
 
 ---
 title: "Remove team member"
-openapi: "DELETE /api/teams/{id}/members/{userId}"
+openapi: "DELETE /api/v1/teams/{id}/members/{userId}"
 ---
 
 ---
@@ -74398,7 +74427,7 @@ openapi: "DELETE /api/teams/{id}/members/{userId}"
 
 ---
 title: "Update team"
-openapi: "PATCH /api/teams/{id}"
+openapi: "PATCH /api/v1/teams/{id}"
 ---
 
 ---
@@ -74474,7 +74503,7 @@ openapi: "PATCH /api/v1/test-suites/{id}"
 
 ---
 title: "Create public path for single trace"
-openapi: "POST /api/trace/{id}/share"
+openapi: "POST /api/v1/trace/{id}/share"
 ---
 
 ---
@@ -74483,7 +74512,7 @@ openapi: "POST /api/trace/{id}/share"
 
 ---
 title: "Delete an existing public path for a trace"
-openapi: "POST /api/trace/{id}/unshare"
+openapi: "POST /api/v1/trace/{id}/unshare"
 ---
 
 ---
@@ -74492,7 +74521,7 @@ openapi: "POST /api/trace/{id}/unshare"
 
 ---
 title: "Get trace details"
-openapi: "GET /api/traces/{traceId}"
+openapi: "GET /api/v1/traces/{traceId}"
 ---
 
 ---
@@ -74501,7 +74530,7 @@ openapi: "GET /api/traces/{traceId}"
 
 ---
 title: "Get Transcript"
-openapi: "GET /api/traces/{traceId}/transcript"
+openapi: "GET /api/v1/traces/{traceId}/transcript"
 ---
 
 ---
@@ -74522,7 +74551,7 @@ Both search and get-trace endpoints support a `format` parameter:
 - **`digest`** (default), Returns an AI-readable formatted trace with hierarchical span tree, timing, inputs/outputs, and errors. Optimized for LLM consumption.
 - **`json`**, Returns the full raw trace data with all fields.
 
-For data-team ETL, `POST /api/traces/search` also accepts a **projection DSL**
+For data-team ETL, `POST /api/v1/traces/search` also accepts a **projection DSL**
 (`from` + `select`) that returns exactly the fields you ask for — including
 nested events, annotations, and evaluations joined server-side — so a daily pull
 becomes one paginated loop instead of a per-trace fan-out. It pairs with a
@@ -74537,16 +74566,16 @@ Pass your LangWatch API key in the `X-Auth-Token` header. Your API key can be fo
 
 | Method  | Path                             | Description                               |
 | ------- | -------------------------------- | ----------------------------------------- |
-| `POST`  | `/api/traces/search`             | Search traces with filters and pagination |
-| `GET`   | `/api/traces/{traceId}`          | Get full trace details by ID              |
-| `PATCH` | `/api/traces/{traceId}/metadata` | Update trace metadata after creation      |
-| `GET`   | `/api/thread/{id}`               | Get all traces in a thread                |
-| `POST`  | `/api/trace/{id}/share`          | Create a public share link                |
-| `POST`  | `/api/trace/{id}/unshare`        | Remove a public share link                |
+| `POST`  | `/api/v1/traces/search`             | Search traces with filters and pagination |
+| `GET`   | `/api/v1/traces/{traceId}`          | Get full trace details by ID              |
+| `PATCH` | `/api/v1/traces/{traceId}/metadata` | Update trace metadata after creation      |
+| `GET`   | `/api/v1/thread/{id}`               | Get all traces in a thread                |
+| `POST`  | `/api/v1/trace/{id}/share`          | Create a public share link                |
+| `POST`  | `/api/v1/trace/{id}/unshare`        | Remove a public share link                |
 
 <Info>
-  The older `/api/trace/search` and `/api/trace/{id}` endpoints still work but are deprecated.
-  Migrate to `/api/traces/search` and `/api/traces/{traceId}` for the improved `format` parameter
+  The older `/api/v1/trace/search` and `/api/v1/trace/{id}` endpoints still work but are deprecated.
+  Migrate to `/api/v1/traces/search` and `/api/v1/traces/{traceId}` for the improved `format` parameter
   and AI-readable digests.
 </Info>
 
@@ -74556,12 +74585,12 @@ Pass your LangWatch API key in the `X-Auth-Token` header. Your API key can be fo
 
 ---
 title: "Projection DSL & field catalog"
-description: "Declare exactly which trace fields to return from POST /api/traces/search — including nested events, annotations, and evaluations — so a daily ETL becomes one paginated loop instead of a per-trace fan-out."
+description: "Declare exactly which trace fields to return from POST /api/v1/traces/search — including nested events, annotations, and evaluations — so a daily ETL becomes one paginated loop instead of a per-trace fan-out."
 ---
 
 ## Why
 
-By default `POST /api/traces/search` returns the full trace shape. For an ETL
+By default `POST /api/v1/traces/search` returns the full trace shape. For an ETL
 pipeline that only needs a handful of fields across thousands of traces, that is
 both more data than required and forces a second call per trace to read
 event-level feedback. The projection DSL lets a caller declare the columns of
@@ -74581,7 +74610,7 @@ Two optional fields on the search request body:
 | `select` | `string[]` | Flat list of dotted-path columns to project. Must be non-empty when present.                               |
 
 ```bash
-curl -X POST https://app.langwatch.ai/api/traces/search \
+curl -X POST https://app.langwatch.ai/api/v1/traces/search \
   -H "X-Auth-Token: $LANGWATCH_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -74786,7 +74815,7 @@ and **no** `schema` field. Existing integrations are unaffected.
 
 ---
 title: "Search traces"
-openapi: "POST /api/traces/search"
+openapi: "POST /api/v1/traces/search"
 ---
 
 ---
@@ -74795,7 +74824,7 @@ openapi: "POST /api/traces/search"
 
 ---
 title: "Update trace metadata"
-openapi: "PATCH /api/traces/{traceId}/metadata"
+openapi: "PATCH /api/v1/traces/{traceId}/metadata"
 ---
 
 ---
@@ -74804,7 +74833,7 @@ openapi: "PATCH /api/traces/{traceId}/metadata"
 
 ---
 title: "Create a Slack alert trigger"
-openapi: "POST /api/trigger/slack"
+openapi: "POST /api/v1/trigger/slack"
 ---
 
 ---
@@ -74813,7 +74842,7 @@ openapi: "POST /api/trigger/slack"
 
 ---
 title: "Create a new trigger"
-openapi: "POST /api/triggers"
+openapi: "POST /api/v1/triggers"
 ---
 
 ---
@@ -74822,7 +74851,7 @@ openapi: "POST /api/triggers"
 
 ---
 title: "Delete a trigger"
-openapi: "DELETE /api/triggers/{id}"
+openapi: "DELETE /api/v1/triggers/{id}"
 ---
 
 ---
@@ -74831,7 +74860,7 @@ openapi: "DELETE /api/triggers/{id}"
 
 ---
 title: "Get a trigger by its ID"
-openapi: "GET /api/triggers/{id}"
+openapi: "GET /api/v1/triggers/{id}"
 ---
 
 ---
@@ -74840,7 +74869,7 @@ openapi: "GET /api/triggers/{id}"
 
 ---
 title: "List all active triggers"
-openapi: "GET /api/triggers"
+openapi: "GET /api/v1/triggers"
 ---
 
 ---
@@ -74862,7 +74891,7 @@ Manage automation triggers that fire actions based on trace events. Create Slack
 
 ---
 title: "Update a trigger"
-openapi: "PATCH /api/triggers/{id}"
+openapi: "PATCH /api/v1/triggers/{id}"
 ---
 
 ---
@@ -74992,7 +75021,7 @@ openapi: "PATCH /api/webhooks/v1/endpoints/{id}"
 
 ---
 title: "Create Evaluate"
-openapi: "POST /api/workflows/{id}/evaluate"
+openapi: "POST /api/v1/workflows/{id}/evaluate"
 ---
 
 ---
@@ -75001,7 +75030,7 @@ openapi: "POST /api/workflows/{id}/evaluate"
 
 ---
 title: "Archive a workflow"
-openapi: "DELETE /api/workflows/{id}"
+openapi: "DELETE /api/v1/workflows/{id}"
 ---
 
 ---
@@ -75010,7 +75039,7 @@ openapi: "DELETE /api/workflows/{id}"
 
 ---
 title: "Get a workflow by its ID"
-openapi: "GET /api/workflows/{id}"
+openapi: "GET /api/v1/workflows/{id}"
 ---
 
 ---
@@ -75019,7 +75048,7 @@ openapi: "GET /api/workflows/{id}"
 
 ---
 title: "List all non-archived workflows for the project"
-openapi: "GET /api/workflows"
+openapi: "GET /api/v1/workflows"
 ---
 
 ---
@@ -75041,7 +75070,7 @@ Manage Optimization Studio workflows. List, update, and archive workflows used f
 
 ---
 title: "Run a specific workflow version"
-openapi: "POST /api/workflows/{workflowId}/{versionId}/run"
+openapi: "POST /api/v1/workflows/{workflowId}/{versionId}/run"
 ---
 
 ---
@@ -75050,7 +75079,7 @@ openapi: "POST /api/workflows/{workflowId}/{versionId}/run"
 
 ---
 title: "Run a workflow version (legacy path)"
-openapi: "POST /api/optimization/{workflowId}/{versionId}"
+openapi: "POST /api/v1/optimization/{workflowId}/{versionId}"
 ---
 
 ---
@@ -75059,7 +75088,7 @@ openapi: "POST /api/optimization/{workflowId}/{versionId}"
 
 ---
 title: "Run a workflow"
-openapi: "POST /api/workflows/{workflowId}/run"
+openapi: "POST /api/v1/workflows/{workflowId}/run"
 ---
 
 ---
@@ -75068,7 +75097,7 @@ openapi: "POST /api/workflows/{workflowId}/run"
 
 ---
 title: "Update a workflow's metadata"
-openapi: "PATCH /api/workflows/{id}"
+openapi: "PATCH /api/v1/workflows/{id}"
 ---
 
 ---

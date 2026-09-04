@@ -17,7 +17,7 @@ sidebarTitle: MCP server
   register on every MCP session the hosted endpoint opens, through the session tool registrar bound
   in `apps/api/src/features/mcp/hosted-mcp.mount.ts`, via `registerGovernanceMcpTools(server, ctx)`,
   and call the governance services (`IngestionTemplateService`, `IngestionKeyService`, etc.)
-  directly with `surface: "mcp"`. They do NOT route through `/api/governance/*` over HTTP. Reason:
+  directly with `surface: "mcp"`. They do NOT route through `/api/v1/governance/*` over HTTP. Reason:
   it avoids the project-API-key vs PAT auth mismatch and matches Sergey's explicit
   `GovernanceCallSurface` contract at `fc6d54100` without needing Hono middleware changes.
   Cross-path uniformity (audit, RBAC, multitenancy) still holds by construction, the service layer
@@ -75,7 +75,7 @@ The pattern is `governance_<resource_with_underscores>_<verb_with_underscores>`,
 Governance MCP tools register inside LangWatch's existing MCP server (served on the same host that serves the dashboard), there is **no separate `langwatch mcp serve` binary**. Clients connect over HTTP using either streamable-HTTP at `/mcp` or SSE at `/sse`, and authenticate with one of:
 
 - **Project API key as Bearer** (`Authorization: Bearer <projectApiKey>`), the plain read tools work immediately. Sufficient to call `governance_*_list` and `governance_*_get`. Admin reads (`governance_*_admin_list`, which expose `ottlRules`) and every write tool require a user-bound session and reject a project-key-only caller.
-- **OAuth (PKCE) flow** at `/api/mcp/authorize` → `/oauth/token`, required for write tools and admin reads. The OAuth flow captures the user's id at authorize time, threads it through the session token cache, and surfaces it to governance tools as `ctx.callerUserId`. Without it, a write tool returns an `AUTH_REQUIRED:` error pointing the client at the OAuth flow.
+- **OAuth (PKCE) flow** at `/api/v1/mcp/authorize` → `/oauth/token`, required for write tools and admin reads. The OAuth flow captures the user's id at authorize time, threads it through the session token cache, and surfaces it to governance tools as `ctx.callerUserId`. Without it, a write tool returns an `AUTH_REQUIRED:` error pointing the client at the OAuth flow.
 
 ```jsonc
 // MCP client config, points at the LangWatch instance's MCP endpoint
@@ -87,7 +87,7 @@ Governance MCP tools register inside LangWatch's existing MCP server (served on 
       // Clients that speak the older SSE transport use
       // https://app.langwatch.ai/sse instead.
       // Read-only access: add Authorization: Bearer <projectApiKey>.
-      // Read+write access: complete the OAuth PKCE flow at /api/mcp/authorize.
+      // Read+write access: complete the OAuth PKCE flow at /api/v1/mcp/authorize.
     },
   },
 }
@@ -101,7 +101,7 @@ The 9 governance tools register via `registerGovernanceMcpTools(server, ctx)` fr
   (Vite), external MCP clients (e.g. Claude Code) hit `FRONTEND_PORT` (default `5560`) which proxies
   the seven MCP route prefixes through to the API port. Local Claude Code runbook: `claude mcp add
   langwatch http://localhost:5560/mcp` (or the OAuth flow at
-  `http://localhost:5560/api/mcp/authorize` for write tools). All 9 tools register over that proxy,
+  `http://localhost:5560/api/v1/mcp/authorize` for write tools). All 9 tools register over that proxy,
   read tools return the catalog with a project apiKey Bearer, and write tools return
   `AUTH_REQUIRED:` until the OAuth flow completes.
 </Note>
@@ -118,7 +118,7 @@ Governance tools enforce two distinct gates at the tool layer (`packages/enterpr
   "content": [
     {
       "type": "text",
-      "text": "AUTH_REQUIRED: this tool requires an OAuth-authenticated MCP session. Complete the OAuth flow at /api/mcp/authorize and reconnect.",
+      "text": "AUTH_REQUIRED: this tool requires an OAuth-authenticated MCP session. Complete the OAuth flow at /api/v1/mcp/authorize and reconnect.",
     },
   ],
 }
@@ -143,7 +143,7 @@ In both cases no record is created and no audit row is emitted (failed calls are
 The Path B mechanics (per `fc6d54100` + `7639b6c2b`):
 
 - **RBAC check happens at the MCP tool layer**, BEFORE the service call, the tool asks the same permission probe the tRPC and REST surfaces ask, `AuthzService.hasPermission` (`packages/features/authz/contract/src/authz.service.ts`, resolved against the built-in role sets in `packages/features/authz/contract/src/roles.ts`), and returns `FORBIDDEN:` early if the required permission is missing. Services trust the surface, they do not gate on the MCP-resolved scope a second time. This split is intentional: the MCP tool owns the RBAC contract for its surface; the service owns the multitenancy + business-logic contract.
-- **`callerUserId` flows from the OAuth session**, the OAuth PKCE flow at `/api/mcp/authorize` captures the user's id, threads it through the session token cache and `SessionState`, and surfaces it as `ctx.callerUserId`. For `IngestionKeyService.{install, rotate}` it's required (write tools reject with `AUTH_REQUIRED:` if absent). For `IngestionTemplateService` authoring methods (which take `callerUserId` for the audit trail), same plumbing.
+- **`callerUserId` flows from the OAuth session**, the OAuth PKCE flow at `/api/v1/mcp/authorize` captures the user's id, threads it through the session token cache and `SessionState`, and surfaces it as `ctx.callerUserId`. For `IngestionKeyService.{install, rotate}` it's required (write tools reject with `AUTH_REQUIRED:` if absent). For `IngestionTemplateService` authoring methods (which take `callerUserId` for the audit trail), same plumbing.
 - **Snake_case ↔ camelCase boundary**: MCP tool inputs use snake_case (`source_template_id`, `template_id`) per public-surface convention; the tool maps to camelCase (`sourceTemplateId`, `templateId`) before calling the service, since service signatures are camelCase. The mapping is the tool's job, not the service's.
 
 ## Audit emission
@@ -166,7 +166,7 @@ The contract is asserted at the application layer by `packages/enterprise/featur
 An agent connecting through the OAuth flow as an admin can fully configure governance through a sequence of MCP tool calls (the write tools below reject a project-key-only caller):
 
 1. `governance_ingestion_templates_list`, read existing platform templates
-2. `governance_ingestion_templates_clone_from_platform`, clone `claude_code` into the org (delegates to `POST /api/governance/ingestion-templates/clone`)
+2. `governance_ingestion_templates_clone_from_platform`, clone `claude_code` into the org (delegates to `POST /api/v1/governance/ingestion-templates/clone`)
 3. `governance_anomaly_rules_create`, rule on org spend > $100/day
 4. `governance_role_bindings_assign_to_user`, give a user `governance:view`
 5. `governance_audit_log_query`, verify steps 2–4 all emitted audit rows

@@ -15,7 +15,7 @@ To make a call to the Evaluators API, you will need to pass through your LangWat
 
 #### Allowed Methods
 
-- `POST /api/evaluations/{evaluator}/evaluate` - Run an evaluation using a specific evaluator
+- `POST /api/v1/evaluations/{evaluator}/evaluate` - Run an evaluation using a specific evaluator
 
 ## Evaluators List
 
@@ -132,7 +132,7 @@ Without unique names, all results would be grouped under the same auto-generated
 All evaluator endpoints follow a similar pattern:
 
 ```
-POST /api/evaluations/{evaluator_path}/evaluate
+POST /api/v1/evaluations/{evaluator_path}/evaluate
 ```
 
 Each evaluator accepts specific input parameters and settings. Refer to the individual evaluator documentation pages for detailed request/response schemas and examples.

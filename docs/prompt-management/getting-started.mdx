@@ -82,7 +82,7 @@ A prompt managed in LangWatch holds its text and its dynamic variables on the pl
 
     ```bash create_prompt.sh
     # Create a new prompt (this creates the prompt with an initial version)
-    curl -X POST "https://app.langwatch.ai/api/prompts" \
+    curl -X POST "https://app.langwatch.ai/api/v1/prompts" \
       -H "Content-Type: application/json" \
       -H "X-Auth-Token: your-api-key" \
       -d '{
@@ -163,7 +163,7 @@ At runtime, you can fetch the latest version of your prompt from LangWatch using
   <Tab title="REST API">
     ```bash use_prompt.sh
     # Get prompt by handle
-    curl -X GET "https://app.langwatch.ai/api/prompts/customer-support-bot" \
+    curl -X GET "https://app.langwatch.ai/api/v1/prompts/customer-support-bot" \
       -H "X-Auth-Token: your-api-key"
     ```
   </Tab>

@@ -70,7 +70,7 @@ The response has the values the CI job needs:
 To run a configuration of your own instead of a whole test suite, `POST /api/v1/run-plans/run` takes a `config` object with the scope, the targets, the repeat count and the two models. The scope is one of `{ "mode": "all" }`, `{ "mode": "test_suites", "testSuiteIds": [...] }`, `{ "mode": "labels", "labels": [...] }`, or `{ "mode": "scenarios" }` with `scenarioIds` beside it. `GET /api/v1/run-plans` lists the plans, and `POST /api/v1/run-plans/{id}/run` runs one again with its stored configuration.
 
 <Note>
-  The `/api/suites` family still answers and is deprecated. Move CI jobs to `/api/v1/test-suites`
+  The `/api/v1/suites` family still answers and is deprecated. Move CI jobs to `/api/v1/test-suites`
   and `/api/v1/run-plans`.
 </Note>
 
@@ -147,10 +147,10 @@ curl -X POST "https://app.langwatch.ai/api/v1/test-suites/suite_abc123/run" \
 
 ## Poll the batch
 
-`GET /api/simulation-runs/batches/{batchRunId}` answers with the counts of one batch:
+`GET /api/v1/simulation-runs/batches/{batchRunId}` answers with the counts of one batch:
 
 ```bash
-curl "https://app.langwatch.ai/api/simulation-runs/batches/batch_xyz789" \
+curl "https://app.langwatch.ai/api/v1/simulation-runs/batches/batch_xyz789" \
   -H "X-Auth-Token: ${LANGWATCH_API_KEY}"
 ```
 
@@ -191,7 +191,7 @@ Exit the CI job nonzero when `failCount` is above zero **or** `stalledCount` is 
 deadline=$(( $(date +%s) + 1800 ))
 while [ "$(date +%s)" -lt "$deadline" ]; do
   body=$(curl -s -w '\n%{http_code}' --connect-timeout 10 --max-time 30 \
-    "https://app.langwatch.ai/api/simulation-runs/batches/${BATCH_RUN_ID}" \
+    "https://app.langwatch.ai/api/v1/simulation-runs/batches/${BATCH_RUN_ID}" \
     -H "X-Auth-Token: ${LANGWATCH_API_KEY}")
   status=$(printf '%s' "$body" | tail -n1)
   summary=$(printf '%s' "$body" | sed '$d')

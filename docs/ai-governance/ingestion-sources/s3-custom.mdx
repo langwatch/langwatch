@@ -13,13 +13,13 @@ sidebarTitle: Custom S3
 `s3_custom` is the catch-all for homegrown agent systems writing audit logs to an S3 bucket, internal agents, CI tools, custom orchestrators. The data plane has two intended ingestion modes:
 
 1. **S3 polling**: the configured bucket + prefix is polled on a cadence; new objects are fetched and parsed via a customer-supplied DSL.
-2. **Webhook callback**: the upstream system can POST to the same `/api/ingest/webhook/:id` endpoint Workato uses, when polling isn't acceptable.
+2. **Webhook callback**: the upstream system can POST to the same `/api/v1/ingest/webhook/:id` endpoint Workato uses, when polling isn't acceptable.
 
 Today, only the **callback mode** is wired. The S3 puller and the DSL parser are on the [adapter roadmap](/ai-governance/ingestion-sources/index#adapter-roadmap).
 
 ## Currently implemented
 
-- **Receiver (callback mode):** `POST /api/ingest/webhook/:sourceId`.
+- **Receiver (callback mode):** `POST /api/v1/ingest/webhook/:sourceId`.
 - **Auth:** `Authorization: Bearer lw_is_<secret>`.
 - **Body:** any JSON payload, typically one log line per request.
 - **Persistence:** envelope-only. One governance event with `eventType: agent.action`, the verbatim payload in `rawPayload`, and `actor`, `target`, `costUsd`, token counts unset (parser pending).
@@ -56,7 +56,7 @@ In callback mode, identical to the Workato envelope-only shape, see [Workato →
 In callback mode:
 
 ```bash
-curl -X POST https://<your-langwatch>/api/ingest/webhook/<sourceId> \
+curl -X POST https://<your-langwatch>/api/v1/ingest/webhook/<sourceId> \
   -H "Authorization: Bearer lw_is_<secret>" \
   -H "Content-Type: application/json" \
   -d '{"actor":"agent-42","action":"file.read","target":"/etc/secrets","ts":"2026-04-27T08:00:00Z"}'

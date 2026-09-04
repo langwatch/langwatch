@@ -66,6 +66,15 @@ A family whose path already names a generation of its own — `/api/v1/agents`,
 in one URL would be two version axes, which is the thing this decision exists
 to prevent.
 
+A route whose v1 address is ALREADY DECLARED by another family is mounted
+once too, at its bare path: `/api/agents`, `/api/secret`, `/api/secrets` and
+`/api/projects` are superseded by families that own `/api/v1/agents`,
+`/api/v1/secret`, `/api/v1/secrets` and `/api/v1/projects/*`, and
+`GET /api/coding-agent/pull-request-usage` is the project-scoped door to the
+question the organization-scoped `/api/v1/coding-agent/pull-request-usage`
+answers for an organization key. Two doors with different credentials cannot
+share one address, so the derived twin is the one that gives way.
+
 Two surfaces are deliberately outside the canonical prefix: the Better Auth
 sign-in door (`/api/auth/*`), which builds its own callback, cookie and
 redirect URLs from one configured base, and the deployment's health probes

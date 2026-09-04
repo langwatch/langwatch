@@ -176,7 +176,7 @@ Send traces directly via HTTP. See [REST API](/integration/rest-api) for full de
 
 <CodeGroup>
 ```bash cURL
-curl -X POST "https://app.langwatch.ai/api/collector" \
+curl -X POST "https://app.langwatch.ai/api/v1/collector" \
   -H "X-Auth-Token: $LANGWATCH_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -210,7 +210,7 @@ import os
 import requests
 
 requests.post(
-    "https://app.langwatch.ai/api/collector",
+    "https://app.langwatch.ai/api/v1/collector",
     headers={
         "X-Auth-Token": os.environ["LANGWATCH_API_KEY"],
         "Content-Type": "application/json",
@@ -243,7 +243,7 @@ requests.post(
 ```
 
 ```typescript TypeScript
-const response = await fetch("https://app.langwatch.ai/api/collector", {
+const response = await fetch("https://app.langwatch.ai/api/v1/collector", {
   method: "POST",
   headers: {
     "X-Auth-Token": process.env.LANGWATCH_API_KEY!,

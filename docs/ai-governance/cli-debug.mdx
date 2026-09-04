@@ -177,7 +177,7 @@ If a source exists but no events have landed yet (status `awaiting_first_event`)
 ```text
 $ langwatch ingest tail brand-new-source-id
 No events for this source yet. Once your upstream platform starts
-sending OTel/audit logs to /api/ingest/* with the source's bearer
+sending OTel/audit logs to /api/v1/ingest/* with the source's bearer
 secret, events will land here.
 ```
 
@@ -203,7 +203,7 @@ The 401-on-expired-session path also clears the cached token, so the next invoca
 
 ## Error catalog
 
-The `langwatch login` flow itself can fail before the device-flow handshake completes if the org isn't configured for CLI sign-in. Each entry below names the error code returned by `/api/auth/cli/personal-virtual-keys/approve`, the human-readable hint shown to the developer, and the admin remediation.
+The `langwatch login` flow itself can fail before the device-flow handshake completes if the org isn't configured for CLI sign-in. Each entry below names the error code returned by `/api/v1/auth/cli/personal-virtual-keys/approve`, the human-readable hint shown to the developer, and the admin remediation.
 
 ### `409 no_default_routing_policy`
 
@@ -254,7 +254,7 @@ Three surfaces, one backend:
 | ------------------------------------------------------ | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Web `/governance` admin oversight                      | Governance admin in a browser   | tRPC: `api.governance.setupState`, `api.activityMonitor.*`, `api.ingestionSources.*`                                                                |
 | Web `/governance/ingestion-sources/:id` detail         | Per-source SRE                  | tRPC: `api.activityMonitor.eventsForSource`, `api.activityMonitor.sourceHealthMetrics`                                                              |
-| **CLI `governance status`, `ingest list/health/tail`** | **Terminal-first SRE, on-call** | **REST: `GET /api/auth/cli/governance/*`, Bearer adapter that imports the same service classes the tRPC procedures use, byte-for-byte matching IO** |
+| **CLI `governance status`, `ingest list/health/tail`** | **Terminal-first SRE, on-call** | **REST: `GET /api/v1/auth/cli/governance/*`, Bearer adapter that imports the same service classes the tRPC procedures use, byte-for-byte matching IO** |
 
 The REST endpoints reuse the existing `validateAccessToken()` Bearer helper that's been in production since the device-flow CLI shipped, so opening this surface doesn't introduce a new auth path. Per-account governance entitlement is enforced at the endpoint layer.
 

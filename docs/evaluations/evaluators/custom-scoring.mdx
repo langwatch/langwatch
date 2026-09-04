@@ -99,7 +99,7 @@ async function myLLMStep(userInput: string): Promise<string> {
 Send evaluation results directly via the collector API:
 
 ```bash
-curl -X POST "https://app.langwatch.ai/api/collector" \
+curl -X POST "https://app.langwatch.ai/api/v1/collector" \
      -H "X-Auth-Token: $LANGWATCH_API_KEY" \
      -H "Content-Type: application/json" \
      -d @- <<EOF

@@ -21,7 +21,7 @@ sidebarTitle: Generic OTel
 
 ## Currently implemented
 
-- **Receiver:** `POST /api/ingest/otel/:sourceId` (also accepts `claude_cowork` sources, see [Anthropic Cowork](/ai-gateway/governance/ingestion-sources/claude-cowork)).
+- **Receiver:** `POST /api/v1/ingest/otel/:sourceId` (also accepts `claude_cowork` sources, see [Anthropic Cowork](/ai-gateway/governance/ingestion-sources/claude-cowork)).
 - **Auth:** `Authorization: Bearer lw_is_<secret>`.
 - **Body:** OTLP/HTTP JSON envelope (`resource_spans`, `scope_spans`, `spans`). `snake_case` and `camelCase` both accepted.
 - **OTLP shape:** Spans (parent-child + duration). Lands in `recorded_spans`.
@@ -34,7 +34,7 @@ After clicking Create on the composer, the one-time-reveal modal exposes:
 
 | Field         | Value                                                                  |
 | ------------- | ---------------------------------------------------------------------- |
-| OTLP URL      | `https://<your-langwatch>/api/ingest/otel/<sourceId>`                  |
+| OTLP URL      | `https://<your-langwatch>/api/v1/ingest/otel/<sourceId>`                  |
 | Bearer secret | `lw_is_<base64url>` (shown once, never returned by the list endpoints) |
 
 The composer also persists one optional config field:
@@ -47,7 +47,7 @@ In the upstream platform's OTLP exporter config:
 # OpenTelemetry Collector example
 exporters:
   otlphttp/langwatch:
-    endpoint: https://<your-langwatch>/api/ingest/otel/<sourceId>
+    endpoint: https://<your-langwatch>/api/v1/ingest/otel/<sourceId>
     headers:
       Authorization: Bearer lw_is_<secret>
 service:
@@ -62,7 +62,7 @@ service:
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 
 exporter = OTLPSpanExporter(
-    endpoint="https://<your-langwatch>/api/ingest/otel/<sourceId>",
+    endpoint="https://<your-langwatch>/api/v1/ingest/otel/<sourceId>",
     headers={"Authorization": "Bearer lw_is_<secret>"},
 )
 ```

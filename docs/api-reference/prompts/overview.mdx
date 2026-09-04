@@ -13,17 +13,17 @@ To make a call to the Prompts API, you will need to pass through your LangWatch 
 
 #### Allowed Methods
 
-- `GET /api/prompts` - Get all prompts for a project
-- `POST /api/prompts` - Create a new prompt
-- `GET /api/prompts/:id` - Get a specific prompt
-- `PUT /api/prompts/:id` - Update a prompt
-- `DELETE /api/prompts/:id` - Delete a prompt
-- `GET /api/prompts/:id/versions` - Get all versions for a prompt
-- `POST /api/prompts/:id/versions` - Create a new version for a prompt
-- `GET /api/prompts/tags` - List all tags for the organization
-- `POST /api/prompts/tags` - Create a new tag
-- `PUT /api/prompts/tags/:tag` - Rename a tag
-- `DELETE /api/prompts/tags/:tag` - Delete a tag
-- `PUT /api/prompts/:id/tags/:tag` - Assign a tag to a prompt version
+- `GET /api/v1/prompts` - Get all prompts for a project
+- `POST /api/v1/prompts` - Create a new prompt
+- `GET /api/v1/prompts/:id` - Get a specific prompt
+- `PUT /api/v1/prompts/:id` - Update a prompt
+- `DELETE /api/v1/prompts/:id` - Delete a prompt
+- `GET /api/v1/prompts/:id/versions` - Get all versions for a prompt
+- `POST /api/v1/prompts/:id/versions` - Create a new version for a prompt
+- `GET /api/v1/prompts/tags` - List all tags for the organization
+- `POST /api/v1/prompts/tags` - Create a new tag
+- `PUT /api/v1/prompts/tags/:tag` - Rename a tag
+- `DELETE /api/v1/prompts/tags/:tag` - Delete a tag
+- `PUT /api/v1/prompts/:id/tags/:tag` - Assign a tag to a prompt version
 
-> **Auth scope:** Tag CRUD endpoints (`/api/prompts/tags*`) are organization-scoped, while tag assignment (`PUT /api/prompts/:id/tags/:tag`) is project-scoped.
+> **Auth scope:** Tag CRUD endpoints (`/api/v1/prompts/tags*`) are organization-scoped, while tag assignment (`PUT /api/v1/prompts/:id/tags/:tag`) is project-scoped.

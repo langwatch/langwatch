@@ -204,7 +204,7 @@ export async function generateOpenApiDocument({
 
   const stamped = withoutEmbeddedJsonSchemaDefinitions(withoutEmptyPaths(generated));
   const unpublishable = stampSecurityFromRegistry(stamped);
-  const document = withoutEmptyPaths(stamped);
+  const document = atCanonicalPaths(withoutEmptyPaths(stamped));
 
   await mkdir(dirname(outputPath), { recursive: true });
   await writeFile(outputPath, `${JSON.stringify(document, null, 2)}\n`, "utf8");
@@ -217,6 +217,37 @@ export async function generateOpenApiDocument({
     unpublishable,
     servedRoutes: registeredRouteKeys(surface.app),
   };
+}
+
+/**
+ * Republishes every path at the `/api/v1` address the same route answers on,
+ * which is the address the document names (ADR 002 §1). The mapping is the
+ * route registry's own, so a path the mount opted out of and a path already
+ * carrying a version segment keep the only address they answer on.
+ */
+export function atCanonicalPaths(document: OpenApiDocument): OpenApiDocument {
+  const paths = document.paths;
+  if (!paths) return document;
+
+  const canonical = new Map<string, string>();
+  for (const route of allRegisteredRoutes()) {
+    if (!route.canonicalPath) continue;
+    canonical.set(documentedPathOf(route.path), documentedPathOf(route.canonicalPath));
+  }
+
+  const rewritten: Record<string, Record<string, unknown>> = {};
+  for (const [routePath, item] of Object.entries(paths)) {
+    const published = canonical.get(routePath) ?? routePath;
+    if (rewritten[published]) {
+      throw new Error(
+        `${routePath} publishes at ${published}, which another path already claims. ` +
+          "Two families cannot share one canonical address — opt one out of the v1 alias.",
+      );
+    }
+    rewritten[published] = item;
+  }
+
+  return { ...document, paths: rewritten };
 }
 
 /** `METHOD /documented/path` for every route a composed app registers. */

@@ -253,7 +253,7 @@ for index, row in evaluation.loop(df.iterrows()):
 Once you have a reliable image evaluator, you can call it directly via REST API for integration into any pipeline:
 
 ```bash
-curl -X POST "https://app.langwatch.ai/api/evaluations/evaluators/image-quality-scorer/evaluate" \
+curl -X POST "https://app.langwatch.ai/api/v1/evaluations/evaluators/image-quality-scorer/evaluate" \
      -H "X-Auth-Token: $LANGWATCH_API_KEY" \
      -H "Content-Type: application/json" \
      -d @- <<EOF

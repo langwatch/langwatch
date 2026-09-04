@@ -61,7 +61,7 @@ prompt.parameters;
 ### REST API
 
 ```bash
-curl -s "https://app.langwatch.ai/api/prompts/qa-extractor" \
+curl -s "https://app.langwatch.ai/api/v1/prompts/qa-extractor" \
   -H "X-Auth-Token: $LANGWATCH_API_KEY" | jq .parameters
 ```
 
@@ -100,7 +100,7 @@ await langwatch.prompts.update("qa-extractor", {
 ### REST API
 
 ```bash
-curl -X PUT "https://app.langwatch.ai/api/prompts/qa-extractor" \
+curl -X PUT "https://app.langwatch.ai/api/v1/prompts/qa-extractor" \
   -H "X-Auth-Token: $LANGWATCH_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"parameters": {"max_search_iterations": 5, "confidence_threshold": 0.9}}'
@@ -112,7 +112,7 @@ curl -X PUT "https://app.langwatch.ai/api/prompts/qa-extractor" \
 - Restoring an older version restores that version's `parameters` too.
 - Tags (`production`, `staging`, custom) resolve to a version, so fetching by tag always returns the matching `parameters`.
 - Explicit updates (`PUT`, SDK `update`) always create a new version, even if the content is unchanged.
-- The sync endpoint (`POST /api/prompts/{id}/sync`, used by the CLI) compares content key-order independently: re-syncing the same parameters with keys in a different order reports `up_to_date` and does not create a new version.
+- The sync endpoint (`POST /api/v1/prompts/{id}/sync`, used by the CLI) compares content key-order independently: re-syncing the same parameters with keys in a different order reports `up_to_date` and does not create a new version.
 
 ## In the UI
 

@@ -30,8 +30,8 @@ Reading needs `organization:view`; updating needs `organization:manage`. A key w
 
 | Method  | Path                | Permission            | Description                             |
 | ------- | ------------------- | --------------------- | --------------------------------------- |
-| `GET`   | `/api/organization` | `organization:view`   | Read the organization profile           |
-| `PATCH` | `/api/organization` | `organization:manage` | Update part of the organization profile |
+| `GET`   | `/api/v1/organization` | `organization:view`   | Read the organization profile           |
+| `PATCH` | `/api/v1/organization` | `organization:manage` | Update part of the organization profile |
 
 Members and invites are families of their own: see [Members](/api-reference/members/overview) and [Invites](/api-reference/invites/overview).
 
@@ -44,11 +44,11 @@ Members and invites are families of their own: see [Members](/api-reference/memb
 
 ```bash
 # Read the profile
-curl https://app.langwatch.ai/api/organization \
+curl https://app.langwatch.ai/api/v1/organization \
   -H "Authorization: Bearer sk-lw-..."
 
 # Rename it and set a support contact, leaving everything else alone
-curl -X PATCH https://app.langwatch.ai/api/organization \
+curl -X PATCH https://app.langwatch.ai/api/v1/organization \
   -H "Authorization: Bearer sk-lw-..." \
   -H "Content-Type: application/json" \
   -d '{"name": "Acme", "supportContact": "support@acme.example"}'

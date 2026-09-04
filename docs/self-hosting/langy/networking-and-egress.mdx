@@ -42,7 +42,7 @@ With `GITHUB_LANGY_HOST` set to a GitHub Enterprise Server hostname, the control
 
 ## Inbound
 
-Everything above is outbound. The one inbound path GitHub uses is the webhook, delivered to `<BASE_URL>/api/github/webhook`.
+Everything above is outbound. The one inbound path GitHub uses is the webhook, delivered to `<BASE_URL>/api/v1/github/webhook`.
 
 It is optional. An instance GitHub cannot reach still connects and works, and reconciles late instead. For what changes, see [Restricted networks](/self-hosting/langy/github-app#restricted-networks).
 

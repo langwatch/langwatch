@@ -26,7 +26,7 @@ arrive, not a worker that polls.
 
 ```text
 ┌────────────────────────────────────────────────────────────────┐
-│  /api/ingest/otel/:sourceId  /api/ingest/webhook/:sourceId      │
+│  /api/v1/ingest/otel/:sourceId  /api/v1/ingest/webhook/:sourceId      │
 │  (Hono routes: auth, validate sourceId, parse body)             │
 └────────────────────────┬───────────────────────────────────────┘
                          │
@@ -127,8 +127,8 @@ The redesign ships as four slices, C0 through C3:
   ActivityEventRow shape.
 - New command: `RecordActivityEventCommand` wired into the
   pipeline.
-- Refactor `/api/ingest/otel/:sourceId` and
-  `/api/ingest/webhook/:sourceId` to call the command instead of
+- Refactor `/api/v1/ingest/otel/:sourceId` and
+  `/api/v1/ingest/webhook/:sourceId` to call the command instead of
   writing CH directly.
 - Map projection `activityEventStorage` writes to
   `gateway_activity_events` (replaces today's direct insert).

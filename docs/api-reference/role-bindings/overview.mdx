@@ -34,10 +34,10 @@ Authorization: Bearer sk-lw-<id>_<secret>
 
 | Method   | Path                      | Description                                   |
 | -------- | ------------------------- | --------------------------------------------- |
-| `GET`    | `/api/role-bindings`      | List bindings, filtered by principal or scope |
-| `POST`   | `/api/role-bindings`      | Grant one role to one principal at one scope  |
-| `PATCH`  | `/api/role-bindings/{id}` | Change the role a binding grants              |
-| `DELETE` | `/api/role-bindings/{id}` | Delete a binding                              |
+| `GET`    | `/api/v1/role-bindings`      | List bindings, filtered by principal or scope |
+| `POST`   | `/api/v1/role-bindings`      | Grant one role to one principal at one scope  |
+| `PATCH`  | `/api/v1/role-bindings/{id}` | Change the role a binding grants              |
+| `DELETE` | `/api/v1/role-bindings/{id}` | Delete a binding                              |
 
 `GET` filters on `userId`, `groupId`, `apiKeyId`, `scopeType` and `scopeId`, and pages with `offset` and `limit`. `limit` defaults to 50 and cannot exceed 200. `totalCount` counts the filtered set, not the organization.
 
@@ -59,7 +59,7 @@ A binding is identified by its principal, its role, and its scope. Creating the 
 
 ```bash
 # A group of engineers gets MEMBER on one team
-curl -X POST https://app.langwatch.ai/api/role-bindings \
+curl -X POST https://app.langwatch.ai/api/v1/role-bindings \
   -H "Authorization: Bearer sk-lw-..." \
   -H "Content-Type: application/json" \
   -d '{
@@ -70,7 +70,7 @@ curl -X POST https://app.langwatch.ai/api/role-bindings \
   }'
 
 # A CI key gets a narrow custom role on one project
-curl -X POST https://app.langwatch.ai/api/role-bindings \
+curl -X POST https://app.langwatch.ai/api/v1/role-bindings \
   -H "Authorization: Bearer sk-lw-..." \
   -H "Content-Type: application/json" \
   -d '{

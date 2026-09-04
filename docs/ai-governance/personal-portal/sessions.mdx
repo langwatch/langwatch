@@ -61,7 +61,7 @@ Each session is identified by:
 ## How sessions get created
 
 Every successful `langwatch login --device` creates a new session. The
-first time the CLI POSTs `/api/auth/cli/exchange`, it sends a
+first time the CLI POSTs `/api/v1/auth/cli/exchange`, it sends a
 `client_info` block:
 
 ```json

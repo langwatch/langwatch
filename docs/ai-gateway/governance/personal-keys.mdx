@@ -124,7 +124,7 @@ Behind the scenes:
 1. The CLI ran an [RFC 8628 device-flow OAuth](https://datatracker.ietf.org/doc/html/rfc8628) handshake against the LangWatch control plane.
 2. Your browser ran the SSO flow your IT admin configured (Okta, Google Workspace, Azure AD, or password-only).
 3. LangWatch minted a **personal virtual key** scoped to your user identity, signed by the gateway, bound to your monthly budget, and audit-trailed per request.
-4. The CLI fetched your AI tools, inheritable providers, and budget from `/api/auth/cli/bootstrap` and rendered the ceremony you see above.
+4. The CLI fetched your AI tools, inheritable providers, and budget from `/api/v1/auth/cli/bootstrap` and rendered the ceremony you see above.
 
 Tokens persisted at `~/.langwatch/config.json` (mode 0600).
 

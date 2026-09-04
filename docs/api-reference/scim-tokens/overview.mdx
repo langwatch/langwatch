@@ -26,16 +26,16 @@ Authorization: Bearer sk-lw-<id>_<secret>
 
 | Method   | Path                    | Description                         |
 | -------- | ----------------------- | ----------------------------------- |
-| `GET`    | `/api/scim-tokens`      | List the organization's SCIM tokens |
-| `POST`   | `/api/scim-tokens`      | Mint a token, returned once         |
-| `DELETE` | `/api/scim-tokens/{id}` | Revoke a token                      |
+| `GET`    | `/api/v1/scim-tokens`      | List the organization's SCIM tokens |
+| `POST`   | `/api/v1/scim-tokens`      | Mint a token, returned once         |
+| `DELETE` | `/api/v1/scim-tokens/{id}` | Revoke a token                      |
 
 ## The value is returned once
 
 `POST` is the only response that ever contains the token itself. The list returns the id, the description, when it was created and when it was last used, and never the value or its hash. If the token is lost, mint a new one and revoke the old one.
 
 ```bash
-curl -X POST https://app.langwatch.ai/api/scim-tokens \
+curl -X POST https://app.langwatch.ai/api/v1/scim-tokens \
   -H "Authorization: Bearer sk-lw-..." \
   -H "Content-Type: application/json" \
   -d '{"description": "Okta production"}'

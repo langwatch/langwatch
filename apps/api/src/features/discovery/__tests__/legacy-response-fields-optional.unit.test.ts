@@ -141,7 +141,7 @@ describe("given the generated OpenAPI document", () => {
     /** @scenario "The scenario answers read testSuiteId as optional" */
     it("lists testSuiteId as optional on every success answer", () => {
       const testSuiteId = readingOf({
-        family: "/api/scenarios",
+        family: "/api/v1/scenarios",
         field: "testSuiteId",
       });
       expect(testSuiteId.occurrences.length).toBeGreaterThan(0);
@@ -156,9 +156,9 @@ describe("given the generated OpenAPI document", () => {
         // The version snapshot was published with these fields from its
         // first day, so it may read them as required.
         const reading = readingOf({
-          family: "/api/scenarios",
+          family: "/api/v1/scenarios",
           field,
-          bornWith: ["/api/scenarios/{id}/versions"],
+          bornWith: ["/api/v1/scenarios/{id}/versions"],
         });
         expect(reading.occurrences.length, field).toBeGreaterThan(0);
         expect(reading.offenders, field).toEqual([]);
@@ -169,8 +169,8 @@ describe("given the generated OpenAPI document", () => {
   describe("when the suite answers are read", () => {
     /** @scenario "The suite answers read kind and scope as optional" */
     it("lists kind and scope as optional on every success answer", () => {
-      const kind = readingOf({ family: "/api/suites", field: "kind" });
-      const scope = readingOf({ family: "/api/suites", field: "scope" });
+      const kind = readingOf({ family: "/api/v1/suites", field: "kind" });
+      const scope = readingOf({ family: "/api/v1/suites", field: "scope" });
       expect(kind.occurrences.length).toBeGreaterThan(0);
       expect(scope.occurrences.length).toBeGreaterThan(0);
       expect(kind.offenders).toEqual([]);
@@ -182,11 +182,11 @@ describe("given the generated OpenAPI document", () => {
     /** @scenario "The simulation run answers read note and scenarioVersion as optional" */
     it("lists note and scenarioVersion as optional on every success answer", () => {
       const note = readingOf({
-        family: "/api/simulation-runs",
+        family: "/api/v1/simulation-runs",
         field: "note",
       });
       const version = readingOf({
-        family: "/api/simulation-runs",
+        family: "/api/v1/simulation-runs",
         field: "scenarioVersion",
       });
       expect(note.occurrences.length).toBeGreaterThan(0);

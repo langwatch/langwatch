@@ -138,7 +138,7 @@ the gateway's base URL injected:
 Dev terminal              LangWatch                  Provider
 ─────────────             ─────────                  ────────
 $ langwatch               app.langwatch.ai           api.anthropic.com
-  login --device  ◀──SSO──▶  /api/auth/cli/*
+  login --device  ◀──SSO──▶  /api/v1/auth/cli/*
   ↓ writes ~/.langwatch
   ↓ ANTHROPIC_AUTH_TOKEN=vk-lw-...
 
@@ -300,8 +300,8 @@ spendByUser, ingestionSourcesHealth, recentAnomalies}` tRPC
   - Tier 4. Seven `sourceType` values supported on the schema
     side (see Tier 3 above).
 - ✅ **`IngestionSourceService` + REST receivers + tRPC admin
-  router.** `POST /api/ingest/otel/:sourceId` (Tier 4 entry
-  point) and `POST /api/ingest/webhook/:sourceId` (Tier 3 push
+  router.** `POST /api/v1/ingest/otel/:sourceId` (Tier 4 entry
+  point) and `POST /api/v1/ingest/webhook/:sourceId` (Tier 3 push
   destination) accept events authenticated by a per-source
   `Bearer lw_is_*` secret, return 202, flip `lastEventAt` on the
   source. `api.ingestionSources.{list,get,create,update,

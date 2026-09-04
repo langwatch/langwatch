@@ -14,7 +14,7 @@ Claude Cowork pushes telemetry over OTLP/HTTP. The receiver is wired and accepts
 
 ## Currently implemented
 
-- **Receiver:** `POST /api/ingest/otel/:sourceId`, same endpoint as [`otel_generic`](/ai-gateway/governance/ingestion-sources/otel-generic).
+- **Receiver:** `POST /api/v1/ingest/otel/:sourceId`, same endpoint as [`otel_generic`](/ai-gateway/governance/ingestion-sources/otel-generic).
 - **Auth:** `Authorization: Bearer lw_is_<secret>`.
 - **Body:** OTLP/HTTP JSON envelope (also accepts protobuf + gzip, deflate, brotli per the shared parser).
 - **OTLP shape:** Spans (lands in `recorded_spans` with origin metadata stamped). Same handoff path as `otel_generic`.
@@ -33,7 +33,7 @@ The one-time-reveal modal exposes:
 
 | Field         | Value                                                 |
 | ------------- | ----------------------------------------------------- |
-| OTLP URL      | `https://<your-langwatch>/api/ingest/otel/<sourceId>` |
+| OTLP URL      | `https://<your-langwatch>/api/v1/ingest/otel/<sourceId>` |
 | Bearer secret | `lw_is_<base64url>`                                   |
 
 In Anthropic's admin console: **Workspace → Telemetry**, paste the OTLP URL + the bearer header. Cowork starts pushing.

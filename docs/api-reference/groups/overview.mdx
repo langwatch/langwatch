@@ -30,27 +30,27 @@ Authorization: Bearer sk-lw-<id>_<secret>
 
 | Method   | Path               | Description                                             |
 | -------- | ------------------ | ------------------------------------------------------- |
-| `GET`    | `/api/groups`      | List all groups in the organization                     |
-| `POST`   | `/api/groups`      | Create a new group (with optional members and bindings) |
-| `GET`    | `/api/groups/{id}` | Get group details with members and bindings             |
-| `PATCH`  | `/api/groups/{id}` | Rename a group                                          |
-| `DELETE` | `/api/groups/{id}` | Delete a group and all its memberships/bindings         |
+| `GET`    | `/api/v1/groups`      | List all groups in the organization                     |
+| `POST`   | `/api/v1/groups`      | Create a new group (with optional members and bindings) |
+| `GET`    | `/api/v1/groups/{id}` | Get group details with members and bindings             |
+| `PATCH`  | `/api/v1/groups/{id}` | Rename a group                                          |
+| `DELETE` | `/api/v1/groups/{id}` | Delete a group and all its memberships/bindings         |
 
 ### Members
 
 | Method   | Path                                | Description                  |
 | -------- | ----------------------------------- | ---------------------------- |
-| `GET`    | `/api/groups/{id}/members`          | List members of a group      |
-| `POST`   | `/api/groups/{id}/members`          | Add a member to a group      |
-| `DELETE` | `/api/groups/{id}/members/{userId}` | Remove a member from a group |
+| `GET`    | `/api/v1/groups/{id}/members`          | List members of a group      |
+| `POST`   | `/api/v1/groups/{id}/members`          | Add a member to a group      |
+| `DELETE` | `/api/v1/groups/{id}/members/{userId}` | Remove a member from a group |
 
 ### Role Bindings
 
 | Method   | Path                                    | Description                        |
 | -------- | --------------------------------------- | ---------------------------------- |
-| `GET`    | `/api/groups/{id}/bindings`             | List role bindings for a group     |
-| `POST`   | `/api/groups/{id}/bindings`             | Add a role binding to a group      |
-| `DELETE` | `/api/groups/{id}/bindings/{bindingId}` | Remove a role binding from a group |
+| `GET`    | `/api/v1/groups/{id}/bindings`             | List role bindings for a group     |
+| `POST`   | `/api/v1/groups/{id}/bindings`             | Add a role binding to a group      |
+| `DELETE` | `/api/v1/groups/{id}/bindings/{bindingId}` | Remove a role binding from a group |
 
 ## SCIM-Managed Groups
 
@@ -66,7 +66,7 @@ Groups provisioned from an identity provider via SCIM are marked with a `scimSou
 2. Create a group with initial members and role bindings:
 
 ```bash
-curl -X POST https://app.langwatch.ai/api/groups \
+curl -X POST https://app.langwatch.ai/api/v1/groups \
   -H "Authorization: Bearer sk-lw-..." \
   -H "Content-Type: application/json" \
   -d '{

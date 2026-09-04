@@ -1,11 +1,11 @@
 ---
 title: "Projection DSL & field catalog"
-description: "Declare exactly which trace fields to return from POST /api/traces/search — including nested events, annotations, and evaluations — so a daily ETL becomes one paginated loop instead of a per-trace fan-out."
+description: "Declare exactly which trace fields to return from POST /api/v1/traces/search — including nested events, annotations, and evaluations — so a daily ETL becomes one paginated loop instead of a per-trace fan-out."
 ---
 
 ## Why
 
-By default `POST /api/traces/search` returns the full trace shape. For an ETL
+By default `POST /api/v1/traces/search` returns the full trace shape. For an ETL
 pipeline that only needs a handful of fields across thousands of traces, that is
 both more data than required and forces a second call per trace to read
 event-level feedback. The projection DSL lets a caller declare the columns of
@@ -25,7 +25,7 @@ Two optional fields on the search request body:
 | `select` | `string[]` | Flat list of dotted-path columns to project. Must be non-empty when present.                               |
 
 ```bash
-curl -X POST https://app.langwatch.ai/api/traces/search \
+curl -X POST https://app.langwatch.ai/api/v1/traces/search \
   -H "X-Auth-Token: $LANGWATCH_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{

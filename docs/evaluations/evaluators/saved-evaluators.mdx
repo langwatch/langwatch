@@ -197,7 +197,7 @@ async function myLLMStep(userInput: string): Promise<string> {
 API_KEY="$LANGWATCH_API_KEY"
 
 # Call your saved evaluator
-curl -X POST "https://app.langwatch.ai/api/evaluations/evaluators/my-tone-checker/evaluate" \
+curl -X POST "https://app.langwatch.ai/api/v1/evaluations/evaluators/my-tone-checker/evaluate" \
      -H "X-Auth-Token: $API_KEY" \
      -H "Content-Type: application/json" \
      -d @- <<EOF

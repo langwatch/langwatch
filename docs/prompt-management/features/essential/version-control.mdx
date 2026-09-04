@@ -79,17 +79,17 @@ Use the REST API to manage prompt versions:
 ```bash
 # Get all versions of a prompt
 curl --request GET \
-  --url "https://app.langwatch.ai/api/prompts/{prompt_handle}/versions" \
+  --url "https://app.langwatch.ai/api/v1/prompts/{prompt_handle}/versions" \
   --header "X-Auth-Token: your-api-key"
 
 # Retrieve prompts via the API to support versioning, evaluation workflows, and agent testing pipelines. (latest version)
 curl --request GET \
-  --url "https://app.langwatch.ai/api/prompts/{prompt_handle}" \
+  --url "https://app.langwatch.ai/api/v1/prompts/{prompt_handle}" \
   --header "X-Auth-Token: your-api-key"
 
 # Create a new version
 curl --request POST \
-  --url "https://app.langwatch.ai/api/prompts/{prompt_handle}/versions" \
+  --url "https://app.langwatch.ai/api/v1/prompts/{prompt_handle}/versions" \
   --header "X-Auth-Token: your-api-key" \
   --header "Content-Type: application/json" \
   --data '{
@@ -108,7 +108,7 @@ curl --request POST \
 
 # Get a specific version
 curl --request GET \
-  --url "https://app.langwatch.ai/api/prompts/{prompt_handle}?version=2" \
+  --url "https://app.langwatch.ai/api/v1/prompts/{prompt_handle}?version=2" \
   --header "X-Auth-Token: your-api-key"
 ```
 

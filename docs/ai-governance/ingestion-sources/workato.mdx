@@ -14,7 +14,7 @@ Workato pushes job-completed webhooks. The receiver is wired and persists each d
 
 ## Currently implemented
 
-- **Receiver:** `POST /api/ingest/webhook/:sourceId`.
+- **Receiver:** `POST /api/v1/ingest/webhook/:sourceId`.
 - **Auth:** `Authorization: Bearer lw_is_<secret>`.
 - **Body:** any JSON payload (Workato's exact webhook envelope).
 - **Persistence:** one governance event per delivery, with `eventType: agent.action`, `actor`/`target` empty, and the verbatim payload in `rawPayload`. The CLI tail shows one row per Workato webhook hit and the per-source detail page lets you expand the row to see the raw envelope.
@@ -32,7 +32,7 @@ The one-time-reveal modal exposes:
 
 | Field         | Value                                                    |
 | ------------- | -------------------------------------------------------- |
-| Webhook URL   | `https://<your-langwatch>/api/ingest/webhook/<sourceId>` |
+| Webhook URL   | `https://<your-langwatch>/api/v1/ingest/webhook/<sourceId>` |
 | Bearer secret | `lw_is_<base64url>`                                      |
 
 In Workato: **Connection Profile → Webhook destination**, paste the webhook URL and add an `Authorization: Bearer lw_is_<secret>` header. Save.
@@ -85,7 +85,7 @@ Hit a Workato recipe that's connected to the webhook, you should see one event r
 If you want to dry-run without a Workato recipe:
 
 ```bash
-curl -X POST https://<your-langwatch>/api/ingest/webhook/<sourceId> \
+curl -X POST https://<your-langwatch>/api/v1/ingest/webhook/<sourceId> \
   -H "Authorization: Bearer lw_is_<secret>" \
   -H "Content-Type: application/json" \
   -d '{"event":"recipe.success","recipe_id":42,"timestamp":"2026-04-27T08:00:00Z"}'

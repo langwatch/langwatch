@@ -30,11 +30,11 @@ Reading the list and a single member needs `organization:view`. Changing, removi
 
 | Method   | Path                                        | Permission            | Description                                                   |
 | -------- | ------------------------------------------- | --------------------- | ------------------------------------------------------------- |
-| `GET`    | `/api/organization/members`                 | `organization:view`   | List members with their role and status                       |
-| `GET`    | `/api/organization/members/{userId}`        | `organization:view`   | Read one member and the teams they reach                      |
-| `PATCH`  | `/api/organization/members/{userId}`        | `organization:manage` | Change the organization role, or disable and re-enable access |
-| `DELETE` | `/api/organization/members/{userId}`        | `organization:manage` | Remove a member from the organization and its teams           |
-| `GET`    | `/api/organization/members/{userId}/access` | `organization:manage` | Read everything the member can reach and where it comes from  |
+| `GET`    | `/api/v1/organization/members`                 | `organization:view`   | List members with their role and status                       |
+| `GET`    | `/api/v1/organization/members/{userId}`        | `organization:view`   | Read one member and the teams they reach                      |
+| `PATCH`  | `/api/v1/organization/members/{userId}`        | `organization:manage` | Change the organization role, or disable and re-enable access |
+| `DELETE` | `/api/v1/organization/members/{userId}`        | `organization:manage` | Remove a member from the organization and its teams           |
+| `GET`    | `/api/v1/organization/members/{userId}/access` | `organization:manage` | Read everything the member can reach and where it comes from  |
 
 Disabled members are left out of the list unless you pass `includeDisabled=true`.
 
@@ -56,10 +56,10 @@ Re-enabling a member takes a seat back, so it is checked against your plan and c
 
 ## The access breakdown
 
-`GET /api/organization/members/{userId}/access` answers the question an auditor asks: not what roles someone has, but what they can reach and why. It returns the organization role and its permissions, every group the member belongs to with the bindings that group carries, and the bindings held directly, each with the permissions it grants and the scope it grants them on.
+`GET /api/v1/organization/members/{userId}/access` answers the question an auditor asks: not what roles someone has, but what they can reach and why. It returns the organization role and its permissions, every group the member belongs to with the bindings that group carries, and the bindings held directly, each with the permissions it grants and the scope it grants them on.
 
 ```bash
-curl https://app.langwatch.ai/api/organization/members/user_abc123/access \
+curl https://app.langwatch.ai/api/v1/organization/members/user_abc123/access \
   -H "Authorization: Bearer sk-lw-..."
 ```
 
@@ -67,17 +67,17 @@ curl https://app.langwatch.ai/api/organization/members/user_abc123/access \
 
 ```bash
 # Who is in the organization
-curl "https://app.langwatch.ai/api/organization/members?includeDisabled=true" \
+curl "https://app.langwatch.ai/api/v1/organization/members?includeDisabled=true" \
   -H "Authorization: Bearer sk-lw-..."
 
 # Promote someone
-curl -X PATCH https://app.langwatch.ai/api/organization/members/user_abc123 \
+curl -X PATCH https://app.langwatch.ai/api/v1/organization/members/user_abc123 \
   -H "Authorization: Bearer sk-lw-..." \
   -H "Content-Type: application/json" \
   -d '{"role": "ADMIN"}'
 
 # Offboard: disable first, remove once the handover is done
-curl -X PATCH https://app.langwatch.ai/api/organization/members/user_abc123 \
+curl -X PATCH https://app.langwatch.ai/api/v1/organization/members/user_abc123 \
   -H "Authorization: Bearer sk-lw-..." \
   -H "Content-Type: application/json" \
   -d '{"disabled": true}'

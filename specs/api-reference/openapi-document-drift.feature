@@ -85,3 +85,36 @@ Feature: The published OpenAPI document tracks the surface the API process serve
       And the process now enforces a different credential class on that route
       When the check runs
       Then the operation is reported as changed with both requirements
+
+  Rule: the document names the canonical /api/v1 address of every route
+
+    # Every REST family answers at both /api/{family} and /api/v1/{family},
+    # and the published document names ONE of the two. It names the canonical
+    # v1 address, because that is the URL an integrator is told to call. A
+    # path that already carries a version segment of its own, and a family
+    # the mount opted out of the alias, keep the only address they answer on.
+
+    @unit
+    Scenario: A described route is published at its canonical v1 address
+      Given a family mounted at a bare /api path with a /api/v1 twin
+      When the description is generated
+      Then the document lists the operation under its /api/v1 path
+      And the bare /api path is not listed beside it
+
+    @unit
+    Scenario: A path carrying its own version segment is published unchanged
+      Given a family whose routes already name a version segment
+      When the description is generated
+      Then the document lists those paths exactly as the routes spell them
+
+    @unit
+    Scenario: A family with no v1 twin keeps its bare address
+      Given a family the mount opted out of the /api/v1 alias
+      When the description is generated
+      Then the document lists its operations under the bare /api path
+
+    @unit
+    Scenario: Two families cannot publish at one canonical address
+      Given a bare family whose v1 twin is another family's declared base
+      When the description is generated
+      Then the run fails naming the path both families claim

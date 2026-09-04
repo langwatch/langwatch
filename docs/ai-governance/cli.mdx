@@ -35,7 +35,7 @@ langwatch governance --help
 ```bash
 langwatch governance --help
 # Manage governance resources (ingestion templates, ingestion keys)
-# from the CLI. Mirrors the public REST surface at /api/governance/*, every
+# from the CLI. Mirrors the public REST surface at /api/v1/governance/*, every
 # mutating call lands an audit row with metadata.surface='cli'.
 #
 # Commands:
@@ -98,7 +98,7 @@ Resources expected to fold into the same namespace as their REST surfaces ship: 
 
 ## Audit emission
 
-Every state-changing CLI invocation emits an audit row with `AuditLog.metadata.surface = "cli"`. The CLI is a REST shell, it calls `/api/governance/*` and sends the `X-LangWatch-Surface: cli` request header. The Hono backend's `resolveSurfaceFromRequest` helper reads the header, validates it against the `GovernanceCallSurface` enum (in-process spoofing of `trpc`, `mcp` is rejected at the enum filter), and threads the value into the service-layer `surface` parameter Sergey wired at `fc6d54100`. The payload shape is identical to a Hono REST audit row apart from the surface field.
+Every state-changing CLI invocation emits an audit row with `AuditLog.metadata.surface = "cli"`. The CLI is a REST shell, it calls `/api/v1/governance/*` and sends the `X-LangWatch-Surface: cli` request header. The Hono backend's `resolveSurfaceFromRequest` helper reads the header, validates it against the `GovernanceCallSurface` enum (in-process spoofing of `trpc`, `mcp` is rejected at the enum filter), and threads the value into the service-layer `surface` parameter Sergey wired at `fc6d54100`. The payload shape is identical to a Hono REST audit row apart from the surface field.
 
 The header-validating Hono helper + the 7 mutation call-sites switching from hardcoded `'hono'` to `resolveSurfaceFromRequest(req)` ship in Lane-B's CLI scaffold at `ed51b0ea1`. The `X-LangWatch-Surface: cli` constant lives at `sdks/typescript/src/cli/utils/governance/surface.ts`.
 
@@ -115,7 +115,7 @@ The end state is that an agent can fully configure governance for a fresh org by
 langwatch governance ingestion-templates admin-list --json
 
 # 2. Clone the claude_code template into the org for customisation
-#    (POST /api/governance/ingestion-templates/clone, auto-derives org from the apiKey's project)
+#    (POST /api/v1/governance/ingestion-templates/clone, auto-derives org from the apiKey's project)
 langwatch governance ingestion-templates clone-from-platform \
     --source-template-id <platform-claude-code-id> \
     --json

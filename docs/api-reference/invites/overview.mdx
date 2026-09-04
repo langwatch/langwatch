@@ -28,9 +28,9 @@ Authorization: Bearer sk-lw-<id>_<secret>
 
 | Method   | Path                             | Description                                      |
 | -------- | -------------------------------- | ------------------------------------------------ |
-| `GET`    | `/api/organization/invites`      | List pending invites with their acceptance links |
-| `POST`   | `/api/organization/invites`      | Create up to 50 invites in one batch             |
-| `DELETE` | `/api/organization/invites/{id}` | Revoke a pending invite                          |
+| `GET`    | `/api/v1/organization/invites`      | List pending invites with their acceptance links |
+| `POST`   | `/api/v1/organization/invites`      | Create up to 50 invites in one batch             |
+| `DELETE` | `/api/v1/organization/invites/{id}` | Revoke a pending invite                          |
 
 ## The acceptance link is part of the response
 
@@ -71,7 +71,7 @@ The refusals to expect:
 ## Typical flow
 
 ```bash
-curl -X POST https://app.langwatch.ai/api/organization/invites \
+curl -X POST https://app.langwatch.ai/api/v1/organization/invites \
   -H "Authorization: Bearer sk-lw-..." \
   -H "Content-Type: application/json" \
   -d '{
@@ -88,9 +88,9 @@ curl -X POST https://app.langwatch.ai/api/organization/invites \
 Someone who never accepts leaves a pending invite behind. List them, then revoke the ones that have gone stale:
 
 ```bash
-curl https://app.langwatch.ai/api/organization/invites \
+curl https://app.langwatch.ai/api/v1/organization/invites \
   -H "Authorization: Bearer sk-lw-..."
 
-curl -X DELETE https://app.langwatch.ai/api/organization/invites/<invite_id> \
+curl -X DELETE https://app.langwatch.ai/api/v1/organization/invites/<invite_id> \
   -H "Authorization: Bearer sk-lw-..."
 ```

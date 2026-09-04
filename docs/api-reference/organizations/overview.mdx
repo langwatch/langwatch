@@ -17,7 +17,7 @@ This is the one LangWatch API that exists before any organization does, which is
 Creating an organization hands back an organization admin API key along with it. That key is what the rest of the management APIs take, so a run can go from an empty deployment to a fully configured organization without a browser step:
 
 ```
-instance key  ->  POST /api/organizations  ->  organization + admin API key
+instance key  ->  POST /api/v1/organizations  ->  organization + admin API key
                                                      |
                                                      v
                       teams, groups, roles, role bindings, members,
@@ -38,16 +38,16 @@ Set the variable on the deployment, generate it the way you generate any other s
 
 | Method | Path                      | Description                                            |
 | ------ | ------------------------- | ------------------------------------------------------ |
-| `GET`  | `/api/organizations`      | List the organizations on this instance                |
-| `POST` | `/api/organizations`      | Create an organization and its bootstrap admin API key |
-| `GET`  | `/api/organizations/{id}` | Read one organization                                  |
+| `GET`  | `/api/v1/organizations`      | List the organizations on this instance                |
+| `POST` | `/api/v1/organizations`      | Create an organization and its bootstrap admin API key |
+| `GET`  | `/api/v1/organizations/{id}` | Read one organization                                  |
 
 There is no `DELETE`. Deleting an organization takes everything in it, so it stays a deliberate operation rather than one an automated run can reach.
 
 ## Creating an organization
 
 ```bash
-curl -X POST https://langwatch.acme.internal/api/organizations \
+curl -X POST https://langwatch.acme.internal/api/v1/organizations \
   -H "Authorization: Bearer $LANGWATCH_INSTANCE_ADMIN_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"name": "Acme", "slug": "acme", "adminApiKeyName": "Provisioning admin"}'
@@ -67,4 +67,4 @@ The slug is optional and is derived from the name when you leave it out. It is a
 
 ## Reading back
 
-`GET /api/organizations` and `GET /api/organizations/{id}` return the organizations on the instance, which is what lets a provisioning run check whether it has work to do before it does any. An id that does not exist answers 404.
+`GET /api/v1/organizations` and `GET /api/v1/organizations/{id}` return the organizations on the instance, which is what lets a provisioning run check whether it has work to do before it does any. An id that does not exist answers 404.

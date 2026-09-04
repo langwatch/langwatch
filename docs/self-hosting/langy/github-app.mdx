@@ -41,16 +41,16 @@ Fill in these fields:
 | ------------------------------------------------------ | ----------------------------------------------------------------------------------- |
 | App name                                               | `LangWatch Langy` (or per environment, e.g. `LangWatch Langy (dev)`)                |
 | Homepage URL                                           | `https://app.langwatch.ai` (or your control-plane URL)                              |
-| Setup URL                                              | `<BASE_URL>/api/github/setup`                                                       |
+| Setup URL                                              | `<BASE_URL>/api/v1/github/setup`                                                       |
 | Redirect on update                                     | ON (so re-configuring an install returns to the Setup URL)                          |
 | Request user authorization (OAuth) during installation | OFF. Langy is bot-authored, no user OAuth.                                          |
 | Webhook > Active                                       | ON (optional, see [Restricted networks](#restricted-networks))                      |
-| Webhook URL                                            | `<BASE_URL>/api/github/webhook`                                                     |
+| Webhook URL                                            | `<BASE_URL>/api/v1/github/webhook`                                                     |
 | Webhook secret                                         | Generate one (`openssl rand -hex 32`). You set it as `GITHUB_LANGY_WEBHOOK_SECRET`. |
 | Where can this GitHub App be installed?                | Any account (recommended) or only this org                                          |
 
 <Note>
-  `/api/github-langy/setup` and `/api/github-langy/webhook` are the earlier paths. They stay mounted
+  `/api/v1/github-langy/setup` and `/api/v1/github-langy/webhook` are the earlier paths. They stay mounted
   on the same handlers, so an App already registered with them keeps working. Use the paths above
   for a new registration.
 </Note>
@@ -140,9 +140,9 @@ Sessions are matched by the host their git remote reports, so an instance bound 
 
 ## Restricted networks
 
-GitHub must be able to reach `<BASE_URL>/api/github/webhook` to deliver webhooks. Many self-hosted instances sit behind a VPN or a private network, where that is not true.
+GitHub must be able to reach `<BASE_URL>/api/v1/github/webhook` to deliver webhooks. Many self-hosted instances sit behind a VPN or a private network, where that is not true.
 
-**The webhook is optional.** An instance with no inbound path connects and works. Connecting is a browser redirect through `/api/github/setup`, so only the admin's own browser has to reach the instance, not GitHub. You can leave **Webhook > Active** off, or leave it on and accept the failed deliveries.
+**The webhook is optional.** An instance with no inbound path connects and works. Connecting is a browser redirect through `/api/v1/github/setup`, so only the admin's own browser has to reach the instance, not GitHub. You can leave **Webhook > Active** off, or leave it on and accept the failed deliveries.
 
 What changes without webhooks:
 

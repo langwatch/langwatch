@@ -8,7 +8,7 @@ description: "Create and manage scenario execution events to power the Simulatio
 The Simulations visualizer is powered by a single endpoint that receives events from your test runs. All events are sent via a `POST` request to the following endpoint:
 
 ```
-/api/scenario-events
+/api/v1/scenario-events
 ```
 
 The request body should be a JSON object representing one of the event types described below. These events allow LangWatch to reconstruct the entire history of your simulation sets, batches, and individual scenario runs.
