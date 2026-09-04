@@ -20,8 +20,8 @@ The runnable example is in the SDK repository: [`sdks/python/examples/agent-opti
 The agent is a `dspy.ReAct` over the tools, and a scenario adapter passes the conversation to it as `dspy.History` plus the last user message and returns the answer:
 
 ```python
-import dspy
 import scenario
+import dspy
 
 class SupportSignature(dspy.Signature):
     """You are the support agent of ACME, an online shop. Help the customer with orders and returns."""
