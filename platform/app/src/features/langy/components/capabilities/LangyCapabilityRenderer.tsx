@@ -29,16 +29,16 @@ import {
   parseCliToolResult,
   toCliToolResult,
 } from "@langwatch/langy";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { digestOfToolCall } from "../../logic/langyCapabilityDigest";
-import { LangyCardBoundary } from "../LangyCardBoundary";
 import {
   type CapabilityCardInput,
   type CapabilityDescriptor,
   isProposalOutput,
   resolveCapability,
   withDecidedCard,
-} from "./capabilityRegistry";
+} from "~/features/langy/logic/capabilities/capabilityRegistry";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { digestOfToolCall } from "../../logic/langyCapabilityDigest";
+import { LangyCardBoundary } from "../LangyCardBoundary";
 import { deriveFollowUpChips } from "./followUpChips";
 import { LangyDatasetCard } from "./LangyDatasetCard";
 import { LangyDeclarativeCard } from "./LangyDeclarativeCard";

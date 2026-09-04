@@ -8,12 +8,12 @@
  */
 import { Text, VStack } from "@chakra-ui/react";
 import { asJsonDocument } from "@langwatch/langy";
-import { useCapabilityData } from "../../hooks/useCapabilityData";
 import {
   type CapabilityCardInput,
   extractPrimaryId,
   extractToolText,
-} from "./capabilityRegistry";
+} from "~/features/langy/logic/capabilities/capabilityRegistry";
+import { useCapabilityData } from "../../hooks/useCapabilityData";
 import { collectionOf, totalOf } from "./cliResultDocument";
 import {
   CapabilityRow,

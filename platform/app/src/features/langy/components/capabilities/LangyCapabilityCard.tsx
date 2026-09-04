@@ -43,20 +43,20 @@ import {
   Zap,
 } from "lucide-react";
 import type { ReactNode } from "react";
+import type {
+  CapabilityIconName,
+  CapabilitySurface,
+} from "~/features/langy/logic/capabilities/capabilityCatalog";
+import {
+  buildSurfaceHref,
+  type CapabilityTone,
+  SURFACE_LABEL,
+} from "~/features/langy/logic/capabilities/capabilityRegistry";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { toRelativeSameOriginHref } from "~/utils/platformHref";
 import { useSpaLinkClick } from "../../logic/spaLink";
 import { LangySpaAnchor } from "../LangySpaAnchor";
 import { langyThinkingShimmerStyles } from "../langyShimmer";
-import type {
-  CapabilityIconName,
-  CapabilitySurface,
-} from "./capabilityCatalog";
-import {
-  buildSurfaceHref,
-  type CapabilityTone,
-  SURFACE_LABEL,
-} from "./capabilityRegistry";
 
 const SURFACE_ICON: Record<CapabilitySurface, LucideIcon> = {
   traces: Waypoints,

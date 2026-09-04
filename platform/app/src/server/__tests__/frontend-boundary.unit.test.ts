@@ -818,3 +818,102 @@ describe("client-imported vocabulary never reaches server-only state", () => {
     });
   });
 });
+
+/**
+ * A file is UI by location if any segment of its path is `components`. The rule
+ * below is about location rather than content, which is the point: a
+ * framework-free helper sitting in `components/` is one edit away from
+ * importing React, and the edit will be made by someone reading only that file.
+ */
+const isComponentsPath = (file: string) =>
+  rel(file).split("/").includes("components");
+
+/** Backend roots for the location rule, including the studio's server tree. */
+const backendRootsForLocationRule = [
+  ...backendFiles,
+  ...(fs.existsSync(path.join(SRC, "optimization_studio/server"))
+    ? walk(path.join(SRC, "optimization_studio/server"))
+    : []),
+];
+
+/** Direct value imports from `file` that land inside a `components/` tree. */
+const componentImportsOf = (file: string): string[] =>
+  valueImportsOf(file)
+    .map((spec) => resolveAppImport(spec, file))
+    .filter((target): target is string => target !== null)
+    .filter(isComponentsPath)
+    .map(rel);
+
+/**
+ * The convention the guard above could not express.
+ *
+ * `chainsToBrowserUi` catches a server file that reaches React. It says nothing
+ * about a server file importing a framework-free module that merely lives under
+ * `components/`, because there is no browser package at the end of that chain.
+ * Four such imports existed, and the repo's own convention note listed three of
+ * them by name as grandfathered exceptions, with "don't add more" as the only
+ * thing holding the line.
+ *
+ * Prose cannot hold a line. This is the same rule, enforced.
+ *
+ * Direct imports only, deliberately. The transitive question is the one above,
+ * and answering it here too would report a server file for the `components/`
+ * path some legitimate dependency of its dependency happens to sit in.
+ */
+describe("server code never value-imports a UI-located module", () => {
+  describe("given every backend source file", () => {
+    it("finds no direct value import into a components/ tree", () => {
+      const violations = backendRootsForLocationRule.flatMap((file) =>
+        componentImportsOf(file).map(
+          (target) => `${rel(file)}\n     -> ${target}`,
+        ),
+      );
+
+      expect(violations).toEqual([]);
+    });
+  });
+
+  // Without this the rule above passes whenever the resolver breaks, which is
+  // indistinguishable from passing because the codebase is clean.
+  describe("given a UI file that imports another UI file", () => {
+    it("still reports it, proving the detector resolves and classifies", () => {
+      const uiFile = path.join(
+        SRC,
+        "features/langy/components/LangyToolActivity.tsx",
+      );
+      expect(fs.existsSync(uiFile)).toBe(true);
+
+      expect(componentImportsOf(uiFile).length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("given a server file naming a component's types", () => {
+    /**
+     * The qualifying file is discovered, not named.
+     *
+     * This pinned `server/traces/types.ts` until main stopped type-importing a
+     * component type there, and the case then failed for a reason that had
+     * nothing to do with the rule. A fixture that names one file is a second
+     * thing to keep in sync; searching for one is not.
+     *
+     * The search must not be allowed to come up empty and pass, so an empty
+     * result is its own failure with its own message.
+     */
+    it("does not report it, because types are erased", () => {
+      const typeImportOfComponent =
+        /import type\s*(?:\{[^}]*\}|[\w*\s,]+)\s*from\s*["'][^"']*components\//;
+      const typeOnly = backendRootsForLocationRule.find((file) =>
+        typeImportOfComponent.test(read(file)),
+      );
+
+      expect(
+        typeOnly,
+        "no backend file type-imports from a components/ tree, so this case cannot " +
+          "show that type-only imports are ignored. If that is now true of the whole " +
+          "backend, delete the case rather than letting it pass on an empty search.",
+      ).toBeDefined();
+
+      expect(componentImportsOf(typeOnly!)).toEqual([]);
+    });
+  });
+});

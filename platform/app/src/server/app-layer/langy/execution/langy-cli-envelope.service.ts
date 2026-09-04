@@ -24,7 +24,7 @@
  * and `cliJson` (noisy stdout -> the JSON document).
  *
  * @see specs/langy/langy-cli-tool-envelope.feature
- * @see src/features/langy/components/capabilities/capabilityRegistry.ts — the
+ * @see src/features/langy/logic/capabilities/capabilityRegistry.ts — the
  *      other half: `langwatch.<resource>.<verb>` -> the card that renders it.
  */
 import {

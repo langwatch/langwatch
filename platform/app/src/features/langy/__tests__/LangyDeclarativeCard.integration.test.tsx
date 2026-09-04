@@ -16,9 +16,9 @@ import type { CliResultDigest } from "@langwatch/langy";
 import { render, screen } from "@testing-library/react";
 import { cloneElement, type ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { resolveCapability } from "../components/capabilities/capabilityRegistry";
 import { LangyDeclarativeCard } from "../components/capabilities/LangyDeclarativeCard";
 import type { CapabilityData } from "../hooks/useCapabilityData";
+import { resolveCapability } from "../logic/capabilities/capabilityRegistry";
 
 // The hydration seam is mocked: these tests pin RENDERING per hydration state;
 // the hook's own resolution rules live in useCapabilityData.unit.test.tsx.

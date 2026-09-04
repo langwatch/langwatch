@@ -26,6 +26,7 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
+import { getSafeColumnName } from "~/utils/datasets/reservedColumns";
 import type {
   DatasetColumns,
   DatasetRecordEntry,
@@ -56,7 +57,6 @@ import {
   retryDatasetNormalize,
 } from "./services/directUpload";
 import { parseHeaderColumns } from "./utils/parseHeaderColumns";
-import { getSafeColumnName } from "./utils/reservedColumns";
 
 const logger = createLogger("UploadCSVDrawer");
 

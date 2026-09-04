@@ -35,6 +35,7 @@ import { Button, Text } from "@chakra-ui/react";
 import { asJsonDocument, type CliResultDigest } from "@langwatch/langy";
 import { ArrowUpRight } from "lucide-react";
 import type { ReactNode } from "react";
+import type { CapabilityCardInput } from "~/features/langy/logic/capabilities/capabilityRegistry";
 import {
   type CapabilityData,
   useCapabilityData,
@@ -48,7 +49,6 @@ import {
 import { LangyContextTarget } from "../LangyContextTarget";
 import { LangyObservationState } from "../LangyObservationState";
 import { LangySpaAnchor } from "../LangySpaAnchor";
-import type { CapabilityCardInput } from "./capabilityRegistry";
 import { collectionOf, textValue, totalOf } from "./cliResultDocument";
 import {
   CapabilityRow,
