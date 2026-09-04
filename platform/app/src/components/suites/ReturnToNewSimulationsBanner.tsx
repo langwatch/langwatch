@@ -1,7 +1,7 @@
 import { HStack, Icon, Text } from "@chakra-ui/react";
 import posthog from "posthog-js";
 import { useEffect, useState } from "react";
-import { LuArrowRight, LuSparkles } from "react-icons/lu";
+import { LuSparkles } from "react-icons/lu";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import {
   clearLegacySimulationsPreference,
@@ -93,17 +93,13 @@ function BannerWithFlag({
   };
 
   return (
-    // The banner carries its own page spacing. A wrapper on the page would
-    // hold that space open on every browser that never sees the banner.
+    // Content-sized: the banner sits inside the page header row beside the
+    // header's own controls, so it takes only the room its words need.
     <Link
       href={href}
       onClick={handleClick}
       aria-label="Go to the new simulations screen"
       textDecoration="none"
-      display="block"
-      width="full"
-      paddingX={6}
-      paddingBottom={2}
       _hover={{ textDecoration: "none" }}
     >
       <HStack
@@ -111,7 +107,8 @@ function BannerWithFlag({
         gap={2}
         borderRadius="lg"
         paddingX={3}
-        paddingY={2}
+        paddingY={1.5}
+        whiteSpace="nowrap"
         bg="colorPalette.subtle"
         borderWidth="1px"
         borderColor="colorPalette.muted"
@@ -125,10 +122,9 @@ function BannerWithFlag({
         <Text fontSize="sm" color="colorPalette.fg">
           You are on the previous simulations screens.
         </Text>
-        <HStack gap={1} color="colorPalette.fg" fontSize="sm" fontWeight="600">
-          <Text>Go to the new version</Text>
-          <Icon as={LuArrowRight} boxSize={3.5} />
-        </HStack>
+        <Text color="colorPalette.fg" fontSize="sm" fontWeight="600">
+          Go to the new version
+        </Text>
       </HStack>
     </Link>
   );

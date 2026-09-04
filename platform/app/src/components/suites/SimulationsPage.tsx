@@ -371,6 +371,7 @@ export default function SimulationsPage() {
             <HStack justify="space-between" align="center" w="full">
               <PageLayout.Heading>Simulations</PageLayout.Heading>
               <HStack>
+                <ReturnToNewSimulationsBanner target="runs" />
                 <PeriodSelector
                   period={period}
                   mode={mode}
@@ -383,8 +384,6 @@ export default function SimulationsPage() {
               </HStack>
             </HStack>
           </PageLayout.Header>
-
-          <ReturnToNewSimulationsBanner target="runs" />
 
           {/* Second row: sidebar + content box */}
           <HStack flex={1} width="full" gap={0} overflow="hidden" minHeight={0}>

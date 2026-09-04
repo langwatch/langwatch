@@ -13,7 +13,7 @@ import { useMemo } from "react";
 import type { Period } from "~/components/PeriodSelector";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { buildRunPlans, type RunPlan } from "./run-plans";
+import { buildRunPlans, type RunPlan, toRunPlanSuites } from "./run-plans";
 
 export type UseRunPlansResult = {
   plans: RunPlan[];
@@ -51,10 +51,7 @@ export function useRunPlans({ period }: { period: Period }): UseRunPlansResult {
       { enabled: !!project },
     );
 
-  const storedPlans = useMemo(
-    () => (suites ?? []).filter((suite) => suite.kind !== "test_suite"),
-    [suites],
-  );
+  const storedPlans = useMemo(() => toRunPlanSuites(suites ?? []), [suites]);
 
   const plans = useMemo(
     () =>

@@ -269,6 +269,13 @@ export type PlanRowsTableProps = {
   rows: PlanRowModel[];
   /** The window, in days, for the row that says nothing ran inside it. */
   days: number;
+  /**
+   * True while the window holds runs that no row of this table accounts for:
+   * a single scenario or a test suite run from the platform belongs to no run
+   * plan. The table then says where those runs are read instead of reporting
+   * a filter that matched nothing.
+   */
+  hasRunsOutsidePlans?: boolean;
   resolveTargetName: (targetKey: string) => string;
   resolveTargetKind: (targetKey: string) => TargetKind;
   onSelectPlan: (planSlug: string) => void;
@@ -281,6 +288,7 @@ export type PlanRowsTableProps = {
 export function PlanRowsTable({
   rows,
   days,
+  hasRunsOutsidePlans = false,
   resolveTargetName,
   resolveTargetKind,
   onSelectPlan,
@@ -352,7 +360,13 @@ export function PlanRowsTable({
         ))}
 
         {rows.length === 0 ? (
-          <ResultsTableEmptyLine text="No run plans match these filters." />
+          <ResultsTableEmptyLine
+            text={
+              hasRunsOutsidePlans
+                ? "These runs were started outside a run plan. Group by scenario or target to read them."
+                : "No run plans match these filters."
+            }
+          />
         ) : null}
       </ResultsTableBody>
 

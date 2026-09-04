@@ -24,7 +24,7 @@ import type { PeriodControls } from "./period-controls";
 const DAY_MS = 86_400_000;
 
 /** The next window to offer when nothing ran inside the one on screen. */
-function nextWiderWindow(period: Period): {
+export function nextWiderWindow(period: Period): {
   key: RelativePresetKey;
   label: string;
 } {

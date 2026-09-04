@@ -570,11 +570,17 @@ export class CallDispatcher {
  * The error a result carries, as the handled error the caller reads.
  *
  * A gateway refusing an oversized payload writes what it measured, and that
- * keeps its own class; anything else is the function's own error.
+ * keeps its own class. An instance that already runs its declared number of
+ * calls answers `agent_busy`, which is the same refusal the dispatcher raises
+ * when every instance is full, so it keeps that class too and the caller can
+ * wait and send the turn again. Anything else is the function's own error.
  */
 function remoteError(error: StoredResultError): Error {
   if (error.payload) {
     return new AgentPayloadTooLargeError(error.payload);
+  }
+  if (error.code === "agent_busy") {
+    return new AgentBusyError({ retryAfterMs: BUSY_RETRY_AFTER_MS });
   }
   return new AgentCallFailedError({
     remoteCode: error.code,

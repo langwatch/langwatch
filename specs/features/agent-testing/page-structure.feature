@@ -111,6 +111,13 @@ Feature: The Agent Testing page
     Then "Scenarios" carries the number of scenarios
     And "Results" carries the number of run plans
 
+  @unit
+  Scenario: The number beside the Results tab counts what the Test Runs list holds
+    Given a project with one test suite, one run plan and one throwaway suite of the command line
+    When the number beside "Results" is worked out
+    Then only the run plan is counted
+    And the Test Runs list holds the same rule, so the two can never disagree
+
   @integration
   Scenario: The selected tab is underlined on the header's own border
     Given the Agent Testing page is open

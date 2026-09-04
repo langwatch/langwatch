@@ -43,6 +43,7 @@ function staticBranchSessions(
     findBySessionId: base.findBySessionId.bind(base),
     findBySessionIdWithApplied: base.findBySessionIdWithApplied.bind(base),
     findManyRecent: base.findManyRecent.bind(base),
+    listBySessionIds: base.listBySessionIds.bind(base),
     listByRepositoryBranch: async (params) =>
       tenantIds
         .filter((tenantId) => params.tenantIds.includes(tenantId))

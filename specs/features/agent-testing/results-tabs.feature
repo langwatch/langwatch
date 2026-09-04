@@ -51,6 +51,21 @@ Feature: The Results tab
     When the Test Runs list is read
     Then its row carries the pass rate of that last run
 
+  @integration
+  Scenario: A window that holds runs of no plan still reads the whole tab
+    Given a project with no run plan and runs inside the window
+    When the Results tab is opened
+    Then the filter row and the period picker read
+    And the "No runs yet" state does not read
+    And the count in the header of the list matches the runs the window holds
+
+  @integration
+  Scenario: The plan table says when the runs of the window belong to no plan
+    Given a project with no run plan and runs inside the window
+    When the Test Runs list is read
+    Then the table says those runs were started outside a run plan
+    And it points at the scenario and target groupings, which list them
+
   # --- The columns of the plan table ---
 
   @integration
@@ -774,6 +789,13 @@ Feature: The Results tab
     When the Results tab loads
     Then the skeleton reads no more
     And the empty "no runs yet" state reads on the tab
+
+  @integration
+  Scenario: The empty state of the tab offers a wider period
+    Given a project with no run plan and no run inside the window
+    When the Results tab is opened
+    Then the "No runs yet" state offers the next wider period
+    And choosing it widens the window
 
   # --- Stalled runs ---
 

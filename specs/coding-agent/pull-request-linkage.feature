@@ -7,6 +7,7 @@
 #   platform/app/src/server/app-layer/github/github-pull-request-status.service.ts    (live status, Redis-cached, never the queue)
 #   platform/app/src/server/event-sourcing/pipelines/coding-agent-processing/subscribers/pullRequestMapping.subscriber.ts (fold trigger)
 #   platform/app/src/server/app-layer/coding-agent/pull-request-assignment.ts          (session-to-PR tenure rule)
+#   platform/app/src/server/app-layer/coding-agent/pull-request-share.ts                (the proportional rule: one session's cost split across the PRs it drove)
 #   platform/app/src/server/app-layer/coding-agent/pull-request-usage.service.ts       (org-first usage rollup)
 #   platform/app/src/server/app-layer/coding-agent/coding-agent-source-type.ts         (agent id to ingestion source type)
 #   platform/app/src/server/app-layer/coding-agent/repositories/coding-agent-session-events.repository.ts (per-model totals)
@@ -323,22 +324,93 @@ Rule: The Pull Requests page prices each pull request's lifetime
 
   @unit
   Scenario: The personal page discovers pull requests from every branch a session drove
-    Given a session that drove two branches
+    Given a session that drove two branches, each with a live pull request
     When the personal pull requests are read
-    Then the pull requests of both branches are looked up
+    Then both pull requests become rows
 
-  # A session records one set of token and cost totals for its whole life and
-  # the per-call facts carry no branch, so there is nothing to divide between
-  # two pull requests. Counting the whole session toward each one would make a
-  # repository's pull requests sum to more than was ever spent. The sessions
-  # screen is where all of a session's pull requests are shown.
+Rule: A session's cost splits across the pull requests it drove, by the work stamped on each
+
+  # A session records one set of cumulative token and cost totals for its
+  # whole life; its per-call fact rows each carry the repository and branch
+  # that were active when the call happened. The fact rows set the RATIO, the
+  # cumulative totals stay the amount, and the buckets partition — so one
+  # session's shares never sum past its own total, and a repository's pull
+  # requests never sum to more than was ever spent.
 
   @unit
-  Scenario: A session that drove two pull requests counts toward only one of them
+  Scenario: A session that drove two pull requests splits its cost between them
     Given a session that drove two branches, each with a live pull request
-    When the tenure rule is asked
-    Then the session counts toward the pull request it opened first
-    And it counts toward the other one not at all
+    And its fact rows stamp a quarter of its tokens on one branch and the rest on the other
+    When each pull request's usage is read
+    Then the first reports a quarter of the session's totals
+    And the second reports the remaining three quarters
+
+  @unit
+  Scenario: Tokens stamped with no context follow the legacy whole-session rule
+    Given a session whose fact rows carry no stamped context
+    When its pull requests' usage is read
+    Then its whole total lands on the pull request it opened first
+    And the other pull requests report none of it
+
+  @unit
+  Scenario: A session with no fact rows at all keeps the legacy rule whole
+    Given a session that recorded totals but logged no per-call facts
+    When its pull requests' usage is read
+    Then its whole total lands on the pull request it opened first
+
+  @unit
+  Scenario: Tokens stamped on another repository stay out of this one
+    Given a session whose fact rows stamp work on two repositories
+    When one repository's pull request usage is read
+    Then only the tokens stamped on that repository count toward its pull request
+    And the other repository's tokens reduce the session's share rather than joining it
+
+  @unit
+  Scenario: A session found only by its stamps still counts toward the pull request
+    Given a session whose row moved on to another repository
+    And fact rows stamped on the pull request's own branch
+    When the pull request's usage is read
+    Then the session's stamped share is counted toward it
+
+  @unit
+  Scenario: The unstamped bucket is priced only where the session's row lives
+    Given a session whose row points at one repository and whose stamps name another
+    When the other repository's pull request usage is read
+    Then the session's unstamped tokens are not priced there
+
+  @unit
+  Scenario: Two pull requests on one branch split by era, not by double counting
+    Given a branch that hosted a merged pull request and later a new one
+    And a session whose fact rows stamp that branch
+    When both pull requests' usage is read
+    Then the stamped tokens count toward the branch's tenure winner only
+
+  @unit
+  Scenario: A session too small to divide is never counted twice
+    Given a session that spent one token, split evenly across two pull requests
+    When each pull request's usage is read
+    Then the two together report the one token, not one each
+
+  @unit
+  Scenario: A discovered pull request with no stamped work still dates itself
+    Given a session that drove two branches, each with a live pull request
+    And its fact rows stamp all of its tokens on one branch
+    When the personal pull requests are read
+    Then the other pull request is still a row, reporting no tokens and no cost
+    And that row is dated by the pull request itself rather than by the epoch
+
+  @unit
+  Scenario: A session that priced its calls without reporting tokens splits by cost
+    Given a session that drove two branches, each with a live pull request
+    And its fact rows report cost but no token counts
+    When each pull request's usage is read
+    Then each reports the share of the cost stamped on its branch
+
+  @unit
+  Scenario: The model breakdown reports only the pull request's own calls
+    Given a session that called two models, each stamped on a different pull request
+    When one pull request's usage is read
+    Then its model breakdown reports only the model stamped on it
 
   @unit
   Scenario: A viewer without a GitHub connection sees the connect invitation
