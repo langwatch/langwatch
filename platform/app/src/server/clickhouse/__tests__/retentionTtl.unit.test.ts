@@ -159,9 +159,7 @@ describe("gateway_spend retention exemption", () => {
     ).toBeUndefined();
   });
 
-  it("declares its fixed 13-month delete in the migration itself", async () => {
-    const { readFileSync } = await import("node:fs");
-    const { join } = await import("node:path");
+  it("declares its fixed 13-month delete in the migration itself", () => {
     const migration = readFileSync(
       join(
         process.cwd(),
@@ -189,7 +187,10 @@ describe("governance_cost_rollup_1d retention exemption", () => {
   });
 
   it("declares its fixed 13-month delete in the migration itself", () => {
-    const migration = readFileSync(migrationEndingIn("_create_governance_cost_rollup_1d.sql"), "utf8");
+    const migration = readFileSync(
+      migrationEndingIn("_create_governance_cost_rollup_1d.sql"),
+      "utf8",
+    );
     expect(migration).toContain(
       "TTL toDateTime(Day) + INTERVAL 13 MONTH DELETE",
     );
