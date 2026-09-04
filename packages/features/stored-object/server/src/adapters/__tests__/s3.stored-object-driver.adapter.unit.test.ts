@@ -5,7 +5,7 @@
  */
 import { Readable } from "node:stream";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ObjectNotFoundError } from "../../errors";
+import { ObjectNotFoundError, UnsupportedStorageSchemeError } from "../../errors";
 import { StoredObjectS3TargetPort } from "../../ports/stored-object-s3-target.port";
 import { S3StoredObjectDriver } from "../s3.stored-object-driver.adapter";
 
@@ -111,7 +111,10 @@ describe("S3StoredObjectDriver", () => {
   // -------------------------------------------------------------------------
 
   describe("when put is called", () => {
-    /** @scenario "S3 driver handles s3 URIs through the configured S3 client" */
+    /**
+     * @scenario "S3 driver handles s3 URIs through the configured S3 client"
+     * @scenario "An S3 address is still read as bucket and key"
+     */
     it("sends a PutObjectCommand with the URI's bucket and key, the bytes, and the media type", async () => {
       s3Client.send.mockResolvedValueOnce({});
       const bytes = Buffer.from("hello world");
@@ -185,6 +188,66 @@ describe("S3StoredObjectDriver", () => {
   describe("when get is called with a non-s3 URI", () => {
     it("throws", async () => {
       await expect(driver.get("file:///var/lib/langwatch/objects/proj/sha")).rejects.toThrow();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // another provider's address
+  // -------------------------------------------------------------------------
+
+  describe("given an address belonging to another provider", () => {
+    const AZURE_URI = "azure-blob://account.blob.core.windows.net/container/proj-123/deadbeef";
+
+    describe("when it reaches the driver's read", () => {
+      /** @scenario "The S3 driver refuses an Azure address" */
+      it("refuses it as an unsupported scheme rather than inventing a bucket", async () => {
+        const error = await driver.get(AZURE_URI).catch((thrown: unknown) => thrown as Error);
+
+        expect(error).toBeInstanceOf(UnsupportedStorageSchemeError);
+        expect(error.name).toBe("UnsupportedStorageSchemeError");
+      });
+
+      /** @scenario "The S3 driver refuses an Azure address" */
+      it("names s3 as the scheme it expected and azure-blob as the one it got", async () => {
+        const error = await driver
+          .get(AZURE_URI)
+          .catch((thrown: unknown) => thrown as UnsupportedStorageSchemeError);
+
+        expect(error.expectedScheme).toBe("s3");
+        expect(error.scheme).toBe("azure-blob");
+      });
+
+      /** @scenario "The S3 driver refuses an Azure address" */
+      it("never asks S3 for an object", async () => {
+        await driver.get(AZURE_URI).catch(() => undefined);
+
+        expect(s3Client.send).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when it reaches the driver's other byte operations", () => {
+      /** @scenario "The S3 driver refuses an Azure address on every byte operation" */
+      it("refuses it on put, delete and exists too", async () => {
+        const names = await Promise.all(
+          [
+            driver.put(AZURE_URI, Buffer.from("x"), "application/octet-stream"),
+            driver.delete(AZURE_URI),
+            driver.exists(AZURE_URI),
+          ].map(async (operation) =>
+            operation.then(
+              () => "resolved",
+              (thrown: Error) => thrown.name,
+            ),
+          ),
+        );
+
+        expect(names).toEqual([
+          "UnsupportedStorageSchemeError",
+          "UnsupportedStorageSchemeError",
+          "UnsupportedStorageSchemeError",
+        ]);
+        expect(s3Client.send).not.toHaveBeenCalled();
+      });
     });
   });
 });

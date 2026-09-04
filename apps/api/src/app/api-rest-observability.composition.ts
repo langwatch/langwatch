@@ -59,7 +59,23 @@ const renderLegacy: ErrorHandler = (error, context) => {
 
   if (HandledError.isHandled(error)) {
     const label = "legacyError" in error ? error.legacyError : error.code;
-    return context.json({ error: label, message: error.message, ...error.meta }, status);
+    const { tips, docsUrl, fault, reasons } = error.serialize();
+    return context.json(
+      {
+        error: label,
+        message: error.message,
+        ...error.meta,
+        // The remediation channel an agent or CLI reads when it has no
+        // presentation registry, and the cause chain a multi-fact refusal IS —
+        // a schema failure's whole payload is one reason per offending field.
+        // `serialize` masks a non-handled cause, so nothing internal rides out.
+        ...(tips?.length ? { tips } : {}),
+        ...(docsUrl ? { docsUrl } : {}),
+        fault,
+        ...(reasons.length > 0 ? { reasons } : {}),
+      },
+      status,
+    );
   }
   return context.json(
     { error: "Internal Server Error", message: "An unknown error occurred" },

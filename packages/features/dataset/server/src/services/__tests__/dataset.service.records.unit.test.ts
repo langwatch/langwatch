@@ -11,6 +11,7 @@
  * so the assertions are on what the service asked them to write.
  */
 import { describe, expect, it, vi } from "vitest";
+import { InvalidColumnError } from "../errors";
 import type { DatasetRepository } from "../../repositories/dataset.repository";
 import type { DatasetRecordRepository } from "../../repositories/dataset-record.repository";
 import { DatasetService } from "../dataset.service";
@@ -87,7 +88,10 @@ describe("DatasetService", () => {
 
   describe("given a dataset with two columns", () => {
     describe("when an entry names only one of them", () => {
-      /** @scenario "Batch create records allows entries with subset of columns" */
+      /**
+       * @scenario "Batch create records allows entries with subset of columns"
+       * @scenario "An entry naming only some of the dataset's columns is accepted"
+       */
       it("fills the column the entry left out with null", async () => {
         const { service: subject, createMany } = service();
 
@@ -120,6 +124,74 @@ describe("DatasetService", () => {
 
         expect(createMany).toHaveBeenCalledWith(
           expect.objectContaining({ entries: [{ id: "generated-id", input: "helloworld" }] }),
+        );
+      });
+    });
+  });
+
+  describe("given a dataset whose columns are input and output", () => {
+    describe("when an entry also names a column the dataset does not define", () => {
+      /** @scenario "An entry naming a column the dataset does not define is refused" */
+      it("refuses the creation as an invalid column", async () => {
+        const { service: subject } = service();
+
+        await expect(
+          subject.batchCreateRecords({
+            slugOrId: "feedback",
+            projectId: PROJECT_ID,
+            entries: [{ input: "hi", notes: "dropped on the floor" }],
+          }),
+        ).rejects.toSatisfy((error: Error) => error.name === "InvalidColumnError");
+      });
+
+      /** @scenario "An entry naming a column the dataset does not define is refused" */
+      it("names the offending column and the columns that are valid", async () => {
+        const { service: subject } = service();
+
+        const error = await subject
+          .batchCreateRecords({
+            slugOrId: "feedback",
+            projectId: PROJECT_ID,
+            entries: [{ input: "hi", notes: "dropped on the floor" }],
+          })
+          .catch((thrown: unknown) => thrown as InvalidColumnError);
+
+        expect(error).toBeInstanceOf(InvalidColumnError);
+        expect(error.columnName).toBe("notes");
+        expect(error.validColumns).toEqual(["input", "output"]);
+      });
+
+      /** @scenario "An entry naming a column the dataset does not define is refused" */
+      it("writes nothing to the record store", async () => {
+        const { service: subject, createMany } = service();
+
+        await subject
+          .batchCreateRecords({
+            slugOrId: "feedback",
+            projectId: PROJECT_ID,
+            entries: [{ input: "hi" }, { input: "bye", notes: "dropped on the floor" }],
+          })
+          .catch(() => undefined);
+
+        expect(createMany).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when an entry carries its own record id", () => {
+      /** @scenario "A record identifier is not treated as a column" */
+      it("writes the record under the identifier the caller supplied", async () => {
+        const { service: subject, createMany } = service();
+
+        await subject.batchCreateRecords({
+          slugOrId: "feedback",
+          projectId: PROJECT_ID,
+          entries: [{ id: "rec-supplied", input: "hi" }],
+        });
+
+        expect(createMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            entries: [{ id: "rec-supplied", input: "hi", output: null }],
+          }),
         );
       });
     });
