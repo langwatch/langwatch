@@ -67,7 +67,7 @@ const SPECS_ROOTS = [
 ] as const;
 
 /**
- * Test roots scanned for `@scenario` bindings. Every `.test.ts` /
+ * Test roots scanned for `@scenario` bindings. Every `.test.ts`, `.spec.ts` /
  * `.test.tsx` file under these roots is parsed for annotations. A binding
  * matches by scenario title, so proximity of the feature file to the test
  * is not required — any test in these roots can bind any scenario.
@@ -92,7 +92,9 @@ const DEFAULT_TEST_ROOTS: string[] = [
   "services/langyworker/src",
   "mcp/typescript/src",
   "sdks/typescript/src",
+  "sdks/typescript/__tests__",
   "sdks/python/src",
+  "dev/tests",
   // The agent plugin is hand-authored manifests plus a bundle, so its only
   // tests are the ones that read those manifests and spawn that bundle. Without
   // this root, every scenario describing what the published plugin does could
@@ -639,7 +641,7 @@ const LEGACY_INERT: string[] = [
   "specs/workflows/studio-usage-limits.feature",
 ];
 
-const TEST_FILE_RE = /\.test\.(?:tsx?|mjs)$/;
+const TEST_FILE_RE = /\.(?:test|spec)\.(?:tsx?|mjs)$/;
 const BATS_FILE_RE = /\.bats$/;
 const SHELL_TEST_FILE_RE = /\.sh$/;
 const GO_TEST_FILE_RE = /_test\.go$/;
