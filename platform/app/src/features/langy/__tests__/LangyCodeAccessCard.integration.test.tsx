@@ -129,13 +129,14 @@ describe("given no folder and nothing remembered", () => {
   });
 
   /** @scenario "The local folder is never remembered" */
-  it("says only GitHub is remembered", () => {
-    renderCard();
-    expect(
-      screen.getByText(
-        "Only GitHub is remembered. A folder is shared again each time.",
-      ),
-    ).toBeDefined();
+  it("stores nothing when the folder is shared with the box ticked", () => {
+    const onChoiceSelect = vi.fn();
+    renderCard({ onChoiceSelect });
+
+    fireEvent.click(screen.getByTestId("langy-remember-code-access"));
+    fireEvent.click(screen.getByText("Share my local folder"));
+
+    expect(setPreference).not.toHaveBeenCalled();
   });
 
   /** @scenario "Choosing the local folder turns the card into the waiting state" */

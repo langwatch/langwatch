@@ -111,7 +111,6 @@ Feature: Langy asks how to reach the customer's code, once
       Given an open code access card
       When I choose to share my local folder with the remember option
       Then no preference is stored, because a folder must be shared again each time
-      And the card says so
 
   Rule: A shared folder belongs to one conversation
 

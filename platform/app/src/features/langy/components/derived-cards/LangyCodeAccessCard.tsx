@@ -408,9 +408,9 @@ function AskingState({
 }
 
 /**
- * The memory box, and what it does not cover. A folder is shared for one
- * conversation and one session, so there is nothing about it to remember, and
- * saying so where the box is keeps the reader from expecting it to hold.
+ * The memory box. Only the GitHub choice is stored: a folder is shared for one
+ * conversation and one session, so choosing it with the box ticked stores
+ * nothing.
  */
 function RememberBox({
   checked,
@@ -422,23 +422,18 @@ function RememberBox({
   onChange: (next: boolean) => void;
 }) {
   return (
-    <>
-      <chakra.label display="flex" alignItems="center" gap={1.5}>
-        <chakra.input
-          type="checkbox"
-          data-testid="langy-remember-code-access"
-          checked={checked}
-          disabled={disabled}
-          onChange={(event) => onChange(event.target.checked)}
-        />
-        <Text textStyle="2xs" color="fg.muted">
-          Remember this choice
-        </Text>
-      </chakra.label>
-      <Text textStyle="2xs" color="fg.subtle">
-        Only GitHub is remembered. A folder is shared again each time.
+    <chakra.label display="flex" alignItems="center" gap={1.5}>
+      <chakra.input
+        type="checkbox"
+        data-testid="langy-remember-code-access"
+        checked={checked}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.checked)}
+      />
+      <Text textStyle="2xs" color="fg.muted">
+        Remember this choice
       </Text>
-    </>
+    </chakra.label>
   );
 }
 
