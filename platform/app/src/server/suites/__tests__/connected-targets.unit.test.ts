@@ -480,8 +480,16 @@ describe("resolveConnectedReferences", () => {
     it("picks the actor's own development row over a teammate's", async () => {
       const [target] = await resolve({
         rows: [
-          row({ id: "agent_theirs", environment: "development", ownerUserId: "u_2" }),
-          row({ id: "agent_mine", environment: "development", ownerUserId: "u_1" }),
+          row({
+            id: "agent_theirs",
+            environment: "development",
+            ownerUserId: "u_2",
+          }),
+          row({
+            id: "agent_mine",
+            environment: "development",
+            ownerUserId: "u_1",
+          }),
         ],
         online: ["agent_theirs", "agent_mine"],
         actor: { id: "u_1", label: "user" },
@@ -523,7 +531,9 @@ describe("resolveConnectedReferences", () => {
         },
       });
       expect((failure as Error).message).toContain("support-agent");
-      expect((failure as Error).message).toContain("production and development");
+      expect((failure as Error).message).toContain(
+        "production and development",
+      );
     });
 
     /** @scenario "A name with no environment is refused when several other environments have a process connected" */

@@ -513,7 +513,9 @@ const presentations = {
         return `${name} is online in ${online.join(", ")}. Name one of them, as connected:${name}@${online[0]}.`;
       }
       const where =
-        registered.length > 0 ? ` It is registered in ${registered.join(", ")}.` : "";
+        registered.length > 0
+          ? ` It is registered in ${registered.join(", ")}.`
+          : "";
       return `No process running ${name} is connected.${where} Start the process, or name the environment as connected:${name}@<environment>.`;
     },
   },
