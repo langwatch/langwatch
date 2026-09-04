@@ -4,8 +4,6 @@ import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import {
   type CarriedOverCell,
-  CONNECTED_OUTPUT_FIELD,
-  connectedParameterDefinitions,
   type ESBatchEvaluationTarget,
   type EvaluationsV3State,
   type EvaluationV3Event,
@@ -19,17 +17,9 @@ import {
   type RecordEvaluatorResultCommandData,
   type RecordTargetResultCommandData,
   type TargetConfig,
-  UNNAMED_FAILURE,
 } from "@langwatch/experiment-contract";
-import {
-  nodeErrorToDomainError,
-  type ExecutionState,
-  type StudioClientEvent,
-  type StudioServerEvent,
-  type StudioWorkflow,
-  type WorkflowService,
-} from "@langwatch/workflow-contract";
-import type { Agent as TypedAgent, ConnectedAgentConfig } from "@langwatch/agent-contract";
+import type { ExecutionState, StudioWorkflow, WorkflowService } from "@langwatch/workflow-contract";
+import type { Agent as TypedAgent } from "@langwatch/agent-contract";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
@@ -48,33 +38,13 @@ import {
   buildCellWorkflow,
   buildEvaluatorCellWorkflow,
 } from "../processes/experiment-cell-workflow.process";
-import {
-  BUSY_RETRY_AFTER_MS,
-  DEFAULT_CALL_TIMEOUT_MS,
-  MAX_CALL_TIMEOUT_MS,
-} from "@langwatch/agent-contract";
 // The connected-agent relay of ADR-128. Its dispatcher, runtime and refusal
 // live in the Agent and Suite feature packages; a build without them
 // cannot run a connected column.
 import type { CallOutcome, DispatchAgent, DispatchCall } from "@langwatch/agent-contract";
-import { AgentBusyError } from "@langwatch/agent-contract";
-import { getConnectedAgentRuntime } from "@langwatch/agent-server";
 import type { RunActor } from "@langwatch/scenario-contract";
 import { assertConnectedAgentsRunnable } from "@langwatch/suite-server";
-import {
-  buildConnectedCall,
-  CONNECTED_BUSY_RETRY_BUDGET_MS,
-  CONNECTED_REQUEST_SLACK_MS,
-  connectedCallFailure,
-  connectedOutputText,
-} from "../processes/experiment-connected-target.process";
-import {
-  extractTargetOutput,
-  mapNlpEvent,
-  mapThrownErrorEvent,
-  mapWorkflowEvaluatorResult,
-  type ResultMapperConfig,
-} from "../processes/experiment-result-mapping.process";
+import type { ResultMapperConfig } from "../processes/experiment-result-mapping.process";
 import { createSemaphore } from "../processes/experiment-run-semaphore.process";
 import {
   evaluatorErrorResult,
@@ -95,6 +65,13 @@ import {
   ExperimentComparisonPlanService,
   type VariantEvaluatorScore,
 } from "./experiment-comparison-plan.service";
+import {
+  ExperimentCellExecutionService,
+  type LoadedCellData,
+} from "./experiment-cell-execution.service";
+import { ExperimentWorkflowCellService } from "./experiment-workflow-cell.service";
+import { ExperimentConnectedCellService } from "./experiment-connected-cell.service";
+import { ExperimentRunSandboxKeyService } from "./experiment-run-sandbox-key.service";
 import {
   comparisonSkipMessage as processComparisonSkipMessage,
   formatList as processFormatList,
@@ -248,188 +225,9 @@ export const generateComparisonCells = ({
     scopedRowIndices,
   });
 
-/**
- * Prices an LLM node's token usage at the project's canonical model rate,
- * the same way the trace-ingest collector does — the engine reports
- * tokens but no cost. Undefined with no model, tokens, or known rate.
- */
-export const priceMetrics = async (
-  cost: ExperimentModelCostPort,
-  projectId: string,
-  metrics: ExecutionState["metrics"] | undefined,
-): Promise<number | undefined> => {
-  if (!metrics?.model) return undefined;
-  const inputTokens = metrics.prompt_tokens ?? 0;
-  const outputTokens = metrics.completion_tokens ?? 0;
-  if (inputTokens === 0 && outputTokens === 0) return undefined;
-  return cost.tryPriceTokens({
-    projectId,
-    model: metrics.model,
-    inputTokens,
-    outputTokens,
-  });
-};
+const sandboxKey = ExperimentRunSandboxKeyService.create();
 
-/** What every evaluator of a cell is dispatched against. */
-type CellEvaluatorContext = {
-  cell: ExecutionCell;
-  projectId: string;
-  workflow: StudioWorkflow;
-  targetOutput: Record<string, unknown>;
-  traceId: string;
-  targetNodes: Set<string>;
-  config: ResultMapperConfig;
-  ports: ExperimentRunPorts;
-  workflows: WorkflowService;
-  isAborted?: () => Promise<boolean>;
-};
-
-/**
- * Dispatches one evaluator and yields the engine's events. Events are
- * collected before any is yielded, so a mid-dispatch throw emits one
- * error cell instead of a half-written result.
- */
-async function* runOneCellEvaluator({
-  evaluatorId,
-  evaluatorNodeId,
-  cell,
-  projectId,
-  workflow,
-  targetOutput,
-  traceId,
-  targetNodes,
-  config,
-  ports,
-  workflows,
-  isAborted,
-}: CellEvaluatorContext & {
-  evaluatorId: string;
-  evaluatorNodeId: string;
-}): AsyncGenerator<EvaluationV3Event> {
-  const evaluatorInputs = evaluatorInputSvc.buildEvaluatorInputs({
-    cell,
-    evaluatorId,
-    targetOutput,
-  });
-
-  // The dispatch decision. An evaluator whose every input resolved empty is
-  // not run: it would score empty against empty and report that as a verdict.
-  const evaluator = cell.evaluatorConfigs.find((e) => e.id === evaluatorId);
-  if (
-    evaluator &&
-    evaluatorInputSvc.hasNoResolvedInputs({ cell, evaluator, inputs: evaluatorInputs })
-  ) {
-    logger.info(
-      {
-        rowIndex: cell.rowIndex,
-        targetId: cell.targetId,
-        evaluatorId,
-        evaluatorType: evaluator.evaluatorType,
-      },
-      "Evaluator not dispatched: every input resolved empty",
-    );
-    yield noInputsResolvedResult({ cell, evaluator, evaluatorId });
-    return;
-  }
-
-  const evaluatorEvent = {
-    type: "execute_component" as const,
-    payload: {
-      trace_id: traceId,
-      workflow: {
-        ...workflow,
-        state: { execution: { status: "idle" as const } },
-      },
-      node_id: evaluatorNodeId,
-      inputs: evaluatorInputs,
-      origin: "evaluation",
-    },
-  };
-
-  const evaluatorEvents: StudioServerEvent[] = [];
-  await ports.studio.postEvent({
-    projectId,
-    event: await workflows.enrichStudioEvent({
-      event: evaluatorEvent,
-      projectId,
-    }),
-    isAborted,
-    onEvent: (serverEvent) => {
-      evaluatorEvents.push(serverEvent);
-    },
-  });
-
-  for (const event of evaluatorEvents) {
-    const mappedEvent = mapNlpEvent({
-      event,
-      rowIndex: cell.rowIndex,
-      targetNodes,
-      config,
-      evaluatorInputs,
-    });
-    if (mappedEvent) {
-      yield mappedEvent;
-    }
-  }
-}
-
-/**
- * Dispatches a cell's grading evaluators against the target's output,
- * shared by both executors. One evaluator failing does not stop the
- * rest — each reports its own error cell.
- */
-async function* runCellEvaluators({
-  evaluatorNodeIds,
-  ...context
-}: CellEvaluatorContext & {
-  evaluatorNodeIds: Record<string, string>;
-}): AsyncGenerator<EvaluationV3Event> {
-  const { cell, isAborted } = context;
-
-  for (const [evaluatorId, evaluatorNodeId] of Object.entries(evaluatorNodeIds)) {
-    if (isAborted && (await isAborted())) {
-      logger.debug({ cell: cell.rowIndex, evaluatorId }, "Cell aborted before evaluator execution");
-      return;
-    }
-    try {
-      yield* runOneCellEvaluator({ ...context, evaluatorId, evaluatorNodeId });
-    } catch (evalError) {
-      logger.warn(
-        {
-          error: evalError,
-          evaluatorId,
-          rowIndex: cell.rowIndex,
-          targetId: cell.targetId,
-        },
-        "Evaluator execution failed",
-      );
-      yield evaluatorErrorResult({ cell, evaluatorId, error: evalError });
-    }
-  }
-}
-
-/** Whether any target this run executes puts Python in a sandbox — the only reason to mint a credential. */
-function runExecutesCode({
-  loadedAgents,
-  loadedWorkflows,
-}: {
-  loadedAgents: Map<string, TypedAgent>;
-  loadedWorkflows?: Map<string, LoadedWorkflow>;
-}): boolean {
-  for (const agent of loadedAgents.values()) {
-    if (agent.type === "code") return true;
-  }
-  for (const workflow of loadedWorkflows?.values() ?? []) {
-    if (workflow.dsl.nodes.some((node) => node.type === "code")) return true;
-  }
-  return false;
-}
-
-/**
- * The credential every code node of this run authenticates with, or
- * undefined. One key for the whole run — a key per row would leave a
- * ledger of live credentials behind. A run that cannot get one still runs.
- */
+/** Mints the run's sandbox credential, when a target executes code. Delegates to {@link ExperimentRunSandboxKeyService}. */
 async function mintRunSandboxApiKey({
   sandboxCredentials,
   projectId,
@@ -441,244 +239,64 @@ async function mintRunSandboxApiKey({
   loadedAgents: Map<string, TypedAgent>;
   loadedWorkflows?: Map<string, LoadedWorkflow>;
 }): Promise<string | undefined> {
-  if (!runExecutesCode({ loadedAgents, loadedWorkflows })) return undefined;
-
-  // Minting here has no signed-in member to authorize — a run mints for itself
-  // — so the port answers with the key or with nothing, and the caller injects
-  // nothing when it gets nothing.
-  return sandboxCredentials.tryMintRunKey({ projectId });
+  return sandboxKey.mintRunSandboxApiKey({
+    sandboxCredentials,
+    projectId,
+    loadedAgents,
+    loadedWorkflows,
+  });
 }
+
+const cellExecution = (ports: ExperimentRunPorts, workflows: WorkflowService) =>
+  ExperimentCellExecutionService.create({ ports, workflows });
 
 /**
- * Sets the run's sandbox credential on an event's workflow. Applied after
- * `addEnvs` rather than inside it — `addEnvs` is shared by callers with
- * no run behind them.
+ * Prices an LLM node's token usage at the project's canonical model rate.
+ * Kept as its own tiny implementation (not a delegation) — it only reaches
+ * `cost`, and {@link ExperimentCellExecutionService} is built from the
+ * full port bag plus a workflow service this call site does not have.
  */
-function withSandboxApiKey(
-  event: StudioClientEvent,
-  sandboxApiKey: string | undefined,
-): StudioClientEvent {
-  const { payload } = event;
-  if (!sandboxApiKey || !("workflow" in payload)) return event;
-  // The cast is what every writer of this union does: spreading one
-  // member widens the payload back to the union, with no narrowing that
-  // survives the spread. `addEnvs` returns the same shape the same way.
-  return {
-    ...event,
-    payload: {
-      ...payload,
-      workflow: { ...payload.workflow, sandbox_api_key: sandboxApiKey },
-    },
-  } as StudioClientEvent;
-}
+export const priceMetrics = async (
+  cost: ExperimentModelCostPort,
+  projectId: string,
+  metrics: ExecutionState["metrics"] | undefined,
+): Promise<number | undefined> => {
+  if (!metrics?.model) return undefined;
+  const inputTokens = metrics.prompt_tokens ?? 0;
+  const outputTokens = metrics.completion_tokens ?? 0;
+  if (inputTokens === 0 && outputTokens === 0) return undefined;
+  return cost.tryPriceTokens({ projectId, model: metrics.model, inputTokens, outputTokens });
+};
 
-/** Executes a single cell and yields events. */
+/** Executes a single cell and yields events. Delegates to {@link ExperimentCellExecutionService}. */
 export async function* executeCell(
   cell: ExecutionCell,
   projectId: string,
   ports: ExperimentRunPorts,
   datasetColumns: Array<{ id: string; name: string; type: string }>,
-  loadedData: {
-    prompt?: VersionedPrompt;
-    agent?: TypedAgent;
-    evaluators?: Map<string, { id: string; name: string; config: unknown }>;
-    /** The run's agent cache credential, when it minted one. */
-    sandboxApiKey?: string;
-  },
+  loadedData: LoadedCellData,
   workflows: WorkflowService,
   resultMapperConfig?: ResultMapperConfig,
   isAborted?: () => Promise<boolean>,
 ): AsyncGenerator<EvaluationV3Event> {
-  // Emit cell_started
-  yield {
-    type: "cell_started",
-    rowIndex: cell.rowIndex,
-    targetId: cell.targetId,
-  };
-
-  try {
-    // The dispatch decision for an evaluator COLUMN. Nothing mapped means
-    // nothing to score, and scoring empty against empty passes.
-    const cellEvaluatorInputs = ExperimentEvaluatorInputService.create({
-      loadedEvaluators: loadedData.evaluators,
-    });
-    if (cellEvaluatorInputs.evaluatorTargetHasNoResolvedInputs({ cell })) {
-      const name = cellEvaluatorInputs.evaluatorTargetDisplayName({ target: cell.targetConfig });
-      logger.info(
-        { rowIndex: cell.rowIndex, targetId: cell.targetId, name },
-        "Evaluator column not dispatched: every input resolved empty",
-      );
-      yield evaluatorTargetNoInputsResult({ cell, name });
-      return;
-    }
-
-    // Build the workflow
-    const { workflow, targetNodeId, evaluatorNodeIds } = buildCellWorkflow(
-      {
-        projectId,
-        cell,
-        datasetColumns,
-      },
-      loadedData,
-    );
-
-    // Create set of target nodes for the result mapper
-    const targetNodes = new Set([cell.targetId]);
-
-    // Build evaluator target node IDs for explicit evaluator-as-target detection
-    const cellConfig: ResultMapperConfig = {
-      ...resultMapperConfig,
-      evaluatorTargetNodeIds:
-        cell.targetConfig.type === "evaluator" ? new Set([cell.targetId]) : undefined,
-    };
-
-    // Generate OTEL-compliant trace ID for this cell execution
-    // Reuse existing traceId if provided (for evaluator reruns to append to existing trace)
-    const traceId = cell.traceId ?? generateOtelTraceId();
-
-    let targetOutput: Record<string, unknown> | undefined;
-    let targetFailed = false;
-
-    // If skipTarget is true, use pre-computed output instead of executing target
-    if (cell.skipTarget && cell.precomputedTargetOutput !== undefined) {
-      logger.debug(
-        { rowIndex: cell.rowIndex, targetId: cell.targetId },
-        "Skipping target execution, using pre-computed output",
-      );
-      // Convert precomputedTargetOutput to the expected format
-      // The target output should be a record with the output field identifier as key
-      if (
-        typeof cell.precomputedTargetOutput === "object" &&
-        cell.precomputedTargetOutput !== null
-      ) {
-        targetOutput = cell.precomputedTargetOutput as Record<string, unknown>;
-      } else {
-        // If it's a primitive value, wrap it in the expected output field
-        const outputField = cell.targetConfig.outputs?.[0]?.identifier ?? "output";
-        targetOutput = { [outputField]: cell.precomputedTargetOutput };
-      }
-    } else {
-      // Execute target normally
-      // Create the execute_component event for the target
-      const rawEvent = {
-        type: "execute_component" as const,
-        payload: {
-          trace_id: traceId,
-          workflow: {
-            ...workflow,
-            state: { execution: { status: "idle" as const } },
-          },
-          node_id: targetNodeId,
-          inputs: evaluatorInputSvc.buildTargetInputs({ cell }),
-          origin: "evaluation",
-        },
-      };
-
-      // Prepare runtime credentials and datasets, then set the run's own
-      // sandbox credential on the workflow so its code nodes authenticate.
-      const enrichedEvent = withSandboxApiKey(
-        await workflows.prepareStudioEvent({ event: rawEvent, projectId }),
-        loadedData.sandboxApiKey,
-      );
-
-      // Execute target and collect events
-      const targetEvents: StudioServerEvent[] = [];
-
-      await ports.studio.postEvent({
-        projectId,
-        event: enrichedEvent,
-        isAborted,
-        onEvent: (serverEvent) => {
-          targetEvents.push(serverEvent);
-
-          // Extract target output from success event
-          if (
-            serverEvent.type === "component_state_change" &&
-            serverEvent.payload.component_id === targetNodeId &&
-            serverEvent.payload.execution_state?.status === "success"
-          ) {
-            targetOutput = serverEvent.payload.execution_state.outputs;
-          } else if (
-            serverEvent.type === "component_state_change" &&
-            serverEvent.payload.component_id === targetNodeId &&
-            serverEvent.payload.execution_state?.status === "error"
-          ) {
-            targetFailed = true;
-          }
-        },
-      });
-
-      // Map and yield target events
-      for (const event of targetEvents) {
-        const mappedEvent = mapNlpEvent({
-          event,
-          rowIndex: cell.rowIndex,
-          targetNodes,
-          config: cellConfig,
-        });
-        if (!mappedEvent) continue;
-        // The engine reports token usage but no cost (it has no price table),
-        // so price the target's tokens here at the canonical model rate. This
-        // keeps the cell's cost consistent with its trace's cost.
-        if (
-          mappedEvent.type === "target_result" &&
-          mappedEvent.cost == null &&
-          event.type === "component_state_change"
-        ) {
-          const cost = await priceMetrics(
-            ports.cost,
-            projectId,
-            event.payload.execution_state?.metrics,
-          );
-          if (cost != null) mappedEvent.cost = cost;
-        }
-        yield mappedEvent;
-      }
-    }
-
-    // Check abort before executing evaluators
-    if (isAborted && (await isAborted())) {
-      logger.debug(
-        { cell: cell.rowIndex, targetId: cell.targetId },
-        "Cell aborted after target execution",
-      );
-      return;
-    }
-
-    // Execute evaluators if target succeeded and we have evaluators
-    if (!targetFailed && targetOutput && Object.keys(evaluatorNodeIds).length > 0) {
-      yield* runCellEvaluators({
-        cell,
-        projectId,
-        workflow,
-        evaluatorNodeIds,
-        targetOutput,
-        traceId,
-        targetNodes,
-        config: cellConfig,
-        ports,
-        workflows,
-        isAborted,
-      });
-    }
-  } catch (error) {
-    logger.error(
-      { error, rowIndex: cell.rowIndex, targetId: cell.targetId },
-      "Cell execution failed",
-    );
-    yield mapThrownErrorEvent({
-      error,
-      rowIndex: cell.rowIndex,
-      targetId: cell.targetId,
-    });
-  }
+  yield* cellExecution(ports, workflows).executeCell({
+    cell,
+    projectId,
+    datasetColumns,
+    loadedData,
+    resultMapperConfig,
+    isAborted,
+  });
 }
 
-/**
- * Executes a single cell whose target is a whole studio workflow: runs
- * the DSL once, surfaces the End node's result as the target output and
- * its own evaluator nodes as evaluator results.
- */
+const workflowCell = (ports: ExperimentRunPorts, workflows: WorkflowService) =>
+  ExperimentWorkflowCellService.create({
+    ports,
+    workflows,
+    cells: cellExecution(ports, workflows),
+  });
+
+/** Executes a single cell whose target is a whole studio workflow. Delegates to {@link ExperimentWorkflowCellService}. */
 export async function* executeWorkflowCell({
   cell,
   projectId,
@@ -695,7 +313,7 @@ export async function* executeWorkflowCell({
   projectId: string;
   workflowDsl: StudioWorkflow;
   datasetColumns?: Array<{ id: string; name: string; type: string }>;
-  loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>;
+  loadedEvaluators?: LoadedEvaluators;
   resultMapperConfig?: ResultMapperConfig;
   isAborted?: () => Promise<boolean>;
   ports: ExperimentRunPorts;
@@ -703,203 +321,16 @@ export async function* executeWorkflowCell({
   /** The run's agent cache credential, when it minted one. */
   sandboxApiKey?: string;
 }): AsyncGenerator<EvaluationV3Event> {
-  yield {
-    type: "cell_started",
-    rowIndex: cell.rowIndex,
-    targetId: cell.targetId,
-  };
-
-  try {
-    const traceId = cell.traceId ?? generateOtelTraceId();
-    const inputs = evaluatorInputSvc.buildTargetInputs({ cell });
-
-    // The workflow's own evaluator nodes carry the scores we surface per row.
-    // Keep each node's display name so results show it (e.g. "Exact Match")
-    // instead of the raw node id; these nodes have no DB evaluator to resolve.
-    const evaluatorNodeNames = new Map(
-      workflowDsl.nodes.filter((n) => n.type === "evaluator").map((n) => [n.id, n.data?.name]),
-    );
-
-    const rawEvent = {
-      type: "execute_flow" as const,
-      payload: {
-        trace_id: traceId,
-        workflow: {
-          ...workflowDsl,
-          state: { execution: { status: "idle" as const } },
-        },
-        inputs: [inputs],
-        manual_execution_mode: false,
-        do_not_trace: false,
-        run_evaluations: true,
-        origin: "evaluation",
-      },
-    };
-
-    const enrichedEvent = withSandboxApiKey(
-      await workflows.prepareStudioEvent({ event: rawEvent, projectId }),
-      sandboxApiKey,
-    );
-
-    const events: StudioServerEvent[] = [];
-    await ports.studio.postEvent({
-      projectId,
-      event: enrichedEvent,
-      isAborted,
-      onEvent: (serverEvent) => {
-        events.push(serverEvent);
-      },
-    });
-
-    let targetOutput: unknown;
-    /**
-     * The end node's results as a record, before extractTargetOutput
-     * unwraps a lone "output" into a bare value — so a mapping to any
-     * other result key still resolves.
-     */
-    let targetOutputRecord: Record<string, unknown> | undefined;
-    let totalCost = 0;
-    let sawCost = false;
-    let targetFailed = false;
-    /**
-     * The failing state, captured whole rather than three independent
-     * latches — latching them apart produced a domainError whose code
-     * and message came from different nodes.
-     */
-    let targetFailure: { error?: string; errorType?: string; upstreamStatus?: number } | undefined;
-    let durationMs: number | undefined;
-    let finalTraceId = traceId;
-    const evaluatorEvents: EvaluationV3Event[] = [];
-
-    for (const event of events) {
-      if (event.type === "execution_state_change") {
-        const ex = event.payload.execution_state;
-        if (ex?.result !== undefined) {
-          targetOutput = extractTargetOutput(ex.result);
-          targetOutputRecord = ex.result;
-        }
-        if (ex?.trace_id) finalTraceId = ex.trace_id;
-        if (ex?.timestamps?.started_at !== undefined && ex?.timestamps?.finished_at !== undefined) {
-          durationMs = ex.timestamps.finished_at - ex.timestamps.started_at;
-        }
-        if (ex?.status === "error") {
-          targetFailed = true;
-          targetFailure = {
-            error: ex.error,
-            errorType: ex.error_type,
-            upstreamStatus: ex.upstream_status,
-          };
-        }
-        continue;
-      }
-
-      if (event.type !== "component_state_change") continue;
-      const { component_id, execution_state } = event.payload;
-      if (!execution_state) continue;
-
-      if (typeof execution_state.cost === "number" && execution_state.cost > 0) {
-        totalCost += execution_state.cost;
-        sawCost = true;
-      } else {
-        // LLM nodes report tokens but no cost (the engine has no price table),
-        // so price them at the canonical model rate, same as executeCell.
-        const cost = await priceMetrics(ports.cost, projectId, execution_state.metrics);
-        if (cost != null) {
-          totalCost += cost;
-          sawCost = true;
-        }
-      }
-
-      if (
-        evaluatorNodeNames.has(component_id) &&
-        (execution_state.status === "success" || execution_state.status === "error")
-      ) {
-        evaluatorEvents.push(
-          mapWorkflowEvaluatorResult(
-            cell.rowIndex,
-            cell.targetId,
-            component_id,
-            evaluatorNodeNames.get(component_id),
-            {
-              status: execution_state.status,
-              outputs: execution_state.outputs,
-              cost: execution_state.cost,
-              error: execution_state.error,
-              // The coded half of the failure — without it the evaluator cell
-              // renders the engine's raw message verbatim.
-              nodeErrorCode: execution_state.error_type,
-              upstream_status: execution_state.upstream_status,
-              trace_id: execution_state.trace_id ?? finalTraceId,
-            },
-          ),
-        );
-      }
-    }
-
-    // Yield the target result first so storage links evaluator results to it.
-    yield {
-      type: "target_result",
-      rowIndex: cell.rowIndex,
-      targetId: cell.targetId,
-      output: targetOutput,
-      cost: sawCost ? totalCost : undefined,
-      duration: durationMs,
-      traceId: finalTraceId,
-      // The engine's own words when it gave any; otherwise the marker, so the
-      // client's fallback copy owns what the customer reads rather than a
-      // sentence written here.
-      error: targetFailed ? (targetFailure?.error ?? UNNAMED_FAILURE) : undefined,
-      ...(targetFailed && targetFailure?.errorType
-        ? {
-            domainError: nodeErrorToDomainError({
-              errorType: targetFailure.errorType,
-              message: targetFailure.error,
-              upstreamStatus: targetFailure.upstreamStatus,
-              traceId: finalTraceId,
-            }),
-          }
-        : {}),
-    };
-
-    for (const evaluatorEvent of evaluatorEvents) {
-      yield evaluatorEvent;
-    }
-
-    // Evaluators attached to this column, not part of the workflow, so
-    // they did not run with it. Only reached when the workflow produced a
-    // result — grading an absent answer would score the absence itself.
-    if (!targetFailed && targetOutputRecord && cell.evaluatorConfigs.length > 0) {
-      const { workflow, evaluatorNodeIds } = buildEvaluatorCellWorkflow({
-        projectId,
-        cell,
-        datasetColumns,
-        loadedEvaluators,
-      });
-      yield* runCellEvaluators({
-        cell,
-        projectId,
-        workflow,
-        evaluatorNodeIds,
-        targetOutput: targetOutputRecord,
-        traceId: finalTraceId,
-        targetNodes: new Set([cell.targetId]),
-        config: resultMapperConfig ?? {},
-        ports,
-        workflows,
-        isAborted,
-      });
-    }
-  } catch (error) {
-    logger.error(
-      { error, rowIndex: cell.rowIndex, targetId: cell.targetId },
-      "Workflow cell execution failed",
-    );
-    yield mapThrownErrorEvent({
-      error,
-      rowIndex: cell.rowIndex,
-      targetId: cell.targetId,
-    });
-  }
+  yield* workflowCell(ports, workflows).executeWorkflowCell({
+    cell,
+    projectId,
+    workflowDsl,
+    datasetColumns,
+    loadedEvaluators,
+    resultMapperConfig,
+    isAborted,
+    sandboxApiKey,
+  });
 }
 
 /** One turn to a connected agent, as the cell executor asks for it. */
@@ -909,107 +340,6 @@ export type ConnectedDispatch = (params: {
   call: DispatchCall;
   signal: AbortSignal;
 }) => Promise<CallOutcome>;
-
-/** The runtime's own dispatcher, which is what a real run uses. */
-const relayDispatch: ConnectedDispatch = (params) =>
-  getConnectedAgentRuntime().dispatcher.dispatch(params);
-
-/**
- * The agent as the dispatcher reads it, budget-capped the same way the
- * relay route caps it — a column may not ask for a longer call.
- */
-const dispatchAgentOf = (agent: TypedAgent): DispatchAgent => {
-  const config = agent.config as ConnectedAgentConfig;
-  return {
-    id: agent.id,
-    name: agent.name,
-    environment: agent.environment ?? null,
-    timeoutMs: Math.min(config.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS, MAX_CALL_TIMEOUT_MS),
-    // A workbench row is a conversation of one turn, so there is nothing to
-    // pin: every row picks whichever instance is free.
-    isSticky: false,
-  };
-};
-
-/** The one turn a row sends: the mapped row as a single user message, in its own conversation and trace. */
-const connectedTurnParams = ({
-  cell,
-  projectId,
-  agent,
-  dispatchAgent,
-  traceId,
-}: {
-  cell: ExecutionCell;
-  projectId: string;
-  agent: TypedAgent;
-  dispatchAgent: ReturnType<typeof dispatchAgentOf>;
-  traceId: string;
-}): Omit<Parameters<ConnectedDispatch>[0], "signal"> => {
-  const { messages, params } = buildConnectedCall({
-    inputs: evaluatorInputSvc.buildTargetInputs({ cell }),
-    definitions: connectedParameterDefinitions(agent.config),
-  });
-  return {
-    projectId,
-    agent: dispatchAgent,
-    call: {
-      // One row, one conversation. The cell's own trace id keeps it unique
-      // and ties the conversation to the row that started it.
-      threadId: `eval_v3_${cell.rowIndex}_${traceId}`,
-      messages,
-      newMessages: messages.slice(-1),
-      params,
-      session: undefined,
-      // The agent adopts this context, so the spans it records land in the
-      // cell's own trace and the row links straight to them.
-      traceparent: `00-${traceId}-${generateOtelSpanId()}-01`,
-      run: {},
-    },
-  };
-};
-
-/**
- * What the cell shows when the turn did not answer. A named failure keeps
- * its code, so the cell renders that code's copy instead of a generic
- * unknown error.
- */
-const connectedFailureEvent = ({
-  cell,
-  projectId,
-  agentId,
-  error,
-  traceId,
-  duration,
-}: {
-  cell: ExecutionCell;
-  projectId: string;
-  agentId: string;
-  error: unknown;
-  traceId: string;
-  duration: number;
-}): EvaluationV3Event => {
-  logger.info(
-    {
-      error,
-      projectId,
-      agentId,
-      rowIndex: cell.rowIndex,
-      targetId: cell.targetId,
-    },
-    "Connected agent cell failed",
-  );
-  const failure = connectedCallFailure(error);
-  return {
-    type: "target_result",
-    rowIndex: cell.rowIndex,
-    targetId: cell.targetId,
-    output: undefined,
-    duration,
-    traceId,
-    error: failure.message,
-    ...(failure.domainError ? { domainError: failure.domainError } : {}),
-  };
-};
 
 /** What one connected agent cell needs to run. */
 interface ConnectedCellInput {
@@ -1034,218 +364,21 @@ interface ConnectedCellInput {
  * Executes a single cell whose target is a connected agent (ADR-128): one
  * turn through the relay dispatcher, since the agent runs in the
  * customer's own process. Each row is its own conversation, no history carried.
+ * Delegates to {@link ExperimentConnectedCellService}.
  */
 export async function* executeConnectedCell(
   input: ConnectedCellInput,
 ): AsyncGenerator<EvaluationV3Event> {
-  const { cell, projectId, agent } = input;
-  const now = input.now ?? (() => Date.now());
-  const traceId = cell.traceId ?? generateOtelTraceId();
-  const startedAt = now();
-
-  yield {
-    type: "cell_started",
-    rowIndex: cell.rowIndex,
-    targetId: cell.targetId,
-  };
-
-  const turn = await connectedTurn({
-    input: { ...input, now },
-    traceId,
-    startedAt,
-  });
-
-  if (!turn.ok) {
-    yield connectedFailureEvent({
-      cell,
-      projectId,
-      agentId: agent.id,
-      error: turn.error,
-      traceId,
-      duration: now() - startedAt,
-    });
-    return;
-  }
-
-  const output = connectedOutputText(turn.outcome.output);
-
-  yield {
-    type: "target_result",
-    rowIndex: cell.rowIndex,
-    targetId: cell.targetId,
-    output,
-    // The whole cell, not only the call that answered: a row that waited out
-    // a busy agent took that time too, and a run comparison reads it.
-    duration: now() - startedAt,
-    traceId,
-  };
-
-  yield* gradeConnectedAnswer({ input, output, traceId });
-}
-
-/**
- * The one turn the row sends, retried while the agent is busy. The
- * refusal comes back rather than being thrown, so the caller renders it
- * as the cell's own failure instead of ending the run.
- */
-const connectedTurn = async ({
-  input,
-  traceId,
-  startedAt,
-}: {
-  input: ConnectedCellInput;
-  traceId: string;
-  startedAt: number;
-}): Promise<{ ok: true; outcome: CallOutcome } | { ok: false; error: unknown }> => {
-  const {
-    cell,
-    projectId,
-    agent,
-    isAborted,
-    dispatch = relayDispatch,
-    sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms)),
-    now = () => Date.now(),
-  } = input;
-  const dispatchAgent = dispatchAgentOf(agent);
-  try {
-    const outcome = await dispatchWithBusyRetry({
-      dispatch,
-      sleep,
-      now,
-      isAborted,
-      budgetEndsAt: startedAt + CONNECTED_BUSY_RETRY_BUDGET_MS,
-      callTimeoutMs: dispatchAgent.timeoutMs + CONNECTED_REQUEST_SLACK_MS,
-      params: connectedTurnParams({
-        cell,
-        projectId,
-        agent,
-        dispatchAgent,
-        traceId,
-      }),
-    });
-    return { ok: true, outcome };
-  } catch (error) {
-    return { ok: false, error };
-  }
-};
-
-/**
- * The evaluators of the column, over the answer the turn gave — run
- * through the same path a workflow target uses, so a connected column
- * scores, costs and traces like every other column.
- */
-async function* gradeConnectedAnswer({
-  input,
-  output,
-  traceId,
-}: {
-  input: ConnectedCellInput;
-  output: string;
-  traceId: string;
-}): AsyncGenerator<EvaluationV3Event> {
-  const {
-    cell,
-    projectId,
-    datasetColumns = [],
-    loadedEvaluators,
-    resultMapperConfig,
-    isAborted,
+  const { ports, workflows, dispatch, sleep, now, ...cellInput } = input;
+  yield* ExperimentConnectedCellService.create({
     ports,
     workflows,
-  } = input;
-  if (cell.evaluatorConfigs.length === 0) return;
-
-  const { workflow, evaluatorNodeIds } = buildEvaluatorCellWorkflow({
-    projectId,
-    cell,
-    datasetColumns,
-    loadedEvaluators,
-  });
-  yield* runCellEvaluators({
-    cell,
-    projectId,
-    workflow,
-    evaluatorNodeIds,
-    targetOutput: { [CONNECTED_OUTPUT_FIELD]: output },
-    traceId,
-    targetNodes: new Set([cell.targetId]),
-    config: resultMapperConfig ?? {},
-    isAborted,
-    ports,
-    workflows,
-  });
+    cells: cellExecution(ports, workflows),
+    dispatch,
+    sleep,
+    now,
+  }).executeConnectedCell(cellInput);
 }
-
-/**
- * One turn, waiting out a busy agent. Every instance being full is a
- * queue, not a failure — the row waits, the same way a simulation turn
- * does, bounded so a permanently full agent still fails the row.
- */
-const dispatchWithBusyRetry = async ({
-  dispatch,
-  params,
-  sleep,
-  now,
-  isAborted,
-  budgetEndsAt,
-  callTimeoutMs,
-}: {
-  dispatch: ConnectedDispatch;
-  params: Omit<Parameters<ConnectedDispatch>[0], "signal">;
-  sleep: (ms: number) => Promise<void>;
-  now: () => number;
-  isAborted?: () => Promise<boolean>;
-  budgetEndsAt: number;
-  callTimeoutMs: number;
-}): Promise<CallOutcome> => {
-  for (;;) {
-    try {
-      // Every attempt gets its own deadline, not one shared signal — a
-      // shared signal would carry the earlier attempts' spent time and
-      // abort a later attempt the moment it starts.
-      return await dispatch({
-        ...params,
-        signal: AbortSignal.timeout(callTimeoutMs),
-      });
-    } catch (error) {
-      const waitMs = await busyWaitMs({ error, now, budgetEndsAt, isAborted });
-      if (waitMs === undefined) throw error;
-      await sleep(waitMs);
-    }
-  }
-};
-
-/**
- * How long to wait before the next attempt, or nothing when the turn must
- * fail now: the agent refused for a reason other than busy, the retry
- * budget is spent, or the run was stopped (which waits for nothing).
- */
-async function busyWaitMs({
-  error,
-  now,
-  budgetEndsAt,
-  isAborted,
-}: {
-  error: unknown;
-  now: () => number;
-  budgetEndsAt: number;
-  isAborted?: () => Promise<boolean>;
-}): Promise<number | undefined> {
-  const retryAfterMs = busyRetryAfterMs(error);
-  if (retryAfterMs === undefined || now() >= budgetEndsAt) return undefined;
-  if (isAborted && (await isAborted())) return undefined;
-
-  // Jitter spreads the retries of the rows that hit a full agent at once.
-  const jittered = retryAfterMs + Math.floor(Math.random() * retryAfterMs);
-  return Math.max(0, Math.min(jittered, budgetEndsAt - now()));
-}
-
-/** How long a busy agent asked to be left alone, or nothing if it is not busy. */
-const busyRetryAfterMs = (error: unknown): number | undefined => {
-  if (!(error instanceof AgentBusyError)) return undefined;
-  const declared = error.meta?.retryAfterMs;
-  return typeof declared === "number" && declared > 0 ? declared : BUSY_RETRY_AFTER_MS;
-};
 
 const evaluatorInputSvc = ExperimentEvaluatorInputService.create({});
 
