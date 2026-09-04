@@ -1,11 +1,16 @@
 /**
- * The product-infrastructure half of the packaged tRPC record, served by the
- * API process.
+ * A project's own storage, retention and monitoring, served by the API process.
  *
- * What this pins is one call per namespace this half mounts, each of them made
+ * The three surfaces that answer for a project's own infrastructure rather than
+ * for the product a member runs on it. They were one composition half until
+ * each took its own; this suite drives all three together because that is how a
+ * process serves them, and because what it pins about the split is that one
+ * absent surface no longer costs the other two.
+ *
+ * What this pins is one call per namespace they mount, each of them made
  * over the REAL `/api/trpc` handler on THIS process's root, through THIS
  * process's policy chain, against the collaborator set
- * `composeApiProductInfraCollaborators` produced. Nothing here reaches a stub
+ * the three feature compositions produced. Nothing here reaches a stub
  * through a proxy: the fakes are at the PORTS — a Prisma double, an AuthZ
  * service, a ClickHouse client and a real directory on disk — and everything
  * between the HTTP request and them is the composed graph.
@@ -52,19 +57,24 @@ import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import { PostgresMonitorAdapter } from "@langwatch/monitor-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it, vi } from "vitest";
-import { ApiApplication, MissingAgentService, MissingSecretService } from "../../api.application";
-import type { ApiStoredObjectsConfigResolution } from "../../platform/config/api.config";
+import { ApiApplication, MissingAgentService, MissingSecretService } from "../../../api.application";
+import type { ApiStoredObjectsConfigResolution } from "../../../platform/config/api.config";
 import {
   ApiTrpcFeaturesComposition,
   composeApiTrpcCollaborators,
-} from "../api-trpc-features.composition";
-import { composeApiProductInfraCollaborators } from "../api-trpc-collaborators.product-infra.composition";
+} from "../../../app/api-trpc-features.composition";
+import {
+  composeDataRetentionFeature,
+  refusingDataRetentionFeature,
+} from "../../data-retention/data-retention.composition";
+import { composeMonitorFeature, refusingMonitorFeature } from "../../monitor/monitor.composition";
+import { composeStoredObjectFeature, refusingStoredObjectFeature } from "../stored-object.composition";
 import {
   stubApplicationSlices,
   stubComposedFeatures,
   stubInfrastructureEntitlements,
   testHalves,
-} from "./api-trpc-collaborators.test-halves";
+} from "../../../app/__tests__/api-trpc-collaborators.test-halves";
 
 const SESSION_USER = { id: "user-1", name: "Sam Rivers", email: "sam@acme.test", role: "ADMIN" };
 const PROJECT_ID = "project-1";
@@ -401,31 +411,56 @@ function composeHalf(
   const clickHouse = testClickHouse(storage);
   const { storage: storageConfig, ...rest } = options;
 
-  const half = composeApiProductInfraCollaborators({
+  const infrastructure = {
+    ...stubInfrastructureEntitlements(),
     prisma: prisma.client,
     authz,
-    dataRetention: testDataRetention(),
-    // The REAL monitor service, over the same double: what this pins is that
-    // `monitors.*` answers from the service the execution half composed rather
-    // than from a second one built here.
-    monitors: PostgresMonitorAdapter.create({
-      database: prisma.client,
-      evaluators: { archive: vi.fn(async () => undefined) } as unknown as EvaluatorService,
-      generateId: () => "monitor-2",
-    }),
-    evaluators: { archive: vi.fn(async () => undefined) } as unknown as EvaluatorService,
-    evaluatorReplication: {
-      replicateEvaluatorWorkflow: vi.fn(async () => "workflow-copy"),
-      deleteReplicatedWorkflow: vi.fn(async () => undefined),
-    } as never,
-    ops: { isAdmin: () => false } as never,
-    resolveClickHouseClient: clickHouse.resolveClient,
-    storage: storageConfig ?? testStorageConfig(),
     plans: { getActivePlan: async () => PAID_PLAN },
-    ...rest,
+    audit: undefined,
+    ...("plans" in rest ? { plans: rest.plans } : {}),
+  };
+
+  const storedObject = composeStoredObjectFeature({
+    prisma: prisma.client,
+    resolveClickHouseClient:
+      "resolveClickHouseClient" in rest ? rest.resolveClickHouseClient! : clickHouse.resolveClient,
+    storage: storageConfig ?? testStorageConfig(),
+  });
+  const monitor = composeMonitorFeature({
+    peers: {
+      // The REAL monitor service, over the same double: what this pins is that
+      // `monitors.*` answers from the service the execution half composed
+      // rather than from a second one built here.
+      monitors: PostgresMonitorAdapter.create({
+        database: prisma.client,
+        evaluators: { archive: vi.fn(async () => undefined) } as unknown as EvaluatorService,
+        generateId: () => "monitor-2",
+      }),
+      evaluators: { archive: vi.fn(async () => undefined) } as unknown as EvaluatorService,
+      evaluatorReplication: {
+        replicateEvaluatorWorkflow: vi.fn(async () => "workflow-copy"),
+        deleteReplicatedWorkflow: vi.fn(async () => undefined),
+      } as never,
+    },
+    resolveClickHouseClient:
+      "resolveClickHouseClient" in rest ? rest.resolveClickHouseClient! : clickHouse.resolveClient,
+  });
+  const dataRetention = composeDataRetentionFeature({
+    infrastructure,
+    peers: { ops: { isAdmin: () => false } as never },
+    dataRetention: testDataRetention(),
   });
 
-  return { half, storage, prisma, authz, clickHouse };
+  return {
+    dataRetention,
+    monitor,
+    storedObject,
+    infrastructure,
+    storage,
+    prisma,
+    authz,
+    clickHouse,
+  };
 }
 
 function composeApplication(
@@ -433,22 +468,29 @@ function composeApplication(
     plans?: undefined;
     storage?: ApiStoredObjectsConfigResolution;
     resolveClickHouseClient?: null;
+    /** Composes the object store as absent, leaving the other two real. */
+    withoutStoredObject?: true;
   } = {},
 ) {
-  const composed = composeHalf(options);
+  const { withoutStoredObject, ...rest } = options;
+  const real = composeHalf(rest);
+  const composed = withoutStoredObject
+    ? { ...real, storedObject: refusingStoredObjectFeature() }
+    : real;
 
   const features = ApiTrpcFeaturesComposition.tryCompose({
-    composed: stubComposedFeatures(),
-    infrastructure: {
-      ...stubInfrastructureEntitlements(),
-      prisma: composed.prisma.client,
-      authz: composed.authz,
-      audit: undefined,
+    composed: {
+      ...stubComposedFeatures(),
+      dataRetention: composed.dataRetention,
+      monitor: composed.monitor,
+      storedObject: composed.storedObject,
     },
-    collaborators: composeApiTrpcCollaborators(
-      testHalves({ productInfra: composed.half }),
-      stubApplicationSlices(),
-    ),
+    infrastructure: composed.infrastructure,
+    collaborators: composeApiTrpcCollaborators(testHalves(), {
+      ...stubApplicationSlices(),
+      monitors: composed.monitor.app,
+      storedObjectApp: composed.storedObject.app,
+    }),
   });
   if (!features) throw new Error("the record refused to compose against its collaborators");
 
@@ -490,7 +532,7 @@ async function callTrpc(
   return { status: response.status, body: await response.json() };
 }
 
-describe("given an API process composed with the product-infrastructure half", () => {
+describe("given an API process composed with the object store, retention and monitor features", () => {
   describe("when the renderer probes a stored object it holds an id for", () => {
     it("reports the object available, having read the row and the bytes", async () => {
       const { application } = composeApplication();
@@ -709,35 +751,80 @@ describe("given an API process composed with the product-infrastructure half", (
     });
 
     it("refuses a retention plan gate rather than passing one it cannot evaluate", async () => {
-      const { half } = composeHalf({ plans: undefined });
+      const { application } = composeApplication({ plans: undefined });
 
-      await expect(
-        half.dataRetention.assertPlanForProject(
-          { session: { user: SESSION_USER } } as never,
-          PROJECT_ID,
-        ),
-      ).rejects.toMatchObject({ code: "service_unavailable" });
+      const { status, body } = await callTrpc(
+        application,
+        "dataRetention.triggerRetroactiveUpdate",
+        { projectId: PROJECT_ID, category: "traces" },
+        "mutation",
+      );
+
+      // A plan gate that cannot read a plan must not pass: with no provider it
+      // refuses by name rather than letting the write through unmetered.
+      expect(status).toBeGreaterThanOrEqual(400);
+      expect(JSON.stringify(body)).toContain("service_unavailable");
     });
 
-    it("refuses to keep data indefinitely for a caller who is not a platform administrator", () => {
-      const { half } = composeHalf();
+    it("refuses to keep data indefinitely for a caller who is not a platform administrator", async () => {
+      const { application } = composeApplication();
 
-      expect(() =>
-        half.dataRetention.assertCanDisableRetention({
-          session: { user: SESSION_USER },
-        } as never),
-      ).toThrow(/platform administrators/);
+      const { status, body } = await callTrpc(
+        application,
+        "dataRetention.setForScope",
+        {
+          projectId: PROJECT_ID,
+          scope: { scopeType: "PROJECT", scopeId: PROJECT_ID },
+          category: "traces",
+          // The keep-forever sentinel, which the schema accepts structurally
+          // and only the platform-administrator check refuses.
+          retentionDays: 0,
+        },
+        "mutation",
+      );
+
+      expect(status).toBeGreaterThanOrEqual(400);
+      expect(JSON.stringify(body)).toContain("FORBIDDEN");
     });
   });
 
-  describe("when the half did not compose", () => {
-    it("composes no record rather than mounting three namespaces over the gap", () => {
-      const composed = composeApiTrpcCollaborators(
-        testHalves({ productInfra: undefined }),
-        stubApplicationSlices(),
-      );
+  describe("when the object store did not compose", () => {
+    /**
+     * Before these three separated they were one half, and a process holding
+     * no byte backend composed NONE of the record — the retention settings and
+     * the monitors page went with the object store, and the seal named the
+     * half rather than the surface.
+     */
+    it("refuses the object probe by name", async () => {
+      const { application } = composeApplication({ withoutStoredObject: true });
 
-      expect(composed).toBeUndefined();
+      const { status, body } = await callTrpc(application, "storedObjects.headById", {
+        projectId: PROJECT_ID,
+        id: OBJECT_ID,
+      });
+
+      expect(status).toBeGreaterThanOrEqual(400);
+      expect(JSON.stringify(body)).toContain("service_unavailable");
+    });
+
+    it("still answers the retention settings, which never read a byte", async () => {
+      const { application } = composeApplication({ withoutStoredObject: true });
+
+      const { status } = await callTrpc(application, "dataRetention.getRules", {
+        projectId: PROJECT_ID,
+      });
+
+      expect(status).toBe(200);
+    });
+
+    it("still lists the project's monitors", async () => {
+      const { application } = composeApplication({ withoutStoredObject: true });
+
+      const { status } = await callTrpc(application, "monitors.getAllForProject", {
+        projectId: PROJECT_ID,
+      });
+
+      expect(status).toBe(200);
     });
   });
 });

@@ -35,7 +35,6 @@ import type { ApiExecutionCollaborators } from "./api-trpc-collaborators.executi
 import type { ApiIdentityCollaborators } from "./api-trpc-collaborators.identity.composition";
 import type { ApiOrgGroupCollaborators } from "./api-trpc-collaborators.org-group.composition";
 import type { ApiProductGroupCollaborators } from "./api-trpc-collaborators.product-group.composition";
-import type { ApiProductInfraCollaborators } from "./api-trpc-collaborators.product-infra.composition";
 import {
   type ApiProductCollaborators,
   type ApiTrpcCollaboratorGapReport,
@@ -306,13 +305,13 @@ export class LoggedApiTrpcFeaturesAbsence extends ApiTrpcCollaboratorsAbsence {
 }
 
 /**
- * The eight halves {@link composeApiTrpcCollaborators} reads into one flat
+ * The seven halves {@link composeApiTrpcCollaborators} reads into one flat
  * {@link ApiTrpcCollaborators} record. Each is `undefined` exactly when the
  * process composed nothing for it — see that half's own composing function
  * for why it can be missing.
  */
 /**
- * The same eight once every one of them is present.
+ * The same seven once every one of them is present.
  *
  * `Required<>` is not this: it strips the `?` a member does not have and leaves
  * the `| undefined` a member does, so the whole record read below stayed
@@ -330,7 +329,6 @@ export type ApiTrpcCollaboratorHalves = Readonly<{
   productGroup: ApiProductGroupCollaborators | undefined;
   traceGroup: ApiTraceGroupCollaborators | undefined;
   orgGroup: ApiOrgGroupCollaborators | undefined;
-  productInfra: ApiProductInfraCollaborators | undefined;
 }>;
 
 /**
@@ -349,21 +347,23 @@ export type ApiTrpcFeatureApplicationSlices = Pick<
   | "governance"
   | "governanceApp"
   | "langy"
+  | "monitors"
   | "ops"
   | "scenarios"
   | "sessionPolicy"
+  | "storedObjectApp"
   | "suites"
   | "webhooks"
 >;
 
 /**
- * Reads all eight collaborator halves into ONE flat {@link ApiTrpcCollaborators}
+ * Reads all seven collaborator halves into ONE flat {@link ApiTrpcCollaborators}
  * record, or refuses by name.
  *
  * All-or-nothing, replacing the ten `withApi*Collaborators` folds and the
  * runtime `sealApiTrpcCollaborators` check those folds needed: a process
  * missing any half composes none of the record, named, rather than mounting
- * the other seven over a gap. No cast to an erased type anywhere in this
+ * the other six over a gap. No cast to an erased type anywhere in this
  * function — every `half.field` access below is checked against the real,
  * concrete type each `compose*` function already returns, so a half's return
  * type drifting from what this literal expects is a compile error here
@@ -394,7 +394,6 @@ export function composeApiTrpcCollaborators(
     productGroup,
     traceGroup,
     orgGroup,
-    productInfra,
   } = halves as ComposedApiTrpcCollaboratorHalves;
 
   return {
@@ -422,8 +421,6 @@ export function composeApiTrpcCollaborators(
       modelProviders: traceGroup.modelProviders,
       planProvider: traceGroup.planProvider,
       ...orgGroup.application,
-      monitors: productInfra.monitorApp,
-      storedObjectApp: productInfra.storedObjectApp,
       ...application,
     },
 
@@ -477,7 +474,5 @@ export function composeApiTrpcCollaborators(
     emailSuppression: orgGroup.emailSuppression,
     enterprise: orgGroup.enterprise,
 
-    dataRetention: productInfra.dataRetention,
-    monitors: productInfra.monitors,
   };
 }

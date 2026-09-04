@@ -39,7 +39,10 @@ import { z } from "zod";
 import { createTrpcRoot } from "../../api.application";
 import { composeGatewayFeature } from "../../features/gateway/gateway.composition";
 import { refusingLangyFeature } from "../../features/langy/langy.composition";
+import { refusingDataRetentionFeature } from "../../features/data-retention/data-retention.composition";
+import { refusingMonitorFeature } from "../../features/monitor/monitor.composition";
 import { refusingScenarioFeature } from "../../features/scenario/scenario.composition";
+import { refusingStoredObjectFeature } from "../../features/stored-object/stored-object.composition";
 import { refusingOpsFeature } from "../../features/ops/ops.composition";
 import { createAppTrpcFeatures, type AppTrpcFeaturePorts } from "../app-trpc.features";
 
@@ -348,6 +351,9 @@ function buildFeatures() {
       langy: refusingLangyFeature(),
       ops: refusingOpsFeature(),
       scenario: refusingScenarioFeature(),
+      dataRetention: refusingDataRetentionFeature(),
+      monitor: refusingMonitorFeature(),
+      storedObject: refusingStoredObjectFeature(),
     },
     // The features that compose themselves take this rather than a ports
     // entry; every member refuses, for the same reason the ports do.

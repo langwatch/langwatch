@@ -26,8 +26,6 @@ import type { EmailSuppressionTrpcPorts } from "@langwatch/automation-server";
 import type { CodingAgentTrpcPorts } from "@langwatch/coding-agent-server";
 
 import type { BatchRecordTrpcPorts, DatasetTrpcPorts } from "@langwatch/dataset-server";
-import type { DataRetentionTrpcPolicy } from "@langwatch/data-retention-server";
-import type { MonitorTrpcPorts } from "@langwatch/monitor-server";
 
 import type { AuthApp } from "@langwatch/auth-server";
 import type { DataPrivacyTrpcPorts } from "@langwatch/data-privacy-server";
@@ -104,9 +102,6 @@ import {
   createDataPrivacyTrpcRouter,
   type DataPrivacyTrpcChecks,
 } from "../features/data-privacy/data-privacy-trpc.mount";
-import { createDataRetentionTrpcRouter } from "../features/data-retention/data-retention-trpc.mount";
-import { createMonitorTrpcRouter } from "../features/monitor/monitor-trpc.mount";
-import { createStoredObjectTrpcRouter } from "../features/stored-object/stored-object-trpc.mount";
 import {
   createEvaluationTrpcRouter,
   type EvaluationMountPorts,
@@ -227,21 +222,7 @@ export interface AppTrpcFeaturePorts<
   TSpendRollup = unknown,
   TApiKeyValidation = unknown,
   TStoredKeyValidation = unknown,
-  TRetentionSnapshot = unknown,
-  TStorageScopeUsage = unknown,
 > {
-  /**
-   * The retention policy: who may write an override at a scope, which values
-   * that scope's plan may persist, who may switch retention off, and the two
-   * RBAC-filtered reads the settings page renders.
-   */
-  dataRetention: DataRetentionTrpcPolicy<TRetentionSnapshot, TStorageScopeUsage>;
-  /**
-   * The monitor surface's four: the precondition parser its two write inputs
-   * are built from, the previous window its performance trend compares to,
-   * and the evaluator replication a monitor copy carries with it.
-   */
-  monitors: MonitorTrpcPorts;
   /** The forty-six answers `organization.*` needs from this deployment. */
   organization: OrganizationTrpcPorts<TSignUpDataSchema>;
   /** The audit-log read's own `kind: "custom"` check, already built. */
@@ -522,8 +503,6 @@ export function createAppTrpcFeatures<
   TSpendRollup = unknown,
   TApiKeyValidation = unknown,
   TStoredKeyValidation = unknown,
-  TRetentionSnapshot = unknown,
-  TStorageScopeUsage = unknown,
 >(options: {
   mount: ApiTrpcFeatureMount;
   /**
@@ -568,9 +547,7 @@ export function createAppTrpcFeatures<
     TSavedView,
     TSpendRollup,
     TApiKeyValidation,
-    TStoredKeyValidation,
-    TRetentionSnapshot,
-    TStorageScopeUsage
+    TStoredKeyValidation
   >;
 }) {
   const { mount, composed, infrastructure, ports } = options;
@@ -668,10 +645,9 @@ export function createAppTrpcFeatures<
     // Takes no ports either — a suite, its folders and its runs are all read
     // through `ctx.app.suites`.
     suites: scenarioRouters.suites,
-    dataRetention: createDataRetentionTrpcRouter({ ...mount, ports: ports.dataRetention }),
-    monitors: createMonitorTrpcRouter({ ...mount, ports: ports.monitors }),
-    // No ports: the probe reads `ctx.app.storedObjectApp` and nothing else.
-    storedObjects: createStoredObjectTrpcRouter(mount),
+    dataRetention: composed.dataRetention.router(mount),
+    monitors: composed.monitor.router(mount),
+    storedObjects: composed.storedObject.router(mount),
     // The six core AI Gateway surfaces — one entry per namespace, straight off
     // `createGatewayTrpcRouters`. Composed over this process's own Prisma and
     // ClickHouse (see `composeApiGateway`); nothing here is a port any more.

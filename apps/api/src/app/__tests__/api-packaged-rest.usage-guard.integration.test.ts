@@ -18,7 +18,9 @@ import { composeEnterpriseGovernanceApplication } from "../../features/enterpris
 import { composeApiPackagedRest } from "../api-packaged-rest.composition";
 import type { ApiPackagedRestCompositionOptions } from "../api-packaged-rest.composition";
 import type { ApiTraceIngestComposition } from "../api-trace-ingest.composition";
+import { refusingMonitorFeature } from "../../features/monitor/monitor.composition";
 import { refusingScenarioFeature } from "../../features/scenario/scenario.composition";
+import { refusingStoredObjectFeature } from "../../features/stored-object/stored-object.composition";
 
 const project = {
   id: "project-1",
@@ -40,7 +42,9 @@ function composeGuard(usageLimit: ApiTraceIngestComposition["usageLimit"] | unde
   const collaborators = composeApiPackagedRest({
     agents: undefined,
     connectedAgents: undefined,
+    monitor: refusingMonitorFeature(),
     scenario: refusingScenarioFeature(),
+    storedObject: refusingStoredObjectFeature(),
     analytics: undefined,
     authz: { authorizeProjectPermission: async () => undefined } as never,
     authzComposition: undefined,
@@ -51,7 +55,6 @@ function composeGuard(usageLimit: ApiTraceIngestComposition["usageLimit"] | unde
     identity: undefined,
     orgGroup: undefined,
     productGroup: undefined,
-    productInfra: undefined,
     plans: undefined,
     publicBaseUrl: undefined,
     rateLimit: async () => ({ allowed: true, resetAt: 0 }),

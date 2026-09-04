@@ -58,7 +58,10 @@ import {
 import { composeEnterpriseGovernanceApplication } from "../../enterprise/enterprise-governance.composition";
 import { composeGatewayFeature } from "../gateway.composition";
 import { refusingLangyFeature } from "../../langy/langy.composition";
+import { refusingDataRetentionFeature } from "../../data-retention/data-retention.composition";
+import { refusingMonitorFeature } from "../../monitor/monitor.composition";
 import { refusingScenarioFeature } from "../../scenario/scenario.composition";
+import { refusingStoredObjectFeature } from "../../stored-object/stored-object.composition";
 import { refusingOpsFeature } from "../../ops/ops.composition";
 import {
   stub,
@@ -213,6 +216,9 @@ function composeApplication(overrides: { saasBilling?: boolean; enterprise?: unk
       langy: refusingLangyFeature(),
       ops: refusingOpsFeature(),
       scenario: refusingScenarioFeature(),
+      dataRetention: refusingDataRetentionFeature(),
+      monitor: refusingMonitorFeature(),
+      storedObject: refusingStoredObjectFeature(),
     },
     infrastructure,
     collaborators: composeApiTrpcCollaborators(testHalves(), {

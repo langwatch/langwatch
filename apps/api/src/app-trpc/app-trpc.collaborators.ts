@@ -52,8 +52,6 @@ import type { WorkflowOptimizationTrpcPorts, WorkflowTrpcPorts } from "@langwatc
 import type { ZodTypeAny } from "zod";
 import type { EvaluationMountPorts } from "../features/evaluation/evaluation-trpc.mount";
 import type { ApiTrpcFeatureApplication } from "./app-trpc.context";
-import type { DataRetentionTrpcPolicy } from "@langwatch/data-retention-server";
-import type { MonitorTrpcPorts } from "@langwatch/monitor-server";
 import type { CodingAgentTrpcPorts } from "@langwatch/coding-agent-server";
 import type { OpsTrpcPorts } from "@langwatch/ops-server";
 import type { AuthzPermission } from "@langwatch/authz-contract";
@@ -162,8 +160,6 @@ export type ApiTrpcCollaborators<
   TSpendRollup = unknown,
   TApiKeyValidation = unknown,
   TStoredKeyValidation = unknown,
-  TRetentionSnapshot = unknown,
-  TStorageScopeUsage = unknown,
 > = Readonly<{
   /**
    * The application slices every packaged surface reads off `ctx.app`.
@@ -313,9 +309,7 @@ export type ApiTrpcCollaborators<
    * that scope's plan may persist, who may switch retention off, and the two
    * RBAC-filtered reads the settings page renders.
    */
-  dataRetention: DataRetentionTrpcPolicy<TRetentionSnapshot, TStorageScopeUsage>;
   /** The monitor surface's precondition parser, comparison window and evaluator replication. */
-  monitors: MonitorTrpcPorts;
 
   user: Omit<UserTrpcPorts, ApiOwnedUserPorts>;
 

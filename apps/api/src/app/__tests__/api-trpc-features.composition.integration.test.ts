@@ -262,11 +262,6 @@ function testCollaborators(overrides: Record<string, unknown> = {}) {
     prompts: stub("prompts"),
     role: stub("role", { customRolePermission: anySchema }),
     team: stub("team"),
-    // The three product-infrastructure surfaces, as one entry. Only the
-    // monitor precondition parser is read while the record is BUILT; the
-    // retention policy and the rest refuse by name if a call reaches them.
-    dataRetention: stub("dataRetention"),
-    monitors: stub("monitors", { preconditionsSchema: anySchema }),
     /**
      * The trace group, stubbed with only what the record reads while it is
      * being BUILT: the input schemas its procedures are parsed with, and the

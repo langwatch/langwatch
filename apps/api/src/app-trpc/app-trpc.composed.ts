@@ -13,7 +13,10 @@
 import type { ComposedGatewayFeature } from "../features/gateway/gateway.composition";
 import type { ComposedLangyFeature } from "../features/langy/langy.composition";
 import type { ComposedOpsFeature } from "../features/ops/ops.composition";
+import type { ComposedDataRetentionFeature } from "../features/data-retention/data-retention.composition";
+import type { ComposedMonitorFeature } from "../features/monitor/monitor.composition";
 import type { ComposedScenarioFeature } from "../features/scenario/scenario.composition";
+import type { ComposedStoredObjectFeature } from "../features/stored-object/stored-object.composition";
 
 export type ComposedApiFeatures = Readonly<{
   /** Six namespaces, one `ctx.app` slice and two REST families over one application. */
@@ -34,4 +37,13 @@ export type ComposedApiFeatures = Readonly<{
    * the four services the two packaged scenario REST families take directly.
    */
   scenario: ComposedScenarioFeature;
+  /** One namespace, over the policy this process supplies the packaged rules. */
+  dataRetention: ComposedDataRetentionFeature;
+  /** One namespace and the `ctx.app.monitors` slice the monitor REST family reads. */
+  monitor: ComposedMonitorFeature;
+  /**
+   * One namespace, the `ctx.app.storedObjectApp` slice two REST families read,
+   * and the content-addressed byte store the scenario-event door writes through.
+   */
+  storedObject: ComposedStoredObjectFeature;
 }>;

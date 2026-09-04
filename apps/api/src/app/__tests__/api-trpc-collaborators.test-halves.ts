@@ -23,12 +23,14 @@ import type { ApiExecutionCollaborators } from "../api-trpc-collaborators.execut
 import { createGatewayTrpcRouters } from "../../features/gateway/gateway-trpc.mount";
 import { refusingLangyFeature } from "../../features/langy/langy.composition";
 import { refusingOpsFeature } from "../../features/ops/ops.composition";
+import { refusingDataRetentionFeature } from "../../features/data-retention/data-retention.composition";
+import { refusingMonitorFeature } from "../../features/monitor/monitor.composition";
 import { refusingScenarioFeature } from "../../features/scenario/scenario.composition";
+import { refusingStoredObjectFeature } from "../../features/stored-object/stored-object.composition";
 import type { ComposedApiFeatures } from "../../app-trpc/app-trpc.composed";
 import type { ApiIdentityCollaborators } from "../api-trpc-collaborators.identity.composition";
 import type { ApiOrgGroupCollaborators } from "../api-trpc-collaborators.org-group.composition";
 import type { ApiProductGroupCollaborators } from "../api-trpc-collaborators.product-group.composition";
-import type { ApiProductInfraCollaborators } from "../api-trpc-collaborators.product-infra.composition";
 import type { ApiProductCollaborators } from "../api-trpc-collaborators.product.composition";
 import type { ApiTraceGroupCollaborators } from "../api-trpc-collaborators.trace-group.composition";
 
@@ -248,17 +250,6 @@ export function stubOrgGroupHalf(): ApiOrgGroupCollaborators {
   });
 }
 
-export function stubProductInfraHalf(): ApiProductInfraCollaborators {
-  return stub<ApiProductInfraCollaborators>("productInfra", {
-    monitorApp: stub("app.monitors"),
-    storedObjectApp: stub("app.storedObjectApp"),
-    storedObjectBytes: stub("productInfra.storedObjectBytes"),
-    dataRetention: stub("dataRetention"),
-    monitors: stub("monitors", { preconditionsSchema: anySchema }),
-    close: async () => undefined,
-  });
-}
-
 /**
  * The `ctx.app` slices no half owns any more, as a suite that drives none of
  * them supplies them: the gateway's application, the GitHub directory and the
@@ -269,7 +260,9 @@ export function stubApplicationSlices(): ApiTrpcFeatureApplicationSlices {
     gateway: stub("app.gateway"),
     github: stub("app.github"),
     langy: stub("app.langy"),
+    monitors: stub("app.monitors"),
     scenarios: stub("app.scenarios"),
+    storedObjectApp: stub("app.storedObjectApp"),
     suites: stub("app.suites"),
     // Answers rather than refuses: several namespaces that are NOT the surface
     // under test still gate on `ctx.app.ops.isAdmin()` at call time.
@@ -300,6 +293,9 @@ export function stubComposedFeatures(): ComposedApiFeatures {
     langy: refusingLangyFeature(),
     ops: refusingOpsFeature(),
     scenario: refusingScenarioFeature(),
+    dataRetention: refusingDataRetentionFeature(),
+    monitor: refusingMonitorFeature(),
+    storedObject: refusingStoredObjectFeature(),
   };
 }
 
@@ -321,7 +317,6 @@ export function testHalves(
     productGroup: stubProductGroupHalf(),
     traceGroup: stubTraceGroupHalf(),
     orgGroup: stubOrgGroupHalf(),
-    productInfra: stubProductInfraHalf(),
     ...overrides,
   };
 }

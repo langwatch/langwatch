@@ -52,7 +52,8 @@ import type { ApiExecutionCollaborators } from "./api-trpc-collaborators.executi
 import type { ApiIdentityCollaborators } from "./api-trpc-collaborators.identity.composition";
 import type { ApiOrgGroupCollaborators } from "./api-trpc-collaborators.org-group.composition";
 import type { ApiProductGroupCollaborators } from "./api-trpc-collaborators.product-group.composition";
-import type { ApiProductInfraCollaborators } from "./api-trpc-collaborators.product-infra.composition";
+import type { ComposedMonitorFeature } from "../features/monitor/monitor.composition";
+import type { ComposedStoredObjectFeature } from "../features/stored-object/stored-object.composition";
 import type { ApiAuthzComposition } from "./api-authz.composition";
 import type { ApiHandlerManagedCredentials } from "./api-handler-managed-credential";
 import type { ApiHandlerManagedSessionPort } from "./api-handler-managed-session";
@@ -108,7 +109,8 @@ export type ApiPackagedRestCompositionOptions = Readonly<{
   identity: ApiIdentityCollaborators | undefined;
   orgGroup: ApiOrgGroupCollaborators | undefined;
   productGroup: ApiProductGroupCollaborators | undefined;
-  productInfra: ApiProductInfraCollaborators | undefined;
+  monitor: ComposedMonitorFeature;
+  storedObject: ComposedStoredObjectFeature;
   plans: PlanProvider | undefined;
   /** The deployment's public origin, where it declared one. */
   publicBaseUrl: string | undefined;
@@ -165,7 +167,7 @@ export function composeApiPackagedRest(
   const platformUrl = createPlatformUrl(options.publicBaseUrl);
   const enterpriseGate = composeEnterpriseGate(options.plans);
   const agentCache = composeAgentCache(options);
-  const storedObjectBytes = options.productInfra?.storedObjectBytes;
+  const storedObjectBytes = options.storedObject.bytes;
   const dualAuth = options.session
     ? createApiDualCredentialAuth({
         apiKeys: options.apiKeys,
@@ -226,18 +228,13 @@ export function composeApiPackagedRest(
         : {}),
       organizations: () => options.organizations,
       ...(options.projects ? { projects: () => options.projects! } : {}),
-      ...(options.productInfra
-        ? {
-            monitors: () => options.productInfra!.monitorApp,
-            storedObjects: () => options.productInfra!.storedObjectApp,
-            // The SAME application `/api/files` reads through, in the shape the
-            // avatar family takes. Its row carries the owner kind, which is
-            // what makes the family's refusal of every non-avatar object a real
-            // check rather than a comparison against a field nobody projected.
-            userAvatarObjects: () =>
-              createApiUserAvatarObjectReader(() => options.productInfra!.storedObjectApp),
-          }
-        : {}),
+      monitors: () => options.monitor.app,
+      storedObjects: () => options.storedObject.app,
+      // The SAME application `/api/files` reads through, in the shape the
+      // avatar family takes. Its row carries the owner kind, which is what
+      // makes the family's refusal of every non-avatar object a real check
+      // rather than a comparison against a field nobody projected.
+      userAvatarObjects: () => createApiUserAvatarObjectReader(() => options.storedObject.app),
       scenarios: () => options.scenario.scenarioService,
       scenarioTabs: () => options.scenario.scenarioTabs,
       simulations: () => options.scenario.simulations,

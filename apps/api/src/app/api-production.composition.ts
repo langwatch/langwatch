@@ -128,10 +128,23 @@ import {
   type ApiProductGroupCollaborators,
 } from "./api-trpc-collaborators.product-group.composition";
 import {
-  composeApiProductInfraCollaborators,
-  LoggedApiProductInfraAbsence,
-  type ApiProductInfraCollaborators,
-} from "./api-trpc-collaborators.product-infra.composition";
+  composeDataRetentionFeature,
+  LoggedApiDataRetentionAbsence,
+  refusingDataRetentionFeature,
+  type ComposedDataRetentionFeature,
+} from "../features/data-retention/data-retention.composition";
+import {
+  composeMonitorFeature,
+  LoggedApiMonitorAbsence,
+  refusingMonitorFeature,
+  type ComposedMonitorFeature,
+} from "../features/monitor/monitor.composition";
+import {
+  composeStoredObjectFeature,
+  LoggedApiStoredObjectAbsence,
+  refusingStoredObjectFeature,
+  type ComposedStoredObjectFeature,
+} from "../features/stored-object/stored-object.composition";
 import {
   composeApiOrgGroupCollaborators,
   type ApiEnterpriseApplicationPort,
@@ -589,7 +602,9 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private composedTraceGroup: ApiTraceGroupCollaborators | undefined;
   private composedProductGroup: ApiProductGroupCollaborators | undefined;
 
-  private composedProductInfra: ApiProductInfraCollaborators | undefined;
+  private composedDataRetention!: ComposedDataRetentionFeature;
+  private composedMonitor!: ComposedMonitorFeature;
+  private composedStoredObject!: ComposedStoredObjectFeature;
   private composedScenario!: ComposedScenarioFeature;
   private composedOrgGroup: ApiOrgGroupCollaborators | undefined;
   /**
@@ -928,12 +943,16 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // namespaces. It folds on rather than seeding, because every one of them
     // resolves an organization or a project through the tenancy graph.
     this.composedOrgGroup = this.composeOrgGroup(options, authz, queueInfrastructure, encryption);
-    // The product-infrastructure half: a project's own object store, the
-    // retention window it is swept on, and the monitors running beside it. It
-    // composes after the execution and product-group halves because it takes
-    // their monitor service, evaluator service and evaluator replication —
-    // one graph per answer, rather than a second one that could disagree.
-    this.composedProductInfra = this.composeProductInfra(options, authz);
+    // A project's own object store and the monitors running beside it. They
+    // compose after the execution and product-group halves because the monitor
+    // surface takes their monitor service, evaluator service and evaluator
+    // replication — one graph per answer, rather than a second one that could
+    // disagree. They composed as one half with retention because all three
+    // read the same routed ClickHouse; sharing a connection is not being one
+    // graph, so each composes itself and a deployment missing one keeps the
+    // other two.
+    this.composedStoredObject = this.composeStoredObject(options);
+    this.composedMonitor = this.composeMonitor(options);
     // The `Idempotency-Key` receipt ledger, over the SAME database every keyed
     // create writes its resource to and the SAME cipher every other at-rest
     // secret is written under. Composed before the gateway because its three
@@ -980,6 +999,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // scoped to. It used to ride inside the agent half, which cost every
     // operator surface whenever a scenario collaborator was missing.
     this.composedOps = this.composeOps(options, infrastructure, tenancy);
+    this.composedDataRetention = this.composeDataRetention(options, infrastructure);
     // The conversation panel and the egress allow-list beside it. It used to
     // ride inside the agent half, so a process missing any scenario
     // collaborator lost both Langy surfaces with it.
@@ -996,6 +1016,9 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         langy: this.composedLangy,
         ops: this.composedOps,
         scenario: this.composedScenario,
+        dataRetention: this.composedDataRetention,
+        monitor: this.composedMonitor,
+        storedObject: this.composedStoredObject,
       },
       // One literal, checked against the real type each half returns. A
       // process missing any of the eight composes none of the record — see
@@ -1009,7 +1032,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
           productGroup: this.composedProductGroup,
           traceGroup: this.composedTraceGroup,
           orgGroup: this.composedOrgGroup,
-          productInfra: this.composedProductInfra,
         },
         // The `ctx.app` slices no half owns: the gateway's own application, the
         // GitHub App the coding-agent reads resolve through, and the four
@@ -1020,7 +1042,9 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
           github,
           langy: this.composedLangy.app,
           ops: this.composedOps.app,
+          monitors: this.composedMonitor.app,
           scenarios: this.composedScenario.scenarios,
+          storedObjectApp: this.composedStoredObject.app,
           suites: this.composedScenario.suites,
           ...composeEnterpriseGovernanceApplication(this.options.enterprise),
         },
@@ -1868,7 +1892,8 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       identity: this.composedIdentity,
       orgGroup: this.composedOrgGroup,
       productGroup: this.composedProductGroup,
-      productInfra: this.composedProductInfra,
+      monitor: this.composedMonitor,
+      storedObject: this.composedStoredObject,
       plans,
       publicBaseUrl,
       rateLimit: (request) => this.rateLimiter.consume(request),
@@ -2813,52 +2838,79 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   }
 
   /**
-   * Composes the product-infrastructure half over this process's own graph.
+   * The object store, over this process's own graph.
    *
-   * Four things gate it, and none of them is optional for these three
-   * surfaces: the database (the retention directory and the BYOC route lookup
-   * are row reads), the execution half (the monitor and evaluator services a
-   * monitor is listed, created and copied through), the product-group half
-   * (the evaluator replication a monitor copy carries with it) and the trace
-   * group (the retention service the settings page reads and writes). A host
-   * that injected its own collaborator set composed none of them here and
-   * holds the set whole.
+   * One thing gates it: the database, because the BYOC route lookup is a row
+   * read. Absent it the namespace still mounts and every probe refuses by
+   * name, so a renderer is told the store is unreachable rather than that the
+   * file is gone.
    *
-   * Everything else degrades where it is used rather than here — an absent
-   * ClickHouse connection, an unregistered Azure driver, a missing plan
-   * provider and the evaluation-run trend each refuse by name at the call. See
-   * the absence report on
-   * `api-trpc-collaborators.product-infra.composition.ts`.
+   * Everything else degrades where it is used — an absent ClickHouse
+   * connection and an unregistered Azure driver each refuse by name at the
+   * call. See the absence report on
+   * `features/stored-object/stored-object.composition.ts`.
    */
-  private composeProductInfra(
-    options: ApiRuntimeCompositionOptions,
-    authz: AuthzService,
-  ): ApiProductInfraCollaborators | undefined {
+  private composeStoredObject(options: ApiRuntimeCompositionOptions): ComposedStoredObjectFeature {
     const database = this.composedDatabase?.connection;
-    const execution = this.composedExecution;
-    const productGroup = this.composedProductGroup;
-    const dataRetention = this.composedTraceGroup?.dataRetention;
-    // The SAME operator allow-list `ctx.app.ops` carries, taken off the
-    // identity half rather than parsed a second time: "who may keep data
-    // forever" and "who sees the operator sidebar" must not be two answers.
-    const ops = this.composedIdentity?.application.ops;
-    if (!database || !execution || !productGroup || !dataRetention || !ops) return undefined;
+    if (!database) return refusingStoredObjectFeature();
 
-    const half = composeApiProductInfraCollaborators({
+    const feature = composeStoredObjectFeature({
       prisma: database.client,
-      authz,
-      dataRetention,
-      monitors: execution.monitors,
-      evaluators: execution.evaluators,
-      evaluatorReplication: productGroup.evaluatorPorts,
-      ops,
       resolveClickHouseClient: this.composedClickHouse?.resolveClient ?? null,
       storage: options.config.infrastructure.storedObjects,
-      plans: this.options.plans ?? this.resolvePlanProvider(options),
-      report: LoggedApiProductInfraAbsence.create(createLogger(options.config.serviceName)),
+      report: LoggedApiStoredObjectAbsence.create(createLogger(options.config.serviceName)),
     });
-    options.resources?.own("api stored-object aws clients", () => half.close());
-    return half;
+    options.resources?.own("api stored-object aws clients", () => feature.close());
+    return feature;
+  }
+
+  /**
+   * The monitor surface, over this process's own graph.
+   *
+   * Two peers and nothing else: the monitor and evaluator services the
+   * execution half composed, and the evaluator replication the product-group
+   * half built over this process's workflow application. All three are taken
+   * rather than rebuilt — a second monitor service would let the list disagree
+   * with what an experiment created, and a second replication would be a second
+   * answer to what copying an evaluator does to the graph behind it.
+   */
+  private composeMonitor(options: ApiRuntimeCompositionOptions): ComposedMonitorFeature {
+    const execution = this.composedExecution;
+    const productGroup = this.composedProductGroup;
+    if (!execution || !productGroup) return refusingMonitorFeature();
+
+    return composeMonitorFeature({
+      peers: {
+        monitors: execution.monitors,
+        evaluators: execution.evaluators,
+        evaluatorReplication: productGroup.evaluatorPorts,
+      },
+      resolveClickHouseClient: this.composedClickHouse?.resolveClient ?? null,
+      report: LoggedApiMonitorAbsence.create(createLogger(options.config.serviceName)),
+    });
+  }
+
+  /**
+   * The retention surface, over this process's own graph.
+   *
+   * One peer: the operator allow-list, taken off the identity half rather than
+   * parsed a second time, so "who may keep data forever" and "who sees the
+   * operator sidebar" are never two answers.
+   */
+  private composeDataRetention(
+    options: ApiRuntimeCompositionOptions,
+    infrastructure: ApiTrpcInfrastructure | undefined,
+  ): ComposedDataRetentionFeature {
+    const dataRetention = this.composedTraceGroup?.dataRetention;
+    const ops = this.composedIdentity?.application.ops;
+    if (!infrastructure || !dataRetention || !ops) return refusingDataRetentionFeature();
+
+    return composeDataRetentionFeature({
+      infrastructure,
+      peers: { ops },
+      dataRetention,
+      report: LoggedApiDataRetentionAbsence.create(createLogger(options.config.serviceName)),
+    });
   }
 
   /**

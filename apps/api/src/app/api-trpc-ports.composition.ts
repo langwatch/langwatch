@@ -342,8 +342,6 @@ export function createApiTrpcPorts<
     httpProxy: collaborators.httpProxy,
     limits: collaborators.limits,
 
-    dataRetention: collaborators.dataRetention,
-    monitors: collaborators.monitors,
 
     organization: collaborators.organization,
     organizationAuditLogCheck: collaborators.organizationAuditLogCheck,
