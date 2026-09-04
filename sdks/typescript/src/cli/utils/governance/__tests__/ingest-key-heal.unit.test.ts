@@ -76,8 +76,11 @@ describe("healRevokedIngestKey", () => {
         expect.objectContaining({ tool: "claude", token: FRESH }),
       );
       expect(healed).toEqual({
-        endpoint: "https://app.example.com/api/otel/v1/logs",
-        headers: { Authorization: `Bearer ${FRESH}` },
+        status: "healed",
+        target: {
+          endpoint: "https://app.example.com/api/otel/v1/logs",
+          headers: { Authorization: `Bearer ${FRESH}` },
+        },
       });
     });
   });
@@ -93,7 +96,7 @@ describe("healRevokedIngestKey", () => {
         deps: d,
       });
 
-      expect(healed).toBeNull();
+      expect(healed).toEqual({ status: "declined" });
       expect(d.resolveLiveIngestionKey).not.toHaveBeenCalled();
     });
   });
@@ -116,7 +119,7 @@ describe("healRevokedIngestKey", () => {
         deps: d,
       });
 
-      expect(healed).toBeNull();
+      expect(healed).toEqual({ status: "declined" });
       expect(d.resolveLiveIngestionKey).not.toHaveBeenCalled();
     });
   });
@@ -132,7 +135,7 @@ describe("healRevokedIngestKey", () => {
         deps: d,
       });
 
-      expect(healed).toBeNull();
+      expect(healed).toEqual({ status: "declined" });
       expect(d.resolveLiveIngestionKey).not.toHaveBeenCalled();
       expect(d.installTelemetryWiring).not.toHaveBeenCalled();
     });
@@ -156,7 +159,7 @@ describe("healRevokedIngestKey", () => {
         deps: d,
       });
 
-      expect(healed).toBeNull();
+      expect(healed).toEqual({ status: "failed" });
       expect(d.saveConfig).not.toHaveBeenCalled();
       expect(d.installTelemetryWiring).not.toHaveBeenCalled();
     });
@@ -173,7 +176,7 @@ describe("healRevokedIngestKey", () => {
         deps: d,
       });
 
-      expect(healed).toBeNull();
+      expect(healed).toEqual({ status: "declined" });
       expect(d.resolveLiveIngestionKey).not.toHaveBeenCalled();
       expect(d.installTelemetryWiring).not.toHaveBeenCalled();
     });
@@ -195,7 +198,7 @@ describe("healRevokedIngestKey", () => {
         deps: d,
       });
 
-      expect(healed).toBeNull();
+      expect(healed).toEqual({ status: "failed" });
       expect(d.saveConfig).not.toHaveBeenCalled();
     });
   });
@@ -219,7 +222,7 @@ describe("healRevokedIngestKey", () => {
         deps: d,
       });
 
-      expect(healed).toBeNull();
+      expect(healed).toEqual({ status: "failed" });
       expect(d.saveConfig).not.toHaveBeenCalled();
       // The invariant the next heal depends on: the cache still names the key
       // the collector rejected, so `rejectedToken === cached` holds next time.

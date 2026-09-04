@@ -28,6 +28,24 @@ export interface HealedTarget {
   headers: Record<string, string>;
 }
 
+/**
+ * How a heal ended, and whether it cost anything.
+ *
+ * The split the caller cares about is `declined` against the other two. A
+ * decline is decided from the config alone, before any network call: this
+ * device is not the one that can repair this 401, and running again a second
+ * later would decide the same thing just as cheaply. A `failed` heal went to
+ * the platform and may already have spent a mint, so it is the one that must
+ * not be retried in a loop. Throttling a decline would spend a repair window
+ * on a rejection that never cost anything, and delay the real repair.
+ */
+export type HealOutcome =
+  | { status: "declined" }
+  | { status: "failed" }
+  | { status: "healed"; target: HealedTarget };
+
+const DECLINED: HealOutcome = { status: "declined" };
+
 /** The seams the healer composes, injectable so a test needs no real config. */
 export interface HealDeps {
   loadConfig: () => GovernanceConfig;
@@ -53,13 +71,19 @@ const TOOL_BY_AGENT: Record<string, string> = {
 };
 
 /**
- * Re-mint the personal ingest key for `agent` and rewrite its wiring, or null
- * when this device is not in a position to: no login to mint with, a tool
- * pinned to a project (that path is `langwatch instrument --project`), a
- * rejected token that is not exactly the cached personal key (a pasted
- * credential is the user's, never overwritten, and a request that carried no
- * bearer at all was rejected for another reason), or a server that says the
- * cached key is still live, in which case the 401 means something else.
+ * Re-mint the personal ingest key for `agent` and rewrite its wiring.
+ *
+ * Declines, without reaching the platform, when this device is not in a
+ * position to repair the 401: no login to mint with, a tool pinned to a
+ * project (that path is `langwatch instrument --project`), or a rejected
+ * token that is not exactly the cached personal key (a pasted credential is
+ * the user's, never overwritten, and a request that carried no bearer at all
+ * was rejected for another reason).
+ *
+ * Reports a failure once it has gone to the platform and not come back with a
+ * wired tool: a server that says the cached key is still live, in which case
+ * the 401 means something else, or a key that minted but could not be written
+ * into the tool's wiring.
  */
 export async function healRevokedIngestKey({
   agent,
@@ -70,26 +94,26 @@ export async function healRevokedIngestKey({
   /** The bearer the collector answered 401 to, without the `Bearer ` word. */
   rejectedToken: string | undefined;
   deps?: HealDeps;
-}): Promise<HealedTarget | null> {
+}): Promise<HealOutcome> {
   const tool = TOOL_BY_AGENT[agent];
-  if (!tool) return null;
+  if (!tool) return DECLINED;
 
   const cfg = deps.loadConfig();
-  if (!deps.isLoggedIn(cfg)) return null;
-  if (cfg.tool_project_keys?.[tool]?.secret) return null;
+  if (!deps.isLoggedIn(cfg)) return DECLINED;
+  if (cfg.tool_project_keys?.[tool]?.secret) return DECLINED;
 
   // Only the cached personal key is ours to replace, and only when it is
   // demonstrably the credential that was rejected. A 401 the device carried
   // no bearer for, or carried someone else's, is not this key's failure.
   const cached = cfg.default_personal_ingest_keys?.[agent]?.secret;
-  if (!cached || rejectedToken !== cached) return null;
+  if (!cached || rejectedToken !== cached) return DECLINED;
 
   const resolved = await deps.resolveLiveIngestionKey({
     cfg,
     sourceType: agent,
     allowOfflineFallback: false,
   });
-  if (!resolved.minted) return null;
+  if (!resolved.minted) return { status: "failed" };
 
   // Wire before caching. A cache that names a key the tool is not wired
   // with is worse than no cache: the next 401 would compare the rejected
@@ -103,7 +127,7 @@ export async function healRevokedIngestKey({
     token: resolved.token,
   });
   if (wiring.requiredFailures.length > 0 || wiring.labels.length === 0) {
-    return null;
+    return { status: "failed" };
   }
 
   cfg.default_personal_ingest_keys = {
@@ -118,7 +142,10 @@ export async function healRevokedIngestKey({
   }
 
   return {
-    endpoint: `${resolved.endpoint}/v1/logs`,
-    headers: { Authorization: `Bearer ${resolved.token}` },
+    status: "healed",
+    target: {
+      endpoint: `${resolved.endpoint}/v1/logs`,
+      headers: { Authorization: `Bearer ${resolved.token}` },
+    },
   };
 }

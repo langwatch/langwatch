@@ -24,9 +24,17 @@ const { posted } = hook;
 const OLD = "ik-lw-old-token";
 const FRESH = "ik-lw-fresh-token";
 const HEALED = {
-  endpoint: `${ENDPOINT}/v1/logs`,
-  headers: { Authorization: `Bearer ${FRESH}` },
-};
+  status: "healed",
+  target: {
+    endpoint: `${ENDPOINT}/v1/logs`,
+    headers: { Authorization: `Bearer ${FRESH}` },
+  },
+} as const;
+
+/** The healer decided from the config alone; nothing was attempted. */
+const DECLINED = { status: "declined" } as const;
+/** The healer went to the platform and did not come back with a wired tool. */
+const FAILED = { status: "failed" } as const;
 
 /** A collector that rejects the old bearer and accepts the fresh one. */
 const rotatedCollector: typeof fetch = ((
@@ -80,7 +88,7 @@ describe("the session context hook's self-heal", () => {
   describe("given a rejected key the healer cannot repair", () => {
     /** @scenario "A rejected key with no login to mint with stays silent" */
     it("posts once, writes nothing and exits zero", async () => {
-      const healRevokedKey = vi.fn().mockResolvedValue(null);
+      const healRevokedKey = vi.fn().mockResolvedValue(DECLINED);
 
       await hook.runHook({
         env: OLD_KEY_ENV,
@@ -109,7 +117,7 @@ describe("the session context hook's self-heal", () => {
   describe("given a heal attempted minutes ago", () => {
     /** @scenario "A second rejection inside the throttle window does not re-mint" */
     it("does not ask the healer again inside the throttle window", async () => {
-      const healRevokedKey = vi.fn().mockResolvedValue(null);
+      const healRevokedKey = vi.fn().mockResolvedValue(DECLINED);
       fs.mkdirSync(hook.stateDir, { recursive: true });
       fs.writeFileSync(
         path.join(hook.stateDir, "heal-claude_code.json"),
@@ -126,7 +134,7 @@ describe("the session context hook's self-heal", () => {
     });
 
     it("asks again once the window has passed", async () => {
-      const healRevokedKey = vi.fn().mockResolvedValue(null);
+      const healRevokedKey = vi.fn().mockResolvedValue(DECLINED);
       fs.mkdirSync(hook.stateDir, { recursive: true });
       fs.writeFileSync(
         path.join(hook.stateDir, "heal-claude_code.json"),
@@ -146,7 +154,7 @@ describe("the session context hook's self-heal", () => {
   describe("given a 401 on a target that carried no key", () => {
     /** @scenario "A 401 the device sent no key with is not this key's failure" */
     it("hands the healer no rejected token, and stays silent when it declines", async () => {
-      const healRevokedKey = vi.fn().mockResolvedValue(null);
+      const healRevokedKey = vi.fn().mockResolvedValue(DECLINED);
 
       // No OTEL_EXPORTER_OTLP_HEADERS: the target carries an endpoint and no
       // authorization at all, so the 401 is not the cached key's failure.
@@ -161,6 +169,54 @@ describe("the session context hook's self-heal", () => {
       });
       expect(hook.stdout).toEqual([]);
       expect(hook.exits).toEqual([]);
+    });
+
+    /** @scenario "A decline does not spend the heal throttle" */
+    it("does not spend the throttle, so the next repairable 401 still heals", async () => {
+      const healRevokedKey = vi
+        .fn()
+        .mockResolvedValueOnce(DECLINED)
+        .mockResolvedValueOnce(HEALED);
+
+      // First session: no bearer to reject, so the healer declines.
+      await hook.runHook({
+        fetchImpl: hook.collector(401),
+        healRevokedKey,
+      });
+      expect(
+        fs.existsSync(path.join(hook.stateDir, "heal-claude_code.json")),
+      ).toBe(false);
+
+      // Second session, inside the ten-minute window, now carrying the key the
+      // collector rejects. It must still be healed.
+      await hook.runHook({
+        env: OLD_KEY_ENV,
+        fetchImpl: rotatedCollector,
+        healRevokedKey,
+      });
+
+      expect(healRevokedKey).toHaveBeenCalledTimes(2);
+      expect(healRevokedKey).toHaveBeenLastCalledWith({
+        agent: "claude_code",
+        rejectedToken: OLD,
+      });
+      expect(hook.stdout).toHaveLength(1);
+    });
+  });
+
+  describe("given a heal that reached the platform and failed", () => {
+    /** @scenario "A failed heal spends the throttle" */
+    it("spends the throttle, so a mint is not retried every session", async () => {
+      await hook.runHook({
+        env: OLD_KEY_ENV,
+        fetchImpl: rotatedCollector,
+        healRevokedKey: vi.fn().mockResolvedValue(FAILED),
+      });
+
+      expect(
+        fs.existsSync(path.join(hook.stateDir, "heal-claude_code.json")),
+      ).toBe(true);
+      expect(hook.stdout).toEqual([]);
     });
   });
 

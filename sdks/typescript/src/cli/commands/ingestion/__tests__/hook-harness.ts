@@ -105,9 +105,9 @@ export interface RunHookOptions {
   claudeRegistryDir?: string;
   readCliConfig?: Parameters<typeof hookCommand>[0]["readCliConfig"];
   /**
-   * The healer a rejected key is handed to. Defaults to one that repairs
-   * nothing, so no test ever reaches the machine's real config or a collector
-   * with a real login.
+   * The healer a rejected key is handed to. Defaults to one that declines, so
+   * no test ever reaches the machine's real config or a collector with a real
+   * login.
    */
   healRevokedKey?: Parameters<typeof hookCommand>[0]["healRevokedKey"];
   /**
@@ -199,7 +199,7 @@ export const installHookHarness = (): HookHarness => {
       tool = "claude-code",
       claudeRegistryDir,
       readCliConfig = NO_CLI_CONFIG,
-      healRevokedKey = async () => null,
+      healRevokedKey = async () => ({ status: "declined" }) as const,
       shouldOmitExporterEnv = false,
     }: RunHookOptions = {}) =>
       hookCommand({

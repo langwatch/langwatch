@@ -304,6 +304,23 @@ Rule: A revoked ingest key heals itself
     When the collector answers 401 again
     Then no new key is minted
 
+  # The window exists to stop a device asking the platform for a key every
+  # session. Only an attempt is worth throttling: a decline is read off the
+  # device's own config before any network call, costs nothing to repeat, and
+  # spending the window on one would silence the next 401 this device can fix.
+
+  @unit
+  Scenario: A decline does not spend the heal throttle
+    Given a 401 the hook declines to heal, because the device sent no key
+    When a repairable 401 arrives inside the same window
+    Then that one is still healed
+
+  @unit
+  Scenario: A failed heal spends the throttle
+    Given a heal that reached the platform and came back with no wired tool
+    When the next session starts inside the window
+    Then no second mint is attempted
+
   @unit
   Scenario: A tool pinned to a project is not re-minted on the personal path
     Given a tool pinned to a project key

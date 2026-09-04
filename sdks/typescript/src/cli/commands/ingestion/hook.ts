@@ -65,7 +65,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 import {
-  type HealedTarget,
+  type HealOutcome,
   healRevokedIngestKey,
 } from "@/cli/utils/governance/ingest-key-heal";
 import { drainSessionContextSpool } from "@/cli/utils/governance/session-context-spool";
@@ -141,7 +141,7 @@ export interface HookCommandOptions {
   healRevokedKey?: (params: {
     agent: string;
     rejectedToken: string | undefined;
-  }) => Promise<HealedTarget | null>;
+  }) => Promise<HealOutcome>;
 }
 
 /**
@@ -272,18 +272,23 @@ async function runHook({
   // user to restart the agent: the running process still holds the old key.
   let liveTarget = target;
   if (own.httpStatus === 401 && !healedRecently({ stateDir, agent, now })) {
-    recordHealAttempt({ stateDir, agent, now });
-    const healed = await healRevokedKey({
+    const outcome = await healRevokedKey({
       agent,
       rejectedToken: bearerOf(target.headers),
     }).catch((error: Error) => {
       debug({ message: `heal failed: ${error.message}`, env });
-      return null;
+      return { status: "failed" } as const;
     });
-    if (healed) {
-      liveTarget = healed;
+    // Only an attempt spends the window. A decline is read off the config
+    // without touching the platform, so throttling it would cost nothing to
+    // repeat and would silence the next 401 that this device CAN repair.
+    if (outcome.status !== "declined") {
+      recordHealAttempt({ stateDir, agent, now });
+    }
+    if (outcome.status === "healed") {
+      liveTarget = outcome.target;
       debug({ message: "ingest key re-minted and wiring rewritten", env });
-      await own.retry?.(healed);
+      await own.retry?.(outcome.target);
       if (agent === "claude_code") notifyClaude(HEAL_NOTICE);
     }
   }
