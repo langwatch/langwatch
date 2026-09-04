@@ -311,6 +311,52 @@ async function pointSdkAtThisCheckout({
  * checks on it, and a folder with no dependencies would push it into
  * installing them itself and grade the wrong thing.
  */
+/** How many finished runs keep their folder on disk. */
+const DEMO_REPOS_KEPT = 4;
+
+/**
+ * The folders to delete, newest kept.
+ *
+ * An installed demo repository is about 400 MB, and one is made per scenario
+ * run: a morning of runs filled the disk. The most recent few stay so a failed
+ * run can still be read on disk.
+ */
+export function demoReposToPrune({
+  existing,
+  keep = DEMO_REPOS_KEPT,
+}: {
+  /** Folder names, as they were made: `<name>-<base36 timestamp>`. */
+  existing: readonly string[];
+  keep?: number;
+}): string[] {
+  const stamped = existing
+    .map((folder) => {
+      const stamp = Number.parseInt(
+        folder.slice(folder.lastIndexOf("-") + 1),
+        36,
+      );
+      return { folder, stamp: Number.isNaN(stamp) ? 0 : stamp };
+    })
+    .sort((a, b) => b.stamp - a.stamp);
+  return stamped.slice(Math.max(0, keep)).map((entry) => entry.folder);
+}
+
+/** Delete every demo repository but the most recent few. */
+async function pruneDemoRepos(): Promise<void> {
+  const entries = await fs
+    .readdir(SCENARIO_REPO_DIR, { withFileTypes: true })
+    .catch(() => []);
+  const folders = entries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name);
+  for (const folder of demoReposToPrune({ existing: folders })) {
+    await fs.rm(path.join(SCENARIO_REPO_DIR, folder), {
+      recursive: true,
+      force: true,
+    });
+  }
+}
+
 export async function createDemoRepo({
   language,
   name,
@@ -321,6 +367,7 @@ export async function createDemoRepo({
   name: string;
   install?: boolean;
 }): Promise<DemoRepo> {
+  await pruneDemoRepos();
   const root = path.join(
     SCENARIO_REPO_DIR,
     `${name}-${Date.now().toString(36)}`,

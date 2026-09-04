@@ -181,6 +181,13 @@ Feature: Langy is tested with LangWatch's own scenario and evaluation tooling
     And Langy offers the code access card again
     And the judge confirms Langy did not pretend the work continued
 
+  @unit
+  Scenario: A run cleans up the demo folders the runs before it left
+    Given several finished runs left their demo folder on disk
+    When a new scenario prepares its own folder
+    Then only the most recent few folders are kept
+    And the rest are deleted, because each one is hundreds of megabytes
+
   # ---------------------------------------------------------------------------
   # The judge rubric grades outcomes, never the prompt restated
   # ---------------------------------------------------------------------------

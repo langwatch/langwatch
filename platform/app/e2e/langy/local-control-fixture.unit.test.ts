@@ -8,6 +8,7 @@
 import { describe, expect, it } from "vitest";
 import {
   answerOfTurn,
+  demoReposToPrune,
   permissionAnswerNote,
   questionAnswerNote,
   type StoredMessage,
@@ -114,6 +115,46 @@ describe("questionAnswerNote", () => {
       expect(note).toBe(
         '[developer answered in the panel: "Which branch?" -> main]',
       );
+    });
+  });
+});
+
+describe("demoReposToPrune", () => {
+  const stamp = (offsetMs: number) => (Date.now() + offsetMs).toString(36);
+
+  describe("when more folders exist than a run keeps", () => {
+    /** @scenario "A run cleans up the demo folders the runs before it left" */
+    it("names the oldest ones, keeping the most recent few", () => {
+      const folders = [
+        `code-access-${stamp(-5000)}`,
+        `permissions-${stamp(-4000)}`,
+        `disconnect-${stamp(-3000)}`,
+        `connected-agent-${stamp(-2000)}`,
+        `code-access-${stamp(-1000)}`,
+        `permissions-${stamp(0)}`,
+      ];
+
+      const pruned = demoReposToPrune({ existing: folders, keep: 4 });
+
+      expect(pruned).toEqual([folders[1], folders[0]]);
+    });
+  });
+
+  describe("when the folders fit inside what a run keeps", () => {
+    it("names none", () => {
+      expect(
+        demoReposToPrune({ existing: [`code-access-${stamp(0)}`], keep: 4 }),
+      ).toEqual([]);
+    });
+  });
+
+  describe("when a folder carries no timestamp", () => {
+    it("treats it as the oldest, so it is pruned first", () => {
+      const folders = ["leftover", `code-access-${stamp(0)}`];
+
+      expect(demoReposToPrune({ existing: folders, keep: 1 })).toEqual([
+        "leftover",
+      ]);
     });
   });
 });
