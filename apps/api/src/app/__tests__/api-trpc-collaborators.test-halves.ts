@@ -18,7 +18,6 @@ import type {
   ApiTrpcCollaboratorHalves,
   ApiTrpcFeatureApplicationSlices,
 } from "../api-trpc-features.composition";
-import type { ApiExecutionCollaborators } from "../api-trpc-collaborators.execution.composition";
 import { createGatewayTrpcRouters } from "../../features/gateway/gateway-trpc.mount";
 import { refusingLangyFeature } from "../../features/langy/langy.composition";
 import { refusingOpsFeature } from "../../features/ops/ops.composition";
@@ -44,6 +43,9 @@ import { refusingTopicFeature } from "../../features/topic/topic.composition";
 import { refusingTraceFeature } from "../../features/trace/trace.composition";
 import { refusingDataPrivacyFeature } from "../../features/data-privacy/data-privacy.composition";
 import { refusingIntegrationsChecksFeature } from "../../features/project/integrations-checks.composition";
+import { refusingWorkflowFeature } from "../../features/workflow/workflow.composition";
+import { refusingExperimentFeature } from "../../features/experiment/experiment.composition";
+import { refusingEvaluationFeature } from "../../features/evaluation/evaluation.composition";
 import type { ComposedApiFeatures } from "../../app-trpc/app-trpc.composed";
 import type { ApiIdentityCollaborators } from "../api-trpc-collaborators.identity.composition";
 import type { ApiOrgGroupCollaborators } from "../api-trpc-collaborators.org-group.composition";
@@ -126,20 +128,6 @@ export function stubIdentityHalf(broadcast: EventEmitter): ApiIdentityCollaborat
   });
 }
 
-export function stubExecutionHalf(): ApiExecutionCollaborators {
-  return stub<ApiExecutionCollaborators>("execution", {
-    workflows: stub("app.workflows"),
-    experiments: stub("app.experiments"),
-    evaluations: stub("app.evaluations"),
-    workflowPorts: {
-      lifecycle: stub("workflows.lifecycle"),
-      optimization: stub("workflows.optimization"),
-    },
-    experimentPorts: stub("experiments", { workbenchStateSchema: anySchema }),
-    evaluationPorts: stub("evaluations", { mappingsSchema: anySchema }),
-  });
-}
-
 export function stubOrgGroupHalf(): ApiOrgGroupCollaborators {
   return stub<ApiOrgGroupCollaborators>("orgGroup", {
     application: {
@@ -186,6 +174,9 @@ export function stubApplicationSlices(): ApiTrpcFeatureApplicationSlices {
     share: stub("app.share"),
     topics: stub("app.topics"),
     traces: stub("app.traces"),
+    workflows: stub("app.workflows"),
+    experiments: stub("app.experiments"),
+    evaluations: stub("app.evaluations"),
     annotations: stub("app.annotations"),
     authzApp: stub("app.authzApp"),
     permissions: stub("app.permissions"),
@@ -235,6 +226,9 @@ export function stubComposedFeatures(): ComposedApiFeatures {
     evaluator: refusingEvaluatorFeature(),
     prompt: refusingPromptFeature(),
     dataRetention: refusingDataRetentionFeature(),
+    workflow: refusingWorkflowFeature(),
+    experiment: refusingExperimentFeature(),
+    evaluation: refusingEvaluationFeature(),
     monitor: refusingMonitorFeature(),
     home: refusingHomeFeature(),
     role: refusingRoleFeature(),
@@ -254,7 +248,7 @@ export function stubComposedFeatures(): ComposedApiFeatures {
 }
 
 /**
- * All four halves, stubbed by default. Pass the half(s) a test actually
+ * Both halves, stubbed by default. Pass the half(s) a test actually
  * composes as overrides — the rest stay stubbed so the full record still
  * builds. `broadcast` seeds the identity half's tenant emitter; give it the
  * same `EventEmitter` a subscription test emits on.
@@ -265,7 +259,6 @@ export function testHalves(
 ): ApiTrpcCollaboratorHalves {
   return {
     identity: stubIdentityHalf(broadcast),
-    execution: stubExecutionHalf(),
     orgGroup: stubOrgGroupHalf(),
     ...overrides,
   };

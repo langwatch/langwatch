@@ -16,16 +16,55 @@
  * own connection and the evaluator package stays unaware of a workflow.
  */
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
-import { EvaluatorApp, type EvaluatorTrpcPorts } from "@langwatch/evaluator-server";
+import {
+  EvaluatorApp,
+  NlpEvaluatorCodeExecutionAdapter,
+  PostgresEvaluatorAdapter,
+  PrismaEvaluatorAuditLogAdapter,
+  type EvaluatorTrpcPorts,
+} from "@langwatch/evaluator-server";
 import { HandledError } from "@langwatch/handled-error";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
-import type { WorkflowApp } from "@langwatch/workflow-server";
+import type { WorkflowApp, WorkflowNlpRuntimePort } from "@langwatch/workflow-server";
+import type { WorkflowService } from "@langwatch/workflow-contract";
+import { nanoid } from "nanoid";
 import { TRPCError } from "@trpc/server";
 
 import type { ApiTrpcFeatureMount } from "../../api.application";
 import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context";
 import type { ApiTrpcInfrastructure } from "../../app-trpc/app-trpc.infrastructure";
 import { createEvaluatorTrpcRouter } from "./evaluator-trpc.mount";
+
+/**
+ * The ONE evaluator service on this process.
+ *
+ * Composed on its own and before the feature, because three other surfaces
+ * read it: the workflow application publishes a workflow as an evaluator, a
+ * monitor names the evaluator it runs, and an experiment scores against one. A
+ * second service over the same rows would be a second answer to what an
+ * evaluator is.
+ *
+ * A code evaluator dispatches through the SAME engine a studio run uses, which
+ * is the point of taking the runtime rather than dialling an address here: one
+ * path, one trace.
+ */
+export function composeEvaluatorService(options: {
+  infrastructure: ApiTrpcInfrastructure;
+  peers: Readonly<{
+    /** The workflow service an evaluator's published graph is read through. */
+    workflows: WorkflowService;
+    /** Where a code evaluator executes. */
+    nlpRuntime: WorkflowNlpRuntimePort;
+  }>;
+}): EvaluatorService {
+  return PostgresEvaluatorAdapter.create({
+    database: options.infrastructure.prisma,
+    workflows: options.peers.workflows,
+    auditLog: PrismaEvaluatorAuditLogAdapter.create(options.infrastructure.prisma),
+    codeExecution: NlpEvaluatorCodeExecutionAdapter.create(options.peers.nlpRuntime),
+    generateId: () => nanoid(),
+  });
+}
 
 /** The other features' services the evaluator surface reaches, named one by one. */
 export type EvaluatorPeers = Readonly<{

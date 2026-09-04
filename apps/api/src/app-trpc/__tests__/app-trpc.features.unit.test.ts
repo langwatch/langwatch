@@ -54,6 +54,9 @@ import { refusingModelProviderFeature } from "../../features/model-provider/mode
 import { refusingShareFeature } from "../../features/share/share.composition";
 import { refusingTopicFeature } from "../../features/topic/topic.composition";
 import { refusingTraceFeature } from "../../features/trace/trace.composition";
+import { refusingWorkflowFeature } from "../../features/workflow/workflow.composition";
+import { refusingExperimentFeature } from "../../features/experiment/experiment.composition";
+import { refusingEvaluationFeature } from "../../features/evaluation/evaluation.composition";
 import { refusingOpsFeature } from "../../features/ops/ops.composition";
 import { createAppTrpcFeatures, type AppTrpcFeaturePorts } from "../app-trpc.features";
 
@@ -103,19 +106,7 @@ const middlewares: AppTrpcPolicyMiddlewares = {
  * become the procedures' input parsers and their chained middleware — so a
  * refusal there could not be mounted at all.
  */
-function refusingPorts(): AppTrpcFeaturePorts<
-  Record<string, unknown>,
-  Record<string, unknown>,
-  Record<string, unknown>,
-  Record<string, unknown>,
-  Record<string, unknown>,
-  Record<string, unknown>,
-  Record<string, unknown>,
-  typeof testSignUpDataSchema,
-  Record<string, unknown>,
-  Record<string, unknown>,
-  Record<string, unknown>
-> {
+function refusingPorts(): AppTrpcFeaturePorts<typeof testSignUpDataSchema> {
   const refuse = (what: string) => (): never => {
     throw new Error(`${what} was reached while building the feature list`);
   };
@@ -136,21 +127,8 @@ function refusingPorts(): AppTrpcFeaturePorts<
     );
 
   return {
-    bugReports: refuseEvery("bugReports"),
     auth: refuseEvery("auth"),
-    // Read while the two writes are BUILT — the policy chain lifts each
-    // declaration off the middleware it is handed — so these are declared
-    // checks rather than refusals.
-    evaluations: {
-      ...(refuseEvery("evaluations") as object),
-      mappingsSchema: z.object({ mapping: z.record(z.string(), z.unknown()) }),
-    } as never,
-    experiments: {
-      ...(refuseEvery("experiments") as object),
-      workbenchStateSchema: z.object({ rows: z.array(z.unknown()) }),
-    } as never,
     group: refuseEvery("group"),
-    home: refuseEvery("home"),
     identity: refuseEvery("identity"),
     joinRequests: refuseEvery("joinRequests"),
     // The questionnaire schema is read while the surface is BUILT — it becomes
@@ -161,37 +139,6 @@ function refusingPorts(): AppTrpcFeaturePorts<
       signUpDataSchema: testSignUpDataSchema,
     } as never,
     prisma: refuseEvery("prisma"),
-    role: {
-      ...(refuseEvery("role") as object),
-      customRolePermission: z.string(),
-    } as never,
-    team: refuseEvery("team"),
-    // The observability group, as one entry. Its build-time members are the
-    // two trace grid schemas, the evaluator and precondition schemas, the
-    // cost-rule safety gate the write and preview schemas are constructed
-    // from, and the two provider tenant gates the policy chain lifts a
-    // declaration off. Everything else refuses.
-    /**
-     * The six agent surfaces, stubbed with only what the record reads while
-     * it is BUILT: the two Langy gates and the operator check the mounts
-     * chain onto a procedure. Their own suites are what prove they answer.
-     */
-    langy: refuseEvery("langy"),
-    langyGates: {
-      refuseDemoProject: passThrough(),
-      enforceLangyAccess: passThrough(),
-    },
-    langyEgress: refuseEvery("langyEgress"),
-    ops: refuseEvery("ops"),
-    opsCheck: () => refusingCheck("opsCheck"),
-    scenarios: refuseEvery("scenarios"),
-    /**
-     * The nine tenant-administration surfaces, stubbed with only what the
-     * record reads while it is BUILT: the sign-up questionnaire the
-     * organization ceremony parses against, and the three data-dependent
-     * gates the mounts chain onto a procedure. Its own suite is what proves it
-     * answers.
-     */
     organization: {
       ...(refuseEvery("organization") as object),
       signUpDataSchema: testSignUpDataSchema,
@@ -213,63 +160,7 @@ function refusingPorts(): AppTrpcFeaturePorts<
       scimToken: refuseEvery("enterprise.scimToken"),
       ssoConnections: refuseEvery("enterprise.ssoConnections"),
     },
-    traces: {
-      ...(refuseEvery("traces") as object),
-      listInputSchema: z.object({ projectId: z.string() }),
-      filterInputSchema: z.object({ projectId: z.string() }),
-      evaluatorTypeSchema: z.string(),
-      preconditionSchema: z.object({ field: z.string() }),
-    } as unknown as TracesTrpcPorts<
-      TraceLegacyListInput,
-      unknown,
-      TraceLegacyFilterInput,
-      unknown,
-      unknown
-    >,
-    tracesV2: refuseEvery("tracesV2"),
-    spans: refuseEvery("spans"),
-    traceEditOverlay: refuseEvery("traceEditOverlay"),
-    sharedTrace: refuseEvery("sharedTrace"),
-    savedViews: { savedViews: refuseEvery("savedViews") },
-    costs: refuseEvery("costs"),
-    // Named member by member rather than spread from `refuseEvery`: the spread
-    // carries no types, so a port growing a member would go unnoticed here.
-    llmModelCost: {
-      isSafeRegex: () => true,
-      getModelLimits: refuse("llmModelCost.getModelLimits"),
-      previewMatchingSpans: refuse("llmModelCost.previewMatchingSpans"),
-    },
-    modelProvider: refuseEvery("modelProvider"),
-    modelProviderChecks: {
-      tenantWrite: (permission: string) =>
-        refusingCheck(`modelProviderChecks.tenantWrite.${permission}`),
-      credentialProbe: refusingCheck("modelProviderChecks.credentialProbe"),
-    },
-    translate: refuseEvery("translate"),
-    httpProxy: refuseEvery("httpProxy"),
-    limits: refuseEvery("limits"),
-    // The monitor precondition parser, which the create and update inputs are
-    // constructed from; everything else refuses. `storedObjects` is absent
-    // because it takes no ports at all.
-    dataRetention: refuseEvery("dataRetention"),
-    monitors: {
-      ...(refuseEvery("monitors") as object),
-      preconditionsSchema: z.array(z.object({ field: z.string() })),
-    } as never,
-    // The virtual-key budget parser, fixed when the router is BUILT because a
-    // tRPC input parser is.
-    gateway: { virtualKeys: { virtualKeyBudgetInput: z.object({}) } } as never,
-    // The SaaS shape, because this suite's last assertion is that no
-    // namespace mounts without procedures: `false` is the self-hosted answer,
-    // and it deliberately serves `subscription` and `currency` as empty
-    // routers of the same type. Which shape a deployment gets is the gateway
-    // group's own suite to pin.
-    saasBilling: true,
     user: refuseEvery("user"),
-    workflows: {
-      lifecycle: refuseEvery("workflows.lifecycle"),
-      optimization: refuseEvery("workflows.optimization"),
-    },
   };
 }
 
@@ -322,6 +213,9 @@ function buildFeatures() {
       share: refusingShareFeature(),
       topic: refusingTopicFeature(),
       trace: refusingTraceFeature(),
+      workflow: refusingWorkflowFeature(),
+      experiment: refusingExperimentFeature(),
+      evaluation: refusingEvaluationFeature(),
     },
     // The features that compose themselves take this rather than a ports
     // entry; every member refuses, for the same reason the ports do.

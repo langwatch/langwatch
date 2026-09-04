@@ -36,10 +36,38 @@ import { EvaluatorReplicationApi, type EvaluatorTrpcPorts } from "@langwatch/eva
 import { HandledError } from "@langwatch/handled-error";
 import type { Logger } from "@langwatch/observability";
 import { monitorPreconditionsSchema, type MonitorService } from "@langwatch/monitor-contract";
-import { MonitorApp, type MonitorTrpcPorts } from "@langwatch/monitor-server";
+import {
+  MonitorApp,
+  PostgresMonitorAdapter,
+  type MonitorTrpcPorts,
+} from "@langwatch/monitor-server";
+import { nanoid } from "nanoid";
 
 import type { ApiTrpcFeatureMount } from "../../api.application";
+import type { ApiTrpcInfrastructure } from "../../app-trpc/app-trpc.infrastructure";
 import { createMonitorTrpcRouter } from "./monitor-trpc.mount";
+
+/**
+ * The ONE monitor service on this process.
+ *
+ * Composed on its own and before the feature, because an experiment upserts
+ * its own monitor through the same service `monitors.*` lists from: two
+ * services over the same table would let the wizard's list disagree with the
+ * monitor it just created.
+ */
+export function composeMonitorService(options: {
+  infrastructure: ApiTrpcInfrastructure;
+  peers: Readonly<{
+    /** The evaluator a monitor runs, through the ONE evaluator service. */
+    evaluators: EvaluatorService;
+  }>;
+}): MonitorService {
+  return PostgresMonitorAdapter.create({
+    database: options.infrastructure.prisma,
+    evaluators: options.peers.evaluators,
+    generateId: () => `monitor_${nanoid()}`,
+  });
+}
 
 /** Reports the one capability this feature can be composed without. */
 export abstract class ApiMonitorAbsenceReport {

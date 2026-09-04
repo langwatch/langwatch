@@ -27,7 +27,6 @@
  * silently degraded — see {@link ApiTrpcCollaboratorsAbsence}.
  */
 import type { AuthApp } from "@langwatch/auth-server";
-import type { ExperimentTrpcPorts } from "@langwatch/experiment-server";
 import type { EmailSuppressionTrpcPorts } from "@langwatch/automation-server";
 import type {
   GroupTrpcPorts,
@@ -36,9 +35,7 @@ import type {
   OrganizationTrpcPorts,
 } from "@langwatch/organization-server";
 import type { IdentityTrpcPorts, UserTrpcPorts } from "@langwatch/user-server";
-import type { WorkflowOptimizationTrpcPorts, WorkflowTrpcPorts } from "@langwatch/workflow-server";
 import type { ZodTypeAny } from "zod";
-import type { EvaluationMountPorts } from "../features/evaluation/evaluation-trpc.mount";
 import type { ApiTrpcFeatureApplication } from "./app-trpc.context";
 import type { CodingAgentTrpcPorts } from "@langwatch/coding-agent-server";
 import type { OpsTrpcPorts } from "@langwatch/ops-server";
@@ -74,40 +71,7 @@ type ApiOwnedUserPorts =
   | "tryGetUserContact"
   | "tryFindFirstProjectSlug";
 
-/** The `workflow.*` entries this process answers from Prisma and its AuthZ service. */
-type ApiOwnedWorkflowPorts =
-  | "hasProjectPermission"
-  | "hasProjectPermissions"
-  | "listWorkflowsWithCopyLineage"
-  | "tryFindWorkflow"
-  | "tryFindCopiesWithPath"
-  | "tryFindWorkflowWithSource"
-  | "tryFindWorkflowWithCopies"
-  | "tryFindLatestVersionNumber"
-  | "listAgentsForWorkflow"
-  | "listMonitorsForEvaluators"
-  | "cascadeArchiveWorkflow";
-
-/** The `optimization.*` entries that are row reads and one flag write. */
-type ApiOwnedOptimizationPorts =
-  | "tryGetWorkflow"
-  | "tryGetWorkflowVersion"
-  | "setWorkflowFlags"
-  | "listPublishedComponents";
-
-/** The `experiments.*` entries that are row reads or an AuthZ probe. */
-type ApiOwnedExperimentPorts =
-  | "probeProjectPermission"
-  | "createWorkflow"
-  | "tryFindWorkflow"
-  | "resolveAuthorNames";
-
-export type ApiTrpcCollaborators<
-  TMappingsIn,
-  TMappingsOut,
-  TSignUpDataSchema extends ZodTypeAny,
-  TWorkbenchState,
-> = Readonly<{
+export type ApiTrpcCollaborators<TSignUpDataSchema extends ZodTypeAny> = Readonly<{
   /**
    * The application slices every packaged surface reads off `ctx.app`.
    *
@@ -121,11 +85,6 @@ export type ApiTrpcCollaborators<
   auth: AuthApp;
 
 
-
-  evaluations: EvaluationMountPorts<TMappingsIn, TMappingsOut>;
-
-
-  experiments: Omit<ExperimentTrpcPorts<TWorkbenchState>, ApiOwnedExperimentPorts>;
 
   group: GroupTrpcPorts;
 
@@ -166,13 +125,6 @@ export type ApiTrpcCollaborators<
 
   user: Omit<UserTrpcPorts, ApiOwnedUserPorts>;
 
-  workflows: Readonly<{
-    lifecycle: Omit<WorkflowTrpcPorts, ApiOwnedWorkflowPorts>;
-    optimization: Pick<
-      WorkflowOptimizationTrpcPorts<never, never>,
-      Exclude<keyof WorkflowOptimizationTrpcPorts<never, never>, ApiOwnedOptimizationPorts>
-    >;
-  }>;
 }>;
 
 /** What a set is missing, and therefore why the record is not mountable. */

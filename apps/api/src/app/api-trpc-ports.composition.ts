@@ -28,55 +28,12 @@
  * and a port that answered `unknown` would hand the pages `unknown`.
  */
 import type { AuthzPermission, AuthzService } from "@langwatch/authz-contract";
-import { pMapLimited } from "@langwatch/eventing";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { nanoid } from "nanoid";
 import type { ZodTypeAny } from "zod";
 import type { ApiAuditPort } from "../api-request.policy";
 import type { ApiTrpcFeatureMount } from "../api.application";
 import type { ApiTrpcCollaborators } from "../app-trpc/app-trpc.collaborators";
 import type { ApiTrpcPortsContext } from "../app-trpc/app-trpc.context";
-
-/** Where one copy lives, for the "org / team / project" path shown beside it. */
-const workflowCopyPathSelect = {
-  id: true,
-  name: true,
-  projectId: true,
-  project: {
-    select: {
-      id: true,
-      name: true,
-      team: {
-        select: {
-          id: true,
-          name: true,
-          organization: { select: { id: true, name: true } },
-        },
-      },
-    },
-  },
-} as const;
-
-/** The copy-lineage selection `workflow.getAll` redacts against permissions. */
-const workflowCopyLineageSelect = {
-  id: true,
-  projectId: true,
-  name: true,
-  icon: true,
-  description: true,
-  createdAt: true,
-  updatedAt: true,
-  latestVersionId: true,
-  currentVersionId: true,
-  publishedId: true,
-  publishedById: true,
-  archivedAt: true,
-  isEvaluator: true,
-  isComponent: true,
-  copiedFromWorkflowId: true,
-  copiedFrom: { select: workflowCopyPathSelect },
-  copiedWorkflows: { where: { archivedAt: null }, select: { projectId: true } },
-} as const;
 
 /** The process's own collaborators, beside the ones it receives. */
 export type ApiTrpcPortsCompositionOptions = Readonly<{
@@ -102,25 +59,12 @@ export type ApiTrpcPortsCompositionOptions = Readonly<{
  * Builds the full ports object from this process's graph plus the collaborators
  * it received.
  *
- * Generic over the same parameters `createAppTrpcFeatures` is, and for the same
- * reason: those types are what the client sees. `TWorkflowVersion` and
- * `TPublishedComponent` are the exception — they are inferred from the row
- * reads written here rather than supplied, because the studio reads exactly
- * what this connection returns.
+ * Generic over the same parameter `createAppTrpcFeatures` is, and for the same
+ * reason: the sign-up questionnaire's schema is what the client sees.
  */
-export function createApiTrpcPorts<
-  TMappingsIn,
-  TMappingsOut,
-  TSignUpDataSchema extends ZodTypeAny,
-  TWorkbenchState,
->(
+export function createApiTrpcPorts<TSignUpDataSchema extends ZodTypeAny>(
   options: ApiTrpcPortsCompositionOptions & {
-    collaborators: ApiTrpcCollaborators<
-      TMappingsIn,
-      TMappingsOut,
-      TSignUpDataSchema,
-      TWorkbenchState
-    >;
+    collaborators: ApiTrpcCollaborators<TSignUpDataSchema>;
   },
 ) {
   const { prisma, authz, audit, mount, collaborators } = options;
@@ -143,52 +87,6 @@ export function createApiTrpcPorts<
   return {
 
     auth: collaborators.auth,
-
-    evaluations: collaborators.evaluations,
-
-    experiments: {
-      ...collaborators.experiments,
-
-      probeProjectPermission: (ctx: unknown, projectId: string, permission: AuthzPermission) =>
-        probeProjectPermission(ctx, projectId, permission),
-
-      createWorkflow: async (
-        _ctx: unknown,
-        input: Readonly<{
-          projectId: string;
-          name: string;
-          icon?: string | null;
-          description?: string | null;
-        }>,
-      ) =>
-        await prisma.workflow.create({
-          data: {
-            id: `workflow_${nanoid()}`,
-            projectId: input.projectId,
-            name: input.name,
-            icon: input.icon ?? "",
-            description: input.description ?? "",
-          },
-        }),
-
-      tryFindWorkflow: async (
-        _ctx: unknown,
-        input: Readonly<{ workflowId: string; projectId: string }>,
-      ) =>
-        await prisma.workflow.findFirst({
-          where: { id: input.workflowId, projectId: input.projectId },
-        }),
-
-      resolveAuthorNames: async (_ctx: unknown, authorIds: readonly string[]) =>
-        await prisma.user.findMany({
-          where: { id: { in: [...authorIds] } },
-          select: { id: true, name: true },
-        }),
-    },
-
-
-
-
 
     group: collaborators.group,
 
@@ -290,252 +188,6 @@ export function createApiTrpcPorts<
             select: { slug: true },
           })
         )?.slug ?? null,
-    },
-
-    workflows: {
-      lifecycle: {
-        ...collaborators.workflows.lifecycle,
-
-        hasProjectPermission: (
-          ctx: unknown,
-          input: Readonly<{ projectId: string; permission: AuthzPermission }>,
-        ) => probeProjectPermission(ctx, input.projectId, input.permission),
-
-        // Each related project needs its own check; cap concurrency so a
-        // workflow with many copies cannot exhaust the connection pool.
-        hasProjectPermissions: async (
-          ctx: unknown,
-          input: Readonly<{ projectIds: readonly string[]; permission: AuthzPermission }>,
-        ) => {
-          const permitted = new Map<string, boolean>();
-          await pMapLimited({
-            items: [...input.projectIds],
-            concurrency: 5,
-            fn: async (projectId: string) => {
-              permitted.set(
-                projectId,
-                await probeProjectPermission(ctx, projectId, input.permission),
-              );
-            },
-          });
-          return permitted;
-        },
-
-        listWorkflowsWithCopyLineage: async (
-          _ctx: unknown,
-          input: Readonly<{ projectId: string }>,
-        ) =>
-          await prisma.workflow.findMany({
-            where: { projectId: input.projectId, archivedAt: null },
-            orderBy: { updatedAt: "desc" },
-            select: workflowCopyLineageSelect,
-          }),
-
-        // Prisma requires projectId in the where clause for a project-level model.
-        tryFindWorkflow: async (
-          _ctx: unknown,
-          input: Readonly<{ workflowId: string; projectId: string }>,
-        ) =>
-          await prisma.workflow.findFirst({
-            where: { id: input.workflowId, projectId: input.projectId, archivedAt: null },
-          }),
-
-        // Copies are queried through the relation so the findMany's projectId
-        // requirement does not force a single project on a cross-project read.
-        tryFindCopiesWithPath: async (
-          _ctx: unknown,
-          input: Readonly<{ workflowId: string; projectId: string }>,
-        ) => {
-          const workflowWithCopies = await prisma.workflow.findUnique({
-            where: { id: input.workflowId, projectId: input.projectId },
-            select: {
-              id: true,
-              copiedWorkflows: { where: { archivedAt: null }, select: workflowCopyPathSelect },
-            },
-          });
-
-          return workflowWithCopies ? workflowWithCopies.copiedWorkflows : null;
-        },
-
-        tryFindWorkflowWithSource: async (
-          _ctx: unknown,
-          input: Readonly<{ workflowId: string; projectId: string }>,
-        ) =>
-          await prisma.workflow.findUnique({
-            where: { id: input.workflowId, projectId: input.projectId, archivedAt: null },
-            include: { latestVersion: true, copiedFrom: { include: { latestVersion: true } } },
-          }),
-
-        tryFindWorkflowWithCopies: async (
-          _ctx: unknown,
-          input: Readonly<{ workflowId: string; projectId: string }>,
-        ) =>
-          await prisma.workflow.findUnique({
-            where: { id: input.workflowId, projectId: input.projectId, archivedAt: null },
-            include: {
-              latestVersion: true,
-              copiedWorkflows: {
-                where: { archivedAt: null },
-                include: { latestVersion: true },
-              },
-            },
-          }),
-
-        tryFindLatestVersionNumber: async (
-          _ctx: unknown,
-          input: Readonly<{ workflowId: string; projectId: string }>,
-        ) => {
-          const workflow = await prisma.workflow.findUnique({
-            where: { id: input.workflowId, projectId: input.projectId },
-            include: { latestVersion: true },
-          });
-
-          return workflow ? { version: workflow.latestVersion?.version ?? null } : null;
-        },
-
-        listAgentsForWorkflow: async (
-          _ctx: unknown,
-          input: Readonly<{ workflowId: string; projectId: string }>,
-        ) =>
-          await prisma.agent.findMany({
-            where: {
-              workflowId: input.workflowId,
-              projectId: input.projectId,
-              archivedAt: null,
-            },
-            select: { id: true, name: true },
-          }),
-
-        listMonitorsForEvaluators: async (
-          _ctx: unknown,
-          input: Readonly<{ projectId: string; evaluatorIds: readonly string[] }>,
-        ) =>
-          (
-            await prisma.monitor.findMany({
-              where: {
-                evaluatorId: { in: [...input.evaluatorIds] },
-                projectId: input.projectId,
-              },
-              select: { id: true, name: true, evaluatorId: true },
-            })
-          ).flatMap(({ id, name, evaluatorId }) =>
-            evaluatorId === null ? [] : [{ id, name, evaluatorId }],
-          ),
-
-        cascadeArchiveWorkflow: async (
-          _ctx: unknown,
-          input: Readonly<{ projectId: string; workflowId: string; unarchive?: boolean }>,
-        ) => {
-          const now = input.unarchive ? null : new Date();
-
-          return prisma.$transaction(async (tx) => {
-            // 1. Find all evaluators linked to this workflow
-            const evaluators = await tx.evaluator.findMany({
-              where: {
-                workflowId: input.workflowId,
-                projectId: input.projectId,
-                archivedAt: null,
-              },
-              select: { id: true },
-            });
-            const evaluatorIds = evaluators.map((evaluator) => evaluator.id);
-
-            // 2. Delete monitors linked to those evaluators (hard delete)
-            const deletedMonitors =
-              evaluatorIds.length > 0
-                ? await tx.monitor.deleteMany({
-                    where: { evaluatorId: { in: evaluatorIds }, projectId: input.projectId },
-                  })
-                : { count: 0 };
-
-            // 3. Archive evaluators linked to this workflow
-            const archivedEvaluators = await tx.evaluator.updateMany({
-              where: { workflowId: input.workflowId, projectId: input.projectId },
-              data: { archivedAt: now },
-            });
-
-            // 4. Archive agents linked to this workflow
-            const archivedAgents = await tx.agent.updateMany({
-              where: { workflowId: input.workflowId, projectId: input.projectId },
-              data: { archivedAt: now },
-            });
-
-            // 5. Archive the workflow itself
-            const workflow = await tx.workflow.update({
-              where: { id: input.workflowId, projectId: input.projectId },
-              data: { archivedAt: now },
-            });
-
-            return {
-              workflow,
-              archivedEvaluatorsCount: archivedEvaluators.count,
-              archivedAgentsCount: archivedAgents.count,
-              deletedMonitorsCount: deletedMonitors.count,
-            };
-          });
-        },
-      },
-
-      // Written out rather than inferred: the studio reads a stored version and
-      // a published component with the shape the rows have, and the transport
-      // is generic over both so the client sees exactly that.
-      optimization: {
-        ...collaborators.workflows.optimization,
-
-        tryGetWorkflow: async (
-          _ctx: unknown,
-          input: Readonly<{ workflowId: string; projectId: string }>,
-        ) =>
-          await prisma.workflow.findFirst({
-            where: { id: input.workflowId, projectId: input.projectId },
-          }),
-
-        tryGetWorkflowVersion: async (
-          _ctx: unknown,
-          input: Readonly<{ versionId: string; projectId: string }>,
-        ) =>
-          await prisma.workflowVersion.findFirst({
-            where: { id: input.versionId, projectId: input.projectId },
-          }),
-
-        setWorkflowFlags: async (
-          _ctx: unknown,
-          input: Readonly<{
-            workflowId: string;
-            projectId: string;
-            isComponent?: boolean;
-            isEvaluator?: boolean;
-          }>,
-        ) => {
-          await prisma.workflow.update({
-            where: { id: input.workflowId, projectId: input.projectId },
-            data: {
-              ...(input.isComponent === undefined ? {} : { isComponent: input.isComponent }),
-              ...(input.isEvaluator === undefined ? {} : { isEvaluator: input.isEvaluator }),
-            },
-          });
-        },
-
-        listPublishedComponents: async (_ctx: unknown, input: Readonly<{ projectId: string }>) => {
-          const workflows = await prisma.workflow.findMany({
-            where: {
-              projectId: input.projectId,
-              OR: [{ isComponent: true }, { isEvaluator: true }],
-            },
-            include: { versions: true },
-          });
-
-          // Each component carries only the version it publishes; the studio
-          // picks a component by its published shape, never by a draft.
-          workflows.forEach((workflow) => {
-            workflow.versions = workflow.versions.filter(
-              (version) => version.id === workflow.publishedId,
-            );
-          });
-
-          return workflows;
-        },
-      },
     },
   };
 }

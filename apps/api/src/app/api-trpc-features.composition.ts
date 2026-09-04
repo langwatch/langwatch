@@ -30,7 +30,6 @@ import {
 import type { ApiTrpcFeatureApplication } from "../app-trpc/app-trpc.context";
 import { createAppTrpcFeatures, type AppTrpcFeatureRecord } from "../app-trpc/app-trpc.features";
 import { createApiTrpcPorts } from "./api-trpc-ports.composition";
-import type { ApiExecutionCollaborators } from "./api-trpc-collaborators.execution.composition";
 import type { ApiIdentityCollaborators } from "./api-trpc-collaborators.identity.composition";
 import type { ApiOrgGroupCollaborators } from "./api-trpc-collaborators.org-group.composition";
 
@@ -44,21 +43,13 @@ import type { ApiOrgGroupCollaborators } from "./api-trpc-collaborators.org-grou
  * service; no collaborators means it composed none of what the record reaches.
  */
 export type ApiTrpcFeaturesCompositionOptions<
-  TMappingsIn,
-  TMappingsOut,
   TSignUpDataSchema extends ZodTypeAny,
-  TWorkbenchState,
 > = Readonly<{
   infrastructure: ApiTrpcInfrastructure | undefined;
   /** The features the process composed before it had a mount; see the type. */
   composed: ComposedApiFeatures;
   collaborators:
-    | ApiTrpcCollaborators<
-        TMappingsIn,
-        TMappingsOut,
-        TSignUpDataSchema,
-        TWorkbenchState
-      >
+    | ApiTrpcCollaborators<TSignUpDataSchema>
     | undefined;
   report?: ApiTrpcCollaboratorsAbsence;
 }>;
@@ -87,12 +78,7 @@ class MembershipDisabledError extends HandledError {
   }
 }
 
-export class ApiTrpcFeaturesComposition<
-  TMappingsIn,
-  TMappingsOut,
-  TSignUpDataSchema extends ZodTypeAny,
-  TWorkbenchState,
-> extends ApiTrpcFeaturesPort {
+export class ApiTrpcFeaturesComposition<TSignUpDataSchema extends ZodTypeAny> extends ApiTrpcFeaturesPort {
   /**
    * Composes the record only when this process has BOTH halves of it.
    *
@@ -105,24 +91,11 @@ export class ApiTrpcFeaturesComposition<
    * collaborator set is not negotiable for the reason its own docblock gives.
    */
   static tryCompose<
-    TMappingsIn,
-    TMappingsOut,
     TSignUpDataSchema extends ZodTypeAny,
-    TWorkbenchState,
   >(
-    options: ApiTrpcFeaturesCompositionOptions<
-      TMappingsIn,
-      TMappingsOut,
-      TSignUpDataSchema,
-      TWorkbenchState
-    >,
+    options: ApiTrpcFeaturesCompositionOptions<TSignUpDataSchema>,
   ):
-    | ApiTrpcFeaturesComposition<
-        TMappingsIn,
-        TMappingsOut,
-        TSignUpDataSchema,
-        TWorkbenchState
-      >
+    | ApiTrpcFeaturesComposition<TSignUpDataSchema>
     | undefined {
     const { infrastructure, collaborators } = options;
     if (!infrastructure) {
@@ -144,12 +117,7 @@ export class ApiTrpcFeaturesComposition<
   private constructor(
     private readonly infrastructure: ApiTrpcInfrastructure,
     private readonly composed: ComposedApiFeatures,
-    private readonly collaborators: ApiTrpcCollaborators<
-      TMappingsIn,
-      TMappingsOut,
-      TSignUpDataSchema,
-      TWorkbenchState
-    >,
+    private readonly collaborators: ApiTrpcCollaborators<TSignUpDataSchema>,
   ) {
     super();
     this.application = collaborators.application;
@@ -246,7 +214,6 @@ type ComposedApiTrpcCollaboratorHalves = {
 
 export type ApiTrpcCollaboratorHalves = Readonly<{
   identity: ApiIdentityCollaborators | undefined;
-  execution: ApiExecutionCollaborators | undefined;
   orgGroup: ApiOrgGroupCollaborators | undefined;
 }>;
 
@@ -267,6 +234,9 @@ export type ApiTrpcFeatureApplicationSlices = Pick<
   | "share"
   | "topics"
   | "traces"
+  | "workflows"
+  | "experiments"
+  | "evaluations"
   | "modelProviders"
   | "annotations"
   | "authzApp"
@@ -321,18 +291,11 @@ export function composeApiTrpcCollaborators(
     report?.incomplete(missing);
     return undefined;
   }
-  const {
-    identity,
-    execution,
-    orgGroup,
-  } = halves as ComposedApiTrpcCollaboratorHalves;
+  const { identity, orgGroup } = halves as ComposedApiTrpcCollaboratorHalves;
 
   return {
     application: {
       ...identity.application,
-      workflows: execution.workflows,
-      experiments: execution.experiments,
-      evaluations: execution.evaluations,
       // `projects` is the ORG group's: `...orgGroup.application` below carries
       // it and overwrote the product group's reader in this slot, silently.
       ...orgGroup.application,
@@ -345,11 +308,6 @@ export function composeApiTrpcCollaborators(
     joinRequests: identity.joinRequests,
     onboarding: identity.onboarding,
     user: identity.user,
-
-    workflows: execution.workflowPorts,
-    experiments: execution.experimentPorts,
-    evaluations: execution.evaluationPorts,
-
 
 
     organization: orgGroup.organization,

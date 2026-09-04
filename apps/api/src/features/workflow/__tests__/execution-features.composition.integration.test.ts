@@ -1,6 +1,7 @@
 /**
- * The execution half of the collaborator set, composed for real and driven
- * over the real `/api/trpc` handler.
+ * The three execution features — the studio, the experiment and the re-score —
+ * composed for real over ONE graph and driven over the real `/api/trpc`
+ * handler.
  *
  * What this pins is what the record was missing: `trpcCollaborators` is a typed
  * obligation, and until something satisfies it every one of the twenty-two
@@ -40,24 +41,33 @@ import type { EventSourcing } from "@langwatch/eventing";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it, vi } from "vitest";
-import { ApiAuditPort } from "../../api-request.policy";
-import { ApiApplication, MissingAgentService, MissingSecretService } from "../../api.application";
+import { ApiAuditPort } from "../../../api-request.policy";
+import {
+  ApiApplication,
+  MissingAgentService,
+  MissingSecretService,
+} from "../../../api.application";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectService, ProjectWithTeam } from "@langwatch/project-contract";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
-import { composeApiModelProviders } from "../api-model-provider.composition";
-import { composeApiExecutionCollaborators } from "../api-trpc-collaborators.execution.composition";
+import { composeApiModelProviders } from "../../../app/api-model-provider.composition";
+import { composeDatasetService } from "../../dataset/dataset.composition";
+import { composeEvaluatorService } from "../../evaluator/evaluator.composition";
+import { composeMonitorService } from "../../monitor/monitor.composition";
+import { composeEvaluationFeature } from "../../evaluation/evaluation.composition";
+import { composeExperimentFeature } from "../../experiment/experiment.composition";
+import { composeWorkflowFeature, composeWorkflowRuntime } from "../workflow.composition";
 import {
   ApiTrpcFeaturesComposition,
   composeApiTrpcCollaborators,
-} from "../api-trpc-features.composition";
+} from "../../../app/api-trpc-features.composition";
 import {
   stub,
   stubApplicationSlices,
   stubComposedFeatures,
   stubInfrastructureEntitlements,
   testHalves,
-} from "./api-trpc-collaborators.test-halves";
+} from "../../../app/__tests__/api-trpc-collaborators.test-halves";
 
 const workflowRow = {
   id: "workflow-1",
@@ -394,34 +404,75 @@ function composeApplication(
   const runEvaluationForTrace = vi.fn(async () => evaluationOutcome);
   const trackEvaluationRan = vi.fn();
 
-  const execution = composeApiExecutionCollaborators({
+  const modelProviders = options.realModelGateway
+    ? testModelGateway(prisma.client)
+    : testModelProviders();
+  const infrastructure = {
+    ...stubInfrastructureEntitlements(),
     prisma: prisma.client,
-    processName: "langwatch-api-test",
-    modelProviders: options.realModelGateway
-      ? testModelGateway(prisma.client)
-      : testModelProviders(),
-    agents: testAgents(),
-    resolveClickHouseClient: clickhouse.resolveClient,
+    authz: testAuthz(),
+    audit: new (class extends ApiAuditPort {
+      async record(): Promise<void> {}
+    })(),
+  };
+
+  // The graph's own order, exactly as the production root composes it: the
+  // dataset service, the studio's runtime, the evaluator over it, the monitor
+  // over that, and then the three features that answer the namespaces.
+  const datasets = composeDatasetService({ infrastructure });
+  const runtime = composeWorkflowRuntime({
+    infrastructure,
+    peers: { datasets, modelProviders },
     nlpServiceUrl: "http://127.0.0.1:5561",
-    publicBaseUrl: "https://app.example.test",
     secretDecryptor: { decrypt: (value) => `decrypted:${value}` },
+  });
+  const evaluators = composeEvaluatorService({
+    infrastructure,
+    peers: { workflows: runtime.workflows, nlpRuntime: runtime.nlpRuntime },
+  });
+  const monitors = composeMonitorService({ infrastructure, peers: { evaluators } });
+  const workflow = composeWorkflowFeature({
+    infrastructure,
+    runtime,
+    peers: { datasets, evaluators, modelProviders },
+  });
+  const evaluation = composeEvaluationFeature({
+    infrastructure,
+    peers: { modelProviders, workflowRuntime: runtime },
+    processName: "langwatch-api-test",
     eventing: options.eventing === false ? undefined : eventing.eventing,
     runEvaluationForTrace: runEvaluationForTrace as never,
     trackEvaluationRan,
     environment: {},
   });
+  const experiment = composeExperimentFeature({
+    infrastructure,
+    peers: {
+      workflowApp: workflow.app,
+      workflows: runtime.workflows,
+      datasets,
+      monitors,
+      evaluators,
+      agents: testAgents(),
+      modelProviders,
+      reportEvaluation: evaluation.reportEvaluation,
+    },
+    processName: "langwatch-api-test",
+    resolveClickHouseClient: clickhouse.resolveClient,
+    eventing: options.eventing === false ? undefined : eventing.eventing,
+    nlpServiceUrl: "http://127.0.0.1:5561",
+    publicBaseUrl: "https://app.example.test",
+  });
 
   const features = ApiTrpcFeaturesComposition.tryCompose({
-    composed: stubComposedFeatures(),
-    infrastructure: {
-      ...stubInfrastructureEntitlements(),
-      prisma: prisma.client,
-      authz: testAuthz(),
-      audit: new (class extends ApiAuditPort {
-        async record(): Promise<void> {}
-      })(),
-    },
-    collaborators: composeApiTrpcCollaborators(testHalves({ execution }), stubApplicationSlices()),
+    composed: { ...stubComposedFeatures(), workflow, experiment, evaluation },
+    infrastructure,
+    collaborators: composeApiTrpcCollaborators(testHalves(), {
+      ...stubApplicationSlices(),
+      workflows: workflow.app,
+      experiments: experiment.app,
+      evaluations: evaluation.app,
+    }),
   });
   if (!features) throw new Error("the record refused to compose against its collaborators");
 
@@ -442,7 +493,9 @@ function composeApplication(
 
   return {
     application,
-    execution,
+    workflow,
+    experiment,
+    evaluation,
     prisma,
     eventing,
     runEvaluationForTrace,
@@ -477,7 +530,7 @@ async function mutateTrpc(
   return { status: response.status, body: await response.json() };
 }
 
-describe("given the execution collaborators composed over this process's own graph", () => {
+describe("given the execution features composed over this process's own graph", () => {
   it("satisfies the record's typed obligation, so the namespaces mount", () => {
     const { application } = composeApplication();
 
@@ -538,8 +591,8 @@ describe("given the execution collaborators composed over this process's own gra
     it("registers the packaged evaluation pipeline as a producer", () => {
       const { eventing } = composeApplication();
 
-      // Two producer registrations, because this half composes two things that
-      // send commands: the re-score, and the workbench run loop beside it.
+      // Two producer registrations, because two things here send commands:
+      // the re-score, and the workbench run loop beside it.
       // `experiment_run_processing` has its own suite in
       // `api-experiment-run.composition.integration.test.ts`.
       const evaluation = eventing.registered.find(

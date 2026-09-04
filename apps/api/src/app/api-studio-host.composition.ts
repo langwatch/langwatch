@@ -26,7 +26,7 @@ import {
 import { HandledError } from "@langwatch/handled-error";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
-import { CollectorSpanUtils } from "@langwatch/trace-server";
+import { TraceCollectorSpanService } from "@langwatch/trace-server";
 import type { StudioClientEvent, StudioServerEvent } from "@langwatch/workflow-contract";
 import {
   HttpWorkflowStudioStreamAdapter,
@@ -157,8 +157,8 @@ class ApiComposedStudioHost extends ApiStudioHostPort {
     const trace = input.trace;
     await ingest.recordSpan({
       tenantId: input.projectId,
-      span: CollectorSpanUtils.convertSpanToOtlp(trace.span),
-      resource: CollectorSpanUtils.buildResource({
+      span: TraceCollectorSpanService.convertSpanToOtlp(trace.span),
+      resource: TraceCollectorSpanService.buildResource({
         reservedTraceMetadata: { user_id: trace.userId },
         customMetadata: trace.customMetadata,
       }),

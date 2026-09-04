@@ -49,7 +49,15 @@ import type { RedisConnection } from "@langwatch/redis-client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiAuditPort } from "../../api-request.policy";
 import { ApiApplication, MissingAgentService, MissingSecretService } from "../../api.application";
-import { composeApiExecutionCollaborators } from "../api-trpc-collaborators.execution.composition";
+import { composeDatasetService } from "../../features/dataset/dataset.composition";
+import { composeEvaluatorService } from "../../features/evaluator/evaluator.composition";
+import { composeMonitorService } from "../../features/monitor/monitor.composition";
+import { composeEvaluationFeature } from "../../features/evaluation/evaluation.composition";
+import { composeExperimentFeature } from "../../features/experiment/experiment.composition";
+import {
+  composeWorkflowFeature,
+  composeWorkflowRuntime,
+} from "../../features/workflow/workflow.composition";
 import {
   ApiTrpcFeaturesComposition,
   composeApiTrpcCollaborators,
@@ -315,32 +323,70 @@ function composeApplication(options: { redis?: RedisConnection | null } = {}) {
   const redis = options.redis === undefined ? testRedis() : null;
   const apiKeys = testApiKeys();
 
-  const execution = composeApiExecutionCollaborators({
+  const modelProviders = testModelProviders();
+  const infrastructure = {
+    ...stubInfrastructureEntitlements(),
     prisma: prisma.client,
+    authz: testAuthz(),
+    audit: new (class extends ApiAuditPort {
+      async record(): Promise<void> {}
+    })(),
+  };
+
+  const datasets = composeDatasetService({ infrastructure });
+  const runtime = composeWorkflowRuntime({
+    infrastructure,
+    peers: { datasets, modelProviders },
+    nlpServiceUrl: NLP_SERVICE_URL,
+    secretDecryptor: { decrypt: (value) => `decrypted:${value}` },
+  });
+  const evaluators = composeEvaluatorService({
+    infrastructure,
+    peers: { workflows: runtime.workflows, nlpRuntime: runtime.nlpRuntime },
+  });
+  const monitors = composeMonitorService({ infrastructure, peers: { evaluators } });
+  const workflow = composeWorkflowFeature({
+    infrastructure,
+    runtime,
+    peers: { datasets, evaluators, modelProviders },
+  });
+  const evaluation = composeEvaluationFeature({
+    infrastructure,
+    peers: { modelProviders, workflowRuntime: runtime },
     processName: "langwatch-api-test",
-    modelProviders: testModelProviders(),
-    agents: stub<AgentService>("agents"),
+    eventing: eventing.eventing,
+    environment: {},
+  });
+  const experiment = composeExperimentFeature({
+    infrastructure,
+    peers: {
+      workflowApp: workflow.app,
+      workflows: runtime.workflows,
+      datasets,
+      monitors,
+      evaluators,
+      agents: stub<AgentService>("agents"),
+      modelProviders,
+      reportEvaluation: evaluation.reportEvaluation,
+    },
+    processName: "langwatch-api-test",
     resolveClickHouseClient: null,
+    eventing: eventing.eventing,
     nlpServiceUrl: NLP_SERVICE_URL,
     publicBaseUrl: PUBLIC_BASE_URL,
-    secretDecryptor: { decrypt: (value) => `decrypted:${value}` },
-    eventing: eventing.eventing,
     redis: redis?.connection ?? options.redis ?? null,
     apiKeys: apiKeys.service,
-    environment: {},
   });
 
   const features = ApiTrpcFeaturesComposition.tryCompose({
-    composed: stubComposedFeatures(),
-    infrastructure: {
-      ...stubInfrastructureEntitlements(),
-      prisma: prisma.client,
-      authz: testAuthz(),
-      audit: new (class extends ApiAuditPort {
-        async record(): Promise<void> {}
-      })(),
-    },
-    collaborators: composeApiTrpcCollaborators(testHalves({ execution }), stubApplicationSlices()),
+    composed: { ...stubComposedFeatures(), workflow, experiment, evaluation },
+    infrastructure,
+    collaborators: composeApiTrpcCollaborators(testHalves(), {
+      ...stubApplicationSlices(),
+      workflows: workflow.app,
+      experiments: experiment.app,
+      evaluations: evaluation.app,
+    }),
   });
   if (!features) throw new Error("the record refused to compose against its collaborators");
 
@@ -359,7 +405,7 @@ function composeApplication(options: { redis?: RedisConnection | null } = {}) {
     },
   });
 
-  return { application, execution, prisma, eventing, redis, apiKeys };
+  return { application, experiment, prisma, eventing, redis, apiKeys };
 }
 
 async function callTrpc(
@@ -451,8 +497,8 @@ describe("given the workbench run loop composed over this process's own graph", 
       );
       vi.stubGlobal("fetch", fetchSpy);
 
-      const { execution, redis, eventing } = composeApplication();
-      const run = execution.experimentRun;
+      const { experiment, redis, eventing } = composeApplication();
+      const run = experiment.run;
       expect(run.ports).not.toBeNull();
       expect(run.progress).not.toBeNull();
 
@@ -522,17 +568,17 @@ describe("given the workbench run loop composed over this process's own graph", 
 
   describe("when the process composed no Redis", () => {
     it("mounts every namespace and refuses to START a run, naming the progress store", async () => {
-      const { application, execution } = composeApplication({ redis: null });
+      const { application, experiment } = composeApplication({ redis: null });
 
       const { status } = await callTrpc(application, "experiments.getAllByProjectId", {
         projectId: "project-1",
       });
       expect(status).toBe(200);
 
-      expect(execution.experimentRun.ports).toBeNull();
-      expect(execution.experimentRun.progress).toBeNull();
+      expect(experiment.run.ports).toBeNull();
+      expect(experiment.run.progress).toBeNull();
 
-      const refusal = await execution.experimentRun
+      const refusal = await experiment.run
         .startRun({
           projectId: "project-1",
           projectSlug: "support",

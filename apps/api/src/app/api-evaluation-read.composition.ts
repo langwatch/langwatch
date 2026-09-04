@@ -21,7 +21,7 @@ import {
   EvaluationExecutionPort,
   type EvaluationClickHouseResolver,
 } from "@langwatch/evaluation-server";
-import { createRetentionFloorService } from "@langwatch/trace-server";
+import { TraceRetentionFloorService } from "@langwatch/trace-server";
 import type { WorkflowService } from "@langwatch/workflow-contract";
 
 /** Names the refusal, so a stand-in says which process reached it. */
@@ -71,7 +71,7 @@ export function composeApiEvaluationReads(options: {
     // driver; this is the one place the two meet, and the worker's evaluation
     // reads join them the same way.
     resolveClickHouse: options.resolveClickHouseClient as unknown as EvaluationClickHouseResolver,
-    retentionFloor: createRetentionFloorService(options.dataRetention),
+    retentionFloor: TraceRetentionFloorService.create(options.dataRetention),
     execution: new UnavailableEvaluationExecution(options.processName),
     workflows: refusingWorkflows(options.processName),
   });

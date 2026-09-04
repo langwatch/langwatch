@@ -48,7 +48,8 @@ import type { MiddlewareHandler } from "hono";
 import type { EnterpriseGovernanceApplication } from "../features/enterprise/enterprise-governance.composition";
 import type { ComposedScenarioFeature } from "../features/scenario/scenario.composition";
 import type { ComposedAnalyticsFeature } from "../features/analytics/analytics.composition";
-import type { ApiExecutionCollaborators } from "./api-trpc-collaborators.execution.composition";
+import type { ComposedExperimentFeature } from "../features/experiment/experiment.composition";
+import type { ComposedWorkflowFeature } from "../features/workflow/workflow.composition";
 import type { ApiIdentityCollaborators } from "./api-trpc-collaborators.identity.composition";
 import type { ApiOrgGroupCollaborators } from "./api-trpc-collaborators.org-group.composition";
 import type { ComposedDatasetFeature } from "../features/dataset/dataset.composition";
@@ -100,7 +101,8 @@ export type ApiPackagedRestCompositionOptions = Readonly<{
   authzComposition: ApiAuthzComposition | undefined;
   credentials: ApiHandlerManagedCredentials;
   encryption: SecretEncryptionPort | undefined;
-  execution: ApiExecutionCollaborators | undefined;
+  experiment: ComposedExperimentFeature;
+  workflow: ComposedWorkflowFeature;
   /**
    * The Enterprise governance slices the `/api/governance` and
    * `/api/webhooks/v1` families are handed. Taken rather than reached for
@@ -217,7 +219,7 @@ export function composeApiPackagedRest(
       evaluators: () => options.evaluator.app,
       permissions: () => options.authz,
       roles: () => options.role.roles,
-      ...(options.execution ? { experiments: () => options.execution!.experiments } : {}),
+      ...(options.experiment.experiments ? { experiments: () => options.experiment.app } : {}),
       governance: () => options.enterpriseGovernance.governanceApp,
       webhooks: () => options.enterpriseGovernance.webhooks,
       ...(options.identity
@@ -245,9 +247,7 @@ export function composeApiPackagedRest(
       // registered no command queue: with nowhere to send the span, the door
       // would answer 200 to a rating it then dropped.
       ...(options.traceIngest ? { trackedEvents: trackedEventPortsFrom(options) } : {}),
-      ...(options.execution
-        ? { workflows: () => options.execution!.workflows.workflowService }
-        : {}),
+      ...(options.workflow.service ? { workflows: () => options.workflow.service! } : {}),
       ...(options.modelProviders ? { modelProviders: () => options.modelProviders! } : {}),
     },
     ports: {

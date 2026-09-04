@@ -35,6 +35,9 @@ import type { ComposedDataRetentionFeature } from "../features/data-retention/da
 import type { ComposedMonitorFeature } from "../features/monitor/monitor.composition";
 import type { ComposedScenarioFeature } from "../features/scenario/scenario.composition";
 import type { ComposedStoredObjectFeature } from "../features/stored-object/stored-object.composition";
+import type { ComposedWorkflowFeature } from "../features/workflow/workflow.composition";
+import type { ComposedExperimentFeature } from "../features/experiment/experiment.composition";
+import type { ComposedEvaluationFeature } from "../features/evaluation/evaluation.composition";
 
 export type ComposedApiFeatures = Readonly<{
   /** Six namespaces, one `ctx.app` slice and two REST families over one application. */
@@ -121,4 +124,21 @@ export type ComposedApiFeatures = Readonly<{
    * and the content-addressed byte store the scenario-event door writes through.
    */
   storedObject: ComposedStoredObjectFeature;
+  /**
+   * Two namespaces and the `ctx.app.workflows` application the packaged
+   * workflow REST family reads. Here rather than in the record's literal for
+   * that last reason.
+   */
+  workflow: ComposedWorkflowFeature;
+  /**
+   * One namespace, the `ctx.app.experiments` application, and the RUN LOOP the
+   * three REST run doors dispatch through.
+   */
+  experiment: ComposedExperimentFeature;
+  /**
+   * One namespace, the `ctx.app.evaluations` slice, and the ONE
+   * `evaluation_processing` producer every re-score and every workbench cell
+   * reports on.
+   */
+  evaluation: ComposedEvaluationFeature;
 }>;

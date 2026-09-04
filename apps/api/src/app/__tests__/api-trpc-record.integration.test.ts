@@ -314,7 +314,7 @@ describe("given an API process composed with the packaged tRPC record", () => {
       })();
 
       const composed = composeApiTrpcCollaborators(
-        testHalves({ execution: undefined }),
+        testHalves({ orgGroup: undefined }),
         stubApplicationSlices(),
         report,
       );
@@ -322,7 +322,7 @@ describe("given an API process composed with the packaged tRPC record", () => {
       expect(composed).toBeUndefined();
       // Named by half: "the record did not mount" is a symptom every half
       // shares, and the name is what an operator can act on.
-      expect(reported[0]).toEqual(["execution"]);
+      expect(reported[0]).toEqual(["orgGroup"]);
     });
   });
 

@@ -68,11 +68,13 @@ import { readAgentPresence } from "@langwatch/agent-server";
 import { ApiUpgradeRouter } from "../api-upgrade-router";
 import {
   composeDatasetFeature,
+  composeDatasetService,
   refusingDatasetFeature,
   type ComposedDatasetFeature,
 } from "../features/dataset/dataset.composition";
 import {
   composeEvaluatorFeature,
+  composeEvaluatorService,
   refusingEvaluatorFeature,
   type ComposedEvaluatorFeature,
 } from "../features/evaluator/evaluator.composition";
@@ -103,10 +105,23 @@ import {
   LoggedApiIdentityPipelinesAbsence,
 } from "./api-identity-pipelines.composition";
 import {
-  composeApiExecutionCollaborators,
-  ExecutionCapabilityUnavailableError,
-  type ApiExecutionCollaborators,
-} from "./api-trpc-collaborators.execution.composition";
+  composeWorkflowFeature,
+  composeWorkflowRuntime,
+  refusingWorkflowFeature,
+  type ApiWorkflowRuntime,
+  type ComposedWorkflowFeature,
+} from "../features/workflow/workflow.composition";
+import {
+  composeExperimentFeature,
+  refusingExperimentFeature,
+  type ComposedExperimentFeature,
+} from "../features/experiment/experiment.composition";
+import {
+  composeEvaluationFeature,
+  ApiEvaluationUnavailableError,
+  refusingEvaluationFeature,
+  type ComposedEvaluationFeature,
+} from "../features/evaluation/evaluation.composition";
 import {
   composeApiEvaluatorExecution,
   LoggedApiEvaluatorExecutionAbsence,
@@ -170,6 +185,7 @@ import {
 } from "../features/data-retention/data-retention.composition";
 import {
   composeMonitorFeature,
+  composeMonitorService,
   LoggedApiMonitorAbsence,
   refusingMonitorFeature,
   type ComposedMonitorFeature,
@@ -219,6 +235,7 @@ import { canonicalErrorFor } from "./api-canonical-error";
 import { PostgresGithubAdapter } from "@langwatch/github-server";
 import type { GithubService } from "@langwatch/github-contract";
 import { PostgresMonitorAdapter } from "@langwatch/monitor-server";
+import type { DatasetService } from "@langwatch/dataset-contract";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import { EvaluationNameAutoslugService } from "@langwatch/evaluation-server";
@@ -681,7 +698,19 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * built beside this one would resolve senders out of a second registry.
    */
   private composedIdentityEventing: ApiEventingIdentityAdapter | undefined;
-  private composedExecution: ApiExecutionCollaborators | undefined;
+  /**
+   * The four things the execution features are built from and hand to each
+   * other, held because a feature composed later reads one: the studio graph
+   * and its engine, the ONE dataset service, the ONE evaluator service, and
+   * the monitor service an experiment upserts through.
+   */
+  private composedWorkflowRuntime: ApiWorkflowRuntime | undefined;
+  private composedDatasets: DatasetService | undefined;
+  private composedEvaluators: EvaluatorService | undefined;
+  private composedExecutionMonitors: MonitorService | undefined;
+  private composedWorkflow!: ComposedWorkflowFeature;
+  private composedExperiment!: ComposedExperimentFeature;
+  private composedEvaluation!: ComposedEvaluationFeature;
   private composedTrace!: ComposedTraceFeature;
   private composedShare!: ComposedShareFeature;
   private composedTopic!: ComposedTopicFeature;
@@ -970,18 +999,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // through and the SAME organization service the REST doors serve from —
     // a second of either would be a second answer to who somebody is.
     this.composedIdentity = this.composeIdentity(options, auth, tenancy, queueInfrastructure);
-    // The execution half: the studio's own lifecycle, the optimization panel,
-    // the experiment wizard and workbench, and the evaluator surfaces. One
-    // workflow service serves all four plus the evaluator service built over
-    // it, and the evaluation re-score reports through a PRODUCER-only
-    // registration of the same pipeline the worker drains.
-    this.composedExecution = this.composeExecution(
-      options,
-      agents,
-      encryption,
-      tenancy,
-      queueInfrastructure,
-    );
     // The product half: a reviewer's annotations, the support inbox, the
     // project's privacy rules and its setup checklist. It composes FIRST
     // because it is the one half that cannot be missing on a process holding a
@@ -1011,6 +1028,19 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
           audit: this.options.audit,
         }
       : undefined;
+    // The execution features: the studio's own lifecycle, the optimization
+    // panel, the experiment wizard and its run loop, and the re-score. One
+    // workflow service serves all of them plus the evaluator service built
+    // over it, and the re-score reports through a PRODUCER-only registration
+    // of the same pipeline the worker drains.
+    this.composeExecutionFeatures(
+      options,
+      agents,
+      encryption,
+      tenancy,
+      queueInfrastructure,
+      infrastructure,
+    );
     // The three services the trace application is built over, each composed by
     // the feature that owns it: the retention window a read's floor is widened
     // to, the ledger an anonymous read redeems its token against, and the tree
@@ -1145,7 +1175,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // used to ride inside the product-group half; each takes only the shared
     // infrastructure and the peers it names.
     this.composedDataset =
-      infrastructure && this.composedExecution
+      infrastructure && this.composedDatasets
         ? composeDatasetFeature({
             infrastructure,
             peers: {
@@ -1153,18 +1183,18 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
               // the workflow and experiment applications read them through the
               // same one, and two would let `dataset.getAll` disagree with an
               // experiment's own row read.
-              datasets: this.composedExecution.datasets,
-              experimentLookup: this.composedExecution.experimentLookup,
+              datasets: this.composedDatasets,
+              experimentLookup: this.composedExperiment.experimentLookup,
             },
           })
         : refusingDatasetFeature();
     this.composedEvaluator =
-      infrastructure && this.composedExecution
+      infrastructure && this.composedEvaluators
         ? composeEvaluatorFeature({
             infrastructure,
             peers: {
-              evaluators: this.composedExecution.evaluators,
-              workflows: this.composedExecution.workflows,
+              evaluators: this.composedEvaluators,
+              workflows: this.composedWorkflow.app,
               ...(this.composedModelProviders
                 ? { modelProviders: this.composedModelProviders }
                 : {}),
@@ -1289,6 +1319,9 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         share: this.composedShare,
         topic: this.composedTopic,
         trace: this.composedTrace,
+        workflow: this.composedWorkflow,
+        experiment: this.composedExperiment,
+        evaluation: this.composedEvaluation,
       },
       // One literal, checked against the real type each half returns. A
       // process missing any of the eight composes none of the record — see
@@ -1296,7 +1329,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       collaborators: composeApiTrpcCollaborators(
         {
           identity: this.composedIdentity,
-          execution: this.composedExecution,
           orgGroup: this.composedOrgGroup,
         },
         // The `ctx.app` slices no half owns: the gateway's own application, the
@@ -1312,6 +1344,9 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
           share: this.composedShare.service,
           topics: this.composedTopic.service,
           traces: this.composedTrace.traces,
+          workflows: this.composedWorkflow.app,
+          experiments: this.composedExperiment.app,
+          evaluations: this.composedEvaluation.app,
           authzApp: this.composedRole.authzApp,
           dashboard: this.composedAnalytics.dashboard,
           dataset: this.composedDataset.app,
@@ -1565,7 +1600,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // The execution half opens AFTER the agent service, so the Workflow
       // application is resolved at the copy rather than captured here.
       workflowCopies: ApiAgentWorkflowCopyAdapter.create({
-        workflows: () => this.composedExecution?.workflows.workflowService,
+        workflows: () => this.composedWorkflowRuntime?.workflows,
         processName: options.config.serviceName,
       }),
       report: LoggedApiAgentsAbsence.create(logger),
@@ -1865,11 +1900,12 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // built through the SAME decision the `httpProxy.*` surface's is, so an
     // absent engine address means the same thing on both.
     const modelProviders = this.composedModelProviders;
+    const workflowService = this.composedWorkflow.service;
     const authoring = composeApiAuthoringRest({
       session: authoringSession,
       modelProviders,
       projects,
-      workflows: this.composedExecution?.workflows,
+      workflows: workflowService ? this.composedWorkflow.app : undefined,
       studioDispatch: modelProviders
         ? composeApiWorkflowStudioDispatch({ nlpServiceUrl, modelProviders })
         : undefined,
@@ -1882,15 +1918,16 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // doors are the browser's) and the execution half; the run loop's own
     // absence is answered inside the family, so a deployment with no progress
     // store still reads and writes a saved setup.
-    const execution = this.composedExecution;
+    const experimentRun = this.composedExperiment.run;
+    const experimentService = this.composedExperiment.experiments;
     const experimentWorkbench =
-      authoringSession && execution
+      authoringSession && experimentService
         ? {
             session: authoringSession,
             credential: (input: { request: Request; permission: AuthzPermission }) =>
               handlerManagedCredentials.authenticate(input),
-            experiments: () => execution.experiments,
-            run: execution.experimentRun,
+            experiments: () => this.composedExperiment.app,
+            run: experimentRun,
           }
         : undefined;
     // The ONE find-or-create rule on this process. Constructed here and handed
@@ -1898,8 +1935,8 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // call and the batch result log — because an SDK that got one experiment
     // from the first and a second from the other would split one run's results
     // across two rows nothing downstream can rejoin.
-    const experimentFindOrCreate = execution
-      ? composeApiExperimentFindOrCreate(execution.experiments.experimentService)
+    const experimentFindOrCreate = experimentService
+      ? composeApiExperimentFindOrCreate(experimentService)
       : undefined;
     const experimentInit = experimentFindOrCreate
       ? {
@@ -1911,11 +1948,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // The three synchronous run URLs, over the SAME graph service the
     // workbench's own cells dispatch through — so a run started over REST and
     // one started as an experiment cell resolve one published version, not two.
-    const workflowRun = execution
+    const workflowRun = experimentService
       ? {
           credential: (input: { request: Request; permission: AuthzPermission }) =>
             handlerManagedCredentials.authenticate(input),
-          workflows: () => execution.experimentRun.workflows,
+          workflows: () => experimentRun.workflows,
         }
       : undefined;
     // The five subsystem probes. Every one of them posts a canary back through
@@ -1930,7 +1967,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // narrowing after it keeps the door exactly as wide as it was.
     const automationApp = this.composedOrgGroup?.application.automation;
     const healthProbes =
-      publicBaseUrl && automationApp && execution
+      publicBaseUrl && automationApp && workflowService
         ? {
             resolveProjectByApiKey: async (token: string) => {
               const resolved = await tenancy.apiKeys.tryResolveToken({ token });
@@ -1940,7 +1977,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
             automation: () => automationApp,
             workflowExists: async (input: { workflowId: string; projectId: string }) => {
               try {
-                await execution.workflows.getById({
+                await workflowService.getById({
                   id: input.workflowId,
                   projectId: input.projectId,
                 });
@@ -2014,19 +2051,19 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // the execution fold's own `reportEvaluation`, which is the same command
     // the workbench's re-scores travel on; without it the collector still
     // records spans and counts the evaluations as rejected by name.
-    const reportEvaluation = this.composedExecution?.evaluations.reportEvaluation;
+    const reportEvaluation = this.composedEvaluation.reportEvaluation;
     // The batch result log's three collaborators. All three travel together
     // because they are ONE write: the rows are a run's history, addressed by
     // the experiment the first of them resolved and scored by the verdict
     // command the third sends. A door holding two of the three would answer
     // 200 to results that land nowhere a customer can read them back.
     const evaluationBatch =
-      execution && experimentFindOrCreate && reportEvaluation
+      experimentFindOrCreate && experimentService && reportEvaluation
         ? {
             findOrCreate: experimentFindOrCreate,
             // The SAME service the workbench's own cells write a run through,
             // so an SDK's batch and a workbench run produce one history.
-            experiments: () => execution.experiments.experimentService,
+            experiments: () => experimentService,
             reportEvaluation: (input: Record<string, unknown>) => reportEvaluation(input as never),
           }
         : undefined;
@@ -2041,12 +2078,17 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     const evaluatorExecution = this.resolveEvaluatorExecution();
     const evaluationDatabase = this.composedDatabase?.connection;
     const evaluationRun =
-      execution && evaluationDatabase && modelProviders && evaluatorExecution && reportEvaluation
+      this.composedEvaluators &&
+      experimentService &&
+      evaluationDatabase &&
+      modelProviders &&
+      evaluatorExecution &&
+      reportEvaluation
         ? {
             prisma: evaluationDatabase.client,
             execution: evaluatorExecution,
-            evaluators: execution.evaluators,
-            experiments: execution.experiments.experimentService,
+            evaluators: this.composedEvaluators,
+            experiments: experimentService,
             modelProviders,
             reportEvaluation: (input: Record<string, unknown>) => reportEvaluation(input as never),
             deriveEvaluatorId: (name: string) => this.evaluatorIdSlug.derive(name),
@@ -2083,12 +2125,12 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // provider gateway the rules live behind, over the SAME service the
     // provider surface reads them through.
     const dspySteps =
-      execution && experimentFindOrCreate && modelProviders
+      experimentFindOrCreate && experimentService && modelProviders
         ? {
             authenticateCredential: (input: { request: Request; permission: AuthzPermission }) =>
               handlerManagedCredentials.authenticate(input),
             findOrCreate: () => experimentFindOrCreate,
-            experiments: () => execution.experiments.experimentService,
+            experiments: () => experimentService,
             listModelCosts: async (input: { projectId: string }) =>
               (await modelProviders.listCosts(input)).map((cost) => ({
                 model: cost.model,
@@ -2165,7 +2207,8 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       authzComposition: this.composedAuthz,
       credentials: handlerManagedCredentials,
       encryption: this.composedEncryption,
-      execution,
+      experiment: this.composedExperiment,
+      workflow: this.composedWorkflow,
       // The two Enterprise governance slices the REST families are handed —
       // the SAME ones `ctx.app` carries, so the two doors cannot answer
       // differently.
@@ -3102,13 +3145,14 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * answer to what copying an evaluator does to the graph behind it.
    */
   private composeMonitor(options: ApiRuntimeCompositionOptions): ComposedMonitorFeature {
-    const execution = this.composedExecution;
-    if (!execution) return refusingMonitorFeature();
+    const monitors = this.composedExecutionMonitors;
+    const evaluators = this.composedEvaluators;
+    if (!monitors || !evaluators) return refusingMonitorFeature();
 
     return composeMonitorFeature({
       peers: {
-        monitors: execution.monitors,
-        evaluators: execution.evaluators,
+        monitors,
+        evaluators,
         // The evaluator feature's own ports: a monitor copy carries its
         // evaluator and that evaluator's workflow with it, and a second
         // replication would be a second answer to what copying one does.
@@ -3197,11 +3241,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // prefetcher below take services rather than optionals: a silent
     // `undefined` in its place would compose a run preparer against half a
     // graph.
-    const execution = this.composedExecution;
+    const workflows = this.composedWorkflowRuntime?.workflows;
     const modelProviders = this.composedModelProviders;
     const secrets = this.secrets;
     const traces = this.composedTrace.traceReads?.readers().tree;
-    if (!execution || !modelProviders || !secrets || !traces) return refusingScenarioFeature();
+    if (!workflows || !modelProviders || !secrets || !traces) return refusingScenarioFeature();
 
     return composeScenarioFeature({
       prisma: database.client,
@@ -3214,7 +3258,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // parameters are decrypted from, and the trace reads an HTTP target's
       // ingest wait is measured on.
       scenarioExecution: {
-        workflows: execution.workflows.workflowService,
+        workflows,
         modelProviders,
         secrets,
         traces,
@@ -3471,7 +3515,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // The evaluator service the execution half composed, for the monitor
     // directory below: taken rather than built so a monitor's evaluator and
     // the `evaluators.*` surface cannot disagree about what one runs.
-    const evaluators = this.composedExecution?.evaluators;
+    const evaluators = this.composedEvaluators;
     if (!database || !tenancy || !evaluators) return undefined;
 
     return composeApiOrgGroupCollaborators({
@@ -3612,7 +3656,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   ): ComposedGatewayFeature {
     const database = this.composedDatabase?.connection;
     const tenancy = this.composedTenancy;
-    const evaluators = this.composedExecution?.evaluators;
+    const evaluators = this.composedEvaluators;
 
     // A host's ledger wins: a process handed the product graph already holds
     // one, and a second over the same receipt table would be a second takeover
@@ -3927,42 +3971,101 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * a process with no Redis mounts every namespace and refuses only to START a
    * run, by name.
    */
-  private composeExecution(
+  private composeExecutionFeatures(
     options: ApiRuntimeCompositionOptions,
     agents: AgentService | undefined,
     encryption: SecretEncryptionPort | undefined,
     tenancy: ApiResolvedTenancy,
     queueInfrastructure: ApiQueueInfrastructure | undefined,
-  ): ApiExecutionCollaborators | undefined {
+    infrastructure: ApiTrpcInfrastructure | undefined,
+  ): void {
     const database = this.composedDatabase?.connection;
     const modelProviders = this.resolveModelProviders(options, encryption);
     // Held so the product-group half reads the SAME gateway rather than
     // composing a second: a stored prompt version's model reference and a
     // studio node's model must resolve to one provider, not to two.
     this.composedModelProviders = modelProviders;
-    if (!database || !agents || !modelProviders) {
+    if (!database || !agents || !modelProviders || !infrastructure) {
       LoggedApiExecutionAbsence.create(createLogger(options.config.serviceName)).absent({
         database: Boolean(database),
         agents: Boolean(agents),
         modelProviders: Boolean(modelProviders),
       });
-      return undefined;
+      this.composedWorkflow = refusingWorkflowFeature();
+      this.composedExperiment = refusingExperimentFeature();
+      this.composedEvaluation = refusingEvaluationFeature();
+      return;
     }
 
-    return composeApiExecutionCollaborators({
-      prisma: database.client,
+    // The order below is the graph's own: a dataset is read by the studio, the
+    // studio's service is what an evaluator publishes through, an evaluator is
+    // what a monitor runs, and an experiment reaches all four.
+    const datasets = composeDatasetService({ infrastructure });
+    this.composedDatasets = datasets;
+    const workflowRuntime = composeWorkflowRuntime({
+      infrastructure,
+      peers: { datasets, modelProviders },
+      nlpServiceUrl: options.config.infrastructure.execution.nlpServiceUrl,
+      secretDecryptor: encryption,
+    });
+    this.composedWorkflowRuntime = workflowRuntime;
+    const evaluators = composeEvaluatorService({
+      infrastructure,
+      peers: { workflows: workflowRuntime.workflows, nlpRuntime: workflowRuntime.nlpRuntime },
+    });
+    this.composedEvaluators = evaluators;
+    const monitors = composeMonitorService({ infrastructure, peers: { evaluators } });
+    this.composedExecutionMonitors = monitors;
+
+    this.composedWorkflow = composeWorkflowFeature({
+      infrastructure,
+      runtime: workflowRuntime,
+      peers: { datasets, evaluators, modelProviders },
+    });
+
+    // The re-score and the pipeline producer, composed before the experiment
+    // feature because the workbench's own cells report on the SAME sender.
+    this.composedEvaluation = composeEvaluationFeature({
+      infrastructure,
+      peers: { modelProviders, workflowRuntime },
       processName: options.config.serviceName,
-      modelProviders,
-      agents,
+      eventing: this.composedEventing?.eventSourcing,
+      // The studio's own re-score, over the process's ONE evaluator runtime.
+      // Resolved at the call rather than passed as a value because the runtime
+      // is built FROM this evaluator service and the trace read stack: at this
+      // line neither exists yet, and at the call both do. An absent runtime
+      // still refuses by name, one layer down.
+      runEvaluationForTrace: (_ctx, input) =>
+        this.requireEvaluatorExecution().runEvaluationForTrace({
+          projectId: input.projectId,
+          traceId: input.traceId,
+          evaluatorType: input.evaluatorType,
+          settings: input.settings,
+          mappings: input.mappings,
+        }),
+    });
+
+    this.composedExperiment = composeExperimentFeature({
+      infrastructure,
+      peers: {
+        workflowApp: this.composedWorkflow.app,
+        workflows: workflowRuntime.workflows,
+        datasets,
+        monitors,
+        evaluators,
+        agents,
+        modelProviders,
+        reportEvaluation: this.composedEvaluation.reportEvaluation,
+      },
+      processName: options.config.serviceName,
       // The SAME ClickHouse the charted reads run on, opened once by
       // {@link composeAnalytics}: an experiment's run history and an
       // evaluation's analytics are rows in that same routed instance, and a
       // second connection would be a second pool against one server.
       resolveClickHouseClient: this.composedClickHouse?.resolveClient ?? null,
+      eventing: this.composedEventing?.eventSourcing,
       nlpServiceUrl: options.config.infrastructure.execution.nlpServiceUrl,
       publicBaseUrl: options.config.infrastructure.execution.publicBaseUrl,
-      secretDecryptor: encryption,
-      eventing: this.composedEventing?.eventSourcing,
       // The SAME Redis the queue owns, which the workbench run's abort flag
       // and its progress both live in: a stop asked for on one replica has to
       // reach the loop running on another, and a poll has to find the run
@@ -3972,22 +4075,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // and verified through: a run's sandbox key is a narrower key, not a
       // second kind of key.
       apiKeys: tenancy.apiKeys,
-      // The studio's own re-score, over the process's ONE evaluator runtime.
-      // Resolved at the call rather than passed as a value because the runtime
-      // is built FROM this half's evaluator service and the observability
-      // half's trace reads: at this line neither exists yet, and at the call
-      // both do. Absent runtime still refuses by name, one layer down.
-      runEvaluationForTrace: (_ctx, input) =>
-        this.requireEvaluatorExecution().runEvaluationForTrace({
-          projectId: input.projectId,
-          traceId: input.traceId,
-          evaluatorType: input.evaluatorType,
-          settings: input.settings,
-          mappings: input.mappings,
-        }),
-      experimentRunReport: LoggedApiExperimentRunAbsence.create(
-        createLogger(options.config.serviceName),
-      ),
+      runReport: LoggedApiExperimentRunAbsence.create(createLogger(options.config.serviceName)),
     });
   }
 
@@ -4003,16 +4091,17 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     if (this.resolvedEvaluatorExecution) return this.composedEvaluatorExecution;
     this.resolvedEvaluatorExecution = true;
 
-    const execution = this.composedExecution;
+    const evaluators = this.composedEvaluators;
+    const workflows = this.composedWorkflowRuntime?.workflows;
     const modelProviders = this.composedModelProviders;
-    if (!execution || !modelProviders) return undefined;
+    if (!evaluators || !workflows || !modelProviders) return undefined;
 
     this.composedEvaluatorExecution = composeApiEvaluatorExecution({
       // The observability half opens after the execution half, so the read
       // stack is resolved at the call rather than captured here.
       traceReads: () => this.composedTrace.traceReads?.readers().read,
-      evaluators: execution.evaluators,
-      workflows: execution.workflows.workflowService,
+      evaluators,
+      workflows,
       modelProviders,
       langevalsEndpoint: this.evaluatorLangevalsEndpoint,
       processName: this.evaluatorProcessName,
@@ -4032,7 +4121,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private requireEvaluatorExecution(): ApiEvaluatorExecution {
     const execution = this.resolveEvaluatorExecution();
     if (!execution) {
-      throw new ExecutionCapabilityUnavailableError(
+      throw new ApiEvaluationUnavailableError(
         "evaluator runtime, so it cannot score a trace on demand",
       );
     }

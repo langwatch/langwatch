@@ -15,6 +15,7 @@
 import type { DatasetService } from "@langwatch/dataset-contract";
 import {
   DatasetApp,
+  PostgresDatasetAdapter,
   type BatchRecordTrpcPorts,
   type DatasetExperimentLookup,
   type DatasetTrpcPorts,
@@ -25,6 +26,20 @@ import type { ApiTrpcFeatureMount } from "../../api.application";
 import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context";
 import type { ApiTrpcInfrastructure } from "../../app-trpc/app-trpc.infrastructure";
 import { createBatchRecordTrpcRouter, createDatasetTrpcRouter } from "./dataset-trpc.mount";
+
+/**
+ * The ONE dataset service on this process.
+ *
+ * Composed on its own and before the feature, because a project's rows are one
+ * set: the studio's node reads, the experiment's run load and `dataset.*`
+ * itself all answer from this service, and a second one over the same table
+ * would let them disagree about what a dataset contains.
+ */
+export function composeDatasetService(options: {
+  infrastructure: ApiTrpcInfrastructure;
+}): DatasetService {
+  return PostgresDatasetAdapter.create({ database: options.infrastructure.prisma }).build();
+}
 
 /** The other features' services the dataset surface reaches, named one by one. */
 export type DatasetPeers = Readonly<{

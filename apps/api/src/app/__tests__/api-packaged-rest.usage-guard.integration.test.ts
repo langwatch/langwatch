@@ -23,6 +23,8 @@ import { refusingDatasetFeature } from "../../features/dataset/dataset.compositi
 import { refusingEvaluatorFeature } from "../../features/evaluator/evaluator.composition";
 import { refusingMonitorFeature } from "../../features/monitor/monitor.composition";
 import { refusingRoleFeature } from "../../features/role/role.composition";
+import { refusingExperimentFeature } from "../../features/experiment/experiment.composition";
+import { refusingWorkflowFeature } from "../../features/workflow/workflow.composition";
 import { refusingScenarioFeature } from "../../features/scenario/scenario.composition";
 import { refusingStoredObjectFeature } from "../../features/stored-object/stored-object.composition";
 
@@ -54,7 +56,8 @@ function composeGuard(usageLimit: ApiTraceIngestComposition["usageLimit"] | unde
     authzComposition: undefined,
     credentials: { authenticate: async () => null } as never,
     encryption: undefined,
-    execution: undefined,
+    experiment: refusingExperimentFeature(),
+    workflow: refusingWorkflowFeature(),
     enterpriseGovernance: composeEnterpriseGovernanceApplication(undefined),
     identity: undefined,
     orgGroup: undefined,
