@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/langwatch/langwatch/pkg/health"
+	"github.com/langwatch/langwatch/services/nlpgo/adapters/engineexec"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/httpapi"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine"
@@ -71,7 +72,7 @@ func setupEvaluatorStack(t *testing.T, langwatch http.HandlerFunc) (url string, 
 		LangWatchBaseURL: lwSrv.URL,
 	})
 
-	application := app.New(app.WithWorkflowExecutor(executorAdapter{eng: eng}))
+	application := app.New(app.WithWorkflowExecutor(engineexec.New(eng)))
 	probes := health.New("test")
 	probes.MarkStarted()
 	router := httpapi.NewRouter(httpapi.RouterDeps{

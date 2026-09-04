@@ -33,6 +33,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/health"
 	"github.com/langwatch/langwatch/services/aigateway/dispatcher"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/dispatcheradapter"
+	"github.com/langwatch/langwatch/services/nlpgo/adapters/engineexec"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/httpapi"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/llmexecutor"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
@@ -66,7 +67,7 @@ func setupVisionStack(t *testing.T) *stack {
 		SSRF: httpblock.SSRFOptions{AllowedHosts: []string{"127.0.0.1"}},
 	})
 
-	executor := liveExecutorAdapter{eng: eng}
+	executor := engineexec.New(eng)
 	application := app.New(app.WithWorkflowExecutor(executor))
 	probes := health.New("test")
 	probes.MarkStarted()
