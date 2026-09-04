@@ -293,6 +293,7 @@ describe.skipIf(!databaseUrl)("GitHub pull-request mapping persistence", () => {
     });
   });
 
+  /** @scenario "A pull request found for a project's session records it on the project" */
   it("persists every discovered pull request and records activity only for the project whose session demanded it", async () => {
     const { github, http, projects } = harness();
     http.setPulls([
@@ -349,6 +350,22 @@ describe.skipIf(!databaseUrl)("GitHub pull-request mapping persistence", () => {
       notFoundAt: expect.any(Date),
       recheckAfter: expect.any(Date),
     });
+  });
+
+  /** @scenario "A branch with no pull request records nothing on the project" */
+  it("records no project activity when a branch's listing comes back empty", async () => {
+    const { github, http, projects } = harness();
+    http.setPulls([]);
+
+    await github.requestBranchMapping({
+      tenantId: projectId,
+      repositoryHost: "github.com",
+      repositoryOwner: `acme-${namespace}`,
+      repositoryName: "widgets",
+      headBranch: "feat/no-pr",
+    });
+
+    expect(projects.pullRequestActivity).toHaveLength(0);
   });
 
   it("records a rate limit as a retryable backoff rather than a branch with no pull request", async () => {
@@ -620,6 +637,7 @@ describe.skipIf(!databaseUrl)("GitHub pull-request mapping persistence", () => {
     await expect(branchCheck("feat/public-host", host)).resolves.toBeNull();
   });
 
+  /** @scenario "A pull request announced over the webhook records nothing on any project" */
   it("does not attribute an empty listing or a webhook-only pull request to a project", async () => {
     const { github, http, projects } = harness();
     http.setPulls([]);

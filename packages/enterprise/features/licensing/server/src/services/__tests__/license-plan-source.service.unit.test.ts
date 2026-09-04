@@ -46,6 +46,7 @@ function planSourceFor(licenseKey: string | null): LicensePlanSourceService {
 
 describe("given the plan a signed licence entitles an organization to", () => {
   describe("when the organization activated no licence", () => {
+    /** @scenario "A deployment that never had a license stays uncapped" */
     it("answers the unlimited baseline on both readings, so nothing narrows an unlicensed deployment", async () => {
       const plans = planSourceFor(null);
 
@@ -55,6 +56,7 @@ describe("given the plan a signed licence entitles an organization to", () => {
   });
 
   describe("when the stored licence was tampered with", () => {
+    /** @scenario "A license we did not sign is still not a license" */
     it("answers the unlimited baseline rather than the plan the payload claims", async () => {
       const plans = planSourceFor(TAMPERED_LICENSE_KEY);
 
@@ -85,8 +87,6 @@ describe("given the plan a signed licence entitles an organization to", () => {
      * company's Enterprise surface on a routine upgrade is a blast radius the
      * product does not have.
      */
-    /** @scenario "Preserve a lapsed self-hosted purchase" */
-    /** @scenario "Let a lapsed Cloud override step aside" */
     it("steps aside on the hosted reading and still holds on the self-hosted one", async () => {
       const plans = planSourceFor(EXPIRED_ENTERPRISE_LICENSE_KEY);
 
@@ -102,7 +102,7 @@ describe("given the plan a signed licence entitles an organization to", () => {
 
 describe("given the licence leg a deployment composes", () => {
   describe("when the deployment is the hosted one", () => {
-    /** @scenario "Let a lapsed Cloud override step aside" */
+    /** @scenario "On Cloud a lapsed license steps aside for the subscription" */
     it("reads the licence on the hosted terms, so a lapsed contract stops answering", async () => {
       const source = LicensingEntitlementSource.forDeployment({
         licenses: StoredLicense.of(EXPIRED_ENTERPRISE_LICENSE_KEY),
@@ -121,7 +121,7 @@ describe("given the licence leg a deployment composes", () => {
      * lapsed self-hosted licence cannot keep its seats in one process and lose
      * them in the other.
      */
-    /** @scenario "Preserve a lapsed self-hosted purchase" */
+    /** @scenario "A lapsed license keeps metering the seats it sold" */
     it("reads the licence on the self-hosted terms and floors it at the open-source baseline", async () => {
       const source = LicensingEntitlementSource.forDeployment({
         licenses: StoredLicense.of(EXPIRED_ENTERPRISE_LICENSE_KEY),
@@ -135,6 +135,19 @@ describe("given the licence leg a deployment composes", () => {
         // does not, because self-hosted volume is never metered.
         maxMembers: 100,
         maxMessagesPerMonth: UNLIMITED_PLAN.maxMessagesPerMonth,
+      });
+    });
+
+    /** @scenario "A lapsed license keeps the capabilities it bought" */
+    it("keeps the Enterprise identity on the self-hosted reading of a lapsed licence", async () => {
+      const source = LicensingEntitlementSource.forDeployment({
+        licenses: StoredLicense.of(EXPIRED_ENTERPRISE_LICENSE_KEY),
+        cryptography,
+        isSaas: false,
+      });
+
+      await expect(source.resolve({ organizationId: "org-1" })).resolves.toMatchObject({
+        type: "ENTERPRISE",
       });
     });
 

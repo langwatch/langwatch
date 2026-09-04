@@ -714,6 +714,7 @@ describe("LangyTurnRelay", () => {
       });
     });
 
+    /** @scenario "An id the project cannot resolve drops silently" */
     it("drops the navigate when the fallback cannot resolve the id in this project", async () => {
       const resolveResourceUrl = vi.fn(async () => null);
       const { relay, buffer } = makeRelay({ resolveResourceUrl });

@@ -120,6 +120,16 @@ describe("SsoGateService", () => {
     );
   });
 
+  /** @scenario "Denied SSO is explained in the server logs" */
+  it("logs that SSO is configured but no genuine license was found", async () => {
+    await create().platformAllowed();
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      {},
+      expect.stringContaining("SSO is configured but no genuine license was found"),
+    );
+  });
+
   /** @scenario "A tampered license does not enable SSO" */
   it("rejects a tampered license and explains the failed signature", async () => {
     licensing.inspectPlatformAccess.mockResolvedValue({

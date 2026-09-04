@@ -185,6 +185,25 @@ describe("LicenseService", () => {
     expect(repository.listCalls).toBe(1);
   });
 
+  /** @scenario "One organization's genuine license enables SSO for the whole deployment" */
+  it("allows platform access when only the second scanned organization holds a genuine license", async () => {
+    repository.organizations.add("org_other");
+    repository.stored.set("org_other", {
+      licenseKey: TAMPERED_LICENSE_KEY,
+      expiresAt: new Date("2030-01-01T00:00:00.000Z"),
+      validatedAt: new Date("2026-01-01T00:00:00.000Z"),
+    });
+    repository.stored.set(ORGANIZATION_ID, {
+      licenseKey: VALID_LICENSE_KEY,
+      expiresAt: new Date("2030-01-01T00:00:00.000Z"),
+      validatedAt: new Date("2026-01-01T00:00:00.000Z"),
+    });
+
+    const result = await service.inspectPlatformAccess({});
+
+    expect(result.allowed).toBe(true);
+  });
+
   /** @scenario "Activate a valid signed license" */
   it("stores a valid signed license before provisioning missing retention", async () => {
     retention.rules = [

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { mergeContextChips, traceContextChip } from "../behavior/langy-context-chips";
 import {
   attachedContextToChip,
   type LangyAttachedContext,
@@ -28,6 +29,7 @@ describe("attachContext", () => {
   });
 
   describe("given a surface attaches a piece of context", () => {
+    /** @scenario "A surface attaches a piece of context" */
     it("lists exactly that item", () => {
       useLangyStore.getState().attachContext(traceItem);
       expect(useLangyStore.getState().attachedContext).toEqual([traceItem]);
@@ -35,6 +37,7 @@ describe("attachContext", () => {
   });
 
   describe("when the same id is attached again", () => {
+    /** @scenario "Attaching the same id twice does not duplicate it" */
     it("refreshes it in place rather than stacking a duplicate", () => {
       useLangyStore.getState().attachContext(traceItem);
       useLangyStore.getState().attachContext({ ...traceItem, label: "Checkout agent — 8.2s" });
@@ -46,6 +49,7 @@ describe("attachContext", () => {
   });
 
   describe("when one of several items is detached", () => {
+    /** @scenario "Detaching removes only the named item" */
     it("removes only the named item", () => {
       useLangyStore.getState().attachContext(traceItem);
       useLangyStore.getState().attachContext({ type: "dataset", id: "ds-1", label: "Golden set" });
@@ -59,6 +63,7 @@ describe("attachContext", () => {
   });
 
   describe("when the store resets for a new project", () => {
+    /** @scenario "Attached context is cleared when the active project changes" */
     it("clears attached context so it cannot bleed across projects", () => {
       useLangyStore.getState().attachContext(traceItem);
       // A genuinely different project — a same-project re-announcement is a
@@ -81,6 +86,21 @@ describe("attachContext", () => {
       useLangyStore.getState().attachContext(traceItem);
       useLangyStore.getState().clearAttachedContext();
       expect(useLangyStore.getState().attachedContext).toEqual([]);
+    });
+  });
+});
+
+describe("attached context reaching the agent as page context", () => {
+  describe("given a trace context item is attached", () => {
+    /** @scenario "Attached context reaches the agent as page context" */
+    it("carries the attached trace as page context, deduplicated against derived chips", () => {
+      const derived = traceContextChip("trace-abc", "Checkout agent — slow run");
+      const attached = attachedContextToChip(traceItem);
+
+      const merged = mergeContextChips([derived, attached]);
+
+      expect(merged).toEqual([derived]);
+      expect(merged).toHaveLength(1);
     });
   });
 });

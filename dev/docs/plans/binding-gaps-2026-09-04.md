@@ -112,3 +112,22 @@ Contract runtime acquisition, transport-neutral contracts, server browser deps f
 ordinary packages, composition-root-only server installers (+ its test exception),
 package-escape relative imports, sealed subpaths for backend packages, and the
 overview scenario. Bind or retire when the lint end-state is designed.
+
+## Licensing and Langy behaviours absent (found binding specs/licensing + specs/langy, evening)
+
+- **Global upgrade modal.** `packages/ui-host/src/upgrade-modal-store.ts` references a
+  `GlobalUpgradeModal` that has no component anywhere, and
+  `packages/features/workflow/web/src/behavior/trpc-error.ts` defines
+  `markAsHandledByLicenseHandler` / `extractLimitExceededInfo` that nothing calls.
+  Blocks `licensing/enforcement-resources.feature` (10) and most of
+  `licensing/proration-preview.feature` (9, plus a missing `shouldRetryPreview`).
+- **Langy navigate fallback.** Main's `langyNavigateFallback.ts`
+  (`resolveNavigateFallbackUrl`, `NAVIGATE_PAGES`, `NAVIGATE_RESOLVERS`) was never ported;
+  only the `resolveResourceUrl` port exists, wired to nothing. Blocks 4 scenarios in
+  `langy/langy-agent-driven-navigation.feature`.
+- **SDK scenario-set limit.** `licensing/sdk-scenario-set-limit.feature` (13) has no
+  counterpart on main at all and no counting logic in scenario/server: a spec written
+  ahead of the feature. Tag `@unimplemented` or build.
+- **Langy turns REST tests.** `packages/features/langy/server/src/transport/api-rest/langy-turns.api.ts`
+  has no test file; main's `langy-api-wait-mode` / `langy-api-refusal-chain` tests need a
+  harness in the current factory shape. 7 scenarios in `langy/langy-api-key-turns.feature`.
