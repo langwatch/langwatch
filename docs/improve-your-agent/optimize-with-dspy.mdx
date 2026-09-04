@@ -247,7 +247,9 @@ GEPA, from the judge's reasoning and the tool errors in the feedback, on its fir
 
 That is the same tool description fix as in [Fix tool calls](/improve-your-agent/fix-tool-calls), found by search. On both runs the damaged blender return went from failed to passed and from 5 steps to 4.
 
-The scenario where the customer asks for a recipe failed on every pass, and the cause was in the example rather than in the agent: its criterion said the agent calls no tool, and the judge counts ReAct's internal `finish` step as a tool call. The criterion now names the tools it means. On the MIPROv2 run the angry customer passed before and failed after, and the 83% of the best trial did not repeat on the final pass, which is the non-determinism described in the Limits below.
+The scenario where the customer asks for a recipe failed on every pass, and the cause was in the example rather than in the agent: its criterion said the agent calls no tool, and the judge counts ReAct's internal `finish` step as a tool call. The criterion now names the tools it means.
+
+On the MIPROv2 run the angry customer passed before and failed after, and the 83% of the best trial did not repeat on the final pass, which is the non-determinism described in the Limits below.
 
 ## Limits
 
