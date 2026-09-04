@@ -50,6 +50,7 @@ const config: ScenarioChildProcessConfig = {
   sourceRoots: ["/app/packages/features/scenario/server/src"],
   nodeEnv: "production",
   isSaas: true,
+  egress: { blockLocal: true, allowedHosts: [] },
   parentEnvironment: {
     path: "/usr/bin",
     home: "/app",

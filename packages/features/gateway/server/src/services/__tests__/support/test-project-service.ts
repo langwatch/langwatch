@@ -1,4 +1,4 @@
-import { ProjectService } from "@langwatch/project-contract";
+import { ProjectService, type TraceDestinationInput } from "@langwatch/project-contract";
 
 /** Complete contract fake for tests that do not cross the Project boundary. */
 export class TestProjectService extends ProjectService {
@@ -54,10 +54,14 @@ export class TestProjectService extends ProjectService {
   listByTeam() {
     return this.unsupported();
   }
-  listNamesByIds() {
+  listNamesByIds(
+    _input: Parameters<ProjectService["listNamesByIds"]>[0],
+  ): ReturnType<ProjectService["listNamesByIds"]> {
     return this.unsupported();
   }
-  listIdsByOrganization() {
+  listIdsByOrganization(
+    _input?: Parameters<ProjectService["listIdsByOrganization"]>[0],
+  ): ReturnType<ProjectService["listIdsByOrganization"]> {
     return Promise.resolve([]);
   }
   listActiveByScopes() {
@@ -84,13 +88,17 @@ export class TestProjectService extends ProjectService {
   resolveOrgAdmin() {
     return this.unsupported();
   }
-  resolveTraceDestination() {
+  resolveTraceDestination(
+    _input: TraceDestinationInput,
+  ): ReturnType<ProjectService["resolveTraceDestination"]> {
     return this.unsupported();
   }
-  tryGetTraceDestination() {
+  tryGetTraceDestination(_projectId: string): ReturnType<ProjectService["tryGetTraceDestination"]> {
     return this.unsupported();
   }
-  listTraceDestinations(): ReturnType<ProjectService["listTraceDestinations"]> {
+  listTraceDestinations(
+    _projectIds: string[],
+  ): ReturnType<ProjectService["listTraceDestinations"]> {
     return this.unsupported();
   }
 }

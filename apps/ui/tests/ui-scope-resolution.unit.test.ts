@@ -58,10 +58,12 @@ describe("given an organization whose personal workspace is listed first", () =>
   const organizations = organizationWith({ teams: [PERSONAL_TEAM, SHARED_TEAM] });
 
   describe("when an organization-scoped page resolves with nothing selected yet", () => {
+    /** @scenario "The personal workspace sorts first but does not win" */
     it("resolves the shared team even though the personal one is listed first", () => {
       expect(resolve({ organizations }).team?.id).toBe("team-shared");
     });
 
+    /** @scenario "Organization-scoped credentials are filed against the organization's project" */
     it("resolves the organization's project, which is what settings writes against", () => {
       expect(resolve({ organizations }).project?.id).toBe("proj-app");
     });
@@ -72,10 +74,12 @@ describe("given an organization whose personal workspace is listed first", () =>
       teams: [PERSONAL_TEAM, { ...SHARED_TEAM, projects: [] }],
     });
 
+    /** @scenario "A shared team without a project still outranks a personal one" */
     it("still resolves the shared team rather than the personal one that has a project", () => {
       expect(resolve({ organizations: withEmptyShared }).team?.id).toBe("team-shared");
     });
 
+    /** @scenario "A shared team without a project still outranks a personal one" */
     it("leaves the page without a project, so it can say a project comes first", () => {
       expect(resolve({ organizations: withEmptyShared }).project).toBeUndefined();
     });
@@ -87,10 +91,12 @@ describe("given an organization whose personal workspace is listed first", () =>
       projectParam: "personal-jane-abc123",
     };
 
+    /** @scenario "Opening the personal project by its own address" */
     it("resolves the personal project", () => {
       expect(resolve({ route: addressed, organizations }).project?.id).toBe("proj-personal");
     });
 
+    /** @scenario "Opening the personal project by its own address" */
     it("resolves the personal team, which the personal chrome keys off", () => {
       expect(resolve({ route: addressed, organizations }).team?.id).toBe("team-personal");
     });
@@ -103,14 +109,17 @@ describe("given an organization whose personal workspace is listed first", () =>
       projectSlug: "personal-jane-abc123",
     };
 
+    /** @scenario "Leaving the personal project releases it" */
     it("resolves the organization's project instead", () => {
       expect(resolve({ organizations, selection: remembered }).project?.id).toBe("proj-app");
     });
 
+    /** @scenario "Leaving the personal project releases it" */
     it("resolves the shared team instead", () => {
       expect(resolve({ organizations, selection: remembered }).team?.id).toBe("team-shared");
     });
 
+    /** @scenario "The remembered selection heals after one organization-scoped page" */
     it("asks for the shared selection to be written over the stale personal one", () => {
       const resolved = resolve({ organizations, selection: remembered });
 
@@ -134,6 +143,7 @@ describe("given an organization whose personal workspace is listed first", () =>
       projectSlug: "personal-jane-abc123",
     };
 
+    /** @scenario "A team slug that matches nothing does not address the personal workspace" */
     it("resolves the shared team rather than the remembered personal one", () => {
       const resolved = resolve({
         route: staleTeamLink,
@@ -145,6 +155,7 @@ describe("given an organization whose personal workspace is listed first", () =>
       expect(resolved.project?.id).toBe("proj-app");
     });
 
+    /** @scenario "A team slug that matches nothing does not address the personal workspace" */
     it("still resolves the personal workspace when the slug does match it", () => {
       const resolved = resolve({
         route: { ...ORGANIZATION_SCOPED_PAGE, teamParam: "personal-jane" },
@@ -173,6 +184,7 @@ describe("given an organization whose personal workspace is listed first", () =>
 describe("given an organization whose only team is the personal one", () => {
   const organizations = organizationWith({ teams: [PERSONAL_TEAM] });
 
+  /** @scenario "The personal workspace is the only one there is" */
   it("resolves the personal workspace rather than leaving the app contextless", () => {
     const resolved = resolve({ organizations });
 
@@ -180,6 +192,7 @@ describe("given an organization whose only team is the personal one", () => {
     expect(resolved.project?.id).toBe("proj-personal");
   });
 
+  /** @scenario "A remembered personal team is not held against the only organization" */
   it("keeps resolving it when it is also the remembered selection", () => {
     const resolved = resolve({
       organizations,
@@ -199,20 +212,41 @@ describe("given the personal-workspace pages", () => {
   const organizations = organizationWith({ teams: [PERSONAL_TEAM, SHARED_TEAM] });
 
   describe("when nothing is selected yet", () => {
+    /** @scenario "Visiting the personal-workspace page resolves the personal team" */
     it("resolves the personal team instead of the shared one", () => {
       expect(resolve({ route: PERSONAL_SCOPED_PAGE, organizations }).team?.id).toBe(
         "team-personal",
       );
     });
 
+    /** @scenario "Visiting the personal-workspace page resolves the personal team" */
     it("resolves the personal project instead of the organization's", () => {
       expect(resolve({ route: PERSONAL_SCOPED_PAGE, organizations }).project?.id).toBe(
         "proj-personal",
       );
     });
+
+    /** @scenario "The personal workspace is not what the next organization-scoped page is about" */
+    it("leaves the shared team for the next organization-scoped page", () => {
+      const personal = resolve({ route: PERSONAL_SCOPED_PAGE, organizations });
+      const writes = uiScopeSelectionWrites({ resolved: personal, selection: NOTHING_REMEMBERED });
+
+      // The visit remembers the organization and nothing of the private
+      // workspace, so the next organization-scoped page resolves afresh.
+      expect(writes).toEqual([{ key: "organizationId", value: "org-acme" }]);
+
+      const next = resolve({
+        organizations,
+        selection: { organizationId: "org-acme", teamId: "", projectSlug: "" },
+      });
+
+      expect(next.team?.id).toBe("team-shared");
+      expect(next.project?.id).toBe("proj-app");
+    });
   });
 
   describe("when the shared team holds no project", () => {
+    /** @scenario "A shared team without a project does not leak into the personal-workspace page" */
     it("still resolves the personal team and project, not an empty shared one", () => {
       const resolved = resolve({
         route: PERSONAL_SCOPED_PAGE,
@@ -227,6 +261,7 @@ describe("given the personal-workspace pages", () => {
   });
 
   describe("when a shared team is remembered from an earlier organization-scoped visit", () => {
+    /** @scenario "A team remembered from an earlier organization-scoped visit does not follow jane onto the personal-workspace page" */
     it("still resolves the personal team, not the remembered shared one", () => {
       const resolved = resolve({
         route: PERSONAL_SCOPED_PAGE,
@@ -238,6 +273,7 @@ describe("given the personal-workspace pages", () => {
       expect(resolved.project?.id).toBe("proj-personal");
     });
 
+    /** @scenario "A project remembered from an earlier organization-scoped visit does not follow jane onto the personal-workspace page" */
     it("resolves the personal project, not the remembered shared project", () => {
       const resolved = resolve({
         route: PERSONAL_SCOPED_PAGE,
@@ -253,6 +289,7 @@ describe("given the personal-workspace pages", () => {
       expect(resolved.project?.id).toBe("proj-personal");
     });
 
+    /** @scenario "Organization-scoped work goes on in the project jane left, after a visit to the personal-workspace page" */
     it("leaves the remembered organization work untouched, so the next page opens it again", () => {
       const remembered = {
         organizationId: "org-acme",
@@ -276,6 +313,7 @@ describe("given the personal-workspace pages", () => {
   });
 
   describe("when the reader has no personal workspace of their own", () => {
+    /** @scenario "A member with no personal workspace of their own falls back to the ambient team" */
     it("falls back to the ambient team rather than resolving nothing", () => {
       const resolved = resolve({
         route: PERSONAL_SCOPED_PAGE,
@@ -330,6 +368,7 @@ describe("given a member of one team in an organization that has several", () =>
   }
 
   describe("when they open a settings page with nothing selected yet", () => {
+    /** @scenario "A member resolves the team they are on, not the first one listed" */
     it("resolves the team the member is on, not the one that sorts first", () => {
       const resolved = resolve({ organizations, userId: MEMBER });
 
@@ -342,6 +381,7 @@ describe("given a member of one team in an organization that has several", () =>
       ).toBe(false);
     });
 
+    /** @scenario "The ambient project belongs to the team the member is on" */
     it("resolves that team's project, which is what settings writes against", () => {
       expect(resolve({ organizations, userId: MEMBER }).project?.slug).toBe("data-app");
     });
@@ -354,6 +394,7 @@ describe("given a member of one team in an organization that has several", () =>
       projectSlug: "platform-app",
     };
 
+    /** @scenario "A remembered team the member is not on does not win" */
     it("ignores the remembered team and resolves the one they hold", () => {
       const resolved = resolve({ organizations, userId: MEMBER, selection: remembered });
 
@@ -361,6 +402,7 @@ describe("given a member of one team in an organization that has several", () =>
       expect(resolved.project?.slug).toBe("data-app");
     });
 
+    /** @scenario "The remembered selection heals to the team the member is on" */
     it("asks for the resolved selection to be written, so the stale one heals", () => {
       const resolved = resolve({ organizations, userId: MEMBER, selection: remembered });
 
@@ -383,6 +425,7 @@ describe("given a member of one team in an organization that has several", () =>
       organizationRole: "ADMIN",
     });
 
+    /** @scenario "The admin's picked project survives a page that names no project" */
     it("keeps the project they picked, and its team", () => {
       const resolved = resolve({
         organizations: asAdmin,
@@ -399,6 +442,7 @@ describe("given a member of one team in an organization that has several", () =>
       expect(resolved.organizationRole).toBe("ADMIN");
     });
 
+    /** @scenario "The admin's remembered team survives" */
     it("keeps the remembered team when only the team is remembered", () => {
       const resolved = resolve({
         organizations: asAdmin,
@@ -411,6 +455,7 @@ describe("given a member of one team in an organization that has several", () =>
   });
 
   describe("when the reader belongs to no team in the organization", () => {
+    /** @scenario "A genuine non-member is still refused" */
     it("still resolves a context, and the chrome still refuses them", () => {
       const resolved = resolve({
         organizations: organizationWith({
@@ -433,6 +478,7 @@ describe("given a member of one team in an organization that has several", () =>
   });
 
   describe("when a project named in the address bar belongs to another team", () => {
+    /** @scenario "A project named in the URL still resolves its own team" */
     it("resolves the addressed team, refusal and all", () => {
       const resolved = resolve({
         route: { ...ORGANIZATION_SCOPED_PAGE, projectParam: "platform-app" },

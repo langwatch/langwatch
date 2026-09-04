@@ -31,6 +31,16 @@ export {
   GovernanceSignalStoragePort,
 } from "./governance/governance-signals.adapter";
 /**
+ * How a personal key is minted: the Governance issuer port over the gateway's
+ * own virtual-key writes. Exported because the mapping between the two shapes
+ * is a decision this composition makes, and a second copy of it elsewhere
+ * would be a second answer to what a personal key looks like.
+ */
+export {
+  AppPersonalVirtualKeyIssuerPort,
+  type GovernanceVirtualKeyPort,
+} from "./governance/governance-products.adapter";
+/**
  * The governance REST family, reached through this composition rather than
  * directly: the API application may depend on the Enterprise API composition
  * and not on an Enterprise feature server.

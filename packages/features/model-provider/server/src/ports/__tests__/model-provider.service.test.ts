@@ -2033,6 +2033,39 @@ describe("ModelProviderService", () => {
     expect(providers.rows[0]?.scopes).toEqual([{ scopeType: "PROJECT", scopeId: "project_1" }]);
   });
 
+  /** @scenario "Advanced gateway writes require manage on every existing-row scope" */
+  it("refuses an id-only advanced write when the actor cannot manage the row's own scope", async () => {
+    const providers = new Providers();
+    providers.rows = [
+      provider({ scopes: [{ scopeType: "ORGANIZATION", scopeId: "org_1" }], rateLimitRpm: null }),
+    ];
+    const authorization = new Authorization();
+    authorization.canWriteResult = false;
+
+    // No `scopes` in the write, so the only scopes to authorize are the ones
+    // the stored row already carries. An advanced field must not slip past
+    // the check just because the caller named no scope.
+    await expect(
+      service(providers, new Catalog(), new CodexRefresher(), authorization).upsert({
+        id: "mp_1",
+        projectId: "project_1",
+        actorId: "user_1",
+        provider: "openai",
+        enabled: true,
+        rateLimitRpm: 600,
+      }),
+    ).rejects.toMatchObject({
+      code: "model_provider_scope_forbidden",
+      meta: { requiredPermission: "organization:manage" },
+    });
+
+    expect(authorization.writes).toEqual([
+      { actorId: "user_1", scopeType: "ORGANIZATION", scopeId: "org_1" },
+    ]);
+    expect(providers.updates).toEqual([]);
+    expect(providers.rows[0]?.rateLimitRpm).toBeNull();
+  });
+
   /** @scenario Update of a vanished id surfaces NOT_FOUND instead of silently creating */
   it("does not turn a missing id into a new provider row", async () => {
     const providers = new Providers();

@@ -1,0 +1,52 @@
+/**
+ * A REST security spine for the families in this directory.
+ *
+ * It supplies only the framework parts every `SecuredApp` needs — context,
+ * logging, tracing and the two error renderers. The credential chain is
+ * whatever the caller passes: the internal control plane carries its own HMAC
+ * gate and needs none, while the organization-scoped spend family is driven
+ * with a middleware that installs the organization the process's real chain
+ * would have installed. Anything not supplied throws, so a family that starts
+ * leaning on a check this spine does not have fails loudly.
+ */
+import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
+import type { ErrorHandler, MiddlewareHandler } from "hono";
+
+const passThrough: MiddlewareHandler = async (_c, next) => {
+  await next();
+};
+
+/** Nothing here is expected to throw, so a failure must be legible. */
+const renderUnexpected: ErrorHandler = (error, c) =>
+  c.json(
+    { error: { type: "internal_error", code: "internal_error", message: String(error) } },
+    500,
+  );
+
+export function testRestSecurity(options?: {
+  organizationAuth?: MiddlewareHandler;
+  organizationPermission?: MiddlewareHandler;
+  canonicalErrorHandler?: ErrorHandler;
+}): AppRestSecurity {
+  const unreachable = () => {
+    throw new Error("this family must not reach the framework credential chain");
+  };
+  const orgAuth = options?.organizationAuth;
+  const orgPermission = options?.organizationPermission;
+  const canonical = options?.canonicalErrorHandler ?? renderUnexpected;
+  return createAppRestSecurity({
+    appContext: passThrough,
+    requestLogger: () => passThrough,
+    requestTracer: () => passThrough,
+    legacyErrorHandler: renderUnexpected,
+    canonicalErrorHandler: canonical,
+    authenticateProject: unreachable,
+    authorizeProjectPermission: unreachable,
+    authorizeApiKeyCeiling: unreachable,
+    authenticateOrganization: orgAuth ? () => orgAuth : unreachable,
+    authorizeOrganizationPermission: orgPermission ? () => orgPermission : unreachable,
+    authorizeRouteProjectPermission: unreachable,
+    authenticateOrganizationThrowing: orgAuth ?? passThrough,
+    authorizeOrganizationPermissionThrowing: unreachable,
+  } as never);
+}

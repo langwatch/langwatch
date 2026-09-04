@@ -86,6 +86,7 @@ describe("given an address the router matched", () => {
       expect(readAt("/me").isPersonalScopeRoute).toBe(true);
     });
 
+    /** @scenario "Every personal-workspace sub-route gets the same treatment" */
     it("says so for every personal sub-route", () => {
       expect(readAt("/me/sessions").isPersonalScopeRoute).toBe(true);
     });

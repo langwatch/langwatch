@@ -196,7 +196,8 @@ describe.skipIf(!databaseUrl)(
       await prisma.organization.deleteMany({ where: { id: ORG_ID } });
     }, 120_000);
 
-    /** @scenario Keys that predate the choice keep falling back */
+    // @scenario "Keys that existed before the routing choice keep failing over"
+    // @scenario "Keys that predate the choice keep falling back"
     it("the shipped backfill maps a legacy null-policy key to FALLBACK_ALL and a policy key to POLICY", async () => {
       const legacyNullPolicyId = `vk-rmm-legacy-${suffix}`;
       const legacyPolicyId = `vk-rmm-policy-${suffix}`;
