@@ -164,7 +164,7 @@ import {
   composeApiGatewaySpendPipeline,
   type ApiGatewaySpendPipeline,
 } from "./api-gateway-spend-pipeline.composition";
-import { canonicalErrorFor } from "./api-rest-observability.composition";
+import { canonicalErrorFor } from "./api-canonical-error";
 import { PostgresGithubAdapter } from "@langwatch/github-server";
 import type { GithubService } from "@langwatch/github-contract";
 import { PostgresMonitorAdapter } from "@langwatch/monitor-server";
@@ -229,6 +229,7 @@ import {
 } from "../api.main";
 import { ApiSecretRestFeature } from "../api-secret-rest.feature";
 import { ApiRestSecurity, type ApiRestProjectPolicy } from "../api-rest.security";
+import { requestTraceIds } from "@langwatch/api/rest";
 import type { AppRestManagementAuditPort, AppRestSecurity } from "@langwatch/api/rest";
 import { ApiRateLimitInfrastructure } from "../platform/infrastructure/api-rate-limit.infrastructure";
 import {
@@ -270,6 +271,7 @@ import {
   type ApiLangyRestComposition,
 } from "../features/langy/langy-rest.mount";
 import { composeApiGithubRest } from "../features/github/github-rest.mount";
+import { composeApiAdminRest } from "../features/ops/admin-rest.mount";
 import { composeApiAuthCliDeviceFlow } from "../features/auth/auth-cli-device-flow-rest.mount";
 import { composeApiAuthRest } from "../features/auth/auth-rest.mount";
 import { composeApiGovernanceCliRest } from "../features/enterprise/governance-cli-rest.mount";
@@ -1351,6 +1353,13 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     const unsubscribe = this.composeUnsubscribe();
     const langyRest = this.composeLangyRest();
     const githubRest = this.composeGithubRest(authz);
+    // The back office. Both halves are already open at this line: the operator
+    // application the `ops.*` namespace answers from, and the one session pair
+    // every other handler-managed door reads.
+    const adminRest = composeApiAdminRest({
+      ops: this.composedAgentGroup?.ops,
+      session: this.composedAuth?.compose(),
+    });
     // The two halves of `/api/auth/cli`. The device grant is this process's
     // own — Redis, the directory, the credential service — and the governance
     // plane rides the SAME session reader the grant mints through, so the
@@ -1424,6 +1433,19 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       : undefined;
     const simulations = this.composedAgentGroup?.simulations;
     const exportBroadcast = this.composedIdentity?.broadcast;
+    // The bulk trace download, beside the bulk run download below. It reads
+    // THROUGH the one read stack every other trace surface redacts through —
+    // never a second one — so the stack decides it along with the session and
+    // the progress fabric.
+    const traceExportReads = this.composedTraceGroup?.traceReads;
+    const traceExport =
+      authoringSession && traceExportReads && exportBroadcast
+        ? {
+            reads: traceExportReads,
+            session: authoringSession,
+            broadcast: () => exportBroadcast,
+          }
+        : undefined;
     const scenarioRunExport =
       authoringSession && simulations && exportBroadcast
         ? {
@@ -1791,6 +1813,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         ...(langWatchQL ? { langWatchQL } : {}),
         ...(prompts ? { prompts: () => prompts } : {}),
         ...(organizationManagement ? { organizationManagement } : {}),
+        ...(traceExport ? { traceExport } : {}),
         ...(scenarioRunExport ? { scenarioRunExport } : {}),
         ...(authoring ? { authoring } : {}),
         ...(experimentWorkbench ? { experimentWorkbench } : {}),
@@ -1813,6 +1836,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         ...(unsubscribe ? { unsubscribe } : {}),
         ...(langyRest ? { langy: langyRest } : {}),
         ...(githubRest ? { github: githubRest } : {}),
+        ...(adminRest ? { admin: adminRest } : {}),
         ...(authCliDeviceFlow ? { authCliDeviceFlow } : {}),
         ...(governanceCli ? { governanceCli } : {}),
         ...(authRest ? { auth: authRest } : {}),
@@ -2188,7 +2212,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // The process's one canonical mapping. The family installs its own
       // `onError` to log what the caller actually received and delegates the
       // rendering here rather than keeping a second taxonomy.
-      canonicalError: (error) => canonicalErrorFor(error),
+      canonicalError: (error, c) => canonicalErrorFor(error, requestTraceIds(c)),
       spend: () => spend.ports,
     }).hono as unknown as Hono;
   }

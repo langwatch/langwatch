@@ -30,7 +30,12 @@ import type {
 } from "@langwatch/api/rest";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
-import { createBugReportsRestApp, type BugReportRestPorts } from "@langwatch/ops-server";
+import {
+  createAdminRestApp,
+  createBugReportsRestApp,
+  type AdminRestPorts,
+  type BugReportRestPorts,
+} from "@langwatch/ops-server";
 import { createUnsubscribeRestApp, type UnsubscribeRestPorts } from "@langwatch/automation-server";
 import {
   createLangyInternalRestApp,
@@ -80,6 +85,10 @@ import {
   mountScenarioRunExportRest,
   type ScenarioRunExportAudit,
 } from "../features/export/scenario-run-export-rest.mount";
+import {
+  mountApiTraceExportRest,
+  type ApiTraceExportRestOptions,
+} from "../features/export/trace-export-rest.mount";
 import { mountAnalyticsRest } from "../features/analytics/analytics-rest.mount";
 import {
   type ApiLangWatchQLRestCollaborators,
@@ -207,6 +216,16 @@ export type ApiProcessRestServices = Readonly<{
    * project in the tenant. A process holding the directory but not the share
    * ledger could turn sharing off and leave the links live.
    */
+  /**
+   * The bulk trace export's collaborators, or none.
+   *
+   * All three travel together. The SESSION makes the download attributable to
+   * a person; the READ STACK is what the export reads through, so a process
+   * without it would serve captured content past the redactions every other
+   * trace surface applies; and the BROADCAST is where the progress the browser
+   * watches goes. A process missing any of them leaves the family off.
+   */
+  traceExport?: Omit<ApiTraceExportRestOptions, "security"> | undefined;
   /**
    * The scenario run export's collaborators, or none.
    *
@@ -357,6 +376,18 @@ export type ApiProcessRestPorts = Readonly<{
    * SAME ingestion service the receiver uses — one dedup gate, not two.
    */
   collector?: CollectorRestPorts | undefined;
+  /**
+   * The back office's collaborators, or none.
+   *
+   * Both travel together, and the SESSION is the one that decides: every route
+   * here is answered to a signed-in member of instance staff, and a process
+   * with no browser-session transport cannot name one. Such a process leaves
+   * the family off rather than mounting a door that hides itself from
+   * everybody — which is what the family's own non-staff refusal looks like,
+   * and is a refusal an operator would then have no way to tell from a
+   * revoked staff list.
+   */
+  admin?: AdminRestPorts | undefined;
   /**
    * The public issue-report intake's collaborators, or none.
    *
@@ -609,8 +640,14 @@ export function createApiProcessRestFeatures(options: {
     features.push(mountOrganizationRest({ security, ...organizationManagement }));
   }
 
-  // The bulk run export. Its own basePath is literal and claimed by nothing
-  // else, so it is order-free among the product families.
+  // The two bulk exports. They share `/api/export` and claim disjoint literal
+  // second segments, so their order is free; traces is registered first, which
+  // is the order the platform router gave the same pair.
+  const traceExport = services.traceExport;
+  if (traceExport) {
+    features.push(mountApiTraceExportRest({ security, ...traceExport }));
+  }
+
   const scenarioRunExport = services.scenarioRunExport;
   if (scenarioRunExport) {
     features.push(mountScenarioRunExportRest({ security, ...scenarioRunExport }));
@@ -672,6 +709,15 @@ export function createApiProcessRestFeatures(options: {
         credential: ports.handlerManagedCredential,
       }),
     );
+  }
+
+  // Impersonation and the back-office resource CRUD. `/api/admin` is a literal
+  // first segment nothing else claims, and it is registered here — ahead of the
+  // issue-report intake and the two authentication families — in the order the
+  // platform router gave the same three.
+  const admin = ports.admin;
+  if (admin) {
+    features.push(createAdminRestApp({ security, ports: admin }));
   }
 
   const bugReports = ports.bugReports;

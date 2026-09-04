@@ -281,7 +281,10 @@ export function composeApiPackagedRest(
       // degradation the receiver has always had when the lookup failed:
       // telemetry a customer already paid to produce is not dropped, and the
       // absent meter is named at boot rather than once per request.
-      traceUsageGuard: traceUsageGuardFor(options.traceIngest?.usageLimit),
+      traceUsageGuard: traceUsageGuardFor({
+        usageLimit: options.traceIngest?.usageLimit,
+        logger: options.logger,
+      }),
       requireProjectPermission: (args) => options.authz.authorizeProjectPermission(args),
       ...(dualAuth ? { dualAuth } : {}),
       ...(enterpriseGate ? { enterpriseGate } : {}),
@@ -322,14 +325,31 @@ export function composeApiPackagedRest(
  * error boundary renders as a 402 — terminal rather than retryable, for the
  * reason the ingest composition's own docblock gives.
  */
-function traceUsageGuardFor(usageLimit: CollectorUsageLimitPort | undefined): MiddlewareHandler {
+function traceUsageGuardFor(options: {
+  usageLimit: CollectorUsageLimitPort | undefined;
+  logger: Pick<Logger, "error">;
+}): MiddlewareHandler {
+  const { usageLimit } = options;
   if (!usageLimit) {
     return async (_c, next) => {
       await next();
     };
   }
   return async (c, next) => {
-    await usageLimit({ project: c.get("project") as CollectorProject });
+    const project = c.get("project") as CollectorProject | undefined;
+    if (!project) {
+      // The chain that resolves the credential is what sets it, so this is a
+      // mounting defect rather than a caller's. Reported and passed through:
+      // taking an ingest door down over our own wiring loses a customer's
+      // telemetry, which is the one failure an exporter cannot retry.
+      options.logger.error(
+        {},
+        "the trace usage guard ran without a resolved project, so this write was not metered",
+      );
+      await next();
+      return;
+    }
+    await usageLimit({ project });
     await next();
   };
 }
