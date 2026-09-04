@@ -110,6 +110,14 @@ Feature: Langy works in a folder shared from the developer's machine
       Then the chip and the card read disconnected within a second
       And a call in flight fails with the folder offline
 
+    @integration
+    Scenario: The chat says the folder is gone
+      Given a connected folder
+      When the CLI exits
+      Then the transcript carries a line that the folder is no longer connected
+      And it sits next to the line that said the folder connected
+      And no new turn is started for it
+
 
     @unit
     Scenario: The card reads the connection off the record, not only off the stream

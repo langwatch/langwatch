@@ -12,6 +12,7 @@
 import type {
   LangyLocalWorkspaceConnectedEventData,
   LangyLocalWorkspaceDisconnectedEventData,
+  LangyMessagePart,
 } from "@langwatch/langy";
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
@@ -91,6 +92,13 @@ export interface ControlConversations {
     currentTurnId: string | null;
     lastModel: string | null;
   } | null>;
+  /** Writes one line into the transcript without starting a turn. */
+  recordUserMessage(args: {
+    projectId: string;
+    conversationId: string;
+    userId: string;
+    parts: LangyMessagePart[];
+  }): Promise<{ messageId: string }>;
 }
 
 /** The two durable dispatches the core makes. */
@@ -477,6 +485,9 @@ export class LocalControlSessionCore {
     session: ControlSession,
     reason: "cli_exit" | "panel" | "presence_lost",
   ): Promise<void> {
+    // Read before the deregister, so the line written below can name the
+    // folder that is going rather than whatever answers afterwards.
+    const workspace = await this.presence.read(session.conversationId);
     const cleared = await this.presence.deregister({
       conversationId: session.conversationId,
       instanceId: session.instanceId,
@@ -505,6 +516,44 @@ export class LocalControlSessionCore {
     });
     await this.requests.revokeKeyBinding(session.apiKeyId);
     await this.announceWorkspace(session, "disconnected");
+    await this.recordDisconnect(session, workspace?.workspace.root ?? "");
+  }
+
+  /**
+   * Says in the chat that the folder is gone.
+   *
+   * The connect is already a line in the transcript, and Ctrl-C was not: the
+   * chip simply vanished from the header and the conversation kept reading as
+   * though the folder were still there. Recorded as a message and nothing
+   * else — a disconnect is not a question, so it starts no turn.
+   */
+  private async recordDisconnect(
+    session: ControlSession,
+    root: string,
+  ): Promise<void> {
+    try {
+      await this.conversations().recordUserMessage({
+        projectId: session.projectId,
+        conversationId: session.conversationId,
+        userId: session.userId,
+        parts: [
+          {
+            type: "text",
+            text: disconnectMessage(
+              root || session.workspaceName,
+              session.hostname,
+            ),
+          },
+        ],
+      });
+    } catch (error) {
+      // The folder is already gone and its key already revoked; a line that
+      // could not be written must not turn a clean exit into a failure.
+      logger.warn(
+        { conversationId: session.conversationId, error },
+        "could not write the folder disconnect into the transcript",
+      );
+    }
   }
 
   /** Puts the folder's connect or disconnect on the live edge of a running turn. */
@@ -624,6 +673,11 @@ export function connectMessage(
 ): string {
   const branch = workspace.gitBranch ? `, branch ${workspace.gitBranch}` : "";
   return `Local folder connected: ${workspace.root} on ${hostname}${branch}`;
+}
+
+/** The line the transcript carries when the folder goes away. */
+export function disconnectMessage(root: string, hostname: string): string {
+  return `Local folder disconnected: ${root} on ${hostname}`;
 }
 
 /**

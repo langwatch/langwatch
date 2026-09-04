@@ -93,6 +93,8 @@ let turnStartOutcome: "ok" | "in_progress" = "ok";
 let events: { name: string; data: Record<string, unknown> }[] = [];
 /** Every live stream entry the cards wrote. */
 let liveEntries: { kind: string; payload: Record<string, unknown> }[] = [];
+/** Every line written straight into the transcript, starting no turn. */
+let recordedMessages: string[] = [];
 
 /** Whether the conversation's model may skip the permission cards. */
 let skipAllowed = false;
@@ -145,6 +147,18 @@ function testPorts(store: AgentStateStore) {
     conversations: {
       async findByIdVisible() {
         return conversationRow;
+      },
+      async recordUserMessage({ parts }) {
+        recordedMessages.push(
+          parts
+            .map((part) =>
+              part.type === "text" && typeof part.text === "string"
+                ? part.text
+                : "",
+            )
+            .join(""),
+        );
+        return { messageId: "msg_1" };
       },
     },
     events: {
@@ -444,6 +458,7 @@ beforeEach(() => {
   turnStartOutcome = "ok";
   events = [];
   liveEntries = [];
+  recordedMessages = [];
   skipAllowed = false;
 });
 
@@ -892,6 +907,27 @@ describe("given a folder the developer stops sharing", () => {
     expect(
       events.some((event) => event.name === "local_workspace_disconnected"),
     ).toBe(true);
+  });
+
+  /** @scenario "The chat says the folder is gone" */
+  it("writes the disconnect into the transcript, and starts no turn for it", async () => {
+    const key = await approvedSessionKey(podA);
+    const { cli } = await shareFolder(podA, key);
+    await expect
+      .poll(() => startedTurns.length, { timeout: 5_000 })
+      .toBeGreaterThan(0);
+
+    cli.send({ type: "deregister" });
+    await cli.closed();
+
+    await expect
+      .poll(() => recordedMessages.length, { timeout: 5_000 })
+      .toBeGreaterThan(0);
+    expect(startedTurns.at(-1)?.text).toContain("Local folder connected");
+    expect(recordedMessages.at(-1)).toContain("Local folder disconnected");
+    expect(recordedMessages.at(-1)).toContain("rogerio-mbp");
+    // The connect starts a turn; the disconnect is news, not a question.
+    expect(startedTurns).toHaveLength(1);
   });
 });
 
