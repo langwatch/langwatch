@@ -639,7 +639,6 @@ const LEGACY_INERT: string[] = [
   "specs/workflows/studio-llm-node-drawer.feature",
   "specs/workflows/studio-local-state.feature",
   "specs/workflows/studio-usage-limits.feature",
-  "specs/workflows/workflow-management.feature",
 ];
 
 const TEST_FILE_RE = /\.test\.(?:tsx?|mjs)$/;

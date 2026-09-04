@@ -197,7 +197,7 @@ function NewWorkflowForm({ template, onClose }: { template: StudioWorkflow; onCl
             void handleSubmit(onSubmit)();
           }}
         >
-          Create StudioWorkflow
+          Create workflow
         </Button>
       </Dialog.Footer>
     </form>

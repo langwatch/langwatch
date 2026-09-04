@@ -16,7 +16,10 @@ import { Sidebar, SidebarEmptyState } from "../studio-internals";
  */
 export function PublishedPromptsList() {
   const { data, isLoading } = useAllPromptsForProject();
-  const { addTab } = useDraggableTabsBrowserStore(({ addTab }) => ({ addTab }));
+  // Selecting the member itself. A selector that builds an object returns a
+  // fresh reference on every read, which `useSyncExternalStore` reads as a
+  // change and the studio re-renders until React gives up.
+  const addTab = useDraggableTabsBrowserStore((state) => state.addTab);
   const { project } = usePromptProject();
 
   // Cascade-resolved model for new-tab prompt defaults.

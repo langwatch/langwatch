@@ -338,29 +338,8 @@ test.describe("browser product journey", () => {
 
     const run = dialog.getByTestId("run-dialog-run");
     await expect(run).toBeDisabled();
-    // The reason is the disabled button's tooltip. A disabled button dispatches
-    // no pointer events, so the footer wraps it in a span that can be hovered,
-    // and the tooltip only opens on a real mouse move over that span — a
-    // synthesised pointer event carries no pointer type and is ignored.
-    const box = await run.locator("xpath=..").boundingBox();
-    expect(box, "the run control has a box to hover").not.toBeNull();
-    const centre = {
-      x: (box?.x ?? 0) + (box?.width ?? 0) / 2,
-      y: (box?.y ?? 0) + (box?.height ?? 0) / 2,
-    };
-    await page.mouse.move(centre.x, centre.y);
-    await page.mouse.move(centre.x + 1, centre.y + 1);
-    await page.waitForTimeout(2000);
-    console.log("DEBUG box", JSON.stringify(box));
-    console.log("DEBUG footer", await run.locator("xpath=../..").innerHTML());
-    console.log(
-      "DEBUG tooltips",
-      await page.locator('[role="tooltip"], [data-scope="tooltip"]').count(),
-    );
-    console.log(
-      "DEBUG body has reason",
-      (await page.content()).includes("Choose an agent to run against"),
-    );
+    // The reason is printed in the footer beside the refused control, so it is
+    // read the same way with a mouse, a keyboard or a screen reader.
     await expect(page.getByText("Choose an agent to run against.").first()).toBeVisible({
       timeout: 15000,
     });
@@ -375,23 +354,13 @@ test.describe("browser product journey", () => {
       .click();
     await page.getByTestId("new-workflow-card-blank").click();
     await page.getByRole("textbox", { name: "Name and Icon" }).fill(WORKFLOW_NAME);
-    await page.getByRole("button", { name: /^create (studio)?workflow$/i }).click();
+    await page.getByRole("button", { name: /^create workflow$/i }).click();
     // A new workflow opens in the studio, on its own id.
     await expect(page).toHaveURL(/\/studio\/workflow_.+/, { timeout: 60000 });
 
     await visit(`/${projectSlug}/prompts`);
     const newPrompt = page.getByRole("button", { name: /new prompt|create first prompt/i }).first();
-    const crashed = page.getByRole("heading", { name: "Something went wrong" });
-    await newPrompt.or(crashed).first().waitFor({ state: "visible", timeout: 90000 });
-    if (await crashed.isVisible()) {
-      throw new Error(
-        "Prompt Studio crashes on load, so a prompt cannot be created: PublishedPromptsList " +
-          "selects a fresh object out of the tabs store on every render, and the store " +
-          "subscription re-renders on it forever. " +
-          "packages/features/prompt/web/src/screens/prompt-studio/sidebar/published-prompts-list.tsx:19. " +
-          "Recorded as D2 in dev/docs/plans/e2e-journey-2026-09-04.md.",
-      );
-    }
+    await newPrompt.waitFor({ state: "visible", timeout: 90000 });
 
     await newPrompt.click();
     await page.getByTestId("save-prompt-button").click();

@@ -344,6 +344,21 @@ describe("<RunDialog/>", () => {
     expect(mockOpenDrawer).toHaveBeenCalledWith("agentTypeSelector");
   });
 
+  /** @scenario "The reason a refused run cannot start is readable without a mouse" */
+  it("prints why the run is refused beside the disabled Run button", () => {
+    mockAgentsGetAll.mockReturnValue({ data: [] });
+    renderDialog(suiteSubject());
+
+    expect(screen.getByTestId("run-dialog-run")).toBeDisabled();
+    // Read from the dialog itself rather than hovered out of a tooltip: a
+    // disabled button takes no focus, so a tooltip is mouse-only.
+    const reason = screen.getByText("Choose an agent to run against.");
+    expect(screen.getByTestId("run-dialog-run")).toHaveAttribute(
+      "aria-describedby",
+      reason.getAttribute("id"),
+    );
+  });
+
   /** @scenario "A run with no target selected is refused" */
   it("keeps the dialog open and says a target is needed when the run is refused", async () => {
     const user = userEvent.setup();

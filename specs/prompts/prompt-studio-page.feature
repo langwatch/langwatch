@@ -33,3 +33,11 @@ Feature: Prompt Studio page
     When I choose "View Trace" on that turn
     Then the address names the trace drawer and carries the trace it is about
     And no parameter left over from a previously opened drawer remains in the address
+
+  @integration
+  Scenario: The prompts sidebar lists published prompts without the studio failing
+    Given I am signed in with the "prompts:view" grant on the project
+    And the project holds a published prompt
+    When I open the prompts page
+    Then the published prompt is listed once
+    And opening a prompt in a tab leaves the list as it was
