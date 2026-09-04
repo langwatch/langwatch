@@ -243,6 +243,21 @@ describe("createAnnotationCommand()", () => {
       expect(document.error.code).toBe("validation_error");
       expect(document.error.message).toContain("--thumbs-up");
     });
+
+    it("refuses both rating flags rather than silently picking one", async () => {
+      await expect(
+        createAnnotationCommand("trace_abc", {
+          comment: "Cannot be both",
+          thumbsUp: true,
+          thumbsDown: true,
+        }),
+      ).rejects.toThrow(ProcessExitError);
+
+      expect(mockCreate).not.toHaveBeenCalled();
+      const document = stdoutDocument();
+      expect(document.error.code).toBe("validation_error");
+      expect(document.error.message).toContain("cannot be combined");
+    });
   });
 });
 

@@ -33,6 +33,17 @@ export const createAnnotationCommand = async (
     });
     process.exit(1);
   }
+  // An annotation carries one rating, so asking for both is a mistake worth
+  // naming rather than resolving silently in favour of whichever is checked
+  // first.
+  if (options.thumbsUp === true && options.thumbsDown === true) {
+    reportCommandError({
+      error: commandValidationError(
+        "--thumbs-up and --thumbs-down cannot be combined: an annotation carries one rating.",
+      ),
+    });
+    process.exit(1);
+  }
 
   await resolveCredentials();
 
