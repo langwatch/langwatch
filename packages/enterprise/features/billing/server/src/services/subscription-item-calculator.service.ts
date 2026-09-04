@@ -94,7 +94,10 @@ export class SubscriptionItemCalculatorService {
     }
 
     const limits = PLAN_LIMITS[input.plan];
-    if (!limits) return [];
+    if (!limits) {
+      return [];
+    }
+
     const totalTraces = Math.max(0, input.tracesToAdd - limits.maxMessagesPerMonth);
     const totalMembers = Math.max(0, input.membersToAdd - limits.maxMembers);
 
@@ -105,21 +108,39 @@ export class SubscriptionItemCalculatorService {
       });
     } else if (totalTraces > 0 && planConfig) {
       const quantity = Math.floor(totalTraces / planConfig.tracesUnit);
-      if (quantity > 0) updates.push({ price: this.prices[planConfig.tracesPriceKey], quantity });
+      if (quantity > 0) {
+        updates.push({ price: this.prices[planConfig.tracesPriceKey], quantity });
+      }
     }
-    if (userItem) updates.push({ id: userItem.id, quantity: totalMembers });
-    else if (totalMembers > 0 && planConfig)
+
+    if (userItem) {
+      updates.push({ id: userItem.id, quantity: totalMembers });
+    } else if (totalMembers > 0 && planConfig) {
       updates.push({
         price: this.prices[planConfig.userPriceKey],
         quantity: totalMembers,
       });
-    if (planItem) updates.push({ id: planItem.id, quantity: 1 });
-    else {
-      const basePrice = this.tryGetBasePrice(input.plan);
-      if (basePrice) updates.push({ price: basePrice, quantity: 1 });
     }
-    for (const item of deleteItems) updates.push({ id: item.id, deleted: true });
-    for (const item of updates) if (item.quantity === 0) item.deleted = true;
+
+    if (planItem) {
+      updates.push({ id: planItem.id, quantity: 1 });
+    } else {
+      const basePrice = this.tryGetBasePrice(input.plan);
+      if (basePrice) {
+        updates.push({ price: basePrice, quantity: 1 });
+      }
+    }
+
+    for (const item of deleteItems) {
+      updates.push({ id: item.id, deleted: true });
+    }
+
+    for (const item of updates) {
+      if (item.quantity === 0) {
+        item.deleted = true;
+      }
+    }
+
     return updates;
   }
 
@@ -134,9 +155,14 @@ export class SubscriptionItemCalculatorService {
         input.priceId === this.prices[candidate.userPriceKey] ||
         input.priceId === this.prices[candidate.tracesPriceKey],
     );
-    if (!config) return 0;
-    if (input.priceId === this.prices[config.userPriceKey])
+    if (!config) {
+      return 0;
+    }
+
+    if (input.priceId === this.prices[config.userPriceKey]) {
       return input.quantity + (limits?.maxMembers ?? 0);
+    }
+
     return input.quantity * config.tracesUnit + (limits?.maxMessagesPerMonth ?? 0);
   }
 
@@ -147,18 +173,25 @@ export class SubscriptionItemCalculatorService {
   ): SubscriptionItemUpdate[] {
     const config = this.tryGetPlanConfig(plan);
     const limits = PLAN_LIMITS[plan];
-    if (!config || !limits) return [];
+    if (!config || !limits) {
+      return [];
+    }
+
     const updates: SubscriptionItemUpdate[] = [];
     const totalMembers = Math.max(0, users.quantity - limits.maxMembers);
     const totalTraces = Math.max(0, traces.quantity - limits.maxMessagesPerMonth);
-    if (totalMembers > 0)
+    if (totalMembers > 0) {
       updates.push({ price: this.prices[config.userPriceKey], quantity: totalMembers });
+    }
+
     const tracesQuantity = Math.floor(totalTraces / config.tracesUnit);
-    if (tracesQuantity > 0)
+    if (tracesQuantity > 0) {
       updates.push({
         price: this.prices[config.tracesPriceKey],
         quantity: tracesQuantity,
       });
+    }
+
     return updates;
   }
 
@@ -168,7 +201,10 @@ export class SubscriptionItemCalculatorService {
 
   private tryGetBasePrice(plan: PlanType): string | undefined {
     const config = this.tryGetPlanConfig(plan);
-    if (config) return this.prices[config.basePriceKey];
+    if (config) {
+      return this.prices[config.basePriceKey];
+    }
+
     return isStripePriceName(plan) ? this.prices[plan] : undefined;
   }
 }

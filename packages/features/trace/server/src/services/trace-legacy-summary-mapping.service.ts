@@ -69,6 +69,7 @@ export function mapAttributesToMetadata(
   if (topicId) {
     metadata.topic_id = topicId;
   }
+
   if (subTopicId) {
     metadata.subtopic_id = subTopicId;
   }
@@ -136,10 +137,15 @@ export function mapAttributesToMetadata(
   }
 
   for (const [key, value] of Object.entries(attributes)) {
-    if (knownKeys.has(key)) continue;
+    if (knownKeys.has(key)) {
+      continue;
+    }
+
     // Strip internal metadata. prefix so API returns bare keys (e.g., "user" not "metadata.user")
     const bareKey = key.startsWith("metadata.") ? key.slice("metadata.".length) : key;
-    if (bareKey && metadata[bareKey] === undefined) metadata[bareKey] = value;
+    if (bareKey && metadata[bareKey] === undefined) {
+      metadata[bareKey] = value;
+    }
   }
 
   addOtelLogRecordCountAlias(metadata, attributes);
@@ -189,10 +195,16 @@ function tokenMetricsFromAttributes(
     [keyof typeof RESERVED_TOKEN_METRIC_ATTRIBUTES, string]
   >) {
     const raw = attributes[attrKey];
-    if (raw == null || raw === "") continue;
+    if (raw == null || raw === "") {
+      continue;
+    }
+
     const value = Number(raw);
-    if (Number.isFinite(value)) metrics[metricKey] = value;
+    if (Number.isFinite(value)) {
+      metrics[metricKey] = value;
+    }
   }
+
   return metrics;
 }
 
@@ -245,7 +257,9 @@ function extractTextFromStateObject(
   fieldNames: readonly string[],
   depth = 0,
 ): string | null {
-  if (depth >= MAX_STATE_OBJECT_RECURSION_DEPTH) return null;
+  if (depth >= MAX_STATE_OBJECT_RECURSION_DEPTH) {
+    return null;
+  }
 
   for (const field of fieldNames) {
     const value = obj[field];
@@ -306,6 +320,7 @@ function extractTextFromMessages(
     if (type === "json" && typeof value === "object" && value !== null) {
       // Extract text from state object using common field names
       const fieldNames = mode === "input" ? INPUT_FIELD_NAMES : OUTPUT_FIELD_NAMES;
+
       return extractTextFromStateObject(value as Record<string, unknown>, fieldNames);
     }
 
@@ -338,9 +353,13 @@ function hasAnnotatedType(
   type: string,
 ): boolean {
   const raw = attributes["langwatch.reserved.value_types"];
-  if (!raw) return false;
+  if (!raw) {
+    return false;
+  }
+
   try {
     const arr: string[] = JSON.parse(raw);
+
     return arr.includes(`${attrKey}=${type}`);
   } catch {
     return false;
@@ -377,7 +396,9 @@ function parseComputedInput(
     // If annotated as chat_messages, treat as message array
     if (isChatMessages && Array.isArray(parsed)) {
       const text = extractTextFromMessages(parsed, "input", traceCanonicalisation);
-      if (text) return { value: text };
+      if (text) {
+        return { value: text };
+      }
     }
 
     const text = extractTextFromMessages(parsed, "input", traceCanonicalisation);
@@ -423,7 +444,9 @@ function parseComputedOutput(
     // If annotated as chat_messages, treat as message array
     if (isChatMessages && Array.isArray(parsed)) {
       const text = extractTextFromMessages(parsed, "output", traceCanonicalisation);
-      if (text) return { value: text };
+      if (text) {
+        return { value: text };
+      }
     }
 
     const text = extractTextFromMessages(parsed, "output", traceCanonicalisation);
@@ -475,11 +498,15 @@ export function extractEventsFromSpans({
 
   for (const span of spans) {
     const eventObj = span.params?.event;
-    if (typeof eventObj !== "object" || eventObj === null) continue;
+    if (typeof eventObj !== "object" || eventObj === null) {
+      continue;
+    }
 
     const eventRecord = eventObj as Record<string, unknown>;
     const eventType = eventRecord.type;
-    if (typeof eventType !== "string" || !eventType) continue;
+    if (typeof eventType !== "string" || !eventType) {
+      continue;
+    }
 
     const metrics: Record<string, number> = {};
     const rawMetrics = eventRecord.metrics;

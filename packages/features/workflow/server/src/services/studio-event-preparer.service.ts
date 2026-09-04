@@ -48,6 +48,7 @@ export class StudioEventPreparerService implements StudioEventPreparer {
 
   async prepare(input: StudioEventPreparationInput): Promise<StudioClientEvent> {
     const event = await this.enrich(input);
+
     return this.materializer.materialize({
       event,
       projectId: input.projectId,

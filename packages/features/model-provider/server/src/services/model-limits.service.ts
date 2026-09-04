@@ -19,7 +19,10 @@ const logger = createLogger("langwatch:model-provider:model-limits");
 function modelNameVariations(modelName: string): string[] {
   const variations = [modelName];
   const baseName = modelName.split("/").pop() ?? modelName;
-  if (baseName !== modelName) variations.push(baseName);
+  if (baseName !== modelName) {
+    variations.push(baseName);
+  }
+
   return variations;
 }
 
@@ -36,9 +39,11 @@ export function getModelLimits(modelName: string): ModelLimits | null {
         };
       }
     }
+
     return null;
   } catch (error) {
     logger.error({ modelName, error }, "error getting model limits");
+
     return null;
   }
 }

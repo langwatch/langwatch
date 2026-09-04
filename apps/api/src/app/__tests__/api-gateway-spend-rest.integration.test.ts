@@ -217,7 +217,7 @@ function buildApp(options?: {
         headers: {
           Authorization: `Bearer ${ORGANIZATION_TOKEN}`,
           "Content-Type": "application/json",
-          ...(init?.headers ?? {}),
+          ...init?.headers,
         },
       }),
     );

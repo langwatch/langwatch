@@ -105,6 +105,7 @@ export class DataRetentionService extends DataRetentionServiceContract {
     category: RetentionCategory;
   }): Promise<number> {
     const retention = await this.getResolvedForProject({ projectId: input.projectId });
+
     return retention[input.category];
   }
 
@@ -120,6 +121,7 @@ export class DataRetentionService extends DataRetentionServiceContract {
     const remaining = rows.filter(
       (row) => !(row.scopeType === input.scope.scopeType && row.scopeId === input.scope.scopeId),
     );
+
     return resolveRetention({
       rows: remaining,
       chain: resolvedScope.chain,
@@ -152,6 +154,7 @@ export class DataRetentionService extends DataRetentionServiceContract {
       organizationId: resolvedScope.organizationId,
     });
     await this.invalidateForScope(input.scope);
+
     return row;
   }
 
@@ -165,6 +168,7 @@ export class DataRetentionService extends DataRetentionServiceContract {
 
   async pin(input: PinTraceInput): Promise<PinnedTrace> {
     const parsed = pinTraceInputSchema.parse(input);
+
     return this.pinRepository.create({ ...parsed, source: "manual" });
   }
 
@@ -175,6 +179,7 @@ export class DataRetentionService extends DataRetentionServiceContract {
 
   async autoPin(input: UnpinTraceInput): Promise<PinnedTrace> {
     const parsed = unpinTraceInputSchema.parse(input);
+
     return this.pinRepository.create({ ...parsed, source: "share" });
   }
 
@@ -261,6 +266,7 @@ export class DataRetentionService extends DataRetentionServiceContract {
     if (scope.scopeType === "ORGANIZATION") {
       return { organizationId: scope.scopeId, chain: [scope] };
     }
+
     if (scope.scopeType === "TEAM") {
       const team = await this.tryGetTeam(scope.scopeId);
       if (!team) {
@@ -272,6 +278,7 @@ export class DataRetentionService extends DataRetentionServiceContract {
         chain: [scope, { scopeType: "ORGANIZATION", scopeId: team.organizationId }],
       };
     }
+
     const project = await this.projects.tryGetWithTeam(scope.scopeId);
     if (!project) {
       return null;
@@ -302,13 +309,16 @@ export class DataRetentionService extends DataRetentionServiceContract {
         organizationId: team.organizationId,
         teamId: scope.scopeId,
       });
+
       return projects.map((project) => project.id);
     }
+
     const projects = await this.projects.listByOrganization({
       organizationId: scope.scopeId,
       page: 1,
       limit: 10_000,
     });
+
     return projects.data.map((project) => project.id);
   }
 

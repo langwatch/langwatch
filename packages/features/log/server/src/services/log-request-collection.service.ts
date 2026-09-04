@@ -122,6 +122,7 @@ export class LogRequestCollectionService {
               "Failed to enqueue canonical log record batch",
             );
             span.setAttribute("logs.ingestion.unavailable", preparation.accepted.length);
+
             return {
               outcome: "unavailable",
               errorMessage: PERSISTENCE_ERROR_MESSAGE,
@@ -140,6 +141,7 @@ export class LogRequestCollectionService {
             ) {
               continue;
             }
+
             try {
               contributions.push(makeTraceContribution(prepared, this.deps.traceCanonicalisation));
             } catch (error) {
@@ -185,6 +187,7 @@ export class LogRequestCollectionService {
         span.setAttribute("logs.ingestion.successes", acceptedLogRecords);
         span.setAttribute("logs.ingestion.failures", rejectedLogRecords);
         const errorMessage = errors.length ? errors.join("; ").slice(0, 1024) : undefined;
+
         return {
           outcome: "collected",
           acceptedLogRecords,
@@ -225,12 +228,14 @@ function makeTraceContribution(
       liftedAttributes[key] = value;
     }
   }
+
   const io = TraceLogRecordIOService.create(traceCanonicalisation).extractIO(legacyView);
   const input = io.input === null ? null : utf8Preview(io.input, IO_PREVIEW_BYTES);
   const output = io.output === null ? null : utf8Preview(io.output, IO_PREVIEW_BYTES);
   if (input !== io.input || output !== io.output) {
     liftedAttributes["langwatch.reserved.log_io_truncated"] = true;
   }
+
   return {
     tenantId: record.tenantId,
     recordId: record.recordId,

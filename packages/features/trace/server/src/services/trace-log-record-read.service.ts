@@ -59,6 +59,7 @@ export class LogRecordStorageService {
         limit,
       }),
     ]);
+
     // Keep-last dedup: canonical goes LAST so it wins a divergent duplicate,
     // matching "canonical is the authoritative store".
     return mergeStoredLogRows([...legacy, ...canonical], limit);

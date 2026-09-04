@@ -61,6 +61,7 @@ const applyVisibilityGate = <T extends Span>(
   if (visibilityCutoffMs === null || visibilityCutoffMs === undefined) {
     return spans;
   }
+
   return spans.map((span) =>
     span.timestamps.started_at < visibilityCutoffMs ? redactSpanContent(span) : span,
   );
@@ -111,6 +112,7 @@ export class SpanStorageService {
       ioExtractionService: this.blobResolutionDeps.ioExtractionService,
       logger: this.logger,
     });
+
     return applyVisibilityGate(mapNormalizedSpansToSpans(resolvedSpans), params.visibilityCutoffMs);
   }
 
@@ -167,7 +169,10 @@ export class SpanStorageService {
       logger: this.logger,
     });
     const resolved = resolvedSpans.find((s) => s.spanId === params.spanId);
-    if (!resolved) return null;
+    if (!resolved) {
+      return null;
+    }
+
     return gateOne(mapNormalizedSpanToSpan(resolved));
   }
 
@@ -212,6 +217,7 @@ export class SpanStorageService {
     params: Paginated & VisibilityGate,
   ): Promise<{ spans: Span[]; total: number }> {
     const page = await this.repository.findSpansPaginated(params);
+
     return {
       ...page,
       spans: applyVisibilityGate(page.spans, params.visibilityCutoffMs),

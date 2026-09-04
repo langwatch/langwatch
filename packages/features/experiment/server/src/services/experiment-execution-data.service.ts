@@ -29,7 +29,9 @@ const parseJsonColumns = (
   rows: Array<Record<string, unknown>>,
   jsonColumnKeys: Set<string>,
 ): Array<Record<string, unknown>> => {
-  if (jsonColumnKeys.size === 0) return rows;
+  if (jsonColumnKeys.size === 0) {
+    return rows;
+  }
 
   return rows.map((row) => {
     const parsedRow = { ...row };
@@ -43,6 +45,7 @@ const parseJsonColumns = (
         }
       }
     }
+
     return parsedRow;
   });
 };
@@ -66,6 +69,7 @@ const normalizeColumnIdsToNames = (
       // Use name if we have a mapping, otherwise keep the key as-is
       normalized[idToName[key] ?? key] = value;
     }
+
     return normalized;
   });
 };
@@ -228,6 +232,7 @@ const rowsFromInlineData = (data: Array<Record<string, unknown>>): LoadedDataset
       }
     }
   }
+
   return {
     rows: data,
     columns: columnNames.map((name) => ({ id: name, name, type: "string" })),
@@ -378,6 +383,7 @@ export const loadExecutionData = async (
     if ("error" in datasetResult) {
       return datasetResult;
     }
+
     baseDataset = datasetResult;
   }
 
@@ -395,7 +401,10 @@ export const loadExecutionData = async (
 
   for (const target of targets) {
     if (target.type === "prompt" && target.promptId) {
-      if (loadedPrompts.has(promptLoadKey(target))) continue;
+      if (loadedPrompts.has(promptLoadKey(target))) {
+        continue;
+      }
+
       try {
         const prompt = await promptService.tryGetPromptByIdOrHandle({
           idOrHandle: target.promptId,
@@ -408,6 +417,7 @@ export const loadExecutionData = async (
           const versionInfo = target.promptVersionNumber
             ? ` version ${target.promptVersionNumber}`
             : "";
+
           return {
             error: `Prompt "${target.promptId}"${versionInfo} not found`,
             status: 404,
@@ -425,6 +435,7 @@ export const loadExecutionData = async (
           },
           "Failed to load prompt for target",
         );
+
         return {
           error: `Failed to load prompt "${target.promptId}"${versionInfo}: ${(promptError as Error).message}`,
           status: 404,
@@ -455,8 +466,10 @@ export const loadExecutionData = async (
         if (error instanceof AgentNotFoundError) {
           return { error: `Agent "${target.dbAgentId}" not found`, status: 404 };
         }
+
         throw error;
       }
+
       loadedAgents.set(target.dbAgentId, agent);
     }
   }
@@ -508,14 +521,22 @@ export const loadExecutionData = async (
   };
 
   for (const target of targets) {
-    if (target.type !== "workflow" || !target.workflowId) continue;
-    if (loadedWorkflows.has(workflowLoadKey(target))) continue;
+    if (target.type !== "workflow" || !target.workflowId) {
+      continue;
+    }
+
+    if (loadedWorkflows.has(workflowLoadKey(target))) {
+      continue;
+    }
 
     const result = await loadPublishedWorkflow({
       workflowId: target.workflowId,
       workflowVersionId: target.workflowVersionId,
     });
-    if ("error" in result) return result;
+    if ("error" in result) {
+      return result;
+    }
+
     loadedWorkflows.set(workflowLoadKey(target), result);
   }
 
@@ -526,21 +547,33 @@ export const loadExecutionData = async (
   // agent's (nonexistent) code. Resolve and cache that linked workflow here so
   // the orchestrator can dispatch it to executeWorkflowCell.
   for (const target of targets) {
-    if (target.type !== "agent" || !target.dbAgentId) continue;
+    if (target.type !== "agent" || !target.dbAgentId) {
+      continue;
+    }
+
     const agent = loadedAgents.get(target.dbAgentId);
-    if (agent?.type !== "workflow") continue;
+    if (agent?.type !== "workflow") {
+      continue;
+    }
 
     const linkedWorkflowId =
       agent.workflowId ?? (agent.config as { workflow_id?: string }).workflow_id;
-    if (!linkedWorkflowId) continue;
+    if (!linkedWorkflowId) {
+      continue;
+    }
 
     const key = workflowLoadKey({ workflowId: linkedWorkflowId });
-    if (loadedWorkflows.has(key)) continue;
+    if (loadedWorkflows.has(key)) {
+      continue;
+    }
 
     const result = await loadPublishedWorkflow({
       workflowId: linkedWorkflowId,
     });
-    if ("error" in result) return result;
+    if ("error" in result) {
+      return result;
+    }
+
     loadedWorkflows.set(key, result);
   }
 
@@ -569,6 +602,7 @@ export const loadExecutionData = async (
       "ExecutionDataServices.evaluators is required when an execution references an evaluator",
     );
   }
+
   for (const evaluatorId of evaluatorIdsToLoad) {
     const dbEvaluator = await services.evaluators?.tryGetById({
       id: evaluatorId,
@@ -580,6 +614,7 @@ export const loadExecutionData = async (
     if (!dbEvaluator) {
       return { error: `Evaluator "${evaluatorId}" not found`, status: 404 };
     }
+
     loadedEvaluators.set(evaluatorId, dbEvaluator);
   }
 

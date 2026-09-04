@@ -36,6 +36,7 @@ export class SeatSyncService {
         organizationId,
         totalMembers: newTotalSeats,
       });
+
       return result.success;
     } catch (error) {
       // The seat updater throws handled errors for the states it can name
@@ -52,8 +53,10 @@ export class SeatSyncService {
           { organizationId, code: error.code, fault: error.fault },
           "[billing] Seat sync did not reach the billing provider",
         );
+
         return false;
       }
+
       throw error;
     }
   }

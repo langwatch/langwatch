@@ -79,9 +79,9 @@ export const getLastOutputAsText = (spans: Span[]): string => {
   // doesn't finish last because of some background process span being captured
   // `.reverse()` on a fresh array rather than `.toReversed()`: the packaged
   // build targets an `es2022` library, and the copy is what the method does.
-  const topLevelNodes = [
-    ...flattenSpanTree(organizeSpansIntoTree(spans), "inside-out").filter(nonEmptySpan),
-  ].reverse();
+  const topLevelNodes = flattenSpanTree(organizeSpansIntoTree(spans), "inside-out")
+    .filter(nonEmptySpan)
+    .reverse();
   const singleTopLevelNode = topLevelNodes.length === 1 ? topLevelNodes[0] : undefined;
 
   if (singleTopLevelNode?.output) {
@@ -164,14 +164,13 @@ export const typedValueToText = (
         : Array.isArray(content)
           ? content.map(textFromContentBlock).join("")
           : JSON.stringify(lastMessage);
-    } else {
-      return typed.value
-        .map((message) => {
-          const content = getMessageContent(message);
-          return content ?? JSON.stringify(message);
-        })
-        .join("");
     }
+    return typed.value
+      .map((message) => {
+        const content = getMessageContent(message);
+        return content ?? JSON.stringify(message);
+      })
+      .join("");
   } else if (typed.type == "json") {
     // A candidate value is "meaningful" when it's defined and not an empty
     // string/array/object — applied RECURSIVELY so a shell like
@@ -358,7 +357,7 @@ export const typedValueToText = (
       }
 
       return firstAndOnlyKey(json) ?? stringified(json);
-    } catch (_e) {
+    } catch {
       return typed.value?.toString() ?? "";
     }
   } else if (typed.type == "list") {
@@ -423,7 +422,7 @@ export const flattenSpanTree = (
   const appendSpans = (spans: SpanWithChildren[]) => {
     spans.forEach((span) => {
       const spanWithoutChildren: Span = { ...span };
-      //@ts-ignore
+      //@ts-expect-error
       delete spanWithoutChildren.children;
       result.push(spanWithoutChildren);
     });

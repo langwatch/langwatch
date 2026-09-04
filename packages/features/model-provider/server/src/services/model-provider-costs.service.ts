@@ -71,6 +71,7 @@ export class ModelProviderCostsService {
     });
 
     const now = new Date();
+
     return this.options.costs.save({
       id: existing?.id ?? parsed.id ?? this.options.ids.generate({ type: "cost" }),
       organizationId,
@@ -101,6 +102,7 @@ export class ModelProviderCostsService {
     if (!organizationId || organizationId !== existing.organizationId) {
       throw new ModelCostNotFoundError();
     }
+
     await this.assertWritable({
       actorId: parsed.actorId,
       currentScope: { scopeType: existing.scopeType, scopeId: existing.scopeId },
@@ -134,6 +136,7 @@ export class ModelProviderCostsService {
         throw new ModelProviderInvalidError("Cannot manage the current cost scope");
       }
     }
+
     if (input.targetScope) {
       const canWriteTarget = await this.options.authorization.canWrite(
         input.actorId,

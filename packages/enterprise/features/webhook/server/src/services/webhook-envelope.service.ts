@@ -67,9 +67,13 @@ function envelopeKind(status: WebhookSpendEventStatus): {
 }
 
 function parseMetadata(raw: string): Record<string, unknown> {
-  if (!raw) return {};
+  if (!raw) {
+    return {};
+  }
+
   try {
     const parsed: unknown = JSON.parse(raw);
+
     return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
       ? (parsed as Record<string, unknown>)
       : {};
@@ -90,6 +94,7 @@ export class WebhookEnvelopeService {
     const settled = row.status === "settled";
     const unknownQuantities = settled || row.status === "admitted";
     const eventId = `${row.gatewayRequestId}:${idSuffix}`;
+
     return {
       id: eventId,
       type,

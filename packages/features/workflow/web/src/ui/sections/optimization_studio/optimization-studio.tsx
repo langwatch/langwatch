@@ -131,7 +131,7 @@ export default function OptimizationStudio() {
   } = useWorkflowStore(
     useShallow((state) => {
       if (typeof window !== "undefined") {
-        // @ts-ignore
+        // @ts-expect-error
         window.state = state;
       }
       return {

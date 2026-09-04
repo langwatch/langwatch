@@ -251,6 +251,7 @@ export class TraceService {
         "This trace read was composed with no log-record reader, so a coding-agent trace cannot be enriched with the content its spans left in the trace's log records.",
       );
     }
+
     return injected;
   }
 
@@ -278,8 +279,12 @@ export class TraceService {
     withEditOverlay?: boolean;
   }): Promise<Trace> {
     const enriched = await this.enrichCodingAgentTrace(projectId, trace);
-    if (!withEditOverlay) return enriched;
+    if (!withEditOverlay) {
+      return enriched;
+    }
+
     const [corrected] = await this.applyEditOverlays(projectId, [enriched], protections);
+
     return corrected ?? enriched;
   }
 
@@ -302,17 +307,25 @@ export class TraceService {
     traces: Trace[],
     protections: Protections,
   ): Promise<Trace[]> {
-    if (traces.length === 0) return traces;
+    if (traces.length === 0) {
+      return traces;
+    }
+
     const patches = await this.editOverlayService().getPatchesByTraceIds({
       projectId,
       traceIds: traces.map((trace) => trace.trace_id),
     });
-    if (patches.size === 0) return traces;
+    if (patches.size === 0) {
+      return traces;
+    }
 
     let changed = false;
     const corrected = traces.map((trace) => {
       const patch = patches.get(trace.trace_id);
-      if (!patch) return trace;
+      if (!patch) {
+        return trace;
+      }
+
       const next = applyOverlayToTrace({
         trace,
         patch: redactPatchForViewer({
@@ -321,9 +334,13 @@ export class TraceService {
           isWindowRedacted: trace.redacted_by_visibility_window === true,
         }),
       });
-      if (next !== trace) changed = true;
+      if (next !== trace) {
+        changed = true;
+      }
+
       return next;
     });
+
     return changed ? corrected : traces;
   }
 
@@ -439,8 +456,10 @@ export class TraceService {
           if (candidates.length === 0) {
             return undefined;
           }
+
           if (candidates.length > 1) {
             span.setAttribute("trace.id.prefix.ambiguous", true);
+
             throw new AmbiguousTraceIdPrefixError(traceId, candidates);
           }
 
@@ -452,6 +471,7 @@ export class TraceService {
             undefined,
             { resolveBlobs: opts?.full },
           );
+
           return resolved[0] ? finish(resolved[0]) : undefined;
         }
 
@@ -474,7 +494,10 @@ export class TraceService {
     const hasCodingAgentTrace = traces.some(
       (trace) => trace.metadata?.["langwatch.origin"] === CODING_AGENT_ORIGIN,
     );
-    if (!hasCodingAgentTrace) return traces;
+    if (!hasCodingAgentTrace) {
+      return traces;
+    }
+
     // Bounded fan-out: each coding-agent trace's enrichment holds a capped but
     // heavy log read (raw bodies run to 60 KB a row) in memory, so an
     // unbounded Promise.all over a big export/eval page multiplies that by the
@@ -492,6 +515,7 @@ export class TraceService {
         enriched[start + offset] = results[offset]!;
       }
     }
+
     return enriched;
   }
 
@@ -510,6 +534,7 @@ export class TraceService {
     if (trace.metadata?.["langwatch.origin"] !== CODING_AGENT_ORIGIN) {
       return trace;
     }
+
     const spans = await enrichCodingAgentSpansFromLogs({
       logRecords: this.logRecordStorageService(),
       tenantId: projectId,
@@ -519,6 +544,7 @@ export class TraceService {
       logger: this.logger,
       traceCanonicalisation: this.traceCanonicalisation,
     });
+
     return spans === trace.spans ? trace : { ...trace, spans };
   }
 
@@ -559,7 +585,10 @@ export class TraceService {
           { resolveBlobs: opts?.full },
         );
         const enriched = await this.enrichCodingAgentTraces(projectId, traces);
-        if (!opts?.withEditOverlay) return enriched;
+        if (!opts?.withEditOverlay) {
+          return enriched;
+        }
+
         return this.applyEditOverlays(projectId, enriched, protections);
       },
     );
@@ -592,6 +621,7 @@ export class TraceService {
           protections,
           { resolveBlobs: opts?.full },
         );
+
         return this.enrichCodingAgentTraces(projectId, traces);
       },
     );
@@ -619,7 +649,10 @@ export class TraceService {
           protections,
           options,
         );
-        if (!options.includeSpans) return result;
+        if (!options.includeSpans) {
+          return result;
+        }
+
         // includeSpans callers (bulk export, search) read whole spans, so the
         // Claude Code content + cost join applies here exactly as on the
         // single-trace and thread reads. Enrichment runs over the flattened
@@ -628,13 +661,17 @@ export class TraceService {
         // array reference and pays nothing.
         const flat = result.groups.flat();
         const enriched = await this.enrichCodingAgentTraces(input.projectId, flat);
-        if (enriched === flat) return result;
+        if (enriched === flat) {
+          return result;
+        }
+
         // The helper is positional (same order, same length), so the groups
         // rebuild by position rather than by id.
         let cursor = 0;
         const groups = result.groups.map((group) =>
           group.map(() => enriched[cursor++] as (typeof group)[number]),
         );
+
         return { ...result, groups };
       },
     );
@@ -740,7 +777,10 @@ export class TraceService {
           { resolveBlobs: opts?.full },
         );
         const enriched = await this.enrichCodingAgentTraces(projectId, traces);
-        if (!opts?.withEditOverlay) return enriched;
+        if (!opts?.withEditOverlay) {
+          return enriched;
+        }
+
         return this.applyEditOverlays(projectId, enriched, protections);
       },
     );

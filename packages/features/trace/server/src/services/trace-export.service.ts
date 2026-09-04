@@ -80,6 +80,7 @@ export class TraceExportService {
         scrollId: null,
       },
     );
+
     return result.totalHits;
   }
 
@@ -158,6 +159,7 @@ export class TraceExportService {
 
         if (total === 0 || traces.length === 0) {
           logger.info({ projectId: request.projectId }, "No traces to export");
+
           return;
         }
       }
@@ -167,7 +169,9 @@ export class TraceExportService {
         traces,
         traceChecks: result.traceChecks,
       });
-      for (const name of batchNames) evaluatorNameSet.add(name);
+      for (const name of batchNames) {
+        evaluatorNameSet.add(name);
+      }
 
       // Merge evaluations from traceChecks into trace objects
       const enrichedTraces = enrichTracesWithEvaluations({
@@ -265,6 +269,7 @@ function serializeBatch({
       return serializeJsonBatch({ traces, request });
     default: {
       const _exhaustive: never = request.format;
+
       throw new Error(`Unsupported format: ${_exhaustive}`);
     }
   }
@@ -284,14 +289,17 @@ function serializeCsvBatch({
   switch (request.mode) {
     case "summary": {
       const fullCsv = serializeTracesToSummaryCsv({ traces, evaluatorNames });
+
       return includeHeader ? fullCsv : stripCsvHeader(fullCsv);
     }
     case "full": {
       const fullCsv = serializeTracesToFullCsv({ traces, evaluatorNames });
+
       return includeHeader ? fullCsv : stripCsvHeader(fullCsv);
     }
     default: {
       const _exhaustive: never = request.mode;
+
       throw new Error(`Unsupported mode: ${_exhaustive}`);
     }
   }
@@ -311,6 +319,7 @@ function serializeJsonBatch({
       return traces.map((trace) => serializeTraceToFullJson({ trace })).join("\n") + "\n";
     default: {
       const _exhaustive: never = request.mode;
+
       throw new Error(`Unsupported mode: ${_exhaustive}`);
     }
   }
@@ -331,5 +340,6 @@ export function stripCsvHeader(csv: string): string {
   if (firstBreak === -1) {
     return "";
   }
+
   return csv.slice(firstBreak + CSV_NEWLINE.length);
 }

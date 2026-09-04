@@ -53,6 +53,7 @@ export class FilterService {
 
         if (!this.repository) {
           span.setAttribute("clickhouse.available", false);
+
           throw new Error(
             "ClickHouse client is not available — check ClickHouse connection configuration",
           );
@@ -71,6 +72,7 @@ export class FilterService {
           });
 
           span.setAttribute("clickhouse.result_count", filterOptions.length);
+
           return filterOptions;
         } catch (error) {
           this.logger.error(
@@ -86,7 +88,10 @@ export class FilterService {
           // code the client renders guidance from - overload in particular,
           // which is a retry-in-a-moment, not a broken filter. Flattening it
           // here would throw away the very thing the typed error exists for.
-          if (error instanceof HandledError) throw error;
+          if (error instanceof HandledError) {
+            throw error;
+          }
+
           // Everything else is not rethrown: a raw ClickHouse message embeds
           // the failing SQL (table and column layout), which tRPC would
           // forward to the browser. Details stay in the server log and span.

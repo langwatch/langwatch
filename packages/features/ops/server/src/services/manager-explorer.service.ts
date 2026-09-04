@@ -102,6 +102,7 @@ export class ManagerExplorerService {
 
     const trouble = (r: ProcessFleetSummary) =>
       r.deadMessages * 4 + r.lapsedLeases * 3 + r.overduePending * 2 + r.overdueWakes;
+
     return rows.sort(
       (a, b) => trouble(b) - trouble(a) || a.processName.localeCompare(b.processName),
     );
@@ -124,7 +125,10 @@ export class ManagerExplorerService {
 
   async getInstanceDetail(params: { ref: ProcessRef }): Promise<ProcessInstanceDetail | null> {
     const instance = await this.store.findByRef({ ref: params.ref });
-    if (!instance) return null;
+    if (!instance) {
+      return null;
+    }
+
     return {
       ref: params.ref,
       tenantId: instance.tenantId,
@@ -161,6 +165,7 @@ export class ManagerExplorerService {
       this.fleet.findDeadMessages(params),
       this.fleet.countDeadByProcessName(),
     ]);
+
     return { ...page, byProcess };
   }
 
@@ -187,6 +192,7 @@ export class ManagerExplorerService {
         metadata: { previousWakeAt: result.previousWakeAt },
       });
     }
+
     return { woke: result.woke };
   }
 
@@ -207,6 +213,7 @@ export class ManagerExplorerService {
         metadata: { requeued },
       });
     }
+
     return { requeued };
   }
 
@@ -221,13 +228,17 @@ export class ManagerExplorerService {
       messageId: params.messageId,
       now: Date.now(),
     });
-    if (!result) return { redriven: false };
+    if (!result) {
+      return { redriven: false };
+    }
+
     await this.audit.append({
       actorUserId: params.actorUserId,
       action: "process_redrive_dead_message",
       ...params.ref,
       metadata: { messageKey: result.messageKey },
     });
+
     return { redriven: true };
   }
 
@@ -246,13 +257,17 @@ export class ManagerExplorerService {
       messageId: params.messageId,
       now: Date.now(),
     });
-    if (!result) return { discarded: false };
+    if (!result) {
+      return { discarded: false };
+    }
+
     await this.audit.append({
       actorUserId: params.actorUserId,
       action: "process_discard_dead_message",
       ...params.ref,
       metadata: { messageKey: result.messageKey },
     });
+
     return { discarded: true };
   }
 
@@ -282,6 +297,7 @@ export class ManagerExplorerService {
         metadata: { redriven, scope: params.processName ?? "every process" },
       });
     }
+
     return { redriven };
   }
 
@@ -304,6 +320,7 @@ export class ManagerExplorerService {
         metadata: { discarded, scope: params.processName ?? "every process" },
       });
     }
+
     return { discarded };
   }
 
@@ -332,13 +349,17 @@ export class ManagerExplorerService {
       messageId: params.messageId,
       now: Date.now(),
     });
-    if (!result) return { released: false };
+    if (!result) {
+      return { released: false };
+    }
+
     await this.audit.append({
       actorUserId: params.actorUserId,
       action: "process_release_lapsed_lease",
       ...params.ref,
       metadata: { messageKey: result.messageKey },
     });
+
     return { released: true };
   }
 
@@ -372,6 +393,7 @@ export class ManagerExplorerService {
           this.store.findByRef({ ref }),
           this.store.findMessagesByRef({ ref }),
         ]);
+
         return {
           processName: m.processName,
           pipelineName: m.pipelineName,
@@ -422,6 +444,7 @@ export class ManagerExplorerService {
     });
     // Intentionally retain these opaque operational IDs for the audit trail.
     logger.info({ ...rest, requestedBy, requeued }, "ops requeue of dead outbox messages");
+
     return { requeued };
   }
 }

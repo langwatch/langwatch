@@ -56,6 +56,7 @@ export class AnomalyAlertDispatcherService {
           })),
         },
       );
+
       return { dispatchTag: "log_only_invalid_config", outcomes: [] };
     }
 
@@ -75,6 +76,7 @@ export class AnomalyAlertDispatcherService {
         }),
       );
     }
+
     return { dispatchTag: AnomalyAlertDispatcherService.summariseOutcomes(outcomes), outcomes };
   }
 
@@ -92,6 +94,7 @@ export class AnomalyAlertDispatcherService {
         reason: "Unsupported destination type",
       };
     }
+
     return this.dispatchWebhook({ ...input, destination: input.destination });
   }
 
@@ -130,8 +133,11 @@ export class AnomalyAlertDispatcherService {
             status: "succeeded",
           };
         }
+
         lastError = `HTTP ${response.status} ${response.statusText}`;
-        if (response.status < 500 || response.status >= 600) break;
+        if (response.status < 500 || response.status >= 600) {
+          break;
+        }
       } catch (error) {
         lastError =
           error instanceof Error
@@ -140,6 +146,7 @@ export class AnomalyAlertDispatcherService {
       } finally {
         clearTimeout(timer);
       }
+
       if (attempt < this.maxRetries && this.retryBackoffMs > 0) {
         await AnomalyAlertDispatcherService.sleep(this.retryBackoffMs * 2 ** attempt);
       }
@@ -151,6 +158,7 @@ export class AnomalyAlertDispatcherService {
       url: input.destination.url,
       reason: lastError,
     });
+
     return {
       destinationIndex: input.destinationIndex,
       type: "webhook",
@@ -181,10 +189,14 @@ export class AnomalyAlertDispatcherService {
   private static summariseOutcomes(outcomes: AnomalyAlertDispatchOutcome[]): string {
     const succeeded = outcomes.filter((outcome) => outcome.status === "succeeded").length;
     const failed = outcomes.length - succeeded;
-    if (succeeded > 0 && failed === 0) return `dispatched_webhook_${succeeded}`;
+    if (succeeded > 0 && failed === 0) {
+      return `dispatched_webhook_${succeeded}`;
+    }
+
     if (succeeded > 0) {
       return `dispatched_webhook_${succeeded}_failed_${failed}`;
     }
+
     return `failed_webhook_${failed}`;
   }
 

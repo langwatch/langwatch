@@ -99,19 +99,25 @@ export class SuiteService extends SuiteServiceContract {
   async get(input: SuiteIdInput): Promise<Suite> {
     const parsed = suiteIdInputSchema.parse(input);
     const suite = await this.tryGet(parsed);
-    if (!suite) throw new SuiteNotFoundError(parsed.id);
+    if (!suite) {
+      throw new SuiteNotFoundError(parsed.id);
+    }
+
     return suite;
   }
 
   async tryGet(input: SuiteIdInput): Promise<Suite | null> {
     const parsed = suiteIdInputSchema.parse(input);
     const suite = await this.options.repository.tryFindById(parsed);
-    if (suite) return suite;
+    if (suite) {
+      return suite;
+    }
 
     const testSuite = await this.options.scenarios.tryGetTestSuite({
       testSuiteId: parsed.id,
       projectId: parsed.projectId,
     });
+
     return testSuite ? SuiteService.testSuiteToSuite(testSuite) : null;
   }
 
@@ -119,6 +125,7 @@ export class SuiteService extends SuiteServiceContract {
     const parsed = createSuiteCommandSchema.parse(input);
     const slug = SuiteService.slugify(parsed.name);
     await this.assertSlugAvailable({ projectId: parsed.projectId, slug });
+
     return this.options.repository.create({
       ...parsed,
       id: (this.options.generateId ?? SuiteService.defaultGenerateId)(),
@@ -130,8 +137,13 @@ export class SuiteService extends SuiteServiceContract {
     const parsed = updateSuiteCommandSchema.parse(input);
     const existing = await this.get({ id: parsed.id, projectId: parsed.projectId });
     if (existing.kind === "test_suite") {
-      if (parsed.scope !== void 0) throw new SuiteScopeNotAllowedError();
-      if (parsed.scenarioIds !== void 0) throw new SuiteTestSuiteMembershipManagedError();
+      if (parsed.scope !== void 0) {
+        throw new SuiteScopeNotAllowedError();
+      }
+
+      if (parsed.scenarioIds !== void 0) {
+        throw new SuiteTestSuiteMembershipManagedError();
+      }
 
       return this.updateTestSuite(parsed);
     }
@@ -144,6 +156,7 @@ export class SuiteService extends SuiteServiceContract {
         excludeId: parsed.id,
       });
     }
+
     return this.options.repository.update({
       ...parsed,
       ...(slug === undefined ? {} : { slug }),
@@ -155,6 +168,7 @@ export class SuiteService extends SuiteServiceContract {
     const name = `${source.name} (copy)`;
     const slug = SuiteService.slugify(name);
     await this.assertSlugAvailable({ projectId: source.projectId, slug });
+
     return this.options.repository.create({
       projectId: source.projectId,
       name,
@@ -180,6 +194,7 @@ export class SuiteService extends SuiteServiceContract {
     const archivedSlug = suite.slug.endsWith(archivedSlugSuffix)
       ? suite.slug
       : `${suite.slug}${archivedSlugSuffix}-${suite.id.slice(-6)}`;
+
     return this.options.repository.archive({
       ...suiteIdInputSchema.parse(input),
       archivedAt: (this.options.now ?? (() => new Date()))(),
@@ -218,6 +233,7 @@ export class SuiteService extends SuiteServiceContract {
         invalidIds: scenarioResolution.missing,
       });
     }
+
     if (scenarioResolution.active.length === 0) {
       throw new AllScenariosArchivedError();
     }
@@ -243,9 +259,11 @@ export class SuiteService extends SuiteServiceContract {
         invalidIds: targetResolution.missing.map((target) => target.referenceId),
       });
     }
+
     if (targetResolution.active.length === 0) {
       throw new AllTargetsArchivedError();
     }
+
     await assertConnectedAgentsRunnable({
       agents: targetResolution.connectedAgents,
       actor: parsed.actor,
@@ -256,6 +274,7 @@ export class SuiteService extends SuiteServiceContract {
       ids: scenarioResolution.active,
       projectId: parsed.projectId,
     });
+
     return execution.execute({
       suiteId: suite.id,
       projectId: parsed.projectId,
@@ -320,6 +339,7 @@ export class SuiteService extends SuiteServiceContract {
         invalidIds: scenarioResolution.missing,
       });
     }
+
     if (scenarioResolution.active.length === 0) {
       throw new AllScenariosArchivedError();
     }
@@ -344,9 +364,11 @@ export class SuiteService extends SuiteServiceContract {
         invalidIds: targetResolution.missing.map((target) => target.referenceId),
       });
     }
+
     if (targetResolution.active.length === 0) {
       throw new AllTargetsArchivedError();
     }
+
     await assertConnectedAgentsRunnable({
       agents: targetResolution.connectedAgents,
       actor: parsed.actor,
@@ -446,6 +468,7 @@ export class SuiteService extends SuiteServiceContract {
       note: parsed.note,
       actor: parsed.actor,
     });
+
     return { ...result, suiteId: suite.id };
   }
 
@@ -488,6 +511,7 @@ export class SuiteService extends SuiteServiceContract {
             organizationId: parsed.organizationId,
           }),
     ]);
+
     return {
       scenarios: Object.fromEntries(scenarioRows.map((row) => [row.id, row.name])),
       targets: Object.fromEntries([...agentRows, ...promptRows].map((row) => [row.id, row.name])),
@@ -507,11 +531,13 @@ export class SuiteService extends SuiteServiceContract {
         simulatorModel: input.simulatorModel,
         judgeModel: input.judgeModel,
       });
+
       return SuiteService.testSuiteToSuite(testSuite);
     } catch (error) {
       if (error instanceof ScenarioTestSuiteNotFoundError) {
         throw new SuiteNotFoundError(input.id);
       }
+
       throw error;
     }
   }
@@ -522,11 +548,13 @@ export class SuiteService extends SuiteServiceContract {
         testSuiteId: suite.id,
         projectId: suite.projectId,
       });
+
       return SuiteService.testSuiteToSuite(testSuite);
     } catch (error) {
       if (error instanceof ScenarioTestSuiteNotFoundError) {
         throw new SuiteNotFoundError(suite.id);
       }
+
       throw error;
     }
   }
@@ -542,15 +570,20 @@ export class SuiteService extends SuiteServiceContract {
           testSuiteId: input.suite.id,
           projectId: input.projectId,
         });
+
         return definition.scenarioIds;
       } catch (error) {
         if (error instanceof ScenarioTestSuiteNotFoundError) {
           throw new SuiteNotFoundError(input.suite.id);
         }
+
         throw error;
       }
     }
-    if (!input.scopeIsDynamic) return input.suite.scenarioIds;
+
+    if (!input.scopeIsDynamic) {
+      return input.suite.scenarioIds;
+    }
 
     return this.options.repository.resolveDynamicRunMembership({
       id: input.suite.id,
@@ -563,10 +596,14 @@ export class SuiteService extends SuiteServiceContract {
     projectId: string;
     scope: SuiteScope;
   }): Promise<SuiteScope> {
-    if (input.scope.mode !== "test_suites") return input.scope;
+    if (input.scope.mode !== "test_suites") {
+      return input.scope;
+    }
+
     const testSuites = await this.options.scenarios.listTestSuites({
       projectId: input.projectId,
     });
+
     return normalizePlanScope({
       scope: input.scope,
       activeTestSuiteIds: testSuites.map((testSuite) => testSuite.id),
@@ -599,6 +636,7 @@ export class SuiteService extends SuiteServiceContract {
         organizationId: params.organizationId,
       }),
     ]);
+
     return derivePlanName({
       scopeLabel,
       targetLabels: targetLabels({
@@ -645,8 +683,13 @@ export class SuiteService extends SuiteServiceContract {
     projectId: string;
     testSuiteIds: string[];
   }): Promise<string> {
-    if (params.testSuiteIds.length === 0) return RUN_ALL_SUITE_NAME;
-    if (params.testSuiteIds.length > 2) return `${params.testSuiteIds.length} test suites`;
+    if (params.testSuiteIds.length === 0) {
+      return RUN_ALL_SUITE_NAME;
+    }
+
+    if (params.testSuiteIds.length > 2) {
+      return `${params.testSuiteIds.length} test suites`;
+    }
 
     const named = new Set(params.testSuiteIds);
     const testSuites = await this.options.scenarios.listTestSuites({
@@ -655,6 +698,7 @@ export class SuiteService extends SuiteServiceContract {
     const names = testSuites
       .filter((testSuite) => named.has(testSuite.id))
       .map((testSuite) => testSuite.name);
+
     return names.length === 0 ? RUN_ALL_SUITE_NAME : names.join(", ");
   }
 
@@ -667,13 +711,19 @@ export class SuiteService extends SuiteServiceContract {
     projectId: string;
     scenarioIds: string[];
   }): Promise<string> {
-    if (params.scenarioIds.length === 0) return RUN_ALL_SUITE_NAME;
-    if (params.scenarioIds.length > 1) return `${params.scenarioIds.length} scenarios`;
+    if (params.scenarioIds.length === 0) {
+      return RUN_ALL_SUITE_NAME;
+    }
+
+    if (params.scenarioIds.length > 1) {
+      return `${params.scenarioIds.length} scenarios`;
+    }
 
     const rows = await this.options.scenarios.getNamesByIds({
       ids: params.scenarioIds,
       projectId: params.projectId,
     });
+
     return rows[0]?.name ?? "Selected scenario";
   }
 
@@ -701,6 +751,7 @@ export class SuiteService extends SuiteServiceContract {
         ? []
         : this.options.prompts.getNamesByIds({ ids: promptIds, projectId, organizationId }),
     ]);
+
     return new Map([...agentRows, ...promptRows].map((row) => [row.id, row.name]));
   }
 
@@ -710,7 +761,9 @@ export class SuiteService extends SuiteServiceContract {
     excludeId?: string;
   }): Promise<void> {
     const existing = await this.options.repository.tryFindBySlug(input);
-    if (existing && existing.id !== input.excludeId) throw new SuiteNameTakenError(existing.name);
+    if (existing && existing.id !== input.excludeId) {
+      throw new SuiteNameTakenError(existing.name);
+    }
   }
 
   private async resolveScenarioReferences(input: {
@@ -728,10 +781,15 @@ export class SuiteService extends SuiteServiceContract {
     const missing: string[] = [];
     for (const id of input.scenarioIds) {
       const scenario = byId.get(id);
-      if (!scenario) missing.push(id);
-      else if (scenario.archivedAt) archived.push(id);
-      else active.push(id);
+      if (!scenario) {
+        missing.push(id);
+      } else if (scenario.archivedAt) {
+        archived.push(id);
+      } else {
+        active.push(id);
+      }
     }
+
     return { active, archived, missing };
   }
 
@@ -773,9 +831,11 @@ export class SuiteService extends SuiteServiceContract {
     const connectedAgents: ConnectedTargetAgent[] = [];
     for (const target of agentTargets) {
       const agent = agentById.get(target.referenceId);
-      if (!agent) missing.push(target);
-      else if (agent.archivedAt || isAgentUnseen(agent)) archived.push(target);
-      else {
+      if (!agent) {
+        missing.push(target);
+      } else if (agent.archivedAt || isAgentUnseen(agent)) {
+        archived.push(target);
+      } else {
         active.push(target);
         if (agent.type === "connected") {
           connectedAgents.push({
@@ -787,10 +847,15 @@ export class SuiteService extends SuiteServiceContract {
         }
       }
     }
+
     for (const target of promptTargets) {
-      if (existingPromptIds.has(target.referenceId)) active.push(target);
-      else missing.push(target);
+      if (existingPromptIds.has(target.referenceId)) {
+        active.push(target);
+      } else {
+        missing.push(target);
+      }
     }
+
     return { active, archived, missing, connectedAgents };
   }
 
@@ -823,6 +888,7 @@ export class SuiteService extends SuiteServiceContract {
         return false;
       default: {
         const unhandledType: never = target.type;
+
         throw new Error(`Unsupported suite target type: ${unhandledType}`);
       }
     }

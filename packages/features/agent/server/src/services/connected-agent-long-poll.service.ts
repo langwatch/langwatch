@@ -149,7 +149,9 @@ export class LongPollTransport {
     body: unknown;
   }): Promise<RegisterAnswer> {
     const replicaRefusal = this.core.replicaRefusal();
-    if (replicaRefusal) return this.refused(replicaRefusal);
+    if (replicaRefusal) {
+      return this.refused(replicaRefusal);
+    }
 
     let resolved: Awaited<ReturnType<AgentSessionCore["authenticate"]>>;
     try {
@@ -167,6 +169,7 @@ export class LongPollTransport {
         }),
       );
     }
+
     const frame = parsed.data;
 
     let session: SessionInfo;
@@ -199,7 +202,9 @@ export class LongPollTransport {
         DELIVERED_TTL_SECONDS,
       );
     }
+
     await this.ensureWatch(session);
+
     return { status: 200, body: { frame: registered, instanceToken: token } };
   }
 
@@ -230,7 +235,10 @@ export class LongPollTransport {
       inFlight: new Set(inFlightCallIds.slice(0, MAX_IN_FLIGHT_IDS)),
       signal,
     });
-    if (!this.closed) await this.touch(stored, session);
+    if (!this.closed) {
+      await this.touch(stored, session);
+    }
+
     return { frames };
   }
 
@@ -251,11 +259,20 @@ export class LongPollTransport {
     for (;;) {
       frames.push(...(await this.drain({ session, inFlight })));
       const remaining = deadline - this.core.now();
-      if (this.settled({ frames, signal }) || remaining <= 0) return frames;
+      if (this.settled({ frames, signal }) || remaining <= 0) {
+        return frames;
+      }
+
       const nudge = await this.waitForNudge({ watch, ms: remaining, signal });
       const outcome = nudgeOutcome({ nudge, closed: this.closed });
-      if (outcome === "stop") return frames;
-      if (outcome === "drain") continue;
+      if (outcome === "stop") {
+        return frames;
+      }
+
+      if (outcome === "drain") {
+        continue;
+      }
+
       inFlight.delete(outcome.cancel);
       frames.push({
         type: "cancel",
@@ -294,6 +311,7 @@ export class LongPollTransport {
           return { accepted: frames.length };
       }
     }
+
     return { accepted: frames.length };
   }
 
@@ -303,7 +321,10 @@ export class LongPollTransport {
     for (const [watchKey, watch] of this.watches) {
       this.watches.delete(watchKey);
       clearTimeout(watch.expiry);
-      for (const waiter of watch.waiters) waiter({ cancel: "" });
+      for (const waiter of watch.waiters) {
+        waiter({ cancel: "" });
+      }
+
       await watch.unsubscribe();
     }
   }
@@ -315,6 +336,7 @@ export class LongPollTransport {
   /** The refused frame for a credential error, with the status of its reason. */
   refusedAnswer(error: unknown): RegisterAnswer {
     const { frame } = this.core.refusal(error);
+
     return { status: refusalStatus(frame.code), body: { frame } };
   }
 
@@ -326,16 +348,24 @@ export class LongPollTransport {
     token: string | undefined;
   }): Promise<{ session: SessionInfo; stored: StoredSession }> {
     const resolved = await this.core.authenticate(credentials);
-    if (!token) throw new AgentSessionUnknownError();
+    if (!token) {
+      throw new AgentSessionUnknownError();
+    }
+
     // Read under the credential's own project: a token minted in another
     // project names no session here, whatever instance it registered.
     const raw = await this.core.runtime.store.get(httpSessionKey(resolved.project.id, token));
-    if (!raw) throw new AgentSessionUnknownError();
+    if (!raw) {
+      throw new AgentSessionUnknownError();
+    }
+
     const parsed = storedSessionSchema.safeParse(JSON.parse(raw));
     if (!parsed.success || parsed.data.projectId !== resolved.project.id) {
       throw new AgentSessionUnknownError();
     }
+
     const stored = parsed.data;
+
     return {
       stored,
       session: {
@@ -380,21 +410,34 @@ export class LongPollTransport {
       this.core.now(),
     );
     for (const callId of pending) {
-      if (inFlight.has(callId)) continue;
+      if (inFlight.has(callId)) {
+        continue;
+      }
+
       const claimed = await store.setIfAbsent(
         callDeliveredKey(session.projectId, callId),
         "1",
         DELIVERED_TTL_SECONDS,
       );
-      if (!claimed) continue;
+      if (!claimed) {
+        continue;
+      }
+
       const call = await this.core.readCallForSession(session, callId);
-      if (call) frames.push(this.core.callFrame(call));
+      if (call) {
+        frames.push(this.core.callFrame(call));
+      }
     }
+
     for (const callId of inFlight) {
-      if (await store.get(callKey(session.projectId, callId))) continue;
+      if (await store.get(callKey(session.projectId, callId))) {
+        continue;
+      }
+
       // The dispatcher deletes the envelope when it cancels a call.
       frames.push({ type: "cancel", protocol: PROTOCOL_VERSION, callId });
     }
+
     return frames;
   }
 
@@ -434,8 +477,10 @@ export class LongPollTransport {
     if (existing) {
       existing.session = session;
       existing.expiry.refresh();
+
       return existing;
     }
+
     const watch: Watch = {
       session,
       unsubscribe: async () => undefined,
@@ -453,9 +498,13 @@ export class LongPollTransport {
         } catch {
           return;
         }
-        for (const waiter of [...watch.waiters]) waiter(nudge);
+
+        for (const waiter of [...watch.waiters]) {
+          waiter(nudge);
+        }
       },
     );
+
     return watch;
   }
 
@@ -466,12 +515,18 @@ export class LongPollTransport {
    */
   private async expireWatch(watchKey: string): Promise<void> {
     const watch = this.watches.get(watchKey);
-    if (!watch) return;
+    if (!watch) {
+      return;
+    }
+
     this.watches.delete(watchKey);
     await watch.unsubscribe();
     const { projectId, instanceId } = watch.session;
     const live = await this.core.runtime.store.hgetall(instanceMetaKey(projectId, instanceId));
-    if (live) return;
+    if (live) {
+      return;
+    }
+
     const pending = await this.core.runtime.store.zrangebyscore(
       pendingKey(projectId, instanceId),
       0,
@@ -488,9 +543,13 @@ export class LongPollTransport {
     if (watch) {
       this.watches.delete(watchKey);
       clearTimeout(watch.expiry);
-      for (const waiter of watch.waiters) waiter({ cancel: "" });
+      for (const waiter of watch.waiters) {
+        waiter({ cancel: "" });
+      }
+
       await watch.unsubscribe();
     }
+
     const pending = await store.zrangebyscore(pendingKey(session.projectId, session.instanceId), 0);
     await this.core.retire(session, pending);
   }
@@ -513,8 +572,14 @@ function nudgeOutcome({
   nudge: InstanceNudge | null;
   closed: boolean;
 }): "stop" | "drain" | { cancel: string } {
-  if (!nudge || closed) return "stop";
-  if ("call" in nudge) return "drain";
+  if (!nudge || closed) {
+    return "stop";
+  }
+
+  if ("call" in nudge) {
+    return "drain";
+  }
+
   return nudge.cancel ? { cancel: nudge.cancel } : "stop";
 }
 

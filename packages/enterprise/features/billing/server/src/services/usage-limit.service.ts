@@ -153,6 +153,7 @@ export class UsageLimitService {
     const noopPlan: BillingPlanResolver = {
       getActivePlan: async () => ({ name: "free" }),
     };
+
     return new UsageLimitService({
       notificationRecords: noopRecords,
       organizationService: noopOrg,
@@ -187,6 +188,7 @@ export class UsageLimitService {
     if (planLimitInFlight.has(organizationId)) {
       return;
     }
+
     planLimitInFlight.add(organizationId);
 
     try {
@@ -201,6 +203,7 @@ export class UsageLimitService {
 
       if (!organization) {
         await this.planCooldown.delete(organizationId);
+
         return;
       }
 
@@ -277,6 +280,7 @@ export class UsageLimitService {
 
       if (!org) {
         await this.resourceCooldown.delete(cooldownKey);
+
         return;
       }
 

@@ -71,6 +71,7 @@ export class ScenarioExecutionPoolService extends ScenarioExecutionPoolPort {
         `Scenario execution pool is not connected for scenarioRunId=${scenarioRunId}`,
       );
     }
+
     return this.runner;
   }
 
@@ -152,8 +153,10 @@ export class ScenarioExecutionPoolService extends ScenarioExecutionPoolPort {
         { scenarioRunId: jobData.scenarioRunId },
         "Ignoring duplicate scenario execution submission",
       );
+
       return;
     }
+
     // Skip if already cancelled before we even start
     if (this._cancelled.has(jobData.scenarioRunId)) {
       logger.info(
@@ -161,8 +164,10 @@ export class ScenarioExecutionPoolService extends ScenarioExecutionPoolPort {
         "Skipping cancelled job, dispatching finished(CANCELLED)",
       );
       this.requireRunner(jobData.scenarioRunId).skipCancelled(jobData);
+
       return;
     }
+
     if (this._active.size < this._concurrency) {
       this.startJob(jobData);
     } else {
@@ -189,6 +194,7 @@ export class ScenarioExecutionPoolService extends ScenarioExecutionPoolPort {
       logger.info({ scenarioRunId: id }, "Draining: killing child process");
       child.kill("SIGTERM");
     }
+
     this._pending.length = 0;
   }
 
@@ -245,6 +251,7 @@ export class ScenarioExecutionPoolService extends ScenarioExecutionPoolPort {
         "Dequeuing pending job",
       );
       this.startJob(next);
+
       return; // One at a time — next dequeue happens when this job completes
     }
   }

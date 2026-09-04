@@ -51,11 +51,12 @@ export class AdminBackofficeService {
     const normalized = this.normalizeOrganizationDomain(parsed);
     const result = await this.repository.execute(normalized);
     await this.auditMutation(normalized, result);
+
     return result;
   }
 
   private async updateUser(input: AdminOperationInput): Promise<AdminOperationResult> {
-    const data = { ...(input.params.data ?? {}) };
+    const data = { ...input.params.data };
     let handledSideEffect = false;
     const sideEffectAudits: Array<{
       action: string;
@@ -82,6 +83,7 @@ export class AdminBackofficeService {
         if (isValidPickedDate) {
           await this.repository.setUserDeactivatedAt(userId, pickedDate);
         }
+
         sideEffectAudits.push({
           action: "update/user",
           payload: {
@@ -101,6 +103,7 @@ export class AdminBackofficeService {
       if (previous && (previous.email ?? "").toLowerCase() !== updated.email) {
         await this.auth.revokeAllBrowserSessions({ userId });
       }
+
       delete data.email;
       handledSideEffect = true;
       sideEffectAudits.push({
@@ -128,6 +131,7 @@ export class AdminBackofficeService {
     };
     const result = await this.repository.execute(normalized);
     await this.auditMutation(normalized, result);
+
     return result;
   }
 
@@ -138,10 +142,12 @@ export class AdminBackofficeService {
     ) {
       return input;
     }
-    const data = { ...(input.params.data ?? {}) };
+
+    const data = { ...input.params.data };
     if (typeof data.ssoDomain === "string" && data.ssoDomain.trim() !== "") {
       data.ssoDomain = data.ssoDomain.trim().toLowerCase();
     }
+
     return { ...input, params: { ...input.params, data } };
   }
 
@@ -149,7 +155,9 @@ export class AdminBackofficeService {
     input: AdminOperationInput,
     result: AdminOperationResult,
   ): Promise<void> {
-    if (!MUTATING_METHODS.has(input.method)) return;
+    if (!MUTATING_METHODS.has(input.method)) {
+      return;
+    }
 
     const params = input.params;
     const ids = this.stringArray(params.ids);
@@ -157,11 +165,14 @@ export class AdminBackofficeService {
       for (const id of ids) {
         await this.recordMutationAudit(input, id);
       }
+
       return;
     }
 
     const id = this.operationId(params, result);
-    if (id !== null) await this.recordMutationAudit(input, id);
+    if (id !== null) {
+      await this.recordMutationAudit(input, id);
+    }
   }
 
   private async recordMutationAudit(input: AdminOperationInput, id: string): Promise<void> {
@@ -169,7 +180,11 @@ export class AdminBackofficeService {
     if (input.params.previousData) {
       payload.previousData = input.params.previousData;
     }
-    if (input.params.data) payload.data = input.params.data;
+
+    if (input.params.data) {
+      payload.data = input.params.data;
+    }
+
     await this.audit.record({
       userId: input.actorId,
       action: `admin/${this.auditAction(input.method)}/${input.resource}`,
@@ -179,9 +194,16 @@ export class AdminBackofficeService {
   }
 
   private operationId(params: AdminOperationParams, result: AdminOperationResult): string | null {
-    if (params.id !== undefined) return String(params.id);
-    if (!this.isDataResult(result) || !this.isRecord(result.data)) return null;
+    if (params.id !== undefined) {
+      return String(params.id);
+    }
+
+    if (!this.isDataResult(result) || !this.isRecord(result.data)) {
+      return null;
+    }
+
     const id = result.data.id;
+
     return typeof id === "string" || typeof id === "number" ? String(id) : null;
   }
 
@@ -190,8 +212,14 @@ export class AdminBackofficeService {
   }
 
   private auditAction(method: AdminOperationInput["method"]): string {
-    if (method === "updateMany") return "update";
-    if (method === "deleteMany") return "delete";
+    if (method === "updateMany") {
+      return "update";
+    }
+
+    if (method === "deleteMany") {
+      return "delete";
+    }
+
     return method;
   }
 

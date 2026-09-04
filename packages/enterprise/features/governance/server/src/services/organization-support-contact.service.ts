@@ -41,7 +41,9 @@ export async function resolveOrgAdminEmail({
     select: { userId: true },
     orderBy: { createdAt: "asc" },
   });
-  if (admins.length === 0) return null;
+  if (admins.length === 0) {
+    return null;
+  }
 
   const users = await prisma.user.findMany({
     where: { id: { in: admins.map((admin) => admin.userId) } },
@@ -51,8 +53,11 @@ export async function resolveOrgAdminEmail({
 
   for (const admin of admins) {
     const email = emailByUserId.get(admin.userId);
-    if (email) return email;
+    if (email) {
+      return email;
+    }
   }
+
   return null;
 }
 
@@ -80,7 +85,9 @@ export async function resolveSupportContact({
     select: { supportContact: true },
   });
   const trimmed = org?.supportContact?.trim();
-  if (trimmed) return trimmed;
+  if (trimmed) {
+    return trimmed;
+  }
 
   return resolveOrgAdminEmail({ prisma, organizationId });
 }

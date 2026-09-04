@@ -104,9 +104,7 @@ function parsePromptVariables(attrs: Record<string, unknown>): Record<string, st
     }
   }
 
-  return fromBlob === null && Object.keys(flat).length === 0
-    ? null
-    : { ...(fromBlob ?? {}), ...flat };
+  return fromBlob === null && Object.keys(flat).length === 0 ? null : { ...fromBlob, ...flat };
 }
 
 function parseVariablesBlob(raw: unknown): Record<string, string> | null {

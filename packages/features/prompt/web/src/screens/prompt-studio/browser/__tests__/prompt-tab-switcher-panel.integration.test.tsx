@@ -38,9 +38,7 @@ function summary(overrides: Partial<PromptTabSummary> = {}): PromptTabSummary {
 
 /** Route each row's hook call to a per-tab fixture. */
 function givenTabs(fixtures: Record<string, Partial<PromptTabSummary>>) {
-  summaryOf.mockImplementation((tabId: string) =>
-    summary({ title: tabId, ...(fixtures[tabId] ?? {}) }),
-  );
+  summaryOf.mockImplementation((tabId: string) => summary({ title: tabId, ...fixtures[tabId] }));
 }
 
 function renderSwitcher(props: Partial<React.ComponentProps<typeof PromptTabSwitcher>> = {}) {

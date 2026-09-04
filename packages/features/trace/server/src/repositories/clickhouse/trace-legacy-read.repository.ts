@@ -3074,7 +3074,7 @@ export class ClickHouseTraceService {
                 query_params: {
                   tenantId: projectId,
                   traceIds: batchTraceIds,
-                  ...(window?.params ?? {}),
+                  ...window?.params,
                 },
                 format: "JSONEachRow",
               });
@@ -3249,7 +3249,7 @@ export class ClickHouseTraceService {
                 query_params: {
                   tenantId: projectId,
                   traceIds: batchTraceIds,
-                  ...(window?.params ?? {}),
+                  ...window?.params,
                 },
                 clickhouse_settings: spanReadSettings,
                 format: "JSONEachRow",

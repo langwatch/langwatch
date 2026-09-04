@@ -18,6 +18,7 @@ import safe from "safe-regex2";
 export function compileSafeRegex(pattern: string): RegExp | null {
   try {
     const compiled = new RegExp(pattern);
+
     return safe(compiled) ? compiled : null;
   } catch {
     return null;

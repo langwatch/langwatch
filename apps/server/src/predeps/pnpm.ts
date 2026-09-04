@@ -65,7 +65,7 @@ export const pnpmPredep: Predep = {
     // Only download our bundled binary when no usable system pnpm exists
     // — the bare-Linux case the predep was originally added for.
     const sysVersion = await resolveVersion("pnpm");
-    if (sysVersion && /^10\./.test(sysVersion)) {
+    if (sysVersion && sysVersion.startsWith("10.")) {
       return { installed: true, version: sysVersion, resolvedPath: "pnpm" };
     }
     return {

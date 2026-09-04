@@ -58,9 +58,11 @@ export class StoredObjectService extends StoredObjectServiceContract {
     if (!Number.isSafeInteger(options.maximumUploadBytes) || options.maximumUploadBytes < 0) {
       throw new RangeError("maximumUploadBytes must be a non-negative safe integer");
     }
+
     if (!Number.isSafeInteger(options.uploadExpiryMs) || options.uploadExpiryMs <= 0) {
       throw new RangeError("uploadExpiryMs must be a positive safe integer");
     }
+
     return new StoredObjectService(options);
   }
 
@@ -95,6 +97,7 @@ export class StoredObjectService extends StoredObjectServiceContract {
           updatedAt: this.now(),
         });
       }
+
       return { reference: this.reference(existing), isDuplicate: true };
     }
 
@@ -136,8 +139,10 @@ export class StoredObjectService extends StoredObjectServiceContract {
       await this.ignoreStorageFailure(() =>
         this.options.storage.delete({ projectId: input.projectId, address }),
       );
+
       throw error;
     }
+
     return { reference: this.reference(record), isDuplicate: false };
   }
 
@@ -147,6 +152,7 @@ export class StoredObjectService extends StoredObjectServiceContract {
     if (input.byteLength > this.options.maximumUploadBytes) {
       throw new UploadTooLargeError(input.byteLength, this.options.maximumUploadBytes);
     }
+
     const id = await this.options.idDeriver.fromDigest({
       projectId: input.projectId,
       sha256: input.sha256,
@@ -157,6 +163,7 @@ export class StoredObjectService extends StoredObjectServiceContract {
     });
     if (existing?.status === "available") {
       this.assertByteFacts(existing, input.byteLength);
+
       return { status: "existing", reference: this.reference(existing) };
     }
 
@@ -173,7 +180,9 @@ export class StoredObjectService extends StoredObjectServiceContract {
         expiresAt,
       }),
     );
-    if (!upload) throw new DirectUploadUnavailableError();
+    if (!upload) {
+      throw new DirectUploadUnavailableError();
+    }
 
     const record: StoredObjectRecord = {
       tenantId: input.projectId,
@@ -207,8 +216,10 @@ export class StoredObjectService extends StoredObjectServiceContract {
           address: upload.address,
         }),
       );
+
       throw error;
     }
+
     const reference = this.reference(record);
     const uploadToken = await this.options.uploadTokens.encode({
       projectId: input.projectId,
@@ -218,6 +229,7 @@ export class StoredObjectService extends StoredObjectServiceContract {
       reference,
       expiresAt: expiresAt.toISOString(),
     });
+
     return {
       status: "pending",
       objectId: id,
@@ -232,27 +244,37 @@ export class StoredObjectService extends StoredObjectServiceContract {
     if (claims.projectId !== input.projectId) {
       throw new UploadTokenInvalidError();
     }
+
     const value = await this.options.store.tryFind({
       tenantId: claims.projectId,
       id: claims.objectId,
     });
     if (!value || value.status !== "pending") {
-      if (value?.status === "available") return this.reference(value);
+      if (value?.status === "available") {
+        return this.reference(value);
+      }
+
       throw new UploadIncompleteError(claims.operationId);
     }
+
     if (value.expiresAt === null || value.expiresAt.getTime() <= this.now().getTime()) {
       throw new UploadExpiredError(claims.operationId);
     }
+
     const stat = await this.storageCall(() =>
       this.options.storage.tryStat({
         projectId: claims.projectId,
         address: claims.address,
       }),
     );
-    if (!stat) throw new UploadIncompleteError(claims.operationId);
+    if (!stat) {
+      throw new UploadIncompleteError(claims.operationId);
+    }
+
     if (stat.byteLength !== value.byteLength || stat.sha256 !== value.sha256) {
       throw new UploadChecksumMismatchError(claims.operationId);
     }
+
     const now = this.now();
     const available: StoredObjectRecord = {
       ...value,
@@ -265,6 +287,7 @@ export class StoredObjectService extends StoredObjectServiceContract {
       updatedAt: now,
     };
     await this.options.store.save(available);
+
     return this.reference(available);
   }
 
@@ -278,7 +301,10 @@ export class StoredObjectService extends StoredObjectServiceContract {
     const bytes = await this.storageCall(() =>
       this.options.storage.tryRead({ projectId: input.projectId, address }),
     );
-    if (!bytes) throw new StoredObjectBytesMissingError(input.projectId, input.id);
+    if (!bytes) {
+      throw new StoredObjectBytesMissingError(input.projectId, input.id);
+    }
+
     return { metadata: this.metadata(value), bytes };
   }
 
@@ -291,6 +317,7 @@ export class StoredObjectService extends StoredObjectServiceContract {
     if (!value.audiences.includes(input.audience)) {
       throw new StoredObjectNotFoundError();
     }
+
     return {
       metadata: this.metadata(value),
       capability: await this.options.delivery.mint({
@@ -311,6 +338,7 @@ export class StoredObjectService extends StoredObjectServiceContract {
     if (value.generation !== input.generation || !value.audiences.includes(input.audience)) {
       throw new StoredObjectNotFoundError();
     }
+
     return this.getById(input);
   }
 
@@ -323,6 +351,7 @@ export class StoredObjectService extends StoredObjectServiceContract {
         deletedAt: value.deletedAt.toISOString(),
       };
     }
+
     const deletedAt = this.now();
     const deleted = {
       ...value,
@@ -341,6 +370,7 @@ export class StoredObjectService extends StoredObjectServiceContract {
         await this.options.store.save({ ...deleted, storage: null });
       }
     }
+
     return {
       id: deleted.id,
       generation: deleted.generation,
@@ -355,13 +385,19 @@ export class StoredObjectService extends StoredObjectServiceContract {
     const query: { tenantId: string; purpose?: string } = {
       tenantId: input.projectId,
     };
-    if (input.purpose) query.purpose = input.purpose;
+    if (input.purpose) {
+      query.purpose = input.purpose;
+    }
+
     const usage = await this.options.store.getUsage(query);
     const result: StoredObjectStorageUsage = {
       projectId: input.projectId,
       ...usage,
     };
-    if (input.purpose) result.purpose = input.purpose;
+    if (input.purpose) {
+      result.purpose = input.purpose;
+    }
+
     return result;
   }
 
@@ -379,7 +415,10 @@ export class StoredObjectService extends StoredObjectServiceContract {
         tenantId: input.projectId,
         limit,
       };
-      if (afterId) query.afterId = afterId;
+      if (afterId) {
+        query.afterId = afterId;
+      }
+
       const page = await this.options.store.findPage(query);
       for (const value of page) {
         if (value.status !== "deleted") {
@@ -392,10 +431,17 @@ export class StoredObjectService extends StoredObjectServiceContract {
           deletedByteLength += value.byteLength;
         }
       }
-      if (page.length < limit) break;
+
+      if (page.length < limit) {
+        break;
+      }
+
       afterId = page.at(-1)?.id;
-      if (!afterId) break;
+      if (!afterId) {
+        break;
+      }
     }
+
     return {
       projectId: input.projectId,
       deletedObjectCount,
@@ -424,6 +470,7 @@ export class StoredObjectService extends StoredObjectServiceContract {
       ) {
         continue;
       }
+
       await this.options.store.save({
         ...value,
         status: "failed",
@@ -432,6 +479,7 @@ export class StoredObjectService extends StoredObjectServiceContract {
       });
       cleaned += 1;
     }
+
     return cleaned;
   }
 
@@ -445,7 +493,10 @@ export class StoredObjectService extends StoredObjectServiceContract {
     });
     let cleaned = 0;
     for (const value of page) {
-      if (!value.storage) continue;
+      if (!value.storage) {
+        continue;
+      }
+
       if (
         !(await this.deleteStorageBestEffort({
           projectId: input.projectId,
@@ -454,6 +505,7 @@ export class StoredObjectService extends StoredObjectServiceContract {
       ) {
         continue;
       }
+
       await this.options.store.save({
         ...value,
         storage: null,
@@ -461,6 +513,7 @@ export class StoredObjectService extends StoredObjectServiceContract {
       });
       cleaned += 1;
     }
+
     return cleaned;
   }
 
@@ -472,9 +525,11 @@ export class StoredObjectService extends StoredObjectServiceContract {
     if (value.status === "deleted") {
       throw new StoredObjectDeletedError(input.projectId, input.id);
     }
+
     if (value.status !== "available") {
       throw new StoredObjectUnavailableError(input.projectId, input.id);
     }
+
     return value;
   }
 
@@ -486,7 +541,10 @@ export class StoredObjectService extends StoredObjectServiceContract {
       tenantId: input.projectId,
       id: input.id,
     });
-    if (!value) throw new StoredObjectNotFoundError();
+    if (!value) {
+      throw new StoredObjectNotFoundError();
+    }
+
     return value;
   }
 
@@ -508,8 +566,14 @@ export class StoredObjectService extends StoredObjectServiceContract {
       },
       createdAt: value.createdAt.toISOString(),
     };
-    if (value.availableAt) result.availableAt = value.availableAt.toISOString();
-    if (value.deletedAt) result.deletedAt = value.deletedAt.toISOString();
+    if (value.availableAt) {
+      result.availableAt = value.availableAt.toISOString();
+    }
+
+    if (value.deletedAt) {
+      result.deletedAt = value.deletedAt.toISOString();
+    }
+
     return result;
   }
 
@@ -529,6 +593,7 @@ export class StoredObjectService extends StoredObjectServiceContract {
     if (!value.storage) {
       throw new StoredObjectBytesMissingError(value.tenantId, value.id);
     }
+
     return value.storage;
   }
 
@@ -552,14 +617,17 @@ export class StoredObjectService extends StoredObjectServiceContract {
       if (byteLength > this.options.maximumUploadBytes) {
         throw new UploadTooLargeError(byteLength, this.options.maximumUploadBytes);
       }
+
       chunks.push(chunk);
     }
+
     const result = new Uint8Array(byteLength);
     let offset = 0;
     for (const chunk of chunks) {
       result.set(chunk, offset);
       offset += chunk.byteLength;
     }
+
     return result;
   }
 
@@ -581,6 +649,7 @@ export class StoredObjectService extends StoredObjectServiceContract {
       ) {
         throw error;
       }
+
       throw new StorageUnavailableError();
     }
   }
@@ -599,6 +668,7 @@ export class StoredObjectService extends StoredObjectServiceContract {
   }): Promise<boolean> {
     try {
       await this.options.storage.delete(input);
+
       return true;
     } catch {
       return false;

@@ -92,7 +92,7 @@ const defaultFormData: FormData = {
 };
 
 function downloadLicenseFile(license: string, organizationName: string) {
-  const sanitizedName = organizationName.replace(/[\/\\:*?"<>|]/g, "_");
+  const sanitizedName = organizationName.replace(/[/\\:*?"<>|]/g, "_");
   const blob = new Blob([license], { type: "text/plain" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -147,7 +147,7 @@ export const LicenseGeneratorForm = forwardRef<LicenseGeneratorFormRef, LicenseG
         downloadLicenseFile(data.licenseKey, formData.organizationName);
         host.succeeded({
           title: "License generated and downloaded",
-          description: `License saved as ${formData.organizationName.replace(/[\/\\:*?"<>|]/g, "_")}.langwatch-license`,
+          description: `License saved as ${formData.organizationName.replace(/[/\\:*?"<>|]/g, "_")}.langwatch-license`,
         });
       },
       onError: (error) => host.failed({ error, fallbackTitle: "Couldn't generate license" }),
@@ -287,7 +287,7 @@ export const LicenseGeneratorForm = forwardRef<LicenseGeneratorFormRef, LicenseG
     }));
 
     if (generatedLicense) {
-      const sanitizedName = formData.organizationName.replace(/[\/\\:*?"<>|]/g, "_");
+      const sanitizedName = formData.organizationName.replace(/[/\\:*?"<>|]/g, "_");
       return (
         <VStack align="start" gap={4} width="full" paddingX={6} paddingY={4}>
           <Box backgroundColor="green.50" padding={4} borderRadius="md" width="full">

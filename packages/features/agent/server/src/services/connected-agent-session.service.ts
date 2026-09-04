@@ -118,7 +118,10 @@ export class AgentSessionCore {
    * instance held by another.
    */
   replicaRefusal(): AgentRegisterRefusedError | null {
-    if (this.runtime.store.shared || this.replicaCount <= 1) return null;
+    if (this.runtime.store.shared || this.replicaCount <= 1) {
+      return null;
+    }
+
     return new AgentRegisterRefusedError({
       reason: "replica_count_unsupported",
       message: "Connected agents need Redis on a deployment with more than one app replica.",
@@ -138,6 +141,7 @@ export class AgentSessionCore {
         message: "Send the API key as Authorization: Bearer <key>.",
       });
     }
+
     return this.credentials.resolve({ token, projectId: projectId ?? null });
   }
 
@@ -188,6 +192,7 @@ export class AgentSessionCore {
       },
       "connected agent instance registered",
     );
+
     return {
       session,
       registered: {
@@ -234,17 +239,22 @@ export class AgentSessionCore {
           message: `The environment "${agent.environment}" is not valid. Use letters, digits, dashes and underscores, up to 32 characters.`,
         });
       }
+
       let normalized: ReturnType<typeof normalizeParameterSchema>;
       try {
         normalized = normalizeParameterSchema(agent.parameters);
       } catch (error) {
-        if (!HandledError.isHandled(error)) throw error;
+        if (!HandledError.isHandled(error)) {
+          throw error;
+        }
+
         throw new AgentRegisterRefusedError({
           reason: "parameters_invalid",
           message: `${agent.name}: ${error.message}`,
           meta: { agentName: agent.name, ...error.meta },
         });
       }
+
       const scope = deriveScope({
         environment,
         userId,
@@ -275,6 +285,7 @@ export class AgentSessionCore {
         notes: normalized.notes,
       });
     }
+
     return registered;
   }
 
@@ -293,9 +304,11 @@ export class AgentSessionCore {
     if (!(error instanceof AgentRegisterRefusedError)) {
       logger.error({ error }, "connect refused by an unexpected error");
     }
+
     const { reason, ...meta } = refused.meta as {
       reason: RefusedCode;
     } & Record<string, unknown>;
+
     return {
       refused,
       frame: {
@@ -315,14 +328,19 @@ export class AgentSessionCore {
    */
   async readCallForSession(session: SessionInfo, callId: string): Promise<StoredCall | null> {
     const raw = await this.runtime.store.get(callKey(session.projectId, callId));
-    if (!raw) return null;
+    if (!raw) {
+      return null;
+    }
+
     let stored: StoredCall;
     try {
       stored = storedCallSchema.parse(JSON.parse(raw));
     } catch {
       logger.warn({ callId }, "envelope could not be read, dropping the call");
+
       return null;
     }
+
     this.assertOwnProject(session, stored);
     if (
       stored.instanceId !== session.instanceId ||
@@ -341,8 +359,10 @@ export class AgentSessionCore {
         stored,
         result: { instanceId: session.instanceId, undelivered: true },
       });
+
       return null;
     }
+
     return stored;
   }
 
@@ -352,7 +372,10 @@ export class AgentSessionCore {
    */
   async undeliver(session: SessionInfo, callId: string): Promise<void> {
     const stored = await this.readStoredCall(session, callId);
-    if (!stored || stored.instanceId !== session.instanceId) return;
+    if (!stored || stored.instanceId !== session.instanceId) {
+      return;
+    }
+
     await this.writeResult({
       stored,
       result: { instanceId: session.instanceId, undelivered: true },
@@ -366,7 +389,10 @@ export class AgentSessionCore {
   /** The instance started the function: the call can no longer be retried elsewhere. */
   async ack(session: SessionInfo, callId: string): Promise<void> {
     const stored = await this.readStoredCall(session, callId);
-    if (!stored || stored.instanceId !== session.instanceId) return;
+    if (!stored || stored.instanceId !== session.instanceId) {
+      return;
+    }
+
     await this.runtime.store.set(
       callAckKey(session.projectId, callId),
       "1",
@@ -378,7 +404,10 @@ export class AgentSessionCore {
   /** The instance answered: the result lands under its cap or as a payload error. */
   async result(session: SessionInfo, frame: ResultFrame): Promise<void> {
     const stored = await this.readStoredCall(session, frame.callId);
-    if (!stored || stored.instanceId !== session.instanceId) return;
+    if (!stored || stored.instanceId !== session.instanceId) {
+      return;
+    }
+
     const violation = resultCapViolation({
       output: frame.output,
       session: frame.session,
@@ -428,12 +457,16 @@ export class AgentSessionCore {
     });
     for (const callId of activeCallIds) {
       const stored = await this.readStoredCall(session, callId);
-      if (!stored || stored.instanceId !== session.instanceId) continue;
+      if (!stored || stored.instanceId !== session.instanceId) {
+        continue;
+      }
+
       await this.writeResult({
         stored,
         result: { instanceId: session.instanceId, disconnected: true },
       });
     }
+
     await this.runtime.store.publish(
       INSTANCE_GONE_CHANNEL,
       JSON.stringify({
@@ -449,14 +482,19 @@ export class AgentSessionCore {
 
   async readStoredCall(session: SessionInfo, callId: string): Promise<StoredCall | null> {
     const raw = await this.runtime.store.get(callKey(session.projectId, callId));
-    if (!raw) return null;
+    if (!raw) {
+      return null;
+    }
+
     let stored: StoredCall;
     try {
       stored = storedCallSchema.parse(JSON.parse(raw));
     } catch {
       return null;
     }
+
     this.assertOwnProject(session, stored);
+
     return stored;
   }
 
@@ -466,7 +504,10 @@ export class AgentSessionCore {
    * session's own when the envelope carries the credential's project.
    */
   private assertOwnProject(session: SessionInfo, stored: StoredCall): void {
-    if (stored.projectId === session.projectId) return;
+    if (stored.projectId === session.projectId) {
+      return;
+    }
+
     logger.warn(
       {
         callId: stored.envelope.callId,
@@ -475,6 +516,7 @@ export class AgentSessionCore {
       },
       "a session referred to a call of another project, refusing it",
     );
+
     throw new AgentCallForeignProjectError({ callId: stored.envelope.callId });
   }
 
@@ -514,6 +556,7 @@ function tooLarge(
   },
 ): StoredResult {
   const error = new AgentPayloadTooLargeError(violation);
+
   return {
     instanceId: session.instanceId,
     error: { code: error.code, message: error.message, payload: violation },

@@ -21,11 +21,15 @@ export class AdminAccessService implements AdminAccess {
 
   static parseEmails(value: string | readonly string[]): string[] {
     const values = typeof value === "string" ? value.split(",") : value;
+
     return values.map((email) => email.trim().toLowerCase()).filter((email) => email.length > 0);
   }
 
   isAdmin(identity: AdminIdentity): boolean {
-    if (!identity.email) return false;
+    if (!identity.email) {
+      return false;
+    }
+
     return this.normalizedEmails.includes(identity.email.trim().toLowerCase());
   }
 }

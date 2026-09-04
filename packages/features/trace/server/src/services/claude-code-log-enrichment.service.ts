@@ -87,8 +87,11 @@ function readContentBody(
 ): string | null {
   for (const key of codingAgents?.contentAttrKeys(eventName) ?? contentAttrKeys(eventName)) {
     const value = nonEmptyOrNull(attrs[key]);
-    if (value !== null) return value;
+    if (value !== null) {
+      return value;
+    }
   }
+
   return null;
 }
 
@@ -107,6 +110,7 @@ function readStringParam(
   key: string,
 ): string | null {
   const value = params?.[key];
+
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
@@ -191,8 +195,11 @@ export function mapSpansToClaudeToolRefs(spans: Span[]): ClaudeToolSpanRef[] {
   const refs: ClaudeToolSpanRef[] = [];
   for (const span of spans) {
     const toolUseId = spanToolUseId(span);
-    if (toolUseId !== null) refs.push({ spanId: span.span_id, toolUseId });
+    if (toolUseId !== null) {
+      refs.push({ spanId: span.span_id, toolUseId });
+    }
   }
+
   return refs;
 }
 
@@ -204,10 +211,17 @@ export function mapSpansToClaudeToolRefs(spans: Span[]): ClaudeToolSpanRef[] {
 export function enrichClaudeInteractionInputs(spans: Span[]): Span[] {
   let hasChanged = false;
   const next = spans.map((span) => {
-    if (span.input != null) return span;
+    if (span.input != null) {
+      return span;
+    }
+
     const prompt = readStringParam(span.params, SPAN_USER_PROMPT_KEY);
-    if (prompt === null) return span;
+    if (prompt === null) {
+      return span;
+    }
+
     hasChanged = true;
+
     return {
       ...span,
       input: {
@@ -216,6 +230,7 @@ export function enrichClaudeInteractionInputs(spans: Span[]): Span[] {
       },
     };
   });
+
   // Identity-preserving on no-op so callers' referential contracts (and
   // memoized readers) see an untouched trace as the SAME array.
   return hasChanged ? next : spans;
@@ -234,6 +249,7 @@ export function mapLogRowsToClaudeContentLogs(
     const attrs = row.attributes;
     const eventName = attrs[EVENT_NAME_ATTR] ?? "";
     const toolCallCount = Number(attrs[DERIVED_ATTRS.OUTPUT_TOOL_CALL_COUNT]);
+
     return {
       eventName,
       requestId: nonEmptyOrNull(attrs[REQUEST_ID_ATTR]),
@@ -267,10 +283,14 @@ export function enrichSpansWithClaudeLogContent({
   traceCanonicalisation: TraceCanonicalisationService;
   codingAgents?: CodingAgentService;
 }): Span[] {
-  if (spans.length === 0) return spans;
+  if (spans.length === 0) {
+    return spans;
+  }
 
   const withInteractionInputs = enrichClaudeInteractionInputs(spans);
-  if (logRows.length === 0) return withInteractionInputs;
+  if (logRows.length === 0) {
+    return withInteractionInputs;
+  }
 
   const logs = mapLogRowsToClaudeContentLogs(logRows, codingAgents);
   const refs = mapSpansToClaudeRefs(withInteractionInputs);
@@ -305,8 +325,14 @@ export function enrichSpansWithClaudeLogContent({
     const next: Span = { ...span };
     const input = enrichment?.input ?? toolEnrichment?.input ?? null;
     const output = enrichment?.output ?? toolEnrichment?.output ?? interactionOutput;
-    if (input !== null && next.input == null) next.input = input;
-    if (output !== null && next.output == null) next.output = output;
+    if (input !== null && next.input == null) {
+      next.input = input;
+    }
+
+    if (output !== null && next.output == null) {
+      next.output = output;
+    }
+
     return next;
   });
 }
@@ -324,6 +350,7 @@ export function mapLogRowsToClaudeToolLogs(rows: TraceLogRecordReadRow[]): Claud
     if (eventName !== TOOL_DECISION_EVENT && eventName !== TOOL_RESULT_EVENT) {
       continue;
     }
+
     out.push({
       eventName,
       toolUseId: nonEmptyOrNull(attrs[TOOL_USE_ID_ATTR]),
@@ -340,18 +367,29 @@ export function mapLogRowsToClaudeToolLogs(rows: TraceLogRecordReadRow[]): Claud
       timeUnixMs: row.timeUnixMs,
     });
   }
+
   return out;
 }
 
 function parseBoolAttr(value: string | undefined): boolean | null {
-  if (value === "true") return true;
-  if (value === "false") return false;
+  if (value === "true") {
+    return true;
+  }
+
+  if (value === "false") {
+    return false;
+  }
+
   return null;
 }
 
 function parseNumberAttr(value: string | undefined): number | null {
-  if (value === undefined || value.length === 0) return null;
+  if (value === undefined || value.length === 0) {
+    return null;
+  }
+
   const parsed = Number(value);
+
   return Number.isFinite(parsed) ? parsed : null;
 }
 
@@ -384,10 +422,13 @@ export async function enrichCodingAgentSpansFromLogs({
   traceCanonicalisation: TraceCanonicalisationService;
   codingAgents?: CodingAgentService;
 }): Promise<Span[]> {
-  if (!hasCodingAgentJoinableSpans(spans)) return spans;
+  if (!hasCodingAgentJoinableSpans(spans)) {
+    return spans;
+  }
 
   try {
     const logRows = await logRecords.getLogsByTraceId(tenantId, traceId, occurredAtMs);
+
     return enrichSpansWithClaudeLogContent({
       spans,
       logRows,
@@ -403,6 +444,7 @@ export async function enrichCodingAgentSpansFromLogs({
       },
       "Claude Code log enrichment skipped: failed to read trace logs",
     );
+
     // Best-effort: the attribute-only interaction input needs no logs.
     return enrichClaudeInteractionInputs(spans);
   }
@@ -467,6 +509,7 @@ export function enrichSingleSpanWithClaudeLogContent({
     if (next !== span && next.input !== span.input) {
       next = { ...next, input: span.input };
     }
+
     if (modelCallRefs.length > 0 && logRows.length > 0) {
       const enrichment = computeClaudeSpanEnrichment({
         spans: modelCallRefs,
@@ -478,12 +521,15 @@ export function enrichSingleSpanWithClaudeLogContent({
         if (enrichment.input !== null && span.input == null) {
           clone.input = enrichment.input;
         }
+
         if (enrichment.output !== null && clone.output == null) {
           clone.output = enrichment.output;
         }
+
         next = clone;
       }
     }
   }
+
   return next;
 }

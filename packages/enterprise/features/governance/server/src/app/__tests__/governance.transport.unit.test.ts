@@ -198,7 +198,7 @@ function buildApi(
         headers: {
           [header]: token,
           "Content-Type": "application/json",
-          ...(init.headers ?? {}),
+          ...init.headers,
         },
       });
 

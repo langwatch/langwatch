@@ -86,6 +86,7 @@ export async function prefetchAgentTestData({
   if (!project.success) {
     return { success: false, error: project.error };
   }
+
   if (adapterResult !== null && "success" in adapterResult) {
     return {
       success: false,
@@ -93,6 +94,7 @@ export async function prefetchAgentTestData({
       reason: adapterResult.reason,
     };
   }
+
   if (!adapterResult) {
     return {
       success: false,

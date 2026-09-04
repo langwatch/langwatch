@@ -27,6 +27,7 @@ export const binaryInputPartSchema = z
         Number(part.data !== undefined) +
         Number(part.url !== undefined) +
         Number(part.id !== undefined);
+
       return present === 1;
     },
     {

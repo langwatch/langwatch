@@ -37,6 +37,7 @@ export class WorkflowDslService {
   } {
     const nodes = (dsl?.nodes ?? []).flatMap((node) => {
       const result = workflowFieldNodeSchema.safeParse(node);
+
       return result.success ? [result.data] : [];
     });
     const entry = nodes.find((node) => node.type === "entry");
@@ -60,6 +61,7 @@ export class WorkflowDslService {
   private fields(values: unknown[] | undefined): WorkflowField[] {
     return (values ?? []).flatMap((value) => {
       const result = workflowFieldSchema.safeParse(value);
+
       return result.success ? [result.data] : [];
     });
   }

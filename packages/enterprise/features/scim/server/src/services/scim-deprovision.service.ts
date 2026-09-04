@@ -43,9 +43,11 @@ export class ScimDeprovisionService {
         organizationId: input.organizationId,
       });
       this.reportManifest(input, result.needsHumanDecision);
+
       return result.needsHumanDecision;
     } catch (error) {
       await this.recordFailure(input, error);
+
       throw error;
     }
   }
@@ -59,7 +61,9 @@ export class ScimDeprovisionService {
     },
     error: unknown,
   ): Promise<void> {
-    if (!input.connectionId) return;
+    if (!input.connectionId) {
+      return;
+    }
 
     const handled = error instanceof HandledError ? error : null;
     await this.lifecycle.applyFailed({

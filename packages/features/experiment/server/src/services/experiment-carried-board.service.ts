@@ -78,7 +78,9 @@ export class ExperimentCarriedBoardService {
     occurredAt: number;
   }): RecordTargetResultCommandData | null {
     const hasOutput = cell.output !== undefined && cell.output !== null;
-    if (!hasOutput && !cell.error) return null;
+    if (!hasOutput && !cell.error) {
+      return null;
+    }
 
     const dispatch = this.dispatches.tryBuildTargetResultDispatch({
       tenantId,
@@ -116,7 +118,9 @@ export class ExperimentCarriedBoardService {
   }): RecordEvaluatorResultCommandData[] {
     return cell.evaluatorResults.flatMap((verdict) => {
       const result = verdict.result as SingleEvaluationResult | undefined;
-      if (!this.isStorableVerdict(result)) return [];
+      if (!this.isStorableVerdict(result)) {
+        return [];
+      }
 
       return [
         {
@@ -164,7 +168,9 @@ export class ExperimentCarriedBoardService {
 
     for (const cell of cells) {
       const datasetEntry = datasetRows[cell.rowIndex];
-      if (!datasetEntry) continue;
+      if (!datasetEntry) {
+        continue;
+      }
 
       const target = this.carriedTargetResult({
         tenantId,
@@ -174,7 +180,9 @@ export class ExperimentCarriedBoardService {
         datasetEntry,
         occurredAt,
       });
-      if (target) targetResults.push(target);
+      if (target) {
+        targetResults.push(target);
+      }
 
       evaluatorResults.push(
         ...this.carriedEvaluatorResults({
@@ -208,10 +216,14 @@ export class ExperimentCarriedBoardService {
     state: EvaluationsV3State;
     loadedEvaluators?: LoadedEvaluators;
   }): Promise<void> {
-    if (cells.length === 0) return;
+    if (cells.length === 0) {
+      return;
+    }
+
     if (!this.commands) {
       throw new Error("ExperimentCarriedBoardService: recordCarriedOverBoard needs commands");
     }
+
     const commands = this.commands;
 
     const { targetResults, evaluatorResults } = this.buildCarriedOverDispatches({
@@ -225,6 +237,7 @@ export class ExperimentCarriedBoardService {
         const dbEvaluator = config?.dbEvaluatorId
           ? loadedEvaluators?.get(config.dbEvaluatorId)
           : null;
+
         return dbEvaluator?.name ?? null;
       },
       occurredAt: Date.now(),

@@ -391,7 +391,7 @@ export class ExperimentApp {
     const { state, ...rest } = input;
     return this.dependencies.experiments.createEvaluationsV3({
       ...rest,
-      state: state ?? createBlankWorkbenchState({ ...(rest.name ? { name: rest.name } : {}) }),
+      state: state ?? createBlankWorkbenchState(rest.name ? { name: rest.name } : {}),
       actor: ExperimentApp.actorFor(by),
     });
   }

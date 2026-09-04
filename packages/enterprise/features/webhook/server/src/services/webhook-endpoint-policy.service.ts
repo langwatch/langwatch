@@ -54,6 +54,7 @@ export class WebhookEndpointPolicyService {
     if (controls.maxBatchSize !== undefined) {
       assertControlInBounds("max_batch_size", controls.maxBatchSize, WEBHOOK_MAX_BATCH_SIZE_BOUNDS);
     }
+
     if (controls.maxBatchDelayMs !== undefined) {
       assertControlInBounds(
         "max_batch_delay_ms",
@@ -61,6 +62,7 @@ export class WebhookEndpointPolicyService {
         WEBHOOK_BATCH_DELAY_BOUNDS_MS,
       );
     }
+
     if (controls.maxInFlight !== undefined) {
       assertControlInBounds("max_in_flight", controls.maxInFlight, WEBHOOK_IN_FLIGHT_BOUNDS);
     }

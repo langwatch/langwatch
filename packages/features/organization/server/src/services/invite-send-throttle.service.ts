@@ -50,7 +50,9 @@ export class InviteSendThrottleService {
       windowSeconds: INVITE_SEND_WINDOW_SECONDS,
       max: INVITE_SENDS_PER_WINDOW,
     });
-    if (decision.allowed) return;
+    if (decision.allowed) {
+      return;
+    }
 
     throw new InviteThrottledError(Math.max(1, Math.ceil((decision.resetAt - now) / 1000)));
   }

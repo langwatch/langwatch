@@ -516,14 +516,12 @@ export class LangyUiHandlerFailedError extends HandledError {
     super("langy_ui_handler_failed", `The page could not carry out "${kind}".`, {
       httpStatus: 502,
       fault: errorCode && errorCode !== UNTYPED_HANDLER_FAILURE ? "customer" : "platform",
-      meta: { kind, ...(errorCode ? { errorCode } : {}) },
-      // The page's own code first when it has advice of its own: the generic
-      // tip only says to read `meta.errorCode`, which is a name, not a next
-      // step.
-      ...{
-        ...remediation("langy_ui_handler_failed"),
-        ...remediationFor(errorCode),
+      meta: {
+        kind,
+        ...(errorCode ? { errorCode } : {}),
       },
+      ...remediation("langy_ui_handler_failed"),
+      ...remediationFor(errorCode),
     });
     this.name = "LangyUiHandlerFailedError";
   }

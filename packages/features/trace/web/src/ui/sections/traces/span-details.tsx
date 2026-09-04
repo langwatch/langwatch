@@ -248,7 +248,7 @@ export function SpanDetails({
                         ...context,
                         content: JSON.parse(context.content),
                       };
-                    } catch (_) {
+                    } catch {
                       return context;
                     }
                   }
@@ -371,7 +371,7 @@ export const getEvaluationResult = (span: Span): EvaluationResult | undefined =>
       }
 
       return span.output.value;
-    } catch (_) {
+    } catch {
       return undefined;
     }
   }

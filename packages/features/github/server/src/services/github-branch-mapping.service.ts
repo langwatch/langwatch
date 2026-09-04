@@ -58,6 +58,7 @@ function nowMs(deps: { now?: () => number }): number {
 
 function backoffMsFor(attempts: number): number {
   const index = Math.min(Math.max(attempts - 1, 0), EMPTY_BACKOFF_MS.length - 1);
+
   return EMPTY_BACKOFF_MS[index]!;
 }
 
@@ -90,6 +91,7 @@ export class GithubBranchMappingService {
         { installationId: event.installationId, action: event.action },
         "pull request event has no local installation",
       );
+
       return false;
     }
 
@@ -110,6 +112,7 @@ export class GithubBranchMappingService {
       isExhaustive: false,
       origin: "demand",
     });
+
     return true;
   }
 
@@ -149,9 +152,11 @@ export class GithubBranchMappingService {
         isExhaustive: true,
         origin: target.origin,
       });
+
       return pullRequests.length;
     } catch (error) {
       await this.recordFailure(scope, error, target.origin);
+
       return 0;
     }
   }
@@ -211,6 +216,7 @@ export class GithubBranchMappingService {
       lastRequestedAt: new Date(now),
       staleBefore: new Date(now - REQUEST_TOUCH_MS),
     });
+
     return false;
   }
 
@@ -250,6 +256,7 @@ export class GithubBranchMappingService {
   ): Promise<void> {
     if (!(error instanceof GithubRateLimitedError)) {
       logger.warn({ error, ...scope }, "branch pull-request mapping failed");
+
       return;
     }
 

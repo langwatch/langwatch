@@ -57,6 +57,7 @@ export class ModelProviderExecutionService {
       model,
       provider: provider.provider,
     });
+
     return modelProviderExecutionParametersSchema.parse(resolved);
   }
 
@@ -78,6 +79,7 @@ export class ModelProviderExecutionService {
       if (!provider) {
         throw new ModelProviderNotFoundError();
       }
+
       return provider;
     }
 
@@ -110,6 +112,7 @@ export class ModelProviderExecutionService {
 
   private baseParameters(model: string, provider: string): ModelProviderExecutionParameters {
     const modelName = ModelProviderExecutionService.modelNameForProvider(model, provider);
+
     return {
       model: translateModelIdForLitellm(modelName).replace("custom/", "openai/"),
     };
@@ -133,6 +136,7 @@ export class ModelProviderExecutionService {
     if (!endpoint) {
       return;
     }
+
     parameters.api_base =
       provider.provider === "anthropic" ? endpoint.replace(/\/v1\/?$/, "") : endpoint;
   }
@@ -163,6 +167,7 @@ export class ModelProviderExecutionService {
     if (!apiKey) {
       return;
     }
+
     const project = (
       storedApiKey
         ? this.storedExecutionValue(provider, "GEMINI_PROJECT")
@@ -217,6 +222,7 @@ export class ModelProviderExecutionService {
     if (!model) {
       throw new ModelProviderInvalidError("Execution parameters are missing a model.");
     }
+
     const deployment = ModelProviderExecutionService.deploymentForModel(
       provider.deploymentMapping,
       model,
@@ -224,6 +230,7 @@ export class ModelProviderExecutionService {
     if (deployment) {
       parameters.deployment = deployment;
     }
+
     if (provider.extraHeaders.length > 0) {
       parameters.extra_headers = JSON.stringify(
         Object.fromEntries(provider.extraHeaders.map(({ key, value }) => [key, value])),
@@ -238,6 +245,7 @@ export class ModelProviderExecutionService {
     if (!key) {
       return null;
     }
+
     return this.options.catalog.tryGetExecutionValue({
       customKeys: provider.customKeys,
       key,
@@ -276,6 +284,7 @@ export class ModelProviderExecutionService {
     if (prefix.startsWith("mp_")) {
       return { kind: "row", id: prefix };
     }
+
     return { kind: "provider", provider: prefix, model };
   }
 
@@ -283,8 +292,10 @@ export class ModelProviderExecutionService {
     const reference = ModelProviderExecutionService.parseModelReference(model);
     if (!reference || reference.kind === "row") {
       const modelName = model.slice(model.indexOf("/") + 1);
+
       return `${provider}/${modelName}`;
     }
+
     return `${provider}/${reference.model}`;
   }
 
@@ -297,6 +308,7 @@ export class ModelProviderExecutionService {
     }
 
     const modelName = model.split("/").slice(1).join("/");
+
     return deploymentMapping[modelName] ?? deploymentMapping[model] ?? null;
   }
 }

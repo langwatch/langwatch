@@ -70,12 +70,16 @@ export class TtlCache<T> {
     if (r) {
       try {
         const result = await r.get(`${this.prefix}${key}`);
-        if (result !== null) return JSON.parse(result) as T;
+        if (result !== null) {
+          return JSON.parse(result) as T;
+        }
+
         return undefined;
       } catch {
         // Redis failed, fall through to memory
       }
     }
+
     return this.memoryGet(key);
   }
 
@@ -91,7 +95,10 @@ export class TtlCache<T> {
     this.memory.set(key, { value, expiresAt: Date.now() + lifetimeMs });
 
     const r = this.redis;
-    if (!r) return;
+    if (!r) {
+      return;
+    }
+
     try {
       await r.setex(`${this.prefix}${key}`, this.ttlSeconds, JSON.stringify(value));
     } catch {
@@ -132,13 +139,19 @@ export class TtlCache<T> {
       );
       if (result === "OK") {
         this.memory.set(key, { value, expiresAt: Date.now() + lifetimeMs });
+
         return true;
       }
+
       return false;
     }
 
-    if (this.memoryGet(key) !== undefined) return false;
+    if (this.memoryGet(key) !== undefined) {
+      return false;
+    }
+
     this.memory.set(key, { value, expiresAt: Date.now() + lifetimeMs });
+
     return true;
   }
 
@@ -146,7 +159,10 @@ export class TtlCache<T> {
     this.memory.delete(key);
 
     const r = this.redis;
-    if (!r) return;
+    if (!r) {
+      return;
+    }
+
     try {
       await r.del(`${this.prefix}${key}`);
     } catch {
@@ -156,11 +172,16 @@ export class TtlCache<T> {
 
   private memoryGet(key: string): T | undefined {
     const entry = this.memory.get(key);
-    if (!entry) return undefined;
-    if (Date.now() > entry.expiresAt) {
-      this.memory.delete(key);
+    if (!entry) {
       return undefined;
     }
+
+    if (Date.now() > entry.expiresAt) {
+      this.memory.delete(key);
+
+      return undefined;
+    }
+
     return entry.value;
   }
 }

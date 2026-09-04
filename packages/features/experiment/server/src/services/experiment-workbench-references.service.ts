@@ -54,7 +54,9 @@ export class ExperimentWorkbenchReferencesService {
     for (const [type, ids] of references) {
       for (const id of ids) {
         const exists = await this.exists({ projectId, type, id, prompts });
-        if (!exists) throw new WorkbenchMissingReferenceError({ refType: type, refId: id });
+        if (!exists) {
+          throw new WorkbenchMissingReferenceError({ refType: type, refId: id });
+        }
       }
     }
   }
@@ -84,7 +86,10 @@ export class ExperimentWorkbenchReferencesService {
           .getById({ id, projectId })
           .then(() => true)
           .catch((error: unknown) => {
-            if (error instanceof EvaluatorNotFoundError) return false;
+            if (error instanceof EvaluatorNotFoundError) {
+              return false;
+            }
+
             throw error;
           });
       case "workflow":
@@ -92,7 +97,10 @@ export class ExperimentWorkbenchReferencesService {
           .getById({ id, projectId })
           .then(() => true)
           .catch((error: unknown) => {
-            if (error instanceof WorkflowNotFoundError) return false;
+            if (error instanceof WorkflowNotFoundError) {
+              return false;
+            }
+
             throw error;
           });
     }

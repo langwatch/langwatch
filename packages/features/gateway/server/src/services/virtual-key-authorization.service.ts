@@ -104,9 +104,15 @@ async function actorHasPermissionAtScope(
   const { prisma, actor } = ctx;
   switch (actor.kind) {
     case "session": {
-      if (!actor.session) return false;
+      if (!actor.session) {
+        return false;
+      }
+
       const scopeRef = await scopeRefFor(prisma, scope);
-      if (!scopeRef) return false;
+      if (!scopeRef) {
+        return false;
+      }
+
       return ctx.permissions.sessionHolds({
         userId: actor.session.user.id,
         permission,
@@ -115,7 +121,10 @@ async function actorHasPermissionAtScope(
     }
     case "apiKey": {
       const scopeRef = await scopeRefFor(prisma, scope);
-      if (!scopeRef) return false;
+      if (!scopeRef) {
+        return false;
+      }
+
       return ctx.permissions.apiKeyHolds({
         apiKeyId: actor.apiKeyId,
         userId: actor.userId,
@@ -145,15 +154,20 @@ async function scopeRefFor(
   if (scope.scopeType === "ORGANIZATION") {
     return { type: "org", id: scope.scopeId };
   }
+
   if (scope.scopeType === "TEAM") {
     return { type: "team", id: scope.scopeId };
   }
+
   const project = await prisma.project.findUnique({
     where: { id: scope.scopeId },
     select: { id: true, teamId: true },
   });
   // Fail closed on a dangling project reference.
-  if (!project) return null;
+  if (!project) {
+    return null;
+  }
+
   return { type: "project", id: project.id, teamId: project.teamId };
 }
 
@@ -174,9 +188,11 @@ export async function assertActorCanManageAllScopes(
   if (scopes.length === 0) {
     throw new TRPCError({ code: "FORBIDDEN", message: "permission_denied" });
   }
+
   if (ctx.actor.kind === "session" && !ctx.actor.session) {
     throw new TRPCError({ code: "FORBIDDEN", message: "permission_denied" });
   }
+
   for (const scope of scopes) {
     if (!(await actorHasPermissionAtScope(ctx, scope, "virtualKeys:manage"))) {
       throw new TRPCError({
@@ -198,8 +214,11 @@ export async function assertActorCanOperateOnAnyScope(
   permission: AuthzPermission,
 ): Promise<void> {
   for (const scope of scopes) {
-    if (await actorHasPermissionAtScope(ctx, scope, permission)) return;
+    if (await actorHasPermissionAtScope(ctx, scope, permission)) {
+      return;
+    }
   }
+
   throw new TRPCError({
     code: "FORBIDDEN",
     message: `permission_denied: ${permission} at one of the virtual key's scopes`,
@@ -230,6 +249,7 @@ export async function assertCanOperateOnAnyScope(
       message: `permission_denied: ${permission} at one of the virtual key's scopes`,
     });
   }
+
   return assertActorCanOperateOnAnyScope(
     {
       prisma: ctx.prisma,
@@ -294,6 +314,7 @@ export async function loadMembershipSet(
           select: { id: true },
         })
       : [];
+
   return {
     isOrgMember: orgMembership !== null,
     isOrgAdmin: orgMembership?.role === OrganizationUserRole.ADMIN,
@@ -349,7 +370,10 @@ async function assertAllResolve(
   ids: string[],
   lookup: (ids: string[]) => Promise<{ id: string }[]>,
 ): Promise<void> {
-  if (ids.length === 0) return;
+  if (ids.length === 0) {
+    return;
+  }
+
   const found = new Set((await lookup(ids)).map((row) => row.id));
   if (ids.some((id) => !found.has(id))) {
     throw new GatewayScopeOrgMismatchError(scopeType);
@@ -388,8 +412,12 @@ export async function resolveVkProjectId(
     scopes = vk?.scopes;
     storedTraceProjectId = vk?.traceProjectId ?? null;
   }
+
   const projectScopes = (scopes ?? []).filter((s) => s.scopeType === "PROJECT");
-  if (projectScopes.length === 1) return projectScopes[0]!.scopeId;
+  if (projectScopes.length === 1) {
+    return projectScopes[0]!.scopeId;
+  }
+
   // Guardrails are project-scoped and enforce where traces land, so an
   // org- or team-owned key's guardrail surface is its explicit trace
   // destination.
@@ -406,7 +434,10 @@ export async function assertTraceProjectBelongsToOrg(
   organizationId: string,
   traceProjectId: string | null | undefined,
 ): Promise<void> {
-  if (!traceProjectId) return;
+  if (!traceProjectId) {
+    return;
+  }
+
   const project = await prisma.project.findFirst({
     where: { id: traceProjectId, team: { organizationId } },
     select: { id: true },
@@ -434,7 +465,9 @@ export async function assertGuardrailAttachmentsAllowed(
   attachments: GuardrailAttachment[] | undefined,
 ): Promise<void> {
   const referencedIds = Array.from(new Set((attachments ?? []).flatMap((a) => a.guardrailIds)));
-  if (referencedIds.length === 0) return;
+  if (referencedIds.length === 0) {
+    return;
+  }
 
   if (!vkProjectId) {
     throw new GatewayGuardrailProjectMismatchError();
@@ -471,10 +504,19 @@ export function isVisibleToMembership(membership: MembershipSet, scopes: Scope[]
   // org, so a blanket `true` here can't leak another org's keys. Without
   // this, the auto-provisioned per-project Langy VK is invisible to the org
   // admin who owns it (real admins hold no per-team TeamUser rows).
-  if (membership.isOrgAdmin) return true;
+  if (membership.isOrgAdmin) {
+    return true;
+  }
+
   return scopes.some((scope) => {
-    if (scope.scopeType === "ORGANIZATION") return membership.isOrgMember;
-    if (scope.scopeType === "TEAM") return membership.teamIds.has(scope.scopeId);
+    if (scope.scopeType === "ORGANIZATION") {
+      return membership.isOrgMember;
+    }
+
+    if (scope.scopeType === "TEAM") {
+      return membership.teamIds.has(scope.scopeId);
+    }
+
     return membership.projectIds.has(scope.scopeId);
   });
 }
@@ -498,6 +540,7 @@ export async function requireExistingVk(
   if (!vk) {
     throw new VirtualKeyNotFoundError();
   }
+
   return vk;
 }
 
@@ -521,5 +564,6 @@ export async function requireVisibleVk(
   if (!isVisibleToMembership(membership, vk.scopes)) {
     throw new VirtualKeyNotFoundError();
   }
+
   return vk;
 }

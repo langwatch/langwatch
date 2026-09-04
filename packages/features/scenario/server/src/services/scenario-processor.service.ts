@@ -53,6 +53,7 @@ export class ScenarioProcessorService extends ScenarioExecutionRunnerPort {
         );
         child.kill("SIGTERM");
       }
+
       this.options.pool.markCancelled(message.scenarioRunId);
     });
 
@@ -103,8 +104,10 @@ export class ScenarioProcessorService extends ScenarioExecutionRunnerPort {
           try {
             if (this.options.pool.wasCancelled(jobData.scenarioRunId)) {
               await this.handleCancelled(jobData, "Cancelled before execution started");
+
               return;
             }
+
             await this.handleFailed(
               jobData,
               "Worker restarting — scenario run terminated before completion",
@@ -118,6 +121,7 @@ export class ScenarioProcessorService extends ScenarioExecutionRunnerPort {
         }),
       );
     }
+
     this.options.pool.drain();
   }
 
@@ -167,19 +171,23 @@ export class ScenarioProcessorService extends ScenarioExecutionRunnerPort {
         environment: childEnvironment,
       });
     }
+
     let prefetch: ScenarioExecutionPrefetchResult;
     try {
       prefetch = await preparation.result;
     } catch (error) {
       await this.releaseChild({ childSession, scenarioRunId: jobData.scenarioRunId });
+
       throw error;
     }
 
     if (this.options.pool.wasCancelled(jobData.scenarioRunId)) {
       await this.releaseChild({ childSession, scenarioRunId: jobData.scenarioRunId });
       await this.handleCancelled(jobData, "Cancelled before execution started");
+
       return;
     }
+
     if (!prefetch.success) {
       await this.releaseChild({ childSession, scenarioRunId: jobData.scenarioRunId });
       jobLogger.error(
@@ -187,6 +195,7 @@ export class ScenarioProcessorService extends ScenarioExecutionRunnerPort {
         "Failed to prefetch scenario data",
       );
       await this.handleFailed(jobData, prefetch.error);
+
       return;
     }
 
@@ -200,6 +209,7 @@ export class ScenarioProcessorService extends ScenarioExecutionRunnerPort {
         },
       });
     }
+
     const result = await childSession.execute({
       ...prefetch.data,
       scenarioRunId: jobData.scenarioRunId,
@@ -249,10 +259,13 @@ export class ScenarioProcessorService extends ScenarioExecutionRunnerPort {
     if (result.success) {
       this.options.metrics.completed(durationMs);
       jobLogger.info({ success: true, durationMs, childDurationMs }, "Scenario job completed");
+
       return;
     }
+
     if (result.cancelled) {
       await this.handleCancelled(jobData, result.error);
+
       return;
     }
 

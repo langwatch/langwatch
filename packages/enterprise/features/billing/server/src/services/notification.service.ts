@@ -130,6 +130,7 @@ export class NotificationService {
       if (missingConfigLog) {
         logger.warn(missingConfigLog);
       }
+
       return;
     }
 
@@ -166,6 +167,7 @@ export class NotificationService {
       });
     } catch (error) {
       logger.error({ error, to }, "Failed to send usage limit email");
+
       throw error;
     }
   }

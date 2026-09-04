@@ -47,8 +47,12 @@ export class TraceEditOverlayService {
       projectId,
       traceId,
     });
-    if (!row) return null;
+    if (!row) {
+      return null;
+    }
+
     const patch = parseTraceEditOverlayPatch(row.patch);
+
     return patch ? toDto({ row, patch }) : null;
   }
 
@@ -70,8 +74,11 @@ export class TraceEditOverlayService {
     const patches = new Map<string, TraceEditOverlayPatch>();
     for (const row of rows) {
       const patch = parseTraceEditOverlayPatch(row.patch);
-      if (patch) patches.set(row.traceId, patch);
+      if (patch) {
+        patches.set(row.traceId, patch);
+      }
     }
+
     return patches;
   }
 
@@ -87,7 +94,10 @@ export class TraceEditOverlayService {
     userId: string | null;
   }): Promise<TraceEditOverlayDto> {
     const parsed = traceEditOverlayPatchSchema.safeParse(patch);
-    if (!parsed.success) throw ValidationError.fromZodError(parsed.error);
+    if (!parsed.success) {
+      throw ValidationError.fromZodError(parsed.error);
+    }
+
     if (!patchHasAnyEdit(parsed.data)) {
       throw new ValidationError("A trace correction must change something.");
     }
@@ -98,6 +108,7 @@ export class TraceEditOverlayService {
       patch: parsed.data,
       userId,
     });
+
     return toDto({ row, patch: parsed.data });
   }
 
@@ -153,10 +164,14 @@ export class TraceEditOverlayService {
       projectId,
       traceId,
     });
-    if (!existing) return null;
+    if (!existing) {
+      return null;
+    }
 
     const current = parseTraceEditOverlayPatch(existing.patch);
-    if (!current?.trace?.[field]) return null;
+    if (!current?.trace?.[field]) {
+      return null;
+    }
 
     const { [field]: _removed, ...remainingTraceEdits } = current.trace;
     const hasRemainingTraceEdits = Object.values(remainingTraceEdits).some(
@@ -169,8 +184,10 @@ export class TraceEditOverlayService {
 
     if (!patchHasAnyEdit(next)) {
       await this.repository.delete({ projectId, traceId });
+
       return null;
     }
+
     return this.upsert({ projectId, traceId, patch: next, userId });
   }
 
@@ -244,11 +261,15 @@ export class TraceEditOverlayService {
       projectId,
       traceId,
     });
-    if (!existing) return null;
+    if (!existing) {
+      return null;
+    }
 
     const current = parseTraceEditOverlayPatch(existing.patch);
     const existingSpan = current?.spans.find((span) => span.spanId === spanId);
-    if (!current || existingSpan?.[field] === undefined) return null;
+    if (!current || existingSpan?.[field] === undefined) {
+      return null;
+    }
 
     const { [field]: _removed, ...remainingSpanEdits } = existingSpan;
     const spanKeepsEdits = Object.entries(remainingSpanEdits).some(
@@ -265,8 +286,10 @@ export class TraceEditOverlayService {
 
     if (!patchHasAnyEdit(next)) {
       await this.repository.delete({ projectId, traceId });
+
       return null;
     }
+
     return this.upsert({ projectId, traceId, patch: next, userId });
   }
 
@@ -290,7 +313,10 @@ export class TraceEditOverlayService {
       projectId,
       traceId,
     });
-    if (!existing) return emptyTraceEditOverlayPatch();
+    if (!existing) {
+      return emptyTraceEditOverlayPatch();
+    }
+
     return parseTraceEditOverlayPatch(existing.patch) ?? emptyTraceEditOverlayPatch();
   }
 }

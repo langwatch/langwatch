@@ -57,7 +57,10 @@ export class CurrencyService {
   }
 
   private static currencyFromCountry(countryCode: string | null | undefined): CurrencyType {
-    if (!countryCode) return DEFAULT_CURRENCY;
+    if (!countryCode) {
+      return DEFAULT_CURRENCY;
+    }
+
     return EUR_COUNTRIES.has(countryCode.toUpperCase()) ? Currency.EUR : Currency.USD;
   }
 
@@ -66,18 +69,27 @@ export class CurrencyService {
    * Tries CDN/proxy headers in order of preference: CF, real-ip, forwarded-for.
    */
   private static clientIp(req: CurrencyRequest | undefined): string | null {
-    if (!req?.headers) return null;
+    if (!req?.headers) {
+      return null;
+    }
 
     const cfIp = req.headers["cf-connecting-ip"];
-    if (cfIp) return Array.isArray(cfIp) ? (cfIp[0] ?? null) : cfIp;
+    if (cfIp) {
+      return Array.isArray(cfIp) ? (cfIp[0] ?? null) : cfIp;
+    }
 
     const realIp = req.headers["x-real-ip"];
-    if (realIp) return Array.isArray(realIp) ? (realIp[0] ?? null) : realIp;
+    if (realIp) {
+      return Array.isArray(realIp) ? (realIp[0] ?? null) : realIp;
+    }
 
     const forwarded = req.headers["x-forwarded-for"];
     if (forwarded) {
       const first = Array.isArray(forwarded) ? (forwarded[0] ?? null) : forwarded;
-      if (!first) return null;
+      if (!first) {
+        return null;
+      }
+
       return first.split(",")[0]?.trim() ?? null;
     }
 
@@ -86,8 +98,12 @@ export class CurrencyService {
 
   private static is172Private(ip: string): boolean {
     const parts = ip.split(".");
-    if (parts[0] !== "172") return false;
+    if (parts[0] !== "172") {
+      return false;
+    }
+
     const second = parseInt(parts[1] ?? "", 10);
+
     return second >= 16 && second <= 31;
   }
 

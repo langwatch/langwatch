@@ -119,7 +119,9 @@ export function computeClaudeSpanEnrichment({
   traceCanonicalisation: TraceCanonicalisationService;
 }): Map<string, ClaudeSpanEnrichment> {
   const result = new Map<string, ClaudeSpanEnrichment>();
-  if (spans.length === 0 || logs.length === 0) return result;
+  if (spans.length === 0 || logs.length === 0) {
+    return result;
+  }
 
   const outputByRequestId = buildOutputIndex(logs, traceCanonicalisation);
   const inputBySpanId = buildInputIndex({ spans, logs, traceCanonicalisation });
@@ -131,6 +133,7 @@ export function computeClaudeSpanEnrichment({
       result.set(span.spanId, { input, output });
     }
   }
+
   return result;
 }
 
@@ -147,8 +150,14 @@ function buildOutputIndex(
   const byRequestId = new Map<string, SpanInputOutput>();
 
   for (const log of logs) {
-    if (log.eventName !== OUTPUT_BODY_EVENT || log.requestId === null) continue;
-    if (byRequestId.has(log.requestId)) continue;
+    if (log.eventName !== OUTPUT_BODY_EVENT || log.requestId === null) {
+      continue;
+    }
+
+    if (byRequestId.has(log.requestId)) {
+      continue;
+    }
+
     // Ingest parsed the raw body once and stamped the reply text on the record,
     // so prefer that over re-parsing a 60 KB blob on every read. The parse stays
     // as the fallback for records ingested before the derivation existed — and
@@ -174,7 +183,11 @@ function buildOutputIndex(
     if (log.eventName !== ASSISTANT_RESPONSE_EVENT || log.requestId === null) {
       continue;
     }
-    if (byRequestId.has(log.requestId)) continue;
+
+    if (byRequestId.has(log.requestId)) {
+      continue;
+    }
+
     if (log.body !== null && log.body.length > 0) {
       byRequestId.set(log.requestId, {
         type: "text",
@@ -235,9 +248,11 @@ function buildInputIndex({
       pushInto(promptsByQuerySource, key, log);
     }
   }
+
   for (const bodies of requestBodiesByQuerySource.values()) {
     bodies.sort(byTimeAsc);
   }
+
   for (const prompts of promptsByQuerySource.values()) {
     prompts.sort(byTimeAsc);
   }
@@ -251,7 +266,9 @@ function buildInputIndex({
         prompts,
         traceCanonicalisation,
       });
-      if (input !== null) bySpanId.set(spansInGroup[i]!.spanId, input);
+      if (input !== null) {
+        bySpanId.set(spansInGroup[i]!.spanId, input);
+      }
     }
   }
 
@@ -283,6 +300,7 @@ function dedupeRepeatedSystemMessages({
     if (input?.type !== "chat_messages" || !Array.isArray(input.value)) {
       continue;
     }
+
     callNumber++;
     const messages = input.value as ChatMessage[];
     for (const [i, message] of messages.entries()) {
@@ -291,7 +309,10 @@ function dedupeRepeatedSystemMessages({
         callNumber,
         firstCallByContent,
       });
-      if (seenAtCall === null) continue;
+      if (seenAtCall === null) {
+        continue;
+      }
+
       messages[i] = repeatedSystemPlaceholder(message.content as string, seenAtCall);
     }
   }
@@ -314,16 +335,20 @@ function firstSystemCall({
   if (message.role !== "system" || typeof message.content !== "string") {
     return null;
   }
+
   const firstCall = firstCallByContent.get(message.content);
   if (firstCall === undefined) {
     firstCallByContent.set(message.content, callNumber);
+
     return null;
   }
+
   return firstCall;
 }
 
 function repeatedSystemPlaceholder(content: string, firstCall: number): ChatMessage {
   const chars = content.length.toLocaleString("en-US");
+
   return {
     role: "system",
     content: `[system context unchanged since call #${firstCall} of this trace, ${chars} chars not repeated]`,
@@ -355,6 +380,7 @@ function buildSpanInput({
       role: normalizeRole(m.role),
       content: capPayloadString(m.content, undefined, "input_message"),
     }));
+
     return { type: "chat_messages", value };
   }
 
@@ -368,6 +394,7 @@ function buildSpanInput({
       value: capPayloadString(promptText, undefined, "user_prompt"),
     };
   }
+
   return null;
 }
 
@@ -385,14 +412,23 @@ function pickPromptFallback({
   refTimeUnixMs: number | undefined;
 }): string | null {
   const withBody = prompts.filter((p) => p.body !== null && p.body.length > 0);
-  if (withBody.length === 0) return null;
+  if (withBody.length === 0) {
+    return null;
+  }
+
   if (refTimeUnixMs !== undefined) {
     let chosen: ClaudeContentLog | null = null;
     for (const p of withBody) {
-      if (p.timeUnixMs <= refTimeUnixMs) chosen = p;
+      if (p.timeUnixMs <= refTimeUnixMs) {
+        chosen = p;
+      }
     }
-    if (chosen !== null) return chosen.body;
+
+    if (chosen !== null) {
+      return chosen.body;
+    }
   }
+
   return withBody[0]!.body;
 }
 
@@ -410,14 +446,20 @@ function byTimeAsc(a: ClaudeContentLog, b: ClaudeContentLog): number {
 
 function groupBy<T>(items: T[], key: (item: T) => string): Map<string, T[]> {
   const out = new Map<string, T[]>();
-  for (const item of items) pushInto(out, key(item), item);
+  for (const item of items) {
+    pushInto(out, key(item), item);
+  }
+
   return out;
 }
 
 function pushInto<T>(map: Map<string, T[]>, key: string, item: T): void {
   const existing = map.get(key);
-  if (existing !== undefined) existing.push(item);
-  else map.set(key, [item]);
+  if (existing !== undefined) {
+    existing.push(item);
+  } else {
+    map.set(key, [item]);
+  }
 }
 
 /** A claude_code tool event log (`tool_decision` / `tool_result`), normalized. */
@@ -482,27 +524,37 @@ export function computeClaudeToolSpanEnrichment({
   traceCanonicalisation: TraceCanonicalisationService;
 }): Map<string, ClaudeToolSpanEnrichment> {
   const result = new Map<string, ClaudeToolSpanEnrichment>();
-  if (spans.length === 0 || toolLogs.length === 0) return result;
+  if (spans.length === 0 || toolLogs.length === 0) {
+    return result;
+  }
 
   // First log per (event, tool_use_id) wins, mirroring buildOutputIndex.
   const resultByUseId = new Map<string, ClaudeToolLog>();
   const decisionByUseId = new Map<string, ClaudeToolLog>();
   for (const log of toolLogs) {
-    if (log.toolUseId === null) continue;
+    if (log.toolUseId === null) {
+      continue;
+    }
+
     if (log.eventName === TOOL_RESULT_EVENT && !resultByUseId.has(log.toolUseId)) {
       resultByUseId.set(log.toolUseId, log);
     } else if (log.eventName === TOOL_DECISION_EVENT && !decisionByUseId.has(log.toolUseId)) {
       decisionByUseId.set(log.toolUseId, log);
     }
   }
-  if (resultByUseId.size === 0 && decisionByUseId.size === 0) return result;
+
+  if (resultByUseId.size === 0 && decisionByUseId.size === 0) {
+    return result;
+  }
 
   const resultContentByUseId = buildToolResultContentIndex(contentLogs, traceCanonicalisation);
 
   for (const span of spans) {
     const toolResult = resultByUseId.get(span.toolUseId) ?? null;
     const decision = decisionByUseId.get(span.toolUseId) ?? null;
-    if (toolResult === null && decision === null) continue;
+    if (toolResult === null && decision === null) {
+      continue;
+    }
 
     const input = buildToolInput({ toolResult, decision });
     const output = buildToolOutput({
@@ -514,6 +566,7 @@ export function computeClaudeToolSpanEnrichment({
       result.set(span.spanId, { input, output });
     }
   }
+
   return result;
 }
 
@@ -528,14 +581,20 @@ function buildToolResultContentIndex(
 ): Map<string, string> {
   const out = new Map<string, string>();
   for (const log of contentLogs) {
-    if (log.eventName !== INPUT_BODY_EVENT || log.body === null) continue;
+    if (log.eventName !== INPUT_BODY_EVENT || log.body === null) {
+      continue;
+    }
+
     const { toolResults } = traceCanonicalisation.deriveClaudeRequestContent({
       body: log.body,
     });
     for (const { useId, text } of toolResults) {
-      if (!out.has(useId)) out.set(useId, text);
+      if (!out.has(useId)) {
+        out.set(useId, text);
+      }
     }
   }
+
   return out;
 }
 
@@ -548,7 +607,10 @@ function buildToolInput({
 }): SpanInputOutput | null {
   const raw =
     toolResult?.toolInput ?? toolResult?.toolParameters ?? decision?.toolParameters ?? null;
-  if (raw === null || raw.length === 0) return null;
+  if (raw === null || raw.length === 0) {
+    return null;
+  }
+
   return toJsonOrText(capPayloadString(raw, undefined, "tool_input"));
 }
 
@@ -564,6 +626,7 @@ function buildToolOutput({
   if (resultContent !== null) {
     return { type: "text", value: resultContent };
   }
+
   if (toolResult !== null) {
     const status =
       toolResult.success === false
@@ -571,6 +634,7 @@ function buildToolOutput({
         : toolResult.success === true
           ? "completed"
           : "unknown";
+
     return {
       type: "json",
       value: prune({
@@ -585,6 +649,7 @@ function buildToolOutput({
       }),
     };
   }
+
   if (decision !== null && decision.decision === "reject") {
     // Denied tools never run: no result log ever comes.
     return {
@@ -596,6 +661,7 @@ function buildToolOutput({
       }),
     };
   }
+
   return null;
 }
 
@@ -611,8 +677,11 @@ function toJsonOrText(value: string): SpanInputOutput {
 function prune<T extends Record<string, unknown>>(obj: T): T {
   const out = {} as T;
   for (const [k, v] of Object.entries(obj)) {
-    if (v !== null && v !== undefined) (out as Record<string, unknown>)[k] = v;
+    if (v !== null && v !== undefined) {
+      (out as Record<string, unknown>)[k] = v;
+    }
   }
+
   return out;
 }
 
@@ -646,8 +715,14 @@ export function computeClaudeInteractionOutput({
     ) {
       continue;
     }
-    if (log.timeUnixMs < windowStartMs) continue;
-    if (log.timeUnixMs > windowEndMs + slackMs) continue;
+
+    if (log.timeUnixMs < windowStartMs) {
+      continue;
+    }
+
+    if (log.timeUnixMs > windowEndMs + slackMs) {
+      continue;
+    }
 
     let text: string | null = null;
     let rank = 0;
@@ -671,7 +746,11 @@ export function computeClaudeInteractionOutput({
     } else {
       continue;
     }
-    if (text === null) continue;
+
+    if (text === null) {
+      continue;
+    }
+
     if (
       best === null ||
       log.timeUnixMs > best.timeUnixMs ||
@@ -680,5 +759,6 @@ export function computeClaudeInteractionOutput({
       best = { timeUnixMs: log.timeUnixMs, rank, text };
     }
   }
+
   return best !== null ? { type: "text", value: best.text } : null;
 }

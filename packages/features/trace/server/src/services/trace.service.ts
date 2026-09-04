@@ -98,12 +98,14 @@ export class TraceService extends TraceServiceContract {
 
   async getFullRecord(input: TraceFullReadInput): Promise<TraceFullRecord> {
     const parsed = traceFullReadInputSchema.parse(input);
+
     return traceFullRecordSchema.parse(await this.composition.fullRecords.get(parsed));
   }
 
   async getFullThread(input: TraceFullThreadReadInput): Promise<TraceFullRecord[]> {
     const parsed = traceFullThreadReadInputSchema.parse(input);
     const records = await this.composition.fullRecords.getThread(parsed);
+
     return traceFullRecordSchema.array().parse(records);
   }
 

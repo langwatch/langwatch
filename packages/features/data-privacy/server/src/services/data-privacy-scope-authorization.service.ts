@@ -29,8 +29,14 @@ export function requiredDataPrivacyWritePermission(
   // organization. A team MEMBER holds `project:update` but not
   // `project:manage`, and the snapshot already shows them their own project as
   // writable, so PROJECT gates on the narrower of the two.
-  if (scopeType === "ORGANIZATION" || scopeType === "DEPARTMENT") return "organization:manage";
-  if (scopeType === "TEAM") return "team:manage";
+  if (scopeType === "ORGANIZATION" || scopeType === "DEPARTMENT") {
+    return "organization:manage";
+  }
+
+  if (scopeType === "TEAM") {
+    return "team:manage";
+  }
+
   return "project:update";
 }
 
@@ -48,7 +54,10 @@ export class DataPrivacyScopeAuthorizationService {
   ) {}
 
   async assertCanWriteScope(input: { userId: string; scope: DataPrivacyScope }): Promise<void> {
-    if (await this.canWriteScope(input)) return;
+    if (await this.canWriteScope(input)) {
+      return;
+    }
+
     // The transport codes the platform surface has always answered with, raised
     // here rather than as a handled error: a new `code` needs an entry in the
     // client presentation registry, and that registry still lives in a tree
@@ -75,10 +84,12 @@ export class DataPrivacyScopeAuthorizationService {
         message: "The data privacy scope target does not exist.",
       });
     }
+
     const projectOrganizationId = project?.organizationId ?? null;
     if (!projectOrganizationId) {
       throw new TRPCError({ code: "NOT_FOUND", message: "The project does not exist." });
     }
+
     if (projectOrganizationId !== scopeOrganizationId) {
       throw new TRPCError({
         code: "BAD_REQUEST",
@@ -97,24 +108,34 @@ export class DataPrivacyScopeAuthorizationService {
         scope.scopeType === "ORGANIZATION"
           ? scope.scopeId
           : await this.directory.tryResolveScopeOrganizationId({ scope });
-      if (!organizationId) return false;
+      if (!organizationId) {
+        return false;
+      }
+
       return this.permissions.canManageOrganization({ userId, organizationId });
     }
+
     if (scope.scopeType === "TEAM") {
       const organizationId = await this.directory.tryResolveScopeOrganizationId({ scope });
-      if (!organizationId) return false;
+      if (!organizationId) {
+        return false;
+      }
+
       const decisions = await this.permissions.canManageTeams({
         userId,
         organizationId,
         teamIds: [scope.scopeId],
       });
+
       return decisions.get(scope.scopeId) === true;
     }
+
     const decisions = await this.permissions.canUpdateProjects({
       userId,
       organizationId: await this.directory.tryResolveScopeOrganizationId({ scope }),
       projectIds: [scope.scopeId],
     });
+
     return decisions.get(scope.scopeId) === true;
   }
 }

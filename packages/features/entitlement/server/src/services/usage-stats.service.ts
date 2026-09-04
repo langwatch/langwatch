@@ -55,9 +55,18 @@ export const MESSAGE_LIMIT_WARNING_THRESHOLD = 0.8;
  * Calculates the message limit status based on current usage and max allowed.
  */
 export function getMessageLimitStatus(current: number, max: number): MessageLimitStatus {
-  if (max === 0 || max === Number.MAX_SAFE_INTEGER || max >= UNLIMITED_MESSAGES) return "ok";
-  if (current >= max) return "exceeded";
-  if (current >= max * MESSAGE_LIMIT_WARNING_THRESHOLD) return "warning";
+  if (max === 0 || max === Number.MAX_SAFE_INTEGER || max >= UNLIMITED_MESSAGES) {
+    return "ok";
+  }
+
+  if (current >= max) {
+    return "exceeded";
+  }
+
+  if (current >= max * MESSAGE_LIMIT_WARNING_THRESHOLD) {
+    return "warning";
+  }
+
   return "ok";
 }
 

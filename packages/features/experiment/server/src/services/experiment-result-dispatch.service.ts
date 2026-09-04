@@ -80,11 +80,15 @@ export class ExperimentResultDispatchService {
     loadedPrompts: Map<string, VersionedPrompt>;
     loadedEvaluators?: LoadedEvaluators;
   }): string | null {
-    if (t.localPromptConfig?.llm?.model) return t.localPromptConfig.llm.model;
+    if (t.localPromptConfig?.llm?.model) {
+      return t.localPromptConfig.llm.model;
+    }
 
     if (t.type === "prompt" && t.promptId) {
       const loadedPrompt = loadedPrompts.get(promptLoadKey(t));
-      if (loadedPrompt?.model) return loadedPrompt.model;
+      if (loadedPrompt?.model) {
+        return loadedPrompt.model;
+      }
     }
 
     // Evaluator targets — the judge, recorded on the run for the same
@@ -102,7 +106,9 @@ export class ExperimentResultDispatchService {
             | { settings?: { model?: unknown } }
             | undefined
         )?.settings;
-      if (typeof settings?.model === "string" && settings.model) return settings.model;
+      if (typeof settings?.model === "string" && settings.model) {
+        return settings.model;
+      }
     }
 
     return null;
@@ -121,11 +127,18 @@ export class ExperimentResultDispatchService {
     loadedEvaluators?: LoadedEvaluators;
     loadedWorkflows?: Map<string, LoadedWorkflow>;
   }): string | null {
-    if (t.type === "prompt" && t.promptId) return loadedPrompts.get(promptLoadKey(t))?.name ?? null;
-    if (t.type === "agent" && t.dbAgentId) return loadedAgents.get(t.dbAgentId)?.name ?? null;
+    if (t.type === "prompt" && t.promptId) {
+      return loadedPrompts.get(promptLoadKey(t))?.name ?? null;
+    }
+
+    if (t.type === "agent" && t.dbAgentId) {
+      return loadedAgents.get(t.dbAgentId)?.name ?? null;
+    }
+
     if (t.type === "evaluator" && t.targetEvaluatorId) {
       return loadedEvaluators?.get(t.targetEvaluatorId)?.name ?? null;
     }
+
     if (t.type === "workflow" && t.workflowId) {
       return loadedWorkflows?.get(workflowLoadKey(t))?.name ?? null;
     }

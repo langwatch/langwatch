@@ -48,6 +48,7 @@ function deriveStoredObjectId({
   const hash = createHash("sha1").update(`${projectId}:${sha256}`).digest();
   const identifier = hash.subarray(0, 8) as unknown as Uint8Array;
   const instance = new Instance(Instance.schemes.RANDOM, identifier);
+
   return new Ksuid("prod", "so", 0, instance, 0).toString();
 }
 
@@ -110,6 +111,7 @@ export class StoredObjectsService {
 
   private registryFor(projectId: string): StoredObjectStorageRegistry {
     const { registry } = this.options;
+
     return typeof registry === "function" ? registry(projectId) : registry;
   }
 
@@ -180,6 +182,7 @@ export class StoredObjectsService {
         if (existing) {
           this.telemetry.recordDedupHit(purpose);
           span.setAttribute("stored_object.dedup_hit", true);
+
           return { id: existing.id, mediaType, isDuplicate: true };
         }
 
@@ -204,6 +207,7 @@ export class StoredObjectsService {
             },
             "Failed to PUT stored object bytes",
           );
+
           throw error;
         }
 
@@ -244,10 +248,12 @@ export class StoredObjectsService {
               "compensating delete failed; bytes may be orphaned",
             );
           }
+
           throw insertError;
         }
 
         span.setAttribute("stored_object.dedup_hit", false);
+
         return { id, mediaType, isDuplicate: false };
       },
     );
@@ -277,8 +283,12 @@ export class StoredObjectsService {
     | { status: "not_found" }
   > {
     const row = await this.repository.findById({ projectId, id });
-    if (!row) return { status: "not_found" };
+    if (!row) {
+      return { status: "not_found" };
+    }
+
     const bytesPresent = await this.registryFor(projectId).exists(row.storage_uri);
+
     return bytesPresent
       ? { status: "available", mediaType: row.media_type }
       : { status: "missing", mediaType: row.media_type };
@@ -326,12 +336,15 @@ export class StoredObjectsService {
 
         try {
           const stream = await this.registryFor(projectId).get(row.storage_uri);
+
           return { row, stream };
         } catch (error) {
           if (error instanceof ObjectNotFoundError) {
             span.setAttribute("result.storage_missing", true);
+
             return { row, status: "missing" as const };
           }
+
           this.telemetry.recordReadFailure();
           logger.error(
             {
@@ -342,6 +355,7 @@ export class StoredObjectsService {
             },
             "Failed to GET stored object bytes",
           );
+
           throw error;
         }
       },
@@ -427,6 +441,7 @@ export class StoredObjectsService {
             );
           }
         }
+
         span.setAttribute("stored_objects.bytes_deleted", bytesDeleted);
         span.setAttribute("stored_objects.byte_delete_failures", byteDeleteFailures);
         span.setAttribute("stored_objects.rows_retained_for_retry", byteDeleteFailures);
@@ -437,6 +452,7 @@ export class StoredObjectsService {
         if (succeededIds.length > 0) {
           await this.repository.deleteByIds({ projectId, ids: succeededIds });
         }
+
         logger.info(
           {
             projectId,

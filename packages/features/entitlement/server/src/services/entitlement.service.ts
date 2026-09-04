@@ -33,17 +33,23 @@ export class EntitlementService extends EntitlementServiceContract implements Pl
     let plan = await this.resolvePlan(input);
     plan = await this.applyEnrichers(plan, input);
     plan = this.applyAuthorization(plan, input.user);
+
     return planSchema.parse(plan);
   }
 
   private async resolvePlan(input: ResolvePlanInput): Promise<Plan> {
     const license = await this.tryResolvePaidPlan(this.options.license, input);
-    if (license) return this.withSource(license, "license");
+    if (license) {
+      return this.withSource(license, "license");
+    }
 
     const subscription = await this.tryResolvePaidPlan(this.options.subscription, input);
-    if (subscription) return this.withSource(subscription, "subscription");
+    if (subscription) {
+      return this.withSource(subscription, "subscription");
+    }
 
     const baseline = await this.resolveBaseline(input);
+
     return this.withSource(baseline, "free");
   }
 
@@ -51,9 +57,15 @@ export class EntitlementService extends EntitlementServiceContract implements Pl
     source: EntitlementSource | undefined,
     input: ResolvePlanInput,
   ): Promise<Plan | null> {
-    if (!source) return null;
+    if (!source) {
+      return null;
+    }
+
     const plan = await source.resolve(input);
-    if (!plan || plan.free) return null;
+    if (!plan || plan.free) {
+      return null;
+    }
+
     return plan;
   }
 
@@ -61,12 +73,14 @@ export class EntitlementService extends EntitlementServiceContract implements Pl
     if ("resolve" in this.options.baseline) {
       return this.options.baseline.resolve(input);
     }
+
     return this.options.baseline;
   }
 
   private withSource(plan: Plan, planSource: PlanSource): Plan {
     const resolved = { ...plan };
     resolved.planSource = planSource;
+
     return resolved;
   }
 
@@ -75,13 +89,18 @@ export class EntitlementService extends EntitlementServiceContract implements Pl
     for (const enricher of this.options.enrichers ?? []) {
       plan = await enricher.enrich(plan, input);
     }
+
     return plan;
   }
 
   private applyAuthorization(plan: Plan, user: PlanProviderUser | undefined): Plan {
-    if (!this.options.authorization) return plan;
+    if (!this.options.authorization) {
+      return plan;
+    }
+
     const authorized = { ...plan };
     Object.assign(authorized, this.options.authorization.resolve(user));
+
     return authorized;
   }
 }

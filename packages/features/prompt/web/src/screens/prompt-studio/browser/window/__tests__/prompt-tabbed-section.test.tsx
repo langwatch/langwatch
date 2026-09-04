@@ -453,7 +453,7 @@ function FormWrapper({
           inputs: [],
           demonstrations: { inline: { records: {} } },
         },
-        ...(defaultValues?.version ?? {}),
+        ...defaultValues?.version,
       },
     },
   });

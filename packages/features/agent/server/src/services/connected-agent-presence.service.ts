@@ -62,6 +62,7 @@ export function agentPresenceView({
   presence: Map<string, AgentPresence>;
 }): { owner: AgentOwnerView | null } & AgentPresence {
   const { status, instances } = presence.get(agent.id) ?? NO_PRESENCE;
+
   return {
     owner: agent.ownerUserId
       ? (owners.get(agent.ownerUserId) ?? {
@@ -101,9 +102,13 @@ export async function readAgentPresence({
   const registry = runtime.registry;
   const entries = await Promise.all(
     agents.map(async (agent): Promise<[string, AgentPresence]> => {
-      if (agent.type !== "connected") return [agent.id, NO_PRESENCE];
+      if (agent.type !== "connected") {
+        return [agent.id, NO_PRESENCE];
+      }
+
       try {
         const live = await registry.listLive({ projectId, agentId: agent.id });
+
         return [
           agent.id,
           {
@@ -118,9 +123,11 @@ export async function readAgentPresence({
           { error, projectId, agentId: agent.id },
           "presence read failed, reporting the agent as offline",
         );
+
         return [agent.id, NO_PRESENCE];
       }
     }),
   );
+
   return new Map(entries);
 }

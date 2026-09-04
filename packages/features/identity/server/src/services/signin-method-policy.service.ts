@@ -105,6 +105,7 @@ export async function resolveFederatedMethod(
   resolveAuthProvider: () => Promise<string>,
 ): Promise<SignInMethod | null> {
   const provider = await resolveAuthProvider();
+
   return provider === "email" ? null : { id: provider, kind: "federated", connectionId: null };
 }
 
@@ -121,6 +122,7 @@ export async function resolveSignInMethodPolicy(
   // without a passkey on THIS device must still find the way they used last
   // time. It is appended, so the order the screen renders does not move.
   const passkeys = inputs.offersPasskeys() ? [PASSKEY_METHOD] : [];
+
   return {
     defaultMethods: [...(federated ? [federated] : LOCAL_METHOD_SET), ...passkeys],
     localMethods: [...LOCAL_METHOD_SET, ...passkeys],

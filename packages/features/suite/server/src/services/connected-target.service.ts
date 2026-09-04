@@ -76,9 +76,12 @@ export async function assertConnectedAgentsRunnable({
       agent.type === "connected" && agent.ownerUserId != null && agent.ownerUserId !== actor?.id,
   );
   const ownerUserId = foreign?.ownerUserId;
-  if (!foreign || !ownerUserId) return;
+  if (!foreign || !ownerUserId) {
+    return;
+  }
 
   const names = await owners?.findNamesByIds([ownerUserId]);
+
   throw new AgentOwnerOnlyError({
     agentId: foreign.id,
     agentName: foreign.name,
@@ -98,6 +101,7 @@ export function agentOwnerNameReader(agents: Pick<AgentService, "ownersOf">): Ag
   return {
     async findNamesByIds(ids) {
       const owners = await agents.ownersOf(ids.map((ownerUserId) => ({ ownerUserId })));
+
       return new Map([...owners].map(([id, owner]) => [id, owner.name]));
     },
   };
@@ -145,15 +149,22 @@ async function resolveConnectedReference({
   actor: RunActor | undefined;
   agents: ConnectedTargetReferenceReader;
 }): Promise<SuiteTarget> {
-  if (target.type !== "connected") return target;
+  if (target.type !== "connected") {
+    return target;
+  }
+
   const reference = parseConnectedReference(target.referenceId);
-  if (!reference) return target;
+  if (!reference) {
+    return target;
+  }
+
   const rows = await agents.getConnectedByNameAndEnvironment({
     projectId,
     name: reference.name,
     environment: reference.environment,
   });
   const picked = pickReferencedAgent({ rows, actor });
+
   return picked ? { ...target, referenceId: picked.id } : target;
 }
 
@@ -170,8 +181,12 @@ function pickReferencedAgent({
   actor: RunActor | undefined;
 }): ConnectedAgentRow | undefined {
   const own = actor ? rows.find((row) => row.ownerUserId === actor.id) : undefined;
-  if (own) return own;
+  if (own) {
+    return own;
+  }
+
   const shared = rows.filter((row) => row.ownerUserId === null);
+
   return shared.length === 1 ? shared[0] : undefined;
 }
 
@@ -198,10 +213,14 @@ export function isAgentUnseen(agent: {
 export function agentParameterDefinitionsOf(
   agent: { type?: string; config?: unknown } | undefined,
 ): ScenarioParameterDefinition[] {
-  if (agent?.type !== "connected") return [];
+  if (agent?.type !== "connected") {
+    return [];
+  }
+
   const config = agent.config;
   if (typeof config !== "object" || config === null || Array.isArray(config)) {
     return [];
   }
+
   return parseScenarioParameterDefinitions((config as { parameters?: unknown }).parameters);
 }

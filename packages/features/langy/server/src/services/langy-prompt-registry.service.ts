@@ -107,6 +107,7 @@ export async function resolveLangyPrompt(
     if (text) {
       return { text: versioned!.prompt, source: "registry" };
     }
+
     logger.warn(
       { handle, projectId, tag },
       "langy prompt registry row missing or empty — using in-repo fallback",
@@ -116,7 +117,9 @@ export async function resolveLangyPrompt(
       { error, handle, projectId, tag },
       "langy prompt registry read failed — using in-repo fallback",
     );
+
     return { text: fallback, source: "error" };
   }
+
   return { text: fallback, source: "fallback" };
 }

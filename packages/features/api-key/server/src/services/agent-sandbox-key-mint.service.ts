@@ -98,6 +98,7 @@ export async function tryMintAgentSandboxApiKey({
       { projectId, error },
       "could not mint an agent sandbox key; the run continues without the agent cache",
     );
+
     return undefined;
   }
 }

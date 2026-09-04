@@ -770,7 +770,7 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
       prompt.variables = reference.promptVariables;
     }
 
-    const next: Record<string, unknown> = { ...(input.currentParams ?? {}) };
+    const next: Record<string, unknown> = { ...input.currentParams };
     const langwatch =
       next.langwatch && typeof next.langwatch === "object"
         ? (next.langwatch as Record<string, unknown>)

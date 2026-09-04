@@ -44,6 +44,7 @@ export class LegacyApiKeyGrantService {
     ) {
       return null;
     }
+
     return {
       bindingId: deriveBindingId({
         organizationId: apiKey.organizationId,
@@ -88,6 +89,7 @@ export class LegacyApiKeyGrantService {
       if (!binding || this.guardHeld(apiKey.id)) {
         return;
       }
+
       this.holdGuard(apiKey.id);
       void this.persist(apiKey, binding).catch((error: unknown) => this.failed(apiKey, error));
     } catch (error) {
@@ -101,8 +103,10 @@ export class LegacyApiKeyGrantService {
     });
     if (cutoverAt === null) {
       this.emitted.delete(apiKey.id);
+
       return;
     }
+
     if (!LegacyApiKeyGrantService.keyPredatesAuthzEngine({ apiKey, cutoverAt })) {
       return;
     }
@@ -128,10 +132,13 @@ export class LegacyApiKeyGrantService {
     if (expiresAt === void 0) {
       return false;
     }
+
     if (this.now() < expiresAt) {
       return true;
     }
+
     this.emitted.delete(apiKeyId);
+
     return false;
   }
 
@@ -139,6 +146,7 @@ export class LegacyApiKeyGrantService {
     if (this.emitted.size >= MINT_GUARD_MAX_ENTRIES) {
       this.sweepGuard();
     }
+
     this.emitted.set(apiKeyId, this.now() + MINT_GUARD_TTL_MS);
   }
 
@@ -149,6 +157,7 @@ export class LegacyApiKeyGrantService {
         this.emitted.delete(apiKeyId);
       }
     }
+
     if (this.emitted.size >= MINT_GUARD_MAX_ENTRIES) {
       this.emitted.clear();
     }

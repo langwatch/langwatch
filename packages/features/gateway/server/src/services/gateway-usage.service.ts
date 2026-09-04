@@ -135,10 +135,14 @@ export class GatewayUsageService {
     window: UsageWindow;
   }): Promise<Map<string, { spentUsd: string; requests: number }>> {
     const out = new Map<string, { spentUsd: string; requests: number }>();
-    if (!this.spendRepo || args.virtualKeyIds.length === 0) return out;
+    if (!this.spendRepo || args.virtualKeyIds.length === 0) {
+      return out;
+    }
 
     const tenantIds = await this.orgProjectIds(args.organizationId);
-    if (tenantIds.length === 0) return out;
+    if (tenantIds.length === 0) {
+      return out;
+    }
 
     const rows = await this.spendRepo.spendByVirtualKey({
       tenantIds,
@@ -151,6 +155,7 @@ export class GatewayUsageService {
         requests: row.requests,
       });
     }
+
     return out;
   }
 
@@ -173,14 +178,18 @@ export class GatewayUsageService {
     }
 
     const tenantIds = await this.orgProjectIds(args.organizationId);
-    if (tenantIds.length === 0) return this.emptySummary();
+    if (tenantIds.length === 0) {
+      return this.emptySummary();
+    }
 
     const buckets = await this.spendRepo.usageBuckets({
       tenantIds,
       window: args.window,
       virtualKeyIds: args.virtualKeyIds,
     });
-    if (buckets.length === 0) return this.emptySummary();
+    if (buckets.length === 0) {
+      return this.emptySummary();
+    }
 
     const byVk = new Map<string, { totalUsd: Prisma.Decimal; requests: number }>();
     const byModel = new Map<string, { totalUsd: Prisma.Decimal; requests: number }>();
@@ -241,10 +250,14 @@ export class GatewayUsageService {
      */
     model?: string;
   }): Promise<VirtualKeyUsageSummary> {
-    if (!this.spendRepo) return this.emptyVirtualKeySummary();
+    if (!this.spendRepo) {
+      return this.emptyVirtualKeySummary();
+    }
 
     const tenantIds = await this.orgProjectIds(args.organizationId);
-    if (tenantIds.length === 0) return this.emptyVirtualKeySummary();
+    if (tenantIds.length === 0) {
+      return this.emptyVirtualKeySummary();
+    }
 
     // Slices aggregate in ClickHouse; only the 20-row recent list pulls
     // raw traces, and that pull carries its own LIMIT.
@@ -311,6 +324,7 @@ export class GatewayUsageService {
     virtualKeyIds: string[],
   ): Promise<Map<string, { name: string; displayPrefix: string }>> {
     const keys = await this.virtualKeys.findMetaByIds({ organizationId, ids: virtualKeyIds });
+
     return new Map(keys.map((k) => [k.id, { name: k.name, displayPrefix: k.displayPrefix }]));
   }
 

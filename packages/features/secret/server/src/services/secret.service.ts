@@ -43,6 +43,7 @@ export class SecretService extends SecretServiceContract {
   async list(input: ListSecretsInput): Promise<Secret[]> {
     const parsed = listSecretsInputSchema.parse(input);
     const rows = await this.options.repository.list(parsed.projectId);
+
     return rows.filter((secret) => !this.reservedNames.has(secret.name));
   }
 
@@ -56,6 +57,7 @@ export class SecretService extends SecretServiceContract {
         values[row.name] = this.options.encryption.decrypt(row.encryptedValue);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
+
         throw new Error(`Failed to decrypt project secret "${row.name}": ${message}`);
       }
     }
@@ -65,6 +67,7 @@ export class SecretService extends SecretServiceContract {
 
   async get(input: GetSecretInput): Promise<Secret> {
     const parsed = getSecretInputSchema.parse(input);
+
     return this.getMutableSecret(parsed);
   }
 
@@ -73,9 +76,11 @@ export class SecretService extends SecretServiceContract {
     if (this.reservedNames.has(parsed.name)) {
       throw new SecretReservedNameError(parsed.name);
     }
+
     if ((await this.options.repository.count(parsed.projectId)) >= this.maximumPerProject) {
       throw new SecretLimitReachedError(this.maximumPerProject);
     }
+
     return this.options.repository.create({
       projectId: parsed.projectId,
       name: parsed.name,
@@ -87,6 +92,7 @@ export class SecretService extends SecretServiceContract {
   async update(input: UpdateSecretInput): Promise<Secret> {
     const parsed = updateSecretInputSchema.parse(input);
     await this.getMutableSecret(parsed);
+
     return this.options.repository.update({
       projectId: parsed.projectId,
       id: parsed.id,
@@ -109,6 +115,7 @@ export class SecretService extends SecretServiceContract {
     if (this.reservedNames.has(secret.name)) {
       throw new SecretNotFoundError();
     }
+
     return secret;
   }
 }

@@ -60,12 +60,19 @@ function readableFieldValue({
   hiddenAttributes: Protections["hiddenAttributes"];
 }): unknown {
   const value = spanPatch[field];
-  if (value === undefined) return void 0;
+  if (value === undefined) {
+    return void 0;
+  }
+
   const category = SPAN_FIELD_CONTENT_CATEGORY[field];
-  if (category !== null && isDeniedByCategory[category]) return void 0;
+  if (category !== null && isDeniedByCategory[category]) {
+    return void 0;
+  }
+
   if (field === "params") {
     return TraceAttributeRedactor.for(hiddenAttributes).redact(spanPatch.params);
   }
+
   return value;
 }
 
@@ -95,12 +102,18 @@ function redactSpanPatch({
       hiddenAttributes,
     });
     changed ||= value !== spanPatch[field];
-    if (value === undefined) continue;
+    if (value === undefined) {
+      continue;
+    }
+
     draft[field] = value;
     carriesEdit = true;
   }
 
-  if (!carriesEdit) return null;
+  if (!carriesEdit) {
+    return null;
+  }
+
   return changed ? next : spanPatch;
 }
 
@@ -133,19 +146,25 @@ function redactMetadataEdits({
   metadata: TraceMetadataEdits | null;
   hiddenAttributes: Protections["hiddenAttributes"];
 }): TraceMetadataEdits | null {
-  if (metadata === null) return metadata;
+  if (metadata === null) {
+    return metadata;
+  }
 
   const byAttributeKey: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(metadata)) {
     byAttributeKey[traceAttributeKeyForMetadata(key)] = value;
   }
+
   const redacted = TraceAttributeRedactor.for(hiddenAttributes).redact(byAttributeKey);
-  if (redacted === byAttributeKey) return metadata;
+  if (redacted === byAttributeKey) {
+    return metadata;
+  }
 
   const next: TraceMetadataEdits = {};
   for (const key of Object.keys(metadata)) {
     next[key] = redacted[traceAttributeKeyForMetadata(key)];
   }
+
   return next;
 }
 
@@ -165,14 +184,21 @@ function readableTraceFieldValue({
   hiddenAttributes: Protections["hiddenAttributes"];
 }): unknown {
   const value = traceEdits[field];
-  if (value === undefined) return void 0;
-  if (isDeniedByCategory[TRACE_FIELD_CONTENT_CATEGORY[field]]) return void 0;
+  if (value === undefined) {
+    return void 0;
+  }
+
+  if (isDeniedByCategory[TRACE_FIELD_CONTENT_CATEGORY[field]]) {
+    return void 0;
+  }
+
   if (field === "metadata") {
     return redactMetadataEdits({
       metadata: traceEdits.metadata ?? null,
       hiddenAttributes,
     });
   }
+
   return value;
 }
 
@@ -188,7 +214,9 @@ function redactTraceEdits({
   isDeniedByCategory: IsDeniedByCategory;
   hiddenAttributes: Protections["hiddenAttributes"];
 }): { value: TraceEditOverlayPatch["trace"]; isChanged: boolean } {
-  if (!traceEdits) return { value: traceEdits, isChanged: false };
+  if (!traceEdits) {
+    return { value: traceEdits, isChanged: false };
+  }
 
   const next: NonNullable<TraceEditOverlayPatch["trace"]> = {};
   const draft = next as unknown as Record<TraceEditTraceField, unknown>;
@@ -203,12 +231,18 @@ function redactTraceEdits({
       hiddenAttributes,
     });
     isChanged ||= value !== traceEdits[field];
-    if (value === undefined) continue;
+    if (value === undefined) {
+      continue;
+    }
+
     draft[field] = value;
     carriesEdit = true;
   }
 
-  if (!isChanged) return { value: traceEdits, isChanged: false };
+  if (!isChanged) {
+    return { value: traceEdits, isChanged: false };
+  }
+
   return { value: carriesEdit ? next : void 0, isChanged: true };
 }
 
@@ -256,17 +290,27 @@ export function redactPatchForViewer({
       isDeniedByCategory,
       hiddenAttributes,
     });
-    if (redacted !== spanPatch) isChanged = true;
-    if (redacted) spans.push(redacted);
+    if (redacted !== spanPatch) {
+      isChanged = true;
+    }
+
+    if (redacted) {
+      spans.push(redacted);
+    }
   }
 
-  if (!isChanged) return patch;
+  if (!isChanged) {
+    return patch;
+  }
 
   const next: TraceEditOverlayPatch = {
     version: patch.version,
     spans,
     deletedSpanIds: patch.deletedSpanIds,
   };
-  if (traceEdits.value) next.trace = traceEdits.value;
+  if (traceEdits.value) {
+    next.trace = traceEdits.value;
+  }
+
   return next;
 }

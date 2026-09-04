@@ -540,16 +540,15 @@ export function createEvaluationsLegacyRestApp(options: {
               "handled error processing batch evaluation",
             );
             return c.json({ error: error.code, message: error.message }, error.httpStatus as 400);
-          } else {
-            logger.error(
-              { error, runId: params.run_id, projectId: project.id },
-              "internal server error processing batch evaluation",
-            );
-            ports.reportError?.(toError(error), { projectId: project.id });
-            // Generic on purpose (ADR-045): the detail is on the log line
-            // above, and a driver's own message names host, port and database.
-            return c.json({ error: "Internal server error" }, 500);
           }
+          logger.error(
+            { error, runId: params.run_id, projectId: project.id },
+            "internal server error processing batch evaluation",
+          );
+          ports.reportError?.(toError(error), { projectId: project.id });
+          // Generic on purpose (ADR-045): the detail is on the log line
+          // above, and a driver's own message names host, port and database.
+          return c.json({ error: "Internal server error" }, 500);
         }
 
         markUsed();

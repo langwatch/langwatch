@@ -145,7 +145,7 @@ export const findMatchingColumn = (
   const canonicalNames = REVERSE_SEMANTIC_LOOKUP.get(fieldLower) ?? new Set();
 
   // Combine all potential matches
-  const potentialMatches = new Set([...equivalents]);
+  const potentialMatches = new Set(equivalents);
   for (const canonical of canonicalNames) {
     const canonicalEquivalents = SEMANTIC_EQUIVALENTS[canonical] ?? [];
     for (const eq of canonicalEquivalents) {

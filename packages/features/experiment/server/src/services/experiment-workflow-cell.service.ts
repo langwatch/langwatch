@@ -101,10 +101,15 @@ export class ExperimentWorkflowCellService {
           state.targetOutput = extractTargetOutput(ex.result);
           state.targetOutputRecord = ex.result;
         }
-        if (ex?.trace_id) state.finalTraceId = ex.trace_id;
+
+        if (ex?.trace_id) {
+          state.finalTraceId = ex.trace_id;
+        }
+
         if (ex?.timestamps?.started_at !== undefined && ex?.timestamps?.finished_at !== undefined) {
           state.durationMs = ex.timestamps.finished_at - ex.timestamps.started_at;
         }
+
         if (ex?.status === "error") {
           state.targetFailed = true;
           state.targetFailure = {
@@ -113,12 +118,18 @@ export class ExperimentWorkflowCellService {
             upstreamStatus: ex.upstream_status,
           };
         }
+
         continue;
       }
 
-      if (event.type !== "component_state_change") continue;
+      if (event.type !== "component_state_change") {
+        continue;
+      }
+
       const { component_id, execution_state } = event.payload;
-      if (!execution_state) continue;
+      if (!execution_state) {
+        continue;
+      }
 
       if (typeof execution_state.cost === "number" && execution_state.cost > 0) {
         state.totalCost += execution_state.cost;
@@ -222,6 +233,7 @@ export class ExperimentWorkflowCellService {
       datasetColumns,
       loadedEvaluators,
     });
+
     return this.cells.runCellEvaluators({
       cell,
       projectId,

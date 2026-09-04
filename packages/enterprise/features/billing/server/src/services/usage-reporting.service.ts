@@ -118,6 +118,7 @@ export class StripeUsageReportingService implements UsageReportingService {
             { organizationId, identifier, valueSent: value, reported: true },
             "[billing] Meter event already exists (duplicate identifier)",
           );
+
           return { identifier, reported: true, valueSent: value };
         }
 
@@ -131,6 +132,7 @@ export class StripeUsageReportingService implements UsageReportingService {
           },
           "[billing] Meter event rejected by Stripe",
         );
+
         return {
           identifier,
           reported: false,
@@ -150,6 +152,7 @@ export class StripeUsageReportingService implements UsageReportingService {
           },
           "[billing] Stripe authentication error",
         );
+
         return {
           identifier,
           reported: false,
@@ -270,8 +273,10 @@ export class StripeUsageReportingService implements UsageReportingService {
           { stripeCustomerId, meterId: this.meterId, error: error.message },
           "[billing] Usage summary rejected by Stripe",
         );
+
         throw new UsageReportFailedError({ reasons: [error] });
       }
+
       throw error;
     }
   }

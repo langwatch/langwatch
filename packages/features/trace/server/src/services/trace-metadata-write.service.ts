@@ -51,6 +51,7 @@ function splitMetadata(metadata: TraceMetadataUpdate): {
       custom[key] = value as CustomMetadata[string];
     }
   }
+
   return { reserved, custom };
 }
 

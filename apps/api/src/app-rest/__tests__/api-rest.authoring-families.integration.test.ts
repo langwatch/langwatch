@@ -359,7 +359,7 @@ function build(input: { authoring?: ApiAuthoringRestComposition; scenarioTimeout
   const hono = new Hono();
   for (const app of createApiProcessRestFeatures({
     security: passThroughSecurity(),
-    services: { ...(input.authoring ? { authoring: input.authoring } : {}) },
+    services: input.authoring ? { authoring: input.authoring } : {},
     ports: {
       handlerManagedCredential: () => {
         throw new Error("These families resolve a session, never a project credential.");

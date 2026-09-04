@@ -1231,11 +1231,9 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     this.composedModelProvider = infrastructure
       ? composeModelProviderFeature({
           infrastructure,
-          peers: {
-            ...(this.composedTrace.traceReads
-              ? { spans: this.composedTrace.traceReads.readers().spans }
-              : {}),
-          },
+          peers: this.composedTrace.traceReads
+            ? { spans: this.composedTrace.traceReads.readers().spans }
+            : {},
           ...(this.composedModelProviders ? { modelProviders: this.composedModelProviders } : {}),
           host: this.composeModelProviderHost(options),
           report: LoggedApiModelProviderSurfaceAbsence.create(

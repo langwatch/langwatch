@@ -81,6 +81,7 @@ export class StorageMeterService {
       if (this.now() - entry.computedAt >= STORAGE_FRESH_MS) {
         void this.refreshInBackground(tenantId);
       }
+
       return entry.bytes;
     }
 
@@ -95,6 +96,7 @@ export class StorageMeterService {
         bytes: 0,
         computedAt: this.now() - STORAGE_FRESH_MS,
       });
+
       return 0;
     }
   }
@@ -117,12 +119,14 @@ export class StorageMeterService {
               { tenantId, error },
               "Per-tenant storage read failed in scope aggregation; counting 0",
             );
+
             return 0;
           }),
         ),
       );
       total += results.reduce((sum, value) => sum + value, 0);
     }
+
     return total;
   }
 
@@ -163,6 +167,7 @@ export class StorageMeterService {
   private async computeAndStore(tenantId: string): Promise<number> {
     const bytes = await this.queryTotalBytes(tenantId);
     await this.cache.set(tenantId, { bytes, computedAt: this.now() });
+
     return bytes;
   }
 
@@ -198,6 +203,7 @@ export class StorageMeterService {
         format: "JSONEachRow",
         clickhouse_settings: METERING_CLICKHOUSE_SETTINGS,
       });
+
       return this.parseTotal(await result.json());
     } catch (error) {
       logger.warn(
@@ -205,6 +211,7 @@ export class StorageMeterService {
         "Total _size_bytes query failed; falling back to per-table breakdown",
       );
       const breakdown = await this.getStorageBreakdown({ tenantId });
+
       return breakdown.totalBytes;
     }
   }
@@ -213,6 +220,7 @@ export class StorageMeterService {
     const parsed = z.array(storageMeterRowSchema).parse(rows);
     const value = parsed[0]?.total ?? 0;
     const total = typeof value === "number" ? value : Number(value);
+
     return z.number().finite().nonnegative().parse(total);
   }
 }

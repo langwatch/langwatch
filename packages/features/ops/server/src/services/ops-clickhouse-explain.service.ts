@@ -39,7 +39,10 @@ export class OpsExplainService {
     auditFields: Record<string, unknown>;
   }): Promise<OpsExplainOutcome> {
     const resolved = this.repository.resolveClient();
-    if (!resolved) return { status: "unavailable" };
+    if (!resolved) {
+      return { status: "unavailable" };
+    }
+
     const { client, usingFallback } = resolved;
 
     if (usingFallback) {
@@ -49,8 +52,10 @@ export class OpsExplainService {
             "Provision a langwatch_ops ClickHouse user with a readonly=1 profile " +
             "and no SOURCES grant, then set CLICKHOUSE_OPS_URL to it.",
         );
+
         return { status: "not_configured_in_production" };
       }
+
       if (!this.warnedAboutMissingOpsUrl) {
         this.warnedAboutMissingOpsUrl = true;
         logger.warn(
@@ -69,10 +74,12 @@ export class OpsExplainService {
         wrappedQuery,
         guardrails: usingFallback ? CLICKHOUSE_GUARDRAILS : undefined,
       });
+
       return { status: "ok", rows };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       logger.warn({ err: message }, "ops explain failed");
+
       return { status: "error", message };
     }
   }

@@ -27,6 +27,7 @@ export class LangyTurnOverrideService {
     if (!this.projectId || !this.prompts) {
       return { text: LANGY_OVERRIDE, source: "unconfigured" };
     }
+
     const resolved = await resolveLangyPrompt({
       promptService: this.prompts,
       projectId: this.projectId,
@@ -35,17 +36,21 @@ export class LangyTurnOverrideService {
     });
     if (resolved.source === "registry") {
       LangyTurnOverrideService.lastRegistryOverrideText = resolved.text;
+
       return { text: resolved.text, source: "registry" };
     }
+
     if (resolved.source === "error" && LangyTurnOverrideService.lastRegistryOverrideText !== null) {
       return {
         text: LangyTurnOverrideService.lastRegistryOverrideText,
         source: "cached",
       };
     }
+
     if (resolved.source !== "error") {
       LangyTurnOverrideService.lastRegistryOverrideText = null;
     }
+
     return { text: resolved.text, source: "fallback" };
   }
 }

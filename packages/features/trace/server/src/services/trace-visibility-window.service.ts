@@ -25,14 +25,19 @@ export const teaserOf = (text: string): string => {
     TEASER_MIN_CHARS,
     Math.min(TEASER_MAX_CHARS, Math.ceil(text.length * TEASER_FRACTION)),
   );
+
   return text.length <= keep ? text : text.slice(0, keep) + TEASER_ELLIPSIS;
 };
 
 const teaserOfError = (error: ErrorCapture | null | undefined): ErrorCapture | null | undefined => {
-  if (!error) return error;
+  if (!error) {
+    return error;
+  }
+
   // The stacktrace is content too (errors routinely embed prompts) —
   // tease the joined trace, not each frame, so N frames can't leak N teasers.
   const joined = error.stacktrace.join("\n");
+
   return {
     ...error,
     message: teaserOf(error.message),
@@ -43,7 +48,10 @@ const teaserOfError = (error: ErrorCapture | null | undefined): ErrorCapture | n
 const teaserOfSpanIO = (
   io: SpanInputOutput | null | undefined,
 ): SpanInputOutput | null | undefined => {
-  if (!io) return io;
+  if (!io) {
+    return io;
+  }
+
   // Real-world payloads don't always honor the declared type (e.g. a
   // chat_messages value that isn't an array) — serialize-and-tease those.
   const teaserAsRaw = (): SpanInputOutput => ({
@@ -54,7 +62,9 @@ const teaserOfSpanIO = (
     case "text":
       return typeof io.value === "string" ? { ...io, value: teaserOf(io.value) } : teaserAsRaw();
     case "chat_messages":
-      if (!Array.isArray(io.value)) return teaserAsRaw();
+      if (!Array.isArray(io.value)) {
+        return teaserAsRaw();
+      }
       return {
         ...io,
         value: io.value.map((message) => ({
@@ -70,7 +80,9 @@ const teaserOfSpanIO = (
         })),
       };
     case "list":
-      if (!Array.isArray(io.value)) return teaserAsRaw();
+      if (!Array.isArray(io.value)) {
+        return teaserAsRaw();
+      }
       return { ...io, value: io.value.map((item) => teaserOfSpanIO(item)!) };
     default:
       // json / raw / guardrail / evaluation results: tease the serialized
@@ -89,20 +101,30 @@ const teaserOfSpanIO = (
  * args, tool results) where content hides below the top level.
  */
 const deepTeaseStrings = (value: unknown): unknown => {
-  if (typeof value === "string") return teaserOf(value);
-  if (Array.isArray(value)) return value.map(deepTeaseStrings);
+  if (typeof value === "string") {
+    return teaserOf(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(deepTeaseStrings);
+  }
+
   if (value !== null && typeof value === "object") {
     return Object.fromEntries(
       Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, deepTeaseStrings(v)]),
     );
   }
+
   return value;
 };
 
 const teaserOfParams = (
   params: Record<string, unknown> | null | undefined,
 ): Record<string, unknown> | null | undefined => {
-  if (!params) return params;
+  if (!params) {
+    return params;
+  }
+
   return Object.fromEntries(
     Object.entries(params).map(([key, value]) => [
       key,
@@ -172,7 +194,10 @@ export class VisibilityWindowService {
   }): Promise<number | null> {
     const plan = await this.planProvider.getActivePlan({ organizationId });
     const visibilityDays = plan?.visibilityDays;
-    if (visibilityDays === null || visibilityDays === undefined) return null;
+    if (visibilityDays === null || visibilityDays === undefined) {
+      return null;
+    }
+
     return Date.now() - visibilityDays * DAY_MS;
   }
 

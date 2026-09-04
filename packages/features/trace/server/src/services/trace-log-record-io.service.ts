@@ -59,9 +59,11 @@ export class TraceLogRecordIOService {
     if (!identifier || !content) {
       return NO_IO;
     }
+
     if (identifier === "Chat Model Prompt Content:") {
       return { input: content, output: null };
     }
+
     if (identifier === "Chat Model Completion:") {
       return { input: null, output: content };
     }

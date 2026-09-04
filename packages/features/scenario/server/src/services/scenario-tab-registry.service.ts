@@ -40,6 +40,7 @@ export class ScenarioTabRegistryService extends ScenarioTabRegistry {
       const entry = this.memoryEntry(key);
       entry.set(input.tabId, now);
       this.pruneMemory(key, entry, now);
+
       return;
     }
 
@@ -65,6 +66,7 @@ export class ScenarioTabRegistryService extends ScenarioTabRegistry {
       if (current !== undefined && retiredScore < current) {
         entry?.set(input.tabId, retiredScore);
       }
+
       return;
     }
 
@@ -83,7 +85,9 @@ export class ScenarioTabRegistryService extends ScenarioTabRegistry {
       if (!entry) {
         return false;
       }
+
       this.pruneMemory(key, entry, now);
+
       return entry.size > 0;
     }
 
@@ -91,6 +95,7 @@ export class ScenarioTabRegistryService extends ScenarioTabRegistry {
       return (await store.countAfter({ key, cutoff })) > 0;
     } catch (error) {
       logger.warn({ error, projectId: input.projectId }, "Failed to read Scenario tab");
+
       return false;
     }
   }
@@ -110,6 +115,7 @@ export class ScenarioTabRegistryService extends ScenarioTabRegistry {
         url: input.url,
         expiresAt: now + SCENARIO_TAB_PENDING_TTL_SECONDS * 1000,
       });
+
       return;
     }
 
@@ -133,6 +139,7 @@ export class ScenarioTabRegistryService extends ScenarioTabRegistry {
     if (!store) {
       const entry = this.memoryPending.get(key);
       this.memoryPending.delete(key);
+
       return entry && entry.expiresAt > now ? entry.url : null;
     }
 
@@ -143,6 +150,7 @@ export class ScenarioTabRegistryService extends ScenarioTabRegistry {
         { error, projectId: input.projectId },
         "Failed to read parked Scenario tab handoff",
       );
+
       return null;
     }
   }
@@ -152,8 +160,10 @@ export class ScenarioTabRegistryService extends ScenarioTabRegistry {
     if (existing) {
       return existing;
     }
+
     const entry = new Map<string, number>();
     this.memoryTabs.set(key, entry);
+
     return entry;
   }
 
@@ -164,6 +174,7 @@ export class ScenarioTabRegistryService extends ScenarioTabRegistry {
         entry.delete(tabId);
       }
     }
+
     if (entry.size === 0) {
       this.memoryTabs.delete(key);
     }

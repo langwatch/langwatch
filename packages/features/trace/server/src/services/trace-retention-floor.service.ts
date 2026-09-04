@@ -28,9 +28,12 @@ class PlatformRetentionDaysProvider implements RetentionDaysProvider {
     table: string;
   }): Promise<number | null> {
     const category = RETENTION_TABLE_CATEGORY_MAP[table as RetentionManagedTable];
-    if (!category) return null;
+    if (!category) {
+      return null;
+    }
 
     const resolved = await this.resolver.getResolvedForProject({ projectId: tenantId });
+
     return resolved[category];
   }
 }

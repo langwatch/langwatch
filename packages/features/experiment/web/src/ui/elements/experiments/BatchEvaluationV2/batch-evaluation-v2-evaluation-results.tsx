@@ -279,9 +279,7 @@ export const useBatchEvaluationDownloadCSV = ({
     // get here). `getRun` returns `ExperimentRunWithItems | null` since
     // PR #3483 to handle the cold-start window where the row hasn't
     // been folded into ClickHouse yet — see service comment.
-    const formattedDate = new Date(run.data!.timestamps.createdAt)
-      .toISOString()
-      .split("T")[0];
+    const formattedDate = new Date(run.data!.timestamps.createdAt).toISOString().split("T")[0];
 
     downloadCsv({
       fields: csvHeaders,
@@ -373,7 +371,7 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
               </Tabs.Trigger>
             </Tabs.List>
             <Tabs.Content value="skeleton" minWidth="full" minHeight="0" overflowY="auto">
-              {/* @ts-ignore */}
+              {/* @ts-expect-error */}
               <Table.Root size={size === "sm" ? "xs" : "sm"} variant="grid">
                 <Table.Header>
                   <Table.Row>

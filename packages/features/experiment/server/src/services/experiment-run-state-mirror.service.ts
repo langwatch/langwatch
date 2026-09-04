@@ -71,12 +71,17 @@ export const createRunStateMirror = ({
 
   const recordEnd = async (event: EvaluationV3Event): Promise<void> => {
     const id = runId;
-    if (!id) return;
+    if (!id) {
+      return;
+    }
+
     if (event.type === "done") {
       ended = true;
       await mirrored("completeRun", () => progress.completeRun(id, event.summary));
+
       return;
     }
+
     if (event.type === "stopped") {
       ended = true;
       await mirrored("stopRun", () => progress.stopRun(id));
@@ -96,10 +101,15 @@ export const createRunStateMirror = ({
             total: event.total,
           }),
         );
+
         return;
       }
+
       const id = runId;
-      if (!id) return;
+      if (!id) {
+        return;
+      }
+
       await mirrored("addEvent", () => progress.addEvent(id, event));
       await recordEnd(event);
     },
@@ -109,7 +119,10 @@ export const createRunStateMirror = ({
       traceId?: string;
     }): Promise<void> {
       const id = runId;
-      if (!id || ended) return;
+      if (!id || ended) {
+        return;
+      }
+
       await mirrored("failRun", () => progress.failRun(id, failure));
     },
   };

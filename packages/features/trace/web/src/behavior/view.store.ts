@@ -750,7 +750,7 @@ export const useViewStore = create<ViewState>((set, get) => ({
         persistDrafts(next);
         return { draftState: next };
       }
-      next.set(s.activeLensId, { ...(existing ?? {}), filter: text });
+      next.set(s.activeLensId, { ...existing, filter: text });
       persistDrafts(next);
       return { draftState: next };
     }),

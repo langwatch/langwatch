@@ -82,6 +82,7 @@ export function createMigrationStorageEndpoint({
     if (!bucket?.trim()) {
       throw new Error("S3 migration endpoint requires a bucket");
     }
+
     return {
       provider,
       scheme: "s3",
@@ -91,9 +92,11 @@ export function createMigrationStorageEndpoint({
         `s3://${bucket}/${chunkKey(projectId, datasetId, index)}`,
     };
   }
+
   if (!accountName?.trim() || !container?.trim()) {
     throw new Error("Azure migration endpoint requires an account name and container");
   }
+
   return {
     provider,
     scheme: "azure-blob",
@@ -188,17 +191,20 @@ export class ObjectStorageMigration {
     if (deps.source.provider === deps.destination.provider) {
       throw new Error("Migration source and destination providers must differ");
     }
+
     this.now = deps.now ?? (() => new Date());
   }
 
   async plan(): Promise<MigrationPlan> {
     const scope = await this.eligibleScope();
+
     return this.buildPlan(scope);
   }
 
   async copy(): Promise<MigrationCopyReport> {
     const scope = await this.eligibleScope();
     const plan = await this.buildPlan(scope);
+
     return this.copyEligible(scope, plan);
   }
 
@@ -227,10 +233,12 @@ export class ObjectStorageMigration {
             `Stored object ${row.id} (project ${row.project_id}) already uses the ${this.deps.destination.scheme} scheme, but its recorded bucket/account is not the one configured as this migration's destination`,
           );
         }
+
         await assertUriDigest(this.deps.destination.driver, destinationUri, row.sha256);
         report.skippedVerified += 1;
         continue;
       }
+
       const result = await copyVerified({
         source: this.deps.source,
         sourceUri: row.storage_uri,
@@ -245,6 +253,7 @@ export class ObjectStorageMigration {
     for await (const chunk of this.eligibleDatasetChunks(scope)) {
       report[await this.copyDatasetChunk(chunk)] += 1;
     }
+
     return report;
   }
 
@@ -278,6 +287,7 @@ export class ObjectStorageMigration {
     if (!(await this.deps.source.driver.exists(sourceUri))) {
       return this.acceptDestinationOnlyChunk({ sourceUri, destinationUri });
     }
+
     return copyVerified({
       source: this.deps.source,
       sourceUri,
@@ -294,6 +304,7 @@ export class ObjectStorageMigration {
     if (await this.deps.destination.driver.exists(destinationUri)) {
       return "skippedVerified";
     }
+
     throw new MigrationBlockedError(
       `Dataset chunk is missing from both providers: ${redactStoredObjectStorageUri(sourceUri)}`,
     );
@@ -303,6 +314,7 @@ export class ObjectStorageMigration {
     if (!this.deps.writesPaused()) {
       throw new MigrationBlockedError("Finalization requires writes to be paused");
     }
+
     if (!this.deps.readsPaused()) {
       throw new MigrationBlockedError("Finalization requires read traffic to be paused");
     }
@@ -313,13 +325,16 @@ export class ObjectStorageMigration {
       const detail = plan.blockingDatasets
         .map(({ id, status, reason }) => `${id} (${status}, ${reason})`)
         .join(", ");
+
       throw new MigrationBlockedError(`Finalization blocked by datasets: ${detail}`);
     }
+
     const queueBlockers = await this.deps.auditQueues();
     if (queueBlockers.length > 0) {
       const detail = queueBlockers
         .map(({ queueName, kind, count }) => `${queueName} ${kind}=${count}`)
         .join(", ");
+
       throw new MigrationBlockedError(`Finalization blocked by queues: ${detail}`);
     }
 
@@ -334,6 +349,7 @@ export class ObjectStorageMigration {
       if (row.storage_uri === destinationUri) {
         continue;
       }
+
       const insertedAt = newerVersionTimestamp(row.inserted_at, this.now());
       await this.deps.publishStoredObject({
         ...row,
@@ -359,6 +375,7 @@ export class ObjectStorageMigration {
       const destinationUri = this.deps.destination.storedObjectUri(row.project_id, row.sha256);
       await assertUriDigest(this.deps.destination.driver, destinationUri, row.sha256);
     }
+
     for await (const chunk of this.eligibleDatasetChunks(scope)) {
       // Mirror of the copy loop's already-at-destination tolerance: a chunk
       // with no source copy has no digest to compare, so presence at the
@@ -367,6 +384,7 @@ export class ObjectStorageMigration {
         await this.acceptDestinationOnlyChunk(chunk);
         continue;
       }
+
       // Verification never needs the bytes resident — hash both streams.
       const sourceSha256 = await sha256OfStream(await this.deps.source.driver.get(chunk.sourceUri));
       await assertUriDigest(this.deps.destination.driver, chunk.destinationUri, sourceSha256);
@@ -385,6 +403,7 @@ export class ObjectStorageMigration {
         eligibleProjectIds.add(project.id);
       }
     }
+
     return {
       eligibleProjectIds,
       excludedProjects: excludedProjects.sort(),
@@ -403,12 +422,17 @@ export class ObjectStorageMigration {
     })) {
       eligibleStoredObjects += 1;
     }
+
     for await (const dataset of this.datasets(scope)) {
       const { id, status, contentLayout } = dataset;
       if (status === "uploading" || status === "processing") {
         blockingDatasets.push({ id, status, reason: "active-upload" });
       }
-      if (contentLayout !== "s3_jsonl") continue;
+
+      if (contentLayout !== "s3_jsonl") {
+        continue;
+      }
+
       // The count tracks what `copy` will attempt, which includes a dataset
       // that is merely mid-upload: copying a moving dataset is safe because
       // finalize re-copies the delta and refuses to run while it is still
@@ -417,8 +441,10 @@ export class ObjectStorageMigration {
         eligibleDatasetChunks += dataset.chunkCount;
         continue;
       }
+
       blockingDatasets.push({ id, status, reason: "invalid-chunk-count" });
     }
+
     return {
       eligibleStoredObjects,
       eligibleDatasetChunks,
@@ -468,13 +494,19 @@ export class ObjectStorageMigration {
     scope: EligibleScope,
   ): AsyncGenerator<MigrationDataset & { chunkCount: number }> {
     for await (const dataset of this.datasets(scope)) {
-      if (dataset.contentLayout !== "s3_jsonl") continue;
+      if (dataset.contentLayout !== "s3_jsonl") {
+        continue;
+      }
+
       // Skipped rather than thrown: a dataset with no usable chunk count has
       // no derivable chunk keys, so there is nothing to copy or verify. It is
       // already reported by `plan` and already refuses finalization, so
       // aborting the whole run here would only deny the operator the copy
       // progress they can safely make first.
-      if (!hasMigratableChunkCount(dataset)) continue;
+      if (!hasMigratableChunkCount(dataset)) {
+        continue;
+      }
+
       yield dataset;
     }
   }
@@ -486,14 +518,23 @@ async function* paginate<T extends { id: string }>(
   let afterId: string | undefined;
   for (;;) {
     const page = await load({ afterId, limit: INVENTORY_PAGE_SIZE });
-    if (page.length === 0) return;
-    for (const row of page) yield row;
+    if (page.length === 0) {
+      return;
+    }
+
+    for (const row of page) {
+      yield row;
+    }
+
     const nextAfterId = page.at(-1)?.id;
     if (!nextAfterId || nextAfterId === afterId) {
       throw new Error("Migration inventory pagination did not advance");
     }
+
     afterId = nextAfterId;
-    if (page.length < INVENTORY_PAGE_SIZE) return;
+    if (page.length < INVENTORY_PAGE_SIZE) {
+      return;
+    }
   }
 }
 
@@ -533,17 +574,22 @@ async function copyVerified({
       `Source object verification failed for ${redactStoredObjectStorageUri(sourceUri)}: expected ${expectedSha256}, got ${sourceSha256}`,
     );
   }
+
   if (await destination.driver.exists(destinationUri)) {
     const destinationSha256 = await sha256OfStream(await destination.driver.get(destinationUri));
     if (destinationSha256 === sourceSha256) {
       return "skippedVerified";
     }
+
     await destination.driver.put(destinationUri, sourceBytes, mediaType);
     await assertUriDigest(destination.driver, destinationUri, sourceSha256);
+
     return "repaired";
   }
+
   await destination.driver.put(destinationUri, sourceBytes, mediaType);
   await assertUriDigest(destination.driver, destinationUri, sourceSha256);
+
   return "copied";
 }
 
@@ -555,6 +601,7 @@ async function assertUriDigest(
   if (!(await driver.exists(uri))) {
     throw new Error(`Destination object is missing: ${redactStoredObjectStorageUri(uri)}`);
   }
+
   const actual = await sha256OfStream(await driver.get(uri));
   if (actual !== expectedSha256) {
     throw new Error(
@@ -568,6 +615,7 @@ async function readAll(stream: Readable): Promise<Buffer> {
   for await (const chunk of stream) {
     chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
   }
+
   return Buffer.concat(chunks);
 }
 
@@ -581,5 +629,6 @@ async function sha256OfStream(stream: Readable): Promise<string> {
   for await (const chunk of stream) {
     hash.update(chunk as Buffer);
   }
+
   return hash.digest("hex");
 }

@@ -59,7 +59,7 @@ export const snakeCaseToPascalCase = (input: string): string => {
 
 export const kebabCase = (input: string): string => {
   return input
-    .replace(/!|@|#|\$|%|\^|&|\*|\(|\)|_|\+|`|~|:|;|,|\.|\?|\/|\\|\{|\}|\[|\]|\"|\'|\<|\>/g, "")
+    .replace(/!|@|#|\$|%|\^|&|\*|\(|\)|_|\+|`|~|:|;|,|\.|\?|\/|\\|\{|\}|\[|\]|"|'|<|>/g, "")
     .replace(/([A-Z])/g, " $1")
     .trim()
     .replace(/ /g, "-")

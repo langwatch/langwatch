@@ -239,25 +239,37 @@ export class SavedWorkbenchChartService {
 
   private parseName(input: unknown): string {
     const parsed = savedWorkbenchChartNameSchema.safeParse(input);
-    if (!parsed.success) throw new SavedWorkbenchChartValidationError(parsed.error);
+    if (!parsed.success) {
+      throw new SavedWorkbenchChartValidationError(parsed.error);
+    }
+
     return parsed.data;
   }
 
   private parseId(input: unknown): string {
     const parsed = savedWorkbenchChartIdSchema.safeParse(input);
-    if (!parsed.success) throw new SavedWorkbenchChartValidationError(parsed.error);
+    if (!parsed.success) {
+      throw new SavedWorkbenchChartValidationError(parsed.error);
+    }
+
     return parsed.data;
   }
 
   private parseDefinition(input: unknown): SavedWorkbenchChartDefinition {
     const parsed = savedWorkbenchChartDefinitionSchema.safeParse(input);
-    if (!parsed.success) throw new SavedWorkbenchChartValidationError(parsed.error);
+    if (!parsed.success) {
+      throw new SavedWorkbenchChartValidationError(parsed.error);
+    }
+
     return parsed.data;
   }
 
   private parsePlacement(input: unknown) {
     const parsed = savedWorkbenchChartPlacementSchema.safeParse(input);
-    if (!parsed.success) throw new SavedWorkbenchChartValidationError(parsed.error);
+    if (!parsed.success) {
+      throw new SavedWorkbenchChartValidationError(parsed.error);
+    }
+
     return parsed.data;
   }
 }

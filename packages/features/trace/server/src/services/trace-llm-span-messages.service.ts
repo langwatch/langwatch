@@ -63,6 +63,7 @@ function pushDecoded(out: ChatMessage[], raw: string, defaultRole: "user" | "ass
     parsed = JSON.parse(raw);
   } catch {
     out.push({ role: defaultRole, content: raw });
+
     return;
   }
 

@@ -332,7 +332,6 @@ export function StudioDrawerWrapper({ node, children, onClose, footer }: StudioD
                 initial={{ x: "110%" }}
                 animate={{ x: "0%" }}
                 transition={{ duration: 0.1, ease: "easeOut", delay: 0.5 }}
-                // @ts-ignore
                 className="js-outer-box"
                 onClick={(e: React.MouseEvent<HTMLDivElement>) => {
                   if ((e.target as HTMLElement).classList.contains("js-outer-box")) {
@@ -365,7 +364,6 @@ export function StudioDrawerWrapper({ node, children, onClose, footer }: StudioD
                 initial={{ x: "-110%" }}
                 animate={{ x: "0%" }}
                 transition={{ duration: 0.1, ease: "easeOut", delay: 0.5 }}
-                // @ts-ignore
                 className="js-outer-box"
                 onClick={(e: React.MouseEvent<HTMLDivElement>) => {
                   if ((e.target as HTMLElement).classList.contains("js-outer-box")) {

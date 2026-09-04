@@ -74,6 +74,7 @@ export class AnnotationService extends AnnotationServiceContract {
 
   getById(input: AnnotationByIdInput): Promise<Annotation> {
     const parsed = annotationByIdInputSchema.parse(input);
+
     return this.repository.getById(parsed);
   }
 
@@ -87,31 +88,37 @@ export class AnnotationService extends AnnotationServiceContract {
 
   listScoreNames(input: ListAnnotationScoreNamesInput): Promise<AnnotationScoreName[]> {
     const parsed = listAnnotationScoreNamesInputSchema.parse(input);
+
     return this.repository.listScoreNames(parsed);
   }
 
   upsertScore(input: UpsertAnnotationScoreInput): Promise<AnnotationScore> {
     const parsed = upsertAnnotationScoreInputSchema.parse(input);
+
     return this.repository.upsertScore(parsed);
   }
 
   listScores(input: ListAnnotationScoresInput): Promise<AnnotationScore[]> {
     const parsed = listAnnotationScoresInputSchema.parse(input);
+
     return this.repository.listScores(parsed);
   }
 
   getScore(input: AnnotationScoreByIdInput): Promise<AnnotationScore> {
     const parsed = annotationScoreByIdInputSchema.parse(input);
+
     return this.repository.getScore(parsed);
   }
 
   toggleScore(input: ToggleAnnotationScoreInput): Promise<AnnotationScore> {
     const parsed = toggleAnnotationScoreInputSchema.parse(input);
+
     return this.repository.toggleScore(parsed);
   }
 
   deleteScore(input: AnnotationScoreByIdInput): Promise<AnnotationScore> {
     const parsed = annotationScoreByIdInputSchema.parse(input);
+
     return this.repository.deleteScore(parsed);
   }
 
@@ -127,6 +134,7 @@ export class AnnotationService extends AnnotationServiceContract {
       if (error instanceof ProjectNotFoundError) {
         throw new AnnotationProjectNotFoundError(parsed.projectId);
       }
+
       throw error;
     }
   }
@@ -147,7 +155,9 @@ export class AnnotationService extends AnnotationServiceContract {
         scoreTypeIds,
       }),
     ]);
-    if (scoreCount !== scoreTypeIds.length) throw new AnnotationScoreInvalidError();
+    if (scoreCount !== scoreTypeIds.length) {
+      throw new AnnotationScoreInvalidError();
+    }
   }
 
   async assertAnnotatorReferences(input: AssertAnnotatorReferencesInput): Promise<void> {
@@ -180,7 +190,10 @@ export class AnnotationService extends AnnotationServiceContract {
     try {
       await this.organizations.getOrganizationMembers({ organizationId, userIds });
     } catch (error) {
-      if (error instanceof UserNotInOrganizationError) throw new InvalidMemberError();
+      if (error instanceof UserNotInOrganizationError) {
+        throw new InvalidMemberError();
+      }
+
       throw error;
     }
   }

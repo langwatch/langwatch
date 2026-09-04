@@ -2251,7 +2251,7 @@ function buildDateBucketedPipelineQuery({
   } else {
     // Multiple sources: FULL OUTER JOIN on (period, date[, group_key])
     let joinSql = anchorCte;
-    const selectCols = [...joinKeys.map((k) => `${anchorCte}.${k}`)];
+    const selectCols = joinKeys.map((k) => `${anchorCte}.${k}`);
 
     // Add simple metric columns from anchor
     if (hasSimple) {

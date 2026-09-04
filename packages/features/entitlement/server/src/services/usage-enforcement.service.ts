@@ -115,12 +115,14 @@ export class UsageService {
         { organizationId, plan: plan.name },
         "checkLimit: usage is unknown, allowing traffic without enforcement",
       );
+
       return { exceeded: false };
     }
 
     if (count >= plan.maxMessagesPerMonth) {
       // getCurrentMonthCount already warmed the decision cache, so this is a map lookup
       const decision = await this.getCachedUsageMeterReading(organizationId, plan);
+
       return {
         exceeded: true,
         message: buildLimitMessage({
@@ -135,6 +137,7 @@ export class UsageService {
         usageUnit: decision.usageUnit,
       };
     }
+
     return { exceeded: false };
   }
 
@@ -144,6 +147,7 @@ export class UsageService {
    */
   async getResolvedUsageUnit({ organizationId }: { organizationId: string }): Promise<UsageUnit> {
     const decision = await this.getCachedUsageMeterReading(organizationId);
+
     return decision.usageUnit;
   }
 
@@ -217,6 +221,7 @@ export class UsageService {
       // avoided by not caching its fail-open zero.
       return USAGE_UNKNOWN;
     }
+
     const total = counts.reduce((sum, c) => sum + c.count, 0);
 
     await this.countCache.set(cacheKey, total);
@@ -236,6 +241,7 @@ export class UsageService {
     }
 
     const decision = await this.getCachedUsageMeterReading(organizationId);
+
     return this.countByProjects({ decision, organizationId, projectIds });
   }
 
@@ -266,10 +272,13 @@ export class UsageService {
     plan?: PlanInfo,
   ): Promise<UsageMeterReading> {
     const cached = await this.decisionCache.get<UsageMeterReading>(organizationId);
-    if (cached) return cached;
+    if (cached) {
+      return cached;
+    }
 
     const decision = await this.resolveUsageMeterReading(organizationId, plan);
     await this.decisionCache.set(organizationId, decision);
+
     return decision;
   }
 

@@ -93,9 +93,11 @@ export class IdentityNewbornReconciliationService {
         );
       }
     }
+
     if (summary.examined > 0 || summary.locksReaped > 0) {
       logger.info(summary, "swept abandoned newborn identity streams");
     }
+
     return summary;
   }
 
@@ -121,6 +123,7 @@ export class IdentityNewbornReconciliationService {
         { error },
         "could not reap orphaned identifier address locks; the next pass retries",
       );
+
       return 0;
     }
   }

@@ -133,12 +133,15 @@ export class WorkflowEvaluationService {
       if (error instanceof WorkflowNotFoundError) {
         return { ok: false, status: 404, error: "Workflow not found" };
       }
+
       if (error instanceof NoCommittedVersionError) {
         return { ok: false, status: 400, error: error.message };
       }
+
       if (error instanceof EvaluationInputError) {
         return { ok: false, status: error.status as 400 | 404, error: error.message };
       }
+
       throw error;
     }
   }

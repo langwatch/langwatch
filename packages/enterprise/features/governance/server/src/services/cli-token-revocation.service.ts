@@ -31,6 +31,7 @@ export class DefaultGovernanceCliTokenRevocationService {
       this.diagnostics?.warn("CLI token store is unavailable — skipping token revocation", {
         userId: parsed.userId,
       });
+
       return { revokedCount: 0 };
     }
 
@@ -40,7 +41,11 @@ export class DefaultGovernanceCliTokenRevocationService {
     for (const memberKey of memberKeys) {
       revokedCount += await this.store.delete(memberKey);
     }
-    if (memberKeys.length > 0) await this.store.delete(indexKey);
+
+    if (memberKeys.length > 0) {
+      await this.store.delete(indexKey);
+    }
+
     return { revokedCount };
   }
 }

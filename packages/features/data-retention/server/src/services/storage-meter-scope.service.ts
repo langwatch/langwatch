@@ -54,6 +54,7 @@ export class StorageMeterScopeService {
     // project itself, already authorized by the route's project:view guard.
     if (!organizationId) {
       const totalBytes = await retention.getTotalStorageBytes({ tenantId: projectId });
+
       return { totalBytes, projectCount: 1 };
     }
 
@@ -77,6 +78,7 @@ export class StorageMeterScopeService {
     const totalBytes = await retention.getTotalStorageBytesForTenants({
       tenantIds: authorizedIds,
     });
+
     return { totalBytes, projectCount: authorizedIds.length };
   }
 }

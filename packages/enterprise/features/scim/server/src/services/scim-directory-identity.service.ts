@@ -27,12 +27,16 @@ export class ScimDirectoryIdentityService {
   }
 
   async assertWritable(input: { connectionId: string | null; userId: string }): Promise<void> {
-    if (input.connectionId === null) return;
+    if (input.connectionId === null) {
+      return;
+    }
 
     const claims = await this.repository.listDirectoryConnectionsForUser({
       userId: input.userId,
     });
-    if (claims.length === 0 || claims.includes(input.connectionId)) return;
+    if (claims.length === 0 || claims.includes(input.connectionId)) {
+      return;
+    }
 
     throw new ScimWriteOutsideConnectionError({ userId: input.userId });
   }

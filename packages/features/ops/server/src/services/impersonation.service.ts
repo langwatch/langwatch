@@ -70,9 +70,11 @@ export class ImpersonationService {
     if (!target) {
       throw new UserToImpersonateNotFoundError(input.userIdToImpersonate);
     }
+
     if (target.deactivatedAt) {
       throw new CannotImpersonateDeactivatedUserError(target.id);
     }
+
     if (this.access.isAdmin(target)) {
       throw new CannotImpersonateAdminError(target.id);
     }

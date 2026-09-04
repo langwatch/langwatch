@@ -27,7 +27,10 @@ export class DefaultGovernanceOcsfExportService {
     if (!tenantId) {
       return { events: [], nextCursor: null, nextCursorCompound: null };
     }
-    if (!this.events) throw new Error("OCSF event storage is not configured");
+
+    if (!this.events) {
+      throw new Error("OCSF event storage is not configured");
+    }
 
     const events = await this.events.findAll({
       tenantId,
@@ -36,6 +39,7 @@ export class DefaultGovernanceOcsfExportService {
       limit: parsed.limit,
     });
     const lastEvent = events.at(-1);
+
     return {
       events,
       nextCursor: lastEvent?.eventTimeMs ?? null,

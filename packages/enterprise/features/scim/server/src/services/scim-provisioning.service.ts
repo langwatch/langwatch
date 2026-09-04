@@ -185,10 +185,12 @@ export class ScimProvisioningService {
       if (!isUniqueViolation(error)) {
         throw error;
       }
+
       await this.reconcileOrganizationMembership({
         userId: existingUser.id,
         organizationId,
       });
+
       return this.toScimUser(existingUser);
     }
 
@@ -199,6 +201,7 @@ export class ScimProvisioningService {
     if (existingUser.deactivatedAt) {
       await this.userService.reactivate({ id: existingUser.id });
     }
+
     await this.costCenters.sync({
       userId: existingUser.id,
       organizationId,
@@ -209,6 +212,7 @@ export class ScimProvisioningService {
     if (!reloadedUser) {
       return this.scimError({ status: "404", detail: "User not found" });
     }
+
     return this.toScimUser(reloadedUser);
   }
 
@@ -237,6 +241,7 @@ export class ScimProvisioningService {
           detail: "User already exists in this organization",
         });
       }
+
       throw error;
     }
 
@@ -249,6 +254,7 @@ export class ScimProvisioningService {
       organizationId,
       costCenter: this.costCenters.tryFromRequest(request),
     });
+
     return this.toScimUser(newUser);
   }
 
@@ -334,6 +340,7 @@ export class ScimProvisioningService {
           op: "deactivate_user",
         });
       }
+
       await this.userService.deactivate({ id });
     }
 
@@ -347,6 +354,7 @@ export class ScimProvisioningService {
     if (!reloadedUser) {
       return this.scimError({ status: "404", detail: "User not found" });
     }
+
     return this.toScimUser(reloadedUser);
   }
 
@@ -378,6 +386,7 @@ export class ScimProvisioningService {
     if (!reloadedUser) {
       return this.scimError({ status: "404", detail: "User not found" });
     }
+
     return this.toScimUser(reloadedUser);
   }
 
@@ -420,7 +429,9 @@ export class ScimProvisioningService {
       });
       await this.prisma.removeMembership({ userId: id, organizationId });
     }
+
     await this.userService.deactivate({ id });
+
     return;
   }
 
@@ -458,6 +469,7 @@ export class ScimProvisioningService {
         return parts.join(" ");
       }
     }
+
     return request.userName.split("@")[0] ?? request.userName;
   }
 
@@ -469,6 +481,7 @@ export class ScimProvisioningService {
     if (spaceIndex === -1) {
       return { givenName: fullName, familyName: "" };
     }
+
     return {
       givenName: fullName.substring(0, spaceIndex),
       familyName: fullName.substring(spaceIndex + 1),
@@ -479,7 +492,9 @@ export class ScimProvisioningService {
     if (!filter) {
       return null;
     }
+
     const match = filter.match(/^userName\s+eq\s+"([^"]+)"$/);
+
     return match?.[1] ?? null;
   }
 

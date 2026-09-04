@@ -72,6 +72,7 @@ export class StripeCustomerCurrencyService {
     // checkout work — recovering the stored id belongs in its own audited flow.
     if (customer.deleted) {
       logger.warn({ organizationId }, "[billing] Stored billing customer no longer exists");
+
       return { status: "deleted" };
     }
 
@@ -87,6 +88,7 @@ export class StripeCustomerCurrencyService {
         { organizationId, customerCurrency: fixed },
         "[billing] Customer is fixed to a currency with no price catalog",
       );
+
       return { status: "unsupported", stripeCurrency: fixed };
     }
 

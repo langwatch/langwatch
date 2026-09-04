@@ -55,6 +55,7 @@ export class ModelProviderAuthorizationService {
     if (scopeType === "ORGANIZATION") {
       return "organization:manage";
     }
+
     if (scopeType === "TEAM") {
       return "team:manage";
     }
@@ -68,6 +69,7 @@ export class ModelProviderAuthorizationService {
     if (scopeType === "ORGANIZATION") {
       return "organization:view";
     }
+
     if (scopeType === "TEAM") {
       return "team:view";
     }

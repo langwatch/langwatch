@@ -58,6 +58,7 @@ export class QuarantineFillEvaluatorService {
         }));
       const spanCount = perSource.reduce((total, source) => total + source.spanCount, 0);
       const rate = (spanCount * 60) / Math.max(1, windowSeconds);
+
       return {
         windowSeconds,
         threshold,
@@ -73,6 +74,7 @@ export class QuarantineFillEvaluatorService {
         windowSeconds,
         error,
       });
+
       return {
         windowSeconds,
         threshold,

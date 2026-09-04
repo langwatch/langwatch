@@ -133,6 +133,7 @@ export class BillingSubscriptionService {
       await this.stripe.subscriptions.update(lastSubscription.stripeSubscriptionId, {
         items: itemsToUpdate,
       });
+
       return { success: true };
     }
 
@@ -160,6 +161,7 @@ export class BillingSubscriptionService {
   }): Promise<{ url: string | null }> {
     if (isGrowthSeatEventPlan(plan) && this.seatEventService) {
       const pricingModel = await this.organizationRepository.tryGetPricingModel(organizationId);
+
       return this.seatEventService.createSeatEventCheckout({
         organizationId,
         customerId,
@@ -183,6 +185,7 @@ export class BillingSubscriptionService {
           baseUrl,
         });
       }
+
       return this.upgradeSubscription({
         stripeSubscriptionId: lastSubscription.stripeSubscriptionId,
         subscriptionId: lastSubscription.id,
@@ -225,10 +228,12 @@ export class BillingSubscriptionService {
         });
       }
     }
+
     const session = await this.stripe.billingPortal.sessions.create({
       customer: customerId,
       return_url: `${baseUrl}/settings/subscription`,
     });
+
     return { url: session.url };
   }
 
@@ -246,7 +251,10 @@ export class BillingSubscriptionService {
     billingInterval: string;
     quotedAt: number;
   }> {
-    if (!this.seatEventService) throw new SeatBillingUnavailableError();
+    if (!this.seatEventService) {
+      throw new SeatBillingUnavailableError();
+    }
+
     return this.seatEventService.previewProration({
       organizationId,
       newTotalSeats,
@@ -270,9 +278,13 @@ export class BillingSubscriptionService {
     billingInterval?: BillingInterval;
     invites: Array<{ email: string; role: string }>;
   }): Promise<{ url: string | null }> {
-    if (!this.seatEventService) throw new SeatBillingUnavailableError();
+    if (!this.seatEventService) {
+      throw new SeatBillingUnavailableError();
+    }
+
     const teamId = (await this.organizationRepository.tryFindFirstTeamId(organizationId)) ?? "";
     const pricingModel = await this.organizationRepository.tryGetPricingModel(organizationId);
+
     return this.seatEventService.createSeatEventCheckout({
       organizationId,
       customerId,
@@ -305,7 +317,10 @@ export class BillingSubscriptionService {
     actorEmail: string;
   }): Promise<{ success: boolean }> {
     const organization = await this.organizationRepository.tryFindName(organizationId);
-    if (!organization) throw new OrganizationNotFoundError();
+    if (!organization) {
+      throw new OrganizationNotFoundError();
+    }
+
     await this.notifier.send({
       type: "prospective",
       organizationId: organization.id,
@@ -316,6 +331,7 @@ export class BillingSubscriptionService {
       note,
       actorEmail,
     });
+
     return { success: true };
   }
 
@@ -326,7 +342,9 @@ export class BillingSubscriptionService {
   }): Promise<BillingDisplayInvoice[]> {
     const stripeCustomerId =
       await this.organizationRepository.tryGetStripeCustomerId(organizationId);
-    if (!stripeCustomerId) return [];
+    if (!stripeCustomerId) {
+      return [];
+    }
 
     let invoices: Stripe.ApiList<Stripe.Invoice>;
     try {
@@ -368,6 +386,7 @@ export class BillingSubscriptionService {
         status: SubscriptionStatus.CANCELLED,
       });
     }
+
     return { url: `${baseUrl}/settings/subscription` };
   }
 
@@ -399,6 +418,7 @@ export class BillingSubscriptionService {
     if (response.status === "active") {
       await this.repository.updatePlan({ id: subscriptionId, plan });
     }
+
     return { url: `${baseUrl}/settings/subscription?success` };
   }
 
@@ -422,8 +442,10 @@ export class BillingSubscriptionService {
         { organizationId, plan },
         "[billing] Plan has no price in the Stripe price catalog",
       );
+
       throw new InvalidPlanError(plan);
     }
+
     const itemsToAdd: SubscriptionItemUpdate[] = this.itemCalculator.createItemsToAdd(
       plan,
       { quantity: tracesToAdd },
@@ -437,7 +459,9 @@ export class BillingSubscriptionService {
       organizationId,
       plan,
     });
-    if (!subscription) throw new SubscriptionCreationFailedError();
+    if (!subscription) {
+      throw new SubscriptionCreationFailedError();
+    }
 
     const basePriceId = this.itemCalculator.prices[plan as StripePriceName];
     const rawCurrency = stripePricesFile.prices[basePriceId]?.currency?.toLowerCase();
@@ -457,6 +481,7 @@ export class BillingSubscriptionService {
       client_reference_id: `subscription_setup_${subscription.id}`,
       allow_promotion_codes: true,
     });
+
     return { url: session.url };
   }
 }

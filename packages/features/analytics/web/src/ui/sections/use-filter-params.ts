@@ -52,9 +52,8 @@ export const useFilterParams = () => {
                 return [];
               }
               return [[key, value_]];
-            } else {
-              return [[key, [value]]];
             }
+            return [[key, [value]]];
           }),
         ) as FilterParam;
       };
@@ -138,7 +137,6 @@ export const useFilterParams = () => {
     const strippedQs = qs.stringify(parsed, {
       allowDots: true,
       arrayFormat: "comma" as const,
-      // @ts-ignore of course it exists
       allowEmptyArrays: true,
     });
 
@@ -152,7 +150,6 @@ export const useFilterParams = () => {
   const qsOpts = {
     allowDots: true,
     arrayFormat: "comma" as const,
-    // @ts-ignore of course it exists
     allowEmptyArrays: true,
   };
 

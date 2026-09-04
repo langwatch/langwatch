@@ -327,7 +327,7 @@ function HeaderCell<T>({
   // (invalid HTML) and add a dead tab stop — we only wire the
   // PointerSensor, so there's no keyboard reorder to expose anyway.
   const dragHandleProps = (
-    reorderable ? { ...(listeners ?? {}) } : {}
+    reorderable ? { ...listeners } : {}
   ) as React.HTMLAttributes<HTMLElement>;
   const meta = header.column.columnDef.meta as ColumnMeta | undefined;
   // Open the one-off education dialog the first time the user tries

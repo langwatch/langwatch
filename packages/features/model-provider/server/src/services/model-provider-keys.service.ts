@@ -29,6 +29,7 @@ export class ModelProviderKeysService extends ModelProviderCredentialPolicy {
     }
 
     const definition = providerDefinition(provider);
+
     return z
       .union([definition.keysSchema, z.object({ MANAGED: z.string() })])
       .pipe(z.record(z.string(), z.unknown()))
@@ -150,5 +151,6 @@ function providerDefinition(provider: string): ModelProviderDefinition {
 
 function credentialKeys(definition: ModelProviderDefinition): Set<string> {
   const schema = z.toJSONSchema(definition.keysSchema);
+
   return new Set([...Object.keys(schema.properties ?? {}), "MANAGED"]);
 }

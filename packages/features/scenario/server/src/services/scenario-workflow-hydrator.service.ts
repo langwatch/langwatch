@@ -52,6 +52,7 @@ function defaultModelForDsl(
 
   const parsedDefault = llmValueSchema.safeParse(dsl.default_llm);
   const defaultLlm = parsedDefault.success ? parsedDefault.data : null;
+
   return {
     defaultLlm,
     defaultModel: defaultLlm?.model ?? legacyDefaultModel,
@@ -63,6 +64,7 @@ function parameterModel(value: unknown, defaultModel?: string): string | undefin
   if (!parsed.success || parsed.data.type !== "llm") {
     return void 0;
   }
+
   return parsed.data.value?.model ?? defaultModel;
 }
 
@@ -123,6 +125,7 @@ export class ScenarioWorkflowHydratorService {
           { projectId, model, reason: result.reason },
           `Failed to hydrate llm parameter: ${result.message}`,
         );
+
         return { success: false, reason: result.reason, message: result.message };
       }
 
@@ -164,6 +167,7 @@ export class ScenarioWorkflowHydratorService {
         }
 
         const base = parsedParameter.data.value ?? input.defaultLlm ?? { model };
+
         return {
           ...parsedParameter.data,
           value: {

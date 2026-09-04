@@ -109,9 +109,11 @@ export class ScenarioExecutionLookupService {
     if (!project) {
       return { success: false, error: `Project ${projectId} not found` };
     }
+
     if (!project.apiKey) {
       return { success: false, error: `Project ${projectId} missing API key` };
     }
+
     return { success: true, data: { apiKey: project.apiKey } };
   }
 
@@ -126,6 +128,7 @@ export class ScenarioExecutionLookupService {
     if (!suiteId) {
       return null;
     }
+
     return this.options.suites.tryGet({ id: suiteId, projectId });
   }
 

@@ -30,9 +30,11 @@ function graphSeriesName(series: GraphSeries, index: number): string {
   if (series.pipeline) {
     return `${index}/${series.metric}/${aggregation}/${series.pipeline.field}/${series.pipeline.aggregation}`;
   }
+
   if (series.key) {
     return `${index}/${series.metric}/${aggregation}/${series.key}`;
   }
+
   return `${index}/${series.metric}/${aggregation}`;
 }
 

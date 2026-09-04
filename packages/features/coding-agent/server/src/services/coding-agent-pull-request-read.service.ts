@@ -93,6 +93,7 @@ export class CodingAgentPullRequestReadService {
       projectId: parsed.projectId,
       sessions: rows,
     });
+
     return rows.map((row) => ({
       sessionId: row.sessionId,
       title: row.title === "" ? null : row.title,
@@ -128,6 +129,7 @@ export class CodingAgentPullRequestReadService {
   ): Promise<CodingAgentPullRequestUsage> {
     const query = codingAgentPullRequestUsageInputSchema.parse(input);
     const gathered = await this.gatherPullRequest(query);
+
     return codingAgentPullRequestUsageSchema.parse({
       pullRequest: this.pullRequestIdentity(gathered.target),
       rows: gathered.rows,
@@ -142,6 +144,7 @@ export class CodingAgentPullRequestReadService {
     const query = codingAgentPullRequestUsageInputSchema.parse(input);
     const gathered = await this.gatherPullRequest(query);
     const costProjects = new Set(query.costProjectIds);
+
     return codingAgentPullRequestDetailSchema.parse({
       pullRequest: {
         ...this.pullRequestIdentity(gathered.target),
@@ -176,6 +179,7 @@ export class CodingAgentPullRequestReadService {
     if (project === null) {
       return codingAgentPersonalPullRequestUsageSchema.parse({ rows: [], unlinked: [] });
     }
+
     const organizationId = project.team.organizationId;
     const toMs = this.dependencies.clock.nowMs();
     const sessions = await this.dependencies.sessionReads.listRecent({
@@ -216,7 +220,10 @@ export class CodingAgentPullRequestReadService {
       const discovered = pullRequests.filter((pullRequest) =>
         group.sessions.some((session) => {
           const branchWinners = assignments.get(session.sessionId);
-          if (branchWinners === undefined) return false;
+          if (branchWinners === undefined) {
+            return false;
+          }
+
           return [...branchWinners.values()].includes(pullRequest.prNumber);
         }),
       );
@@ -232,8 +239,12 @@ export class CodingAgentPullRequestReadService {
           })),
         );
       }
+
       const unmatched = group.sessions.filter((session) => !assignments.has(session.sessionId));
-      if (unmatched.length === 0) continue;
+      if (unmatched.length === 0) {
+        continue;
+      }
+
       const repoCovered = await this.dependencies.github.coversRepository({
         organizationId,
         repositoryFullName: group.repositoryFullName,
@@ -247,6 +258,7 @@ export class CodingAgentPullRequestReadService {
         }),
       );
     }
+
     return codingAgentPersonalPullRequestUsageSchema.parse({ rows, unlinked });
   }
 
@@ -268,9 +280,11 @@ export class CodingAgentPullRequestReadService {
         prNumber: query.prNumber,
       });
     }
+
     if (query.permittedProjectIds.length === 0) {
       return { target, sessions: [], rows: [], modelBreakdown: [] };
     }
+
     const siblings = await this.dependencies.github.findAllByBranches({
       organizationId: query.organizationId,
       repositoryHost: target.repositoryHost,
@@ -281,6 +295,7 @@ export class CodingAgentPullRequestReadService {
     if (!repositoryOwner || !repositoryName) {
       return { target, sessions: [], rows: [], modelBreakdown: [] };
     }
+
     const toMs = this.dependencies.clock.nowMs();
     const candidates = await this.candidateSessionsFor({
       tenantIds: query.permittedProjectIds,
@@ -310,6 +325,7 @@ export class CodingAgentPullRequestReadService {
       query.organizationId,
       attached.map((session) => session.agent),
     );
+
     return {
       target,
       sessions: attached,
@@ -339,9 +355,15 @@ export class CodingAgentPullRequestReadService {
     organizationId: string;
     toMs: number;
   }): Promise<unknown[]> {
-    if (input.query.permittedProjectIds.length === 0) return [];
+    if (input.query.permittedProjectIds.length === 0) {
+      return [];
+    }
+
     const [repositoryOwner, repositoryName] = input.group.repositoryFullName.split("/");
-    if (!repositoryOwner || !repositoryName) return [];
+    if (!repositoryOwner || !repositoryName) {
+      return [];
+    }
+
     const candidates = await this.candidateSessionsFor({
       tenantIds: input.query.permittedProjectIds,
       repositoryHost: input.group.repositoryHost,
@@ -360,6 +382,7 @@ export class CodingAgentPullRequestReadService {
       fromMs: input.toMs - USAGE_SESSION_WINDOW_MS,
     });
     const costProjects = new Set(input.query.costProjectIds);
+
     return input.discovered.map((pullRequest) => {
       const attribution = this.dependencies.shares.attribute({
         sessions: candidates.sessions,
@@ -377,6 +400,7 @@ export class CodingAgentPullRequestReadService {
         nonBillableAgents,
         input.query.projects,
       );
+
       return {
         ...this.pullRequestIdentity(pullRequest),
         title: pullRequest.title,
@@ -472,6 +496,7 @@ export class CodingAgentPullRequestReadService {
     const stampedOnly = fetched.filter((session) =>
       missingKeys.has(CodingAgentPullRequestShareService.sessionKey(session)),
     );
+
     return {
       sessions: [...rowMatched, ...stampedOnly],
       rowMatchedSessionKeys,
@@ -492,6 +517,7 @@ export class CodingAgentPullRequestReadService {
         }),
       })),
     );
+
     return new Set(answers.filter((answer) => answer.nonBillable).map((answer) => answer.agent));
   }
 

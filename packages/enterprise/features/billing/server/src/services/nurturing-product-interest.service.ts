@@ -32,6 +32,7 @@ export function mapProductSelectionToIntegrationMethod(selection: string): Integ
   if (!Object.hasOwn(mapping, selection)) {
     throw new Error(`Unknown product selection: ${selection}`);
   }
+
   return mapping[selection]!;
 }
 
@@ -50,7 +51,9 @@ export function fireIntegrationMethodNurturing({
   integrationMethod: IntegrationMethodValue;
 }): void {
   const nurturing = tryNurturingSink();
-  if (!nurturing) return;
+  if (!nurturing) {
+    return;
+  }
 
   void nurturing
     .identifyUser({

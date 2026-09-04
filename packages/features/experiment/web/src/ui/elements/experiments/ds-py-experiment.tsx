@@ -686,9 +686,9 @@ export const RunDetails = React.memo(
             ) : dspyStep.data ? (
               <Table.Root
                 height="fit-content"
-                // @ts-ignore
+                // @ts-expect-error
                 size={size === "sm" ? "xs" : "sm"}
-                // @ts-ignore
+                // @ts-expect-error
                 variant="grid"
               >
                 <Table.Header>
@@ -794,9 +794,9 @@ export const RunDetails = React.memo(
             {tabIndex === 1 && (
               <Table.Root
                 height="fit-content"
-                // @ts-ignore
+                // @ts-expect-error
                 size={size === "sm" ? "xs" : "sm"}
-                // @ts-ignore
+                // @ts-expect-error
                 variant="grid"
               >
                 <Table.Header>
@@ -894,9 +894,9 @@ export const RunDetails = React.memo(
           >
             <Table.Root
               height="fit-content"
-              // @ts-ignore
+              // @ts-expect-error
               size={size === "sm" ? "xs" : "sm"}
-              // @ts-ignore
+              // @ts-expect-error
               variant="grid"
             >
               <Table.Header>
@@ -1077,7 +1077,7 @@ export function DSPyRunsScoresChart({
       if (!runIsVisible(run.runId)) return acc;
       run.steps.forEach((step) => {
         acc[step.index] = {
-          ...(acc[step.index] ?? {}),
+          ...acc[step.index],
           index: step.index,
           [run.runId]: step.score,
           [`${run.runId}_label`]: step.label,

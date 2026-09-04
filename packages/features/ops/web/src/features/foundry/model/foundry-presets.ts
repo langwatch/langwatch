@@ -2238,7 +2238,7 @@ export const builtInPresets: Preset[] = [
                   {
                     role: "assistant",
                     content:
-                      '{"function_call": {"name": "create_ticket", "arguments": "{\"order_id\": \"12345\", \"priority\": \"high\", \"description\": \"Customer support request for order #12345\"}"}}',
+                      '{"function_call": {"name": "create_ticket", "arguments": "{"order_id": "12345", "priority": "high", "description": "Customer support request for order #12345"}"}}',
                   },
                   {
                     role: "tool",

@@ -48,6 +48,7 @@ export class StudioWorkflowEventEnricherService implements StudioEventEnricher {
       event,
       projectId: input.projectId,
     });
+
     return this.withWorkflow(event, workflow, resolutions);
   }
 
@@ -98,6 +99,7 @@ export class StudioWorkflowEventEnricherService implements StudioEventEnricher {
             if (parameter.type !== "llm") {
               return parameter;
             }
+
             const llm = workflowLlmConfigSchema.parse(parameter.value);
 
             return {

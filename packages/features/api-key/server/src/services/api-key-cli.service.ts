@@ -48,12 +48,14 @@ export class ApiKeyCliService {
     if (bindings.length === 0) {
       throw new CliKeySelectionInvalidError({ bindings: ["Select at least one scope"] });
     }
+
     const unknown = selection.permissions.filter((permission) => !isRegistryPermission(permission));
     if (unknown.length > 0) {
       throw new CliKeySelectionInvalidError({
         permissions: unknown.map((permission) => `Unknown permission "${permission}"`),
       });
     }
+
     const permissions = [...new Set(selection.permissions)].filter(
       (permission) =>
         bindings.some((binding) => binding.scopeType === "ORGANIZATION") ||
@@ -64,12 +66,14 @@ export class ApiKeyCliService {
         permissions: ["Select at least one permission"],
       });
     }
+
     await this.policy.assertSelectionWithinCeiling({
       userId: input.userId,
       organizationId: input.organizationId,
       bindings: bindings.map((binding) => ({ ...binding, role: "CUSTOM" as const })),
       permissions,
     });
+
     return { bindings, permissions: permissions.sort() };
   }
 
@@ -87,6 +91,7 @@ export class ApiKeyCliService {
         permissions: [...defaults].sort(),
       };
     }
+
     const bindings = await this.options.authz.listUserBindings(input);
     const teamIds = [
       ...new Set(
@@ -104,6 +109,7 @@ export class ApiKeyCliService {
       if (personal && personal.ownerUserId !== input.userId) {
         continue;
       }
+
       const held = await this.options.authz.effectivePermissions({
         principal: { type: "user", id: input.userId },
         scope: { type: "team", id: teamId, organizationId: input.organizationId },
@@ -113,6 +119,7 @@ export class ApiKeyCliService {
         heldByTeam.set(teamId, selected);
       }
     }
+
     let permissions: string[] | null = null;
     const selectedTeams: string[] = [];
     for (const [teamId, held] of heldByTeam) {
@@ -120,9 +127,11 @@ export class ApiKeyCliService {
       permissions =
         permissions === null ? held : permissions.filter((permission) => held.includes(permission));
     }
+
     if (!permissions || permissions.length === 0) {
       return null;
     }
+
     return {
       bindings: selectedTeams.map((scopeId) => ({ scopeType: "TEAM" as const, scopeId })),
       permissions: permissions.sort(),
@@ -169,8 +178,10 @@ export class ApiKeyCliService {
           organizationId: input.organizationId,
         })
         .catch(() => void 0);
+
       throw error;
     }
+
     return { token: created.token, apiKeyId: created.apiKey.id, scope };
   }
 
@@ -194,6 +205,7 @@ export class ApiKeyCliService {
       ) {
         continue;
       }
+
       await this.lifecycle.revoke({
         id: key.id,
         callerUserId: input.userId,
@@ -219,6 +231,7 @@ export class ApiKeyCliService {
       if (error instanceof ApiKeyNotFoundError || error instanceof ApiKeyAlreadyRevokedError) {
         return;
       }
+
       throw error;
     }
   }
@@ -230,6 +243,7 @@ export class ApiKeyCliService {
     if (input.bindings.some((binding) => binding.scopeType === "ORGANIZATION")) {
       return { kind: "organization", projectIds: [] };
     }
+
     const teamIds = input.bindings
       .filter((binding) => binding.scopeType === "TEAM")
       .map((binding) => binding.scopeId);
@@ -243,6 +257,7 @@ export class ApiKeyCliService {
         limit: 1000,
       })
     ).data.filter((project) => projectIds.includes(project.id) || teamIds.includes(project.teamId));
+
     return { kind: "projects", projectIds: projects.map((project) => project.id).sort() };
   }
 }

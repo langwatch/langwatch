@@ -26,6 +26,7 @@ const AVATAR_SIGNATURES: Record<UserAvatarMediaType, (bytes: Uint8Array) => bool
     bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff,
   "image/gif": (bytes) => {
     const header = Buffer.from(bytes.subarray(0, 6)).toString("latin1");
+
     return header === "GIF87a" || header === "GIF89a";
   },
   "image/webp": (bytes) =>
@@ -41,6 +42,7 @@ function parseAvatar(dataUrl: string): {
   if (trimmed.length > USER_AVATAR_MAX_DATA_URL_LENGTH) {
     throw new UserAvatarTooLargeError();
   }
+
   const match = DATA_URL_PATTERN.exec(trimmed);
   if (!match) {
     throw new UserAvatarUnreadableError(
@@ -48,25 +50,30 @@ function parseAvatar(dataUrl: string): {
       "Avatar payload is not a base64 image data URL",
     );
   }
+
   const mediaType = match[1]!.toLowerCase();
   const parsedMediaType = userAvatarMediaTypeSchema.safeParse(mediaType);
   if (!parsedMediaType.success) {
     throw new UserAvatarTypeUnsupportedError(mediaType);
   }
+
   const allowedMediaType = parsedMediaType.data;
   const bytes = Buffer.from(match[2]!.replace(/\s+/gu, ""), "base64");
   if (bytes.length === 0) {
     throw new UserAvatarUnreadableError("empty", "Avatar payload decoded to zero bytes");
   }
+
   if (bytes.length > USER_AVATAR_MAX_BYTES) {
     throw new UserAvatarTooLargeError();
   }
+
   if (!AVATAR_SIGNATURES[allowedMediaType](bytes)) {
     throw new UserAvatarUnreadableError(
       "content_mismatch",
       `Avatar bytes do not match the declared media type: ${mediaType}`,
     );
   }
+
   return { mediaType: allowedMediaType, bytes };
 }
 

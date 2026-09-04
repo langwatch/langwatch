@@ -25,14 +25,17 @@ function toJsonSerializable(value: unknown): JsonSerializable {
   if (typeof value === "bigint") {
     return Number(value);
   }
+
   if (Array.isArray(value)) {
     return value.map(toJsonSerializable);
   }
+
   if (typeof value === "object" && value !== null) {
     const result: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(value)) {
       result[k] = toJsonSerializable(v);
     }
+
     return result;
   }
 
@@ -81,18 +84,21 @@ function unwrapLegacyWrapper(
       value: toJsonSerializable(value) as ChatMessage[],
     };
   }
+
   if (type === "text") {
     return {
       type: "text",
       value: typeof value === "string" ? value : JSON.stringify(value),
     };
   }
+
   if (type === "evaluation_result" || type === "guardrail_result") {
     return {
       type,
       value: toJsonSerializable(value),
     } as unknown as SpanInputOutput;
   }
+
   return { type: "json", value: toJsonSerializable(value) };
 }
 
@@ -112,7 +118,9 @@ function getAnnotatedType(spanAttributes: NormalizedAttributes, attrKey: string)
     }
   }
 
-  if (!Array.isArray(raw)) return null;
+  if (!Array.isArray(raw)) {
+    return null;
+  }
 
   const prefix = `${attrKey}=`;
   for (const entry of raw) {
@@ -120,6 +128,7 @@ function getAnnotatedType(spanAttributes: NormalizedAttributes, attrKey: string)
       return entry.slice(prefix.length);
     }
   }
+
   return null;
 }
 
@@ -156,10 +165,12 @@ function extractInput(spanAttributes: NormalizedAttributes): SpanInputOutput | n
         // Not JSON — keep as string
       }
     }
+
     // Unwrap {type, value} wrapper preserved by canonicalization (e.g. chat_messages)
     if (isLegacyWrapper(lwInput)) {
       return unwrapLegacyWrapper(lwInput, spanAttributes, "langwatch.input");
     }
+
     const annotatedType = getAnnotatedType(spanAttributes, "langwatch.input");
     if (annotatedType === "chat_messages" && Array.isArray(lwInput)) {
       return {
@@ -167,13 +178,16 @@ function extractInput(spanAttributes: NormalizedAttributes): SpanInputOutput | n
         value: toJsonSerializable(lwInput) as ChatMessage[],
       };
     }
+
     if (annotatedType === "text" || typeof lwInput === "string") {
       // ClickHouse deserializeAttributes() may parse JSON-like strings back to
       // objects/arrays (e.g. "[{\"role\":...}]" → Array). Re-stringify to avoid
       // String([object Object]).
       const textValue = typeof lwInput === "string" ? lwInput : JSON.stringify(lwInput);
+
       return { type: "text", value: textValue };
     }
+
     return {
       type: "json",
       value: toJsonSerializable(lwInput),
@@ -204,8 +218,10 @@ function parseJsonOrText(value: unknown): SpanInputOutput {
     } catch {
       // Not JSON — keep as string
     }
+
     return { type: "text", value };
   }
+
   return { type: "json", value: toJsonSerializable(value) };
 }
 
@@ -240,10 +256,12 @@ function extractOutput(spanAttributes: NormalizedAttributes): SpanInputOutput | 
         // Not JSON — keep as string
       }
     }
+
     // Unwrap {type, value} wrapper preserved by canonicalization (e.g. chat_messages)
     if (isLegacyWrapper(lwOutput)) {
       return unwrapLegacyWrapper(lwOutput, spanAttributes, "langwatch.output");
     }
+
     const annotatedType = getAnnotatedType(spanAttributes, "langwatch.output");
     if (annotatedType === "chat_messages" && Array.isArray(lwOutput)) {
       return {
@@ -251,16 +269,20 @@ function extractOutput(spanAttributes: NormalizedAttributes): SpanInputOutput | 
         value: toJsonSerializable(lwOutput) as ChatMessage[],
       };
     }
+
     if (annotatedType === "evaluation_result" || annotatedType === "guardrail_result") {
       return {
         type: annotatedType,
         value: toJsonSerializable(lwOutput),
       } as unknown as SpanInputOutput;
     }
+
     if (annotatedType === "text" || typeof lwOutput === "string") {
       const textValue = typeof lwOutput === "string" ? lwOutput : JSON.stringify(lwOutput);
+
       return { type: "text", value: textValue };
     }
+
     return {
       type: "json",
       value: toJsonSerializable(lwOutput),
@@ -377,14 +399,17 @@ function extractContexts(spanAttributes: NormalizedAttributes): RAGChunk[] | und
     if (typeof ctx === "string") {
       return { content: ctx };
     }
+
     if (typeof ctx === "object" && ctx !== null) {
       const obj = ctx as Record<string, unknown>;
+
       return {
         document_id: typeof obj.document_id === "string" ? obj.document_id : null,
         chunk_id: typeof obj.chunk_id === "string" ? obj.chunk_id : null,
         content: obj.content ?? obj,
       };
     }
+
     return { content: String(ctx) };
   });
 }

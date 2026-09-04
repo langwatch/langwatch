@@ -70,17 +70,20 @@ export class DefaultGovernanceAiToolCatalogService {
 
   listForAdmin(input: AiToolOrganizationInput): Promise<AiToolEntry[]> {
     const parsed = aiToolOrganizationInputSchema.parse(input);
+
     return this.repository.listAdmin(parsed.organizationId);
   }
 
   async tryFindById(input: FindAiToolEntryInput): Promise<AiToolEntry | null> {
     const parsed = findAiToolEntryInputSchema.parse(input);
     const entry = await this.repository.tryFindById(parsed.id);
+
     return entry?.organizationId === parsed.organizationId ? entry : null;
   }
 
   async getById(input: FindAiToolEntryInput): Promise<AiToolEntry> {
     const parsed = findAiToolEntryInputSchema.parse(input);
+
     return this.getOwn(parsed.id, parsed.organizationId);
   }
 
@@ -91,6 +94,7 @@ export class DefaultGovernanceAiToolCatalogService {
       config: parsed.config,
     });
     await this.assertDepartments(parsed.organizationId, parsed.departmentIds);
+
     return this.repository.create({
       values: parsed,
       slug: this.slugs.generate(parsed.displayName),
@@ -106,15 +110,18 @@ export class DefaultGovernanceAiToolCatalogService {
         config: parsed.config,
       });
     }
+
     if (parsed.departmentIds) {
       await this.assertDepartments(parsed.organizationId, parsed.departmentIds);
     }
+
     return this.repository.update(parsed);
   }
 
   async remove(input: FindAiToolEntryInput): Promise<AiToolEntry> {
     const parsed = findAiToolEntryInputSchema.parse(input);
     await this.getOwn(parsed.id, parsed.organizationId);
+
     return this.repository.remove(parsed.id);
   }
 
@@ -122,6 +129,7 @@ export class DefaultGovernanceAiToolCatalogService {
     input: AiToolOrganizationInput,
   ): Promise<{ hasSeeded: boolean; created: number }> {
     const parsed = aiToolOrganizationInputSchema.parse(input);
+
     return this.repository.ensureDefaultCatalog({
       organizationId: parsed.organizationId,
       tiles: AI_TOOL_STARTER_TILES,
@@ -135,6 +143,7 @@ export class DefaultGovernanceAiToolCatalogService {
     const selected = parsed.slugs
       ? AI_TOOL_STARTER_TILES.filter((tile) => parsed.slugs?.includes(tile.slug))
       : AI_TOOL_STARTER_TILES;
+
     return this.repository.seedStarterPack({ values: parsed, tiles: selected });
   }
 
@@ -149,6 +158,7 @@ export class DefaultGovernanceAiToolCatalogService {
     const configured = new Set(
       await this.repository.listConfiguredProvidersForOrganization(parsed.organizationId),
     );
+
     return this.providers
       .list()
       .filter(({ type }) => type === "llm")
@@ -164,6 +174,7 @@ export class DefaultGovernanceAiToolCatalogService {
     input: AiToolOrganizationInput,
   ): Promise<Array<{ id: string; name: string }>> {
     const parsed = aiToolOrganizationInputSchema.parse(input);
+
     return this.repository.listRoutingPolicyOptions(parsed.organizationId);
   }
 
@@ -186,16 +197,29 @@ export class DefaultGovernanceAiToolCatalogService {
     const overrides: Partial<Record<PlatformToolSlug, PlatformToolPolicy>> = {};
     for (const tile of sorted) {
       const kind = tile.config.assistantKind;
-      if (typeof kind !== "string") continue;
+      if (typeof kind !== "string") {
+        continue;
+      }
+
       const slug = ASSISTANT_KIND_TO_TOOL_SLUG[kind as keyof typeof ASSISTANT_KIND_TO_TOOL_SLUG];
-      if (!slug || overrides[slug]) continue;
+      if (!slug || overrides[slug]) {
+        continue;
+      }
+
       let allowVk = tile.config.allowVk === undefined ? true : Boolean(tile.config.allowVk);
       let allowOtelDirect =
         tile.config.allowOtelDirect === undefined ? true : Boolean(tile.config.allowOtelDirect);
-      if (slug === "code") allowVk = false;
-      if (slug === "cursor") allowOtelDirect = false;
+      if (slug === "code") {
+        allowVk = false;
+      }
+
+      if (slug === "cursor") {
+        allowOtelDirect = false;
+      }
+
       overrides[slug] = { allowVk, allowOtelDirect };
     }
+
     return overrides;
   }
 
@@ -207,6 +231,7 @@ export class DefaultGovernanceAiToolCatalogService {
         ...PLATFORM_TOOL_POLICY_DEFAULTS[slug],
       };
     }
+
     return result;
   }
 
@@ -217,6 +242,7 @@ export class DefaultGovernanceAiToolCatalogService {
       organizationId: input.organizationId,
       userId: input.userId,
     });
+
     return policies[input.slug];
   }
 
@@ -235,12 +261,19 @@ export class DefaultGovernanceAiToolCatalogService {
     const seenTools = new Set<string>();
     for (const tile of sortTiles(assistantTiles)) {
       const kind = tile.config.assistantKind;
-      if (typeof kind !== "string") continue;
+      if (typeof kind !== "string") {
+        continue;
+      }
+
       const slug = ASSISTANT_KIND_TO_TOOL_SLUG[kind as keyof typeof ASSISTANT_KIND_TO_TOOL_SLUG];
-      if (!slug || seenTools.has(slug)) continue;
+      if (!slug || seenTools.has(slug)) {
+        continue;
+      }
+
       seenTools.add(slug);
       tools.push({ slug, displayName: tile.displayName });
     }
+
     const providers: AiToolCliCatalog["providers"] = [];
     const seenProviders = new Set<string>();
     for (const tile of sortTiles(providerTiles)) {
@@ -248,6 +281,7 @@ export class DefaultGovernanceAiToolCatalogService {
       if (typeof providerKey !== "string" || seenProviders.has(providerKey)) {
         continue;
       }
+
       seenProviders.add(providerKey);
       providers.push({
         providerKey,
@@ -255,6 +289,7 @@ export class DefaultGovernanceAiToolCatalogService {
         configured: configured.has(providerKey),
       });
     }
+
     return { tools, providers, configuredProviderKeys };
   }
 
@@ -263,16 +298,22 @@ export class DefaultGovernanceAiToolCatalogService {
     if (!entry || entry.organizationId !== organizationId) {
       throw new AiToolEntryNotFoundError(id, organizationId);
     }
+
     return entry;
   }
 
   private async assertDepartments(organizationId: string, departmentIds: string[]): Promise<void> {
-    if (departmentIds.length === 0) return;
+    if (departmentIds.length === 0) {
+      return;
+    }
+
     const valid = await this.repository.departmentsBelongToOrganization({
       organizationId,
       departmentIds,
     });
-    if (!valid) throw new AiToolDepartmentScopeError();
+    if (!valid) {
+      throw new AiToolDepartmentScopeError();
+    }
   }
 }
 

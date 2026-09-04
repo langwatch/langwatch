@@ -10,6 +10,7 @@ const STATUSES: readonly string[] = ["open", "draft", "merged", "closed"];
 function cacheKey(input: { organizationId: string; ref: GithubPullRequestRef }): string {
   const host = input.ref.repositoryHost.toLowerCase();
   const fullName = input.ref.repositoryFullName.toLowerCase();
+
   return `gh:prstatus:${input.organizationId}:${host}:${fullName}:${input.ref.prNumber}`;
 }
 
@@ -34,6 +35,7 @@ export class GithubPullRequestStatusCacheService {
 
     try {
       const value = await this.redis.tryGet(cacheKey(input));
+
       return isStatus(value) ? value : null;
     } catch {
       return null;

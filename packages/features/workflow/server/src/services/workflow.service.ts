@@ -76,6 +76,7 @@ export class WorkflowService extends WorkflowServiceContract {
     if (!workflow) {
       throw new WorkflowNotFoundError(input.id, input.projectId);
     }
+
     return workflow;
   }
 
@@ -172,6 +173,7 @@ export class WorkflowService extends WorkflowServiceContract {
     if (!version) {
       throw new WorkflowVersionNotFoundError(input.versionId);
     }
+
     const workflow = await this.options.repository.tryFindById({
       id: version.workflowId,
       projectId: input.projectId,
@@ -180,6 +182,7 @@ export class WorkflowService extends WorkflowServiceContract {
     if (!workflow) {
       throw new WorkflowNotFoundError(version.workflowId, input.projectId);
     }
+
     const dsl = this.options.dslMigration.migrate(version.dsl);
     await this.options.repository.updateWorkflow({
       id: workflow.id,
@@ -191,6 +194,7 @@ export class WorkflowService extends WorkflowServiceContract {
         currentVersionId: version.id,
       },
     });
+
     return { ...version, dsl };
   }
 
@@ -212,6 +216,7 @@ export class WorkflowService extends WorkflowServiceContract {
 
       throw new WorkflowVersionNotFoundError(input.versionId ?? workflow.publishedId ?? "");
     }
+
     return version;
   }
 
@@ -243,6 +248,7 @@ export class WorkflowService extends WorkflowServiceContract {
           actorId: command.authorId,
         })
       : await this.getById({ id, projectId: command.projectId, includeVersion: true });
+
     return { workflow: published, version };
   }
 
@@ -256,6 +262,7 @@ export class WorkflowService extends WorkflowServiceContract {
       icon: command.icon !== undefined ? command.icon : existing.icon,
       description: command.description !== undefined ? command.description : existing.description,
     });
+
     return this.options.repository.updateWorkflow({
       id: command.id,
       projectId: command.projectId,
@@ -306,6 +313,7 @@ export class WorkflowService extends WorkflowServiceContract {
         ...(command.setAsLatestVersion === false ? {} : { latestVersionId: version.id }),
       },
     });
+
     return version;
   }
 
@@ -321,11 +329,13 @@ export class WorkflowService extends WorkflowServiceContract {
     if (!version) {
       throw new WorkflowVersionNotFoundError(command.versionId);
     }
+
     return this.options.repository.publish(command);
   }
 
   async unpublish(input: { id: string; projectId: string }): Promise<Workflow> {
     await this.getById(input);
+
     return this.options.repository.updateWorkflow({
       id: input.id,
       projectId: input.projectId,
@@ -338,6 +348,7 @@ export class WorkflowService extends WorkflowServiceContract {
   ): Promise<Workflow> {
     const command = this.parse(archiveWorkflowCommandSchema, input);
     await this.getById(command);
+
     return this.options.repository.updateWorkflow({
       id: command.id,
       projectId: command.projectId,
@@ -390,6 +401,7 @@ export class WorkflowService extends WorkflowServiceContract {
       autoSaved: false,
       authorId: command.authorId,
     });
+
     return {
       workflow: await this.getById({
         id: workflow.id,
@@ -433,6 +445,7 @@ export class WorkflowService extends WorkflowServiceContract {
         autoSaved: false,
       });
     }
+
     return { pushedTo: selected.length, selectedCopies: selected.length };
   }
 
@@ -443,6 +456,7 @@ export class WorkflowService extends WorkflowServiceContract {
       projectId: command.projectId,
       versionId: command.versionId,
     });
+
     return this.options.execution.execute({ ...command, version });
   }
 
@@ -451,6 +465,7 @@ export class WorkflowService extends WorkflowServiceContract {
     if (!version) {
       throw new WorkflowVersionRequiredError();
     }
+
     return version;
   }
 
@@ -470,6 +485,7 @@ export class WorkflowService extends WorkflowServiceContract {
     if (!result.success) {
       throw new WorkflowDslValidationError(result.error.issues);
     }
+
     return result.data;
   }
 }

@@ -179,7 +179,7 @@ export type CliMintedSession = Readonly<{
  * Both the validating reader and the raw extraction share it, so tightening it
  * can never leave a second, more permissive copy behind on the auth boundary.
  */
-const BEARER_ACCESS_TOKEN_REGEX = /^Bearer\s+(lw_at_[A-Za-z0-9_\-]+)$/;
+const BEARER_ACCESS_TOKEN_REGEX = /^Bearer\s+(lw_at_[A-Za-z0-9_-]+)$/;
 
 /**
  * Extract the bearer access token from an `Authorization` header, or null.
@@ -188,8 +188,12 @@ const BEARER_ACCESS_TOKEN_REGEX = /^Bearer\s+(lw_at_[A-Za-z0-9_\-]+)$/;
  * (to revoke it) does not re-run the full read.
  */
 export function bearerCliAccessToken(authHeader: string | null | undefined): string | null {
-  if (!authHeader) return null;
+  if (!authHeader) {
+    return null;
+  }
+
   const match = BEARER_ACCESS_TOKEN_REGEX.exec(authHeader.trim());
+
   return match ? match[1]! : null;
 }
 
@@ -204,6 +208,7 @@ function generateUserCode(): string {
   const alphabet = "ABCDEFGHJKMNPQRSTVWXYZ23456789";
   const bytes = randomBytes(8);
   const chars = Array.from(bytes, (b) => alphabet[b % alphabet.length]!);
+
   return `${chars.slice(0, 4).join("")}-${chars.slice(4, 8).join("")}`;
 }
 
@@ -270,13 +275,17 @@ export class CliDeviceSessionService {
       value: record.device_code,
       ttlSeconds: DEVICE_CODE_TTL_SECONDS,
     });
+
     return record;
   }
 
   /** The device-code record behind one device code, or nothing. */
   async tryFindDeviceCode(deviceCode: string): Promise<CliDeviceCodeRecord | null> {
     const raw = await this.store.tryGet(deviceCodeKey(deviceCode));
-    if (!raw) return null;
+    if (!raw) {
+      return null;
+    }
+
     return JSON.parse(raw) as CliDeviceCodeRecord;
   }
 
@@ -287,7 +296,10 @@ export class CliDeviceSessionService {
    */
   async tryFindDeviceCodeByUserCode(userCode: string): Promise<CliDeviceCodeRecord | null> {
     const deviceCode = await this.store.tryGet(userCodeKey(userCode.toUpperCase()));
-    if (!deviceCode) return null;
+    if (!deviceCode) {
+      return null;
+    }
+
     return await this.tryFindDeviceCode(deviceCode);
   }
 
@@ -318,7 +330,9 @@ export class CliDeviceSessionService {
   }): Promise<void> {
     await this.store.delete(deviceCodeKey(input.record.device_code));
     await this.store.delete(userCodeKey(input.record.user_code));
-    if (input.alsoPollWindow) await this.store.delete(pollRateKey(input.record.device_code));
+    if (input.alsoPollWindow) {
+      await this.store.delete(pollRateKey(input.record.device_code));
+    }
   }
 
   /**
@@ -337,9 +351,17 @@ export class CliDeviceSessionService {
     keySelection?: CliKeySelection | undefined;
   }): Promise<{ approved: boolean }> {
     const record = await this.tryFindDeviceCode(input.deviceCode);
-    if (!record) return { approved: false };
-    if (Date.now() > record.expires_at) return { approved: false };
-    if (record.status !== "pending") return { approved: false };
+    if (!record) {
+      return { approved: false };
+    }
+
+    if (Date.now() > record.expires_at) {
+      return { approved: false };
+    }
+
+    if (record.status !== "pending") {
+      return { approved: false };
+    }
 
     const updated: CliDeviceCodeRecord = {
       ...record,
@@ -350,13 +372,17 @@ export class CliDeviceSessionService {
       key_selection: input.keySelection,
     };
     await this.rewriteDeviceCode(updated);
+
     return { approved: true };
   }
 
   /** Flips a device code to `denied`, leaving the CLI's poll to report it. */
   async denyDeviceCode(deviceCode: string): Promise<void> {
     const record = await this.tryFindDeviceCode(deviceCode);
-    if (!record) return;
+    if (!record) {
+      return;
+    }
+
     await this.rewriteDeviceCode({ ...record, status: "denied" });
   }
 
@@ -417,6 +443,7 @@ export class CliDeviceSessionService {
       memberKeys: [cliAccessTokenKey(accessToken), cliRefreshTokenKey(refreshToken)],
       ttlMs: this.refreshTokenTtlSeconds * 1000,
     });
+
     return {
       accessToken,
       refreshToken,
@@ -428,7 +455,10 @@ export class CliDeviceSessionService {
   /** The refresh record behind one refresh token, or nothing. */
   async tryFindRefreshToken(refreshToken: string): Promise<CliRefreshTokenRecord | null> {
     const raw = await this.store.tryGet(cliRefreshTokenKey(refreshToken));
-    if (!raw) return null;
+    if (!raw) {
+      return null;
+    }
+
     try {
       return JSON.parse(raw) as CliRefreshTokenRecord;
     } catch {
@@ -453,19 +483,28 @@ export class CliDeviceSessionService {
     authHeader: string | null | undefined,
   ): Promise<CliAccessTokenRecord | null> {
     const token = bearerCliAccessToken(authHeader);
-    if (!token) return null;
+    if (!token) {
+      return null;
+    }
+
     const raw = await this.store.tryGet(cliAccessTokenKey(token));
-    if (!raw) return null;
+    if (!raw) {
+      return null;
+    }
+
     let record: CliAccessTokenRecord;
     try {
       record = JSON.parse(raw) as CliAccessTokenRecord;
     } catch {
       return null;
     }
+
     if (Date.now() > record.expires_at) {
       await this.store.delete(cliAccessTokenKey(token));
+
       return null;
     }
+
     return record;
   }
 
@@ -481,7 +520,10 @@ export class CliDeviceSessionService {
     userId: string;
   }): Promise<void> {
     const token = bearerCliAccessToken(input.authHeader);
-    if (!token) return;
+    if (!token) {
+      return;
+    }
+
     await this.store.delete(cliAccessTokenKey(token));
     await this.store.removeFromIndex({
       indexKey: cliUserTokensIndexKey(input.userId),
@@ -506,7 +548,10 @@ export class CliDeviceSessionService {
       [input.refreshToken, cliRefreshTokenKey],
       [input.accessToken, cliAccessTokenKey],
     ] as const) {
-      if (!token) continue;
+      if (!token) {
+        continue;
+      }
+
       const raw = await this.store.tryGet(keyFor(token));
       if (raw) {
         try {
@@ -516,8 +561,10 @@ export class CliDeviceSessionService {
           // delete below still happens, which is what logout promises.
         }
       }
+
       await this.store.delete(keyFor(token));
     }
+
     return records;
   }
 }

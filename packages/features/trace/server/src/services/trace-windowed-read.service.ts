@@ -118,8 +118,10 @@ function windowFragment(fromMs: number, toMs: number): WindowFragment {
 function fallbackFragment(fallback: WindowFallback, windowMs: number): WindowFragment | null {
   if (typeof fallback === "object") {
     const now = Date.now();
+
     return windowFragment(now - fallback.lookbackMs, now + windowMs);
   }
+
   return null;
 }
 
@@ -153,6 +155,7 @@ export async function queryWindowed<T>(opts: QueryWindowedOptions<T>): Promise<T
     if (hintMs === null) {
       const result = await run(fallbackFragment(fallback, windowMs));
       incrementWindowedReadCount(table, "unwindowed");
+
       return result;
     }
 
@@ -165,12 +168,14 @@ export async function queryWindowed<T>(opts: QueryWindowedOptions<T>): Promise<T
     // it into `hit` reports a permanently-failing lookup as a healthy one.
     if (fallback === "none") {
       incrementWindowedReadCount(table, isEmpty(hinted) ? "windowed_empty" : "hit");
+
       return hinted;
     }
 
     // A non-empty hinted read needs no widening: it stayed cheap. Count as `hit`.
     if (!isEmpty(hinted)) {
       incrementWindowedReadCount(table, "hit");
+
       return hinted;
     }
 
@@ -181,11 +186,13 @@ export async function queryWindowed<T>(opts: QueryWindowedOptions<T>): Promise<T
     } else {
       incrementWindowedReadCount(table, isWidenedEmpty ? "widened_empty" : "widened_hit");
     }
+
     return widened;
   } catch (error) {
     // A failed attempt still emits exactly one outcome — the future limiter's
     // baseline must see failures, not undercount them as absent reads.
     incrementWindowedReadCount(table, "error");
+
     throw error;
   }
 }

@@ -36,7 +36,9 @@ export class LicenseGenerationService extends LicenseGenerationCapability {
     now = new Date(),
   }: GenerateLicenseInput): GenerateLicenseOutput {
     const template = getPlanTemplate(planType);
-    if (!template) throw new Error(`Unknown plan type: ${planType}`);
+    if (!template) {
+      throw new Error(`Unknown plan type: ${planType}`);
+    }
 
     const seats = maxMembers > 0 ? maxMembers : 1;
     const oneYearOut = new Date(now);
@@ -45,6 +47,7 @@ export class LicenseGenerationService extends LicenseGenerationCapability {
     if (Number.isNaN(expiresAt.getTime())) {
       throw new Error("Expiration date is not a date");
     }
+
     if (expiresAt <= now) {
       throw new Error("Expiration date must be in the future");
     }
@@ -70,6 +73,7 @@ export class LicenseGenerationService extends LicenseGenerationCapability {
       ...(organizationId ? { organizationId } : {}),
     };
     const signedLicense = this.cryptography.signLicense(licenseData, privateKey);
+
     return {
       licenseKey: this.cryptography.encodeLicenseKey(signedLicense),
       licenseData,

@@ -57,8 +57,14 @@ export type DataRetentionPolicyServiceOptions = Readonly<{
 export function requiredRetentionWritePermission(
   scopeType: RetentionScopeTarget["scopeType"],
 ): "organization:manage" | "team:manage" | "project:update" {
-  if (scopeType === "ORGANIZATION") return "organization:manage";
-  if (scopeType === "TEAM") return "team:manage";
+  if (scopeType === "ORGANIZATION") {
+    return "organization:manage";
+  }
+
+  if (scopeType === "TEAM") {
+    return "team:manage";
+  }
+
   return "project:update";
 }
 
@@ -80,6 +86,7 @@ function ruleForPlan(plan: DataRetentionPlan): RetentionRule {
   if (plan.uncapped) {
     return { kind: "uncapped", customMin: ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS };
   }
+
   return { kind: "fixed", presetDays: PAID_RETENTION_PRESET_DAYS };
 }
 
@@ -89,7 +96,10 @@ function ruleForPlan(plan: DataRetentionPlan): RetentionRule {
  * in hand doesn't refetch it.
  */
 export function assertPlanConfigurable(plan: DataRetentionPlan): void {
-  if (!plan.free) return;
+  if (!plan.free) {
+    return;
+  }
+
   throw new TRPCError({
     code: "FORBIDDEN",
     message:
@@ -112,8 +122,13 @@ export function assertPlanAllowsRetentionValue(
   plan: DataRetentionPlan,
   retentionDays: number,
 ): void {
-  if (retentionDays === INDEFINITE_RETENTION_DAYS) return;
-  if (plan.free) return;
+  if (retentionDays === INDEFINITE_RETENTION_DAYS) {
+    return;
+  }
+
+  if (plan.free) {
+    return;
+  }
 
   const rule = ruleForPlan(plan);
 
@@ -124,12 +139,14 @@ export function assertPlanAllowsRetentionValue(
     if ((PAID_RETENTION_PRESET_DAYS as readonly number[]).includes(retentionDays)) {
       return;
     }
+
     if (retentionDays < rule.customMin) {
       throw new TRPCError({
         code: "FORBIDDEN",
         message: `Retention must be at least ${rule.customMin} days on your plan.`,
       });
     }
+
     return;
   }
 
@@ -159,11 +176,15 @@ export class DataRetentionPolicyService {
     organizationId: string | null;
     actor: RetentionActor;
   }): Promise<boolean> {
-    if (!input.organizationId) return false;
+    if (!input.organizationId) {
+      return false;
+    }
+
     const plan = await this.options.plans.getPlan({
       organizationId: input.organizationId,
       userId: input.actor.userId,
     });
+
     return !plan.free;
   }
 
@@ -176,7 +197,10 @@ export class DataRetentionPolicyService {
     actor: RetentionActor;
     scope: RetentionScopeTarget;
   }): Promise<void> {
-    if (await this.canWriteScope(input)) return;
+    if (await this.canWriteScope(input)) {
+      return;
+    }
+
     throw new TRPCError({
       code: "FORBIDDEN",
       message: `You need ${requiredRetentionWritePermission(
@@ -199,6 +223,7 @@ export class DataRetentionPolicyService {
     ) {
       return;
     }
+
     throw new TRPCError({
       code: "FORBIDDEN",
       message:
@@ -233,6 +258,7 @@ export class DataRetentionPolicyService {
         message: "Project does not belong to any organization.",
       });
     }
+
     const plan = await this.options.plans.getPlan({
       organizationId,
       userId: input.actor.userId,
@@ -261,7 +287,10 @@ export class DataRetentionPolicyService {
     scope: RetentionScopeTarget;
   }): Promise<boolean> {
     const userId = input.actor.userId;
-    if (!userId) return false;
+    if (!userId) {
+      return false;
+    }
+
     const { scopeType, scopeId } = input.scope;
     if (scopeType === "ORGANIZATION") {
       return await this.options.permissions.canManageOrganization({
@@ -269,23 +298,30 @@ export class DataRetentionPolicyService {
         organizationId: scopeId,
       });
     }
+
     const organizationId = await this.options.directory.tryResolveScopeOrganizationId({
       scope: input.scope,
     });
-    if (!organizationId) return false;
+    if (!organizationId) {
+      return false;
+    }
+
     if (scopeType === "TEAM") {
       const decided = await this.options.permissions.canManageTeams({
         userId,
         organizationId,
         teamIds: [scopeId],
       });
+
       return decided.get(scopeId) === true;
     }
+
     const decided = await this.options.permissions.canUpdateProjects({
       userId,
       organizationId,
       projectIds: [scopeId],
     });
+
     return decided.get(scopeId) === true;
   }
 
@@ -307,10 +343,12 @@ export class DataRetentionPolicyService {
         message: `${input.scope.scopeType.toLowerCase()} ${input.scope.scopeId} was not found.`,
       });
     }
+
     const plan = await this.options.plans.getPlan({
       organizationId,
       userId: input.actor.userId,
     });
+
     return { organizationId, plan };
   }
 }

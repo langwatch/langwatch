@@ -27,10 +27,17 @@ const DROP_CATEGORY_ORDER = ["input", "output", "system", "tools"];
 function readSpanDropMarker(span: Span): string[] {
   let node: unknown = span.params;
   for (const key of PRIVACY_DROPPED_MARKER_ATTR.split(".")) {
-    if (typeof node !== "object" || node === null) return [];
+    if (typeof node !== "object" || node === null) {
+      return [];
+    }
+
     node = (node as Record<string, unknown>)[key];
   }
-  if (typeof node !== "string") return [];
+
+  if (typeof node !== "string") {
+    return [];
+  }
+
   return node
     .split(",")
     .map((category) => category.trim())
@@ -45,8 +52,11 @@ function readSpanDropMarker(span: Span): string[] {
 export function collectDroppedCategories(spans: Span[] | undefined): string[] {
   const found = new Set<string>();
   for (const span of spans ?? []) {
-    for (const category of readSpanDropMarker(span)) found.add(category);
+    for (const category of readSpanDropMarker(span)) {
+      found.add(category);
+    }
   }
+
   return [
     ...DROP_CATEGORY_ORDER.filter((category) => found.has(category)),
     ...[...found].filter((category) => !DROP_CATEGORY_ORDER.includes(category)),
@@ -65,6 +75,7 @@ export function extractRedactionsForObject(object: unknown): string[] {
   if (typeof object === "string") {
     try {
       const json = JSON.parse(object) as unknown;
+
       return extractRedactionsForObject(json);
     } catch {
       // Try parsing as Python repr - only if it looks like an object
@@ -76,12 +87,15 @@ export function extractRedactionsForObject(object: unknown): string[] {
       } catch {
         // Not valid Python repr either
       }
+
       return [object];
     }
   }
+
   if (Array.isArray(object)) {
     return object.flatMap(extractRedactionsForObject);
   }
+
   if (typeof object === "object" && object !== null) {
     return Object.values(object).flatMap(extractRedactionsForObject);
   }
@@ -100,9 +114,11 @@ export function redactObject<T>(object: T, redactions: Set<string>): T {
   if (redactions.size === 0) {
     return object;
   }
+
   if (typeof object === "string") {
     try {
       const json = JSON.parse(object) as unknown;
+
       return JSON.stringify(redactObject(json, redactions)) as T;
     } catch {
       // Try parsing as Python repr - only if it looks like an object
@@ -114,19 +130,23 @@ export function redactObject<T>(object: T, redactions: Set<string>): T {
       } catch {
         // Not valid Python repr either
       }
+
       return Array.from(redactions).filter((redaction) => object.includes(redaction)).length > 0
         ? ("[REDACTED]" as T)
         : object;
     }
   }
+
   if (Array.isArray(object)) {
     return object.map((item) => redactObject(item, redactions)) as T;
   }
+
   if (typeof object === "object" && object !== null) {
     return Object.fromEntries(
       Object.entries(object).map(([key, value]) => [key, redactObject(value, redactions)]),
     ) as T;
   }
+
   return object;
 }
 
@@ -279,11 +299,13 @@ export function applyDerivedTraceEventProtections(
   const cutoffMs = protections.visibilityCutoffMs;
   const blank = (attrs: Record<string, string>): Record<string, string> =>
     Object.fromEntries(Object.keys(attrs).map((key) => [key, "[REDACTED]"]));
+
   return events.map((event) => {
     const beyondCutoff = cutoffMs != null && event.timestamp < cutoffMs;
     if (!contentVisible || beyondCutoff) {
       return { ...event, attributes: blank(event.attributes) };
     }
+
     return {
       ...event,
       attributes:
@@ -311,6 +333,7 @@ export function applyTraceProtections(trace: Trace, protections: Protections): T
   if (!protections.canSeeCapturedInput && trace.spans) {
     redactions = new Set([...redactions, ...extractRedactionsFromAllSpanInputs(trace.spans)]);
   }
+
   if (!protections.canSeeCapturedOutput && trace.spans) {
     redactions = new Set([...redactions, ...extractRedactionsFromAllSpanOutputs(trace.spans)]);
   }
@@ -383,6 +406,7 @@ export function applyTraceProtections(trace: Trace, protections: Protections): T
     trace.timestamps.started_at < protections.visibilityCutoffMs
   ) {
     const { spans, ...traceWithoutSpans } = transformed;
+
     return {
       ...redactTraceContent({ ...traceWithoutSpans, spans: [] }),
       spans,

@@ -100,16 +100,24 @@ function migrateField({
   registryModelIds: Set<string>;
 }): CustomModelEntry[] | null {
   // Null/undefined: nothing to migrate
-  if (value == null) return null;
+  if (value == null) {
+    return null;
+  }
 
   // Not an array: nothing to migrate
-  if (!Array.isArray(value)) return null;
+  if (!Array.isArray(value)) {
+    return null;
+  }
 
   // Already in new format (first element has modelId property): skip
-  if (!isLegacyCustomModels(value)) return null;
+  if (!isLegacyCustomModels(value)) {
+    return null;
+  }
 
   // Empty legacy array: also nothing to migrate
-  if (value.length === 0) return null;
+  if (value.length === 0) {
+    return null;
+  }
 
   // Filter out registry models and convert the rest
   const filtered = (value as string[]).filter((modelId) => !registryModelIds.has(modelId));
@@ -191,8 +199,13 @@ export function migrateModelProviderKeysRow({
   row: ModelProviderCredentialRow;
   cipher: ModelProviderCredentialCipherPort;
 }): string | null {
-  if (row.customKeys == null) return null;
-  if (isAlreadyEncrypted(row.customKeys)) return null;
+  if (row.customKeys == null) {
+    return null;
+  }
+
+  if (isAlreadyEncrypted(row.customKeys)) {
+    return null;
+  }
 
   return cipher.encrypt(JSON.stringify(row.customKeys));
 }

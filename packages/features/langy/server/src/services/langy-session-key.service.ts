@@ -91,6 +91,7 @@ export class LangySessionKeyService extends LangySessionKeyPort {
       expiresAt: new Date(Date.now() + sessionKeyLifetimeMs),
     });
     this.metrics.record({ operation: "minted" });
+
     return { token: result.token, apiKeyId: result.apiKey.id };
   }
 
@@ -118,19 +119,24 @@ export class LangySessionKeyService extends LangySessionKeyPort {
     if (!key) {
       return "not_found";
     }
+
     if (key.name !== LANGY_SESSION_API_KEY_NAME) {
       logger.warn({ apiKeyId: key.id, name: key.name }, "refusing to revoke a non-Langy key");
+
       return "refused";
     }
+
     if (!key.isScopedToProject) {
       return "not_found";
     }
+
     if (key.revokedAt) {
       return "already_revoked";
     }
 
     await this.repository.revoke(key.id, new Date());
     this.metrics.record({ operation: "revoked" });
+
     return "revoked";
   }
 

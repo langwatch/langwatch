@@ -66,10 +66,12 @@ export function decodeSessionGroupsCursor(encoded: string): SessionGroupsCursor 
   } catch {
     throw new ValidationError("Invalid sessions cursor");
   }
+
   const result = sessionGroupsCursorSchema.safeParse(parsed);
   if (!result.success) {
     throw new ValidationError("Invalid sessions cursor");
   }
+
   return result.data;
 }
 
@@ -89,11 +91,15 @@ export function keysetCursorFor({
   sortColumn: SessionGroupSortColumn;
   sortDirection: "asc" | "desc";
 }): SessionGroupCursor | undefined {
-  if (encoded === undefined) return undefined;
+  if (encoded === undefined) {
+    return undefined;
+  }
+
   const cursor = decodeSessionGroupsCursor(encoded);
   if (cursor.sortColumn !== sortColumn || cursor.sortDirection !== sortDirection) {
     throw new ValidationError("Sessions cursor does not match the sort");
   }
+
   return {
     sortValue: cursor.sortValue,
     conversationId: cursor.conversationId,

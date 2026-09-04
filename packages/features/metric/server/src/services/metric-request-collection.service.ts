@@ -134,6 +134,7 @@ export class MetricRequestCollectionService {
               },
               "Failed to enqueue canonical metric data point batch",
             );
+
             return {
               outcome: "unavailable",
               errorMessage: PERSISTENCE_ERROR_MESSAGE,
@@ -167,6 +168,7 @@ export class MetricRequestCollectionService {
         span.setAttribute("metrics.ingestion.failures", rejectedDataPoints);
 
         const errorMessage = errors.length ? errors.join("; ").slice(0, 1024) : undefined;
+
         return {
           outcome: "collected",
           acceptedDataPoints,

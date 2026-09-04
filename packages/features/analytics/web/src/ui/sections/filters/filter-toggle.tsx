@@ -52,7 +52,6 @@ export const useFilterToggle = ({ defaultShowFilters } = { defaultShowFilters: f
     const newQs = qs.stringify(newParams, {
       allowDots: true,
       arrayFormat: "comma" as const,
-      // @ts-ignore
       allowEmptyArrays: true,
     });
 

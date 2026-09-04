@@ -159,6 +159,7 @@ export async function resolveOffloadedTraces({
             aggregateType,
             aggregateId,
           });
+
           return { attrKey, fullValue };
         }),
       );
@@ -209,9 +210,13 @@ export async function resolveOffloadedTraces({
   let anyResolved = false;
   const resolvedSpans: NormalizedSpan[] = spanSettlements.map((settlement, i) => {
     if (settlement.status === "fulfilled") {
-      if (settlement.value.resolvedCount > 0) anyResolved = true;
+      if (settlement.value.resolvedCount > 0) {
+        anyResolved = true;
+      }
+
       return settlement.value.span;
     }
+
     // Unexpected uncaught error from the span's async mapper — log and fall back.
     logger.warn(
       {
@@ -225,6 +230,7 @@ export async function resolveOffloadedTraces({
       },
       "Failed to resolve offloaded event refs for span — keeping preview value",
     );
+
     return normalizedSpans[i]!;
   });
 

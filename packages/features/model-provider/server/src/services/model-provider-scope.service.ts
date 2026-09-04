@@ -74,6 +74,7 @@ export class ModelProviderScopeService {
     if (firstPage.pagination.total === 0) {
       return null;
     }
+
     if (firstPage.pagination.total === 1) {
       return firstPage.data[0]?.createdAt ?? null;
     }
@@ -83,6 +84,7 @@ export class ModelProviderScopeService {
       page: firstPage.pagination.total,
       limit: 1,
     });
+
     return lastPage.data[0]?.createdAt ?? null;
   }
 
@@ -99,14 +101,18 @@ export class ModelProviderScopeService {
       const organization = await this.organizations.getBillingProfile({
         organizationId: scope.scopeId,
       });
+
       return organization.id;
     }
+
     if (scope.scopeType === "TEAM") {
       const team = await this.organizations.getTeamById({ teamId: scope.scopeId });
+
       return team.organizationId;
     }
 
     const project = await this.projects.getWithTeam(scope.scopeId);
+
     return project.team.organizationId;
   }
 

@@ -119,8 +119,10 @@ export class WorkflowNlpExecutionService {
         },
         "nlpgo execute_sync returned a non-OK response",
       );
+
       throw new WorkflowExecutionFailedError();
     }
+
     return workflowExecutionResponseSchema.parse(await response.json());
   }
 
@@ -141,6 +143,7 @@ export class WorkflowNlpExecutionService {
       workflow_type: state.workflow_type,
     };
   }
+
   private static isSignatureNode(
     node: StudioWorkflow["nodes"][number],
   ): node is StudioNode<Signature> {
@@ -265,6 +268,7 @@ export class WorkflowNlpExecutionService {
         }
 
         const provider = parsed.data.model.split("/")[0];
+
         return provider ? [provider] : [];
       });
     });

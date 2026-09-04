@@ -100,6 +100,7 @@ export class TraceIOAccumulationService {
     if (span.spanAttributes[ATTR_KEYS.SPAN_TYPE] !== "guardrail") {
       return false;
     }
+
     const rawOutput = span.spanAttributes[ATTR_KEYS.LANGWATCH_OUTPUT];
 
     return (
@@ -298,15 +299,19 @@ export class TraceIOAccumulationService {
     if (isRoot) {
       return !outputFromRoot || endTime >= currentEndTime;
     }
+
     if (outputFromRoot) {
       return false;
     }
+
     if (isExplicit && !currentIsExplicit) {
       return true;
     }
+
     if (isExplicit === currentIsExplicit && endTime >= currentEndTime) {
       return true;
     }
+
     return false;
   }
 
@@ -340,6 +345,7 @@ export class TraceIOAccumulationService {
     if (incoming.length === 0) {
       return serialized;
     }
+
     return mediaReferences.trySerialize(
       mediaReferences.merge({
         existing: mediaReferences.parse(serialized),
@@ -386,9 +392,11 @@ export class TraceIOAccumulationService {
     if (typeof text === "string" && text.length > 0) {
       return text;
     }
+
     if (typeof raw === "string") {
       return raw;
     }
+
     // JSON.stringify(undefined) returns the literal value `undefined`,
     // not the string "undefined". Guard explicitly so a future caller
     // that hands us `undefined` doesn't silently corrupt the trace
@@ -396,6 +404,7 @@ export class TraceIOAccumulationService {
     if (raw === undefined) {
       return "";
     }
+
     return JSON.stringify(raw);
   }
 }

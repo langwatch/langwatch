@@ -305,10 +305,7 @@ const renderHandled: ErrorHandler = (error, c) => {
     meta?: Record<string, unknown>;
   };
   if (typeof handled.httpStatus === "number") {
-    return c.json(
-      { error: handled.code ?? "error", ...(handled.meta ?? {}) },
-      handled.httpStatus as never,
-    );
+    return c.json({ error: handled.code ?? "error", ...handled.meta }, handled.httpStatus as never);
   }
   return c.json({ error: String(error) }, 500);
 };

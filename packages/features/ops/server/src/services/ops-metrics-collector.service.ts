@@ -112,11 +112,19 @@ function emptyPhases(): DashboardData["phases"] {
 export function mapJobTypeToPhase(
   jobType: string | null | undefined,
 ): "commands" | "projections" | "reactions" {
-  if (!jobType) return "commands";
+  if (!jobType) {
+    return "commands";
+  }
+
   const lower = jobType.toLowerCase();
-  if (lower === "projection" || lower === "handler" || lower === "stateprojection")
+  if (lower === "projection" || lower === "handler" || lower === "stateprojection") {
     return "projections";
-  if (lower === "reactor" || lower === "reaction") return "reactions";
+  }
+
+  if (lower === "reactor" || lower === "reaction") {
+    return "reactions";
+  }
+
   return "commands";
 }
 
@@ -129,10 +137,22 @@ export function mapJobTypeToPhase(
  */
 function normalizeJobType(jobType: string): string {
   const lower = jobType.toLowerCase();
-  if (lower === "projection") return "fold";
-  if (lower === "handler") return "map";
-  if (lower === "stateprojection") return "state";
-  if (lower === "reaction") return "reactor";
+  if (lower === "projection") {
+    return "fold";
+  }
+
+  if (lower === "handler") {
+    return "map";
+  }
+
+  if (lower === "stateprojection") {
+    return "state";
+  }
+
+  if (lower === "reaction") {
+    return "reactor";
+  }
+
   return jobType;
 }
 
@@ -145,7 +165,10 @@ interface PeakBucket {
 
 /** Field-wise max, so neither side of a handover loses a peak it observed. */
 function mergePeakBucket(mine: PeakBucket | undefined, theirs: PeakBucket): PeakBucket {
-  if (!mine) return { ...theirs };
+  if (!mine) {
+    return { ...theirs };
+  }
+
   return {
     completedPerSec: Math.max(mine.completedPerSec, theirs.completedPerSec),
     failedPerSec: Math.max(mine.failedPerSec, theirs.failedPerSec),
@@ -168,10 +191,16 @@ function mergeThroughput({
   theirs: ThroughputPoint[];
 }): ThroughputPoint[] {
   const byTimestamp = new Map<number, ThroughputPoint>();
-  for (const point of mine) byTimestamp.set(point.timestamp, point);
-  for (const point of theirs) byTimestamp.set(point.timestamp, point);
+  for (const point of mine) {
+    byTimestamp.set(point.timestamp, point);
+  }
+
+  for (const point of theirs) {
+    byTimestamp.set(point.timestamp, point);
+  }
 
   const cutoff = Date.now() - THROUGHPUT_BUFFER_SIZE * METRICS_COLLECT_INTERVAL_MS;
+
   return Array.from(byTimestamp.values())
     .filter((point) => point.timestamp > cutoff)
     .sort((a, b) => a.timestamp - b.timestamp)
@@ -191,21 +220,31 @@ export function buildPipelineTree({
   >();
 
   const ensurePath = (pName: string, jType?: string, jName?: string) => {
-    if (!pipelineMap.has(pName)) pipelineMap.set(pName, new Map());
+    if (!pipelineMap.has(pName)) {
+      pipelineMap.set(pName, new Map());
+    }
+
     if (jType) {
       const normalized = normalizeJobType(jType);
       const typeMap = pipelineMap.get(pName)!;
-      if (!typeMap.has(normalized)) typeMap.set(normalized, new Map());
+      if (!typeMap.has(normalized)) {
+        typeMap.set(normalized, new Map());
+      }
+
       if (jName) {
         const nameMap = typeMap.get(normalized)!;
-        if (!nameMap.has(jName)) nameMap.set(jName, { pending: 0, active: 0, blocked: 0 });
+        if (!nameMap.has(jName)) {
+          nameMap.set(jName, { pending: 0, active: 0, blocked: 0 });
+        }
       }
     }
   };
 
   for (const key of seedKeys) {
     const parts = key.split("/");
-    if (parts.length >= 1) ensurePath(parts[0]!, parts[1], parts[2]);
+    if (parts.length >= 1) {
+      ensurePath(parts[0]!, parts[1], parts[2]);
+    }
   }
 
   for (const queue of queues) {
@@ -265,6 +304,7 @@ export function buildPipelineTree({
   }
 
   tree.sort((a, b) => a.name.localeCompare(b.name));
+
   return tree;
 }
 
@@ -434,10 +474,12 @@ export class OpsMetricsCollector {
       clearInterval(this.collectInterval);
       this.collectInterval = null;
     }
+
     if (this.discoveryInterval) {
       clearInterval(this.discoveryInterval);
       this.discoveryInterval = null;
     }
+
     if (this.reconcileInterval) {
       clearInterval(this.reconcileInterval);
       this.reconcileInterval = null;
@@ -534,13 +576,18 @@ export class OpsMetricsCollector {
     >();
     for (const q of fullQueues) {
       for (const g of q.groups) {
-        if (!g.isBlocked || !g.errorMessage) continue;
+        if (!g.isBlocked || !g.errorMessage) {
+          continue;
+        }
+
         const normalized = normalizeErrorMessage(g.errorMessage);
         const key = `${g.pipelineName ?? ""}::${normalized}`;
         const existing = errorMap.get(key);
         if (existing) {
           existing.count++;
-          if (existing.sampleGroupIds.length < 5) existing.sampleGroupIds.push(g.groupId);
+          if (existing.sampleGroupIds.length < 5) {
+            existing.sampleGroupIds.push(g.groupId);
+          }
         } else {
           errorMap.set(key, {
             normalizedMessage: normalized,
@@ -554,6 +601,7 @@ export class OpsMetricsCollector {
         }
       }
     }
+
     const topErrors = Array.from(errorMap.values())
       .sort((a, b) => b.count - a.count)
       .slice(0, 10);
@@ -619,9 +667,15 @@ export class OpsMetricsCollector {
 
   /** Cheap artifact: exact counts, rates, peaks and the rolling history. */
   private async publishLive(): Promise<void> {
-    if (!this.snapshots) return;
+    if (!this.snapshots) {
+      return;
+    }
+
     const leaseToken = this.leaseToken;
-    if (!leaseToken) return;
+    if (!leaseToken) {
+      return;
+    }
+
     const data = this.getDashboardData();
     const mem = process.memoryUsage();
     try {
@@ -674,16 +728,26 @@ export class OpsMetricsCollector {
    * stale `computedAt`, which readers surface, rather than as a lost lease.
    */
   private maybePublishDetail(queues: QueueInfo[]): void {
-    if (!this.snapshots) return;
+    if (!this.snapshots) {
+      return;
+    }
+
     const snapshots = this.snapshots;
-    if (this.detailInFlight) return;
-    if (Date.now() - this.lastDetailAt < DETAIL_CYCLE_INTERVAL_MS) return;
+    if (this.detailInFlight) {
+      return;
+    }
+
+    if (Date.now() - this.lastDetailAt < DETAIL_CYCLE_INTERVAL_MS) {
+      return;
+    }
 
     // Captured BEFORE the scan: a slow detail scan can outlive the lease it
     // started under, and the write must be fenced on that lease rather than on
     // whatever the pod holds by the time the scan finishes.
     const tokenAtScanStart = this.leaseToken;
-    if (!tokenAtScanStart) return;
+    if (!tokenAtScanStart) {
+      return;
+    }
 
     this.detailInFlight = true;
     void (async () => {
@@ -730,7 +794,10 @@ export class OpsMetricsCollector {
           snapshot: detail,
           leaseToken: tokenAtScanStart,
         });
-        if (!published) return;
+        if (!published) {
+          return;
+        }
+
         this.latestDetail = detail;
         this.lastDetailAt = Date.now();
       } catch (err) {
@@ -764,6 +831,7 @@ export class OpsMetricsCollector {
       // tenants) must not be lost to a histogram read hiccup. All-null
       // windows render as "nothing to report yet".
       logger.warn({ error: err }, "Failed to compute latency windows");
+
       return { hour: null, day: null, week: null, allTime: null };
     }
   }
@@ -779,13 +847,16 @@ export class OpsMetricsCollector {
         pipeline.hgetall(latencyMinuteBucketKey(queueName, nowMs - i * LATENCY_MINUTE_BUCKET_MS));
         plan.push("minute");
       }
+
       for (let i = 0; i < 168; i++) {
         pipeline.hgetall(latencyHourBucketKey(queueName, nowMs - i * LATENCY_HOUR_BUCKET_MS));
         plan.push("hour");
       }
+
       pipeline.hgetall(latencyAllTimeKey(queueName));
       plan.push("all");
     }
+
     return { pipeline, plan };
   }
 
@@ -804,13 +875,18 @@ export class OpsMetricsCollector {
         minuteHashes.push(hash);
         continue;
       }
+
       if (plan[i] === "all") {
         allHashes.push(hash);
         continue;
       }
+
       // Hour buckets are emitted newest-first per queue; the first 24 of
       // each queue's 168 belong to the day window as well as the week's.
-      if (hourIndex % 168 < 24) dayHashes.push(hash);
+      if (hourIndex % 168 < 24) {
+        dayHashes.push(hash);
+      }
+
       weekHashes.push(hash);
       hourIndex++;
     }
@@ -832,6 +908,7 @@ export class OpsMetricsCollector {
         phases[phase].active += g.hasActiveJob ? 1 : 0;
       }
     }
+
     return phases;
   }
 
@@ -873,6 +950,7 @@ export class OpsMetricsCollector {
         }
       }
     }
+
     return map;
   }
 
@@ -893,6 +971,7 @@ export class OpsMetricsCollector {
       pipeline.get(`${name}:gq:stats:completed`);
       pipeline.get(`${name}:gq:stats:failed`);
     }
+
     const results = await pipeline.exec();
 
     if (results) {
@@ -920,14 +999,20 @@ export class OpsMetricsCollector {
       for (const name of this.groupQueueNames) {
         latencyPipeline.lrange(`${name}:gq:stats:latencies-ms`, 0, -1);
       }
+
       const latencyResults = await latencyPipeline.exec();
 
       if (latencyResults) {
         for (const [, result] of latencyResults) {
-          if (!Array.isArray(result)) continue;
+          if (!Array.isArray(result)) {
+            continue;
+          }
+
           for (const raw of result) {
             const ms = Number(raw);
-            if (Number.isFinite(ms) && ms >= 0) latencies.push(ms);
+            if (Number.isFinite(ms) && ms >= 0) {
+              latencies.push(ms);
+            }
           }
         }
       }
@@ -950,6 +1035,7 @@ export class OpsMetricsCollector {
       phases[key].peakLatencyP50Ms = pp.latencyP50Ms;
       phases[key].peakLatencyP99Ms = pp.latencyP99Ms;
     }
+
     this.currentPhases = phases;
 
     this.currentJobNameMetrics = await this.computeJobNameThroughput(queues, elapsed);
@@ -975,8 +1061,10 @@ export class OpsMetricsCollector {
         jobNameCounterPipeline.get(`${queueName}:gq:stats:completed:${jobName}`);
         jobNameCounterPipeline.get(`${queueName}:gq:stats:failed:${jobName}`);
       }
+
       dedupedJobNames.push(jobName);
     }
+
     const jobNameCounterResults =
       dedupedJobNames.length > 0 ? await jobNameCounterPipeline.exec() : [];
 
@@ -990,6 +1078,7 @@ export class OpsMetricsCollector {
           completed += Number(jobNameCounterResults[baseIdx]?.[1] ?? 0);
           failed += Number(jobNameCounterResults[baseIdx + 1]?.[1] ?? 0);
         }
+
         jobNameTotals.set(dedupedJobNames[i]!, { completed, failed });
       }
     }
@@ -1012,6 +1101,7 @@ export class OpsMetricsCollector {
         completedPerSec = Math.max(0, totals.completed - prevC) / elapsed;
         failedPerSec = Math.max(0, totals.failed - prevF) / elapsed;
       }
+
       this.prevCompleted.set(prevKey, totals.completed);
       this.prevFailed.set(prevKey, totals.failed);
 
@@ -1041,6 +1131,7 @@ export class OpsMetricsCollector {
         peakLatencyP99Ms: peak.latencyP99Ms,
       });
     }
+
     return metrics;
   }
 
@@ -1060,10 +1151,14 @@ export class OpsMetricsCollector {
   private async restoreState(): Promise<void> {
     try {
       const raw = await this.redis.get(REDIS_STATE_KEY);
-      if (!raw) return;
+      if (!raw) {
+        return;
+      }
 
       const state: PersistedMetricsState = JSON.parse(raw);
-      if (state.version !== 3) return;
+      if (state.version !== 3) {
+        return;
+      }
 
       this.peakCompletedPerSec = Math.max(this.peakCompletedPerSec, state.peakCompletedPerSec);
       this.peakFailedPerSec = Math.max(this.peakFailedPerSec, state.peakFailedPerSec);
@@ -1122,8 +1217,10 @@ export class OpsMetricsCollector {
     const info = await this.redis.info();
     const get = (key: string): string => {
       const match = info.match(new RegExp(`${key}:(.+)`));
+
       return match?.[1]?.trim() ?? "?";
     };
+
     return {
       usedMemoryHuman: get("used_memory_human"),
       peakMemoryHuman: get("used_memory_peak_human"),
@@ -1139,7 +1236,10 @@ export class OpsMetricsCollector {
   private pruneStaleCounters(): void {
     const activeKeys = new Set(this.groupQueueNames);
     for (const key of this.prevCompleted.keys()) {
-      if (key.startsWith(JOB_NAME_COUNTER_PREFIX)) continue;
+      if (key.startsWith(JOB_NAME_COUNTER_PREFIX)) {
+        continue;
+      }
+
       if (!activeKeys.has(key)) {
         this.prevCompleted.delete(key);
         this.prevFailed.delete(key);
@@ -1148,7 +1248,10 @@ export class OpsMetricsCollector {
   }
 
   async collect(): Promise<void> {
-    if (this.isCollecting) return;
+    if (this.isCollecting) {
+      return;
+    }
+
     this.isCollecting = true;
     try {
       // Election first: a pod that does not hold the lease must not scan at
@@ -1161,8 +1264,10 @@ export class OpsMetricsCollector {
         if (!lease.isHeld) {
           this.holdsLease = false;
           this.leaseToken = null;
+
           return;
         }
+
         // Taking over: reload the fleet's accumulators BEFORE scanning, and so
         // before the publish and persist at the end of this cycle.
         //
@@ -1173,11 +1278,15 @@ export class OpsMetricsCollector {
         // with the stale copy, losing it for good rather than for one cycle.
         // Every rolling deploy moves this lease, so this is the ordinary path,
         // not the exceptional one.
-        if (!this.holdsLease) await this.restoreState();
+        if (!this.holdsLease) {
+          await this.restoreState();
+        }
+
         this.holdsLease = true;
         this.leaseEpoch = lease.epoch;
         this.leaseToken = lease.token;
       }
+
       const [queues, redisInfo] = await Promise.all([
         this.ops.scanQueues({ queueNames: this.groupQueueNames }),
         this.getRedisInfo(),
@@ -1202,15 +1311,19 @@ export class OpsMetricsCollector {
       for (const name of this.groupQueueNames) {
         pausedPipeline.smembers(`${name}:gq:paused-jobs`);
       }
+
       const pausedResults = await pausedPipeline.exec();
       const pausedKeysSet = new Set<string>();
       if (pausedResults) {
         for (const [, result] of pausedResults) {
           if (Array.isArray(result)) {
-            for (const key of result) pausedKeysSet.add(key as string);
+            for (const key of result) {
+              pausedKeysSet.add(key as string);
+            }
           }
         }
       }
+
       this.currentPausedKeys = Array.from(pausedKeysSet);
 
       const discoveredPaths = new Set<string>();
@@ -1222,15 +1335,18 @@ export class OpsMetricsCollector {
           discoveredPaths.add(`${p}/${t}/${n}`);
         }
       }
+
       if (discoveredPaths.size > 0) {
         const timestamp = Date.now();
         const pipelineBatch = this.redis.pipeline();
         for (const path of discoveredPaths) {
           pipelineBatch.zadd(KNOWN_PIPELINES_KEY, timestamp, path);
         }
+
         pipelineBatch.zremrangebyscore(KNOWN_PIPELINES_KEY, 0, timestamp - 86400 * 1000);
         await pipelineBatch.exec();
       }
+
       const knownPaths = await this.redis.zrange(KNOWN_PIPELINES_KEY, 0, 9999);
       this.knownPipelinePaths = knownPaths;
 
@@ -1239,6 +1355,7 @@ export class OpsMetricsCollector {
       for (const q of queues) {
         totalPending += q.totalPendingJobs;
       }
+
       // Parked groups included: see ./in-flight.ts for why the derived
       // ingestion rate below is wrong without them.
       const totalInFlight = computeTotalInFlight({ queues });
@@ -1297,6 +1414,7 @@ export class OpsMetricsCollector {
         const totalCpuUs = cpuNow.user + cpuNow.system;
         this.currentCpuPercent = (totalCpuUs / 1000 / cpuElapsed) * 100;
       }
+
       this.lastCpuUsage = process.cpuUsage();
       this.lastCpuTime = now;
 
@@ -1330,5 +1448,6 @@ export function getOpsMetricsCollector(params: {
       logger.error({ error: err }, "Failed to start ops metrics collector");
     });
   }
+
   return singleton;
 }

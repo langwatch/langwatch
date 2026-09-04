@@ -44,10 +44,14 @@ export class ModelProviderOnboardingDefaultsService {
         });
         continue;
       }
+
       // Per role, additive only: a role the scope already carries stays as the
       // user set it, so a second provider never replaces a configured choice.
       for (const [key, model] of Object.entries(config)) {
-        if (existing.config[key] !== undefined) continue;
+        if (existing.config[key] !== undefined) {
+          continue;
+        }
+
         await this.options.defaults.set({
           id: this.options.ids.generate({ type: "default" }),
           organizationId,

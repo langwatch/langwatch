@@ -53,6 +53,7 @@ export function createConnectedAgentRuntime({
     firstTurnPollMs,
     resultPollMs,
   });
+
   return { podId, store, registry, dispatcher };
 }
 
@@ -73,15 +74,20 @@ export function installConnectedAgentRedis(redis: RedisConnection): void {
       "The connected agent runtime is already built; install Redis before anything dispatches.",
     );
   }
+
   processRedis = redis;
 }
 
 /** The runtime of this process, built on first use. */
 export function getConnectedAgentRuntime(): ConnectedAgentRuntime {
-  if (processRuntime) return processRuntime;
+  if (processRuntime) {
+    return processRuntime;
+  }
+
   processRuntime = createConnectedAgentRuntime({
     store: processRedis ? createRedisStateStore(processRedis) : createMemoryStateStore(),
   });
+
   return processRuntime;
 }
 
@@ -89,7 +95,10 @@ export function getConnectedAgentRuntime(): ConnectedAgentRuntime {
 export async function closeConnectedAgentRuntime(): Promise<void> {
   const runtime = processRuntime;
   processRuntime = null;
-  if (!runtime) return;
+  if (!runtime) {
+    return;
+  }
+
   await runtime.dispatcher.close();
   await runtime.store.close();
 }

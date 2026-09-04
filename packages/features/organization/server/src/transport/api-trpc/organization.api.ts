@@ -803,9 +803,8 @@ export class OrganizationTrpcApi {
                     (member) => member.userId === demoProjectUserId || member.userId === userId,
                   );
                   return [team];
-                } else {
-                  return [];
                 }
+                return [];
               });
             }
           }

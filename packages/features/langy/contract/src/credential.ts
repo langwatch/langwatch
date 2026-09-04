@@ -22,7 +22,7 @@ export function resolveWorkerGatewayBaseUrl(
 
 export function ensureGatewayV1BaseUrl(baseUrl: string): string {
   const trimmed = baseUrl.replace(/\/+$/, "");
-  return /\/v1$/.test(trimmed) ? trimmed : `${trimmed}/v1`;
+  return trimmed.endsWith("/v1") ? trimmed : `${trimmed}/v1`;
 }
 
 export function resolveActingGithubLogin(session: LangyCredentialSession): string {

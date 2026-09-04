@@ -48,6 +48,7 @@ export class PulledUsagePricingService {
           `pulled usage cost ${input.costUsd} exceeds the exactly-representable nano-USD range; refusing to round a money figure`,
         );
       }
+
       return {
         costNanoUsd: Number(exact),
         rateVersion: null,
@@ -55,10 +56,12 @@ export class PulledUsagePricingService {
         costStatus: input.costStatus,
       };
     }
+
     const rated = this.rates.rate({
       model: input.model,
       quantities: input.quantities,
     });
+
     return {
       ...rated,
       costBasis: PULLED_USAGE_COST_BASIS.COMPUTED,

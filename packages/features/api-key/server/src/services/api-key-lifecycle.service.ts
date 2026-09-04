@@ -24,6 +24,7 @@ const SYSTEM_NAMES = new Set(HIDDEN_SYSTEM_KEY_NAMES);
 
 function publicApiKey(row: StoredApiKey): ApiKey {
   const { hashedSecret: _hashedSecret, ...key } = row;
+
   return key;
 }
 
@@ -53,6 +54,7 @@ export class ApiKeyLifecycleService {
     if (!parsed.isSystemManaged && SYSTEM_NAMES.has(parsed.name)) {
       throw new ApiKeyReservedNameError(parsed.name);
     }
+
     const bindings = parsed.bindings;
     const permissions = this.grants.tryValidatePermissionSelection({
       bindings,
@@ -78,6 +80,7 @@ export class ApiKeyLifecycleService {
     if (parsed.userId && effectiveBindings.length === 0) {
       throw new ApiKeyScopeViolationError("A personal API key needs at least one role binding");
     }
+
     const generated = this.options.tokens.generate({
       prefix: parsed.ingestSourceType ? INGEST_KEY_PREFIX : API_KEY_PREFIX,
     });
@@ -105,6 +108,7 @@ export class ApiKeyLifecycleService {
       actor: actor(parsed.createdByUserId ?? parsed.userId),
       roleId: `apikey:${row.id}`,
     });
+
     return {
       token: generated.token,
       apiKey: publicApiKey(await this.repository.activate({ id: row.id })),
@@ -119,15 +123,18 @@ export class ApiKeyLifecycleService {
     ) {
       throw new ApiKeyNotFoundError(input.id);
     }
+
     if (
       !input.callerIsAdmin &&
       (existing.userId === null || existing.userId !== input.callerUserId)
     ) {
       throw new ApiKeyNotOwnedError(input.id);
     }
+
     if (existing.revokedAt) {
       throw new ApiKeyAlreadyRevokedError(input.id);
     }
+
     const hasPermissionUpdate =
       input.bindings !== void 0 || input.permissionMode !== void 0 || input.permissions !== void 0;
     const permissions = hasPermissionUpdate
@@ -141,6 +148,7 @@ export class ApiKeyLifecycleService {
       for (const binding of input.bindings) {
         await this.grants.validateScope(binding, input.organizationId);
       }
+
       await this.grants.assertPersonalScopesOwnedBy({
         scopes: input.bindings,
         organizationId: input.organizationId,
@@ -155,6 +163,7 @@ export class ApiKeyLifecycleService {
         });
       }
     }
+
     const effectiveBindings =
       input.bindings === void 0
         ? void 0
@@ -166,6 +175,7 @@ export class ApiKeyLifecycleService {
             actor: actor(input.callerUserId),
             replace: true,
           });
+
     return publicApiKey(
       await this.repository.update({
         id: input.id,
@@ -182,15 +192,18 @@ export class ApiKeyLifecycleService {
     if (SYSTEM_NAMES.has(existing.name)) {
       throw new ApiKeyNotFoundError(input.id);
     }
+
     if (
       !input.callerIsAdmin &&
       (existing.userId === null || existing.userId !== input.callerUserId)
     ) {
       throw new ApiKeyNotOwnedError(input.id);
     }
+
     if (existing.revokedAt) {
       throw new ApiKeyAlreadyRevokedError(input.id);
     }
+
     await this.options.grants.revokeBindingsWhere({
       organizationId: input.organizationId,
       where: { apiKeyId: input.id },
@@ -212,6 +225,7 @@ export class ApiKeyLifecycleService {
         awaitProjection: input.awaitProjection,
       });
     }
+
     return publicApiKey(await this.repository.revoke({ id: input.id }));
   }
 
@@ -223,6 +237,7 @@ export class ApiKeyLifecycleService {
     if (!row) {
       throw new ApiKeyNotFoundError(id);
     }
+
     return row;
   }
 
@@ -238,9 +253,11 @@ export class ApiKeyLifecycleService {
         organizationId: input.organizationId,
       });
     }
+
     for (const binding of input.bindings) {
       await this.grants.validateScope(binding, input.organizationId);
     }
+
     await this.grants.assertPersonalScopesOwnedBy({
       scopes: input.bindings,
       organizationId: input.organizationId,

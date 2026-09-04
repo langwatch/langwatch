@@ -31,9 +31,9 @@ export const setEvaluatorMapping: Transform<
               mappings: {
                 ...evaluator.mappings,
                 [datasetId]: {
-                  ...(evaluator.mappings[datasetId] ?? {}),
+                  ...evaluator.mappings[datasetId],
                   [targetId]: {
-                    ...(evaluator.mappings[datasetId]?.[targetId] ?? {}),
+                    ...evaluator.mappings[datasetId]?.[targetId],
                     [inputField]: mapping,
                   },
                 },

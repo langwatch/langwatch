@@ -104,6 +104,7 @@ export class GithubConnectionService {
     if (installation.accountType === "Organization") {
       return `${webBase}/organizations/${installation.accountLogin}/settings/installations/${installation.installationId}`;
     }
+
     return `${webBase}/settings/installations/${installation.installationId}`;
   }
 
@@ -118,7 +119,10 @@ export class GithubConnectionService {
    * the route's 503.
    */
   private installUrl(organizationId: string): string | null {
-    if (!this.configured) return null;
+    if (!this.configured) {
+      return null;
+    }
+
     return `/api/github/install?organizationId=${encodeURIComponent(organizationId)}`;
   }
 }

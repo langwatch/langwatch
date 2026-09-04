@@ -42,10 +42,23 @@ export class WebhookDestinationService {
     } catch {
       return "invalid_url";
     }
-    if (parsed.username || parsed.password) return "credentials";
-    if (!parsed.hostname) return "host";
-    if (!allowInsecureLocal && parsed.protocol !== "https:") return "scheme";
-    if (!allowInsecureLocal && parsed.port && parsed.port !== "443") return "port";
+
+    if (parsed.username || parsed.password) {
+      return "credentials";
+    }
+
+    if (!parsed.hostname) {
+      return "host";
+    }
+
+    if (!allowInsecureLocal && parsed.protocol !== "https:") {
+      return "scheme";
+    }
+
+    if (!allowInsecureLocal && parsed.port && parsed.port !== "443") {
+      return "port";
+    }
+
     return null;
   }
 
@@ -57,9 +70,15 @@ export class WebhookDestinationService {
       (found, pattern) => found ?? pattern.exec(trimmed),
       null,
     );
-    if (!match) return { ok: false, problem: "shape" };
+    if (!match) {
+      return { ok: false, problem: "shape" };
+    }
+
     const [, region, accountId, queueName, fifoSuffix] = match;
-    if (fifoSuffix) return { ok: false, problem: "fifo" };
+    if (fifoSuffix) {
+      return { ok: false, problem: "fifo" };
+    }
+
     return {
       ok: true,
       parsed: {
@@ -73,6 +92,7 @@ export class WebhookDestinationService {
 
   tryParseSqsQueueUrl(queueUrl: string): ParsedSqsQueueUrl | null {
     const result = this.inspectSqsQueueUrl(queueUrl);
+
     return result.ok ? result.parsed : null;
   }
 
@@ -84,8 +104,14 @@ export class WebhookDestinationService {
     roleArn: string | null | undefined;
     accessKeyId: string | null | undefined;
   }): SqsCredentialMode {
-    if (input.roleArn) return "assume_role";
-    if (input.accessKeyId) return "static";
+    if (input.roleArn) {
+      return "assume_role";
+    }
+
+    if (input.accessKeyId) {
+      return "static";
+    }
+
     return "ambient";
   }
 

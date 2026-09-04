@@ -380,7 +380,7 @@ function InlineEvaluatorPanel({ node }: { node: Node<Evaluator> }) {
         if (typeof value === "object" && !Array.isArray(value) && value !== null) {
           setDefaultSettings(value, `${prefix}.${key}`);
         } else {
-          //@ts-ignore
+          //@ts-expect-error
           form.setValue(`${prefix}.${key}`, value);
         }
       });

@@ -39,7 +39,9 @@ export class SuiteRunModelsService {
   }): Promise<Map<string, ResolvedRunModels>> => {
     const { scenarios, modelProviders } = this;
     const resolved = new Map<string, ResolvedRunModels>();
-    if (scenarioIds.length === 0) return resolved;
+    if (scenarioIds.length === 0) {
+      return resolved;
+    }
 
     try {
       const uniqueIds = Array.from(new Set(scenarioIds));
@@ -63,9 +65,11 @@ export class SuiteRunModelsService {
             if (!resolution) {
               throw new Error(`No model configured for "${featureKey}" (project: ${projectId}).`);
             }
+
             return resolution.model;
           });
         defaults.set(featureKey, pending);
+
         return pending;
       };
 
@@ -84,6 +88,7 @@ export class SuiteRunModelsService {
         { error, projectId },
         "Could not resolve the models for the queued runs; they record none",
       );
+
       return new Map();
     }
 

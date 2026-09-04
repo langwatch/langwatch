@@ -264,6 +264,7 @@ export class ScenarioService extends ScenarioServiceContract {
     const { projectId } = scenarioIdInputSchema
       .pick({ projectId: true })
       .parse({ projectId: input.projectId });
+
     return this.options.repository.findTestSuites({
       projectId,
       includeArchived: input.includeArchived,

@@ -40,10 +40,13 @@ const annotatorReferenceSchema = z.string().transform((annotator, ctx) => {
   if (annotator.startsWith("queue-") && annotator.length > 6) {
     return { type: "queue" as const, id: annotator.slice(6) };
   }
+
   if (annotator.startsWith("user-") && annotator.length > 5) {
     return { type: "user" as const, id: annotator.slice(5) };
   }
+
   ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Invalid annotator" });
+
   return z.NEVER;
 });
 
@@ -84,6 +87,7 @@ const resolveQueueableTraceIds = async ({
       "Dropped trace ids that resolve to no trace when queueing for annotation",
     );
   }
+
   return queueable;
 };
 
@@ -116,7 +120,10 @@ export async function createOrUpdateQueueItems({
 }): Promise<{ created: number; skipped: number }> {
   const parsedAnnotators: AnnotatorReference[] = annotators.map((annotator) => {
     const parsed = annotatorReferenceSchema.safeParse(annotator);
-    if (!parsed.success) throw new AnnotationAnnotatorReferenceInvalidError(annotator);
+    if (!parsed.success) {
+      throw new AnnotationAnnotatorReferenceInvalidError(annotator);
+    }
+
     return parsed.data;
   });
   const queueIds = parsedAnnotators

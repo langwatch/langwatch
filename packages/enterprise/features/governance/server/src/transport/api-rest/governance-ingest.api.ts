@@ -411,7 +411,7 @@ export function createGovernanceIngestRestApp(options: {
   const authIngestionSource = async (c: Context): Promise<GovernanceIngestionSource | null> => {
     const header = c.req.header("Authorization");
     if (!header) return null;
-    const match = /^Bearer\s+(lw_is_[A-Za-z0-9_\-]+)$/.exec(header.trim());
+    const match = /^Bearer\s+(lw_is_[A-Za-z0-9_-]+)$/.exec(header.trim());
     if (!match) return null;
     return await ports.governance().tryFindIngestionSourceByIngestSecret(match[1]!);
   };

@@ -74,7 +74,10 @@ export class DefaultGovernancePersonalVirtualKeyService {
       organizationId: parsed.organizationId,
       personalProjectId: workspace.project.id,
     });
-    if (existing) throw new PersonalVirtualKeyAlreadyExistsError(existing.id);
+    if (existing) {
+      throw new PersonalVirtualKeyAlreadyExistsError(existing.id);
+    }
+
     return this.issue({
       userId: parsed.userId,
       organizationId: parsed.organizationId,
@@ -98,6 +101,7 @@ export class DefaultGovernancePersonalVirtualKeyService {
         personalTeamId: parsed.personalTeamId,
       });
     }
+
     if (parsed.routingPolicyId && (!policy || policy.organizationId !== parsed.organizationId)) {
       throw new PersonalVirtualKeyNotFoundError(parsed.routingPolicyId);
     }
@@ -127,6 +131,7 @@ export class DefaultGovernancePersonalVirtualKeyService {
       label: parsed.label,
       routingPolicyId: resolvedPolicyId,
     });
+
     return {
       virtualKey: issued.virtualKey,
       secret: issued.secret,
@@ -148,7 +153,10 @@ export class DefaultGovernancePersonalVirtualKeyService {
       organizationId: parsed.organizationId,
       userId: parsed.userId,
     });
-    if (!key) throw new PersonalVirtualKeyNotFoundError(parsed.virtualKeyId);
+    if (!key) {
+      throw new PersonalVirtualKeyNotFoundError(parsed.virtualKeyId);
+    }
+
     return this.issuer.revoke({
       id: key.id,
       organizationId: key.organizationId,
@@ -166,6 +174,7 @@ export class DefaultGovernancePersonalVirtualKeyService {
         actorUserId: parsed.actorUserId,
       });
     }
+
     return keys.length;
   }
 }

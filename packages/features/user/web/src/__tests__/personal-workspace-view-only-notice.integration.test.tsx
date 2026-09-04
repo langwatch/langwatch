@@ -32,11 +32,11 @@ const mockOrganizationRole: { current: string | null } = { current: null };
 
 const renderNotice = () =>
   renderWithPersonalWorkspaceHost(<PersonalWorkspaceViewOnlyNotice />, {
-    host: fakePersonalWorkspaceHost({
-      ...(mockOrganizationRole.current !== null
+    host: fakePersonalWorkspaceHost(
+      mockOrganizationRole.current !== null
         ? { organizationRole: mockOrganizationRole.current }
-        : {}),
-    }),
+        : {},
+    ),
   });
 
 describe("given a member opening their own personal workspace", () => {

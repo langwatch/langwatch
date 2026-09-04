@@ -30,6 +30,7 @@ export class DefaultGovernanceCliSessionInventoryService {
       this.diagnostics?.warn("CLI token store is unavailable", {
         userId: parsed.userId,
       });
+
       return [];
     }
 
@@ -37,15 +38,22 @@ export class DefaultGovernanceCliSessionInventoryService {
     const buckets = new Map<number, { tokenKeys: string[]; records: CliTokenRecord[] }>();
     for (const memberKey of memberKeys) {
       const raw = await this.store.tryGet(memberKey);
-      if (!raw) continue;
+      if (!raw) {
+        continue;
+      }
+
       let json: unknown;
       try {
         json = JSON.parse(raw);
       } catch {
         continue;
       }
+
       const result = cliTokenRecordSchema.safeParse(json);
-      if (!result.success || result.data.user_id !== parsed.userId) continue;
+      if (!result.success || result.data.user_id !== parsed.userId) {
+        continue;
+      }
+
       const record = result.data;
       const anchor = record.client_info?.session_started_at ?? record.issued_at;
       const bucket = buckets.get(anchor) ?? { tokenKeys: [], records: [] };
@@ -59,6 +67,7 @@ export class DefaultGovernanceCliSessionInventoryService {
         const fresh = bucket.records.reduce((left, right) =>
           left.issued_at >= right.issued_at ? left : right,
         );
+
         return {
           sessionStartedAtMs,
           deviceLabel: this.deviceLabel(fresh.client_info),
@@ -75,33 +84,49 @@ export class DefaultGovernanceCliSessionInventoryService {
 
   async revokeSession(input: RevokeCliSessionInput): Promise<{ revokedTokens: number }> {
     const parsed = revokeCliSessionInputSchema.parse(input);
-    if (!this.store) return { revokedTokens: 0 };
+    if (!this.store) {
+      return { revokedTokens: 0 };
+    }
+
     const sessions = await this.listForUser({ userId: parsed.userId });
     const target = sessions.find(
       ({ sessionStartedAtMs }) => sessionStartedAtMs === parsed.sessionStartedAtMs,
     );
-    if (!target) return { revokedTokens: 0 };
+    if (!target) {
+      return { revokedTokens: 0 };
+    }
 
     let revokedTokens = 0;
     for (const tokenKey of target.tokenKeys) {
       revokedTokens += await this.store.delete(tokenKey);
     }
+
     if (target.tokenKeys.length > 0) {
       await this.store.removeMembers(cliUserTokensIndexKey(parsed.userId), target.tokenKeys);
     }
+
     return { revokedTokens };
   }
 
   private deviceLabel(info: CliTokenRecord["client_info"]): string {
-    if (info?.device_label?.trim()) return info.device_label.trim();
+    if (info?.device_label?.trim()) {
+      return info.device_label.trim();
+    }
+
     const platform = this.tryPlatformName(info?.platform);
     const host = info?.hostname?.trim();
-    if (host && platform) return `${platform} (${host})`;
+    if (host && platform) {
+      return `${platform} (${host})`;
+    }
+
     return host || platform || "Unknown device";
   }
 
   private tryPlatformName(platform: string | undefined): string | null {
-    if (!platform) return null;
+    if (!platform) {
+      return null;
+    }
+
     switch (platform.toLowerCase()) {
       case "darwin":
         return "Mac";

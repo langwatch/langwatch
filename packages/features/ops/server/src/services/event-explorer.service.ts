@@ -108,6 +108,7 @@ export class EventExplorerService {
       } catch {
         parsedPayload = row.payload;
       }
+
       return {
         eventId: row.eventId,
         eventType: row.eventType,
@@ -170,6 +171,7 @@ export class EventExplorerService {
       } catch {
         parsedPayload = {};
       }
+
       const timestampMs = parseInt(row.eventTimestamp, 10);
       const event = {
         id: row.eventId,

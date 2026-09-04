@@ -48,10 +48,14 @@ export class AuthService extends AuthCapability {
     verified: VerifiedBrowserSession | null;
   }): Promise<BrowserSession | null> {
     const verified = input.verified ? verifiedBrowserSessionSchema.parse(input.verified) : null;
-    if (!verified) return null;
+    if (!verified) {
+      return null;
+    }
 
     const stored = await this.options.repository.tryFindById({ id: verified.session.id });
-    if (!stored) return null;
+    if (!stored) {
+      return null;
+    }
 
     const user = await this.options.users.tryFindById({ id: verified.user.id });
     const session = browserSessionSchema.parse({
@@ -78,11 +82,14 @@ export class AuthService extends AuthCapability {
     const targetIsActive = await this.options.repository.isUserActive({
       id: impersonation.data.id,
     });
-    if (!targetIsActive) return session;
+    if (!targetIsActive) {
+      return session;
+    }
 
     const impersonatedUser = await this.options.users.tryFindById({
       id: impersonation.data.id,
     });
+
     return browserSessionSchema.parse({
       ...session,
       user: {
@@ -113,7 +120,9 @@ export class AuthService extends AuthCapability {
 
   async revokeBrowserSession({ sessionId }: { sessionId: string }): Promise<void> {
     const session = await this.options.repository.tryFindById({ id: sessionId });
-    if (!session) return;
+    if (!session) {
+      return;
+    }
 
     await this.clearCachedSessions({ userId: session.userId });
     const deleted = await this.options.repository.deleteById({ id: sessionId });
@@ -141,18 +150,24 @@ export class AuthService extends AuthCapability {
     keepToken?: string;
   }): Promise<void> {
     const store = this.options.secondaryStore;
-    if (!store) return;
+    if (!store) {
+      return;
+    }
 
     try {
       const indexKey = activeSessionsKey(userId);
       const cached = AuthService.parseCachedSessions(await store.tryGet({ key: indexKey }));
       const retained = cached.filter(({ token }) => token === keepToken);
       for (const { token } of cached) {
-        if (token !== keepToken) await store.delete({ key: tokenCacheKey(token) });
+        if (token !== keepToken) {
+          await store.delete({ key: tokenCacheKey(token) });
+        }
       }
 
       for (const token of await this.options.repository.listTokensForUser({ userId })) {
-        if (token !== keepToken) await store.delete({ key: tokenCacheKey(token) });
+        if (token !== keepToken) {
+          await store.delete({ key: tokenCacheKey(token) });
+        }
       }
 
       if (keepToken && retained.length > 0) {
@@ -169,10 +184,16 @@ export class AuthService extends AuthCapability {
   }
 
   private static parseCachedSessions(value: string | null): CachedSession[] {
-    if (!value) return [];
+    if (!value) {
+      return [];
+    }
+
     try {
       const parsed: unknown = JSON.parse(value);
-      if (!Array.isArray(parsed)) return [];
+      if (!Array.isArray(parsed)) {
+        return [];
+      }
+
       return parsed.flatMap((item): CachedSession[] => {
         if (
           typeof item === "object" &&
@@ -182,6 +203,7 @@ export class AuthService extends AuthCapability {
         ) {
           return [{ token: item.token, expiresAt: item.expiresAt }];
         }
+
         return [];
       });
     } catch {

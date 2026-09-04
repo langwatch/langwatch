@@ -192,6 +192,7 @@ export class PromptService extends PromptServiceContract {
 
     return configs.map((config) => {
       const latestVersionId = config.latestVersion.id ?? "";
+
       return this.transformToVersionedPrompt(
         config,
         this.withLatestTag({
@@ -233,6 +234,7 @@ export class PromptService extends PromptServiceContract {
         },
         "Mutual exclusion: cannot specify both version/versionId and tag",
       );
+
       throw new TagValidationError(
         "Cannot specify both 'version'/'versionId' and 'tag'. Use one or the other.",
       );
@@ -517,6 +519,7 @@ export class PromptService extends PromptServiceContract {
     // tag assignments exist yet (those are attached by the route in a second
     // step), so the only tag to surface is the built-in "latest".
     const newVersionId = config.latestVersion.id ?? "";
+
     return this.transformToVersionedPrompt(
       config,
       newVersionId ? [{ name: "latest", versionId: newVersionId }] : [],
@@ -718,6 +721,7 @@ export class PromptService extends PromptServiceContract {
       normalized.prompt = normalized.prompt ?? messageSystemPrompt;
       normalized.messages = (normalized.messages ?? []).filter((msg) => msg.role !== "system");
     }
+
     return normalized;
   }
 
@@ -885,6 +889,7 @@ export class PromptService extends PromptServiceContract {
   }): Promise<boolean> {
     const organizationId =
       params.organizationId ?? (await this.getOrganizationIdFromProjectId(params.projectId));
+
     return this.repository.isHandleUnique({
       handle: params.handle,
       projectId: params.projectId,
@@ -1000,8 +1005,14 @@ export class PromptService extends PromptServiceContract {
       prompt: existingPrompt.prompt,
       messages: existingPrompt.messages.filter((msg) => msg.role !== "system"),
       inputs: [...existingPrompt.inputs].sort((a, b) => {
-        if (a.identifier === "input") return -1;
-        if (b.identifier === "input") return 1;
+        if (a.identifier === "input") {
+          return -1;
+        }
+
+        if (b.identifier === "input") {
+          return 1;
+        }
+
         return a.identifier.localeCompare(b.identifier);
       }),
       outputs: existingPrompt.outputs,
@@ -1160,6 +1171,7 @@ export class PromptService extends PromptServiceContract {
       projectId: params.projectId,
       organizationId,
     });
+
     return result;
   }
 
@@ -1410,7 +1422,9 @@ export class PromptService extends PromptServiceContract {
   }): Promise<Map<string, Array<{ name: string; versionId: string }>>> {
     const map = new Map<string, Array<{ name: string; versionId: string }>>();
 
-    if (params.versionIds.length === 0) return map;
+    if (params.versionIds.length === 0) {
+      return map;
+    }
 
     const assignments = await this.tagRepository.findByVersionIds({
       versionIds: params.versionIds,
@@ -1461,6 +1475,7 @@ export class PromptService extends PromptServiceContract {
     if (!params.currentVersionId || params.currentVersionId !== params.latestVersionId) {
       return params.tags;
     }
+
     return [{ name: "latest", versionId: params.latestVersionId }, ...params.tags];
   }
 
@@ -1479,6 +1494,7 @@ export class PromptService extends PromptServiceContract {
       organizationId,
       name: tagName,
     });
+
     return promptTag?.id ?? null;
   }
 }

@@ -97,7 +97,9 @@ const SPAN_ID_HEX = /^[0-9a-fA-F]{16}$/;
 export function extractParentTraceForNlpgo(
   trace: Trace | undefined,
 ): { traceId: string; parentSpanId: string } | undefined {
-  if (!trace?.trace_id || !TRACE_ID_HEX.test(trace.trace_id)) return undefined;
+  if (!trace?.trace_id || !TRACE_ID_HEX.test(trace.trace_id)) {
+    return undefined;
+  }
 
   // Broken / multi-source instrumentation can leave a trace with more
   // than one parent-less span. `find()` would then pick whichever span
@@ -106,15 +108,24 @@ export function extractParentTraceForNlpgo(
   // with span_id as the tie-breaker to keep two consecutive eval runs
   // pinned to the same parent_span_id.
   const rootCandidates = (trace.spans ?? []).filter((s) => !s.parent_id);
-  if (rootCandidates.length === 0) return undefined;
+  if (rootCandidates.length === 0) {
+    return undefined;
+  }
+
   rootCandidates.sort((a, b) => {
     const aStart = a.timestamps?.started_at ?? Number.MAX_SAFE_INTEGER;
     const bStart = b.timestamps?.started_at ?? Number.MAX_SAFE_INTEGER;
-    if (aStart !== bStart) return aStart - bStart;
+    if (aStart !== bStart) {
+      return aStart - bStart;
+    }
+
     return (a.span_id ?? "").localeCompare(b.span_id ?? "");
   });
   const rootSpan = rootCandidates[0];
-  if (!rootSpan?.span_id || !SPAN_ID_HEX.test(rootSpan.span_id)) return undefined;
+  if (!rootSpan?.span_id || !SPAN_ID_HEX.test(rootSpan.span_id)) {
+    return undefined;
+  }
+
   return {
     traceId: trace.trace_id.toLowerCase(),
     parentSpanId: rootSpan.span_id.toLowerCase(),
@@ -143,15 +154,24 @@ export function maxCausalityDepthOfSpans(
     | undefined
     | null,
 ): number {
-  if (!spans || spans.length === 0) return 0;
+  if (!spans || spans.length === 0) {
+    return 0;
+  }
+
   let max = 0;
   for (const span of spans) {
     const raw = pickCausalityDepth(span);
-    if (raw === undefined || raw === null) continue;
+    if (raw === undefined || raw === null) {
+      continue;
+    }
+
     const n =
       typeof raw === "number" ? raw : typeof raw === "string" ? Number.parseInt(raw, 10) : NaN;
-    if (Number.isFinite(n) && n > max) max = n;
+    if (Number.isFinite(n) && n > max) {
+      max = n;
+    }
   }
+
   return max;
 }
 
@@ -163,16 +183,21 @@ function pickCausalityDepth(span: {
   const params = (span.params ?? null) as Record<string, unknown> | null;
   if (params) {
     const ns = params.langwatch as Record<string, unknown> | undefined;
-    if (ns && ns.causality_depth !== undefined) return ns.causality_depth;
+    if (ns && ns.causality_depth !== undefined) {
+      return ns.causality_depth;
+    }
+
     if (params["langwatch.causality_depth"] !== undefined) {
       return params["langwatch.causality_depth"];
     }
   }
+
   // Legacy / synthetic test path.
   const attrs = (span.attributes ?? null) as Record<string, unknown> | null;
   if (attrs && attrs["langwatch.causality_depth"] !== undefined) {
     return attrs["langwatch.causality_depth"];
   }
+
   return undefined;
 }
 
@@ -489,7 +514,9 @@ export class EvaluationExecutionService {
 
       if (isThreadMapping && "source" in mappingConfig) {
         const source = mappingConfig.source;
-        if (!source) continue;
+        if (!source) {
+          continue;
+        }
 
         if ((SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(source)) {
           if (source === "formatted_traces") {
@@ -575,6 +602,7 @@ export class EvaluationExecutionService {
           parentTrace: extractParentTraceForNlpgo(trace),
         });
       }
+
       return this.runCustomEvaluation(
         projectId,
         evaluatorType,
@@ -608,6 +636,7 @@ export class EvaluationExecutionService {
         status: nativeResult.status,
         durationMs: performance.now() - nativeStart,
       });
+
       return this.deps.evaluators.augmentResult({
         evaluatorType: builtInType,
         mappedData: data.data,

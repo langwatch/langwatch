@@ -66,6 +66,7 @@ export class RedisBudgetChangeEventDedupeService implements BudgetChangeEventDed
     const key = `${BUDGET_CHANGE_EVENT_KEY_PREFIX}${projectId}`;
     try {
       const result = await this.redis.set(key, "1", "EX", BUDGET_CHANGE_EVENT_WINDOW_SECONDS, "NX");
+
       return result === "OK";
     } catch (error) {
       // Fail toward emitting. Emitting is what this path did before the
@@ -76,6 +77,7 @@ export class RedisBudgetChangeEventDedupeService implements BudgetChangeEventDed
         { projectId, error },
         "budget change-event dedupe unavailable; emitting this change event",
       );
+
       return true;
     }
   }
@@ -84,6 +86,9 @@ export class RedisBudgetChangeEventDedupeService implements BudgetChangeEventDed
 export function createBudgetChangeEventDedupeService(
   redis: IORedis | Cluster | null,
 ): BudgetChangeEventDedupeService {
-  if (!redis) return new NullBudgetChangeEventDedupeService();
+  if (!redis) {
+    return new NullBudgetChangeEventDedupeService();
+  }
+
   return new RedisBudgetChangeEventDedupeService(redis);
 }

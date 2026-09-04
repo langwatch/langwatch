@@ -49,8 +49,10 @@ export class IngestionPullService {
     } catch (error) {
       if (input.attempt < this.maxAttempts) {
         this.metrics.count("failed_retryable");
+
         throw error;
       }
+
       this.metrics.count("failed_final");
       await this.outcomePort.failed({
         tenantId: input.tenantId,
@@ -62,6 +64,7 @@ export class IngestionPullService {
         errorCode: "pull_failed",
         retryable: false,
       });
+
       return;
     }
 

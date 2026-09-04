@@ -59,13 +59,16 @@ export class LwqlKeyMapService {
    */
   async syncProject(input: { projectId: string; lwqlKey: string | null }): Promise<void> {
     const connection = lwqlConnectionFromEnv();
-    if (!connection) return;
+    if (!connection) {
+      return;
+    }
 
     if (!input.lwqlKey) {
       logger.error(
         { projectId: input.projectId },
         "new project has an empty lwqlKey — cannot sync its LangWatchQL key-map row",
       );
+
       return;
     }
 

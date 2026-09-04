@@ -79,6 +79,7 @@ export class CodingAgentSessionReadService {
     if (page.events.length > 0 || parsed.cursor !== undefined || !derivedWindow) {
       return page;
     }
+
     return this.dependencies.sessionEvents.findBySessionId({
       tenantId: parsed.projectId,
       sessionId: parsed.sessionId,
@@ -114,8 +115,12 @@ export class CodingAgentSessionReadService {
             tenantId: parsed.projectId,
             sessionId: parsed.sessionId,
           }));
-    if (row === null) return null;
+    if (row === null) {
+      return null;
+    }
+
     const [overlaid] = await this.withMetricTotals(parsed.projectId, [row]);
+
     return overlaid ?? row;
   }
 
@@ -128,7 +133,10 @@ export class CodingAgentSessionReadService {
       tenantId: parsed.projectId,
       traceId: parsed.traceId,
     });
-    if (mapping === null) return null;
+    if (mapping === null) {
+      return null;
+    }
+
     return this.tryGetBySessionId({
       projectId: parsed.projectId,
       sessionId: mapping.sessionId,
@@ -145,12 +153,14 @@ export class CodingAgentSessionReadService {
       toMs: parsed.toMs,
       limit: parsed.limit ?? 50,
     });
+
     return this.withMetricTotals(parsed.projectId, rows, parsed);
   }
 
   async getUsageTotals(input: CodingAgentUsageTotalsInput): Promise<CodingAgentUsageTotals> {
     const parsed = codingAgentUsageTotalsInputSchema.parse(input);
     const rows = await this.listRecent({ ...parsed, limit: 1000 });
+
     return codingAgentUsageTotalsSchema.parse(
       rows.reduce<CodingAgentUsageTotals>(
         (totals, row) => ({
@@ -190,6 +200,7 @@ export class CodingAgentSessionReadService {
       tenantId: input.projectId,
       sessionId: input.sessionId,
     });
+
     return row === null
       ? undefined
       : CodingAgentSessionReadService.readWindowAround(row.startedAtMs);
@@ -203,7 +214,10 @@ export class CodingAgentSessionReadService {
     const needy = rows.filter(
       (row) => row.costUsd === 0 || row.inputTokens + row.outputTokens === 0,
     );
-    if (needy.length === 0) return rows;
+    if (needy.length === 0) {
+      return rows;
+    }
+
     const startedAts = needy.map((row) => row.startedAtMs).filter((ms) => ms > 0);
     const fromMs =
       (range?.fromMs ??
@@ -224,17 +238,26 @@ export class CodingAgentSessionReadService {
     } catch {
       return rows;
     }
-    if (totals.length === 0) return rows;
+
+    if (totals.length === 0) {
+      return rows;
+    }
+
     const bySession = new Map<string, SessionMetricTotal[]>();
     for (const total of totals) {
       const sessionTotals = bySession.get(total.sessionId) ?? [];
       sessionTotals.push(total);
       bySession.set(total.sessionId, sessionTotals);
     }
+
     return rows.map((row) => {
       const sessionTotals = bySession.get(row.sessionId);
-      if (sessionTotals === undefined) return row;
+      if (sessionTotals === undefined) {
+        return row;
+      }
+
       const filled = CodingAgentSessionReadService.foldTokenAndCostTotals(sessionTotals);
+
       return {
         ...row,
         costUsd: row.costUsd || filled.costUsd,
@@ -254,7 +277,10 @@ export class CodingAgentSessionReadService {
   }
 
   private static clampSessionEventsLimit(limit: number): number {
-    if (!Number.isFinite(limit)) return MAX_CODING_AGENT_SESSION_EVENTS_PAGE_SIZE;
+    if (!Number.isFinite(limit)) {
+      return MAX_CODING_AGENT_SESSION_EVENTS_PAGE_SIZE;
+    }
+
     return Math.min(Math.max(Math.trunc(limit), 1), MAX_CODING_AGENT_SESSION_EVENTS_PAGE_SIZE);
   }
 
@@ -272,7 +298,11 @@ export class CodingAgentSessionReadService {
         folded.costUsd += total.total;
         continue;
       }
-      if (metric !== "token_usage") continue;
+
+      if (metric !== "token_usage") {
+        continue;
+      }
+
       switch (normalizeTokenType(total.bucket)) {
         case "input":
           folded.inputTokens += total.total;
@@ -288,6 +318,7 @@ export class CodingAgentSessionReadService {
           break;
       }
     }
+
     return folded;
   }
 }

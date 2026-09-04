@@ -63,11 +63,15 @@ const FIELD_RESOLVERS: Record<
   "metadata.labels": (data) => data.labels,
   "metadata.prompt_ids": (data) => data.promptIds,
   "metadata.value": (data, key) => {
-    if (!key) return null;
+    if (!key) {
+      return null;
+    }
+
     // The UI encodes a dotted metadata key with a middle dot so the field
     // string stays parseable, and prefixes it the way the trace stores it.
     const decoded = key.replaceAll("\u00b7", ".");
     const metadataKey = decoded.replace(/^(langwatch\.)?metadata\./u, "");
+
     return data.customMetadata?.[metadataKey] ?? null;
   },
   "spans.type": (data) => data.spanTypes,

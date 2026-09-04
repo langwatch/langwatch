@@ -181,7 +181,7 @@ function handledErrorResponseBody(error: HandledError): object {
   return {
     error: code,
     message,
-    ...(meta ?? {}),
+    ...meta,
     ...(tips?.length ? { tips } : {}),
     ...(docsUrl ? { docsUrl } : {}),
     ...(fault ? { fault } : {}),

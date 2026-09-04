@@ -43,13 +43,17 @@ export class ExperimentEvaluatorInputService {
    */
   private catalogFields(evaluatorType: string | undefined): string[] {
     const definition = AVAILABLE_EVALUATORS[evaluatorType as EvaluatorTypes];
+
     return [...(definition?.requiredFields ?? []), ...(definition?.optionalFields ?? [])];
   }
 
   /** The fields an evaluator reads: its own declared inputs, or the catalog's otherwise. */
   private declaredEvaluatorFields(evaluator: EvaluatorConfig): string[] {
     const declared = evaluator.inputs?.map((field) => field.identifier) ?? [];
-    if (declared.length > 0) return declared;
+    if (declared.length > 0) {
+      return declared;
+    }
+
     return this.catalogFields(evaluator.evaluatorType);
   }
 
@@ -59,10 +63,14 @@ export class ExperimentEvaluatorInputService {
    */
   private evaluatorTargetFields({ target }: { target: TargetConfig }): string[] {
     const declared = target.inputs?.map((field) => field.identifier) ?? [];
-    if (declared.length > 0) return declared;
+    if (declared.length > 0) {
+      return declared;
+    }
+
     const dbConfig = this.loadedEvaluators?.get(target.targetEvaluatorId ?? "")?.config as
       | { evaluatorType?: string }
       | undefined;
+
     return this.catalogFields(dbConfig?.evaluatorType);
   }
 
@@ -82,11 +90,18 @@ export class ExperimentEvaluatorInputService {
    */
   evaluatorTargetHasNoResolvedInputs({ cell }: { cell: ExecutionCell }): boolean {
     const target = cell.targetConfig;
-    if (target.type !== "evaluator") return false;
-    if (cell.comparison || cell.skipTarget) return false;
+    if (target.type !== "evaluator") {
+      return false;
+    }
+
+    if (cell.comparison || cell.skipTarget) {
+      return false;
+    }
 
     const fields = this.evaluatorTargetFields({ target });
-    if (fields.length === 0) return false;
+    if (fields.length === 0) {
+      return false;
+    }
 
     return Object.values(this.buildTargetInputs({ cell })).every((v) => this.isEmptyInputValue(v));
   }
@@ -113,7 +128,9 @@ export class ExperimentEvaluatorInputService {
 
     // An evaluator that declares no field reads nothing from the row, so there is
     // nothing to be missing.
-    if (this.declaredEvaluatorFields(evaluator).length === 0) return false;
+    if (this.declaredEvaluatorFields(evaluator).length === 0) {
+      return false;
+    }
 
     // An empty payload is the shape the production failure takes: no mapping
     // resolved, so no key was ever written.
@@ -128,7 +145,9 @@ export class ExperimentEvaluatorInputService {
   buildTargetInputs({ cell }: { cell: ExecutionCell }): Record<string, unknown> {
     const inputs: Record<string, unknown> = {};
     const datasetId = cell.datasetEntry._datasetId as string | undefined;
-    if (!datasetId) return inputs;
+    if (!datasetId) {
+      return inputs;
+    }
 
     const mappings = cell.targetConfig.mappings[datasetId] ?? {};
 
@@ -204,6 +223,7 @@ export class ExperimentEvaluatorInputService {
         inputs.candidate_a_cost = candidateA.cost;
         inputs.candidate_a_duration = candidateA.duration;
       }
+
       if (candidateB) {
         inputs.candidate_b_id = candidateB.id;
         inputs.candidate_b_output = candidateB.output;
@@ -280,10 +300,14 @@ export class ExperimentEvaluatorInputService {
   }): Record<string, unknown> {
     const inputs: Record<string, unknown> = {};
     const datasetId = cell.datasetEntry._datasetId as string | undefined;
-    if (!datasetId) return inputs;
+    if (!datasetId) {
+      return inputs;
+    }
 
     const evaluator = cell.evaluatorConfigs.find((e) => e.id === evaluatorId);
-    if (!evaluator) return inputs;
+    if (!evaluator) {
+      return inputs;
+    }
 
     const comparisonConfig = toComparisonConfig(evaluator);
     if (comparisonConfig && cell.comparison) {

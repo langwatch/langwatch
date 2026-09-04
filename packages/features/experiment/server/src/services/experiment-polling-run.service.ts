@@ -147,7 +147,10 @@ const runExecution = async ({
       { runId, reason, persists: Boolean(persistResults) },
       "Run ended, deciding whether to write its cells back",
     );
-    if (!persistResults) return;
+    if (!persistResults) {
+      return;
+    }
+
     await persistRunResults({
       persistence: persistResults,
       projectId: orchestratorInput.projectId,
@@ -179,7 +182,9 @@ const runExecution = async ({
     for await (const rawEvent of orchestrator) {
       const event = rawEvent as EvaluationV3Event;
       await progress.addEvent(runId, event);
-      if (persistResults) applyRunEvent({ draft, event });
+      if (persistResults) {
+        applyRunEvent({ draft, event });
+      }
 
       if (event.type === "done") {
         await finishRun(event.summary);

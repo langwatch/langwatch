@@ -12,7 +12,7 @@ export const getImageUrl = (str: unknown): string | null => {
   const str_ = str.toString().trim();
 
   // Check for markdown image format ![alt](url)
-  const markdownImageRegex = /^\!\[.*?\]\((.*?)\)$/;
+  const markdownImageRegex = /^!\[.*?\]\((.*?)\)$/;
   const markdownMatch = str_.match(markdownImageRegex);
   if (markdownMatch?.[1]) {
     // Extract the URL from markdown format and validate it recursively

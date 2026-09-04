@@ -39,7 +39,10 @@ export class AnomalyRuleService {
     organizationId: string;
   }): Promise<AnomalyRule | null> {
     const row = await this.repository.tryFindById(id);
-    if (!row || row.organizationId !== organizationId) return null;
+    if (!row || row.organizationId !== organizationId) {
+      return null;
+    }
+
     return row;
   }
 
@@ -60,6 +63,7 @@ export class AnomalyRuleService {
     if (!existing) {
       throw new AnomalyRuleNotFoundError(id);
     }
+
     return existing;
   }
 
@@ -71,6 +75,7 @@ export class AnomalyRuleService {
         allowed: ANOMALY_RULE_SEVERITIES,
       });
     }
+
     if (!ANOMALY_RULE_SCOPES.includes(input.scope)) {
       throw unsupportedValue({
         field: "scope",
@@ -78,6 +83,7 @@ export class AnomalyRuleService {
         allowed: ANOMALY_RULE_SCOPES,
       });
     }
+
     // Strict per-rule-type validation. Throws ZodError on shape failure or a
     // `ValidationError` on an unknown ruleType — both reach the admin as
     // `validation_error`. Spec:
@@ -91,6 +97,7 @@ export class AnomalyRuleService {
     if (input.destinationConfig !== undefined && Object.keys(input.destinationConfig).length > 0) {
       validateDestinationConfig(input.destinationConfig);
     }
+
     return this.repository.create({
       organizationId: input.organizationId,
       name: input.name,
@@ -109,8 +116,14 @@ export class AnomalyRuleService {
   async updateRule(input: UpdateAnomalyRuleInput): Promise<AnomalyRule> {
     const existing = await this.getById({ id: input.id, organizationId: input.organizationId });
     const changes: AnomalyRuleChanges = {};
-    if (input.name !== undefined) changes.name = input.name;
-    if (input.description !== undefined) changes.description = input.description;
+    if (input.name !== undefined) {
+      changes.name = input.name;
+    }
+
+    if (input.description !== undefined) {
+      changes.description = input.description;
+    }
+
     if (input.severity !== undefined) {
       if (!ANOMALY_RULE_SEVERITIES.includes(input.severity)) {
         throw unsupportedValue({
@@ -119,9 +132,14 @@ export class AnomalyRuleService {
           allowed: ANOMALY_RULE_SEVERITIES,
         });
       }
+
       changes.severity = input.severity;
     }
-    if (input.ruleType !== undefined) changes.ruleType = input.ruleType;
+
+    if (input.ruleType !== undefined) {
+      changes.ruleType = input.ruleType;
+    }
+
     if (input.scope !== undefined) {
       if (!ANOMALY_RULE_SCOPES.includes(input.scope)) {
         throw unsupportedValue({
@@ -130,9 +148,14 @@ export class AnomalyRuleService {
           allowed: ANOMALY_RULE_SCOPES,
         });
       }
+
       changes.scope = input.scope;
     }
-    if (input.scopeId !== undefined) changes.scopeId = input.scopeId;
+
+    if (input.scopeId !== undefined) {
+      changes.scopeId = input.scopeId;
+    }
+
     if (input.thresholdConfig !== undefined) {
       // Re-validate against the effective ruleType after this update.
       // If the caller supplies a new ruleType, the new config must match
@@ -153,6 +176,7 @@ export class AnomalyRuleService {
         config: existing.thresholdConfig,
       });
     }
+
     if (input.destinationConfig !== undefined) {
       // Same allow-empty rule as create: empty `{}` clears destinations
       // (back to log-only). Anything non-empty must round-trip the
@@ -165,9 +189,14 @@ export class AnomalyRuleService {
       if (Object.keys(destinationConfig).length > 0) {
         validateDestinationConfig(destinationConfig);
       }
+
       changes.destinationConfig = destinationConfig;
     }
-    if (input.status !== undefined) changes.status = input.status;
+
+    if (input.status !== undefined) {
+      changes.status = input.status;
+    }
+
     return this.repository.update(existing.id, changes);
   }
 
@@ -179,6 +208,7 @@ export class AnomalyRuleService {
     organizationId: string;
   }): Promise<AnomalyRule> {
     const existing = await this.getById({ id, organizationId });
+
     return this.repository.update(existing.id, {
       archivedAt: this.now(),
       status: "disabled",

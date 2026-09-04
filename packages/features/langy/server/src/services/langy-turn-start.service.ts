@@ -71,6 +71,7 @@ export class LangyTurnStartService {
     if ("conversationId" in claimed) {
       return claimed;
     }
+
     return this.runClaimedTurn({
       input,
       request,
@@ -86,9 +87,11 @@ export class LangyTurnStartService {
     if (!worker) {
       throw new LangyAgentUnavailableError("Agent not configured");
     }
+
     if (!accessStore || !handoffStore) {
       throw new LangyAgentUnavailableError();
     }
+
     return { worker, accessStore, handoffStore };
   }
 
@@ -98,8 +101,10 @@ export class LangyTurnStartService {
     const userText = extractLangyTextFromParts(lastUserMessage?.parts);
     if (!userText.trim()) {
       this.deps.metrics.count({ outcome: "rejected" });
+
       throw new LangyEmptyMessageError();
     }
+
     return {
       userId,
       lastUserMessage,
@@ -118,6 +123,7 @@ export class LangyTurnStartService {
     if (!turnModel) {
       throw new LangyModelNotConfiguredError();
     }
+
     return turnModel;
   }
 
@@ -134,28 +140,37 @@ export class LangyTurnStartService {
   }): ClaimedTurn | { conversationId: string; turnId: string } {
     if (admission.kind === "mismatch") {
       this.deps.metrics.count({ outcome: "mismatch" });
+
       throw new LangyIdempotencyMismatchError();
     }
+
     if (admission.kind === "replay") {
       this.deps.metrics.count({ outcome: "replay" });
+
       return { conversationId: admission.conversationId, turnId: admission.turnId };
     }
+
     if (admission.kind === "pending") {
       this.deps.metrics.count({ outcome: "rejected" });
+
       throw new LangyAgentUnavailableError(
         "This turn is already being prepared. Please retry shortly.",
       );
     }
+
     if (admission.kind === "busy") {
       this.deps.metrics.count({ outcome: "busy" });
+
       throw new LangyTurnInProgressError();
     }
+
     trace.getActiveSpan()?.setAttributes({
       "tenant.id": projectId,
       "langy.conversation.id": admission.conversationId,
       "langy.turn.id": admission.turnId,
       "user.id": userId,
     });
+
     return {
       conversation: {
         id: admission.conversationId,
@@ -224,6 +239,7 @@ export class LangyTurnStartService {
       if (error instanceof LangySessionKeyScopeError) {
         throw new LangyInsufficientScopeError(error.message);
       }
+
       throw error;
     }
   }

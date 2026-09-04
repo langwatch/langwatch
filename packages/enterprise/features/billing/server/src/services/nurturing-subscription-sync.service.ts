@@ -14,7 +14,9 @@ export function fireSubscriptionSyncNurturing({
   hasSubscription: boolean;
 }): void {
   const nurturing = tryNurturingSink();
-  if (!nurturing) return;
+  if (!nurturing) {
+    return;
+  }
 
   void syncSubscriptionTrait({ organizationId, hasSubscription }).catch(reportNurturingFailure);
 }
@@ -27,9 +29,14 @@ async function syncSubscriptionTrait({
   hasSubscription: boolean;
 }): Promise<void> {
   const nurturing = tryNurturingSink();
-  if (!nurturing) return;
+  if (!nurturing) {
+    return;
+  }
+
   const database = tryNurturingDatabase();
-  if (!database) return;
+  if (!database) {
+    return;
+  }
 
   const orgUsers = await database.organizationUser.findMany({
     where: { organizationId },

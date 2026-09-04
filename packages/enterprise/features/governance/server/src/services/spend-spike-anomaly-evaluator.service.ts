@@ -83,6 +83,7 @@ export class SpendSpikeAnomalyEvaluatorService {
           message: issue.message,
         })),
       });
+
       return SpendSpikeAnomalyEvaluatorService.noDataResult(
         rule,
         now,
@@ -105,6 +106,7 @@ export class SpendSpikeAnomalyEvaluatorService {
         windowStart,
       );
     }
+
     if (!this.spend) {
       return SpendSpikeAnomalyEvaluatorService.noDataResult(
         rule,
@@ -180,10 +182,14 @@ export class SpendSpikeAnomalyEvaluatorService {
   }
 
   private static sourceFilterFor(rule: AnomalyRule): AnomalySpendSourceFilter {
-    if (rule.scope === "source") return { type: "source", id: rule.scopeId };
+    if (rule.scope === "source") {
+      return { type: "source", id: rule.scopeId };
+    }
+
     if (rule.scope === "source_type") {
       return { type: "source_type", id: rule.scopeId };
     }
+
     return { type: "all" };
   }
 

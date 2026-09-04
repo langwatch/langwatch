@@ -55,11 +55,13 @@ export function parseSpanEventRefs(attrs: NormalizedAttributes): ParsedSpanEvent
         if (typeof decoded !== "object" || decoded === null || Array.isArray(decoded)) {
           continue;
         }
+
         const ref = decoded as { field?: unknown; eventId?: unknown };
         if (typeof ref.eventId !== "string" || ref.eventId.length === 0) {
           missingEventIdKeys.push(attrKey);
           continue;
         }
+
         eventrefEntries.push({
           attrKey,
           field: typeof ref.field === "string" && ref.field.length > 0 ? ref.field : attrKey,

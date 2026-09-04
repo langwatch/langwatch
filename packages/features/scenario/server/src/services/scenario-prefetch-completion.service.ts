@@ -150,6 +150,7 @@ export class ScenarioPrefetchCompletionService {
         { projectId: context.projectId, scenarioId: context.scenarioId },
         "Scenario not found",
       );
+
       return {
         success: false,
         result: {
@@ -158,16 +159,19 @@ export class ScenarioPrefetchCompletionService {
         },
       };
     }
+
     if (!lookups.project.success) {
       logger.warn(
         { projectId: context.projectId, error: lookups.project.error },
         "Project fetch failed",
       );
+
       return {
         success: false,
         result: { success: false, error: lookups.project.error },
       };
     }
+
     if (lookups.adapter !== null && "success" in lookups.adapter) {
       logger.warn(
         {
@@ -177,6 +181,7 @@ export class ScenarioPrefetchCompletionService {
         },
         `Workflow LLM hydration failed: ${lookups.adapter.message}`,
       );
+
       return {
         success: false,
         result: {
@@ -186,6 +191,7 @@ export class ScenarioPrefetchCompletionService {
         },
       };
     }
+
     if (!lookups.adapter) {
       logger.warn(
         {
@@ -195,6 +201,7 @@ export class ScenarioPrefetchCompletionService {
         },
         "Target adapter not found",
       );
+
       return {
         success: false,
         result: {
@@ -236,6 +243,7 @@ export class ScenarioPrefetchCompletionService {
     if (adapter.type !== "prompt") {
       return;
     }
+
     adapter.scenarioMappings = suite?.targets?.find(
       (candidate) => candidate.type === "prompt" && candidate.referenceId === target.referenceId,
     )?.scenarioMappings;
@@ -270,6 +278,7 @@ export class ScenarioPrefetchCompletionService {
         resolveFeatureModel: (featureKey) =>
           this.options.lookups.resolveModel({ featureKey, projectId: context.projectId }),
       });
+
       return { success: true, adapter, simulator: simulatorModel, judge: judgeModel };
     } catch (error) {
       // A project with no model set for scenarios is the customer's to fix and
@@ -286,6 +295,7 @@ export class ScenarioPrefetchCompletionService {
           "Model resolution failed for a scenario run",
         );
       }
+
       return {
         success: false,
         result: {
@@ -316,6 +326,7 @@ export class ScenarioPrefetchCompletionService {
       this.options.modelParameters.prepare({ projectId, model: models.simulator }),
       this.options.modelParameters.prepare({ projectId, model: models.judge }),
     ]);
+
     return { adapter, simulator, judge };
   }
 
@@ -333,6 +344,7 @@ export class ScenarioPrefetchCompletionService {
       if (!check.result || check.result.success) {
         continue;
       }
+
       logger.warn(
         {
           projectId: context.projectId,
@@ -342,12 +354,14 @@ export class ScenarioPrefetchCompletionService {
         },
         `Failed to prepare model params: ${check.result.message}`,
       );
+
       return {
         success: false,
         error: check.result.message,
         reason: check.result.reason,
       };
     }
+
     return null;
   }
 

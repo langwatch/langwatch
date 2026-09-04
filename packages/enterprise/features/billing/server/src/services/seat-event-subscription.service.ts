@@ -127,6 +127,7 @@ const seatChangeParams = ({
   if (stripeSubscription.canceled_at) {
     params.cancel_at_period_end = false;
   }
+
   return params;
 };
 
@@ -149,12 +150,15 @@ const QUOTE_VALIDITY_SECONDS = 15 * 60;
  */
 const resolveProrationDate = (quotedAt: number | undefined) => {
   const now = Math.floor(Date.now() / 1000);
-  if (quotedAt === undefined) return now;
+  if (quotedAt === undefined) {
+    return now;
+  }
 
   const age = now - quotedAt;
   if (age < 0 || age > QUOTE_VALIDITY_SECONDS) {
     throw new QuoteExpiredError();
   }
+
   return quotedAt;
 };
 
@@ -235,6 +239,7 @@ export class SeatEventSubscriptionService {
         },
         "[billing] Organization has multiple active subscriptions; refusing to guess which one a seat change belongs to",
       );
+
       throw new AmbiguousSubscriptionError(active.length);
     }
 
@@ -260,6 +265,7 @@ export class SeatEventSubscriptionService {
         { organizationId, subscriptionId: activeUnlinked.id },
         "[billing] Active subscription has no billing-provider link; seat changes need one to be connected by hand",
       );
+
       throw new SubscriptionNotLinkedError();
     }
 
@@ -402,7 +408,9 @@ export class SeatEventSubscriptionService {
             },
           });
 
-          if (existing) continue;
+          if (existing) {
+            continue;
+          }
 
           await tx.organizationInvite.create({
             data: {
@@ -559,10 +567,12 @@ export class SeatEventSubscriptionService {
     if (unitAmountCents === null) {
       throw new SubscriptionItemNotFoundError("seat_unit_amount");
     }
+
     const recurringTotalCents = newTotalSeats * unitAmountCents;
 
     const format = (cents: number) => {
       const amount = cents / 100;
+
       return new Intl.NumberFormat(currency === Currency.EUR ? "en-IE" : "en-US", {
         style: "currency",
         currency,

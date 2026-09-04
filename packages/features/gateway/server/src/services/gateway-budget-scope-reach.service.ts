@@ -34,6 +34,7 @@ export class GatewayBudgetScopeReachService {
         reachableProjectIds,
       });
     }
+
     return reach;
   }
 
@@ -43,6 +44,7 @@ export class GatewayBudgetScopeReachService {
     scope: GatewayBudgetScope;
   }): ScopeReach {
     const keys = this.keyReach(input.candidates, input.traceProjects);
+
     return {
       reachable: keys.some((key) => this.matches({ budget: input.scope, key })),
       reachableProjectIds: this.reachableProjectIds(keys),
@@ -55,6 +57,7 @@ export class GatewayBudgetScopeReachService {
     projects: TraceDestinationProject[],
   ): KeyReach[] {
     const projectsById = new Map(projects.map((project) => [project.id, project]));
+
     return candidates.map((candidate) => {
       const project = candidate.traceProjectId
         ? projectsById.get(candidate.traceProjectId)
@@ -63,6 +66,7 @@ export class GatewayBudgetScopeReachService {
       if (project) {
         teamIds.add(project.teamId);
       }
+
       return { ...candidate, teamIds: [...teamIds], projectId: project?.id ?? null };
     });
   }

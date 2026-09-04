@@ -33,11 +33,13 @@ export class GithubBranchMaintenanceService {
         await this.deps.mapping.map(target);
       }
     }
+
     return due.length;
   }
 
   pruneStaleBranchLinkage(): Promise<{ branchChecks: number }> {
     const now = this.deps.now?.() ?? Date.now();
+
     return this.deps.repository.deleteStaleBefore({
       before: new Date(now - ACTIVE_WINDOW_MS),
     });

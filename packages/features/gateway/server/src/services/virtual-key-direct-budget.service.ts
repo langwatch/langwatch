@@ -53,7 +53,9 @@ export async function loadDirectBudgetsForKeys(args: {
 }): Promise<Map<string, VirtualKeyDirectBudget>> {
   const { prisma, chRepo, now = new Date() } = args;
   const out = new Map<string, VirtualKeyDirectBudget>();
-  if (args.virtualKeyIds.length === 0) return out;
+  if (args.virtualKeyIds.length === 0) {
+    return out;
+  }
 
   const budgets = await prisma.gatewayBudget.findMany({
     where: {
@@ -68,7 +70,9 @@ export async function loadDirectBudgetsForKeys(args: {
   });
 
   const chosen = chooseOnePerKey(budgets, new Set(args.virtualKeyIds));
-  if (chosen.size === 0) return out;
+  if (chosen.size === 0) {
+    return out;
+  }
 
   const spentByBudgetId = await loadPeriodSpend({
     prisma,
@@ -91,6 +95,7 @@ export async function loadDirectBudgetsForKeys(args: {
       resetsAt: GatewayWindow.nextResetAt(budget.window, now).toISOString(),
     });
   }
+
   return out;
 }
 
@@ -109,9 +114,15 @@ function chooseOnePerKey(
   const chosen = new Map<string, GatewayBudget>();
   for (const budget of budgets) {
     const keyId = keyThisBudgetBelongsTo(budget, visibleKeyIds);
-    if (!keyId) continue;
-    if (winsOver(budget, chosen.get(keyId))) chosen.set(keyId, budget);
+    if (!keyId) {
+      continue;
+    }
+
+    if (winsOver(budget, chosen.get(keyId))) {
+      chosen.set(keyId, budget);
+    }
   }
+
   return chosen;
 }
 
@@ -126,14 +137,21 @@ function chooseOnePerKey(
  */
 function keyThisBudgetBelongsTo(budget: GatewayBudget, visibleKeyIds: Set<string>): string | null {
   const scoped = budget.scopeType === "VIRTUAL_KEY" ? budget.scopeId : null;
-  if (scoped && visibleKeyIds.has(scoped)) return scoped;
+  if (scoped && visibleKeyIds.has(scoped)) {
+    return scoped;
+  }
+
   const managed = budget.managedByVirtualKeyId;
+
   return managed && visibleKeyIds.has(managed) ? managed : null;
 }
 
 /** First row seen wins, except that a drawer-managed row displaces one that is not. */
 function winsOver(candidate: GatewayBudget, incumbent: GatewayBudget | undefined): boolean {
-  if (!incumbent) return true;
+  if (!incumbent) {
+    return true;
+  }
+
   return !incumbent.managedByVirtualKeyId && !!candidate.managedByVirtualKeyId;
 }
 
@@ -150,7 +168,10 @@ async function loadPeriodSpend(args: {
   now: Date;
 }): Promise<Map<string, string> | null> {
   const { prisma, organizationId, budgets, chRepo, now } = args;
-  if (!chRepo) return null;
+  if (!chRepo) {
+    return null;
+  }
+
   // ORG/TEAM/PRINCIPAL rows accrue under whichever project emitted the
   // trace, so every project in the organization is a tenant to sum over.
   const projects = await prisma.project.findMany({
@@ -163,6 +184,7 @@ async function loadPeriodSpend(args: {
       spendTargetsForBudgets({ budgets, now }),
       now,
     );
+
     return new Map(spends.map((s) => [s.budgetId, s.spentUsd]));
   } catch (error) {
     // The bar degrades to "unknown" either way, but a broken rollup read
@@ -175,6 +197,7 @@ async function loadPeriodSpend(args: {
       },
       "the direct-budget spend rollup could not be read; the bar degrades to unknown",
     );
+
     return null;
   }
 }

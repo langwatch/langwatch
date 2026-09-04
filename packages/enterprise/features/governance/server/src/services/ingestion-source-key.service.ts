@@ -51,6 +51,7 @@ export class IngestionKeyService {
     const origin = input.createdByDeviceLabel
       ? `${input.sourceType}, ${input.createdByDeviceLabel}`
       : input.sourceType;
+
     return this.mint({ ...input, name: `Ingestion key (${origin})` });
   }
 
@@ -62,7 +63,9 @@ export class IngestionKeyService {
     createdByDeviceLabel?: string | null;
   }): Promise<IssuedIngestionKey> {
     const workspace = await this.organizations.tryFindPersonalWorkspace(input);
-    if (!workspace) throw new PersonalWorkspaceMissingError();
+    if (!workspace) {
+      throw new PersonalWorkspaceMissingError();
+    }
 
     return this.ensureForProject({
       callerUserId: input.userId,
@@ -80,12 +83,15 @@ export class IngestionKeyService {
     organizationId: string;
   }): Promise<PersonalIngestionKey[]> {
     const workspace = await this.organizations.tryFindPersonalWorkspace(input);
-    if (!workspace) return [];
+    if (!workspace) {
+      return [];
+    }
 
     const keys = await this.repository.findIngestKeysForProject({
       organizationId: input.organizationId,
       projectId: workspace.project.id,
     });
+
     return keys.flatMap((key) =>
       key.ingestSourceType
         ? [
@@ -115,6 +121,7 @@ export class IngestionKeyService {
       ingestionTemplateId: input.ingestionTemplateId ?? null,
       createdByDeviceLabel: input.createdByDeviceLabel ?? null,
     });
+
     return {
       token,
       apiKeyId: apiKey.id,

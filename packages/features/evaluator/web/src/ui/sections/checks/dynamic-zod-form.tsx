@@ -330,7 +330,7 @@ const DynamicZodForm = ({
 
     const fieldSchema_ = fieldSchema instanceof z.ZodOptional ? fieldSchema.unwrap() : fieldSchema;
 
-    const fieldKey = [...fieldName.split(".")].reverse()[0] ?? "";
+    const fieldKey = fieldName.split(".").reverse()[0] ?? "";
 
     if (fieldSchema_ instanceof z.ZodDefault) {
       const innerSchema = fieldSchema_.unwrap();
@@ -379,7 +379,7 @@ const DynamicZodForm = ({
                 fontWeight={variant === "studio" ? 400 : undefined}
                 fontSize={variant === "studio" ? "13px" : undefined}
               >
-                {camelCaseToTitleCase([...fieldName.split(".")].reverse()[0] ?? "")}
+                {camelCaseToTitleCase(fieldName.split(".").reverse()[0] ?? "")}
               </Field.Label>
             )}
           </HStack>

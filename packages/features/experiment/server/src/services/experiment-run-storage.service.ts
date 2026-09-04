@@ -128,6 +128,7 @@ export class ExperimentRunStorageService {
     } catch (err) {
       this.chDispatchFailures++;
       logger.error({ err, runId }, "Failed to dispatch startExperimentRun to CH");
+
       throw err;
     }
   }
@@ -229,6 +230,7 @@ export class ExperimentRunStorageService {
         });
         this.completedTargetEvaluatorScores.set(key, arr);
       }
+
       const dbEvaluator = evaluatorConfig?.dbEvaluatorId
         ? loadedEvaluators?.get(evaluatorConfig.dbEvaluatorId)
         : null;

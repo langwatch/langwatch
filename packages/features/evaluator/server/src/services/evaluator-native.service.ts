@@ -31,6 +31,7 @@ export class EvaluatorNativeService {
       if (input.evaluatorType === API_KEYS_AND_SECRETS_DETECTION) {
         return EvaluatorNativeService.evaluateApiKeysAndSecrets(input.data);
       }
+
       return {
         status: "error",
         error_type: "NATIVE_EVALUATOR_NOT_FOUND",
@@ -57,13 +58,17 @@ export class EvaluatorNativeService {
    */
   augment(input: EvaluatorResultAugmentationInput): SingleEvaluationResult {
     const kind = AUGMENT_KIND[input.evaluatorType];
-    if (!kind || input.result.status === "error") return input.result;
+    if (!kind || input.result.status === "error") {
+      return input.result;
+    }
 
     const texts = EvaluatorNativeService.collectStrings(input.mappedData);
     const markerHits = this.countRedactedValues(kind, texts, input.settings);
     const hasContent = texts.some((text) => text.trim().length > 0);
     const droppedFail = !hasContent && input.droppedCategories.length > 0;
-    if (markerHits === 0 && !droppedFail) return input.result;
+    if (markerHits === 0 && !droppedFail) {
+      return input.result;
+    }
 
     return this.reFailed(input, markerHits, droppedFail, kind);
   }
@@ -85,12 +90,16 @@ export class EvaluatorNativeService {
     for (const text of texts) {
       for (const [entity, count] of findRedactionMarkers(text)) {
         const isSecret = entity === SECRET_MARKER_ENTITY;
-        if (kind === "secret" && isSecret) hits += count;
+        if (kind === "secret" && isSecret) {
+          hits += count;
+        }
+
         if (kind === "pii" && !isSecret && (enabled === null || enabled.has(entity))) {
           hits += count;
         }
       }
     }
+
     return hits;
   }
 
@@ -125,27 +134,43 @@ export class EvaluatorNativeService {
     } else if (markerHits > 1) {
       notes.push(`${markerHits} ${noun} values were already redacted at ingestion`);
     }
-    if (droppedFail) notes.push("content was dropped at ingestion and could not be checked");
+
+    if (droppedFail) {
+      notes.push("content was dropped at ingestion and could not be checked");
+    }
+
     return notes;
   }
 
   private static collectStrings(value: unknown): string[] {
     const values: string[] = [];
     const walk = (node: unknown, depth: number): void => {
-      if (values.length >= MAX_STRINGS || depth > MAX_DEPTH) return;
+      if (values.length >= MAX_STRINGS || depth > MAX_DEPTH) {
+        return;
+      }
+
       if (typeof node === "string") {
         values.push(node);
+
         return;
       }
+
       if (Array.isArray(node)) {
-        for (const item of node) walk(item, depth + 1);
+        for (const item of node) {
+          walk(item, depth + 1);
+        }
+
         return;
       }
+
       if (node && typeof node === "object") {
-        for (const item of Object.values(node)) walk(item, depth + 1);
+        for (const item of Object.values(node)) {
+          walk(item, depth + 1);
+        }
       }
     };
     walk(value, 0);
+
     return values;
   }
 
@@ -153,13 +178,17 @@ export class EvaluatorNativeService {
     const matches = EvaluatorNativeService.collectStrings(data).flatMap((text) =>
       detectSecretsInText({ text }),
     );
-    if (matches.length === 0) return { status: "processed", score: 0, passed: true };
+    if (matches.length === 0) {
+      return { status: "processed", score: 0, passed: true };
+    }
 
     const byRule = new Map<string, number>();
     for (const match of matches) {
       byRule.set(match.ruleId, (byRule.get(match.ruleId) ?? 0) + 1);
     }
+
     const summary = [...byRule.entries()].map(([rule, count]) => `${rule} (${count})`).join(", ");
+
     return {
       status: "processed",
       score: matches.length,
@@ -172,11 +201,17 @@ export class EvaluatorNativeService {
     settings: Record<string, unknown> | undefined,
   ): Set<string> | null {
     const entities = settings?.entities;
-    if (!entities || typeof entities !== "object") return null;
+    if (!entities || typeof entities !== "object") {
+      return null;
+    }
+
     const enabled = new Set<string>();
     for (const [key, value] of Object.entries(entities)) {
-      if (value) enabled.add(key.toUpperCase());
+      if (value) {
+        enabled.add(key.toUpperCase());
+      }
     }
+
     return enabled;
   }
 }

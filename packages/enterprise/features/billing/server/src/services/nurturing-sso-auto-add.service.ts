@@ -21,7 +21,9 @@ export function fireSsoAutoAddNurturingCalls({
   organizationName: string;
 }): void {
   const nurturing = tryNurturingSink();
-  if (!nurturing) return;
+  if (!nurturing) {
+    return;
+  }
 
   void nurturing
     .identifyUser({

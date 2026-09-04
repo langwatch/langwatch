@@ -55,7 +55,7 @@ export function composeBugReportFeature(options: {
         actorId: entry.userId,
         path: entry.action,
         input: {
-          ...(entry.args ?? {}),
+          ...entry.args,
           targetKind: entry.targetKind,
           ...(entry.targetId === undefined ? {} : { targetId: entry.targetId }),
         },

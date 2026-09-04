@@ -82,6 +82,7 @@ export class GithubInstallationsService {
         attemptedOrganizationId: input.organizationId,
       });
     }
+
     const repositories = await this.tryReadSelectedRepositories(details);
     const record = {
       installationId: details.installationId,
@@ -102,6 +103,7 @@ export class GithubInstallationsService {
         attemptedOrganizationId: input.organizationId,
       });
     }
+
     if (!wasInserted) {
       await this.repository.upsert(record);
     }
@@ -178,6 +180,7 @@ export class GithubInstallationsService {
         { error, installationId: details.installationId },
         "failed to cache selected repositories",
       );
+
       return null;
     }
   }
@@ -215,8 +218,14 @@ const INSTALLATION_CREATION_SKEW_MS = 60_000;
  * flow, so it is refused: the whole point is that an unproven claim fails.
  */
 function installationBelongsToFlow(createdAt: string | null, flowStartedAt: number): boolean {
-  if (!createdAt) return false;
+  if (!createdAt) {
+    return false;
+  }
+
   const created = Date.parse(createdAt);
-  if (Number.isNaN(created)) return false;
+  if (Number.isNaN(created)) {
+    return false;
+  }
+
   return created >= flowStartedAt - INSTALLATION_CREATION_SKEW_MS;
 }

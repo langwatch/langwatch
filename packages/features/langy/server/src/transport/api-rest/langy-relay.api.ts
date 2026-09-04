@@ -113,7 +113,7 @@ export function createLangyRelayRestApp(options: {
       logger.warn(
         {
           error: error instanceof Error ? error.message : String(error),
-          ...(relay.pinnedTurn ?? {}),
+          ...relay.pinnedTurn,
         },
         "relay stream read error — connection closed mid-turn",
       );
@@ -126,7 +126,7 @@ export function createLangyRelayRestApp(options: {
     ports.metrics.frames("duplicate", tally.duplicate);
     ports.metrics.frames("rejected", tally.rejected);
     if (tally.terminal) ports.metrics.frames("terminal", 1);
-    logger.info({ ...tally, ...(relay.pinnedTurn ?? {}) }, "langy relay stream closed");
+    logger.info({ ...tally, ...relay.pinnedTurn }, "langy relay stream closed");
 
     return c.json(tally, 200);
   });

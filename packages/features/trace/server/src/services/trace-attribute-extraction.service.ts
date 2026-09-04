@@ -185,9 +185,11 @@ export class TraceAttributeExtractionService {
       if (STANDARD_RESOURCE_PREFIXES.some((p) => key.startsWith(p))) {
         continue;
       }
+
       if (NON_HOISTED_RESOURCE_KEYS.has(key)) {
         continue;
       }
+
       // Normalize langwatch.metadata.* resource attributes to metadata.* canonical form
       const normalizedKey = key.startsWith("langwatch.metadata.")
         ? key.replace("langwatch.metadata.", "metadata.")
@@ -214,6 +216,7 @@ export class TraceAttributeExtractionService {
       if (result[dest]) {
         continue;
       }
+
       for (const source of sources) {
         const v = resourceAttrs[source] ?? result[source];
         if (typeof v === "string" && v.length > 0) {
@@ -317,6 +320,7 @@ export class TraceAttributeExtractionService {
       if (!key.startsWith("metadata.")) {
         continue;
       }
+
       if (typeof value === "string") {
         result[key] = value;
       } else if (value !== null && value !== undefined) {
@@ -374,6 +378,7 @@ export class TraceAttributeExtractionService {
     if (labels.length === 0) {
       return;
     }
+
     const existing = parseJsonStringArray(result[ATTR_KEYS.LANGWATCH_LABELS]);
     result[ATTR_KEYS.LANGWATCH_LABELS] = JSON.stringify([...new Set([...existing, ...labels])]);
   }
@@ -383,6 +388,7 @@ export class TraceAttributeExtractionService {
     if (result[key]) {
       return;
     }
+
     if (typeof value === "string" && value.length > 0) {
       result[key] = value;
     }

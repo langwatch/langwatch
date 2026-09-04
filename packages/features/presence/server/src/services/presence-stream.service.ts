@@ -51,6 +51,7 @@ export class PresenceStreamService {
   }): AsyncGenerator<PresenceEvent> {
     if (!(await this.presence.isEnabledForProject({ projectId }))) {
       yield { kind: "snapshot", sessions: [] };
+
       return;
     }
 
@@ -115,26 +116,40 @@ export class PresenceStreamService {
     sessionId: string;
     signal?: AbortSignal;
   }): AsyncGenerator<PresenceCursorEvent> {
-    if (!(await this.presence.isEnabledForProject({ projectId }))) return;
+    if (!(await this.presence.isEnabledForProject({ projectId }))) {
+      return;
+    }
 
     const emitter = this.emitters.getTenantEmitter(projectId);
 
     try {
       for await (const frame of on(emitter, "presence_cursor", { signal })) {
         const decoded = decodeFrame(frame);
-        if (decoded === undefined) continue;
+        if (decoded === undefined) {
+          continue;
+        }
 
         const result = presenceCursorEventSchema.safeParse(decoded);
-        if (!result.success) continue;
+        if (!result.success) {
+          continue;
+        }
 
         const parsed = result.data;
         // Defense-in-depth: per-tenant emitter already isolates this, but
         // a malformed payload or future shared-emitter regression must not
         // leak cursors across projects.
-        if (parsed.projectId !== projectId) continue;
-        if (parsed.anchor !== anchor) continue;
+        if (parsed.projectId !== projectId) {
+          continue;
+        }
+
+        if (parsed.anchor !== anchor) {
+          continue;
+        }
+
         // Don't echo a client's own cursor back to it.
-        if (parsed.sessionId === sessionId) continue;
+        if (parsed.sessionId === sessionId) {
+          continue;
+        }
 
         yield parsed;
       }

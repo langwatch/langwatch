@@ -241,7 +241,9 @@ export class SavedViewService {
     const existing = await this.repository.findAll({ projectId });
     const existingNames = new Set(existing.map((v) => v.name));
     const missing = SEED_VIEWS.filter((seed) => !existingNames.has(seed.name));
-    if (missing.length === 0) return;
+    if (missing.length === 0) {
+      return;
+    }
 
     const highestOrder = existing.reduce((acc, v) => (v.order > acc ? v.order : acc), -1);
     await this.repository.createMany({

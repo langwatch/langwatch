@@ -74,6 +74,7 @@ export class ApiKeyVisibilityService {
         },
       );
     }
+
     if (candidates.data.length === 0) {
       return { kind: "some", ids: [] };
     }
@@ -88,6 +89,7 @@ export class ApiKeyVisibilityService {
         teamId: project.teamId,
       })),
     });
+
     return {
       kind: "some",
       ids: candidates.data

@@ -162,13 +162,12 @@ export default function BatchEvaluation({
           evaluations.processed.reduce((acc, curr) => acc + curr.score, 0) /
             evaluations.processed.length,
         ];
-      } else {
-        return [
-          evaluation,
-          evaluations.processed.filter((evaluation) => evaluation.passed).length /
-            evaluations.processed.length,
-        ];
       }
+      return [
+        evaluation,
+        evaluations.processed.filter((evaluation) => evaluation.passed).length /
+          evaluations.processed.length,
+      ];
     }),
   );
 

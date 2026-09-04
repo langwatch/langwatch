@@ -82,7 +82,9 @@ function loadConfig(credentials: Auth0ManagementCredentials): Auth0Config {
         "Auth0 environment variables are not set. Set AUTH0_ISSUER and either AUTH0_MGMT_CLIENT_ID/SECRET (preferred — a separate Machine-to-Machine app) or AUTH0_CLIENT_ID/SECRET.",
     });
   }
+
   const trimmedIssuer = issuer.replace(/\/+$/, "");
+
   return {
     issuer: trimmedIssuer,
     mgmtClientId,
@@ -122,6 +124,7 @@ async function fetchAuth0(url: string, init: Omit<RequestInit, "signal">): Promi
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+
     throw new Auth0ApiError({
       status: 502,
       code: "unknown",
@@ -243,7 +246,9 @@ export async function updateUserPassword(args: {
     }),
   });
 
-  if (res.ok) return;
+  if (res.ok) {
+    return;
+  }
 
   const body = (await parseJsonSafe(res)) as
     | { errorCode?: string; message?: string; error?: string }
@@ -259,6 +264,7 @@ export async function updateUserPassword(args: {
       { status: res.status, body },
       "Auth0 Management API rejected password update — missing update:users scope",
     );
+
     throw new Auth0ApiError({
       status: res.status,
       code: "insufficient_scope",
@@ -279,6 +285,7 @@ export async function updateUserPassword(args: {
       { status: res.status, body },
       "Auth0 Management API rejected new password (tenant policy)",
     );
+
     throw new Auth0ApiError({
       status: res.status,
       code: "weak_password",
@@ -288,6 +295,7 @@ export async function updateUserPassword(args: {
   }
 
   logger.error({ status: res.status, body }, "Auth0 Management API password update failed");
+
   throw new Auth0ApiError({
     status: res.status,
     code: "unknown",
@@ -317,18 +325,25 @@ function extractPasswordPolicyMessage(
   body: { errorCode?: string; message?: string; error?: string } | undefined,
 ): string | null {
   const message = body?.message;
-  if (typeof message !== "string") return null;
+  if (typeof message !== "string") {
+    return null;
+  }
+
   const policyPrefixes = [
     "PasswordStrengthError",
     "PasswordHistoryError",
     "PasswordDictionaryError",
     "PasswordNoUserInfoError",
   ];
-  if (!policyPrefixes.some((p) => message.startsWith(p))) return null;
+  if (!policyPrefixes.some((p) => message.startsWith(p))) {
+    return null;
+  }
+
   // Strip the "PasswordStrengthError: " prefix so the user sees a clean
   // sentence ("Password is too weak.") instead of the type tag.
   const colonIdx = message.indexOf(":");
   const cleaned = colonIdx >= 0 ? message.slice(colonIdx + 1).trim() : message;
+
   return cleaned.length > 0
     ? `${cleaned} Please choose a stronger password (Auth0 tenant policy).`
     : "Auth0 rejected the new password as too weak. Please choose a stronger one.";
@@ -370,14 +385,18 @@ export async function verifyCurrentPassword(args: {
     }),
   });
 
-  if (res.ok) return true;
+  if (res.ok) {
+    return true;
+  }
 
   const body = (await parseJsonSafe(res)) as
     | { error?: string; error_description?: string }
     | undefined;
 
   // Wrong email or password — Auth0 returns 403 with error=invalid_grant.
-  if (body?.error === "invalid_grant") return false;
+  if (body?.error === "invalid_grant") {
+    return false;
+  }
 
   // The M2M app doesn't have the Password grant enabled. Surface a
   // setup-fixable error so callers don't show "wrong password" when
@@ -391,6 +410,7 @@ export async function verifyCurrentPassword(args: {
       { status: res.status, body },
       "Auth0 Password grant is not enabled on the Management M2M application",
     );
+
     throw new Auth0ApiError({
       status: res.status,
       code: "password_grant_not_enabled",
@@ -437,7 +457,9 @@ export async function changeAuth0Password(args: {
     email: args.email,
     password: args.currentPassword,
   });
-  if (!verified) return { ok: false, reason: "wrong_password" };
+  if (!verified) {
+    return { ok: false, reason: "wrong_password" };
+  }
 
   const token = await getManagementApiToken(args.credentials);
   await updateUserPassword({

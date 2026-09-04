@@ -200,6 +200,7 @@ export class ModelProviderDefaultsService {
         role,
       );
     }
+
     for (const feature of features) {
       effective[feature.key] = this.resolveConfigured(
         input.configs,
@@ -231,6 +232,7 @@ export class ModelProviderDefaultsService {
       const configured = this.resolveConfigured(input.configs, input.tiers, key, role, false);
       inherited[key] = configured ?? (await this.inferDefault(input.projectId, key));
     }
+
     for (const feature of features) {
       inherited[feature.key] = inherited[feature.key] ?? inherited[feature.role] ?? null;
     }
@@ -343,6 +345,7 @@ export class ModelProviderDefaultsService {
     }
 
     const projectScopes = await this.options.scopes.getProjectScopes(projectId);
+
     return this.options.defaults.listForProject(projectScopes);
   }
 
@@ -407,6 +410,7 @@ export class ModelProviderDefaultsService {
       if (scope.scopeType === "ORGANIZATION") {
         return scope.scopeId === organizationId;
       }
+
       if (scope.scopeType === "TEAM") {
         return available.teams.some((team) => team.id === scope.scopeId);
       }
@@ -463,6 +467,7 @@ export class ModelProviderDefaultsService {
         chain.push({ scopeType: "TEAM", scopeId: project.teamId });
       }
     }
+
     if (organizationId) {
       chain.push({ scopeType: "ORGANIZATION", scopeId: organizationId });
     }

@@ -92,7 +92,10 @@ export class DatasetService extends DatasetServiceContract {
         slug,
         excludeId: existing.id,
       });
-      if (conflict) throw new DatasetConflictError();
+      if (conflict) {
+        throw new DatasetConflictError();
+      }
+
       const update: DatasetUpdateInput = {
         id: existing.id,
         projectId: parsed.projectId,
@@ -113,6 +116,7 @@ export class DatasetService extends DatasetServiceContract {
           columnTypes: parsed.columnTypes,
         });
       }
+
       return this.options.repository.update(update);
     }
 
@@ -120,7 +124,10 @@ export class DatasetService extends DatasetServiceContract {
       projectId: parsed.projectId,
       slug,
     });
-    if (conflict) throw new DatasetConflictError();
+    if (conflict) {
+      throw new DatasetConflictError();
+    }
+
     const created = await this.options.repository.create({
       projectId: parsed.projectId,
       name,
@@ -137,6 +144,7 @@ export class DatasetService extends DatasetServiceContract {
         })),
       });
     }
+
     return created;
   }
 
@@ -148,6 +156,7 @@ export class DatasetService extends DatasetServiceContract {
       slug,
       excludeId: parsed.excludeDatasetId,
     });
+
     return {
       available: conflict === null,
       slug,
@@ -158,7 +167,10 @@ export class DatasetService extends DatasetServiceContract {
   async findNextAvailableName(input: DatasetNameInput): Promise<string> {
     const parsed = datasetNameInputSchema.parse(input);
     const baseName = parsed.proposedName.trim();
-    if ((await this.validateDatasetName(parsed)).available) return baseName;
+    if ((await this.validateDatasetName(parsed)).available) {
+      return baseName;
+    }
+
     for (let index = 2; index < 10_000; index += 1) {
       const candidate = `${baseName} ${index}`;
       if (
@@ -172,6 +184,7 @@ export class DatasetService extends DatasetServiceContract {
         return candidate;
       }
     }
+
     throw new DatasetConflictError("Unable to find an available dataset name");
   }
 
@@ -186,7 +199,10 @@ export class DatasetService extends DatasetServiceContract {
         projectId: parsed.projectId,
         slug: parsed.slugOrId,
       }));
-    if (!dataset) throw new DatasetNotFoundError();
+    if (!dataset) {
+      throw new DatasetNotFoundError();
+    }
+
     return dataset;
   }
 
@@ -199,11 +215,15 @@ export class DatasetService extends DatasetServiceContract {
             projectId: input.projectId,
           });
         } catch (error) {
-          if (error instanceof DatasetNotFoundError) return null;
+          if (error instanceof DatasetNotFoundError) {
+            return null;
+          }
+
           throw error;
         }
       }),
     );
+
     return datasets.filter((dataset): dataset is Dataset => dataset !== null);
   }
 
@@ -216,6 +236,7 @@ export class DatasetService extends DatasetServiceContract {
       slugOrId: input.datasetId,
       projectId: input.projectId,
     });
+
     return this.options.repository.update({
       id: dataset.id,
       projectId: input.projectId,
@@ -228,6 +249,7 @@ export class DatasetService extends DatasetServiceContract {
   async listDatasets(input: ListDatasetsInput): Promise<DatasetListResult> {
     const parsed = listDatasetsInputSchema.parse(input);
     const data = await this.options.repository.list(parsed);
+
     return {
       data,
       pagination: {
@@ -252,6 +274,7 @@ export class DatasetService extends DatasetServiceContract {
       slug: `${dataset.slug}-archived-${this.generateId()}`,
       archivedAt: new Date(),
     });
+
     return { id: dataset.id, archived: true };
   }
 
@@ -264,12 +287,16 @@ export class DatasetService extends DatasetServiceContract {
       projectId: input.projectId,
       includeArchived: true,
     });
-    if (!dataset) throw new DatasetNotFoundError();
+    if (!dataset) {
+      throw new DatasetNotFoundError();
+    }
+
     await this.options.repository.restore({
       id: dataset.id,
       projectId: input.projectId,
       slug: DatasetService.slugify(dataset.name),
     });
+
     return { success: true };
   }
 
@@ -284,6 +311,7 @@ export class DatasetService extends DatasetServiceContract {
       projectId: input.projectId,
     });
     const existing = (dataset.mapping as Record<string, unknown> | null) ?? {};
+
     return this.options.repository.updateMapping({
       id: dataset.id,
       projectId: input.projectId,
@@ -305,6 +333,7 @@ export class DatasetService extends DatasetServiceContract {
     if (dataset.contentLayout === "s3_jsonl" && this.options.content) {
       return this.options.content.listRecords({ dataset, input: parsed });
     }
+
     const result = await this.options.records.list({
       datasetId: dataset.id,
       projectId: parsed.projectId,
@@ -313,6 +342,7 @@ export class DatasetService extends DatasetServiceContract {
     });
     const page = parsed.page ?? 1;
     const limit = parsed.limit ?? 50;
+
     return {
       data: result.records,
       pagination: {
@@ -334,12 +364,14 @@ export class DatasetService extends DatasetServiceContract {
     if (dataset.contentLayout === "s3_jsonl" && this.options.content) {
       return this.options.content.getDatasetPage({ dataset, input: parsed });
     }
+
     const page = await this.options.records.list({
       datasetId: dataset.id,
       projectId: parsed.projectId,
       page: parsed.page ?? 1,
       limit: parsed.limit ?? 50,
     });
+
     return {
       id: dataset.id,
       name: dataset.name,
@@ -371,6 +403,7 @@ export class DatasetService extends DatasetServiceContract {
         limitMb: parsed.limitMb ?? 5,
       });
     }
+
     const records: DatasetRecord[] = [];
     let page = 1;
     while (true) {
@@ -381,11 +414,16 @@ export class DatasetService extends DatasetServiceContract {
         limit: 200,
       });
       records.push(...result.data);
-      if (result.data.length < 200 || records.length >= result.pagination.total) break;
+      if (result.data.length < 200 || records.length >= result.pagination.total) {
+        break;
+      }
+
       page += 1;
     }
+
     const selected = DatasetService.selectRecords(records, parsed.entrySelection);
     const limited = DatasetService.limitRecordsByBytes(selected, parsed.limitMb ?? 5);
+
     return { dataset, records: limited.records, truncated: limited.truncated };
   }
 
@@ -399,12 +437,14 @@ export class DatasetService extends DatasetServiceContract {
     if (dataset.contentLayout === "s3_jsonl" && this.options.content) {
       return this.options.content.getDatasetHead({ dataset });
     }
+
     const page = await this.listRecords({
       slugOrId: parsed.slugOrId,
       projectId: parsed.projectId,
       page: 1,
       limit: 5,
     });
+
     return { dataset, records: page.data, total: page.pagination.total };
   }
 
@@ -420,6 +460,7 @@ export class DatasetService extends DatasetServiceContract {
     if (dataset.contentLayout === "s3_jsonl" && this.options.content) {
       return this.options.content.upsertRecord({ dataset, input: parsed });
     }
+
     try {
       return {
         record: await this.options.records.update({
@@ -431,14 +472,20 @@ export class DatasetService extends DatasetServiceContract {
         created: false,
       };
     } catch (error) {
-      if (!DatasetService.isNotFound(error)) throw error;
+      if (!DatasetService.isNotFound(error)) {
+        throw error;
+      }
     }
+
     const [record] = await this.options.records.createMany({
       datasetId: dataset.id,
       projectId: parsed.projectId,
       entries: [{ id: parsed.recordId, ...sanitizedEntry(parsed.updatedRecord) }],
     });
-    if (!record) throw new Error("Dataset record creation returned no record");
+    if (!record) {
+      throw new Error("Dataset record creation returned no record");
+    }
+
     return { record, created: true };
   }
 
@@ -458,6 +505,7 @@ export class DatasetService extends DatasetServiceContract {
     if (dataset.contentLayout === "s3_jsonl" && this.options.content) {
       return this.options.content.batchCreateRecords({ dataset, input: parsed });
     }
+
     return this.options.records.createMany({
       datasetId: dataset.id,
       projectId: parsed.projectId,
@@ -470,6 +518,7 @@ export class DatasetService extends DatasetServiceContract {
 
   async createRecords(input: CreateDatasetRecordsInput): Promise<DatasetRecord[]> {
     const parsed = createDatasetRecordsInputSchema.parse(input);
+
     return this.batchCreateRecords(parsed);
   }
 
@@ -485,8 +534,10 @@ export class DatasetService extends DatasetServiceContract {
         dataset,
         input: { ...parsed, recordId: parsed.recordId },
       });
+
       return result.record;
     }
+
     try {
       return await this.options.records.update({
         id: parsed.recordId,
@@ -495,7 +546,10 @@ export class DatasetService extends DatasetServiceContract {
         entry: sanitizedEntry(parsed.updatedRecord),
       });
     } catch (error) {
-      if (DatasetService.isNotFound(error)) throw new DatasetRecordNotFoundError();
+      if (DatasetService.isNotFound(error)) {
+        throw new DatasetRecordNotFoundError();
+      }
+
       throw error;
     }
   }
@@ -510,59 +564,84 @@ export class DatasetService extends DatasetServiceContract {
     if (dataset.contentLayout === "s3_jsonl" && this.options.content) {
       return this.options.content.deleteRecords({ dataset, input: parsed });
     }
+
     const count = await this.options.records.deleteMany({
       ...parsed,
       datasetId: dataset.id,
     });
+
     return { count };
   }
 
   async uploadToExistingDataset(
     input: UploadExistingDatasetInput,
   ): Promise<{ datasetId: string; recordsCreated: number }> {
-    if (!this.options.uploads) throw new Error("Dataset upload capability is not configured");
+    if (!this.options.uploads) {
+      throw new Error("Dataset upload capability is not configured");
+    }
+
     return this.options.uploads.uploadToExistingDataset(input);
   }
 
   async createDatasetFromUpload(
     input: CreateDatasetFromUploadInput,
   ): Promise<import("@langwatch/dataset-contract").CreateDatasetFromUploadResult> {
-    if (!this.options.uploads) throw new Error("Dataset upload capability is not configured");
+    if (!this.options.uploads) {
+      throw new Error("Dataset upload capability is not configured");
+    }
+
     return this.options.uploads.createDatasetFromUpload(input);
   }
 
   async createPendingUpload(input: PendingUploadInput): Promise<PendingUploadResult> {
-    if (!this.options.uploads) throw new Error("Dataset upload capability is not configured");
+    if (!this.options.uploads) {
+      throw new Error("Dataset upload capability is not configured");
+    }
+
     return this.options.uploads.createPendingUpload(input);
   }
 
   async writeStagedUpload(input: StagedUploadInput): Promise<void> {
-    if (!this.options.uploads) throw new Error("Dataset upload capability is not configured");
+    if (!this.options.uploads) {
+      throw new Error("Dataset upload capability is not configured");
+    }
+
     return this.options.uploads.writeStagedUpload(input);
   }
 
   async abortPendingUpload(
     input: AbortPendingUploadInput,
   ): Promise<{ datasetId: string; aborted: true }> {
-    if (!this.options.uploads) throw new Error("Dataset upload capability is not configured");
+    if (!this.options.uploads) {
+      throw new Error("Dataset upload capability is not configured");
+    }
+
     return this.options.uploads.abortPendingUpload(input);
   }
 
   async finalizeUpload(
     input: FinalizeUploadInput,
   ): Promise<{ datasetId: string; status: "processing" }> {
-    if (!this.options.uploads) throw new Error("Dataset upload capability is not configured");
+    if (!this.options.uploads) {
+      throw new Error("Dataset upload capability is not configured");
+    }
+
     const result = await this.options.uploads.finalizeUpload(input);
     await this.enqueueNormalize(input.projectId, input.datasetId);
+
     return result;
   }
 
   async retryNormalize(
     input: RetryNormalizeInput,
   ): Promise<{ datasetId: string; status: "processing" }> {
-    if (!this.options.uploads) throw new Error("Dataset upload capability is not configured");
+    if (!this.options.uploads) {
+      throw new Error("Dataset upload capability is not configured");
+    }
+
     const result = await this.options.uploads.retryNormalize(input);
     await this.enqueueNormalize(input.projectId, input.datasetId);
+
     return result;
   }
 
@@ -592,8 +671,10 @@ export class DatasetService extends DatasetServiceContract {
         target,
         targetProjectId: parsed.targetProjectId,
       });
+
       return target;
     }
+
     const records = await this.options.records.list({
       datasetId: source.id,
       projectId: parsed.sourceProjectId,
@@ -610,6 +691,7 @@ export class DatasetService extends DatasetServiceContract {
         })),
       });
     }
+
     return target;
   }
 
@@ -632,7 +714,10 @@ export class DatasetService extends DatasetServiceContract {
     const valid = new Set(columns);
     for (const entry of entries) {
       for (const key of Object.keys(entry)) {
-        if (key === "id" || valid.has(key)) continue;
+        if (key === "id" || valid.has(key)) {
+          continue;
+        }
+
         throw new InvalidColumnError({
           columnName: key,
           datasetName,
@@ -649,7 +734,10 @@ export class DatasetService extends DatasetServiceContract {
   }
 
   private async enqueueNormalize(projectId: string, datasetId: string): Promise<void> {
-    if (!this.options.queue) return;
+    if (!this.options.queue) {
+      return;
+    }
+
     await this.options.queue.enqueueNormalize({ projectId, datasetId });
   }
 
@@ -659,6 +747,7 @@ export class DatasetService extends DatasetServiceContract {
       .replaceAll(/[^\p{L}\p{N}]+/gu, "-")
       .replaceAll(/^-+|-+$/g, "")
       .toLowerCase();
+
     return slug || "dataset";
   }
 
@@ -670,8 +759,14 @@ export class DatasetService extends DatasetServiceContract {
     records: DatasetRecord[],
     selection: import("@langwatch/dataset-contract").DatasetEntrySelection,
   ): DatasetRecord[] {
-    if (selection === "all") return records;
-    if (records.length === 0) return [];
+    if (selection === "all") {
+      return records;
+    }
+
+    if (records.length === 0) {
+      return [];
+    }
+
     const index =
       selection === "first"
         ? 0
@@ -680,6 +775,7 @@ export class DatasetService extends DatasetServiceContract {
           : selection === "random"
             ? Math.floor(Math.random() * records.length)
             : Math.min(Math.max(selection, 0), records.length - 1);
+
     return [records[index]!];
   }
 
@@ -687,7 +783,10 @@ export class DatasetService extends DatasetServiceContract {
     records: DatasetRecord[],
     limitMb: number | null,
   ): { records: DatasetRecord[]; truncated: boolean } {
-    if (limitMb === null) return { records, truncated: false };
+    if (limitMb === null) {
+      return { records, truncated: false };
+    }
+
     const limitBytes = limitMb * 1024 * 1024;
     let bytes = 0;
     const result: DatasetRecord[] = [];
@@ -696,9 +795,11 @@ export class DatasetService extends DatasetServiceContract {
       if (bytes + recordBytes >= limitBytes) {
         return { records: result, truncated: true };
       }
+
       bytes += recordBytes;
       result.push(record);
     }
+
     return { records: result, truncated: false };
   }
 }

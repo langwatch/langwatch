@@ -42,11 +42,13 @@ export class ApiKeyGrantPolicyService {
     for (const binding of input.bindings) {
       await this.validateScope(binding, input.organizationId);
     }
+
     await this.assertCeiling(input);
   }
 
   async isOrgAdmin(input: { userId: string; organizationId: string }): Promise<boolean> {
     const bindings = await this.options.authz.listUserBindings(input);
+
     return bindings.some(
       (binding) =>
         binding.scopeType === "ORGANIZATION" &&
@@ -61,6 +63,7 @@ export class ApiKeyGrantPolicyService {
       scopeType: "ORGANIZATION",
       scopeIds: [input.organizationId],
     });
+
     return bindings.some(
       (binding) => binding.apiKeyId === input.apiKeyId && binding.role === "ADMIN",
     );
@@ -81,9 +84,11 @@ export class ApiKeyGrantPolicyService {
           "CUSTOM permissions require permissionMode 'restricted'",
         );
       }
+
       if (!hasCustomBinding) {
         throw new ApiKeyScopeViolationError("restricted mode requires at least one CUSTOM binding");
       }
+
       if (!hasPermissions) {
         throw new ApiKeyScopeViolationError("CUSTOM bindings require at least one permission");
       }
@@ -109,6 +114,7 @@ export class ApiKeyGrantPolicyService {
       if (scope.scopeType === "ORGANIZATION") {
         continue;
       }
+
       const personal = await this.repository.tryFindPersonalWorkspaceOwner({
         organizationId: input.organizationId,
         scopeId: scope.scopeId,
@@ -128,8 +134,10 @@ export class ApiKeyGrantPolicyService {
           "Organization scope must match the API key's organization",
         );
       }
+
       return { type: "organization", id: organizationId, organizationId };
     }
+
     if (binding.scopeType === "TEAM") {
       try {
         await this.options.organizations.getTeam({
@@ -141,12 +149,15 @@ export class ApiKeyGrantPolicyService {
           `Team ${binding.scopeId} not found in this organization`,
         );
       }
+
       return { type: "team", id: binding.scopeId, organizationId };
     }
+
     const project = await this.options.projects.getWithTeam(binding.scopeId);
     if (project.archivedAt || project.team.organizationId !== organizationId) {
       throw new ApiKeyScopeViolationError(`Project ${binding.scopeId} not found or archived`);
     }
+
     return {
       type: "project",
       id: binding.scopeId,
@@ -189,9 +200,11 @@ export class ApiKeyGrantPolicyService {
     if (scope.type === "organization") {
       return { type: "organization" as const, id: scope.id };
     }
+
     if (scope.type === "team") {
       return { type: "team" as const, id: scope.id, organizationId };
     }
+
     return {
       type: "project" as const,
       id: scope.id,
@@ -218,12 +231,15 @@ export class ApiKeyGrantPolicyService {
             : "project:view",
       ];
     }
+
     if (rawPermissions.length > 0) {
       return [...rawPermissions].sort();
     }
+
     if (!binding.customRoleId) {
       throw new ApiKeyScopeViolationError("CUSTOM role requires a customRoleId");
     }
+
     const role = (await this.options.authz.listUserCreatedRoles({ organizationId })).find(
       (candidate) => candidate.id === binding.customRoleId,
     );
@@ -236,6 +252,7 @@ export class ApiKeyGrantPolicyService {
         `Custom role ${binding.customRoleId} not found or has malformed permissions`,
       );
     }
+
     return [...role.permissions].sort();
   }
 
@@ -293,6 +310,7 @@ export class ApiKeyGrantPolicyService {
         reason: "api key grants replaced",
       });
     }
+
     return bindings;
   }
 }

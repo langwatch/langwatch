@@ -42,13 +42,16 @@ export class PostgresGovernancePolicyService {
     const key = `${input.organizationId}::${input.sourceType}`;
     const now = (this.options.clock ?? Date.now)();
     const cached = this.cache.get(key);
-    if (cached && cached.expiresAt > now) return cached.nonBillable;
+    if (cached && cached.expiresAt > now) {
+      return cached.nonBillable;
+    }
 
     let nonBillable = true;
     try {
       const configs = await this.repository.enabledCodingAssistantConfigs(input.organizationId);
       nonBillable = !configs.some((candidate) => {
         const parsed = codingAssistantConfigSchema.safeParse(candidate);
+
         return (
           parsed.success &&
           parsed.data.assistantKind === input.sourceType &&
@@ -63,10 +66,12 @@ export class PostgresGovernancePolicyService {
         sourceType: input.sourceType,
       });
     }
+
     this.cache.set(key, {
       nonBillable,
       expiresAt: now + (this.options.cacheTtlMs ?? 30_000),
     });
+
     return nonBillable;
   }
 
@@ -79,6 +84,7 @@ export class PostgresGovernancePolicyService {
         UNASSIGNED_DEPARTMENT
       );
     }
+
     return input.projectDepartmentId || UNASSIGNED_DEPARTMENT;
   }
 

@@ -40,25 +40,36 @@ export class CanonicalCostExtractorService {
       for (const scopeLog of resourceLog.scopeLogs ?? []) {
         for (const record of scopeLog.logRecords ?? []) {
           const parsed = this.tryParse(record, resource);
-          if (parsed) events.push(parsed);
+          if (parsed) {
+            events.push(parsed);
+          }
         }
       }
     }
+
     return events;
   }
 
   private merge(values: OtlpKeyValue[]): Record<string, unknown> {
     const result: Record<string, unknown> = {};
     for (const item of values) {
-      if (!item.key || !item.value) continue;
+      if (!item.key || !item.value) {
+        continue;
+      }
+
       const value = item.value;
-      if (value.stringValue !== undefined) result[item.key] = value.stringValue;
-      else if (value.intValue !== undefined) {
+      if (value.stringValue !== undefined) {
+        result[item.key] = value.stringValue;
+      } else if (value.intValue !== undefined) {
         result[item.key] =
           typeof value.intValue === "string" ? Number(value.intValue) : value.intValue;
-      } else if (value.doubleValue !== undefined) result[item.key] = value.doubleValue;
-      else if (value.boolValue !== undefined) result[item.key] = value.boolValue;
+      } else if (value.doubleValue !== undefined) {
+        result[item.key] = value.doubleValue;
+      } else if (value.boolValue !== undefined) {
+        result[item.key] = value.boolValue;
+      }
     }
+
     return result;
   }
 
@@ -69,7 +80,10 @@ export class CanonicalCostExtractorService {
     const merged = { ...resource, ...this.merge(record.attributes ?? []) };
     const requestId = this.tryString(merged[FIELD.requestId]);
     const costUsd = this.tryCost(merged[FIELD.costUsd]);
-    if (!requestId || costUsd === null) return null;
+    if (!requestId || costUsd === null) {
+      return null;
+    }
+
     return {
       costUsd,
       model: this.tryString(merged[FIELD.model]) ?? "unknown",
@@ -91,17 +105,27 @@ export class CanonicalCostExtractorService {
 
   private number(value: unknown): number {
     const parsed = typeof value === "number" ? value : Number(value);
+
     return Number.isFinite(parsed) ? parsed : 0;
   }
 
   private tryCost(value: unknown): string | null {
-    if (typeof value === "number" && Number.isFinite(value)) return String(value);
-    if (typeof value !== "string" || value.trim() === "") return null;
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return String(value);
+    }
+
+    if (typeof value !== "string" || value.trim() === "") {
+      return null;
+    }
+
     return Number.isFinite(Number(value)) ? value.trim() : null;
   }
 
   private date(value: OtlpFixed64 | undefined): Date {
-    if (value === undefined) return new Date();
+    if (value === undefined) {
+      return new Date();
+    }
+
     let nanos: bigint;
     if (typeof value === "string") {
       nanos = BigInt(value);
@@ -110,6 +134,7 @@ export class CanonicalCostExtractorService {
     } else {
       nanos = (BigInt(value.high >>> 0) << 32n) | BigInt(value.low >>> 0);
     }
+
     return new Date(Number(nanos / 1_000_000n));
   }
 }

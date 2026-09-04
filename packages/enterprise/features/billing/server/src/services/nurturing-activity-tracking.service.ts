@@ -23,12 +23,16 @@ let lastSweepAt = 0;
  * Only runs at most once per hour to keep per-call cost constant.
  */
 function sweepExpiredEntries({ now }: { now: number }): void {
-  if (now - lastSweepAt < ONE_HOUR_MS) return;
+  if (now - lastSweepAt < ONE_HOUR_MS) {
+    return;
+  }
+
   for (const [cachedUserId, sentAt] of lastActivitySentAt) {
     if (now - sentAt >= ONE_HOUR_MS) {
       lastActivitySentAt.delete(cachedUserId);
     }
   }
+
   lastSweepAt = now;
 }
 
@@ -47,8 +51,13 @@ export function fireActivityTrackingNurturing({
   hasOrganization?: boolean;
 }): void {
   const nurturing = tryNurturingSink();
-  if (!nurturing) return;
-  if (!hasOrganization) return;
+  if (!nurturing) {
+    return;
+  }
+
+  if (!hasOrganization) {
+    return;
+  }
 
   const now = Date.now();
   sweepExpiredEntries({ now });

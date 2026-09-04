@@ -76,21 +76,26 @@ export class IngestionSourceService {
     organizationId: string;
   }): Promise<GovernanceIngestionSource | null> {
     const row = await this.repository.tryFindById(id);
+
     return row?.organizationId === organizationId ? row : null;
   }
 
   async tryFindByIngestSecret(rawSecret: string): Promise<GovernanceIngestionSource | null> {
     const candidateHash = this.secrets.hash(rawSecret);
     const direct = await this.repository.tryFindByCurrentSecretHash(candidateHash);
-    if (direct) return direct;
+    if (direct) {
+      return direct;
+    }
 
     const candidates = await this.repository.findByPriorSecretHash(candidateHash);
     const now = this.now();
+
     return (
       candidates.find((candidate) => {
         const rotation = candidate.parserConfig._rotation as
           | { priorHash?: string; expiresAt?: number }
           | undefined;
+
         return (
           rotation?.priorHash === candidateHash &&
           typeof rotation.expiresAt === "number" &&
@@ -131,8 +136,8 @@ export class IngestionSourceService {
       ? this.secrets.generate()
       : null;
     const requestedParserConfig = {
-      ...(input.pullConfig ?? {}),
-      ...(input.parserConfig ?? {}),
+      ...input.pullConfig,
+      ...input.parserConfig,
     };
     this.destinations.assertAllowed(requestedParserConfig);
     await this.assertTraceDestination({
@@ -153,7 +158,10 @@ export class IngestionSourceService {
       status: "awaiting_first_event",
       createdById: input.actorUserId,
     });
-    if (source.pullSchedule) await this.syncBestEffort(source);
+    if (source.pullSchedule) {
+      await this.syncBestEffort(source);
+    }
+
     return { source, ingestSecret };
   }
 
@@ -164,10 +172,22 @@ export class IngestionSourceService {
     this.assertPullSchedule(input.pullSchedule);
     const update: UpdateIngestionSourceRecord = {};
     let cursorMustNotMove = false;
-    if (input.name !== undefined) update.name = input.name;
-    if (input.description !== undefined) update.description = input.description;
-    if (input.status !== undefined) update.status = input.status;
-    if (input.teamId !== undefined) update.teamId = input.teamId;
+    if (input.name !== undefined) {
+      update.name = input.name;
+    }
+
+    if (input.description !== undefined) {
+      update.description = input.description;
+    }
+
+    if (input.status !== undefined) {
+      update.status = input.status;
+    }
+
+    if (input.teamId !== undefined) {
+      update.teamId = input.teamId;
+    }
+
     if (input.traceProjectId !== undefined) {
       await this.assertTraceDestination({
         organizationId: input.organizationId,
@@ -175,16 +195,22 @@ export class IngestionSourceService {
       });
       update.traceProjectId = input.traceProjectId;
     }
-    if (input.pullSchedule !== undefined) update.pullSchedule = input.pullSchedule;
+
+    if (input.pullSchedule !== undefined) {
+      update.pullSchedule = input.pullSchedule;
+    }
+
     if (input.parserConfig !== undefined) {
       const incoming = { ...input.parserConfig };
       if (this.credentials.isEncrypted(incoming.credentials)) {
         const message =
           "Credentials cannot be submitted in their stored form. Re-enter the secret to change this source, or omit it to keep the current one.";
+
         throw new GovernanceValidationError(message, {
           formErrors: [message],
         });
       }
+
       for (const key of Object.keys(existing.parserConfig)) {
         if (
           (key === "credentials" ||
@@ -196,6 +222,7 @@ export class IngestionSourceService {
           incoming[key] = existing.parserConfig[key];
         }
       }
+
       this.assertAdapterUnchanged(existing.parserConfig, incoming);
       cursorMustNotMove = this.assertReportUnchangedOncePulled(existing, incoming);
       this.destinations.assertAllowed(incoming);
@@ -213,11 +240,14 @@ export class IngestionSourceService {
       const message =
         "This source started pulling while the change was being saved, and the report " +
         "can no longer be changed. Reload the source to see its current configuration.";
+
       throw new GovernanceValidationError(message, { formErrors: [message] });
     }
+
     if (existing.pullSchedule !== null || source.pullSchedule !== null) {
       await this.syncBestEffort(source);
     }
+
     return source;
   }
 
@@ -235,6 +265,7 @@ export class IngestionSourceService {
         { formErrors: ["Only push-mode sources have an ingest secret to rotate."] },
       );
     }
+
     const ingestSecret = this.secrets.generate();
     const parserConfig = this.credentials.tryEncryptParserConfig({
       ...existing.parserConfig,
@@ -247,6 +278,7 @@ export class IngestionSourceService {
       ingestSecretHash: this.secrets.hash(ingestSecret),
       parserConfig,
     });
+
     return { source, ingestSecret };
   }
 
@@ -262,7 +294,10 @@ export class IngestionSourceService {
       archivedAt: new Date(this.now()),
       status: "disabled",
     });
-    if (source.pullSchedule) await this.syncBestEffort(source);
+    if (source.pullSchedule) {
+      await this.syncBestEffort(source);
+    }
+
     return source;
   }
 
@@ -281,7 +316,10 @@ export class IngestionSourceService {
     organizationId: string;
   }): Promise<GovernanceIngestionSource> {
     const source = await this.tryFindById({ id, organizationId });
-    if (!source) throw new IngestionSourceNotFoundError(id);
+    if (!source) {
+      throw new IngestionSourceNotFoundError(id);
+    }
+
     return source;
   }
 
@@ -306,7 +344,9 @@ export class IngestionSourceService {
     const wanted = [
       ...new Set(sources.map((s) => s.traceProjectId).filter((id): id is string => !!id)),
     ];
-    if (wanted.length === 0) return new Set();
+    if (wanted.length === 0) {
+      return new Set();
+    }
 
     const { data } = await this.projects.listActiveByScopes({
       organizationId,
@@ -315,14 +355,22 @@ export class IngestionSourceService {
       projectIds: wanted,
       limit: wanted.length,
     });
+
     return new Set(data.map((project) => project.id));
   }
 
   private assertPullSchedule(value: string | null | undefined): void {
-    if (value == null) return;
+    if (value == null) {
+      return;
+    }
+
     const parsed = pullScheduleSchema.safeParse(value);
-    if (parsed.success) return;
+    if (parsed.success) {
+      return;
+    }
+
     const complaints = parsed.error.issues.map((issue) => issue.message);
+
     throw new GovernanceValidationError(
       complaints.join(" ") || "Pull schedule is not a valid cron expression",
       { formErrors: complaints },
@@ -334,12 +382,18 @@ export class IngestionSourceService {
     incoming: Record<string, unknown>,
   ): void {
     const adapter = stored.adapter;
-    if (typeof adapter !== "string") return;
-    if (incoming.adapter === adapter) return;
+    if (typeof adapter !== "string") {
+      return;
+    }
+
+    if (incoming.adapter === adapter) {
+      return;
+    }
 
     const message =
       `This source runs on the ${adapter} adapter, which is fixed when the source is created. ` +
       "Archive this source and create a new one to change how it pulls.";
+
     throw new GovernanceValidationError(message, { formErrors: [message] });
   }
 
@@ -348,8 +402,13 @@ export class IngestionSourceService {
     incoming: Record<string, unknown>,
   ): boolean {
     const report = existing.parserConfig.report;
-    if (typeof report !== "string" || incoming.report === report) return false;
-    if (!hasPollerCursor(existing.pollerCursor)) return true;
+    if (typeof report !== "string" || incoming.report === report) {
+      return false;
+    }
+
+    if (!hasPollerCursor(existing.pollerCursor)) {
+      return true;
+    }
 
     const message =
       incoming.report === undefined
@@ -357,6 +416,7 @@ export class IngestionSourceService {
           "An update that replaces the configuration has to carry the same report value rather than omit it."
         : `This source has already pulled its ${report} report. ` +
           "Changing the report would record the same spend a second time, so it is fixed once a source has run.";
+
     throw new GovernanceValidationError(message, { formErrors: [message] });
   }
 
@@ -364,16 +424,21 @@ export class IngestionSourceService {
     organizationId: string;
     traceProjectId: string | null | undefined;
   }): Promise<void> {
-    if (!input.traceProjectId) return;
+    if (!input.traceProjectId) {
+      return;
+    }
 
     const project = await this.projects.tryGetWithTeam(input.traceProjectId);
     const isAllowed =
       project !== null &&
       project.archivedAt === null &&
       project.team.organizationId === input.organizationId;
-    if (isAllowed) return;
+    if (isAllowed) {
+      return;
+    }
 
     const message = "Trace destination must be an active project of this organization.";
+
     throw new GovernanceValidationError(message, { formErrors: [message] });
   }
 

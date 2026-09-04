@@ -92,6 +92,7 @@ export class LangyCredentialService {
     if (!langwatchEndpoint) {
       throw new Error("Langy worker callback origin is not configured");
     }
+
     if (!gatewayBaseUrl) {
       throw new Error("Langy gateway base URL is not configured");
     }
@@ -111,11 +112,13 @@ export class LangyCredentialService {
         if (error instanceof Error && error.name === "LangySessionKeyScopeError") {
           throw new LangyCredentialResolutionError(error.message);
         }
+
         this.deps.errors?.report(error, {
           projectId,
           userId: session.user.id,
           context: "mintLangySessionApiKey:LangyCredentialService.getOrProvision",
         });
+
         throw new LangyCredentialResolutionError(
           `Failed to mint a Langy session key for project ${projectId}.`,
         );
@@ -171,7 +174,10 @@ export class LangyCredentialService {
 
   async tryGetModelsAllowedForProject(projectId: string): Promise<string[] | null> {
     const project = await this.deps.repository.tryFindProject(projectId);
-    if (!project) return null;
+    if (!project) {
+      return null;
+    }
+
     return this.tryGetModelsAllowed({
       projectId,
       organizationId: project.organizationId,
@@ -190,8 +196,12 @@ export class LangyCredentialService {
     organizationId: string;
   }): Promise<string[] | null> {
     const config = await this.deps.repository.tryFindVirtualKeyConfig(input);
-    if (config == null) return null;
+    if (config == null) {
+      return null;
+    }
+
     const allowed = virtualKeyConfigSchema.parse(config ?? {}).modelsAllowed;
+
     return allowed && allowed.length > 0 ? allowed : null;
   }
 
@@ -204,8 +214,12 @@ export class LangyCredentialService {
 
   async tryGetEgressAllowlist({ projectId }: { projectId: string }): Promise<string[] | null> {
     const value = await this.deps.repository.tryFindEgressAllowlist(projectId);
-    if (value == null) return null;
+    if (value == null) {
+      return null;
+    }
+
     const parsed = langyEgressAllowlistSchema.parse(value);
+
     return parsed.length > 0 ? parsed : null;
   }
 
@@ -220,6 +234,7 @@ export class LangyCredentialService {
     const normalized = parsed.map((host) => host.trim().replace(/\.$/, "").toLowerCase());
     const value = normalized.length > 0 ? normalized : null;
     await this.deps.repository.saveEgressAllowlist(projectId, value);
+
     return value;
   }
 }

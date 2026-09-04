@@ -62,7 +62,7 @@ const ROLE_ARN = "arn:aws:iam::123456789012:role/webhook-sender";
 describe.skipIf(!databaseUrl)("PrismaWebhookEndpointRepository", () => {
   const ns = `whep-${randomBytes(4).toString("hex")}`;
   const orgId = `org-${ns}`;
-  let createdEndpointIds: string[] = [];
+  const createdEndpointIds: string[] = [];
 
   const repository = (configuration?: WebhookEndpointConfiguration) =>
     PrismaWebhookEndpointRepository.create({ prisma, ids, secrets, configuration });

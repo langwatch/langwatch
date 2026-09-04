@@ -336,12 +336,12 @@ function mount(overrides: MountOverrides) {
     readEvaluations: async () => ({}),
     listTraces: async () => ({ groups: [], traceChecks: {}, totalHits: 0 }),
     readThreadTraces: async () => [],
-    ...(overrides.app ?? {}),
+    ...overrides.app,
   } as unknown as TraceApp;
   const shares = {
     createShare: async () => ({ id: "share-1" }),
     unshare: async () => undefined,
-    ...(overrides.share ?? {}),
+    ...overrides.share,
   } as unknown as ShareService;
 
   const hono = new Hono();

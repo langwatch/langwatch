@@ -69,7 +69,7 @@ export function HomeBriefingSection() {
       meta: {
         query: receipt.context.query,
         severity: receipt.severity,
-        ...(receipt.context.meta ?? {}),
+        ...receipt.context.meta,
       },
     });
   };
@@ -94,7 +94,7 @@ export function HomeBriefingSection() {
         meta: {
           query: receipt.context.query,
           severity: receipt.severity,
-          ...(receipt.context.meta ?? {}),
+          ...receipt.context.meta,
         },
       });
     }

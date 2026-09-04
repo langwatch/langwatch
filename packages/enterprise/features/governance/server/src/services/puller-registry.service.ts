@@ -17,6 +17,7 @@ export class PullerRegistryService {
     if (this.adapters.has(adapter.id)) {
       throw new Error(`PullerAdapter "${adapter.id}" is already registered`);
     }
+
     this.adapters.set(adapter.id, adapter);
   }
 

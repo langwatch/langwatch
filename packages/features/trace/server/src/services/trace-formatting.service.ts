@@ -62,6 +62,7 @@ export const generateAsciiTree = (spans: Span[]): string => {
   const spansById = spans.reduce(
     (acc, span) => {
       acc[span.span_id] = span;
+
       return acc;
     },
     {} as Record<string, Span>,
@@ -106,7 +107,10 @@ const SUMMARY_TRUNCATE_LENGTH = 200;
  * Truncates a string to the given length, appending "..." if truncated.
  */
 function truncate(value: string, maxLength: number): string {
-  if (value.length <= maxLength) return value;
+  if (value.length <= maxLength) {
+    return value;
+  }
+
   return value.slice(0, maxLength) + "...";
 }
 

@@ -51,9 +51,7 @@ export const PASSWORD_REQUIREMENTS_HINT = `At least ${PASSWORD_MINIMUM_LENGTH} c
  * to every consumer — the package ships its TypeScript sources — and collide
  * with the real declaration in anything compiled with the DOM lib.
  */
-declare const TextEncoder: {
-  new (): { encode(input: string): { length: number } };
-};
+declare const TextEncoder: new () => { encode(input: string): { length: number } };
 
 export function passwordProblem(value: string): string | null {
   if (value.length < PASSWORD_MINIMUM_LENGTH) {

@@ -17,8 +17,11 @@ export class CodingAgentPullRequestAssignmentService {
         candidates: byBranch.get(session.headBranch),
         startedAtMs: session.startedAtMs,
       });
-      if (match) assignments.set(session.sessionId, match.prNumber);
+      if (match) {
+        assignments.set(session.sessionId, match.prNumber);
+      }
     }
+
     return assignments;
   }
 
@@ -35,11 +38,19 @@ export class CodingAgentPullRequestAssignmentService {
           candidates: byBranch.get(headBranch),
           startedAtMs: session.startedAtMs,
         });
-        if (match && (!winner || CodingAgentPullRequestAssignmentService.isEarlier(match, winner)))
+        if (
+          match &&
+          (!winner || CodingAgentPullRequestAssignmentService.isEarlier(match, winner))
+        ) {
           winner = match;
+        }
       }
-      if (winner) assignments.set(session.sessionId, winner.prNumber);
+
+      if (winner) {
+        assignments.set(session.sessionId, winner.prNumber);
+      }
     }
+
     return assignments;
   }
 
@@ -65,16 +76,24 @@ export class CodingAgentPullRequestAssignmentService {
           candidates: byBranch.get(headBranch),
           startedAtMs: session.startedAtMs,
         });
-        if (match) perBranch.set(headBranch, match.prNumber);
+        if (match) {
+          perBranch.set(headBranch, match.prNumber);
+        }
       }
-      if (perBranch.size > 0) assignments.set(session.sessionId, perBranch);
+
+      if (perBranch.size > 0) {
+        assignments.set(session.sessionId, perBranch);
+      }
     }
 
     return assignments;
   }
 
   branchesOf(session: { gitBranch: string; gitBranches: readonly string[] }): string[] {
-    if (session.gitBranches.length > 0) return [...session.gitBranches];
+    if (session.gitBranches.length > 0) {
+      return [...session.gitBranches];
+    }
+
     return session.gitBranch === "" ? [] : [session.gitBranch];
   }
 
@@ -105,9 +124,11 @@ export class CodingAgentPullRequestAssignmentService {
       list.push(pullRequest);
       byBranch.set(pullRequest.headBranch, list);
     }
+
     for (const list of byBranch.values()) {
       list.sort((a, b) => a.prCreatedAtMs - b.prCreatedAtMs || a.prNumber - b.prNumber);
     }
+
     return byBranch;
   }
 }

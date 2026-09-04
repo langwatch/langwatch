@@ -48,6 +48,7 @@ export class GatewayCacheRulePersistence {
     if (!existing) {
       throw new GatewayCacheRuleNotFoundError();
     }
+
     return this.repository.update(parsed);
   }
 
@@ -60,6 +61,7 @@ export class GatewayCacheRulePersistence {
     if (!existing) {
       throw new GatewayCacheRuleNotFoundError();
     }
+
     return this.repository.archive(parsed);
   }
 

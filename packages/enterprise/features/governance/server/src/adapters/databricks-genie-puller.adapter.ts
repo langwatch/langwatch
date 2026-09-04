@@ -1690,7 +1690,7 @@ export class DatabricksGeniePuller implements PullerAdapter<DatabricksGeniePullC
           budget,
           path,
           query: {
-            ...(query ?? {}),
+            ...query,
             page_size: String(PAGE_SIZE),
             ...(page ? { page_token: page } : {}),
           },

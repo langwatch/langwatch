@@ -129,7 +129,10 @@ interface CandidateSite {
  * which the parity test pins against `processContentPart`'s behavior.
  */
 export function isExtractableMediaPart(part: unknown): boolean {
-  if (typeof part !== "object" || part === null) return false;
+  if (typeof part !== "object" || part === null) {
+    return false;
+  }
+
   return (
     visitContentPart<boolean>(part, {
       text: () => false,
@@ -159,24 +162,34 @@ function collectCandidates(
   path: PathSeg[],
   sites: CandidateSite[],
 ): void {
-  if (value == null || depth > MAX_MEDIA_WALK_DEPTH) return;
+  if (value == null || depth > MAX_MEDIA_WALK_DEPTH) {
+    return;
+  }
 
   if (typeof value === "string") {
     if (isBareDataUri(value)) {
       sites.push({ path, node: value, kind: "bareDataUri" });
+
       return;
     }
+
     if (value.length < 2 || value.length > MAX_NESTED_JSON_BYTES || !containsMediaMarkers(value)) {
       return;
     }
+
     let parsed: unknown;
     try {
       parsed = JSON.parse(value);
     } catch {
       return;
     }
-    if (typeof parsed !== "object" || parsed === null) return;
+
+    if (typeof parsed !== "object" || parsed === null) {
+      return;
+    }
+
     collectCandidates(parsed, depth + 1, [...path, { json: true }], sites);
+
     return;
   }
 
@@ -184,6 +197,7 @@ function collectCandidates(
     for (let i = 0; i < value.length; i++) {
       collectCandidates(value[i], depth + 1, [...path, { index: i }], sites);
     }
+
     return;
   }
 
@@ -192,8 +206,10 @@ function collectCandidates(
     // nothing left to extract inside it, so we never descend into parts.
     if (isExtractableMediaPart(value)) {
       sites.push({ path, node: value, kind: "part" });
+
       return;
     }
+
     const obj = value as Record<string, unknown>;
     for (const key of Object.keys(obj)) {
       collectCandidates(obj[key], depth + 1, [...path, { key }], sites);
@@ -217,7 +233,10 @@ async function processSite(
   if (site.kind === "bareDataUri") {
     const uri = site.node as string;
     const parsed = parseBase64DataUri(uri);
-    if (!parsed) return null;
+    if (!parsed) {
+      return null;
+    }
+
     // Route the payload through the part vocabulary so audio gets the same
     // store-time WAV wrap (and mime handling) as an explicit part would.
     const asPart = parsed.mimeType.startsWith("audio/")
@@ -233,8 +252,12 @@ async function processSite(
             data: parsed.base64,
           };
     const { ref } = await processContentPart({ part: asPart, ...params });
-    if (ref === null) return null;
+    if (ref === null) {
+      return null;
+    }
+
     refs.push(ref);
+
     // The attribute stays a string: rewrite the whole value to the minted
     // reference URL (the render-side collector surfaces bare reference
     // strings symmetrically).
@@ -248,8 +271,14 @@ async function processSite(
     part: site.node,
     ...params,
   });
-  if (ref !== null) refs.push(ref);
-  if (part === site.node) return null;
+  if (ref !== null) {
+    refs.push(ref);
+  }
+
+  if (part === site.node) {
+    return null;
+  }
+
   return { ...site, replacement: part };
 }
 
@@ -264,6 +293,7 @@ async function storeCandidates(
     budget.droppedByCap += sites.length - budget.remainingParts;
     takeable = sites.slice(0, Math.max(0, budget.remainingParts));
   }
+
   budget.remainingParts -= takeable.length;
 
   const stored: StoredSite[] = [];
@@ -272,6 +302,7 @@ async function storeCandidates(
       budget.droppedByDeadline += takeable.length - i;
       break;
     }
+
     const wave = takeable.slice(i, i + CONCURRENT_STORES);
     const results = await Promise.all(
       wave.map(async (site) => {
@@ -281,14 +312,18 @@ async function storeCandidates(
           // Per-part fail-open: this part stays inline; parts already stored
           // keep their references, so nothing orphans.
           budget.failedParts += 1;
+
           return null;
         }
       }),
     );
     for (const result of results) {
-      if (result !== null) stored.push(result);
+      if (result !== null) {
+        stored.push(result);
+      }
     }
   }
+
   return stored;
 }
 
@@ -298,13 +333,19 @@ async function storeCandidates(
 
 function rebuild(value: unknown, sites: StoredSite[], segIndex: number): unknown {
   const direct = sites.find((site) => site.path.length === segIndex);
-  if (direct) return direct.replacement;
+  if (direct) {
+    return direct.replacement;
+  }
 
   if (typeof value === "string") {
     // All remaining sites hop through this string's JSON boundary.
     const inner = sites.filter((site) => "json" in site.path[segIndex]!);
-    if (inner.length === 0) return value;
+    if (inner.length === 0) {
+      return value;
+    }
+
     const parsed: unknown = JSON.parse(value);
+
     return JSON.stringify(rebuild(parsed, inner, segIndex + 1));
   }
 
@@ -319,9 +360,11 @@ function rebuild(value: unknown, sites: StoredSite[], segIndex: number): unknown
         byIndex.set(seg.index, group);
       }
     }
+
     for (const [index, group] of byIndex) {
       out[index] = rebuild(out[index], group, segIndex + 1);
     }
+
     return out;
   }
 
@@ -336,9 +379,11 @@ function rebuild(value: unknown, sites: StoredSite[], segIndex: number): unknown
         byKey.set(seg.key, group);
       }
     }
+
     for (const [key, group] of byKey) {
       out[key] = rebuild(out[key], group, segIndex + 1);
     }
+
     return out;
   }
 
@@ -379,7 +424,9 @@ export async function extractInlineMediaFromValue({
 }> {
   const sites: CandidateSite[] = [];
   collectCandidates(value, 0, [], sites);
-  if (sites.length === 0) return { value, refs: [] };
+  if (sites.length === 0) {
+    return { value, refs: [] };
+  }
 
   const refs: ExtractedRef[] = [];
   const stored = await storeCandidates(
@@ -388,7 +435,9 @@ export async function extractInlineMediaFromValue({
     budget ?? createExtractionBudget(),
     refs,
   );
-  if (stored.length === 0) return { value, refs };
+  if (stored.length === 0) {
+    return { value, refs };
+  }
 
   return { value: rebuild(value, stored, 0), refs };
 }

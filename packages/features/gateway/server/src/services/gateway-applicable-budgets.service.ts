@@ -124,7 +124,9 @@ export async function resolveApplicableBudgetsForTarget(
   chRepo?: GatewayBudgetSpendPort,
 ): Promise<ApplicableBudget[]> {
   const resolved = await budgetDecisions.resolveApplicableBudgets(target);
-  if (resolved.length === 0) return [];
+  if (resolved.length === 0) {
+    return [];
+  }
 
   // Independent lookups on an interactive path: run them together.
   const [spentByBudgetId, targets, providerLabels] = await Promise.all([
@@ -181,6 +183,7 @@ async function decidedTraceProject({
       .map((scope) => scope.scopeId),
     traceProjectId: draft.traceProjectId,
   });
+
   return decision.outcome === "resolved" ? decision.project : null;
 }
 
@@ -190,9 +193,15 @@ async function loadSpend(
   resolved: GatewayResolvedBudget[],
   chRepo?: GatewayBudgetSpendPort,
 ): Promise<Map<string, string>> {
-  if (!chRepo) return new Map();
+  if (!chRepo) {
+    return new Map();
+  }
+
   const tenantIds = await budgetDecisions.listSpendTenantIds(organizationId);
-  if (tenantIds.length === 0) return new Map();
+  if (tenantIds.length === 0) {
+    return new Map();
+  }
+
   const targets: BudgetSpendTarget[] = resolved.map((r) => ({
     budgetId: r.budget.id,
     scope: r.budget.scopeType,
@@ -203,6 +212,7 @@ async function loadSpend(
   }));
   try {
     const spends = await chRepo.getSpendForTargetsAcrossTenants(tenantIds, targets);
+
     return new Map(spends.map((s) => [s.budgetId, s.spentUsd]));
   } catch {
     // Spend is decoration on this list; the budgets themselves are the

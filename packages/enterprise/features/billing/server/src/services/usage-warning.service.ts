@@ -83,6 +83,7 @@ export class UsageWarningService {
         { organizationId, usagePercentage, lowestThreshold: USAGE_WARNING_THRESHOLDS[0] },
         "Usage below all warning thresholds, skipping notification",
       );
+
       return null;
     }
 
@@ -90,11 +91,13 @@ export class UsageWarningService {
 
     if (!organization) {
       logger.warn({ organizationId }, "Organization not found");
+
       return null;
     }
 
     if (organization.members.length === 0) {
       logger.warn({ organizationId }, "No admin members found for organization");
+
       return null;
     }
 
@@ -119,6 +122,7 @@ export class UsageWarningService {
         },
         "No admins with email addresses found, skipping notification (no deliverable recipients)",
       );
+
       return null;
     }
 
@@ -169,6 +173,7 @@ export class UsageWarningService {
       if (!notification.metadata || typeof notification.metadata !== "object") {
         return false;
       }
+
       const metadata = notification.metadata as Record<string, unknown>;
 
       return (
@@ -280,6 +285,7 @@ export class UsageWarningService {
           },
           "All usage limit warning emails failed to send, aborting notification creation to allow retries",
         );
+
         throw new Error(`All ${recipientsFailureCount} usage limit warning emails failed to send`);
       }
 
@@ -312,6 +318,7 @@ export class UsageWarningService {
       return notification;
     } catch (error) {
       logger.error({ error, organizationId }, "Error sending usage limit warning notifications");
+
       throw error;
     }
   }
@@ -328,8 +335,11 @@ export class UsageWarningService {
   ): (typeof USAGE_WARNING_THRESHOLDS)[number] | undefined {
     let crossed: (typeof USAGE_WARNING_THRESHOLDS)[number] | undefined;
     for (const threshold of USAGE_WARNING_THRESHOLDS) {
-      if (usagePercentage >= threshold) crossed = threshold;
+      if (usagePercentage >= threshold) {
+        crossed = threshold;
+      }
     }
+
     return crossed;
   }
 
@@ -416,6 +426,7 @@ export class UsageWarningService {
       const member = deliverableAdmins[index];
       if (!member) {
         logger.warn({ index, organizationId }, "Member not found at index, skipping");
+
         return;
       }
 

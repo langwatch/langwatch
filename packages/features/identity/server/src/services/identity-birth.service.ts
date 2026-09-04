@@ -132,12 +132,15 @@ export class IdentityBirthService implements IdentityBirthPort {
     // otherwise keep this pod off the identity branch for a whole TTL.
     this.deps.forgetGate({ userId });
 
-    if (events.length > 0) await this.observeFold({ userId, command, events });
+    if (events.length > 0) {
+      await this.observeFold({ userId, command, events });
+    }
 
     logger.info(
       { userId, identifiers: events.length },
       "a flagged sign-up was born finalized on the identity branch",
     );
+
     return written;
   }
 
@@ -179,7 +182,10 @@ export class IdentityBirthService implements IdentityBirthPort {
     command: AttachIdentifierCommandData;
   }): Promise<void> {
     const attached = facts.find((fact) => fact.type === IDENTIFIER_ATTACHED_EVENT_TYPE);
-    if (attached === undefined) return;
+    if (attached === undefined) {
+      return;
+    }
+
     const holder = await this.deps.reservations.claim({
       normalizedValue,
       userId,
@@ -189,6 +195,7 @@ export class IdentityBirthService implements IdentityBirthPort {
     if (holder.userId === userId || holder.commandId === command.commandId) {
       return;
     }
+
     throw new IdentityEmailInUseError(
       "born_finalized: another user holds the lock on this address",
     );

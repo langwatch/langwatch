@@ -68,8 +68,10 @@ export class ExperimentComparisonPlanService {
         { ownerId, variants: cfg.variants },
         "Comparison skipped: fewer than 2 variants configured",
       );
+
       return { skip: "too-few-variants" };
     }
+
     if (!isGoldenFieldSatisfied(cfg)) {
       logger.debug(
         {
@@ -80,16 +82,20 @@ export class ExperimentComparisonPlanService {
         },
         "Comparison skipped: golden field not configured",
       );
+
       return { skip: "golden-not-set" };
     }
+
     const resolved = cfg.variants.map((id) => state.targets.find((t) => t.id === id));
     if (resolved.some((t) => !t)) {
       logger.warn(
         { ownerId, variants: cfg.variants },
         "Comparison skipped: one or more variant targets not found",
       );
+
       return { skip: "variant-not-found" };
     }
+
     return { variants: resolved as TargetConfig[] };
   }
 
@@ -122,17 +128,24 @@ export class ExperimentComparisonPlanService {
   }): void {
     for (const rowIndex of rowsInScope) {
       const datasetEntry = datasetRows[rowIndex];
-      if (!datasetEntry || isRowEmpty(datasetEntry)) continue;
+      if (!datasetEntry || isRowEmpty(datasetEntry)) {
+        continue;
+      }
+
       skipReasons.push({ rowIndex, targetId, evaluatorId, kind, variantNames: [] });
     }
   }
 
   /** Whether a column-target's backing DB evaluator is still the legacy `pairwise_compare` judge. */
   private isLegacyPairwiseBacked(dbEvaluatorId: string | undefined): boolean {
-    if (!dbEvaluatorId) return false;
+    if (!dbEvaluatorId) {
+      return false;
+    }
+
     const dbConfig = this.loadedEvaluators?.get(dbEvaluatorId)?.config as
       | { evaluatorType?: string }
       | undefined;
+
     return dbConfig?.evaluatorType === LEGACY_PAIRWISE_EVALUATOR_TYPE;
   }
 
@@ -158,12 +171,15 @@ export class ExperimentComparisonPlanService {
     const outputs = cfg.variants.map((id) => completedTargetOutputs.get(`${rowIndex}:${id}`));
 
     const missing = variantDisplayNames.filter((_, i) => !outputs[i]);
-    if (missing.length > 0) return { missing };
+    if (missing.length > 0) {
+      return { missing };
+    }
 
     const candidates = cfg.variants.map((variantId, i) => {
       const text = toCandidateText(
         pickOutputPath(outputs[i]!.output, cfg.variantOutputPaths?.[variantId]),
       );
+
       return {
         id: variantIds[i]!,
         output: text
@@ -175,7 +191,9 @@ export class ExperimentComparisonPlanService {
     });
 
     const empty = variantDisplayNames.filter((_, i) => candidates[i]!.output === "");
-    if (empty.length > 0) return { empty };
+    if (empty.length > 0) {
+      return { empty };
+    }
 
     return { candidates: { candidates } };
   }
@@ -202,7 +220,9 @@ export class ExperimentComparisonPlanService {
   }): void {
     for (const evaluator of state.evaluators) {
       const cfg = toComparisonConfig(evaluator);
-      if (!cfg) continue;
+      if (!cfg) {
+        continue;
+      }
 
       const resolution = this.resolveVariants({ state, cfg, ownerId: evaluator.id });
       if (resolution.skip) {
@@ -217,8 +237,10 @@ export class ExperimentComparisonPlanService {
             skipReasons,
           });
         }
+
         continue;
       }
+
       const resolvedVariants = resolution.variants;
 
       const variantIds = buildVariantIdentifiers({
@@ -234,7 +256,9 @@ export class ExperimentComparisonPlanService {
 
       for (const rowIndex of rowsInScope) {
         const datasetEntry = datasetRows[rowIndex];
-        if (!datasetEntry) continue;
+        if (!datasetEntry) {
+          continue;
+        }
 
         const built = this.buildCandidates({
           cfg,
@@ -365,9 +389,14 @@ export class ExperimentComparisonPlanService {
     skipReasons: ComparisonSkipReason[];
   }): void {
     for (const target of state.targets) {
-      if (target.type !== "evaluator") continue;
+      if (target.type !== "evaluator") {
+        continue;
+      }
+
       const cfg = toComparisonConfig(target);
-      if (!cfg || !target.targetEvaluatorId) continue;
+      if (!cfg || !target.targetEvaluatorId) {
+        continue;
+      }
 
       const resolution = this.resolveVariants({ state, cfg, ownerId: target.id });
       if (resolution.skip) {
@@ -381,6 +410,7 @@ export class ExperimentComparisonPlanService {
         });
         continue;
       }
+
       const resolvedVariants = resolution.variants;
 
       const variantIds = buildVariantIdentifiers({
@@ -398,7 +428,9 @@ export class ExperimentComparisonPlanService {
 
       for (const rowIndex of rowsInScope) {
         const datasetEntry = datasetRows[rowIndex];
-        if (!datasetEntry) continue;
+        if (!datasetEntry) {
+          continue;
+        }
 
         const built = this.buildCandidates({
           cfg,
@@ -493,7 +525,10 @@ export class ExperimentComparisonPlanService {
     state: Pick<EvaluationsV3State, "datasets" | "activeDatasetId">,
   ): string {
     const activeId = state.activeDatasetId;
-    if (activeId && state.datasets.some((d) => d.id === activeId)) return activeId;
+    if (activeId && state.datasets.some((d) => d.id === activeId)) {
+      return activeId;
+    }
+
     return state.datasets[0]?.id ?? activeId ?? "dataset-1";
   }
 }

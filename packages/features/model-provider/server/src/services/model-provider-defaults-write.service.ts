@@ -71,6 +71,7 @@ export class ModelProviderDefaultsWriteService {
       if (existing) {
         return this.deleteEmptyConfig(parsed.actorId, existing);
       }
+
       throw new ModelDefaultValidationError(
         "Pick at least one model. A default-models config with every key on inherit has no effect.",
       );
@@ -82,6 +83,7 @@ export class ModelProviderDefaultsWriteService {
         "Pick at least one scope for this default-models config.",
       );
     }
+
     if (parsed.actorId) {
       await this.options.writeAuthorization.assertCanWriteDefault(parsed.actorId, [
         ...(existing?.scopes ?? []),
@@ -90,6 +92,7 @@ export class ModelProviderDefaultsWriteService {
     }
 
     const organizationId = await this.options.scopes.getOrganizationIdForScopes(scopes);
+
     return this.options.defaults.save({
       id: parsed.id ?? this.options.ids.generate({ type: "default" }),
       organizationId,
@@ -108,6 +111,7 @@ export class ModelProviderDefaultsWriteService {
     if (!existing || existing.scopes.length === 0) {
       throw new ModelDefaultNotFoundError();
     }
+
     if (input.actorId) {
       await this.options.writeAuthorization.assertCanWriteDefault(input.actorId, existing.scopes);
     }
@@ -119,6 +123,7 @@ export class ModelProviderDefaultsWriteService {
     if (id && !existing) {
       throw new ModelDefaultNotFoundError();
     }
+
     if (existing && existing.scopes.length === 0) {
       throw new ModelDefaultNotFoundError();
     }
@@ -131,11 +136,13 @@ export class ModelProviderDefaultsWriteService {
     if (!existing) {
       throw new ModelDefaultNotFoundError();
     }
+
     if (actorId) {
       await this.options.writeAuthorization.assertCanWriteDefault(actorId, existing.scopes);
     }
 
     await this.options.defaults.delete(existing.id);
+
     return existing;
   }
 }

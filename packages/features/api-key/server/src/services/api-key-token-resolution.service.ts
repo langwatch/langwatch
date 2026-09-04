@@ -18,6 +18,7 @@ import type { ApiKeyDependencies } from "./api-key.service";
 
 function publicApiKey(row: StoredApiKey): ApiKey {
   const { hashedSecret: _hashedSecret, ...key } = row;
+
   return key;
 }
 
@@ -38,8 +39,14 @@ function bindingsReachProject(
   project: ProjectIdentity,
 ): boolean {
   return bindings.some((binding) => {
-    if (binding.scopeType === "ORGANIZATION") return binding.scopeId === project.organizationId;
-    if (binding.scopeType === "TEAM") return binding.scopeId === project.teamId;
+    if (binding.scopeType === "ORGANIZATION") {
+      return binding.scopeId === project.organizationId;
+    }
+
+    if (binding.scopeType === "TEAM") {
+      return binding.scopeId === project.teamId;
+    }
+
     return binding.scopeId === project.id;
   });
 }
@@ -65,20 +72,25 @@ export class ApiKeyTokenResolutionService {
     if (!split) {
       return null;
     }
+
     const row = await this.repository.tryFindByLookupId({ lookupId: split.lookupId });
     if (!row || row.revokedAt || (row.expiresAt !== null && row.expiresAt < new Date())) {
       return null;
     }
+
     const verification = this.options.tokens.verify(split.secret, row.hashedSecret);
     if (verification === "no_match") {
       return null;
     }
+
     if (verification === "match_legacy") {
       void this.repository
         .upgradeHash({ id: row.id, hashedSecret: this.options.tokens.hash(split.secret) })
         .catch(() => void 0);
     }
+
     this.options.legacyGrants.mint(publicApiKey(row));
+
     return { ...publicApiKey(row), tokenType: "apiKey" };
   }
 
@@ -98,9 +110,11 @@ export class ApiKeyTokenResolutionService {
       if (resolved) {
         return resolved;
       }
+
       if (parsed.token.startsWith(API_KEY_PREFIX)) {
         return this.tryResolveLegacyProjectKey(parsed.token);
       }
+
       return null;
     }
 
@@ -116,6 +130,7 @@ export class ApiKeyTokenResolutionService {
     if (!rotated) {
       throw new ApiKeyNotFoundError(input.projectId);
     }
+
     return token;
   }
 
@@ -137,6 +152,7 @@ export class ApiKeyTokenResolutionService {
     }
 
     const legacy = await this.tryResolveLegacyProjectKey(parsed.token);
+
     return organizationApiKeyResolutionSchema.parse(
       legacy
         ? { ok: false, reason: "wrong_credential_class" }
@@ -153,7 +169,9 @@ export class ApiKeyTokenResolutionService {
     if (!projectId) {
       return null;
     }
+
     const project = await this.options.projects.tryGetIdentity(projectId);
+
     return project ? resolvedApiKeyTokenSchema.parse({ type: "legacyProjectKey", project }) : null;
   }
 
@@ -179,6 +197,7 @@ export class ApiKeyTokenResolutionService {
         effectiveProjectId = projectIds[0] ?? null;
       }
     }
+
     if (!effectiveProjectId) {
       return null;
     }
@@ -187,6 +206,7 @@ export class ApiKeyTokenResolutionService {
     if (!project || project.organizationId !== apiKey.organizationId) {
       return null;
     }
+
     // Only a caller-NAMED project needs this: a self-scoped resolution derived
     // the project from a binding already.
     if (projectId && !bindingsReachProject(apiKey.roleBindings, project)) {

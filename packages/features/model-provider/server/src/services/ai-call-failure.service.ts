@@ -104,8 +104,14 @@ export async function wrapAiCall<T>(
   try {
     return await fn();
   } catch (err) {
-    if (err instanceof ModelNotConfiguredError) throw err;
-    if (err instanceof ModelProviderDisabledError) throw err;
+    if (err instanceof ModelNotConfiguredError) {
+      throw err;
+    }
+
+    if (err instanceof ModelProviderDisabledError) {
+      throw err;
+    }
+
     const message = err instanceof Error ? err.message : String(err);
     // The provider's own words are diagnostic, not copy: they go in the log
     // line, correlated by trace id, and nowhere a customer can read them.
@@ -114,6 +120,7 @@ export async function wrapAiCall<T>(
     // `data.cause` sidecar until that block is retired, and a stack-laden
     // provider error should not be dragged along wholesale.
     const firstLine = message.split("\n")[0]!.slice(0, 200);
+
     throw new AiCallFailedError(feature.key, feature.role, feature.displayName, firstLine);
   }
 }

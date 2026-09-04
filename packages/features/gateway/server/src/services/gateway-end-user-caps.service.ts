@@ -60,6 +60,7 @@ export class GatewayEndUserCapsService {
     const now = new Date();
     const targets = templates.map((template) => {
       const bucketScopeId = bucketFor(template);
+
       return {
         budgetId: template.id,
         scope: template.scopeType,
@@ -79,6 +80,7 @@ export class GatewayEndUserCapsService {
     return templates.map((template) => {
       const boundary = boundaryByKey.get(`${template.id}:${bucketFor(template)}`);
       const periodFloorMs = bucketPeriodFloorMs(template, boundary?.periodStartedAt, now);
+
       return {
         budget_id: template.id,
         anchor_id: template.scopeId,

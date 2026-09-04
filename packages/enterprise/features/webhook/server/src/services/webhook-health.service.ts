@@ -81,7 +81,9 @@ export class WebhookHealthService extends WebhookHealthServiceContract {
       organizationId: params.organizationId,
       endpointId: params.endpointId,
     });
-    if (!endpoint) throw new WebhookEndpointNotFoundError();
+    if (!endpoint) {
+      throw new WebhookEndpointNotFoundError();
+    }
 
     const stats = await this.deps.endpoints.getDeliveryStats({
       organizationId: params.organizationId,
@@ -98,6 +100,7 @@ export class WebhookHealthService extends WebhookHealthServiceContract {
     );
 
     const { attempted, delivered } = stats;
+
     return {
       status: endpoint.status,
       disabledReason: endpoint.disabledReason,
@@ -126,13 +129,20 @@ export class WebhookHealthService extends WebhookHealthServiceContract {
       this.deps.processStore.findByRef<EndpointStreamState>({ ref }),
       this.deps.processStore.findMessagesByRef({ ref }),
     ]);
+
     return { instance, messages };
   }
 
   /** The earlier of two optional instants; null only when both are. */
   private static earlierInstant(a: number | null, b: number | null): number | null {
-    if (a === null) return b;
-    if (b === null) return a;
+    if (a === null) {
+      return b;
+    }
+
+    if (b === null) {
+      return a;
+    }
+
     return Math.min(a, b);
   }
 
@@ -147,9 +157,16 @@ export class WebhookHealthService extends WebhookHealthServiceContract {
         entry.appendedAtMs,
       );
     }
+
     for (const message of read.messages) {
-      if (message.intentType !== "sendBatch") continue;
-      if (message.status === "dead") dlqDepth++;
+      if (message.intentType !== "sendBatch") {
+        continue;
+      }
+
+      if (message.status === "dead") {
+        dlqDepth++;
+      }
+
       if (message.status === "pending") {
         oldestUndeliveredMs = WebhookHealthService.earlierInstant(
           oldestUndeliveredMs,
@@ -157,13 +174,17 @@ export class WebhookHealthService extends WebhookHealthServiceContract {
         );
       }
     }
+
     return { dlqDepth, oldestUndeliveredMs };
   }
 
   /** The p95 of a latency sample, by nearest-rank on the sorted values. */
   private static p95Of(latencies: readonly number[]): number | null {
     const sorted = [...latencies].sort((a, b) => a - b);
-    if (sorted.length === 0) return null;
+    if (sorted.length === 0) {
+      return null;
+    }
+
     return sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))]!;
   }
 }

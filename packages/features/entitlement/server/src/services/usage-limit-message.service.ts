@@ -49,5 +49,6 @@ export function buildUpgradeUrl(deployment: UsageDeployment): string {
   }
 
   const baseHost = deployment.baseHost ?? "https://app.langwatch.ai";
+
   return `buy a license at ${baseHost}/settings/license`;
 }

@@ -102,6 +102,7 @@ export function normalizeUsageUnit(raw: string): UsageUnit {
   if (normalized === "events" || normalized === "event") {
     return "events";
   }
+
   return "traces";
 }
 

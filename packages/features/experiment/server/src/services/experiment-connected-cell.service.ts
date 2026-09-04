@@ -105,6 +105,7 @@ export class ExperimentConnectedCellService {
    */
   private dispatchAgentOf(agent: TypedAgent): DispatchAgent {
     const config = agent.config as ConnectedAgentConfig;
+
     return {
       id: agent.id,
       name: agent.name,
@@ -134,6 +135,7 @@ export class ExperimentConnectedCellService {
       inputs: ExperimentEvaluatorInputService.create({}).buildTargetInputs({ cell }),
       definitions: connectedParameterDefinitions(agent.config),
     });
+
     return {
       projectId,
       agent: dispatchAgent,
@@ -178,6 +180,7 @@ export class ExperimentConnectedCellService {
       "Connected agent cell failed",
     );
     const failure = connectedCallFailure(error);
+
     return {
       type: "target_result",
       rowIndex: cell.rowIndex,
@@ -192,8 +195,12 @@ export class ExperimentConnectedCellService {
 
   /** How long a busy agent asked to be left alone, or nothing if it is not busy. */
   private busyRetryAfterMs(error: unknown): number | undefined {
-    if (!(error instanceof AgentBusyError)) return undefined;
+    if (!(error instanceof AgentBusyError)) {
+      return undefined;
+    }
+
     const declared = error.meta?.retryAfterMs;
+
     return typeof declared === "number" && declared > 0 ? declared : BUSY_RETRY_AFTER_MS;
   }
 
@@ -212,11 +219,17 @@ export class ExperimentConnectedCellService {
     isAborted?: () => Promise<boolean>;
   }): Promise<number | undefined> {
     const retryAfterMs = this.busyRetryAfterMs(error);
-    if (retryAfterMs === undefined || this.now() >= budgetEndsAt) return undefined;
-    if (isAborted && (await isAborted())) return undefined;
+    if (retryAfterMs === undefined || this.now() >= budgetEndsAt) {
+      return undefined;
+    }
+
+    if (isAborted && (await isAborted())) {
+      return undefined;
+    }
 
     // Jitter spreads the retries of the rows that hit a full agent at once.
     const jittered = retryAfterMs + Math.floor(Math.random() * retryAfterMs);
+
     return Math.max(0, Math.min(jittered, budgetEndsAt - this.now()));
   }
 
@@ -244,7 +257,10 @@ export class ExperimentConnectedCellService {
         return await this.dispatch({ ...params, signal: AbortSignal.timeout(callTimeoutMs) });
       } catch (error) {
         const waitMs = await this.busyWaitMs({ error, budgetEndsAt, isAborted });
-        if (waitMs === undefined) throw error;
+        if (waitMs === undefined) {
+          throw error;
+        }
+
         await this.sleep(waitMs);
       }
     }
@@ -273,6 +289,7 @@ export class ExperimentConnectedCellService {
         callTimeoutMs: dispatchAgent.timeoutMs + CONNECTED_REQUEST_SLACK_MS,
         params: this.connectedTurnParams({ cell, projectId, agent, dispatchAgent, traceId }),
       });
+
       return { ok: true, outcome };
     } catch (error) {
       return { ok: false, error };
@@ -301,7 +318,9 @@ export class ExperimentConnectedCellService {
       resultMapperConfig,
       isAborted,
     } = input;
-    if (cell.evaluatorConfigs.length === 0) return;
+    if (cell.evaluatorConfigs.length === 0) {
+      return;
+    }
 
     const { workflow, evaluatorNodeIds } = buildEvaluatorCellWorkflow({
       projectId,
@@ -342,6 +361,7 @@ export class ExperimentConnectedCellService {
         traceId,
         duration: this.now() - startedAt,
       });
+
       return;
     }
 

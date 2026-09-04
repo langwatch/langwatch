@@ -134,7 +134,10 @@ export class CodingAgentPullRequestShareService {
         repositoryHost,
         repositoryFullName,
       });
-      if (share === null) continue;
+      if (share === null) {
+        continue;
+      }
+
       scaled.push(share.session);
       attributedTotals.push(...share.prRows);
     }
@@ -201,7 +204,10 @@ export class CodingAgentPullRequestShareService {
     // divide by, so the legacy whole-session rule stands — and only where the
     // session's own row lives, like always.
     if (totalWeight === 0) {
-      if (!rowMatched || legacyWinner !== prNumber) return null;
+      if (!rowMatched || legacyWinner !== prNumber) {
+        return null;
+      }
+
       return { session, prRows: [] };
     }
 
@@ -223,14 +229,22 @@ export class CodingAgentPullRequestShareService {
     }
 
     const ownsBucket = (key: string): boolean => {
-      if (key === ELSEWHERE_BUCKET) return false;
-      if (key === UNSTAMPED_BUCKET) return rowMatched && legacyWinner === prNumber;
+      if (key === ELSEWHERE_BUCKET) {
+        return false;
+      }
+
+      if (key === UNSTAMPED_BUCKET) {
+        return rowMatched && legacyWinner === prNumber;
+      }
+
       return perBranch.get(key.slice(BRANCH_BUCKET_PREFIX.length)) === prNumber;
     };
 
     const ownKeys = [...buckets.keys()].filter(ownsBucket);
     const prWeight = ownKeys.reduce((total, key) => total + buckets.get(key)!, 0);
-    if (prWeight <= 0) return null;
+    if (prWeight <= 0) {
+      return null;
+    }
 
     const prRows = rows.filter((row) => ownsBucket(bucketOf.get(row)!));
     const allocated = CodingAgentPullRequestShareService.allocateCounters({
@@ -261,7 +275,10 @@ export class CodingAgentPullRequestShareService {
     repositoryHost: string;
     repositoryFullName: string;
   }): string {
-    if (CodingAgentPullRequestShareService.isUnstamped(row)) return UNSTAMPED_BUCKET;
+    if (CodingAgentPullRequestShareService.isUnstamped(row)) {
+      return UNSTAMPED_BUCKET;
+    }
+
     if (
       !CodingAgentPullRequestShareService.isStampedOnRepository({
         row,
@@ -271,6 +288,7 @@ export class CodingAgentPullRequestShareService {
     ) {
       return ELSEWHERE_BUCKET;
     }
+
     return `${BRANCH_BUCKET_PREFIX}${row.branch}`;
   }
 
@@ -352,7 +370,10 @@ export class CodingAgentPullRequestShareService {
     repositoryHost: string;
     repositoryFullName: string;
   }): boolean {
-    if (CodingAgentPullRequestShareService.isUnstamped(row)) return false;
+    if (CodingAgentPullRequestShareService.isUnstamped(row)) {
+      return false;
+    }
+
     return (
       row.repositoryHost.toLowerCase() === repositoryHost.toLowerCase() &&
       `${row.repositoryOwner}/${row.repositoryName}`.toLowerCase() ===
@@ -377,7 +398,10 @@ export class CodingAgentPullRequestShareService {
     const tokensOf = CodingAgentPullRequestShareService.tokensOf;
     const costOf = CodingAgentPullRequestShareService.costOf;
     const tokenWeight = CodingAgentPullRequestShareService.sum(rows, tokensOf);
-    if (tokenWeight > 0) return { weightOf: tokensOf, totalWeight: tokenWeight };
+    if (tokenWeight > 0) {
+      return { weightOf: tokensOf, totalWeight: tokenWeight };
+    }
+
     return {
       weightOf: costOf,
       totalWeight: CodingAgentPullRequestShareService.sum(rows, costOf),
@@ -410,6 +434,7 @@ export class CodingAgentPullRequestShareService {
       list.push(row);
       grouped.set(key, list);
     }
+
     return grouped;
   }
 }

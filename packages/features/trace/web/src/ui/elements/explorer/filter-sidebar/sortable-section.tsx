@@ -51,7 +51,7 @@ export const SortableSection: React.FC<SortableSectionProps> = ({
     () =>
       ({
         ...attributes,
-        ...(listeners ?? {}),
+        ...listeners,
       }) as React.HTMLAttributes<HTMLDivElement>,
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [isDragging],

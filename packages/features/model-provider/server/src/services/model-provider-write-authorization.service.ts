@@ -52,6 +52,7 @@ export class ModelProviderWriteAuthorizationService {
       if (target === "default") {
         throw new ModelDefaultScopeForbiddenError(input);
       }
+
       throw new ModelProviderScopeForbiddenError(input);
     }
   }

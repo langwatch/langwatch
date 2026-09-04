@@ -52,7 +52,9 @@ export class OrganizationSessionPolicyService {
     ) {
       throw new SessionPolicyOutOfRangeError(maxSessionDurationDays, SESSION_POLICY_MAX_DAYS);
     }
+
     await this.repository.setMaxDurationDays(organizationId, maxSessionDurationDays);
+
     return { maxSessionDurationDays };
   }
 }

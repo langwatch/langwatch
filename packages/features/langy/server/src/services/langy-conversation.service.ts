@@ -248,7 +248,9 @@ export class LangyConversationService {
         projectId,
         userId,
       });
-      if (row) return row;
+      if (row) {
+        return row;
+      }
 
       // Re-asked every beat, not once up front: the handoff row lands on the
       // same dispatch we are waiting for, so "no handoff yet" early on means
@@ -256,11 +258,17 @@ export class LangyConversationService {
       const handoff = await this.repository
         .tryFindPendingHandoff({ projectId, conversationId: id })
         .catch(() => null);
-      if (!handoff && attempt >= DISPATCH_HANDOFF_GRACE_ATTEMPTS) return null;
+      if (!handoff && attempt >= DISPATCH_HANDOFF_GRACE_ATTEMPTS) {
+        return null;
+      }
 
-      if (attempt === DISPATCH_LAG_ATTEMPTS) return null;
+      if (attempt === DISPATCH_LAG_ATTEMPTS) {
+        return null;
+      }
+
       await new Promise((resolve) => setTimeout(resolve, DISPATCH_LAG_RETRY_MS));
     }
+
     return null;
   }
 
@@ -299,7 +307,10 @@ export class LangyConversationService {
       projectId,
       userId,
     });
-    if (!row) throw new LangyConversationNotFoundError(id);
+    if (!row) {
+      throw new LangyConversationNotFoundError(id);
+    }
+
     return {
       ...LangyConversationService.toListItem(row, userId),
       status: row.status,
@@ -350,11 +361,15 @@ export class LangyConversationService {
       projectId,
       userId,
     });
-    if (!visible) throw new LangyConversationNotFoundError(conversationId);
+    if (!visible) {
+      throw new LangyConversationNotFoundError(conversationId);
+    }
 
     // No event store configured (event sourcing disabled) means there are no
     // durable events at all — an empty tail is the honest answer.
-    if (!this.events) return { events: [], cursor: after, truncated: false };
+    if (!this.events) {
+      return { events: [], cursor: after, truncated: false };
+    }
 
     const all = await this.events.getEventsOccurredSince(
       conversationId,
@@ -375,6 +390,7 @@ export class LangyConversationService {
         "Langy event tail exceeded the response ceiling — serving a truncated page",
       );
     }
+
     const page = truncated ? tail.slice(0, CONVERSATION_EVENT_TAIL_LIMIT) : tail;
 
     const events = page.map((event) =>
@@ -388,6 +404,7 @@ export class LangyConversationService {
     );
 
     const last = events.at(-1);
+
     return {
       events,
       cursor: last ? { acceptedAt: last.createdAt, eventId: last.id } : after,
@@ -415,7 +432,10 @@ export class LangyConversationService {
     try {
       return await this.getById({ id, projectId, userId });
     } catch (error) {
-      if (LangyConversationNotFoundError.is(error)) return null;
+      if (LangyConversationNotFoundError.is(error)) {
+        return null;
+      }
+
       throw error;
     }
   }
@@ -434,6 +454,7 @@ export class LangyConversationService {
       userId,
       limit,
     });
+
     return rows.map((r) => LangyConversationService.toListItem(r, userId));
   }
 
@@ -505,6 +526,7 @@ export class LangyConversationService {
     if (!conversationId) {
       return { id: this.runtime.generateId("conversation"), isNew: true };
     }
+
     // Resolve straight from the repo (not the share-aware getById): visibility
     // of a shared conversation does not grant continuation rights.
     const ownership = await this.repository.findOwnership({
@@ -515,12 +537,15 @@ export class LangyConversationService {
     if (ownership === "owned") {
       return { id: conversationId, isNew: false };
     }
+
     if (ownership === "other") {
       throw new LangyConversationNotOwnedError(conversationId);
     }
+
     if (adoptUnknownId) {
       return LangyConversationService.adoptConversationId(conversationId, ownership);
     }
+
     // Archived / never existed: mint a fresh id — a stale id is legitimate
     // client state, unlike one owned by another user.
     return { id: this.runtime.generateId("conversation"), isNew: true };
@@ -564,6 +589,7 @@ export class LangyConversationService {
       title: title ?? null,
       runToken: runToken ?? mintRunToken(),
     });
+
     return { id: resolvedConversationId };
   }
 
@@ -631,6 +657,7 @@ export class LangyConversationService {
     }
 
     const lastActivityAt = new Date(startedAt + sourceMessages.length);
+
     return {
       conversation: {
         id: conversationId,
@@ -706,6 +733,7 @@ export class LangyConversationService {
       parts,
       title: title ?? null,
     });
+
     return { messageId: resolvedMessageId };
   }
 
@@ -752,6 +780,7 @@ export class LangyConversationService {
       ...(userMessage ? { userMessage } : {}),
       ...(consumeHandoffTurnId ? { consumeHandoffTurnId } : {}),
     });
+
     return { turnId: resolvedTurnId };
   }
 
@@ -972,8 +1001,10 @@ export class LangyConversationService {
           }),
         ),
       });
+
       return;
     }
+
     const order = await this.readTurnOrder({ conversationId, turnId });
     await this.finalizeTurn({
       projectId,
@@ -1004,7 +1035,10 @@ export class LangyConversationService {
     conversationId: string;
     turnId: string;
   }): Promise<LangyTurnSegment[]> {
-    if (!this.turnOrder) return [];
+    if (!this.turnOrder) {
+      return [];
+    }
+
     try {
       return await this.turnOrder.readTurnOrder(at);
     } catch (error) {
@@ -1012,6 +1046,7 @@ export class LangyConversationService {
         { ...at, error },
         "could not read a turn's order; recording its calls before its reply",
       );
+
       return [];
     }
   }
@@ -1122,6 +1157,7 @@ export class LangyConversationService {
       outcome,
       error: error ?? null,
     });
+
     return { messageId };
   }
 
@@ -1136,12 +1172,16 @@ export class LangyConversationService {
   }): Promise<boolean> {
     const conv = await this.tryFindByIdVisible({ id, projectId, userId });
     // Only the owner may archive — a shared conversation is visible, not deletable.
-    if (!conv?.isOwn) return false;
+    if (!conv?.isOwn) {
+      return false;
+    }
+
     await this.commands.archiveConversation({
       tenantId: projectId,
       occurredAt: this.runtime.now(),
       conversationId: id,
     });
+
     return true;
   }
 
@@ -1164,9 +1204,11 @@ export class LangyConversationService {
       // not leak that distinction — both read as "not found" to the caller.
       throw new LangyConversationNotFoundError(id);
     }
+
     if (title === undefined && isShared === undefined) {
       return conv;
     }
+
     await this.commands.updateConversationMetadata({
       tenantId: projectId,
       occurredAt: Date.now(),
@@ -1174,6 +1216,7 @@ export class LangyConversationService {
       ...(title !== undefined ? { title } : {}),
       ...(isShared !== undefined ? { isShared, sharedById: isShared ? userId : null } : {}),
     });
+
     // Optimistic echo: the fold is written asynchronously, so return the
     // caller's intended state rather than a possibly-stale re-read.
     return {
@@ -1201,6 +1244,7 @@ export class LangyConversationService {
         }),
       ),
     );
+
     return { deletedCount: ids.length };
   }
 
@@ -1237,9 +1281,11 @@ export class LangyConversationService {
     if (!ADOPTABLE_CONVERSATION_ID.test(conversationId)) {
       throw new LangyConversationIdUnadoptableError(conversationId, "invalid_shape");
     }
+
     if (ownership === "archived") {
       throw new LangyConversationIdUnadoptableError(conversationId, "archived");
     }
+
     return { id: conversationId, isNew: true };
   }
 

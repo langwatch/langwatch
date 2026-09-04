@@ -109,11 +109,15 @@ async function mapWithConcurrency<T, R>(
   const worker = async (): Promise<void> => {
     for (;;) {
       const index = cursor++;
-      if (index >= items.length) return;
+      if (index >= items.length) {
+        return;
+      }
+
       results[index] = await fn(items[index]!, index);
     }
   };
   await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, () => worker()));
+
   return results;
 }
 
@@ -134,8 +138,12 @@ function formatBucketLabel({
   timeScale: ReportGraphInput["timeScale"];
 }): string {
   const parsed = new Date(date);
-  if (Number.isNaN(parsed.getTime())) return date;
+  if (Number.isNaN(parsed.getTime())) {
+    return date;
+  }
+
   const daily = timeScale === "full" || Number(timeScale) >= DAY_SCALE_MINUTES;
+
   return parsed.toLocaleString("en-US", {
     timeZone: "UTC",
     ...(daily
@@ -158,6 +166,7 @@ export async function loadReportCharts({
   to: number;
 }): Promise<ReportChart[]> {
   const graphs = await loadGraphs({ deps, source, projectId });
+
   // Panels are independent queries, so overlap them rather than paying eight
   // round-trips in series — but under a concurrency cap (ADR-044 §5) so a large
   // dashboard doesn't fire every panel's heavy ClickHouse query at once.
@@ -180,14 +189,17 @@ async function loadGraphs({
       projectId,
       customGraphId: source.customGraphId,
     });
+
     return graph ? [graph] : [];
   }
+
   if (source.kind === "dashboard") {
     return deps.loadDashboardGraphs({
       projectId,
       dashboardId: source.dashboardId,
     });
   }
+
   return [];
 }
 
@@ -228,7 +240,9 @@ async function buildChart({
     total: 0,
     isEmpty: true,
   };
-  if (seriesInputs.length === 0) return empty;
+  if (seriesInputs.length === 0) {
+    return empty;
+  }
 
   const timeseries = await deps.getTimeseries({
     projectId,
@@ -244,7 +258,9 @@ async function buildChart({
   });
 
   const buckets = timeseries.currentPeriod;
-  if (buckets.length === 0) return empty;
+  if (buckets.length === 0) {
+    return empty;
+  }
 
   // Result buckets key each series by `buildSeriesName(input, queryIndex)`, NOT
   // by the series' display name — the two encodings differ, and reading by the
@@ -260,6 +276,7 @@ async function buildChart({
       groupBy: graphData.groupBy,
     });
     const total = segments.reduce((sum, segment) => sum + segment.value, 0);
+
     return {
       ...empty,
       segments: segments.slice(0, MAX_SEGMENTS),
@@ -321,6 +338,7 @@ function pieSegments({
       (segment) => segment.value > 0,
     );
   }
+
   return seriesInputs
     .map((input, index) => ({
       label: names?.[index]?.name ?? bucketKeys[index]!,

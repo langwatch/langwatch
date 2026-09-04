@@ -95,7 +95,7 @@ interface FacetValuesParams {
 }
 
 /** Whitelist for attribute key chars — defends against SQL injection in dynamic Attributes lookup. */
-const ATTRIBUTE_KEY_REGEX = /^[a-zA-Z0-9_.\-]+$/;
+const ATTRIBUTE_KEY_REGEX = /^[a-zA-Z0-9_.-]+$/;
 
 /**
  * Stale-while-revalidate cache for facet value results.
@@ -248,6 +248,7 @@ function snapToWindowPreset(timeRange: { from: number; to: number }): {
   // Reconstruct `from` from the snapped span so the cache key reflects
   // the canonical window, not the original (drifty) boundaries.
   const from = to - Math.round(span / preset.bucketMs) * preset.bucketMs;
+
   return { from, to, label: preset.label };
 }
 
@@ -327,12 +328,17 @@ export class TraceListService {
     result: CategoricalFacetResult,
   ): Promise<CategoricalFacetResult> {
     const ids = result.values.map((v) => v.value).filter(Boolean);
-    if (ids.length === 0) return result;
+    if (ids.length === 0) {
+      return result;
+    }
+
     const names = await this.topicService.getNamesByIds({ projectId, ids });
+
     return {
       ...result,
       values: result.values.map((v) => {
         const name = names.get(v.value);
+
         return name ? { ...v, label: name } : v;
       }),
     };
@@ -410,6 +416,7 @@ export class TraceListService {
         facetExpression: expression,
         filterWhere: params.filterWhere,
       });
+
       return [name, result.values] as const;
     });
 
@@ -478,7 +485,9 @@ export class TraceListService {
 
   async getSuggestions(params: SuggestParams): Promise<string[]> {
     const column = SUGGEST_COLUMN_MAP[params.field];
-    if (!column) return [];
+    if (!column) {
+      return [];
+    }
 
     return this.repository.findDistinctValues({
       tenantId: params.tenantId,
@@ -514,6 +523,7 @@ export class TraceListService {
       if (Date.now() - cached.timestamp > DISCOVER_REFRESH_AFTER_MS) {
         this.refreshDiscoverInBackground(snappedParams, cacheKey);
       }
+
       return { facets: cached.value, pending: false };
     }
 
@@ -527,6 +537,7 @@ export class TraceListService {
     // within the TTL hit the warm cache. The discover_updated SSE push
     // flips `pending` to false without the user having to refresh.
     this.refreshDiscoverInBackground(snappedParams, cacheKey);
+
     return { facets: [], pending: true };
   }
 
@@ -537,7 +548,10 @@ export class TraceListService {
     // only one pod in the fleet pays the compute cost per refresh
     // window. If we don't win the claim, another pod is already on it
     // and its result will land in the shared cache for us shortly.
-    if (this.discoverRefreshing.has(cacheKey)) return;
+    if (this.discoverRefreshing.has(cacheKey)) {
+      return;
+    }
+
     this.discoverRefreshing.add(cacheKey);
 
     void (async () => {
@@ -549,7 +563,9 @@ export class TraceListService {
         // already on it and its write will hydrate the value cache for
         // every reader.
         const claimed = await DISCOVER_REFRESH_LOCK_CACHE.claim(cacheKey, Date.now());
-        if (!claimed) return;
+        if (!claimed) {
+          return;
+        }
 
         const fresh = await this.computeDiscover(params);
         await DISCOVER_CACHE.set(cacheKey, {
@@ -641,6 +657,7 @@ export class TraceListService {
     const startedAt = Date.now();
     const wrap = <T>(label: string, p: Promise<T>): Promise<T> => {
       const t0 = Date.now();
+
       return p.finally(() => {
         taskTimings.push({ label, durationMs: Date.now() - t0 });
       });
@@ -688,6 +705,7 @@ export class TraceListService {
                 descriptor = await this.discoverDynamicKeys(def, params, TOP_N);
                 break;
             }
+
             return { kind: "standalone", key: def.key, descriptor };
           })(),
         ),
@@ -697,7 +715,10 @@ export class TraceListService {
     // Distinct-value discovery for `isDiscrete`-flagged integer facets. Runs as
     // its own GROUP BY per facet — the batched range pass only yields min/max.
     for (const def of FACET_REGISTRY) {
-      if (def.kind !== "range" || !def.isDiscrete) continue;
+      if (def.kind !== "range" || !def.isDiscrete) {
+        continue;
+      }
+
       tasks.push(
         wrap(
           `discrete:${def.key}`,
@@ -746,6 +767,7 @@ export class TraceListService {
         );
         continue;
       }
+
       if (result.value.kind === "batch") {
         batchByTable.set(result.value.table, result.value.result);
       } else if (result.value.kind === "discrete") {
@@ -765,8 +787,11 @@ export class TraceListService {
         standaloneByKey,
         discreteByKey,
       );
-      if (descriptor) facets.push(descriptor);
+      if (descriptor) {
+        facets.push(descriptor);
+      }
     }
+
     return facets;
   }
 
@@ -781,13 +806,18 @@ export class TraceListService {
       if (def.expression.includes("arrayJoin")) {
         return standaloneByKey.get(def.key) ?? null;
       }
+
       const batch = batchByTable.get(def.table);
       const raw = batch?.categoricals[def.key];
-      if (!raw) return null;
+      if (!raw) {
+        return null;
+      }
+
       const enriched =
         def.key === "topic" || def.key === "subtopic"
           ? await this.enrichTopicNames(params.tenantId, raw)
           : raw;
+
       return {
         key: def.key,
         kind: "categorical",
@@ -801,8 +831,12 @@ export class TraceListService {
     if (def.kind === "range") {
       const batch = batchByTable.get(def.table);
       const range = batch?.ranges[def.key];
-      if (!range) return null;
+      if (!range) {
+        return null;
+      }
+
       const discrete = def.isDiscrete ? discreteByKey.get(def.key) : undefined;
+
       return {
         key: def.key,
         kind: "range",
@@ -831,6 +865,7 @@ export class TraceListService {
       if (Date.now() - cached.timestamp > FACET_VALUES_REFRESH_AFTER_MS) {
         this.refreshFacetValuesInBackground(params, cacheKey);
       }
+
       return cached.value;
     }
 
@@ -840,11 +875,15 @@ export class TraceListService {
       value: result,
       timestamp: Date.now(),
     });
+
     return result;
   }
 
   private refreshFacetValuesInBackground(params: FacetValuesParams, cacheKey: string): void {
-    if (this.facetValuesRefreshing.has(cacheKey)) return;
+    if (this.facetValuesRefreshing.has(cacheKey)) {
+      return;
+    }
+
     this.facetValuesRefreshing.add(cacheKey);
 
     void this.computeFacetValues(params)
@@ -868,9 +907,7 @@ export class TraceListService {
       });
   }
 
-  private async computeFacetValues(
-    params: FacetValuesParams,
-  ): Promise<FacetValuesResult> {
+  private async computeFacetValues(params: FacetValuesParams): Promise<FacetValuesResult> {
     // Dynamic per-attribute drills — not in the static registry. Each prefix
     // routes to the store its filter actually queries: `event.attribute.` /
     // `span.attribute.` read stored_spans (Events.Attributes / SpanAttributes),
@@ -881,11 +918,13 @@ export class TraceListService {
         this.repository.findEventAttributeValues(p),
       );
     }
+
     if (params.facetKey.startsWith("span.attribute.")) {
       return this.attributeFacetValues(params, "span.attribute.", (p) =>
         this.repository.findSpanAttributeValues(p),
       );
     }
+
     if (params.facetKey.startsWith("attribute.")) {
       return this.attributeFacetValues(params, "attribute.", (p) =>
         this.repository.findAttributeValues(p),
@@ -896,6 +935,7 @@ export class TraceListService {
     if (!def) {
       throw new Error(`Unknown facet: ${params.facetKey}`);
     }
+
     if (def.kind === "range") {
       throw new Error("Cannot drill into range facet");
     }
@@ -1062,8 +1102,12 @@ export class TraceListService {
  * so the hover hides the row rather than showing a zero.
  */
 function parseTokenCount(raw: string | undefined): number | null {
-  if (raw == null || raw === "") return null;
+  if (raw == null || raw === "") {
+    return null;
+  }
+
   const n = Number(raw);
+
   return Number.isFinite(n) ? n : null;
 }
 
@@ -1073,10 +1117,16 @@ function parseTokenCount(raw: string | undefined): number | null {
  * missing or malformed value reads as no labels rather than throwing.
  */
 export function parseLabels(raw: string | undefined): string[] {
-  if (raw == null || raw === "") return [];
+  if (raw == null || raw === "") {
+    return [];
+  }
+
   try {
     const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
     return parsed.filter((label): label is string => typeof label === "string" && label !== "");
   } catch {
     return [];
@@ -1128,6 +1178,7 @@ function cursorForTraceRow(
 /** Parsed refs, or undefined so media-free rows serialize without the field. */
 function presentMediaRefs(serialized: string | undefined): TraceMediaRef[] | undefined {
   const refs = parseMediaRefs(serialized);
+
   return refs.length > 0 ? refs : undefined;
 }
 

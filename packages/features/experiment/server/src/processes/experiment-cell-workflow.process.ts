@@ -322,9 +322,8 @@ const buildTargetNode = (
         }),
         targetNodeId,
       };
-    } else {
-      throw new Error(`Prompt target ${targetConfig.id} has no local config and no loaded prompt`);
     }
+    throw new Error(`Prompt target ${targetConfig.id} has no local config and no loaded prompt`);
   } else if (targetConfig.type === "evaluator") {
     // Evaluator target - build evaluator node with target ID
     return {

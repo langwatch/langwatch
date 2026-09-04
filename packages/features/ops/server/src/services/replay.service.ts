@@ -42,6 +42,7 @@ export class ReplayService {
 
   async findHistoryEntry(params: { runId: string }): Promise<ReplayHistoryEntry | null> {
     const history = await this.repo.getHistory();
+
     return history.find((entry) => entry.runId === params.runId) ?? null;
   }
 
@@ -118,10 +119,12 @@ export class ReplayService {
     if (status.state !== "running") {
       return { cancelled: false };
     }
+
     // TTL matches the lock TTL so the flag cannot expire between polls
     // during a long callback-silent batch phase — the heartbeat checks it
     // every LOCK_REFRESH_INTERVAL_MS.
     await this.repo.setCancelled({ ttlSeconds: REPLAY_LOCK_TTL_SECONDS });
+
     return { cancelled: true };
   }
 
@@ -143,6 +146,7 @@ export class ReplayService {
         runId: params.runId,
         errorMessage: err instanceof Error ? err.message : String(err),
       });
+
       return;
     }
 
@@ -166,6 +170,7 @@ export class ReplayService {
           runId: params.runId,
           errorMessage: "No matching projections found",
         });
+
         return;
       }
 
@@ -175,6 +180,7 @@ export class ReplayService {
           runId: params.runId,
           historyCtx: params,
         });
+
         return;
       }
 
@@ -239,7 +245,9 @@ export class ReplayService {
         this.repo
           .isCancelled()
           .then((cancelled) => {
-            if (cancelled) cancelledFlag = true;
+            if (cancelled) {
+              cancelledFlag = true;
+            }
           })
           .catch((err) => {
             logger.warn({ error: err }, "Failed to poll replay cancel flag");
@@ -274,7 +282,9 @@ export class ReplayService {
               this.repo
                 .isCancelled()
                 .then((cancelled) => {
-                  if (cancelled) cancelledFlag = true;
+                  if (cancelled) {
+                    cancelledFlag = true;
+                  }
                 })
                 .catch(() => {});
             }
@@ -298,7 +308,9 @@ export class ReplayService {
       // finalization. A null holder (lock expired, no successor) still
       // finalizes so a completed run is never left stuck in "running".
       const lockHolder = await this.repo.tryGetLockHolder();
-      if (lockHolder !== null && lockHolder !== params.runId) return;
+      if (lockHolder !== null && lockHolder !== params.runId) {
+        return;
+      }
 
       if (result.batchErrors > 0) {
         await this.finalizeWithError({
@@ -365,10 +377,14 @@ export class ReplayService {
 
   private async updateProgress(params: { runId: string; progress: ReplayProgress }): Promise<void> {
     const lockHolder = await this.repo.tryGetLockHolder();
-    if (lockHolder !== params.runId) return;
+    if (lockHolder !== params.runId) {
+      return;
+    }
 
     const current = await this.repo.getStatus();
-    if (current.state !== "running" || current.runId !== params.runId) return;
+    if (current.state !== "running" || current.runId !== params.runId) {
+      return;
+    }
 
     await this.repo.writeStatus({
       status: {
@@ -418,6 +434,7 @@ export class ReplayService {
         },
       });
     }
+
     await this.repo.releaseLock({ runId: params.runId });
   }
 
@@ -454,6 +471,7 @@ export class ReplayService {
         },
       });
     }
+
     await this.repo.releaseLock({ runId: params.runId });
   }
 }

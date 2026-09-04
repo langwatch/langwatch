@@ -52,6 +52,7 @@ export class IngestionPullLifecycleService {
         configVersion,
         cursor: this.tryCursorOf(source.pollerCursor),
       });
+
       return;
     }
 
@@ -88,7 +89,10 @@ export class IngestionPullLifecycleService {
   }
 
   private tryCursorOf(cursor: unknown): string | null {
-    if (typeof cursor === "string") return cursor;
+    if (typeof cursor === "string") {
+      return cursor;
+    }
+
     return cursor == null ? null : JSON.stringify(cursor);
   }
 }

@@ -43,6 +43,7 @@ function pickDefined<T extends Record<string, unknown>>(
       result[key] = value;
     }
   }
+
   return result as { [K in keyof T]?: NonNullable<T[K]> };
 }
 
@@ -71,7 +72,9 @@ export function fireSignupNurturingCalls({
   primaryIntent?: OrganizationIntent | null;
 }): void {
   const nurturing = tryNurturingSink();
-  if (!nurturing) return;
+  if (!nurturing) {
+    return;
+  }
 
   const traits: Partial<CioPersonTraits> = {
     ...pickDefined({
@@ -119,7 +122,7 @@ export function fireSignupNurturingCalls({
       userId,
       event: "signed_up",
       properties: pickDefined({
-        ...(signUpData ?? {}),
+        ...signUpData,
         primary_intent: primaryIntent?.toLowerCase(),
       }),
     })

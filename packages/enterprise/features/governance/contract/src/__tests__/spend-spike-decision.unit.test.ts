@@ -39,7 +39,7 @@ function input(overrides: {
   return {
     ruleId: "rule-1",
     organizationId: "org-1",
-    config: { ...DEFAULT_SPEND_SPIKE_CONFIG, ...(overrides.config ?? {}) },
+    config: { ...DEFAULT_SPEND_SPIKE_CONFIG, ...overrides.config },
     currentSpendUsd: overrides.currentSpendUsd,
     baselineSpendUsd: overrides.baselineSpendUsd,
     hasOpenAlertInWindow: overrides.hasOpenAlertInWindow ?? false,

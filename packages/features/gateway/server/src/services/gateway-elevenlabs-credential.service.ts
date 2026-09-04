@@ -56,7 +56,10 @@ async function elevenLabsKeys(
     where: { id: modelProviderId },
     select: { provider: true, organizationId: true, customKeys: true },
   });
-  if (provider?.provider !== "elevenlabs") return null;
+  if (provider?.provider !== "elevenlabs") {
+    return null;
+  }
+
   return {
     keys: collaborators.credentials.readCustomKeys(provider.customKeys),
     organizationId: provider.organizationId,
@@ -79,9 +82,15 @@ export async function getElevenLabsWebhookSecret({
   collaborators: ElevenLabsCredentialCollaborators;
 }): Promise<ElevenLabsWebhookSecret | null> {
   const row = await elevenLabsKeys(modelProviderId, collaborators);
-  if (!row) return null;
+  if (!row) {
+    return null;
+  }
+
   const secret = row.keys[ELEVENLABS_WEBHOOK_SECRET_KEY];
-  if (typeof secret !== "string" || secret.length === 0) return null;
+  if (typeof secret !== "string" || secret.length === 0) {
+    return null;
+  }
+
   return { secret, organizationId: row.organizationId };
 }
 
@@ -102,20 +111,28 @@ export async function getElevenLabsApiCredential({
   collaborators: ElevenLabsCredentialCollaborators;
 }): Promise<ElevenLabsApiCredential | null> {
   const row = await elevenLabsKeys(modelProviderId, collaborators);
-  if (!row) return null;
+  if (!row) {
+    return null;
+  }
+
   const apiKey = row.keys.ELEVENLABS_API_KEY;
-  if (typeof apiKey !== "string" || apiKey.length === 0) return null;
+  if (typeof apiKey !== "string" || apiKey.length === 0) {
+    return null;
+  }
 
   const configured = row.keys.ELEVENLABS_BASE_URL;
   if (typeof configured !== "string" || configured.length === 0) {
     return { apiKey, baseUrl: ELEVENLABS_DEFAULT_BASE_URL };
   }
+
   if (!isElevenLabsHost(configured)) {
     logger.warn(
       { modelProviderId },
       "an ElevenLabs credential names a base URL outside elevenlabs.io; using the default host instead",
     );
+
     return { apiKey, baseUrl: ELEVENLABS_DEFAULT_BASE_URL };
   }
+
   return { apiKey, baseUrl: configured.replace(/\/$/, "") };
 }

@@ -29,10 +29,13 @@ export async function streamToBuffer(stream: Readable, maxBytes?: number): Promi
       total += buf.length;
       if (total > maxBytes) {
         stream.destroy();
+
         throw new StreamTooLargeError(maxBytes);
       }
     }
+
     chunks.push(buf);
   }
+
   return Buffer.concat(chunks);
 }

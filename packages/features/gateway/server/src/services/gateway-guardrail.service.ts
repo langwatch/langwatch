@@ -69,6 +69,7 @@ export class GatewayGuardrailCatalogue {
       targetId: row.id,
       after: serializeRowForAudit(row),
     });
+
     return row;
   }
 
@@ -81,9 +82,11 @@ export class GatewayGuardrailCatalogue {
     if (!existing) {
       throw new GatewayGuardrailNotFoundError();
     }
+
     if (parsed.evaluatorId !== undefined && parsed.evaluatorId !== existing.evaluatorId) {
       await this.assertEvaluatorEligible(parsed.evaluatorId, parsed.projectId);
     }
+
     const row = await this.repository.update(parsed);
     await this.audit.append({
       organizationId: await this.organizationIdFor(parsed.projectId),
@@ -95,6 +98,7 @@ export class GatewayGuardrailCatalogue {
       before: serializeRowForAudit(existing),
       after: serializeRowForAudit(row),
     });
+
     return row;
   }
 
@@ -107,6 +111,7 @@ export class GatewayGuardrailCatalogue {
     if (!existing) {
       throw new GatewayGuardrailNotFoundError();
     }
+
     await this.repository.archive(parsed);
     await this.audit.append({
       organizationId: await this.organizationIdFor(parsed.projectId),
@@ -124,6 +129,7 @@ export class GatewayGuardrailCatalogue {
     if (!evaluator) {
       throw new GatewayGuardrailEvaluatorInvalidError();
     }
+
     const monitors = await this.monitors.listEnabledGuardrailMonitors({
       projectId,
       evaluatorIds: [evaluatorId],
@@ -138,6 +144,7 @@ export class GatewayGuardrailCatalogue {
     if (!project) {
       throw new GatewayGuardrailProjectNotFoundError();
     }
+
     return project.team.organizationId;
   }
 }

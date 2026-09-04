@@ -202,13 +202,19 @@ export class LangyUiActionService {
       projectId,
       userId,
     });
-    if (!conversation) throw notFound();
+    if (!conversation) {
+      throw notFound();
+    }
 
     const turnId = conversation.currentTurnId;
-    if (!turnId) throw new LangyUiTurnInactiveError();
+    if (!turnId) {
+      throw new LangyUiTurnInactiveError();
+    }
 
     const definition = this.actions.tryFind(kind);
-    if (!definition) throw new LangyUiActionUnknownError(kind);
+    if (!definition) {
+      throw new LangyUiActionUnknownError(kind);
+    }
 
     const parsed = definition.payloadSchema.safeParse(payload);
     if (!parsed.success) {
@@ -270,7 +276,10 @@ export class LangyUiActionService {
     /** What is left of the ceiling once the claim window is spent. */
     remainingMs: number;
   }): Promise<UiActionOutcome> {
-    if (!this.backendRunner) throw new LangyUiNoBrowserError(kind);
+    if (!this.backendRunner) {
+      throw new LangyUiNoBrowserError(kind);
+    }
+
     // The backend answers under the same ceiling the page does. Without this
     // the runner is awaited unbounded, so a slow action runs past the ceiling
     // and the CLI's deadline reports the failure instead of this layer.
@@ -288,8 +297,11 @@ export class LangyUiActionService {
         deadline,
       ]);
     } finally {
-      if (timer) clearTimeout(timer);
+      if (timer) {
+        clearTimeout(timer);
+      }
     }
+
     return {
       status: "done",
       executedVia: "backend",
@@ -333,7 +345,9 @@ export class LangyUiActionService {
     try {
       const claimWindowSeconds = Math.ceil(UI_ACTION_CLAIM_WINDOW_MS / 1000);
       const first = await blocking.blpop(uiActionKeys.result(actionId), claimWindowSeconds);
-      if (first) return this.toOutcome({ actionId, kind, raw: first[1] });
+      if (first) {
+        return this.toOutcome({ actionId, kind, raw: first[1] });
+      }
 
       // Take the claim key for the backend with the same SET NX a page uses:
       // both sides then contend for one key, so exactly one of them can win.
@@ -361,6 +375,7 @@ export class LangyUiActionService {
         // Nothing is listening, and no page can claim now. Drop the pending
         // record so a zombie tab finds nothing left to validate either.
         await this.redis.del(uiActionKeys.pending(actionId));
+
         return await this.runOnBackend({
           actionId,
           kind,
@@ -373,9 +388,12 @@ export class LangyUiActionService {
 
       const remainingSeconds = Math.max(1, Math.ceil(remainingMs / 1000));
       const second = await blocking.blpop(uiActionKeys.result(actionId), remainingSeconds);
-      if (second) return this.toOutcome({ actionId, kind, raw: second[1] });
+      if (second) {
+        return this.toOutcome({ actionId, kind, raw: second[1] });
+      }
 
       await this.redis.del(uiActionKeys.pending(actionId));
+
       throw new LangyUiTimeoutError(kind);
     } finally {
       blocking.disconnect();
@@ -397,9 +415,11 @@ export class LangyUiActionService {
     } catch {
       throw new LangyUiHandlerFailedError(kind);
     }
+
     if (!completion.ok) {
       throw new LangyUiHandlerFailedError(kind, completion.errorCode);
     }
+
     return {
       status: "done",
       executedVia: "browser",
@@ -442,6 +462,7 @@ export class LangyUiActionService {
     if (!pending || pending.projectId !== projectId || pending.conversationId !== conversationId) {
       return { isClaimed: false };
     }
+
     const set = await this.redis.set(
       uiActionKeys.claim(actionId),
       userId,
@@ -449,6 +470,7 @@ export class LangyUiActionService {
       CLAIM_TTL_SECONDS,
       "NX",
     );
+
     return { isClaimed: set === "OK" };
   }
 
@@ -476,8 +498,11 @@ export class LangyUiActionService {
     if (!pending || pending.projectId !== projectId || pending.conversationId !== conversationId) {
       return { isAccepted: false };
     }
+
     const claimant = await this.redis.get(uiActionKeys.claim(actionId));
-    if (claimant !== userId) return { isAccepted: false };
+    if (claimant !== userId) {
+      return { isAccepted: false };
+    }
 
     const raw = JSON.stringify(completion);
     // Measure what Redis stores: a string's length counts UTF-16 code units,
@@ -494,14 +519,19 @@ export class LangyUiActionService {
     } else {
       await this.redis.lpush(uiActionKeys.result(actionId), raw);
     }
+
     await this.redis.expire(uiActionKeys.result(actionId), RESULT_TTL_SECONDS);
     await this.redis.del(uiActionKeys.pending(actionId));
+
     return { isAccepted: true };
   }
 
   private async readPending(actionId: string): Promise<PendingUiAction | null> {
     const raw = await this.redis.get(uiActionKeys.pending(actionId));
-    if (!raw) return null;
+    if (!raw) {
+      return null;
+    }
+
     try {
       return JSON.parse(raw) as PendingUiAction;
     } catch {

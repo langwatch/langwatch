@@ -82,6 +82,7 @@ export class LangyTurnPreparationService {
     await this.acceptPreparedTurn(args, prepared, mintedRunToken);
     await this.dispatchPreparedTurn(args, prepared, runToken);
     this.deps.metrics.count({ outcome: "accepted" });
+
     return { conversationId: args.conversation.id, turnId: args.turnId };
   }
 
@@ -90,6 +91,7 @@ export class LangyTurnPreparationService {
     mintedRunToken: string | null,
   ) {
     const { conversation, projectId, userId, credentials } = args;
+
     return Promise.allSettled([
       conversation.isNew
         ? Promise.resolve(null)
@@ -148,11 +150,14 @@ export class LangyTurnPreparationService {
         },
         "could not read langy runToken; refusing unsignable turn",
       );
+
       throw new LangyAgentUnavailableError("Agent request failed");
     }
+
     if (modelsAllowedResult.status === "rejected") {
       throw modelsAllowedResult.reason;
     }
+
     if (modelsAllowedResult.value && !modelsAllowedResult.value.includes(args.turnModel)) {
       logger.warn(
         {
@@ -162,20 +167,24 @@ export class LangyTurnPreparationService {
         },
         "turn model not allowed",
       );
+
       throw new LangyModelNotAllowedError(args.turnModel);
     }
+
     if (currentResult.status === "rejected") {
       logger.warn(
         { error: currentResult.reason, conversationId: args.conversation.id },
         "busy projection read failed after admission",
       );
     }
+
     if (
       currentResult.status === "fulfilled" &&
       currentResult.value?.status === LANGY_CONVERSATION_STATUS.RUNNING
     ) {
       throw new LangyTurnInProgressError();
     }
+
     return runTokenResult.value;
   }
 
@@ -203,6 +212,7 @@ export class LangyTurnPreparationService {
     if (!permit.allowed) {
       stripGithubCredentials(args.credentials);
     }
+
     return { reserved: permit.reserved, capReachedNote };
   }
 
@@ -225,6 +235,7 @@ export class LangyTurnPreparationService {
     if (workerAvailable) {
       return;
     }
+
     const minted = await this.deps.sessionKeys.mint({
       session: args.session,
       projectId: args.projectId,
@@ -248,6 +259,7 @@ export class LangyTurnPreparationService {
         "failed to read langy conversation memory",
       );
     }
+
     const durableMessages = memoryResult.status === "fulfilled" ? memoryResult.value : [];
     const transcript = LangyConversationMemoryService.tryRenderTranscript({
       messages: durableMessages,
@@ -266,6 +278,7 @@ export class LangyTurnPreparationService {
         "langy override resolution failed",
       );
     }
+
     trace.getActiveSpan()?.setAttribute("langy.prompt.override.source", override.source);
     const seedBlocks = [transcript, memory].filter(
       (block): block is string => !!block && block.trim().length > 0,
@@ -289,6 +302,7 @@ export class LangyTurnPreparationService {
         "failed to read pending handoff",
       );
     }
+
     return {
       prompt,
       system: [override.text, LANGY_REFERENT_POLICY].join("\n\n"),
@@ -339,6 +353,7 @@ export class LangyTurnPreparationService {
         },
         "failed to prepare langy turn",
       );
+
       throw new LangyAgentUnavailableError("Agent request failed");
     }
   }
@@ -393,6 +408,7 @@ export class LangyTurnPreparationService {
         },
         "failed to commit AcceptAgentTurn",
       );
+
       throw new LangyAgentUnavailableError("Agent request failed");
     }
   }
@@ -405,6 +421,7 @@ export class LangyTurnPreparationService {
     if (!(await args.attempt.commit())) {
       return;
     }
+
     void args.worker
       .dispatch({
         intent: prepared.pendingHandoff

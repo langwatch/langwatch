@@ -60,6 +60,7 @@ export class DatasetNormalizationService
     if (!dataset.stagingKey || !dataset.uploadFilename) {
       throw new UploadNotPendingError("Dataset normalization requires a staged upload");
     }
+
     const payload: DatasetNormalizePayload = {
       id: dataset.id,
       tenantId: input.projectId,
@@ -71,8 +72,10 @@ export class DatasetNormalizationService
 
     if (this.sender) {
       await this.sender(payload);
+
       return;
     }
+
     await this.runInline(payload);
   }
 
@@ -86,6 +89,7 @@ export class DatasetNormalizationService
         this.inlineChains.delete(key);
       }
     });
+
     return next;
   }
 }

@@ -91,6 +91,7 @@ export class AnnualEventsBillingThresholdService {
       if (existingThreshold?.reset_billing_cycle_anchor !== true) {
         return "already_set";
       }
+
       // The amount was chosen deliberately — keep it. The anchor reset was
       // not: it would move the renewal date on every threshold invoice.
       if (!isDryRun) {
@@ -101,6 +102,7 @@ export class AnnualEventsBillingThresholdService {
           },
         });
       }
+
       return "anchor_pinned";
     }
 

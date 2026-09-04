@@ -55,6 +55,7 @@ export class LangySessionKeyReapService {
       this.metrics.record({ operation: "reaped", count });
       logger.info({ count }, "reaped expired langy session keys");
     }
+
     return count;
   }
 }

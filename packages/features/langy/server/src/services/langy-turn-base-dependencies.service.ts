@@ -26,6 +26,7 @@ export class LangyTurnBaseDependenciesService {
   }): ReturnType<LangyTurnBaseDependenciesService["enrich"]> {
     const results = await this.read(input);
     const resolved = this.requireResolved(input.projectId, results);
+
     return this.enrich(input, resolved);
   }
 
@@ -39,6 +40,7 @@ export class LangyTurnBaseDependenciesService {
       adoptConversationId,
       modelOverride,
     } = input;
+
     return Promise.allSettled([
       deps.conversations.ensureConversation({
         projectId,
@@ -62,20 +64,26 @@ export class LangyTurnBaseDependenciesService {
     if (conversation.status === "rejected") {
       throw conversation.reason;
     }
+
     if (model.status === "rejected") {
       logger.warn({ error: model.reason, projectId }, "getVercelAIModel failed");
+
       throw new LangyModelNotConfiguredError();
     }
+
     if (credentials.status === "rejected") {
       throw credentials.reason;
     }
+
     if (egress.status === "rejected") {
       logger.error(
         { error: egress.reason, projectId },
         "failed to resolve Langy egress allow-list",
       );
+
       throw new LangyEgressMisconfiguredError();
     }
+
     return {
       conversation: conversation.value,
       model: model.value,
@@ -93,6 +101,7 @@ export class LangyTurnBaseDependenciesService {
     if (resolved.egress) {
       credentials.egressAllowlist = resolved.egress;
     }
+
     credentials.mirrorTier =
       resolved.mirror.status === "fulfilled" ? resolved.mirror.value : "skip";
     if (resolved.mirror.status === "rejected") {
@@ -101,6 +110,7 @@ export class LangyTurnBaseDependenciesService {
         "failed to resolve Langy mirror tier",
       );
     }
+
     if (input.deps.harness) {
       credentials.harness = await input.deps.harness.resolve({
         userId: input.userId,
@@ -108,6 +118,7 @@ export class LangyTurnBaseDependenciesService {
         organizationId: credentials.organizationId,
       });
     }
+
     return {
       speculativeConversation: resolved.conversation,
       credentials,

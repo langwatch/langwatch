@@ -136,6 +136,7 @@ export class StudioDatasetMaterializerService {
             Object.fromEntries(
               input.dataset.columnTypes.map((column) => {
                 const value = record.entry[column.name];
+
                 return [column.name, typeof value === "object" ? JSON.stringify(value) : value];
               }),
             ),

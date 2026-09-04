@@ -149,7 +149,7 @@ describe("facet perspectives", () => {
   });
 
   it("covers every group in every perspective (no facet ever dropped)", () => {
-    const allGroupIds = [...FACET_GROUPS.map((g) => g.id)].sort();
+    const allGroupIds = FACET_GROUPS.map((g) => g.id).sort();
     for (const p of FACET_PERSPECTIVES) {
       const order = [...groupOrderForPerspective(p.id)].sort();
       expect(order, `perspective ${p.id}`).toEqual(allGroupIds);

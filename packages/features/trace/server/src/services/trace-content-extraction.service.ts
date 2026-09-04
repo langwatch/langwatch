@@ -101,7 +101,9 @@ export async function processContentPart({
     toolResult: () => noOp,
 
     async media(mediaPart) {
-      if (mediaPart.source.type !== "data") return noOp;
+      if (mediaPart.source.type !== "data") {
+        return noOp;
+      }
 
       const { value: base64, mimeType } = mediaPart.source;
       // A source with no media type is not extractable: the read path serves
@@ -121,6 +123,7 @@ export async function processContentPart({
           { mimeType },
           "document part has an unsafe MIME type — passing through unchanged",
         );
+
         return noOp;
       }
 
@@ -173,6 +176,7 @@ export async function processContentPart({
           { error: refined.error.message },
           "binary part violates exactly-one-of(data,url,id); passing through unchanged",
         );
+
         return noOp;
       }
 
@@ -234,7 +238,9 @@ export async function processContentPart({
     // external CDN we shouldn't re-host).
     async imageUrl(url) {
       const parsed = parseBase64DataUri(url);
-      if (!parsed) return noOp;
+      if (!parsed) {
+        return noOp;
+      }
 
       const { mimeType, base64 } = parsed;
       const bytes = Buffer.from(base64, "base64");
@@ -281,7 +287,9 @@ export async function processContentPart({
     // `application/octet-stream` fallback when neither is recognised.
     async inputAudio(audioPart) {
       // Already-externalized: nothing to extract, pass through unchanged.
-      if (!audioPart.data) return noOp;
+      if (!audioPart.data) {
+        return noOp;
+      }
 
       const format = audioPart.format?.toLowerCase();
       let mimeType =
@@ -370,7 +378,9 @@ export async function processContentPart({
     // older fixtures. Handle the data-URI case symmetrically.
     async bareImage(src) {
       const parsed = parseBase64DataUri(src);
-      if (!parsed) return noOp;
+      if (!parsed) {
+        return noOp;
+      }
 
       const { mimeType, base64 } = parsed;
       const bytes = Buffer.from(base64, "base64");
@@ -448,11 +458,20 @@ async function rewriteMessage(
       part: raw,
       ...params,
     });
-    if (rewritten !== raw) changed = true;
+    if (rewritten !== raw) {
+      changed = true;
+    }
+
     rewrittenParts.push(rewritten);
-    if (ref !== null) refs.push(ref);
+    if (ref !== null) {
+      refs.push(ref);
+    }
   }
-  if (!changed) return { message: rawMessage, refs };
+
+  if (!changed) {
+    return { message: rawMessage, refs };
+  }
+
   return { message: { ...rawMessage, content: rewrittenParts }, refs };
 }
 
@@ -476,13 +495,17 @@ async function rewriteMessageArray(
         m as Record<string, unknown>,
         params,
       );
-      if (rewritten !== m) changed = true;
+      if (rewritten !== m) {
+        changed = true;
+      }
+
       out.push(rewritten);
       allRefs.push(...refs);
     } else {
       out.push(m);
     }
   }
+
   return { messages: out, refs: allRefs, changed };
 }
 
@@ -540,6 +563,7 @@ export async function extractInlineMediaFromEvent({
     async (span) => {
       if (typeof event !== "object" || event === null) {
         span.setAttribute("stored_objects.refs_extracted", 0);
+
         return { rewrittenEvent: event, refs: [] };
       }
 
@@ -564,6 +588,7 @@ export async function extractInlineMediaFromEvent({
         if (message === original) {
           return { rewrittenEvent: event, refs };
         }
+
         return { rewrittenEvent: { ...eventObj, message }, refs };
       }
 
@@ -571,11 +596,15 @@ export async function extractInlineMediaFromEvent({
       if (Array.isArray(eventObj.messages)) {
         const { messages, refs, changed } = await rewriteMessageArray(eventObj.messages, params);
         span.setAttribute("stored_objects.refs_extracted", refs.length);
-        if (!changed) return { rewrittenEvent: event, refs };
+        if (!changed) {
+          return { rewrittenEvent: event, refs };
+        }
+
         return { rewrittenEvent: { ...eventObj, messages }, refs };
       }
 
       span.setAttribute("stored_objects.refs_extracted", 0);
+
       return { rewrittenEvent: event, refs: [] };
     },
   );

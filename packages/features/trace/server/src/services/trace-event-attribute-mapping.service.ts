@@ -32,7 +32,9 @@ export function mapEventAttrsToEvent({
 }): Event | null {
   const attrs = row.EventAttrs ?? {};
   const eventType = attrs["event.type"];
-  if (!eventType) return null;
+  if (!eventType) {
+    return null;
+  }
 
   const metrics: Record<string, number> = {};
   const details: Record<string, string> = {};

@@ -436,9 +436,7 @@ export class TraceApp {
       input.traceIds,
       input.protections,
       undefined,
-      {
-        ...(input.withEditOverlay !== undefined ? { withEditOverlay: input.withEditOverlay } : {}),
-      },
+      input.withEditOverlay !== undefined ? { withEditOverlay: input.withEditOverlay } : {},
     );
   }
 

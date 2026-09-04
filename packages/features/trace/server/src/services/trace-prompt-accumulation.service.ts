@@ -111,11 +111,14 @@ function isLater({
   if (currentMs === null || currentSpanId === null) {
     return true;
   }
+
   if (candidateMs > currentMs) {
     return true;
   }
+
   if (candidateMs < currentMs) {
     return false;
   }
+
   return candidateSpanId > currentSpanId;
 }

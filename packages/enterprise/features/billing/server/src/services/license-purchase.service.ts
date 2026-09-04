@@ -72,6 +72,7 @@ export class LicensePurchaseService {
     if (!email) {
       throw new Error("No email found in checkout session customer_details");
     }
+
     const businessName = checkoutSession.customer_details?.name ?? "";
     const lineItems = await stripe.checkout.sessions.listLineItems(checkoutSession.id);
     const quantity = lineItems.data[0]?.quantity ?? 1;

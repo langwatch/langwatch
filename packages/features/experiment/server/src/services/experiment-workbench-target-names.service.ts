@@ -54,14 +54,18 @@ export const resolveWorkbenchTargetNames = async ({
     for (const target of targets) {
       const entity = entityFor({ target, prompts, agents, evaluators });
       const name = pickTargetName({ target, entity, isLoading: false });
-      if (name) names[target.id] = name;
+      if (name) {
+        names[target.id] = name;
+      }
     }
+
     return names;
   } catch (error) {
     logger.warn(
       { error, projectId },
       "Could not resolve workbench column names; falling back to target ids",
     );
+
     return {};
   }
 };
@@ -87,8 +91,12 @@ const loadNamedRows = async ({
   ids: string[];
   find: (ids: string[]) => Promise<Record<string, string>>;
 }): Promise<Map<string, { name: string }>> => {
-  if (ids.length === 0) return new Map();
+  if (ids.length === 0) {
+    return new Map();
+  }
+
   const names = await find(ids);
+
   return new Map(Object.entries(names).map(([id, name]) => [id, { name }]));
 };
 
@@ -119,8 +127,11 @@ const loadPrompts = async ({
   );
   const byId = new Map<string, { handle?: string | null }>();
   for (const { promptId, prompt } of found) {
-    if (prompt) byId.set(promptId, prompt);
+    if (prompt) {
+      byId.set(promptId, prompt);
+    }
   }
+
   return byId;
 };
 
@@ -135,7 +146,13 @@ const entityFor = ({
   agents: Map<string, { name: string }>;
   evaluators: Map<string, { name: string }>;
 }): { name?: string | null; handle?: string | null } | undefined => {
-  if (target.type === "prompt") return prompts.get(target.promptId ?? "");
-  if (target.type === "agent") return agents.get(target.dbAgentId ?? "");
+  if (target.type === "prompt") {
+    return prompts.get(target.promptId ?? "");
+  }
+
+  if (target.type === "agent") {
+    return agents.get(target.dbAgentId ?? "");
+  }
+
   return evaluators.get(target.targetEvaluatorId ?? "");
 };

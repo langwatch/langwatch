@@ -26,14 +26,21 @@ export class CodingAgentSessionListPullRequestService {
     sessions: CodingAgentSession[];
   }): Promise<Map<string, Array<{ number: number; url: string; title: string }>>> {
     const drives = this.listBranchDrives(input.sessions);
-    if (drives.length === 0) return new Map();
+    if (drives.length === 0) {
+      return new Map();
+    }
+
     try {
       const project = await this.dependencies.projects.tryGetWithTeam(input.projectId);
-      if (project === null) return new Map();
+      if (project === null) {
+        return new Map();
+      }
+
       const candidates = await this.dependencies.github.findForBranches({
         organizationId: project.team.organizationId,
         keys: this.uniqueBranchKeys(drives),
       });
+
       return this.linkedPullRequests(drives, candidates);
     } catch {
       return new Map();
@@ -43,7 +50,10 @@ export class CodingAgentSessionListPullRequestService {
   private listBranchDrives(sessions: readonly CodingAgentSession[]): ListBranchDrive[] {
     const drives: ListBranchDrive[] = [];
     for (const session of sessions) {
-      if (!session.repositoryOwner || !session.repositoryName) continue;
+      if (!session.repositoryOwner || !session.repositoryName) {
+        continue;
+      }
+
       for (const headBranch of this.dependencies.assignments.branchesOf(session)) {
         drives.push({
           sessionId: session.sessionId,
@@ -54,6 +64,7 @@ export class CodingAgentSessionListPullRequestService {
         });
       }
     }
+
     return drives;
   }
 
@@ -71,6 +82,7 @@ export class CodingAgentSessionListPullRequestService {
         headBranch: drive.headBranch,
       });
     }
+
     return [...keys.values()];
   }
 
@@ -86,6 +98,7 @@ export class CodingAgentSessionListPullRequestService {
       bucket.push(drive);
       byRepository.set(key, bucket);
     }
+
     for (const [bucket, bucketDrives] of byRepository) {
       const bucketCandidates = candidates.filter(
         (candidate) =>
@@ -110,7 +123,10 @@ export class CodingAgentSessionListPullRequestService {
         const candidate = bucketCandidates.find(
           (row) => row.prNumber === assignments.get(`${drive.sessionId}\0${drive.headBranch}`),
         );
-        if (!candidate) continue;
+        if (!candidate) {
+          continue;
+        }
+
         const rows = found.get(drive.sessionId) ?? new Map();
         rows.set(candidate.prNumber, {
           number: candidate.prNumber,
@@ -120,6 +136,7 @@ export class CodingAgentSessionListPullRequestService {
         found.set(drive.sessionId, rows);
       }
     }
+
     return new Map(
       [...found].map(([sessionId, rows]) => [
         sessionId,

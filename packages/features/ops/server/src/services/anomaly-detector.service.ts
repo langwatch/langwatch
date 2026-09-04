@@ -54,19 +54,23 @@ export class AnomalyDetectorService {
       if (result === "surfaced") {
         surfaced++;
       }
+
       if (result === "cleared") {
         cleared++;
       }
+
       if (result === "killed") {
         skippedKillSwitch++;
       }
     }
+
     if (surfaced > 0 || cleared > 0 || skippedKillSwitch > 0) {
       logger.info(
         { checked: tenants.length, surfaced, cleared, skippedKillSwitch },
         "AnomalyDetector tick complete",
       );
     }
+
     return { checked: tenants.length, surfaced, cleared, skippedKillSwitch };
   }
 
@@ -76,10 +80,12 @@ export class AnomalyDetectorService {
     if (await this.isKilledForTenant(tenantId)) {
       return "killed";
     }
+
     const baseline = await this.resolveBaseline(tenantId);
     if (baseline === null) {
       return "noop";
     }
+
     const recentSurface = await this.rateTracker.currentWindowCount(
       tenantId,
       SURFACE_TIER_SUSTAIN_MINUTES * 60,
@@ -111,7 +117,9 @@ export class AnomalyDetectorService {
           );
         }
       }
+
       logger.error({ tenantId, currentRate: hardPerMin, baseline }, "HARD-tier rate anomaly");
+
       return "surfaced";
     }
 
@@ -125,14 +133,17 @@ export class AnomalyDetectorService {
       });
       await this.anomalyState.upsert(anomaly);
       logger.warn({ tenantId, currentRate: surfacePerMin, baseline }, "SURFACE-tier rate anomaly");
+
       return "surfaced";
     }
 
     if (existing) {
       await this.anomalyState.clear(tenantId, "rate_breaker");
       logger.info({ tenantId }, "Rate anomaly cleared — back below threshold");
+
       return "cleared";
     }
+
     return "noop";
   }
 
@@ -171,6 +182,7 @@ export class AnomalyDetectorService {
     if (!this.featureFlags) {
       return false;
     }
+
     try {
       return await this.featureFlags.isEnabled(ANOMALY_DETECTION_KILL_SWITCH_FLAG, {
         kind: "project",
@@ -186,6 +198,7 @@ export class AnomalyDetectorService {
     if (cached !== null) {
       return cached < MIN_BASELINE_RATE ? null : cached;
     }
+
     const series = await this.rateTracker.perMinuteSeries(tenantId, BASELINE_LOOKBACK_SECONDS);
     const nonZero = series.filter((value) => value > 0);
     if (nonZero.length < 60) {
@@ -194,10 +207,13 @@ export class AnomalyDetectorService {
         baseline: 0,
         ttlSeconds: INSUFFICIENT_DATA_RECHECK_SECONDS,
       });
+
       return null;
     }
+
     const baseline = percentile({ values: nonZero, p: 95 });
     await this.rateTracker.setCachedBaseline({ tenantId, baseline });
+
     return baseline < MIN_BASELINE_RATE ? null : baseline;
   }
 }

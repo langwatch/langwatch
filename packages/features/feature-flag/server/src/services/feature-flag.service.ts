@@ -394,9 +394,17 @@ export class FeatureFlagService extends FeatureFlagServiceContract {
     context: RuleEvaluationContext,
     flagKey: string,
   ): Promise<RuleEvaluationContext> {
-    if (context.organizationCreatedAt !== undefined) return context;
-    if (!context.organizationId) return context;
-    if (!readNeedsOrganizationAge({ rules, ctx: context, flagKey })) return context;
+    if (context.organizationCreatedAt !== undefined) {
+      return context;
+    }
+
+    if (!context.organizationId) {
+      return context;
+    }
+
+    if (!readNeedsOrganizationAge({ rules, ctx: context, flagKey })) {
+      return context;
+    }
 
     return {
       ...context,
@@ -413,11 +421,14 @@ export class FeatureFlagService extends FeatureFlagServiceContract {
   private async getOrganizationCreatedAt(organizationId: string): Promise<Date | null> {
     const now = Date.now();
     const cached = this.organizationCreatedAt.get(organizationId);
-    if (cached && cached.expiresAt > now) return cached.createdAt;
+    if (cached && cached.expiresAt > now) {
+      return cached.createdAt;
+    }
 
     try {
       const createdAt = await this.repository.tryFindOrganizationCreatedAt(organizationId);
       this.rememberOrganizationCreatedAt({ organizationId, createdAt, now });
+
       return createdAt;
     } catch {
       // Deliberately not cached: a failed read is a blip, not an answer, and
@@ -438,6 +449,7 @@ export class FeatureFlagService extends FeatureFlagServiceContract {
     if (this.organizationCreatedAt.size >= ORGANIZATION_CREATED_AT_MAX_KEYS) {
       this.evictOrganizationCreatedAt(now);
     }
+
     this.organizationCreatedAt.set(organizationId, {
       createdAt,
       expiresAt: now + ORGANIZATION_CREATED_AT_TTL_MS,
@@ -452,11 +464,19 @@ export class FeatureFlagService extends FeatureFlagServiceContract {
    */
   private evictOrganizationCreatedAt(now: number): void {
     for (const [id, entry] of this.organizationCreatedAt) {
-      if (entry.expiresAt <= now) this.organizationCreatedAt.delete(id);
+      if (entry.expiresAt <= now) {
+        this.organizationCreatedAt.delete(id);
+      }
     }
-    if (this.organizationCreatedAt.size < ORGANIZATION_CREATED_AT_MAX_KEYS) return;
+
+    if (this.organizationCreatedAt.size < ORGANIZATION_CREATED_AT_MAX_KEYS) {
+      return;
+    }
+
     const oldest = this.organizationCreatedAt.keys().next();
-    if (!oldest.done) this.organizationCreatedAt.delete(oldest.value);
+    if (!oldest.done) {
+      this.organizationCreatedAt.delete(oldest.value);
+    }
   }
 
   async listOperatorCatalogue(): Promise<OperatorFeatureFlagCatalogue> {

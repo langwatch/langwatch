@@ -50,12 +50,16 @@ export class TraceEventDerivationService {
         traceId: input.traceId,
         ...(input.occurredAtMs === undefined ? {} : { occurredAtMs: input.occurredAtMs }),
       });
-    if (input.foldVersion === undefined) return read();
+    if (input.foldVersion === undefined) {
+      return read();
+    }
 
     const key = `${input.projectId}:${input.traceId}:${input.foldVersion}`;
     const now = Date.now();
     const hit = this.memo.get(key);
-    if (hit && hit.expiresAt > now) return hit.value;
+    if (hit && hit.expiresAt > now) {
+      return hit.value;
+    }
 
     const value = read();
     // Delete before set so a refreshed key re-inserts at the end: `Map.set` on
@@ -75,7 +79,9 @@ export class TraceEventDerivationService {
       // Never cache a failure: drop it so the next caller retries the read
       // rather than replaying the rejection.
       () => {
-        if (this.memo.get(key) === entry) this.memo.delete(key);
+        if (this.memo.get(key) === entry) {
+          this.memo.delete(key);
+        }
       },
     );
     this.evict(now);
@@ -85,12 +91,19 @@ export class TraceEventDerivationService {
 
   private evict(now: number): void {
     for (const [key, entry] of this.memo) {
-      if (entry.expiresAt > now) break;
+      if (entry.expiresAt > now) {
+        break;
+      }
+
       this.memo.delete(key);
     }
+
     while (this.memo.size > EVENT_DERIVATION_MEMO_MAX_ENTRIES) {
       const oldest = this.memo.keys().next().value;
-      if (oldest === undefined) break;
+      if (oldest === undefined) {
+        break;
+      }
+
       this.memo.delete(oldest);
     }
   }

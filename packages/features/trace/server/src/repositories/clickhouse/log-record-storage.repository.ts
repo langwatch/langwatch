@@ -111,7 +111,7 @@ export class LogRecordStorageClickHouseRepository implements LogRecordStorageRep
             traceId,
             // One row past the cap so truncation is detectable without a count.
             limitPlusOne: limit + 1,
-            ...(window?.params ?? {}),
+            ...window?.params,
           },
           format: "JSONEachRow",
         });

@@ -80,6 +80,7 @@ export class WebhookBatchPlanner {
       });
       inFlight++;
     }
+
     return { messages, remaining, inFlight };
   }
 
@@ -97,8 +98,14 @@ export class WebhookBatchPlanner {
     now: number;
   }): number | null {
     const oldest = remaining[0];
-    if (!oldest) return null;
-    if (inFlight >= this.endpoint.maxInFlight) return now + WEBHOOK_FLUSH_RECHECK_MS;
+    if (!oldest) {
+      return null;
+    }
+
+    if (inFlight >= this.endpoint.maxInFlight) {
+      return now + WEBHOOK_FLUSH_RECHECK_MS;
+    }
+
     return Math.max(this.deadlineFor(oldest), now + WEBHOOK_FLUSH_RECHECK_MS);
   }
 
@@ -129,6 +136,7 @@ export class WebhookBatchPlanner {
       )
       .digest("hex")
       .slice(0, 16);
+
     return `${this.endpoint.id}:${hash}`;
   }
 }

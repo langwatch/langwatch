@@ -52,19 +52,28 @@ const tryToMapPreviousColumnsToNewColumns = (
   const mapping: Record<string, string | undefined> = {};
   for (const previous of previousColumns) {
     const exact = newColumns.find((column) => column.name === previous.name);
-    if (exact) mapping[previous.name] = exact.name;
+    if (exact) {
+      mapping[previous.name] = exact.name;
+    }
   }
+
   const previousUnmapped = previousColumns.filter((column) => !(column.name in mapping));
   const newUnmapped = newColumns.filter((column) => !Object.values(mapping).includes(column.name));
   previousUnmapped.forEach((previous, index) => {
     const next = newUnmapped[index];
-    if (next) mapping[previous.name] = next.name;
+    if (next) {
+      mapping[previous.name] = next.name;
+    }
   });
+
   return records.map((record) => {
     const mapped: DatasetRecordInput = record.id ? { id: record.id } : {};
     for (const [key, value] of Object.entries(record)) {
-      if (key !== "id" && mapping[key]) mapped[mapping[key]!] = value;
+      if (key !== "id" && mapping[key]) {
+        mapped[mapping[key]!] = value;
+      }
     }
+
     return mapped;
   });
 };
@@ -131,9 +140,13 @@ const toChunkLines = (
   // common upsert case.)
   const seen = new Set<string>();
   for (const { id } of lines) {
-    if (seen.has(id)) throw new DuplicateRecordIdError(id);
+    if (seen.has(id)) {
+      throw new DuplicateRecordIdError(id);
+    }
+
     seen.add(id);
   }
+
   return lines;
 };
 
@@ -174,6 +187,7 @@ const recomputeOffsets = (
     startRow = endRow;
     sizeBytes += c.byteSize;
   });
+
   return { offsets, rowCount: startRow, sizeBytes };
 };
 
@@ -256,6 +270,7 @@ export class DatasetChunkService {
       } catch {
         // swallow — surface the write failure below
       }
+
       throw error;
     }
 
@@ -312,6 +327,7 @@ export class DatasetChunkService {
     return this.datasets.withDatasetLock(dataset.id, async (tx) => {
       const current = await tx.findOneOrThrow({ id: dataset.id, projectId });
       assertReady(current);
+
       return this.appendLines({
         tx,
         current,
@@ -414,8 +430,10 @@ export class DatasetChunkService {
           const rowIndex = rows.findIndex((line) => isChunkLine(line) && line.id === recordId);
           if (rowIndex !== -1) {
             await rewriteRowAt(index, rows, rowIndex);
+
             return { updated: true };
           }
+
           // Row moved/removed since the scan → fall through to the full scan.
           logger.warn(
             { projectId, datasetId: dataset.id, recordId, index },
@@ -433,8 +451,12 @@ export class DatasetChunkService {
           index,
         });
         const rowIndex = rows.findIndex((line) => isChunkLine(line) && line.id === recordId);
-        if (rowIndex === -1) continue;
+        if (rowIndex === -1) {
+          continue;
+        }
+
         await rewriteRowAt(index, rows, rowIndex);
+
         return { updated: true };
       }
 
@@ -448,6 +470,7 @@ export class DatasetChunkService {
         storage: datasetStorage,
         forcedIds: [recordId],
       });
+
       return { updated: false };
     });
   }
@@ -511,6 +534,7 @@ export class DatasetChunkService {
       if (removeSet.size === 0) {
         return { deleted: 0 };
       }
+
       const offsets = readOffsets(current);
 
       // Fast path — only when the pre-scan located EVERY target id and the offset
@@ -531,22 +555,30 @@ export class DatasetChunkService {
           const pendingRewrites: Array<{ index: number; kept: unknown[] }> = [];
           let deleted = 0;
           for (const index of hint.affectedIndices) {
-            if (index >= chunkCount) continue; // chunk trimmed away since the scan
+            if (index >= chunkCount) {
+              continue;
+            } // chunk trimmed away since the scan
+
             const rows = await datasetStorage.readChunk({
               projectId,
               datasetId: dataset.id,
               index,
             });
             const kept = rows.filter((line) => !isTarget(line));
-            if (kept.length === rows.length) continue; // none of ours here now
+            if (kept.length === rows.length) {
+              continue;
+            } // none of ours here now
+
             for (const line of rows) {
               if (isChunkLine(line) && removeSet.has(line.id)) {
                 removedIds.add(line.id);
               }
             }
+
             deleted += rows.length - kept.length;
             pendingRewrites.push({ index, kept });
           }
+
           // Re-validate the hint: every located id must have been removed here. If
           // not, a concurrent mutation moved/removed it since the scan — bail to
           // the proven full scan rather than risk a missed delete. No S3 write has
@@ -557,12 +589,15 @@ export class DatasetChunkService {
                 { projectId, datasetId: dataset.id, recordId: id },
                 "delete fast-path drift: located id not removed (concurrent mutation); falling back to full in-lock scan",
               );
+
               return null;
             }
           }
+
           if (deleted === 0) {
             return { deleted: 0 };
           }
+
           // Hint validated — now commit the buffered rewrites to S3.
           for (const { index, kept } of pendingRewrites) {
             const offset = await datasetStorage.rewriteChunk({
@@ -574,6 +609,7 @@ export class DatasetChunkService {
             newRowCount.set(index, kept.length);
             newByteSize.set(index, offset.byteSize);
           }
+
           // Per-chunk (rowCount, byteSize) for ALL chunks: affected from the
           // re-read above, the rest from the authoritative offset index (no read).
           const perChunk = [...offsets]
@@ -590,9 +626,12 @@ export class DatasetChunkService {
             projectId,
             perChunk,
           });
+
           return { deleted };
         })();
-        if (fast) return fast;
+        if (fast) {
+          return fast;
+        }
       }
 
       // Full in-lock scan (the proven path): read every chunk, drop target rows,
@@ -629,12 +668,14 @@ export class DatasetChunkService {
       if (deleted === 0) {
         return { deleted: 0 };
       }
+
       await this.commitDeleteCounts({
         tx,
         datasetId: dataset.id,
         projectId,
         perChunk,
       });
+
       return { deleted };
     });
   }
@@ -699,6 +740,7 @@ export class DatasetChunkService {
       while (keptChunkCount > 0 && perChunk[keptChunkCount - 1]!.rowCount === 0) {
         keptChunkCount -= 1;
       }
+
       const keptOffsets = offsets.slice(0, keptChunkCount);
 
       await tx.updateContent({
@@ -954,8 +996,10 @@ export class DatasetChunkService {
           { projectId, datasetId, index },
           "off-lock chunk read failed during id locate; abandoning fast-path hint, falling back to full in-lock scan",
         );
+
         return null;
       }
+
       for (const line of rows) {
         if (isChunkLine(line) && remaining.has(line.id)) {
           affected.add(index);
@@ -964,6 +1008,7 @@ export class DatasetChunkService {
         }
       }
     }
+
     return { affectedIndices: [...affected].sort((a, b) => a - b), locatedIds };
   }
 
@@ -991,6 +1036,7 @@ export class DatasetChunkService {
     while (keptChunkCount > 0 && perChunk[keptChunkCount - 1]!.rowCount === 0) {
       keptChunkCount -= 1;
     }
+
     const trimmed = keptChunkCount < perChunk.length;
     await tx.updateContent({
       id: datasetId,

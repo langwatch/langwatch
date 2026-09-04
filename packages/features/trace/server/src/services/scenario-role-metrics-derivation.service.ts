@@ -91,26 +91,37 @@ export class ScenarioRoleMetricsDerivationService {
         spanCostService: this.spanCosts,
       });
 
-    if (input.foldVersion === undefined) return read();
+    if (input.foldVersion === undefined) {
+      return read();
+    }
 
     const key = `${input.tenantId}:${input.traceId}:${input.foldVersion}`;
     const now = this.now();
     const cached = this.memo.get(key);
-    if (cached && cached.expiresAt > now) return cached.value;
+    if (cached && cached.expiresAt > now) {
+      return cached.value;
+    }
 
     const value = read();
     this.memo.set(key, { value, expiresAt: now + DERIVATION_READ_WINDOW_MS });
     this.sweep(now);
+
     return value;
   }
 
   private sweep(now: number): void {
     for (const [key, entry] of this.memo) {
-      if (entry.expiresAt <= now) this.memo.delete(key);
+      if (entry.expiresAt <= now) {
+        this.memo.delete(key);
+      }
     }
+
     while (this.memo.size > DERIVATION_MEMO_MAX_ENTRIES) {
       const oldest = this.memo.keys().next();
-      if (oldest.done) break;
+      if (oldest.done) {
+        break;
+      }
+
       this.memo.delete(oldest.value);
     }
   }

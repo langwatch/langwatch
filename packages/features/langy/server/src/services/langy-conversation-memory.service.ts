@@ -109,22 +109,34 @@ export class LangyConversationMemoryService {
     let turn = 0;
 
     for (const message of messages) {
-      if (message.role !== "assistant") continue;
+      if (message.role !== "assistant") {
+        continue;
+      }
+
       turn += 1;
       for (const part of message.parts) {
-        if (LangyConversationMemoryService.isErrored(part)) continue;
+        if (LangyConversationMemoryService.isErrored(part)) {
+          continue;
+        }
+
         const digest = LangyConversationMemoryService.digestOf(part);
-        if (!digest) continue;
+        if (!digest) {
+          continue;
+        }
 
         const ids = (digest.primaryId ? [digest.primaryId] : (digest.ids ?? []))
           .map((value) => LangyConversationMemoryService.cleanId(value))
           .filter((id): id is string => id !== null)
           .slice(0, MAX_MEMORY_IDS_PER_ENTRY);
-        if (ids.length === 0) continue;
+        if (ids.length === 0) {
+          continue;
+        }
 
         const resource = sanitizeLangyPromptValue(digest.resource, MAX_MEMORY_TERM_LENGTH);
         const verb = sanitizeLangyPromptValue(digest.verb, MAX_MEMORY_TERM_LENGTH);
-        if (!resource || !verb) continue;
+        if (!resource || !verb) {
+          continue;
+        }
 
         const name = digest.name
           ? sanitizeLangyPromptValue(digest.name, MAX_LANGY_CONTEXT_LABEL_LENGTH)
@@ -161,7 +173,9 @@ export class LangyConversationMemoryService {
    * as proof the thing still exists.
    */
   static tryRender(entries: LangyConversationMemoryEntry[]): string | null {
-    if (entries.length === 0) return null;
+    if (entries.length === 0) {
+      return null;
+    }
 
     return [
       [
@@ -215,13 +229,20 @@ export class LangyConversationMemoryService {
   }): string | null {
     const spoken: { role: "user" | "assistant"; text: string }[] = [];
     for (const message of messages) {
-      if (message.role !== "user" && message.role !== "assistant") continue;
+      if (message.role !== "user" && message.role !== "assistant") {
+        continue;
+      }
+
       const text = LangyConversationMemoryService.sanitizeTranscriptText(
         extractLangyTextFromParts(message.parts),
       );
-      if (!text) continue;
+      if (!text) {
+        continue;
+      }
+
       spoken.push({ role: message.role, text });
     }
+
     const last = spoken[spoken.length - 1];
     if (
       last &&
@@ -231,7 +252,10 @@ export class LangyConversationMemoryService {
     ) {
       spoken.pop();
     }
-    if (spoken.length === 0) return null;
+
+    if (spoken.length === 0) {
+      return null;
+    }
 
     // Newest messages win the budget; render order stays chronological.
     const kept: string[] = [];
@@ -242,11 +266,18 @@ export class LangyConversationMemoryService {
         entry.role,
         entry.text,
       );
-      if (rendered.length > budget) break;
+      if (rendered.length > budget) {
+        break;
+      }
+
       kept.unshift(rendered);
       budget -= rendered.length;
     }
-    if (kept.length === 0) return null;
+
+    if (kept.length === 0) {
+      return null;
+    }
+
     const elided = spoken.length - kept.length;
 
     return [
@@ -279,8 +310,12 @@ export class LangyConversationMemoryService {
    */
   private static digestOf(part: LangyMessageRow["parts"][number]) {
     const raw = (part as { digest?: unknown }).digest;
-    if (raw === undefined) return null;
+    if (raw === undefined) {
+      return null;
+    }
+
     const parsed = cliResultDigestSchema.safeParse(raw);
+
     return parsed.success ? parsed.data : null;
   }
 
@@ -291,6 +326,7 @@ export class LangyConversationMemoryService {
 
   private static cleanId(value: string): string | null {
     const id = sanitizeLangyPromptValue(value, MAX_MEMORY_ID_LENGTH);
+
     return id ? id : null;
   }
 
@@ -301,6 +337,7 @@ export class LangyConversationMemoryService {
       entry.ids.length === 1
         ? `id ${entry.ids[0]}`
         : `ids ${entry.ids.join(", ")}${entry.total ? ` (of ${entry.total} matched)` : ""}`;
+
     return `- turn ${entry.turn} — ${entry.verb} ${what} — ${ids}`;
   }
 
@@ -318,7 +355,10 @@ export class LangyConversationMemoryService {
       .replace(/ +\n/g, "\n")
       .replace(/\n{3,}/g, "\n\n")
       .trim();
-    if (cleaned.length <= MAX_TRANSCRIPT_MESSAGE_CHARS) return cleaned;
+    if (cleaned.length <= MAX_TRANSCRIPT_MESSAGE_CHARS) {
+      return cleaned;
+    }
+
     return [...cleaned].slice(0, MAX_TRANSCRIPT_MESSAGE_CHARS).join("").trimEnd() + "…";
   }
 
@@ -331,6 +371,7 @@ export class LangyConversationMemoryService {
   private static renderTranscriptMessage(role: "user" | "assistant", text: string) {
     const label = role === "user" ? "User" : "Langy";
     const [first = "", ...rest] = text.split("\n");
+
     return [`${label}: ${first}`, ...rest.map((line) => `  ${line}`)].join("\n");
   }
 }

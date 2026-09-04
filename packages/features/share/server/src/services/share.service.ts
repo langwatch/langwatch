@@ -66,6 +66,7 @@ export class ShareService extends ShareServiceContract {
 
   async listForResource(input: ShareResourceInput): Promise<ShareLink[]> {
     const parsed = shareResourceInputSchema.parse(input);
+
     return this.options.repository.listByResource(parsed);
   }
 
@@ -232,6 +233,7 @@ export class ShareService extends ShareServiceContract {
             "Failed to roll back share after auto-pin failure; share record is orphaned",
           );
         }
+
         throw error;
       }
     }
@@ -292,6 +294,7 @@ export class ShareService extends ShareServiceContract {
           { projectId, traceId: resourceId, error },
           "Failed to auto-unpin trace on unshare",
         );
+
         throw error;
       }
     }

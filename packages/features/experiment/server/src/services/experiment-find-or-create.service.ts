@@ -91,7 +91,9 @@ export class ExperimentFindOrCreateService {
       });
     }
 
-    if (!experiment) throw new Error("Experiment not found");
+    if (!experiment) {
+      throw new Error("Experiment not found");
+    }
 
     // A name or a workflow sent with an EXISTING experiment updates it; the
     // slug is preserved, because it is already in the customer's URLs.

@@ -83,6 +83,7 @@ export type AgentTestServiceOptions = {
 /** The input of a single turn, as the adapters read it. */
 function oneTurnInput({ threadId, message }: { threadId: string; message: string }): AgentInput {
   const userMessage = { role: "user" as const, content: message };
+
   return {
     threadId,
     messages: [userMessage],
@@ -108,7 +109,9 @@ async function withinCallDeadline<T>(work: Promise<T>, timeoutMs: number): Promi
       }),
     ]);
   } finally {
-    if (timer) clearTimeout(timer);
+    if (timer) {
+      clearTimeout(timer);
+    }
   }
 }
 
@@ -131,6 +134,7 @@ export class AgentTestService {
       workflowHydrator,
       legacyDefaultModel: options.config.legacyDefaultModel,
     });
+
     return new AgentTestService(options, targetPrefetch);
   }
 
@@ -150,6 +154,7 @@ export class AgentTestService {
     if (!target) {
       throw new AgentTestRefusedError({ reason: NOT_TESTABLE_REASON });
     }
+
     await this.options.ownership.assertRunnable({
       agents: [
         {
@@ -161,6 +166,7 @@ export class AgentTestService {
       ],
       actor: input.actor,
     });
+
     return target;
   }
 
@@ -169,6 +175,7 @@ export class AgentTestService {
     if (!project) {
       return { success: false, error: `Project ${projectId} was not found` };
     }
+
     return { success: true, data: { apiKey: project.apiKey, organizationId: null } };
   }
 
@@ -181,10 +188,14 @@ export class AgentTestService {
       target: input.target,
       runSecretValues: {},
     });
-    if (result === null) return null;
+    if (result === null) {
+      return null;
+    }
+
     if ("success" in result) {
       return { success: false, reason: result.reason, message: result.message };
     }
+
     return result;
   }
 
@@ -207,6 +218,7 @@ export class AgentTestService {
         message: input.message,
         params: input.params,
       });
+
       return dispatched;
     }
 
@@ -240,6 +252,7 @@ export class AgentTestService {
       adapter.call(oneTurnInput({ threadId: crypto.randomUUID(), message: input.message })),
       this.options.maxCallTimeoutMs,
     );
+
     return { output, durationMs: Date.now() - startedAt, instance: null };
   }
 
@@ -252,6 +265,7 @@ export class AgentTestService {
     if (target.type === "connected") {
       throw new AgentTestRefusedError({ reason: CONNECTED_RUN_NOT_QUEUEABLE_REASON });
     }
+
     // `agentTestTarget` never answers "prompt"; only "connected" was excluded
     // above, so what remains is exactly what a run can queue.
     const queueableTarget = target as QueueableTarget;

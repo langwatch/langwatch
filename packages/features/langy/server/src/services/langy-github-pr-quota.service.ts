@@ -80,6 +80,7 @@ export async function getLangyGithubPrUsage({
       reserved: false,
     };
   }
+
   const bucket = dayBucket();
   const key = `langy:gh:prs:${userId}:${bucket}`;
   let count = 0;
@@ -94,6 +95,7 @@ export async function getLangyGithubPrUsage({
       reserved: false,
     };
   }
+
   return {
     allowed: count < limit,
     remaining: Math.max(0, limit - count),
@@ -131,6 +133,7 @@ export async function recordLangyGithubPr({
       reserved: false,
     };
   }
+
   const bucket = dayBucket();
   const key = `langy:gh:prs:${userId}:${bucket}`;
   let count: number;
@@ -152,6 +155,7 @@ export async function recordLangyGithubPr({
       reserved: false,
     };
   }
+
   return {
     allowed: count <= limit,
     remaining: Math.max(0, limit - count),
@@ -180,8 +184,14 @@ export async function recordExtraLangyGithubPrs({
   extra: number;
 }): Promise<void> {
   const connection = counter;
-  if (!connection) return;
-  if (extra <= 0) return;
+  if (!connection) {
+    return;
+  }
+
+  if (extra <= 0) {
+    return;
+  }
+
   const bucket = dayBucket();
   const key = `langy:gh:prs:${userId}:${bucket}`;
   try {
@@ -233,6 +243,7 @@ export async function reserveLangyGithubPrPermit({
       reserved: false,
     };
   }
+
   const bucket = dayBucket();
   const key = `langy:gh:prs:${userId}:${bucket}`;
   // Track each step's outcome explicitly so a Redis blip MID-flow doesn't
@@ -256,6 +267,7 @@ export async function reserveLangyGithubPrPermit({
       reserved: false,
     };
   }
+
   if (count === 1) {
     // EXPIRE failures used to leak through the catch as `allowed: true`
     // PLUS leave the key without a TTL. Retry once in a tail-call; if
@@ -280,6 +292,7 @@ export async function reserveLangyGithubPrPermit({
       }
     }
   }
+
   if (count > limit) {
     // Over-cap: count already past the limit before any DECR attempt. Even
     // if the DECR throws below, the right answer is `allowed: false`.
@@ -292,6 +305,7 @@ export async function reserveLangyGithubPrPermit({
       // (release without matching INCR). The cap still holds; future
       // reservations on this user/day see the inflated count and deny.
     }
+
     return {
       allowed: false,
       remaining: 0,
@@ -299,6 +313,7 @@ export async function reserveLangyGithubPrPermit({
       reserved: false,
     };
   }
+
   // INCR committed AND count is within cap — caller holds the permit.
   return {
     allowed: true,
@@ -323,7 +338,10 @@ export async function releaseLangyGithubPrPermit({
   userId: string;
 }): Promise<void> {
   const connection = counter;
-  if (!connection) return;
+  if (!connection) {
+    return;
+  }
+
   const bucket = dayBucket();
   const key = `langy:gh:prs:${userId}:${bucket}`;
   try {
@@ -347,8 +365,10 @@ export async function releaseLangyGithubPrPermit({
       "return redis.call('DECR', KEYS[1])";
     if (typeof conn.eval === "function") {
       await conn.eval(script, 1, key);
+
       return;
     }
+
     // Pre-Redis-6.2 or mock-Redis fallback: no eval, so guard with a
     // read-before-decrement. Not atomic, but the decrement is best-effort
     // anyway (a race here yields a slightly under-counted cap, not an

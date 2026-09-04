@@ -236,7 +236,10 @@ const SAFE_PATH_SEGMENT = /^[A-Za-z0-9_-]+$/;
  * legible in a bucket listing.
  */
 function safePathSegment(id: string): string {
-  if (SAFE_PATH_SEGMENT.test(id) && id !== "." && id !== "..") return id;
+  if (SAFE_PATH_SEGMENT.test(id) && id !== "." && id !== "..") {
+    return id;
+  }
+
   return createHash("sha256").update(id, "utf8").digest("hex");
 }
 
@@ -453,6 +456,7 @@ export class BlobStore {
         "BlobStore has no spool storage configured — cannot resolve the trace spool destination.",
       );
     }
+
     const destination = await this.spoolStorage.resolveDestination(projectId);
 
     if (purpose === "write") {
@@ -597,6 +601,7 @@ export class BlobStore {
       if (typeof body !== "string") {
         throw new BlobFieldNotFoundError(eventId, field);
       }
+
       return body;
     }
 
@@ -611,7 +616,10 @@ export class BlobStore {
 
     for (const raw of spanAttributes) {
       const attr = spanAttributeSchema.safeParse(raw);
-      if (!attr.success || attr.data.key !== field) continue;
+      if (!attr.success || attr.data.key !== field) {
+        continue;
+      }
+
       if (typeof attr.data.value.stringValue === "string") {
         return attr.data.value.stringValue;
       }
@@ -652,14 +660,17 @@ export class BlobStore {
   }): Promise<Buffer> {
     if (isLegacySpoolRef(spoolRef)) {
       assertLegacySpoolKeyBelongsTo(spoolRef, projectId);
+
       return this.getLegacySpool(spoolRef, projectId);
     }
+
     const { uri, objectStore } = await this.mintSpoolUri({
       projectId,
       traceId,
       spanId,
       purpose: "access",
     });
+
     return streamToBuffer(await objectStore.get(uri), MAX_SPOOL_BYTES);
   }
 
@@ -675,6 +686,7 @@ export class BlobStore {
         `Spool object returned no body from S3 (key=${spoolRef}) — cannot reconstitute command`,
       );
     }
+
     // Read through the same bounded helper the v2 path uses. `transformToByteArray()`
     // buffers the whole object first, so it would have skipped MAX_SPOOL_BYTES
     // entirely — and a v1 reference points at an object written before this
@@ -711,6 +723,7 @@ export class BlobStore {
       purpose: "write",
     });
     await objectStore.put(uri, body, "application/octet-stream");
+
     return SPOOL_REF_V2;
   }
 
@@ -744,12 +757,16 @@ export class BlobStore {
             { projectId, traceId, spanId },
             "Refused a cross-tenant v1 spool delete",
           );
+
           return;
         }
+
         const { s3Client, s3Bucket } = await this.resolveS3Client(projectId);
         await s3Client.send(new DeleteObjectCommand({ Bucket: s3Bucket, Key: spoolRef }));
+
         return;
       }
+
       const { uri, objectStore } = await this.mintSpoolUri({
         projectId,
         traceId,

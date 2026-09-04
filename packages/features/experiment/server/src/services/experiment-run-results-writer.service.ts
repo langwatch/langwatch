@@ -78,6 +78,7 @@ export const persistRunResults = async ({
 }): Promise<void> => {
   if (runResultsAreEmpty(draft)) {
     logger.info({ runId, experimentId }, "Run produced no cells to write into the workbench state");
+
     return;
   }
 
@@ -128,6 +129,7 @@ export const persistRunResults = async ({
         errorReporting,
         isRetry: true,
       });
+
       return;
     }
 
@@ -178,14 +180,18 @@ export const runResultsWriterFor = ({
   parameters?: Record<string, string | number | boolean> | undefined;
   errorReporting?: ExperimentRunErrorReportingPort;
 }): RunResultsWriter | undefined => {
-  if (!experimentId) return undefined;
+  if (!experimentId) {
+    return undefined;
+  }
 
   const runsTheBoard = runsSavedDataset({
     ...(data !== undefined ? { data } : {}),
     ...(datasetId !== undefined ? { dataset_id: datasetId } : {}),
     ...(parameters !== undefined ? { parameters } : {}),
   });
-  if (!runsTheBoard) return undefined;
+  if (!runsTheBoard) {
+    return undefined;
+  }
 
   return createRunResultsWriter({
     persistence,
@@ -217,17 +223,25 @@ export const createRunResultsWriter = ({
     async record(event: EvaluationV3Event): Promise<void> {
       applyRunEvent({ draft, event });
 
-      if (event.type !== "done" && event.type !== "stopped") return;
+      if (event.type !== "done" && event.type !== "stopped") {
+        return;
+      }
+
       // A run reports it ended once. A second terminal frame would write the
       // same cells again and take a second version number for them.
-      if (written) return;
+      if (written) {
+        return;
+      }
+
       written = true;
 
       // The frame that names the run is the first one the orchestrator sends.
       // A stream that ended before it arrived carries no cells either, so
       // there is nothing to write.
       const runId = draft.runId;
-      if (!runId) return;
+      if (!runId) {
+        return;
+      }
 
       await persistRunResults({
         persistence,

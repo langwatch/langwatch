@@ -12,9 +12,11 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return false;
   }
+
   // Span params are unflattened into bare records, which may carry a null
   // prototype; class instances (Date, Map, ...) stay leaves.
   const proto: unknown = Object.getPrototypeOf(value);
+
   return proto === Object.prototype || proto === null;
 }
 
@@ -36,6 +38,7 @@ export class TraceAttributeRedactor {
   static for(hidden: Protections["hiddenAttributes"]): TraceAttributeRedactor {
     const rules = hidden ?? [];
     const compiled = compileAttributePatterns(rules.map((rule) => rule.pattern));
+
     return new TraceAttributeRedactor(
       compiled.map((matcher, index) => ({
         ...matcher,
@@ -54,7 +57,9 @@ export class TraceAttributeRedactor {
     if (!value || this.matchers.length === 0) {
       return value;
     }
+
     const result = this.redactNode(value, "");
+
     return (result.changed ? result.value : value) as T;
   }
 
@@ -64,6 +69,7 @@ export class TraceAttributeRedactor {
         return `[REDACTED] (visible to ${matcher.visibleTo})`;
       }
     }
+
     return null;
   }
 
@@ -81,14 +87,17 @@ export class TraceAttributeRedactor {
         changed = true;
         continue;
       }
+
       if (isPlainObject(value)) {
         const child = this.redactNode(value, path);
         next[key] = child.value;
         changed = changed || child.changed;
         continue;
       }
+
       next[key] = value;
     }
+
     return changed ? { value: next, changed } : { value: node, changed };
   }
 }

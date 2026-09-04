@@ -23,13 +23,19 @@ export class GovernanceSignalService {
   }
 
   async emitVirtualKeyLifecycle(signal: GovernanceVirtualKeyLifecycleSignal): Promise<void> {
-    if (!this.port.available()) return;
+    if (!this.port.available()) {
+      return;
+    }
+
     try {
       const tenantId = await this.port.tryResolveLifecycleTenant({
         organizationId: signal.virtualKey.organizationId,
         preferredProjectId: signal.virtualKey.traceProjectId,
       });
-      if (!tenantId) return;
+      if (!tenantId) {
+        return;
+      }
+
       await this.port.appendVirtualKeyLifecycle({
         tenantId,
         organization_id: signal.virtualKey.organizationId,
@@ -50,13 +56,18 @@ export class GovernanceSignalService {
   }
 
   async detectBudgetCrossings(candidates: GatewayBudgetCrossingCandidate[]): Promise<void> {
-    if (candidates.length === 0 || !this.port.available()) return;
+    if (candidates.length === 0 || !this.port.available()) {
+      return;
+    }
+
     try {
       const now = this.port.now();
       const resolved = await this.port.resolveBudgetCrossings(candidates, now);
       for (const crossing of resolved) {
         const data = this.tryCrossingData(crossing, now);
-        if (data) await this.port.appendBudgetCrossing(data);
+        if (data) {
+          await this.port.appendBudgetCrossing(data);
+        }
       }
     } catch (error) {
       this.diagnostics.warn("budget crossing detection failed (best effort)", {
@@ -72,13 +83,24 @@ export class GovernanceSignalService {
   ): GovernanceBudgetCrossingData | null {
     const spent = Number.parseFloat(resolved.spentUsd) || 0;
     const limit = Number.parseFloat(resolved.budget.limitUsd) || 0;
-    if (limit <= 0) return null;
+    if (limit <= 0) {
+      return null;
+    }
+
     const percentage = (spent * 100) / limit;
     let kind: GovernanceBudgetCrossingData["kind"] | null = null;
-    if (percentage >= 100) kind = "breached";
-    else if (percentage >= SoftWarnPercent) kind = "threshold_crossed";
-    if (!kind) return null;
+    if (percentage >= 100) {
+      kind = "breached";
+    } else if (percentage >= SoftWarnPercent) {
+      kind = "threshold_crossed";
+    }
+
+    if (!kind) {
+      return null;
+    }
+
     const { budget, candidate } = resolved;
+
     return {
       tenantId: candidate.tenantId,
       organization_id: budget.organizationId,

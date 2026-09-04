@@ -126,6 +126,7 @@ export class OpsService extends OpsServiceContract {
     }
 
     const anomalies = await this.anomalyState.list();
+
     return anomalies.sort((left, right) => {
       if (left.tier !== right.tier) {
         return left.tier === "hard" ? -1 : 1;
@@ -141,6 +142,7 @@ export class OpsService extends OpsServiceContract {
     }
 
     await this.anomalyState.clear(input.tenantId, input.kind);
+
     return true;
   }
 

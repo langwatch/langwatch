@@ -9,7 +9,7 @@ export const formatMoney = (money: Money, format = "$0.00[00]"): string => {
 
   const formatted = numeral(money.amount ?? 0).format(format);
 
-  const minimumAmount = format.replace(/[\$\[\]]/g, "").replace(/0$/, "1");
+  const minimumAmount = format.replace(/[$[\]]/g, "").replace(/0$/, "1");
   if (formatted === "$0.00" && money.amount < parseFloat(minimumAmount) && money.amount > 0) {
     return `< ${currencySymbols[money.currency ?? "USD"]}${minimumAmount}`;
   }

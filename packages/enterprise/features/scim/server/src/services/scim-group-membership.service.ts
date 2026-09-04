@@ -50,6 +50,7 @@ export class ScimGroupMembershipService {
     while (await this.repository.groupSlugExists({ organizationId, slug })) {
       slug = `${base}-${sequence++}`;
     }
+
     return slug;
   }
 
@@ -90,6 +91,7 @@ export class ScimGroupMembershipService {
         memberIds: toAdd,
       });
     }
+
     if (toRemove.length > 0) {
       await this.remove({ groupId: input.group.id, userIds: toRemove });
     }
@@ -111,6 +113,7 @@ export class ScimGroupMembershipService {
           memberIds,
         });
       }
+
       return;
     }
 
@@ -119,10 +122,13 @@ export class ScimGroupMembershipService {
       if (memberIds.length > 0) {
         await this.remove({ groupId: input.group.id, userIds: memberIds });
       }
+
       return;
     }
 
-    if (normalizedOp !== "replace") return;
+    if (normalizedOp !== "replace") {
+      return;
+    }
 
     const renamed = await this.renameIfRequested(input.group.id, operation);
     const instruction = this.requestedMemberIds(operation);
@@ -138,6 +144,7 @@ export class ScimGroupMembershipService {
           "SCIM group replace matched no known attribute; leaving the group unchanged",
         );
       }
+
       return;
     }
 
@@ -154,47 +161,68 @@ export class ScimGroupMembershipService {
   ): Promise<boolean> {
     if (operation.path === "displayName" && typeof operation.value === "string") {
       await this.repository.renameGroup({ id: groupId, name: operation.value });
+
       return true;
     }
+
     if (!operation.path && isRecord(operation.value)) {
       const displayName = operation.value.displayName;
       if (typeof displayName === "string") {
         await this.repository.renameGroup({ id: groupId, name: displayName });
+
         return true;
       }
     }
+
     return false;
   }
 
   private requestedMemberIds(operation: ScimPatchOperation): MemberInstruction {
-    if (operation.path === "members") return this.readMemberList(operation.value);
+    if (operation.path === "members") {
+      return this.readMemberList(operation.value);
+    }
+
     if (!operation.path && isRecord(operation.value) && "members" in operation.value) {
       return this.readMemberList(operation.value.members);
     }
+
     return { kind: "absent" };
   }
 
   private readMemberList(value: unknown): MemberInstruction {
-    if (value === null) return { kind: "list", ids: [] };
-    if (!Array.isArray(value)) return { kind: "malformed" };
+    if (value === null) {
+      return { kind: "list", ids: [] };
+    }
+
+    if (!Array.isArray(value)) {
+      return { kind: "malformed" };
+    }
 
     const ids = this.memberIds(value);
     if (ids.length !== value.length || ids.some((id) => id.trim() === "")) {
       return { kind: "malformed" };
     }
+
     return { kind: "list", ids };
   }
 
   private memberIds(value: unknown): string[] {
-    if (!Array.isArray(value)) return [];
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
     return value.flatMap((member) => {
-      if (!isRecord(member) || typeof member.value !== "string") return [];
+      if (!isRecord(member) || typeof member.value !== "string") {
+        return [];
+      }
+
       return [member.value];
     });
   }
 
   private memberIdsFromPath(path: string, value: unknown): string[] {
     const match = path.match(/members\[value\s+eq\s+"([^"]+)"\]/);
+
     return match?.[1] ? [match[1]] : this.memberIds(value);
   }
 }

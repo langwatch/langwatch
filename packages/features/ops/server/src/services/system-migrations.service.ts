@@ -134,6 +134,7 @@ function sample<T>({ pool, count }: { pool: T[]; count: number }): T[] {
     const swap = index + Math.floor(Math.random() * (copy.length - index));
     [copy[index], copy[swap]] = [copy[swap] as T, copy[index] as T];
   }
+
   return copy.slice(0, size);
 }
 
@@ -274,6 +275,7 @@ export class SystemMigrationsService {
           this.deps.enrollments.countOrganizations(),
         ])
       : [null, 0];
+
     return Promise.all(
       this.deps.migrations().map(async (migration) => {
         const enrolledCount = enrolledByMigration?.get(migration.name) ?? 0;
@@ -287,6 +289,7 @@ export class SystemMigrationsService {
             limit: ATTENTION_LIMIT,
           }),
         ]);
+
         return {
           name: migration.name,
           title: migration.title,
@@ -330,6 +333,7 @@ export class SystemMigrationsService {
       userId: requestedBy,
       action: "systemMigrations.listEnrollments",
     });
+
     return { isSaaS: this.deps.isSaaS(), enrollments };
   }
 
@@ -344,7 +348,10 @@ export class SystemMigrationsService {
     query: string;
   }): Promise<Array<{ id: string; name: string }>> {
     const trimmed = query.trim();
-    if (trimmed.length === 0) return [];
+    if (trimmed.length === 0) {
+      return [];
+    }
+
     return this.deps.enrollments.searchOrganizations({ query: trimmed });
   }
 
@@ -368,7 +375,10 @@ export class SystemMigrationsService {
     migrationName: string;
     actorUserId: string;
   }): Promise<void> {
-    if (!this.deps.isSaaS()) throw new MigrationEnrollmentCloudOnlyError();
+    if (!this.deps.isSaaS()) {
+      throw new MigrationEnrollmentCloudOnlyError();
+    }
+
     this.requireRegisteredMigration(migrationName);
     this.requireEnrollmentDecidesSomething(migrationName);
     const organization = await this.deps.enrollments.tryFindOrganizationById({
@@ -377,6 +387,7 @@ export class SystemMigrationsService {
     if (!organization) {
       throw new MigrationEnrollmentOrganizationNotFoundError();
     }
+
     await this.deps.enrollments.create({
       organizationId,
       migrationName,
@@ -436,7 +447,10 @@ export class SystemMigrationsService {
     enrolled: Array<{ id: string; name: string }>;
     eligibleCount: number;
   }> {
-    if (!this.deps.isSaaS()) throw new MigrationEnrollmentCloudOnlyError();
+    if (!this.deps.isSaaS()) {
+      throw new MigrationEnrollmentCloudOnlyError();
+    }
+
     this.requireRegisteredMigration(migrationName);
     this.requireEnrollmentDecidesSomething(migrationName);
     // The steps run as an ordered pipeline per organization, so a later
@@ -504,6 +518,7 @@ export class SystemMigrationsService {
         },
       });
     }
+
     return { enrolled: picked, eligibleCount: eligible.length };
   }
 
@@ -524,7 +539,10 @@ export class SystemMigrationsService {
     migrationName: string;
     actorUserId: string;
   }): Promise<void> {
-    if (!this.deps.isSaaS()) throw new MigrationEnrollmentCloudOnlyError();
+    if (!this.deps.isSaaS()) {
+      throw new MigrationEnrollmentCloudOnlyError();
+    }
+
     this.requireEnrollmentDecidesSomething(migrationName);
     await this.deps.enrollments.delete({ organizationId, migrationName });
     logger.info(
@@ -586,6 +604,7 @@ export class SystemMigrationsService {
     if (summary.claimed > 0 && summary.claimed === summary.tenantsSeen) {
       throw new MigrationPassAlreadyRunningError();
     }
+
     if ((migration.tenant ?? "organization") === "user") {
       // The tenants were the organization's members, so there is no single
       // record to read back: the pass summary is the answer. Any held,
@@ -593,6 +612,7 @@ export class SystemMigrationsService {
       // operator's list.
       return { status: statusOfMemberSummary(summary), waiting: false };
     }
+
     return this.organizationRecordStatus({ migrationName, organizationId });
   }
 
@@ -611,16 +631,24 @@ export class SystemMigrationsService {
     if (!this.deps.isSaaS() && !migration.runsAutomaticallyOnSelfHosted) {
       throw new MigrationNotAvailableOnInstallationError();
     }
+
     const organization = await this.deps.enrollments.tryFindOrganizationById({
       organizationId,
     });
     if (!organization) {
       throw new MigrationEnrollmentOrganizationNotFoundError();
     }
-    if (!this.deps.isSaaS()) return;
+
+    if (!this.deps.isSaaS()) {
+      return;
+    }
+
     // Nothing to be outside of: the migration admits every organization, so
     // a targeted run only brings this one's turn forward.
-    if (migration.enrolledAutomatically) return;
+    if (migration.enrolledAutomatically) {
+      return;
+    }
+
     const enrolled = await this.deps.enrollments.isEnrolled({
       organizationId,
       migrationName,
@@ -641,6 +669,7 @@ export class SystemMigrationsService {
       migrationName,
       tenantId: organizationId,
     });
+
     // `migrated` covers two outcomes an operator must not confuse: the
     // migration ran and is held for review, or it did nothing because it is
     // still waiting. Only the migration's own report tells them apart, so
@@ -668,7 +697,10 @@ export class SystemMigrationsService {
     migrationName: string,
   ): ReturnType<SystemMigrationsService["deps"]["migrations"]>[number] {
     const migration = this.deps.migrations().find((candidate) => candidate.name === migrationName);
-    if (!migration) throw new MigrationUnknownError();
+    if (!migration) {
+      throw new MigrationUnknownError();
+    }
+
     return migration;
   }
 
@@ -699,6 +731,7 @@ export class SystemMigrationsService {
       if (rollbackDecidedAt(priorReport) === null) {
         await this.deps.state.upsertRecord(pin);
       }
+
       logger.warn(
         {
           migrationName: pin.migrationName,
@@ -707,8 +740,10 @@ export class SystemMigrationsService {
         },
         "operator retried the rollback of an already pinned tenant",
       );
+
       return;
     }
+
     await this.deps.state.upsertRecord(pin);
     logger.warn(
       {
@@ -778,12 +813,16 @@ export class SystemMigrationsService {
       migrationName,
       tenantId,
     });
-    if (!record) throw new MigrationStateNotFoundError();
+    if (!record) {
+      throw new MigrationStateNotFoundError();
+    }
+
     if (record.status !== "migrated") {
       throw new MigrationDrainProofRequiresMigratedError({
         status: record.status,
       });
     }
+
     const priorReport =
       record.report != null && typeof record.report === "object"
         ? (record.report as Record<string, unknown>)
@@ -921,6 +960,7 @@ export class SystemMigrationsService {
     if (record === null || !ROLLBACK_EFFECT_STATUSES.includes(record.status)) {
       return;
     }
+
     await this.deps.rollbackEffects?.[migrationName]?.({
       tenantId,
       actorUserId,
@@ -938,8 +978,12 @@ export class SystemMigrationsService {
  */
 function rollbackDecidedAt(report: Record<string, unknown>): string | null {
   const rolledBack = report.rolledBack;
-  if (rolledBack == null || typeof rolledBack !== "object") return null;
+  if (rolledBack == null || typeof rolledBack !== "object") {
+    return null;
+  }
+
   const at = (rolledBack as Record<string, unknown>).at;
+
   return typeof at === "string" && at !== "" ? at : null;
 }
 
@@ -957,11 +1001,21 @@ function rollbackDecidedAt(report: Record<string, unknown>): string | null {
  * organization is not finished, and the next pass picks that member up.
  */
 function statusOfMemberSummary(summary: MigrationPassSummary): TenantMigrationStatus | null {
-  if (summary.parked > 0) return "parked";
-  if (summary.held > 0 || summary.claimed > 0) return "migrated";
-  if (summary.alreadyRolledBack > 0) return "rolled_back";
+  if (summary.parked > 0) {
+    return "parked";
+  }
+
+  if (summary.held > 0 || summary.claimed > 0) {
+    return "migrated";
+  }
+
+  if (summary.alreadyRolledBack > 0) {
+    return "rolled_back";
+  }
+
   if (summary.finalized > 0 || summary.alreadyFinalized > 0) {
     return "finalized";
   }
+
   return null;
 }

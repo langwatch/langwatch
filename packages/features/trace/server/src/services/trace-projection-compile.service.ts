@@ -41,6 +41,7 @@ export function compileProjection({
   protections,
 }: CompileProjectionArgs): CompiledProjection {
   const fields = resolveSelectedFields(select);
+
   return {
     schema: buildSchema({ from, fields }),
     plan: buildPlan({ from, fields, protections }),
@@ -57,15 +58,23 @@ function resolveSelectedFields(select: string[]): ResolvedField[] {
   const invalidPaths: string[] = [];
   const seen = new Set<string>();
   for (const path of select) {
-    if (seen.has(path)) continue;
+    if (seen.has(path)) {
+      continue;
+    }
+
     seen.add(path);
     const resolved = resolveField(path);
-    if (resolved) fields.push(resolved);
-    else invalidPaths.push(path);
+    if (resolved) {
+      fields.push(resolved);
+    } else {
+      invalidPaths.push(path);
+    }
   }
+
   if (invalidPaths.length > 0) {
     throw new ProjectionValidationError(invalidPaths);
   }
+
   return fields;
 }
 
@@ -149,7 +158,10 @@ function buildProjector({
 
     for (const collection of COLLECTIONS) {
       const collFields = collectionFields[collection];
-      if (collFields.length === 0) continue;
+      if (collFields.length === 0) {
+        continue;
+      }
+
       row[collection] = collectionElements({ trace, collection }).map((element) => {
         const projected: ProjectedRow = {};
         for (const f of collFields) {
@@ -162,6 +174,7 @@ function buildProjector({
             value: isPermitted({ field: f, protections }) ? f.read(element) : null,
           });
         }
+
         return projected;
       });
     }
@@ -202,6 +215,7 @@ function collectionElements({
       : collection === "annotations"
         ? trace.annotations
         : trace.evaluations;
+
   return (raw ?? []) as unknown as ProjectionSource[];
 }
 
@@ -225,14 +239,22 @@ function setPath({
   let cursor = target;
   for (let i = 0; i < path.length - 1; i++) {
     const key = path[i] as string;
-    if (FORBIDDEN_KEYS.has(key)) return;
+    if (FORBIDDEN_KEYS.has(key)) {
+      return;
+    }
+
     const existing = cursor[key];
     if (typeof existing !== "object" || existing === null) {
       cursor[key] = {};
     }
+
     cursor = cursor[key] as ProjectedRow;
   }
+
   const last = path[path.length - 1] as string;
-  if (FORBIDDEN_KEYS.has(last)) return;
+  if (FORBIDDEN_KEYS.has(last)) {
+    return;
+  }
+
   cursor[last] = value;
 }

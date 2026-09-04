@@ -66,7 +66,9 @@ export class DefaultOpsSnapshotService extends OpsSnapshotServiceContract {
       blockedCount += q.blockedGroupCount;
       dlqCount += q.dlqCount;
     }
+
     this.badgeCache = { blockedCount, dlqCount, computedAt: new Date(now) };
+
     return this.badgeCache;
   }
 
@@ -84,6 +86,7 @@ export class DefaultOpsSnapshotService extends OpsSnapshotServiceContract {
       clearInterval(this.readInterval);
       this.readInterval = null;
     }
+
     this.subscribers.clear();
   }
 
@@ -102,6 +105,7 @@ export class DefaultOpsSnapshotService extends OpsSnapshotServiceContract {
     if (this.latest) {
       pending.push(this.latest);
     }
+
     this.subscribers.add(push);
 
     try {

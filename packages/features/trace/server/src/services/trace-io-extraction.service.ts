@@ -55,6 +55,7 @@ export class TraceIOExtractionService {
       (otelSpan) => {
         if (spans.length === 0) {
           otelSpan.setAttributes({ "input.found": false });
+
           return null;
         }
 
@@ -63,8 +64,12 @@ export class TraceIOExtractionService {
 
         // Filter to spans with valid inputs
         const spansWithInput = orderedSpans.filter((span) => {
-          if (shouldExcludeSpan(span)) return false;
+          if (shouldExcludeSpan(span)) {
+            return false;
+          }
+
           const input = this.extractRichIOFromSpan(span, "input");
+
           return input !== null;
         });
 
@@ -77,6 +82,7 @@ export class TraceIOExtractionService {
             "span.type": getSpanType(firstSpan),
             "input.length": input?.text.length ?? 0,
           });
+
           return input;
         }
 
@@ -86,7 +92,10 @@ export class TraceIOExtractionService {
         // applied only after every semantic candidate has been exhausted,
         // so it can never shadow a real match.
         for (const span of orderedSpans) {
-          if (shouldExcludeSpan(span)) continue;
+          if (shouldExcludeSpan(span)) {
+            continue;
+          }
+
           const fb = this.extractFallbackIOFromSpan(span, "input");
           if (fb) {
             otelSpan.setAttributes({
@@ -94,6 +103,7 @@ export class TraceIOExtractionService {
               "input.source": "stringified_fallback",
               "input.length": fb.text.length,
             });
+
             return fb;
           }
         }
@@ -103,6 +113,7 @@ export class TraceIOExtractionService {
           "fallback.used": true,
         });
         const httpFallback = this.getHttpFallback(orderedSpans);
+
         return httpFallback
           ? {
               raw: httpFallback,
@@ -130,14 +141,19 @@ export class TraceIOExtractionService {
       (otelSpan) => {
         if (spans.length === 0) {
           otelSpan.setAttributes({ "output.found": false });
+
           return null;
         }
 
         const tree = this.organizeSpansIntoTree(spans);
 
         const hasValidOutput = (span: NormalizedSpan): boolean => {
-          if (shouldExcludeSpan(span)) return false;
+          if (shouldExcludeSpan(span)) {
+            return false;
+          }
+
           const output = this.extractRichIOFromSpan(span, "output");
+
           return output !== null;
         };
 
@@ -175,6 +191,7 @@ export class TraceIOExtractionService {
             "output.source": "last_finishing",
             "output.length": output?.text.length ?? 0,
           });
+
           return output;
         }
 
@@ -183,7 +200,10 @@ export class TraceIOExtractionService {
         // rationale: fallback is never allowed to shadow a semantic match.
         const allByEndTime = [...spans].sort((a, b) => b.endTimeUnixMs - a.endTimeUnixMs);
         for (const span of allByEndTime) {
-          if (shouldExcludeSpan(span)) continue;
+          if (shouldExcludeSpan(span)) {
+            continue;
+          }
+
           const fb = this.extractFallbackIOFromSpan(span, "output");
           if (fb) {
             otelSpan.setAttributes({
@@ -191,6 +211,7 @@ export class TraceIOExtractionService {
               "output.source": "stringified_fallback",
               "output.length": fb.text.length,
             });
+
             return fb;
           }
         }
@@ -200,6 +221,7 @@ export class TraceIOExtractionService {
           "fallback.used": true,
         });
         const httpFallback = this.getHttpStatusFallback(tree);
+
         return httpFallback
           ? {
               raw: httpFallback,
@@ -274,7 +296,10 @@ export class TraceIOExtractionService {
     const keys = TraceIOExtractionService.IO_ATTR_KEYS[type];
     const langwatchValue = attrs[keys.langwatch];
 
-    if (langwatchValue === undefined || langwatchValue === null) return null;
+    if (langwatchValue === undefined || langwatchValue === null) {
+      return null;
+    }
+
     if (typeof langwatchValue === "string") {
       return langwatchValue.length > 0
         ? { raw: langwatchValue, text: langwatchValue, source: "langwatch" }
@@ -285,6 +310,7 @@ export class TraceIOExtractionService {
     if (fallbackText) {
       return { raw: langwatchValue, text: fallbackText, source: "langwatch" };
     }
+
     return null;
   }
 
@@ -326,19 +352,30 @@ export class TraceIOExtractionService {
 
     const traverse = (nodes: SpanTreeNode[]) => {
       for (const node of nodes) {
-        if (mode === "outside-in") result.push(node.span);
-        if (node.children.length > 0) traverse(node.children);
-        if (mode === "inside-out") result.push(node.span);
+        if (mode === "outside-in") {
+          result.push(node.span);
+        }
+
+        if (node.children.length > 0) {
+          traverse(node.children);
+        }
+
+        if (mode === "inside-out") {
+          result.push(node.span);
+        }
       }
     };
 
     traverse(tree);
+
     return result;
   }
 
   private getHttpFallback(orderedSpans: NormalizedSpan[]): string | null {
     const topSpan = orderedSpans.find((span) => !span.parentSpanId);
-    if (!topSpan) return null;
+    if (!topSpan) {
+      return null;
+    }
 
     const httpMethod = topSpan.spanAttributes["http.method"];
     const httpTarget = topSpan.spanAttributes["http.target"];
@@ -391,11 +428,13 @@ export interface ExtractedIO {
 
 function getSpanType(span: NormalizedSpan): string {
   const type = span.spanAttributes[ATTR_KEYS.SPAN_TYPE];
+
   return typeof type === "string" ? type : "unknown";
 }
 
 function shouldExcludeSpan(span: NormalizedSpan): boolean {
   const type = getSpanType(span);
+
   return type === "evaluation" || type === "guardrail";
 }
 
@@ -433,17 +472,30 @@ const MAX_PLAIN_JSON_RECURSION_DEPTH = 32;
  * `{ question: "what is 2+2?" }` that are used by various frameworks.
  */
 function extractTextFromPlainJson(obj: Record<string, unknown>, depth = 0): string | null {
-  if (depth >= MAX_PLAIN_JSON_RECURSION_DEPTH) return null;
+  if (depth >= MAX_PLAIN_JSON_RECURSION_DEPTH) {
+    return null;
+  }
 
   for (const key of COMMON_TEXT_KEYS) {
     const val = obj[key];
-    if (val === undefined) continue;
-    if (typeof val === "string" && val.length > 0) return val;
-    if (typeof val === "number" || typeof val === "boolean") return String(val);
+    if (val === undefined) {
+      continue;
+    }
+
+    if (typeof val === "string" && val.length > 0) {
+      return val;
+    }
+
+    if (typeof val === "number" || typeof val === "boolean") {
+      return String(val);
+    }
+
     // Nested object with a known key (e.g. { inputs: { input: "hello" } })
     if (val && typeof val === "object" && !Array.isArray(val)) {
       const nested = extractTextFromPlainJson(val as Record<string, unknown>, depth + 1);
-      if (nested) return nested;
+      if (nested) {
+        return nested;
+      }
     }
   }
 
@@ -451,7 +503,9 @@ function extractTextFromPlainJson(obj: Record<string, unknown>, depth = 0): stri
   const wrapper = obj.inputs ?? obj.outputs;
   if (wrapper && typeof wrapper === "object" && !Array.isArray(wrapper)) {
     const nested = extractTextFromPlainJson(wrapper as Record<string, unknown>, depth + 1);
-    if (nested) return nested;
+    if (nested) {
+      return nested;
+    }
   }
 
   // Single-key wrapper fallback: many frameworks emit the real payload under an
@@ -463,7 +517,9 @@ function extractTextFromPlainJson(obj: Record<string, unknown>, depth = 0): stri
     const [, only] = entries[0]!;
     if (only && typeof only === "object" && !Array.isArray(only)) {
       const nested = extractTextFromPlainJson(only as Record<string, unknown>, depth + 1);
-      if (nested) return nested;
+      if (nested) {
+        return nested;
+      }
     }
   }
 
@@ -478,13 +534,31 @@ function extractTextFromPlainJson(obj: Record<string, unknown>, depth = 0): stri
  * WeakSet to guard against circular references.
  */
 function hasMeaningfulLeaf(value: unknown, seen: WeakSet<object> = new WeakSet()): boolean {
-  if (value === null || value === undefined) return false;
-  if (typeof value === "string") return value.length > 0;
-  if (typeof value === "number" || typeof value === "boolean") return true;
-  if (typeof value !== "object") return false;
-  if (seen.has(value as object)) return false;
+  if (value === null || value === undefined) {
+    return false;
+  }
+
+  if (typeof value === "string") {
+    return value.length > 0;
+  }
+
+  if (typeof value === "number" || typeof value === "boolean") {
+    return true;
+  }
+
+  if (typeof value !== "object") {
+    return false;
+  }
+
+  if (seen.has(value as object)) {
+    return false;
+  }
+
   seen.add(value as object);
-  if (Array.isArray(value)) return value.some((v) => hasMeaningfulLeaf(v, seen));
+  if (Array.isArray(value)) {
+    return value.some((v) => hasMeaningfulLeaf(v, seen));
+  }
+
   return Object.values(value as Record<string, unknown>).some((v) => hasMeaningfulLeaf(v, seen));
 }
 
@@ -503,7 +577,11 @@ function stringifyForText(value: unknown): string | null {
   if (typeof value === "number" || typeof value === "boolean") {
     return String(value);
   }
-  if (!hasMeaningfulLeaf(value)) return null;
+
+  if (!hasMeaningfulLeaf(value)) {
+    return null;
+  }
+
   try {
     return JSON.stringify(value) ?? null;
   } catch {
@@ -533,20 +611,31 @@ function normalizeChatPayload(value: unknown, seen: WeakSet<object> = new WeakSe
     if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
       try {
         const parsed = JSON.parse(trimmed);
+
         return normalizeChatPayload(parsed, seen);
       } catch {
         // not parseable JSON — leave the raw string alone
       }
     }
+
     return value;
   }
+
   if (Array.isArray(value)) {
-    if (seen.has(value)) return null;
+    if (seen.has(value)) {
+      return null;
+    }
+
     seen.add(value);
+
     return value.map((item) => normalizeChatPayload(item, seen));
   }
+
   if (value && typeof value === "object") {
-    if (seen.has(value as object)) return null;
+    if (seen.has(value as object)) {
+      return null;
+    }
+
     seen.add(value as object);
     const obj = value as Record<string, unknown>;
     // If this object IS a content block whose `text` is a JSON-encoded
@@ -571,10 +660,12 @@ function normalizeChatPayload(value: unknown, seen: WeakSet<object> = new WeakSe
           // not clean JSON — fall through and keep the text wrapper
         }
       }
+
       // Text block that wasn't unwrapped: preserve `text` verbatim so
       // user-pasted JSON-looking content stays as the original string.
       return obj;
     }
+
     // Otherwise: walk every property, normalizing in place.
     const out: Record<string, unknown> = {};
     const isChatMessage = typeof obj.role === "string";
@@ -587,8 +678,10 @@ function normalizeChatPayload(value: unknown, seen: WeakSet<object> = new WeakSe
           ? v
           : normalizeChatPayload(v, seen);
     }
+
     return out;
   }
+
   return value;
 }
 
@@ -597,7 +690,9 @@ function messagesToText(
   mode: "input" | "output" = "output",
   traceCanonicalisation: TraceCanonicalisationService,
 ): string | null {
-  if (!messages) return null;
+  if (!messages) {
+    return null;
+  }
 
   if (typeof messages === "string") {
     // Try to parse JSON-encoded message payloads and extract text semantically
@@ -609,6 +704,7 @@ function messagesToText(
     } catch {
       // Not JSON — return the string as-is
     }
+
     return messages;
   }
 
@@ -624,7 +720,9 @@ function messagesToText(
     value: messages,
     mode,
   });
-  if (messageText) return messageText;
+  if (messageText) {
+    return messageText;
+  }
 
   // Fall back to common JSON wrapper keys (input, question, query, etc.)
   if (typeof messages === "object" && messages !== null) {

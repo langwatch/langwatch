@@ -110,6 +110,7 @@ export class ScenarioRunExportService {
           { projectId: request.projectId, visited, total },
           "Scenario run export aborted by the client",
         );
+
         return;
       }
 
@@ -144,7 +145,9 @@ export class ScenarioRunExportService {
       isFirstBatch = false;
       cursor = page.nextCursor;
 
-      if (!page.hasMore || !cursor || page.runs.length === 0) break;
+      if (!page.hasMore || !cursor || page.runs.length === 0) {
+        break;
+      }
     }
 
     logger.info({ projectId: request.projectId, visited, total }, "Scenario run export completed");
@@ -158,8 +161,12 @@ function applyStatusFilter({
   runs: SimulationExportRun[];
   passFailStatus?: ScenarioRunExportStatusFilter;
 }): SimulationExportRun[] {
-  if (!passFailStatus) return runs;
+  if (!passFailStatus) {
+    return runs;
+  }
+
   const wanted = FILTER_TO_CATEGORY[passFailStatus];
+
   return runs.filter((run) => categorizeRunStatus(run.status) === wanted);
 }
 
@@ -179,6 +186,7 @@ function serializeBatch({
       return serializeRunsToFullCsv({ runs, includeHeader });
     default: {
       const _exhaustive: never = mode;
+
       throw new Error(`Unsupported export mode: ${String(_exhaustive)}`);
     }
   }

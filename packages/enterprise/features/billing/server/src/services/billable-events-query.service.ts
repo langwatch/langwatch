@@ -17,12 +17,14 @@ export class BillableEventsQueryService {
   static getBillingMonth(now: Date = new Date()): string {
     const year = now.getUTCFullYear();
     const month = String(now.getUTCMonth() + 1).padStart(2, "0");
+
     return `${year}-${month}`;
   }
 
   /** Returns the billing month string for the previous month. */
   static getPreviousBillingMonth(now: Date = new Date()): string {
     const previous = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+
     return BillableEventsQueryService.getBillingMonth(previous);
   }
 
@@ -35,6 +37,7 @@ export class BillableEventsQueryService {
     const nextMonth = new Date(Date.UTC(year, month, 1));
     const endYear = nextMonth.getUTCFullYear();
     const endMonth = String(nextMonth.getUTCMonth() + 1).padStart(2, "0");
+
     return [startDate, `${endYear}-${endMonth}-01 00:00:00.000`];
   }
 
@@ -48,10 +51,12 @@ export class BillableEventsQueryService {
     const repository = this.repository;
     if (!repository) {
       logger.warn({ organizationId }, "ClickHouse not available, skipping billable events query");
+
       return null;
     }
 
     const [startDate, endDate] = BillableEventsQueryService.billingMonthDateRange(billingMonth);
+
     return await repository.findTotal({ organizationId, startDate, endDate });
   }
 
@@ -69,10 +74,12 @@ export class BillableEventsQueryService {
     const repository = this.repository;
     if (!repository) {
       logger.warn({ organizationId }, "ClickHouse not available, skipping billable events query");
+
       return null;
     }
 
     const [startDate, endDate] = BillableEventsQueryService.billingMonthDateRange(billingMonth);
+
     return await repository.findTotalUniq({
       organizationId,
       startDate,
@@ -98,10 +105,12 @@ export class BillableEventsQueryService {
     const repository = this.repository;
     if (!repository) {
       logger.warn({ projectIds }, "ClickHouse not available, skipping trace summaries query");
+
       return null;
     }
 
     const [startDate, endDate] = BillableEventsQueryService.billingMonthDateRange(billingMonth);
+
     return await repository.findTraceSummariesTotalUniq({
       tenantIds: projectIds,
       startDate,
@@ -126,10 +135,12 @@ export class BillableEventsQueryService {
         { organizationId },
         "ClickHouse not available, skipping billable events by project query",
       );
+
       return [];
     }
 
     const [startDate, endDate] = BillableEventsQueryService.billingMonthDateRange(billingMonth);
+
     return await repository.findByProjectApprox({
       organizationId,
       startDate,
@@ -154,10 +165,12 @@ export class BillableEventsQueryService {
         { organizationId },
         "ClickHouse not available, skipping billable events by project query",
       );
+
       return [];
     }
 
     const [startDate, endDate] = BillableEventsQueryService.billingMonthDateRange(billingMonth);
+
     return await repository.findByProject({
       organizationId,
       startDate,

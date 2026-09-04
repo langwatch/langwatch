@@ -68,7 +68,9 @@ export async function submitBugReport({
     windowSeconds: RATE_LIMIT_WINDOW_SECONDS,
     max: RATE_LIMIT_MAX_PER_WINDOW,
   });
-  if (!limit.allowed) throw new BugReportRateLimitedError();
+  if (!limit.allowed) {
+    throw new BugReportRateLimitedError();
+  }
 
   const linkedProjectId = await resolveLinkedProjectId({
     apiToken,
@@ -156,15 +158,20 @@ async function resolveLinkedProjectId({
   projectIdHint?: string | null;
   apiKeys?: ApiKeyService;
 }): Promise<string | null> {
-  if (!apiToken || !apiKeys) return null;
+  if (!apiToken || !apiKeys) {
+    return null;
+  }
+
   try {
     const resolved = await apiKeys.tryResolveToken({
       token: apiToken,
       projectId: projectIdHint ?? null,
     });
+
     return resolved?.project.id ?? null;
   } catch (error) {
     logger.warn({ error }, "bug report project linkage failed, storing unlinked");
+
     return null;
   }
 }

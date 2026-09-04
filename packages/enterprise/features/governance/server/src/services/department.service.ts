@@ -37,6 +37,7 @@ export class DepartmentService {
     if (!(await this.repository.rename(input))) {
       throw new DepartmentNotFoundError();
     }
+
     return this.getDepartment(input);
   }
 
@@ -83,7 +84,10 @@ export class DepartmentService {
     organizationId: string;
     departmentId: string | null;
   }): Promise<void> {
-    if (input.departmentId === null) return;
+    if (input.departmentId === null) {
+      return;
+    }
+
     await this.getDepartment({
       id: input.departmentId,
       organizationId: input.organizationId,
@@ -92,7 +96,10 @@ export class DepartmentService {
 
   private async getDepartment(input: { id: string; organizationId: string }): Promise<Department> {
     const department = await this.repository.tryGetById(input);
-    if (!department) throw new DepartmentNotFoundError();
+    if (!department) {
+      throw new DepartmentNotFoundError();
+    }
+
     return department;
   }
 }

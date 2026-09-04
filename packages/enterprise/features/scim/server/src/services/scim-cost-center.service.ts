@@ -57,7 +57,9 @@ export class ScimCostCenterService {
     if (extension === null || typeof extension !== "object" || !("costCenter" in extension)) {
       return undefined;
     }
+
     const costCenter = Reflect.get(extension, "costCenter");
+
     return typeof costCenter === "string" ? costCenter : null;
   }
 
@@ -70,6 +72,7 @@ export class ScimCostCenterService {
       if (operation.op === "remove") {
         return { present: true, value: null };
       }
+
       return {
         present: true,
         value: typeof operation.value === "string" ? operation.value : null,
@@ -80,6 +83,7 @@ export class ScimCostCenterService {
       const extension = Reflect.get(operation.value, SCIM_ENTERPRISE_USER_SCHEMA);
       if (extension && typeof extension === "object" && "costCenter" in extension) {
         const costCenter = Reflect.get(extension, "costCenter");
+
         return {
           present: true,
           value: typeof costCenter === "string" ? costCenter : null,

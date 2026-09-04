@@ -48,7 +48,10 @@ export class CodingAgentPullRequestMappingBackfillService {
     ).data.map((project) => project.id);
     const targets = new Map<string, PullRequestMappingTarget>();
     for (const projectId of projectIds) {
-      if (targets.size >= PULL_REQUEST_MAPPING_BACKFILL_BRANCH_CAP) break;
+      if (targets.size >= PULL_REQUEST_MAPPING_BACKFILL_BRANCH_CAP) {
+        break;
+      }
+
       const sessions = await this.readProjectSessions({
         organizationId: parsed.organizationId,
         projectId,
@@ -57,6 +60,7 @@ export class CodingAgentPullRequestMappingBackfillService {
       });
       this.collectTargets({ projectId, sessions, targets });
     }
+
     await this.requestTargets(targets);
   }
 
@@ -78,6 +82,7 @@ export class CodingAgentPullRequestMappingBackfillService {
         { error, organizationId: input.organizationId, projectId: input.projectId },
         "backfill could not read a project's sessions",
       );
+
       return [];
     }
   }
@@ -88,12 +93,21 @@ export class CodingAgentPullRequestMappingBackfillService {
     targets: Map<string, PullRequestMappingTarget>;
   }): void {
     for (const session of input.sessions) {
-      if (input.targets.size >= PULL_REQUEST_MAPPING_BACKFILL_BRANCH_CAP) break;
-      if (!session.repositoryOwner || !session.repositoryName || !session.gitBranch) continue;
+      if (input.targets.size >= PULL_REQUEST_MAPPING_BACKFILL_BRANCH_CAP) {
+        break;
+      }
+
+      if (!session.repositoryOwner || !session.repositoryName || !session.gitBranch) {
+        continue;
+      }
+
       const repositoryHost = this.dependencies.github.normalizeRepositoryHost(
         session.repositoryHost,
       );
-      if (!this.dependencies.github.canMapRepositoryHost(repositoryHost)) continue;
+      if (!this.dependencies.github.canMapRepositoryHost(repositoryHost)) {
+        continue;
+      }
+
       const target = {
         tenantId: input.projectId,
         repositoryHost,
@@ -107,7 +121,9 @@ export class CodingAgentPullRequestMappingBackfillService {
         target.repositoryName.toLowerCase(),
         target.headBranch,
       ].join("\0");
-      if (!input.targets.has(key)) input.targets.set(key, target);
+      if (!input.targets.has(key)) {
+        input.targets.set(key, target);
+      }
     }
   }
 

@@ -25,11 +25,15 @@ export class RecentItemsService {
 
     for (const log of auditLogs) {
       const type = this.getTypeFromAction(log.action);
-      if (!type) continue;
+      if (!type) {
+        continue;
+      }
 
       const extractor = ENTITY_ID_EXTRACTORS[type];
       const entityId = extractor(log.args as Record<string, unknown>);
-      if (!entityId) continue;
+      if (!entityId) {
+        continue;
+      }
 
       const key = `${type}:${entityId}`;
 
@@ -71,6 +75,7 @@ export class RecentItemsService {
         return type;
       }
     }
+
     return null;
   }
 
@@ -86,7 +91,10 @@ export class RecentItemsService {
     switch (type) {
       case "prompt": {
         const prompt = await this.repository.tryGetPromptById(id, projectId);
-        if (!prompt || prompt.deletedAt) return null;
+        if (!prompt || prompt.deletedAt) {
+          return null;
+        }
+
         return {
           id: prompt.id,
           type: "prompt",
@@ -97,7 +105,10 @@ export class RecentItemsService {
       }
       case "workflow": {
         const workflow = await this.repository.tryGetWorkflowById(id, projectId);
-        if (!workflow || workflow.archivedAt) return null;
+        if (!workflow || workflow.archivedAt) {
+          return null;
+        }
+
         return {
           id: workflow.id,
           type: "workflow",
@@ -108,7 +119,10 @@ export class RecentItemsService {
       }
       case "dataset": {
         const dataset = await this.repository.tryGetDatasetById(id, projectId);
-        if (!dataset || dataset.archivedAt) return null;
+        if (!dataset || dataset.archivedAt) {
+          return null;
+        }
+
         return {
           id: dataset.id,
           type: "dataset",
@@ -119,7 +133,10 @@ export class RecentItemsService {
       }
       case "evaluation": {
         const monitor = await this.repository.tryGetMonitorById(id, projectId);
-        if (!monitor) return null;
+        if (!monitor) {
+          return null;
+        }
+
         return {
           id: monitor.id,
           type: "evaluation",
@@ -130,7 +147,10 @@ export class RecentItemsService {
       }
       case "annotation": {
         const queue = await this.repository.tryGetAnnotationQueueById(id, projectId);
-        if (!queue) return null;
+        if (!queue) {
+          return null;
+        }
+
         return {
           id: queue.id,
           type: "annotation",

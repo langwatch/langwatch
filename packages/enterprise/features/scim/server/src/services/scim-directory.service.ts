@@ -284,7 +284,9 @@ export class ScimDirectoryService {
     if (!filter) {
       return null;
     }
+
     const match = filter.match(/^displayName\s+eq\s+"([^"]+)"$/);
+
     return match?.[1] ?? null;
   }
 

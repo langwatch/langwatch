@@ -215,8 +215,8 @@ export function getInputsForExecution({
   const inputs_ = Object.fromEntries(
     Object.entries({
       ...defaultValues,
-      ...(node?.data.execution_state?.inputs ?? {}),
-      ...(inputs ?? {}),
+      ...node?.data.execution_state?.inputs,
+      ...inputs,
     }).filter(([key]) => allFields.has(key)),
   );
 

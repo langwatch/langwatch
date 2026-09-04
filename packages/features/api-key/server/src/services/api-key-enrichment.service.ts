@@ -49,6 +49,7 @@ export class ApiKeyEnrichmentService {
     for (const role of customRoles) {
       customRoleName.set(role.id, role.name);
     }
+
     for (const binding of bindings) {
       if (binding.scopeType === "ORGANIZATION") {
         const organization = await this.options.organizations.getBillingProfile({
@@ -56,6 +57,7 @@ export class ApiKeyEnrichmentService {
         });
         orgName.set(binding.scopeId, organization.name);
       }
+
       if (binding.scopeType === "TEAM" && resolvedOrganizationId) {
         const team = await this.options.organizations.getTeam({
           organizationId: resolvedOrganizationId,
@@ -63,6 +65,7 @@ export class ApiKeyEnrichmentService {
         });
         teamName.set(binding.scopeId, team.name);
       }
+
       if (binding.scopeType === "PROJECT") {
         const project = await this.options.projects.tryGetById(binding.scopeId);
         if (project) {
@@ -122,6 +125,7 @@ export class ApiKeyEnrichmentService {
           ]
         : [],
     );
+
     return {
       customRoles,
       users: [...new Map(users.map((user) => [user.id, user])).values()],

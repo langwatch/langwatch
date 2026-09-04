@@ -89,6 +89,7 @@ export class StorageStatsCollectionService {
       instances = await this.options.resolveInstances();
     } catch (error) {
       logger.error({ error }, "could not enumerate ClickHouse endpoints for storage stats");
+
       return;
     }
 
@@ -114,9 +115,13 @@ export class StorageStatsCollectionService {
         this.options.intervalMs ?? DEFAULT_INTERVAL_MS,
       );
     }
+
     return {
       stop: () => {
-        if (this.timer) clearInterval(this.timer);
+        if (this.timer) {
+          clearInterval(this.timer);
+        }
+
         this.timer = undefined;
       },
     };
@@ -163,7 +168,9 @@ export class StorageStatsCollectionService {
     }
 
     await this.collectDisks(instance);
-    if (this.options.collectBackups) await this.collectBackups(instance);
+    if (this.options.collectBackups) {
+      await this.collectBackups(instance);
+    }
   }
 
   private async collectDisks(instance: StorageStatsInstance): Promise<void> {
@@ -174,8 +181,7 @@ export class StorageStatsCollectionService {
           FROM system.disks
         `,
         unscoped: {
-          reason:
-            "system.disks carries no tenant column: this is the instance's disk capacity.",
+          reason: "system.disks carries no tenant column: this is the instance's disk capacity.",
         },
       });
       const rows = await disks.json<{
@@ -236,10 +242,16 @@ export class StorageStatsCollectionService {
           status: row.status,
           count: Number.parseInt(row.cnt, 10),
         });
-        if (row.status !== "BACKUP_CREATED" || !row.last_success_time) continue;
+        if (row.status !== "BACKUP_CREATED" || !row.last_success_time) {
+          continue;
+        }
+
         const succeededAtSeconds = new Date(row.last_success_time).getTime() / 1000;
         const sizeBytes = Number.parseInt(row.last_success_size, 10);
-        if (!Number.isFinite(succeededAtSeconds) || succeededAtSeconds <= 0) continue;
+        if (!Number.isFinite(succeededAtSeconds) || succeededAtSeconds <= 0) {
+          continue;
+        }
+
         this.options.metrics.recordLastBackup({
           instance: instance.target,
           succeededAtSeconds,
@@ -259,18 +271,25 @@ export class StorageStatsCollectionService {
       // named once at info. A real failure is still edge-triggered, because a
       // warning every fifteen seconds would bury the one that matters.
       if (isMissingBackupLog(error)) {
-        if (this.backupLogAbsent) return;
+        if (this.backupLogAbsent) {
+          return;
+        }
+
         logger.info(
           { instance: instance.target },
           "ClickHouse has no system.backup_log, so no backup status is collected; this instance has never taken a backup",
         );
         this.backupLogAbsent = true;
+
         return;
       }
+
       if (this.backupsFailing) {
         logger.debug({ error }, "failed to collect ClickHouse backup stats");
+
         return;
       }
+
       logger.warn(
         { error, instance: instance.target },
         "failed to collect ClickHouse backup stats from system.backup_log (further failures suppressed until recovery)",
@@ -288,7 +307,10 @@ export class StorageStatsCollectionService {
  */
 function isMissingBackupLog(error: unknown): boolean {
   const detail = error as { code?: unknown; type?: unknown; message?: unknown };
-  if (detail?.type === "UNKNOWN_TABLE" || String(detail?.code) === "60") return true;
+  if (detail?.type === "UNKNOWN_TABLE" || String(detail?.code) === "60") {
+    return true;
+  }
+
   return /UNKNOWN_TABLE|Table system\.backup_log (does not|doesn't) exist/i.test(
     typeof detail?.message === "string" ? detail.message : "",
   );

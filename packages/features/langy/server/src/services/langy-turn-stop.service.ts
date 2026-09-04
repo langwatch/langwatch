@@ -41,6 +41,7 @@ export class LangyTurnStopService {
       if (!conversation?.isOwn) {
         throw new LangyConversationNotOwnedError(conversationId);
       }
+
       if (conversation.currentTurnId !== turnId) {
         throw new LangyTurnNotStoppableError(turnId);
       }

@@ -44,6 +44,7 @@ export class LangyTurnAttemptService {
     this.turnCommitted = true;
     try {
       await this.deps.admission.commit({ ...this.identity });
+
       return true;
     } catch (error) {
       // The canonical acceptance event is already durable. Returning an error
@@ -52,6 +53,7 @@ export class LangyTurnAttemptService {
         { error, turnId: this.identity.turnId },
         "failed to mark langy turn admission committed",
       );
+
       return false;
     }
   }
@@ -60,10 +62,12 @@ export class LangyTurnAttemptService {
     if (this.turnCommitted) {
       return;
     }
+
     const cleanups: Promise<unknown>[] = [this.deps.admission.abort({ ...this.identity })];
     if (this.permitReserved) {
       cleanups.push(this.deps.permits.release({ userId: this.identity.userId }));
     }
+
     if (this.mintedApiKeyId) {
       cleanups.push(
         this.deps.sessionKeys.revoke({
@@ -72,6 +76,7 @@ export class LangyTurnAttemptService {
         }),
       );
     }
+
     const results = await Promise.allSettled(cleanups);
     for (const result of results) {
       if (result.status === "rejected") {

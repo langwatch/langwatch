@@ -585,7 +585,7 @@ const EVALUATION_SELECTABLE_COLUMNS = [
  * Characters that can appear immediately after a column name in SQL.
  * Used to prevent false-positive substring matches (e.g. "Status" matching "StatusCode").
  */
-const COLUMN_BOUNDARY = /(?=[\s,)=<>!\[\.'"]|$)/;
+const COLUMN_BOUNDARY = /(?=[\s,)=<>![.'"]|$)/;
 
 /**
  * Build a regex that matches a column name at a word boundary in SQL context.

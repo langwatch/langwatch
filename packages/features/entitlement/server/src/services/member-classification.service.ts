@@ -31,6 +31,7 @@ export type MemberType = "FullMember" | "LiteMember";
  */
 export function isViewOnlyPermission(permission: string): boolean {
   const action = permission.split(":")[1];
+
   return action === "view";
 }
 
@@ -131,6 +132,9 @@ export function getRoleChangeType(
   const wasFull = isFullMember(oldRole, oldPermissions);
   const willBeFull = isFullMember(newRole, newPermissions);
 
-  if (wasFull === willBeFull) return "no-change";
+  if (wasFull === willBeFull) {
+    return "no-change";
+  }
+
   return wasFull ? "full-to-lite" : "lite-to-full";
 }

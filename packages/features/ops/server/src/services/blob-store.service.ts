@@ -87,6 +87,7 @@ export class BlobStoreService {
         },
         "Refused an operator blob delete: a live lease still references it",
       );
+
       return { deleted: false };
     }
 
@@ -100,6 +101,7 @@ export class BlobStoreService {
       },
       "Operator deleted a queue blob",
     );
+
     return { deleted: result.deleted };
   }
 
@@ -115,6 +117,7 @@ export class BlobStoreService {
       },
       "Operator ran a blob cleanup sweep",
     );
+
     return report;
   }
 }

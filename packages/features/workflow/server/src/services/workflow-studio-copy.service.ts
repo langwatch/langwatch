@@ -54,8 +54,12 @@ export type CopyStudioWorkflowInput = {
 type DatasetReference = { id?: string; name?: string };
 
 const isDatasetReference = (value: unknown): value is DatasetReference => {
-  if (!value || typeof value !== "object") return false;
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
   const candidate = value as Record<string, unknown>;
+
   return (
     (candidate.id === undefined || typeof candidate.id === "string") &&
     (candidate.name === undefined || typeof candidate.name === "string")
@@ -120,7 +124,9 @@ export class WorkflowStudioCopyService {
       const data = node.data as
         | (Record<string, unknown> & { parameters?: { type?: string; value?: unknown }[] })
         | undefined;
-      if (!data) continue;
+      if (!data) {
+        continue;
+      }
 
       if ("dataset" in data && data.dataset) {
         await this.rewriteReference({
@@ -132,8 +138,14 @@ export class WorkflowStudioCopyService {
       }
 
       for (const parameter of data.parameters ?? []) {
-        if (parameter.type !== "dataset") continue;
-        if (parameter.value == null || !isDatasetReference(parameter.value)) continue;
+        if (parameter.type !== "dataset") {
+          continue;
+        }
+
+        if (parameter.value == null || !isDatasetReference(parameter.value)) {
+          continue;
+        }
+
         await this.rewriteReference({
           reference: parameter.value,
           copied,
@@ -152,12 +164,15 @@ export class WorkflowStudioCopyService {
     targetProjectId: string;
   }): Promise<void> {
     const sourceDatasetId = input.reference.id;
-    if (!sourceDatasetId) return;
+    if (!sourceDatasetId) {
+      return;
+    }
 
     const already = input.copied.get(sourceDatasetId);
     if (already) {
       input.reference.id = already.id;
       input.reference.name = already.name;
+
       return;
     }
 

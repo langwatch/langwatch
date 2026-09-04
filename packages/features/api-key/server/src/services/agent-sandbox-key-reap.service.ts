@@ -48,6 +48,7 @@ export class AgentSandboxKeyReapService {
     if (count > 0) {
       logger.info({ count }, "reaped expired agent sandbox keys");
     }
+
     return count;
   }
 }

@@ -116,7 +116,9 @@ export function enrichTeamWithRoleBindings<
           teamProjectIds.has(b.scopeId),
       );
   const binding = teamBinding ?? projectBinding;
-  if (!binding) return team;
+  if (!binding) {
+    return team;
+  }
 
   const bindingMember = {
     userId,
@@ -132,6 +134,7 @@ export function enrichTeamWithRoleBindings<
     existingIndex >= 0
       ? team.members.map((m, i) => (i === existingIndex ? bindingMember : m))
       : [...team.members, bindingMember];
+
   return { ...team, members: newMembers };
 }
 
@@ -152,6 +155,7 @@ function clientFromRepo(repo: OrganizationRepository): PrismaClient {
   if (!client) {
     throw new Error("This operation requires a Prisma-backed organization repository");
   }
+
   return client;
 }
 
@@ -173,7 +177,10 @@ async function collectCustomRolePermissions({
   const customRoleIds = currentTeamBindings
     .map((binding) => binding.customRoleId)
     .filter((id): id is string => !!id);
-  if (customRoleIds.length === 0) return undefined;
+  if (customRoleIds.length === 0) {
+    return undefined;
+  }
+
   const customRoles = await prisma.customRole.findMany({
     where: { id: { in: customRoleIds }, organizationId },
     select: { permissions: true },
@@ -190,6 +197,7 @@ async function collectCustomRolePermissions({
       );
     }
   }
+
   return allPermissions.length > 0 ? allPermissions : undefined;
 }
 
@@ -365,6 +373,7 @@ export class OrganizationMembershipService {
             : new Error(String(compensationError)),
         );
       }
+
       throw error;
     }
 
@@ -475,7 +484,9 @@ export class OrganizationMembershipService {
     if (!membership) {
       throw new MemberNotFoundError(params.userId);
     }
+
     const teams = await this.repo.findMemberTeamBindings(params);
+
     return { ...membership, teams };
   }
 
@@ -499,6 +510,7 @@ export class OrganizationMembershipService {
     if (params.actingUserId != null && params.actingUserId === params.userId) {
       throw new CannotRemoveSelfError();
     }
+
     const membership = await this.repo.tryFindMembership({
       organizationId: params.organizationId,
       userId: params.userId,
@@ -506,6 +518,7 @@ export class OrganizationMembershipService {
     if (!membership) {
       throw new MemberNotFoundError(params.userId);
     }
+
     return this.repo.deleteMember({
       organizationId: params.organizationId,
       userId: params.userId,
@@ -726,16 +739,19 @@ export class OrganizationMembershipService {
           userId,
         });
       }
+
       if (!organizationTeamIdSet.has(update.teamId)) {
         throw new TeamRoleUpdateRejectedError("Team role update must belong to the organization", {
           userId,
         });
       }
+
       acc.push({
         teamId: update.teamId,
         role: update.role as TeamRoleValue,
         customRoleId: update.customRoleId,
       });
+
       return acc;
     }, []);
 
@@ -777,6 +793,7 @@ export class OrganizationMembershipService {
           userId,
         });
       }
+
       await this.repo.updateTeamMemberRole({
         teamId,
         userId,

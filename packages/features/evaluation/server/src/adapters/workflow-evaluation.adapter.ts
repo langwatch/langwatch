@@ -40,7 +40,7 @@ export class WorkflowEvaluationAdapter {
       });
 
       return this.normalize(response);
-    } catch (error) {
+    } catch {
       return {
         status: "error",
         result: singleEvaluationResultSchema.parse({

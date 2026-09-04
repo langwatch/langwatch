@@ -84,6 +84,7 @@ export class ModelProviderCommandService {
 
     await this.seedOnboardingDefaults(existing, saved);
     await this.saveProjectDefault(parsed);
+
     return saved;
   }
 
@@ -117,6 +118,7 @@ export class ModelProviderCommandService {
     if (parsed.actorId) {
       await this.options.writeAuthorization.assertCanWrite(parsed.actorId, existing.scopes);
     }
+
     await this.options.repository.delete({
       id: existing.id,
       organizationId: existing.organizationId,
@@ -156,6 +158,7 @@ export class ModelProviderCommandService {
     if (parsed.actorId) {
       await this.options.writeAuthorization.assertCanWrite(parsed.actorId, provider.scopes);
     }
+
     await this.options.connectionRateLimiter.assertAvailable({ organizationId });
 
     return this.options.catalog.testConnection(provider.provider, provider.customKeys ?? {});
@@ -225,9 +228,11 @@ export class ModelProviderCommandService {
     if (input.scopes) {
       return input.scopes;
     }
+
     if (input.projectId) {
       return [{ scopeType: "PROJECT", scopeId: input.projectId }];
     }
+
     if (existing) {
       return existing.scopes;
     }

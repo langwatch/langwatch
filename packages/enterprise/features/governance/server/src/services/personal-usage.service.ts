@@ -29,7 +29,9 @@ export class DefaultGovernancePersonalUsageService {
   async summary(input: PersonalUsageQueryInput): Promise<PersonalUsageSummary> {
     const parsed = personalUsageQueryInputSchema.parse(input);
     const window = parsed.window ?? this.currentMonthWindow();
-    if (!this.reader) return this.emptySummary();
+    if (!this.reader) {
+      return this.emptySummary();
+    }
 
     const [summary, topModel] = await Promise.all([
       this.reader.findSummary({ tenantId: parsed.personalProjectId, window }),
@@ -72,7 +74,9 @@ export class DefaultGovernancePersonalUsageService {
   async dailyBuckets(input: PersonalUsageQueryInput): Promise<PersonalUsageBucket[]> {
     const parsed = personalUsageQueryInputSchema.parse(input);
     const window = parsed.window ?? this.lastFourteenDaysWindow();
-    if (!this.reader) return this.fillEmptyBuckets(window);
+    if (!this.reader) {
+      return this.fillEmptyBuckets(window);
+    }
 
     const rows = await this.reader.findDailyBuckets({
       tenantId: parsed.personalProjectId,
@@ -99,6 +103,7 @@ export class DefaultGovernancePersonalUsageService {
         byDay.set(row.day, current);
       }
     }
+
     return this.fillEmptyBuckets(window, byDay);
   }
 
@@ -108,7 +113,9 @@ export class DefaultGovernancePersonalUsageService {
   ): Promise<PersonalUsageBreakdown[]> {
     const parsed = personalUsageQueryInputSchema.parse(input);
     const window = parsed.window ?? this.currentMonthWindow();
-    if (!this.reader) return [];
+    if (!this.reader) {
+      return [];
+    }
 
     const rows = await this.reader.findModelBreakdown({
       tenantId: parsed.personalProjectId,
@@ -135,6 +142,7 @@ export class DefaultGovernancePersonalUsageService {
         aggregated.set(row.label, current);
       }
     }
+
     return [...aggregated.values()]
       .sort((left, right) => right.spentUsd - left.spentUsd)
       .slice(0, limit);
@@ -178,6 +186,7 @@ export class DefaultGovernancePersonalUsageService {
 
   private currentMonthWindow(): PersonalUsageWindow {
     const now = new Date(this.clock());
+
     return {
       startMs: Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1),
       endMs: now.getTime() + 1,
@@ -187,6 +196,7 @@ export class DefaultGovernancePersonalUsageService {
   private lastFourteenDaysWindow(): PersonalUsageWindow {
     const now = new Date(this.clock());
     const todayMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+
     return { startMs: todayMs - 13 * DAY_MS, endMs: todayMs + DAY_MS };
   }
 
@@ -199,6 +209,7 @@ export class DefaultGovernancePersonalUsageService {
       const day = new Date(cursor).toISOString().slice(0, 10);
       buckets.push(data.get(day) ?? { day, spentUsd: 0, billedUsd: 0, requests: 0 });
     }
+
     return buckets;
   }
 

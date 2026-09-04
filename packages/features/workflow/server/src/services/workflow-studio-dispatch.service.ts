@@ -98,7 +98,10 @@ export class WorkflowStudioDispatchService {
    */
   private async stripUnsupportedParams(input: WorkflowStudioDispatchInput): Promise<void> {
     const workflow = studioWorkflowOf(input.event);
-    if (!workflow) return;
+    if (!workflow) {
+      return;
+    }
+
     try {
       const providers = await this.options.modelProviders.getForProject({
         projectId: input.projectId,
@@ -134,6 +137,7 @@ export class WorkflowStudioDispatchService {
       if (isAborted && (await isAborted())) {
         logger.info("Execution aborted, cancelling stream reader");
         await reader.cancel();
+
         return;
       }
 
@@ -141,18 +145,26 @@ export class WorkflowStudioDispatchService {
       if (read === "aborted") {
         logger.info("Execution aborted mid-read, cancelling stream reader");
         await reader.cancel();
+
         return;
       }
-      if (read.done || !read.value) break;
+
+      if (read.done || !read.value) {
+        break;
+      }
 
       buffered += decoder.decode(read.value, { stream: true });
-      if (!buffered.includes("\n\n")) continue;
+      if (!buffered.includes("\n\n")) {
+        continue;
+      }
 
       frames++;
       const chunks = buffered.split("\n\n");
       const ready = chunks.slice(0, -1).join("\n\n");
       buffered = chunks[chunks.length - 1] ?? "";
-      if (this.emitFrames(ready, input.onEvent)) return;
+      if (this.emitFrames(ready, input.onEvent)) {
+        return;
+      }
     }
 
     if (frames === 0 && !(isAborted && (await isAborted()))) {
@@ -163,18 +175,26 @@ export class WorkflowStudioDispatchService {
   /** Emits every `data:` frame in one chunk. True once the engine said `done`. */
   private emitFrames(chunk: string, onEvent: (event: StudioServerEvent) => void): boolean {
     for (const frame of chunk.split("\n\n").filter(Boolean)) {
-      if (!frame.startsWith("data: ")) continue;
+      if (!frame.startsWith("data: ")) {
+        continue;
+      }
+
       let event: StudioServerEvent;
       try {
         event = JSON.parse(frame.slice(6)) as StudioServerEvent;
       } catch (error) {
         const message = (error as Error).message ?? "Failed to parse server event";
         logger.error({ error, event: frame }, message);
+
         throw error;
       }
+
       onEvent(event);
-      if (event.type === "done") return true;
+      if (event.type === "done") {
+        return true;
+      }
     }
+
     return false;
   }
 }
@@ -182,9 +202,15 @@ export class WorkflowStudioDispatchService {
 /** The workflow a studio event carries, or none where it carries no graph. */
 function studioWorkflowOf(event: StudioClientEvent): StudioWorkflow | null {
   const payload = "payload" in event ? (event.payload as Record<string, unknown>) : null;
-  if (!payload || typeof payload !== "object") return null;
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
   const workflow = payload.workflow;
-  if (!workflow || typeof workflow !== "object") return null;
+  if (!workflow || typeof workflow !== "object") {
+    return null;
+  }
+
   return workflow as StudioWorkflow;
 }
 
@@ -201,9 +227,11 @@ function asReachabilityError(error: unknown): Error {
   if (cause?.code === "ECONNREFUSED" || cause?.code === "ETIMEDOUT") {
     return new Error("LangWatch NLP is unreachable");
   }
+
   if ((error as { message?: string } | null)?.message === "fetch failed" && cause?.code) {
     return new Error(cause.code);
   }
+
   return error instanceof Error ? error : new Error(String(error));
 }
 
@@ -225,8 +253,10 @@ function reportAsStudioEvent(error: unknown, input: WorkflowStudioDispatchInput)
         },
       },
     } as StudioServerEvent);
+
     return;
   }
+
   input.onEvent({ type: "error", payload: { message } } as StudioServerEvent);
 }
 
@@ -244,13 +274,17 @@ async function readChunkOrAbort(
   reader: ReadableStreamDefaultReader<Uint8Array>,
   isAborted?: () => Promise<boolean>,
 ): Promise<StreamRead | "aborted"> {
-  if (!isAborted) return reader.read() as Promise<StreamRead>;
+  if (!isAborted) {
+    return reader.read() as Promise<StreamRead>;
+  }
 
   let poll: ReturnType<typeof setInterval> | undefined;
   const aborted = new Promise<"aborted">((resolve) => {
     poll = setInterval(() => {
       void isAborted().then((stop) => {
-        if (stop) resolve("aborted");
+        if (stop) {
+          resolve("aborted");
+        }
       });
     }, ABORT_POLL_INTERVAL_MS);
   });
@@ -258,6 +292,8 @@ async function readChunkOrAbort(
   try {
     return await Promise.race([reader.read() as Promise<StreamRead>, aborted]);
   } finally {
-    if (poll) clearInterval(poll);
+    if (poll) {
+      clearInterval(poll);
+    }
   }
 }

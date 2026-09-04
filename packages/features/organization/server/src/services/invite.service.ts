@@ -105,8 +105,10 @@ export function matchInviteToAcceptor({
       viaIdentifierId: null,
     };
   }
+
   const normalizedInviteEmail = normalizeIdentifierValue(inviteEmail);
   const hit = matchable.find((candidate) => candidate.value === normalizedInviteEmail);
+
   return {
     matches: hit !== undefined,
     viaIdentifierId: hit?.identifierId ?? null,
@@ -132,10 +134,13 @@ export function matchInviteToAcceptor({
 export function maskInvitedAddress(email: string): string {
   const trimmed = email.trim();
   const at = trimmed.lastIndexOf("@");
-  if (at <= 0 || at === trimmed.length - 1) return "•••";
+  if (at <= 0 || at === trimmed.length - 1) {
+    return "•••";
+  }
 
   const local = trimmed.slice(0, at);
   const domain = trimmed.slice(at + 1);
+
   return `${local[0]}•••@${domain}`;
 }
 
@@ -207,7 +212,10 @@ export function resolveInviteTeamMemberships({
     }));
   }
 
-  if (role !== OrganizationUserRole.EXTERNAL) return memberships;
+  if (role !== OrganizationUserRole.EXTERNAL) {
+    return memberships;
+  }
+
   return memberships.map((membership) =>
     membership.role === TeamUserRole.VIEWER && !membership.customRoleId
       ? membership
@@ -245,8 +253,12 @@ export function classifyInvitesByMemberType({
       fullMembers++;
     } else if (invite.role === OrganizationUserRole.EXTERNAL) {
       const hasNonViewRole = invite.teams?.some((t) => {
-        if (!t.customRoleId) return false;
+        if (!t.customRoleId) {
+          return false;
+        }
+
         const permissions = customRoleMap.get(t.customRoleId);
+
         return permissions && !isViewOnlyCustomRole(permissions);
       });
       if (hasNonViewRole) {
@@ -418,7 +430,9 @@ export class InviteService {
     emails: string[];
     organizationId: string;
   }): Promise<void> {
-    if (emails.length === 0) return;
+    if (emails.length === 0) {
+      return;
+    }
 
     const existing = await this.prisma.organizationUser.findFirst({
       where: {
@@ -453,6 +467,7 @@ export class InviteService {
       },
       select: { id: true },
     });
+
     return validTeams.map((team) => team.id);
   }
 
@@ -505,6 +520,7 @@ export class InviteService {
           },
         });
       }
+
       if (currentMembersLite + newLiteMembers > subscriptionLimits.maxMembersLite) {
         throw new MemberSeatLimitReachedError({
           meta: {
@@ -531,7 +547,10 @@ export class InviteService {
     role: OrganizationUserRole;
     teamAssignments?: TeamAssignmentInput[];
   }): void {
-    if (role !== OrganizationUserRole.EXTERNAL) return;
+    if (role !== OrganizationUserRole.EXTERNAL) {
+      return;
+    }
+
     for (const assignment of teamAssignments ?? []) {
       if (assignment.customRoleId || assignment.role !== TeamUserRole.VIEWER) {
         throw new LiteMemberViewerOnlyError();
@@ -605,16 +624,21 @@ export class InviteService {
     inviteCode: string;
   }): Promise<{ emailNotSent: boolean }> {
     const mailer = this.mailer;
-    if (!mailer) return { emailNotSent: true };
+    if (!mailer) {
+      return { emailNotSent: true };
+    }
+
     try {
       await mailer.sendInvite({
         email,
         organization,
         acceptInviteUrl: buildInviteAcceptUrl(this.deps.baseHost, inviteCode),
       });
+
       return { emailNotSent: false };
     } catch (error) {
       logger.error({ error }, "Failed to send invite email");
+
       return { emailNotSent: true };
     }
   }
@@ -723,6 +747,7 @@ export class InviteService {
           organization: record.organization,
           inviteCode: record.invite.inviteCode,
         });
+
         return { invite: record.invite, emailNotSent };
       }),
     );
@@ -770,6 +795,7 @@ export class InviteService {
         if (isStrict) {
           throw new DuplicateInviteError(invite.email);
         }
+
         continue;
       }
 
@@ -847,6 +873,7 @@ export class InviteService {
         isStrict,
       });
     }
+
     if (invite.teamIds?.trim()) {
       return this.resolveLegacyInviteTeams({
         organizationId,
@@ -855,6 +882,7 @@ export class InviteService {
         isStrict,
       });
     }
+
     return null;
   }
 
@@ -882,6 +910,7 @@ export class InviteService {
     if (isStrict) {
       this.assertAllTeamIdsValid({ requestedTeamIds: teamIds, validTeamIds });
     }
+
     if (validTeamIds.length === 0) {
       return null;
     }
@@ -936,6 +965,7 @@ export class InviteService {
         validTeamIds,
       });
     }
+
     if (validTeamIds.length === 0) {
       return null;
     }
@@ -983,6 +1013,7 @@ export class InviteService {
       .map((team) => {
         const isCustomString = typeof team.role === "string" && isCustomRole(team.role);
         const isCustom = isCustomString || team.role === TeamUserRole.CUSTOM;
+
         return {
           teamId: team.teamId,
           role: isCustom ? TeamUserRole.CUSTOM : (team.role as TeamUserRole),
@@ -994,8 +1025,10 @@ export class InviteService {
           if (isStrict) {
             throw new CustomRoleIdRequiredError();
           }
+
           return false;
         }
+
         return true;
       });
   }
@@ -1039,8 +1072,10 @@ export class InviteService {
       if (isStrict) {
         throw new CustomRoleNotAssignableError(invalidRoleId);
       }
+
       return false;
     }
+
     return true;
   }
 
@@ -1119,6 +1154,7 @@ export class InviteService {
     if (revoked.count === 0) {
       throw new InviteNotFoundError("Invitation not found");
     }
+
     return { success: true };
   }
 
@@ -1148,6 +1184,7 @@ export class InviteService {
     if (existing?.status !== "PENDING") {
       throw new InviteNotFoundError("Invitation not found");
     }
+
     if (!existing.organization) {
       throw new OrganizationNotFoundError();
     }
@@ -1176,6 +1213,7 @@ export class InviteService {
     });
 
     const { organization: _organization, ...inviteRow } = existing;
+
     return {
       invite: {
         ...inviteRow,
@@ -1207,7 +1245,10 @@ export class InviteService {
     inviteCode: string;
     membersSettingsUrl: string;
   }): Promise<{ notifiedAdmins: number }> {
-    if (!this.mailer) return { notifiedAdmins: 0 };
+    if (!this.mailer) {
+      return { notifiedAdmins: 0 };
+    }
+
     const existing = await this.prisma.organizationInvite.findUnique({
       where: { inviteCode },
       include: { organization: true },
@@ -1215,6 +1256,7 @@ export class InviteService {
     if (existing?.status !== "PENDING" || !existing.organization) {
       throw new InviteNotFoundError("Invitation not found");
     }
+
     if (resolveInviteDisplayStatus(existing) !== "EXPIRED") {
       throw new InviteNotFoundError("Invitation not found");
     }
@@ -1234,7 +1276,9 @@ export class InviteService {
       .map((admin) => admin.user.email)
       .filter((email): email is string => Boolean(email));
     const mailer = this.mailer;
-    if (!mailer) return { notifiedAdmins: 0 };
+    if (!mailer) {
+      return { notifiedAdmins: 0 };
+    }
 
     // One failing address must not silence the rest: an organization whose
     // first admin has a bouncing address still has the others to ask.
@@ -1266,6 +1310,7 @@ export class InviteService {
     if (!("$connect" in this.prisma)) {
       throw new Error("This orchestration requires a root Prisma client, not a transaction client");
     }
+
     return this.prisma;
   }
 
@@ -1308,8 +1353,10 @@ export class InviteService {
     const invitedTeamIds = (() => {
       if (invite.teamAssignments && Array.isArray(invite.teamAssignments)) {
         const assignments = invite.teamAssignments as Array<{ teamId: string }>;
+
         return assignments.map((a) => a.teamId).filter(Boolean);
       }
+
       return invite.teamIds
         .split(",")
         .map((id) => id.trim())
@@ -1409,8 +1456,10 @@ export class InviteService {
         }));
       if (isCallerRetryingItsOwnAccept) {
         await this.applyInviteGrants({ userId, invite });
+
         return;
       }
+
       throw new InviteNotReadyError(invite.id, invite.status);
     }
 
@@ -1439,7 +1488,10 @@ export class InviteService {
           acceptedViaIdentifierId: viaIdentifierId ?? null,
         },
       });
-      if (claim.count === 0) return false;
+      if (claim.count === 0) {
+        return false;
+      }
+
       await tx.organizationUser.createMany({
         data: [
           {
@@ -1450,6 +1502,7 @@ export class InviteService {
         ],
         skipDuplicates: true,
       });
+
       return true;
     });
 
@@ -1470,8 +1523,10 @@ export class InviteService {
         }));
       if (isCallerRacingItself) {
         await this.applyInviteGrants({ userId, invite });
+
         return;
       }
+
       throw new InviteNotFoundError("Invitation is no longer open");
     }
 
@@ -1496,6 +1551,7 @@ export class InviteService {
       where: { userId_organizationId: { userId, organizationId } },
       select: { userId: true },
     });
+
     return membership != null;
   }
 
@@ -1579,6 +1635,7 @@ export class InviteService {
           "dropping team assignments with invalid/non-assignable custom roles at invite accept",
         );
       }
+
       teamMembershipData = teamMembershipData.filter(
         (m) => !m.customRoleId || validIds.has(m.customRoleId),
       );
@@ -1601,6 +1658,7 @@ export class InviteService {
         reason: "replaced by the invite's team role",
       });
     }
+
     if (teamMembershipData.length > 0) {
       await writer.attachBindings({
         organizationId: invite.organizationId,

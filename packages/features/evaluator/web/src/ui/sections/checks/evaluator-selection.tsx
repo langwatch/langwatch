@@ -386,7 +386,7 @@ export function EvaluatorSelection({
               {category === "custom" && (
                 <GridItem
                   as={Link}
-                  //@ts-ignore
+                  //@ts-expect-error
                   href={`/${project?.slug}/workflows`}
                   border="dashed"
                   borderColor="border.emphasized"

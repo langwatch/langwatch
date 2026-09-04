@@ -388,8 +388,10 @@ export class AuthzService extends AuthzServiceContract {
         matched = permission;
         break;
       }
+
       firstDenied ??= decision;
     }
+
     const result: {
       allowed: boolean;
       matchedPermission?: AuthzPermission;

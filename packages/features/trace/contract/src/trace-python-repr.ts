@@ -45,10 +45,9 @@ const semantics = grammar.createSemantics().addOperation("toJSON", {
       if (Array.isArray(arg)) {
         // Named argument
         return arg;
-      } else {
-        // Unnamed argument
-        return [`arg${argIndex++}`, arg];
       }
+      // Unnamed argument
+      return [`arg${argIndex++}`, arg];
     });
     return {
       [id.sourceString]: Object.fromEntries(processedArgs),

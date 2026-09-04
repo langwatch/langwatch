@@ -202,7 +202,7 @@ export function mountRestFamily(options: {
   for (const app of createApiProcessRestFeatures({
     security: options.security ?? createRestFamilySecurity(options.caller ?? {}),
     services: {
-      ...(options.services ?? {}),
+      ...options.services,
       ...(packaged ? { packaged } : {}),
     } as ApiProcessRestServices,
     ports: {
@@ -211,7 +211,7 @@ export function mountRestFamily(options: {
       },
       rateLimit: async () => ({ allowed: true }),
       publicBaseUrl: "https://app.langwatch.test",
-      ...(options.processPorts ?? {}),
+      ...options.processPorts,
     } as never,
     ...(options.absence ? { packagedAbsence: options.absence } : {}),
   })) {

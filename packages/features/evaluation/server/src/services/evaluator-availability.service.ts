@@ -28,7 +28,10 @@ function explicitlyDisabled(input: {
   variable: string;
 }): boolean {
   const raw = input.environment[input.variable]?.trim().toLowerCase();
-  if (raw === undefined || raw === "") return false;
+  if (raw === undefined || raw === "") {
+    return false;
+  }
+
   return ["0", "false", "no", "off"].includes(raw);
 }
 
@@ -46,6 +49,7 @@ export function evaluatorUnavailability(input: {
       howToEnable: `Set ${PRESIDIO_ENABLE_ENV_VAR}=true and restart LangWatch. It downloads a ~670MB language model the first time, which is why it is left out by default.`,
     };
   }
+
   if (
     input.evaluatorType.startsWith("lingua/") &&
     explicitlyDisabled({ environment: input.environment, variable: LINGUA_ENABLE_ENV_VAR })
@@ -55,6 +59,7 @@ export function evaluatorUnavailability(input: {
       howToEnable: `Set ${LINGUA_ENABLE_ENV_VAR}=true and restart LangWatch. It downloads ~95MB of language models the first time, which is why it is left out by default.`,
     };
   }
+
   return undefined;
 }
 

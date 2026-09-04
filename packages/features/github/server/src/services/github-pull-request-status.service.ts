@@ -68,12 +68,15 @@ export class GithubPullRequestStatusService {
     if (input.mergedAt) {
       return "merged";
     }
+
     if (input.state === "closed") {
       return "closed";
     }
+
     if (input.draft) {
       return "draft";
     }
+
     return "open";
   }
 
@@ -108,6 +111,7 @@ export class GithubPullRequestStatusService {
         out.push(status);
       }
     }
+
     return out;
   }
 
@@ -141,6 +145,7 @@ export class GithubPullRequestStatusService {
       if (!live) {
         return this.snapshotAnswer(ref, stored);
       }
+
       const status = GithubPullRequestStatusService.deriveStatus({
         mergedAt: live.mergedAt,
         state: live.state,
@@ -150,6 +155,7 @@ export class GithubPullRequestStatusService {
       if (status !== this.statusFromRow(stored)) {
         this.refreshSnapshot({ organizationId, ref, live });
       }
+
       return { ...ref, status, source: "live", mappedAt: stored.mappedAt };
     } catch (error) {
       // Rate limited, uninstalled, network: the reader still gets a label,
@@ -158,6 +164,7 @@ export class GithubPullRequestStatusService {
         { error, organizationId, ...ref },
         "live pull-request status read failed, answering from the snapshot",
       );
+
       return this.snapshotAnswer(ref, stored);
     }
   }
@@ -196,10 +203,12 @@ export class GithubPullRequestStatusService {
     if (!covering) {
       return null;
     }
+
     const [owner, repo] = ref.repositoryFullName.split("/");
     if (!owner || !repo) {
       return null;
     }
+
     return this.deps.appTokens.getPullRequest({
       installationId: covering.installationId,
       repositoryId: covering.repositoryId,
@@ -254,17 +263,21 @@ function assertValidRefs(refs: readonly GithubPullRequestRef[]): void {
   if (refs.length === 0) {
     return;
   }
+
   if (refs.length > MAX_STATUS_REFS) {
     throw new ValidationError(`At most ${MAX_STATUS_REFS} pull requests can be read at once`);
   }
+
   for (const ref of refs) {
     const looksLikeRepository = /^[^/\s]+\/[^/\s]+$/.test(ref.repositoryFullName);
     if (!looksLikeRepository) {
       throw new ValidationError("repositoryFullName must be owner/name");
     }
+
     if (!Number.isInteger(ref.prNumber) || ref.prNumber <= 0) {
       throw new ValidationError("prNumber must be a positive integer");
     }
+
     if (!ref.repositoryHost) {
       throw new ValidationError("repositoryHost is required");
     }

@@ -32,11 +32,13 @@ export class ModelProviderProjectScopeService {
 
   async getProjectScopes(projectId: string): Promise<ModelDefaultScope[]> {
     const project = await this.projects.getWithTeam(projectId);
+
     return projectScopes(project.id, project.teamId, project.team.organizationId);
   }
 
   async tryGetProjectScopes(projectId: string): Promise<ModelDefaultScope[] | null> {
     const project = await this.projects.tryGetWithTeam(projectId);
+
     return project ? projectScopes(project.id, project.teamId, project.team.organizationId) : null;
   }
 
@@ -56,11 +58,13 @@ export class ModelProviderProjectScopeService {
     if (input.organizationId) {
       return input.organizationId;
     }
+
     if (!input.projectId) {
       return null;
     }
 
     const project = await this.projects.tryGetWithTeam(input.projectId);
+
     return project?.team.organizationId ?? null;
   }
 }

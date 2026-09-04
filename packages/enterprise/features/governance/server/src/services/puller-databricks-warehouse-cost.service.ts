@@ -345,11 +345,15 @@ export class DatabricksWarehouseCostService {
     toMs,
     chunkMs = WAREHOUSE_COST_CHUNK_MS,
   }: WarehouseCostChunkInput): WarehouseCostWindow[] {
-    if (!Number.isFinite(fromMs) || !Number.isFinite(toMs)) return [];
+    if (!Number.isFinite(fromMs) || !Number.isFinite(toMs)) {
+      return [];
+    }
 
     const start = Math.floor(fromMs / ONE_HOUR_MS) * ONE_HOUR_MS;
     const end = Math.ceil(toMs / ONE_HOUR_MS) * ONE_HOUR_MS;
-    if (end <= start) return [];
+    if (end <= start) {
+      return [];
+    }
 
     const chunks: WarehouseCostWindow[] = [];
     for (let at = start; at < end; at += chunkMs) {
@@ -358,6 +362,7 @@ export class DatabricksWarehouseCostService {
         toMs: Math.min(at + chunkMs, end),
       });
     }
+
     return chunks;
   }
 
@@ -386,6 +391,7 @@ export class DatabricksWarehouseCostService {
       toMs: chunk.toMs,
       chunkMs: WAREHOUSE_COST_PIECE_MS,
     });
+
     // A chunk already at or below the piece size has nothing smaller to be asked
     // as. Reporting no pieces is what tells the caller re-asking is pointless.
     return pieces.length > 1 ? pieces : [];
@@ -423,13 +429,19 @@ export class DatabricksWarehouseCostService {
       usageHour: string;
     }): void => {
       const hours = into.get(statementId);
-      if (hours) hours.add(usageHour);
-      else into.set(statementId, new Set([usageHour]));
+      if (hours) {
+        hours.add(usageHour);
+      } else {
+        into.set(statementId, new Set([usageHour]));
+      }
     };
 
     for (const row of rows) {
       const share = this.shareOf(row);
-      if (share === "free" || share === "idle") continue;
+      if (share === "free" || share === "idle") {
+        continue;
+      }
+
       if (share === "owed") {
         noteHour({
           into: owedHours,
@@ -479,7 +491,10 @@ export class DatabricksWarehouseCostService {
    * then report a complete sweep.
    */
   costReadFloor({ sinceMs, nowMs, costEnabled }: WarehouseCostReadFloorInput): number {
-    if (!costEnabled) return sinceMs;
+    if (!costEnabled) {
+      return sinceMs;
+    }
+
     return Math.min(sinceMs, nowMs - WAREHOUSE_COST_SETTLING_LAG_MS);
   }
 
@@ -515,6 +530,7 @@ export class DatabricksWarehouseCostService {
         into.set(statementId, priced);
         continue;
       }
+
       into.set(statementId, {
         costUsd: nanoUsdToDecimalString(
           usdToNanoUsd(already.costUsd) + usdToNanoUsd(priced.costUsd),
@@ -531,7 +547,10 @@ export class DatabricksWarehouseCostService {
 
   private wholeMs(value: string): bigint | null {
     const trimmed = value.trim();
-    if (!/^\d+$/.test(trimmed)) return null;
+    if (!/^\d+$/.test(trimmed)) {
+      return null;
+    }
+
     return BigInt(trimmed);
   }
 
@@ -556,20 +575,28 @@ export class DatabricksWarehouseCostService {
     // statement was not awake in is a stall bought for a share of exactly zero.
     // It does not disturb the distinction below, because every row that turns on
     // it has execution time by definition.
-    if (this.wholeMs(row.executionMsInHour) === 0n) return "idle";
+    if (this.wholeMs(row.executionMsInHour) === 0n) {
+      return "idle";
+    }
 
     // No billing row for this statement's hour yet. Checked first, before every
     // other branch: a null SKU is not a free line and not an unreadable one, it
     // is a bill that has not landed. Reading it as anything else — or letting
     // `.includes` run on a null — is the zero-cost stall this branch exists to
     // stop.
-    if (row.skuName === null) return "owed";
+    if (row.skuName === null) {
+      return "owed";
+    }
 
     // Genie's own line is free today. Pricing it would invent spend for the one
     // thing Databricks is explicit about not charging for.
-    if (row.skuName.includes(GENIE_FREE_USAGE_SKU_MARKER)) return "free";
+    if (row.skuName.includes(GENIE_FREE_USAGE_SKU_MARKER)) {
+      return "free";
+    }
 
-    if (row.hourBillableUsd === null) return { reason: "no_published_price" };
+    if (row.hourBillableUsd === null) {
+      return { reason: "no_published_price" };
+    }
 
     // A rate in another currency is not a rate. Converting it would need a number
     // from outside Databricks, and the result would be indistinguishable from a
@@ -583,7 +610,10 @@ export class DatabricksWarehouseCostService {
     if (executionMs === null || totalMs === null) {
       return { reason: "unreadable_row" };
     }
-    if (totalMs === 0n) return { reason: "hour_has_no_execution_time" };
+
+    if (totalMs === 0n) {
+      return { reason: "hour_has_no_execution_time" };
+    }
 
     let hourNanoUsd: bigint;
     try {
@@ -620,8 +650,10 @@ export class DatabricksWarehouseCostService {
       // several hours a long statement ran through.
       entry.hourNanoUsd += share.hourNanoUsd;
       entry.hourTotalMsByHour.set(row.usageHour, share.hourTotalMs);
+
       return;
     }
+
     into.set(row.statementId, {
       costNanoUsd: share.nanoUsd,
       hourNanoUsd: share.hourNanoUsd,
@@ -644,13 +676,17 @@ export class DatabricksWarehouseCostService {
     const costByStatementId = new Map<string, WarehousePricedStatement>();
     for (const [statementId, entry] of nanoByStatementId) {
       let hourTotalMs = 0n;
-      for (const total of entry.hourTotalMsByHour.values()) hourTotalMs += total;
+      for (const total of entry.hourTotalMsByHour.values()) {
+        hourTotalMs += total;
+      }
+
       costByStatementId.set(statementId, {
         costUsd: nanoUsdToDecimalString(entry.costNanoUsd),
         hourTotalExecutionMs: hourTotalMs.toString(),
         hourBillableUsd: nanoUsdToDecimalString(entry.hourNanoUsd),
       });
     }
+
     return costByStatementId;
   }
 
@@ -673,11 +709,15 @@ export class DatabricksWarehouseCostService {
     for (const [statementId, hours] of owedHours) {
       const priced = pricedHours.get(statementId);
       for (const hour of hours) {
-        if (priced?.has(hour)) continue;
+        if (priced?.has(hour)) {
+          continue;
+        }
+
         owed.add(statementId);
         break;
       }
     }
+
     return owed;
   }
 }

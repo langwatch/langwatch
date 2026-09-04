@@ -168,6 +168,7 @@ function memberTarget(member: OrganizationTeamMemberInput): {
   if (member.role.startsWith("custom:")) {
     return { role: "CUSTOM", customRoleId: member.customRoleId ?? null };
   }
+
   switch (member.role) {
     case "ADMIN":
     case "MEMBER":
@@ -184,11 +185,15 @@ function planTeamMembership(
 ): TeamMembershipPlan {
   const byUser = new Map<string, AuthzAccessBinding[]>();
   for (const binding of currentBindings) {
-    if (!binding.userId) continue;
+    if (!binding.userId) {
+      continue;
+    }
+
     const bindings = byUser.get(binding.userId) ?? [];
     bindings.push(binding);
     byUser.set(binding.userId, bindings);
   }
+
   const requested = new Map(members.map((member) => [member.userId, member]));
   const plan: TeamMembershipPlan = {
     bindingIdsToRemove: [],
@@ -200,12 +205,14 @@ function planTeamMembership(
       plan.bindingIdsToRemove.push(...bindings.map(({ id }) => id));
     }
   }
+
   for (const member of members) {
     const bindings = byUser.get(member.userId) ?? [];
     if (bindings.length === 0) {
       plan.membersToAdd.push(member);
       continue;
     }
+
     const displayed = [...bindings].sort(
       (left, right) => TEAM_ROLE_PRIORITY[left.role] - TEAM_ROLE_PRIORITY[right.role],
     )[0]!;
@@ -213,6 +220,7 @@ function planTeamMembership(
     if (displayed.role === target.role && displayed.customRoleId === target.customRoleId) {
       continue;
     }
+
     const targetAlreadyHeld = bindings.some(
       (binding) =>
         binding.id !== displayed.id &&
@@ -225,6 +233,7 @@ function planTeamMembership(
       plan.bindingsToChange.push({ bindingId: displayed.id, ...target });
     }
   }
+
   return plan;
 }
 
@@ -236,23 +245,37 @@ function directAdminIdsAfterPlan(
   const changed = new Map(plan.bindingsToChange.map((binding) => [binding.bindingId, binding]));
   const administrators = new Set<string>();
   for (const binding of currentBindings) {
-    if (!binding.userId || removed.has(binding.id)) continue;
+    if (!binding.userId || removed.has(binding.id)) {
+      continue;
+    }
+
     if ((changed.get(binding.id)?.role ?? binding.role) === "ADMIN") {
       administrators.add(binding.userId);
     }
   }
+
   for (const member of plan.membersToAdd) {
     if (memberTarget(member).role === "ADMIN") {
       administrators.add(member.userId);
     }
   }
+
   return administrators;
 }
 
 function compareNullableText(left: string | null, right: string | null): number {
-  if (left === right) return 0;
-  if (left === null) return 1;
-  if (right === null) return -1;
+  if (left === right) {
+    return 0;
+  }
+
+  if (left === null) {
+    return 1;
+  }
+
+  if (right === null) {
+    return -1;
+  }
+
   return left.localeCompare(right);
 }
 
@@ -282,9 +305,13 @@ export class OrganizationService extends OrganizationServiceContract {
         userIds: [input.userId],
         activeOnly: input.includeDeactivated !== true,
       });
+
       return true;
     } catch (error) {
-      if (error instanceof UserNotInOrganizationError) return false;
+      if (error instanceof UserNotInOrganizationError) {
+        return false;
+      }
+
       throw error;
     }
   }
@@ -312,7 +339,10 @@ export class OrganizationService extends OrganizationServiceContract {
   async getSettings(input: { organizationId: string }): Promise<OrganizationSettings> {
     const parsed = getOrganizationSettingsInputSchema.parse(input);
     const settings = await this.repository.tryFindSettings(parsed.organizationId);
-    if (!settings) throw new OrganizationNotFoundError();
+    if (!settings) {
+      throw new OrganizationNotFoundError();
+    }
+
     return settings;
   }
 
@@ -326,6 +356,7 @@ export class OrganizationService extends OrganizationServiceContract {
             ?.traceSharingEnabled === true
         : false;
     await this.repository.updateSettings(parsed);
+
     return { traceShareRevocationRequired: wasSharingEnabled };
   }
 
@@ -355,6 +386,7 @@ export class OrganizationService extends OrganizationServiceContract {
 
   getOldestTeamId(input: GetOldestTeamInput): Promise<string> {
     const parsed = getOldestTeamInputSchema.parse(input);
+
     return this.repository.getOldestTeamId(parsed.organizationId);
   }
 
@@ -403,12 +435,16 @@ export class OrganizationService extends OrganizationServiceContract {
         awaitProjection: false,
       });
     } catch (error) {
-      if (!(error instanceof AuthzLedgerUnavailableError)) throw error;
+      if (!(error instanceof AuthzLedgerUnavailableError)) {
+        throw error;
+      }
+
       this.diagnostics?.warn(
         "Personal workspace owner grant could not append; the next ensure retries",
         grant,
       );
     }
+
     return { ...result.workspace, created: result.created };
   }
 
@@ -420,6 +456,7 @@ export class OrganizationService extends OrganizationServiceContract {
     input: PersonalWorkspaceFeaturesInput,
   ): Promise<PersonalFeatures> {
     const project = await this.getOwnedPersonalWorkspaceProject(input);
+
     return readPersonalFeatures(project.personalFeatures);
   }
 
@@ -445,6 +482,7 @@ export class OrganizationService extends OrganizationServiceContract {
 
   getTeam(input: GetOrganizationTeamInput): Promise<OrganizationTeam> {
     const parsed = getOrganizationTeamInputSchema.parse(input);
+
     return this.teams.get(parsed);
   }
 
@@ -459,7 +497,10 @@ export class OrganizationService extends OrganizationServiceContract {
       organizationId: parsed.organizationId,
       slug: identity.slug,
     });
-    if (duplicate) throw new TeamSlugConflictError();
+    if (duplicate) {
+      throw new TeamSlugConflictError();
+    }
+
     return this.teams.create({
       organizationId: parsed.organizationId,
       name: parsed.name,
@@ -469,6 +510,7 @@ export class OrganizationService extends OrganizationServiceContract {
 
   updateTeam(input: UpdateOrganizationTeamInput): Promise<OrganizationTeam> {
     const parsed = updateOrganizationTeamInputSchema.parse(input);
+
     return this.teams.update(parsed);
   }
 
@@ -478,6 +520,7 @@ export class OrganizationService extends OrganizationServiceContract {
     if (team.isPersonal) {
       throw new PersonalTeamProtectedError(PERSONAL_TEAM_ARCHIVE_REFUSAL);
     }
+
     return this.teams.archive(parsed);
   }
 
@@ -487,6 +530,7 @@ export class OrganizationService extends OrganizationServiceContract {
     if (team.isPersonal) {
       throw new PersonalTeamProtectedError(PERSONAL_TEAM_MEMBERSHIP_REFUSAL);
     }
+
     await this.teams.getOrganizationMembers({
       organizationId: parsed.organizationId,
       userIds: [parsed.userId],
@@ -511,6 +555,7 @@ export class OrganizationService extends OrganizationServiceContract {
       if (error instanceof DuplicateBindingError) {
         throw new TeamMemberAlreadyAddedError(parsed.userId);
       }
+
       throw error;
     }
   }
@@ -521,11 +566,13 @@ export class OrganizationService extends OrganizationServiceContract {
     if (team.isPersonal) {
       throw new PersonalTeamProtectedError(PERSONAL_TEAM_MEMBERSHIP_REFUSAL);
     }
+
     const bindings = await this.teamBindings(parsed.organizationId, parsed.teamId);
     const memberBindings = bindings.filter((binding) => binding.userId === parsed.userId);
     if (memberBindings.length === 0) {
       throw new TeamMembershipNotFoundError(parsed.userId);
     }
+
     const administratorsBefore = await this.effectiveAdminUserIds({
       organizationId: parsed.organizationId,
       bindings,
@@ -533,6 +580,7 @@ export class OrganizationService extends OrganizationServiceContract {
     if (administratorsBefore.size === 0) {
       throw new TeamLastAdminRequiredError(team.name);
     }
+
     const administratorsAfter = await this.effectiveAdminUserIds({
       organizationId: parsed.organizationId,
       bindings: bindings.filter((binding) => binding.userId !== parsed.userId),
@@ -541,8 +589,10 @@ export class OrganizationService extends OrganizationServiceContract {
       if (parsed.actor.type === "user" && parsed.actor.id === parsed.userId) {
         throw new CannotRemoveSelfAsLastAdminError(team.name);
       }
+
       throw new TeamLastAdminRequiredError(team.name);
     }
+
     await this.teams.fenceMembershipChange({
       teamId: team.id,
       organizationId: team.organizationId,
@@ -559,6 +609,7 @@ export class OrganizationService extends OrganizationServiceContract {
 
   getTeamById(input: GetOrganizationTeamByIdInput): Promise<OrganizationTeam> {
     const parsed = getOrganizationTeamByIdInputSchema.parse(input);
+
     return this.teams.getById(parsed.teamId);
   }
 
@@ -574,6 +625,7 @@ export class OrganizationService extends OrganizationServiceContract {
     if (!(bindings.get(team.id) ?? []).some(({ userId }) => userId === parsed.userId)) {
       throw new TeamNotFoundError(team.id);
     }
+
     return team;
   }
 
@@ -585,10 +637,12 @@ export class OrganizationService extends OrganizationServiceContract {
     if (!parsed.callerCanManage && team.isPersonal && team.ownerUserId !== parsed.callerUserId) {
       throw new TeamNotFoundError(team.id);
     }
+
     const bindings = await this.authz.listTeamMemberBindings({
       organizationId: parsed.organizationId,
       teamIds: [team.id],
     });
+
     return {
       ...team,
       members: this.shapeTeamMembers({
@@ -611,6 +665,7 @@ export class OrganizationService extends OrganizationServiceContract {
       organizationId: parsed.organizationId,
       teamIds: teams.map(({ id }) => id),
     });
+
     return teams.map((team) => ({
       ...team,
       members: this.shapeTeamMembers({
@@ -629,6 +684,7 @@ export class OrganizationService extends OrganizationServiceContract {
     if (!parsed.members.some((member) => memberTarget(member).role === "ADMIN")) {
       throw new TeamLastAdminRequiredError(parsed.name);
     }
+
     const team = await this.createTeam({
       organizationId: parsed.organizationId,
       name: parsed.name,
@@ -639,6 +695,7 @@ export class OrganizationService extends OrganizationServiceContract {
       members: parsed.members,
       actor: parsed.actor,
     });
+
     return team;
   }
 
@@ -655,6 +712,7 @@ export class OrganizationService extends OrganizationServiceContract {
         throw new PersonalWorkspaceNotManagedHereError(team.name);
       }
     }
+
     await this.validateTeamMembers(team.organizationId, parsed.members);
     if (parsed.members.length === 0) {
       await this.teams.update({
@@ -662,8 +720,10 @@ export class OrganizationService extends OrganizationServiceContract {
         teamId: team.id,
         name: parsed.name,
       });
+
       return;
     }
+
     const bindings = await this.teamBindings(team.organizationId, team.id);
     const directBindings = bindings.filter(({ userId }) => userId !== null);
     const plan = planTeamMembership(directBindings, parsed.members);
@@ -679,6 +739,7 @@ export class OrganizationService extends OrganizationServiceContract {
     if (administratorsBefore.size > 0 && administratorsAfter.size === 0) {
       throw new TeamLastAdminRequiredError(team.name);
     }
+
     await this.teams.fenceMembershipChange({
       teamId: team.id,
       organizationId: team.organizationId,
@@ -722,6 +783,7 @@ export class OrganizationService extends OrganizationServiceContract {
       organizationId: parsed.organizationId,
       groupIds,
     });
+
     return teams.map((team) =>
       this.teamAccess({
         team,
@@ -760,8 +822,11 @@ export class OrganizationService extends OrganizationServiceContract {
       groupIds: [...new Set(adminGroupIds)],
     });
     for (const groupMembers of members.values()) {
-      for (const member of groupMembers) administrators.add(member.userId);
+      for (const member of groupMembers) {
+        administrators.add(member.userId);
+      }
     }
+
     return administrators;
   }
 
@@ -777,6 +842,7 @@ export class OrganizationService extends OrganizationServiceContract {
         displayedByUser.set(binding.userId, binding);
       }
     }
+
     return [...displayedByUser.values()]
       .map((binding) => ({
         userId: binding.userId,
@@ -798,8 +864,12 @@ export class OrganizationService extends OrganizationServiceContract {
       }))
       .sort((left, right) => {
         const byName = compareNullableText(left.user.name, right.user.name);
-        if (byName !== 0) return byName;
+        if (byName !== 0) {
+          return byName;
+        }
+
         const byEmail = compareNullableText(left.user.email, right.user.email);
+
         return byEmail !== 0 ? byEmail : left.userId.localeCompare(right.userId);
       });
   }
@@ -813,11 +883,17 @@ export class OrganizationService extends OrganizationServiceContract {
       userIds: [...new Set(members.map(({ userId }) => userId))],
     });
     const customMembers = members.filter(({ role }) => role.startsWith("custom:"));
-    if (customMembers.length === 0) return;
+    if (customMembers.length === 0) {
+      return;
+    }
+
     const roles = await this.authz.listUserCreatedRoles({ organizationId });
     const assignable = new Set(roles.map(({ id }) => id));
     for (const member of customMembers) {
-      if (!member.customRoleId) throw new TeamCustomRoleRequiredError();
+      if (!member.customRoleId) {
+        throw new TeamCustomRoleRequiredError();
+      }
+
       if (!assignable.has(member.customRoleId)) {
         throw new TeamCustomRoleNotAssignableError(member.customRoleId);
       }
@@ -858,6 +934,7 @@ export class OrganizationService extends OrganizationServiceContract {
         actor: input.actor,
       });
     }
+
     for (const binding of input.plan.bindingsToChange) {
       await this.grants.changeBindingRole({
         organizationId: input.organizationId,
@@ -867,6 +944,7 @@ export class OrganizationService extends OrganizationServiceContract {
         actor: input.actor,
       });
     }
+
     if (input.plan.bindingIdsToRemove.length > 0) {
       await this.grants.revokeBindings({
         organizationId: input.organizationId,
@@ -895,12 +973,17 @@ export class OrganizationService extends OrganizationServiceContract {
     const expandedGroupMembers = [...groupBindings]
       .sort((left, right) => TEAM_ROLE_PRIORITY[left.role] - TEAM_ROLE_PRIORITY[right.role])
       .flatMap((binding): OrganizationTeamAccessMember[] => {
-        if (!binding.groupId) return [];
+        if (!binding.groupId) {
+          return [];
+        }
+
         return (input.groupMembers.get(binding.groupId) ?? []).flatMap((member) => {
           if (directUserIds.has(member.userId) || seenExpandedUserIds.has(member.userId)) {
             return [];
           }
+
           seenExpandedUserIds.add(member.userId);
+
           return [
             {
               bindingId: null,
@@ -935,8 +1018,12 @@ export class OrganizationService extends OrganizationServiceContract {
       ...expandedGroupMembers,
     ].sort((left, right) => {
       const byName = left.name.localeCompare(right.name);
-      if (byName !== 0) return byName;
+      if (byName !== 0) {
+        return byName;
+      }
+
       const byEmail = (left.email ?? "").localeCompare(right.email ?? "");
+
       return byEmail !== 0 ? byEmail : (left.userId ?? "").localeCompare(right.userId ?? "");
     });
     const teamBoundUserIds = new Set(
@@ -947,9 +1034,15 @@ export class OrganizationService extends OrganizationServiceContract {
       OrganizationTeamAccess["projectOnlyAccess"][number]
     >();
     for (const binding of projectBindings) {
-      if (!binding.userId || teamBoundUserIds.has(binding.userId)) continue;
+      if (!binding.userId || teamBoundUserIds.has(binding.userId)) {
+        continue;
+      }
+
       const project = input.projects.find(({ id }) => id === binding.scopeId);
-      if (!project) continue;
+      if (!project) {
+        continue;
+      }
+
       const key = `${binding.userId}:${project.id}`;
       if (!projectOnlyAccess.has(key)) {
         projectOnlyAccess.set(key, {
@@ -966,6 +1059,7 @@ export class OrganizationService extends OrganizationServiceContract {
         });
       }
     }
+
     const projectAccess: OrganizationTeamAccess["projectAccess"] = {};
     const teamBoundGroupIds = new Set(
       groupBindings.flatMap(({ groupId }) => (groupId ? [groupId] : [])),
@@ -974,11 +1068,15 @@ export class OrganizationService extends OrganizationServiceContract {
       const bindings = projectBindings.filter(({ scopeId }) => scopeId === project.id);
       const overriddenUserIds = new Set(bindings.flatMap(({ userId }) => (userId ? [userId] : [])));
       for (const binding of bindings) {
-        if (!binding.groupId) continue;
+        if (!binding.groupId) {
+          continue;
+        }
+
         for (const member of input.groupMembers.get(binding.groupId) ?? []) {
           overriddenUserIds.add(member.userId);
         }
       }
+
       const inherited = directMembers
         .filter(({ userId }) => !userId || !overriddenUserIds.has(userId))
         .map(({ viaGroupId: _viaGroupId, ...member }) => ({
@@ -992,6 +1090,7 @@ export class OrganizationService extends OrganizationServiceContract {
         const inherits =
           (!!binding.userId && teamBoundUserIds.has(binding.userId)) ||
           (!!binding.groupId && teamBoundGroupIds.has(binding.groupId));
+
         return {
           bindingId: binding.id,
           userId: binding.userId,
@@ -1009,6 +1108,7 @@ export class OrganizationService extends OrganizationServiceContract {
       });
       projectAccess[project.id] = [...inherited, ...direct];
     }
+
     return {
       id: input.team.id,
       name: input.team.name,
@@ -1027,6 +1127,7 @@ export class OrganizationService extends OrganizationServiceContract {
       this.groups.listMembers(parsed),
       this.readGroupBindings(parsed),
     ]);
+
     return { ...group, members, bindings };
   }
 
@@ -1039,6 +1140,7 @@ export class OrganizationService extends OrganizationServiceContract {
       }),
     ]);
     const bindingsByGroup = this.groupBindingsByGroup(bindings);
+
     return {
       ...page,
       data: page.data.map((group) => ({
@@ -1059,6 +1161,7 @@ export class OrganizationService extends OrganizationServiceContract {
       }),
     ]);
     const bindingsByGroup = this.groupBindingsByGroup(bindings);
+
     return groups.map((group) => ({
       ...group,
       bindings: bindingsByGroup.get(group.id) ?? [],
@@ -1094,18 +1197,23 @@ export class OrganizationService extends OrganizationServiceContract {
         onDuplicate: "skip",
       });
     }
+
     return group;
   }
 
   async renameGroup(input: RenameOrganizationGroupInput): Promise<OrganizationGroup> {
     const parsed = renameOrganizationGroupInputSchema.parse(input);
     const group = await this.groups.get(parsed);
-    if (group.scimSource) throw new ScimManagedGroupError(group.id);
+    if (group.scimSource) {
+      throw new ScimManagedGroupError(group.id);
+    }
+
     const slug = await this.groups.nextAvailableSlug({
       organizationId: parsed.organizationId,
       baseSlug: this.groupIdentities.slugify(parsed.name),
       excludeGroupId: parsed.groupId,
     });
+
     return this.groups.rename({ ...parsed, slug });
   }
 
@@ -1115,6 +1223,7 @@ export class OrganizationService extends OrganizationServiceContract {
     if (group.scimSource && !parsed.allowScimManaged) {
       throw new ScimManagedGroupError(group.id);
     }
+
     await this.grants.revokeBindingsWhere({
       organizationId: parsed.organizationId,
       where: { groupId: parsed.groupId },
@@ -1127,7 +1236,10 @@ export class OrganizationService extends OrganizationServiceContract {
   async addGroupMember(input: ChangeOrganizationGroupMemberInput): Promise<void> {
     const parsed = changeOrganizationGroupMemberInputSchema.parse(input);
     const group = await this.groups.get(parsed);
-    if (group.scimSource) throw new ScimManagedGroupError(group.id);
+    if (group.scimSource) {
+      throw new ScimManagedGroupError(group.id);
+    }
+
     await this.teams.getOrganizationMembers({
       organizationId: parsed.organizationId,
       userIds: [parsed.userId],
@@ -1138,13 +1250,17 @@ export class OrganizationService extends OrganizationServiceContract {
   async removeGroupMember(input: ChangeOrganizationGroupMemberInput): Promise<void> {
     const parsed = changeOrganizationGroupMemberInputSchema.parse(input);
     const group = await this.groups.get(parsed);
-    if (group.scimSource) throw new ScimManagedGroupError(group.id);
+    if (group.scimSource) {
+      throw new ScimManagedGroupError(group.id);
+    }
+
     await this.groups.removeMember(parsed);
   }
 
   async listGroupBindings(input: GetOrganizationGroupInput): Promise<OrganizationGroupBinding[]> {
     const parsed = getOrganizationGroupInputSchema.parse(input);
     await this.groups.get(parsed);
+
     return this.readGroupBindings(parsed);
   }
 
@@ -1172,8 +1288,10 @@ export class OrganizationService extends OrganizationServiceContract {
       ) {
         throw new GroupBindingAlreadyExistsError();
       }
+
       throw error;
     }
+
     return {
       id: write.bindingId,
       role: write.role,
@@ -1203,6 +1321,7 @@ export class OrganizationService extends OrganizationServiceContract {
     if (!rawBinding?.groupId) {
       throw new GroupBindingNotFoundError(parsed.bindingId);
     }
+
     await this.groups.get({
       organizationId: parsed.organizationId,
       groupId: rawBinding.groupId,
@@ -1228,6 +1347,7 @@ export class OrganizationService extends OrganizationServiceContract {
     ) {
       throw new ScimManagedGroupError(group.id);
     }
+
     const memberIdsToAdd = [...new Set(parsed.memberUserIdsToAdd)];
     await this.teams.getOrganizationMembers({
       organizationId: parsed.organizationId,
@@ -1245,6 +1365,7 @@ export class OrganizationService extends OrganizationServiceContract {
         actor: parsed.actor,
       });
     }
+
     const rename = parsed.rename
       ? {
           name: parsed.rename.name,
@@ -1282,6 +1403,7 @@ export class OrganizationService extends OrganizationServiceContract {
     if (customBindings.some(({ customRoleId }) => !customRoleId)) {
       throw new GroupCustomRoleRequiredError();
     }
+
     const customRoleIds = [
       ...new Set(customBindings.map(({ customRoleId }) => customRoleId as string)),
     ];
@@ -1289,7 +1411,10 @@ export class OrganizationService extends OrganizationServiceContract {
       customRoleIds.length === 0 ? [] : await this.authz.listUserCreatedRoles({ organizationId });
     const rolesById = new Map(roles.map((role) => [role.id, role]));
     const missingRole = customRoleIds.find((id) => !rolesById.has(id));
-    if (missingRole) throw new GroupRoleNotAssignableError(missingRole);
+    if (missingRole) {
+      throw new GroupRoleNotAssignableError(missingRole);
+    }
+
     for (const binding of customBindings) {
       const role = rolesById.get(binding.customRoleId as string);
       const permissions = Array.isArray(role?.permissions)
@@ -1304,8 +1429,11 @@ export class OrganizationService extends OrganizationServiceContract {
             permission,
           }),
       );
-      if (refused) throw new GroupRoleScopeError(refused, binding.scopeType);
+      if (refused) {
+        throw new GroupRoleScopeError(refused, binding.scopeType);
+      }
     }
+
     await this.assertGroupScopes(organizationId, bindings);
   }
 
@@ -1329,6 +1457,7 @@ export class OrganizationService extends OrganizationServiceContract {
       if (!scope || resolvedOrganizationId !== organizationId) {
         throw new GroupScopeNotInOrganizationError(binding.scopeType);
       }
+
       if (scope.type === "team" || scope.type === "project") {
         const team = await this.teams.get({
           organizationId,
@@ -1360,6 +1489,7 @@ export class OrganizationService extends OrganizationServiceContract {
       organizationId: input.organizationId,
       groupId: input.groupId,
     });
+
     return bindings.map((binding) => this.toGroupBinding(binding));
   }
 
@@ -1394,11 +1524,15 @@ export class OrganizationService extends OrganizationServiceContract {
   ): Map<string, OrganizationGroupBinding[]> {
     const result = new Map<string, OrganizationGroupBinding[]>();
     for (const binding of bindings) {
-      if (!binding.groupId) continue;
+      if (!binding.groupId) {
+        continue;
+      }
+
       const groupBindings = result.get(binding.groupId) ?? [];
       groupBindings.push(this.toGroupBinding(binding));
       result.set(binding.groupId, groupBindings);
     }
+
     return result;
   }
 
@@ -1416,6 +1550,7 @@ export class OrganizationService extends OrganizationServiceContract {
       before: readPersonalFeatures(project.personalFeatures),
       after: next,
     });
+
     return next;
   }
 
@@ -1427,6 +1562,7 @@ export class OrganizationService extends OrganizationServiceContract {
     if (!project.isPersonal || project.ownerUserId !== parsed.callerUserId) {
       throw new PersonalProjectOwnerMismatchError();
     }
+
     return project;
   }
 }

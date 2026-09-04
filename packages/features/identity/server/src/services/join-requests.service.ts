@@ -173,11 +173,18 @@ export class JoinRequestsService {
     userId: string;
     verifiedEmail: string | null;
   }): Promise<JoinLookupDecision> {
-    if (!(await this.deps.enabled({ userId }))) return { outcome: "none" };
-    if (!verifiedEmail) return { outcome: "none" };
+    if (!(await this.deps.enabled({ userId }))) {
+      return { outcome: "none" };
+    }
+
+    if (!verifiedEmail) {
+      return { outcome: "none" };
+    }
 
     const domain = joinDomainOf(verifiedEmail);
-    if (!domain || isPublicEmailDomain(domain)) return { outcome: "none" };
+    if (!domain || isPublicEmailDomain(domain)) {
+      return { outcome: "none" };
+    }
 
     await this.assertNotLooking({ userId });
 
@@ -196,6 +203,7 @@ export class JoinRequestsService {
       { domain, outcome: decision.outcome },
       "join lookup answered for a verified domain",
     );
+
     return decision;
   }
 
@@ -219,6 +227,7 @@ export class JoinRequestsService {
     if (!(await this.deps.enabled({ userId }))) {
       throw new JoinNotAvailableError("join requests are not enabled here");
     }
+
     const domain = this.provenDomainOrRefuse({ verifiedEmail });
     const candidate = await this.deps.candidates.tryFindCandidateOrganization({
       organizationId,
@@ -253,6 +262,7 @@ export class JoinRequestsService {
       requesterUserId: userId,
       domain,
     });
+
     return { joinRequestId, state: "PENDING" };
   }
 
@@ -272,10 +282,14 @@ export class JoinRequestsService {
     verifiedEmail: string | null;
   }): Promise<{ organization: JoinOffer } | null> {
     const decision = await this.lookup({ userId, verifiedEmail });
-    if (decision.outcome !== "auto") return null;
+    if (decision.outcome !== "auto") {
+      return null;
+    }
 
     const domain = joinDomainOf(verifiedEmail ?? "");
-    if (!domain) return null;
+    if (!domain) {
+      return null;
+    }
 
     const organizationId = decision.organization.organizationId;
     const joinRequestId = newJoinRequestId();
@@ -317,6 +331,7 @@ export class JoinRequestsService {
       requesterUserId: userId,
       domain,
     });
+
     return { organization: decision.organization };
   }
 
@@ -396,6 +411,7 @@ export class JoinRequestsService {
         `join request ${joinRequestId} is not ${userId}'s to withdraw`,
       );
     }
+
     await this.deps.requests.withdrawJoin({
       tenantId: request.organizationId,
       organizationId: request.organizationId,
@@ -428,7 +444,10 @@ export class JoinRequestsService {
       userId,
       organizationId,
     });
-    if (!open) return;
+    if (!open) {
+      return;
+    }
+
     await this.deps.requests.approveJoin({
       tenantId: organizationId,
       organizationId,
@@ -463,7 +482,10 @@ export class JoinRequestsService {
       userId,
       organizationId,
     });
-    if (!open) return;
+    if (!open) {
+      return;
+    }
+
     await this.deps.requests.withdrawJoin({
       tenantId: organizationId,
       organizationId,
@@ -500,11 +522,13 @@ export class JoinRequestsService {
           `organization ${organizationId} cannot enable automatic joining without a genuine license`,
         );
       }
+
       if (normalized.length === 0) {
         throw new JoinAutoDomainUnprovenError(
           "automatic joining needs a company domain to be named",
         );
       }
+
       for (const domain of normalized) {
         await this.assertDomainProven({ organizationId, domain });
       }
@@ -518,6 +542,7 @@ export class JoinRequestsService {
       // inherit a list from a decision somebody made months ago.
       joinDomains: domainJoin === "auto" ? normalized : [],
     });
+
     return { previous: current.domainJoin, next: domainJoin };
   }
 
@@ -595,8 +620,10 @@ export class JoinRequestsService {
         { joinRequestId, organizationId },
         "join request approved for somebody who was already a member; no second membership attached",
       );
+
       return;
     }
+
     await this.deps.membership.attachDefaultMembership({
       userId,
       organizationId,
@@ -619,6 +646,7 @@ export class JoinRequestsService {
         `join request ${joinRequestId} does not belong to ${organizationId}`,
       );
     }
+
     return request;
   }
 
@@ -628,6 +656,7 @@ export class JoinRequestsService {
     if (!domain || isPublicEmailDomain(domain)) {
       throw new JoinNotAvailableError("no verified company address is available for this request");
     }
+
     return domain;
   }
 
@@ -646,6 +675,7 @@ export class JoinRequestsService {
     if (!limit.allowed) {
       throw new JoinRequestThrottledError(retryAfterSeconds(limit.resetAt));
     }
+
     logger.debug({ organizationId }, "join request rate limit checked for an asking user");
   }
 
@@ -671,10 +701,16 @@ export class JoinRequestsService {
       userId,
       organizationId,
     });
-    if (!rejectedAt) return;
+    if (!rejectedAt) {
+      return;
+    }
+
     const clearsAt = rejectedAt.getTime() + JOIN_REJECTION_COOLDOWN_MS;
     const now = this.now();
-    if (now >= clearsAt) return;
+    if (now >= clearsAt) {
+      return;
+    }
+
     // The throttle code, not a rejection code: see the cool-down constant.
     throw new JoinRequestThrottledError(Math.ceil((clearsAt - now) / 1000));
   }
@@ -699,6 +735,7 @@ export class JoinRequestsService {
         `automatic joining refused for the public email domain ${domain}`,
       );
     }
+
     const candidate = await this.deps.candidates.tryFindCandidateOrganization({
       organizationId,
       domain,
@@ -708,6 +745,7 @@ export class JoinRequestsService {
         `an active connection already admits ${domain} for ${organizationId}`,
       );
     }
+
     const verified = candidate?.verifiedMembersOnDomain ?? 0;
     if (verified < JOIN_AUTO_VERIFIED_MEMBER_THRESHOLD) {
       throw new JoinAutoDomainUnprovenError(

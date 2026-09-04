@@ -212,7 +212,9 @@ export class EEWebhookService implements WebhookService {
     try {
       if (event.type === "checkout.session.completed") {
         const licenseResult = await this.tryRouteLicensePurchase(event);
-        if (licenseResult) return licenseResult;
+        if (licenseResult) {
+          return licenseResult;
+        }
       }
 
       if (
@@ -234,6 +236,7 @@ export class EEWebhookService implements WebhookService {
         { eventType: event.type, eventId: event.id },
         "[stripeWebhook] Ignoring unhandled event type",
       );
+
       return { status: "ok" };
     } catch (error) {
       logger.error(
@@ -245,6 +248,7 @@ export class EEWebhookService implements WebhookService {
         },
         "[stripeWebhook] Unhandled error processing event",
       );
+
       return {
         status: "error",
         httpStatus: 500,
@@ -276,6 +280,7 @@ export class EEWebhookService implements WebhookService {
         { eventId: event.id },
         "[stripeWebhook] License purchase handler is not configured",
       );
+
       return {
         status: "error",
         httpStatus: 500,
@@ -288,6 +293,7 @@ export class EEWebhookService implements WebhookService {
         { eventId: event.id },
         "[stripeWebhook] LANGWATCH_LICENSE_PRIVATE_KEY is not configured",
       );
+
       return {
         status: "error",
         httpStatus: 500,
@@ -321,6 +327,7 @@ export class EEWebhookService implements WebhookService {
         { eventType: event.type, eventId: event.id },
         "[stripeWebhook] Event has no subscription id — skipping",
       );
+
       return { status: "ok" };
     }
 
@@ -400,6 +407,7 @@ export class EEWebhookService implements WebhookService {
         },
         "[stripeWebhook] No client_reference_id in checkout session",
       );
+
       return;
     }
 
@@ -427,7 +435,9 @@ export class EEWebhookService implements WebhookService {
     organizationId: string;
   }): void {
     const posthog = this.getPostHog?.() ?? null;
-    if (!posthog) return;
+    if (!posthog) {
+      return;
+    }
 
     posthog.capture({
       distinctId: organizationId,
@@ -458,6 +468,7 @@ export class EEWebhookService implements WebhookService {
         { eventType: event.type, eventId: event.id },
         "[stripeWebhook] Subscription event has no id — skipping",
       );
+
       return { status: "ok" };
     }
 
@@ -497,6 +508,7 @@ export class EEWebhookService implements WebhookService {
         { subscriptionClientReferenceId },
         "[stripeWebhook] No subscription found for checkout",
       );
+
       throw new SubscriptionRecordNotFoundError(subscriptionClientReferenceId);
     }
 
@@ -611,6 +623,7 @@ export class EEWebhookService implements WebhookService {
         { subscriptionId },
         "[stripeWebhook] No subscription record for payment failure, skipping",
       );
+
       return;
     }
 
@@ -635,6 +648,7 @@ export class EEWebhookService implements WebhookService {
         { stripeSubscriptionId },
         "[stripeWebhook] No subscription for deletion event, skipping",
       );
+
       return;
     }
 
@@ -644,6 +658,7 @@ export class EEWebhookService implements WebhookService {
         { stripeSubscriptionId },
         "[stripeWebhook] Subscription already cancelled, skipping redundant update",
       );
+
       return;
     }
 
@@ -693,6 +708,7 @@ export class EEWebhookService implements WebhookService {
         { stripeSubscriptionId: subscription.id },
         "[stripeWebhook] No subscription for update event, skipping",
       );
+
       return;
     }
 
@@ -801,10 +817,12 @@ export class EEWebhookService implements WebhookService {
       if (throwOnMissing) {
         throw new SubscriptionRecordNotFoundError(subscriptionId);
       }
+
       logger.warn(
         { subscriptionId },
         "[stripeWebhook] No subscription record found, skipping sync",
       );
+
       return;
     }
 
@@ -825,6 +843,7 @@ export class EEWebhookService implements WebhookService {
           { subscriptionId },
           "[stripeWebhook] Stripe status unavailable and DB is CANCELLED, skipping activation",
         );
+
         return;
       }
     }
@@ -834,6 +853,7 @@ export class EEWebhookService implements WebhookService {
         { subscriptionId },
         "[stripeWebhook] Stripe subscription is canceled, skipping activation from $0 invoice",
       );
+
       return;
     }
 
@@ -946,11 +966,15 @@ export class EEWebhookService implements WebhookService {
         { organizationId, err },
         "[stripeWebhook] Failed to read retention rules; skipping seat provisioning",
       );
+
       return;
     }
 
     for (const category of retentionCategories) {
-      if (covered.has(category)) continue;
+      if (covered.has(category)) {
+        continue;
+      }
+
       try {
         await this.host.setOrganizationRetention({
           scope: { scopeType: "ORGANIZATION", scopeId: organizationId },
@@ -970,7 +994,10 @@ export class EEWebhookService implements WebhookService {
     updatedSubscription: SubscriptionWithOrg,
     reason: string,
   ) {
-    if (!updatedSubscription.organization.license) return;
+    if (!updatedSubscription.organization.license) {
+      return;
+    }
+
     logger.info(
       { organizationId: updatedSubscription.organizationId },
       `[stripeWebhook] Clearing trial license — ${reason}`,
@@ -982,6 +1009,7 @@ export class EEWebhookService implements WebhookService {
     if (value === Currency.EUR || value === Currency.USD) {
       return value;
     }
+
     return null;
   }
 }

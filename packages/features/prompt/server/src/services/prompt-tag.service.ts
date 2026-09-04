@@ -102,6 +102,7 @@ export class PromptTagService {
       if (isUniqueConstraintError(error)) {
         throw new PromptTagConflictError(`A tag with name "${name}" already exists in this org.`);
       }
+
       throw error;
     }
   }
@@ -194,9 +195,11 @@ export class PromptTagService {
           `A tag with name "${newName}" already exists in this org.`,
         );
       }
+
       if (error instanceof Error && error.message.includes("not found")) {
         throw new PromptTagNotFoundError(oldName);
       }
+
       throw error;
     }
   }

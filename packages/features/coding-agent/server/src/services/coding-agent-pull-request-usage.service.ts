@@ -61,8 +61,14 @@ export class CodingAgentPullRequestUsageService {
   private constructor() {}
 
   ingestSourceType(agent: string): string {
-    if (agent === "gemini_cli") return "gemini";
-    if (agent === "copilot") return "github_copilot";
+    if (agent === "gemini_cli") {
+      return "gemini";
+    }
+
+    if (agent === "copilot") {
+      return "github_copilot";
+    }
+
     return agent;
   }
 
@@ -71,6 +77,7 @@ export class CodingAgentPullRequestUsageService {
     projects: Record<string, CodingAgentContributorProject>,
   ): CodingAgentContributor {
     const project = projects[projectId];
+
     return {
       projectId,
       projectSlug: project?.slug ?? "",
@@ -118,6 +125,7 @@ export class CodingAgentPullRequestUsageService {
         });
         continue;
       }
+
       row.sessionsCount += 1;
       row.inputTokens += session.inputTokens;
       row.outputTokens += session.outputTokens;
@@ -129,8 +137,12 @@ export class CodingAgentPullRequestUsageService {
         row.billedCostUsd = (row.billedCostUsd ?? 0) + (nonBilled ? 0 : session.costUsd);
         row.nonBilledCostUsd = (row.nonBilledCostUsd ?? 0) + (nonBilled ? session.costUsd : 0);
       }
-      for (const model of session.models) row.modelSet.add(model);
+
+      for (const model of session.models) {
+        row.modelSet.add(model);
+      }
     }
+
     return [...grouped.values()].map(({ modelSet, ...row }) => ({
       ...row,
       models: [...modelSet].sort(),
@@ -149,6 +161,7 @@ export class CodingAgentPullRequestUsageService {
       billedCostUsd: null,
       nonBilledCostUsd: null,
     };
+
     return rows.reduce<CodingAgentUsageTotals>(
       (totals, row) => ({
         sessionsCount: totals.sessionsCount + row.sessionsCount,
@@ -184,6 +197,7 @@ export class CodingAgentPullRequestUsageService {
       if (!attached.has(`${total.tenantId}\0${total.sessionId}`) || total.model === "") {
         continue;
       }
+
       const existing = byModel.get(total.model) ?? {
         model: total.model,
         inputTokens: 0,
@@ -202,11 +216,14 @@ export class CodingAgentPullRequestUsageService {
       if (costProjects.has(total.tenantId)) {
         existing.costUsd = (existing.costUsd ?? 0) + total.costUsd;
       }
+
       byModel.set(total.model, existing);
     }
+
     if (byModel.size > 0) {
       return [...byModel.values()].sort((a, b) => b.totalTokens - a.totalTokens);
     }
+
     return this.unknownModels(sessions);
   }
 
@@ -225,14 +242,16 @@ export class CodingAgentPullRequestUsageService {
     const grouped = new Map<string, CodingAgentContributor & { sessionsCount: number }>();
     for (const session of sessions) {
       const current = grouped.get(session.tenantId);
-      if (current) current.sessionsCount += 1;
-      else {
+      if (current) {
+        current.sessionsCount += 1;
+      } else {
         grouped.set(session.tenantId, {
           ...this.contributorFor(session.tenantId, projects),
           sessionsCount: 1,
         });
       }
     }
+
     return [...grouped.values()].sort((a, b) => b.sessionsCount - a.sessionsCount);
   }
 
@@ -241,8 +260,13 @@ export class CodingAgentPullRequestUsageService {
   ): CodingAgentModelUsage[] {
     const models = new Set<string>();
     for (const session of sessions) {
-      for (const model of session.models) if (model !== "") models.add(model);
+      for (const model of session.models) {
+        if (model !== "") {
+          models.add(model);
+        }
+      }
     }
+
     return [...models].sort().map((model) => ({
       model,
       inputTokens: 0,

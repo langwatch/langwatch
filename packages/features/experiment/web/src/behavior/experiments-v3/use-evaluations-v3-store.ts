@@ -213,7 +213,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
           mappings: {
             ...target.mappings,
             [dataset.id]: {
-              ...(target.mappings[dataset.id] ?? {}),
+              ...target.mappings[dataset.id],
               ...newDatasetMappings,
             },
           },
@@ -554,7 +554,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   clearPendingChange: (dbDatasetId, recordId) => {
     set((state) => {
       const pendingSavedChanges = { ...state.pendingSavedChanges };
-      const datasetChanges = { ...(pendingSavedChanges[dbDatasetId] ?? {}) };
+      const datasetChanges = { ...pendingSavedChanges[dbDatasetId] };
       delete datasetChanges[recordId];
 
       if (Object.keys(datasetChanges).length === 0) {
@@ -747,7 +747,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
       const newDatasetMappings: Record<string, Record<string, FieldMapping>> = {};
       for (const dataset of state.datasets) {
         const derived = deriveComparisonTargetMappings(comparison, dataset);
-        const existing = { ...(existingTarget.mappings[dataset.id] ?? {}) };
+        const existing = { ...existingTarget.mappings[dataset.id] };
         for (const key of DERIVED_KEYS) delete existing[key];
         newDatasetMappings[dataset.id] = {
           ...existing,
@@ -786,7 +786,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
     set((state) => ({
       targets: state.targets.map((r) => {
         if (r.id !== targetId) return r;
-        const datasetMappings = { ...(r.mappings[datasetId] ?? {}) };
+        const datasetMappings = { ...r.mappings[datasetId] };
         delete datasetMappings[inputField];
         return {
           ...r,
@@ -862,8 +862,8 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
     set((state) => ({
       evaluators: state.evaluators.map((e) => {
         if (e.id !== evaluatorId) return e;
-        const datasetMappings = { ...(e.mappings[datasetId] ?? {}) };
-        const targetMappings = { ...(datasetMappings[targetId] ?? {}) };
+        const datasetMappings = { ...e.mappings[datasetId] };
+        const targetMappings = { ...datasetMappings[targetId] };
         delete targetMappings[inputField];
         datasetMappings[targetId] = targetMappings;
         return {

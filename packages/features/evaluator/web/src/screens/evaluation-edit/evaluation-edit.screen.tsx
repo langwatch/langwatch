@@ -51,7 +51,7 @@ export default function EditTraceCheck() {
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
 
-  const checkId = typeof router.query.id == "string" ? router.query.id : "";
+  const checkId = typeof router.query.id === "string" ? router.query.id : "";
   const check = api.monitors.getById.useQuery(
     { id: checkId, projectId: project?.id ?? "" },
     { enabled: !!project },

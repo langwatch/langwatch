@@ -61,18 +61,23 @@ export class UserCredentialService {
     newPassword: string;
   }): Promise<UserPasswordRotationOutcome> {
     const account = await this.repository.tryFindCredentialAccount({ userId: input.userId });
-    if (!account?.passwordHash) return "no_password";
+    if (!account?.passwordHash) {
+      return "no_password";
+    }
 
     const matches = await this.passwords.matches({
       password: input.currentPassword,
       hash: account.passwordHash,
     });
-    if (!matches) return "wrong_password";
+    if (!matches) {
+      return "wrong_password";
+    }
 
     await this.repository.writePasswordHash({
       accountId: account.id,
       passwordHash: await this.passwords.hash({ password: input.newPassword }),
     });
+
     return "rotated";
   }
 

@@ -54,6 +54,7 @@ export class SaaSPlanProviderService extends BillingService {
       typeof options.adminEmails === "string"
         ? options.adminEmails.split(",").map((value) => value.trim())
         : (options.adminEmails ?? []);
+
     return new SaaSPlanProviderService(options.subscriptions, options.isSaas, new Set(emails));
   }
 

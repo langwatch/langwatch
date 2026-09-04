@@ -134,7 +134,7 @@ export class PersonalVirtualKeyTrpcApi {
               .string()
               .min(1)
               .max(64)
-              .regex(/^[a-z0-9][a-z0-9_\-]*$/, {
+              .regex(/^[a-z0-9][a-z0-9_-]*$/, {
                 message: "Label must be lowercase alphanumeric, dash, or underscore (no spaces)",
               }),
             routingPolicyId: z.string().optional(),

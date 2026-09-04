@@ -119,6 +119,7 @@ export class ScimService extends ScimServiceContract {
     if (!input.connectionId) {
       throw new ScimConnectionRequiredError();
     }
+
     const exists = await this.repository.scimConnectionExists({
       organizationId: input.organizationId,
       connectionId: input.connectionId,
@@ -139,6 +140,7 @@ export class ScimService extends ScimServiceContract {
       connectionId: input.connectionId,
       tokenId: stored.id,
     });
+
     return { token, tokenId: stored.id, connectionId: input.connectionId };
   }
 
@@ -154,6 +156,7 @@ export class ScimService extends ScimServiceContract {
     if (!(await this.repository.revokeToken(input))) {
       throw new ScimTokenNotFoundError(input.tokenId);
     }
+
     if (token?.connectionId) {
       await this.lifecycle.revoked({
         organizationId: input.organizationId,
@@ -162,6 +165,7 @@ export class ScimService extends ScimServiceContract {
         cause: "revoke",
       });
     }
+
     return { success: true };
   }
 
@@ -175,6 +179,7 @@ export class ScimService extends ScimServiceContract {
       tokenId: null,
       cause: "teardown",
     });
+
     return { revoked };
   }
 
@@ -183,13 +188,16 @@ export class ScimService extends ScimServiceContract {
     if (!stored) {
       return { status: "invalid_token" };
     }
+
     const plan = await this.entitlements.getActivePlan({
       organizationId: stored.organizationId,
     });
     if (plan.type !== "ENTERPRISE") {
       return { status: "plan_not_entitled", organizationId: stored.organizationId };
     }
+
     await this.repository.recordTokenUse({ tokenId: stored.id, usedAt: new Date() });
+
     return {
       status: "ok",
       organizationId: stored.organizationId,
@@ -238,6 +246,7 @@ export class ScimService extends ScimServiceContract {
         externalId: input.request.externalId ?? null,
       });
     }
+
     return group;
   }
 
@@ -288,12 +297,14 @@ export class ScimService extends ScimServiceContract {
         userId: user.id,
       });
     }
+
     await this.recordUserPush({
       ...input,
       userId: user.id,
       externalId,
       op: "create",
     });
+
     return { ...user, ...(externalId ? { externalId } : {}) };
   }
 
@@ -329,12 +340,14 @@ export class ScimService extends ScimServiceContract {
         userId: input.id,
       });
     }
+
     await this.recordUserPush({
       ...input,
       userId: input.id,
       externalId,
       op: input.request.active === false ? "deactivate" : "update",
     });
+
     return { ...user, ...(externalId ? { externalId } : {}) };
   }
 
@@ -355,6 +368,7 @@ export class ScimService extends ScimServiceContract {
       externalId: null,
       op: this.patchDeactivates(input.patchRequest) ? "deactivate" : "update",
     });
+
     return user;
   }
 
@@ -374,6 +388,7 @@ export class ScimService extends ScimServiceContract {
         userId: input.id,
       });
     }
+
     await this.recordUserPush({
       ...input,
       userId: input.id,
@@ -393,7 +408,9 @@ export class ScimService extends ScimServiceContract {
     externalId: string | null | undefined;
     op: ScimUserPushOperation;
   }): Promise<void> {
-    if (!input.connectionId) return;
+    if (!input.connectionId) {
+      return;
+    }
 
     await this.lifecycle.userPushed({
       organizationId: input.organizationId,
@@ -406,16 +423,24 @@ export class ScimService extends ScimServiceContract {
 
   private patchDeactivates(request: ScimPatchRequest): boolean {
     return request.Operations.some((operation) => {
-      if (operation.op !== "replace") return false;
+      if (operation.op !== "replace") {
+        return false;
+      }
+
       if (operation.path === "active") {
         return operation.value === false || operation.value === "false";
       }
+
       if (typeof operation.value !== "object" || operation.value === null) {
         return false;
       }
-      if (!("active" in operation.value)) return false;
+
+      if (!("active" in operation.value)) {
+        return false;
+      }
 
       const active = operation.value.active;
+
       return active === false || active === "false";
     });
   }

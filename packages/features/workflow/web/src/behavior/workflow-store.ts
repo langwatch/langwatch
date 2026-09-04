@@ -879,12 +879,12 @@ export const store = (
             data: {
               ...node.data,
               execution_state: {
-                ...(current_execution_state ?? {}),
+                ...current_execution_state,
                 ...executionState,
                 ...(executionState?.error ? { error: executionState.error.slice(0, 2048) } : {}),
                 timestamps: {
-                  ...(timestamps ?? {}),
-                  ...(executionState?.timestamps ?? {}),
+                  ...timestamps,
+                  ...executionState?.timestamps,
                 },
               },
             },
@@ -916,7 +916,7 @@ export const store = (
       state: {
         ...get().state,
         evaluation: {
-          ...(get().state.evaluation ?? {}),
+          ...get().state.evaluation,
           ...evaluationState,
           ...(evaluationState?.error ? { error: evaluationState.error.slice(0, 140) } : {}),
         },
@@ -928,7 +928,7 @@ export const store = (
       state: {
         ...get().state,
         optimization: {
-          ...(get().state.optimization ?? {}),
+          ...get().state.optimization,
           ...optimizationState,
           ...(optimizationState?.error ? { error: optimizationState.error.slice(0, 140) } : {}),
           ...(optimizationState?.stdout

@@ -61,9 +61,11 @@ export class ScenarioTargetPrefetchService {
     if (target.type === "prompt") {
       return this.fetchPromptTarget(projectId, target.referenceId);
     }
+
     if (target.type === "code") {
       return this.fetchCodeAgentTarget(projectId, target.referenceId, runSecretValues);
     }
+
     if (target.type === "workflow") {
       return this.fetchWorkflowAgentTarget({
         projectId,
@@ -71,6 +73,7 @@ export class ScenarioTargetPrefetchService {
         runSecretValues,
       });
     }
+
     return this.fetchHttpAgentTarget({
       projectId,
       agentId: target.referenceId,
@@ -85,6 +88,7 @@ export class ScenarioTargetPrefetchService {
       if (error instanceof AgentNotFoundError) {
         return null;
       }
+
       throw error;
     }
   }
@@ -102,11 +106,13 @@ export class ScenarioTargetPrefetchService {
       if (!workflow.latestVersion) {
         return null;
       }
+
       return { workflowId: workflow.id, dsl: workflow.latestVersion.dsl };
     } catch (error) {
       if (error instanceof WorkflowNotFoundError) {
         return null;
       }
+
       throw error;
     }
   }
@@ -169,6 +175,7 @@ export class ScenarioTargetPrefetchService {
     if (!parseResult.success) {
       return null;
     }
+
     const config = parseResult.data;
 
     // Loaded once for the whole run, the same way the code and workflow paths
@@ -204,6 +211,7 @@ export class ScenarioTargetPrefetchService {
     if (!parseResult.success) {
       return null;
     }
+
     const config = parseResult.data;
 
     const codeParam = config.parameters.find((p) => p.identifier === "code" && p.type === "code");
@@ -243,6 +251,7 @@ export class ScenarioTargetPrefetchService {
     if (!parseResult.success) {
       return null;
     }
+
     const config = parseResult.data;
 
     // workflowId can live on the Agent row or inside the DSL config. Prefer the

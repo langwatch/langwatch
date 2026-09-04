@@ -163,6 +163,7 @@ export class SignUpVerificationService {
     // address catching up with it. Confirming is the whole job.
     if (alreadyRegistered) {
       await this.deps.accounts.markAddressConfirmed({ email: pending.email });
+
       return {
         email: pending.email,
         accountCreated: false,
@@ -186,6 +187,7 @@ export class SignUpVerificationService {
       passwordHash: pending.passwordHash,
     });
     await this.deps.accounts.markAddressConfirmed({ email: pending.email });
+
     return { email: pending.email, accountCreated: true, accountExists: true };
   }
 
@@ -230,13 +232,21 @@ function writePendingSignUp(pending: PendingSignUp): string {
  * sign-up: answering null sends it down the same path as an expired link.
  */
 function readPendingSignUp(identifier: string): PendingSignUp | null {
-  if (!identifier.startsWith(SIGN_UP_TOKEN_NAMESPACE)) return null;
+  if (!identifier.startsWith(SIGN_UP_TOKEN_NAMESPACE)) {
+    return null;
+  }
 
   try {
     const parsed: unknown = JSON.parse(identifier.slice(SIGN_UP_TOKEN_NAMESPACE.length));
-    if (typeof parsed !== "object" || parsed === null) return null;
+    if (typeof parsed !== "object" || parsed === null) {
+      return null;
+    }
+
     const { email, passwordHash } = parsed as Record<string, unknown>;
-    if (typeof email !== "string" || email.length === 0) return null;
+    if (typeof email !== "string" || email.length === 0) {
+      return null;
+    }
+
     return {
       email,
       passwordHash: typeof passwordHash === "string" ? passwordHash : null,

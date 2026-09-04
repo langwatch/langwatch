@@ -61,10 +61,16 @@ export const IO_ATTR_KEYS = new Set([
 /** UTF-8-safe truncation to at most `maxBytes`, backing off to a codepoint boundary. */
 export function utf8Preview(value: string, maxBytes: number): string {
   const buf = Buffer.from(value, "utf8");
-  if (buf.byteLength <= maxBytes) return value;
+  if (buf.byteLength <= maxBytes) {
+    return value;
+  }
+
   let end = maxBytes;
   // 0b10xxxxxx are UTF-8 continuation bytes — don't cut mid-codepoint.
-  while (end > 0 && (buf[end]! & 0xc0) === 0x80) end--;
+  while (end > 0 && (buf[end]! & 0xc0) === 0x80) {
+    end--;
+  }
+
   return buf.subarray(0, end).toString("utf8") + "…";
 }
 
@@ -90,22 +96,29 @@ const PREVIEW_MAX_DEPTH = 64;
  * surrounding structure. Roles, ids, and short content stay verbatim.
  */
 function clampLongStrings(value: unknown, depth = 0): unknown {
-  if (depth > PREVIEW_MAX_DEPTH) return value;
+  if (depth > PREVIEW_MAX_DEPTH) {
+    return value;
+  }
+
   if (typeof value === "string") {
     return Buffer.byteLength(value, "utf8") > PREVIEW_STRING_CLAMP_BYTES
       ? utf8Preview(value, PREVIEW_STRING_CLAMP_BYTES)
       : value;
   }
+
   if (Array.isArray(value)) {
     return value.map((item) => clampLongStrings(item, depth + 1));
   }
+
   if (value && typeof value === "object") {
     const out: Record<string, unknown> = {};
     for (const [key, entry] of Object.entries(value)) {
       out[key] = clampLongStrings(entry, depth + 1);
     }
+
     return out;
   }
+
   return value;
 }
 
@@ -132,21 +145,35 @@ function clampLongStrings(value: unknown, depth = 0): unknown {
  * shapes ONLY the preview.
  */
 export function structuredIoPreview(value: string, maxBytes: number): string | null {
-  if (Buffer.byteLength(value, "utf8") > PREVIEW_MAX_SOURCE_BYTES) return null;
+  if (Buffer.byteLength(value, "utf8") > PREVIEW_MAX_SOURCE_BYTES) {
+    return null;
+  }
+
   const trimmed = value.trim();
-  if (!trimmed.startsWith("[") && !trimmed.startsWith("{")) return null;
+  if (!trimmed.startsWith("[") && !trimmed.startsWith("{")) {
+    return null;
+  }
+
   let parsed: unknown;
   try {
     parsed = JSON.parse(trimmed);
   } catch {
     return null;
   }
-  if (parsed === null || typeof parsed !== "object") return null;
+
+  if (parsed === null || typeof parsed !== "object") {
+    return null;
+  }
 
   const clamped = clampLongStrings(parsed);
   const clampedJson = JSON.stringify(clamped);
-  if (Buffer.byteLength(clampedJson, "utf8") <= maxBytes) return clampedJson;
-  if (!Array.isArray(clamped)) return null;
+  if (Buffer.byteLength(clampedJson, "utf8") <= maxBytes) {
+    return clampedJson;
+  }
+
+  if (!Array.isArray(clamped)) {
+    return null;
+  }
 
   const first = clamped[0];
   const firstSize = Buffer.byteLength(JSON.stringify(first), "utf8");
@@ -155,12 +182,20 @@ export function structuredIoPreview(value: string, maxBytes: number): string | n
   const tail: unknown[] = [];
   for (let i = clamped.length - 1; i >= 1; i--) {
     const cost = Buffer.byteLength(JSON.stringify(clamped[i]), "utf8") + 1;
-    if (cost > budget) break;
+    if (cost > budget) {
+      break;
+    }
+
     tail.unshift(clamped[i]);
     budget -= cost;
   }
-  if (tail.length === 0 && clamped.length > 1) return null;
+
+  if (tail.length === 0 && clamped.length > 1) {
+    return null;
+  }
+
   const preview = JSON.stringify([first, ...tail]);
+
   return Buffer.byteLength(preview, "utf8") <= maxBytes ? preview : null;
 }
 
@@ -186,9 +221,11 @@ export function leanForProjection(event: Event): Event {
   if (event.type === SPAN_RECEIVED_EVENT_TYPE) {
     return leanSpanReceivedEvent(event);
   }
+
   if (event.type === LOG_RECORD_RECEIVED_EVENT_TYPE) {
     return leanLogRecordReceivedEvent(event);
   }
+
   return event;
 }
 
@@ -331,7 +368,7 @@ function leanLogRecordReceivedEvent(event: Event): Event {
       ...data,
       body: preview,
       attributes: {
-        ...(data.attributes ?? {}),
+        ...data.attributes,
         // ADR-022: embed event.id so the read path can resolve via event_log.
         [eventrefKey]: serializeTraceEventReference({ field: "body", eventId: event.id }),
       },

@@ -54,12 +54,16 @@ function scalarTypeOf(property: Record<string, unknown>): {
   const concrete = names.filter((name) => name !== "null");
   if (concrete.length === 1) {
     const mapped = SCALAR_TYPES[concrete[0]!];
-    if (mapped) return { type: mapped, isDowngraded: false };
+    if (mapped) {
+      return { type: mapped, isDowngraded: false };
+    }
   }
+
   // An enum with no type is a string list.
   if (concrete.length === 0 && Array.isArray(property.enum)) {
     return { type: "string", isDowngraded: false };
   }
+
   return { type: "string", isDowngraded: true };
 }
 
@@ -68,9 +72,11 @@ function coerceString(value: unknown): string | undefined {
   if (typeof value === "string") {
     return value.slice(0, MAX_PARAMETER_VALUE_LENGTH);
   }
+
   if (typeof value === "number" || typeof value === "boolean") {
     return String(value);
   }
+
   return undefined;
 }
 
@@ -101,17 +107,25 @@ function optionsOf({
   type: ScenarioParameterType;
   notes: string[];
 }): ScenarioParameterValue[] | undefined {
-  if (!Array.isArray(property.enum)) return undefined;
+  if (!Array.isArray(property.enum)) {
+    return undefined;
+  }
+
   const values = property.enum
     .map((value) => coerceValue(value, type))
     .filter((value): value is ScenarioParameterValue => value !== undefined);
-  if (values.length === 0) return undefined;
+  if (values.length === 0) {
+    return undefined;
+  }
+
   if (values.length > MAX_PARAMETER_OPTIONS) {
     notes.push(
       `"${name}": the option list was cut to the first ${MAX_PARAMETER_OPTIONS} of ${values.length} values`,
     );
+
     return values.slice(0, MAX_PARAMETER_OPTIONS);
   }
+
   return values;
 }
 
@@ -123,6 +137,7 @@ function assertUsableName(name: string): void {
       reason: "it is a turn field the platform sends on every call",
     });
   }
+
   if (!parameterNameSchema.safeParse(name).success) {
     throw new AgentParameterInvalidError({
       name,
@@ -144,6 +159,7 @@ function propertyEntriesOf(schema: Record<string, unknown>): [string, unknown][]
       reason: "the schema must be an object schema with named properties",
     });
   }
+
   const entries = Object.entries((properties ?? {}) as Record<string, unknown>);
   if (entries.length > MAX_SCENARIO_PARAMETER_DEFINITIONS) {
     throw new AgentParameterInvalidError({
@@ -151,6 +167,7 @@ function propertyEntriesOf(schema: Record<string, unknown>): [string, unknown][]
       reason: `an agent can declare at most ${MAX_SCENARIO_PARAMETER_DEFINITIONS} parameters, ${entries.length} were sent`,
     });
   }
+
   return entries;
 }
 
@@ -208,12 +225,14 @@ function normalizeProperty({
       `"${name}": the type ${describeType(property.type)} is not supported and is presented as text`,
     );
   }
+
   const defaultValue = coerceValue(property.default, type);
   const description =
     typeof property.description === "string"
       ? property.description.slice(0, MAX_PARAMETER_DESCRIPTION_LENGTH)
       : undefined;
   const options = optionsOf({ name, property, type, notes });
+
   return {
     name,
     type,
@@ -251,9 +270,13 @@ function shapeFailureReason(rule: unknown): string {
  */
 function assertScenarioShape(parameters: ScenarioParameterDefinition[]): void {
   const parsed = scenarioParameterDefinitionsSchema.safeParse(parameters);
-  if (parsed.success) return;
+  if (parsed.success) {
+    return;
+  }
+
   const issue = parsed.error.issues[0];
   const rule = (issue as { params?: { rule?: unknown } } | undefined)?.params?.rule;
+
   throw new AgentParameterInvalidError({
     name: typeof issue?.path[0] === "number" ? (parameters[issue.path[0]]?.name ?? null) : null,
     reason: shapeFailureReason(rule),
@@ -275,11 +298,18 @@ export function normalizeParameterSchema(schema: Record<string, unknown>): Norma
     normalizeProperty({ name, raw, required: required.has(name), notes }),
   );
   assertScenarioShape(parameters);
+
   return { parameters, notes };
 }
 
 function describeType(declared: unknown): string {
-  if (typeof declared === "string") return `"${declared}"`;
-  if (Array.isArray(declared)) return `"${declared.join(" | ")}"`;
+  if (typeof declared === "string") {
+    return `"${declared}"`;
+  }
+
+  if (Array.isArray(declared)) {
+    return `"${declared.join(" | ")}"`;
+  }
+
   return "of that property";
 }

@@ -42,11 +42,14 @@ export class DefaultAuditLogService extends AuditLogServiceContract {
     value: AuditLogJsonValue,
     maxStringLength: number,
   ): AuditLogJsonValue {
-    if (typeof value === "string")
+    if (typeof value === "string") {
       return DefaultAuditLogService.truncateString(value, maxStringLength);
+    }
+
     if (Array.isArray(value)) {
       return value.map((item) => DefaultAuditLogService.truncateValue(item, maxStringLength));
     }
+
     if (value !== null && typeof value === "object") {
       return Object.fromEntries(
         Object.entries(value).map(([key, item]) => [
@@ -55,15 +58,22 @@ export class DefaultAuditLogService extends AuditLogServiceContract {
         ]),
       );
     }
+
     return value;
   }
 
   private static boundJson(value: AuditLogJsonValue, maxBytes: number): AuditLogJsonValue {
-    if (JSON.stringify(value).length <= maxBytes) return value;
+    if (JSON.stringify(value).length <= maxBytes) {
+      return value;
+    }
+
     for (const length of [2048, 1024, 512, 256, 128]) {
       const candidate = DefaultAuditLogService.truncateValue(value, length);
-      if (JSON.stringify(candidate).length <= maxBytes) return candidate;
+      if (JSON.stringify(candidate).length <= maxBytes) {
+        return candidate;
+      }
     }
+
     return { "...": "[truncated]" };
   }
 }

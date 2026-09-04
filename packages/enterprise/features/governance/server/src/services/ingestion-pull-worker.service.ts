@@ -126,11 +126,13 @@ export class IngestionPullWorkerService {
     if (!source) {
       throw new Error(`IngestionSource ${input.sourceId} not found`);
     }
+
     if (source.status !== "active" && source.status !== "awaiting_first_event") {
       this.diagnostics.info("IngestionSource not active, skipping", {
         ingestionSourceId: source.id,
         status: source.status,
       });
+
       return { nextCursor: input.cursor, eventCount: 0 };
     }
 
@@ -139,10 +141,12 @@ export class IngestionPullWorkerService {
     if (typeof adapterId !== "string") {
       throw new Error("IngestionSource has no pullConfig.adapter");
     }
+
     const adapter = this.registry.tryGet(adapterId);
     if (!adapter) {
       throw new Error(`Unknown ingestion pull adapter: ${adapterId}`);
     }
+
     const validatedConfig = adapter.validateConfig(pullConfig);
 
     let result: PullResult;
@@ -173,6 +177,7 @@ export class IngestionPullWorkerService {
         worker: "ingestionPuller",
         ingestionSourceId: source.id,
       });
+
       throw error;
     }
 
@@ -189,6 +194,7 @@ export class IngestionPullWorkerService {
       });
       await this.routeConversations({ events: result.events, source });
     }
+
     return { nextCursor: result.cursor, eventCount: result.events.length };
   }
 
@@ -197,10 +203,15 @@ export class IngestionPullWorkerService {
     source: GovernanceIngestionSource;
   }): Promise<void> {
     const { source } = input;
-    if (!source.traceProjectId) return;
+    if (!source.traceProjectId) {
+      return;
+    }
 
     const routing = CONVERSATION_ROUTING.get(source.sourceType);
-    if (!routing) return;
+    if (!routing) {
+      return;
+    }
+
     if (!this.traceIngestion) {
       throw new Error("Conversation trace ingestion is not composed");
     }
@@ -214,7 +225,9 @@ export class IngestionPullWorkerService {
         profile: routing.profile,
       },
     });
-    if (!request) return;
+    if (!request) {
+      return;
+    }
 
     const project = await this.projects.tryGetWithTeam(source.traceProjectId);
     const destinationIsLive =
@@ -226,6 +239,7 @@ export class IngestionPullWorkerService {
         "trace destination is archived, deleted, or belongs to another organization",
         { ingestionSourceId: source.id, traceProjectId: source.traceProjectId },
       );
+
       return;
     }
 
@@ -233,9 +247,12 @@ export class IngestionPullWorkerService {
       projectId: project.id,
       request,
     });
-    if (result.ingestionFailures === 0) return;
+    if (result.ingestionFailures === 0) {
+      return;
+    }
 
     const detail = result.ingestionFailureMessage ? `: ${result.ingestionFailureMessage}` : "";
+
     throw new Error(
       `Trace door failed to dispatch ${result.ingestionFailures} span(s) for ingestion source ${source.id}${detail}`,
     );
@@ -284,7 +301,10 @@ export class IngestionPullWorkerService {
           sourceType: input.source.sourceType,
         }),
       );
-      if (!recordCost || !input.pulledUsage) continue;
+      if (!recordCost || !input.pulledUsage) {
+        continue;
+      }
+
       let record: ReturnType<PulledUsageRecordService["tryBuild"]>;
       try {
         record = this.usageRecords.tryBuild({
@@ -313,7 +333,11 @@ export class IngestionPullWorkerService {
         });
         continue;
       }
-      if (!record) continue;
+
+      if (!record) {
+        continue;
+      }
+
       await input.pulledUsage.recordPulledUsage({
         ...record,
         tenantId: project.id,
@@ -355,10 +379,11 @@ export class IngestionPullWorkerService {
           tokens_input: input.event.tokens_input,
           tokens_output: input.event.tokens_output,
           raw_event: input.event.raw_payload,
-          ...(input.event.extra ?? {}),
+          ...input.event.extra,
         },
       },
     });
+
     return {
       tenantId: input.tenantId,
       eventId,

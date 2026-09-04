@@ -46,6 +46,7 @@ export class DefaultGovernanceCliBootstrapService {
       this.budgets.overviewForUser(parsed),
       this.contacts.tryResolveAdminEmail(parsed.organizationId),
     ]);
+
     return {
       tools: catalog.tools,
       providers: catalog.providers.map((provider) => ({
@@ -69,6 +70,7 @@ function collapseOverview(overview: CliBudgetOverview): CliBootstrapResult["budg
   if (!monthly) {
     return { monthlyLimitUsd: null, monthlyUsedUsd: 0, period: "MONTHLY" };
   }
+
   return {
     monthlyLimitUsd: Number.parseFloat(monthly.limitUsd) || 0,
     monthlyUsedUsd: Number.parseFloat(monthly.spentUsd) || 0,

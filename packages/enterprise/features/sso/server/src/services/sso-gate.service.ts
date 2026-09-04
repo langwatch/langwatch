@@ -56,7 +56,9 @@ export class SsoGateService extends SsoGate {
   }
 
   async platformAllowed(): Promise<boolean> {
-    if (this.configuration.isSaas) return true;
+    if (this.configuration.isSaas) {
+      return true;
+    }
 
     if (!this.memoizedGate) {
       this.memoizedGate = this.computeGate()
@@ -68,10 +70,12 @@ export class SsoGateService extends SsoGate {
                 "set LANGWATCH_LICENSE_KEY or activate an organization license to enable SSO",
             );
           }
+
           return allowed;
         })
         .catch((error: unknown) => {
           this.memoizedGate = null;
+
           throw error;
         });
     }
@@ -83,6 +87,7 @@ export class SsoGateService extends SsoGate {
         { error },
         "SSO gate evaluation failed (licensing store unreachable) — denying SSO for this request; will retry on the next request",
       );
+
       return false;
     }
   }
@@ -92,8 +97,13 @@ export class SsoGateService extends SsoGate {
   }
 
   async resolveProvider(): Promise<string> {
-    if (this.configuration.provider === "email") return "email";
-    if (!(await this.platformAllowed())) return "email";
+    if (this.configuration.provider === "email") {
+      return "email";
+    }
+
+    if (!(await this.platformAllowed())) {
+      return "email";
+    }
 
     if (!this.providerIsMounted()) {
       this.logger.warn(
@@ -102,6 +112,7 @@ export class SsoGateService extends SsoGate {
           "starting in email mode; check the provider id against the " +
           "self-hosting SSO docs and that its client credentials are set",
       );
+
       return "email";
     }
 
@@ -131,9 +142,12 @@ export class SsoGateService extends SsoGate {
       for (const inspection of result.inspections) {
         this.logInspection(inspection);
       }
+
       return result.allowed;
     } finally {
-      if (timer) clearTimeout(timer);
+      if (timer) {
+        clearTimeout(timer);
+      }
     }
   }
 
@@ -148,6 +162,7 @@ export class SsoGateService extends SsoGate {
           ? "Inspected a license candidate: could not be parsed (invalid format)"
           : "Inspected a license candidate: signature failed";
       this.logger.info({ ...context, signatureOk: false }, message);
+
       return;
     }
 

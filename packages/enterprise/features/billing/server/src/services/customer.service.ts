@@ -86,6 +86,7 @@ export class CustomerService {
       if (!refreshed.billingCustomerId) {
         throw new CustomerCreationRaceError();
       }
+
       return refreshed.billingCustomerId;
     }
 

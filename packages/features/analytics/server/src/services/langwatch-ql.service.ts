@@ -346,6 +346,7 @@ export class LangWatchQLService {
         },
         "LangWatchQL refused by policy",
       );
+
       throw lwqlValidationError(validation);
     }
 
@@ -376,7 +377,9 @@ export class LangWatchQLService {
       // declares the parameter unsavable.
       .filter((name) => name !== LWQL_PERIOD_GRANULARITY_PARAMETER)
       .sort();
-    if (missing.length > 0) throw new LangWatchQLParameterMissingError(missing);
+    if (missing.length > 0) {
+      throw new LangWatchQLParameterMissingError(missing);
+    }
 
     return {
       ...validation,
@@ -433,6 +436,7 @@ export class LangWatchQLService {
         { projectId: project.id },
         "LangWatchQL query refused: no restricted identity is provisioned",
       );
+
       throw new LangWatchQLUnavailableError();
     }
 
@@ -556,6 +560,7 @@ export function createLangWatchQLService(
   overrides: Partial<LangWatchQLServiceDependencies> = {},
 ): LangWatchQLService {
   const connection = lwqlConnectionFromEnv();
+
   return new LangWatchQLService({
     executor: connection ? createLangWatchQLExecutor(connection) : null,
     database: connection?.database ?? DEFAULT_LWQL_DATABASE,
@@ -593,6 +598,7 @@ let cached: LangWatchQLService | null = null;
 /** The process-wide service, built from the environment on first use. */
 export function getLangWatchQLService(): LangWatchQLService {
   cached ??= createLangWatchQLService();
+
   return cached;
 }
 

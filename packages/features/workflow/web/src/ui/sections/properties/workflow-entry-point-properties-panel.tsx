@@ -79,7 +79,7 @@ export function EntryPointPropertiesPanel({
       const outputs: Field[] = newVariables.map((variable) => {
         const prev = existing.find((f) => f.identifier === variable.identifier);
         return {
-          ...(prev ?? {}),
+          ...prev,
           identifier: variable.identifier,
           type: variable.type as Field["type"],
         };

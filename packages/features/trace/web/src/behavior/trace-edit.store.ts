@@ -928,7 +928,7 @@ function mergeSpanPatches({
 function mergeTraceMetadata(state: TraceEditDraftState): TraceMetadataEdits {
   const base = state.basePatch?.trace?.metadata;
   if (Object.keys(state.traceMetadataDrafts).length === 0) return base;
-  return { ...(base ?? {}), ...state.traceMetadataDrafts };
+  return { ...base, ...state.traceMetadataDrafts };
 }
 
 /** The trace's own corrected input, output and metadata, when any has one. */

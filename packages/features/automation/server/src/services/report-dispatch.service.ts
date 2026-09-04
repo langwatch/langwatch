@@ -113,10 +113,16 @@ export function reportWindowMs({
   } catch {
     return WEEK_MS;
   }
-  if (!previous) return WEEK_MS;
+
+  if (!previous) {
+    return WEEK_MS;
+  }
 
   const span = slot.getTime() - previous.getTime();
-  if (!Number.isFinite(span) || span <= 0) return WEEK_MS;
+  if (!Number.isFinite(span) || span <= 0) {
+    return WEEK_MS;
+  }
+
   return Math.min(Math.max(span, MIN_WINDOW_MS), MAX_WINDOW_MS);
 }
 
@@ -175,6 +181,7 @@ export async function dispatchScheduledReport({
       { triggerId: fire.targetId, projectId: fire.projectId },
       "Report trigger missing/inactive — skipping scheduled fire",
     );
+
     return;
   }
 
@@ -184,11 +191,14 @@ export async function dispatchScheduledReport({
       { triggerId: trigger.id, projectId: fire.projectId },
       "Report trigger actionParams did not parse — skipping",
     );
+
     return;
   }
 
   const project = await deps.loadProject(fire.projectId);
-  if (!project) return;
+  if (!project) {
+    return;
+  }
 
   const params = trigger.actionParams as {
     members?: string[];
@@ -252,13 +262,19 @@ export async function dispatchScheduledReport({
   const deliver = async (): Promise<boolean> => {
     if (trigger.action === "SEND_EMAIL") {
       const recipients = params.members ?? [];
-      if (recipients.length === 0) return false;
+      if (recipients.length === 0) {
+        return false;
+      }
+
       const allowed = await deps.filterSuppressedRecipients({
         projectId: project.id,
         triggerId: trigger.id,
         emails: recipients,
       });
-      if (allowed.length === 0) return false;
+      if (allowed.length === 0) {
+        return false;
+      }
+
       const rendered = await renderTriggerEmail({
         subjectTemplate: trigger.templates.emailSubjectTemplate,
         bodyTemplate: trigger.templates.emailBodyTemplate,
@@ -278,6 +294,7 @@ export async function dispatchScheduledReport({
         isRecipientSent: async () => false,
         recordRecipientSent: async () => {},
       });
+
       return true;
     }
 
@@ -290,7 +307,10 @@ export async function dispatchScheduledReport({
       if (slackDeliveryMethodOf(slackParams) === "bot") {
         const token = deps.slackProvider.tryDecrypt(slackParams);
         const channel = slackParams.slackChannelId?.trim();
-        if (!token || !channel) return false;
+        if (!token || !channel) {
+          return false;
+        }
+
         const rendered = await renderTriggerSlack({
           templateType,
           template: trigger.templates.slackTemplate,
@@ -304,11 +324,15 @@ export async function dispatchScheduledReport({
           payload: rendered.payload,
           triggerName: trigger.name,
         });
+
         return true;
       }
 
       const webhook = params.slackWebhook ?? null;
-      if (!webhook) return false;
+      if (!webhook) {
+        return false;
+      }
+
       const rendered = await renderTriggerSlack({
         templateType,
         template: trigger.templates.slackTemplate,
@@ -320,6 +344,7 @@ export async function dispatchScheduledReport({
         triggerName: trigger.name,
         payload: rendered.payload,
       });
+
       return true;
     }
 
@@ -327,10 +352,13 @@ export async function dispatchScheduledReport({
       { triggerId: trigger.id, action: trigger.action },
       "Report trigger action is not a notify channel — skipping",
     );
+
     return false;
   };
 
-  if (!(await deliver())) return;
+  if (!(await deliver())) {
+    return;
+  }
 
   // The report went out — record it, so the automations page can show when it
   // last sent and what it has been doing. Best-effort: a bookkeeping failure

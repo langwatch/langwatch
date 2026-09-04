@@ -133,6 +133,7 @@ export class ModelProviderQueryService {
     );
 
     candidates.sort((left, right) => this.compareProjectProviders(left, right, chain));
+
     return candidates[0] ?? null;
   }
 
@@ -275,9 +276,11 @@ export class ModelProviderQueryService {
       if (scope.scopeType === "PROJECT") {
         specificity = Math.max(specificity, 3);
       }
+
       if (scope.scopeType === "TEAM") {
         specificity = Math.max(specificity, 2);
       }
+
       if (scope.scopeType === "ORGANIZATION") {
         specificity = Math.max(specificity, 1);
       }

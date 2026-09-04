@@ -33,8 +33,11 @@ function summarizeErrorShapes(messages: string[]): string[] {
   for (const message of messages) {
     const named = /^([A-Za-z][A-Za-z0-9_]*(?:Error|Exception))\b/.exec(message);
     shapes.add(named?.[1]?.slice(0, 80) ?? UNTYPED_ERROR_SHAPE);
-    if (shapes.size >= 5) break;
+    if (shapes.size >= 5) {
+      break;
+    }
   }
+
   return [...shapes];
 }
 
@@ -54,6 +57,7 @@ export class QueueService {
   async getQueues(): Promise<QueueSummaryInfo[]> {
     const queueNames = await this.repository.discoverQueueNames();
     const queues = await this.repository.scanQueues({ queueNames });
+
     return queues.map(({ groups: _groups, ...summary }) => summary);
   }
 
@@ -98,7 +102,9 @@ export class QueueService {
       queueNames: [params.queueName],
     });
     const queue = queues[0];
-    if (!queue) return null;
+    if (!queue) {
+      return null;
+    }
 
     return queue.groups.find((g) => g.groupId === params.groupId) ?? null;
   }
@@ -115,6 +121,7 @@ export class QueueService {
     pageSize: number;
   }> {
     const result = await this.repository.getGroupJobs(params);
+
     return {
       ...result,
       page: params.page,
@@ -124,6 +131,7 @@ export class QueueService {
 
   async getBlockedSummary(): Promise<BlockedSummary> {
     const queueNames = await this.repository.discoverQueueNames();
+
     return this.repository.getBlockedSummary({ queueNames });
   }
 
@@ -143,6 +151,7 @@ export class QueueService {
     pageSize: number;
   }> {
     const result = await this.repository.listParkedGroups(params);
+
     return { ...result, page: params.page, pageSize: params.pageSize };
   }
 
@@ -183,6 +192,7 @@ export class QueueService {
     }
 
     allGroups.sort((a, b) => (b.movedAt ?? 0) - (a.movedAt ?? 0));
+
     return allGroups;
   }
 
@@ -204,6 +214,7 @@ export class QueueService {
         metadata: { groupId: params.groupId, ...result },
       });
     }
+
     return result;
   }
 
@@ -221,6 +232,7 @@ export class QueueService {
         metadata: { ...result },
       });
     }
+
     return result;
   }
 
@@ -241,6 +253,7 @@ export class QueueService {
         metadata: { groupId: params.groupId, ...result },
       });
     }
+
     return result;
   }
 
@@ -299,6 +312,7 @@ export class QueueService {
         },
       });
     }
+
     return result;
   }
 
@@ -317,6 +331,7 @@ export class QueueService {
         metadata: { groupId: params.groupId, ...result },
       });
     }
+
     return result;
   }
 
@@ -340,6 +355,7 @@ export class QueueService {
         },
       });
     }
+
     return result;
   }
 
@@ -382,6 +398,7 @@ export class QueueService {
         },
       });
     }
+
     return result;
   }
 
@@ -414,6 +431,7 @@ export class QueueService {
         },
       });
     }
+
     return result;
   }
 

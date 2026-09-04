@@ -96,6 +96,7 @@ export class CodingAgentFeatureService extends CodingAgentServiceContract {
       projects: options.projects,
       clock: options.clock,
     });
+
     return new CodingAgentFeatureService({
       sessionReads,
       pullRequestReads,

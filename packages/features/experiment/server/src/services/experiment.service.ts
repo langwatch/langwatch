@@ -114,14 +114,20 @@ export class ExperimentService extends ExperimentServiceContract {
   async getById(input: ExperimentLookup): Promise<Experiment> {
     const lookup = experimentLookupSchema.parse(input);
     const experiment = await this.options.repository.tryFindById(lookup);
-    if (!experiment) throw new ExperimentNotFoundError(lookup.id);
+    if (!experiment) {
+      throw new ExperimentNotFoundError(lookup.id);
+    }
+
     return experiment;
   }
 
   async getBySlug(input: ExperimentSlugLookup): Promise<Experiment> {
     const lookup = experimentSlugLookupSchema.parse(input);
     const experiment = await this.options.repository.tryFindBySlug(lookup);
-    if (!experiment) throw new ExperimentNotFoundError(lookup.slug);
+    if (!experiment) {
+      throw new ExperimentNotFoundError(lookup.slug);
+    }
+
     return experiment;
   }
 
@@ -141,6 +147,7 @@ export class ExperimentService extends ExperimentServiceContract {
     input: ExperimentSlugLookup & { type: ExperimentType },
   ): Promise<Experiment | null> {
     const lookup = experimentSlugLookupSchema.parse(input);
+
     return this.options.repository.tryFindBySlug({
       ...lookup,
       type: input.type,
@@ -162,6 +169,7 @@ export class ExperimentService extends ExperimentServiceContract {
       }),
       this.options.repository.count({ projectId: query.projectId }),
     ]);
+
     return { experiments, totalHits };
   }
 
@@ -180,7 +188,9 @@ export class ExperimentService extends ExperimentServiceContract {
   async save(input: SaveExperimentInput): Promise<Experiment> {
     const command = saveExperimentInputSchema.parse(input);
     const state = await this.options.repository.tryGetRowState(command);
-    if (state?.archived) throw new ExperimentNotFoundError(command.id);
+    if (state?.archived) {
+      throw new ExperimentNotFoundError(command.id);
+    }
 
     const slug =
       command.slugMode === "preserve-existing" && state
@@ -197,12 +207,17 @@ export class ExperimentService extends ExperimentServiceContract {
       if (error instanceof ArchivedExperimentWriteError) {
         throw new ExperimentNotFoundError(command.id, { reasons: [error] });
       }
-      if (!PostgresUniqueConflict.matches(error)) throw error;
+
+      if (!PostgresUniqueConflict.matches(error)) {
+        throw error;
+      }
+
       const retrySlug = await this.slugs.generateUnique({
         baseSlug: command.requestedSlug,
         projectId: command.projectId,
         excludeExperimentId: command.id,
       });
+
       return this.options.repository.saveActive({
         ...command,
         slug: retrySlug,
@@ -221,6 +236,7 @@ export class ExperimentService extends ExperimentServiceContract {
         id: existing.id,
         workbenchState: command.workbenchState,
       });
+
       return { id: existing.id, slug: existing.slug };
     }
 
@@ -234,6 +250,7 @@ export class ExperimentService extends ExperimentServiceContract {
       workflowId: command.workflowId,
       workbenchState: command.workbenchState,
     });
+
     return { id: experiment.id, slug: experiment.slug };
   }
 
@@ -247,16 +264,22 @@ export class ExperimentService extends ExperimentServiceContract {
     const maximum = index + 1_000;
     while (index < maximum) {
       const name = `Draft Evaluation (${index})`;
-      if (!slugs.has(this.options.slugify(name))) return name;
+      if (!slugs.has(this.options.slugify(name))) {
+        return name;
+      }
+
       index += 1;
     }
+
     return `Draft Evaluation (${this.options.newId()})`;
   }
 
   async archive(input: ExperimentLookup): Promise<{ success: true }> {
     const command = experimentLookupSchema.parse(input);
     const state = await this.options.repository.tryGetRowState(command);
-    if (!state) throw new ExperimentNotFoundError(command.id);
+    if (!state) {
+      throw new ExperimentNotFoundError(command.id);
+    }
 
     await this.options.repository.archiveActive({
       ...command,
@@ -291,6 +314,7 @@ export class ExperimentService extends ExperimentServiceContract {
     const values = await this.options.dspyRepository.list(
       experimentDspyStepsLookupSchema.parse(input),
     );
+
     return values.map((value) => experimentDspyStepSummarySchema.parse(value));
   }
 
@@ -313,6 +337,7 @@ export class ExperimentService extends ExperimentServiceContract {
 
     return Array.from(stepsByRun, ([runId, runSteps]) => {
       const versionId = runSteps.find((step) => step.workflowVersionId)?.workflowVersionId;
+
       return {
         runId,
         workflow_version: versionId ? versions[versionId] : void 0,
@@ -344,6 +369,7 @@ export class ExperimentService extends ExperimentServiceContract {
         `${lookup.tenantId}/${lookup.experimentId}/${lookup.runId}/${lookup.stepIndex}`,
       );
     }
+
     return experimentDspyStepSchema.parse(value);
   }
 
@@ -403,13 +429,17 @@ export class ExperimentService extends ExperimentServiceContract {
       projectId: query.projectId,
       slug: query.experimentSlug,
     });
-    if (!experiment) throw new ExperimentNotFoundError(query.experimentSlug);
+    if (!experiment) {
+      throw new ExperimentNotFoundError(query.experimentSlug);
+    }
+
     const page = await this.getRunsPage({
       projectId: query.projectId,
       experimentId: experiment.id,
       page: query.page,
       pageSize: query.pageSize,
     });
+
     return { experiment, ...page };
   }
 }

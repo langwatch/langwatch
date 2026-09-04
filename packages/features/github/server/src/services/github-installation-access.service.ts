@@ -139,6 +139,7 @@ export class GithubInstallationAccessService {
 
   private async usableInstallations(organizationId: string): Promise<GithubInstallationRow[]> {
     const installations = await this.repository.findAllForOrganization(organizationId);
+
     return installations.filter((installation) => !installation.suspendedAt);
   }
 
@@ -154,6 +155,7 @@ export class GithubInstallationAccessService {
       }
 
       logger.warn({ error, installationId }, "failed to list installation repos");
+
       return [];
     }
   }
@@ -175,6 +177,7 @@ export class GithubInstallationAccessService {
       if (outcome.token) {
         return outcome.token;
       }
+
       if (!outcome.wasDeadInstallation) {
         return null;
       }
@@ -193,6 +196,7 @@ export class GithubInstallationAccessService {
       if (outcome.token) {
         return outcome.token;
       }
+
       if (!outcome.wasDeadInstallation) {
         return null;
       }
@@ -224,6 +228,7 @@ export class GithubInstallationAccessService {
     } catch (error) {
       if (error instanceof GithubInstallationNotFoundError) {
         await this.markInstallationDead(input.installationId);
+
         return { token: null, wasDeadInstallation: true };
       }
 
@@ -231,6 +236,7 @@ export class GithubInstallationAccessService {
         { error, installationId: input.installationId },
         "failed to mint installation token",
       );
+
       return { token: null, wasDeadInstallation: false };
     }
   }
@@ -241,6 +247,7 @@ export class GithubInstallationAccessService {
   ): Promise<RepositoryResolution> {
     try {
       const repoId = await this.resolveRepositoryId(installation, repositoryFullName);
+
       return { repoId, wasDeadInstallation: false };
     } catch (error) {
       if (!(error instanceof GithubInstallationNotFoundError)) {
@@ -248,6 +255,7 @@ export class GithubInstallationAccessService {
       }
 
       await this.markInstallationDead(installation.installationId);
+
       return { repoId: null, wasDeadInstallation: true };
     }
   }
@@ -268,6 +276,7 @@ export class GithubInstallationAccessService {
       const repositories = await this.appTokens.listInstallationRepositories(
         installation.installationId,
       );
+
       return (
         repositories.find((repository) => repository.fullName.toLowerCase() === wanted)?.id ?? null
       );
@@ -284,6 +293,7 @@ export class GithubInstallationAccessService {
         },
         "failed to resolve repository id",
       );
+
       return null;
     }
   }

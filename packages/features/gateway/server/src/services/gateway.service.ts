@@ -73,17 +73,20 @@ export class GatewayService extends GatewayServiceContract {
   async checkBudget(input: GatewayBudgetCheckInput): Promise<GatewayBudgetCheckResult> {
     const parsed = gatewayBudgetCheckInputSchema.parse(input);
     const tenantIds = await this.listSpendTenantIds(parsed.organizationId);
+
     return this.repository.check({ ...parsed, tenantIds });
   }
 
   /** Compatibility name retained while callers migrate to checkBudget. */
   async check(input: BudgetCheckInput): Promise<BudgetCheckResult> {
     const tenantIds = await this.listSpendTenantIds(input.organizationId);
+
     return this.repository.check({ ...input, tenantIds });
   }
 
   async list(organizationId: string): Promise<GatewayBudgetWithSeats[]> {
     const tenantIds = await this.listSpendTenantIds(organizationId);
+
     return this.repository.list({ organizationId, tenantIds });
   }
 
@@ -94,6 +97,7 @@ export class GatewayService extends GatewayServiceContract {
     }
 
     const tenantIds = await this.listSpendTenantIds(project.team.organizationId);
+
     return this.repository.listForProject({
       organizationId: project.team.organizationId,
       teamId: project.teamId,
@@ -105,12 +109,14 @@ export class GatewayService extends GatewayServiceContract {
   async listWithHealth(organizationId: string): Promise<BudgetListWithHealth> {
     const tenantIds = await this.listSpendTenantIds(organizationId);
     const result = await this.repository.listWithHealth({ organizationId, tenantIds });
+
     return this.withScopeReach(result, organizationId);
   }
 
   async listPageWithHealth(input: GatewayBudgetPageInput): Promise<BudgetListWithHealth> {
     const tenantIds = await this.listSpendTenantIds(input.organizationId);
     const result = await this.repository.listPageWithHealth({ ...input, tenantIds });
+
     return this.withScopeReach(result, input.organizationId);
   }
 
@@ -132,6 +138,7 @@ export class GatewayService extends GatewayServiceContract {
       projectId: project.id,
       tenantIds,
     });
+
     return this.withScopeReach(result, project.team.organizationId);
   }
 
@@ -143,6 +150,7 @@ export class GatewayService extends GatewayServiceContract {
     organizationId: string;
   }): Promise<GatewayBudgetWithSeats | null> {
     const tenantIds = await this.listSpendTenantIds(organizationId);
+
     return this.repository.tryGet({ id, organizationId, tenantIds });
   }
 
@@ -167,6 +175,7 @@ export class GatewayService extends GatewayServiceContract {
       organizationId,
       scope: { scopeType: result.budget.scopeType, scopeId: result.budget.scopeId },
     });
+
     return { ...result, unreachableByAnyKey: !scopeReach.reachable };
   }
 
@@ -185,6 +194,7 @@ export class GatewayService extends GatewayServiceContract {
 
     const targets = await this.resolveScopeTargets([detail.budget], organizationId);
     const target = targets.get(`${detail.budget.scopeType}:${detail.budget.scopeId}`);
+
     return target ? { ...detail, scopeTarget: target } : detail;
   }
 
@@ -194,6 +204,7 @@ export class GatewayService extends GatewayServiceContract {
       candidate.traceProjectId ? [candidate.traceProjectId] : [],
     );
     const traceProjects = await this.projects.listTraceDestinations(projectIds);
+
     return this.reachPolicy.resolveScope({
       candidates,
       traceProjects,
@@ -205,6 +216,7 @@ export class GatewayService extends GatewayServiceContract {
     const parsed = createGatewayBudgetInputSchema.parse(input);
     await this.assertProjectScopesBelongToOrganization(parsed);
     await this.assertScopeIsReachable(parsed);
+
     return this.repository.create(parsed);
   }
 
@@ -243,6 +255,7 @@ export class GatewayService extends GatewayServiceContract {
         ...new Set([...projectIds, ...virtualKeyProjectScopes.map((scope) => scope.projectId)]),
       ],
     });
+
     return this.repository.resolveScopeTargets(
       budgets,
       organizationId,
@@ -327,6 +340,7 @@ export class GatewayService extends GatewayServiceContract {
         guardrailIds: attachment.guardrailIds.filter((id) => availableGuardrailIds.has(id)),
       }))
       .filter((attachment) => attachment.guardrailIds.length > 0);
+
     return { cacheRules, guardrails, attachments };
   }
 
@@ -344,6 +358,7 @@ export class GatewayService extends GatewayServiceContract {
       traceProjects,
       budgets: result.budgets,
     });
+
     return { ...result, scopeReach };
   }
 
@@ -364,6 +379,7 @@ export class GatewayService extends GatewayServiceContract {
     }
 
     const scopeType = kind === "TEAM" ? "team" : kind === "PROJECT" ? "project" : "group";
+
     throw new GatewayBudgetScopeUnreachableError({
       scopeType,
       reachableProjectIds: reach.reachableProjectIds,

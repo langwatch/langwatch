@@ -42,6 +42,7 @@ export class IngestionTemplateService {
 
   async listForUser(input: { organizationId: string }): Promise<IngestionTemplate[]> {
     const templates = await this.repository.listUserVisible(input.organizationId);
+
     return templates.map((template) => ({ ...template, ottlRules: "" }));
   }
 
@@ -58,7 +59,10 @@ export class IngestionTemplateService {
 
   async getByIdForOrg(input: { id: string; organizationId: string }): Promise<IngestionTemplate> {
     const template = await this.repository.tryFindVisible(input);
-    if (!template) throw new TemplateNotFoundError(input.id);
+    if (!template) {
+      throw new TemplateNotFoundError(input.id);
+    }
+
     return template;
   }
 
@@ -67,6 +71,7 @@ export class IngestionTemplateService {
     if (!ingestionTemplateSourceTypeSchema.safeParse(parsed.sourceType).success) {
       throw new InvalidSourceTypeError();
     }
+
     return this.repository.createWithAudit({
       template: {
         organizationId: parsed.organizationId,
@@ -92,9 +97,11 @@ export class IngestionTemplateService {
     if (result.status === "platform") {
       throw new PlatformTemplateImmutableError();
     }
+
     if (result.status === "not_found") {
       throw new TemplateNotFoundError(parsed.id);
     }
+
     return result.template;
   }
 
@@ -108,6 +115,7 @@ export class IngestionTemplateService {
     if (result.status === "platform") {
       throw new PlatformTemplateImmutableError();
     }
+
     if (result.status === "not_found") {
       throw new TemplateNotFoundError(parsed.id);
     }
@@ -116,7 +124,10 @@ export class IngestionTemplateService {
   async cloneFromPlatform(input: CloneIngestionTemplateInput): Promise<IngestionTemplate> {
     const parsed = cloneIngestionTemplateInputSchema.parse(input);
     const source = await this.repository.tryFindPlatform(parsed.sourceTemplateId);
-    if (!source) throw new TemplateNotFoundError(parsed.sourceTemplateId);
+    if (!source) {
+      throw new TemplateNotFoundError(parsed.sourceTemplateId);
+    }
+
     return this.createOrgTemplate({
       organizationId: parsed.organizationId,
       callerUserId: parsed.callerUserId,
@@ -144,6 +155,7 @@ export class IngestionTemplateService {
       .replace(/[^a-z0-9]+/g, "_")
       .replace(/^_+|_+$/g, "")
       .slice(0, 32);
+
     return `${base || "custom"}_${this.newSlugSuffix()}`;
   }
 }

@@ -81,6 +81,7 @@ export class LangyFinalPartsService {
     const call = this.cliEnvelope.normalizeToolFrame({
       frame: { ...rawCall, phase: "end" },
     });
+
     return langyMessagePartSchema.parse({
       type: `tool-${call.name}`,
       toolCallId: call.id,
@@ -119,12 +120,14 @@ export class LangyFinalPartsService {
           recorded.add(call.id);
           parts.push(this.toolPart(call));
         }
+
         continue;
       }
 
       if ((endedOnParagraph && index === order.length - 1) || segment.text.trim() === "") {
         continue;
       }
+
       hasProse = true;
       parts.push(...this.assistantTextParts(segment.text, countBlock));
     }
@@ -134,6 +137,7 @@ export class LangyFinalPartsService {
     if (endedOnParagraph || !hasProse) {
       parts.push(...this.assistantTextParts(text, countBlock));
     }
+
     return parts;
   }
 
@@ -172,6 +176,7 @@ export class LangyFinalPartsService {
         parts.push({ type: "text", text: segment.text, role: "assistant" });
         continue;
       }
+
       ordinal += 1;
       const parsed = salvageLangyDerivedCard(segment.raw);
       if (parsed.ok) {
@@ -188,6 +193,7 @@ export class LangyFinalPartsService {
         );
         continue;
       }
+
       countBlock(parsed.reason);
       parts.push({
         type: LANGY_CARD_FAILED_PART_TYPE,
@@ -195,6 +201,7 @@ export class LangyFinalPartsService {
         raw: segment.raw,
       });
     }
+
     return parts;
   }
 }

@@ -31,9 +31,17 @@ export function ensureUserSyncedToCio({
   hasOrganization: boolean;
 }): void {
   const nurturing = tryNurturingSink();
-  if (!nurturing) return;
-  if (!hasOrganization) return;
-  if (syncedUserIds.has(userId)) return;
+  if (!nurturing) {
+    return;
+  }
+
+  if (!hasOrganization) {
+    return;
+  }
+
+  if (syncedUserIds.has(userId)) {
+    return;
+  }
 
   // Optimistic: mark as synced BEFORE async work to prevent concurrent
   // logins from both triggering a full sync. Removed on failure so the
@@ -52,9 +60,14 @@ export function ensureUserSyncedToCio({
  */
 async function performFullSync({ userId }: { userId: string }): Promise<void> {
   const nurturing = tryNurturingSink();
-  if (!nurturing) return;
+  if (!nurturing) {
+    return;
+  }
+
   const database = tryNurturingDatabase();
-  if (!database) return;
+  if (!database) {
+    return;
+  }
 
   const [user, orgUser] = await Promise.all([
     database.user.findUnique({
@@ -67,7 +80,9 @@ async function performFullSync({ userId }: { userId: string }): Promise<void> {
     }),
   ]);
 
-  if (!user || !orgUser) return;
+  if (!user || !orgUser) {
+    return;
+  }
 
   const [org, projects, activeSubscription] = await Promise.all([
     database.organization.findUnique({
@@ -91,7 +106,9 @@ async function performFullSync({ userId }: { userId: string }): Promise<void> {
     }),
   ]);
 
-  if (!org) return;
+  if (!org) {
+    return;
+  }
 
   const signupData = (org.signupData ?? {}) as Record<string, unknown>;
   const hasTraces = projects.some((p) => p.firstMessage);

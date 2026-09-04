@@ -79,7 +79,10 @@ export class ExperimentCellPlanService {
     state: Pick<EvaluationsV3State, "datasets" | "activeDatasetId">,
   ): string {
     const activeId = state.activeDatasetId;
-    if (activeId && state.datasets.some((d) => d.id === activeId)) return activeId;
+    if (activeId && state.datasets.some((d) => d.id === activeId)) {
+      return activeId;
+    }
+
     return state.datasets[0]?.id ?? activeId ?? "dataset-1";
   }
 
@@ -102,12 +105,16 @@ export class ExperimentCellPlanService {
     // A comparison evaluator needs every variant's output, not one target's,
     // so it is not attached here (see the comparison-skip block below) — it
     // would otherwise silently receive an empty input object.
-    if (!targetConfig || !evaluatorConfig || isComparisonEvaluator(evaluatorConfig)) return cells;
+    if (!targetConfig || !evaluatorConfig || isComparisonEvaluator(evaluatorConfig)) {
+      return cells;
+    }
 
     for (const [rowIndexStr, targetOutput] of Object.entries(scope.precomputedTargetOutputs)) {
       const rowIndex = Number(rowIndexStr);
       const datasetEntry = datasetRows[rowIndex];
-      if (!datasetEntry) continue;
+      if (!datasetEntry) {
+        continue;
+      }
 
       cells.push({
         rowIndex,
@@ -120,6 +127,7 @@ export class ExperimentCellPlanService {
         traceId: scope.traceIds[rowIndex],
       });
     }
+
     return cells;
   }
 
@@ -159,6 +167,7 @@ export class ExperimentCellPlanService {
         traceId: scope.traceId,
       });
     }
+
     return cells;
   }
 
@@ -170,9 +179,15 @@ export class ExperimentCellPlanService {
   private scopedTargetIds({ state, scope }: { state: PlanState; scope: ExecutionScope }): string[] {
     const expandComparisonDeps = (id: string): string[] => {
       const t = state.targets.find((tg: TargetConfig) => tg.id === id);
-      if (t?.type !== "evaluator") return [id];
+      if (t?.type !== "evaluator") {
+        return [id];
+      }
+
       const deps = (toComparisonConfig(t)?.variants ?? []).filter((v): v is string => !!v);
-      if (deps.length === 0) return [id];
+      if (deps.length === 0) {
+        return [id];
+      }
+
       return Array.from(new Set([...deps, id]));
     };
 
@@ -207,6 +222,7 @@ export class ExperimentCellPlanService {
     if (scope.type === "evaluator-all-rows") {
       return this.cellsForEvaluatorAllRowsScope({ state, datasetRows, scope, datasetId });
     }
+
     if (scope.type === "evaluator") {
       return this.cellsForEvaluatorScope({ state, datasetRows, scope, datasetId });
     }
@@ -237,7 +253,9 @@ export class ExperimentCellPlanService {
 
     for (const rowIndex of rowIndices) {
       const datasetEntry = datasetRows[rowIndex];
-      if (!datasetEntry) continue;
+      if (!datasetEntry) {
+        continue;
+      }
 
       if (isRowEmpty(datasetEntry)) {
         logger.debug({ rowIndex }, "Skipping empty row");
@@ -250,12 +268,16 @@ export class ExperimentCellPlanService {
         }
 
         const targetConfig = state.targets.find((t: TargetConfig) => t.id === targetId);
-        if (!targetConfig) continue;
+        if (!targetConfig) {
+          continue;
+        }
 
         // Column-style comparison targets (pairwise #5100, N-way #5101) are
         // skipped in Phase 1 — they need every variant's output, not yet
         // available per-target. Picked up by generateComparisonCells (Phase 2).
-        if (targetConfig.type === "evaluator" && isComparisonEvaluator(targetConfig)) continue;
+        if (targetConfig.type === "evaluator" && isComparisonEvaluator(targetConfig)) {
+          continue;
+        }
 
         cells.push({
           rowIndex,

@@ -172,7 +172,7 @@ export function useDrawer() {
       options: { replace?: boolean; resetStack?: boolean } = {},
     ) => {
       const { urlParams, ...rest } = props ?? {};
-      const params: Record<string, unknown> = { ...rest, ...(urlParams ?? {}) };
+      const params: Record<string, unknown> = { ...rest, ...urlParams };
       const openNow = router.query["drawer.open"];
 
       if (openNow === drawer) {

@@ -30,6 +30,7 @@ export class BugReportInboxService {
       this.reports.findAll(input),
       this.reports.count({ search: input.search }),
     ]);
+
     return { reports, total };
   }
 

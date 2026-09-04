@@ -314,6 +314,7 @@ export class VirtualKeyService {
       organizationId: input.organizationId,
       ids: [...input.virtualKeyIds],
     });
+
     return rows.map((row) => ({ id: row.id, name: row.name }));
   }
 
@@ -324,7 +325,10 @@ export class VirtualKeyService {
    */
   async getById(id: string, organizationId: string): Promise<VirtualKeyWithScopes | null> {
     const vk = await this.repository.tryFindById({ id, organizationId });
-    if (!vk || isProductManaged(vk)) return null;
+    if (!vk || isProductManaged(vk)) {
+      return null;
+    }
+
     return vk;
   }
 
@@ -345,9 +349,10 @@ export class VirtualKeyService {
         message: "At least one scope is required",
       });
     }
+
     const config = virtualKeyConfigSchema.parse({
       ...defaultVirtualKeyConfig(),
-      ...(input.config ?? {}),
+      ...input.config,
     });
     const secret = VirtualKeyCryptoAdapter.mintSecret();
     const { displayPrefix } = VirtualKeyCryptoAdapter.parseSecret(secret);
@@ -356,6 +361,7 @@ export class VirtualKeyService {
     if (input.routingPolicyId) {
       await this.assertRoutingPolicyBelongsToOrg(input.routingPolicyId, input.organizationId);
     }
+
     const routingMode = resolveRoutingMode(input.routingMode, input.routingPolicyId ?? null);
     assertProvidersAllowedShape(input.config?.providersAllowed);
     assertExpiryInFuture({ expiresAt: input.expiresAt });
@@ -406,6 +412,7 @@ export class VirtualKeyService {
             tx,
           );
         }
+
         await this.changeEvents.append(
           {
             organizationId: input.organizationId,
@@ -426,6 +433,7 @@ export class VirtualKeyService {
           },
           tx,
         );
+
         return vk;
       })
       // The unique index is what actually decides whether the external id was
@@ -439,6 +447,7 @@ export class VirtualKeyService {
       virtualKey: created,
       action: "created",
     });
+
     return { virtualKey: created, secret };
   }
 
@@ -468,6 +477,7 @@ export class VirtualKeyService {
     if (input.routingPolicyId) {
       await this.assertRoutingPolicyBelongsToOrg(input.routingPolicyId, input.organizationId);
     }
+
     const nextRoutingPolicyId =
       input.routingPolicyId !== undefined
         ? input.routingPolicyId
@@ -496,6 +506,7 @@ export class VirtualKeyService {
               message: "At least one scope is required",
             });
           }
+
           await this.repository.replaceScopes(input.id, input.scopes, tx);
         }
 
@@ -586,6 +597,7 @@ export class VirtualKeyService {
             tx,
           );
         }
+
         for (const d of guardrailDelta.detached) {
           await this.auditLog.append(
             {
@@ -600,6 +612,7 @@ export class VirtualKeyService {
             tx,
           );
         }
+
         return vk;
       })
       .catch((error: unknown) =>
@@ -617,6 +630,7 @@ export class VirtualKeyService {
         message: "Cannot rotate a revoked virtual key",
       });
     }
+
     const before = serialiseForAudit(existing);
     const newSecret = VirtualKeyCryptoAdapter.mintSecret();
     const { displayPrefix: newDisplayPrefix } = VirtualKeyCryptoAdapter.parseSecret(newSecret);
@@ -656,6 +670,7 @@ export class VirtualKeyService {
         },
         tx,
       );
+
       return vk;
     });
 
@@ -663,12 +678,16 @@ export class VirtualKeyService {
       virtualKey: rotated,
       action: "rotated",
     });
+
     return { virtualKey: rotated, secret: newSecret };
   }
 
   async revoke(input: RevokeVirtualKeyInput): Promise<VirtualKeyWithScopes> {
     const existing = await this.requireOwn(input.id, input.organizationId);
-    if (existing.status === "REVOKED") return existing;
+    if (existing.status === "REVOKED") {
+      return existing;
+    }
+
     const before = serialiseForAudit(existing);
 
     return this.prisma
@@ -713,6 +732,7 @@ export class VirtualKeyService {
           },
           tx,
         );
+
         return vk;
       })
       .then(async (vk) => {
@@ -720,6 +740,7 @@ export class VirtualKeyService {
           virtualKey: vk,
           action: "revoked",
         });
+
         return vk;
       });
   }
@@ -738,14 +759,19 @@ export class VirtualKeyService {
     reason?: string | null;
   }): Promise<VirtualKeyWithScopes> {
     const existing = await this.requireOwn(input.id, input.organizationId);
-    if (existing.status === "DISABLED") return existing;
+    if (existing.status === "DISABLED") {
+      return existing;
+    }
+
     if (existing.status === "REVOKED") {
       throw new TRPCError({
         code: "BAD_REQUEST",
         message: "A revoked key cannot be disabled; revocation is terminal.",
       });
     }
+
     const before = serialiseForAudit(existing);
+
     return this.prisma
       .$transaction(async (tx) => {
         const vk = await this.repository.setDisabled(
@@ -778,6 +804,7 @@ export class VirtualKeyService {
           },
           tx,
         );
+
         return vk;
       })
       .then(async (vk) => {
@@ -786,6 +813,7 @@ export class VirtualKeyService {
           action: "disabled",
           reason: input.reason ?? null,
         });
+
         return vk;
       });
   }
@@ -797,14 +825,19 @@ export class VirtualKeyService {
     actorUserId: string;
   }): Promise<VirtualKeyWithScopes> {
     const existing = await this.requireOwn(input.id, input.organizationId);
-    if (existing.status === "ACTIVE") return existing;
+    if (existing.status === "ACTIVE") {
+      return existing;
+    }
+
     if (existing.status === "REVOKED") {
       throw new TRPCError({
         code: "BAD_REQUEST",
         message: "A revoked key cannot be enabled; mint a new key instead.",
       });
     }
+
     const before = serialiseForAudit(existing);
+
     return this.prisma
       .$transaction(async (tx) => {
         const vk = await this.repository.setDisabled(
@@ -837,6 +870,7 @@ export class VirtualKeyService {
           },
           tx,
         );
+
         return vk;
       })
       .then(async (vk) => {
@@ -844,6 +878,7 @@ export class VirtualKeyService {
           virtualKey: vk,
           action: "enabled",
         });
+
         return vk;
       });
   }
@@ -866,6 +901,7 @@ export class VirtualKeyService {
         message: "Virtual key not found",
       });
     }
+
     return existing;
   }
 
@@ -953,6 +989,7 @@ export class VirtualKeyService {
       },
       tx,
     );
+
     return row;
   }
 
@@ -1116,6 +1153,7 @@ export class VirtualKeyService {
     if (input.traceProjectId === undefined && existing.traceProjectId) {
       return existing.traceProjectId;
     }
+
     return this.resolveStoredTraceDestination({
       organizationId: input.organizationId,
       scopes: input.scopes ?? existing.scopes,
@@ -1137,7 +1175,10 @@ export class VirtualKeyService {
     providersAllowed: string[] | null,
     tx: Prisma.TransactionClient,
   ): Promise<void> {
-    if (!providersAllowed) return;
+    if (!providersAllowed) {
+      return;
+    }
+
     const reachable = await scopeReachableModelProvidersForVk(this.prisma, vk, tx);
     const reachableIds = new Set(reachable.map((mp) => mp.id));
     const unreachable = providersAllowed.filter((id) => !reachableIds.has(id));
@@ -1163,6 +1204,7 @@ export class VirtualKeyService {
         message: `Routing policy ${routingPolicyId} not found`,
       });
     }
+
     if (policy.organizationId !== organizationId) {
       throw new TRPCError({
         code: "FORBIDDEN",
@@ -1194,12 +1236,14 @@ function resolveRoutingMode(
       message: "routing_policy_required: routingMode POLICY needs a routingPolicyId",
     });
   }
+
   if (mode !== "POLICY" && routingPolicyId) {
     throw new TRPCError({
       code: "BAD_REQUEST",
       message: `routing_policy_conflict: routingMode ${mode} cannot carry a routingPolicyId`,
     });
   }
+
   return mode;
 }
 
@@ -1209,7 +1253,10 @@ function resolveRoutingMode(
  * nothing, which is always a mis-click rather than an intent.
  */
 function assertProvidersAllowedShape(providersAllowed: string[] | null | undefined): void {
-  if (providersAllowed === undefined || providersAllowed === null) return;
+  if (providersAllowed === undefined || providersAllowed === null) {
+    return;
+  }
+
   if (providersAllowed.length === 0) {
     throw new TRPCError({
       code: "BAD_REQUEST",
@@ -1227,7 +1274,10 @@ function assertProvidersAllowedShape(providersAllowed: string[] | null | undefin
  * saved serves nothing and reads as a bug in whatever wrote it.
  */
 function assertExpiryInFuture({ expiresAt }: { expiresAt: Date | null | undefined }): void {
-  if (!expiresAt) return;
+  if (!expiresAt) {
+    return;
+  }
+
   if (expiresAt.getTime() <= Date.now()) {
     throw new VirtualKeyExpiryInPastError();
   }
@@ -1247,12 +1297,16 @@ function diffGuardrailAttachments(
   const flatten = (attachments: GuardrailAttachment[]): Set<string> => {
     const set = new Set<string>();
     for (const a of attachments) {
-      for (const id of a.guardrailIds) set.add(`${a.direction}\u0000${id}`);
+      for (const id of a.guardrailIds) {
+        set.add(`${a.direction}\u0000${id}`);
+      }
     }
+
     return set;
   };
   const toPair = (key: string): GuardrailPair => {
     const [direction, guardrailId] = key.split("\u0000");
+
     return {
       direction: direction as GuardrailDirection,
       guardrailId: guardrailId!,
@@ -1263,11 +1317,17 @@ function diffGuardrailAttachments(
   const attached: GuardrailPair[] = [];
   const detached: GuardrailPair[] = [];
   for (const key of afterSet) {
-    if (!beforeSet.has(key)) attached.push(toPair(key));
+    if (!beforeSet.has(key)) {
+      attached.push(toPair(key));
+    }
   }
+
   for (const key of beforeSet) {
-    if (!afterSet.has(key)) detached.push(toPair(key));
+    if (!afterSet.has(key)) {
+      detached.push(toPair(key));
+    }
   }
+
   return { attached, detached };
 }
 
@@ -1275,5 +1335,6 @@ function serialiseForAudit(vk: VirtualKeyWithScopes): GatewayAuditJson {
   // Strip secret material. The base serializer already handles BigInt
   // (revision) safely — see auditSerializer.ts.
   const { hashedSecret, previousHashedSecret, ...safe } = vk;
+
   return serializeRowForAudit(safe as unknown as Record<string, unknown>);
 }

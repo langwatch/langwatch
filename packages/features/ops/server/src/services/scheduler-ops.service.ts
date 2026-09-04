@@ -106,6 +106,7 @@ export class SchedulerOpsService {
       action: active ? "ops.scheduler.resume" : "ops.scheduler.pause",
       row,
     });
+
     return this.readBack(scheduleId);
   }
 
@@ -145,6 +146,7 @@ export class SchedulerOpsService {
       row,
     });
     this.wake.wake();
+
     return this.readBack(scheduleId);
   }
 
@@ -162,6 +164,7 @@ export class SchedulerOpsService {
     if (!row.active) {
       this.refuse({ error: new ScheduleInactiveError(), scheduleId });
     }
+
     if (row.currentSlot) {
       this.refuse({ error: new ScheduleRunInProgressError(), scheduleId });
     }
@@ -177,14 +180,17 @@ export class SchedulerOpsService {
       if (current && !current.active) {
         this.refuse({ error: new ScheduleInactiveError(), scheduleId });
       }
+
       if (current?.currentSlot) {
         this.refuse({ error: new ScheduleRunInProgressError(), scheduleId });
       }
+
       this.refuse({ error: new ScheduleAlreadyInFlightError(), scheduleId });
     }
 
     await this.record({ actorUserId, action: "ops.scheduler.run_now", row });
     this.wake.wake();
+
     return this.readBack(scheduleId);
   }
 
@@ -193,17 +199,20 @@ export class SchedulerOpsService {
     if (!row) {
       this.refuse({ error: new ScheduleNotFoundError(), scheduleId });
     }
+
     return row;
   }
 
   private refuse({ error, scheduleId }: { error: Error; scheduleId: string }): never {
     logger.info({ scheduleId, code: error.name }, "Refused scheduler operator control");
+
     throw error;
   }
 
   private async readBack(scheduleId: string): Promise<OpsScheduledJob> {
     const row = await this.getSchedule(scheduleId);
     const names = await this.resolveProjectNames([row]);
+
     return toOpsScheduledJob({
       row,
       projectName: names.get(row.projectId) ?? null,
@@ -243,6 +252,7 @@ export class SchedulerOpsService {
 
     try {
       const projects = await this.projects.listNamesByIds({ projectIds });
+
       return new Map(projects.map((project) => [project.id, project.name]));
     } catch {
       return new Map();

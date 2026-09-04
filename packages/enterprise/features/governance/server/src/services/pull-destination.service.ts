@@ -23,13 +23,20 @@ export class PullDestinationService {
   }
 
   assertAllowed(parserConfig: Record<string, unknown> | null | undefined): void {
-    if (!parserConfig || typeof parserConfig !== "object") return;
-    if (parserConfig.adapter !== DATABRICKS_GENIE_ADAPTER_ID) return;
+    if (!parserConfig || typeof parserConfig !== "object") {
+      return;
+    }
+
+    if (parserConfig.adapter !== DATABRICKS_GENIE_ADAPTER_ID) {
+      return;
+    }
+
     if (
       typeof parserConfig.workspaceUrl !== "string" ||
       !isDatabricksWorkspaceOrigin(parserConfig.workspaceUrl)
     ) {
       const message = `Workspace URL must be an https Databricks workspace address, ending in ${PullDestinationService.allowedSuffixes()}.`;
+
       throw new GovernanceValidationError(message, {
         formErrors: [message],
       });

@@ -51,19 +51,25 @@ export class ScimUserPatchService {
       });
     }
 
-    if (input.operation.op !== "replace") return;
-
-    if (input.operation.path === "active") {
-      await this.updateActive(input, input.operation.value);
+    if (input.operation.op !== "replace") {
       return;
     }
 
-    if (!isRecord(input.operation.value)) return;
+    if (input.operation.path === "active") {
+      await this.updateActive(input, input.operation.value);
+
+      return;
+    }
+
+    if (!isRecord(input.operation.value)) {
+      return;
+    }
 
     const updates = this.profileUpdates(input.operation.value);
     if (updates.hasActive) {
       await this.updateActive(input, updates.active);
     }
+
     if (updates.name !== void 0 || updates.email !== void 0) {
       await this.profiles.updateProfile({
         id: input.id,
@@ -90,9 +96,12 @@ export class ScimUserPatchService {
           op: "deactivate_user",
         });
       }
+
       await this.users.deactivate({ id: input.id });
+
       return;
     }
+
     await this.users.reactivate({ id: input.id });
   }
 
@@ -104,6 +113,7 @@ export class ScimUserPatchService {
   } {
     const email = typeof value.userName === "string" ? value.userName : undefined;
     const name = this.readName(value);
+
     return {
       hasActive: "active" in value,
       ...("active" in value ? { active: value.active } : {}),
@@ -117,6 +127,7 @@ export class ScimUserPatchService {
     if (isRecord(compoundName)) {
       return this.joinName(compoundName.givenName, compoundName.familyName);
     }
+
     return this.joinName(value["name.givenName"], value["name.familyName"]);
   }
 
@@ -124,6 +135,7 @@ export class ScimUserPatchService {
     const parts = [givenName, familyName].filter(
       (part): part is string => typeof part === "string" && part.length > 0,
     );
+
     return parts.length > 0 ? parts.join(" ") : undefined;
   }
 }

@@ -30,7 +30,9 @@ export function firePromptCreatedNurturing({
   orgPromptCount: number;
 }): void {
   const nurturing = tryNurturingSink();
-  if (!nurturing) return;
+  if (!nurturing) {
+    return;
+  }
 
   void nurturing
     .identifyUser({
@@ -87,6 +89,7 @@ export function afterPromptCreated({
 
       if (!resolvedUserId) {
         logger.warn({ projectId }, "No user ID available for prompt creation nurturing — skipping");
+
         return;
       }
 
@@ -101,6 +104,7 @@ export function afterPromptCreated({
 
       if (!organizationId) {
         logger.warn({ projectId }, "Could not resolve organizationId for prompt count — skipping");
+
         return;
       }
 

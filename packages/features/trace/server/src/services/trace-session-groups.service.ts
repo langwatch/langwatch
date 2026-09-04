@@ -175,10 +175,12 @@ export class SessionGroupsService {
         row,
         codingAgent: enrichments[index] ?? null,
       });
+
       return cutoffMs !== null && row.lastActivityMs < cutoffMs ? teasedSession(dto) : dto;
     });
 
     const lastRow = visibleRows[visibleRows.length - 1];
+
     return {
       sessions,
       totalHits: page.totalHits,
@@ -246,6 +248,7 @@ export class SessionGroupsService {
       );
       results.push(...settled);
     }
+
     return results;
   }
 
@@ -268,7 +271,9 @@ export class SessionGroupsService {
   }): Promise<void> {
     try {
       const organizationId = await this.resolveOrganizationId(tenantId);
-      if (!organizationId) return;
+      if (!organizationId) {
+        return;
+      }
 
       const links = await this.codingAgentSessions.linkTraceSessionsToPullRequests({
         organizationId,

@@ -65,16 +65,19 @@ export class UserService extends UserServiceContract {
 
   getProfiles(input: UserProfilesInput): Promise<UserFullProfile[]> {
     const parsed = userProfilesInputSchema.parse(input);
+
     return this.repository.getProfiles([...new Set(parsed.userIds)]);
   }
 
   tryFindById(input: UserIdInput): Promise<UserProfile | null> {
     const parsed = userIdInputSchema.parse(input);
+
     return this.repository.tryFindById(parsed.id);
   }
 
   tryFindByEmail(input: UserEmailInput): Promise<UserProfile | null> {
     const parsed = userEmailInputSchema.parse(input);
+
     return this.repository.tryFindByEmail(parsed.email);
   }
 
@@ -92,6 +95,7 @@ export class UserService extends UserServiceContract {
 
   hasPassword(input: UserIdInput): Promise<boolean> {
     const parsed = userIdInputSchema.parse(input);
+
     return this.repository.hasPassword(parsed.id);
   }
 
@@ -101,6 +105,7 @@ export class UserService extends UserServiceContract {
 
   getPasskeyNudgeStatus(input: UserIdInput): Promise<UserPasskeyNudgeStatus> {
     const parsed = userIdInputSchema.parse(input);
+
     return this.repository.getPasskeyNudgeStatus(parsed.id);
   }
 
@@ -118,32 +123,46 @@ export class UserService extends UserServiceContract {
     if (normalizedEmail !== undefined && !current) {
       throw new UserNotFoundError(parsed.id);
     }
+
     const update: UpdateUserProfileInput = { id: parsed.id };
-    if (parsed.name !== undefined) update.name = parsed.name;
-    if (normalizedEmail !== undefined) update.email = normalizedEmail;
+    if (parsed.name !== undefined) {
+      update.name = parsed.name;
+    }
+
+    if (normalizedEmail !== undefined) {
+      update.email = normalizedEmail;
+    }
+
     const updated = await this.repository.updateProfile(update);
+
     return updated;
   }
 
   async getAccountInfo(input: UserIdInput): Promise<UserAccountInfo> {
     const parsed = userIdInputSchema.parse(input);
     const account = await this.repository.tryGetAccountInfo(parsed.id);
-    if (!account) throw new UserNotFoundError(parsed.id);
+    if (!account) {
+      throw new UserNotFoundError(parsed.id);
+    }
+
     return account;
   }
 
   getSsoStatus(input: UserIdInput): Promise<UserSsoStatus> {
     const parsed = userIdInputSchema.parse(input);
+
     return this.repository.getSsoStatus(parsed.id);
   }
 
   getTraceExplorerTourPreference(input: UserIdInput): Promise<UserTourPreference> {
     const parsed = userIdInputSchema.parse(input);
+
     return this.repository.getTraceExplorerTourPreference(parsed.id);
   }
 
   dismissTraceExplorerTour(input: UserIdInput): Promise<UserTourPreference> {
     const parsed = userIdInputSchema.parse(input);
+
     return this.repository.setTraceExplorerTourDismissedAt(parsed.id, this.now());
   }
 
@@ -154,6 +173,7 @@ export class UserService extends UserServiceContract {
 
   tryGetLastHomePath(input: UserIdInput): Promise<string | null> {
     const parsed = userIdInputSchema.parse(input);
+
     return this.repository.tryGetLastHomePath(parsed.id);
   }
 
@@ -165,11 +185,13 @@ export class UserService extends UserServiceContract {
   async deactivate(input: UserIdInput): Promise<UserProfile> {
     const parsed = userIdInputSchema.parse(input);
     const user = await this.repository.setDeactivatedAt(parsed.id, this.now());
+
     return user;
   }
 
   reactivate(input: UserIdInput): Promise<UserProfile> {
     const parsed = userIdInputSchema.parse(input);
+
     return this.repository.setDeactivatedAt(parsed.id, null);
   }
 
@@ -193,6 +215,7 @@ export class UserService extends UserServiceContract {
       id: stored.id,
     });
     await this.repository.setAvatar(parsed.userId, image);
+
     return { image };
   }
 

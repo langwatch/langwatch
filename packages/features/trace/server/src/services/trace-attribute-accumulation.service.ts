@@ -163,11 +163,13 @@ export class TraceAttributeAccumulationService {
       if (!key.startsWith("metadata.")) {
         continue;
       }
+
       const prev = state.attributes[key];
       const next = spanAttrs[key];
       if (!prev || !next) {
         continue;
       }
+
       try {
         const prevObj: unknown = JSON.parse(prev);
         const nextObj: unknown = JSON.parse(next);
@@ -322,6 +324,7 @@ export class TraceAttributeAccumulationService {
     if (models.length === 0) {
       return;
     }
+
     const stampedByUs = attributes[MODEL_METADATA_STAMPED_MARKER] === "true";
     const userProvided =
       !stampedByUs &&
@@ -330,6 +333,7 @@ export class TraceAttributeAccumulationService {
     if (userProvided) {
       return;
     }
+
     attributes[STAMPED_MODEL_ATTRIBUTE] = models[0]!;
     attributes[STAMPED_MODELS_ATTRIBUTE] = JSON.stringify(models);
     attributes[MODEL_METADATA_STAMPED_MARKER] = "true";

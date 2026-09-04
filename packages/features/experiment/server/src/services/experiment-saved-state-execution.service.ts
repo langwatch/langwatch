@@ -74,6 +74,7 @@ export const planSavedRunSeeding = ({
     rowCount: prepared.datasetRows.length,
     results: prepared.workbenchState.results as SeedableResults | undefined,
   });
+
   return Object.keys(seedTargetOutputs).length > 0 ? seedTargetOutputs : undefined;
 };
 
@@ -196,6 +197,7 @@ export async function prepareSavedStateExecution({
   if ("error" in saved) {
     return saved;
   }
+
   const { experimentId, workbenchState, dataset } = saved;
 
   const dataResult = await loadExecutionData(

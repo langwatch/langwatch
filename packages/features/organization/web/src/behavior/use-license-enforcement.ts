@@ -35,17 +35,16 @@ export function useLicenseEnforcement(limitType: LimitType) {
 
       if (checkResult.data.allowed) {
         return onAllowed();
-      } else {
-        openUpgradeModal(limitType, checkResult.data.current, checkResult.data.max);
-        // Fire-and-forget: notify backend that a UI pre-check blocked the user
-        if (organization?.id) {
-          reportBlocked.mutate({
-            organizationId: organization.id,
-            limitType,
-          });
-        }
-        return undefined;
       }
+      openUpgradeModal(limitType, checkResult.data.current, checkResult.data.max);
+      // Fire-and-forget: notify backend that a UI pre-check blocked the user
+      if (organization?.id) {
+        reportBlocked.mutate({
+          organizationId: organization.id,
+          limitType,
+        });
+      }
+      return undefined;
     },
     [checkResult.data, openUpgradeModal, limitType, organization?.id, reportBlocked],
   );

@@ -47,10 +47,12 @@ export class AuthzScopeLineageService {
         return { ...scope, organizationId: scope.id };
       case "team": {
         const team = await this.repository.tryFindTeamOrganization({ teamId: scope.id });
+
         return { ...scope, organizationId: team?.organizationId ?? null };
       }
       case "project": {
         const project = await this.repository.tryFindProjectLineage({ projectId: scope.id });
+
         return { ...scope, organizationId: project?.organizationId ?? null };
       }
     }
@@ -60,6 +62,7 @@ export class AuthzScopeLineageService {
 function presentScopes(input: AuthzScopeLineageInput): PresentScope[] {
   return BINDING_SCOPE_TIERS.flatMap((tier) => {
     const id = input[SCOPE_TIER_FIELDS[tier]];
+
     return typeof id === "string" && id.length > 0 ? [{ tier, id }] : [];
   });
 }

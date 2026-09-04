@@ -132,6 +132,7 @@ export async function generateTraceQueryFromPrompt(input: AiQueryInput): Promise
     if (validation.ok) {
       return { ok: true, query: lastQuery, attempts: attempt };
     }
+
     lastError = validation.error;
     logger.info(
       { projectId: input.projectId, attempt, lastError, lastQuery },
@@ -148,12 +149,21 @@ export async function generateTraceQueryFromPrompt(input: AiQueryInput): Promise
 }
 
 function validateQuery(query: string): { ok: true } | { ok: false; error: string } {
-  if (!query) return { ok: false, error: "Empty query." };
+  if (!query) {
+    return { ok: false, error: "Empty query." };
+  }
+
   try {
     const ast = parse(query);
-    if (isEmptyAST(ast)) return { ok: false, error: "Empty query." };
+    if (isEmptyAST(ast)) {
+      return { ok: false, error: "Empty query." };
+    }
+
     const semanticError = validateAst(ast);
-    if (semanticError) return { ok: false, error: semanticError };
+    if (semanticError) {
+      return { ok: false, error: semanticError };
+    }
+
     return { ok: true };
   } catch (e) {
     return {
@@ -174,6 +184,7 @@ function sanitizeLlmOutput(raw: string): string {
   if ((out.startsWith('"') && out.endsWith('"')) || (out.startsWith("'") && out.endsWith("'"))) {
     out = out.slice(1, -1);
   }
+
   return out.trim();
 }
 
@@ -254,6 +265,7 @@ export async function generateTraceAction(input: AiQueryInput): Promise<AiAction
             query: parsedAction.query,
           };
     }
+
     lastFailure = "validation";
     lastError = validation.error;
     logger.info(

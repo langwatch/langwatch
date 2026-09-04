@@ -445,7 +445,9 @@ export class OtlpSpanPiiRedactionService {
           compiledSecretPatterns: compiled.secrets,
           compiledPiiExceptions: compiled.piiExceptions,
         });
-        if (text !== value) record[key] = text;
+        if (text !== value) {
+          record[key] = text;
+        }
       }
     }
   }
@@ -460,7 +462,10 @@ export class OtlpSpanPiiRedactionService {
     },
     policy: ResolvedDataPrivacy,
   ): void {
-    if (!this.policy.nativePassActive(policy)) return;
+    if (!this.policy.nativePassActive(policy)) {
+      return;
+    }
+
     const compiled = this.policy.compileNativePatterns(policy);
     if (log.body) {
       const { text } = redactStringNative({
@@ -469,8 +474,11 @@ export class OtlpSpanPiiRedactionService {
         compiledSecretPatterns: compiled.secrets,
         compiledPiiExceptions: compiled.piiExceptions,
       });
-      if (text !== log.body) log.body = text;
+      if (text !== log.body) {
+        log.body = text;
+      }
     }
+
     this.redactRecordNative({
       record: log.attributes,
       policy,
@@ -508,8 +516,10 @@ export class OtlpSpanPiiRedactionService {
     const native = await this.policy.tryResolveNativeContext(tenantId, piiRedactionLevel);
     if (!native) {
       await this.lambdaRedactLog(log, piiRedactionLevel);
+
       return;
     }
+
     this.applyNativeLogPass(log, native.policy);
     const lambda = this.policy.tryLambdaAfterNative(native.policy);
     if (lambda) {
@@ -537,12 +547,15 @@ export class OtlpSpanPiiRedactionService {
       lambda?.entities,
       lambda?.exceptPatterns,
     );
-    if (!options) return;
+    if (!options) {
+      return;
+    }
 
     const batch = this.createRedactionBatch();
     if (log.body) {
       batch.tryPush(log as unknown as Record<string, string>, "body", log.body);
     }
+
     this.collectRecordEntries(batch, log.attributes);
     this.collectRecordEntries(batch, log.resourceAttributes);
 
@@ -566,8 +579,10 @@ export class OtlpSpanPiiRedactionService {
     const native = await this.policy.tryResolveNativeContext(tenantId, piiRedactionLevel);
     if (!native) {
       await this.lambdaRedactMetricAttributes(metric, piiRedactionLevel);
+
       return;
     }
+
     if (this.policy.nativePassActive(native.policy)) {
       const compiled = this.policy.compileNativePatterns(native.policy);
       this.redactRecordNative({
@@ -582,6 +597,7 @@ export class OtlpSpanPiiRedactionService {
         compiled,
       });
     }
+
     const lambda = this.policy.tryLambdaAfterNative(native.policy);
     if (lambda) {
       await this.lambdaRedactMetricAttributes(metric, "STRICT", {
@@ -607,7 +623,9 @@ export class OtlpSpanPiiRedactionService {
       lambda?.entities,
       lambda?.exceptPatterns,
     );
-    if (!options) return;
+    if (!options) {
+      return;
+    }
 
     const batch = this.createRedactionBatch();
     this.collectRecordEntries(batch, metric.attributes);
@@ -631,8 +649,13 @@ export class OtlpSpanPiiRedactionService {
           kind: "system",
         })
       : false;
-    if (disabled) return null;
-    if (piiRedactionLevel === "DISABLED") return null;
+    if (disabled) {
+      return null;
+    }
+
+    if (piiRedactionLevel === "DISABLED") {
+      return null;
+    }
 
     const piiEnforced = this.deps.isProduction;
 
@@ -640,6 +663,7 @@ export class OtlpSpanPiiRedactionService {
       if (piiEnforced) {
         throw new Error("LANGEVALS_ENDPOINT is not set, PII check cannot be performed");
       }
+
       return null;
     }
 
@@ -673,8 +697,10 @@ export class OtlpSpanPiiRedactionService {
             },
             "Skipping PII redaction — cumulative batch size would exceed limit",
           );
+
           return;
         }
+
         texts.push(value);
         refs.push({ obj, key });
         state.totalLength += value.length;
@@ -694,7 +720,9 @@ export class OtlpSpanPiiRedactionService {
     batch: RedactionBatch,
     options: PIICheckOptions,
   ): Promise<void> {
-    if (batch.texts.length === 0) return;
+    if (batch.texts.length === 0) {
+      return;
+    }
 
     const results = await this.policy.clearBatch(batch.texts, options);
 

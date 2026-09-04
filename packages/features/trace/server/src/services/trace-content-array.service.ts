@@ -14,15 +14,24 @@
  *  - null otherwise (caller should pass through unchanged).
  */
 export function coerceContentToArray(content: unknown): unknown[] | null {
-  if (Array.isArray(content)) return content;
-  if (typeof content !== "string") return null;
+  if (Array.isArray(content)) {
+    return content;
+  }
+
+  if (typeof content !== "string") {
+    return null;
+  }
 
   const trimmed = content.trim();
-  if (!trimmed.startsWith("[")) return null;
+  if (!trimmed.startsWith("[")) {
+    return null;
+  }
 
   try {
     const parsed = JSON.parse(trimmed) as unknown;
-    if (Array.isArray(parsed)) return parsed;
+    if (Array.isArray(parsed)) {
+      return parsed;
+    }
   } catch {
     // fall through to Python-repr recovery
   }
@@ -30,7 +39,9 @@ export function coerceContentToArray(content: unknown): unknown[] | null {
   const jsonified = pythonReprToJsonish(trimmed);
   try {
     const parsed = JSON.parse(jsonified) as unknown;
-    if (Array.isArray(parsed)) return parsed;
+    if (Array.isArray(parsed)) {
+      return parsed;
+    }
   } catch {
     // give up
   }
@@ -68,11 +79,20 @@ function readPythonHexEscape(
   input: string,
   offset: number,
 ): { json: string; consumed: number } | null {
-  if (input[offset] !== "\\" || input[offset + 1] !== "x") return null;
+  if (input[offset] !== "\\" || input[offset + 1] !== "x") {
+    return null;
+  }
+
   const h1 = input[offset + 2];
   const h2 = input[offset + 3];
-  if (h1 === undefined || h2 === undefined) return null;
-  if (!/[0-9a-fA-F]/.test(h1) || !/[0-9a-fA-F]/.test(h2)) return null;
+  if (h1 === undefined || h2 === undefined) {
+    return null;
+  }
+
+  if (!/[0-9a-fA-F]/.test(h1) || !/[0-9a-fA-F]/.test(h2)) {
+    return null;
+  }
+
   return { json: `\\u00${h1}${h2}`, consumed: 4 };
 }
 
@@ -102,11 +122,13 @@ function pythonReprToJsonish(input: string): string {
           i += 4;
           continue;
         }
+
         if (matchIdentifier("True")) {
           out += "true";
           i += 4;
           continue;
         }
+
         if (matchIdentifier("False")) {
           out += "false";
           i += 5;
@@ -123,6 +145,7 @@ function pythonReprToJsonish(input: string): string {
       } else {
         out += c;
       }
+
       i++;
       continue;
     }
@@ -140,17 +163,20 @@ function pythonReprToJsonish(input: string): string {
           i += 2;
           continue;
         }
+
         if (next === '"') {
           out += '\\"';
           i += 2;
           continue;
         }
+
         const hex = readPythonHexEscape(input, i);
         if (hex !== null) {
           out += hex.json;
           i += hex.consumed;
           continue;
         }
+
         if (next !== undefined) {
           // Pass through other escapes verbatim (\n, \t, \\, \uXXXX
           // all share semantics between Python and JSON).
@@ -158,16 +184,19 @@ function pythonReprToJsonish(input: string): string {
           i += 2;
           continue;
         }
+
         out += c;
         i++;
         continue;
       }
+
       if (c === "'") {
         out += '"';
         state = "none";
         i++;
         continue;
       }
+
       if (c === '"') {
         // Literal double quote inside a Python single-quoted string —
         // must be escaped now that the outer quote is `"`.
@@ -175,6 +204,7 @@ function pythonReprToJsonish(input: string): string {
         i++;
         continue;
       }
+
       out += c;
       i++;
       continue;
@@ -188,22 +218,26 @@ function pythonReprToJsonish(input: string): string {
         i += hex.consumed;
         continue;
       }
+
       const next = input[i + 1];
       if (next !== undefined) {
         out += c + next;
         i += 2;
         continue;
       }
+
       out += c;
       i++;
       continue;
     }
+
     if (c === '"') {
       out += '"';
       state = "none";
       i++;
       continue;
     }
+
     // Apostrophes inside Python-double-quoted strings stay verbatim:
     // they're valid inside JSON double-quoted strings unescaped.
     out += c;

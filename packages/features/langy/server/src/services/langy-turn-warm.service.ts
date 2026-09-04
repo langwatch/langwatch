@@ -36,6 +36,7 @@ export class LangyTurnWarmService {
           "langy warm failed; the first message cold-starts the worker",
         );
       }
+
       return { conversationId: progress.conversationId, warmed: false };
     }
   }
@@ -79,12 +80,14 @@ export class LangyTurnWarmService {
     if (modelsAllowed && !modelsAllowed.includes(warmModel)) {
       return { conversationId, warmed: false };
     }
+
     if (credentials.githubToken) {
       const { allowed } = await this.deps.permits.check({ userId });
       if (!allowed) {
         stripGithubCredentials(credentials);
       }
     }
+
     const alive = await worker.probe(
       buildWorkerProbeArgs({
         projectId,
@@ -119,6 +122,7 @@ export class LangyTurnWarmService {
           "langy warm dispatch failed; the first message cold-starts the worker",
         );
       });
+
     return { conversationId, warmed: true };
   }
 }

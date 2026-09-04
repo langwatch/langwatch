@@ -35,6 +35,7 @@ export class ModelProviderCodexService {
     }
 
     const plan = provider.customKeys?.CODEX_PLAN;
+
     return modelProviderCodexStatusSchema.parse({
       connected: true,
       providerId: provider.id,
@@ -73,6 +74,7 @@ export class ModelProviderCodexService {
     }
 
     await this.options.repository.update({ ...provider, customKeys: refreshed.tokens });
+
     return modelProviderCodexGatewayRefreshSchema.parse({
       status: "refreshed",
       accessToken: refreshed.tokens.CODEX_ACCESS_TOKEN,
@@ -83,5 +85,6 @@ export class ModelProviderCodexService {
 
 function isRecent(savedAt: string): boolean {
   const savedAtMs = Date.parse(savedAt);
+
   return Number.isFinite(savedAtMs) && Date.now() - savedAtMs < 30_000;
 }

@@ -126,12 +126,14 @@ export class ScenarioExecutionPrefetcherService {
     }
 
     const lookups = this.startLookups(input, runSecrets.values);
+
     return {
       childEnvironment: Promise.all([lookups.scenario, lookups.project])
         .then(([scenario, project]) => {
           if (!scenario || !project.success) {
             return null;
           }
+
           return {
             labels: scenario.config.labels,
             telemetry: {
@@ -172,6 +174,7 @@ export class ScenarioExecutionPrefetcherService {
     runSecretValues: Record<string, string>,
   ): ScenarioPrefetchLookups {
     const { context, target } = input;
+
     return {
       scenario: this.lookups.tryFetchScenario({
         projectId: context.projectId,

@@ -55,6 +55,7 @@ async function readUserOnIdentityWrites({
       migrationName: IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME,
       tenantId: userId,
     });
+
     // Only `finalized` opens the gate; `migrated` is held (see above). The
     // D03 READ fork will ask the same question of the same row.
     return record?.status === "finalized";
@@ -68,6 +69,7 @@ async function readUserOnIdentityWrites({
       "could not read the identifier-backfill state; this user's ceremonies emit no events until the cache expires",
     );
     identityWriteGateReadFailuresTotal.inc();
+
     return false;
   }
 }
@@ -103,6 +105,7 @@ async function readAnyoneOnIdentityWrites(state: SystemMigrationStateRepository)
       "could not read whether any user has finalized the identifier backfill; the gate stays closed until the cache expires",
     );
     identityWriteGateReadFailuresTotal.inc();
+
     return false;
   }
 }
@@ -136,7 +139,10 @@ export async function isUserOnIdentityWrites({
   userId: string;
   state: SystemMigrationStateRepository;
 }): Promise<boolean> {
-  if (!(await isAnyoneOnIdentityWrites({ state }))) return false;
+  if (!(await isAnyoneOnIdentityWrites({ state }))) {
+    return false;
+  }
+
   return gate.get({
     subject: userId,
     read: () => readUserOnIdentityWrites({ userId, state }),

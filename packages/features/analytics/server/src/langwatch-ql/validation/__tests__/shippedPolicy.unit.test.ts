@@ -63,7 +63,7 @@ function readManifest(): {
   const dependencies = manifest.dependencies ?? {};
   return {
     dependencies,
-    all: Object.keys({ ...dependencies, ...(manifest.devDependencies ?? {}) }),
+    all: Object.keys({ ...dependencies, ...manifest.devDependencies }),
   };
 }
 

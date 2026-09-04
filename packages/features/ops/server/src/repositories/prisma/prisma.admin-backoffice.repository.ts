@@ -203,7 +203,7 @@ export class PrismaAdminBackofficeRepository extends AdminBackofficeRepository {
     filter: Record<string, unknown>;
     where: Record<string, unknown>;
   } {
-    const filter = { ...(params.filter ?? {}) };
+    const filter = { ...params.filter };
     const query = typeof filter.query === "string" ? filter.query : undefined;
     delete filter.query;
     if (!query) return { filter, where: {} };

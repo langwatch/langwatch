@@ -134,7 +134,9 @@ export function deploymentPlanSources(
   const license = options.license
     ? { license: options.license, enrichers: [{ enrich: applyPlanTypeEntitlements }] }
     : {};
-  if (!options.subscriptions) return { baseline, ...license };
+  if (!options.subscriptions) {
+    return { baseline, ...license };
+  }
 
   return {
     baseline,

@@ -81,13 +81,19 @@ export class LangyCliEnvelopeService {
    */
   normalizeToolFrame({ frame }: { frame: LangyToolFrame }): LangyToolFrame {
     const command = this.tryShellCommandOf(frame);
-    if (!command) return frame;
+    if (!command) {
+      return frame;
+    }
 
     const invocation = parseLangwatchCommand(command);
-    if (!invocation) return frame;
+    if (!invocation) {
+      return frame;
+    }
 
     const name = this.toolNameOf(invocation);
-    if (frame.phase === "start") return { ...frame, name };
+    if (frame.phase === "start") {
+      return { ...frame, name };
+    }
 
     // A FAILED CALL STILL PRINTED ITS FAILURE DOCUMENT.
     //
@@ -102,6 +108,7 @@ export class LangyCliEnvelopeService {
       const reportedOnFailure = readCliErrorDocument(
         parseCliJson(frame.output ?? "") ?? frame.output,
       );
+
       return reportedOnFailure
         ? {
             ...frame,
@@ -122,6 +129,7 @@ export class LangyCliEnvelopeService {
         args: invocation.args,
         output: frame.output ?? "",
       });
+
       return {
         ...frame,
         name,
@@ -131,7 +139,9 @@ export class LangyCliEnvelopeService {
       };
     }
 
-    if (frame.output === undefined) return { ...frame, name };
+    if (frame.output === undefined) {
+      return { ...frame, name };
+    }
 
     // The digest is the reference the card hydrates from (ids, the parsed
     // flags as its query, honest counts); the reduced output stays alongside
@@ -162,6 +172,7 @@ export class LangyCliEnvelopeService {
         output: JSON.stringify(toCliErrorDocument(reported)),
       };
     }
+
     const digest = extractDigest({
       resource: invocation.resource,
       verb: invocation.verb,
@@ -171,6 +182,7 @@ export class LangyCliEnvelopeService {
 
     if (document === null) {
       const result = toCliTextResult(frame.output);
+
       return {
         ...frame,
         name,
@@ -185,6 +197,7 @@ export class LangyCliEnvelopeService {
       verb: invocation.verb,
       payload: document,
     });
+
     // Re-stringified because a frame's `output` is a string all the way to the
     // browser; the card parses it back into the structure it renders.
     return {
@@ -216,17 +229,27 @@ export class LangyCliEnvelopeService {
    * re-deriving that knowledge and letting the two drift.
    */
   tryShellCommandOf(frame: LangyToolFrame): string | null {
-    if (!SHELL_TOOL_NAMES.has(frame.name.trim().toLowerCase())) return null;
+    if (!SHELL_TOOL_NAMES.has(frame.name.trim().toLowerCase())) {
+      return null;
+    }
 
     const { input } = frame;
-    if (typeof input === "string") return input.trim() ? input : null;
-    if (!input || typeof input !== "object") return null;
+    if (typeof input === "string") {
+      return input.trim() ? input : null;
+    }
+
+    if (!input || typeof input !== "object") {
+      return null;
+    }
 
     const record = input as Record<string, unknown>;
     for (const key of COMMAND_KEYS) {
       const value = record[key];
-      if (typeof value === "string" && value.trim()) return value;
+      if (typeof value === "string" && value.trim()) {
+        return value;
+      }
     }
+
     return null;
   }
 }

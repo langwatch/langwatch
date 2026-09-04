@@ -85,10 +85,16 @@ export function spanCarriesMediaMarkers(span: OtlpSpan): boolean {
         containsMediaMarkers(attr.value.stringValue),
     );
 
-  if (attrsCarryMarkers(span.attributes)) return true;
-  for (const event of span.events ?? []) {
-    if (attrsCarryMarkers(event.attributes)) return true;
+  if (attrsCarryMarkers(span.attributes)) {
+    return true;
   }
+
+  for (const event of span.events ?? []) {
+    if (attrsCarryMarkers(event.attributes)) {
+      return true;
+    }
+  }
+
   return false;
 }
 
@@ -131,8 +137,10 @@ async function rewriteAttributeList({
         continue;
       }
     }
+
     out.push(attr);
   }
+
   return changed ? out : attributes;
 }
 
@@ -152,7 +160,9 @@ export async function maybeExtractSpanMedia({
   logger: EdgeMediaExtractionLogger;
 }): Promise<RecordSpanCommandData> {
   const span = data.span;
-  if (!spanCarriesMediaMarkers(span)) return data;
+  if (!spanCarriesMediaMarkers(span)) {
+    return data;
+  }
 
   const resolved = {
     featureFlags: deps.featureFlags,
@@ -171,14 +181,21 @@ export async function maybeExtractSpanMedia({
       kind: "project",
       projectId,
     });
-    if (!enabled) return data;
+    if (!enabled) {
+      return data;
+    }
 
     stage = "privacy_probe";
-    if (await resolved.hasContentDropRules(projectId)) return data;
+    if (await resolved.hasContentDropRules(projectId)) {
+      return data;
+    }
 
     stage = "storage";
     const service = resolved.service ?? resolved.createService?.(projectId);
-    if (!service) return data;
+    if (!service) {
+      return data;
+    }
+
     const refs: ExtractedRef[] = [];
     // One budget for the WHOLE span: the part cap and the deadline apply
     // across every attribute and event-attribute value, so a span cannot
@@ -216,10 +233,18 @@ export async function maybeExtractSpanMedia({
     // ride through inline (today's behavior) and the drop is logged and
     // counted so a sustained rate is alertable.
     if (budget.droppedByCap > 0 || budget.droppedByDeadline > 0 || budget.failedParts > 0) {
-      if (budget.droppedByCap > 0) deps.telemetry?.failOpen("part_cap", budget.droppedByCap);
-      if (budget.droppedByDeadline > 0)
+      if (budget.droppedByCap > 0) {
+        deps.telemetry?.failOpen("part_cap", budget.droppedByCap);
+      }
+
+      if (budget.droppedByDeadline > 0) {
         deps.telemetry?.failOpen("deadline", budget.droppedByDeadline);
-      if (budget.failedParts > 0) deps.telemetry?.failOpen("part_store", budget.failedParts);
+      }
+
+      if (budget.failedParts > 0) {
+        deps.telemetry?.failOpen("part_store", budget.failedParts);
+      }
+
       logger.warn(
         {
           projectId,
@@ -234,7 +259,9 @@ export async function maybeExtractSpanMedia({
       );
     }
 
-    if (attributes === span.attributes && !eventsChanged) return data;
+    if (attributes === span.attributes && !eventsChanged) {
+      return data;
+    }
 
     logger.info(
       {
@@ -267,6 +294,7 @@ export async function maybeExtractSpanMedia({
       },
       "Edge media extraction failed — falling back to unmodified command data (fail-open)",
     );
+
     return data;
   }
 }

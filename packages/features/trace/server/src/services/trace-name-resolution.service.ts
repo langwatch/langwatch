@@ -138,7 +138,9 @@ export class TraceNameResolutionService {
     // root's metadata should still land in that case.
     const claimsMetadata =
       metadataFromFallback || !haveCanonicalRoot || isEarlierNamedRoot || upgradesEmptyNamedRoot;
-    if (!claimsMetadata) return unchanged;
+    if (!claimsMetadata) {
+      return unchanged;
+    }
 
     // The name only takes over when the NAME itself was still fallback-sourced
     // (or empty). A user-supplied name survives a metadata upgrade — the user's
@@ -179,15 +181,26 @@ export class TraceNameResolutionService {
     const currentStartMs = state.rootSpanStartTimeMs;
 
     // A real root has already spoken.
-    if (!metadataFromFallback && currentStartMs !== undefined) return unchanged;
+    if (!metadataFromFallback && currentStartMs !== undefined) {
+      return unchanged;
+    }
+
     // A user-overridden name is final, even with no real root: they told us
     // what to call this trace.
-    if (state.traceNameUserOverridden) return unchanged;
+    if (state.traceNameUserOverridden) {
+      return unchanged;
+    }
+
     // Same span re-arriving, or another at the same start, must not ping-pong
     // the name — only a strictly earlier start dethrones the current fallback.
-    if (currentStartMs !== undefined && spanStartMs >= currentStartMs) return unchanged;
+    if (currentStartMs !== undefined && spanStartMs >= currentStartMs) {
+      return unchanged;
+    }
+
     // The fallback is the trace's working name, not a placeholder of nothing.
-    if (state.traceName !== "" && span.name === "") return unchanged;
+    if (state.traceName !== "" && span.name === "") {
+      return unchanged;
+    }
 
     return {
       traceName: span.name || state.traceName,

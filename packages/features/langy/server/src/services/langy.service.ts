@@ -85,6 +85,7 @@ export class LangyService extends LangyServiceContract {
     if (!this.relayOptions) {
       throw new Error("Langy relay is not configured");
     }
+
     return LangyTurnRelay.create({
       conversations: this,
       redis: this.relayOptions.redis,
@@ -107,6 +108,7 @@ export class LangyService extends LangyServiceContract {
 
   tryGetEgressAllowlist(input: { projectId: string }): Promise<LangyEgressAllowlist | null> {
     const projectId = langyEgressProjectInputSchema.parse(input).projectId;
+
     return this.credentials.tryGetEgressAllowlist({ projectId });
   }
 
@@ -115,6 +117,7 @@ export class LangyService extends LangyServiceContract {
     allowlist: LangyEgressAllowlist;
   }): Promise<LangyEgressAllowlist | null> {
     const { projectId, allowlist } = langySetEgressInputSchema.parse(input);
+
     return this.credentials.trySetEgressAllowlist({ projectId, allowlist });
   }
 

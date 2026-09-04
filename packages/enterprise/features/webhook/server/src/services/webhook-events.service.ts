@@ -40,6 +40,7 @@ class StructuralWebhookTenantsRepository extends WebhookTenantsRepository {
       select: { id: true },
       orderBy: { id: "asc" },
     });
+
     return rows.map((row) => row.id);
   }
 }
@@ -73,6 +74,7 @@ export class WebhookEventsService extends WebhookEventsServiceContract {
       tenantIds: await this.options.tenants.tenantIdsForOrganization(input.organizationId),
       id: input.id,
     });
+
     return row ? this.options.envelopes.fromSpendRow(row) : null;
   }
 
@@ -85,6 +87,7 @@ export class WebhookEventsService extends WebhookEventsServiceContract {
       limit: query.limit,
       types: query.types,
     });
+
     return {
       events: page.rows.map((row) => this.options.envelopes.fromSpendRow(row)),
       nextCursor: page.nextCursor,

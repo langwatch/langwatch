@@ -80,13 +80,12 @@ function MarkdownWithPluginsAndProxy({
                   code={String(children).replace(/\n$/, "")}
                 />
               );
-            } else {
-              return (
-                <code className={className} {...rest}>
-                  {code}
-                </code>
-              );
             }
+            return (
+              <code className={className} {...rest}>
+                {code}
+              </code>
+            );
           },
         }}
       >

@@ -85,10 +85,16 @@ export class ExperimentCellExecutionService {
     projectId: string;
     metrics: ExecutionState["metrics"] | undefined;
   }): Promise<number | undefined> {
-    if (!metrics?.model) return undefined;
+    if (!metrics?.model) {
+      return undefined;
+    }
+
     const inputTokens = metrics.prompt_tokens ?? 0;
     const outputTokens = metrics.completion_tokens ?? 0;
-    if (inputTokens === 0 && outputTokens === 0) return undefined;
+    if (inputTokens === 0 && outputTokens === 0) {
+      return undefined;
+    }
+
     return this.ports.cost.tryPriceTokens({
       projectId,
       model: metrics.model,
@@ -136,6 +142,7 @@ export class ExperimentCellExecutionService {
         "Evaluator not dispatched: every input resolved empty",
       );
       yield noInputsResolvedResult({ cell, evaluator, evaluatorId });
+
       return;
     }
 
@@ -168,7 +175,9 @@ export class ExperimentCellExecutionService {
         config,
         evaluatorInputs,
       });
-      if (mappedEvent) yield mappedEvent;
+      if (mappedEvent) {
+        yield mappedEvent;
+      }
     }
   }
 
@@ -191,8 +200,10 @@ export class ExperimentCellExecutionService {
           { cell: cell.rowIndex, evaluatorId },
           "Cell aborted before evaluator execution",
         );
+
         return;
       }
+
       try {
         yield* this.runOneCellEvaluator({ ...context, evaluatorId, evaluatorNodeId });
       } catch (evalError) {
@@ -216,7 +227,9 @@ export class ExperimentCellExecutionService {
     const cellEvaluatorInputs = ExperimentEvaluatorInputService.create({
       loadedEvaluators: loadedData.evaluators,
     });
-    if (!cellEvaluatorInputs.evaluatorTargetHasNoResolvedInputs({ cell })) return false;
+    if (!cellEvaluatorInputs.evaluatorTargetHasNoResolvedInputs({ cell })) {
+      return false;
+    }
 
     const name = cellEvaluatorInputs.evaluatorTargetDisplayName({ target: cell.targetConfig });
     logger.info(
@@ -224,6 +237,7 @@ export class ExperimentCellExecutionService {
       "Evaluator column not dispatched: every input resolved empty",
     );
     yield evaluatorTargetNoInputsResult({ cell, name });
+
     return true;
   }
 
@@ -236,7 +250,9 @@ export class ExperimentCellExecutionService {
     if (typeof cell.precomputedTargetOutput === "object" && cell.precomputedTargetOutput !== null) {
       return cell.precomputedTargetOutput as Record<string, unknown>;
     }
+
     const outputField = cell.targetConfig.outputs?.[0]?.identifier ?? "output";
+
     return { [outputField]: cell.precomputedTargetOutput };
   }
 
@@ -317,7 +333,10 @@ export class ExperimentCellExecutionService {
         targetNodes,
         config: cellConfig,
       });
-      if (!mappedEvent) continue;
+      if (!mappedEvent) {
+        continue;
+      }
+
       // The engine reports token usage but no cost (it has no price table),
       // so price the target's tokens here at the canonical model rate. This
       // keeps the cell's cost consistent with its trace's cost.
@@ -330,8 +349,11 @@ export class ExperimentCellExecutionService {
           projectId,
           metrics: event.payload.execution_state?.metrics,
         });
-        if (cost != null) mappedEvent.cost = cost;
+        if (cost != null) {
+          mappedEvent.cost = cost;
+        }
       }
+
       yield mappedEvent;
     }
 
@@ -358,7 +380,9 @@ export class ExperimentCellExecutionService {
 
     try {
       const refused = yield* this.refuseUnmappedColumn({ cell, loadedData });
-      if (refused) return;
+      if (refused) {
+        return;
+      }
 
       const { workflow, targetNodeId, evaluatorNodeIds } = buildCellWorkflow(
         { projectId, cell, datasetColumns },
@@ -399,6 +423,7 @@ export class ExperimentCellExecutionService {
           { cell: cell.rowIndex, targetId: cell.targetId },
           "Cell aborted after target execution",
         );
+
         return;
       }
 

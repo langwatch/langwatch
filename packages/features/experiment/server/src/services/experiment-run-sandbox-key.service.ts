@@ -26,11 +26,17 @@ export class ExperimentRunSandboxKeyService {
     loadedWorkflows?: Map<string, LoadedWorkflow>;
   }): boolean {
     for (const agent of loadedAgents.values()) {
-      if (agent.type === "code") return true;
+      if (agent.type === "code") {
+        return true;
+      }
     }
+
     for (const workflow of loadedWorkflows?.values() ?? []) {
-      if (workflow.dsl.nodes.some((node) => node.type === "code")) return true;
+      if (workflow.dsl.nodes.some((node) => node.type === "code")) {
+        return true;
+      }
     }
+
     return false;
   }
 
@@ -49,7 +55,9 @@ export class ExperimentRunSandboxKeyService {
     loadedAgents: Map<string, TypedAgent>;
     loadedWorkflows?: Map<string, LoadedWorkflow>;
   }): Promise<string | undefined> {
-    if (!this.runExecutesCode({ loadedAgents, loadedWorkflows })) return undefined;
+    if (!this.runExecutesCode({ loadedAgents, loadedWorkflows })) {
+      return undefined;
+    }
 
     // Minting here has no signed-in member to authorize — a run mints for itself
     // — so the port answers with the key or with nothing, and the caller injects
@@ -63,7 +71,10 @@ export class ExperimentRunSandboxKeyService {
     sandboxApiKey: string | undefined,
   ): StudioClientEvent {
     const { payload } = event;
-    if (!sandboxApiKey || !("workflow" in payload)) return event;
+    if (!sandboxApiKey || !("workflow" in payload)) {
+      return event;
+    }
+
     return {
       ...event,
       payload: { ...payload, workflow: { ...payload.workflow, sandbox_api_key: sandboxApiKey } },

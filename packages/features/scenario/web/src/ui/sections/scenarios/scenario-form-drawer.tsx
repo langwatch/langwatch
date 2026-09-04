@@ -608,7 +608,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     }
     // A new scenario made from inside a test suite starts filed in it.
     if (props.testSuiteId !== undefined && props.testSuiteId !== null) {
-      return { ...(initialFormData ?? {}), testSuiteId: props.testSuiteId };
+      return { ...initialFormData, testSuiteId: props.testSuiteId };
     }
     return initialFormData ?? undefined;
   }, [scenario, initialFormData, props.testSuiteId]);

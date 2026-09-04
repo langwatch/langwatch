@@ -255,10 +255,16 @@ export const priceMetrics = async (
   projectId: string,
   metrics: ExecutionState["metrics"] | undefined,
 ): Promise<number | undefined> => {
-  if (!metrics?.model) return undefined;
+  if (!metrics?.model) {
+    return undefined;
+  }
+
   const inputTokens = metrics.prompt_tokens ?? 0;
   const outputTokens = metrics.completion_tokens ?? 0;
-  if (inputTokens === 0 && outputTokens === 0) return undefined;
+  if (inputTokens === 0 && outputTokens === 0) {
+    return undefined;
+  }
+
   return cost.tryPriceTokens({ projectId, model: metrics.model, inputTokens, outputTokens });
 };
 
@@ -564,6 +570,7 @@ export async function* runOrchestrator(
       });
     } catch (err) {
       await ports.abort.clearRunning(runId);
+
       throw err;
     }
 
@@ -801,6 +808,7 @@ export async function* runOrchestrator(
             aborted = true;
             break;
           }
+
           const { detail, errorType } = comparisonSkipMessage(reason);
           const skipEvent: EvaluationV3Event = {
             type: "evaluator_result",
@@ -827,15 +835,32 @@ export async function* runOrchestrator(
             resolveScopedRowIndices({ scope, rowCount: datasetRows.length }),
           );
           for (const [key, seeded] of Object.entries(seedTargetOutputs)) {
-            if (storage.hasProduced(key)) continue;
+            if (storage.hasProduced(key)) {
+              continue;
+            }
+
             const separator = key.indexOf(":");
-            if (separator < 0) continue;
+            if (separator < 0) {
+              continue;
+            }
+
             const rowIndex = Number(key.slice(0, separator));
             const targetId = key.slice(separator + 1);
-            if (!Number.isInteger(rowIndex)) continue;
-            if (!rowsThisRunOwns.has(rowIndex)) continue;
-            if (!datasetRows[rowIndex]) continue;
-            if (seeded.output === null || seeded.output === undefined) continue;
+            if (!Number.isInteger(rowIndex)) {
+              continue;
+            }
+
+            if (!rowsThisRunOwns.has(rowIndex)) {
+              continue;
+            }
+
+            if (!datasetRows[rowIndex]) {
+              continue;
+            }
+
+            if (seeded.output === null || seeded.output === undefined) {
+              continue;
+            }
 
             await processEventForStorage({
               type: "target_result",
@@ -861,11 +886,14 @@ export async function* runOrchestrator(
               aborted = true;
               break;
             }
+
             await semaphore.acquire();
 
             const cellPromise = (async () => {
               try {
-                if (await ports.abort.isAborted(runId)) return;
+                if (await ports.abort.isAborted(runId)) {
+                  return;
+                }
 
                 const loadedData = {
                   ...getLoadedDataForTarget(cell.targetConfig, loadedPrompts, loadedAgents),
@@ -886,15 +914,23 @@ export async function* runOrchestrator(
                   resultMapperConfig,
                   checkAbort,
                 )) {
-                  if (await ports.abort.isAborted(runId)) break;
+                  if (await ports.abort.isAborted(runId)) {
+                    break;
+                  }
+
                   pushEvent(event);
                   await processEventForStorage(event);
-                  if (event.type === "error") cellFailed = true;
+                  if (event.type === "error") {
+                    cellFailed = true;
+                  }
                 }
 
                 completed++;
-                if (cellFailed) failedCells++;
-                else completedCells++;
+                if (cellFailed) {
+                  failedCells++;
+                } else {
+                  completedCells++;
+                }
 
                 pushEvent({
                   type: "progress",
@@ -923,7 +959,10 @@ export async function* runOrchestrator(
     // Yield events as they arrive
     while (true) {
       const event = await waitForEvent();
-      if (event === null) break;
+      if (event === null) {
+        break;
+      }
+
       yield event;
     }
 
@@ -1032,8 +1071,10 @@ const getLoadedDataForTarget = (
         const workflow = linkedWorkflowId
           ? loadedWorkflows?.get(workflowLoadKey({ workflowId: linkedWorkflowId }))
           : undefined;
+
         return { agent, workflow };
       }
+
       return { agent };
     }
   }

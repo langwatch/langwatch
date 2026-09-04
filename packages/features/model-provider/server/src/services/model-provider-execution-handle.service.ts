@@ -90,6 +90,7 @@ export const getVercelAIModel = async (
       `Model provider "${providerKey}" is not configured for this project. Go to Settings → Model Providers to add it.`,
     );
   }
+
   if (!modelProvider.enabled) {
     throw new Error(
       `Model provider "${providerKey}" is configured but disabled. Go to Settings → Model Providers to enable it.`,
@@ -107,6 +108,7 @@ export const getVercelAIModel = async (
         `Codex models cannot be executed by this process: it composes no AI gateway credential, and "${model_}" has no other road. Configure the gateway, or choose a model from another provider.`,
       );
     }
+
     return input.codexHandles.resolve({
       projectId,
       model: model_,
@@ -153,7 +155,9 @@ async function resolveModel({
 }): Promise<string> {
   // 1. Explicit model always wins. A latest alias resolves to the concrete
   //    model here so the provider lookup below reads the real prefix.
-  if (explicit) return expandLatestAlias(explicit);
+  if (explicit) {
+    return expandLatestAlias(explicit);
+  }
 
   // 2. Cascade-resolved default for the given feature key. Throws
   //    ModelNotConfiguredError when nothing is set at any scope —
@@ -167,7 +171,10 @@ async function resolveModel({
       featureKey,
     });
     const providerKey = resolved.model.split("/")[0] ?? "";
-    if (modelProviders[providerKey]?.enabled) return resolved.model;
+    if (modelProviders[providerKey]?.enabled) {
+      return resolved.model;
+    }
+
     // Cascade picked a model but the backing provider is disabled.
     // Silently swapping to a random enabled provider is dangerous (the
     // user thinks they're calling the one they configured); throw a
@@ -181,6 +188,7 @@ async function resolveModel({
     if (resolved.scope === null) {
       throw new Error("resolveModelForFeature returned a null scope");
     }
+
     let alternate: ModelProviderAlternateResolution | null = null;
     try {
       alternate = await modelProviderService.findAlternateModel({
@@ -193,7 +201,9 @@ async function resolveModel({
         throw error;
       }
     }
+
     const alternateProviderKey = alternate?.model.split("/")[0] ?? null;
+
     throw new ModelProviderDisabledError(
       featureKey,
       resolved.feature.displayName,
@@ -214,8 +224,13 @@ async function resolveModel({
         : null,
     );
   } catch (err) {
-    if (err instanceof ModelNotConfiguredError) throw err;
-    if (err instanceof ModelProviderDisabledError) throw err;
+    if (err instanceof ModelNotConfiguredError) {
+      throw err;
+    }
+
+    if (err instanceof ModelProviderDisabledError) {
+      throw err;
+    }
     // Otherwise fall through to the "any enabled provider" rescue;
     // resolver-internal errors (DB, race) get the conservative
     // recovery path.

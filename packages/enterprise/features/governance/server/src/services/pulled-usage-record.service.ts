@@ -54,6 +54,7 @@ function restatementKeyFor({
     ["periodStartMs", String(periodStartMs)],
     ...Object.entries(dimensions).sort(([a], [b]) => (a < b ? -1 : 1)),
   ];
+
   return createHash("sha256").update(JSON.stringify(coordinates)).digest("hex");
 }
 
@@ -85,7 +86,9 @@ export class PulledUsageRecordService {
     observedAt: Date;
   }): PulledUsageObservedEventData | null {
     const raw = event.extra?.[PULLED_USAGE_HINT_KEY];
-    if (raw === undefined || raw === null) return null;
+    if (raw === undefined || raw === null) {
+      return null;
+    }
 
     const hint = pulledUsageHintSchema.parse(raw);
 

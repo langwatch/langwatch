@@ -75,6 +75,7 @@ export class TopicService extends TopicServiceContract {
         }),
       nextRunAt: nextWakeAt?.getTime() ?? null,
     };
+
     return topicClusteringStatusSchema.parse(status);
   }
 
@@ -84,8 +85,10 @@ export class TopicService extends TopicServiceContract {
     const runs = await this.repository.findClusteringRunHistory(
       topicProjectInputSchema.parse(input),
     );
+
     return runs.map((run) => {
       const parsed = topicClusteringRunHistoryEntrySchema.parse(run);
+
       return parsed.outcome === "running" &&
         this.now() - parsed.startedAt >= TOPIC_CLUSTERING_STALE_RUN_MS
         ? { ...parsed, outcome: "abandoned" }
@@ -98,11 +101,18 @@ export class TopicService extends TopicServiceContract {
     lastRunAt: number | null;
     lastRequestTrigger: string | null;
   }): boolean {
-    if (input.lastRequestedAt === null) return false;
-    if (input.lastRequestTrigger !== "manual") return false;
+    if (input.lastRequestedAt === null) {
+      return false;
+    }
+
+    if (input.lastRequestTrigger !== "manual") {
+      return false;
+    }
+
     if (input.lastRunAt !== null && input.lastRunAt >= input.lastRequestedAt) {
       return false;
     }
+
     return this.now() - input.lastRequestedAt < TOPIC_CLUSTERING_STALE_RUN_MS;
   }
 }

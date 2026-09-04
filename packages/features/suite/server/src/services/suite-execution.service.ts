@@ -285,6 +285,7 @@ export class SuiteExecutionService extends SuiteExecutionPort {
 
   private static withSecretParameterNames(secretParameters: RunSecretCiphertext | undefined) {
     const names = Object.keys(secretParameters ?? {});
+
     return names.length > 0 ? { secretParameterNames: names } : {};
   }
 

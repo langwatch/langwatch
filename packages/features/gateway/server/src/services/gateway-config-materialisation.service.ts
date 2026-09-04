@@ -330,6 +330,7 @@ export class GatewayConfigMaterialiser {
       eligibleProviders,
       allowed,
     });
+
     return {
       providers,
       exclusions: {
@@ -441,9 +442,13 @@ export class GatewayConfigMaterialiser {
     if (this.chRepo === null || budgets.length === 0) {
       return new Map();
     }
+
     try {
       const tenantIds = await this.budgetDecisions.listSpendTenantIds(vk.organizationId);
-      if (tenantIds.length === 0) return new Map();
+      if (tenantIds.length === 0) {
+        return new Map();
+      }
+
       // Read each budget's spend from its RESOLVED bucket, exactly. The
       // bundle enforces this key's buckets, so the figure must be the
       // bucket's own: a GROUP budget read from the raw row would prefix-sum
@@ -468,6 +473,7 @@ export class GatewayConfigMaterialiser {
       for (const s of spends) {
         out.set(s.budgetId, s.spentUsd);
       }
+
       return out;
     } catch {
       return new Map();
@@ -529,7 +535,10 @@ function mergePolicyDim(raw: unknown): {
   deny: string[];
   allow: string[] | null;
 } {
-  if (!raw || typeof raw !== "object") return { ...EMPTY_POLICY_RULE_DIM };
+  if (!raw || typeof raw !== "object") {
+    return { ...EMPTY_POLICY_RULE_DIM };
+  }
+
   const r = raw as { deny?: unknown; allow?: unknown };
   const deny = Array.isArray(r.deny)
     ? r.deny.filter((x): x is string => typeof x === "string")
@@ -540,12 +549,17 @@ function mergePolicyDim(raw: unknown): {
       : Array.isArray(r.allow)
         ? r.allow.filter((x): x is string => typeof x === "string")
         : null;
+
   return { deny, allow };
 }
 
 function normalisePolicyRules(raw: unknown): BundlePolicyRules {
-  if (!raw || typeof raw !== "object") return emptyPolicyRules();
+  if (!raw || typeof raw !== "object") {
+    return emptyPolicyRules();
+  }
+
   const r = raw as Record<string, unknown>;
+
   return {
     tools: mergePolicyDim(r.tools),
     mcp: mergePolicyDim(r.mcp),
@@ -565,6 +579,7 @@ function resolvePolicySideOfBundle(
   if (!rp) {
     return { modelAliases: {}, policyRules: emptyPolicyRules() };
   }
+
   const aliasesRaw = rp.modelAliases;
   const aliases: Record<string, string> =
     aliasesRaw && typeof aliasesRaw === "object" && !Array.isArray(aliasesRaw)
@@ -574,6 +589,7 @@ function resolvePolicySideOfBundle(
           ) as Array<[string, string]>,
         )
       : {};
+
   return {
     modelAliases: withTierFallthrough({
       aliases,
@@ -601,6 +617,7 @@ function geminiCredentials(pick: (k: string) => string): Record<string, unknown>
   // pick the Agent Platform door.
   const project = pick("GEMINI_PROJECT").trim();
   const location = pick("GEMINI_LOCATION").trim();
+
   return {
     api_key: pick("GEMINI_API_KEY") || pick("GOOGLE_API_KEY"),
     ...(project && location
@@ -695,7 +712,8 @@ export function buildCredentials(
     case "cloudflare":
       return { api_key: pick("CLOUDFLARE_API_KEY") };
     default: {
-      const apiKey = Object.entries(customKeys).find(([k]) => /_API_KEY$/.test(k))?.[1];
+      const apiKey = Object.entries(customKeys).find(([k]) => k.endsWith("_API_KEY"))?.[1];
+
       return { api_key: typeof apiKey === "string" ? apiKey : "" };
     }
   }
@@ -739,6 +757,7 @@ function buildProviderSlot(
   const deploymentMap = mp.deploymentMapping
     ? (mp.deploymentMapping as Record<string, string>)
     : undefined;
+
   return {
     id: mp.id,
     slot: index === 0 ? "primary" : `fallback_${index}`,
@@ -760,6 +779,7 @@ function buildProviderSlot(
  */
 function routingWire({ mp }: { mp: ModelProvider }): Pick<ProviderSlot, "handle" | "models"> {
   const models = declaredModelsForProvider(mp);
+
   return {
     ...(mp.routingHandle ? { handle: mp.routingHandle } : {}),
     ...(models ? { models } : {}),
@@ -768,11 +788,13 @@ function routingWire({ mp }: { mp: ModelProvider }): Pick<ProviderSlot, "handle"
 
 function pickString(obj: Record<string, unknown>, key: string): string | undefined {
   const v = obj[key];
+
   return typeof v === "string" && v.length > 0 ? v : undefined;
 }
 
 function buildProviderConfig(mp: ModelProvider): Record<string, unknown> {
   const gatewayExtras = (mp.providerConfig ?? {}) as Record<string, unknown>;
+
   return {
     rate_limit: {
       rpm: mp.rateLimitRpm,
@@ -859,6 +881,7 @@ function providerExclusions({
     (mp) => (!allowed || allowed.includes(mp.id)) && !dispatchIds.has(mp.id),
   );
   const accessExcluded = allowed ? scopeReachable.filter((mp) => !allowed.includes(mp.id)) : [];
+
   return { routingExcluded, accessExcluded };
 }
 
@@ -874,8 +897,12 @@ function budgetSpentMicroUSD(
   budget: GatewayBudgetResource,
   spendByBudgetId: Map<string, string>,
 ): number {
-  if (budget.scopeType === "ATTRIBUTED_USER") return 0;
+  if (budget.scopeType === "ATTRIBUTED_USER") {
+    return 0;
+  }
+
   const rollup = spendByBudgetId.get(budget.id);
+
   return rollup === undefined
     ? decimalToMicroUSD(budget.spentUsd)
     : decimalUSDStringToMicroUSD(rollup);
@@ -941,6 +968,9 @@ function decimalToMicroUSD(d: GatewayMoney): number {
 
 function decimalUSDStringToMicroUSD(s: string): number {
   const n = Number.parseFloat(s);
-  if (!Number.isFinite(n)) return 0;
+  if (!Number.isFinite(n)) {
+    return 0;
+  }
+
   return Math.round(n * 1_000_000);
 }

@@ -153,6 +153,7 @@ export async function reserveRealtimeSession(
         status: "OPEN",
       },
     });
+
     return { ok: true as const };
   });
 }
@@ -168,6 +169,7 @@ export async function correlateRealtimeSession(params: {
     where: { id: params.sessionId, projectId: params.projectId },
     data: { vendorConversationId: params.vendorConversationId },
   });
+
   return updated.count > 0;
 }
 
@@ -191,6 +193,7 @@ export async function releaseRealtimeSession(params: {
       closeReason: params.reason.slice(0, 256),
     },
   });
+
   return updated.count > 0;
 }
 
@@ -232,14 +235,18 @@ export async function matchRealtimeSession(params: {
     const exact = await prisma.gatewayRealtimeSession.findFirst({
       where: { ...tenancy, vendorConversationId: params.vendorConversationId },
     });
-    if (exact) return exact;
+    if (exact) {
+      return exact;
+    }
   }
 
   if (params.echoedSessionId) {
     const echoed = await prisma.gatewayRealtimeSession.findFirst({
       where: { ...tenancy, id: params.echoedSessionId },
     });
-    if (echoed) return echoed;
+    if (echoed) {
+      return echoed;
+    }
   }
 
   const since = new Date(
@@ -254,11 +261,15 @@ export async function matchRealtimeSession(params: {
     },
     take: 2,
   });
-  if (candidates.length === 1) return candidates[0] ?? null;
+  if (candidates.length === 1) {
+    return candidates[0] ?? null;
+  }
+
   logger.warn(
     { vendor: params.vendor, candidates: candidates.length },
     "a realtime post-call report matched no single open session; it settles as cost-unknown rather than being charged to a guess",
   );
+
   return null;
 }
 
@@ -349,6 +360,7 @@ export async function closeAndConfirmRealtimeSession(params: {
       { sessionId: params.session.id },
       "a realtime report arrived for a session that was already closed",
     );
+
     return;
   }
 
@@ -400,12 +412,16 @@ export async function reportRealtimeSessionUsage(params: {
       virtualKeyId: params.virtualKeyId,
     },
   });
-  if (!session) return "not_found";
+  if (!session) {
+    return "not_found";
+  }
+
   if (session.status === "CLOSED" || session.status === "FAILED") {
     logger.info(
       { sessionId: session.id, status: session.status },
       "a realtime usage report arrived for a session that is no longer open",
     );
+
     return "already_closed";
   }
 
@@ -418,6 +434,7 @@ export async function reportRealtimeSessionUsage(params: {
     reason: "usage reported by the client",
     durationMs: Math.max(0, now.getTime() - session.mintedAt.getTime()),
   });
+
   return "closed";
 }
 
@@ -456,5 +473,6 @@ export async function expireStaleRealtimeSessions(params: {
       closeReason: "no vendor report arrived within the longest possible call",
     },
   });
+
   return count;
 }

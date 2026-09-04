@@ -95,6 +95,7 @@ async function forEachWithConcurrency<T>(
       await Promise.race(executing);
     }
   }
+
   await Promise.all(executing);
 }
 
@@ -186,6 +187,7 @@ export async function resolveOffloadedTracesBatch({
         if (!fetchTasks.has(fetchKey)) {
           fetchTasks.set(fetchKey, { eventId, field, aggregateId });
         }
+
         return { attrKey, fetchKey };
       });
 
@@ -231,6 +233,7 @@ export async function resolveOffloadedTracesBatch({
           warnResolutionFailure(logger, projectId, span, attrKey, result.error);
         }
       }
+
       return { ...span, spanAttributes: resolvedAttrs };
     });
 

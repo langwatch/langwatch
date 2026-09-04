@@ -46,10 +46,15 @@ export class ExperimentSlugService {
         })
       ).filter((slug) => suffixPattern.test(slug)),
     );
-    if (!existing.has(input.baseSlug)) return input.baseSlug;
+    if (!existing.has(input.baseSlug)) {
+      return input.baseSlug;
+    }
+
     for (let index = 2; index <= MAX_NUMBERED_SUFFIX; index += 1) {
       const candidate = `${input.baseSlug}-${index}`;
-      if (!existing.has(candidate)) return candidate;
+      if (!existing.has(candidate)) {
+        return candidate;
+      }
     }
 
     return `${input.baseSlug}-${this.newId()}`;

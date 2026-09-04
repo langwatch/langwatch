@@ -434,7 +434,10 @@ export class WebhookDeliveryService {
         )
         .onWake((state, context) => {
           const target = WebhookDeliveryService.endpointFlushTarget(state, context.key);
-          if (!target) return { state };
+          if (!target) {
+            return { state };
+          }
+
           return {
             state,
             intents: [
@@ -467,6 +470,7 @@ export class WebhookDeliveryService {
    *  table: the log's consumers stay independent AND state the same cost. */
   static payloadToRow(payload: DeliverPayload): WebhookSpendEventRow {
     const usage = payload.usage ?? EMPTY_SPEND_USAGE;
+
     return {
       ...WebhookDeliveryService.attributedColumns(payload.attribution),
       tenantId: payload.project_id,
@@ -523,17 +527,22 @@ export class WebhookDeliveryService {
           },
           "spend outcome arrived without admission attribution; skipping webhook delivery (reconciliation surfaces the row)",
         );
+
         return;
       }
 
       const plan = await this.deps.getPlan(organizationId);
-      if (plan.webhookEndpointsEnabled !== true) return;
+      if (plan.webhookEndpointsEnabled !== true) {
+        return;
+      }
 
       const endpoints = await this.endpointsSubscribedTo({
         organizationId,
         status: payload.status,
       });
-      if (endpoints.length === 0) return;
+      if (endpoints.length === 0) {
+        return;
+      }
 
       const row = WebhookDeliveryService.payloadToRow(payload);
       const envelope = WebhookEnvelopeService.fromSpendRow(
@@ -563,7 +572,10 @@ export class WebhookDeliveryService {
         organizationId: payload.organizationId,
         endpointId: payload.endpointId,
       });
-      if (!endpoint) return;
+      if (!endpoint) {
+        return;
+      }
+
       await this.flushEndpointStream({
         organizationId: payload.organizationId,
         endpoint,
@@ -589,6 +601,7 @@ export class WebhookDeliveryService {
           { endpointId: payload.endpointId, batchId: payload.batchId },
           "webhook batch dropped: endpoint disabled or gone (replay covers the gap)",
         );
+
         return;
       }
 
@@ -647,7 +660,10 @@ export class WebhookDeliveryService {
     const pending: PendingEnvelope[] = existing?.state.pending ? [...existing.state.pending] : [];
     if (append) {
       const item: PendingEnvelope = { envelope: append, appendedAtMs: now };
-      if (appendSalt) item.salt = appendSalt;
+      if (appendSalt) {
+        item.salt = appendSalt;
+      }
+
       pending.push(item);
     }
 
@@ -692,6 +708,7 @@ export class WebhookDeliveryService {
   }): Promise<WebhookEndpointView[]> {
     const eventType = WebhookDeliveryService.deliveryEventType(status);
     const endpoints = await this.deps.endpoints.getActiveByOrganization({ organizationId });
+
     return endpoints.filter((e) => eventMatches(e.enabledEvents, eventType));
   }
 
@@ -702,7 +719,10 @@ export class WebhookDeliveryService {
    */
   private async runMaintenanceIfDue(): Promise<void> {
     const now = (this.deps.now ?? Date.now)();
-    if (now - maintenanceLastCheckedMs < 60_000) return;
+    if (now - maintenanceLastCheckedMs < 60_000) {
+      return;
+    }
+
     maintenanceLastCheckedMs = now;
 
     // Both sweeps below are global, so the CAS row must be too: a sentinel
@@ -720,6 +740,7 @@ export class WebhookDeliveryService {
       if (existing && now - existing.state.lastRunMs < MAINTENANCE_INTERVAL_MS) {
         return;
       }
+
       const claimed = await this.deps.processStore.commit({
         ref,
         tenantId: MAINTENANCE_TENANT,
@@ -730,7 +751,9 @@ export class WebhookDeliveryService {
         messages: [],
         now,
       });
-      if (claimed.outcome !== "committed") return;
+      if (claimed.outcome !== "committed") {
+        return;
+      }
 
       await this.deps.processStore.deleteDispatchedBefore({
         processName: WEBHOOK_DELIVERY_PROCESS_NAME,
@@ -807,6 +830,7 @@ export class WebhookDeliveryService {
         latencyMs: (this.deps.now ?? Date.now)() - startedAt,
         error: error instanceof Error ? error.message.slice(0, 500) : String(error),
       });
+
       throw error;
     }
   }
@@ -847,12 +871,16 @@ export class WebhookDeliveryService {
       eventCount: payload.envelopes.length,
       latencyMs,
     };
-    if (result.status !== null) attempt.responseStatus = result.status;
+    if (result.status !== null) {
+      attempt.responseStatus = result.status;
+    }
+
     if (result.verdict === "success") {
       await this.deps.endpoints.recordDeliveryAttempt({
         ...attempt,
         outcome: "success",
       });
+
       return;
     }
 
@@ -866,6 +894,7 @@ export class WebhookDeliveryService {
     if (result.retryAfterMs !== undefined) {
       response.retryAfterMs = result.retryAfterMs;
     }
+
     await this.deps.endpoints.recordDeliveryAttempt({
       ...attempt,
       outcome: result.verdict,
@@ -887,6 +916,7 @@ export class WebhookDeliveryService {
     if (result.verdict === "retryable" && result.retryAfterMs !== undefined) {
       dispatchError.retryAfterMs = result.retryAfterMs;
     }
+
     throw new DispatchError(dispatchError);
   }
 
@@ -939,10 +969,16 @@ export class WebhookDeliveryService {
     state: WebhookDeliveryState,
     key: string,
   ): { endpointId: string; organizationId: string } | null {
-    if (!WebhookDeliveryService.isEndpointStreamKey(key)) return null;
+    if (!WebhookDeliveryService.isEndpointStreamKey(key)) {
+      return null;
+    }
+
     const stream = state as unknown as EndpointStreamState;
     const organizationId = stream.pending[0]?.envelope.data?.organization_id;
-    if (typeof organizationId !== "string" || organizationId === "") return null;
+    if (typeof organizationId !== "string" || organizationId === "") {
+      return null;
+    }
+
     return { endpointId: key.slice("endpoint:".length), organizationId };
   }
 
@@ -1042,6 +1078,7 @@ export class WebhookDeliveryService {
     incoming: DeliverPayload,
   ): WebhookDeliveryState {
     const keepStashed = incoming.status === "settled" && state.pendingOutcome !== null;
+
     return {
       ...state,
       pendingOutcome: keepStashed ? state.pendingOutcome : incoming,
@@ -1061,7 +1098,10 @@ export class WebhookDeliveryService {
   private static attributionFromOutcome(
     data: ConfirmSpendCommandData | FailSpendCommandData | SettleSpendCommandData,
   ): SpendAttribution | null {
-    if (!data.organization_id) return null;
+    if (!data.organization_id) {
+      return null;
+    }
+
     return {
       organization_id: data.organization_id,
       virtual_key_id: data.virtual_key_id,
@@ -1112,6 +1152,7 @@ export class WebhookDeliveryService {
     if (attribution === null) {
       return { state: WebhookDeliveryService.withStashedOutcome(state, payload) };
     }
+
     return {
       state,
       intents: [ctx.intents.deliver(`deliver:${status}`, payload)],
@@ -1148,11 +1189,15 @@ export class WebhookDeliveryService {
     // Every outcome states the attribution itself, so there is nothing worth
     // remembering and this admission writes no row.
     if (admit.outcome_carries_attribution) {
-      if (!stashed) return { state };
+      if (!stashed) {
+        return { state };
+      }
+
       return { state: { ...state, pendingOutcome: null }, intents: release };
     }
 
     const admitted = { ...state, attribution, pendingOutcome: null };
+
     return stashed ? { state: admitted, intents: release } : { state: admitted };
   }
 

@@ -83,18 +83,24 @@ export function deriveLogContentAttributes({
   attributes: Record<string, string>;
   traceCanonicalisation: TraceCanonicalisationService;
 }): Record<string, string> {
-  if (scopeName !== CLAUDE_CODE_EVENTS_SCOPE) return {};
+  if (scopeName !== CLAUDE_CODE_EVENTS_SCOPE) {
+    return {};
+  }
 
   const eventName = attributes["event.name"];
   const body = attributes.body;
-  if (typeof body !== "string" || body.length === 0) return {};
+  if (typeof body !== "string" || body.length === 0) {
+    return {};
+  }
 
   if (eventName === RESPONSE_BODY_EVENT) {
     return deriveFromResponseBody(body, traceCanonicalisation);
   }
+
   if (eventName === REQUEST_BODY_EVENT) {
     return deriveFromRequestBody(body, traceCanonicalisation);
   }
+
   return {};
 }
 
@@ -114,7 +120,9 @@ function deriveFromResponseBody(
   }
 
   const parsed = parseJsonObject(body);
-  if (parsed === null) return derived;
+  if (parsed === null) {
+    return derived;
+  }
 
   const toolCalls = readToolCalls(parsed.content);
   if (toolCalls.length > 0) {
@@ -137,7 +145,10 @@ function deriveFromRequestBody(
   const messages = traceCanonicalisation.deriveClaudeRequestContent({
     body,
   }).messages;
-  if (messages === null || messages.length === 0) return {};
+  if (messages === null || messages.length === 0) {
+    return {};
+  }
+
   return {
     [DERIVED_ATTRS.INPUT_MESSAGE_COUNT]: String(messages.length),
   };
@@ -151,23 +162,36 @@ function deriveFromRequestBody(
  * tools, how many.
  */
 function readToolCalls(content: unknown): DerivedToolCall[] {
-  if (!Array.isArray(content)) return [];
+  if (!Array.isArray(content)) {
+    return [];
+  }
 
   const calls: DerivedToolCall[] = [];
   for (const block of content) {
-    if (typeof block !== "object" || block === null) continue;
+    if (typeof block !== "object" || block === null) {
+      continue;
+    }
+
     const b = block as Record<string, unknown>;
-    if (b.type !== "tool_use") continue;
+    if (b.type !== "tool_use") {
+      continue;
+    }
+
     const name = typeof b.name === "string" ? b.name : null;
-    if (name === null) continue;
+    if (name === null) {
+      continue;
+    }
+
     calls.push({ id: typeof b.id === "string" ? b.id : "", name });
   }
+
   return calls;
 }
 
 function parseJsonObject(raw: string): Record<string, unknown> | null {
   try {
     const parsed: unknown = JSON.parse(raw);
+
     return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
       ? (parsed as Record<string, unknown>)
       : null;

@@ -101,6 +101,7 @@ export class ExperimentWorkbenchService {
         ...(target.id ? { id: target.id } : {}),
       });
     }
+
     const current = target.state;
     await this.references.assertAllExist({ projectId: command.projectId, state });
 
@@ -124,6 +125,7 @@ export class ExperimentWorkbenchService {
       saved: written,
       actor: command.actor,
     });
+
     return written;
   }
 
@@ -155,6 +157,7 @@ export class ExperimentWorkbenchService {
       saved: result,
       actor: command.actor,
     });
+
     return result;
   }
 

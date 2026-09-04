@@ -41,6 +41,7 @@ export class PresenceService extends PresenceServiceContract {
     if (!Number.isSafeInteger(ttlSeconds) || ttlSeconds <= 0) {
       throw new RangeError("ttlSeconds must be a positive safe integer");
     }
+
     return new PresenceService(
       options.repository,
       options.broadcast,
@@ -53,6 +54,7 @@ export class PresenceService extends PresenceServiceContract {
 
   isEnabledForProject(input: PresenceProjectInput): Promise<boolean> {
     const parsed = presenceProjectInputSchema.parse(input);
+
     return this.projects.isPresenceEnabled(parsed);
   }
 
@@ -69,6 +71,7 @@ export class PresenceService extends PresenceServiceContract {
     } else if (!locationsEqual(existing.location, parsed.location)) {
       await this.publishUpdate(parsed.projectId, { kind: "update", session });
     }
+
     return session;
   }
 
@@ -78,7 +81,10 @@ export class PresenceService extends PresenceServiceContract {
       projectId: parsed.projectId,
       sessionId: parsed.sessionId,
     });
-    if (!removed) return;
+    if (!removed) {
+      return;
+    }
+
     await this.publishUpdate(parsed.projectId, {
       kind: "leave",
       sessionId: parsed.sessionId,
@@ -87,6 +93,7 @@ export class PresenceService extends PresenceServiceContract {
 
   list(input: PresenceProjectInput): Promise<PresenceSession[]> {
     const parsed = presenceProjectInputSchema.parse(input);
+
     return this.repository.listByProject(parsed.projectId);
   }
 

@@ -91,6 +91,7 @@ export class DataRetentionSnapshotService {
           })
         : new Map<string, boolean>();
       const canWrite = decided.get(projectId) === true;
+
       return {
         projectId,
         effective,
@@ -153,14 +154,26 @@ export class DataRetentionSnapshotService {
       scopeType: RetentionScopeTarget["scopeType"],
       scopeId: string,
     ): boolean => {
-      if (scopeType === "ORGANIZATION") return canManageOrganization;
-      if (scopeType === "TEAM") return teamManage.get(scopeId) === true;
+      if (scopeType === "ORGANIZATION") {
+        return canManageOrganization;
+      }
+
+      if (scopeType === "TEAM") {
+        return teamManage.get(scopeId) === true;
+      }
+
       return projectUpdate.get(scopeId) === true;
     };
 
     const scopeName = (scopeType: RetentionScopeTarget["scopeType"], scopeId: string): string => {
-      if (scopeType === "ORGANIZATION") return organizationName ?? scopeId;
-      if (scopeType === "TEAM") return teamName.get(scopeId) ?? scopeId;
+      if (scopeType === "ORGANIZATION") {
+        return organizationName ?? scopeId;
+      }
+
+      if (scopeType === "TEAM") {
+        return teamName.get(scopeId) ?? scopeId;
+      }
+
       return projectName.get(scopeId) ?? scopeId;
     };
 

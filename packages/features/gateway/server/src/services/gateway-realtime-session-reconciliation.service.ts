@@ -123,7 +123,9 @@ export class GatewayRealtimeSessionReconciliationWorker {
     let confirmed = 0;
     for (const session of sessions) {
       try {
-        if (await this.reconcile(session)) confirmed += 1;
+        if (await this.reconcile(session)) {
+          confirmed += 1;
+        }
       } catch (error) {
         this.logger.warn(
           { error, sessionId: session.id },
@@ -140,12 +142,16 @@ export class GatewayRealtimeSessionReconciliationWorker {
     let running = false;
 
     const tick = async () => {
-      if (stopped) return;
+      if (stopped) {
+        return;
+      }
+
       if (running) {
         this.logger.warn(
           {},
           "the previous realtime reconciliation tick is still running; skipping this one",
         );
+
         return;
       }
 
@@ -177,12 +183,16 @@ export class GatewayRealtimeSessionReconciliationWorker {
   }
 
   private async reconcile(session: GatewayRealtimeSessionRecord): Promise<boolean> {
-    if (!session.vendorConversationId) return false;
+    if (!session.vendorConversationId) {
+      return false;
+    }
 
     const credential = await this.credentials.getApiCredential({
       modelProviderId: session.modelProviderId,
     });
-    if (!credential) return false;
+    if (!credential) {
+      return false;
+    }
 
     const { report, notFound } = await this.conversations.readConversation({
       ...credential,
@@ -195,9 +205,13 @@ export class GatewayRealtimeSessionReconciliationWorker {
         projectId: session.projectId,
         reason: "the vendor has no conversation for this session, so the credential was never used",
       });
+
       return false;
     }
-    if (!report || !isTerminal(report.status)) return false;
+
+    if (!report || !isTerminal(report.status)) {
+      return false;
+    }
 
     const reportedSecs = report.metadata?.call_duration_secs;
     if (
@@ -209,6 +223,7 @@ export class GatewayRealtimeSessionReconciliationWorker {
         { sessionId: session.id, status: report.status },
         "the vendor reported a finished conversation with no usable duration; leaving the session open",
       );
+
       return false;
     }
 
@@ -220,6 +235,7 @@ export class GatewayRealtimeSessionReconciliationWorker {
       durationMs: durationSecs * 1000,
       reason: "reconciled by poll",
     });
+
     return true;
   }
 }

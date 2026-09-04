@@ -54,7 +54,9 @@ export class TraceSummaryService {
     },
   ): Promise<TraceSummaryData> {
     const result = await this.repository.findByTraceId({ tenantId, traceId }, options);
-    if (!result) throw new TraceNotFoundError(traceId);
+    if (!result) {
+      throw new TraceNotFoundError(traceId);
+    }
 
     const cutoff = options?.visibilityCutoffMs;
     if (cutoff !== null && cutoff !== undefined && result.occurredAt < cutoff) {
@@ -74,6 +76,7 @@ export class TraceSummaryService {
     if (options?.full && this.fullResolutionDeps) {
       return await this.withFullIO(tenantId, result);
     }
+
     return result;
   }
 
@@ -85,7 +88,10 @@ export class TraceSummaryService {
    */
   private async withFullIO(tenantId: string, summary: TraceSummaryData): Promise<TraceSummaryData> {
     const deps = this.fullResolutionDeps;
-    if (!deps) return summary;
+    if (!deps) {
+      return summary;
+    }
+
     try {
       const normalizedSpans = await deps.spanStorageRepository.getNormalizedSpansByTraceId({
         tenantId,
@@ -99,7 +105,10 @@ export class TraceSummaryService {
         ioExtractionService: deps.ioExtractionService,
         logger: this.logger,
       });
-      if (!anyResolved) return summary;
+      if (!anyResolved) {
+        return summary;
+      }
+
       return {
         ...summary,
         ...(recomputedInput !== null ? { computedInput: recomputedInput.text } : {}),
@@ -110,6 +119,7 @@ export class TraceSummaryService {
         { error, tenantId, traceId: summary.traceId },
         "full-resolution summary read failed; returning stored preview",
       );
+
       return summary;
     }
   }

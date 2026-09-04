@@ -74,8 +74,14 @@ export function evaluationDataFor({
   content: GuardrailCheckContent | undefined;
 }): { input: string; output: string } {
   const asText = (value: unknown): string => {
-    if (value === undefined || value === null) return "";
-    if (typeof value === "string") return value;
+    if (value === undefined || value === null) {
+      return "";
+    }
+
+    if (typeof value === "string") {
+      return value;
+    }
+
     return JSON.stringify(value);
   };
 
@@ -87,11 +93,14 @@ export function evaluationDataFor({
       .filter((part) => part !== undefined && part !== null)
       .map(asText)
       .filter((part) => part !== "");
+
     return { input: parts.join("\n"), output: "" };
   }
+
   if (direction === "response") {
     return { input: "", output: asText(content?.output) };
   }
+
   return { input: "", output: asText(content?.chunk) };
 }
 
@@ -135,7 +144,9 @@ export class GatewayGuardrailEvaluationService {
     direction: GuardrailWireDirection;
     content?: GuardrailCheckContent;
   }): Promise<GuardrailCheckVerdict> {
-    if (guardrailIds.length === 0) return ALLOW;
+    if (guardrailIds.length === 0) {
+      return ALLOW;
+    }
 
     // Scoping by projectId as well as id is what keeps one project's virtual
     // key from naming another project's guardrail.
@@ -147,7 +158,9 @@ export class GatewayGuardrailEvaluationService {
         direction: storedDirectionFor(direction),
       },
     });
-    if (guardrails.length === 0) return ALLOW;
+    if (guardrails.length === 0) {
+      return ALLOW;
+    }
 
     const monitorsByEvaluator = await this.guardrailMonitors({
       projectId,
@@ -168,12 +181,15 @@ export class GatewayGuardrailEvaluationService {
             reason: "guardrail evaluator is not enabled for guardrail execution",
           });
         }
+
         return this.runOne({ guardrail, monitor, data, projectId });
       }),
     );
 
     const blocked = verdicts.filter((verdict) => verdict.decision === "block");
-    if (blocked.length === 0) return ALLOW;
+    if (blocked.length === 0) {
+      return ALLOW;
+    }
 
     return {
       decision: "block",
@@ -204,6 +220,7 @@ export class GatewayGuardrailEvaluationService {
         byEvaluator.set(monitor.evaluatorId, monitor);
       }
     }
+
     return byEvaluator;
   }
 
@@ -228,6 +245,7 @@ export class GatewayGuardrailEvaluationService {
       });
     } catch (error) {
       logger.warn({ guardrailId: guardrail.id, projectId, error }, "guardrail evaluator threw");
+
       return this.onFailure({
         guardrail,
         reason: "guardrail evaluator failed to run",
@@ -240,7 +258,11 @@ export class GatewayGuardrailEvaluationService {
         reason: result.details || "guardrail evaluator returned an error",
       });
     }
-    if (result.status === "skipped") return ALLOW;
+
+    if (result.status === "skipped") {
+      return ALLOW;
+    }
+
     if (result.passed === false) {
       return {
         decision: "block",
@@ -249,6 +271,7 @@ export class GatewayGuardrailEvaluationService {
         policies_triggered: [guardrail.id],
       };
     }
+
     return ALLOW;
   }
 
@@ -264,7 +287,10 @@ export class GatewayGuardrailEvaluationService {
     guardrail: { id: string; failureMode: string };
     reason: string;
   }): GuardrailCheckVerdict {
-    if (guardrail.failureMode === "FAIL_OPEN") return ALLOW;
+    if (guardrail.failureMode === "FAIL_OPEN") {
+      return ALLOW;
+    }
+
     return {
       decision: "block",
       reason,

@@ -65,8 +65,11 @@ export class TraceQueryEvaluationService {
     } catch {
       return false;
     }
+
     // `null` means no filter (empty / whitespace) — every trace matches.
-    if (compiled === null) return true;
+    if (compiled === null) {
+      return true;
+    }
 
     let ast: LiqeQuery;
     try {
@@ -107,7 +110,9 @@ export class TraceQueryEvaluationService {
     } catch {
       return needs;
     }
+
     TraceQueryEvaluationService.collectNeeds(ast, needs);
+
     return needs;
   }
 
@@ -118,7 +123,9 @@ export class TraceQueryEvaluationService {
     state: WalkState,
   ): boolean | Unsupported {
     state.nodeCount++;
-    if (state.nodeCount > MAX_NODE_COUNT) return UNSUPPORTED;
+    if (state.nodeCount > MAX_NODE_COUNT) {
+      return UNSUPPORTED;
+    }
 
     switch (node.type) {
       case "EmptyExpression":
@@ -130,6 +137,7 @@ export class TraceQueryEvaluationService {
         if (result === UNSUPPORTED && tag.field.type !== "ImplicitField") {
           state.unsupportedFields.push(tag.field.name);
         }
+
         return result;
       }
 
@@ -138,20 +146,27 @@ export class TraceQueryEvaluationService {
         // Negation threads down unchanged and the operator stays as-is — the
         // exact shape `translateNode` compiles, so both sides always agree.
         const left = TraceQueryEvaluationService.evaluateNode(logExpr.left, negated, trace, state);
-        if (left === UNSUPPORTED) return UNSUPPORTED;
+        if (left === UNSUPPORTED) {
+          return UNSUPPORTED;
+        }
+
         const right = TraceQueryEvaluationService.evaluateNode(
           logExpr.right,
           negated,
           trace,
           state,
         );
-        if (right === UNSUPPORTED) return UNSUPPORTED;
+        if (right === UNSUPPORTED) {
+          return UNSUPPORTED;
+        }
+
         return logExpr.operator.operator === "OR" ? left || right : left && right;
       }
 
       case "UnaryOperator": {
         const unary = node as UnaryOperatorToken;
         const isNeg = unary.operator === "NOT" || unary.operator === "-";
+
         return TraceQueryEvaluationService.evaluateNode(
           unary.operand,
           negated !== isNeg,
@@ -162,6 +177,7 @@ export class TraceQueryEvaluationService {
 
       case "ParenthesizedExpression": {
         const paren = node as ParenthesizedExpressionToken;
+
         return TraceQueryEvaluationService.evaluateNode(paren.expression, negated, trace, state);
       }
 
@@ -190,11 +206,13 @@ export class TraceQueryEvaluationService {
         trace,
       );
     }
+
     if (fieldName.startsWith(SPAN_ATTRIBUTE_PREFIX)) {
       // span.attribute.<k> resolves via stored_spans; spans aren't derived at
       // dispatch time yet.
       return UNSUPPORTED;
     }
+
     if (fieldName.startsWith(EVENT_ATTRIBUTE_PREFIX)) {
       return TraceQueryEvaluationService.evaluateEventAttribute(
         fieldName.slice(EVENT_ATTRIBUTE_PREFIX.length),
@@ -203,6 +221,7 @@ export class TraceQueryEvaluationService {
         trace,
       );
     }
+
     if (fieldName.startsWith(TRACE_ATTRIBUTE_PREFIX_LEGACY)) {
       return TraceQueryEvaluationService.evaluateTraceAttribute(
         fieldName.slice(TRACE_ATTRIBUTE_PREFIX_LEGACY.length),
@@ -211,6 +230,7 @@ export class TraceQueryEvaluationService {
         trace,
       );
     }
+
     if (fieldName.startsWith(EVENT_ATTRIBUTE_PREFIX_LEGACY) && fieldName !== "event") {
       return TraceQueryEvaluationService.evaluateEventAttribute(
         fieldName.slice(EVENT_ATTRIBUTE_PREFIX_LEGACY.length),
@@ -225,7 +245,10 @@ export class TraceQueryEvaluationService {
     // this guard and then blow up on `def.evaluateInMemory(...)`.
     const def = FIELD_DEF_BY_NAME.get(fieldName);
     // Unknown field — the gate already rejected it; defensive fail-closed.
-    if (!def) return UNSUPPORTED;
+    if (!def) {
+      return UNSUPPORTED;
+    }
+
     return def.evaluateInMemory(tag, negated, trace);
   }
 
@@ -272,6 +295,7 @@ export class TraceQueryEvaluationService {
           ? null
           : false;
     const result = negated ? (matched === null ? null : !matched) : matched;
+
     return result === true;
   }
 
@@ -280,7 +304,10 @@ export class TraceQueryEvaluationService {
     column: string | null | undefined,
     lowerValue: string,
   ): boolean | null {
-    if (column == null) return null;
+    if (column == null) {
+      return null;
+    }
+
     return column.toLowerCase().includes(lowerValue);
   }
 
@@ -291,9 +318,13 @@ export class TraceQueryEvaluationService {
     trace: InMemoryTrace,
   ): boolean | Unsupported {
     // Empty key throws on the SQL side (422) — fail closed.
-    if (!key) return UNSUPPORTED;
+    if (!key) {
+      return UNSUPPORTED;
+    }
+
     const value = TraceQueryValues.extractStringValue(tag);
     const matched = TraceQueryValues.readAttribute(trace.summary.attributes, key) === value;
+
     return negated ? !matched : matched;
   }
 
@@ -303,12 +334,19 @@ export class TraceQueryEvaluationService {
     negated: boolean,
     trace: InMemoryTrace,
   ): boolean | Unsupported {
-    if (!key) return UNSUPPORTED;
-    if (trace.events == null) return UNSUPPORTED;
+    if (!key) {
+      return UNSUPPORTED;
+    }
+
+    if (trace.events == null) {
+      return UNSUPPORTED;
+    }
+
     const value = TraceQueryValues.extractStringValue(tag);
     const matched = trace.events.some(
       (e) => TraceQueryValues.readAttribute(e.attributes, key) === value,
     );
+
     return negated ? !matched : matched;
   }
 
@@ -321,6 +359,7 @@ export class TraceQueryEvaluationService {
         const logExpr = node as LogicalExpressionToken;
         TraceQueryEvaluationService.collectNeeds(logExpr.left, needs);
         TraceQueryEvaluationService.collectNeeds(logExpr.right, needs);
+
         return;
       }
       case "UnaryOperator":
@@ -342,22 +381,35 @@ export class TraceQueryEvaluationService {
     // in-memory mirror needs the span rows to answer it without failing closed.
     if (tag.field.type === "ImplicitField") {
       needs.add("spans");
+
       return;
     }
+
     const fieldName = tag.field.name;
 
-    if (fieldName.startsWith(TRACE_ATTRIBUTE_PREFIX)) return;
+    if (fieldName.startsWith(TRACE_ATTRIBUTE_PREFIX)) {
+      return;
+    }
+
     if (fieldName.startsWith(SPAN_ATTRIBUTE_PREFIX)) {
       needs.add("spans");
+
       return;
     }
+
     if (fieldName.startsWith(EVENT_ATTRIBUTE_PREFIX)) {
       needs.add("events");
+
       return;
     }
-    if (fieldName.startsWith(TRACE_ATTRIBUTE_PREFIX_LEGACY)) return;
+
+    if (fieldName.startsWith(TRACE_ATTRIBUTE_PREFIX_LEGACY)) {
+      return;
+    }
+
     if (fieldName.startsWith(EVENT_ATTRIBUTE_PREFIX_LEGACY) && fieldName !== "event") {
       needs.add("events");
+
       return;
     }
 
@@ -366,15 +418,20 @@ export class TraceQueryEvaluationService {
     if (fieldName === "has" || fieldName === "none") {
       try {
         const need = TraceQueryMetaFields.existenceNeeds(TraceQueryValues.extractStringValue(tag));
-        if (need) needs.add(need);
+        if (need) {
+          needs.add(need);
+        }
       } catch {
         // Non-literal value — nothing to resolve.
       }
+
       return;
     }
 
     const def = FIELD_DEF_BY_NAME.get(fieldName);
-    if (def?.needs) needs.add(def.needs);
+    if (def?.needs) {
+      needs.add(def.needs);
+    }
   }
 }
 

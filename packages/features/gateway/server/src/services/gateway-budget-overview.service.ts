@@ -252,6 +252,7 @@ export class BudgetOverviewService {
           personalVkIds,
           userId: input.userId,
         });
+
         return {
           ...budget,
           scopeClass,
@@ -279,7 +280,9 @@ export class BudgetOverviewService {
     const budget = await this.prisma.gatewayBudget.findFirst({
       where: { id: input.budgetId, organizationId: input.organizationId },
     });
-    if (!budget) return null;
+    if (!budget) {
+      return null;
+    }
 
     const [targets, providerLabels, spentUsd] = await Promise.all([
       this.budgetDecisions.resolveScopeTargets([budget], input.organizationId),
@@ -290,6 +293,7 @@ export class BudgetOverviewService {
     const scopeLabel =
       targets.get(scopeTargetKey(budget.scopeType, budget.scopeId))?.name ?? budget.scopeId;
     const scopeClass = absoluteScopeClass(budget.scopeType) ?? "other";
+
     return {
       id: budget.id,
       name: budget.name,
@@ -314,9 +318,15 @@ export class BudgetOverviewService {
   }
 
   private async loadSpendForBudget(budget: GatewayBudget, organizationId: string): Promise<string> {
-    if (!this.chRepo) return "0";
+    if (!this.chRepo) {
+      return "0";
+    }
+
     const tenantIds = await this.budgetDecisions.listSpendTenantIds(organizationId);
-    if (tenantIds.length === 0) return "0";
+    if (tenantIds.length === 0) {
+      return "0";
+    }
+
     const now = new Date();
     try {
       const spends = await this.chRepo.getSpendForTargetsAcrossTenants(
@@ -324,6 +334,7 @@ export class BudgetOverviewService {
         spendTargetsForBudgets({ budgets: [budget], now }),
         now,
       );
+
       return spends[0]?.spentUsd ?? "0";
     } catch {
       // Same posture as the applicable-budgets list: spend decorates the
@@ -336,12 +347,16 @@ export class BudgetOverviewService {
     personalProjectId: string | null;
     userId: string;
   }): Promise<Array<{ model: string; spentUsd: number }>> {
-    if (!input.personalProjectId || !this.personalUsage) return [];
+    if (!input.personalProjectId || !this.personalUsage) {
+      return [];
+    }
+
     try {
       const breakdown = await this.personalUsage.breakdownByModel(
         { personalProjectId: input.personalProjectId, userId: input.userId },
         3,
       );
+
       return breakdown.map((b) => ({ model: b.label, spentUsd: b.spentUsd }));
     } catch {
       return [];
@@ -358,7 +373,10 @@ function scopeRank(scopeType: string): number {
 
 function byMostBindingFirst(a: BudgetOverviewItem, b: BudgetOverviewItem): number {
   const rank = scopeRank(a.scopeType) - scopeRank(b.scopeType);
-  if (rank !== 0) return rank;
+  if (rank !== 0) {
+    return rank;
+  }
+
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }
 
@@ -444,13 +462,22 @@ function absoluteScopePhrase(scopeType: string, scopeLabel: string): string {
   const scopeClass = absoluteScopeClass(scopeType);
   // Without a user in context "this key's budget" and a bare "personal
   // budget" would dangle; name the target instead.
-  if (scopeClass === "key") return `key budget (${scopeLabel})`;
-  if (scopeClass === "personal") return `personal budget (${scopeLabel})`;
+  if (scopeClass === "key") {
+    return `key budget (${scopeLabel})`;
+  }
+
+  if (scopeClass === "personal") {
+    return `personal budget (${scopeLabel})`;
+  }
+
   return scopePhraseFor(scopeClass ?? "other", scopeLabel);
 }
 
 function resetsAtFor(window: string): string | null {
-  if (window === "TOTAL") return null;
+  if (window === "TOTAL") {
+    return null;
+  }
+
   return GatewayWindow.nextResetAt(
     window as Parameters<typeof GatewayWindow.nextResetAt>[0],
   ).toISOString();

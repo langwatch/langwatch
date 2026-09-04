@@ -39,6 +39,7 @@ function hasTimePredicate(sql: string, column: string): boolean {
   const colThenOp = new RegExp(`\\b${col}\\b\\s*(?:>=|<=|<>|!=|=|>|<|\\bBETWEEN\\b|\\bIN\\b)`, "i");
   // ... <op> column   (e.g. {from} <= StartTime)
   const opThenCol = new RegExp(`(?:>=|<=|<>|!=|=|>|<)\\s*\\b${col}\\b`, "i");
+
   return colThenOp.test(sql) || opThenCol.test(sql);
 }
 
@@ -52,19 +53,27 @@ function hasTimePredicate(sql: string, column: string): boolean {
  * positive is a cheap advisory log line; a false negative misses real S3 cost.
  */
 export function detectColdScan(query: string): string | null {
-  if (typeof query !== "string" || query.length === 0) return null;
+  if (typeof query !== "string" || query.length === 0) {
+    return null;
+  }
 
   const sql = stripComments(query);
   const trimmed = sql.trimStart().toUpperCase();
-  if (!trimmed.startsWith("SELECT") && !trimmed.startsWith("WITH")) return null;
+  if (!trimmed.startsWith("SELECT") && !trimmed.startsWith("WITH")) {
+    return null;
+  }
 
   for (const [table, timeColumns] of Object.entries(TIME_PARTITIONED_TABLES)) {
     // Word-boundary match so `stored_spans` doesn't match `stored_spans_v2`.
     const tableRef = new RegExp(`\\b${table}\\b`, "i");
-    if (!tableRef.test(sql)) continue;
+    if (!tableRef.test(sql)) {
+      continue;
+    }
 
     const hasPredicate = timeColumns.some((col) => hasTimePredicate(sql, col));
-    if (!hasPredicate) return table;
+    if (!hasPredicate) {
+      return table;
+    }
   }
 
   return null;

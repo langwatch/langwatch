@@ -215,12 +215,20 @@ export class SpanNormalizationPipelineService {
     const raw =
       span.spanAttributes[ATTR_KEYS.LANGWATCH_RAG_CONTEXTS] ??
       span.spanAttributes[ATTR_KEYS.LANGWATCH_RAG_CONTEXTS_LEGACY];
-    if (!Array.isArray(raw)) return;
+    if (!Array.isArray(raw)) {
+      return;
+    }
 
     span.spanAttributes[ATTR_KEYS.LANGWATCH_RAG_CONTEXTS] = raw.map((context) => {
-      if (!context || typeof context !== "object" || Array.isArray(context)) return context;
+      if (!context || typeof context !== "object" || Array.isArray(context)) {
+        return context;
+      }
+
       const entry: Record<string, unknown> = context;
-      if ("document_id" in entry && entry.document_id) return entry;
+      if ("document_id" in entry && entry.document_id) {
+        return entry;
+      }
+
       return {
         ...entry,
         document_id: SpanNormalizationPipelineService.documentIdFor(
@@ -258,6 +266,7 @@ export class SpanNormalizationPipelineService {
         return (object as string).trim();
       }
     }
+
     if (Array.isArray(content)) {
       return content
         .map((item) => SpanNormalizationPipelineService.chunkText(item))
@@ -265,9 +274,11 @@ export class SpanNormalizationPipelineService {
         .join("\n")
         .trim();
     }
+
     if (typeof content === "object" && content !== null) {
       return JSON.stringify(content);
     }
+
     // Parsed to a primitive (number, boolean, etc.) — use the original string
     return String(object).trim();
   }

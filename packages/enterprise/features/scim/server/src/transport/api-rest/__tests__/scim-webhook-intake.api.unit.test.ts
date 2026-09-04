@@ -78,7 +78,7 @@ function mount(options: { secret?: string | undefined } = {}) {
         new Request("http://api.test/api/webhooks/auth0-scim", {
           method: "POST",
           body,
-          headers: { "content-type": "application/json", ...(init.headers ?? {}) },
+          headers: { "content-type": "application/json", ...init.headers },
         }),
       );
     },

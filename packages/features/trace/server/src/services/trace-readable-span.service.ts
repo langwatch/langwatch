@@ -8,6 +8,7 @@ import type { Span, SpanTypes } from "@langwatch/trace-contract";
 function msToHrTime(ms: number): HrTime {
   const seconds = Math.trunc(ms / 1000);
   const nanoseconds = (ms % 1000) * 1_000_000;
+
   return [seconds, nanoseconds];
 }
 
@@ -18,6 +19,7 @@ function hrTimeDuration(start: HrTime, end: HrTime): HrTime {
     seconds -= 1;
     nanoseconds += 1_000_000_000;
   }
+
   return [seconds, nanoseconds];
 }
 
@@ -55,8 +57,13 @@ function flattenParams({
   attrs: Attributes;
 }): void {
   for (const [key, value] of Object.entries(params)) {
-    if (key === "_keys") continue;
-    if (value == null) continue;
+    if (key === "_keys") {
+      continue;
+    }
+
+    if (value == null) {
+      continue;
+    }
 
     const fullKey = prefix ? `${prefix}.${key}` : key;
 
@@ -109,27 +116,41 @@ function buildAttributes(span: Span): Attributes {
   if ("model" in span && span.model) {
     attrs["gen_ai.request.model"] = span.model;
   }
+
   if ("vendor" in span && span.vendor) {
     attrs["gen_ai.system"] = span.vendor;
   }
 
   // Params
   if (span.params) {
-    if (span.params.temperature != null)
+    if (span.params.temperature != null) {
       attrs["gen_ai.request.temperature"] = span.params.temperature;
-    if (span.params.max_tokens != null) attrs["gen_ai.request.max_tokens"] = span.params.max_tokens;
-    if (span.params.top_p != null) attrs["gen_ai.request.top_p"] = span.params.top_p;
+    }
+
+    if (span.params.max_tokens != null) {
+      attrs["gen_ai.request.max_tokens"] = span.params.max_tokens;
+    }
+
+    if (span.params.top_p != null) {
+      attrs["gen_ai.request.top_p"] = span.params.top_p;
+    }
 
     flattenParams({ params: span.params, prefix: "", attrs });
   }
 
   // Metrics
   if (span.metrics) {
-    if (span.metrics.prompt_tokens != null)
+    if (span.metrics.prompt_tokens != null) {
       attrs["gen_ai.usage.prompt_tokens"] = span.metrics.prompt_tokens;
-    if (span.metrics.completion_tokens != null)
+    }
+
+    if (span.metrics.completion_tokens != null) {
       attrs["gen_ai.usage.completion_tokens"] = span.metrics.completion_tokens;
-    if (span.metrics.cost != null) attrs["gen_ai.usage.cost"] = span.metrics.cost;
+    }
+
+    if (span.metrics.cost != null) {
+      attrs["gen_ai.usage.cost"] = span.metrics.cost;
+    }
   }
 
   // RAG contexts
@@ -144,6 +165,7 @@ function buildStatus(span: Span): SpanStatus {
   if (span.error) {
     return { code: SpanStatusCode.ERROR, message: span.error.message };
   }
+
   return { code: SpanStatusCode.OK };
 }
 
@@ -156,6 +178,7 @@ function buildStatus(span: Span): SpanStatus {
  */
 export function formatSpansDigest(spans: Span[]): Promise<string> {
   const readableSpans = spans.map(langwatchSpanToReadableSpan);
+
   return Promise.resolve(judgeSpanDigestFormatter.format(readableSpans));
 }
 

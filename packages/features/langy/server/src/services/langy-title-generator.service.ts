@@ -73,7 +73,9 @@ export class LangyTitleGeneratorService {
         projectId,
       });
       const transcript = buildTranscript(records);
-      if (!transcript) return null;
+      if (!transcript) {
+        return null;
+      }
 
       const model = await this.deps.models.resolveTitleModel({
         projectId,
@@ -94,6 +96,7 @@ export class LangyTitleGeneratorService {
       // conversation is which model wrote the title — so both shapes answer it
       // rather than one of them recording `undefined`.
       const modelId = typeof model === "string" ? model : model.modelId;
+
       return title ? { title, model: modelId } : null;
     } catch (error) {
       logger.warn(
@@ -104,6 +107,7 @@ export class LangyTitleGeneratorService {
         },
         "Langy title model call failed — leaving title unchanged",
       );
+
       return null;
     }
   }

@@ -175,12 +175,17 @@ export function resolveField(path: string): ResolvedField | null {
   }
 
   const scalar = TRACE_SCALARS[path];
-  if (scalar) return field({ path, collection: null, ...scalar });
+  if (scalar) {
+    return field({ path, collection: null, ...scalar });
+  }
 
   if (path.startsWith(PREFIX.metrics)) {
     const key = path.slice(PREFIX.metrics.length);
     const type = TRACE_METRICS[key];
-    if (!type) return null;
+    if (!type) {
+      return null;
+    }
+
     return field({
       path,
       type,
@@ -193,7 +198,10 @@ export function resolveField(path: string): ResolvedField | null {
 
   if (path.startsWith(PREFIX.metadata)) {
     const key = path.slice(PREFIX.metadata.length);
-    if (!key) return null;
+    if (!key) {
+      return null;
+    }
+
     return field({
       path,
       type: "json",
@@ -207,7 +215,10 @@ export function resolveField(path: string): ResolvedField | null {
   if (path.startsWith(PREFIX.evaluations)) {
     const key = path.slice(PREFIX.evaluations.length);
     const type = EVALUATION_FIELDS[key];
-    if (!type) return null;
+    if (!type) {
+      return null;
+    }
+
     return field({
       path,
       type,
@@ -243,6 +254,7 @@ function resolveEventField({ path, rest }: { path: string; rest: string }): Reso
       read: (e) => e.event_type ?? null,
     });
   }
+
   if (rest === "timestamp") {
     return field({
       path,
@@ -253,6 +265,7 @@ function resolveEventField({ path, rest }: { path: string; rest: string }): Reso
       read: (e) => e.timestamps?.started_at ?? null,
     });
   }
+
   if (rest === "metrics") {
     return field({
       path,
@@ -263,6 +276,7 @@ function resolveEventField({ path, rest }: { path: string; rest: string }): Reso
       read: (e) => e.metrics ?? {},
     });
   }
+
   if (rest === "details") {
     return field({
       path,
@@ -273,9 +287,13 @@ function resolveEventField({ path, rest }: { path: string; rest: string }): Reso
       read: (e) => e.event_details ?? {},
     });
   }
+
   if (rest.startsWith("metrics.")) {
     const k = rest.slice("metrics.".length);
-    if (!k) return null;
+    if (!k) {
+      return null;
+    }
+
     return field({
       path,
       type: "number",
@@ -285,9 +303,13 @@ function resolveEventField({ path, rest }: { path: string; rest: string }): Reso
       read: (e) => e.metrics?.[k] ?? null,
     });
   }
+
   if (rest.startsWith("details.")) {
     const k = rest.slice("details.".length);
-    if (!k) return null;
+    if (!k) {
+      return null;
+    }
+
     return field({
       path,
       type: "string",
@@ -297,6 +319,7 @@ function resolveEventField({ path, rest }: { path: string; rest: string }): Reso
       read: (e) => e.event_details?.[k] ?? null,
     });
   }
+
   return null;
 }
 
@@ -318,6 +341,7 @@ function resolveAnnotationField({
       read: (a) => a[rest] ?? null,
     });
   }
+
   if (rest === "scores") {
     return field({
       path,
@@ -328,9 +352,13 @@ function resolveAnnotationField({
       read: (a) => a.scores ?? {},
     });
   }
+
   if (rest.startsWith("scores.")) {
     const name = rest.slice("scores.".length);
-    if (!name) return null;
+    if (!name) {
+      return null;
+    }
+
     return field({
       path,
       type: "json",
@@ -340,5 +368,6 @@ function resolveAnnotationField({
       read: (a) => a.scores?.[name] ?? null,
     });
   }
+
   return null;
 }

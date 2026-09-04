@@ -150,7 +150,7 @@ const applyCellError = ({
   rowsOf(draft.errors, targetId)[rowIndex] = event.message;
   const metadata = rowsOf(draft.targetMetadata, targetId);
   metadata[rowIndex] = {
-    ...(metadata[rowIndex] ?? {}),
+    ...metadata[rowIndex],
     ...(event.domainError ? { domainError: event.domainError } : {}),
   };
 };
@@ -170,7 +170,7 @@ const applyTargetResult = ({
     // cell derives what the customer reads from the code.
     rowsOf(draft.errors, event.targetId)[event.rowIndex] = event.error ?? UNNAMED_FAILURE;
     metadata[event.rowIndex] = {
-      ...(metadata[event.rowIndex] ?? {}),
+      ...metadata[event.rowIndex],
       ...(event.domainError ? { domainError: event.domainError } : {}),
     };
     return;

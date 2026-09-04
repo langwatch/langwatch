@@ -89,6 +89,7 @@ export class SsoConnectionBackofficeService {
       this.deps.prisma.ssoConnection.count({ where }),
     ]);
     const names = await this.organizationNames(rows.map((row) => row.organizationId));
+
     return {
       connections: rows.map((row) =>
         toBackofficeConnection({
@@ -108,8 +109,12 @@ export class SsoConnectionBackofficeService {
     const row = await this.deps.prisma.ssoConnection.findUnique({
       where: { id: connectionId },
     });
-    if (!row) return null;
+    if (!row) {
+      return null;
+    }
+
     const names = await this.organizationNames([row.organizationId]);
+
     return toBackofficeConnection({
       state: rowToConnection(row),
       organizationName: names.get(row.organizationId) ?? null,
@@ -144,6 +149,7 @@ export class SsoConnectionBackofficeService {
         `connection type ${type} is not registrable through a self-serve surface`,
       );
     }
+
     const connectionId = newSsoConnectionId();
     await this.deps.connections().registerConnection({
       ...this.command({ organizationId, connectionId, operator }),
@@ -157,6 +163,7 @@ export class SsoConnectionBackofficeService {
       },
       allowsJit,
     });
+
     return { connectionId };
   }
 
@@ -238,11 +245,15 @@ export class SsoConnectionBackofficeService {
 
   private async organizationNames(organizationIds: string[]): Promise<Map<string, string>> {
     const unique = [...new Set(organizationIds)];
-    if (unique.length === 0) return new Map();
+    if (unique.length === 0) {
+      return new Map();
+    }
+
     const rows = await this.deps.prisma.organization.findMany({
       where: { id: { in: unique } },
       select: { id: true, name: true },
     });
+
     return new Map(rows.map((row) => [row.id, row.name]));
   }
 }
@@ -262,6 +273,7 @@ type DomainCommandArgs = ConnectionCommandArgs & { domain: string };
  */
 function searchFilter(search: string) {
   const term = search.trim();
+
   return {
     OR: [
       { id: { contains: term, mode: "insensitive" as const } },

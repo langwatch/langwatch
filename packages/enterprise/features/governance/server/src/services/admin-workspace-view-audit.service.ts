@@ -47,7 +47,10 @@ export class DefaultGovernanceAdminWorkspaceViewAuditService {
       teamId: parsed.targetTeamId,
       actorUserId: parsed.actorUserId,
     });
-    if (!team || team.organizationId !== parsed.organizationId) return skipped();
+    if (!team || team.organizationId !== parsed.organizationId) {
+      return skipped();
+    }
+
     if ((team.isPersonal && team.ownerUserId === parsed.actorUserId) || team.actorIsMember) {
       return skipped();
     }
@@ -59,7 +62,9 @@ export class DefaultGovernanceAdminWorkspaceViewAuditService {
       targetId: parsed.targetTeamId,
       sinceMs: this.options.clock() - ADMIN_WORKSPACE_VIEW_DEDUP_MS,
     });
-    if (recent) return skipped();
+    if (recent) {
+      return skipped();
+    }
 
     const label = (parsed.workspaceLabel ?? team.name).slice(0, 256);
     const row = await this.repository.create({
@@ -70,6 +75,7 @@ export class DefaultGovernanceAdminWorkspaceViewAuditService {
       metadata: { kind: parsed.kind, workspaceLabel: label },
     });
     await this.mirrorBestEffort(parsed, label, row);
+
     return { recorded: true, auditLogId: row.id };
   }
 
@@ -78,7 +84,10 @@ export class DefaultGovernanceAdminWorkspaceViewAuditService {
     label: string,
     row: { id: string; createdAtMs: number },
   ): Promise<void> {
-    if (!this.options.ocsf || !this.options.projects) return;
+    if (!this.options.ocsf || !this.options.projects) {
+      return;
+    }
+
     try {
       const project = await this.options.projects.ensureInternal({
         organizationId: input.organizationId,

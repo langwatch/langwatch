@@ -44,7 +44,10 @@ export class LangyMessageService {
   }
 
   static extractTextFromParts(parts: unknown): string {
-    if (!Array.isArray(parts)) return "";
+    if (!Array.isArray(parts)) {
+      return "";
+    }
+
     return parts
       .map((part) =>
         part && typeof (part as { text?: unknown }).text === "string"
@@ -59,6 +62,7 @@ export class LangyMessageService {
     return {
       async getRecordsByConversation(params): Promise<LangyMessageRecord[]> {
         const rows = await repository.findAllByConversation(params);
+
         return rows.map((row) => ({
           id: row.id,
           role: row.role,

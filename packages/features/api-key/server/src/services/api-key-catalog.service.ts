@@ -17,6 +17,7 @@ const SYSTEM_NAMES = new Set(HIDDEN_SYSTEM_KEY_NAMES);
 
 function publicApiKey(row: StoredApiKey): ApiKey {
   const { hashedSecret: _hashedSecret, ...key } = row;
+
   return key;
 }
 
@@ -40,6 +41,7 @@ export class ApiKeyCatalogService {
 
   async tryGetById({ id }: { id: string }): Promise<ApiKey | null> {
     const row = await this.repository.tryFindById({ id });
+
     return row ? publicApiKey(row) : null;
   }
 
@@ -56,6 +58,7 @@ export class ApiKeyCatalogService {
     ) {
       throw new ApiKeyNotFoundError(input.id);
     }
+
     return {
       ...publicApiKey(row),
       permissions: await this.customPermissions(row, input.organizationId),
@@ -67,6 +70,7 @@ export class ApiKeyCatalogService {
     organizationId: string;
   }): Promise<ApiKeyName | null> {
     const row = await this.repository.tryFindByIdInOrganization(input);
+
     return row ? { name: row.name, revoked: row.revokedAt !== null } : null;
   }
 
@@ -75,6 +79,7 @@ export class ApiKeyCatalogService {
     organizationId: string;
   }): Promise<ApiKeyBinding[]> {
     const bindings = await this.options.authz.listUserBindings(input);
+
     return bindings.map((binding) => ({
       id: binding.id,
       role: binding.role,
@@ -90,6 +95,7 @@ export class ApiKeyCatalogService {
       page: 1,
       limit: 1000,
     });
+
     return page.data.map((project) => ({
       id: project.id,
       name: project.name,
@@ -103,6 +109,7 @@ export class ApiKeyCatalogService {
       page: 1,
       limit: 1000,
     });
+
     return page.data.map((team) => ({ id: team.id, name: team.name }));
   }
 
@@ -119,16 +126,19 @@ export class ApiKeyCatalogService {
         });
       }
     }
+
     return [...members.values()];
   }
 
   async list(input: { userId: string; organizationId: string }): Promise<ApiKey[]> {
     const rows = await this.repository.listForUser(input);
+
     return rows.map(publicApiKey);
   }
 
   async listAll({ organizationId }: { organizationId: string }): Promise<ApiKey[]> {
     const rows = await this.repository.listForOrganization({ organizationId });
+
     return rows.map(publicApiKey);
   }
 
@@ -138,6 +148,7 @@ export class ApiKeyCatalogService {
     sourceType: string;
   }): Promise<ApiKey | null> {
     const row = await this.repository.tryFindIngestKey(input);
+
     return row ? publicApiKey(row) : null;
   }
 
@@ -146,6 +157,7 @@ export class ApiKeyCatalogService {
     projectId: string;
   }): Promise<ApiKey[]> {
     const rows = await this.repository.findIngestKeysForProject(input);
+
     return rows.map(publicApiKey);
   }
 
@@ -153,7 +165,9 @@ export class ApiKeyCatalogService {
     if (ids.length === 0) {
       return [];
     }
+
     const roles = await this.options.authz.listUserCreatedRoles({ organizationId });
+
     return roles
       .filter((role) => ids.includes(role.id))
       .map((role) => ({
@@ -177,6 +191,7 @@ export class ApiKeyCatalogService {
     if (!row) {
       throw new ApiKeyNotFoundError(id);
     }
+
     return row;
   }
 
@@ -187,9 +202,11 @@ export class ApiKeyCatalogService {
     if (ids.size === 0) {
       return [];
     }
+
     const roles = await this.options.authz.listUserCreatedRoles({
       organizationId,
     });
+
     return [
       ...new Set(
         roles

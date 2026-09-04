@@ -115,9 +115,7 @@ const traceEditOverlayPatchObjectSchema = z.object({
  * to every consumer — the package ships its TypeScript sources — and collide
  * with the real declaration in anything compiled with the DOM lib.
  */
-declare const TextEncoder: {
-  new (): { encode(input: string): { length: number } };
-};
+declare const TextEncoder: new () => { encode(input: string): { length: number } };
 
 function patchExceedsSizeLimit(value: unknown): boolean {
   const json = JSON.stringify(value) ?? "";

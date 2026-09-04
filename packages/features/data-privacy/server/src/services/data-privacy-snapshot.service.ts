@@ -100,21 +100,37 @@ export class DataPrivacySnapshotService {
       if (scopeType === "ORGANIZATION" || scopeType === "DEPARTMENT") {
         return canManageOrganization;
       }
-      if (scopeType === "TEAM") return teamManage.get(scopeId) === true;
+
+      if (scopeType === "TEAM") {
+        return teamManage.get(scopeId) === true;
+      }
+
       return projectUpdate.get(scopeId) === true;
     };
 
     const scopeName = (scopeType: DataPrivacyScopeType, scopeId: string): string => {
-      if (scopeType === "ORGANIZATION") return organizationName ?? scopeId;
-      if (scopeType === "DEPARTMENT") return departmentName.get(scopeId) ?? scopeId;
-      if (scopeType === "TEAM") return teamName.get(scopeId) ?? scopeId;
+      if (scopeType === "ORGANIZATION") {
+        return organizationName ?? scopeId;
+      }
+
+      if (scopeType === "DEPARTMENT") {
+        return departmentName.get(scopeId) ?? scopeId;
+      }
+
+      if (scopeType === "TEAM") {
+        return teamName.get(scopeId) ?? scopeId;
+      }
+
       return projectName.get(scopeId) ?? scopeId;
     };
 
     const allRows: DataPrivacyRow[] = [];
     for (const row of rows) {
       const parsed = dataPrivacyConfigSchema.safeParse(row.config);
-      if (!parsed.success) continue;
+      if (!parsed.success) {
+        continue;
+      }
+
       allRows.push({
         scopeType: row.scopeType,
         scopeId: row.scopeId,
@@ -149,7 +165,10 @@ export class DataPrivacySnapshotService {
 
     const rules: DataPrivacyRule[] = [];
     for (const row of allRows) {
-      if (!canReadScope(row.scopeType, row.scopeId)) continue;
+      if (!canReadScope(row.scopeType, row.scopeId)) {
+        continue;
+      }
+
       rules.push({
         scopeType: row.scopeType,
         scopeId: row.scopeId,
@@ -204,6 +223,7 @@ export class DataPrivacySnapshotService {
       projectIds: [input.projectId],
     });
     const canWrite = writable.get(input.projectId) === true;
+
     return {
       projectId: input.projectId,
       effective: input.effective,

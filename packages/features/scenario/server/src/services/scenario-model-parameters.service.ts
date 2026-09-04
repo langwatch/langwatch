@@ -61,6 +61,7 @@ export class ScenarioModelParametersService {
           ...(!hasCredentials ? ["API key"] : []),
           ...(!params.model ? ["model"] : []),
         ];
+
         return {
           success: false,
           reason: "missing_params",
@@ -73,12 +74,14 @@ export class ScenarioModelParametersService {
       if (error instanceof ModelProviderNotFoundError) {
         const providers = await this.modelProviders.getExecutionProviders({ projectId });
         const available = Object.keys(providers).join(", ") || "none";
+
         return {
           success: false,
           reason: "provider_not_found",
           message: `Provider '${providerKey}' not found for this project. Available providers: ${available}`,
         };
       }
+
       if (error instanceof ModelProviderInvalidError) {
         return {
           success: false,
@@ -89,6 +92,7 @@ export class ScenarioModelParametersService {
 
       const message = error instanceof Error ? error.message : String(error);
       logger.error({ error }, "failed to prepare LiteLLM params");
+
       return {
         success: false,
         reason: "preparation_error",

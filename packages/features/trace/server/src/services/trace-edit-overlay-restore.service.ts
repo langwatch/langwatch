@@ -45,7 +45,10 @@ function copyFields({
   fields: TraceEditSpanField[];
 }): TraceEditSpanPatch {
   const draft = onto as unknown as Record<TraceEditSpanField, unknown>;
-  for (const field of fields) draft[field] = from[field];
+  for (const field of fields) {
+    draft[field] = from[field];
+  }
+
   return onto;
 }
 
@@ -77,15 +80,25 @@ function spansWithWithheldEdits({
   const value = incoming.map((incomingSpan) => {
     const storedSpan = storedSpans.get(incomingSpan.spanId);
     const fields = storedSpan ? withheldFieldsOf(storedSpan) : [];
-    if (!storedSpan || fields.length === 0) return incomingSpan;
+    if (!storedSpan || fields.length === 0) {
+      return incomingSpan;
+    }
+
     isRestored = true;
+
     return copyFields({ from: storedSpan, onto: { ...incomingSpan }, fields });
   });
 
   for (const storedSpan of stored) {
-    if (savedSpanIds.has(storedSpan.spanId)) continue;
+    if (savedSpanIds.has(storedSpan.spanId)) {
+      continue;
+    }
+
     const fields = withheldFieldsOf(storedSpan);
-    if (fields.length === 0) continue;
+    if (fields.length === 0) {
+      continue;
+    }
+
     isRestored = true;
     value.push(
       copyFields({
@@ -117,17 +130,24 @@ function metadataWithWithheld({
   if (stored === undefined || readable === stored) {
     return { value: incoming, isRestored: false };
   }
+
   // The whole map was withheld, or the correction cleared it: nothing about it
   // could have been the viewer's decision.
-  if (stored === null || readable == null) return { value: stored, isRestored: true };
+  if (stored === null || readable == null) {
+    return { value: stored, isRestored: true };
+  }
 
   const next: TraceMetadataEdits = { ...incoming };
   let isRestored = false;
   for (const [key, value] of Object.entries(stored)) {
-    if (readable[key] === value) continue;
+    if (readable[key] === value) {
+      continue;
+    }
+
     next[key] = value;
     isRestored = true;
   }
+
   return isRestored ? { value: next, isRestored } : { value: incoming, isRestored };
 }
 
@@ -147,7 +167,10 @@ function traceEditsWithWithheld({
   for (const field of ["input", "output"] as const) {
     const storedValue = stored?.[field];
     const isWithheld = storedValue !== undefined && readable?.[field] !== storedValue;
-    if (!isWithheld) continue;
+    if (!isWithheld) {
+      continue;
+    }
+
     value[field] = storedValue;
     isRestored = true;
   }
@@ -163,6 +186,7 @@ function traceEditsWithWithheld({
   }
 
   const carriesEdit = TRACE_EDIT_TRACE_FIELDS.some((field) => value[field] !== undefined);
+
   return { value: carriesEdit ? value : void 0, isRestored };
 }
 
@@ -192,13 +216,18 @@ export function restoreWithheldEdits({
   protections: Protections;
   isWindowRedacted?: boolean;
 }): TraceEditOverlayPatch {
-  if (!stored) return incoming;
+  if (!stored) {
+    return incoming;
+  }
+
   const readable = redactPatchForViewer({
     patch: stored,
     protections,
     isWindowRedacted,
   });
-  if (readable === stored) return incoming;
+  if (readable === stored) {
+    return incoming;
+  }
 
   const spans = spansWithWithheldEdits({
     incoming: incoming.spans,
@@ -210,13 +239,18 @@ export function restoreWithheldEdits({
     stored: stored.trace,
     readable: readable.trace,
   });
-  if (!spans.isRestored && !traceEdits.isRestored) return incoming;
+  if (!spans.isRestored && !traceEdits.isRestored) {
+    return incoming;
+  }
 
   const next: TraceEditOverlayPatch = {
     version: incoming.version,
     spans: spans.value,
     deletedSpanIds: incoming.deletedSpanIds,
   };
-  if (traceEdits.value) next.trace = traceEdits.value;
+  if (traceEdits.value) {
+    next.trace = traceEdits.value;
+  }
+
   return next;
 }

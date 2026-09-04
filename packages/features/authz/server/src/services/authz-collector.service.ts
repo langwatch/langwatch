@@ -56,7 +56,10 @@ export class AuthzCollectorService {
   }): Promise<AuthzScopeRef | null> {
     if (projectId) {
       const lineage = await this.reader.tryFindProjectLineage({ projectId });
-      if (!lineage) return null;
+      if (!lineage) {
+        return null;
+      }
+
       return {
         type: "project",
         id: projectId,
@@ -64,14 +67,20 @@ export class AuthzCollectorService {
         organizationId: lineage.organizationId,
       };
     }
+
     if (teamId) {
       const team = await this.reader.tryFindTeamOrganization({ teamId });
-      if (!team) return null;
+      if (!team) {
+        return null;
+      }
+
       return { type: "team", id: teamId, organizationId: team.organizationId };
     }
+
     if (organizationId) {
       return { type: "organization", id: organizationId };
     }
+
     return null;
   }
 
@@ -102,7 +111,10 @@ export class AuthzCollectorService {
     shareTokens?: readonly string[];
   }): Promise<AuthzScopeRef | null> {
     const lineage = await this.reader.tryFindProjectLineage({ projectId });
-    if (!lineage) return null;
+    if (!lineage) {
+      return null;
+    }
+
     return {
       type: "resource",
       kind,
@@ -182,6 +194,7 @@ export class AuthzCollectorService {
         // would otherwise silently resolve to "no grants" - a fail-open
         // shape. Fail loudly instead.
         const unreachable: never = principal;
+
         throw new Error(`unhandled authz principal type: ${JSON.stringify(unreachable)}`);
       }
     }
@@ -202,12 +215,21 @@ export class AuthzCollectorService {
    * than adding a parallel table.
    */
   async collectResourceGrants({ scope }: { scope: AuthzScopeRef }): Promise<ResourceGrant[]> {
-    if (scope.type !== "resource") return [];
-    if (!scope.shareTokens || scope.shareTokens.length === 0) return [];
+    if (scope.type !== "resource") {
+      return [];
+    }
+
+    if (!scope.shareTokens || scope.shareTokens.length === 0) {
+      return [];
+    }
+
     const links: Array<{ kind: ShareableResourceKind; id: string }> = [
       { kind: scope.kind, id: scope.id },
     ];
-    if (scope.parents) links.push(...scope.parents);
+    if (scope.parents) {
+      links.push(...scope.parents);
+    }
+
     // Same one-pass discipline as collectGrants above: the composition
     // root holds ONE reader for the process's lifetime, and a routed
     // reader's head decision is memoized per instance. A gated read taken
@@ -220,6 +242,7 @@ export class AuthzCollectorService {
       links,
     });
     const now = this.now();
+
     return rows
       .filter((row) => this.isLiveShareLink(row, now))
       .map((row) => ({
@@ -260,6 +283,7 @@ export class AuthzCollectorService {
       apiKeyId: principal.id,
       organizationId,
     });
+
     return {
       principal,
       organizationId,
@@ -326,6 +350,7 @@ export class AuthzCollectorService {
     // `membershipDisabled` is carried separately so the denial can say WHICH
     // gate closed instead of claiming they were never here.
     const isOrgMember = membership != null && !membership.disabled;
+
     return {
       principal,
       organizationId,
@@ -354,7 +379,10 @@ export class AuthzCollectorService {
     customRoleIds: string[];
     reader: AuthzReadRepository;
   }): Promise<Map<string, readonly string[]>> {
-    if (customRoleIds.length === 0) return new Map();
+    if (customRoleIds.length === 0) {
+      return new Map();
+    }
+
     return this.parseCustomRolePermissions(
       await reader.findCustomRolePermissions({
         organizationId,
@@ -383,12 +411,19 @@ export class AuthzCollectorService {
         : [];
       map.set(row.id, permissions);
     }
+
     return map;
   }
 
   private isLiveShareLink(row: ShareLinkRow, now: Date): boolean {
-    if (row.expiresAt != null && row.expiresAt <= now) return false;
-    if (row.maxViews != null && row.viewCount >= row.maxViews) return false;
+    if (row.expiresAt != null && row.expiresAt <= now) {
+      return false;
+    }
+
+    if (row.maxViews != null && row.viewCount >= row.maxViews) {
+      return false;
+    }
+
     return true;
   }
 
@@ -403,6 +438,7 @@ export class AuthzCollectorService {
         // otherwise need a fallback, and any fallback is a grant matched at a
         // node the resource does not sit at.
         const unreachable: never = resourceType;
+
         throw new Error(`unhandled share link resource type: ${String(unreachable)}`);
       }
     }
@@ -440,6 +476,7 @@ export class AuthzCollectorService {
         // A visibility added to the stored enum without an audience here
         // would otherwise fall out as undefined and read as "no audience".
         const unreachable: never = visibility;
+
         throw new Error(`unhandled share link visibility: ${String(unreachable)}`);
       }
     }

@@ -107,7 +107,9 @@ export class LicenseService extends LicensingServiceContract {
         source: "instance",
       });
       inspections.push(inspection);
-      if (inspection.valid) return { allowed: true, inspections };
+      if (inspection.valid) {
+        return { allowed: true, inspections };
+      }
     }
 
     const candidates = await this.repository.findOrganizationsWithLicense();
@@ -117,8 +119,11 @@ export class LicenseService extends LicensingServiceContract {
         organizationId: candidate.organizationId,
       });
       inspections.push(inspection);
-      if (inspection.valid) return { allowed: true, inspections };
+      if (inspection.valid) {
+        return { allowed: true, inspections };
+      }
     }
+
     return { allowed: false, inspections };
   }
 
@@ -138,7 +143,10 @@ export class LicenseService extends LicensingServiceContract {
     licenseKey: string;
   }): Promise<StoreLicenseResult> {
     const result = this.cryptography.validateLicense({ licenseKey });
-    if (!result.valid) return { success: false, error: result.error };
+    if (!result.valid) {
+      return { success: false, error: result.error };
+    }
+
     // A key that names an organization activates on that organization only.
     // A key minted before the claim existed carries none, and stays a bearer
     // token until it is reissued — see the migration note in
@@ -149,6 +157,7 @@ export class LicenseService extends LicensingServiceContract {
     ) {
       return { success: false, error: LICENSE_ERRORS.ORGANIZATION_MISMATCH };
     }
+
     if (!(await this.repository.organizationExists(organizationId))) {
       throw new OrganizationNotFoundError();
     }
@@ -159,12 +168,15 @@ export class LicenseService extends LicensingServiceContract {
       validatedAt: this.configuration.now(),
     });
     await this.provisionMissingRetentionPolicies(organizationId);
+
     return { success: true, planInfo: result.planInfo };
   }
 
   async getLicenseStatus(organizationId: string): Promise<LicenseStatus> {
     const licenseKey = await this.repository.tryReadLicense(organizationId);
-    if (!licenseKey) return { hasLicense: false, valid: false };
+    if (!licenseKey) {
+      return { hasLicense: false, valid: false };
+    }
 
     const validation = this.cryptography.validateLicense({ licenseKey });
     if (validation.valid) {
@@ -183,7 +195,9 @@ export class LicenseService extends LicensingServiceContract {
     if (!signedLicense) {
       return { hasLicense: true, valid: false, corrupted: true };
     }
+
     const { data } = signedLicense;
+
     return {
       hasLicense: true,
       valid: false,
@@ -202,7 +216,9 @@ export class LicenseService extends LicensingServiceContract {
     if (!(await this.repository.organizationExists(organizationId))) {
       throw new OrganizationNotFoundError();
     }
+
     await this.repository.removeLicense(organizationId);
+
     return { removed: true };
   }
 
@@ -221,6 +237,7 @@ export class LicenseService extends LicensingServiceContract {
       this.repository.getMembersLiteCount(organizationId),
       messagesPromise,
     ]);
+
     return {
       currentMembers,
       maxMembers: resolved.maxMembers,
@@ -239,15 +256,22 @@ export class LicenseService extends LicensingServiceContract {
     if (!signedLicense) {
       return { ...source, valid: false, reason: "invalid_format" };
     }
+
     if (!this.cryptography.verifySignature(signedLicense)) {
       return { ...source, valid: false, reason: "invalid_signature" };
     }
+
     // A stored key that names another organization is not this organization's
     // entitlement, however genuine the signature is.
     const claimed = signedLicense.data.organizationId;
-    if (claimed !== void 0 && source.organizationId !== void 0 && claimed !== source.organizationId) {
+    if (
+      claimed !== void 0 &&
+      source.organizationId !== void 0 &&
+      claimed !== source.organizationId
+    ) {
       return { ...source, valid: false, reason: "organization_mismatch" };
     }
+
     return {
       ...source,
       valid: true,
@@ -259,7 +283,9 @@ export class LicenseService extends LicensingServiceContract {
 
   private async provisionMissingRetentionPolicies(organizationId: string): Promise<void> {
     const retentionConfiguration = this.configuration.retention;
-    if (!this.retention || !retentionConfiguration) return;
+    if (!this.retention || !retentionConfiguration) {
+      return;
+    }
 
     try {
       const existing = await this.retention.listOrganizationRules(organizationId);
@@ -269,7 +295,10 @@ export class LicenseService extends LicensingServiceContract {
           .map((rule) => rule.category),
       );
       for (const category of retentionConfiguration.categories) {
-        if (covered.has(category)) continue;
+        if (covered.has(category)) {
+          continue;
+        }
+
         try {
           await this.retention.setForOrganization({
             organizationId,

@@ -57,6 +57,7 @@ function grantKey(grant: {
   if (!principal) {
     throw new Error("a SCIM grant names no principal");
   }
+
   return authzBindingIdentityKey({
     principal,
     scopeType: grant.scopeType,
@@ -68,6 +69,7 @@ function grantKey(grant: {
 
 function keyOfDesired(grant: DesiredScimGrant): string {
   const principal = grant.principal;
+
   return grantKey({
     userId: "userId" in principal ? principal.userId : null,
     groupId: "groupId" in principal ? principal.groupId : null,

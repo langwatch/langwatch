@@ -24,7 +24,7 @@ export function usePromptBrowserTabController() {
   const updateTabData = useDraggableTabsBrowserStore((state) => state.updateTabData);
 
   const configId = tab?.data.form.currentValues?.configId;
-  const isNewPrompt = !Boolean(configId);
+  const isNewPrompt = !configId;
 
   const { getPromptById } = usePrompts();
 

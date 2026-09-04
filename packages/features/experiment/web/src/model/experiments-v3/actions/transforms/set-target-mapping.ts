@@ -28,7 +28,7 @@ export const setTargetMapping: Transform<SetMappingPayload, { targetId: string }
               mappings: {
                 ...target.mappings,
                 [datasetId]: {
-                  ...(target.mappings[datasetId] ?? {}),
+                  ...target.mappings[datasetId],
                   [inputField]: mapping,
                 },
               },

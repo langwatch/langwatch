@@ -177,6 +177,7 @@ export async function previewCostRuleMatchingSpans({
         row.outputTokens !== null ||
         row.cacheReadTokens !== null ||
         row.cacheCreationTokens !== null;
+
       return {
         ...row,
         exampleCost: !hasTokenUsage
@@ -225,14 +226,24 @@ export async function deriveUnmappedCostSuggestion({
   promptTokens: number | null | undefined;
   completionTokens: number | null | undefined;
 }): Promise<{ model: string } | null> {
-  if (!model) return null;
-  if (cost != null) return null;
+  if (!model) {
+    return null;
+  }
+
+  if (cost != null) {
+    return null;
+  }
+
   const hasTokens = (promptTokens ?? 0) > 0 || (completionTokens ?? 0) > 0;
-  if (!hasTokens) return null;
+  if (!hasTokens) {
+    return null;
+  }
 
   const stored = await costs.listCosts({ projectId });
   const rates = [...stored.map(storedRate), ...costs.staticCostRates()];
-  if (matchModelCost(model, rates)) return null;
+  if (matchModelCost(model, rates)) {
+    return null;
+  }
 
   return { model };
 }

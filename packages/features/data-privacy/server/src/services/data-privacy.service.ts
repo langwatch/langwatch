@@ -36,6 +36,7 @@ export class DataPrivacyService extends DataPrivacyServiceContract {
     now?: () => number;
   }): DataPrivacyService {
     const cache = new DataPrivacyPolicyCache(options.repository, options.ttlMs, options.now);
+
     return new DataPrivacyService(
       options.repository,
       cache,
@@ -73,6 +74,7 @@ export class DataPrivacyService extends DataPrivacyServiceContract {
         `Invalid data-privacy config: ${parsed.error.message}`,
       );
     }
+
     this.validatePatterns(parsed.data);
     const organizationId = await this.resolveOrganizationId(input);
     const row = await this.repository.upsertForScope({
@@ -82,6 +84,7 @@ export class DataPrivacyService extends DataPrivacyServiceContract {
       config: parsed.data,
     });
     this.cache.clear();
+
     return row;
   }
 
@@ -103,15 +106,19 @@ export class DataPrivacyService extends DataPrivacyServiceContract {
       if (input.scope.scopeId !== input.organizationId) {
         throw new ScopeTargetNotFoundError("The policy organization does not match its scope.");
       }
+
       return input.organizationId;
     }
+
     if (input.scope.scopeType === "TEAM") {
       const team = await this.organizations.getTeamById({ teamId: input.scope.scopeId });
       if (team.organizationId !== input.organizationId) {
         throw new ScopeTargetNotFoundError("The policy team does not belong to its organization.");
       }
+
       return team.organizationId;
     }
+
     if (input.scope.scopeType === "PROJECT") {
       const project = await this.projects.getWithTeam(input.scope.scopeId);
       if (project.team.organizationId !== input.organizationId) {
@@ -119,8 +126,10 @@ export class DataPrivacyService extends DataPrivacyServiceContract {
           "The policy project does not belong to its organization.",
         );
       }
+
       return project.team.organizationId;
     }
+
     throw new DepartmentScopeOwnershipUnavailableError();
   }
 
@@ -134,6 +143,7 @@ export class DataPrivacyService extends DataPrivacyServiceContract {
         );
       }
     }
+
     this.assertSafePatterns(config.pii?.exceptPatterns ?? [], "PII exception pattern");
     for (const pattern of config.pii?.exceptPatterns ?? []) {
       const expression = new RegExp(`^(?:${pattern})$`);
@@ -150,6 +160,7 @@ export class DataPrivacyService extends DataPrivacyServiceContract {
         );
       }
     }
+
     for (const rule of config.customAttributes ?? []) {
       if (rule.pattern.replaceAll("*", "").length === 0) {
         throw new InvalidDataPrivacyConfigError(
@@ -162,7 +173,9 @@ export class DataPrivacyService extends DataPrivacyServiceContract {
   private assertSafePatterns(patterns: string[], label: string): void {
     for (const pattern of patterns) {
       try {
-        if (!safe(new RegExp(pattern))) throw new Error("unsafe");
+        if (!safe(new RegExp(pattern))) {
+          throw new Error("unsafe");
+        }
       } catch {
         throw new InvalidDataPrivacyConfigError(
           `${label} ${JSON.stringify(pattern)} is not a safe regular expression.`,

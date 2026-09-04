@@ -41,6 +41,7 @@ export class DataPrivacyResolutionService {
 
   async getResolvedForProject(input: { projectId: string }): Promise<ResolvedDataPrivacy> {
     const project = await this.projects.getWithTeam(input.projectId);
+
     return this.cache.resolve({
       projectId: project.id,
       facts: {

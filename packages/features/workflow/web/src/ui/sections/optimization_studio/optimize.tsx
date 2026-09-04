@@ -184,7 +184,7 @@ export function OptimizeModalContent({
       "params",
       Object.entries({ ...optimizer.params, ...params }).reduce(
         (acc, [key, value]) => {
-          // @ts-ignore
+          // @ts-expect-error
           acc[key] = value ? value : optimizer.params[key];
           return acc;
         },

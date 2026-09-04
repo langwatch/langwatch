@@ -16,7 +16,9 @@ export function fireTeamMemberInvitedNurturing({
   role: string;
 }): void {
   const nurturing = tryNurturingSink();
-  if (!nurturing) return;
+  if (!nurturing) {
+    return;
+  }
 
   void nurturing
     .identifyUser({ userId, traits: { team_member_count: teamMemberCount } })
@@ -51,7 +53,9 @@ export function fireWorkflowCreatedNurturing({
   projectId: string;
 }): void {
   const nurturing = tryNurturingSink();
-  if (!nurturing) return;
+  if (!nurturing) {
+    return;
+  }
 
   void nurturing
     .identifyUser({ userId, traits: { workflow_count: workflowCount } })
@@ -87,7 +91,9 @@ export function fireScenarioCreatedNurturing({
   projectId: string;
 }): void {
   const nurturing = tryNurturingSink();
-  if (!nurturing) return;
+  if (!nurturing) {
+    return;
+  }
 
   void nurturing
     .identifyUser({ userId, traits: { scenario_count: scenarioCount } })
@@ -120,7 +126,9 @@ export function fireExperimentRanNurturing({
   projectId: string;
 }): void {
   const nurturing = tryNurturingSink();
-  if (!nurturing) return;
+  if (!nurturing) {
+    return;
+  }
 
   void nurturing
     .trackEvent({
