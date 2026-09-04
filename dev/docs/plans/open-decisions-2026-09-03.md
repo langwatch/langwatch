@@ -129,8 +129,7 @@ Eleven documented REST operations across these two families are unmounted and
 mounts `/api/suites` and never `/api/v1/test-suites`. They are in the frozen
 OpenAPI document, so the drift guard fails on them, and the published CLI and
 MCP server both call `POST /api/v1/run-plans/run`. **(a) Build both families**
-onto the existing `SuiteApp` — a real slice, and the one that unblocks decision
-4. **(b) Build `run-plans` only** (the CLI path) and retire the `test-suites`
+onto the existing `SuiteApp` — a real slice, and the one that unblocks decision 4. **(b) Build `run-plans` only** (the CLI path) and retire the `test-suites`
 v1 family from the frozen document, since `/api/suites` serves the same
 resource. **(c) Retire both from the document** and accept that the published
 CLI's `run-plans run` command is broken against this branch. **Recommended:
@@ -444,104 +443,132 @@ work as specified — not for rediscovering the shape.
 
 ## Blocking defects (do these first; they are hours, not days)
 
-| Item | Where | Size |
-| --- | --- | --- |
-| `apps/api/src/index.ts:40,53` re-export `withApiTraceGroupCollaborators` and `withApiGatewayGroupCollaborators`, which step B deleted and nothing defines. `@langwatch/platform-api` does not compile. | `trpc-flatten-review.md` | 10 minutes |
-| ~~`normalizePlanScope` (suite contract) and `CLI_EPHEMERAL_LABEL` (suite contract) are restored with **no consumer**~~ — landed 2026-09-04, both wired and the three spec scenarios bound. | `suite-restore-review.md` fixes 3, 9 | done |
-| `useRegisterLangyActions` is exported from a module langy-web's entry point does not publish, and nothing calls it. | decision 13 | see below |
+| Item                                                                                                                                                                                                   | Where                                | Size       |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------ | ---------- |
+| `apps/api/src/index.ts:40,53` re-export `withApiTraceGroupCollaborators` and `withApiGatewayGroupCollaborators`, which step B deleted and nothing defines. `@langwatch/platform-api` does not compile. | `trpc-flatten-review.md`             | 10 minutes |
+| ~~`normalizePlanScope` (suite contract) and `CLI_EPHEMERAL_LABEL` (suite contract) are restored with **no consumer**~~ — landed 2026-09-04, both wired and the three spec scenarios bound.             | `suite-restore-review.md` fixes 3, 9 | done       |
+| `useRegisterLangyActions` is exported from a module langy-web's entry point does not publish, and nothing calls it.                                                                                    | decision 13                          | see below  |
 
 ## tRPC flatten and the api-map retirement
 
-| Item | Size |
-| --- | --- |
-| Step C — `agents`/`secrets` required, `PinPresent` deleted, ~20 test call sites | 1 day |
-| Step D — drop the `TRPCRouterRecord` cast, delete the type parameters on `ApiTrpcCollaborators` and `AppTrpcFeaturePorts`, export `AppTrpcFeatureRecord` (**needs decision 3**) | 1–2 days |
+| Item                                                                                                                                                                                                                                                             | Size                                                 |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| Step C — `agents`/`secrets` required, `PinPresent` deleted, ~20 test call sites                                                                                                                                                                                  | 1 day                                                |
+| Step D — drop the `TRPCRouterRecord` cast, delete the type parameters on `ApiTrpcCollaborators` and `AppTrpcFeaturePorts`, export `AppTrpcFeatureRecord` (**needs decision 3**)                                                                                  | 1–2 days                                             |
 | api-map lane — 39 `createFeatureApi<` sites → `trpcReact`, delete `feature-api.ts` and `use-invalidate-procedure.ts`, move `trpc-query-key.ts` into apps/ui, collapse the 36 `uiFeatureApi` bindings to one Provider mount, rewrite `feature-web-data-access.md` | 1 week, fan-out-able after the first two conversions |
-| `mergeUiPageLoaders` / `UiApplicationInstall.pages.loaders` deletion | half a day |
+| `mergeUiPageLoaders` / `UiApplicationInstall.pages.loaders` deletion                                                                                                                                                                                             | half a day                                           |
 
 ## Composition simplification
 
-| Option | Item | Size |
-| --- | --- | --- |
-| A | Shared config blocks in `packages/config`; both app configs spread them (59 identical bindings each today) | 1 day |
-| G | Worker installers return an optional closer; delete 26 handle classes and the triple-naming array | half a day |
-| B | One absence mechanism: 26 `*AbsenceReport` files, 25 `Logged*Absence`, 21 `*UnavailableError` → one `AbsenceLog` | 2 days |
-| C | Split `api-production.composition.ts` (4,001 lines, 55 sibling roots); delete the standalone shim (after B) | 2–3 days |
-| H | One REST registration list replacing 22 `*rest.mount.ts` + 2 `app-rest.*` + 5 composition roots (after C) | 1 day |
-| E | Generate the api-maps (after step D) | 1 week, staged |
-| J | Web packages export `install` (**needs decision 11**) | 1 week |
+| Option | Item                                                                                                             | Size           |
+| ------ | ---------------------------------------------------------------------------------------------------------------- | -------------- |
+| A      | Shared config blocks in `packages/config`; both app configs spread them (59 identical bindings each today)       | 1 day          |
+| G      | Worker installers return an optional closer; delete 26 handle classes and the triple-naming array                | half a day     |
+| B      | One absence mechanism: 26 `*AbsenceReport` files, 25 `Logged*Absence`, 21 `*UnavailableError` → one `AbsenceLog` | 2 days         |
+| C      | Split `api-production.composition.ts` (4,001 lines, 55 sibling roots); delete the standalone shim (after B)      | 2–3 days       |
+| H      | One REST registration list replacing 22 `*rest.mount.ts` + 2 `app-rest.*` + 5 composition roots (after C)        | 1 day          |
+| E      | Generate the api-maps (after step D)                                                                             | 1 week, staged |
+| J      | Web packages export `install` (**needs decision 11**)                                                            | 1 week         |
 
 ## Architecture-lint burn-down
 
 Counts predate R1–R6; re-derive before starting any slice.
 
-| Item | Size |
-| --- | --- |
-| R7 (`rules/` kind) — **needs decision 1** | half a day once ruled |
-| R8 (boundary edge baseline) — **needs decision 2**, and W1–W3 first | 1 day |
-| A5a–c — adapter doors for the ~56 consumed private exports (**the resume point**) | 3 days |
-| A1–A3 — apps/api and apps/worker stop importing enterprise feature packages; plan-gate rename; agent-cache move | 2 days |
-| A6a–c — `PrismaClient` named outside the seam, 29 files behind ports | 4 days |
-| A7 — Prisma enums and model types into contracts, 30 rows | 2 days |
-| A9a–c — `try*` renames, ~100 methods, mechanical `tslsp` | 2 days |
-| L1–L6 — 303 layout file moves in eight classes (L2 needs R7) | 2 weeks |
-| Q1–Q3 — line length, method length, module-length ratchet + split lanes | 3 days (plus decision 16) |
-| W1, W3 — design-system promotion and the prisma-types rows (**W2 is in progress in the working tree**) | 3 days |
-| A12, A13, A15–A19 — web layout, layer direction, cycles, screen capabilities, apps/ui features, server→server edges, singletons | 4 days |
-| C0–C5 — ~110 comment-block slices, 20,137 blocks; **the `apps/*` root expiries fire 2026-09-17** | ~110 agent-sittings |
+| Item                                                                                                                            | Size                      |
+| ------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| R7 (`rules/` kind) — **needs decision 1**                                                                                       | half a day once ruled     |
+| R8 (boundary edge baseline) — **needs decision 2**, and W1–W3 first                                                             | 1 day                     |
+| A5a–c — adapter doors for the ~56 consumed private exports (**the resume point**)                                               | 3 days                    |
+| A1–A3 — apps/api and apps/worker stop importing enterprise feature packages; plan-gate rename; agent-cache move                 | 2 days                    |
+| A6a–c — `PrismaClient` named outside the seam, 29 files behind ports                                                            | 4 days                    |
+| A7 — Prisma enums and model types into contracts, 30 rows                                                                       | 2 days                    |
+| A9a–c — `try*` renames, ~100 methods, mechanical `tslsp`                                                                        | 2 days                    |
+| L1–L6 — 303 layout file moves in eight classes (L2 needs R7)                                                                    | 2 weeks                   |
+| Q1–Q3 — line length, method length, module-length ratchet + split lanes                                                         | 3 days (plus decision 16) |
+| W1, W3 — design-system promotion and the prisma-types rows (**W2 is in progress in the working tree**)                          | 3 days                    |
+| A12, A13, A15–A19 — web layout, layer direction, cycles, screen capabilities, apps/ui features, server→server edges, singletons | 4 days                    |
+| C0–C5 — ~110 comment-block slices, 20,137 blocks; **the `apps/*` root expiries fire 2026-09-17**                                | ~110 agent-sittings       |
 
 ## Connected agents (ADR-128) — live lane
 
-| Item | Size |
-| --- | --- |
-| Slice 7, `apps/api` half — two config leaves, `ApiConnectCredentialAdapter`, `ApiConnectedAgentsComposition`, the `"agents-v1"` family mount, `AgentApp.connected.presence` wiring, `ApiUpgradeRouter` into the listener, drain order | 2 days |
-| The four `apps/api` integration suites Slice 7 unblocks (15 + 11 + 4 + 2 scenarios, Postgres + Redis) | 1 day |
-| Slice 8 — the `connectedSection` host slot on the agents page | half a day |
-| Slice 9 — parity sweep across the three connected-agent specs | half a day |
-| De-duplicate `agent-v1.api.ts`'s own presence enrichment onto `AgentApp` | half a day |
+| Item                                                                                                                                                                                                                                  | Size       |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| Slice 7, `apps/api` half — two config leaves, `ApiConnectCredentialAdapter`, `ApiConnectedAgentsComposition`, the `"agents-v1"` family mount, `AgentApp.connected.presence` wiring, `ApiUpgradeRouter` into the listener, drain order | 2 days     |
+| The four `apps/api` integration suites Slice 7 unblocks (15 + 11 + 4 + 2 scenarios, Postgres + Redis)                                                                                                                                 | 1 day      |
+| Slice 8 — the `connectedSection` host slot on the agents page                                                                                                                                                                         | half a day |
+| Slice 9 — parity sweep across the three connected-agent specs                                                                                                                                                                         | half a day |
+| De-duplicate `agent-v1.api.ts`'s own presence enrichment onto `AgentApp`                                                                                                                                                              | half a day |
 
 ## Suite run plans
 
-| Item | Size |
-| --- | --- |
-| Fix 3 — the `cli-ephemeral` `NOT` clause, using the constant already in the contract | 30 minutes |
-| Fix 5 / 11 — `repeatCount` cap and the door's duplicate schema | 30 minutes |
-| Fix 6 — use `planNameKey` and main's lock prefix and hash, plus the transaction timeout | 1 hour |
-| Fix 7 — batch the model resolve (a `getModelChoices` on `ScenarioService`); today it is one `tryGetById` per scenario at queue time | half a day |
-| Fix 8 — make the two "refuses before touching the plan row" tests assert it | 1 hour |
-| Fix 9 — call `normalizePlanScope` from `runPlan` and bind the three `@unit` scenarios | half a day |
-| Fix 4 — `defaultPlanName` (**needs decisions 4 and 5**) | 1 day |
-| The 22 `@integration` scenarios — a Postgres-backed repository suite plus a `vitest.config.ts` that names the datastore | 2 days |
+| Item                                                                                                                    | Size   |
+| ----------------------------------------------------------------------------------------------------------------------- | ------ |
+| ~~Fix 3~~ — done 2026-09-04, the `cli-ephemeral` `NOT` clause                                                           | done   |
+| ~~Fix 5 / 11~~ — done 2026-09-04, `repeatCount` cap and the door's duplicate schema                                     | done   |
+| ~~Fix 6~~ — done 2026-09-04, `planNameKey` and main's lock prefix/hash/timeout                                          | done   |
+| ~~Fix 7~~ — done 2026-09-04, `ScenarioService.getModelChoices` batches the model resolve                                | done   |
+| ~~Fix 8~~ — done 2026-09-04, the two refusal tests assert zero writes                                                   | done   |
+| ~~Fix 9~~ — done 2026-09-04, `normalizePlanScope` wired and the three `@unit` scenarios bound                           | done   |
+| ~~Fix 4~~ — done 2026-09-04, `defaultPlanName` restored alongside the REST mount                                        | done   |
+| The 19 `@integration` scenarios — a Postgres-backed repository suite plus a `vitest.config.ts` that names the datastore | 2 days |
 
 ## Tasks and langwatch-saas
 
-| Item | Size |
-| --- | --- |
-| Fix 16 — lazy handle composition on `TasksHost`, plus the eight lifecycle tests (plan is written) | 1 day |
-| Fix 18 — audit the remaining `stored-object/server` index exports individually | half a day |
-| The trace producer-only pipeline factory; register `annotation-clickhouse-backfill` and `dataset-content-backfill` (**needs decision 6**) | 2 days |
-| Move `WorkerDatasetStorageResolver` into `dataset/server/adapters` and fill `TasksHost.objectStorage` | half a day |
-| `topic-clustering-run` — the runner's collaborator graph plus two producer registrations | 3 days |
+| Item                                                                                                                                                                                    | Size              |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
+| Fix 16 — lazy handle composition on `TasksHost`, plus the eight lifecycle tests (plan is written)                                                                                       | 1 day             |
+| Fix 18 — audit the remaining `stored-object/server` index exports individually                                                                                                          | half a day        |
+| The trace producer-only pipeline factory; register `annotation-clickhouse-backfill` and `dataset-content-backfill` (**needs decision 6**)                                               | 2 days            |
+| Move `WorkerDatasetStorageResolver` into `dataset/server/adapters` and fill `TasksHost.objectStorage`                                                                                   | half a day        |
+| `topic-clustering-run` — the runner's collaborator graph plus two producer registrations                                                                                                | 3 days            |
 | langwatch-saas PR — delete the 5 moved tasks, keep `backfillInviteUsersToCio` as a `@langwatch/task` plugin, drop the submodule, build `FROM` the public image (decision 9 **DECIDED**) | 1 day, other repo |
 
 ## Unserved surfaces and restored features
 
-| Item | Size |
-| --- | --- |
-| `/api/v1/run-plans*` and `/api/v1/test-suites*` — 11 operations, unowned (**needs decision 5**) | 3 days |
-| The result-atoms query layer, then `run-configurations` service/repository/router, then the composition wiring — unblocks five procedures (**needs decision 12**) | 1 week |
-| The workbench Langy handoff — publish the two hooks, port the manifest/narration/run-identification modules, rewire the screen (**needs decision 13**) | 1 week |
-| Regenerate the OpenAPI artefacts, last, on the merged branch | half a day |
+| Item                                                                                                                                                              | Size       |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| ~~`/api/v1/run-plans*` and `/api/v1/test-suites*` — 11 operations, unowned~~ — done 2026-09-04, both families built and mounted                                   | done       |
+| The result-atoms query layer, then `run-configurations` service/repository/router, then the composition wiring — unblocks five procedures (**needs decision 12**) | 1 week     |
+| The workbench Langy handoff — publish the two hooks, port the manifest/narration/run-identification modules, rewire the screen (**needs decision 13**)            | 1 week     |
+| Regenerate the OpenAPI artefacts, last, on the merged branch                                                                                                      | half a day |
 
 ## Cross-cutting and operational
 
-| Item | Size |
-| --- | --- |
-| `make haven install` after this branch lands — a pre-removal binary hard-refuses at boot | 1 minute, everyone |
-| Mark PR #7536 ready and read the first full CI run (**decision 17**) | — |
-| `F-GATEWAY-CAT-01` and `F-HOME-01` (**decision 18**) | half a day together |
-| `F-TRACE-01` — the extracted full-read path trusts a stale storage-anchor hint | 1 day |
-| `F-AGENT-01` — refresh `specs/agents/AUDIT_MANIFEST.md` (rides with connected-agents Slice 9) | 1 hour |
-| `F-LINT-02` — wire `oxlint-tsgolint`, restoring four type-aware rules | 1 day, needs a capable machine |
-| Read `oxlint-plugin.mjs` against `service-quality.ts` and `manifests.ts` to settle the claimed rule overlap | half a day |
-| Re-verify the four residual unknowns from the bug hunt: REST body-shape drift on ~253 mounted operations, procedure-level gaps inside mounted namespaces, the haven migration `context canceled`, and worker job-processing behaviour | 2 days |
+| Item                                                                                                                                                                                                                                  | Size                           |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| `make haven install` after this branch lands — a pre-removal binary hard-refuses at boot                                                                                                                                              | 1 minute, everyone             |
+| Mark PR #7536 ready and read the first full CI run (**decision 17**)                                                                                                                                                                  | —                              |
+| `F-GATEWAY-CAT-01` and `F-HOME-01` (**decision 18**)                                                                                                                                                                                  | half a day together            |
+| `F-TRACE-01` — the extracted full-read path trusts a stale storage-anchor hint                                                                                                                                                        | 1 day                          |
+| `F-AGENT-01` — refresh `specs/agents/AUDIT_MANIFEST.md` (rides with connected-agents Slice 9)                                                                                                                                         | 1 hour                         |
+| `F-LINT-02` — wire `oxlint-tsgolint`, restoring four type-aware rules                                                                                                                                                                 | 1 day, needs a capable machine |
+| Read `oxlint-plugin.mjs` against `service-quality.ts` and `manifests.ts` to settle the claimed rule overlap                                                                                                                           | half a day                     |
+| Re-verify the four residual unknowns from the bug hunt: REST body-shape drift on ~253 mounted operations, procedure-level gaps inside mounted namespaces, the haven migration `context canceled`, and worker job-processing behaviour | 2 days                         |
+
+## 20. Bare REST alias versus the frozen OpenAPI document (added 2026-09-04)
+
+The OpenAPI parity audit (`openapi-parity-2026-09-04.md`) found 24 documented
+operations that 404 on the branch. All but one come from one change: ADR-002 in
+`packages/api` (Proposed, 2026-08-20, pinned by
+`packages/api/specs/versioned-routing.feature` "The bare alias is gone") removed
+the unversioned mount that main still serves. The frozen document publishes the
+management families (`/api/organization`, `/api/roles`, `/api/role-bindings`,
+`/api/scim-tokens`, ...) at exactly those bare paths, and the branch's own drift
+guard (`openapi-check` task) is red because of it.
+
+The two rulings in force contradict each other here: the document is frozen,
+and ADR-002 §2 says the document must instead carry every dated version plus
+`latest`. One of them has to give.
+
+- (a) Reinstate the bare `latest` alias in `route-mounting.ts` as main has it,
+  amend ADR-002 §1 and the spec scenario, keep the document frozen. Cheapest,
+  keeps every generated client working, guard goes green with no document edit.
+- (b) Keep ADR-002, unfreeze the document, regenerate it with the versioned
+  paths, and accept that every published client URL changes.
+
+**Recommendation: (a) for this branch.** ADR-002 is Proposed, not Accepted, and
+the published contract predates it. (b) is a product decision about the public
+URL scheme and should not ride on a restructure branch.
+
+Not decided; nothing implemented either way. The one remaining gap outside this,
+`GET /api/traces/{traceId}/transcript`, waits on a composed `LogService`.
