@@ -1902,6 +1902,99 @@ Rule: Dynamic prefix sidebar parity
     And toggling a value writes "@event.attribute.<key>:<value>" into the search bar
 
 
+Rule: Attribute sections list values from their own attribute store
+  Each attribute flavour is backed by a different ClickHouse column
+  (trace.attribute → trace_summaries.Attributes, span.attribute →
+  stored_spans.SpanAttributes, event.attribute → stored_spans.Events.Attributes).
+  Expanding a key must list values read from that flavour's own store — a
+  span- or event-attribute key whose values only exist on spans/events must
+  not come back empty because the lookup went to the trace-level map.
+
+  Background:
+    Given the user is authenticated with "traces:view" permission
+    And the project has traces with trace, span, and event attributes
+
+  Scenario: Expanding an event-attribute key lists values observed on events
+    Given events carry the attribute "event.metrics.vote" with values "1" and "-1"
+    And no trace-level attribute named "event.metrics.vote" exists
+    When the user expands the "event.metrics.vote" key in the Event attributes section
+    Then the value list shows "1" and "-1"
+
+  Scenario: Expanding a span-attribute key lists values observed on spans
+    Given spans carry the attribute "gen_ai.request.model" with value "gpt-5-mini"
+    And no trace-level attribute named "gen_ai.request.model" exists
+    When the user expands the "gen_ai.request.model" key in the Span attributes section
+    Then the value list shows "gpt-5-mini"
+
+  Scenario: A listed event-attribute value round-trips verbatim into the filter
+    Given events carry the attribute "event.metrics.vote" with the stored string "1"
+    When the user toggles the listed value "1" under "event.metrics.vote"
+    Then the search bar shows "@event.attribute.event.metrics.vote:1"
+    And the filter value is the stored string unmodified — never reformatted
+
+
+Rule: Event filtering is reachable on the default sidebar
+  A fresh profile lands on comfortable density; the Event name section and
+  the Event attributes section must be part of that default set so feedback
+  events (thumbs_up_down and friends) are filterable without configuration.
+
+  Background:
+    Given the user is authenticated with "traces:view" permission
+    And the user has never changed density
+    And the project has traces with events carrying attributes
+
+  Scenario: Event name and Event attributes sections show on the comfortable default
+    Given the user has never changed facet visibility
+    Then the sidebar shows the "Event name" section
+    And the sidebar shows the "Event attributes" section
+
+  Scenario: Span attributes stays behind the facet picker on comfortable density
+    Given the user has never changed facet visibility
+    And the project has traces with span attributes
+    Then the sidebar does not show the "Span attributes" section
+    But the facet picker still offers "Span attributes"
+
+  Scenario: Users who previously hid the Event name section keep it hidden
+    Given the user explicitly hid the "Event name" section earlier
+    And no event filter is active in the query
+    Then the sidebar does not show the "Event name" section
+
+
+Rule: Event rows drill down into their metric values
+  Each event-name row in the Event name section expands inline — like the
+  evaluator drilldown — to show the metric values observed for that event
+  type, with counts, sourced from the same discover payload (no extra query
+  per click).
+
+  Background:
+    Given the user is authenticated with "traces:view" permission
+    And the project has traces with "thumbs_up_down" events carrying "event.metrics.vote" values "1" and "-1"
+
+  Scenario: Expanding the thumbs_up_down row shows its vote values with counts
+    When the user expands the "thumbs_up_down" row in the Event name section
+    Then the drilldown lists "vote" values "1" and "-1" with their counts
+    And no additional facet query is fired by the expansion
+
+  Scenario: Clicking a vote value applies a single event-attribute filter
+    When the user clicks the vote value "-1" in the thumbs_up_down drilldown
+    Then the search bar shows "@event.attribute.event.metrics.vote:-1"
+    And no other clause is added to the query
+
+  # Known limitation, accepted: the emitted clause matches the metric on ANY
+  # event in the trace. Combining it with "@event:thumbs_up_down" ANDs two
+  # independent trace-scoped subqueries — they may match different events in
+  # the same trace. Same-event pairing would need new filter grammar and is
+  # out of scope here.
+  Scenario: The drilldown filter is trace-scoped, not same-event-scoped
+    Given a trace has a "thumbs_up_down" event with vote "1" and another event with vote "-1"
+    When the user clicks the vote value "-1" in the thumbs_up_down drilldown
+    Then that trace still matches the resulting query
+
+  Scenario: An event type with no metrics shows no drilldown affordance
+    Given the project has "custom_marker" events carrying no event.metrics attributes
+    Then the "custom_marker" row shows no expand affordance
+
+
 Rule: Unknown field handling for typo'd prefixes
   A typo in a dynamic prefix (e.g. "atrace.attribute.x") produces a clear
   parse error rather than a silent empty result.
