@@ -87,6 +87,7 @@ LONG_PAGE="$WORK/docs/long.mdx"
   printf -- '--- | ---\n'
   printf 'one two three four five six | seven eight nine ten eleven twelve\n\n'
   printf -- '- one two three four five six seven eight nine ten\n\n'
+  printf -- '````markdown\n```bash\necho one two three four five six seven eight nine ten eleven\n```\n````\n\n'
   printf 'one two three four five six\n\none two three four five six\n'
 } > "$LONG_PAGE"
 rm -f "$WORK/docs/$PAGE_NAME"
@@ -120,6 +121,24 @@ if printf '%s\n' "$LONG_OUTPUT" | grep -q 'long.mdx,line=18::'; then
   echo "Output: $LONG_OUTPUT"
 else
   check "a list item of exactly the limit passes" yes
+fi
+
+# The nested fence block sits at lines 20-24 and the prose after it at 26 and
+# 28. A fence rule that toggles on every fence line leaves the scanner inside
+# a code block from line 24 on, so the paragraphs after it stop being read.
+if printf '%s\n' "$LONG_OUTPUT" | grep -qE 'long.mdx,line=2[0-4]::'; then
+  check "a fence nested in a longer fence stays code" no
+  echo "Output: $LONG_OUTPUT"
+else
+  check "a fence nested in a longer fence stays code" yes
+fi
+
+TAIL_OUTPUT="$(DOCS_PROSE_MAX_PARAGRAPH_WORDS=5 bash "$WORK/docs/scripts/check-docs-prose.sh" --all 2>&1)"
+if printf '%s\n' "$TAIL_OUTPUT" | grep -q 'long.mdx,line=26::'; then
+  check "prose after a nested fence block is still read" yes
+else
+  check "prose after a nested fence block is still read" no
+  echo "Output: $TAIL_OUTPUT"
 fi
 
 if printf '%s\n' "$LONG_OUTPUT" | grep -q 'long.mdx,line=5::'; then
