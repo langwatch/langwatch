@@ -16,6 +16,13 @@ export const GUIDED_ONBOARDING_KICKOFF_PART_TYPE = "guided-onboarding-kickoff";
 
 export const GUIDED_ONBOARDING_SKILL_NAME = "guided-onboarding";
 
+/**
+ * The title of the conversation the kickoff starts. It is set when the
+ * conversation is created and it sticks, so the brief never reads as a title
+ * in the panel header, the history list or the follow-along link.
+ */
+export const GUIDED_KICKOFF_CONVERSATION_TITLE = "Getting started";
+
 export const guidedKickoffTourStatusSchema = z.enum([
   "completed",
   "skipped",

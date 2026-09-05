@@ -92,6 +92,28 @@ Feature: Langy guides the first setup after sign-up
       Then the text is the brief
       And nothing of the typed part reaches the model
 
+  Rule: The kickoff conversation is called Getting started, never after the brief
+
+    @unit
+    Scenario: The kickoff names its conversation Getting started
+      Given a new conversation whose first user message is the kickoff
+      When the conversation is created
+      Then its title is "Getting started"
+      And the brief shows as a title nowhere, not in the panel header, the history list or the follow-along link
+
+    @unit
+    Scenario: A title chosen at creation is never replaced by a generated one
+      Given a conversation created with the title "Getting started"
+      When its first successful reply arrives
+      Then no title is generated for it
+      And the title stays "Getting started"
+
+    @unit
+    Scenario: An ordinary first message still gets its placeholder title
+      Given a new conversation whose first user message is typed text
+      When the conversation is created
+      Then its title is the placeholder derived from that text
+
   Rule: The kickoff renders as the tour card, never as a bubble
 
     @integration
