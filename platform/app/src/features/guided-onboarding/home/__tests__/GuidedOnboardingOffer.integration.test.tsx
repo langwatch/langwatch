@@ -15,6 +15,7 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { GuidedOnboardingCheck } from "~/server/onboarding-checks/onboarding-checks.service";
 import type { GuidedOnboardingState } from "~/server/schemas/sign-up-data.schema";
 import type { GuidedSpace } from "../../landing";
 
@@ -46,21 +47,25 @@ vi.mock("~/hooks/useRequiredSession", () => ({
   }),
 }));
 let isNewProject = true;
+let guidedState: GuidedOnboardingCheck = {
+  variant: "guided",
+  paths: [],
+  donePaths: [],
+};
 vi.mock("~/components/home/useProjectReach", () => ({
-  useProjectReach: () => ({ isNewProject }),
+  useProjectReach: () => ({ isNewProject, guidedOnboarding: guidedState }),
 }));
 
-let guidedState: GuidedOnboardingState = { paths: [], donePaths: [] };
 const beginPathMutateAsync = vi.fn();
 const recordTourMutate = vi.fn();
 const invalidate = vi.fn();
 vi.mock("~/utils/api", () => ({
   api: {
-    useUtils: () => ({ onboarding: { getGuidedState: { invalidate } } }),
+    useUtils: () => ({
+      onboarding: { getGuidedState: { invalidate } },
+      integrationsChecks: { getCheckStatus: { invalidate } },
+    }),
     onboarding: {
-      getGuidedState: {
-        useQuery: () => ({ data: guidedState, isLoading: false }),
-      },
       beginPath: { useMutation: () => ({ mutateAsync: beginPathMutateAsync }) },
       recordTour: { useMutation: () => ({ mutate: recordTourMutate }) },
     },
@@ -97,7 +102,7 @@ describe("GuidedOnboardingOffer", () => {
   beforeEach(() => {
     flagEnabled = true;
     isNewProject = true;
-    guidedState = { paths: [], donePaths: [] };
+    guidedState = { variant: "guided", paths: [], donePaths: [] };
     beginPathMutateAsync.mockReset();
     recordTourMutate.mockReset();
     queueGuidedKickoff.mockReset();
@@ -134,14 +139,23 @@ describe("GuidedOnboardingOffer", () => {
 
     /** @scenario the offer is hidden while Langy is guiding that same space */
     it("hides while the space's path is the current one", () => {
-      guidedState = { paths: ["llmops"], currentPath: "llmops", donePaths: [] };
+      guidedState = {
+        variant: "guided",
+        paths: ["llmops"],
+        currentPath: "llmops",
+        donePaths: [],
+      };
       renderOffer("project");
       expect(pill()).toBeNull();
     });
 
     /** @scenario the offer is hidden once the space is done */
     it("hides once the space's path is done", () => {
-      guidedState = { paths: ["gateway"], donePaths: ["gateway"] };
+      guidedState = {
+        variant: "guided",
+        paths: ["gateway"],
+        donePaths: ["gateway"],
+      };
       renderOffer("gateway");
       expect(pill()).toBeNull();
     });
@@ -156,6 +170,7 @@ describe("GuidedOnboardingOffer", () => {
     /** @scenario a path picked on the value screen but not started yet is offered in its space */
     it("offers a picked path that has not started", () => {
       guidedState = {
+        variant: "guided",
         paths: ["llmops", "gateway"],
         currentPath: "llmops",
         donePaths: [],
@@ -166,7 +181,12 @@ describe("GuidedOnboardingOffer", () => {
 
     /** @scenario a space the user never picked is offered too */
     it("offers a space that was never picked", () => {
-      guidedState = { paths: ["llmops"], currentPath: "llmops", donePaths: [] };
+      guidedState = {
+        variant: "guided",
+        paths: ["llmops"],
+        currentPath: "llmops",
+        donePaths: [],
+      };
       renderOffer("governance");
       expect(pill()).toBeInTheDocument();
     });
@@ -183,8 +203,13 @@ describe("GuidedOnboardingOffer", () => {
 
   describe("given the classic variant", () => {
     /** @scenario the classic variant never shows the offer */
-    it("shows no pill", () => {
+    it("shows no pill with the flag off, nor for a classic organization", () => {
       flagEnabled = false;
+      renderOffer("project");
+      expect(pill()).toBeNull();
+      cleanup();
+      flagEnabled = true;
+      guidedState = { variant: "classic", paths: [], donePaths: [] };
       renderOffer("project");
       expect(pill()).toBeNull();
     });
@@ -221,9 +246,9 @@ describe("GuidedOnboardingOffer", () => {
     /** @scenario the kickoff continues the attached conversation when the tour ends */
     it("queues one kickoff for the attached conversation when the tour ends", async () => {
       guidedState = {
+        variant: "guided",
         paths: ["llmops"],
         donePaths: ["llmops"],
-        conversationId: "conv_1",
       };
       beginPathMutateAsync.mockResolvedValue({
         paths: ["llmops", "gateway"],

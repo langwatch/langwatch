@@ -19,23 +19,27 @@ import { showErrorToast } from "~/features/errors/logic/showErrorToast";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
-import type { GuidedOnboardingState } from "~/server/schemas/sign-up-data.schema";
+import type { GuidedOnboardingCheck } from "~/server/onboarding-checks/onboarding-checks.service";
 import { api } from "~/utils/api";
 import { type GuidedSpace, guidedPathForSpace } from "../landing";
 import type { GuidedPath } from "../paths";
 import { buildKickoff, firstNameOf } from "../tour/GuidedOnboardingHost";
 import { useGuidedTourStore } from "../tour/guidedTourStore";
 import { pathHasTour } from "../tour/tourSteps";
-import { useGuidedOnboarding } from "../useGuidedOnboarding";
+import { useGuidedOnboardingFlag } from "../useGuidedOnboarding";
 
-/** The path this space offers, or none when the space is guided or done. */
+/**
+ * The path this space offers, or none when the space is guided or done, or
+ * when the organization went through the classic onboarding.
+ */
 export function offeredPath({
   space,
   state,
 }: {
   space: GuidedSpace;
-  state: GuidedOnboardingState;
+  state: GuidedOnboardingCheck;
 }): GuidedPath | null {
+  if (state.variant === "classic") return null;
   const path = guidedPathForSpace(space);
   if (state.currentPath === path) return null;
   if (state.donePaths.includes(path)) return null;
@@ -51,8 +55,8 @@ export function GuidedOnboardingOffer({ space }: { space: GuidedSpace }) {
 }
 
 function GuidedOnboardingOfferInner({ space }: { space: GuidedSpace }) {
-  const { guided, state, organizationId } = useGuidedOnboarding();
-  const { isNewProject } = useProjectReach();
+  const { enabled, organizationId } = useGuidedOnboardingFlag();
+  const { isNewProject, guidedOnboarding } = useProjectReach();
   const touring = useGuidedTourStore((s) => s.running);
   const { organization } = useOrganizationTeamProject({
     redirectToOnboarding: false,
@@ -65,10 +69,16 @@ function GuidedOnboardingOfferInner({ space }: { space: GuidedSpace }) {
   const recordTour = api.onboarding.recordTour.useMutation();
   const [busy, setBusy] = useState(false);
 
-  if (!guided || !state || !organizationId || !isNewProject || touring) {
+  if (
+    !enabled ||
+    !guidedOnboarding ||
+    !organizationId ||
+    !isNewProject ||
+    touring
+  ) {
     return null;
   }
-  const path = offeredPath({ space, state });
+  const path = offeredPath({ space, state: guidedOnboarding });
   if (!path) return null;
 
   const begin = async () => {
@@ -77,7 +87,10 @@ function GuidedOnboardingOfferInner({ space }: { space: GuidedSpace }) {
     emit("clicked", "home_offer", { path });
     try {
       const next = await beginPath.mutateAsync({ organizationId, path });
-      await utils.onboarding.getGuidedState.invalidate({ organizationId });
+      await Promise.all([
+        utils.onboarding.getGuidedState.invalidate({ organizationId }),
+        utils.integrationsChecks.getCheckStatus.invalidate(),
+      ]);
       const orgName = organization?.name ?? "";
       const firstName = firstNameOf(session.data?.user?.name);
       const queue = (tourStatus: "completed" | "skipped" | "none") =>

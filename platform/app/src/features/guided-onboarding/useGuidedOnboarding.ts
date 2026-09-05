@@ -1,7 +1,8 @@
 /**
  * The guided onboarding as the client sees it: is this organization in the
- * guided variant, and what does its guided state say. One hook for the tour
- * host and the Home offer, so both read the same query and the same flag.
+ * guided variant, and what does its guided state say. The tour host reads
+ * the full state; the Home offer only needs the flag, its state comes with
+ * the onboarding checks the home already loads.
  *
  * @see specs/features/onboarding/guided-tour.feature
  * @see specs/home/guided-onboarding-offer.feature
@@ -13,15 +14,14 @@ import { api } from "~/utils/api";
 
 export const GUIDED_ONBOARDING_FLAG = "experiment_onboarding_langy_guided";
 
-export interface GuidedOnboardingView {
-  /** The organization is in the guided variant and its state has loaded. */
-  guided: boolean;
-  state: GuidedOnboardingState | null;
+export interface GuidedOnboardingFlagView {
+  /** The guided variant is on for this organization. */
+  enabled: boolean;
   organizationId: string | null;
   isLoading: boolean;
 }
 
-export function useGuidedOnboarding(): GuidedOnboardingView {
+export function useGuidedOnboardingFlag(): GuidedOnboardingFlagView {
   const { organization, project } = useOrganizationTeamProject({
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
@@ -32,6 +32,20 @@ export function useGuidedOnboarding(): GuidedOnboardingView {
     organizationId: organizationId ?? undefined,
     enabled: !!organizationId,
   });
+  return { enabled: flag.enabled, organizationId, isLoading: flag.isLoading };
+}
+
+export interface GuidedOnboardingView {
+  /** The organization is in the guided variant and its state has loaded. */
+  guided: boolean;
+  state: GuidedOnboardingState | null;
+  organizationId: string | null;
+  isLoading: boolean;
+}
+
+export function useGuidedOnboarding(): GuidedOnboardingView {
+  const flag = useGuidedOnboardingFlag();
+  const { organizationId } = flag;
   const stateQuery = api.onboarding.getGuidedState.useQuery(
     { organizationId: organizationId ?? "" },
     { enabled: !!organizationId && flag.enabled },

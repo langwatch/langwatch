@@ -1,5 +1,6 @@
 import type { ProjectReach } from "~/features/langy/logic/langyHomeSuggestions";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import type { GuidedOnboardingCheck } from "~/server/onboarding-checks/onboarding-checks.service";
 import { api } from "~/utils/api";
 
 export interface ProjectReachResult extends ProjectReach {
@@ -7,6 +8,8 @@ export interface ProjectReachResult extends ProjectReach {
   isLoading: boolean;
   /** No traces yet: the home page leads with setup rather than figures. */
   isNewProject: boolean;
+  /** Where the organization's guided onboarding stands; null until loaded. */
+  guidedOnboarding: GuidedOnboardingCheck | null;
 }
 
 /**
@@ -41,6 +44,7 @@ export function useProjectReach(): ProjectReachResult {
   return {
     isLoading: isLoading || !data,
     isNewProject: !isLoading && !!data && !hasTraces,
+    guidedOnboarding: data?.guidedOnboarding ?? null,
     hasTraces,
     hasEvaluations: (data?.onlineEvaluations ?? 0) > 0,
     hasExperiments: (data?.simulations ?? 0) > 0 || (data?.datasets ?? 0) > 0,
