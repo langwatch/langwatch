@@ -336,6 +336,7 @@ function TourLayerInner() {
                had while the cursor was still travelling */
             let fresh = targetRect(step.target) ?? rect;
             setSpot(padded(fresh, 6));
+            if (!sameRect(fresh, rect)) setCursor(cursorPoint(fresh));
             setCaption(captionPoint(fresh, step));
             /* the auto-advance: a slow read, then move on by itself */
             later(advance, readMs(step.text));

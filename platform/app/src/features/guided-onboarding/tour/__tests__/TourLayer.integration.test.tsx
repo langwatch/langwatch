@@ -243,9 +243,17 @@ describe("TourLayer", () => {
       renderLayer();
       act(() => useGuidedTourStore.getState().start("gateway"));
       act(() => useGuidedTourStore.getState().goToStep(2));
-      landStep(true);
+      act(() => vi.advanceTimersByTime(SETTLE));
+      /* the field was measured mid-slide */
       expect(screen.getByTestId("tour-spotlight").style.left).toBe("894px");
-      /* the drawer finishes sliding in */
+      act(() => vi.advanceTimersByTime(TRAVEL));
+      rects.set("vk-name", rect(600, 100, 460, 40));
+      act(() => vi.advanceTimersByTime(550));
+      expect(screen.getByTestId("tour-spotlight").style.left).toBe("594px");
+      expect(screen.getByTestId("tour-cursor").style.transform).toBe(
+        "translate(931.2px, 124.8px)",
+      );
+      /* and it keeps sliding while the caption is up */
       rects.set("vk-name", rect(380, 100, 460, 40));
       act(() => vi.advanceTimersByTime(TOUR_TARGET_POLL_MS));
       expect(screen.getByTestId("tour-spotlight").style.left).toBe("374px");
