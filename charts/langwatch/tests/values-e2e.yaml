@@ -69,6 +69,14 @@ clickhouse:
     size: 1Gi
   auth:
     password: "e2etest"
+  # LangWatchQL PostgreSQL bridge is NOT overridden here on purpose: the chart
+  # now defaults it to its own PostgreSQL out of the box (host auto-derives to
+  # <release>-postgresql, database/user to the chart-managed PostgreSQL's), so
+  # the lwql_postgres named collection the single-replica scenario asserts
+  # (specs/analytics/lwql-api.feature) renders from the DEFAULTS. Exercising the
+  # defaults is the point — a hand-wired override here would hide a regression in
+  # them. The collection is lazy config (never dialed at ClickHouse boot), so the
+  # default coordinates are sufficient for that existence check.
 
 # ── PostgreSQL ─────────────────────────────────────────────────────────────────
 postgresql:

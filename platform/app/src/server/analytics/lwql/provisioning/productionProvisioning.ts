@@ -1,7 +1,7 @@
 /**
  * Production LangWatchQL provisioning — pure composition only.
  *
- * `provisioning.ts`, `views.ts` and `postgresMapping.ts` generate the SQL;
+ * `accessModel.ts`, `catalogStatements.ts` and `postgresMapping.ts` generate the SQL;
  * this module decides which of it a real deploy runs and in what order, from
  * the runtime `LWQL_*` connection. No I/O happens here — every function
  * takes its inputs as parameters and returns SQL statements, a name, or a
@@ -23,23 +23,23 @@
  * @see specs/analytics/lwql-api.feature
  */
 
-import { lwqlTenantCapability } from "./capability";
-import { LWQL_VIEW_CATALOG } from "./catalog/lwqlViews";
-import type { LangWatchQLViewDefinition } from "./catalog/types";
-import { isPostgresResident } from "./catalog/types";
-import type { LangWatchQLConnection } from "./executor";
+import { lwqlTenantCapability } from "../capability";
+import { LWQL_VIEW_CATALOG } from "../catalog/lwqlViews";
+import type { LangWatchQLViewDefinition } from "../catalog/types";
+import { isPostgresResident } from "../catalog/types";
+import type { LangWatchQLConnection } from "../connection";
+import { postgresLiteral, postgresQuoted } from "../sqlText";
 import {
   KEY_MAP_COLUMNS,
   type LangWatchQLNames,
   qualified,
-} from "./provisioning";
-import { postgresLiteral, postgresQuoted } from "./sqlText";
+} from "./accessModel";
 import {
   lwqlApprovedPostgresViewNames,
   lwqlPostgresApprovedViewStatements,
   lwqlViewStatement,
   SHIPPED_LWQL_DEDUP,
-} from "./views";
+} from "./catalogStatements";
 
 /**
  * Literal, hard-coded match for the table name the SaaS row-filter subqueries

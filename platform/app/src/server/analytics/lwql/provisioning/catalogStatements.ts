@@ -1,16 +1,20 @@
 /**
- * LangWatchQL analytics SQL — the `analytics.*` views, as SQL text.
+ * LangWatchQL catalog statements — binds the catalog into DDL for both
+ * ClickHouse (the `analytics.*` views) and PostgreSQL (approved views and
+ * engine tables), as SQL text.
  *
- * `provisioning.ts` builds the access model (who the restricted identity is,
+ * `accessModel.ts` builds the access model (who the restricted identity is,
  * what it may change, which rows it may see). This module builds the objects
- * that model is applied to: one normal view per catalog entry over the real
- * fact tables, the column grants that bound what those views may read, and the
- * row policies that bound which rows they return.
+ * that model is applied to: one normal ClickHouse view per catalog entry over
+ * the real fact tables, the column grants that bound what those views may
+ * read, the row policies that bound which rows they return, and — for
+ * catalog entries whose data lives in PostgreSQL — the approved views and
+ * engine tables that expose them there instead.
  *
- * Everything here is generated from `./catalog/`, so the exposed surface is the
- * catalog and nothing else. A column that is not in the catalog is not in the
- * grant, which under ClickHouse's column-level access means unreachable rather
- * than merely unselected.
+ * Everything here is generated from `../catalog/`, so the exposed surface is
+ * the catalog and nothing else. A column that is not in the catalog is not in
+ * the grant, which under ClickHouse's column-level access means unreachable
+ * rather than merely unselected.
  *
  * ## Three properties that are not negotiable
  *
@@ -43,11 +47,11 @@
  * `./catalog/contentGating.ts` for how the views themselves strip content keys.
  *
  * @see ./catalog/lwqlViews.ts — the catalog these statements are built from
- * @see ./provisioning.ts — the access model applied over them
+ * @see ./accessModel.ts — the access model applied over them
  * @see specs/analytics/lwql-api.feature
  */
 
-import { LWQL_VIEW_CATALOG } from "./catalog/lwqlViews";
+import { LWQL_VIEW_CATALOG } from "../catalog/lwqlViews";
 import {
   columnExpression,
   isPostgresResident,
@@ -57,19 +61,19 @@ import {
   lwqlGrainColumns,
   lwqlPostgresViews,
   lwqlViewSourceColumns,
-} from "./catalog/types";
-import {
-  DEFAULT_POSTGRES_ENGINE_POOL_SIZE,
-  postgresApprovedViewStatement,
-  postgresEngineTableStatement,
-} from "./postgresMapping";
+} from "../catalog/types";
 import {
   KEY_MAP_COLUMNS,
   type LangWatchQLNames,
   type LangWatchQLTable,
   lwqlGrantStatement,
   lwqlRowPolicyStatement,
-} from "./provisioning";
+} from "./accessModel";
+import {
+  DEFAULT_POSTGRES_ENGINE_POOL_SIZE,
+  postgresApprovedViewStatement,
+  postgresEngineTableStatement,
+} from "./postgresMapping";
 
 /**
  * The strategy the shipped views use where a catalog entry pins none of its
@@ -114,7 +118,7 @@ import {
  * above for a correctness problem they do not have.
  *
  * Re-measured on every run by the pruning case in
- * `__tests__/lwqlViews.integration.test.ts`.
+ * `__tests__/catalogStatements.integration.test.ts`.
  */
 export const SHIPPED_LWQL_DEDUP: LangWatchQLDedupStrategy = "final";
 
@@ -596,8 +600,9 @@ export function lwqlPostgresApprovedViewStatements({
 /**
  * The approved views the reader role must be granted, in catalog order.
  *
- * No production caller in this repo — input to the infra-owned access model
- * (langwatch-saas#1126); reference implementation, not dead code.
+ * Called for real by self-hosted provisioning (`selfProvisioning.ts`, issue
+ * #6635); on cloud the same access model is infra-owned (langwatch-saas#1126) and this
+ * is the reference implementation terraform must match.
  */
 export function lwqlApprovedPostgresViewNames(
   views: readonly LangWatchQLViewDefinition[] = LWQL_VIEW_CATALOG,
@@ -618,8 +623,9 @@ export function lwqlApprovedPostgresViewNames(
  * Headroom on top of the pools' total demand, for the connection a
  * re-provisioning run or an operator's `psql` needs while the pools are full.
  *
- * No production caller in this repo — input to the infra-owned reader role
- * (langwatch-saas#1126); reference implementation, not dead code.
+ * Called for real by self-hosted provisioning (`selfProvisioning.ts`, issue
+ * #6635); on cloud the same reader role is infra-owned (langwatch-saas#1126) and this
+ * is the reference implementation terraform must match.
  */
 export function lwqlPostgresReaderConnectionLimit({
   views = LWQL_VIEW_CATALOG,
@@ -654,10 +660,12 @@ export function lwqlPostgresReaderConnectionLimit({
  * Run before {@link lwqlViewSetupStatements}, which builds the LangWatchQL
  * views over them, and after the named collection exists.
  *
- * Not called from any production path in this repo: the real tables are owned
- * by infra (langwatch-saas#1126). This is the reference implementation that
- * terraform must match — keep it and its tests in sync, do not delete as dead
- * code.
+ * Two callers, two ownership models. Self-hosted deployments run this for
+ * real via `selfProvisioning.ts` under `LWQL_SELF_PROVISION` (issue #6635),
+ * so it is a production path. On cloud the same tables are
+ * owned by infra (langwatch-saas#1126) and this stays the reference
+ * implementation terraform must match — keep it and its tests in sync with
+ * both.
  */
 export function lwqlPostgresEngineTableStatements({
   names,
@@ -721,10 +729,11 @@ function singleSourceColumn(
  * {@link lwqlPostgresEngineTableStatements}, which must have run first.
  * This function only exposes them.
  *
- * Not called from any production path in this repo: the real views' grants and
- * access model are owned by infra (langwatch-saas#1126). This is the reference
- * implementation that terraform must match — keep it and its tests in sync, do
- * not delete as dead code.
+ * Two callers, two ownership models. Self-hosted deployments run this for real
+ * via `selfProvisioning.ts` under `LWQL_SELF_PROVISION` (issue #6635), so it is
+ * a production path. On cloud the same views' grants and access model are
+ * owned by infra (langwatch-saas#1126) and this stays the reference
+ * implementation terraform must match — keep it and its tests in sync with both.
  */
 export function lwqlViewSetupStatements({
   names,
@@ -741,6 +750,23 @@ export function lwqlViewSetupStatements({
     ...views.map((view) =>
       lwqlViewStatement({ names, sourceDatabase, view, dedup }),
     ),
+    // Row policies BEFORE the grants they constrain, and this order is
+    // load-bearing rather than cosmetic. In ClickHouse a table carrying a
+    // `SELECT` grant and no row policy returns every row, so grants-first
+    // leaves a window in which the restricted identity reads across every
+    // tenant — and provisioning is not atomic. A caller that dies midway (a
+    // dropped connection, a refused statement) can leave that window standing
+    // indefinitely, and `provisionLwql` deliberately swallows the error and
+    // continues booting, so nothing downstream would close it.
+    //
+    // Emitting policies first inverts the failure: a partial run leaves the
+    // identity policed but not yet granted, which refuses reads rather than
+    // widening them. Safe to hoist because every table named here already
+    // exists by this point — fact tables come from migrations, and the
+    // PostgreSQL-engine tables are created earlier in the same batch.
+    ...lwqlSourceTables({ names, sourceDatabase, views }).map((lwqlTable) =>
+      lwqlRowPolicyStatement({ names, lwqlTable }),
+    ),
     // A fact table carries far more than the catalog exposes, so its grant is
     // column-scoped. A PostgreSQL-engine table was *created from* the catalog
     // and its whole column list is the exposed surface, so it takes the
@@ -753,8 +779,5 @@ export function lwqlViewSetupStatements({
         : lwqlSourceColumnGrantStatement({ names, sourceDatabase, view }),
     ),
     ...views.map((view) => lwqlGrantStatement({ names, table: view.name })),
-    ...lwqlSourceTables({ names, sourceDatabase, views }).map((lwqlTable) =>
-      lwqlRowPolicyStatement({ names, lwqlTable }),
-    ),
   ];
 }

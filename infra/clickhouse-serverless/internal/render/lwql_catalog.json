@@ -1,0 +1,36 @@
+{
+  "_comment": "Single source of truth for the Go side of the LangWatchQL access model. The two ordered lists are the fixed set of source tables (each behind a per-tenant row filter) and the caller-facing views the langwatch_lwql user is granted SELECT on. They are asserted equal to the application's LWQL catalog by platform/app/src/server/analytics/lwql/catalog/__tests__/manifestParity.unit.test.ts, so a catalog change without a matching edit here fails CI. The langwatch-saas render-config.sh is a third list in another repo and cannot be checked from here.",
+  "sourceTables": [
+    "trace_summaries",
+    "stored_spans",
+    "evaluation_runs",
+    "simulation_runs",
+    "trace_analytics",
+    "trace_analytics_rollup",
+    "evaluation_analytics",
+    "evaluation_analytics_rollup",
+    "annotations_pg",
+    "experiments_pg",
+    "batch_evaluations_pg",
+    "projects_pg",
+    "prompts_pg",
+    "prompt_versions_pg"
+  ],
+  "viewNames": [
+    "traces",
+    "spans",
+    "evaluations",
+    "simulations",
+    "trace_metrics",
+    "trace_metrics_by_minute",
+    "model_usage_by_minute",
+    "evaluation_metrics",
+    "evaluation_metrics_by_minute",
+    "annotations",
+    "experiments",
+    "batch_evaluations",
+    "projects",
+    "prompts",
+    "prompt_versions"
+  ]
+}

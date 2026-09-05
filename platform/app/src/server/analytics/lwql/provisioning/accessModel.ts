@@ -32,7 +32,7 @@
  * statement here fails with UNKNOWN_SETTING (115).
  *
  * Every name emitted below is interpolated into SQL text, so it goes through
- * `./sqlText.ts`: `assertIdentifier` for identifiers and the literal escapers
+ * `../sqlText.ts`: `assertIdentifier` for identifiers and the literal escapers
  * for values.
  *
  * Some LangWatchQL datasets live in PostgreSQL rather than ClickHouse. The access
@@ -40,11 +40,15 @@
  * `./postgresMapping.ts`.
  *
  * @see ./postgresMapping.ts — the PostgreSQL-resident datasets this model covers
- * @see ./sqlText.ts — the escaping and identifier rules these statements obey
+ * @see ../sqlText.ts — the escaping and identifier rules these statements obey
  * @see specs/analytics/lwql-api.feature
  */
 
-import { assertIdentifier, clickHouseLiteral } from "./sqlText";
+import {
+  DEFAULT_LWQL_RESOURCE_LIMITS,
+  type LangWatchQLResourceLimits,
+} from "../limits";
+import { assertIdentifier, clickHouseLiteral } from "../sqlText";
 
 /**
  * Server-level ClickHouse config declaring the `custom_` settings prefix.
@@ -75,6 +79,14 @@ export const CLICKHOUSE_CUSTOM_SETTINGS_PREFIX_CONFIG_PATH =
  *
  * Nothing here widens what the restricted identity can do — it must never
  * carry these. Belongs at {@link CLICKHOUSE_ACCESS_MANAGEMENT_CONFIG_PATH}.
+ *
+ * `show_named_collections_secrets` is deliberately NOT granted, for parity with
+ * the chart-managed renderer (`infra/clickhouse-serverless`): the `lwql_postgres`
+ * named collection holds a plaintext PostgreSQL password — ClickHouse must dial
+ * PG with the real value — and that grant would expose it through
+ * `SHOW CREATE NAMED COLLECTION`. `show_named_collections` (existence, secrets
+ * redacted) is enough to administer the collection, and nothing here reads the
+ * collection back: `./postgresMapping.ts` only ever writes it.
  */
 export function clickHouseAccessManagementConfigXml({
   administrativeUser,
@@ -88,7 +100,6 @@ export function clickHouseAccessManagementConfigXml({
             <access_management>1</access_management>
             <named_collection_control>1</named_collection_control>
             <show_named_collections>1</show_named_collections>
-            <show_named_collections_secrets>1</show_named_collections_secrets>
         </${administrativeUser}>
     </users>
 </clickhouse>
@@ -149,62 +160,6 @@ export interface LangWatchQLTable {
    */
   database?: string;
 }
-
-/**
- * Ceilings pinned `CONST` by the profile.
- *
- * Belt and braces rather than the load-bearing control: `readonly = 1` already
- * rejects *every* setting change except the tenant capability, including
- * settings the profile never mentions. The `CONST` pins survive any future
- * relaxation of `readonly`.
- */
-export interface LangWatchQLResourceLimits {
-  maxExecutionTimeSeconds: number;
-  maxMemoryUsageBytes: number;
-  /** Per-query thread ceiling, so one LangWatchQL query cannot saturate the server's cores. */
-  maxThreads: number;
-  /**
-   * How many LangWatchQL queries the shared restricted identity may run at once.
-   *
-   * The only ceiling here that is not per-query, and the reason it exists: every
-   * other bound in this interface constrains a single statement and says nothing
-   * about N of them arriving together. Because one identity is shared by every
-   * LangWatchQL query, this is an aggregate bound on the whole API's load — the
-   * N+1th concurrent query is refused rather than admitted alongside the others.
-   */
-  maxConcurrentQueriesForUser: number;
-  /**
-   * Scan ceilings, enforced with `read_overflow_mode = 'throw'`: a query that
-   * would read past either bound fails instead of silently returning a partial
-   * result — partial data that looks complete is the worse failure for an
-   * analytics caller. The breach reaches the caller as a coded
-   * `query_scan_limit_exceeded`, mapped from TOO_MANY_ROWS (158) /
-   * TOO_MANY_BYTES (307) by
-   * `~/server/app-layer/clients/clickhouse/translate-query-error`.
-   */
-  maxRowsToRead: number;
-  maxBytesToRead: number;
-}
-
-/**
- * The shipped ceilings.
- *
- * `maxExecutionTimeSeconds` and `maxMemoryUsageBytes` were measured working
- * against `clickhouse/clickhouse-server:25.10.2.65`. The rest — the thread,
- * scan and concurrency ceilings — are conservative order-of-magnitude choices
- * rather than measurements: nothing has profiled where they should sit, and
- * they are set where a runaway query is refused without a realistic analytical
- * one noticing. That every one of them is *accepted* by that server version is
- * proven, by the integration suites provisioning this profile into a container.
- */
-export const DEFAULT_LWQL_RESOURCE_LIMITS: LangWatchQLResourceLimits = {
-  maxExecutionTimeSeconds: 10,
-  maxMemoryUsageBytes: 1_000_000_000,
-  maxThreads: 4,
-  maxConcurrentQueriesForUser: 10,
-  maxRowsToRead: 1_000_000_000,
-  maxBytesToRead: 10_000_000_000,
-};
 
 /**
  * Validates every configured name, and that the tenant setting carries the
@@ -471,10 +426,11 @@ export function dropLangWatchQLRowPolicyStatement({
  * NOT created here — they come from migrations and from the PG mapping. This
  * function provisions only the access model over them.
  *
- * Not called from any production path in this repo: the real access model is
- * owned by infra (langwatch-saas#1126). This is the reference implementation
- * that terraform must match — keep it and its tests in sync, do not delete as
- * dead code.
+ * Two callers, two ownership models. Self-hosted deployments run this for
+ * real via `selfProvisioning.ts` under `LWQL_SELF_PROVISION` (issue #6635),
+ * so it is a production path. On cloud the same access model is owned by
+ * infra (langwatch-saas#1126) and this stays the reference implementation
+ * terraform must match — keep it and its tests in sync with both.
  */
 export function lwqlClickHouseSetupStatements({
   names,
@@ -493,13 +449,26 @@ export function lwqlClickHouseSetupStatements({
     lwqlKeyMapTableStatement({ names }),
     lwqlSettingsProfileStatement({ names, limits }),
     lwqlRestrictedUserStatement({ names, password }),
-    lwqlGrantStatement({ names, table: names.keyMapTable }),
-    ...lwqlTables.map((lwqlTable) =>
-      lwqlGrantStatement({ names, table: lwqlTable.table }),
-    ),
+    // Each table's row policy before its grant, and the order is load-bearing.
+    // A table carrying a SELECT grant and no row policy returns every row in
+    // ClickHouse, so granting first opens a window in which the restricted
+    // identity reads across every tenant — and this list is executed statement
+    // by statement, not atomically. A caller that dies partway (a dropped
+    // connection, one refused statement) leaves that window standing, and
+    // `provisionLwql`'s self-provisioning path deliberately swallows the error
+    // and continues booting, so nothing downstream would close it.
+    //
+    // Policy-first inverts the failure: a partial run leaves the identity
+    // policed but not yet granted, which refuses reads rather than widening
+    // them. Safe because every table named already exists by this point — the
+    // key map is created above, and `lwqlTables` are migration-owned.
     lwqlKeyMapRowPolicyStatement({ names }),
     ...lwqlTables.map((lwqlTable) =>
       lwqlRowPolicyStatement({ names, lwqlTable }),
+    ),
+    lwqlGrantStatement({ names, table: names.keyMapTable }),
+    ...lwqlTables.map((lwqlTable) =>
+      lwqlGrantStatement({ names, table: lwqlTable.table }),
     ),
   ];
 }

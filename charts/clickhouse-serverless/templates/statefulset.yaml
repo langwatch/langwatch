@@ -170,6 +170,33 @@ spec:
               value: "true"
             {{- end }}
 
+            {{- if .Values.lwqlAccessModel.enabled }}
+            # LangWatchQL access model (issue langwatch-saas#1168). ch-config
+            # self-gates on the password file: absent (optional Secret key), no
+            # LWQL identity is rendered.
+            - name: CLICKHOUSE_LWQL_PASSWORD_FILE
+              value: "/mnt/secrets/lwql/lwql_password"
+            - name: CLICKHOUSE_LWQL_DATABASE
+              value: {{ .Values.lwqlAccessModel.database | quote }}
+            {{- $lwqlPgHost := include "clickhouse-serverless.lwqlPgHost" . }}
+            {{- if $lwqlPgHost }}
+            # lwql_postgres named collection (the ClickHouse -> PostgreSQL
+            # bridge). Host auto-derives to the langwatch chart's own PostgreSQL
+            # Service when unset — see clickhouse-serverless.lwqlPgHost. Set
+            # lwqlAccessModel.postgres.host to point at an external PostgreSQL.
+            - name: CLICKHOUSE_LWQL_PG_PASSWORD_FILE
+              value: "/mnt/secrets/lwql/lwql_pg_password"
+            - name: CLICKHOUSE_LWQL_PG_HOST
+              value: {{ $lwqlPgHost | quote }}
+            - name: CLICKHOUSE_LWQL_PG_PORT
+              value: {{ .Values.lwqlAccessModel.postgres.port | quote }}
+            - name: CLICKHOUSE_LWQL_PG_DATABASE
+              value: {{ .Values.lwqlAccessModel.postgres.database | quote }}
+            - name: CLICKHOUSE_LWQL_PG_USER
+              value: {{ .Values.lwqlAccessModel.postgres.user | quote }}
+            {{- end }}
+            {{- end }}
+
             # Advanced overrides (applied last — override any derived value above)
             {{- range $key, $value := .Values.env }}
             - name: {{ $key }}
@@ -254,6 +281,11 @@ spec:
             - name: secrets
               mountPath: /mnt/secrets
               readOnly: true
+            {{- if .Values.lwqlAccessModel.enabled }}
+            - name: lwql-secrets
+              mountPath: /mnt/secrets/lwql
+              readOnly: true
+            {{- end }}
 
       volumes:
         - name: config-d
@@ -282,6 +314,23 @@ spec:
               - key: {{ include "clickhouse-serverless.clusterSecretKey" . }}
                 path: cluster-secret
               {{- end }}
+        {{- if .Values.lwqlAccessModel.enabled }}
+        # LWQL passwords, projected to files ch-config reads. optional: true so
+        # a Secret missing a key leaves that half unprovisioned (fail-closed)
+        # rather than wedging the pod in CreateContainerConfigError.
+        - name: lwql-secrets
+          secret:
+            secretName: {{ include "clickhouse-serverless.lwqlSecretName" . }}
+            optional: true
+            defaultMode: 0400
+            items:
+              - key: {{ .Values.lwqlAccessModel.passwordSecretKey }}
+                path: lwql_password
+              {{- if include "clickhouse-serverless.lwqlPgHost" . }}
+              - key: {{ .Values.lwqlAccessModel.postgres.passwordSecretKey }}
+                path: lwql_pg_password
+              {{- end }}
+        {{- end }}
 
   volumeClaimTemplates:
     - metadata:

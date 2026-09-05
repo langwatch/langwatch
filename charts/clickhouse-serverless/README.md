@@ -54,6 +54,28 @@ You set CPU + RAM, everything else is computed. Any computed value can be overri
 
 See the [Docker image README](../../infra/clickhouse-serverless/README.md) for the full list of computed parameters and their formulas.
 
+### LangWatchQL (LWQL)
+
+When the app's `lwql.enabled` chart passes down its two LWQL passwords, this
+chart's `ch-config` binary also renders the LangWatchQL access model as
+config, re-read at every pod boot: the `langwatch_lwql` restricted user, the
+`lwql_restricted` settings profile (fixed grants, row-level tenant filters),
+and the `lwql_postgres` PostgreSQL-bridge named collection. This is the
+chart-managed half of the ownership contract in
+[ADR-101](../../dev/docs/adr/101-lwql-clickhouse-access-model-ownership.md) —
+the application self-provisions the same objects via SQL DDL only when
+ClickHouse is **not** chart-managed (BYO / external). See
+`internal/render/lwql.go` for the rendering, and the parent chart's
+[LangWatchQL (LWQL) — BYO ClickHouse prerequisites](../langwatch/README.md#langwatchql-lwql--byo-clickhouse-prerequisites)
+section for the prerequisites an external ClickHouse must satisfy instead.
+
+The `lwql_postgres` PostgreSQL reader password is rendered in **plaintext**
+into `config.d/lwql-server.yaml` on the pod's disk — ClickHouse must dial
+PostgreSQL with the real credential, so unlike every other credential this
+chart renders, this one cannot be hashed. See the parent README's
+plaintext-password caveat for the mitigations (file permissions, Secret
+delivery).
+
 ## Parameters
 
 ### Primary Inputs

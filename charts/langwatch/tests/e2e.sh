@@ -400,6 +400,130 @@ test_app() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+# SUITE: LangWatchQL access model — chart-managed render (issue #6635, Design C)
+# Runs after test_app. For chart-managed ClickHouse the clickhouse-serverless pod
+# that OWNS the server renders the LangWatchQL access model as config at boot —
+# the restricted user, its settings profile, grants, tenant row filters and the
+# lwql_postgres named collection. The app does NOT self-provision it
+# (LWQL_SELF_PROVISION is off for chart-managed: one owner per entity name), so
+# re-invoking the app's provision task must be a harmless no-op. Asserts the
+# access model exists (identity, profile, row policies, named collection — the
+# single-replica scenario's contract), that the restricted identity is genuinely
+# restricted, that the endpoint refuses while the backend objects stand (the
+# flag-off AC), and that a re-run does not disturb the renderer-owned model.
+#
+# The PostgreSQL-engine tables, the lwql_ro reader role and the approved
+# PostgreSQL views are NOT asserted here: they are the full-model scenario
+# deferred to tracking issue #7387 (specs/analytics/lwql-api.feature, "Clustered
+# chart-managed ClickHouse provisions the full LangWatchQL access model",
+# @unimplemented), and the reader role has no chart-managed creation path — it
+# belongs to the app's external self-provision path, covered by its own tests.
+# ─────────────────────────────────────────────────────────────────────────────
+# @scenario "A single-replica deployment provisions LangWatchQL unchanged"
+test_lwql() {
+  sep; info "Suite: LangWatchQL access model (chart-managed render)"
+
+  local app_pod
+  app_pod=$(kc get pod \
+    -l "app.kubernetes.io/name=${RELEASE}-app" \
+    -o jsonpath='{.items[0].metadata.name}')
+
+  # Discover ClickHouse pods (may be multiple in clustered mode)
+  local pods
+  pods=$(kc get pods -l "app.kubernetes.io/name=${RELEASE}-clickhouse" -o name | sed 's|^pod/||')
+  # Use the first pod for queries (same data visible on all replicas)
+  local pod
+  pod=$(echo "$pods" | head -1)
+
+  # ClickHouse access model
+  assert_eq "restricted user langwatch_lwql exists" \
+    "$(ch_query "$pod" "SELECT count() FROM system.users WHERE name='langwatch_lwql'")" "1"
+  assert_eq "settings profile lwql_restricted exists" \
+    "$(ch_query "$pod" "SELECT count() FROM system.settings_profiles WHERE name='lwql_restricted'")" "1"
+  local policies
+  policies=$(ch_query "$pod" "SELECT count() FROM system.row_policies WHERE database='langwatch'")
+  if [ "${policies:-0}" -ge 1 ]; then
+    pass "row policies provisioned on langwatch ($policies)"
+  else
+    fail "no row policies on the langwatch database"
+  fi
+
+  # PostgreSQL bridge, ClickHouse side: the lwql_postgres named collection the
+  # renderer emits when clickhouse.lwqlAccessModel.postgres.host is set (values-e2e wires it
+  # to the in-cluster PostgreSQL). Existence only — the collection is config, not
+  # dialed at boot; the engine tables that consume it, plus the PostgreSQL reader
+  # role and approved views, are the full-model scenario deferred to #7387.
+  assert_eq "named collection lwql_postgres exists" \
+    "$(ch_query "$pod" "SELECT count() FROM system.named_collections WHERE name='lwql_postgres'")" "1"
+
+  # The restricted identity: authenticates, reads zero key-map rows without a
+  # tenant capability (row policy default-deny), and has no admin surface.
+  # Design C: for chart-managed ClickHouse the owning pod creates langwatch_lwql
+  # from the ClickHouse credentials Secret (key lwql_password), which is also
+  # where the app/workers read the query password from — one source, no divergence.
+  local lwql_pw
+  lwql_pw=$(kc get secret "${RELEASE}-clickhouse" \
+    -o jsonpath='{.data.lwql_password}' | base64 -d)
+  assert_eq "restricted identity authenticates" \
+    "$(kc exec "$pod" -- clickhouse-client --user langwatch_lwql --password "$lwql_pw" -q 'SELECT 1')" "1"
+  assert_eq "key map reads empty without a tenant capability" \
+    "$(kc exec "$pod" -- clickhouse-client --user langwatch_lwql --password "$lwql_pw" -q 'SELECT count() FROM langwatch.lwql_api_key_tenant_map')" "0"
+  if kc exec "$pod" -- clickhouse-client --user langwatch_lwql --password "$lwql_pw" \
+    -q 'SELECT count() FROM system.users' &>/dev/null; then
+    fail "restricted identity can read system.users"
+  else
+    pass "restricted identity denied system.users"
+  fi
+
+  # The endpoint stays shut while the backend objects above all stand
+  # provisioned. Asserted unauthenticated, so this pins the auth gate, not the
+  # `release_lwql_workbench` flag — minting a project API key inside the
+  # cluster to reach the flag branch belongs with the endpoint's own tests,
+  # which cover it. What it does prove here is that provisioning the access
+  # model does not, by itself, open the route.
+  local http_code
+  http_code=$(kc exec "$app_pod" -- curl -s -o /dev/null -w '%{http_code}' \
+    -X POST -H 'Content-Type: application/json' -d '{"sql":"SELECT 1"}' \
+    http://localhost:5560/api/v1/query)
+  assert_eq "query endpoint refuses unauthenticated" "$http_code" "401"
+
+  # For chart-managed ClickHouse the clickhouse-serverless subchart owns the
+  # ACCESS MODEL (identity, profile, row policies, lwql_postgres), while the app
+  # owns the LangWatchQL VIEWS: the ClickHouse views over its own tables, the
+  # PostgreSQL approved views, and the api-key -> tenant backfill. Re-invoking the
+  # app's provision task must run that app-owned half IDEMPOTENTLY: exit 0,
+  # actually provision, and disturb neither the key-map rows nor the
+  # renderer-owned identity.
+  local rows_before rows_after provision_out
+  rows_before=$(ch_query "$pod" "SELECT count() FROM langwatch.lwql_api_key_tenant_map")
+  if provision_out=$(kc exec "$app_pod" -- sh -c 'cd /app/platform/app && pnpm run lwql:provision' 2>&1); then
+    pass "re-running lwql:provision succeeds"
+  else
+    fail "re-running lwql:provision failed:
+$provision_out"
+  fi
+  # Non-vacuity guard (review 5115397477): before the LWQL_* connection was wired
+  # to the app pod, lwqlConnectionFromEnv returned null and this task logged
+  # "LWQL not configured, skipping" and did nothing — every assertion here passed
+  # against a feature that never ran. If that line reappears, the connection env
+  # regressed and this whole suite is meaningless, so fail on it explicitly.
+  if printf '%s' "$provision_out" | grep -qiE 'LWQL not configured, skipping|skipping provisioning this boot'; then
+    fail "lwql:provision skipped as unconfigured — the full LWQL_* connection is not wired to the app pod (regression of the P1 fix)"
+  else
+    pass "lwql:provision ran (did not skip as unconfigured)"
+  fi
+  # Proof the provisioning path EXECUTED, not merely that it exited 0: the app
+  # creates its catalog views in the LWQL database. `traces` is the canonical
+  # entry (platform/app/src/server/analytics/lwql/catalog/lwqlViews.ts).
+  assert_eq "app-owned LWQL view langwatch.traces provisioned" \
+    "$(ch_query "$pod" "SELECT count() FROM system.tables WHERE database='langwatch' AND name='traces' AND engine='View'")" "1"
+  rows_after=$(ch_query "$pod" "SELECT count() FROM langwatch.lwql_api_key_tenant_map")
+  assert_eq "key-map rows unchanged after re-provisioning" "$rows_after" "$rows_before"
+  assert_eq "still exactly one restricted user" \
+    "$(ch_query "$pod" "SELECT count() FROM system.users WHERE name='langwatch_lwql'")" "1"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
 # SUITE: Workers health check
 # Upgrades the release to enable workers and verifies the pod reaches Ready.
 # The worker serves one HTTP listener (the metrics port, 2999): /metrics behind
@@ -773,6 +897,7 @@ main() {
   test_redis
   test_resources
   test_app
+  test_lwql
   test_workers
   test_metrics_collection
   test_upgrade_strategy_boundary

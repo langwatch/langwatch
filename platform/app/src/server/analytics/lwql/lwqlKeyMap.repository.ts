@@ -1,5 +1,5 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import type { LwqlKeyMapRow } from "./productionProvisioning";
+import type { LwqlKeyMapRow } from "./provisioning";
 
 /**
  * The one place runtime code writes the LangWatchQL key-map table.
