@@ -494,7 +494,9 @@ Scoring each target on its own leaves you calibrating numbers: is `0.78` better 
 
 ### Comparing a row
 
-Every target that produced a non-empty output for the row is a candidate, and one comparison weighs all of them together rather than a round of one-against-one matchups. Behind it the judge is called twice per row by default, the second time with the candidate order reversed, which is what [`swap_and_reconcile`](#options) does; turn that off and one comparison is one judge call. There is no candidate list to assemble, and no judge prompt you have to choose, since the shipped one runs unless you [write your own](#customizing-the-judge-prompt):
+Every target that produced a non-empty output for the row is a candidate, and one comparison weighs all of them together rather than a round of one-against-one matchups. Behind it the judge is called twice per row by default, the second time with the candidate order reversed, which is what [`swap_and_reconcile`](#options) does; turn that off and one comparison is one judge call.
+
+There is no candidate list to assemble, and no judge prompt you have to choose, since the shipped one runs unless you [write your own](#customizing-the-judge-prompt):
 
 <Tabs>
   <Tab title="Python">
@@ -1021,7 +1023,9 @@ What each [verdict](#the-verdict) writes into those three cells:
 
 An empty winner is never a tie. The three cells go empty together for `error` and for a row the comparison never ran on, so `tie` in the winner column always means the judge saw the candidates and called the row even.
 
-`no_verdict` is the shared export token for `inconclusive` and `skipped`. The two are separate in code, on the `verdict.status` your call returns, but they are recorded under one status, so a row read back from a completed run cannot be sorted into one or the other and naming either in the export would be a guess. The reasoning cell explains why no verdict was recorded, either in the judge's own words or, when the judge itself never answered, in the evaluator's account of what came back. Keep the two apart by reading `verdict.status` at the point of comparison.
+`no_verdict` is the shared export token for `inconclusive` and `skipped`. The two are separate in code, on the `verdict.status` your call returns, but they are recorded under one status, so a row read back from a completed run cannot be sorted into one or the other and naming either in the export would be a guess.
+
+The reasoning cell explains why no verdict was recorded, either in the judge's own words or, when the judge itself never answered, in the evaluator's account of what came back. Keep the two apart by reading `verdict.status` at the point of comparison.
 
 A row's candidates can be fewer than the comparison's full set of targets, because a target that produced no output for that row is left out of the matchup. The winner reads `unresolved` on the rare row where the judge's answer matches none of the candidates it was shown, and a winner naming a target the run no longer lists is written under its own name.
 

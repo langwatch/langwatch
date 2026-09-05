@@ -37,7 +37,11 @@ The evaluators are grouped in the same five categories the platform shows:
 
 ### Seeing through privacy redaction
 
-PII redaction and secrets redaction run when a trace is ingested, before an evaluation reads the stored content. So redaction does not silently turn these evaluators green, redaction replaces a removed value with a typed marker that names what it was (`[PHONE_NUMBER]`, `[SECRET]`, and so on), and the PII and secrets evaluators read those markers back: a value that was already redacted still counts as a detection. The PII evaluator only counts a marker when its settings still check that entity. The markers are read from every field the evaluation is mapped to, so a secret hidden in a mapped span attribute is covered just like input or output.
+PII redaction and secrets redaction run when a trace is ingested, before an evaluation reads the stored content.
+
+So redaction does not silently turn these evaluators green, redaction replaces a removed value with a typed marker that names what it was (`[PHONE_NUMBER]`, `[SECRET]`, and so on), and the PII and secrets evaluators read those markers back: a value that was already redacted still counts as a detection.
+
+The PII evaluator only counts a marker when its settings still check that entity. The markers are read from every field the evaluation is mapped to, so a secret hidden in a mapped span attribute is covered just like input or output.
 
 If a content category was dropped at ingestion (removed entirely rather than masked) and the evaluation reads only that category, the evaluation fails, since a leak cannot be ruled out. If the evaluation is mapped to a field that still has content, that field is evaluated normally.
 
