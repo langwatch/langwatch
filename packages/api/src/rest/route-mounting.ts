@@ -7,7 +7,6 @@ import { buildEndpointMiddlewareStack, buildWithdrawnMiddlewareStack } from "./p
 import {
   mountFamilyRoute,
   mountOptionalVersionRoutes,
-  mountRoute,
   mountStaticVersionRoutes,
 } from "./public-rest-routing.js";
 import type { BaseApp, ServiceConfig, VersionStatus } from "./types.js";
@@ -20,8 +19,16 @@ type ErrorHandler = NonNullable<ServiceConfig["onError"]>;
 
 /**
  * Mounts the latest catalogue at the family's own paths and nothing else: no
- * dated namespace, no alias, and no version guard — a family based at bare
- * `/api` would claim `/api/:apiVersion{…}/*` and shadow every sibling.
+ * dated namespace and no version guard, because a family based at bare `/api`
+ * would claim `/api/:apiVersion{…}/*` and shadow every sibling.
+ *
+ * A family based at bare `/api` additionally answers at the `/api/v1` address
+ * of each of its own paths — `/api/evaluations/list` at
+ * `/api/v1/evaluations/list` — which is the generation it already served and
+ * the address the published document names (ADR 002 §1). The alias is per
+ * ROUTE because `/api` has no segment of its own to alias. A bare mount at a
+ * DEEPER prefix gets no alias: it is bare precisely because a different family
+ * already answers on its `/api/v1` twin.
  */
 function mountBareRoutes<TProject>({
   app,
@@ -41,6 +48,9 @@ function mountBareRoutes<TProject>({
   const latest = versionMap.get(VERSION_LATEST);
   if (!latest) return;
 
+  const aliasedConfig: ServiceConfig =
+    basePath === "/api" ? serviceConfig : { ...serviceConfig, v1Alias: false };
+
   for (const endpoint of latest) {
     const method = endpoint.method === "sse" ? "get" : endpoint.method;
     const path = endpoint.path || "/";
@@ -56,11 +66,18 @@ function mountBareRoutes<TProject>({
           status,
           version,
         });
-    const absolute = mergePath(basePath, path);
-    mountRoute({ app, method, path: absolute, stack });
+    const mounted = mountFamilyRoute({
+      app,
+      basePath,
+      method,
+      path,
+      serviceConfig: aliasedConfig,
+      stack,
+    });
     serviceConfig.onRouteMounted?.({
       method,
-      path: absolute,
+      path: mounted.path,
+      ...(mounted.canonicalPath ? { canonicalPath: mounted.canonicalPath } : {}),
       version,
       status,
       withdrawn: endpoint.withdrawn === true,

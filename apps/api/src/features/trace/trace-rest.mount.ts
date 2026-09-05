@@ -130,7 +130,7 @@ export function mountTracesRest(options: {
       // `contentAttrKeys` — so the store was never what this door was waiting
       // for.
     },
-  }).hono as unknown as MountableRestApp;
+  });
 }
 
 /** What this process supplies the deprecated family. */

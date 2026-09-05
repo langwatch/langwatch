@@ -60,7 +60,12 @@ export function assertVersionLabel(version: string): void {
 // HTTP method
 // ---------------------------------------------------------------------------
 
-export type HttpMethod = "get" | "post" | "put" | "delete" | "patch";
+/**
+ * `head` is registered for the registry and the published document only: Hono
+ * answers a HEAD request from the GET route BEFORE routing, so a HEAD handler
+ * never runs. Register it beside the GET whose headers it describes.
+ */
+export type HttpMethod = "get" | "head" | "post" | "put" | "delete" | "patch";
 
 /**
  * A body the framework must NOT parse: the handler is given the exact bytes,
@@ -162,6 +167,19 @@ export interface EndpointDocs {
    * response (same-status keys win).
    */
   responses?: DescribeRouteOptions["responses"];
+  /**
+   * Hand-written operation parameters, appended after the ones the framework
+   * derives (the version header, the idempotency key). A family that carries
+   * its own path or query documentation because its handler parses the request
+   * itself declares them here.
+   */
+  parameters?: DescribeRouteOptions["parameters"];
+  /**
+   * Hand-written request body documentation, replacing whatever the framework
+   * would derive. For a family whose handler validates the body itself, this
+   * is the only place the published shape can come from.
+   */
+  requestBody?: DescribeRouteOptions["requestBody"];
 }
 
 // ---------------------------------------------------------------------------

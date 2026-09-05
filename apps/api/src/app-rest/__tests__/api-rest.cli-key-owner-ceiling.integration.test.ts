@@ -27,6 +27,22 @@ const OTHER_TEAM_PROJECT: RestAuthProject = {
   ownerUserId: null,
 };
 
+/**
+ * One auth-world project as `ProjectService.listByOrganization` really returns
+ * it: a stored row, not the narrower fixture the auth world carries. The
+ * listing publishes the setup fields and both timestamps, so a stub that omits
+ * them describes a response the door never sends.
+ */
+function listedProject(project: RestAuthProject) {
+  return {
+    ...project,
+    language: "python",
+    framework: "openai",
+    createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+  };
+}
+
 const CLI_KEY = "sk-lw-cli-login";
 const PROJECTS = [REST_AUTH_PROJECT, OTHER_TEAM_PROJECT];
 
@@ -93,8 +109,10 @@ describe("given a CLI key minted while its owner covered the whole organization"
         ownerProjectIds: [REST_AUTH_PROJECT.id],
       });
       const listByOrganization = vi.fn(async ({ projectIds }: { projectIds?: string[] }) => ({
-        data: PROJECTS.filter((project) => !projectIds || projectIds.includes(project.id)),
-        pagination: { page: 1, limit: 25, totalCount: 0, totalPages: 1 },
+        data: PROJECTS.filter((project) => !projectIds || projectIds.includes(project.id)).map(
+          listedProject,
+        ),
+        pagination: { page: 1, limit: 25, total: 1 },
       }));
       const api = mountProjects({ world, listByOrganization });
 

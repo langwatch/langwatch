@@ -3,7 +3,15 @@
  * three evaluate doors and the dataset evaluation.
  */
 import { handlerManagedAuth, publicEndpoint } from "@langwatch/api";
-import type { AppRestSecurity, SecuredApp } from "@langwatch/api/rest";
+import {
+  type AppRestSecurity,
+  bodyLimit,
+  type EndpointVariables,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
+  resolver,
+  type ServiceContext,
+} from "@langwatch/api/rest";
 import { mapZodIssuesToLogContext } from "@langwatch/config";
 import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
@@ -39,15 +47,12 @@ import {
 } from "@langwatch/experiment-contract";
 import { rAGChunkSchema, extractChunkTextualContent } from "@langwatch/trace-contract";
 import { getInputsOutputs, type StudioEdge, type StudioNode } from "@langwatch/workflow-contract";
-import type { Context, Env } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { describeRoute, resolver } from "hono-openapi";
 import { nanoid } from "nanoid";
 import { type ZodError, ZodError as ZodErrorClass, z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { fromZodError } from "zod-validation-error";
 
-import { bodyLimit } from "@langwatch/api/rest";
 import {
   acknowledgementSchema,
   datasetEvaluateRequestSchema,
@@ -225,6 +230,19 @@ class EvaluationRestExperimentNotFoundError extends HandledError {
 const logger = createLogger("langwatch:evaluations-legacy");
 
 /**
+ * Why every door here writes its own response.
+ *
+ * The bodies are the ones released SDKs already parse — a bare `{ message }`,
+ * an `{ error: <sentence> }` built by `fromZodError` from the schema's own
+ * failure, and a verdict whose optional fields differ per evaluator. Declaring
+ * an output schema over that would re-serialise it through zod and drop
+ * whatever the schema does not name, which is the one thing this family may
+ * not do. The published shapes stay in `withDocs`, written by hand.
+ */
+const HANDLER_WRITTEN_RESPONSE =
+  "legacy SDK wire: the bodies are hand-built and documented per route, not derived from a schema";
+
+/**
  * Whatever was thrown, as an Error the process's report port can take. A thrown non-Error
  * carries no stack, so the sink would record a bare string with nothing to correlate it by;
  * wrapping keeps every report the same shape.
@@ -274,9 +292,18 @@ const legacyEvaluationAuth = handlerManagedAuth({
 export function createEvaluationsLegacyRestApp(options: {
   security: AppRestSecurity;
   ports: EvaluationsLegacyRestPorts;
-}): SecuredApp<Env> {
+}): MountableRestApp {
   const { security, ports } = options;
-  const secured = security.createServiceApp({ basePath: "/api" });
+
+  // `/api` with no version namespace: these six paths are the ones a released
+  // SDK already calls, and a version guard here would claim every other
+  // family's URL under the same prefix.
+  const { service, policy } = security.createServiceVersionedApp({
+    name: "evaluations-legacy",
+    basePath: "/api",
+    bareMount: true,
+    errorEnvelope: "legacy",
+  });
 
   // ---------- GET /api/evaluations/list ----------
   /**
@@ -309,31 +336,33 @@ export function createEvaluationsLegacyRestApp(options: {
         ]),
     );
 
-  secured.access(catalogueAuth).get(
+  service.registerRoute(
+    "get",
     "/evaluations/list",
-    describeRoute({
-      summary: "List the built-in evaluators",
-      description:
-        "List every evaluator this server ships with, along with the `data` fields each one needs and the settings it accepts. The keys of `evaluators` are the ids you put in the evaluate path. The list is the same for every caller and needs no credential.",
-      tags: ["Evaluations"],
-      // Overrides the document's root requirement: this endpoint takes no
-      // credential, and declaring one it does not check would be a fiction.
-      security: [],
-      responses: {
-        200: {
-          description: "The evaluator catalogue",
-          content: {
-            "application/json": {
-              schema: resolver(evaluatorCatalogueResponseSchema),
-            },
-          },
-        },
-      },
-    }),
+    MANAGEMENT_API_VERSION,
     (c) => {
       evaluatorCatalogue ??= buildEvaluatorCatalogue();
       return c.json({ evaluators: evaluatorCatalogue });
     },
+    (b) =>
+      policy(catalogueAuth)(b)
+        .withRawResponse(HANDLER_WRITTEN_RESPONSE, { contentType: "application/json" })
+        .withDocs({
+          summary: "List the built-in evaluators",
+          description:
+            "List every evaluator this server ships with, along with the `data` fields each one needs and the settings it accepts. The keys of `evaluators` are the ids you put in the evaluate path. The list is the same for every caller and needs no credential.",
+          tags: ["Evaluations"],
+          responses: {
+            200: {
+              description: "The evaluator catalogue",
+              content: {
+                "application/json": {
+                  schema: resolver(evaluatorCatalogueResponseSchema),
+                },
+              },
+            },
+          },
+        }),
   );
 
   // The batch result log, where this process composed the experiment run
@@ -341,52 +370,10 @@ export function createEvaluationsLegacyRestApp(options: {
   const batch = ports.batch;
   if (batch) {
     // ---------- POST /api/evaluations/batch/log_results ----------
-    secured.access(legacyEvaluationAuth).post(
+    service.registerRoute(
+      "post",
       "/evaluations/batch/log_results",
-      describeRoute({
-        summary: "Report batch evaluation results",
-        description:
-          "Report the rows of a batch evaluation against an experiment, so its scores and progress show up in the app. This is the second half of an SDK batch evaluation: create the experiment with `POST /api/experiment/init`, then post rows here as they finish. Identify the experiment by either `experiment_id` or `experiment_slug`. Bodies up to 20MB are accepted.",
-        tags: ["Evaluations"],
-        requestBody: {
-          required: true,
-          content: {
-            "application/json": {
-              schema: requestBodySchema(eSBatchEvaluationRESTParamsSchema),
-            },
-          },
-        },
-        responses: {
-          200: {
-            description: "The rows were recorded",
-            content: {
-              "application/json": { schema: resolver(acknowledgementSchema) },
-            },
-          },
-          400: {
-            description:
-              "The request was not sent as application/json, failed validation, named neither experiment_id nor experiment_slug, or carried timestamps in seconds rather than milliseconds",
-            content: {
-              "application/json": {
-                schema: resolver(legacySentenceErrorSchema),
-              },
-            },
-          },
-          401: {
-            description: "Missing or invalid API key",
-            content: {
-              "application/json": { schema: resolver(evaluateErrorSchema) },
-            },
-          },
-          403: {
-            description: "The API key lacks evaluations:manage",
-            content: {
-              "application/json": { schema: resolver(evaluateErrorSchema) },
-            },
-          },
-        },
-      }),
-      bodyLimit({ maxSize: 20 * 1024 * 1024 }),
+      MANAGEMENT_API_VERSION,
       async (c) => {
         const auth = await ports.credential({ request: c.req.raw });
         if (!auth.ok) {
@@ -484,6 +471,53 @@ export function createEvaluationsLegacyRestApp(options: {
         markUsed();
         return c.json({ message: "ok" });
       },
+      (b) =>
+        policy(legacyEvaluationAuth)(b)
+          .withMiddleware(bodyLimit({ maxSize: 20 * 1024 * 1024 }))
+          .withRawResponse(HANDLER_WRITTEN_RESPONSE, { contentType: "application/json" })
+          .withDocs({
+            summary: "Report batch evaluation results",
+            description:
+              "Report the rows of a batch evaluation against an experiment, so its scores and progress show up in the app. This is the second half of an SDK batch evaluation: create the experiment with `POST /api/experiment/init`, then post rows here as they finish. Identify the experiment by either `experiment_id` or `experiment_slug`. Bodies up to 20MB are accepted.",
+            tags: ["Evaluations"],
+            requestBody: {
+              required: true,
+              content: {
+                "application/json": {
+                  schema: requestBodySchema(eSBatchEvaluationRESTParamsSchema),
+                },
+              },
+            },
+            responses: {
+              200: {
+                description: "The rows were recorded",
+                content: {
+                  "application/json": { schema: resolver(acknowledgementSchema) },
+                },
+              },
+              400: {
+                description:
+                  "The request was not sent as application/json, failed validation, named neither experiment_id nor experiment_slug, or carried timestamps in seconds rather than milliseconds",
+                content: {
+                  "application/json": {
+                    schema: resolver(legacySentenceErrorSchema),
+                  },
+                },
+              },
+              401: {
+                description: "Missing or invalid API key",
+                content: {
+                  "application/json": { schema: resolver(evaluateErrorSchema) },
+                },
+              },
+              403: {
+                description: "The API key lacks evaluations:manage",
+                content: {
+                  "application/json": { schema: resolver(evaluateErrorSchema) },
+                },
+              },
+            },
+          }),
     );
   }
 
@@ -547,152 +581,90 @@ export function createEvaluationsLegacyRestApp(options: {
     const EVALUATOR_PARAM_DESCRIPTION =
       "Which evaluator to run. Either a built-in id (`ragas/faithfulness`), the slug of a monitor configured in this project, or `evaluators/{slug|id}` for a saved evaluator. `GET /api/evaluations/list` returns the built-in ids.";
 
+    /**
+     * The evaluator slot, as the document publishes it. A schema rather than a
+     * hand-written `parameters` block: the framework derives the parameter,
+     * and the prose a person wrote travels on the schema's own description.
+     */
+    const evaluatorParamsSchema = z.object({
+      evaluator: z.string().describe(EVALUATOR_PARAM_DESCRIPTION),
+    });
+    const namespacedEvaluatorParamsSchema = z.object({
+      evaluator: z.string().describe("First segment of the evaluator id, such as `ragas`"),
+      subpath: z.string().describe("Second segment of the evaluator id, such as `faithfulness`"),
+    });
+
     // ---------- POST /api/evaluations/:evaluator/evaluate ----------
-    secured.access(legacyEvaluationAuth).post(
+    service.registerRoute(
+      "post",
       "/evaluations/:evaluator/evaluate",
-      describeRoute({
-        summary: "Run an evaluator",
-        description:
-          "Run one evaluator over a single input and get its score back. Built-in evaluators whose id has two segments, such as `ragas/faithfulness`, are addressed with the two-segment form of this path. Bodies up to 30MB are accepted.",
-        tags: ["Evaluations"],
-        parameters: [
-          {
-            in: "path",
-            name: "evaluator",
-            required: true,
-            schema: { type: "string" },
-            description: EVALUATOR_PARAM_DESCRIPTION,
-          },
-        ],
-        requestBody: evaluateRequestBody,
-        responses: evaluateResponses,
-      }),
-      bodyLimit({ maxSize: 30 * 1024 * 1024 }),
-      async (c) => {
-        const evaluatorSlug = c.req.param("evaluator");
-        return handleEvaluatorCall(c, run, evaluatorSlug, false);
-      },
+      MANAGEMENT_API_VERSION,
+      async (c, input: { path: { evaluator: string } }) =>
+        handleEvaluatorCall(c, run, input.path.evaluator, false),
+      (b) =>
+        policy(legacyEvaluationAuth)(b)
+          .withMiddleware(bodyLimit({ maxSize: 30 * 1024 * 1024 }))
+          .withParams(evaluatorParamsSchema)
+          .withRawResponse(HANDLER_WRITTEN_RESPONSE, { contentType: "application/json" })
+          .withDocs({
+            summary: "Run an evaluator",
+            description:
+              "Run one evaluator over a single input and get its score back. Built-in evaluators whose id has two segments, such as `ragas/faithfulness`, are addressed with the two-segment form of this path. Bodies up to 30MB are accepted.",
+            tags: ["Evaluations"],
+            requestBody: evaluateRequestBody,
+            responses: evaluateResponses,
+          }),
     );
 
     // ---------- POST /api/evaluations/:evaluator/:subpath/evaluate ----------
-    secured.access(legacyEvaluationAuth).post(
+    service.registerRoute(
+      "post",
       "/evaluations/:evaluator/:subpath/evaluate",
-      describeRoute({
-        summary: "Run a namespaced evaluator",
-        description:
-          "Run one evaluator whose id has two segments, such as `ragas/faithfulness` or `langevals/valid_format`. Identical to the single-segment form in every other respect; the id is simply split across two path segments.",
-        tags: ["Evaluations"],
-        parameters: [
-          {
-            in: "path",
-            name: "evaluator",
-            required: true,
-            schema: { type: "string" },
-            description: "First segment of the evaluator id, such as `ragas`",
-          },
-          {
-            in: "path",
-            name: "subpath",
-            required: true,
-            schema: { type: "string" },
-            description: "Second segment of the evaluator id, such as `faithfulness`",
-          },
-        ],
-        requestBody: evaluateRequestBody,
-        responses: evaluateResponses,
-      }),
-      bodyLimit({ maxSize: 30 * 1024 * 1024 }),
-      async (c) => {
-        const evaluatorSlug = `${c.req.param("evaluator")}/${c.req.param("subpath")}`;
-        return handleEvaluatorCall(c, run, evaluatorSlug, false);
-      },
+      MANAGEMENT_API_VERSION,
+      async (c, input: { path: { evaluator: string; subpath: string } }) =>
+        handleEvaluatorCall(c, run, `${input.path.evaluator}/${input.path.subpath}`, false),
+      (b) =>
+        policy(legacyEvaluationAuth)(b)
+          .withMiddleware(bodyLimit({ maxSize: 30 * 1024 * 1024 }))
+          .withParams(namespacedEvaluatorParamsSchema)
+          .withRawResponse(HANDLER_WRITTEN_RESPONSE, { contentType: "application/json" })
+          .withDocs({
+            summary: "Run a namespaced evaluator",
+            description:
+              "Run one evaluator whose id has two segments, such as `ragas/faithfulness` or `langevals/valid_format`. Identical to the single-segment form in every other respect; the id is simply split across two path segments.",
+            tags: ["Evaluations"],
+            requestBody: evaluateRequestBody,
+            responses: evaluateResponses,
+          }),
     );
 
     // ---------- POST /api/guardrails/:evaluator/evaluate ----------
-    secured.access(legacyEvaluationAuth).post(
+    service.registerRoute(
+      "post",
       "/guardrails/:evaluator/evaluate",
-      describeRoute({
-        summary: "Run an evaluator as a guardrail",
-        description:
-          "Run an evaluator inline and gate on one boolean. Same call as the evaluate path with `as_guardrail` set: every outcome carries `passed`, so an evaluator that skips or fails does not block the request it was guarding. Check `passed` and let the request through when it is true.",
-        tags: ["Evaluations"],
-        parameters: [
-          {
-            in: "path",
-            name: "evaluator",
-            required: true,
-            schema: { type: "string" },
-            description: EVALUATOR_PARAM_DESCRIPTION,
-          },
-        ],
-        requestBody: evaluateRequestBody,
-        responses: evaluateResponses,
-      }),
-      bodyLimit({ maxSize: 30 * 1024 * 1024 }),
-      async (c) => {
-        const evaluatorSlug = c.req.param("evaluator");
-        return handleEvaluatorCall(c, run, evaluatorSlug, true);
-      },
+      MANAGEMENT_API_VERSION,
+      async (c, input: { path: { evaluator: string } }) =>
+        handleEvaluatorCall(c, run, input.path.evaluator, true),
+      (b) =>
+        policy(legacyEvaluationAuth)(b)
+          .withMiddleware(bodyLimit({ maxSize: 30 * 1024 * 1024 }))
+          .withParams(evaluatorParamsSchema)
+          .withRawResponse(HANDLER_WRITTEN_RESPONSE, { contentType: "application/json" })
+          .withDocs({
+            summary: "Run an evaluator as a guardrail",
+            description:
+              "Run an evaluator inline and gate on one boolean. Same call as the evaluate path with `as_guardrail` set: every outcome carries `passed`, so an evaluator that skips or fails does not block the request it was guarding. Check `passed` and let the request through when it is true.",
+            tags: ["Evaluations"],
+            requestBody: evaluateRequestBody,
+            responses: evaluateResponses,
+          }),
     );
 
     // ---------- POST /api/dataset/evaluate ----------
-    secured.access(legacyEvaluationAuth).post(
+    service.registerRoute(
+      "post",
       "/dataset/evaluate",
-      describeRoute({
-        summary: "Evaluate a dataset",
-        description:
-          "Run one evaluator across a saved dataset and record the result against an experiment. Name the dataset by slug and the evaluator the same way the evaluate endpoints do; results are grouped under `experimentSlug`, or under a generated batch id when you omit it. Bodies up to 30MB are accepted.",
-        tags: ["Datasets"],
-        requestBody: {
-          required: true,
-          content: {
-            "application/json": {
-              schema: requestBodySchema(datasetEvaluateRequestSchema),
-            },
-          },
-        },
-        responses: {
-          200: {
-            description: "The evaluator ran; branch on `status`",
-            content: {
-              "application/json": { schema: resolver(evaluateResponseSchema) },
-            },
-          },
-          400: {
-            description:
-              "The body was not valid JSON, failed validation, or named an evaluator that does not exist",
-            content: {
-              "application/json": { schema: resolver(legacySentenceErrorSchema) },
-            },
-          },
-          401: {
-            description: "Missing or invalid API key",
-            content: {
-              "application/json": { schema: resolver(legacySentenceErrorSchema) },
-            },
-          },
-          403: {
-            description: "The API key lacks evaluations:manage",
-            content: {
-              "application/json": { schema: resolver(evaluateErrorSchema) },
-            },
-          },
-          404: {
-            description: "No dataset with that slug",
-            content: {
-              "application/json": { schema: resolver(evaluateErrorSchema) },
-            },
-          },
-          413: {
-            description:
-              "The body is larger than 30MB. Refused before it is read, so the response is the plain sentence `Payload Too Large` rather than a JSON error",
-            content: {
-              "text/plain": { schema: { type: "string" } },
-            },
-          },
-        },
-      }),
-      bodyLimit({ maxSize: 30 * 1024 * 1024 }),
+      MANAGEMENT_API_VERSION,
       async (c) => {
         const auth = await ports.credential({ request: c.req.raw });
         if (!auth.ok) {
@@ -830,10 +802,68 @@ export function createEvaluationsLegacyRestApp(options: {
         markUsed();
         return c.json(result);
       },
+      (b) =>
+        policy(legacyEvaluationAuth)(b)
+          .withMiddleware(bodyLimit({ maxSize: 30 * 1024 * 1024 }))
+          .withRawResponse(HANDLER_WRITTEN_RESPONSE, { contentType: "application/json" })
+          .withDocs({
+            summary: "Evaluate a dataset",
+            description:
+              "Run one evaluator across a saved dataset and record the result against an experiment. Name the dataset by slug and the evaluator the same way the evaluate endpoints do; results are grouped under `experimentSlug`, or under a generated batch id when you omit it. Bodies up to 30MB are accepted.",
+            tags: ["Datasets"],
+            requestBody: {
+              required: true,
+              content: {
+                "application/json": {
+                  schema: requestBodySchema(datasetEvaluateRequestSchema),
+                },
+              },
+            },
+            responses: {
+              200: {
+                description: "The evaluator ran; branch on `status`",
+                content: {
+                  "application/json": { schema: resolver(evaluateResponseSchema) },
+                },
+              },
+              400: {
+                description:
+                  "The body was not valid JSON, failed validation, or named an evaluator that does not exist",
+                content: {
+                  "application/json": { schema: resolver(legacySentenceErrorSchema) },
+                },
+              },
+              401: {
+                description: "Missing or invalid API key",
+                content: {
+                  "application/json": { schema: resolver(legacySentenceErrorSchema) },
+                },
+              },
+              403: {
+                description: "The API key lacks evaluations:manage",
+                content: {
+                  "application/json": { schema: resolver(evaluateErrorSchema) },
+                },
+              },
+              404: {
+                description: "No dataset with that slug",
+                content: {
+                  "application/json": { schema: resolver(evaluateErrorSchema) },
+                },
+              },
+              413: {
+                description:
+                  "The body is larger than 30MB. Refused before it is read, so the response is the plain sentence `Payload Too Large` rather than a JSON error",
+                content: {
+                  "text/plain": { schema: { type: "string" } },
+                },
+              },
+            },
+          }),
     );
   }
 
-  return secured;
+  return service.build();
 }
 
 // ============ Shared helpers ============
@@ -1072,7 +1102,7 @@ function gatedVerdictFields(result: {
 }
 
 async function handleEvaluatorCall(
-  c: Context,
+  c: ServiceContext<EndpointVariables>,
   run: EvaluationRunHandlerPorts,
   evaluatorSlug: string,
   as_guardrail: boolean,

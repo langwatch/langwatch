@@ -1,5 +1,6 @@
 import { updateCurrentContext } from "@langwatch/observability/context";
 import type { Context, MiddlewareHandler } from "hono";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { z } from "zod";
 import {
   type DescribeRouteOptions,
@@ -290,6 +291,17 @@ function versionContextMiddleware({
   return async (c, next) => {
     c.set(ENDPOINT_ROUTE, route);
     c.set(REQUEST_FAMILY, serviceConfig.name);
+    // A family whose published paths are its whole contract negotiates no
+    // version: it answers no version header, and refuses no request for
+    // naming one, because its door never read one before either.
+    if (serviceConfig.bareMount) {
+      await next();
+      if (deprecated) {
+        c.header("Deprecation", "true");
+        c.header("X-API-Deprecation-Notice", deprecated);
+      }
+      return;
+    }
     const staticVersioning =
       serviceConfig.staticVersioning ?? serviceConfig.publicRest?.staticVersioning;
     const staticSelection = staticVersioning?.selector.select({
@@ -459,6 +471,10 @@ function appendOpenApiMiddleware({
       operationIdSuffix ?? (status === "latest" ? void 0 : version.replaceAll("-", "_"));
     options.operationId = suffix ? `${docs.operationId}_${suffix}` : docs.operationId;
   }
+  if (docs?.parameters !== undefined) {
+    options.parameters = [...(options.parameters ?? []), ...docs.parameters];
+  }
+  if (docs?.requestBody !== undefined) options.requestBody = docs.requestBody;
   if (docs?.security !== undefined) options.security = docs.security;
   if (config.deprecated !== undefined) {
     // Deprecated still answers and warns — on every dated mount the
@@ -773,9 +789,17 @@ async function replayableResponse({
     }),
   });
   if (outcome.isReplayed) return idempotentJson({ c, outcome });
-  // Serialised by the same writer as any other answer, so a first execution
-  // is validated against its declared output exactly as it would be without
-  // the ledger.
+  // A replayable answer is JSON by construction: the ledger stores serialised
+  // bytes and a replay writes them back as JSON, so a first execution has to
+  // be written the same way even on a route that otherwise answers outside the
+  // JSON contract — otherwise the retry would not match the original.
+  if (config.rawResponse) {
+    return c.json(outcome.body as Record<string, unknown>, (config.status ??
+      200) as ContentfulStatusCode);
+  }
+  // Otherwise the same writer as any other answer, so a first execution is
+  // validated against its declared output exactly as it would be without the
+  // ledger.
   return serializeEndpointResult({ c, config, kind, result: outcome.body });
 }
 

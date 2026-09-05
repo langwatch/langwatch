@@ -11,6 +11,7 @@ import {
   requires,
 } from "../../access-policy.js";
 import { createService, type ServiceBuilder } from "../builder.js";
+import type { IdempotentRunner } from "../idempotency.js";
 import { RestVersionSelector } from "../rest-version-selector.js";
 import type { DefaultsChain } from "../definition.js";
 import {
@@ -92,6 +93,12 @@ export interface RestApiServicePorts {
     envelope: ApiErrorEnvelope;
   }) => MiddlewareHandler;
 
+  /**
+   * The receipt ledger backing `withIdempotency(...)`. Supplied ONCE by the
+   * process, which is what owns the database and the encryption key a receipt
+   * lives in; a family that declares the capability without it fails to build.
+   */
+  readonly idempotency?: IdempotentRunner;
   /**
    * Organization-scope authentication in THROWING mode, for the versioned
    * families {@link RestApiService.createVersionedApp} builds.
@@ -468,11 +475,24 @@ function registerMountedRoute({
   route,
   family,
   scope,
+  credentialClass,
 }: {
   route: MountedRoute;
   family: string;
   scope: VersionedFamilyScope;
+  /**
+   * What the family publishes its door as, where the derived class is one no
+   * API client can present. A service family authenticating a shared secret
+   * derives `internal`, which the spec generator refuses to advertise — and
+   * silently drops from the document — so a family whose secret IS a
+   * documented credential says so here.
+   */
+  credentialClass?: CredentialClass;
 }): void {
+  const published = (policy: AccessPolicy): CredentialClass => {
+    const derived = credentialClassFor({ scope, policy });
+    return derived === "internal" && credentialClass ? credentialClass : derived;
+  };
   if (route.isNamespaceGuard) {
     const policy = publicEndpoint(
       "version-namespace guard: answers 404 for unknown version segments " +
@@ -485,7 +505,7 @@ function registerMountedRoute({
       ...(route.canonicalPath ? { canonicalPath: route.canonicalPath } : {}),
       policy,
       family,
-      credentialClass: credentialClassFor({ scope, policy }),
+      credentialClass: published(policy),
       isNamespaceGuard: true,
     });
     return;
@@ -515,7 +535,7 @@ function registerMountedRoute({
     family,
     // The class a SecuredApp on the same scope would derive: the family's own
     // door decides what credential reaches the route.
-    credentialClass: credentialClassFor({ scope, policy: meta.policy }),
+    credentialClass: published(meta.policy),
     ...(route.withdrawn ? { withdrawn: true as const } : {}),
   });
 }
@@ -673,11 +693,13 @@ function versionedFamily({
   options,
   scope,
   verifySecret,
+  credentialClass,
 }: {
   ports: RestApiServicePorts;
   options: VersionedAppOptions;
   scope: VersionedFamilyScope;
   verifySecret?: MiddlewareHandler;
+  credentialClass?: CredentialClass;
 }): RestApiVersionedFamily {
   const { name, basePath, routeMiddleware = [] } = options;
   // A family based at bare `/api` derives no name from its path, and every one
@@ -710,6 +732,7 @@ function versionedFamily({
     middleware: [ports.appContext],
     ...(staticVersioning ? { staticVersioning } : {}),
     ...(options.bareMount ? { bareMount: options.bareMount } : {}),
+    ...(ports.idempotency ? { idempotency: ports.idempotency } : {}),
     ...(auth ? { auth } : {}),
     onError,
     ...(options.v1Alias === false ? { v1Alias: false } : {}),
@@ -717,7 +740,13 @@ function versionedFamily({
       scope === "project"
         ? ports.authorizeProjectPermission({ permission, envelope })
         : ports.authorizeOrganizationPermissionThrowing(permission),
-    onRouteMounted: (route) => registerMountedRoute({ route, family, scope }),
+    onRouteMounted: (route) =>
+      registerMountedRoute({
+        route,
+        family,
+        scope,
+        ...(credentialClass ? { credentialClass } : {}),
+      }),
   });
 
   const refuse = (message: string): never => {
@@ -894,6 +923,7 @@ export function createRestApiService<
         options,
         scope: "service",
         ...(options.verifySecret ? { verifySecret: options.verifySecret } : {}),
+        ...(options.credentialClass ? { credentialClass: options.credentialClass } : {}),
       });
     },
 

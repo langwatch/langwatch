@@ -118,7 +118,7 @@ export function mountEvaluationsLegacyRest(options: {
         : {}),
       ...(run ? { evaluationRun: evaluationRunPorts(run) } : {}),
     },
-  }).hono as unknown as MountableRestApp;
+  });
 }
 
 /** The evaluate doors' ports, over this process's own graph. */

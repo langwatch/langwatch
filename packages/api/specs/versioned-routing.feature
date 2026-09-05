@@ -106,9 +106,10 @@ Feature: Explicit compatibility version namespaces
     And no dated namespace or latest alias is mounted beside them
 
   @unit
-  Scenario: A family at a shared prefix mounts its own paths and nothing else
+  Scenario: A family at a shared prefix mounts its own paths and their canonical address
     Given a family declares that its published paths are its whole contract
     When it is built
     Then each route answers at its literal path
-    And no dated namespace, no version alias and no version guard is mounted
+    And each route also answers at the /api/v1 address of that same path
+    And no dated namespace and no version guard is mounted
     And the route registry names the family for itself rather than for the shared prefix

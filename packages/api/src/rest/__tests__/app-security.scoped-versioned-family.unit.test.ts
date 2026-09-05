@@ -440,8 +440,8 @@ describe("a stream on a family that is not organization-scoped", () => {
 });
 
 describe("a family whose published URLs are its whole contract", () => {
-  /** @scenario "A family at a shared prefix mounts its own paths and nothing else" */
-  it("answers at its literal path, mounts no version namespace, and is named for itself", async () => {
+  /** @scenario "A family at a shared prefix mounts its own paths and their canonical address" */
+  it("answers at its literal path and its /api/v1 address, mounts no version namespace, and is named for itself", async () => {
     const { service, policy } = securityUnder().createProjectVersionedApp({
       name: "toy-annotation",
       basePath: "/api",
@@ -466,11 +466,53 @@ describe("a family whose published URLs are its whole contract", () => {
 
     expect(served.status).toBe(200);
     expect(dated.status).toBe(404);
-    expect(aliased.status).toBe(404);
+    // The generation these families already served on, and the address the
+    // published document names: `/api` has no segment of its own to alias, so
+    // the alias is per route rather than per family.
+    expect(aliased.status).toBe(200);
     expect(sibling.status).toBe(404);
 
     const registered = getRoutePolicy("GET", "/api/annotations");
     expect(registered?.family).toBe("toy-annotation");
-    expect(registered?.canonicalPath).toBeUndefined();
+    expect(registered?.canonicalPath).toBe("/api/v1/annotations");
+  });
+});
+
+describe("a family that answers HEAD beside its GET", () => {
+  /** @scenario "A route is registered for HEAD so the document and the registry carry it" */
+  it("records the HEAD route with the same access declaration, and lets the GET answer it", async () => {
+    const { service, policy } = securityUnder().createProjectVersionedApp({
+      name: "toy-avatar",
+      basePath: "/api/toy-avatar",
+    });
+    const app = service
+      .registerRoute(
+        "get",
+        "/image",
+        MANAGEMENT_API_VERSION,
+        async () => ({ ok: true }),
+        (b) => policy("agentCache:manage")(b).withOutput(okOutput),
+      )
+      .registerRoute(
+        "head",
+        "/image",
+        MANAGEMENT_API_VERSION,
+        async () => ({ ok: true }),
+        (b) => policy("agentCache:manage")(b).withOutput(okOutput),
+      )
+      .build();
+
+    const path = `/api/toy-avatar/${MANAGEMENT_API_VERSION}/image`;
+    const head = await app.request(path, { method: "HEAD" });
+
+    // Hono answers HEAD from the GET route before routing, so the status is
+    // the GET's and the body is dropped. The HEAD registration is what puts
+    // the operation in the registry and the published document.
+    expect(head.status).toBe(200);
+    expect(await head.text()).toBe("");
+    expect(getRoutePolicy("HEAD", path)?.policy).toEqual({
+      kind: "permission",
+      permission: "agentCache:manage",
+    });
   });
 });

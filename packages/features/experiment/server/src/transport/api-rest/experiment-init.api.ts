@@ -19,13 +19,21 @@
  * and the handled ceiling payload at 403.
  */
 import { handlerManagedAuth } from "@langwatch/api";
-import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
+import {
+  type AppRestSecurity,
+  type EndpointVariables,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
+  resolver,
+  type RestErrorHandler,
+  type ServiceContext,
+} from "@langwatch/api/rest";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { zodErrorMessage } from "@langwatch/config";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
+import type { MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 
 import type { ExperimentFindOrCreateService } from "../../services/experiment-find-or-create.service";
@@ -60,6 +68,44 @@ export interface ExperimentInitRestPorts {
 }
 
 /**
+ * A body this door refuses in its own words, rather than through either
+ * envelope: the SDKs parse these two shapes.
+ */
+class ExperimentInitRefusal extends Error {
+  constructor(
+    readonly status: ContentfulStatusCode,
+    readonly body: object,
+  ) {
+    super("experiment init refused");
+    this.name = "ExperimentInitRefusal";
+  }
+}
+
+/** What the credential middleware puts on the context for the handler. */
+const INIT_CALLER = "experimentInitCaller";
+
+type ExperimentInitCaller = Readonly<{
+  project: Readonly<{ id: string; slug: string }>;
+  markUsed: () => void;
+}>;
+
+/**
+ * The caller the middleware resolved, read off the handler's own context. A
+ * structural reader rather than a widened variables map: the service's map is
+ * the framework's, and a family adding one key to it would have to restate the
+ * whole thing.
+ */
+function callerOf(c: {
+  get(key: typeof INIT_CALLER): ExperimentInitCaller | undefined;
+}): ExperimentInitCaller {
+  const caller = c.get(INIT_CALLER);
+  if (!caller) {
+    throw new Error("No credential on the request context: the init door's middleware did not run");
+  }
+  return caller;
+}
+
+/**
  * The body, as the door has always accepted it.
  *
  * `experiment_slug` and `experiment_id` are individually optional and jointly
@@ -83,171 +129,145 @@ export function createExperimentInitRestApp(options: {
   ports: ExperimentInitRestPorts;
 }): MountableRestApp {
   const { security, ports } = options;
-  const secured = security.createServiceApp({ basePath: "/api" });
 
-  secured
-    .access(
-      handlerManagedAuth({
-        // Experiments carry their own RBAC permission, decoupled from
-        // workflows: initializing an experiment run is `experiments:manage`.
-        reason:
-          "project API key resolved by the process's credential port and its ceiling enforced",
-        permissions: ["experiments:manage"],
-        credential: "apiKey",
-      }),
+  // `/api` with no version namespace: the family owns one literal path under a
+  // prefix twenty other families share, and a version guard here would claim
+  // every one of their URLs.
+  const { service, policy } = security.createServiceVersionedApp({
+    name: "experiment-init",
+    basePath: "/api",
+    bareMount: true,
+    errorEnvelope: "legacy",
+    errorHandler:
+      (boundary): RestErrorHandler =>
+      (error, c) =>
+        error instanceof ExperimentInitRefusal
+          ? c.json(error.body, error.status)
+          : boundary(error, c),
+  });
+
+  /**
+   * The project key, resolved before the body is read — the order this door
+   * has always answered in: an unauthenticated call is refused as such
+   * whatever it carries.
+   */
+  const authenticate: MiddlewareHandler = async (c, next) => {
+    const credential = await ports.authenticateCredential({
+      request: c.req.raw,
+      permission: "experiments:manage",
+    });
+    if (!credential.ok) {
+      throw new ExperimentInitRefusal(credential.status, credential.body);
+    }
+    c.set(INIT_CALLER, { project: credential.project, markUsed: credential.markUsed });
+    await next();
+  };
+
+  const initHandler = async (c: ServiceContext<EndpointVariables>, input: { body: string }) => {
+    const { project, markUsed } = callerOf(c);
+
+    let rawBody: unknown;
+    try {
+      rawBody = JSON.parse(input.body);
+    } catch {
+      throw new ExperimentInitRefusal(400, { message: "Bad request" });
+    }
+
+    const parsed = experimentInitBodySchema.safeParse(rawBody);
+    if (!parsed.success) {
+      logger.error({ error: parsed.error, projectId: project.id }, "invalid init data received");
+      ports.reportError?.(parsed.error, { projectId: project.id });
+      throw new ExperimentInitRefusal(400, { error: zodErrorMessage(parsed.error) });
+    }
+    const params = parsed.data;
+
+    let experiment;
+    try {
+      experiment = await ports.findOrCreate().resolve({
+        projectId: project.id,
+        // Both identifiers are forwarded. The route this replaces sent only the
+        // slug, so an id-only request passed validation and then raised
+        // "Either experiment_id or experiment_slug is required" as a 500.
+        experimentId: params.experiment_id,
+        experimentSlug: params.experiment_slug,
+        experimentType: params.experiment_type,
+        experimentName: params.experiment_name,
+        workflowId: params.workflowId,
+      });
+    } catch (error) {
+      // Matched on the CODE, not on the licence layer's own error class: that
+      // class lives in an enterprise package this one may not reach, and a code
+      // comparison is what the repo asks for anywhere an error may have crossed
+      // a serialisation boundary. The flat body below is the wire an SDK's
+      // limit handling already reads.
+      if (error instanceof HandledError && error.code === "resource_limit_exceeded") {
+        const meta = error.meta;
+        throw new ExperimentInitRefusal(403, {
+          error: error.code,
+          message: error.message,
+          limitType: meta.limitType,
+          current: meta.current,
+          max: meta.max,
+        });
+      }
+      throw error;
+    }
+
+    markUsed();
+    return {
+      path: `/${project.slug}/experiments/${experiment.slug}`,
+      slug: experiment.slug,
+    };
+  };
+
+  return service
+    .registerRoute("post", "/experiment/init", MANAGEMENT_API_VERSION, initHandler, (b) =>
+      policy(
+        handlerManagedAuth({
+          // Experiments carry their own RBAC permission, decoupled from
+          // workflows: initializing an experiment run is `experiments:manage`.
+          reason:
+            "project API key resolved by the process's credential port and its ceiling enforced",
+          permissions: ["experiments:manage"],
+          credential: "apiKey",
+        }),
+      )(b)
+        .withMiddleware(authenticate)
+        // Read as bytes, parsed here: this handler answers its own sentence on
+        // a bad body — built by `zodErrorMessage` from the schema's own
+        // failure, and reported to the process's error sink with that failure
+        // in hand — which a validated input cannot hand back.
+        .withRawBody("text", { contentType: "application/json" })
+        .withOutput(experimentInitResponseSchema)
+        .withDocs({
+          operationId: "initExperiment",
+          summary: "Create an experiment",
+          description:
+            "Create an experiment, or return the existing one when the slug is already taken. This is the first call in an experiment run: take the slug back, report results against it, and every run under that slug groups together in the app. The SDKs call this endpoint for you. The body carries `experiment_type` and at least one of `experiment_slug` (the stable slug you choose, which is what makes repeated runs land together) or `experiment_id`; `experiment_name` names it on creation and `workflowId` ties it to an Optimization Studio workflow.",
+          tags: ["Experiments"],
+          responses: {
+            400: {
+              description:
+                "The body was not valid JSON, or neither experiment_slug nor experiment_id was supplied",
+              content: {
+                "application/json": { schema: resolver(experimentInitBadRequestSchema) },
+              },
+            },
+            401: {
+              description: "Missing or invalid API key",
+              content: {
+                "application/json": { schema: resolver(z.object({ message: z.string() })) },
+              },
+            },
+            403: {
+              description:
+                "The API key lacks experiments:manage, or the plan's experiment limit is already reached",
+              content: {
+                "application/json": { schema: resolver(experimentInitForbiddenSchema) },
+              },
+            },
+          },
+        }),
     )
-    .post(
-      "/experiment/init",
-      describeRoute({
-        summary: "Create an experiment",
-        description:
-          "Create an experiment, or return the existing one when the slug is already taken. This is the first call in an experiment run: take the slug back, report results against it, and every run under that slug groups together in the app. The SDKs call this endpoint for you.",
-        tags: ["Experiments"],
-        // Declared by hand rather than through a validator: this handler parses
-        // the body itself and answers its own sentence on a bad one, so there is
-        // no validator schema for the generator to read. `experiment_slug` and
-        // `experiment_id` are individually optional and jointly required, which
-        // `anyOf` states and a required-list cannot.
-        requestBody: {
-          required: true,
-          content: {
-            "application/json": {
-              schema: {
-                type: "object" as const,
-                properties: {
-                  experiment_slug: {
-                    type: "string",
-                    description:
-                      "Stable slug you choose. Reusing it returns the same experiment instead of creating another, which is what makes repeated runs land together.",
-                  },
-                  experiment_id: {
-                    type: "string",
-                    description: "Existing experiment id, as an alternative to the slug",
-                  },
-                  experiment_type: {
-                    type: "string",
-                    enum: ["DSPY", "BATCH_EVALUATION", "BATCH_EVALUATION_V2"],
-                    description:
-                      "BATCH_EVALUATION_V2 for SDK batch evaluations, DSPY for optimizer runs",
-                  },
-                  experiment_name: {
-                    type: "string",
-                    description: "Display name, used only when the experiment is created",
-                  },
-                  workflowId: {
-                    type: "string",
-                    description: "Optimization Studio workflow this experiment belongs to",
-                  },
-                },
-                required: ["experiment_type"],
-                // `anyOf`, not `oneOf`: the refine only asks that at least one
-                // identifier is present, and sending both is accepted. `oneOf`
-                // would document exactly-one and reject a valid body.
-                anyOf: [{ required: ["experiment_slug"] }, { required: ["experiment_id"] }],
-              },
-            },
-          },
-        },
-        responses: {
-          200: {
-            description: "The experiment, created or already existing",
-            content: {
-              "application/json": { schema: resolver(experimentInitResponseSchema) },
-            },
-          },
-          400: {
-            description:
-              "The body was not valid JSON, or neither experiment_slug nor experiment_id was supplied",
-            content: {
-              "application/json": { schema: resolver(experimentInitBadRequestSchema) },
-            },
-          },
-          401: {
-            description: "Missing or invalid API key",
-            content: {
-              "application/json": { schema: resolver(z.object({ message: z.string() })) },
-            },
-          },
-          403: {
-            description:
-              "The API key lacks experiments:manage, or the plan's experiment limit is already reached",
-            content: {
-              "application/json": { schema: resolver(experimentInitForbiddenSchema) },
-            },
-          },
-        },
-      }),
-      async (c) => {
-        const credential = await ports.authenticateCredential({
-          request: c.req.raw,
-          permission: "experiments:manage",
-        });
-        if (!credential.ok) {
-          return c.json(credential.body, credential.status);
-        }
-        const project = credential.project;
-
-        let rawBody: unknown;
-        try {
-          rawBody = await c.req.json();
-        } catch {
-          return c.json({ message: "Bad request" }, 400);
-        }
-
-        const parsed = experimentInitBodySchema.safeParse(rawBody);
-        if (!parsed.success) {
-          logger.error(
-            { error: parsed.error, projectId: project.id },
-            "invalid init data received",
-          );
-          ports.reportError?.(parsed.error, { projectId: project.id });
-          return c.json({ error: zodErrorMessage(parsed.error) }, 400);
-        }
-        const params = parsed.data;
-
-        let experiment;
-        try {
-          experiment = await ports.findOrCreate().resolve({
-            projectId: project.id,
-            // Both identifiers are forwarded. The route this replaces sent
-            // only the slug, so an id-only request passed validation and then
-            // raised "Either experiment_id or experiment_slug is required" as
-            // a 500.
-            experimentId: params.experiment_id,
-            experimentSlug: params.experiment_slug,
-            experimentType: params.experiment_type,
-            experimentName: params.experiment_name,
-            workflowId: params.workflowId,
-          });
-        } catch (error) {
-          // Matched on the CODE, not on the licence layer's own error class:
-          // that class lives in an enterprise package this one may not reach,
-          // and a code comparison is what the repo asks for anywhere an error
-          // may have crossed a serialisation boundary. The flat body below is
-          // the wire an SDK's limit handling already reads.
-          if (error instanceof HandledError && error.code === "resource_limit_exceeded") {
-            const meta = error.meta;
-            return c.json(
-              {
-                error: error.code,
-                message: error.message,
-                limitType: meta.limitType,
-                current: meta.current,
-                max: meta.max,
-              },
-              403,
-            );
-          }
-          throw error;
-        }
-
-        credential.markUsed();
-        return c.json({
-          path: `/${project.slug}/experiments/${experiment.slug}`,
-          slug: experiment.slug,
-        });
-      },
-    );
-
-  return secured.hono;
+    .build();
 }

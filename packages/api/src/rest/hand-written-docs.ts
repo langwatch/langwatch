@@ -11,7 +11,9 @@ import type { EndpointDocs } from "./types.js";
  * `parameters` from the route's params schema — so they are dropped here
  * rather than restated per route. Everything a person wrote (the summary, the
  * prose, the response bodies, the operation id the SDK generators turn into
- * function names) is carried through unchanged.
+ * function names) is carried through unchanged, including the request body: a
+ * family that parses its own body gives the framework no schema to derive one
+ * from.
  */
 export function handWrittenDocs(spec: DescribeRouteOptions): EndpointDocs {
   return {
@@ -20,5 +22,6 @@ export function handWrittenDocs(spec: DescribeRouteOptions): EndpointDocs {
     ...(spec.tags ? { tags: [...spec.tags] } : {}),
     ...(typeof spec.operationId === "string" ? { operationId: spec.operationId } : {}),
     ...(spec.responses ? { responses: spec.responses } : {}),
+    ...(spec.requestBody ? { requestBody: spec.requestBody } : {}),
   };
 }

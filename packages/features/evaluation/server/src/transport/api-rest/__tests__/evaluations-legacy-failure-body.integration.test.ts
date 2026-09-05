@@ -34,7 +34,7 @@ function mount(findOrCreateExperiment: () => Promise<never>) {
   });
 
   return (body: unknown) =>
-    app.hono.fetch(
+    app.fetch(
       new Request("http://api.test/api/evaluations/batch/log_results", {
         method: "POST",
         headers: { "content-type": "application/json" },

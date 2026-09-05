@@ -2,7 +2,16 @@
  * `POST /api/dspy/log_steps` — the DSPy optimizer's own progress log.
  */
 import { handlerManagedAuth } from "@langwatch/api";
-import { bodyLimit, type AppRestSecurity, type MountableRestApp } from "@langwatch/api/rest";
+import {
+  bodyLimit,
+  type AppRestSecurity,
+  type EndpointVariables,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
+  resolver,
+  type RestErrorHandler,
+  type ServiceContext,
+} from "@langwatch/api/rest";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { zodErrorMessage } from "@langwatch/config";
 import {
@@ -18,8 +27,8 @@ import {
 } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import { createHash } from "node:crypto";
+import type { MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 
 import type { ExperimentService } from "@langwatch/experiment-contract";
@@ -35,6 +44,36 @@ const MAX_BODY_BYTES = 20 * 1024 * 1024;
  * more than reading them is worth. The response text is dropped past this.
  */
 const MAX_LLM_CALL_BYTES = 256_000;
+
+/**
+ * A refusal this door answers in its own words rather than through either
+ * envelope: an SDK optimizer parses these two fields.
+ */
+class DspyStepsRefusal extends Error {
+  constructor(
+    readonly status: ContentfulStatusCode,
+    readonly body: object,
+  ) {
+    super("dspy step log refused");
+    this.name = "DspyStepsRefusal";
+  }
+}
+
+/** What the credential middleware puts on the context for the handler. */
+const DSPY_CALLER = "dspyStepsCaller";
+
+type DspyStepsCaller = Readonly<{ project: Readonly<{ id: string }> }>;
+
+/** The caller the middleware resolved, read off the handler's own context. */
+function callerOf(c: {
+  get(key: typeof DSPY_CALLER): DspyStepsCaller | undefined;
+}): DspyStepsCaller {
+  const caller = c.get(DSPY_CALLER);
+  if (!caller) {
+    throw new Error("No credential on the request context: the step log's middleware did not run");
+  }
+  return caller;
+}
 
 /** A resolved project credential, or the refusal to answer in its place. */
 export type DspyStepsRestCredential =
@@ -70,140 +109,144 @@ export function createDspyStepsRestApp(options: {
 }): MountableRestApp {
   const { security, ports } = options;
 
-  const secured = security.createServiceApp({ basePath: "/api" });
+  // `/api` with no version namespace: the family owns one literal path under a
+  // prefix twenty other families share, and a version guard here would claim
+  // every one of their URLs.
+  const { service, policy } = security.createServiceVersionedApp({
+    name: "dspy-steps",
+    basePath: "/api",
+    bareMount: true,
+    errorEnvelope: "legacy",
+    errorHandler:
+      (boundary): RestErrorHandler =>
+      (error, c) =>
+        error instanceof DspyStepsRefusal ? c.json(error.body, error.status) : boundary(error, c),
+  });
 
-  secured
-    .access(
-      handlerManagedAuth({
-        reason: "project auth + permission ceiling enforced by in-route middleware",
-        permissions: ["experiments:manage"],
-        credential: "apiKey",
-      }),
-    )
-    .post(
-      "/dspy/log_steps",
-      describeRoute({
-        summary: "Report DSPy optimizer steps",
-        description:
-          "Report the steps of a DSPy optimizer run against an experiment, so the run's progress and scores show up in the app. Send the steps as an array; the optimizer typically posts each batch as it finishes. Bodies up to 20MB are accepted.",
-        tags: ["Experiments"],
-        responses: {
-          200: {
-            description: "Every step in the batch was recorded",
-            content: {
-              "application/json": { schema: resolver(z.object({ message: z.string() })) },
-            },
-          },
-          400: {
-            description:
-              "The body was not valid JSON, failed validation, or carried timestamps in seconds rather than milliseconds",
-            content: { "application/json": { schema: resolver(sentenceErrorSchema) } },
-          },
-          401: {
-            description: "Missing or invalid API key",
-            content: {
-              "application/json": { schema: resolver(z.object({ message: z.string() })) },
-            },
-          },
-          500: {
-            description:
-              "A step could not be stored. The cause is on our side and is logged with the run and step ids; retrying the batch is safe.",
-            content: { "application/json": { schema: resolver(sentenceErrorSchema) } },
-          },
-        },
-      }),
-      bodyLimit({ maxSize: MAX_BODY_BYTES }),
-      async (c) => {
-        const credential = await ports.authenticateCredential({
-          request: c.req.raw,
-          permission: "experiments:manage",
-        });
-        if (!credential.ok) {
-          return c.json(credential.body, credential.status);
-        }
-        const project = credential.project;
-        credential.markUsed();
+  /** The project key, resolved before the batch is read. */
+  const authenticate: MiddlewareHandler = async (c, next) => {
+    const credential = await ports.authenticateCredential({
+      request: c.req.raw,
+      permission: "experiments:manage",
+    });
+    if (!credential.ok) {
+      throw new DspyStepsRefusal(credential.status, credential.body);
+    }
+    c.set(DSPY_CALLER, { project: credential.project });
+    credential.markUsed();
+    await next();
+  };
 
-        let body: unknown;
-        let payloadSize: number;
-        try {
-          // The size comes from the wire bytes rather than a re-serialisation
-          // of the parsed body: bodies here run to 20MB, and stringifying the
-          // parse both costs a second full pass and reports UTF-16 code units
-          // instead of transferred bytes.
-          const raw = await c.req.text();
-          payloadSize = Buffer.byteLength(raw, "utf8");
-          body = JSON.parse(raw);
-        } catch {
-          return c.json({ message: "Bad request" }, 400);
-        }
+  const logStepsHandler = async (c: ServiceContext<EndpointVariables>, input: { body: string }) => {
+    const { project } = callerOf(c);
 
-        ports.observePayloadSize?.(payloadSize);
-        logger.info(
-          {
-            payloadSize,
-            payloadSizeMB: (payloadSize / (1024 * 1024)).toFixed(2),
-            projectId: project.id,
-          },
-          "DSPy log_steps request received",
-        );
+    // The size comes from the wire bytes rather than a re-serialisation of the
+    // parsed body: bodies here run to 20MB, and stringifying the parse both
+    // costs a second full pass and reports UTF-16 code units instead of
+    // transferred bytes.
+    const payloadSize = Buffer.byteLength(input.body, "utf8");
+    let body: unknown;
+    try {
+      body = JSON.parse(input.body);
+    } catch {
+      throw new DspyStepsRefusal(400, { message: "Bad request" });
+    }
 
-        const parsed = z.array(dSPyStepRESTParamsSchema).safeParse(body);
-        if (!parsed.success) {
-          logger.error(
-            { error: parsed.error, payloadSize, projectId: project.id },
-            "invalid log_steps data received",
-          );
-          ports.reportError?.(parsed.error, { projectId: project.id });
-          return c.json({ error: zodErrorMessage(parsed.error) }, 400);
-        }
-
-        for (const param of parsed.data) {
-          if (param.timestamps.created_at && param.timestamps.created_at.toString().length === 10) {
-            logger.error(
-              { stepId: param.index, runId: param.run_id, projectId: project.id },
-              "timestamps not in milliseconds for step",
-            );
-            return c.json(
-              {
-                error:
-                  "Timestamps should be in milliseconds not in seconds, please multiply it by 1000",
-              },
-              400,
-            );
-          }
-        }
-
-        logger.info(
-          { stepCount: parsed.data.length, projectId: project.id },
-          "Processing DSPy steps",
-        );
-
-        for (const param of parsed.data) {
-          try {
-            await recordStep({ ports, project, param });
-          } catch (error) {
-            const context = {
-              projectId: project.id,
-              stepId: param.index,
-              runId: param.run_id,
-            };
-            logger.error({ error, ...context }, "failed to process DSPy step");
-            ports.reportError?.(error, context);
-            if (error instanceof z.ZodError) {
-              return c.json({ error: zodErrorMessage(error) }, 400);
-            }
-            // Generic on purpose (ADR-045): the detail is on the log line
-            // above, and a driver's own message names host, port and database.
-            return c.json({ error: "Internal server error" }, 500);
-          }
-        }
-
-        return c.json({ message: "ok" });
+    ports.observePayloadSize?.(payloadSize);
+    logger.info(
+      {
+        payloadSize,
+        payloadSizeMB: (payloadSize / (1024 * 1024)).toFixed(2),
+        projectId: project.id,
       },
+      "DSPy log_steps request received",
     );
 
-  return secured.hono;
+    const parsed = z.array(dSPyStepRESTParamsSchema).safeParse(body);
+    if (!parsed.success) {
+      logger.error(
+        { error: parsed.error, payloadSize, projectId: project.id },
+        "invalid log_steps data received",
+      );
+      ports.reportError?.(parsed.error, { projectId: project.id });
+      throw new DspyStepsRefusal(400, { error: zodErrorMessage(parsed.error) });
+    }
+
+    for (const param of parsed.data) {
+      if (param.timestamps.created_at && param.timestamps.created_at.toString().length === 10) {
+        logger.error(
+          { stepId: param.index, runId: param.run_id, projectId: project.id },
+          "timestamps not in milliseconds for step",
+        );
+        throw new DspyStepsRefusal(400, {
+          error: "Timestamps should be in milliseconds not in seconds, please multiply it by 1000",
+        });
+      }
+    }
+
+    logger.info({ stepCount: parsed.data.length, projectId: project.id }, "Processing DSPy steps");
+
+    for (const param of parsed.data) {
+      try {
+        await recordStep({ ports, project, param });
+      } catch (error) {
+        const context = { projectId: project.id, stepId: param.index, runId: param.run_id };
+        logger.error({ error, ...context }, "failed to process DSPy step");
+        ports.reportError?.(error, context);
+        if (error instanceof z.ZodError) {
+          throw new DspyStepsRefusal(400, { error: zodErrorMessage(error) });
+        }
+        // Generic on purpose (ADR-045): the detail is on the log line above,
+        // and a driver's own message names host, port and database.
+        throw new DspyStepsRefusal(500, { error: "Internal server error" });
+      }
+    }
+
+    return { message: "ok" };
+  };
+
+  return service
+    .registerRoute("post", "/dspy/log_steps", MANAGEMENT_API_VERSION, logStepsHandler, (b) =>
+      policy(
+        handlerManagedAuth({
+          reason: "project auth + permission ceiling enforced by in-route middleware",
+          permissions: ["experiments:manage"],
+          credential: "apiKey",
+        }),
+      )(b)
+        .withMiddleware(bodyLimit({ maxSize: MAX_BODY_BYTES }), authenticate)
+        // Read as bytes, parsed here: the door reports the wire size it
+        // accepted, and answers its own sentence — built by `zodErrorMessage`
+        // from the schema's own failure — on a bad batch.
+        .withRawBody("text", { contentType: "application/json" })
+        .withOutput(z.object({ message: z.string() }))
+        .withDocs({
+          operationId: "logDspySteps",
+          summary: "Report DSPy optimizer steps",
+          description:
+            "Report the steps of a DSPy optimizer run against an experiment, so the run's progress and scores show up in the app. Send the steps as an array; the optimizer typically posts each batch as it finishes. Bodies up to 20MB are accepted.",
+          tags: ["Experiments"],
+          responses: {
+            400: {
+              description:
+                "The body was not valid JSON, failed validation, or carried timestamps in seconds rather than milliseconds",
+              content: { "application/json": { schema: resolver(sentenceErrorSchema) } },
+            },
+            401: {
+              description: "Missing or invalid API key",
+              content: {
+                "application/json": { schema: resolver(z.object({ message: z.string() })) },
+              },
+            },
+            500: {
+              description:
+                "A step could not be stored. The cause is on our side and is logged with the run and step ids; retrying the batch is safe.",
+              content: { "application/json": { schema: resolver(sentenceErrorSchema) } },
+            },
+          },
+        }),
+    )
+    .build();
 }
 
 /** The two refusal fields this door has always answered in. */

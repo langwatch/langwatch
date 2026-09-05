@@ -19,7 +19,15 @@
  * so each keeps its own code rather than collapsing into one "not found".
  */
 import { handlerManagedAuth } from "@langwatch/api";
-import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
+import {
+  type AppRestSecurity,
+  type EndpointVariables,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
+  resolver,
+  type RestErrorHandler,
+  type ServiceContext,
+} from "@langwatch/api/rest";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import {
@@ -28,10 +36,42 @@ import {
   WorkflowVersionNotFoundError,
   type WorkflowService,
 } from "@langwatch/workflow-contract";
-import type { Context } from "hono";
+import type { MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
+
+/**
+ * A refusal this door answers in its own words rather than through the
+ * envelope: an SDK parses `{ message }` at 400 and 401.
+ */
+class WorkflowRunRefusal extends Error {
+  constructor(
+    readonly status: ContentfulStatusCode,
+    readonly body: object,
+  ) {
+    super("workflow run refused");
+    this.name = "WorkflowRunRefusal";
+  }
+}
+
+/** What the credential middleware puts on the context for the handler. */
+const RUN_CALLER = "workflowRunCaller";
+
+type WorkflowRunCaller = Readonly<{
+  project: Readonly<{ id: string }>;
+  markUsed: () => void;
+}>;
+
+/** The caller the middleware resolved, read off the handler's own context. */
+function callerOf(c: {
+  get(key: typeof RUN_CALLER): WorkflowRunCaller | undefined;
+}): WorkflowRunCaller {
+  const caller = c.get(RUN_CALLER);
+  if (!caller) {
+    throw new Error("No credential on the request context: the run door's middleware did not run");
+  }
+  return caller;
+}
 
 /** A resolved project credential, or the refusal to answer in its place. */
 export type WorkflowRunRestCredential =
@@ -87,6 +127,19 @@ const handledErrorEnvelopeSchema = z
     docsUrl: z.string().optional(),
   })
   .passthrough();
+
+/**
+ * What the run route validates its answer against.
+ *
+ * Open where the documented shape is closed: the engine's answer carries the
+ * two fields below and whatever else that execution recorded, and a closed
+ * schema would silently drop the rest on the way out. The document keeps the
+ * named shape, which is what a caller reads.
+ */
+const workflowRunOutputSchema = z.looseObject({
+  status: z.enum(["idle", "waiting", "running", "success", "error", "skipped"]),
+  result: z.record(z.string(), z.unknown()).nullable().optional(),
+});
 
 const workflowRunResponses = {
   200: {
@@ -149,7 +202,20 @@ export function createWorkflowRunRestApp(options: {
   ports: WorkflowRunRestPorts;
 }): MountableRestApp {
   const { security, ports } = options;
-  const secured = security.createServiceApp({ basePath: "/api" });
+
+  // `/api` with no version namespace: these three literal paths sit under a
+  // prefix twenty other families share, and a version guard here would claim
+  // every one of their URLs.
+  const { service, policy } = security.createServiceVersionedApp({
+    name: "workflow-run",
+    basePath: "/api",
+    bareMount: true,
+    errorEnvelope: "legacy",
+    errorHandler:
+      (boundary): RestErrorHandler =>
+      (error, c) =>
+        error instanceof WorkflowRunRefusal ? c.json(error.body, error.status) : boundary(error, c),
+  });
 
   const runAuth = handlerManagedAuth({
     reason: "project API key resolved by the process's credential port and its ceiling enforced",
@@ -157,29 +223,35 @@ export function createWorkflowRunRestApp(options: {
     credential: "apiKey",
   });
 
-  const handleWorkflowRun = async (
-    c: Context,
-    workflowId: string,
-    versionId: string | undefined,
-  ): Promise<Response> => {
+  /** The project key, resolved before the body is looked at. */
+  const authenticate: MiddlewareHandler = async (c, next) => {
     const credential = await ports.authenticateCredential({
       request: c.req.raw,
       permission: "workflows:manage",
     });
     if (!credential.ok) {
-      return c.json(credential.body, credential.status);
+      throw new WorkflowRunRefusal(credential.status, credential.body);
     }
+    c.set(RUN_CALLER, { project: credential.project, markUsed: credential.markUsed });
+    await next();
+  };
+
+  const runWorkflow = async (
+    c: ServiceContext<EndpointVariables>,
+    input: { workflowId: string; versionId?: string; body: string },
+  ) => {
+    const { project, markUsed } = callerOf(c);
 
     const contentType = c.req.header("content-type");
     if (!contentType?.includes("application/json")) {
-      return c.json({ message: "Invalid body, expecting json" }, 400);
+      throw new WorkflowRunRefusal(400, { message: "Invalid body, expecting json" });
     }
 
     let body: Record<string, unknown>;
     try {
-      body = await c.req.json<Record<string, unknown>>();
+      body = JSON.parse(input.body) as Record<string, unknown>;
     } catch {
-      return c.json({ message: "Invalid body" }, 400);
+      throw new WorkflowRunRefusal(400, { message: "Invalid body" });
     }
 
     // Failures propagate to the family's error boundary, which already maps a
@@ -188,17 +260,19 @@ export function createWorkflowRunRestApp(options: {
     let result: unknown;
     try {
       result = await ports.workflows().run({
-        workflowId,
-        projectId: credential.project.id,
+        workflowId: input.workflowId,
+        projectId: project.id,
         inputs: body,
-        ...(versionId ? { versionId } : {}),
+        ...(input.versionId ? { versionId: input.versionId } : {}),
       });
     } catch (error) {
       if (error instanceof WorkflowNotFoundError) {
-        throw new NotFoundError("workflow_not_found", "Workflow", workflowId);
+        throw new NotFoundError("workflow_not_found", "Workflow", input.workflowId);
       }
       if (error instanceof WorkflowNotPublishedError) {
-        throw new ValidationError("Workflow not published", { meta: { workflowId } });
+        throw new ValidationError("Workflow not published", {
+          meta: { workflowId: input.workflowId },
+        });
       }
       if (error instanceof WorkflowVersionNotFoundError) {
         throw new NotFoundError(
@@ -209,48 +283,71 @@ export function createWorkflowRunRestApp(options: {
       }
       throw error;
     }
-    credential.markUsed();
-    return c.json(result);
+    markUsed();
+    return result;
   };
 
-  secured.access(runAuth).post(
-    "/optimization/:workflowId/:versionId",
-    describeRoute({
-      summary: "Run a workflow version (legacy path)",
-      description:
-        "Run one pinned version of an Optimization Studio workflow synchronously. Identical to `POST /api/workflows/{workflowId}/{versionId}/run`, which is the path to use in new integrations; this one stays for callers written against it.",
-      tags: ["Workflows"],
-      requestBody: workflowRunRequestBody,
-      responses: workflowRunResponses,
-    }),
-    (c) => handleWorkflowRun(c, c.req.param("workflowId"), c.req.param("versionId")),
-  );
+  const versionedParamsSchema = z.object({
+    workflowId: z.string().min(1),
+    versionId: z.string().min(1),
+  });
+  const workflowParamsSchema = z.object({ workflowId: z.string().min(1) });
 
-  secured.access(runAuth).post(
-    "/workflows/:workflowId/run",
-    describeRoute({
-      summary: "Run a workflow",
-      description:
-        "Run an Optimization Studio workflow synchronously and return its output. Runs the workflow's published version; address a specific version with the `{versionId}` form of this path.",
-      tags: ["Workflows"],
-      requestBody: workflowRunRequestBody,
-      responses: workflowRunResponses,
-    }),
-    (c) => handleWorkflowRun(c, c.req.param("workflowId"), undefined),
-  );
-
-  secured.access(runAuth).post(
-    "/workflows/:workflowId/:versionId/run",
-    describeRoute({
-      summary: "Run a specific workflow version",
-      description:
-        "Run one pinned version of an Optimization Studio workflow synchronously and return its output. Use this when a caller must keep hitting the same version as the workflow is edited.",
-      tags: ["Workflows"],
-      requestBody: workflowRunRequestBody,
-      responses: workflowRunResponses,
-    }),
-    (c) => handleWorkflowRun(c, c.req.param("workflowId"), c.req.param("versionId")),
-  );
-
-  return secured.hono;
+  return service
+    .registerRoute(
+      "post",
+      "/optimization/:workflowId/:versionId",
+      MANAGEMENT_API_VERSION,
+      runWorkflow,
+      (b) =>
+        policy(runAuth)(b)
+          .withMiddleware(authenticate)
+          .withParams(versionedParamsSchema)
+          .withRawBody("text", { contentType: "application/json" })
+          .withOutput(workflowRunOutputSchema)
+          .withDocs({
+            operationId: "runOptimizationWorkflowVersion",
+            summary: "Run a workflow version (legacy path)",
+            description:
+              "Run one pinned version of an Optimization Studio workflow synchronously. Identical to `POST /api/workflows/{workflowId}/{versionId}/run`, which is the path to use in new integrations; this one stays for callers written against it. The body is the workflow's own input fields, named as its entry node names them.",
+            tags: ["Workflows"],
+            responses: workflowRunResponses,
+          }),
+    )
+    .registerRoute("post", "/workflows/:workflowId/run", MANAGEMENT_API_VERSION, runWorkflow, (b) =>
+      policy(runAuth)(b)
+        .withMiddleware(authenticate)
+        .withParams(workflowParamsSchema)
+        .withRawBody("text", { contentType: "application/json" })
+        .withOutput(workflowRunOutputSchema)
+        .withDocs({
+          operationId: "runWorkflow",
+          summary: "Run a workflow",
+          description:
+            "Run an Optimization Studio workflow synchronously and return its output. Runs the workflow's published version; address a specific version with the `{versionId}` form of this path. The body is the workflow's own input fields, named as its entry node names them.",
+          tags: ["Workflows"],
+          responses: workflowRunResponses,
+        }),
+    )
+    .registerRoute(
+      "post",
+      "/workflows/:workflowId/:versionId/run",
+      MANAGEMENT_API_VERSION,
+      runWorkflow,
+      (b) =>
+        policy(runAuth)(b)
+          .withMiddleware(authenticate)
+          .withParams(versionedParamsSchema)
+          .withRawBody("text", { contentType: "application/json" })
+          .withOutput(workflowRunOutputSchema)
+          .withDocs({
+            operationId: "runWorkflowVersion",
+            summary: "Run a specific workflow version",
+            description:
+              "Run one pinned version of an Optimization Studio workflow synchronously and return its output. Use this when a caller must keep hitting the same version as the workflow is edited. The body is the workflow's own input fields, named as its entry node names them.",
+            tags: ["Workflows"],
+            responses: workflowRunResponses,
+          }),
+    )
+    .build();
 }

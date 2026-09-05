@@ -5,15 +5,25 @@
 import {
   ANNOTATION_ANCHOR_SCOPES,
   type AnnotationAnchorScope,
+  annotationSchema as annotationRowSchema,
   AnnotationNotFoundError,
   annotationAnchorScopeSchema,
 } from "@langwatch/annotation-contract";
 import { handlerManagedAuth } from "@langwatch/api";
-import { baseResponses, type AppRestSecurity, type MountableRestApp } from "@langwatch/api/rest";
+import {
+  baseResponses,
+  type AppRestSecurity,
+  type EndpointVariables,
+  MANAGEMENT_API_VERSION,
+  type MountableRestApp,
+  resolver,
+  type RestErrorHandler,
+  type ServiceContext,
+} from "@langwatch/api/rest";
+import { RequestValidationError } from "@langwatch/api/rest";
 import { ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import type { Context } from "hono";
-import { describeRoute, resolver, type DescribeRouteOptions } from "hono-openapi";
+import type { MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { nanoid } from "nanoid";
 import { z } from "zod";
@@ -83,53 +93,68 @@ const annotationStatusResponse = z.object({
   message: z.string(),
 });
 
-/** The schema slot of a `describeRoute` request body, on hono-openapi's terms. */
-type RequestBodySchema = NonNullable<
-  Extract<
-    NonNullable<DescribeRouteOptions["requestBody"]>,
-    { content: unknown }
-  >["content"][string]["schema"]
->;
-
-type RouteParameters = NonNullable<DescribeRouteOptions["parameters"]>;
-
-const ANCHOR_PARAMETER: RouteParameters[number] = {
-  name: "anchor",
-  in: "query",
-  required: false,
-  description:
-    'Which comments to return. Omitted returns every comment, including the ones left on a span, a field, an attribute or a message; "trace" returns only the comments about whole traces.',
-  schema: { type: "string", enum: [...ANNOTATION_ANCHOR_SCOPES] },
-};
-
-/** A path parameter, spelled the way an operation object carries it. */
-const pathParameter = (name: string, description: string): RouteParameters[number] => ({
-  name,
-  in: "path",
-  required: true,
-  description,
-  schema: { type: "string" },
-});
-
 /** One JSON response body, spelled the way an operation object carries it. */
 const jsonBody = (description: string, schema: z.ZodType) => ({
   description,
   content: { "application/json": { schema: resolver(schema) } },
 });
 
-/** The write body both create and update accept. */
-const annotationWriteBody = {
-  required: true,
-  description: "Annotation data",
-  content: {
-    "application/json": {
-      schema: z.toJSONSchema(annotationRestWriteSchema, {
-        target: "openapi-3.0",
-        reused: "inline",
-      }) as RequestBodySchema,
-    },
-  },
-};
+/**
+ * What this family validates its answers against.
+ *
+ * The DOCUMENTED annotation above is the narrower shape the reference has
+ * always published; this is the row the store actually returns, left open so
+ * that a projection carrying more than the contract names is passed through
+ * rather than silently trimmed on the way out.
+ */
+const annotationOutputSchema = z.looseObject(annotationRowSchema.shape);
+const annotationListOutput = z.object({ data: z.array(annotationOutputSchema) });
+const annotationOutput = z.object({ data: annotationOutputSchema });
+
+/** Which comments a list endpoint returns, as a query parameter. */
+const anchorQuerySchema = z.object({
+  anchor: annotationAnchorScopeSchema
+    .optional()
+    .describe(
+      'Which comments to return. Omitted returns every comment, including the ones left on a span, a field, an attribute or a message; "trace" returns only the comments about whole traces.',
+    ),
+});
+
+const annotationParamsSchema = z.object({ id: z.string().min(1) });
+
+/**
+ * A refusal this family answers in its own words: the credential port's own
+ * body, the not-found sentence, the two field sentences, and the one generic
+ * failure a store error becomes.
+ */
+class AnnotationRefusal extends Error {
+  constructor(
+    readonly status: ContentfulStatusCode,
+    readonly body: object,
+  ) {
+    super("annotation request refused");
+    this.name = "AnnotationRefusal";
+  }
+}
+
+/** What the credential middleware puts on the context for the handler. */
+const ANNOTATION_CALLER = "annotationCaller";
+
+type AnnotationCaller = Readonly<{ project: Readonly<{ id: string }>; markUsed: () => void }>;
+
+/** The caller the middleware resolved, read off the handler's own context. */
+function callerOf(c: {
+  get(key: typeof ANNOTATION_CALLER): AnnotationCaller | undefined;
+}): AnnotationCaller {
+  const caller = c.get(ANNOTATION_CALLER);
+  if (!caller) {
+    throw new Error("No credential on the request context: this family's middleware did not run");
+  }
+  return caller;
+}
+
+/** The one body a store failure becomes, whichever route hit it. */
+const INTERNAL_ERROR = { status: "error", message: "Internal server error." } as const;
 
 // One policy per GRAIN, not one per file. A single shared policy would report
 // the same requirement for a read and a delete, which is worse than reporting
@@ -152,10 +177,14 @@ const annotationsManageAuth = handlerManagedAuth({
 
 /**
  * Which comments a list endpoint returns.
+ *
+ * The query is read here rather than declared as a validated input because the
+ * sentence a bad value answers with is this family's own, and it names the
+ * whole vocabulary — which is the fact a caller acts on.
  */
-function anchorScopeFromQuery(c: Context): AnnotationAnchorScope {
+function anchorScopeFromQuery(c: { req: { query(name: string): string | undefined } }) {
   const requested = c.req.query("anchor");
-  if (requested === void 0) return "all";
+  if (requested === void 0) return "all" as AnnotationAnchorScope;
 
   const parsed = annotationAnchorScopeSchema.safeParse(requested);
   if (!parsed.success) {
@@ -175,343 +204,301 @@ export function createAnnotationsRestApp(options: {
   credential: AnnotationRestCredentialPort;
 }): MountableRestApp {
   const { security, annotations, credential } = options;
-  const secured = security.createServiceApp({ basePath: "/api" });
 
-  const authenticate = (c: Context, permission: AnnotationRestPermission) =>
-    credential({ request: c.req.raw, permission });
-
-  // ---------- GET /api/annotations ----------
-  secured.access(annotationsViewAuth).get(
-    "/annotations",
-    describeRoute({
-      description: "Returns all annotations for project",
-      parameters: [ANCHOR_PARAMETER],
-      responses: {
-        ...baseResponses,
-        200: jsonBody("Annotation response", annotationListResponse),
-      },
-    }),
-    async (c) => {
-      const auth = await authenticate(c, "annotations:view");
-      if (!auth.ok) {
-        return c.json(auth.body, auth.status);
-      }
-      const { project, markUsed } = auth;
-      const anchorScope = anchorScopeFromQuery(c);
-
-      try {
-        const rows = await annotations().list({
-          projectId: project.id,
-          anchor: anchorScope,
-        });
-
-        markUsed();
-        return c.json({ data: rows });
-      } catch (e) {
-        logger.error({ error: e, projectId: project.id }, "error fetching annotations");
-        // Generic on purpose (ADR-045): the detail is on the log line above, and
-        // a store's own message names the host, the port and the database.
-        return c.json(
-          {
-            status: "error",
-            message: "Internal server error.",
-          },
-          500,
-        );
-      }
-    },
-  );
-
-  // ---------- GET|DELETE|PATCH /api/annotations/:id ----------
-  secured.access(annotationsViewAuth).get(
-    "/annotations/:id",
-    describeRoute({
-      description: "Returns a single annotation based on the ID supplied",
-      parameters: [pathParameter("id", "ID of annotation to fetch")],
-      responses: {
-        ...baseResponses,
-        200: jsonBody("Annotation response", annotationResponse),
-      },
-    }),
-    async (c) => {
-      const auth = await authenticate(c, "annotations:view");
-      if (!auth.ok) {
-        return c.json(auth.body, auth.status);
-      }
-      const { project, markUsed } = auth;
-
-      try {
-        const annotationId = c.req.param("id");
-        let annotation;
-        try {
-          annotation = await annotations().getById({ id: annotationId, projectId: project.id });
-        } catch (error) {
-          if (error instanceof AnnotationNotFoundError) {
-            return c.json({ status: "error", message: "Annotation not found." }, 404);
+  // `/api` with no version namespace: this family owns three literal paths
+  // under a prefix twenty others share, and a version guard here would claim
+  // every one of their URLs.
+  const { service, policy } = security.createServiceVersionedApp({
+    name: "annotations",
+    basePath: "/api",
+    bareMount: true,
+    errorEnvelope: "legacy",
+    errorHandler:
+      (boundary): RestErrorHandler =>
+      (error, c) => {
+        if (error instanceof AnnotationRefusal) return c.json(error.body, error.status);
+        // A body the write schema rejected, in the three sentences this door
+        // has always answered: the first offending field it names, then the
+        // catch-all. The framework's own 422 envelope would be a fourth shape
+        // for a caller that already branches on these.
+        if (error instanceof RequestValidationError) {
+          const fields = (error.meta.fields as string[] | undefined) ?? [];
+          const offends = (name: string) =>
+            fields.some((field) => field === name || field.startsWith(`${name}.`));
+          if (offends("comment")) {
+            return c.json(
+              {
+                status: "error",
+                message: "[comment] is required in the request body and must be a string.",
+              },
+              400,
+            );
           }
-          throw error;
-        }
-        markUsed();
-        return c.json({ data: annotation });
-      } catch (e) {
-        logger.error({ error: e, projectId: project.id }, "error fetching annotation");
-        return c.json(
-          {
-            status: "error",
-            message: "Internal server error.",
-          },
-          500,
-        );
-      }
-    },
-  );
-
-  secured.access(annotationsManageAuth).delete(
-    "/annotations/:id",
-    describeRoute({
-      description: "Deletes a single annotation based on the ID supplied",
-      parameters: [pathParameter("id", "ID of annotation to delete")],
-      responses: {
-        ...baseResponses,
-        200: jsonBody("Annotation deleted", annotationStatusResponse),
-      },
-    }),
-    async (c) => {
-      const auth = await authenticate(c, "annotations:manage");
-      if (!auth.ok) {
-        return c.json(auth.body, auth.status);
-      }
-      const { project, markUsed } = auth;
-
-      try {
-        const annotationId = c.req.param("id");
-        await annotations().delete({ id: annotationId, projectId: project.id });
-        markUsed();
-        return c.json({ status: "success", message: "Annotation deleted." });
-      } catch (e) {
-        logger.error({ error: e, projectId: project.id }, "error deleting annotation");
-        return c.json(
-          {
-            status: "error",
-            message: "Internal server error.",
-          },
-          500,
-        );
-      }
-    },
-  );
-
-  secured.access(annotationsManageAuth).patch(
-    "/annotations/:id",
-    describeRoute({
-      description: "Updates a single annotation based on the ID supplied",
-      parameters: [pathParameter("id", "ID of annotation to update")],
-      requestBody: annotationWriteBody,
-      responses: {
-        ...baseResponses,
-        200: jsonBody("Annotation response", annotationResponse),
-      },
-    }),
-    async (c) => {
-      const auth = await authenticate(c, "annotations:manage");
-      if (!auth.ok) {
-        return c.json(auth.body, auth.status);
-      }
-      const { project, markUsed } = auth;
-
-      try {
-        const body = await c.req.json();
-        const parsed = annotationRestWriteSchema.safeParse(body);
-        const annotationId = c.req.param("id");
-        const issues = parsed.success ? [] : parsed.error.issues;
-
-        const commentIssue = issues.some((issue) => issue.path[0] === "comment");
-        if (commentIssue) {
-          return c.json(
-            {
-              status: "error",
-              message: "[comment] is required in the request body and must be a string.",
-            },
-            400,
-          );
-        }
-        const thumbsIssue = issues.some((issue) => issue.path[0] === "isThumbsUp");
-        if (thumbsIssue) {
-          return c.json(
-            {
-              status: "error",
-              message: "[isThumbsUp] is required in the request body and must be a boolean.",
-            },
-            400,
-          );
-        }
-
-        if (!parsed.success) {
+          if (offends("isThumbsUp")) {
+            return c.json(
+              {
+                status: "error",
+                message: "[isThumbsUp] is required in the request body and must be a boolean.",
+              },
+              400,
+            );
+          }
           return c.json({ status: "error", message: "Invalid request body." }, 400);
         }
-
-        const patchAnnotation = await annotations().update({
-          id: annotationId,
-          projectId: project.id,
-          comment: parsed.data.comment,
-          isThumbsUp: parsed.data.isThumbsUp,
-          ...(parsed.data.email === void 0 ? {} : { email: parsed.data.email }),
-        });
-
-        markUsed();
-        return c.json({ data: patchAnnotation });
-      } catch (e) {
-        logger.error({ error: e, projectId: project.id }, "error patching annotation");
-        return c.json(
-          {
-            status: "error",
-            message: "Internal server error.",
-          },
-          500,
-        );
-      }
-    },
-  );
-
-  // ---------- GET|POST /api/annotations/trace/:id ----------
-  secured.access(annotationsViewAuth).get(
-    "/annotations/trace/:id",
-    describeRoute({
-      description: "Returns all annotations for single trace",
-      parameters: [pathParameter("id", "ID of trace to fetch"), ANCHOR_PARAMETER],
-      responses: {
-        ...baseResponses,
-        200: jsonBody("Annotation response", annotationListResponse),
+        return boundary(error, c);
       },
-    }),
-    async (c) => {
-      const auth = await authenticate(c, "annotations:view");
-      if (!auth.ok) {
-        return c.json(auth.body, auth.status);
-      }
-      const { project, markUsed } = auth;
-      const anchorScope = anchorScopeFromQuery(c);
+  });
 
+  /**
+   * The project credential, resolved before anything reads the request — the
+   * order this family has always answered in.
+   */
+  const authenticate = (permission: AnnotationRestPermission): MiddlewareHandler => {
+    return async (c, next) => {
+      const auth = await credential({ request: c.req.raw, permission });
+      if (!auth.ok) throw new AnnotationRefusal(auth.status, auth.body);
+      c.set(ANNOTATION_CALLER, { project: auth.project, markUsed: auth.markUsed });
+      await next();
+    };
+  };
+
+  /** A store failure: logged with its context, answered generically (ADR-045). */
+  const storeFailure = (error: unknown, context: Record<string, unknown>, sentence: string) => {
+    logger.error({ error, ...context }, sentence);
+    return new AnnotationRefusal(500, INTERNAL_ERROR);
+  };
+
+  type AnnotationContext = ServiceContext<EndpointVariables>;
+
+  const listHandler = async (c: AnnotationContext) => {
+    const { project, markUsed } = callerOf(c);
+    const anchor = anchorScopeFromQuery(c);
+    try {
+      const rows = await annotations().list({ projectId: project.id, anchor });
+      markUsed();
+      return { data: rows };
+    } catch (e) {
+      throw storeFailure(e, { projectId: project.id }, "error fetching annotations");
+    }
+  };
+
+  const getHandler = async (
+    c: AnnotationContext,
+    input: z.infer<typeof annotationParamsSchema>,
+  ) => {
+    const { project, markUsed } = callerOf(c);
+    try {
+      let annotation;
       try {
-        const trace = c.req.param("id");
-        const annotationsByTrace = await annotations().list({
-          projectId: project.id,
-          traceIds: [trace],
-          anchor: anchorScope,
-        });
-
-        markUsed();
-        return c.json({ data: annotationsByTrace });
-      } catch (e) {
-        logger.error(
-          { error: e, trace: c.req.param("id"), projectId: project.id },
-          "error fetching annotations for trace",
-        );
-        return c.json(
-          {
+        annotation = await annotations().getById({ id: input.id, projectId: project.id });
+      } catch (error) {
+        if (error instanceof AnnotationNotFoundError) {
+          throw new AnnotationRefusal(404, {
             status: "error",
-            message: "Internal server error.",
-          },
-          500,
-        );
+            message: "Annotation not found.",
+          });
+        }
+        throw error;
       }
-    },
-  );
+      markUsed();
+      return { data: annotation };
+    } catch (e) {
+      if (e instanceof AnnotationRefusal) throw e;
+      throw storeFailure(e, { projectId: project.id }, "error fetching annotation");
+    }
+  };
 
-  secured.access(annotationsCreateAuth).post(
-    "/annotations/trace/:id",
-    describeRoute({
-      description: "Create an annotation for a single trace",
-      parameters: [pathParameter("id", "ID of the trace to annotate")],
-      requestBody: annotationWriteBody,
-      responses: {
-        ...baseResponses,
-        200: jsonBody("Annotation created", annotationResponse),
-      },
-    }),
-    async (c) => {
+  const deleteHandler = async (
+    c: AnnotationContext,
+    input: z.infer<typeof annotationParamsSchema>,
+  ) => {
+    const { project, markUsed } = callerOf(c);
+    try {
+      await annotations().delete({ id: input.id, projectId: project.id });
+      markUsed();
+      return { status: "success", message: "Annotation deleted." };
+    } catch (e) {
+      throw storeFailure(e, { projectId: project.id }, "error deleting annotation");
+    }
+  };
+
+  const patchHandler = async (
+    c: AnnotationContext,
+    input: z.infer<typeof annotationParamsSchema> & z.infer<typeof annotationRestWriteSchema>,
+  ) => {
+    const { project, markUsed } = callerOf(c);
+    try {
+      const patched = await annotations().update({
+        id: input.id,
+        projectId: project.id,
+        comment: input.comment,
+        isThumbsUp: input.isThumbsUp,
+        ...(input.email === void 0 ? {} : { email: input.email }),
+      });
+      markUsed();
+      return { data: patched };
+    } catch (e) {
+      throw storeFailure(e, { projectId: project.id }, "error patching annotation");
+    }
+  };
+
+  const listByTraceHandler = async (
+    c: AnnotationContext,
+    input: z.infer<typeof annotationParamsSchema>,
+  ) => {
+    const { project, markUsed } = callerOf(c);
+    const anchor = anchorScopeFromQuery(c);
+    try {
+      const rows = await annotations().list({
+        projectId: project.id,
+        traceIds: [input.id],
+        anchor,
+      });
+      markUsed();
+      return { data: rows };
+    } catch (e) {
+      throw storeFailure(
+        e,
+        { trace: input.id, projectId: project.id },
+        "error fetching annotations for trace",
+      );
+    }
+  };
+
+  const createForTraceHandler = async (
+    c: AnnotationContext,
+    input: z.infer<typeof annotationParamsSchema> & z.infer<typeof annotationRestWriteSchema>,
+  ) => {
+    const { project, markUsed } = callerOf(c);
+    try {
+      // Unattributed on purpose: this family authenticates with a project key,
+      // so there is no reviewer to credit. `email` is the only identity an
+      // external annotator gives us.
+      const created = await annotations().createUnattributed({
+        id: nanoid(),
+        comment: input.comment,
+        projectId: project.id,
+        isThumbsUp: input.isThumbsUp,
+        traceId: input.id,
+        ...(input.email === void 0 ? {} : { email: input.email }),
+        scoreOptions: {},
+        expectedOutput: null,
+      });
+      markUsed();
+      return { data: created };
+    } catch (e) {
+      throw storeFailure(
+        e,
+        { trace: input.id, projectId: project.id },
+        "error creating annotation",
+      );
+    }
+  };
+
+  return (
+    service
+      .registerRoute("get", "/annotations", MANAGEMENT_API_VERSION, listHandler, (b) =>
+        policy(annotationsViewAuth)(b)
+          .withMiddleware(authenticate("annotations:view"))
+          .withQuery(anchorQuerySchema)
+          .withOutput(annotationListOutput)
+          .withDocs({
+            operationId: "listAnnotations",
+            description: "Returns all annotations for project",
+            responses: {
+              ...baseResponses,
+              200: jsonBody("Annotation response", annotationListResponse),
+            },
+          }),
+      )
+      .registerRoute("get", "/annotations/:id", MANAGEMENT_API_VERSION, getHandler, (b) =>
+        policy(annotationsViewAuth)(b)
+          .withMiddleware(authenticate("annotations:view"))
+          .withParams(annotationParamsSchema)
+          .withOutput(annotationOutput)
+          .withDocs({
+            operationId: "getAnnotation",
+            description: "Returns a single annotation based on the ID supplied",
+            responses: {
+              ...baseResponses,
+              200: jsonBody("Annotation response", annotationResponse),
+            },
+          }),
+      )
+      .registerRoute("delete", "/annotations/:id", MANAGEMENT_API_VERSION, deleteHandler, (b) =>
+        policy(annotationsManageAuth)(b)
+          .withMiddleware(authenticate("annotations:manage"))
+          .withParams(annotationParamsSchema)
+          .withOutput(annotationStatusResponse)
+          .withDocs({
+            operationId: "deleteAnnotation",
+            description: "Deletes a single annotation based on the ID supplied",
+            responses: {
+              ...baseResponses,
+              200: jsonBody("Annotation deleted", annotationStatusResponse),
+            },
+          }),
+      )
+      .registerRoute("patch", "/annotations/:id", MANAGEMENT_API_VERSION, patchHandler, (b) =>
+        policy(annotationsManageAuth)(b)
+          .withMiddleware(authenticate("annotations:manage"))
+          .withParams(annotationParamsSchema)
+          .withInput(annotationRestWriteSchema)
+          .withOutput(annotationOutput)
+          .withDocs({
+            operationId: "updateAnnotation",
+            description: "Updates a single annotation based on the ID supplied",
+            responses: {
+              ...baseResponses,
+              200: jsonBody("Annotation response", annotationResponse),
+            },
+          }),
+      )
+      .registerRoute(
+        "get",
+        "/annotations/trace/:id",
+        MANAGEMENT_API_VERSION,
+        listByTraceHandler,
+        (b) =>
+          policy(annotationsViewAuth)(b)
+            .withMiddleware(authenticate("annotations:view"))
+            .withParams(annotationParamsSchema)
+            .withQuery(anchorQuerySchema)
+            .withOutput(annotationListOutput)
+            .withDocs({
+              operationId: "listTraceAnnotations",
+              description: "Returns all annotations for single trace",
+              responses: {
+                ...baseResponses,
+                200: jsonBody("Annotation response", annotationListResponse),
+              },
+            }),
+      )
       // `:create` (not `:manage`) — same fix as evaluators' POST route. A create
       // asks for the create grain; demanding `:manage` here would refuse every
       // restricted key that can create but not delete, which is exactly how
       // `scenarios:create` produced a production 403. (`:manage` still implies
       // `:create` via the hierarchy, so nobody loses access.)
-      const auth = await authenticate(c, "annotations:create");
-      if (!auth.ok) {
-        return c.json(auth.body, auth.status);
-      }
-      const { project, markUsed } = auth;
-
-      try {
-        const body = await c.req.json();
-        const parsed = annotationRestWriteSchema.safeParse(body);
-        const trace = c.req.param("id");
-        const issues = parsed.success ? [] : parsed.error.issues;
-
-        const commentIssue = issues.some((issue) => issue.path[0] === "comment");
-        if (commentIssue) {
-          return c.json(
-            {
-              status: "error",
-              message: "[comment] is required in the request body and must be a string.",
-            },
-            400,
-          );
-        }
-        const thumbsIssue = issues.some((issue) => issue.path[0] === "isThumbsUp");
-        if (thumbsIssue) {
-          return c.json(
-            {
-              status: "error",
-              message: "[isThumbsUp] is required in the request body and must be a boolean.",
-            },
-            400,
-          );
-        }
-        if (!trace) {
-          return c.json(
-            {
-              status: "error",
-              message: "Trace ID is required and must be a string.",
-            },
-            400,
-          );
-        }
-
-        if (!parsed.success) {
-          return c.json({ status: "error", message: "Invalid request body." }, 400);
-        }
-
-        // Unattributed on purpose: this family authenticates with a project key,
-        // so there is no reviewer to credit. `email` below is the only identity an
-        // external annotator gives us.
-        const addAnnotation = await annotations().createUnattributed({
-          id: nanoid(),
-          comment: parsed.data.comment,
-          projectId: project.id,
-          isThumbsUp: parsed.data.isThumbsUp,
-          traceId: trace,
-          ...(parsed.data.email === void 0 ? {} : { email: parsed.data.email }),
-          scoreOptions: {},
-          expectedOutput: null,
-        });
-
-        markUsed();
-        return c.json({ data: addAnnotation });
-      } catch (e) {
-        logger.error(
-          { error: e, trace: c.req.param("id"), projectId: project.id },
-          "error creating annotation",
-        );
-        return c.json(
-          {
-            status: "error",
-            message: "Internal server error.",
-          },
-          500,
-        );
-      }
-    },
+      .registerRoute(
+        "post",
+        "/annotations/trace/:id",
+        MANAGEMENT_API_VERSION,
+        createForTraceHandler,
+        (b) =>
+          policy(annotationsCreateAuth)(b)
+            .withMiddleware(authenticate("annotations:create"))
+            .withParams(annotationParamsSchema)
+            .withInput(annotationRestWriteSchema)
+            .withOutput(annotationOutput)
+            .withDocs({
+              operationId: "createTraceAnnotation",
+              description: "Create an annotation for a single trace",
+              responses: {
+                ...baseResponses,
+                200: jsonBody("Annotation created", annotationResponse),
+              },
+            }),
+      )
+      .build()
   );
-
-  return secured.hono;
 }
