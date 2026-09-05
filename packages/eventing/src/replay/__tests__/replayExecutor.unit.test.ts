@@ -56,6 +56,7 @@ function makeEvent(overrides: Partial<ReplayEvent> = {}): ReplayEvent {
 }
 
 describe("replayEvents", () => {
+  /** @scenario "Replay rebuilds projections without repeating subscribers" */
   it("folds events into accumulated state", async () => {
     const { projection, storeBatchSpy } = createTestProjection();
     const events = [
@@ -222,6 +223,7 @@ describe("replayEvents", () => {
 
   describe("when replaying resets state from init()", () => {
     /** @scenario the event log is read only for a deliberate rebuild */
+    /** @scenario "Replay never re-runs side effects" */
     it("always starts from init state, never loads existing", async () => {
       const { projection, storeBatchSpy } = createTestProjection();
       const events = [makeEvent({ data: { value: 5 } }), makeEvent({ data: { value: 7 } })];

@@ -189,6 +189,7 @@ describe("ProcessRuntime", () => {
   });
 
   describe("given duplicate physical rows share one logical event key", () => {
+    /** @scenario "A process manager redelivery does not evolve state twice" */
     it("evolves the process exactly once", async () => {
       const store = InMemoryProcessStore.createForTesting();
       const runtime = new ProcessRuntime({ store, consumersEnabled: false });
@@ -292,6 +293,7 @@ describe("ProcessRuntime", () => {
   });
 
   describe("given a scheduled process manager is registered with consumers enabled", () => {
+    /** @scenario "A process manager can schedule its next wake" */
     it("arms nextWakeAt on the singleton scheduled process", async () => {
       const store = InMemoryProcessStore.createForTesting();
       const runtime = new ProcessRuntime({ store, consumersEnabled: true });

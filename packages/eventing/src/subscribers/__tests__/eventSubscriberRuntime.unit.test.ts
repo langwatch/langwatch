@@ -116,6 +116,7 @@ function makeEvent(id: string): Event {
 
 describe("event-subscriber runtime boundary", () => {
   describe("given a subscriber running on the global queue", () => {
+    /** @scenario "An event subscriber receives no projection state" */
     it("receives the full queued event without reading event_log or a projection", async () => {
       const eventStore = createMockEventStore<Event>();
       const registry = new Map<string, JobRegistryEntry>();
@@ -229,6 +230,8 @@ describe("event-subscriber runtime boundary", () => {
   });
 
   describe("given a projection replay over canonical events", () => {
+    /** @scenario "Replay rebuilds projections without repeating subscribers" */
+    /** @scenario "Replay never re-runs side effects" */
     it("rebuilds the projection without invoking any live subscriber", async () => {
       const applied: Event[] = [];
       const fold = createMockFoldProjectionDefinition("operationalFold", {

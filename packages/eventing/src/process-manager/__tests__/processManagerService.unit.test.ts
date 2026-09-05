@@ -29,6 +29,7 @@ describe("ProcessManagerService", () => {
 
   describe("given a conversation process with no turn in flight", () => {
     describe("when it consumes an agent-response-started event", () => {
+      /** @scenario "A process manager consumes an event once and dispatches durable intent" */
       it("records the turn as running with a first revision", async () => {
         const result = await service.handleEvent({
           envelope: pilotEvent({ eventId: "evt_start" }),
@@ -45,6 +46,7 @@ describe("ProcessManagerService", () => {
         });
       });
 
+      /** @scenario "A process manager consumes an event once and dispatches durable intent" */
       it("records exactly one worker-dispatch intent with a deterministic message key", async () => {
         await service.handleEvent({
           envelope: pilotEvent({ eventId: "evt_start" }),
@@ -61,6 +63,7 @@ describe("ProcessManagerService", () => {
         });
       });
 
+      /** @scenario "A process manager can schedule its next wake" */
       it("schedules a liveness wake-up", async () => {
         await service.handleEvent({
           envelope: pilotEvent({ eventId: "evt_start" }),
@@ -87,6 +90,7 @@ describe("ProcessManagerService", () => {
     });
 
     describe("when the same event is delivered again", () => {
+      /** @scenario "A process manager consumes an event once and dispatches durable intent" */
       it("reports a duplicate-event no-op", async () => {
         const result = await service.handleEvent({
           envelope: pilotEvent({ eventId: "evt_start" }),
@@ -95,6 +99,7 @@ describe("ProcessManagerService", () => {
         expect(result.outcome).toBe("duplicateEvent");
       });
 
+      /** @scenario "A process manager redelivery does not evolve state twice" */
       it("changes process state only once", async () => {
         await service.handleEvent({
           envelope: pilotEvent({ eventId: "evt_start" }),
@@ -104,6 +109,7 @@ describe("ProcessManagerService", () => {
         expect(instance?.revision).toBe(1);
       });
 
+      /** @scenario "A process manager redelivery does not evolve state twice" */
       it("keeps exactly one logical worker-dispatch intent", async () => {
         await service.handleEvent({
           envelope: pilotEvent({ eventId: "evt_start" }),

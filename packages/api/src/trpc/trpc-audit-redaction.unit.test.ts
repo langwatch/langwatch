@@ -163,6 +163,7 @@ describe("redactAuditArgs", () => {
       });
 
       /** @scenario "A credential is never persisted to the audit trail" */
+      /** @scenario "A secret typed into a scalar field never reaches the audit trail" */
       it.each(["secrets.create", "secrets.update"])("redacts a secret value on %s", (action) => {
         const redacted = redactAuditArgs({
           input: { projectId: "proj-1", name: "STRIPE_KEY", value: "sk-live-TheRealSecret" },

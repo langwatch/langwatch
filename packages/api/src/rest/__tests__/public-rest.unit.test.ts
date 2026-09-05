@@ -68,7 +68,6 @@ describe("modern REST", () => {
     ]).toEqual([false, false, false, true, false, false]);
   });
 
-
   /** @scenario "The global and date versions are independent" */
   it("defaults to /api/v1/{name} and permits a validated explicit base path", async () => {
     const endpoint = (path: string) =>
@@ -470,6 +469,37 @@ describe("modern REST", () => {
 
     expect(padded.status).toBe(200);
     expect(handlerCalls).toBe(1);
+  });
+
+  describe("given an existing createService consumer", () => {
+    /** @scenario "Adoption is opt-in" */
+    it("keeps its registrations and URLs, and offers no public REST mount", async () => {
+      const family = createService({
+        name: "thing",
+        basePath: "/api/thing",
+        logger: false,
+        tracer: false,
+      })
+        .withoutPermission("framework test endpoint")
+        .registerRoute(
+          "post",
+          "/things.get",
+          "2026-08-07",
+          async () => ({ ok: true }),
+          (definition) => definition.withOutput(z.object({ ok: z.boolean() })),
+        );
+
+      for (const method of ["get", "post", "put", "patch", "delete"]) {
+        expect(method in family, method).toBe(false);
+      }
+
+      const app = family.build();
+      expect((await app.request("/api/thing/things.get", { method: "POST" })).status).toBe(200);
+      expect((await app.request("/api/thing/latest/things.get", { method: "POST" })).status).toBe(
+        200,
+      );
+      expect((await app.request("/api/v1/thing/things", { method: "GET" })).status).toBe(404);
+    });
   });
 
   /** @scenario "Every family answers at its /api/v1 path and its bare path" */

@@ -28,6 +28,7 @@ describe("event subscribers", () => {
 
   describe("given an event was durably stored", () => {
     describe("when a matching subscriber handles it inline", () => {
+      /** @scenario "An event subscriber receives no projection state" */
       it("receives the event envelope without loading the event log or a fold", async () => {
         const eventStore = createMockEventStore<Event>();
         const handle = vi.fn().mockResolvedValue(void 0);

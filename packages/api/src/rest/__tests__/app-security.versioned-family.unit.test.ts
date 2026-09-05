@@ -72,6 +72,7 @@ describe("createVersionedApp", () => {
     });
 
     describe("when the family builds", () => {
+      /** @scenario "Every mounted endpoint has one explicit access policy" */
       it("registers the declared policy for the dated and latest mounts", () => {
         for (const path of [
           `/api/toy-management/${MANAGEMENT_API_VERSION}/things`,
@@ -178,6 +179,7 @@ describe("createVersionedApp", () => {
   });
 
   describe("given an endpoint declares no policy", () => {
+    /** @scenario "Every mounted endpoint has one explicit access policy" */
     it("refuses to build rather than mounting an unclassified route", () => {
       const { service } = security.createVersionedApp({
         name: "toy-unguarded",
@@ -219,6 +221,29 @@ describe("createVersionedApp", () => {
           )
           .build(),
       ).toThrow(/declares no access policy/);
+    });
+  });
+
+  describe("given an endpoint turns its credential middleware off", () => {
+    /** @scenario "Disabling credential middleware does not make a route public" */
+    it("still refuses the unclassified route rather than reading it as public", () => {
+      const { service } = security.createVersionedApp({
+        name: "toy-authless",
+        basePath: "/api/toy-authless",
+        routeMiddleware: [enterpriseGate],
+      });
+
+      expect(() =>
+        service
+          .registerRoute(
+            "get",
+            "/things",
+            MANAGEMENT_API_VERSION,
+            async () => ({ ok: true }),
+            (builder) => builder.withAuth("none").withOutput(z.object({ ok: z.boolean() })),
+          )
+          .build(),
+      ).toThrow(/must declare exactly one of/);
     });
   });
 });

@@ -72,6 +72,7 @@ describe("GroupQueueProcessor blockingConnection selection", () => {
 
   describe("given consumer mode is enabled", () => {
     describe("when the source connection is a standalone IORedis", () => {
+      /** @scenario "GroupQueueProcessor retries blocked operations regardless of source connection retry settings" */
       it("duplicates the connection with maxRetriesPerRequest: null for the blocking connection", () => {
         const conn = track(new IORedis({ lazyConnect: true, maxRetriesPerRequest: 0 }));
         const dupSentinel = {} as IORedis;
@@ -89,6 +90,7 @@ describe("GroupQueueProcessor blockingConnection selection", () => {
     });
 
     describe("when the source connection is a Redis Cluster", () => {
+      /** @scenario "Cluster connections also get a dedicated blocking connection" */
       it("duplicates the connection for a dedicated blocking connection", () => {
         const conn = track(
           new Cluster([{ host: "127.0.0.1", port: 6379 }], {

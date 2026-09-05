@@ -59,6 +59,7 @@ function resultPolicies(root: string) {
 }
 
 describe("service result contract lint", () => {
+  /** @scenario "A capability communicates absence through its name" */
   it("rejects ordinary methods that expose nullable absence", () => {
     const root = fixture(
       "export abstract class ProjectService { abstract findById(): Promise<string | null>; }",
@@ -66,6 +67,7 @@ describe("service result contract lint", () => {
     expect(resultPolicies(root)).toHaveLength(1);
   });
 
+  /** @scenario "A capability communicates absence through its name" */
   it("accepts optional try methods", () => {
     const root = fixture(
       "export abstract class ProjectService { abstract tryGetById(): Promise<string | null>; }",
@@ -87,6 +89,7 @@ describe("service result contract lint", () => {
     expect(resultPolicies(root)).toEqual([]);
   });
 
+  /** @scenario "A capability communicates absence through its name" */
   it("rejects redundant require naming", () => {
     const root = fixture(
       "export abstract class ProjectService { abstract requireById(): Promise<string>; }",
@@ -94,6 +97,7 @@ describe("service result contract lint", () => {
     expect(resultPolicies(root)).toHaveLength(1);
   });
 
+  /** @scenario "A capability communicates absence through its name" */
   it("rejects inferred results and still catches inferred require helpers", () => {
     const root = fixture(
       "export class ProjectService { requireById() { return 'project'; } tryGetById() { return null; } }",
@@ -115,6 +119,7 @@ describe("service result contract lint", () => {
     expect(resultPolicies(root)).toHaveLength(1);
   });
 
+  /** @scenario "A capability communicates absence through its name" */
   it("applies the same convention to private repository ports", () => {
     const root = fixture(
       "export abstract class ProjectService { abstract getById(): Promise<string>; }",

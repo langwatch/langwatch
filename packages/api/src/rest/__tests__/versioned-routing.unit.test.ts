@@ -299,6 +299,7 @@ function buildRoutedService(onRouteMounted?: (route: MountedRoute) => void) {
 }
 
 describe("explicit version namespaces", () => {
+  /** @scenario "A dated URL is served by the latest registration on or before it" */
   it("serves a dated URL with the latest registration on or before it", async () => {
     const app = buildRoutedService();
 
@@ -312,6 +313,7 @@ describe("explicit version namespaces", () => {
     expect(res.headers.get("X-API-Version-Status")).toBe("stable");
   });
 
+  /** @scenario "The latest namespace serves the newest registrations" */
   it("serves the newest registrations under latest", async () => {
     const app = buildRoutedService();
 
@@ -324,6 +326,7 @@ describe("explicit version namespaces", () => {
     expect(res.headers.get("X-API-Version-Status")).toBe("latest");
   });
 
+  /** @scenario "The preview namespace is separate from latest" */
   it("keeps preview separate from latest", async () => {
     const app = buildRoutedService();
 
@@ -446,6 +449,7 @@ describe("explicit version namespaces", () => {
     expect(res.headers.get("X-API-Version-Status")).toBe("stable");
   });
 
+  /** @scenario "Withdrawal answers 410 from its version onward" */
   it("answers 410 from the withdrawal version onward, with the version headers", async () => {
     const app = buildRoutedService();
 
@@ -517,6 +521,7 @@ describe("explicit version namespaces", () => {
     expect(response.status).toBe(410);
   });
 
+  /** @scenario "Errors carry the version headers too" */
   it("carries the version headers on error responses too", async () => {
     const app = createService({
       name: "things",

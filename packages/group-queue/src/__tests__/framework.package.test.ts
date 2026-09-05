@@ -43,6 +43,7 @@ describe("Group Queue framework contract", () => {
     ).toThrow("must use letters");
   });
 
+  /** @scenario "Application policy is supplied before queue construction" */
   it("rejects policy values outside the runtime contract", () => {
     const definition = defineGroupQueue({
       name: "work",
@@ -89,6 +90,7 @@ describe("Group Queue framework contract", () => {
     ).rejects.toThrow("expected a version 2 envelope");
   });
 
+  /** @scenario "Application policy is supplied before queue construction" */
   it("has no application, enterprise or Eventing imports", () => {
     const sourceRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
     const productionFiles = readdirSync(sourceRoot, {

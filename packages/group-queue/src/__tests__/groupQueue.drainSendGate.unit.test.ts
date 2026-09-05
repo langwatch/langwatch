@@ -138,6 +138,7 @@ describe("GroupQueueProcessor staging gate during shutdown", () => {
     });
 
     /** @scenario The dispatcher stops claiming new jobs as soon as shutdown starts */
+    /** @scenario "Closing a GroupQueueConsumer drains claimed work within its budget" */
     it("stops the dispatcher claiming further jobs", async () => {
       const processor = makeProcessor();
       const closing = processor.close();
@@ -168,6 +169,7 @@ describe("GroupQueueProcessor staging gate during shutdown", () => {
 
   describe("given a queue whose drain overran its budget", () => {
     /** @scenario A drain that overran its budget still closes the gate */
+    /** @scenario "Closing a GroupQueueConsumer drains claimed work within its budget" */
     it("refuses further work even though the drain never finished", async () => {
       vi.useFakeTimers();
       const processor = makeProcessor();

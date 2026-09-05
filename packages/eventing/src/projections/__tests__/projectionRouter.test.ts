@@ -298,6 +298,7 @@ describe("ProjectionRouter", () => {
 
     describe("when a fold projection throws", () => {
       /** @scenario A projection failure prevents the side effect */
+      /** @scenario "A projection subscriber runs only after a successful projection write" */
       it("does not dispatch to subscribers registered on that fold", async () => {
         const queueManager = createMockQueueManager();
         const router = new ProjectionRouter(
@@ -501,6 +502,7 @@ describe("ProjectionRouter", () => {
 
       describe("when the predicate returns true", () => {
         /** @scenario A subscriber fires only after its projection commits */
+        /** @scenario "A projection subscriber runs only after a successful projection write" */
         it("enqueues the job with the event and fold state", async () => {
           const mockSend = vi.fn().mockResolvedValue(undefined);
           const queueManager = createMockQueueManager({

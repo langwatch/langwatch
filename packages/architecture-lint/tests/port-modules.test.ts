@@ -59,6 +59,7 @@ describe("strict feature ports", () => {
     root = "";
   });
 
+  /** @scenario "Strict services, ports, and contract builds remain mechanically bounded" */
   it("requires an exported abstract Port class while allowing supporting types", () => {
     root = mkdtempSync(join(tmpdir(), "strict-port-module-"));
     writePort(
@@ -68,6 +69,7 @@ describe("strict feature ports", () => {
     expect(lint()).toEqual([]);
   });
 
+  /** @scenario "Strict services, ports, and contract builds remain mechanically bounded" */
   it("rejects a new callback or object type bag masquerading as a port", () => {
     root = mkdtempSync(join(tmpdir(), "strict-port-module-"));
     writePort("export type ExamplePort = { load(id: string): Promise<void>; };");

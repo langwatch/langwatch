@@ -55,6 +55,7 @@ describe("Eventing role lint", () => {
     expect(policies()).toEqual([]);
   });
 
+  /** @scenario "Eventing roles remain mechanically distinct" */
   it("rejects asynchronous and network work in a projection", () => {
     write(
       "apps/api/src/order.projection.ts",
@@ -64,6 +65,7 @@ describe("Eventing role lint", () => {
     expect(policies()).toContain("eventing-projection-purity");
   });
 
+  /** @scenario "Eventing roles remain mechanically distinct" */
   it("rejects durable event fabrication from a subscriber", () => {
     write(
       "apps/api/src/order.subscriber.ts",
@@ -73,6 +75,7 @@ describe("Eventing role lint", () => {
     expect(policies()).toContain("eventing-durable-event-path");
   });
 
+  /** @scenario "Eventing roles remain mechanically distinct" */
   it("rejects external work from a process definition", () => {
     write(
       "apps/api/src/processes/order.process.ts",
@@ -97,6 +100,7 @@ describe("Eventing role lint", () => {
     );
   });
 
+  /** @scenario "Eventing roles remain mechanically distinct" */
   it("requires a named redelivery test for every strict-package subscriber", () => {
     const pkg = strictServer();
     write(

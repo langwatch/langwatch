@@ -23,6 +23,7 @@ describe("service quality baseline", () => {
     lineLength: 180,
   };
 
+  /** @scenario "Strict services, ports, and contract builds remain mechanically bounded" */
   it("permits only a shrinking baseline", () => {
     expect(compareServiceQualityBaselines([ceiling], [], "baseline.json")).toEqual([]);
     expect(
@@ -93,6 +94,7 @@ describe("service quality baseline", () => {
     }
   });
 
+  /** @scenario "Strict services, ports, and contract builds remain mechanically bounded" */
   it("keeps the api-key service below the measured default ceiling", () => {
     expect(lintServiceQualityFile(root, apiKeyService)).toEqual([]);
   });

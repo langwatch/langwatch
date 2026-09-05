@@ -417,6 +417,7 @@ describe("provide", () => {
   });
 
   /** @scenario "The context exposes the application the composition root supplied" */
+  /** @scenario "Handlers use the process-composed application" */
   it("exposes the process app directly on the handler context", async () => {
     const runtimeApp = { things: { marker: "one-process-app" } };
     const app = createService<unknown, typeof runtimeApp>({
@@ -444,6 +445,7 @@ describe("provide", () => {
     expect(await jsonBody(response)).toEqual(runtimeApp.things);
   });
 
+  /** @scenario "Handlers use the process-composed application" */
   it("exposes the resolved actor as a context function", async () => {
     const app = createService({
       name: "test",
@@ -466,6 +468,7 @@ describe("provide", () => {
     expect(await jsonBody(response)).toEqual({ id: "user-1" });
   });
 
+  /** @scenario "Handlers use the process-composed application" */
   it("does not resolve an actor until a handler asks for it", async () => {
     const resolveActor = vi.fn(() => ({ id: "user-1" }));
     const app = createService({

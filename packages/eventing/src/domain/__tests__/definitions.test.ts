@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createEventCatalogue, defineAggregate, defineEvents } from "../definitions";
 
 describe("event catalogue", () => {
+  /** @scenario "The application composes an explicit event catalogue" */
   it("registers aggregate-owned event types", () => {
     const traces = defineAggregate({
       type: "trace",

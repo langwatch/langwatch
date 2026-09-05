@@ -84,6 +84,7 @@ function buildDocumentedApp() {
 }
 
 describe("OpenAPI documentation", () => {
+  /** @scenario "The document carries every dated version plus latest" */
   it("documents every dated version plus latest, each with the schemas that version serves", async () => {
     const spec = await generateSpecs(buildDocumentedApp(), SPEC_OPTIONS);
 
@@ -108,6 +109,7 @@ describe("OpenAPI documentation", () => {
     expect(successSchema(june)).toEqual(successSchema(latest));
   });
 
+  /** @scenario "Preview never reaches the document" */
   /** @scenario "One logical route reaches the document once" */
   it("never documents preview, and never documents an /api/v1 twin", async () => {
     const spec = await generateSpecs(buildDocumentedApp(), SPEC_OPTIONS);

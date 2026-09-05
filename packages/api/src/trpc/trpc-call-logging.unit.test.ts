@@ -409,6 +409,7 @@ describe("a call that succeeds slowly", () => {
 
     describe("when it runs 50 times inside one throttle interval", () => {
       /** @scenario "A call over the budget is raised to warning" */
+      /** @scenario "A slow call is raised without burying the log" */
       it("warns once and leaves the rest at info, so no record is lost", () => {
         const log = createMockLog();
 
@@ -421,6 +422,7 @@ describe("a call that succeeds slowly", () => {
 
     describe("when the interval elapses and it is slow again", () => {
       /** @scenario "A call over the budget is raised to warning" */
+      /** @scenario "A slow call is raised without burying the log" */
       it("reports how many calls the throttle suppressed", () => {
         const log = createMockLog();
         callSlowly({ log, times: 50, now: 0 });

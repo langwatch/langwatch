@@ -67,6 +67,7 @@ function parseSSEEvents(chunks: string[]): Array<{ event: string; data: unknown 
 // ---------------------------------------------------------------------------
 
 describe("registerSse", () => {
+  /** @scenario "An SSE endpoint is a dotted name mounted as a GET" */
   it("mounts a dotted name as a GET under the versioned namespace", async () => {
     const mounted: MountedRoute[] = [];
     createService({
@@ -93,6 +94,7 @@ describe("registerSse", () => {
   });
 
   describe("when an SSE endpoint emits typed events", () => {
+    /** @scenario "Emitted events are validated against their declared schema" */
     it("streams events in SSE format", async () => {
       const app = createService({ name: "test", basePath: "/api/test" })
         .registerSse(
@@ -126,6 +128,7 @@ describe("registerSse", () => {
   });
 
   describe("when SSE event data fails schema validation", () => {
+    /** @scenario "A non-conforming emit fails loudly on the stream" */
     it("emits an error event and rejects instead of silently continuing", async () => {
       const app = createService({ name: "test", basePath: "/api/test" })
         .registerSse(
@@ -210,6 +213,7 @@ describe("registerSse", () => {
   });
 
   describe("when an SSE handler throws", () => {
+    /** @scenario "A handler error reaches the service error handler" */
     it("reports the error through the configured framework error handler", async () => {
       const onError = vi.fn((error: Error, c) => c.json({ message: error.message }, 500));
       const app = createService({
@@ -241,6 +245,7 @@ describe("registerSse", () => {
   });
 
   describe("when the client disconnects", () => {
+    /** @scenario "Client disconnect settles the stream's completion" */
     it("settles the SSE lifecycle used by request instrumentation", async () => {
       let requestContext: Parameters<typeof getSSECompletion>[0] | undefined;
       const app = createService({

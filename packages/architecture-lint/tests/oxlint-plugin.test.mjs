@@ -290,6 +290,7 @@ tester.run("environment-boundaries", plugin.rules["environment-boundaries"], {
 });
 
 /** @scenario "LangWatch house rules keep executable fixtures" */
+/** @scenario "Behaviour-bearing modules are classes" */
 tester.run("feature-module-classes", plugin.rules["feature-module-classes"], {
   valid: [
     {
@@ -442,6 +443,7 @@ tester.run("service-member-spacing", plugin.rules["service-member-spacing"], {
   ],
 });
 
+/** @scenario "API handlers use the composed request context" */
 tester.run("api-context-services", plugin.rules["api-context-services"], {
   valid: [
     {
@@ -742,6 +744,204 @@ tester.run("awaited-return-chain", plugin.rules["awaited-return-chain"], {
       filename: "packages/features/api-key/server/src/services/api-key.service.ts",
       code: "export class ApiKeyService { async run() { return (await this.repository.list()).data.items; } }",
       errors: [{ messageId: "awaitedReturnChain" }],
+    },
+  ],
+});
+
+/** @scenario "Contract production code cannot acquire runtime implementations" */
+tester.run("package-boundaries: portable contracts", plugin.rules["package-boundaries"], {
+  valid: [
+    {
+      filename: "packages/features/agent/contract/src/agent.service.ts",
+      code: 'import { z } from "zod"; export const agent = z.object({ id: z.string() });',
+    },
+  ],
+  invalid: [
+    {
+      filename: "packages/features/agent/contract/src/agent.service.ts",
+      code: 'import React from "react"; export { React };',
+      errors: [{ messageId: "packageRole" }],
+    },
+    {
+      filename: "packages/features/agent/contract/src/agent.service.ts",
+      code: 'import { readFile } from "node:fs/promises"; export { readFile };',
+      errors: [{ messageId: "packageRole" }],
+    },
+    {
+      filename: "packages/features/agent/contract/src/agent.service.ts",
+      code: 'import { PrismaClient } from "@prisma/client"; export { PrismaClient };',
+      errors: [{ messageId: "prismaContainment" }],
+    },
+    {
+      filename: "packages/features/agent/contract/src/agent.service.ts",
+      code: 'import { AgentService } from "@langwatch/agent-server"; export { AgentService };',
+      errors: [{ messageId: "packageRole" }],
+    },
+    {
+      filename: "packages/features/agent/contract/src/agent.service.ts",
+      code: 'import { AgentCard } from "@langwatch/agent-web/screens/agent-management"; export { AgentCard };',
+      errors: [{ messageId: "packageRole" }],
+    },
+  ],
+});
+
+/** @scenario "Feature contracts remain transport-neutral" */
+tester.run("package-boundaries: transport neutrality", plugin.rules["package-boundaries"], {
+  valid: [
+    {
+      filename: "packages/features/agent/contract/src/agent.command.ts",
+      code: 'import { z } from "zod"; export const createAgent = z.object({ name: z.string() });',
+    },
+  ],
+  invalid: [
+    {
+      filename: "packages/features/agent/contract/src/agent.command.ts",
+      code: 'import { zValidator } from "@hono/zod-validator"; export { zValidator };',
+      errors: [{ messageId: "schemaBoundary" }],
+    },
+    {
+      filename: "packages/features/agent/contract/src/agent.command.ts",
+      code: 'import { resolver } from "hono-openapi/zod"; export { resolver };',
+      errors: [{ messageId: "schemaBoundary" }, { messageId: "packageRole" }],
+    },
+  ],
+});
+
+/** @scenario "Server production code cannot acquire browser dependencies" */
+tester.run("package-boundaries: server stays headless", plugin.rules["package-boundaries"], {
+  valid: [
+    {
+      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      code: 'import type { Agent } from "@langwatch/agent-contract"; export type Value = Agent;',
+    },
+  ],
+  invalid: [
+    {
+      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      code: 'import React from "react"; export { React };',
+      errors: [{ messageId: "packageRole" }],
+    },
+    {
+      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      code: 'import { Box } from "@chakra-ui/react"; export { Box };',
+      errors: [{ messageId: "packageRole" }],
+    },
+    {
+      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      code: 'import { AgentCard } from "@langwatch/agent-web/screens/agent-management"; export { AgentCard };',
+      errors: [{ messageId: "packageRole" }],
+    },
+  ],
+});
+
+/** @scenario "Only composition roots import feature server installers" */
+tester.run("package-boundaries: server installers", plugin.rules["package-boundaries"], {
+  valid: [
+    {
+      filename: "apps/api/src/app/api-production.composition.ts",
+      code: 'import { AgentService } from "@langwatch/agent-server"; export { AgentService };',
+    },
+    {
+      filename: "apps/worker/src/app/worker.composition.ts",
+      code: 'import { AgentService } from "@langwatch/agent-server"; export { AgentService };',
+    },
+    {
+      filename: "packages/enterprise/composition/api/src/enterprise-api.composition.ts",
+      code: 'import { AgentService } from "@langwatch/agent-server"; export { AgentService };',
+    },
+  ],
+  invalid: [
+    {
+      filename: "apps/ui/src/features/agent/ui/agent-list.tsx",
+      code: 'import { AgentService } from "@langwatch/agent-server"; export { AgentService };',
+      errors: [{ messageId: "compositionRoot" }],
+    },
+    {
+      filename: "sdks/typescript/src/example.ts",
+      code: 'import { AgentService } from "@langwatch/agent-server"; export { AgentService };',
+      errors: [{ messageId: "compositionRoot" }],
+    },
+  ],
+});
+
+/** @scenario "A composition root's own tests import what the root imports" */
+tester.run("package-boundaries: composition root tests", plugin.rules["package-boundaries"], {
+  valid: [
+    {
+      filename: "apps/api/src/app/__tests__/api-production.composition.unit.test.ts",
+      code: 'import { AgentService } from "@langwatch/agent-server"; export { AgentService };',
+    },
+    {
+      filename: "packages/enterprise/composition/api/tests/wiring.unit.test.ts",
+      code: 'import { AgentService } from "@langwatch/agent-server"; export { AgentService };',
+    },
+  ],
+  invalid: [
+    {
+      filename: "sdks/typescript/src/__tests__/agent.unit.test.ts",
+      code: 'import { AgentService } from "@langwatch/agent-server"; export { AgentService };',
+      errors: [{ messageId: "compositionRoot" }],
+    },
+  ],
+});
+
+/** @scenario "A relative import cannot escape its physical package" */
+tester.run("package-boundaries: package escape", plugin.rules["package-boundaries"], {
+  valid: [
+    {
+      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      code: 'import type { AgentRepository } from "../repositories/agent.repository"; export type Value = AgentRepository;',
+    },
+  ],
+  invalid: [
+    {
+      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      code: 'import type { Agent } from "../../../contract/src/agent.service"; export type Value = Agent;',
+      errors: [{ messageId: "packageEscape" }],
+    },
+  ],
+});
+
+/** @scenario "An undeclared package subpath is not importable" */
+tester.run("package-boundaries: sealed exports", plugin.rules["package-boundaries"], {
+  valid: [
+    {
+      filename: "packages/features/prompt/web/src/prompt-list.tsx",
+      code: 'import type { Agent } from "@langwatch/agent-contract"; export type Value = Agent;',
+    },
+  ],
+  invalid: [
+    {
+      filename: "packages/features/prompt/web/src/prompt-list.tsx",
+      code: 'import type { Agent } from "@langwatch/agent-contract/src/agent.service"; export type Value = Agent;',
+      errors: [{ messageId: "sealedExports" }],
+    },
+  ],
+});
+
+/** @scenario "Internal server dependencies point toward the service contract" */
+tester.run("package-boundaries: feature layer direction", plugin.rules["package-boundaries"], {
+  valid: [
+    {
+      filename: "packages/features/agent/server/src/api/public/agent.api.ts",
+      code: 'import type { AgentService } from "../../services/agent.service"; export type Value = AgentService;',
+    },
+  ],
+  invalid: [
+    {
+      filename: "packages/features/agent/server/src/api/public/agent.api.ts",
+      code: 'import type { AgentRepository } from "../../repositories/agent.repository"; export type Value = AgentRepository;',
+      errors: [{ messageId: "featureLayer" }],
+    },
+    {
+      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      code: 'import type { AgentApi } from "../api/public/agent.api"; export type Value = AgentApi;',
+      errors: [{ messageId: "featureLayer" }],
+    },
+    {
+      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      code: 'import { PrismaAgentRepository } from "../repositories/prisma/prisma.agent.repository"; export { PrismaAgentRepository };',
+      errors: [{ messageId: "featureLayer" }],
     },
   ],
 });

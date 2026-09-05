@@ -142,6 +142,7 @@ function createStore<
 describe("RedisCachedFoldStore", () => {
   describe("given a cached entry", () => {
     describe("when the fold reads state", () => {
+      /** @scenario "A ClickHouse fold evolves the latest cached state" */
       it("returns the cached state without reading the durable store", async () => {
         const redis = createRedis();
         const { store, inner } = createStore(redis);
@@ -218,6 +219,7 @@ describe("RedisCachedFoldStore", () => {
   });
 
   describe("when the fold stores state", () => {
+    /** @scenario "A ClickHouse fold evolves the latest cached state" */
     it("writes the durable store before caching", async () => {
       const redis = createRedis();
       const { store, inner } = createStore(redis);

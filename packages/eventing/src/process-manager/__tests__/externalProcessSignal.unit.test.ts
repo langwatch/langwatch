@@ -114,6 +114,7 @@ describe("synchronous external process signals", () => {
   });
 
   describe("given no durable process instance", () => {
+    /** @scenario "An external signal advances an existing process synchronously" */
     it("does not let a signal create one", async () => {
       const result = await service.handleSignal({
         signal: signal(),
@@ -164,6 +165,7 @@ describe("synchronous external process signals", () => {
       await initialize(service);
     });
 
+    /** @scenario "An external signal advances an existing process synchronously" */
     it("commits state, clears its wake and inserts its intent atomically", async () => {
       const result = await service.handleSignal({
         signal: signal(),
@@ -191,6 +193,7 @@ describe("synchronous external process signals", () => {
       ]);
     });
 
+    /** @scenario "Retrying a committed external signal recovers its durable state" */
     it("recovers a lost response without evolving the same signal twice", async () => {
       await service.handleSignal({ signal: signal(), now: T0 + 1 });
 
@@ -213,6 +216,7 @@ describe("synchronous external process signals", () => {
       expect(await store.findMessagesByRef({ ref })).toHaveLength(1);
     });
 
+    /** @scenario "External signals and wakes share one revision fence" */
     it("reloads and retries when another commit wins the first revision", async () => {
       const originalCommit = store.commit.bind(store);
       let interleaved = false;
@@ -248,6 +252,7 @@ describe("synchronous external process signals", () => {
       ]);
     });
 
+    /** @scenario "External signals and wakes share one revision fence" */
     it("returns the winning state when its configured retry budget is exhausted", async () => {
       const noRetryService = new ProcessManagerService({
         definition: definition(),
@@ -286,6 +291,7 @@ describe("synchronous external process signals", () => {
       expect(await store.findMessagesByRef({ ref })).toHaveLength(0);
     });
 
+    /** @scenario "Retrying a committed external signal recovers its durable state" */
     it("applies concurrent delivery of one signal identity exactly once", async () => {
       const [first, second] = await Promise.all([
         service.handleSignal({ signal: signal(), now: T0 + 1 }),

@@ -48,6 +48,7 @@ describe("strict contract declaration build configs", () => {
     expect(lintStrictContractBuildConfigs(root, [contractPackage("future-feature")])).toEqual([]);
   });
 
+  /** @scenario "Strict services, ports, and contract builds remain mechanically bounded" */
   it("rejects a config that can include a package test root", () => {
     root = mkdtempSync(join(tmpdir(), "contract-build-config-"));
     writeConfig("api-key", {

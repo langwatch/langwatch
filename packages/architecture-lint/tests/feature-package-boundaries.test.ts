@@ -1060,6 +1060,58 @@ describe("Prisma client containment", () => {
     expect(policies().filter((policy) => policy === "prisma-containment")).toHaveLength(1);
   });
 
+  /** @scenario "Architecture lint stays on structural facts" */
+  it("reports each structural family and stays silent about formatting", () => {
+    featurePackage({
+      feature: "agent",
+      role: "contract",
+      dependencies: { zod: "^3.25.76" },
+    });
+    featurePackage({ feature: "agent", role: "server" });
+    featurePackage({
+      feature: "agent",
+      role: "web",
+      dependencies: { "@langwatch/agent-server": "workspace:*" },
+      subjects: ["agent", "shared", "shared"],
+      source:
+        'import type { value } from "@langwatch/agent-server"; export type View = typeof value;',
+    });
+    write(
+      "packages/features/agent/contract/src/agent.service.ts",
+      "export abstract class AgentService { abstract findById(): Promise<string | null>; }",
+    );
+    write(
+      "packages/features/agent/server/src/services/agent.service.ts",
+      'import type { PrismaClient } from "@langwatch/prisma-client/generated"; export class AgentService { static create(_client: PrismaClient) { return new AgentService(); } }',
+    );
+    write(
+      "packages/features/agent/server/src/subscribers/agent.subscriber.ts",
+      "export const handle = (events: { append(): void }) => events.append();",
+    );
+
+    const reported = new Set(policies());
+    for (const family of [
+      "feature-catalogue",
+      "package-role",
+      "fallible-result-naming",
+      "prisma-containment",
+      "eventing-subscriber-idempotency",
+      "retired-package-runtime",
+    ]) {
+      expect(reported).toContain(family);
+    }
+  });
+
+  it("reports nothing about a source file whose only defect is its formatting", () => {
+    featurePackage({ feature: "agent", role: "contract" });
+    write(
+      "packages/features/agent/contract/src/agent.command.ts",
+      "export    const   createAgent=(name:string)=>({name})\n\n\n",
+    );
+
+    expect(lintWorkspace({ root, declarations: false })).toEqual([]);
+  });
+
   /** @scenario Prisma cannot leak through public declarations */
   it("rejects generated Prisma reached through a public server re-export", () => {
     featurePackage({
