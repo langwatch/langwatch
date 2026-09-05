@@ -357,14 +357,46 @@ describe("given a folder shared with a Langy conversation", () => {
       expect(grantPatternFor({ tokens: ["pnpm", "typecheck"] })).toBe(
         "pnpm typecheck",
       );
-      expect(grantPatternFor({ tokens: ["pnpm", "-r", "build"] })).toBe(
-        "pnpm build",
-      );
       expect(grantPatternFor({ tokens: ["make"] })).toBe("make *");
       expect(
         grantsAllow({ tokens: ["pnpm", "test"], grants: new Set(["pnpm *"]) }),
       ).toBe(true);
       expect(grantsAllow({ tokens: [], grants: new Set(["pnpm *"]) })).toBe(false);
+    });
+
+    /** @scenario "The session grant names the program and its first argument" */
+    it("keeps a first argument that is a flag out of a grant over the whole program", () => {
+      const patterns: Array<[string[], boolean[] | undefined, string]> = [
+        [[".venv/bin/python", "-c", "from app import x"], [false, false, true], ".venv/bin/python -c"],
+        [[".venv/bin/python", "-m", "compileall", "-q"], undefined, ".venv/bin/python -m"],
+        [["git", "commit", "-m", "done"], undefined, "git commit"],
+        [["uv", "run", "pytest"], undefined, "uv run"],
+        [["pnpm", "-r", "build"], undefined, "pnpm -r"],
+        [["make"], undefined, "make *"],
+        [["echo", "hello"], [false, true], "echo *"],
+      ];
+      for (const [tokens, quoted, expected] of patterns) {
+        expect(
+          grantPatternFor({
+            tokens,
+            ...(quoted === undefined ? {} : { quoted }),
+          }),
+          tokens.join(" "),
+        ).toBe(expected);
+      }
+    });
+
+    /** @scenario "The session grant names the program and its first argument" */
+    it("asks again for the same interpreter with another first argument", () => {
+      const grants = [".venv/bin/python -c"];
+      expect(
+        bash(".venv/bin/python -c 'import app'", { grants }).kind,
+      ).toBe("run");
+      const asked = bash(".venv/bin/python -m http.server", { grants });
+      expect(asked.kind).toBe("ask");
+      if (asked.kind === "ask") {
+        expect(asked.pattern).toBe(".venv/bin/python -m");
+      }
     });
   });
 
@@ -373,7 +405,7 @@ describe("given a folder shared with a Langy conversation", () => {
     it("spends one grant on both spellings", () => {
       const asked = bash("python -m compileall src");
       expect(asked.kind).toBe("ask");
-      if (asked.kind === "ask") expect(asked.pattern).toBe("python *");
+      if (asked.kind === "ask") expect(asked.pattern).toBe("python -m");
 
       const grants = ["python *"];
       expect(bash("python -m compileall src", { grants })).toEqual({
@@ -387,15 +419,15 @@ describe("given a folder shared with a Langy conversation", () => {
       });
     });
 
-    it("offers the interpreter as the pattern for every alias", () => {
+    it("folds both spellings of an interpreter into one pattern", () => {
       expect(grantPatternFor({ tokens: ["python3", "-m", "compileall"] })).toBe(
-        "python *",
+        "python -m",
       );
       expect(grantPatternFor({ tokens: ["nodejs", "server.js"] })).toBe(
-        "node *",
+        "node server.js",
       );
       expect(grantPatternFor({ tokens: ["pip3", "install", "-r", "reqs.txt"] })).toBe(
-        "pip *",
+        "pip install",
       );
     });
 

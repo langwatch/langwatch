@@ -45,6 +45,8 @@ export interface ApprovalCard {
   /** Why the call stopped, and the time limit when there is one. */
   description: string;
   options: ApprovalOption[];
+  /** The patterns the session grant would cover, named under the options. */
+  patterns: string[];
 }
 
 /** What the developer answered in the terminal. */
@@ -149,7 +151,24 @@ export function approvalCardFor({
     subject: summary,
     description: `${reason}${limit}`,
     options: approvalOptions(patterns),
+    patterns,
   };
+}
+
+/**
+ * What the session grant covers, in one sentence under the options.
+ *
+ * The developer answered "allow for this session" without being told what
+ * the grant lets through afterwards, and one of those grants covered every
+ * python command on the machine. The sentence names the same patterns the
+ * option names, so the two read as one answer.
+ */
+export function grantCoverageSentence(patterns: string[]): string | null {
+  const covered = patterns
+    .map((pattern) => pattern.replace(/ \*$/, ""))
+    .filter((pattern) => pattern !== "");
+  if (covered.length === 0) return null;
+  return `The session grant covers every command that starts with ${patternPhrase(covered)}.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -198,9 +217,23 @@ export function renderApprovalBox({
   plain("   Do you want to allow this?");
   card.options.forEach((option, index) => {
     const chosen = index === selected;
-    const row = `${chosen ? " ❯ " : "   "}${index + 1}. ${option.label}`;
-    plain(row, chosen ? chalk.cyan(row) : row);
+    const marker = `${chosen ? " ❯ " : "   "}${index + 1}. `;
+    // A label of a chain names every pattern, so it is wrapped like any other
+    // line rather than pushed through the frame.
+    wrapWords(option.label, textWidth - marker.length + 3).forEach(
+      (line, part) => {
+        const row = `${part === 0 ? marker : " ".repeat(marker.length)}${line}`;
+        plain(row, chosen ? chalk.cyan(row) : row);
+      },
+    );
   });
+  const coverage = grantCoverageSentence(card.patterns);
+  if (coverage !== null) {
+    plain("");
+    for (const line of wrapWords(coverage, textWidth)) {
+      plain(`   ${line}`, `   ${chalk.gray(line)}`);
+    }
+  }
   plain("");
   for (const line of wrapWords(HINT, textWidth)) {
     plain(`   ${line}`, `   ${chalk.gray(line)}`);

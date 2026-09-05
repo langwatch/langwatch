@@ -15,6 +15,7 @@ import {
   approvalOptions,
   askApproval,
   createTerminalApprovals,
+  grantCoverageSentence,
   renderApprovalBox,
   timeLimitSentence,
   type ApprovalCard,
@@ -25,6 +26,14 @@ import type { UiWriter } from "../ui";
 
 const ANSI_COLOURS = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
 const plain = (text: string): string => text.replace(ANSI_COLOURS, "");
+
+/** What the box says, with the frame and the padding taken out. */
+const bodyText = (drawn: string[]): string =>
+  drawn
+    .join(" ")
+    .replace(/[│╭╮╰╯─]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 
 /** A screen that keeps the block that is drawn on it. */
 function fakeScreen({ interactive = true } = {}) {
@@ -146,6 +155,74 @@ describe("the box the selector draws", () => {
     );
     expect(drawn.join("\n")).toContain("Enter or a number to answer");
     for (const line of drawn) expect(line.length).toBe(79);
+  });
+
+  describe("when the first option offers a session grant", () => {
+    /** @scenario "The box says what the session grant covers" */
+    it("names what every command the grant covers starts with", () => {
+      const drawn = renderApprovalBox({
+        card: approvalCardFor({
+          call: bashCall(".venv/bin/python -c 'from app import x'"),
+          workspaceName: "acme-support-dogfood",
+          summary: ".venv/bin/python -c 'from app import x'",
+          reason: "This runs a program that is not read-only.",
+          patterns: [".venv/bin/python -c"],
+        }),
+        selected: 0,
+        width: 100,
+      }).map(plain);
+
+      expect(bodyText(drawn)).toContain(
+        'The session grant covers every command that starts with ".venv/bin/python -c".',
+      );
+    });
+
+    const sentences: Array<[string, string[], string | null]> = [
+      [
+        "one pattern",
+        [".venv/bin/python -c"],
+        'The session grant covers every command that starts with ".venv/bin/python -c".',
+      ],
+      [
+        "a chain",
+        ["git add", "git commit", "git push"],
+        'The session grant covers every command that starts with "git add", "git commit" and "git push".',
+      ],
+      [
+        "a pattern over the whole command name",
+        ["make *"],
+        'The session grant covers every command that starts with "make".',
+      ],
+      ["no pattern at all", [], null],
+    ];
+    for (const [what, patterns, sentence] of sentences) {
+      describe(`when the grant is ${what}`, () => {
+        it(sentence === null ? "says nothing" : "reads what it covers", () => {
+          expect(grantCoverageSentence(patterns)).toBe(sentence);
+        });
+      });
+    }
+  });
+
+  describe("when an option names every pattern of a long chain", () => {
+    it("wraps the label inside the frame", () => {
+      const drawn = renderApprovalBox({
+        card: approvalCardFor({
+          call: bashCall("git add . && git commit -m x && git push"),
+          workspaceName: "acme",
+          summary: "git add . && git commit -m x && git push",
+          reason: "This changes the git repository and reaches the network.",
+          patterns: ["git add", "git commit", "git push", "gh pr", "uv run"],
+        }),
+        selected: 0,
+        width: 60,
+      }).map(plain);
+
+      for (const line of drawn) expect(line.length).toBe(60);
+      expect(bodyText(drawn)).toContain(
+        'Yes, allow "git add", "git commit", "git push", "gh pr" and "uv run" for this session',
+      );
+    });
   });
 
   describe("when the selection moves", () => {

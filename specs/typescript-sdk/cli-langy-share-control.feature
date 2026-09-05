@@ -204,6 +204,20 @@ Feature: `langwatch langy --share-control` shares this folder with a Langy sessi
       Then the first option names every pattern the grant covers
 
     @unit
+    Scenario: The session grant names the program and its first argument
+      Given a connected folder
+      When Langy asks to run a one-line program with the python interpreter
+      Then the grant offered covers commands that start with the interpreter and the flag it ran
+      And the same interpreter with another first argument asks again
+      And a command written with no argument at all offers its own name
+
+    @unit
+    Scenario: The box says what the session grant covers
+      Given a permission selector open in the terminal
+      When the first option offers a session grant
+      Then a dim line under the options reads what every command the grant covers starts with
+
+    @unit
     Scenario: The selector says what the command is and what it changes
       Given a connected folder
       When Langy asks for permission to run a command with a time limit

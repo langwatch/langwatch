@@ -412,10 +412,8 @@ export function parseCommand(command: string): ParsedCommand {
  *
  * A grant is keyed on the command name, so `python3 -m compileall` asked
  * again after the user had already allowed `python -m compileall`, and the
- * two cards read the same. The alias folds into one name, and the pattern the
- * card offers covers the interpreter: what an interpreter runs is its
- * argument, so a per-argument grant would ask again for the next script
- * anyway.
+ * two cards read the same. The alias folds both spellings into one name, so
+ * one answer covers both.
  *
  * Grants only. Nothing else in the policy reads this: the read-only set and
  * the refusals still see the name the command actually wrote.
@@ -437,9 +435,15 @@ export function grantName(name: string): string {
 /**
  * The pattern "allow for this session" would grant for one command part.
  *
- * A quoted string is text the command prints or matches, so it never becomes
- * the pattern: `printf '\nAPI_KEY=x\n' >> .env.example` would otherwise offer
- * the whole literal on the button. The command name covers it instead.
+ * The pattern is the program and its first argument, and a first argument
+ * that is a flag counts like any other: `.venv/bin/python -c 'code'` grants
+ * one-line programs rather than every python invocation on this machine, and
+ * `git commit` grants commits rather than every git command. Only a command
+ * written with no argument at all grants its own name.
+ *
+ * A quoted first argument is text the command prints or matches, so it never
+ * becomes the pattern: `printf '\nAPI_KEY=x\n' >> .env.example` would
+ * otherwise offer the whole literal on the button.
  */
 export function grantPatternFor({
   tokens,
@@ -448,13 +452,12 @@ export function grantPatternFor({
   tokens: string[];
   quoted?: boolean[];
 }): string {
-  const name = tokens[0] ?? "";
-  if (INTERPRETER_ALIASES.has(name)) return `${grantName(name)} *`;
-  const first = tokens.findIndex(
-    (token, index) => index > 0 && !token.startsWith("-"),
-  );
-  if (first === -1 || quoted[first] === true) return `${name} *`;
-  return `${name} ${tokens[first]}`;
+  const name = grantName(tokens[0] ?? "");
+  const argument = tokens[1];
+  if (argument === undefined || argument === "" || quoted[1] === true) {
+    return `${name} *`;
+  }
+  return `${name} ${argument}`;
 }
 
 /** True when the session grants cover this command part. */
