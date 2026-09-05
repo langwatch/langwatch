@@ -28,7 +28,11 @@ vi.mock("~/utils/compat/next-router", () => ({
 }));
 
 import { useGuidedTourStore } from "../guidedTourStore";
-import { TOUR_MISSING_TARGET_MS, TourLayer } from "../TourLayer";
+import {
+  TOUR_MISSING_TARGET_MS,
+  TOUR_TARGET_POLL_MS,
+  TourLayer,
+} from "../TourLayer";
 import { useTourRegistry } from "../tourRegistry";
 import { readMs, TOUR_STEPS } from "../tourSteps";
 
@@ -230,6 +234,25 @@ describe("TourLayer", () => {
       expect(expandGroup).toHaveBeenCalledWith("library");
       act(() => vi.advanceTimersByTime(550));
       expect(screen.getByTestId("tour-spotlight").style.height).toBe("192px");
+    });
+
+    /** @scenario the spotlight follows a target that moves while the caption is up */
+    it("moves the spotlight, cursor and caption onto the target's new place", () => {
+      mountTarget("gw-new-key", rect(500, 80, 120, 32));
+      mountTarget("vk-name", rect(900, 100, 460, 40));
+      renderLayer();
+      act(() => useGuidedTourStore.getState().start("gateway"));
+      act(() => useGuidedTourStore.getState().goToStep(2));
+      landStep(true);
+      expect(screen.getByTestId("tour-spotlight").style.left).toBe("894px");
+      /* the drawer finishes sliding in */
+      rects.set("vk-name", rect(380, 100, 460, 40));
+      act(() => vi.advanceTimersByTime(TOUR_TARGET_POLL_MS));
+      expect(screen.getByTestId("tour-spotlight").style.left).toBe("374px");
+      expect(screen.getByTestId("tour-cursor").style.transform).toBe(
+        "translate(711.2px, 124.8px)",
+      );
+      expect(screen.getByTestId("tour-caption").style.left).toBe("644px");
     });
 
     /** @scenario the spotlight slides onto the panel when the tour ends */

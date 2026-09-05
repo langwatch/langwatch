@@ -123,6 +123,13 @@ Feature: Guided onboarding tour
     Then the spotlight is measured again and covers the whole expanded group
 
   @unit
+  Scenario: the spotlight follows a target that moves while the caption is up
+    Given the gateway tour is on the name field step
+    And the create drawer is still sliding in when the field is first measured
+    When the drawer finishes sliding
+    Then the spotlight, the cursor and the caption move onto where the field ended up
+
+  @unit
   Scenario: Build folds before the first step and is restored at the end
     Given the Build group was expanded before the tour
     When the llmops tour starts

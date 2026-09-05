@@ -67,6 +67,15 @@ function targetRect(target: string): DOMRect | null {
   return rect && rect.width > 0 ? rect : null;
 }
 
+function sameRect(a: DOMRect, b: DOMRect): boolean {
+  return (
+    Math.abs(a.left - b.left) < 1 &&
+    Math.abs(a.top - b.top) < 1 &&
+    Math.abs(a.width - b.width) < 1 &&
+    Math.abs(a.height - b.height) < 1
+  );
+}
+
 function padded(rect: DOMRect, pad: number): Rect {
   return {
     x: rect.left - pad,
@@ -325,11 +334,25 @@ function TourLayerInner() {
             /* onArrive may have grown the target (opening a nav group), so
                the spotlight takes its final size here rather than the one it
                had while the cursor was still travelling */
-            const fresh = targetRect(step.target) ?? rect;
+            let fresh = targetRect(step.target) ?? rect;
             setSpot(padded(fresh, 6));
             setCaption(captionPoint(fresh, step));
             /* the auto-advance: a slow read, then move on by itself */
             later(advance, readMs(step.text));
+            /* and while the caption is up the target may still move: a
+               drawer finishing its slide, a list replacing its spinner. The
+               spotlight, cursor and caption follow it */
+            const follow = () => {
+              const now = targetRect(step.target);
+              if (now && !sameRect(now, fresh)) {
+                fresh = now;
+                setSpot(padded(now, 6));
+                setCursor(cursorPoint(now));
+                setCaption(captionPoint(now, step));
+              }
+              later(follow, TOUR_TARGET_POLL_MS);
+            };
+            later(follow, TOUR_TARGET_POLL_MS);
           },
           step.onArrive ? 550 : 150,
         );
