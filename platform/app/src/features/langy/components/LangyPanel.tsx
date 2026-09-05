@@ -123,6 +123,7 @@ import {
 } from "../logic/langyHomeSuggestions";
 import {
   langyPermissionCards,
+  langyQuestionCards,
   langyQuestionWaitsByToolCall,
   routeLangyChoiceAnswer,
 } from "../logic/langyLocalWaits";
@@ -149,6 +150,10 @@ import {
   SIDEBAR_PEEK_NEAR_PX,
 } from "../logic/langyPeekDock";
 import { langyPlan } from "../logic/langyPlan";
+import {
+  questionToolCallIdsIn,
+  questionWaitCardParts,
+} from "../logic/langyQuestionTool";
 import { resolveLangyStopTarget } from "../logic/langyStopTarget";
 import {
   currentTurnAssistant,
@@ -178,6 +183,7 @@ import {
   skeletonMessageCount,
 } from "./ConversationSkeleton";
 import { LANGY_CODE_ACCESS_ASK_AGAIN } from "./derived-cards/LangyCodeAccessCard";
+import { LangyDerivedCardView } from "./derived-cards/LangyDerivedCardView";
 import { EmptyState } from "./EmptyState";
 import { LangyGitHubConnectCard } from "./github/LangyGitHubConnectCard";
 import { LangyCardBoundary } from "./LangyCardBoundary";
@@ -2366,6 +2372,28 @@ function LangyPanel({
       }),
     [recordWaits, turnToolCalls, liveWaits],
   );
+  // The same waits, whole, keyed by the tool call that asked. A settled
+  // question is settled in the WAIT and nowhere else: answering one writes no
+  // selection into the transcript, so the card would read back unanswered and
+  // a click on it would start a second turn for a question already decided.
+  const questionCards = useMemo(
+    () =>
+      langyQuestionCards({
+        record: recordWaits,
+        toolCalls: turnToolCalls,
+        live: liveWaits,
+      }),
+    [recordWaits, turnToolCalls, liveWaits],
+  );
+  const questionCardsByToolCall = useMemo(
+    () =>
+      new Map(
+        questionCards.flatMap((card) =>
+          card.toolCallId ? [[card.toolCallId, card] as const] : [],
+        ),
+      ),
+    [questionCards],
+  );
 
   // A card is holding the turn for the developer's answer. What the panel
   // says while that is true is not what it says while Langy is working: the
@@ -2660,6 +2688,31 @@ function LangyPanel({
   // What Langy is waiting for on the developer's own machine (ADR-129). Read
   // from the durable record and the folded turn document, so a tab that
   // adopted a running turn renders the cards without the live stream.
+  //
+  // A question the tool is waiting on is one of them, and its card comes off
+  // the wait rather than off the transcript: a tab that adopted a running turn
+  // reads no live stream, and the `question` tool part only lands when the
+  // turn ends, so the question was invisible for the whole wait while the
+  // composer asked the reader to answer it. Once the part has arrived the
+  // transcript draws the card and this one stands down, so it is never drawn
+  // twice.
+  const openQuestionParts = useMemo(() => {
+    const inTranscript = questionToolCallIdsIn(displayMessages);
+    return questionCards
+      .filter(
+        (card) =>
+          card.status === "pending" &&
+          card.toolCallId !== null &&
+          !inTranscript.has(card.toolCallId),
+      )
+      .flatMap((card) =>
+        questionWaitCardParts({
+          toolCallId: card.toolCallId,
+          questions: card.questions,
+        }),
+      );
+  }, [questionCards, displayMessages]);
+
   const localCards =
     !timeTravel && projectId && activeConversationId
       ? permissionCards.map((card) => (
@@ -2677,6 +2730,29 @@ function LangyPanel({
             />
           </IsolatedErrorBoundary>
         ))
+      : null;
+
+  const openQuestionCards =
+    !timeTravel && projectId && activeConversationId
+      ? openQuestionParts.map((part) => (
+          <IsolatedErrorBoundary
+            key={part.blockId}
+            scope="This question failed to render"
+            resetKeys={[part.blockId]}
+          >
+            <LangyDerivedCardView
+              card={part.card}
+              projectSlug={project?.slug ?? null}
+              choicesLockState={{ status: "open" }}
+              onChoiceSelect={selectChoice}
+            />
+          </IsolatedErrorBoundary>
+        ))
+      : null;
+
+  const waitingCards =
+    localCards || openQuestionCards
+      ? [...(localCards ?? []), ...(openQuestionCards ?? [])]
       : null;
 
   // Where those cards sit in the column.
@@ -3431,7 +3507,7 @@ function LangyPanel({
                               {/* The cards the settled turn raised, above the
                                   message that closed it, so the answer is the
                                   last thing in the turn. */}
-                              {index === cardAnchorIndex ? localCards : null}
+                              {index === cardAnchorIndex ? waitingCards : null}
                               {/* One message's render crash stays that
                                   message's: a malformed tool part or card
                                   payload draws an inline error where the
@@ -3493,6 +3569,11 @@ function LangyPanel({
                                   // live-only: while time-travelling the cards
                                   // render read-only from the replayed record.
                                   choicesTimeline={choicesTimeline}
+                                  // A question answered back to its wait
+                                  // writes no selection into the transcript,
+                                  // so the wait is what tells the card it is
+                                  // settled and which option closed it.
+                                  questionWaits={questionCardsByToolCall}
                                   onChoiceSelect={
                                     timeTravel ? undefined : selectChoice
                                   }
@@ -3528,7 +3609,7 @@ function LangyPanel({
                               live edge where the answer they want is given.
                               A settled turn's cards render inside it instead,
                               above the message that closed it. */}
-                          {cardAnchorIndex === -1 ? localCards : null}
+                          {cardAnchorIndex === -1 ? waitingCards : null}
                           {!timeTravel && pendingPrompt ? (
                             <QueuedPrompt
                               prompt={pendingPrompt}

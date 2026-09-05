@@ -1,6 +1,7 @@
 import { Box, Button, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import type {
   LangyChoiceSelection,
+  LangyChoicesLockState,
   LangyChoicesTimelineEntry,
   LangyDerivedCard,
   LangyDerivedChoicesCard,
@@ -26,6 +27,11 @@ import {
   isSubstantiveLangyAnswer,
   parseLangyFeedbackDirective,
 } from "../logic/langyFeedbackDirective";
+import {
+  type LangyQuestionCardData,
+  langyAnsweredOptionIds,
+  toolCallIdOfQuestionBlock,
+} from "../logic/langyLocalWaits";
 import { langyPlan } from "../logic/langyPlan";
 import {
   linkPullRequestReferences,
@@ -91,6 +97,7 @@ function MessageContentImpl({
   onVerifyDerivedCard,
   onAskCodeAccessAgain,
   liveCodeAccessCallId,
+  questionWaits,
 }: {
   message: UIMessage;
   organizationId?: string | null;
@@ -135,6 +142,18 @@ function MessageContentImpl({
   }) => void;
   /** Bind a derived card's verify hint. Absent = chip hidden. */
   onVerifyDerivedCard?: (a: { card: LangyDerivedCard }) => void;
+  /**
+   * The question waits of this conversation, keyed by the tool call that
+   * asked (ADR-129).
+   *
+   * A question asked mid-turn is answered back to its WAIT, and that answer
+   * writes no selection into the transcript, so the timeline the lock state
+   * derives from knows nothing about it: the card came back on screen after
+   * the turn with both options empty and a click on it started a second turn
+   * for a question that was already settled. The wait is what knows, so it is
+   * what the card reads.
+   */
+  questionWaits?: ReadonlyMap<string, LangyQuestionCardData>;
   /**
    * Stop whatever is running and ask Langy the code access question again —
    * what the code access card's Change and Ask again controls do. Absent =
@@ -505,10 +524,17 @@ function MessageContentImpl({
             <LangyDerivedCardView
               card={part.card}
               projectSlug={project?.slug ?? null}
-              choicesLockState={deriveLangyChoicesLockState({
-                blockId: part.blockId,
-                timeline: choicesTimeline ?? [],
-              })}
+              choicesLockState={
+                questionWaitLockState({
+                  blockId: part.blockId,
+                  card: part.card,
+                  waits: questionWaits,
+                }) ??
+                deriveLangyChoicesLockState({
+                  blockId: part.blockId,
+                  timeline: choicesTimeline ?? [],
+                })
+              }
               onChoiceSelect={onChoiceSelect}
             />
           </LangyCardBoundary>
@@ -1061,4 +1087,33 @@ function isLangyProposal(value: unknown): value is LangyProposal {
     typeof v.kind === "string" &&
     typeof v.summary === "string"
   );
+}
+
+/**
+ * What a settled question WAIT says about one choices card, or null when the
+ * wait knows nothing and the timeline should answer instead.
+ *
+ * A wait that is still pending leaves the card open; a wait that ended locks
+ * it, on the option the answer names when the answer can be matched to one.
+ */
+function questionWaitLockState({
+  blockId,
+  card,
+  waits,
+}: {
+  blockId: string;
+  card: LangyDerivedCard;
+  waits: ReadonlyMap<string, LangyQuestionCardData> | undefined;
+}): LangyChoicesLockState | null {
+  if (!waits || card.kind !== "choices") return null;
+  const toolCallId = toolCallIdOfQuestionBlock(blockId);
+  const wait = toolCallId ? waits.get(toolCallId) : undefined;
+  if (!wait || wait.status === "pending") return null;
+  const answered = langyAnsweredOptionIds({
+    answers: wait.answers,
+    options: card.options,
+  });
+  return answered
+    ? { status: "answered", ...answered }
+    : { status: "superseded" };
 }

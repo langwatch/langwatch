@@ -101,6 +101,28 @@ export interface LangyQuestionWait {
   status: LangyWaitStatus;
 }
 
+/**
+ * One question card, as the wait that raised it carries it.
+ *
+ * The transcript is not where a live question comes from. A tab that adopted
+ * a running turn reads no live stream and its message list only grows when
+ * the turn ends, so the `question` tool part reached the screen minutes after
+ * the tool started waiting: the composer said to answer the card above while
+ * there was no card to answer. The wait itself carries the question and its
+ * options, and the wait is on the conversation record from the moment it is
+ * raised.
+ */
+export interface LangyQuestionCardData {
+  waitId: string;
+  /** The tool call that asked, which is what an answer is routed back on. */
+  toolCallId: string | null;
+  status: LangyWaitStatus;
+  /** The `questions` payload the tool sent, in its own shape. */
+  questions: unknown;
+  /** The answers the wait settled with, when it settled with any. */
+  answers: unknown;
+}
+
 const DECISIONS = new Set<string>(["allow_once", "allow_pattern", "deny"]);
 
 function readDecision(value: unknown): LangyPermissionDecision | null {
@@ -296,6 +318,122 @@ function withLive(
     workspaceName: durable?.workspaceName ?? entry.workspaceName ?? null,
     hostname: durable?.hostname ?? entry.hostname ?? null,
   };
+}
+
+/**
+ * Every question card of the conversation, off the same three sources the
+ * permission cards come from and folded by the same forward-only rule.
+ */
+export function langyQuestionCards(
+  sources: WaitSources,
+): LangyQuestionCardData[] {
+  const cards = new Map<string, LangyQuestionCardData>();
+
+  const durable: LangyQuestionCardData[] = [
+    ...(sources.record ?? []).flatMap((wait) =>
+      wait.kind === "question"
+        ? [
+            {
+              waitId: wait.waitId,
+              toolCallId: wait.toolCallId,
+              status: wait.status,
+              questions: wait.questions,
+              answers: wait.answers,
+            },
+          ]
+        : [],
+    ),
+    ...(sources.toolCalls ?? []).flatMap((call) =>
+      call.wait?.kind === "question"
+        ? [
+            {
+              waitId: call.wait.waitId,
+              toolCallId: call.toolCallId,
+              status: call.wait.status,
+              questions: call.wait.questions,
+              answers: call.wait.answers,
+            },
+          ]
+        : [],
+    ),
+  ];
+  for (const next of durable) {
+    const known = cards.get(next.waitId);
+    cards.set(next.waitId, known ? mergeQuestionCard({ known, next }) : next);
+  }
+  for (const entry of Object.values(sources.live ?? {})) {
+    if (entry.kind !== "question") continue;
+    const known = cards.get(entry.waitId);
+    const next: LangyQuestionCardData = {
+      waitId: entry.waitId,
+      toolCallId: entry.toolCallId ?? null,
+      status: entry.status,
+      questions: entry.questions ?? null,
+      answers: entry.answers ?? null,
+    };
+    cards.set(entry.waitId, known ? mergeQuestionCard({ known, next }) : next);
+  }
+
+  return [...cards.values()];
+}
+
+/** The same card folded over another reading of it. A card only moves forward. */
+function mergeQuestionCard({
+  known,
+  next,
+}: {
+  known: LangyQuestionCardData;
+  next: LangyQuestionCardData;
+}): LangyQuestionCardData {
+  return {
+    waitId: known.waitId,
+    toolCallId: next.toolCallId ?? known.toolCallId,
+    status: mergeLangyWaitStatus({ durable: known.status, live: next.status }),
+    questions: known.questions ?? next.questions,
+    answers: next.answers ?? known.answers,
+  };
+}
+
+/**
+ * The option ids one settled question wait names, given the card's own
+ * options.
+ *
+ * A wait records the answer as the LABELS it was given, because that is what
+ * the tool reads. The card binds by id, so the two are matched here: a card
+ * read back after the turn then renders locked on what was chosen, instead of
+ * offering an answer that was already given.
+ */
+export function langyAnsweredOptionIds({
+  answers,
+  options,
+}: {
+  answers: unknown;
+  options: readonly { id: string; label: string }[];
+}): { optionIds: string[]; otherText?: string } | null {
+  if (!Array.isArray(answers) || answers.length === 0) return null;
+  const first = answers[0] as {
+    selected?: unknown;
+    other?: unknown;
+  } | null;
+  if (!first || typeof first !== "object") return null;
+  const selected = Array.isArray(first.selected)
+    ? first.selected.filter(
+        (label): label is string => typeof label === "string",
+      )
+    : [];
+  const idByLabel = new Map(
+    options.map((option) => [option.label, option.id] as const),
+  );
+  const optionIds = selected.flatMap((label) => {
+    const id = idByLabel.get(label);
+    return id ? [id] : [];
+  });
+  const otherText =
+    typeof first.other === "string" && first.other.trim() !== ""
+      ? first.other
+      : undefined;
+  if (optionIds.length === 0 && otherText === undefined) return null;
+  return { optionIds, ...(otherText === undefined ? {} : { otherText }) };
 }
 
 /** One question wait as a map entry, keyed by the tool call that asked. */
