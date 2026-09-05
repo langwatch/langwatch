@@ -16,6 +16,7 @@ import {
   collapseProgressRedraws,
   commandEnvironment,
   excludeLogDirFromGit,
+  inheritsVariable,
   killGroup,
   logPathFor,
   startCommand,
@@ -318,28 +319,95 @@ describe("given the environment a command runs with", () => {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
-  /** @scenario "A command runs with the machine's own variables and no more" */
-  it("keeps the paths of the machine and drops everything else", () => {
-    const kept = commandEnvironment({
-      PATH: "/usr/bin",
-      HOME: "/home/dev",
-      LANG: "en_US.UTF-8",
-      LC_ALL: "en_US.UTF-8",
-      TERM: "xterm",
-      SSH_AUTH_SOCK: "/tmp/agent.socket",
-      LANGWATCH_API_KEY: "sk-lw-secret",
-      OPENAI_API_KEY: "sk-secret",
-      AWS_SECRET_ACCESS_KEY: "secret",
-    });
+  /**
+   * The rule, as a table: a name on the list, a name in a family named by its
+   * prefix or by its suffix, and the veto that reads last and wins.
+   */
+  const variables: Array<[string, boolean]> = [
+    ["PATH", true],
+    ["HOME", true],
+    ["SHELL", true],
+    ["TERM", true],
+    ["COLORTERM", true],
+    ["TERM_PROGRAM", true],
+    ["USER", true],
+    ["LOGNAME", true],
+    ["TMPDIR", true],
+    ["TZ", true],
+    ["LANG", true],
+    ["LANGUAGE", true],
+    ["LC_ALL", true],
+    ["LC_CTYPE", true],
+    ["XDG_CACHE_HOME", true],
+    ["XDG_CONFIG_HOME", true],
+    ["SSH_AUTH_SOCK", true],
+    ["HOMEBREW_PREFIX", true],
+    ["HOMEBREW_CELLAR", true],
+    ["HOMEBREW_REPOSITORY", true],
+    ["JAVA_HOME", true],
+    ["PNPM_HOME", true],
+    ["CARGO_HOME", true],
+    ["RUSTUP_HOME", true],
+    ["GRADLE_USER_HOME", true],
+    ["M2_HOME", true],
+    ["VOLTA_HOME", true],
+    ["GOPATH", true],
+    ["GOROOT", true],
+    ["GOFLAGS", true],
+    ["GOPROXY", true],
+    ["PYENV_ROOT", true],
+    ["NVM_DIR", true],
+    ["NVM_BIN", true],
+    ["ASDF_DIR", true],
+    ["RBENV_ROOT", true],
+    ["SDKMAN_DIR", true],
+    ["VIRTUAL_ENV", true],
+    ["CONDA_PREFIX", true],
+    ["UV_CACHE_DIR", true],
+    ["UV_PYTHON", true],
+    ["HTTP_PROXY", true],
+    ["HTTPS_PROXY", true],
+    ["NO_PROXY", true],
+    ["ALL_PROXY", true],
+    ["http_proxy", true],
+    ["https_proxy", true],
+    ["no_proxy", true],
+    ["all_proxy", true],
+    ["SSL_CERT_FILE", true],
+    ["SSL_CERT_DIR", true],
+    ["NODE_EXTRA_CA_CERTS", true],
+    ["REQUESTS_CA_BUNDLE", true],
+    ["CURL_CA_BUNDLE", true],
+    // The veto reads last, so a family with a secret in it loses that one.
+    ["HOMEBREW_GITHUB_API_TOKEN", false],
+    ["XDG_SESSION_TOKEN", false],
+    ["SOMETHING_HOME_KEY", false],
+    ["LANGWATCH_API_KEY", false],
+    ["OPENAI_API_KEY", false],
+    ["AWS_SECRET_ACCESS_KEY", false],
+    ["GITHUB_TOKEN", false],
+    ["DATABASE_PASSWORD", false],
+    // And a name that is on no list at all never travels.
+    ["AWS_ACCESS_KEY_ID", false],
+    ["NODE_ENV", false],
+    ["DATABASE_URL", false],
+    ["SHLVL", false],
+  ];
 
-    expect(Object.keys(kept).sort()).toEqual([
-      "HOME",
-      "LANG",
-      "LC_ALL",
-      "PATH",
-      "SSH_AUTH_SOCK",
-      "TERM",
-    ]);
+  /** @scenario "A command runs with the machine's own variables and no more" */
+  it("keeps the machine and the toolchain, and never a name that reads as a secret", () => {
+    for (const [name, inherited] of variables) {
+      expect(inheritsVariable(name), name).toBe(inherited);
+    }
+    const source = Object.fromEntries(
+      variables.map(([name]) => [name, `value-of-${name}`]),
+    );
+    expect(Object.keys(commandEnvironment(source)).sort()).toEqual(
+      variables
+        .filter(([, inherited]) => inherited)
+        .map(([name]) => name)
+        .sort(),
+    );
   });
 
   /** @scenario "A command runs with the machine's own variables and no more" */

@@ -362,7 +362,15 @@ With the output piped or redirected there is no selector, because there is no te
 
 A session grant is the program and its first argument, so `uv run` allows the tests and not `uv pip install`, and `.venv/bin/python -c` allows a one-line program and not every python command. The line under the options says what it covers.
 
-Paths outside the folder and `sudo` are refused whatever you answer. A file that may hold secrets always asks, whether Langy reads it directly or through a shell command, and a command runs with the paths, the shell and the language of your machine rather than with every variable your terminal holds. A grant lives with this run of the command: stop it and start it again, and Langy asks once more.
+Paths outside the folder and `sudo` are refused whatever you answer. A file that may hold secrets always asks, whether Langy reads it directly or through a shell command: `.env` and `.envrc`, keys and keystores, `.netrc`, `.npmrc`, `.pgpass`, `.git-credentials`, anything named for a token or a secret, `.git/config`, and anything under `.ssh/`, `.aws/` or `.docker/`. A committed `.env.example` still reads without a question. A grant lives with this run of the command: stop it and start it again, and Langy asks once more.
+
+A command inherits only what a toolchain needs from your machine:
+
+- the shell and the locale: `PATH`, `HOME`, `SHELL`, `USER`, `TMPDIR`, `TERM`, `LANG`, and the `LC_*` and `XDG_*` families
+- where the toolchains live: `GOPATH`, `GOROOT`, `NVM_DIR`, `PYENV_ROOT`, `VIRTUAL_ENV`, `CONDA_PREFIX`, the `HOMEBREW_*` paths, and every `*_HOME` such as `JAVA_HOME`, `PNPM_HOME` or `CARGO_HOME`
+- how it reaches the network and what it trusts: `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`, `ALL_PROXY`, `SSL_CERT_FILE`, `SSL_CERT_DIR`, `NODE_EXTRA_CA_CERTS`, `REQUESTS_CA_BUNDLE` and `CURL_CA_BUNDLE`
+
+Everything else your terminal holds stays behind, and a name that ends in `_KEY`, `_TOKEN`, `_SECRET` or `_PASSWORD` never passes even when it belongs to one of those families. Your project reads its own `.env` file itself, so nothing in the project depends on what the command line hands over.
 
 The command is a live session with no machine-readable output, so it refuses `-o json`. Press Ctrl-C to stop sharing; commands Langy started in the background keep running, and the terminal prints their process id and log path.
 

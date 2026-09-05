@@ -42,28 +42,101 @@ export const SHELL_ARGS = (command: string): [string, string[]] => [
 ];
 
 /**
- * The variables a command inherits from this process.
+ * The variables a command inherits from this process, by name.
  *
  * The terminal that started the CLI carries the developer's own keys, and a
  * command Langy runs reads every one of them the moment it is handed the
- * whole environment. What a build needs from the machine is its paths, its
- * shell and its language; what a project needs is in the project, and the
- * project's own tools read it from there.
+ * whole environment. What a build needs from the machine is where its
+ * toolchain lives, how it reaches the network and which certificates it
+ * trusts. What a project needs is in the project, and the project's own
+ * tools read it from there.
  */
 export const INHERITED_ENVIRONMENT: ReadonlySet<string> = new Set([
+  // The machine and the shell.
   "PATH",
   "HOME",
   "SHELL",
-  "TERM",
   "USER",
   "LOGNAME",
   "TMPDIR",
   "TZ",
   "LANG",
+  "LANGUAGE",
+  "TERM",
+  "COLORTERM",
+  "TERM_PROGRAM",
   // The socket of the key agent, so a push over a signed connection still
   // works. It carries no key itself.
   "SSH_AUTH_SOCK",
+  // Where the toolchains live.
+  "HOMEBREW_PREFIX",
+  "HOMEBREW_CELLAR",
+  "HOMEBREW_REPOSITORY",
+  "GOPATH",
+  "GOROOT",
+  "GOFLAGS",
+  "GOPROXY",
+  "PYENV_ROOT",
+  "NVM_DIR",
+  "NVM_BIN",
+  "ASDF_DIR",
+  "RBENV_ROOT",
+  "SDKMAN_DIR",
+  "VIRTUAL_ENV",
+  "CONDA_PREFIX",
+  "UV_CACHE_DIR",
+  "UV_PYTHON",
+  // How it reaches the network, and what it trusts.
+  "HTTP_PROXY",
+  "HTTPS_PROXY",
+  "NO_PROXY",
+  "ALL_PROXY",
+  "http_proxy",
+  "https_proxy",
+  "no_proxy",
+  "all_proxy",
+  "SSL_CERT_FILE",
+  "SSL_CERT_DIR",
+  "NODE_EXTRA_CA_CERTS",
+  "REQUESTS_CA_BUNDLE",
+  "CURL_CA_BUNDLE",
 ]);
+
+/** Families of variables that are inherited whatever the rest of the name is. */
+export const INHERITED_ENVIRONMENT_PREFIXES: readonly string[] = ["LC_", "XDG_"];
+
+/**
+ * The name of a toolchain's own directory: `JAVA_HOME`, `PNPM_HOME`,
+ * `CARGO_HOME`, `GRADLE_USER_HOME` and every other one written this way.
+ */
+export const INHERITED_ENVIRONMENT_SUFFIXES: readonly string[] = ["_HOME"];
+
+/**
+ * Names that never travel, whatever else matches.
+ *
+ * A prefix or a suffix rule is a family, and a family has secrets in it:
+ * `HOMEBREW_GITHUB_API_TOKEN` is a homebrew variable and a token at the same
+ * time. The veto is read last and wins.
+ */
+export const SECRET_ENVIRONMENT_SUFFIXES: readonly string[] = [
+  "_KEY",
+  "_TOKEN",
+  "_SECRET",
+  "_PASSWORD",
+];
+
+/** True when a command may read this variable. */
+export function inheritsVariable(name: string): boolean {
+  const upper = name.toUpperCase();
+  if (SECRET_ENVIRONMENT_SUFFIXES.some((veto) => upper.endsWith(veto))) {
+    return false;
+  }
+  if (INHERITED_ENVIRONMENT.has(name)) return true;
+  if (INHERITED_ENVIRONMENT_PREFIXES.some((family) => name.startsWith(family))) {
+    return true;
+  }
+  return INHERITED_ENVIRONMENT_SUFFIXES.some((family) => upper.endsWith(family));
+}
 
 /** The environment one command runs with. */
 export function commandEnvironment(
@@ -72,13 +145,10 @@ export function commandEnvironment(
   const kept: NodeJS.ProcessEnv = {};
   for (const [name, value] of Object.entries(source)) {
     if (value === undefined) continue;
-    if (INHERITED_ENVIRONMENT.has(name) || name.startsWith("LC_")) {
-      kept[name] = value;
-    }
+    if (inheritsVariable(name)) kept[name] = value;
   }
   return kept;
 }
-
 export interface RunningCommand {
   /** The process group leader, undefined when the spawn failed. */
   pid: number | undefined;
