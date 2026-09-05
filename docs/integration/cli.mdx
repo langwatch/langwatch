@@ -305,7 +305,25 @@ A connected agent needs none of this: it reaches out from your machine, so a loc
 langwatch langy --share-control
 ```
 
-Ask Langy for a code change in the LangWatch panel first. Its request appears in the terminal, and you approve it there. The command then prints what Langy does, one line per call:
+Ask Langy for a code change in the LangWatch panel first. Its request appears in the terminal:
+
+```
+╭─ Langy wants to work in acme-support ───────────────────────────────────────╮
+│                                                                             │
+│   Instrument traces with LangWatch                                          │
+│   Project ACME Support, asked 2 minutes ago.                                │
+│   /Users/dev/acme-support                                                   │
+│                                                                             │
+│   Do you want to share this folder?                                         │
+│ ❯ 1. Share this folder with Langy                                           │
+│   2. Cancel this request                                                    │
+│                                                                             │
+│   Enter or a number to answer · ↑↓ to choose · Esc to leave the request     │
+│   open                                                                      │
+╰─────────────────────────────────────────────────────────────────────────────╯
+```
+
+When two conversations asked for the same folder, you pick one first. After you share it, the command prints what Langy does, one line per call:
 
 ```
 ⏺ Read(app/main.py)
@@ -329,6 +347,8 @@ Reading files and running read-only commands needs no answer. Everything else st
 │   2. Yes, this time only                                                    │
 │   3. No, and tell Langy what to do instead                                  │
 │                                                                             │
+│   The session grant covers every command that starts with "uv run".         │
+│                                                                             │
 │   Enter or a number to answer · ↑↓ to choose · Esc to deny · or answer on   │
 │   the card in LangWatch                                                     │
 ╰─────────────────────────────────────────────────────────────────────────────╯
@@ -340,7 +360,9 @@ The same question also appears as a card in the LangWatch panel, and the first a
 
 With the output piped or redirected there is no selector, because there is no terminal to draw it on. The command prints the question and the card in the panel is the only way to answer it.
 
-Paths outside the folder, `sudo` and files that may hold secrets are refused whatever you answer. A grant lives with this run of the command: stop it and start it again, and Langy asks once more.
+A session grant is the program and its first argument, so `uv run` allows the tests and not `uv pip install`, and `.venv/bin/python -c` allows a one-line program and not every python command. The line under the options says what it covers.
+
+Paths outside the folder and `sudo` are refused whatever you answer. A file that may hold secrets always asks, whether Langy reads it directly or through a shell command, and a command runs with the paths, the shell and the language of your machine rather than with every variable your terminal holds. A grant lives with this run of the command: stop it and start it again, and Langy asks once more.
 
 The command is a live session with no machine-readable output, so it refuses `-o json`. Press Ctrl-C to stop sharing; commands Langy started in the background keep running, and the terminal prints their process id and log path.
 
