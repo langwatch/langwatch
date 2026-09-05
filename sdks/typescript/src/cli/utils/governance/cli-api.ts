@@ -710,6 +710,53 @@ export async function listIngestionKeys(
   }));
 }
 
+/** Why the platform revoked a key, as the server records it. */
+export type IngestionKeyRevocationCause = "user" | "rotation" | "cap";
+
+export interface IngestionKeyDescription {
+  /** `unknown` is also what a key of another user reads as. */
+  status: "live" | "revoked" | "unknown";
+  sourceType?: string;
+  /** Null for a live key, and for one revoked before the cause was recorded. */
+  revocationCause: IngestionKeyRevocationCause | null;
+}
+
+/**
+ * What became of one of the caller's own personal ingestion keys. The hook's
+ * self-heal asks this before it re-mints a key the collector rejected: a key
+ * a person revoked from the API-keys page is left dead, one the cap retired or
+ * a rotation replaced is re-minted. A server from before this route answers
+ * 404, which reads as `unknown`, so an older platform heals as it always did.
+ */
+export async function describeIngestionKey(
+  cfg: GovernanceConfig,
+  lookupId: string,
+  options: CliApiOptions = {},
+): Promise<IngestionKeyDescription> {
+  try {
+    const body = await requestREST<{
+      status: "live" | "revoked" | "unknown";
+      source_type?: string;
+      revocation_cause?: IngestionKeyRevocationCause | null;
+    }>(
+      cfg,
+      "GET",
+      `/api/auth/cli/governance/ingestion-keys/${encodeURIComponent(lookupId)}`,
+      options,
+    );
+    return {
+      status: body.status,
+      sourceType: body.source_type,
+      revocationCause: body.revocation_cause ?? null,
+    };
+  } catch (error) {
+    if (error instanceof GovernanceCliError && error.status === 404) {
+      return { status: "unknown", revocationCause: null };
+    }
+    throw error;
+  }
+}
+
 // IngestionTemplate verbs ----------------------------------------------------
 
 export async function adminListIngestionTemplates(

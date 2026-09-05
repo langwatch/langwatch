@@ -4,7 +4,10 @@
 # See specs/python-sdk/agent-decorator.feature
 
 import asyncio
+import builtins
 import logging
+import subprocess
+import sys
 import threading
 from typing import Any, Literal
 
@@ -251,6 +254,118 @@ def test_call_reads_the_scenario_input_shape():
     }
 
 
+# @scenario "The decorated function is accepted as the agent under test"
+def test_scenario_run_accepts_the_connected_agent_as_the_agent_under_test():
+    import scenario
+
+    @connect_agent(name="under-test")
+    def agent(messages) -> str:
+        return f"answered {messages[-1]['content']}"
+
+    result = run(
+        scenario.run(
+            name="connected agent under test",
+            description="the decorated function answers the user",
+            # The simulator is there to own the user role. Every message is
+            # scripted, so its model is declared but never called.
+            agents=[agent, scenario.UserSimulatorAgent(model="openai/gpt-5-mini")],
+            script=[scenario.user("hello"), scenario.agent(), scenario.succeed()],
+        )
+    )
+
+    assert result.success
+    assert [(m["role"], m["content"]) for m in result.messages] == [
+        ("user", "hello"),
+        ("assistant", "answered hello"),
+    ]
+
+
+def test_role_is_the_scenario_enum_member():
+    from scenario.types import AgentRole
+
+    @connect_agent(name="enum-identity")
+    def agent(messages) -> str:
+        return "reply"
+
+    # The executor compares enum members, so the string value never matches.
+    assert agent.role is AgentRole.AGENT
+    assert agent.role != AgentRole.AGENT.value
+
+
+def test_importing_the_decorator_never_imports_the_scenario_package():
+    """The scenario package is optional, so the role resolves it lazily."""
+    probe = (
+        "import sys;"
+        " from langwatch.agent import decorator;"
+        " assert 'scenario' not in sys.modules, sorted("
+        "     m for m in sys.modules if m.startswith('scenario'))"
+    )
+    done = subprocess.run([sys.executable, "-c", probe], capture_output=True, text=True)
+
+    assert done.returncode == 0, done.stderr
+
+
+def break_the_scenario_import(monkeypatch, *, missing: str) -> None:
+    """Fail every scenario import, reporting `missing` as the absent module."""
+    real_import = builtins.__import__
+
+    def fake_import(module, *args, **kwargs):
+        if module.split(".")[0] == "scenario":
+            raise ModuleNotFoundError(f"No module named '{missing}'", name=missing)
+        return real_import(module, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+
+
+def test_role_falls_back_when_the_scenario_package_is_not_installed(monkeypatch):
+    @connect_agent(name="no-scenario")
+    def agent(messages) -> str:
+        return "reply"
+
+    break_the_scenario_import(monkeypatch, missing="scenario")
+
+    assert agent.role == "Agent"
+
+
+@pytest.mark.parametrize("missing", ["scenario.types", "litellm"])
+def test_role_raises_when_the_scenario_package_is_installed_but_broken(
+    monkeypatch, missing
+):
+    """Only an absent scenario package falls back; a broken install is raised.
+
+    Swallowing this would hand the executor the string value, which never
+    matches AgentRole.AGENT, and the run would fail somewhere else entirely.
+    """
+
+    @connect_agent(name=f"broken-{missing}")
+    def agent(messages) -> str:
+        return "reply"
+
+    break_the_scenario_import(monkeypatch, missing=missing)
+
+    with pytest.raises(ModuleNotFoundError) as raised:
+        agent.role
+
+    assert raised.value.name == missing
+
+
+def test_an_absent_package_is_named_by_its_top_level_module():
+    """What the role guard tells a missing package from a broken one by.
+
+    Python reports the top-level name when the package itself is absent, and
+    the dotted name when only the submodule is, so an exact match on
+    "scenario" is what separates the two.
+    """
+    with pytest.raises(ModuleNotFoundError) as absent:
+        from langwatch_no_such_package.types import AgentRole  # noqa: F401
+
+    with pytest.raises(ModuleNotFoundError) as broken:
+        from scenario.no_such_module import AgentRole  # noqa: F401
+
+    assert absent.value.name == "langwatch_no_such_package"
+    assert broken.value.name == "scenario.no_such_module"
+
+
 def test_call_accepts_a_dict_input():
     @connect_agent(name="duck-dict")
     def agent(messages) -> str:
@@ -407,11 +522,25 @@ def test_registration_frame_carries_the_agent_options():
             "type": "object",
             "properties": {"plan": {"type": "string", "default": "free"}},
         },
-        "concurrency": 4,
+        "concurrency": 10,
         "timeoutMs": 300000,
         "sticky": True,
     }
-    assert ConnectedAgent(agent, name="dev", environment="development").concurrency == 1
+
+
+# @scenario "A connected agent takes ten calls at once unless told otherwise"
+def test_concurrency_defaults_to_ten_in_every_environment():
+    def agent(messages):
+        return "ok"
+
+    assert (
+        ConnectedAgent(agent, name="dev", environment="development").concurrency == 10
+    )
+    assert (
+        ConnectedAgent(agent, name="prod", environment="production").concurrency == 10
+    )
+    assert ConnectedAgent(agent, name="dev", concurrency=3).concurrency == 3
+    assert ConnectedAgent(agent, name="dev", concurrency=0).concurrency == 10
 
 
 def test_langwatch_exports_the_decorator_surface():

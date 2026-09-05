@@ -74,6 +74,8 @@ type MockScenarioRepository = {
 type MockAgentRepository = {
   findManyIncludingArchived: ReturnType<typeof vi.fn>;
   findNamesByIds: ReturnType<typeof vi.fn>;
+  findConnectedByNameAndEnvironment: ReturnType<typeof vi.fn>;
+  findConnectedByName: ReturnType<typeof vi.fn>;
 };
 
 type MockLlmConfigRepository = {
@@ -114,6 +116,8 @@ function makeMockAgentRepository(
       Promise.resolve(ids.map((id) => ({ id, archivedAt: null }))),
     ),
     findNamesByIds: vi.fn(async () => []),
+    findConnectedByNameAndEnvironment: vi.fn(async () => []),
+    findConnectedByName: vi.fn(async () => []),
     ...overrides,
   };
 }

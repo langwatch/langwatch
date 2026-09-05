@@ -362,6 +362,13 @@ const registry = {
     ],
     docsPath: "/agent-testing/run-parameters",
   },
+  agent_environment_unresolved: {
+    tips: [
+      "connected:<name> runs the agent in development, or in the one other environment it is online in; when more than one is online, name it as connected:<name>@<environment>",
+      "Start the process that runs the decorated function; the agent shows Online in the agents list once it connects",
+    ],
+    docsPath: "/agent-testing/connect-your-agent",
+  },
   agent_not_found: {
     tips: [
       "List the project's agents with `langwatch agent list` and use an id from that list",
