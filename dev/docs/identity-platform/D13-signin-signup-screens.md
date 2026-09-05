@@ -1,10 +1,10 @@
 # D13 — Sign-in & sign-up screens (the first-party auth UI)
 
-Epic: `../identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 2 · Depends on: D01 (identifier model); flips with D03 (same flag: `IDENTITY_ROUTER_V2`)
+Epic: `../identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 2 · Depends on: D01 (identifier model); shipped with D03
 
 # Overview
 
-Auth0 owned the front-door visuals; retiring it means every screen an unauthenticated person can touch must be rebuilt first-party. This deliverable is that screen set: sign-in, sign-up, method picker, password reset, email verification, and every deny/guidance state — designed as one experience, shipped behind the router flag, with the hook points D06/D07/D12 later fill. It also moves the join-your-team decision to **before** workspace creation, which is where orphaned organizations stop being minted.
+Auth0 owned the auth-screen visuals; retiring it means every screen an unauthenticated person can touch must be rebuilt first-party. This deliverable is that screen set: sign-in, sign-up, method picker, password reset, email verification, and every deny/guidance state — designed as one experience, shipped behind the router flag, with the hook points D06/D07/D12 later fill. It also moves the join-your-team decision to **before** workspace creation, which is where orphaned organizations stop being minted.
 
 # Requirements
 
@@ -19,7 +19,7 @@ Auth0 owned the front-door visuals; retiring it means every screen an unauthenti
 - **Hook points left, not built**: MFA challenge (D06), passkey button + no-email sign-in (D07), interstitial content and matching (D12).
 - Consistent with the product design system; no Auth0-hosted pages, assets, or redirects anywhere on the unauthenticated surface.
 
-**Cutover:** the screens ship dark behind `IDENTITY_ROUTER_V2` and appear at the enforce flip together with D03's routing. Shadow mode never renders them (it compares routing decisions only).
+**Cutover: done.** The screens shipped dark, flipped with D03's routing, and the flag is now removed along with the legacy screens behind it. `/auth/signin` and `/auth/signup` render the identifier-first screens and nothing else.
 
 **Where the UI lives** (all first-party app routes; zero Auth0-hosted pages):
 

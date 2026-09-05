@@ -1,5 +1,5 @@
-import { Button, Container, Heading, Html, Img } from "@react-email/components";
 import { render } from "@react-email/render";
+import { EmailAction, EmailParagraph, EmailShell } from "./emailLayout";
 import { sendEmail } from "./emailSender";
 
 /**
@@ -24,48 +24,22 @@ export const sendInviteReRequestEmail = async ({
   membersSettingsUrl: string;
 }) => {
   const emailHtml = await render(
-    <Html lang="en" dir="ltr">
-      <Container
-        style={{
-          border: "1px solid #F2F4F8",
-          borderRadius: "10px",
-          padding: "24px",
-          paddingBottom: "12px",
-        }}
-      >
-        <Img
-          src="https://app.langwatch.ai/images/logo-icon.png"
-          alt="LangWatch Logo"
-          width="36"
-        />
-        <Heading as="h1">An invitation expired</Heading>
-        <p>
-          <strong>{invitedEmail}</strong> tried to accept their invitation to{" "}
-          <strong>{organizationName}</strong> on LangWatch, but it had already
-          expired. They asked for a new one.
-        </p>
-        <p>
-          Resending takes one click and sends them a fresh link. The expired one
-          stops working when you do.
-        </p>
-        <Button
-          href={membersSettingsUrl}
-          style={{
-            padding: "10px 20px",
-            color: "white",
-            backgroundColor: "#ED8926",
-            textDecoration: "none",
-            borderRadius: "6px",
-          }}
-        >
-          Open members settings
-        </Button>
-        <p>
-          If you did not mean to invite them, you can ignore this — their
-          expired link already does nothing.
-        </p>
-      </Container>
-    </Html>,
+    <EmailShell title="An invitation expired">
+      <EmailParagraph>
+        <strong>{invitedEmail}</strong> tried to accept their invitation to{" "}
+        <strong>{organizationName}</strong> on LangWatch, but it had already
+        expired. They asked for a new one.
+      </EmailParagraph>
+      <EmailParagraph>
+        Resending takes one click and sends them a fresh link. The expired one
+        stops working when you do.
+      </EmailParagraph>
+      <EmailAction href={membersSettingsUrl} label="Open members settings" />
+      <EmailParagraph tone="muted" style={{ margin: 0 }}>
+        If you did not mean to invite them, you can ignore this — their expired
+        link already does nothing.
+      </EmailParagraph>
+    </EmailShell>,
   );
 
   await sendEmail({

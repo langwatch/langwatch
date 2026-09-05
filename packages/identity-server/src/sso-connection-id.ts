@@ -17,9 +17,51 @@ export function newSsoConnectionId(): string {
   return generate("ssoc").toString();
 }
 
+/**
+ * Whether a string is SHAPED like a connection id.
+ *
+ * A pre-filter and never the decision: what settles it is the row. better-auth
+ * stores the connection id as an account's provider, so every OAuth account
+ * the deployment mints — google, github, the brokered one — passes the same
+ * seam as a connection arrival, and asking the database about each of them is
+ * a round trip to learn "no". The prefix is a persisted contract stated at the
+ * top of this file, so reading it here costs nothing and commits to nothing.
+ *
+ * The environment prefixes ksuids (`local_ssoc_...`), and `ssocmd_` is a
+ * different form, so the underscore on both sides is load-bearing.
+ */
+export function looksLikeSsoConnectionId(value: string): boolean {
+  return /(?:^|_)ssoc_/.test(value);
+}
+
 /** A live ops or self-service action's command id. */
 export function newSsoConnectionCommandId(): string {
   return generate("ssocmd").toString();
+}
+
+/** One way back in, granted to one person until one date (D05). Minted here
+ *  rather than beside the connection ids' consumers for the same reason they
+ *  are: an id prefix is a persisted contract. */
+export function newSsoBreakGlassBindingId(): string {
+  return generate("ssobg").toString();
+}
+
+/**
+ * Whether an id names a connection — in any form above, under any environment
+ * prefix (`generate` prefixes everything but production).
+ *
+ * Asked by the legacy storage branch, which has to tell two provider ids apart
+ * that look identical to it: one whose issuer we MINT synthetically, and one
+ * that brings a real issuer of its own. Only a connection does the latter, so
+ * only a connection may be found by a provider id standing beside an issuer
+ * the `Account` table could never have stored.
+ *
+ * `ssocmd_` and `ssobg_` deliberately do not match: neither ever appears as a
+ * provider id, and a prefix test loose enough to catch them would be loose
+ * enough to catch the next id minted with an `ssoc` stem.
+ */
+export function isSsoConnectionId(id: string): boolean {
+  return id.startsWith("ssoc_") || id.includes("_ssoc_");
 }
 
 /**

@@ -61,6 +61,10 @@ minimumReleaseAgeExclude:
   # entry point alone fails on the first transitive one. All of them, pinned.
   - better-auth@1.7.1
   - "@better-auth/passkey@1.7.1"
+  # The single sign-on plugin, on the same reasoning and the same release as
+  # the rest of the family (D09): it is what terminates a customer's own
+  # OpenID Connect and SAML provider, and it only exists at 1.7.x.
+  - "@better-auth/sso@1.7.1"
   - "@better-auth/core@1.7.1"
   - "@better-auth/drizzle-adapter@1.7.1"
   - "@better-auth/kysely-adapter@1.7.1"

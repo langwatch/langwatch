@@ -26,6 +26,7 @@ import {
 } from "~/generated/prisma/client";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { assertLegacySsoStringWriteAllowed } from "~/server/app-layer/identity/legacy-sso-string-writes";
+import { identityEmail } from "~/server/app-layer/identity/runtime";
 import { getServerAuthSession } from "~/server/auth";
 import { auth as betterAuth } from "~/server/better-auth";
 import { prisma } from "~/server/db";
@@ -132,8 +133,13 @@ async function handleImpersonate(c: any, method: "POST" | "DELETE") {
 
   // Adapt the real `auditLog` (typed with NextApiRequest) to the service's
   // structural `AuditLogFn`, which keeps Next/Hono types out of the service.
-  const service = ImpersonationService.create(prisma, async (entry) =>
-    auditLog({ ...entry, req: entry.req as any }),
+  const service = ImpersonationService.create(
+    prisma,
+    async (entry) => auditLog({ ...entry, req: entry.req as any }),
+    // The same fork `getServerAuthSession` resolves the session's own address
+    // through, so the admin gate on this route and the admin guard inside the
+    // service are reading one answer rather than two.
+    ({ userId }) => identityEmail().resolveEmail({ userId }),
   );
 
   if (method === "DELETE") {
@@ -497,18 +503,23 @@ secured.access(adminAuth).post("/admin/:resource", async (c) => {
   }
 
   // The legacy SSO strings: normalized while they still decide sign-in, and
-  // refused once the connection projection does (ADR-117 §5). Inert until
-  // `SSOCONN_ROUTING` reaches `enforce` — every connection change already has
-  // a guarded command with the actor on it, and after the flip these two
-  // columns are derived rather than settings.
+  // refused for an organization whose connection decides it instead
+  // (ADR-117 §5). Every connection change already has a guarded command with
+  // the actor on it, so for those organizations these two columns are
+  // derived rather than settings.
   if (
     body.resource === "organization" &&
     (body.method === "create" || body.method === "update")
   ) {
     const params = body.params as
-      | { data?: Record<string, unknown> }
+      | { id?: unknown; data?: Record<string, unknown> }
       | undefined;
-    assertLegacySsoStringWriteAllowed({ data: params?.data });
+    await assertLegacySsoStringWriteAllowed({
+      organizationId: params?.id === undefined ? null : String(params.id),
+      data: params?.data,
+      hasConnection: async ({ organizationId }) =>
+        (await prisma.ssoConnection.count({ where: { organizationId } })) > 0,
+    });
     const ssoDomain = params?.data?.ssoDomain;
     if (typeof ssoDomain === "string" && ssoDomain.trim() !== "") {
       params!.data!.ssoDomain = ssoDomain.trim().toLowerCase();

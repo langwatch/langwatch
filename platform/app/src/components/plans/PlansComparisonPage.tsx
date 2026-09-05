@@ -1,32 +1,29 @@
 import {
-  Badge,
   Box,
   Button,
-  Card,
   Flex,
+  Grid,
   Heading,
   HStack,
-  SimpleGrid,
   Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ArrowLeft, Check, DollarSign, Euro, Info } from "lucide-react";
+import { ArrowLeft, Info } from "lucide-react";
 import { useState } from "react";
 import { Link } from "~/components/ui/link";
+// The page's display voice (Sentient) is declared in langyTheme.css. Imported
+// HERE, the way the home page does it, because no Langy or auth-screen surface
+// mounts inside settings and the face would otherwise fall back to a plain
+// serif on the one screen inside the product that is selling something.
+import "~/features/langy/langyTheme.css";
+import { HEADING_FONT, SHAPE } from "~/features/auth/authTheme";
 import { Currency as PrismaCurrency } from "~/generated/prisma/client";
 import { api } from "~/utils/api";
-import { CONTACT_SALES_URL } from "../../../ee/licensing/constants";
-import {
-  type BillingInterval,
-  type Currency,
-  currencySymbol,
-  ENTERPRISE_PLAN_FEATURES,
-  FREE_PLAN_FEATURES,
-  formatPrice,
-  getGrowthPlanFeatures,
-  getGrowthSeatPriceCents,
-} from "../subscription/billing-plans";
+import type { BillingInterval, Currency } from "../subscription/billing-plans";
+import { PlanCard, type PlanStanding } from "./PlanCard";
+import { PlanControls } from "./PlanControls";
+import { getNextPlan, getPlanColumns } from "./planColumns";
 import {
   type ComparisonPlanId,
   resolveCurrentComparisonPlan,
@@ -36,46 +33,6 @@ import {
 const BILLABLE_EVENTS_DOCS_URL =
   "https://docs.langwatch.ai/pricing/billable-events";
 
-type PlanColumn = {
-  id: ComparisonPlanId;
-  name: string;
-  subtitle: string;
-  actionLabel: string;
-  actionHref: string;
-  actionColor: "blue" | "orange";
-  features: string[];
-};
-
-const getPlanColumns = (currency: Currency): PlanColumn[] => [
-  {
-    id: "free",
-    name: "Free",
-    subtitle: "For teams getting started",
-    actionLabel: "Get Started",
-    actionHref: "/settings/subscription",
-    actionColor: "blue",
-    features: FREE_PLAN_FEATURES,
-  },
-  {
-    id: "growth",
-    name: "Growth",
-    subtitle: "Seat and usage pricing for growing teams",
-    actionLabel: "Get Started",
-    actionHref: "/settings/subscription",
-    actionColor: "orange",
-    features: getGrowthPlanFeatures(currency),
-  },
-  {
-    id: "enterprise",
-    name: "Enterprise",
-    subtitle: "Regulated and high-volume deployments",
-    actionLabel: "Contact Sales",
-    actionHref: CONTACT_SALES_URL,
-    actionColor: "blue",
-    features: ENTERPRISE_PLAN_FEATURES,
-  },
-];
-
 type PlansComparisonPageProps = {
   activePlan?: {
     type?: string | null;
@@ -84,145 +41,21 @@ type PlansComparisonPageProps = {
   pricingModel?: string | null;
 };
 
-function getPlanPrice(
-  planId: ComparisonPlanId,
-  currency: Currency,
-  billingPeriod: BillingInterval,
-): string {
-  if (planId === "free") return `${currencySymbol[currency]}0 per user/month`;
-  if (planId === "growth") {
-    const p = getGrowthSeatPriceCents();
-    const cents =
-      billingPeriod === "annual"
-        ? Math.round(p[currency].annual / 12)
-        : p[currency].monthly;
-    return `${formatPrice({ cents, currency })} per seat/month`;
-  }
-  return "Custom pricing";
-}
-
-function PlanCardActions({
-  plan,
-  currentPlan,
-}: {
-  plan: PlanColumn;
-  currentPlan: ComparisonPlanId | null;
-}) {
-  if (plan.id === "free") {
-    return null;
-  }
-
-  if (plan.id === "growth") {
-    if (currentPlan === "growth") {
-      return (
-        <VStack width="full" gap={2}>
-          <Button
-            asChild
-            width="full"
-            color="bg.emphasized"
-            backgroundColor="orange.600"
-            variant="solid"
-          >
-            <Link href="/settings/members">Add Members</Link>
-          </Button>
-        </VStack>
-      );
-    }
-
-    return (
-      <Button asChild width="full" colorPalette="orange" variant="solid">
-        <Link color="white" href="/settings/subscription">
-          Upgrade Now
-        </Link>
-      </Button>
-    );
-  }
-
-  if (plan.id === "enterprise" && currentPlan !== "enterprise") {
-    return (
-      <Button asChild width="full" colorPalette="muted" variant="outline">
-        <Link href={CONTACT_SALES_URL} isExternal>
-          Contact Sales
-        </Link>
-      </Button>
-    );
-  }
-
-  return null;
-}
-
-function PlanCard({
-  plan,
-  isCurrent,
-  currentPlan,
-  currency,
-  billingPeriod,
-}: {
-  plan: PlanColumn;
-  isCurrent: boolean;
-  currentPlan: ComparisonPlanId | null;
-  currency: Currency;
-  billingPeriod: BillingInterval;
-}) {
-  return (
-    <Card.Root
-      data-testid={`plan-column-${plan.id}`}
-      borderWidth={1}
-      borderColor="border.emphasized"
-      bg="bg.panel"
-      borderRadius="2xl"
-      height="full"
-      transition="all 0.2s ease-in-out"
-      _hover={{
-        transform: "scale(1.02)",
-        boxShadow: "lg",
-      }}
-    >
-      <Card.Body paddingY={6} paddingX={6}>
-        <VStack align="stretch" gap={5} height="full">
-          <VStack align="start" gap={1}>
-            <HStack gap={2}>
-              <Heading as="h2" size="xl">
-                {plan.name}
-              </Heading>
-              {isCurrent && (
-                <Badge colorPalette="green" variant="surface" size={"lg"}>
-                  Current
-                </Badge>
-              )}
-            </HStack>
-            <Text color="fg" fontSize="md" fontWeight="medium">
-              {getPlanPrice(plan.id, currency, billingPeriod)}
-            </Text>
-            <Text color="fg.muted" fontSize="sm">
-              {plan.subtitle}
-            </Text>
-          </VStack>
-
-          <VStack align="start" gap={2} flex={1}>
-            {plan.features.map((feature) => (
-              <HStack key={feature} align="start" gap={2}>
-                <Check
-                  size={14}
-                  style={{ marginTop: "4px", flexShrink: 0 }}
-                  color="var(--chakra-colors-blue-500)"
-                />
-                <Text fontSize="sm" color="fg.muted">
-                  {feature}
-                </Text>
-              </HStack>
-            ))}
-          </VStack>
-
-          <VStack width="full" marginTop="auto" paddingTop={4}>
-            <PlanCardActions plan={plan} currentPlan={currentPlan} />
-          </VStack>
-        </VStack>
-      </Card.Body>
-    </Card.Root>
-  );
-}
-
+/**
+ * The plans row, in the auth screens' language.
+ *
+ * This is a settings page and it stays one — the app's own layout, its colour
+ * modes, its tokens — but it is also the only screen inside the product that
+ * is selling something, so it borrows the vocabulary of the screen people
+ * arrive on: the site's serif for the headings, the brand orange for exactly
+ * one action, warm tint for the plan the organization already holds, and
+ * hairlines for everything else.
+ *
+ * Nothing here decides anything. The plan the reader is on comes from
+ * `resolveCurrentComparisonPlan`, the figures from the Stripe catalogue
+ * through `planColumns`, and the bullets from `billing-plans`. What this file
+ * owns is which of those the eye reaches first.
+ */
 export function PlansComparisonPage({
   activePlan,
   pricingModel,
@@ -248,149 +81,188 @@ export function PlansComparisonPage({
       gap={6}
       width="full"
       align="stretch"
-      maxWidth="900px"
+      maxWidth="1000px"
       marginX="auto"
     >
-      <Flex justifyContent="space-between" alignItems="flex-start">
-        <Box flex={1}>
-          <Link href="/settings/subscription">
-            <Button variant="ghost" size="sm" color="gray.600">
-              <ArrowLeft size={14} /> Subscription
-            </Button>
-          </Link>
-        </Box>
-        <VStack align="center" gap={1} flex={2}>
-          <Heading size="xl" as="h2">
+      <PlansMasthead
+        billingPeriod={billingPeriod}
+        onBillingPeriodChange={setBillingPeriod}
+        currency={currency}
+        onCurrencyChange={setSelectedCurrency}
+      />
+
+      {showTieredNotice ? <DiscontinuedPricingNotice /> : null}
+
+      <PlanRow
+        currentPlan={currentPlan}
+        currency={currency}
+        billingPeriod={billingPeriod}
+      />
+    </VStack>
+  );
+}
+
+/**
+ * The way back, the title, the sentence under it, and the two switches that
+ * change what the figures say — the switches beside the title rather than
+ * centred on a row of their own, where they read as the settings for the row
+ * underneath.
+ */
+function PlansMasthead({
+  billingPeriod,
+  onBillingPeriodChange,
+  currency,
+  onCurrencyChange,
+}: {
+  billingPeriod: BillingInterval;
+  onBillingPeriodChange: (billingPeriod: BillingInterval) => void;
+  currency: Currency;
+  onCurrencyChange: (currency: Currency) => void;
+}) {
+  return (
+    <VStack align="stretch" gap={4}>
+      <Box>
+        <Link href="/settings/subscription">
+          <Button
+            variant="ghost"
+            size="sm"
+            color="fg.muted"
+            borderRadius={SHAPE.action}
+            paddingInline={3}
+            marginInlineStart={-3}
+            _hover={{ color: "fg", backgroundColor: "bg.muted" }}
+          >
+            <ArrowLeft size={14} /> Subscription
+          </Button>
+        </Link>
+      </Box>
+
+      <Flex
+        direction={{ base: "column", md: "row" }}
+        justifyContent="space-between"
+        alignItems={{ base: "stretch", md: "flex-end" }}
+        gap={4}
+      >
+        <VStack align="start" gap={1} maxWidth="46ch">
+          <Heading
+            as="h2"
+            fontFamily={HEADING_FONT}
+            fontWeight={400}
+            fontSize={{ base: "30px", md: "38px" }}
+            lineHeight="1.1"
+            letterSpacing="-0.02em"
+            color="fg"
+          >
             Plans
           </Heading>
-          <Text color="fg.muted">
+          <Text color="fg.muted" fontSize="15px">
             Compare plans and choose the right tier for your organization.
           </Text>
           <Link
             href={BILLABLE_EVENTS_DOCS_URL}
             isExternal
             data-testid="billable-events-docs-link"
-            fontSize="sm"
+            fontSize="13px"
             color="fg.muted"
             display="inline-flex"
             alignItems="center"
             gap={1}
-            _hover={{ color: "fg" }}
+            marginTop={1}
+            _hover={{ color: "auth.ink" }}
           >
             <Info size={13} />
             What counts as an event?
           </Link>
         </VStack>
-        <Box flex={1} />
+
+        <PlanControls
+          billingPeriod={billingPeriod}
+          onBillingPeriodChange={onBillingPeriodChange}
+          currency={currency}
+          onCurrencyChange={onCurrencyChange}
+        />
       </Flex>
-
-      <HStack
-        width="full"
-        justifyContent={{ base: "center", md: "center" }}
-        flexWrap="wrap"
-        gap={3}
-      >
-        <Box flex={{ md: 1 }} />
-        <HStack
-          gap={0}
-          bg="bg.muted"
-          borderRadius="full"
-          padding="1"
-          data-testid="billing-period-toggle"
-        >
-          {[
-            { label: "Monthly", value: "monthly" as const },
-            { label: "Annually", value: "annual" as const },
-          ].map((opt) => (
-            <Box
-              key={opt.value}
-              as="button"
-              aria-pressed={billingPeriod === opt.value}
-              onClick={() => setBillingPeriod(opt.value)}
-              paddingX={4}
-              paddingY={1.5}
-              borderRadius="full"
-              fontSize="sm"
-              fontWeight={billingPeriod === opt.value ? "semibold" : "normal"}
-              color={billingPeriod === opt.value ? "orange.500" : "fg.muted"}
-              bg={billingPeriod === opt.value ? "bg.panel" : "transparent"}
-              boxShadow={billingPeriod === opt.value ? "xs" : "none"}
-              transition="all 0.15s ease-in-out"
-              cursor="pointer"
-              _hover={{
-                color: billingPeriod === opt.value ? "orange.500" : "fg",
-              }}
-            >
-              {opt.label}
-            </Box>
-          ))}
-        </HStack>
-        <Box flex={{ md: 1 }} display="flex" justifyContent="flex-end">
-          <Button
-            data-testid="currency-toggle"
-            variant="subtle"
-            size="sm"
-            _hover={{
-              bgColor: "orange.400",
-              color: "bg.muted",
-            }}
-            onClick={() =>
-              setSelectedCurrency(
-                currency === PrismaCurrency.EUR
-                  ? PrismaCurrency.USD
-                  : PrismaCurrency.EUR,
-              )
-            }
-          >
-            {currency === PrismaCurrency.EUR ? (
-              <Euro size={14} />
-            ) : (
-              <DollarSign size={14} />
-            )}
-            {currency}
-          </Button>
-        </Box>
-      </HStack>
-
-      {showTieredNotice && (
-        <Box
-          data-testid="tiered-discontinued-notice"
-          backgroundColor="orange.50"
-          borderWidth={1}
-          borderColor="orange.200"
-          borderRadius="md"
-          padding={4}
-        >
-          <HStack gap={2} alignItems="start">
-            <Info size={16} color="var(--chakra-colors-orange-500)" />
-            <Text fontSize="sm" color="orange.900">
-              Your current pricing model has been discontinued.{" "}
-              <Link
-                href="/settings/subscription"
-                fontWeight="semibold"
-                color="orange.700"
-                _hover={{ color: "orange.900" }}
-              >
-                Update your plan
-              </Link>{" "}
-              to move to seat and usage billing.
-            </Text>
-          </HStack>
-        </Box>
-      )}
-
-      <SimpleGrid columns={{ base: 1, md: 3 }} gap={4}>
-        {getPlanColumns(currency).map((plan) => (
-          <PlanCard
-            key={plan.id}
-            plan={plan}
-            isCurrent={currentPlan === plan.id}
-            currentPlan={currentPlan}
-            currency={currency}
-            billingPeriod={billingPeriod}
-          />
-        ))}
-      </SimpleGrid>
     </VStack>
+  );
+}
+
+/**
+ * Said in the brand's own warm tint rather than in a warning colour: the
+ * organization is not in trouble, and the sentence is an invitation to move,
+ * so it is set like one.
+ */
+function DiscontinuedPricingNotice() {
+  return (
+    <HStack
+      data-testid="tiered-discontinued-notice"
+      gap={3}
+      alignItems="start"
+      backgroundColor="auth.tint"
+      borderWidth={1}
+      borderColor="auth.detail"
+      borderRadius={SHAPE.card}
+      paddingInline={4}
+      paddingBlock={3}
+    >
+      <Box color="auth.ink" flexShrink={0} paddingTop="2px">
+        <Info size={16} />
+      </Box>
+      <Text fontSize="14px" color="fg">
+        Your current pricing model has been discontinued.{" "}
+        <Link
+          href="/settings/subscription"
+          fontWeight="600"
+          color="auth.ink"
+          textDecoration="underline"
+          textUnderlineOffset="3px"
+        >
+          Update your plan
+        </Link>{" "}
+        to move to seat and usage billing.
+      </Text>
+    </HStack>
+  );
+}
+
+/**
+ * The row is ONE grid, and each card subgrids its four rows into it, so the
+ * names, the figures, the lists and the actions line up across all three
+ * columns however much any one of them has to say. Below `md` the cards stack
+ * and each keeps its own rows.
+ */
+function PlanRow({
+  currentPlan,
+  currency,
+  billingPeriod,
+}: {
+  currentPlan: ComparisonPlanId | null;
+  currency: Currency;
+  billingPeriod: BillingInterval;
+}) {
+  const nextPlan = getNextPlan(currentPlan);
+  const standingOf = (planId: ComparisonPlanId): PlanStanding => {
+    if (currentPlan === planId) return "held";
+    return nextPlan === planId ? "offered" : "listed";
+  };
+
+  return (
+    <Grid
+      templateColumns={{ base: "1fr", md: "repeat(3, minmax(0, 1fr))" }}
+      templateRows={{ md: "auto auto auto 1fr" }}
+      gap={5}
+      width="full"
+      alignItems="stretch"
+    >
+      {getPlanColumns(currency).map((plan) => (
+        <PlanCard
+          key={plan.id}
+          plan={plan}
+          standing={standingOf(plan.id)}
+          currentPlan={currentPlan}
+          currency={currency}
+          billingPeriod={billingPeriod}
+        />
+      ))}
+    </Grid>
   );
 }

@@ -14,13 +14,17 @@ import {
   CompleteTeardownCommand,
   DiscardConnectionCommand,
   GrandfatherConnectionCommand,
+  RecordDomainProofAbsentCommand,
+  RecordDomainProofPresentCommand,
   RegisterConnectionCommand,
   RejectDomainClaimCommand,
   RequestTeardownCommand,
   RequestVerificationCommand,
   ResumeConnectionCommand,
+  SetArrivalPolicyCommand,
   SuspendConnectionCommand,
   VerifyDomainCommand,
+  WithdrawDomainCommand,
 } from "./commands/ssoConnectionCommands";
 import {
   CONNECTION_TEARDOWN_INITIAL_STATE,
@@ -53,7 +57,7 @@ import type { SsoConnectionEvent } from "./schemas/events";
  * class, so a list says that, and adding a verb is one line in one place
  * instead of five in two.
  */
-const CONNECTION_COMMANDS = [
+export const CONNECTION_COMMANDS = [
   ["registerConnection", RegisterConnectionCommand],
   ["claimDomain", ClaimDomainCommand],
   ["approveDomainClaim", ApproveDomainClaimCommand],
@@ -62,11 +66,15 @@ const CONNECTION_COMMANDS = [
   ["requestVerification", RequestVerificationCommand],
   ["attestDomain", AttestDomainCommand],
   ["verifyDomain", VerifyDomainCommand],
+  ["withdrawDomain", WithdrawDomainCommand],
   ["activateConnection", ActivateConnectionCommand],
   ["suspendConnection", SuspendConnectionCommand],
   ["resumeConnection", ResumeConnectionCommand],
   ["requestTeardown", RequestTeardownCommand],
   ["completeTeardown", CompleteTeardownCommand],
+  ["setArrivalPolicy", SetArrivalPolicyCommand],
+  ["recordDomainProofAbsent", RecordDomainProofAbsentCommand],
+  ["recordDomainProofPresent", RecordDomainProofPresentCommand],
   ["grandfatherConnection", GrandfatherConnectionCommand],
 ] as const;
 
@@ -86,10 +94,10 @@ export interface SsoConnectionPipelineDeps {
  * the operational projection folds into the Postgres `SsoConnection` head in
  * per-connection FIFO.
  *
- * Ships DARK: `SSOCONN_ROUTING` defaults to `off`, so nothing routes off this
- * projection and no string write stops. The grandfather migration is the only
- * production writer until D05's self-service, and it is paced by the same
- * per-organization enrollment every other in-place migration is.
+ * The rollout is the connection itself: nothing routes off this projection
+ * for an organization that has not turned one on, and the grandfather
+ * migration is paced by the same per-organization enrollment every other
+ * in-place migration is.
  *
  * Lanes: the commands keep the default per-aggregate group key — one
  * connection is one lane, which is already the narrowest useful shard, and a

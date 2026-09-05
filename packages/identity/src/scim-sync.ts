@@ -92,6 +92,8 @@ export const SCIM_APPLY_RECOVERED_EVENT_TYPE =
   "lw.identity.scim_apply_recovered" as const;
 export const SCIM_APPLY_RETIRED_EVENT_TYPE =
   "lw.identity.scim_apply_retired" as const;
+export const SCIM_APPLY_REDRIVEN_EVENT_TYPE =
+  "lw.identity.scim_apply_redriven" as const;
 export const SCIM_TOKEN_REVOKED_EVENT_TYPE =
   "lw.identity.scim_token_revoked" as const;
 
@@ -102,6 +104,7 @@ export const SCIM_SYNC_EVENT_TYPES = [
   SCIM_APPLY_FAILED_EVENT_TYPE,
   SCIM_APPLY_RECOVERED_EVENT_TYPE,
   SCIM_APPLY_RETIRED_EVENT_TYPE,
+  SCIM_APPLY_REDRIVEN_EVENT_TYPE,
   SCIM_TOKEN_REVOKED_EVENT_TYPE,
 ] as const;
 export type ScimSyncEventType = (typeof SCIM_SYNC_EVENT_TYPES)[number];
@@ -169,6 +172,27 @@ export const scimApplyRetiredPayloadSchema = z.object({
   userId: z.string().min(1).nullable(),
 });
 
+/**
+ * The one write the operator surface has (ADR-122): a retired apply is sent
+ * through again, once its cause has been fixed.
+ *
+ * It names WHICH dead letter by the business time it was retired at, because
+ * a connection can hold several and "re-drive the failure" is not an
+ * instruction anybody could check. The operator rides on the fact rather than
+ * only in the audit trail: a re-drive is authority exercised across a tenant
+ * boundary, and the tenant's own history is where that has to be readable.
+ */
+export const scimApplyRedrivenPayloadSchema = z.object({
+  ...syncIdentity,
+  op: scimApplyOpSchema,
+  errorCode: z.string().min(1),
+  userId: z.string().min(1).nullable(),
+  /** Business time of the retirement this re-drive answers. */
+  retiredAtMs: z.number().int().nonnegative(),
+  /** The platform operator who sent it through again. */
+  actor: identityActorSchema,
+});
+
 export const scimTokenRevokedPayloadSchema = z.object({
   ...syncIdentity,
   tokenId: z.string().min(1).nullable(),
@@ -206,6 +230,10 @@ export const scimSyncFactInputSchema = z.discriminatedUnion("type", [
     data: scimApplyRetiredPayloadSchema,
   }),
   z.object({
+    type: z.literal(SCIM_APPLY_REDRIVEN_EVENT_TYPE),
+    data: scimApplyRedrivenPayloadSchema,
+  }),
+  z.object({
     type: z.literal(SCIM_TOKEN_REVOKED_EVENT_TYPE),
     data: scimTokenRevokedPayloadSchema,
   }),
@@ -230,6 +258,14 @@ export interface ScimSyncFailure {
   attempts: number;
   /** Set once the failure is retired: it will not be retried again. */
   retiredAtMs: number | null;
+  /**
+   * Set once a platform operator has sent the retired apply through again
+   * (ADR-122). Null on every failure nobody has re-driven — which is also
+   * what makes a second re-drive state nothing: the dead letter itself
+   * carries whether the act has already happened, so idempotency is a
+   * property of the history rather than of whoever pressed the control.
+   */
+  redrivenAtMs: number | null;
   /** The person it was about, when it was about one. */
   userId: string | null;
   occurredAtMs: number;
@@ -344,6 +380,7 @@ export function reduceScimSync({
             ? state.lastFailure.attempts + 1
             : 1,
           retiredAtMs: null,
+          redrivenAtMs: null,
           userId: fact.data.userId,
           occurredAtMs: fact.occurredAt,
         },
@@ -356,6 +393,7 @@ export function reduceScimSync({
         errorCode: fact.data.errorCode,
         attempts: fact.data.attempts,
         retiredAtMs: fact.occurredAt,
+        redrivenAtMs: null,
         userId: fact.data.userId,
         occurredAtMs: fact.occurredAt,
       };
@@ -367,6 +405,23 @@ export function reduceScimSync({
         state: "ERROR",
         lastFailure: retired,
         deadLetters: [...state.deadLetters, retired],
+      };
+    }
+    case SCIM_APPLY_REDRIVEN_EVENT_TYPE: {
+      // Stamps the ONE dead letter the operator named, and leaves the sync
+      // where it is. A re-drive is a request, not an outcome: what the apply
+      // then does states its own fact, and moving the connection to SYNCING
+      // here would report a directory as healthy on the strength of somebody
+      // having tried.
+      const stamp = (failure: ScimSyncFailure): ScimSyncFailure =>
+        failure.retiredAtMs === fact.data.retiredAtMs &&
+        failure.redrivenAtMs === null
+          ? { ...failure, redrivenAtMs: fact.occurredAt }
+          : failure;
+      return {
+        ...touched,
+        lastFailure: state.lastFailure ? stamp(state.lastFailure) : null,
+        deadLetters: state.deadLetters.map(stamp),
       };
     }
     case SCIM_TOKEN_REVOKED_EVENT_TYPE:

@@ -42,7 +42,7 @@ func scimError(w http.ResponseWriter, status int, detail string) {
 
 // scimUserResource renders a user in SCIM 2.0 shape.
 func scimUserResource(u *User) map[string]any {
-	return map[string]any{
+	resource := map[string]any{
 		"schemas":  []string{scimUserSchema},
 		"id":       u.ID,
 		"userName": u.UserName,
@@ -54,8 +54,15 @@ func scimUserResource(u *User) map[string]any {
 		"displayName": u.DisplayName(),
 		"emails":      []map[string]any{{"value": u.Email, "primary": true}},
 		"active":      u.Active,
-		"externalId":  u.ExternalID,
 	}
+	// ABSENT, NEVER EMPTY. A user the simulator seeded has no external id,
+	// and "externalId": "" is not "no external id" to a service provider - it
+	// is an external id that happens to be blank, which a strict one refuses
+	// the whole resource over. Sending nothing says what we mean.
+	if u.ExternalID != "" {
+		resource["externalId"] = u.ExternalID
+	}
+	return resource
 }
 
 func scimGroupResource(t *Tenant, g *Group) map[string]any {

@@ -20,28 +20,40 @@ import {
   GRANDFATHER_CONNECTION_COMMAND_TYPE,
   type GrandfatherConnectionCommandData,
   grandfatherConnectionCommandDataSchema,
+  RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE,
+  RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE,
   REGISTER_CONNECTION_COMMAND_TYPE,
   REJECT_DOMAIN_CLAIM_COMMAND_TYPE,
   REQUEST_TEARDOWN_COMMAND_TYPE,
   REQUEST_VERIFICATION_COMMAND_TYPE,
   RESUME_CONNECTION_COMMAND_TYPE,
+  type RecordDomainProofAbsentCommandData,
+  type RecordDomainProofPresentCommandData,
   type RegisterConnectionCommandData,
   type RejectDomainClaimCommandData,
   type RequestTeardownCommandData,
   type RequestVerificationCommandData,
   type ResumeConnectionCommandData,
+  recordDomainProofAbsentCommandDataSchema,
+  recordDomainProofPresentCommandDataSchema,
   registerConnectionCommandDataSchema,
   rejectDomainClaimCommandDataSchema,
   requestTeardownCommandDataSchema,
   requestVerificationCommandDataSchema,
   resumeConnectionCommandDataSchema,
+  SET_ARRIVAL_POLICY_COMMAND_TYPE,
+  type SetArrivalPolicyCommandData,
   type SsoConnectionCommand,
   SUSPEND_CONNECTION_COMMAND_TYPE,
   type SuspendConnectionCommandData,
+  setArrivalPolicyCommandDataSchema,
   suspendConnectionCommandDataSchema,
   VERIFY_DOMAIN_COMMAND_TYPE,
   type VerifyDomainCommandData,
   verifyDomainCommandDataSchema,
+  WITHDRAW_DOMAIN_COMMAND_TYPE,
+  type WithdrawDomainCommandData,
+  withdrawDomainCommandDataSchema,
 } from "@langwatch/identity";
 import type { SsoConnectionGuards } from "@langwatch/identity-server";
 import type { ZodTypeAny, z } from "zod";
@@ -172,6 +184,14 @@ export const VerifyDomainCommand = connectionCommand({
 });
 export type VerifyDomainPayload = VerifyDomainCommandData;
 
+export const WithdrawDomainCommand = connectionCommand({
+  type: WITHDRAW_DOMAIN_COMMAND_TYPE,
+  schema: withdrawDomainCommandDataSchema,
+  description: "Take a domain back out of the connection",
+  verb: "withdrawDomain",
+});
+export type WithdrawDomainPayload = WithdrawDomainCommandData;
+
 export const ActivateConnectionCommand = connectionCommand({
   type: ACTIVATE_CONNECTION_COMMAND_TYPE,
   schema: activateConnectionCommandDataSchema,
@@ -211,6 +231,31 @@ export const CompleteTeardownCommand = connectionCommand({
   verb: "completeTeardown",
 });
 export type CompleteTeardownPayload = CompleteTeardownCommandData;
+
+export const SetArrivalPolicyCommand = connectionCommand({
+  type: SET_ARRIVAL_POLICY_COMMAND_TYPE,
+  schema: setArrivalPolicyCommandDataSchema,
+  description: "Choose what happens to a person this connection has never seen",
+  verb: "setArrivalPolicy",
+});
+export type SetArrivalPolicyPayload = SetArrivalPolicyCommandData;
+
+export const RecordDomainProofAbsentCommand = connectionCommand({
+  type: RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE,
+  schema: recordDomainProofAbsentCommandDataSchema,
+  description: "Record that a re-check found a domain's ownership proof gone",
+  verb: "recordDomainProofAbsent",
+});
+export type RecordDomainProofAbsentPayload = RecordDomainProofAbsentCommandData;
+
+export const RecordDomainProofPresentCommand = connectionCommand({
+  type: RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE,
+  schema: recordDomainProofPresentCommandDataSchema,
+  description: "Record that a re-check found a domain's ownership proof back",
+  verb: "recordDomainProofPresent",
+});
+export type RecordDomainProofPresentPayload =
+  RecordDomainProofPresentCommandData;
 
 export const GrandfatherConnectionCommand = connectionCommand({
   type: GRANDFATHER_CONNECTION_COMMAND_TYPE,

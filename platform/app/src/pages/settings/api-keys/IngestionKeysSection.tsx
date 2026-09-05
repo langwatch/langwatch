@@ -1,19 +1,16 @@
 import {
   Badge,
-  Box,
   Button,
   Card,
   Heading,
-  HStack,
   Table,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import { Radio, Trash2 } from "lucide-react";
 
-import { Tooltip } from "../../../components/ui/tooltip";
 import type { RouterOutputs } from "../../../utils/api";
-import { formatTimeAgo } from "../../../utils/formatTimeAgo";
+import { ApiKeyLastUsedCell, ApiKeyNameCell } from "./ApiKeyTableCells";
 import { apiKeyRowAnchorId } from "./apiKeyAnchor";
 
 type IngestionKeyRow = RouterOutputs["apiKey"]["list"][number];
@@ -58,78 +55,33 @@ export function IngestionKeysSection({
           <Table.Root variant="line" size="md" width="full">
             <Table.Header>
               <Table.Row>
-                <Table.ColumnHeader>Name</Table.ColumnHeader>
-                <Table.ColumnHeader>Status</Table.ColumnHeader>
-                <Table.ColumnHeader>Secret Key</Table.ColumnHeader>
-                <Table.ColumnHeader>Created</Table.ColumnHeader>
-                <Table.ColumnHeader>Last Used</Table.ColumnHeader>
+                <Table.ColumnHeader>Key</Table.ColumnHeader>
                 <Table.ColumnHeader>Source</Table.ColumnHeader>
                 <Table.ColumnHeader>Created from</Table.ColumnHeader>
-                <Table.ColumnHeader width="100px"></Table.ColumnHeader>
+                <Table.ColumnHeader>Last used</Table.ColumnHeader>
+                <Table.ColumnHeader>Created</Table.ColumnHeader>
+                <Table.ColumnHeader width="60px" />
               </Table.Row>
             </Table.Header>
             <Table.Body>
               {keys.map((apiKey) => (
                 <Table.Row key={apiKey.id} id={apiKeyRowAnchorId(apiKey.id)}>
                   <Table.Cell>
-                    <HStack align="start">
-                      <Box paddingTop={1}>
-                        <Radio size={14} />
-                      </Box>
-                      <VStack align="start" gap={0}>
-                        <Text>{apiKey.name}</Text>
-                        {apiKey.description && (
-                          <Text fontSize="xs" color="fg.muted">
-                            {apiKey.description}
-                          </Text>
-                        )}
-                      </VStack>
-                    </HStack>
+                    <ApiKeyNameCell
+                      name={apiKey.name}
+                      description={apiKey.description}
+                      secret={{
+                        display: `ik-lw-${apiKey.lookupIdPrefix}…`,
+                        copyValue: `ik-lw-${apiKey.lookupIdPrefix}`,
+                        copyLabel: `Copy the key identifier for ${apiKey.name}`,
+                        copiedTitle: "Key identifier copied",
+                      }}
+                      isExpired={isExpired(apiKey)}
+                      icon={<Radio size={14} aria-hidden />}
+                    />
                   </Table.Cell>
                   <Table.Cell>
-                    {isExpired(apiKey) ? (
-                      <Badge size="sm" colorPalette="red">
-                        Expired
-                      </Badge>
-                    ) : (
-                      <Badge size="sm" colorPalette="green">
-                        Active
-                      </Badge>
-                    )}
-                  </Table.Cell>
-                  <Table.Cell>
-                    <Text fontSize="xs" fontFamily="monospace" color="fg.muted">
-                      ik-lw-{apiKey.lookupIdPrefix}…
-                    </Text>
-                  </Table.Cell>
-                  <Table.Cell>
-                    {new Date(apiKey.createdAt).toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                    })}
-                  </Table.Cell>
-                  <Table.Cell>
-                    {apiKey.lastUsedAt ? (
-                      <Tooltip
-                        content={new Date(apiKey.lastUsedAt).toISOString()}
-                      >
-                        <Text
-                          cursor="help"
-                          tabIndex={0}
-                          aria-label={`Last used at ${new Date(apiKey.lastUsedAt).toISOString()}`}
-                        >
-                          {formatTimeAgo(new Date(apiKey.lastUsedAt).getTime())}
-                        </Text>
-                      </Tooltip>
-                    ) : (
-                      <Text fontSize="sm" color="fg.muted">
-                        Never
-                      </Text>
-                    )}
-                  </Table.Cell>
-                  <Table.Cell>
-                    <Badge size="sm" colorPalette="blue">
+                    <Badge size="sm" variant="subtle" colorPalette="blue">
                       {apiKey.ingestSourceType}
                     </Badge>
                   </Table.Cell>
@@ -141,6 +93,18 @@ export function IngestionKeysSection({
                         Unknown device
                       </Text>
                     )}
+                  </Table.Cell>
+                  <Table.Cell>
+                    <ApiKeyLastUsedCell lastUsedAt={apiKey.lastUsedAt} />
+                  </Table.Cell>
+                  <Table.Cell>
+                    <Text fontSize="sm">
+                      {new Date(apiKey.createdAt).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </Text>
                   </Table.Cell>
                   <Table.Cell>
                     {/* Ingestion keys carry no role bindings to edit; revoke

@@ -19,8 +19,12 @@ import {
   identifierDetachedEventSchema,
   identifierVerifiedEventSchema,
   identityEventSchema,
+  type LinkConfirmedEvent,
   type LinkProposedEvent,
+  type LinkRejectedEvent,
+  linkConfirmedEventSchema,
   linkProposedEventSchema,
+  linkRejectedEventSchema,
   type PrimaryChangedEvent,
   primaryChangedEventSchema,
   type UserErasedEvent,
@@ -37,6 +41,8 @@ const identityEvents = [
   identifierDetachedEventSchema,
   userErasedEventSchema,
   linkProposedEventSchema,
+  linkConfirmedEventSchema,
+  linkRejectedEventSchema,
 ] as const;
 
 /** The reducer's heads plus the base class's bookkeeping stamps — server
@@ -149,6 +155,27 @@ export class IdentityStateFoldProjection
    */
   handleIdentityLinkProposed(
     event: LinkProposedEvent,
+    state: IdentityFoldState,
+  ): IdentityFoldState {
+    return this.fold(event, state);
+  }
+
+  /**
+   * A decision on a proposal, folded for the same reason the proposal is:
+   * it moves no head, and it still has to move the cursor. Confirming is
+   * followed by the ordinary attach ceremony, which is what actually gives
+   * the person a head — so a fold that attached one here would be doing the
+   * ceremony's job with none of its guards.
+   */
+  handleIdentityLinkConfirmed(
+    event: LinkConfirmedEvent,
+    state: IdentityFoldState,
+  ): IdentityFoldState {
+    return this.fold(event, state);
+  }
+
+  handleIdentityLinkRejected(
+    event: LinkRejectedEvent,
     state: IdentityFoldState,
   ): IdentityFoldState {
     return this.fold(event, state);

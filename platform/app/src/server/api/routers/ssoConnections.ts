@@ -1,5 +1,6 @@
 import { auditLog } from "@ee/audit-log/auditLog";
 import { z } from "zod";
+import { PrismaSsoConnectionBackofficeRepository } from "~/server/app-layer/identity/repositories/sso-connection-backoffice.prisma.repository";
 import { ssoConnections } from "~/server/app-layer/identity/runtime";
 import { SsoConnectionBackofficeService } from "~/server/app-layer/identity/sso-connection-backoffice.service";
 import { prisma } from "~/server/db";
@@ -70,7 +71,7 @@ function requireOperator(user: { id: string; email?: string | null }): {
 
 function service(): SsoConnectionBackofficeService {
   return new SsoConnectionBackofficeService({
-    prisma,
+    reads: new PrismaSsoConnectionBackofficeRepository(prisma),
     connections: ssoConnections,
   });
 }
@@ -124,38 +125,6 @@ export const ssoConnectionsRouter = createTRPCRouter({
         targetId: input.connectionId,
       });
       return service().getById(input);
-    }),
-
-  register: protectedProcedure
-    .input(
-      z.object({
-        organizationId: z.string().min(1),
-        // The union the aggregate speaks, so a SAML request reaches the
-        // service and is refused BY NAME. Narrowing it to `"oidc"` here would
-        // answer a validation error instead, which tells the operator the
-        // field is wrong rather than that the protocol is not self-serve yet.
-        type: z.enum(["oidc", "saml"]),
-        providerId: z.string().min(1).max(100),
-        issuer: z.string().max(2048).nullable().default(null),
-        allowsJit: z.boolean().default(false),
-      }),
-    )
-    .noPermission(NO_PERMISSION_FOR_ORGANIZATION)
-    .mutation(async ({ ctx, input }) => {
-      const operator = await audited({ ctx, action: "register", args: input });
-      return service().registerConnection({ ...input, operator });
-    }),
-
-  claimDomain: protectedProcedure
-    .input(domainTarget)
-    .noPermission(NO_PERMISSION_FOR_ORGANIZATION)
-    .mutation(async ({ ctx, input }) => {
-      const operator = await audited({
-        ctx,
-        action: "claimDomain",
-        args: input,
-      });
-      await service().claimDomain({ ...input, operator });
     }),
 
   approveDomainClaim: protectedProcedure

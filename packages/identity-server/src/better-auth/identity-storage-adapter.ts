@@ -13,12 +13,15 @@ import type {
 } from "better-auth/adapters";
 import { createAdapterFactory } from "better-auth/adapters";
 import type { IdentityUserGate } from "../identity-user-gate";
+import { isSsoConnectionId } from "../sso-connection-id";
+import type { SsoProviderConfigCipher } from "../sso-provider-config-cipher";
 import {
   type AccountQuery,
   type AccountWhere,
   IdentityUnsupportedStorageQueryError,
   issuerForProviderId,
   parseAccountQuery,
+  providerIdFromIssuer,
 } from "./account-queries";
 import type { IdentityAccountCeremonies } from "./ceremony-types";
 import {
@@ -32,6 +35,7 @@ import type {
   IdentityAccountRow,
   IdentityAccountSecrets,
   IdentityAccountsPort,
+  IdentityConnectionIssuersPort,
   IdentityResolutionPort,
 } from "./storage-ports";
 
@@ -129,6 +133,12 @@ export interface IdentityStorageAdapterDeps {
   legacyEngine: (options: BetterAuthOptions) => DBAdapter;
   accounts: IdentityAccountsPort;
   resolution: IdentityResolutionPort;
+  /**
+   * The issuer each connection registered, both ways. Required rather than
+   * optional: without it the legacy branch silently cannot serve a single
+   * connection, which is the shape of failure this port exists to end.
+   */
+  connectionIssuers: IdentityConnectionIssuersPort;
   ceremonies: IdentityAccountCeremonies;
   /** ADR-116 §2: `finalized` and nothing else, cached, fail-closed. */
   isUserOnIdentityWrites: IdentityUserGate;
@@ -150,6 +160,15 @@ export interface IdentityStorageAdapterDeps {
    * deploy of the entrance from changing anything on its own.
    */
   birth: IdentityBirthPort;
+  /**
+   * Opens the engine row's dialing configuration on its way out (D09).
+   *
+   * Required rather than optional, and for the reason the credential vault
+   * is: a cipher nobody passed would leave the document readable by anybody
+   * holding a database copy, and an optional dependency nobody wires is a
+   * protection that only looks present.
+   */
+  providerConfig: SsoProviderConfigCipher;
 }
 
 /**
@@ -231,10 +250,12 @@ function identityCustomAdapter({
   legacy,
   accounts,
   resolution,
+  connectionIssuers,
   ceremonies,
   isUserOnIdentityWrites,
   isAnyoneOnIdentityWrites,
   birth,
+  providerConfig,
 }: Omit<IdentityStorageAdapterDeps, "legacyEngine"> & {
   legacy: DBAdapter;
 }): AdapterFactoryCustomizeAdapterCreator {
@@ -700,6 +721,194 @@ function identityCustomAdapter({
       );
     };
 
+    /**
+     * better-auth 1.7's issuer, translated back into the only vocabulary the
+     * legacy `Account` table speaks.
+     *
+     * The table predated the issuer half of 1.7's account key, and for a while
+     * had no column for it: the provider id was the row's whole truth, and
+     * handing an issuer clause to the legacy engine was a
+     * `PrismaClientValidationError` on a column that did not exist — which
+     * reached customers as "two-step verification wouldn't start".
+     *
+     * IT HAS THE COLUMN NOW (`account_issuer`: added, backfilled, and indexed
+     * as `(issuer, providerAccountId)`, which is the key 1.7 looks an account
+     * up by). What survives is the translation of the SYNTHETIC forms, which
+     * are ours and which no column should hold twice:
+     *
+     * - an issuer beside the providerId it was minted from is the same fact
+     *   said twice, and is dropped;
+     * - an issuer standing alone in one of the synthetic forms is rewritten
+     *   to the providerId it encodes;
+     * - an issuer contradicting the providerId beside it answers NO ROWS
+     *   (`null` here). Dropping such a clause instead would widen the query,
+     *   and a widened account key is how one identity provider's subject
+     *   resolves another's user;
+     * - a REAL issuer standing alone is passed through to the column, which
+     *   narrows rather than widens: a row whose issuer is null or different
+     *   does not match.
+     */
+    /*
+     * IT HANDS BACK A MUTABLE ARRAY, and that is not a detail. It takes a
+     * `readonly` list because it does not write to what it is given, and it
+     * used to hand the same list straight back on the two paths that change
+     * nothing — so `readonly` travelled out with it, into a binding
+     * better-auth types as mutable. Seven assignments failed to typecheck for
+     * a variance that says nothing about this function's behaviour.
+     *
+     * Copying on those two paths costs one shallow copy on a lookup that has
+     * already decided to do nothing, and it means every caller gets the same
+     * shape whichever branch answered.
+     *
+     * IT ALSO TAKES A LIST RATHER THAN A MAYBE-LIST. Handing it `undefined`
+     * only ever got `undefined` straight back, which is not a translation and
+     * put an `undefined` in the return type that four of the seven callers —
+     * the ones better-auth guarantees a `where` to — then had to talk their
+     * way out of. The two callers that genuinely hold an optional one skip
+     * the call instead, which is what "there is nothing to translate" means.
+     */
+    const legacyAccountWhere = async (
+      model: string,
+      where: readonly CleanedWhere[],
+    ): Promise<CleanedWhere[] | null> => {
+      const canonicalNameOf = (clause: CleanedWhere): string =>
+        getDefaultFieldName({ model, field: clause.field });
+      const issuerClause = where.find(
+        (clause) => canonicalNameOf(clause) === "issuer",
+      );
+      if (issuerClause === undefined) return [...where];
+      const issuer = issuerClause.value;
+      if (
+        (issuerClause.operator?.toLowerCase() ?? "eq") !== "eq" ||
+        typeof issuer !== "string"
+      ) {
+        return null;
+      }
+      const rest = where.filter((clause) => clause !== issuerClause);
+      const derived = providerIdFromIssuer(issuer);
+      const providerClause = rest.find(
+        (clause) => canonicalNameOf(clause) === "providerId",
+      );
+      if (providerClause !== undefined) {
+        const providerId = providerClause.value;
+        if (typeof providerId !== "string") return null;
+        // The issuer was minted from this very provider id: the same fact
+        // twice, and the table already keys by the half it holds.
+        if (derived === providerId) return rest;
+        // AN ISSUER WE DID NOT MINT, BESIDE A CONNECTION. This is not a
+        // contradiction, it is the ordinary shape of single sign-on: a
+        // connection's issuer is its identity provider's real URL, which
+        // decodes to no provider id because we never encoded one into it.
+        //
+        // Refusing it was refusing every RETURNING person on a connection.
+        // The first sign-in created the row, the next one could not find it,
+        // and better-auth created it again — straight into the unique
+        // constraint on (provider, providerAccountId), which reached the
+        // person as "Something went wrong signing you in".
+        //
+        // Nothing is widened by answering: the provider id is a connection
+        // id, unique to one identity provider by construction, so the key
+        // stays exactly as specific as it was. A built-in provider beside a
+        // foreign issuer stays unanswerable, which is the case that would
+        // resolve one provider's subject onto another's.
+        if (derived === null && isSsoConnectionId(providerId)) return rest;
+        return null;
+      }
+
+      // AN ISSUER STANDING ALONE, which is the shape that actually matters:
+      // `findAccountOwnerByKey` — the OAuth callback's lookup — sends the
+      // issuer and the subject and NO provider id at all. A synthetic issuer
+      // decodes; a connection's real one has to be looked up, because the
+      // connection wrote it down when it registered.
+      const registered =
+        derived === null
+          ? await connectionIssuers.providerIdForIssuer({ issuer })
+          : derived;
+      // An issuer no connection registered and no provider id encodes — a
+      // built-in provider's REAL issuer, of which Google's is the one that
+      // matters. Answered by matching the column directly.
+      //
+      // This used to return "no rows", on the premise that the legacy table
+      // keys nothing by issuer. It does now: `account_issuer` added the
+      // column, backfilled Google's rows with
+      // `https://accounts.google.com`, and indexed
+      // `(issuer, providerAccountId)` — which is exactly the key 1.7 looks an
+      // account up by. Passing the clause through NARROWS rather than widens:
+      // a row whose issuer is null or different does not match, so one
+      // identity provider's subject still cannot resolve another's user.
+      // Copied, for the reason the note below this function gives: it takes a
+      // `readonly` list and every caller is typed a mutable one.
+      if (registered === null) return [...where];
+      return [
+        ...rest,
+        { ...issuerClause, field: "providerId", value: registered },
+      ];
+    };
+
+    /**
+     * And minted back onto every account row the legacy branch serves, for
+     * the same reason `withIssuer` mints it on the identity branch: 1.7
+     * checks the issuer on rows it is handed — a credential row without one
+     * fails its own `local:credential` comparison, which reaches the person
+     * as a wrong password. Every legacy row's issuer is the synthetic form,
+     * because the legacy table never stored a real one: a provider with an
+     * issuer of its own arrived after the identity branch existed to hold it.
+     */
+    /**
+     * The engine row's dialing configuration, opened on its way out.
+     *
+     * This is the ONLY reader — the plugin takes whatever the adapter hands
+     * it, and its own parse accepts a document that is already an object or
+     * still a string. So the row can be kept sealed at rest (D09) and opened
+     * here, once, on the path that is about to dial the provider.
+     *
+     * Total over both forms: a row written before the seal existed is
+     * returned unchanged, so this needs no backfill to be correct and no
+     * branch at the call sites.
+     */
+    const withOpenedProviderConfig = (model: string, row: Row): Row => {
+      if (modelOf(model) !== "ssoProvider") return row;
+      const opened = { ...row };
+      for (const field of ["oidcConfig", "samlConfig"] as const) {
+        const stored = opened[field];
+        if (typeof stored === "string" && stored.length > 0) {
+          opened[field] = providerConfig.open(stored);
+        }
+      }
+      return opened;
+    };
+
+    /**
+     * Everything a row needs on its way OUT of the store, in one place.
+     *
+     * Both halves are per-model no-ops for the model the other one serves, so
+     * every generic read path can call this without asking what it is holding
+     * — which is what keeps a new outbound rule from having to be remembered
+     * at four call sites.
+     */
+    const outbound = async (model: string, row: Row): Promise<Row> =>
+      withOpenedProviderConfig(model, await withLegacyIssuer(model, row));
+
+    const withLegacyIssuer = async (model: string, row: Row): Promise<Row> => {
+      if (modelOf(model) !== "account") return row;
+      if (row.issuer != null) return row;
+      const providerId = row.providerId;
+      if (typeof providerId !== "string") return row;
+      // A CONNECTION GETS THE ISSUER IT REGISTERED, not a synthetic one.
+      // 1.7 compares the issuer on the row it is handed against the issuer
+      // the ceremony is running for (`acc.issuer === account.issuer`, and
+      // again under `requireExactAccountBinding`). Minting `local:oauth:<id>`
+      // for a connection fails that comparison every time, so finding the row
+      // at all would not have been enough on its own.
+      const registered = await connectionIssuers.registeredIssuerFor({
+        providerId,
+      });
+      return {
+        ...row,
+        issuer: registered ?? issuerForProviderId(providerId),
+      };
+    };
+
     const adapter: CustomAdapter = {
       create: async ({ model, data, select }) => {
         const canonical = toCanonicalKeys(model, data);
@@ -728,10 +937,11 @@ function identityCustomAdapter({
           // ceremony pinned would stop being the row's.
           forceAllowId: true,
         });
-        return toStorageKeys(model, row) as never;
+        return toStorageKeys(model, await outbound(model, row)) as never;
       },
 
       findOne: async ({ model, where, select, join }) => {
+        let legacyWhere = where;
         if (modelOf(model) === "account") {
           const rows = await routeAccount({
             model,
@@ -742,17 +952,22 @@ function identityCustomAdapter({
             const row = rows[0];
             return row ? (toStorageKeys(model, { ...row }) as never) : null;
           }
+          const translated = await legacyAccountWhere(model, where);
+          if (translated === null) return null;
+          legacyWhere = translated;
         }
         const found = await legacy.findOne<Row>({
           model,
           where:
             modelOf(model) === "user"
-              ? await resolveUserWhere(model, where)
-              : where,
+              ? await resolveUserWhere(model, legacyWhere)
+              : legacyWhere,
           select,
           join,
         });
-        return found === null ? null : (toStorageKeys(model, found) as never);
+        return found === null
+          ? null
+          : (toStorageKeys(model, await outbound(model, found)) as never);
       },
 
       findMany: async ({
@@ -764,6 +979,7 @@ function identityCustomAdapter({
         offset,
         join,
       }) => {
+        let legacyWhere = where;
         if (modelOf(model) === "account") {
           const rows = await routeAccount({
             model,
@@ -784,31 +1000,50 @@ function identityCustomAdapter({
               .slice(0, limit)
               .map((row) => toStorageKeys(model, { ...row })) as never;
           }
+          // A findMany with no `where` asks for every account row, and there
+          // is nothing in "everything" to translate — the issuer clause the
+          // translation exists for is exactly what is absent.
+          if (where !== undefined) {
+            const translated = await legacyAccountWhere(model, where);
+            if (translated === null) return [] as never;
+            legacyWhere = translated;
+          }
         }
         const found = await legacy.findMany<Row>({
           model,
           where:
-            modelOf(model) === "user" && where !== undefined
-              ? await resolveUserWhere(model, where)
-              : where,
+            modelOf(model) === "user" && legacyWhere !== undefined
+              ? await resolveUserWhere(model, legacyWhere)
+              : legacyWhere,
           limit,
           select,
           sortBy,
           offset,
           join,
         });
-        return found.map((row) => toStorageKeys(model, row)) as never;
+        return (await Promise.all(
+          found.map(async (row) =>
+            toStorageKeys(model, await outbound(model, row)),
+          ),
+        )) as never;
       },
 
       count: async ({ model, where }) => {
         if (modelOf(model) === "account") {
           const rows = await routeAccount({ model, operation: "count", where });
           if (rows !== null) return rows.length;
+          // Counting every account row has no issuer clause to translate, so
+          // it goes to the legacy engine exactly as it arrived.
+          if (where === undefined) return legacy.count({ model });
+          const translated = await legacyAccountWhere(model, where);
+          if (translated === null) return 0;
+          return legacy.count({ model, where: translated });
         }
         return legacy.count({ model, where });
       },
 
       update: async ({ model, where, update }) => {
+        let legacyWhere = where;
         if (modelOf(model) === "account") {
           const rows = await routeAccount({
             model,
@@ -833,6 +1068,9 @@ function identityCustomAdapter({
               ? null
               : (toStorageKeys(model, { ...fresh }) as never);
           }
+          const translated = await legacyAccountWhere(model, where);
+          if (translated === null) return null;
+          legacyWhere = translated;
         }
         if (modelOf(model) === "user") {
           const remaining = await withoutRoutedEmail({
@@ -858,15 +1096,19 @@ function identityCustomAdapter({
             ? null
             : (toStorageKeys(model, updated) as never);
         }
+        const canonicalUpdate = toCanonicalKeys(model, update as Row);
         const row = await legacy.update<Row>({
           model,
-          where,
-          update: toCanonicalKeys(model, update as Row),
+          where: legacyWhere,
+          update: canonicalUpdate,
         });
-        return row === null ? null : (toStorageKeys(model, row) as never);
+        return row === null
+          ? null
+          : (toStorageKeys(model, await outbound(model, row)) as never);
       },
 
       updateMany: async ({ model, where, update }) => {
+        let legacyWhere = where;
         if (modelOf(model) === "account") {
           const rows = await routeAccount({
             model,
@@ -884,6 +1126,9 @@ function identityCustomAdapter({
             });
             return rows.length;
           }
+          const translated = await legacyAccountWhere(model, where);
+          if (translated === null) return 0;
+          legacyWhere = translated;
         }
         if (modelOf(model) === "user") {
           const remaining = await withoutRoutedEmail({ model, where, update });
@@ -894,10 +1139,11 @@ function identityCustomAdapter({
             update: toCanonicalKeys(model, remaining),
           });
         }
+        const canonicalUpdate = toCanonicalKeys(model, update);
         return legacy.updateMany({
           model,
-          where,
-          update: toCanonicalKeys(model, update),
+          where: legacyWhere,
+          update: canonicalUpdate,
         });
       },
 
@@ -912,6 +1158,10 @@ function identityCustomAdapter({
             await detachOnIdentityBranch(rows);
             return;
           }
+          const translated = await legacyAccountWhere(model, where);
+          if (translated === null) return;
+          await legacy.delete({ model, where: translated });
+          return;
         }
         await legacy.delete({ model, where });
       },
@@ -935,6 +1185,9 @@ function identityCustomAdapter({
               erasingUser: isWholeUserScope(model, where),
             });
           }
+          const translated = await legacyAccountWhere(model, where);
+          if (translated === null) return 0;
+          return legacy.deleteMany({ model, where: translated });
         }
         return legacy.deleteMany({ model, where });
       },

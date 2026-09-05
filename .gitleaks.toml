@@ -239,6 +239,22 @@ regexes = [
   '''^eyJhbGciOiJIUzI1NiJ9\.eyJzdWIiOiIxMjM0NTY3ODkwIn0\.dBjftJeZ4CVPmB92K27uhbUJU1p1r_wW1gFWFOEjXk$''',
 ]
 
+# The WebAuthn AAGUID map. An AAGUID is the FIDO Alliance's PUBLIC identifier
+# for an authenticator MODEL — every YubiKey 5 in the world reports the same
+# one, the authenticator broadcasts it in every attestation, and the FIDO
+# metadata service publishes the full list. The map here only turns one into a
+# product name for the passkeys screen ("YubiKey 5", "1Password"). gitleaks'
+# `generic-api-key` rule fires on the `"<high-entropy uuid>": "<name>"` shape
+# and cannot tell a registry identifier from a credential.
+#
+# Scoped to `generic-api-key` and to this one path, so every provider-specific
+# rule still applies here, and scoped by path rather than by value so
+# recognising a new authenticator does not need a config change.
+[[allowlists]]
+description = "WebAuthn AAGUIDs are published model identifiers, not credentials"
+targetRules = ["generic-api-key"]
+paths = ['''platform/app/src/components/me/passkeyAuthenticators\.ts''']
+
 # `ik-lw-fresh1234567890_secret`, the stand-in ingestion token an earlier commit
 # on the ingest-key rotation branch handed the mocked `apiKeys.create`. The tip
 # spells it `ik-lw-fake-token`, which no rule fires on, but gitleaks scans the

@@ -6,20 +6,23 @@ import { PersonalWorkspaceService } from "@ee/governance/services/personalWorksp
 import { RoutingPolicyService } from "@ee/governance/services/routingPolicy.service";
 import { resolveAuthProvider } from "@ee/sso/sso-gate";
 import { ValidationError } from "@langwatch/handled-error";
-import { passwordProblem } from "@langwatch/identity";
-import { issuerForProviderId } from "@langwatch/identity-server/better-auth";
+import { normalizeIdentifierValue, passwordProblem } from "@langwatch/identity";
 import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
-import { compare, hash } from "bcrypt";
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
-import { deploymentOffersPasskeys } from "~/server/app-layer/identity/signin-method-policy";
+import type { FederatedPasswordResult } from "~/server/app-layer/identity/credential-account.service";
+import {
+  credentialAccounts,
+  signUpVerification,
+} from "~/server/app-layer/identity/runtime";
+import { deploymentOffersTwoStepVerification } from "~/server/app-layer/identity/signin-method-policy";
 import { NoAdminConfiguredError } from "~/server/app-layer/organizations/errors";
 import {
-  Auth0ApiError,
-  changeAuth0Password,
-} from "~/server/auth0/passwordService";
-import { revokeOtherSessionsForUser } from "~/server/better-auth/revokeSessions";
+  AuthRateLimitedError,
+  DirectRegistrationUnavailableError,
+} from "~/server/auth/errors";
+import { Auth0ApiError } from "~/server/auth0/passwordService";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { BudgetOverviewService } from "~/server/gateway/budgetOverview.service";
 import { sendBudgetIncreaseRequestEmail } from "~/server/mailer/budgetIncreaseRequestEmail";
@@ -28,22 +31,145 @@ import { resolveSupportContact } from "~/server/organizations/resolveSupportCont
 import { rateLimit } from "~/server/rateLimit";
 import { AvatarRateLimitedError } from "~/server/user-avatar/avatar";
 import { UserAvatarService } from "~/server/user-avatar/avatar.service";
-import { createCredentialUser } from "~/server/users/credential-user";
-import { EmailAlreadyRegisteredError } from "~/server/users/errors";
 import { UserService } from "~/server/users/user.service";
-import { getClientIp } from "~/utils/getClientIp";
+import { getDirectPeerIp } from "~/utils/getClientIp";
 import { isAdmin as checkIsAdmin } from "../../../../ee/admin/isAdmin";
 import { env } from "../../../env.mjs";
+import type { Session } from "../../auth";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 
 const logger = createLogger("langwatch:user-router");
+
+/**
+ * How long until a rate-limit budget refills, in whole seconds, never
+ * negative. Carried on the refusal so a screen can count down rather than say
+ * "later" and leave somebody guessing.
+ */
+function secondsUntil(resetAt: number): number {
+  return Math.max(0, Math.ceil((resetAt - Date.now()) / 1000));
+}
+
+/**
+ * The session a password write is allowed to spare, or null for "spare
+ * nothing".
+ *
+ * Null while IMPERSONATING, and that is the safeguard rather than an
+ * omission: the session id an operator's request carries is the operator's
+ * own, so asking to end every OTHER session of the subject would end the
+ * subject's and leave the operator's — the opposite of what the caller means.
+ * Password changes should not be reachable while impersonating at all; this is
+ * the defensive half of that.
+ */
+function sessionToSpare(session: Session): string | null {
+  if (session.user.impersonator) return null;
+  return session.sessionId ?? null;
+}
+
+/**
+ * The settings an operator has to change before Auth0 will accept a password
+ * change at all, keyed by the code its API answers with.
+ *
+ * Named rather than "try again later" because none of them will come right on
+ * their own: they are the Management application's grants and configuration,
+ * and the person typing their password can do nothing about any of them.
+ */
+const AUTH0_MISCONFIGURATIONS: Record<string, string> = {
+  insufficient_scope:
+    "Auth0 is not authorized to update users. Ask an administrator to enable the update:users scope on the Auth0 Management M2M application.",
+  password_grant_not_enabled:
+    "Auth0 Password grant is not enabled on the Management M2M application. Ask an administrator to enable it under that application's Advanced Settings → Grant Types.",
+  not_configured:
+    "Auth0 is not configured on the server. Set AUTH0_ISSUER plus AUTH0_MGMT_CLIENT_ID/SECRET (or AUTH0_CLIENT_ID/SECRET).",
+};
+
+/** An Auth0 failure, as the transport answers it. */
+function auth0Failure(error: Auth0ApiError): TRPCError {
+  // The tenant's own password policy refused the new password. Shown verbatim,
+  // because it is the only one of these the person can act on and only the
+  // tenant knows what it asks for.
+  if (error.code === "weak_password") {
+    return new TRPCError({ code: "BAD_REQUEST", message: error.message });
+  }
+  return new TRPCError({
+    code: "INTERNAL_SERVER_ERROR",
+    message:
+      AUTH0_MISCONFIGURATIONS[error.code] ??
+      "Could not update password with Auth0. Please try again later.",
+  });
+}
+
+/**
+ * Changing a password the Auth0 tenant holds, rather than one of our own rows.
+ *
+ * Only the Auth0 database connection has a password the Management API can
+ * update, and only the credential service knows which row that is; each answer
+ * below is a refusal the caller can act on. Auth0's own errors arrive as
+ * `Auth0ApiError` and are translated once, in {@link auth0Failure}.
+ */
+async function changeAuth0HeldPassword({
+  session,
+  currentPassword,
+  newPassword,
+}: {
+  session: Session;
+  currentPassword: string;
+  newPassword: string;
+}): Promise<void> {
+  let outcome: FederatedPasswordResult;
+  try {
+    outcome = await credentialAccounts().changeFederatedPassword({
+      userId: session.user.id,
+      email: session.user.email ?? null,
+      currentPassword,
+      newPassword,
+      keepSessionId: sessionToSpare(session),
+    });
+  } catch (error) {
+    if (error instanceof Auth0ApiError) throw auth0Failure(error);
+    throw error;
+  }
+
+  if (outcome === "no_federated_account") {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message:
+        "No Auth0 database (Email/Password) account is linked to this user. Password changes are only supported for that sign-in method.",
+    });
+  }
+  if (outcome === "no_address_on_record") {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Authenticated session is missing an email",
+    });
+  }
+  if (outcome === "wrong_password") {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Current password is incorrect",
+    });
+  }
+}
 
 /**
  * How long "not now" lasts (ADR-120). Long enough that the offer reads as an
  * offer rather than a nag, short enough that somebody who declined on the day
  * they signed up is asked again once they have something worth protecting.
  */
-const PASSKEY_NUDGE_INTERVAL_DAYS = 30;
+const SECURE_ACCOUNT_NUDGE_INTERVAL_DAYS = 30;
+
+const DAY_MS = 24 * 60 * 60_000;
+
+/**
+ * A display name, as `user.updateName` will accept it.
+ *
+ * Trimmed BEFORE the length checks, so "   " is a name of length zero and is
+ * refused rather than stored as a blank that renders as an unexplained gap in
+ * every member list. Exported so the shape is testable on its own, without
+ * standing a router up around it.
+ *
+ * Spec: specs/settings/profile.feature
+ */
+export const PROFILE_NAME_SCHEMA = z.string().trim().min(1).max(120);
 
 export const userRouter = createTRPCRouter({
   getTraceExplorerTourPreference: protectedProcedure
@@ -99,7 +225,7 @@ export const userRouter = createTRPCRouter({
   register: publicProcedure
     .input(
       z.object({
-        // Optional: the front door does not ask. Onboarding does, in a place
+        // Optional: the auth screens does not ask. Onboarding does, in a place
         // where the question is worth a field. The legacy sign-up page still
         // sends one, so it is taken when it comes.
         name: z.string().min(1, "Name is required").optional(),
@@ -109,6 +235,13 @@ export const userRouter = createTRPCRouter({
         // looking at. An input-schema rejection arrives as a tRPC parse error
         // with no field to hang on.
         password: z.string().min(1),
+        /**
+         * The single-use proof that an emailed link already confirmed this
+         * address, minted by `completeSignUpVerification` for an address that
+         * had no account behind it. Where it checks out, the account is born
+         * confirmed and no second link is sent.
+         */
+        addressProof: z.string().min(1).optional(),
       }),
     )
     .noPermission({
@@ -126,13 +259,10 @@ export const userRouter = createTRPCRouter({
           meta: { fieldErrors: { password: [problem] } },
         });
       }
-      // BetterAuth lowercases the email on every one of its lookups and
-      // writes, and sign-in goes through BetterAuth. An account stored as
-      // typed, capitals and all, is therefore one that sign-in can never find
-      // again, no matter the password. Store the shape sign-in will search
-      // for. Customer report: onboarding signups that autocapitalised the
-      // address were permanently locked out with "User already exists".
-      const email = input.email.toLowerCase();
+      // The same canonical normalization identity attach and sign-in use.
+      // Storing a different shape makes the new account unreachable by the
+      // identifier the front door resolves.
+      const email = normalizeIdentifierValue(input.email);
 
       // Keyed off the RESOLVED provider, not the raw env: on an SSO-capable
       // deployment with no genuine license the platform gate coerces the
@@ -140,48 +270,77 @@ export const userRouter = createTRPCRouter({
       // the signup form's actual backend — blocking it would kill the
       // fresh-signup recovery route (Decision 5c).
       if ((await resolveAuthProvider()) !== "email") {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message:
-            "Direct registration is not available for this auth provider",
-        });
+        throw new DirectRegistrationUnavailableError();
       }
 
-      // Per-IP rate limit. Mirrors BetterAuth's `/sign-up/email` 20-per-hour
-      // limit so the tRPC path can't be used as a side-channel for spam
-      // signups (iter 45/46 of the migration audit).
-      const ip = getClientIp(ctx.req) ?? "unknown";
+      // Direct-peer rate limit. Mirrors BetterAuth's `/sign-up/email`
+      // 20-per-hour limit so the tRPC path can't be used as a side-channel for
+      // spam signups (iter 45/46 of the migration audit).
+      const peerIp = getDirectPeerIp(ctx.req) ?? "unknown";
       const limit = await rateLimit({
-        key: `user.register:${ip}`,
+        key: `user.register:${peerIp}`,
         windowSeconds: 60 * 60,
         max: 20,
       });
       if (!limit.allowed) {
-        throw new TRPCError({
-          code: "TOO_MANY_REQUESTS",
-          message: "Too many signup attempts. Please try again later.",
+        throw new AuthRateLimitedError({
+          retryAfterSeconds: secondsUntil(limit.resetAt),
         });
       }
 
-      // Case-insensitive on purpose: rows written before the lowercasing
-      // above (or seeded by other means) may carry capitals, and minting a
-      // case-twin beside one would leave two Users answering for one human.
-      const user = await ctx.prisma.user.findFirst({
-        where: {
-          email: { equals: email, mode: "insensitive" },
-        },
-      });
-
-      if (user) {
-        throw new EmailAlreadyRegisteredError();
-      }
-
-      const newUser = await createCredentialUser({
-        prisma: ctx.prisma,
+      // Refuses an address somebody already holds, hashes the password and
+      // states the credential identifier the front door routes on — all of it
+      // the service's, so the router never holds a plaintext password past
+      // this line.
+      const newUser = await credentialAccounts().register({
         name: name ?? null,
         email,
-        passwordHash: await hash(password, 10),
+        password,
       });
+
+      // An address an emailed link already proved does not get asked again.
+      // The proof is spent here, so it confirms exactly one account, and it
+      // is checked against THIS address, so a proof for one address cannot
+      // confirm another. Anything that does not check out simply falls
+      // through to the ordinary link below.
+      const verification = signUpVerification();
+      if (
+        input.addressProof &&
+        (await verification.claimAddressProof({
+          token: input.addressProof,
+          email,
+        }))
+      ) {
+        await verification.markAddressConfirmed({ email });
+        return { id: newUser.id };
+      }
+
+      // The confirmation link, sent from HERE (ADR-117 §6). Sign-up creates
+      // the account but opens no session: the address is confirmed before
+      // anybody gets in, so there is no session for the screen to send this
+      // from. The alternative — a public "send a confirmation to this
+      // address" — is a mailer pointed at anything anybody types, and the
+      // guard that keeps `requestSignUpVerification` honest (refusing an
+      // address that already has an account) is exactly the guard such an
+      // endpoint could not have, since by this line the account is the point.
+      //
+      // Sending it from the call that CREATED the account closes that: the
+      // only address reachable is the one just registered, and the mail is a
+      // consequence of the write rather than a favour done for a caller.
+      //
+      // Awaited, unlike the passkey path's, because nothing navigates behind
+      // it and the screen it returns to is the one that says a link is on its
+      // way. A mailer that is down must not lose the account, though, so a
+      // failure is logged and swallowed: the account exists, and the way on
+      // is the "send it again" the next screen offers.
+      try {
+        await verification.requestVerification({ email });
+      } catch (failure) {
+        logger.warn(
+          { error: failure, userId: newUser.id },
+          "sign-up could not send the address confirmation",
+        );
+      }
 
       return { id: newUser.id };
     }),
@@ -225,24 +384,48 @@ export const userRouter = createTRPCRouter({
         id: ctx.session.user.id,
       });
     }),
+
+  /**
+   * Sets the caller's own display name — the one a member list, a comment and
+   * an audit entry name them by.
+   *
+   * The name was writable by sign-up, by the identity provider and by a
+   * back-office operator, and by nobody else: somebody whose directory sent
+   * "asmith" was stuck as "asmith" to every colleague who read a member list.
+   *
+   * A name the directory owns is still the caller's to set. The next push may
+   * overwrite it; refusing the edit would not change that and would only take
+   * away the one thing they could do about it in the meantime.
+   *
+   * The schema trims first and requires something left, so a name that is
+   * nothing but whitespace is refused at the boundary rather than persisted
+   * as a blank that renders as an unexplained gap wherever a person is
+   * listed. Sessions are NOT revoked: `updateProfile` reserves that for an
+   * email change, and a cosmetic edit is no reason to sign somebody out.
+   *
+   * Spec: specs/settings/profile.feature
+   */
+  updateName: protectedProcedure
+    .input(z.object({ name: PROFILE_NAME_SCHEMA }))
+    .noPermission({
+      reason: "operates on the session user's own account, no tenant scope",
+    })
+    .mutation(async ({ ctx, input }) => {
+      await UserService.create(ctx.prisma).updateProfile({
+        id: ctx.session.user.id,
+        name: input.name,
+      });
+      return { name: input.name };
+    }),
   getLinkedAccounts: protectedProcedure
     .input(z.object({}))
     .noPermission({
       reason: "operates on the session user's own account, no tenant scope",
     })
     .query(async ({ ctx }) => {
-      const accounts = await ctx.prisma.account.findMany({
-        where: {
-          userId: ctx.session.user.id,
-        },
-        select: {
-          id: true,
-          provider: true,
-          providerAccountId: true,
-        },
+      return await credentialAccounts().linkedAccounts({
+        userId: ctx.session.user.id,
       });
-
-      return accounts;
     }),
   unlinkAccount: protectedProcedure
     .input(
@@ -254,85 +437,97 @@ export const userRouter = createTRPCRouter({
       reason: "operates on the session user's own account, no tenant scope",
     })
     .mutation(async ({ ctx, input }) => {
-      // Wrap the count + delete in a serializable transaction. The
-      // previous implementation did the count and delete as separate
-      // statements with no isolation, so two concurrent unlink calls
-      // (e.g. user double-clicking the X) could both observe
-      // `count = 2`, both pass the "last account" guard, and both
-      // delete — leaving the user with zero accounts and no way to
-      // sign in. Iter 49 / bug 37 of the BetterAuth migration audit.
-      const userId = ctx.session.user.id;
-      await ctx.prisma.$transaction(
-        async (tx) => {
-          const accountCount = await tx.account.count({
-            where: { userId },
-          });
-          if (accountCount <= 1) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: "Cannot remove the last authentication method",
-            });
-          }
-          const account = await tx.account.findFirst({
-            where: { id: input.accountId, userId },
-          });
-          if (!account) {
-            throw new TRPCError({
-              code: "NOT_FOUND",
-              message: "Account not found",
-            });
-          }
-          await tx.account.delete({ where: { id: input.accountId } });
-        },
-        // Serializable isolation prevents the read of `accountCount`
-        // from being a stale snapshot if a concurrent unlink commits
-        // between this transaction's count and delete.
-        { isolationLevel: "Serializable" },
-      );
+      // Removing the LAST way in is refused by the service, in the handled
+      // vocabulary the detach guard uses, so the words the caller reads come
+      // from the code-keyed presentation registry rather than from a sentence
+      // written here. An account that is not this person's is the one answer
+      // the boundary still has to turn into a transport code.
+      const outcome = await credentialAccounts().unlinkAccount({
+        userId: ctx.session.user.id,
+        accountId: input.accountId,
+      });
+      if (outcome === "no_such_account") {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Account not found",
+        });
+      }
 
       return { success: true };
     }),
   /**
-   * Whether to offer this person a passkey right now (ADR-120).
+   * What this person could do to secure their account right now, and whether
+   * to say so (ADR-120, extended at D06).
    *
-   * Three conditions, and the first is the one that keeps it from being noise:
-   * somebody who already HOLDS a passkey is never asked, whatever they signed
-   * in with today — a member on a machine that does not hold theirs has a good
-   * reason, and asking them to make another is a nag with no upside.
+   * ONE offer covering both halves, not two nudges racing each other. A
+   * person is asked once about the account rather than once about a passkey
+   * and again about two-step verification, because two dialogs on the way in
+   * is a nag whatever each one says on its own — and because somebody who
+   * declines the first has answered the question the second would ask.
    *
-   * The interval lives on the account rather than in browser storage, so a new
-   * device does not restart the count and the 30 days actually mean 30 days.
+   * Each half keeps its own gate and its own reason to be absent:
+   *
+   *   - the passkey half is gated on the sign-in screens actually TAKING a
+   *     passkey, not just on the plugin being mounted (a deployment on the
+   *     legacy auth screens would otherwise nudge people into minting a
+   *     credential no screen has a button for), and never appears for
+   *     somebody who already holds one — whatever they signed in with today;
+   *   - the two-step half is gated on `MFA_ENROLLMENT_OPEN`, so with the flag
+   *     off nothing about it is offered, and never appears for somebody who
+   *     has already set one up.
+   *
+   * The interval lives on the account rather than in browser storage, so a
+   * new device does not restart the count and the 30 days actually mean 30
+   * days. One dismissal governs the WHOLE nudge, which is what makes it one
+   * question rather than two.
+   *
+   * `signedInWith` rides along because the offer is about THIS sign-in rather
+   * than about the account: ADR-120 offers a passkey where it replaces a
+   * password, and both halves of what the account still lacks are the same
+   * whether somebody typed a password today or came through their employer's
+   * identity provider. It is read off the session (D06) and never re-derived,
+   * so a screen cannot reach a different answer than the sign-in did.
    */
-  passkeyNudge: protectedProcedure
+  secureAccountNudge: protectedProcedure
     .input(z.object({}))
     .noPermission({
       reason: "operates on the session user's own account, no tenant scope",
     })
     .query(async ({ ctx }) => {
-      if (!deploymentOffersPasskeys()) return { offer: false };
+      const twoStepOffered = deploymentOffersTwoStepVerification();
+      const signedInWith = ctx.session.signedInWith ?? "unknown";
 
-      const [passkeys, user] = await Promise.all([
-        ctx.prisma.passkey.count({ where: { userId: ctx.session.user.id } }),
-        ctx.prisma.user.findUnique({
-          where: { id: ctx.session.user.id },
-          select: { passkeyNudgeDismissedAt: true },
-        }),
-      ]);
-      if (passkeys > 0) return { offer: false };
+      const facts = await credentialAccounts().secureAccountFacts({
+        userId: ctx.session.user.id,
+      });
 
-      const dismissedAt = user?.passkeyNudgeDismissedAt;
-      if (!dismissedAt) return { offer: true };
+      const passkey = facts.passkeys === 0;
+      const twoStep = twoStepOffered && !facts.twoStepEnabled;
+      if (!passkey && !twoStep) {
+        return { offer: false, passkey: false, twoStep: false, signedInWith };
+      }
 
-      const askAgainAfter =
-        dismissedAt.getTime() + PASSKEY_NUDGE_INTERVAL_DAYS * 24 * 60 * 60_000;
-      return { offer: Date.now() >= askAgainAfter };
+      const dismissedAt = facts.nudgeDismissedAt;
+      const askAgainAfter = dismissedAt
+        ? dismissedAt.getTime() + SECURE_ACCOUNT_NUDGE_INTERVAL_DAYS * DAY_MS
+        : 0;
+      return {
+        offer: Date.now() >= askAgainAfter,
+        passkey,
+        twoStep,
+        signedInWith,
+      };
     }),
   /**
    * "Not now". Dated rather than flagged, because the offer comes back — a
    * flag would make one dismissal permanent, and somebody who declines on the
-   * day they sign up is not somebody who never wants a passkey.
+   * day they sign up is not somebody who never wants to secure their account.
+   *
+   * One dismissal covers both halves. Declining is an answer to "shall we
+   * make this account harder to take over", and asking again about the other
+   * half tomorrow would be answering a question nobody asked.
    */
-  dismissPasskeyNudge: protectedProcedure
+  dismissSecureAccountNudge: protectedProcedure
     .input(z.object({}))
     .noPermission({
       reason: "operates on the session user's own account, no tenant scope",
@@ -359,8 +554,8 @@ export const userRouter = createTRPCRouter({
     })
     .query(async ({ ctx }) => {
       return {
-        hasPassword: await UserService.create(ctx.prisma).hasPassword({
-          id: ctx.session.user.id,
+        hasPassword: await credentialAccounts().hasPassword({
+          userId: ctx.session.user.id,
         }),
       };
     }),
@@ -400,10 +595,7 @@ export const userRouter = createTRPCRouter({
       // Email mode only. Under Auth0 the password lives in the Auth0 tenant
       // and this row is not where it would go.
       if ((await resolveAuthProvider()) !== "email") {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Passwords are not available for this auth provider",
-        });
+        throw new DirectRegistrationUnavailableError();
       }
 
       const limit = await rateLimit({
@@ -412,65 +604,26 @@ export const userRouter = createTRPCRouter({
         max: 5,
       });
       if (!limit.allowed) {
-        throw new TRPCError({
-          code: "TOO_MANY_REQUESTS",
-          message: "Too many attempts. Please try again later.",
+        throw new AuthRateLimitedError({
+          retryAfterSeconds: secondsUntil(limit.resetAt),
         });
       }
 
-      const credentialAccount = await ctx.prisma.account.findFirst({
-        where: { userId: ctx.session.user.id, provider: "credential" },
-        select: { id: true, password: true },
+      // Filling the empty slot, writing the credential row an older account
+      // never had, and ending every other session are one move, and the
+      // service owns all three. The refusal that makes this safe to expose —
+      // it can never REPLACE a password — comes back as an outcome rather
+      // than a thrown message, because the words belong to the transport.
+      const outcome = await credentialAccounts().setFirstPassword({
+        userId: ctx.session.user.id,
+        password: input.password,
+        keepSessionId: sessionToSpare(ctx.session),
       });
-
-      // The refusal that makes this safe to expose. Overwriting a password
-      // without proving the old one is account takeover with extra steps.
-      if (credentialAccount?.password) {
+      if (outcome === "already_has_password") {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message:
             "This account already has a password. Change it instead of setting a new one.",
-        });
-      }
-
-      const hashedPassword = await hash(input.password, 10);
-
-      if (credentialAccount) {
-        await ctx.prisma.account.update({
-          where: { id: credentialAccount.id },
-          data: { password: hashedPassword },
-        });
-      } else {
-        // An account that predates the credential row being written up front
-        // (an SSO-only user, say). The row is what password reset updates, so
-        // it has to exist before recovery can work.
-        await ctx.prisma.account.create({
-          data: {
-            userId: ctx.session.user.id,
-            type: "credential",
-            provider: "credential",
-            // better-auth 1.7 finds a credential account by
-            // `(providerId, issuer, accountId)` and nothing else. A row
-            // written without the issuer is a row its lookup cannot see, so
-            // the password set here would never sign anybody in — the
-            // customer would be told their correct password is wrong.
-            issuer: issuerForProviderId("credential"),
-            providerAccountId: ctx.session.user.id,
-            password: hashedPassword,
-          },
-        });
-      }
-
-      // Every other session ends. A password is a credential that outlives
-      // session revocation, so anything else holding a session at the moment
-      // one appears must not keep it. Skipped while impersonating for the
-      // same reason `changePassword` skips it: the session id in hand is the
-      // operator's, not the subject's.
-      if (!ctx.session.user.impersonator && ctx.session.sessionId) {
-        await revokeOtherSessionsForUser({
-          prisma: ctx.prisma,
-          userId: ctx.session.user.id,
-          keepSessionId: ctx.session.sessionId,
         });
       }
 
@@ -524,159 +677,40 @@ export const userRouter = createTRPCRouter({
         max: 5,
       });
       if (!limit.allowed) {
-        throw new TRPCError({
-          code: "TOO_MANY_REQUESTS",
-          message: "Too many password change attempts. Please try again later.",
+        throw new AuthRateLimitedError({
+          retryAfterSeconds: secondsUntil(limit.resetAt),
         });
       }
 
       if (provider === "auth0") {
-        // Only the Auth0 database connection (`auth0|<id>` providerAccountId)
-        // has a password we can update via the Management API. Social
-        // identities linked through Auth0 (google-oauth2|..., github|...,
-        // windowslive|...) are managed by their upstream IdPs — calling
-        // PATCH /api/v2/users with `connection: "Username-Password-Authentication"`
-        // on those would fail.
-        const auth0Account = await ctx.prisma.account.findFirst({
-          where: {
-            userId: ctx.session.user.id,
-            provider: "auth0",
-            providerAccountId: { startsWith: "auth0|" },
-          },
-          select: { providerAccountId: true },
+        await changeAuth0HeldPassword({
+          session: ctx.session,
+          currentPassword: input.currentPassword,
+          newPassword: input.newPassword,
         });
-
-        if (!auth0Account) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message:
-              "No Auth0 database (Email/Password) account is linked to this user. Password changes are only supported for that sign-in method.",
-          });
-        }
-
-        if (!ctx.session.user.email) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Authenticated session is missing an email",
-          });
-        }
-
-        try {
-          const result = await changeAuth0Password({
-            email: ctx.session.user.email,
-            auth0UserId: auth0Account.providerAccountId,
-            currentPassword: input.currentPassword,
-            newPassword: input.newPassword,
-          });
-          if (!result.ok) {
-            throw new TRPCError({
-              code: "UNAUTHORIZED",
-              message: "Current password is incorrect",
-            });
-          }
-        } catch (error) {
-          if (error instanceof TRPCError) throw error;
-          if (error instanceof Auth0ApiError) {
-            if (error.code === "weak_password") {
-              // Auth0 tenant policy rejected the new password — show its
-              // message verbatim so the user knows what to fix.
-              throw new TRPCError({
-                code: "BAD_REQUEST",
-                message: error.message,
-              });
-            }
-            if (error.code === "insufficient_scope") {
-              throw new TRPCError({
-                code: "INTERNAL_SERVER_ERROR",
-                message:
-                  "Auth0 is not authorized to update users. Ask an administrator to enable the update:users scope on the Auth0 Management M2M application.",
-              });
-            }
-            if (error.code === "password_grant_not_enabled") {
-              throw new TRPCError({
-                code: "INTERNAL_SERVER_ERROR",
-                message:
-                  "Auth0 Password grant is not enabled on the Management M2M application. Ask an administrator to enable it under that application's Advanced Settings → Grant Types.",
-              });
-            }
-            if (error.code === "not_configured") {
-              throw new TRPCError({
-                code: "INTERNAL_SERVER_ERROR",
-                message:
-                  "Auth0 is not configured on the server. Set AUTH0_ISSUER plus AUTH0_MGMT_CLIENT_ID/SECRET (or AUTH0_CLIENT_ID/SECRET).",
-              });
-            }
-            throw new TRPCError({
-              code: "INTERNAL_SERVER_ERROR",
-              message:
-                "Could not update password with Auth0. Please try again later.",
-            });
-          }
-          throw error;
-        }
-
-        // Auth0's OIDC sessions are managed by the Auth0 tenant, but the
-        // LangWatch *app* session is a BetterAuth row in our DB and is NOT
-        // invalidated by the Management API password change. Revoke other
-        // devices' app sessions so a stolen session token cannot outlive a
-        // password rotation. Same impersonation safeguard as the email path.
-        if (!ctx.session.user.impersonator && ctx.session.sessionId) {
-          await revokeOtherSessionsForUser({
-            prisma: ctx.prisma,
-            userId: ctx.session.user.id,
-            keepSessionId: ctx.session.sessionId,
-          });
-        }
         return { success: true };
       }
 
-      const credentialAccount = await ctx.prisma.account.findFirst({
-        where: {
-          userId: ctx.session.user.id,
-          provider: "credential",
-        },
-        select: { id: true, password: true },
+      // Proving the current password, writing the new one and ending every
+      // other session are one move, and the service owns all three: the
+      // current tab stays signed in because it just re-authenticated, and any
+      // other device or stolen session is signed out.
+      const outcome = await credentialAccounts().changePassword({
+        userId: ctx.session.user.id,
+        currentPassword: input.currentPassword,
+        newPassword: input.newPassword,
+        keepSessionId: sessionToSpare(ctx.session),
       });
-
-      if (!credentialAccount?.password) {
+      if (outcome === "no_password_set") {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "User not found or password not set",
         });
       }
-
-      const passwordMatch = await compare(
-        input.currentPassword,
-        credentialAccount.password,
-      );
-      if (!passwordMatch) {
+      if (outcome === "wrong_password") {
         throw new TRPCError({
           code: "UNAUTHORIZED",
           message: "Current password is incorrect",
-        });
-      }
-
-      const hashedPassword = await hash(input.newPassword, 10);
-
-      await ctx.prisma.account.update({
-        where: { id: credentialAccount.id },
-        data: { password: hashedPassword },
-      });
-
-      // Best practice: invalidate all OTHER sessions of this user after a
-      // password change. The current tab stays logged in (the user just
-      // re-authenticated by typing the current password); any other
-      // device or stolen session is force-logged-out. Skip during
-      // impersonation — the impersonator is the admin, and the
-      // ctx.session.sessionId is the admin's session, so revoking
-      // "other" sessions for the impersonated user wouldn't keep the
-      // admin's tab open. In an impersonation context, password change
-      // shouldn't be exposed in the UI, but be defensive.
-      if (!ctx.session.user.impersonator && ctx.session.sessionId) {
-        await revokeOtherSessionsForUser({
-          prisma: ctx.prisma,
-          userId: ctx.session.user.id,
-          keepSessionId: ctx.session.sessionId,
         });
       }
 

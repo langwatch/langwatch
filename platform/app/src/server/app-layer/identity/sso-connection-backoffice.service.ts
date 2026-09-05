@@ -1,16 +1,11 @@
-import {
-  type SsoConnectionLifecycleState,
-  type SsoConnectionState,
-  type SsoDomainVerification,
-  SsoSamlNotSelfServeError,
+import type {
+  SsoArrivalPolicy,
+  SsoConnectionLifecycleState,
+  SsoConnectionState,
+  SsoDomainVerification,
 } from "@langwatch/identity";
 import type { SsoConnectionService } from "@langwatch/identity-server";
-import {
-  newSsoConnectionCommandId,
-  newSsoConnectionId,
-} from "@langwatch/identity-server";
-import type { PrismaClient } from "~/generated/prisma/client";
-import { rowToConnection } from "./repositories/sso-connection-projection.prisma.repository";
+import { newSsoConnectionCommandId } from "@langwatch/identity-server";
 
 /**
  * What the back office reads and commands (D05 tier 1).
@@ -45,7 +40,7 @@ export interface BackofficeSsoConnection {
   domainVerifications: SsoDomainVerification[];
   providerId: string;
   issuer: string | null;
-  allowsJit: boolean;
+  arrivalPolicy: SsoArrivalPolicy;
   source: string;
   testLoginAccountId: string | null;
   rejection: { domain: string; note: string } | null;
@@ -64,10 +59,31 @@ export interface OperatorActor {
   userId: string;
 }
 
+/**
+ * The projection, as the back office reads it: a page of connections across
+ * every customer, one connection by id, and the names behind the organization
+ * ids those carry.
+ *
+ * `PrismaSsoConnectionBackofficeRepository` is the implementation, and the
+ * search predicate lives with it — what an operator may search by is a
+ * question about the columns, not about the surface.
+ */
+export interface SsoConnectionBackofficeReadsPort {
+  findPage(args: {
+    page: number;
+    pageSize: number;
+    search?: string;
+  }): Promise<{ connections: readonly SsoConnectionState[]; total: number }>;
+  findById(args: { connectionId: string }): Promise<SsoConnectionState | null>;
+  findOrganizationNames(args: {
+    organizationIds: readonly string[];
+  }): Promise<ReadonlyMap<string, string>>;
+}
+
 export class SsoConnectionBackofficeService {
   constructor(
     private readonly deps: {
-      prisma: PrismaClient;
+      reads: SsoConnectionBackofficeReadsPort;
       connections: () => SsoConnectionService;
     },
   ) {}
@@ -81,24 +97,19 @@ export class SsoConnectionBackofficeService {
     pageSize: number;
     search?: string;
   }): Promise<BackofficeSsoConnectionList> {
-    const where = search ? searchFilter(search) : {};
-    const [rows, total] = await Promise.all([
-      this.deps.prisma.ssoConnection.findMany({
-        where,
-        orderBy: { updatedAt: "desc" },
-        skip: page * pageSize,
-        take: pageSize,
-      }),
-      this.deps.prisma.ssoConnection.count({ where }),
-    ]);
-    const names = await this.organizationNames(
-      rows.map((row) => row.organizationId),
-    );
+    const { connections, total } = await this.deps.reads.findPage({
+      page,
+      pageSize,
+      search,
+    });
+    const names = await this.deps.reads.findOrganizationNames({
+      organizationIds: connections.map((state) => state.organizationId),
+    });
     return {
-      connections: rows.map((row) =>
+      connections: connections.map((state) =>
         toBackofficeConnection({
-          state: rowToConnection(row),
-          organizationName: names.get(row.organizationId) ?? null,
+          state,
+          organizationName: names.get(state.organizationId) ?? null,
         }),
       ),
       total,
@@ -110,65 +121,14 @@ export class SsoConnectionBackofficeService {
   }: {
     connectionId: string;
   }): Promise<BackofficeSsoConnection | null> {
-    const row = await this.deps.prisma.ssoConnection.findUnique({
-      where: { id: connectionId },
+    const state = await this.deps.reads.findById({ connectionId });
+    if (!state) return null;
+    const names = await this.deps.reads.findOrganizationNames({
+      organizationIds: [state.organizationId],
     });
-    if (!row) return null;
-    const names = await this.organizationNames([row.organizationId]);
     return toBackofficeConnection({
-      state: rowToConnection(row),
-      organizationName: names.get(row.organizationId) ?? null,
-    });
-  }
-
-  /**
-   * Register a connection for an organization.
-   *
-   * SAML is refused by name here rather than at the aggregate: the aggregate
-   * is protocol-agnostic on purpose, and D09 will terminate SAML through it.
-   * What is not available is registering one through a SELF-SERVE surface,
-   * which is a property of the surface and belongs on it.
-   */
-  async registerConnection({
-    organizationId,
-    type,
-    providerId,
-    issuer,
-    allowsJit,
-    operator,
-  }: {
-    organizationId: string;
-    type: string;
-    providerId: string;
-    issuer: string | null;
-    allowsJit: boolean;
-    operator: OperatorActor;
-  }): Promise<{ connectionId: string }> {
-    if (type !== "oidc") {
-      throw new SsoSamlNotSelfServeError(
-        `connection type ${type} is not registrable through a self-serve surface`,
-      );
-    }
-    const connectionId = newSsoConnectionId();
-    await this.deps.connections().registerConnection({
-      ...this.command({ organizationId, connectionId, operator }),
-      type: "oidc",
-      idp: {
-        issuer,
-        providerId,
-        clientIdRef: null,
-        secretRef: null,
-        certRefs: [],
-      },
-      allowsJit,
-    });
-    return { connectionId };
-  }
-
-  async claimDomain(args: DomainCommandArgs): Promise<void> {
-    await this.deps.connections().claimDomain({
-      ...this.command(args),
-      domain: args.domain,
+      state,
+      organizationName: names.get(state.organizationId) ?? null,
     });
   }
 
@@ -248,18 +208,6 @@ export class SsoConnectionBackofficeService {
       source: "self-serve" as const,
     };
   }
-
-  private async organizationNames(
-    organizationIds: string[],
-  ): Promise<Map<string, string>> {
-    const unique = [...new Set(organizationIds)];
-    if (unique.length === 0) return new Map();
-    const rows = await this.deps.prisma.organization.findMany({
-      where: { id: { in: unique } },
-      select: { id: true, name: true },
-    });
-    return new Map(rows.map((row) => [row.id, row.name]));
-  }
 }
 
 interface ConnectionCommandArgs {
@@ -269,24 +217,6 @@ interface ConnectionCommandArgs {
 }
 
 type DomainCommandArgs = ConnectionCommandArgs & { domain: string };
-
-/**
- * Search over the identifiers and domains an operator would have to hand: a
- * connection id from a log line, an organization id from a support thread, or
- * the domain the customer told them about.
- */
-function searchFilter(search: string) {
-  const term = search.trim();
-  return {
-    OR: [
-      { id: { contains: term, mode: "insensitive" as const } },
-      { organizationId: { contains: term, mode: "insensitive" as const } },
-      { verifiedDomains: { has: term.toLowerCase() } },
-      { claimedDomains: { has: term.toLowerCase() } },
-      { approvedDomains: { has: term.toLowerCase() } },
-    ],
-  };
-}
 
 export function toBackofficeConnection({
   state,
@@ -307,7 +237,7 @@ export function toBackofficeConnection({
     domainVerifications: state.domainVerifications,
     providerId: state.idpMetadata.providerId,
     issuer: state.idpMetadata.issuer,
-    allowsJit: state.allowsJit,
+    arrivalPolicy: state.arrivalPolicy,
     source: state.source,
     testLoginAccountId: state.testLoginAccountId,
     rejection: state.rejection,

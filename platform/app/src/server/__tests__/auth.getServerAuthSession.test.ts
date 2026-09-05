@@ -60,14 +60,47 @@ const makeBetterAuthResponse = (
   },
 });
 
+/** A session row with no impersonation on it — every ordinary session. */
+const ordinarySessionRow = (userId = "user_1") => ({
+  userId,
+  actorUserId: null,
+  subjectUserId: null,
+  impersonationReason: null,
+  impersonationExpiresAt: null,
+});
+
+/** A session row carrying the {actor, subject} claims (D06). */
+const impersonatingSessionRow = ({
+  sessionUserId,
+  subjectUserId,
+  actorUserId,
+  reason = "support",
+  expiresAt,
+}: {
+  sessionUserId: string;
+  subjectUserId: string;
+  actorUserId?: string;
+  reason?: string;
+  expiresAt?: Date;
+}) => ({
+  userId: sessionUserId,
+  actorUserId: actorUserId ?? sessionUserId,
+  subjectUserId,
+  impersonationReason: reason,
+  impersonationExpiresAt: expiresAt ?? new Date(Date.now() + 60 * 60 * 1000),
+});
+
 describe("getServerAuthSession", () => {
   beforeEach(() => {
     mockGetSession.mockReset();
     mockSessionFindUnique.mockReset();
     mockUserFindUnique.mockReset();
-    // Default: any impersonation target is an active user.
+    // Default: any impersonation subject is an active user.
     mockUserFindUnique.mockResolvedValue({
       id: "target_1",
+      name: "Target User",
+      email: "target@customer.com",
+      image: null,
       deactivatedAt: null,
     });
   });
@@ -83,7 +116,7 @@ describe("getServerAuthSession", () => {
   describe("when a plain session exists with no impersonation", () => {
     it("returns the NextAuth-shaped session", async () => {
       mockGetSession.mockResolvedValue(makeBetterAuthResponse());
-      mockSessionFindUnique.mockResolvedValue({ impersonating: null });
+      mockSessionFindUnique.mockResolvedValue(ordinarySessionRow());
 
       const result = await getServerAuthSession({ req: fakeReq });
       expect(result).toMatchObject({
@@ -107,7 +140,7 @@ describe("getServerAuthSession", () => {
           pendingSsoSetup: true,
         },
       });
-      mockSessionFindUnique.mockResolvedValue({ impersonating: null });
+      mockSessionFindUnique.mockResolvedValue(ordinarySessionRow());
 
       const result = await getServerAuthSession({ req: fakeReq });
       expect(result?.user.pendingSsoSetup).toBe(true);
@@ -129,7 +162,8 @@ describe("getServerAuthSession", () => {
   });
 
   describe("when an admin is impersonating another user", () => {
-    it("rewrites session.user to the impersonated user and sets impersonator", async () => {
+    /** @scenario "An impersonated session records both people" */
+    it("names the operator as the actor and the subject as the subject", async () => {
       mockGetSession.mockResolvedValue(
         makeBetterAuthResponse({
           id: "admin_1",
@@ -137,18 +171,28 @@ describe("getServerAuthSession", () => {
           name: "Admin One",
         }),
       );
-      mockSessionFindUnique.mockResolvedValue({
-        impersonating: {
-          id: "target_1",
-          name: "Target User",
-          email: "target@customer.com",
-          image: null,
-          expires: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
-        },
+      mockSessionFindUnique.mockResolvedValue(
+        impersonatingSessionRow({
+          sessionUserId: "admin_1",
+          subjectUserId: "target_1",
+          reason: "customer asked us to look",
+        }),
+      );
+      mockUserFindUnique.mockResolvedValue({
+        id: "target_1",
+        name: "Target User",
+        email: "target@customer.com",
+        image: null,
+        deactivatedAt: null,
       });
 
       const result = await getServerAuthSession({ req: fakeReq });
 
+      expect(result?.principal).toEqual({
+        actor: { userId: "admin_1" },
+        subject: { userId: "target_1" },
+      });
+      expect(result?.impersonationReason).toBe("customer asked us to look");
       expect(result?.user.id).toBe("target_1");
       expect(result?.user.email).toBe("target@customer.com");
       expect(result?.user.impersonator).toEqual({
@@ -160,77 +204,100 @@ describe("getServerAuthSession", () => {
     });
   });
 
-  describe("when impersonation has expired", () => {
-    it("falls through to the real session without impersonator", async () => {
+  describe("when nobody is impersonating", () => {
+    /** @scenario "An impersonated session records both people" */
+    it("names the same person as actor and subject", async () => {
+      mockGetSession.mockResolvedValue(makeBetterAuthResponse());
+      mockSessionFindUnique.mockResolvedValue(ordinarySessionRow());
+
+      const result = await getServerAuthSession({ req: fakeReq });
+
+      expect(result?.principal).toEqual({
+        actor: { userId: "user_1" },
+        subject: { userId: "user_1" },
+      });
+      expect(result?.user.impersonator).toBeUndefined();
+    });
+  });
+
+  describe("when the impersonation window has lapsed", () => {
+    it("returns the operator to their own session, ending nothing", async () => {
       mockGetSession.mockResolvedValue(
         makeBetterAuthResponse({
           id: "admin_1",
           email: "admin@langwatch.ai",
         }),
       );
-      mockSessionFindUnique.mockResolvedValue({
-        impersonating: {
-          id: "target_1",
-          name: "Target",
-          email: "target@x.com",
-          image: null,
-          expires: new Date(Date.now() - 1000).toISOString(),
-        },
-      });
+      mockSessionFindUnique.mockResolvedValue(
+        impersonatingSessionRow({
+          sessionUserId: "admin_1",
+          subjectUserId: "target_1",
+          expiresAt: new Date(Date.now() - 1000),
+        }),
+      );
 
       const result = await getServerAuthSession({ req: fakeReq });
       expect(result?.user.id).toBe("admin_1");
       expect(result?.user.impersonator).toBeUndefined();
+      expect(result?.principal).toEqual({
+        actor: { userId: "admin_1" },
+        subject: { userId: "admin_1" },
+      });
     });
   });
 
-  describe("when impersonating has a malformed payload", () => {
-    it("ignores it and returns the real session", async () => {
+  describe("when the claims are half written", () => {
+    it("ignores a subject with no actor beside it", async () => {
       mockGetSession.mockResolvedValue(makeBetterAuthResponse());
       mockSessionFindUnique.mockResolvedValue({
-        impersonating: { garbage: true },
+        ...ordinarySessionRow(),
+        subjectUserId: "target_1",
+        impersonationExpiresAt: new Date(Date.now() + 60_000),
       });
       const result = await getServerAuthSession({ req: fakeReq });
       expect(result?.user.id).toBe("user_1");
       expect(result?.user.impersonator).toBeUndefined();
     });
 
-    it("ignores it when impersonating is missing required fields", async () => {
+    it("ignores claims with no window on them", async () => {
       mockGetSession.mockResolvedValue(makeBetterAuthResponse());
       mockSessionFindUnique.mockResolvedValue({
-        impersonating: { expires: new Date(Date.now() + 10000) },
+        ...ordinarySessionRow(),
+        actorUserId: "user_1",
+        subjectUserId: "target_1",
       });
       const result = await getServerAuthSession({ req: fakeReq });
       expect(result?.user.id).toBe("user_1");
       expect(result?.user.impersonator).toBeUndefined();
     });
 
-    it("ignores it when expires is missing", async () => {
+    it("ignores an actor that is not the session's own user", async () => {
       mockGetSession.mockResolvedValue(makeBetterAuthResponse());
-      mockSessionFindUnique.mockResolvedValue({
-        impersonating: { id: "target_1", email: "t@x.com" },
-      });
+      mockSessionFindUnique.mockResolvedValue(
+        impersonatingSessionRow({
+          sessionUserId: "user_1",
+          actorUserId: "somebody_else",
+          subjectUserId: "target_1",
+        }),
+      );
       const result = await getServerAuthSession({ req: fakeReq });
       expect(result?.user.id).toBe("user_1");
       expect(result?.user.impersonator).toBeUndefined();
     });
   });
 
-  describe("when the impersonation target was deleted after impersonation started", () => {
-    it("falls back to the admin session", async () => {
+  describe("when the impersonation subject was deleted after it started", () => {
+    it("falls back to the operator's own session", async () => {
       mockGetSession.mockResolvedValue(
         makeBetterAuthResponse({ id: "admin_1", email: "admin@x.com" }),
       );
-      mockSessionFindUnique.mockResolvedValue({
-        impersonating: {
-          id: "target_1",
-          name: "Target",
-          email: "target@x.com",
-          image: null,
-          expires: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
-        },
-      });
-      // Target user returned as null — deleted
+      mockSessionFindUnique.mockResolvedValue(
+        impersonatingSessionRow({
+          sessionUserId: "admin_1",
+          subjectUserId: "target_1",
+        }),
+      );
+      // Subject returned as null — deleted
       mockUserFindUnique.mockResolvedValue(null);
 
       const result = await getServerAuthSession({ req: fakeReq });
@@ -239,23 +306,23 @@ describe("getServerAuthSession", () => {
     });
   });
 
-  describe("when the impersonation target was deactivated after impersonation started", () => {
-    it("falls back to the admin session", async () => {
+  describe("when the impersonation subject was deactivated after it started", () => {
+    it("falls back to the operator's own session", async () => {
       mockGetSession.mockResolvedValue(
         makeBetterAuthResponse({ id: "admin_1", email: "admin@x.com" }),
       );
-      mockSessionFindUnique.mockResolvedValue({
-        impersonating: {
-          id: "target_1",
-          name: "Target",
-          email: "target@x.com",
-          image: null,
-          expires: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
-        },
-      });
-      // Target exists but is deactivated
+      mockSessionFindUnique.mockResolvedValue(
+        impersonatingSessionRow({
+          sessionUserId: "admin_1",
+          subjectUserId: "target_1",
+        }),
+      );
+      // Subject exists but is deactivated
       mockUserFindUnique.mockResolvedValue({
         id: "target_1",
+        name: "Target",
+        email: "target@x.com",
+        image: null,
         deactivatedAt: new Date("2020-01-01"),
       });
 

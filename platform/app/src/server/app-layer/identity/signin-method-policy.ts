@@ -52,12 +52,18 @@ export const PASSKEY_METHOD: SignInMethod = {
 export const LOCAL_METHOD_SET: readonly SignInMethod[] = [PASSWORD_METHOD];
 
 /**
- * Whether this deployment mounted the passkey plugin at boot. The server half
- * is registered off the same value, so the set can never name a method the
- * endpoint behind it does not have.
+ * Whether this deployment offers two-step verification at all (D06). The
+ * two-factor plugin's server half is registered off this value, so a screen
+ * that offers a setup can never call an endpoint nobody mounted. Passkeys
+ * used to have a matching read; they no longer do, because they are no longer
+ * a setting — the plugin is mounted everywhere.
+ *
+ * It is NOT part of any method set. Two-step verification is a second factor
+ * answered after a first one, never a way in on its own, so nothing about it
+ * belongs in `defaultMethods` or `localMethods`.
  */
-export function deploymentOffersPasskeys(): boolean {
-  return env.PASSKEYS_ENABLED === "on";
+export function deploymentOffersTwoStepVerification(): boolean {
+  return env.MFA_ENROLLMENT_OPEN === "on";
 }
 
 /**
@@ -92,13 +98,20 @@ export async function resolveSignInMethodPolicy(): Promise<SignInMethodPolicy> {
   // Offered alongside whatever else answers, never instead of it: somebody
   // without a passkey on THIS device must still find the way they used last
   // time. It is appended, so the order the screen renders does not move.
-  const passkeys = deploymentOffersPasskeys() ? [PASSKEY_METHOD] : [];
+  const passkeys = [PASSKEY_METHOD];
   return {
     defaultMethods: [
       ...(federated ? [federated] : LOCAL_METHOD_SET),
       ...passkeys,
     ],
-    localMethods: [...LOCAL_METHOD_SET, ...passkeys],
+    // NOT the passkeys. Break-glass is the door somebody reaches for when the
+    // identity provider cannot be answered, and the whole reason it exists is
+    // that anybody can use it from any machine — which is exactly what a
+    // credential bound to one device is not. `PASSKEY_METHOD` says so where it
+    // is defined; this is the line that has to agree with it. Appending them
+    // here was invisible while the plugin was behind a setting that defaulted
+    // off, and would have gone live the moment it was not.
+    localMethods: LOCAL_METHOD_SET,
     federationLicensed,
     // Only a self-hosted deployment auto-redirects on its sole connection.
     selfHosted: !env.IS_SAAS,

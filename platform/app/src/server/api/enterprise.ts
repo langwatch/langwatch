@@ -14,6 +14,7 @@ export const ENTERPRISE_FEATURE_ERRORS = {
   RBAC: "Custom roles require an Enterprise plan",
   AUDIT_LOGS: "Audit logs require an Enterprise plan",
   SCIM: "SCIM provisioning requires an Enterprise plan",
+  SSO: "Single sign-on requires an Enterprise plan",
   ANOMALY_RULES: "Anomaly rules require an Enterprise plan",
   ACTIVITY_MONITOR: "The activity monitor requires an Enterprise plan",
   INGESTION_SOURCES: "Ingestion sources require an Enterprise plan",

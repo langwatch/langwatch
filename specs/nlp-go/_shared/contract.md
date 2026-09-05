@@ -223,7 +223,7 @@ Workflows pass `chat_messages` between nodes. The engine MUST:
 - Env override: `RELEASE_NLP_GO_ENGINE_ENABLED=0` to force-disable; `FEATURE_FLAG_FORCE_ENABLE=release_nlp_go_engine_enabled` to pin it on regardless of backend state.
 - Decision points (TS app): `runWorkflow.ts`, `playground.ts`, `topicClustering.ts`. **All three** flip together so a project sees the same path everywhere.
 - When on (default):
-  - **runWorkflow + playground:** TS app prepends `/go` and routes to nlpgo (single container with Go front-door + Python child).
+  - **runWorkflow + playground:** TS app prepends `/go` and routes to nlpgo (single container with Go auth-screen + Python child).
   - **topic clustering:** TS app routes to **langevals** at `${LANGEVALS_BASE_URL}/topics/{batch,incremental}_clustering` (new langevals workspace member). The langwatch_nlp side is bypassed.
 - When off (per-project opt-out):
   - All three call sites stay on the legacy paths (langwatch_nlp), bit-identical to today's traffic.
@@ -251,7 +251,7 @@ through every child span without further intervention by handlers.
 The TS app sends header `X-LangWatch-Origin: <origin>` on every call to nlpgo
 or to the AI Gateway. nlpgo:
 
-1. Reads the header at the front-door middleware.
+1. Reads the header at the auth-screen middleware.
 2. Stashes the value in the request context via `originctx.With(ctx, origin)`.
 3. Sets attribute `langwatch.origin` on the request span.
 4. The engine threads the same context through every block executor.

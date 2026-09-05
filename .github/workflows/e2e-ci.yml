@@ -286,6 +286,9 @@ jobs:
           # Migrations already ran in earlier steps; skip them during pnpm start
           SKIP_PRISMA_MIGRATE: "true"
           SKIP_CLICKHOUSE_MIGRATE: "true"
+          # Identity sign-in routes from projections folded by the worker.
+          # Keep CI's single-process topology while running that stack.
+          WORKERS_IN_PROCESS: "1"
           # Launch the runner's preinstalled Google Chrome (no browser download)
           E2E_BROWSER_CHANNEL: chrome
         run: |

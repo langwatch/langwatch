@@ -9,6 +9,7 @@ import { SsoConnectionService } from "../sso-connection.service";
 import {
   InMemoryConnections,
   StubBreakGlassBindings,
+  StubLicenseAuthority,
   StubPlatformOperators,
   StubStranding,
 } from "./support/in-memory-connections";
@@ -66,6 +67,7 @@ beforeEach(() => {
       breakGlass: new StubBreakGlassBindings(true),
       stranding: new StubStranding([]),
       platformOperators: new StubPlatformOperators([OPS.id]),
+      licenseAuthority: new StubLicenseAuthority(),
     }),
     ledger,
   );
@@ -79,7 +81,7 @@ describe("the sso connection write surface", () => {
         ...identity,
         type: "oidc",
         idp: IDP,
-        allowsJit: true,
+        arrivalPolicy: "admit",
       });
       await service.claimDomain({
         ...identity,
@@ -144,7 +146,7 @@ describe("the sso connection write surface", () => {
         ...identity,
         type: "oidc",
         idp: IDP,
-        allowsJit: true,
+        arrivalPolicy: "admit",
       });
       committed = [];
 
@@ -164,7 +166,7 @@ describe("the sso connection write surface", () => {
         ...identity,
         type: "oidc",
         idp: IDP,
-        allowsJit: true,
+        arrivalPolicy: "admit",
       });
       committed = [];
 
@@ -174,7 +176,7 @@ describe("the sso connection write surface", () => {
         ...identity,
         type: "oidc",
         idp: IDP,
-        allowsJit: true,
+        arrivalPolicy: "admit",
       });
 
       expect(facts).toEqual([]);

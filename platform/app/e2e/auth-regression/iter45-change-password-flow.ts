@@ -8,7 +8,7 @@
  *   2. Sign in the SAME user from TWO separate browser contexts
  *      (= two distinct Session rows).
  *   3. Change the password from context A via the tRPC mutation
- *      (simulates what the /settings/authentication form does).
+ *      (simulates what the /settings/security form does).
  *   4. Verify context A is STILL signed in (keepSessionId preserves
  *      the caller's session).
  *   5. Verify context B is signed OUT (revokeOtherSessionsForUser
@@ -145,7 +145,7 @@ async function main() {
 
     // ──────────────────────────────────────────────────────────────
     // [2] Change password from context A via the tRPC mutation
-    //     (simulating what /settings/authentication submits)
+    //     (simulating what /settings/security submits)
     // ──────────────────────────────────────────────────────────────
     console.log("\n[2] Change password from context A");
     const tRpcBody = {

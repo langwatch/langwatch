@@ -1,12 +1,16 @@
 import type {
+  SsoArrivalPolicy,
   SsoConnectionLifecycleState,
   SsoConnectionSource,
   SsoConnectionState,
   SsoConnectionType,
+  SsoDomainClaim,
   SsoDomainVerification,
   SsoIdpMetadata,
   SsoVerificationMethod,
 } from "@langwatch/identity";
+import { lapsedDomains, type SsoDomainProofState } from "@langwatch/identity";
+import type { SsoEngineProviderRow } from "@langwatch/identity-server";
 import type {
   Prisma,
   PrismaClient,
@@ -18,6 +22,12 @@ import type {
   StateProjectionStore,
   StoredProjection,
 } from "~/server/event-sourcing/projections/stateProjection.types";
+
+/** A connection in one of these is gone, and gone connections own nothing. */
+const TERMINAL_STATES: readonly SsoConnectionLifecycleState[] = [
+  "DISCARDED",
+  "TORN_DOWN",
+];
 
 /**
  * The connection pipeline's projection store (D04, ADR-117 §5): the Postgres
@@ -36,7 +46,19 @@ import type {
 export class PrismaSsoConnectionProjectionRepository
   implements StateProjectionStore<SsoConnectionFoldState>
 {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    /**
+     * How the engine's provider row is derived from the same state (D09).
+     *
+     * Injected rather than built here so this class keeps holding no policy,
+     * and so a test can fold a connection without a credential vault. Absent,
+     * the engine's table is simply not maintained — which is what every test
+     * written before D09 expects, and what a deployment mounting no single
+     * sign-on plugin would want.
+     */
+    private readonly engineProvider?: SsoEngineProviderDerivation,
+  ) {}
 
   async load(
     key: string,
@@ -75,8 +97,18 @@ export class PrismaSsoConnectionProjectionRepository
       type: state.type,
       state: state.state,
       claimedDomains: state.claimedDomains,
+      // The claim rows the tier-3 queue reads and sorts. Asserted at the
+      // column boundary for the same reason `domainVerifications` is.
+      domainClaims: state.domainClaims as unknown as Prisma.InputJsonValue,
       approvedDomains: state.approvedDomains,
       verifiedDomains: state.verifiedDomains,
+      // The subset of `verifiedDomains` whose published record stayed missing
+      // through its grace (ADR-123). A column of its own rather than a read
+      // over the JSON above, because the two questions that consult it —
+      // "may this person be provisioned" and "may this person join by
+      // domain" — are asked on a sign-in path and have to be one indexed
+      // predicate, not a fold.
+      lapsedDomains: lapsedDomains(state),
       // Prisma's `InputJsonValue` does not accept a typed array directly (it
       // wants an index signature), so the shape is asserted at the column
       // boundary. `rowToConnection` asserts it back on the way out, and both
@@ -86,7 +118,11 @@ export class PrismaSsoConnectionProjectionRepository
         state.domainVerifications as unknown as Prisma.InputJsonValue,
       pendingVerification: state.pendingVerification ?? undefined,
       idpMetadata: state.idpMetadata,
-      allowsJit: state.allowsJit,
+      arrivalPolicy: state.arrivalPolicy,
+      arrivalPolicyDecidedAt:
+        state.arrivalPolicyDecidedAtMs === null
+          ? null
+          : new Date(state.arrivalPolicyDecidedAtMs),
       source: state.source,
       testLoginAccountId: state.testLoginAccountId,
       rejection: state.rejection ?? undefined,
@@ -103,13 +139,148 @@ export class PrismaSsoConnectionProjectionRepository
       createdAt: new Date(state.createdAtMs),
       updatedAt: new Date(state.updatedAtMs),
     };
-    await this.prisma.ssoConnection.upsert({
-      where: { id },
-      create: { id, ...columns },
+    // THE HEAD AND THE OWNERSHIP ROWS TOGETHER, or neither.
+    //
+    // `SsoVerifiedDomain` is what makes "first verifier owns" a rule the
+    // database enforces rather than a check two connections can race. It only
+    // does that if it is written with the array it mirrors: a domain in
+    // `verifiedDomains` with no ownership row would be a domain nobody owns,
+    // which is the state the whole table exists to make impossible.
+    await this.prisma.$transaction(async (tx) => {
+      await tx.ssoConnection.upsert({
+        where: { id },
+        create: { id, ...columns },
+        update: columns,
+      });
+      await this.projectDomainOwnership({ tx, connectionId: id, state });
+    });
+    await this.projectEngineProvider({ connectionId: id, state });
+  }
+
+  /**
+   * The ownership rows this connection's proved domains hold.
+   *
+   * The write is a plain insert rather than an upsert on purpose: the whole
+   * point of the row is that a SECOND connection inserting the same domain
+   * fails, which is how a race between two organizations proving `acme.com`
+   * is decided by the database instead of by whichever read happened first.
+   * The guard's refusal is still the sentence a customer reads; this is what
+   * makes the refusal true when two of them arrive at once.
+   *
+   * Rows this connection no longer holds are dropped — a withdrawn domain
+   * stops being owned, so the next organization to claim it can.
+   */
+  private async projectDomainOwnership({
+    tx,
+    connectionId,
+    state,
+  }: {
+    tx: Prisma.TransactionClient;
+    connectionId: string;
+    state: SsoConnectionState;
+  }): Promise<void> {
+    // A connection that is gone owns nothing. `findDomainOwner` already
+    // excludes the terminal states for this reason — holding a domain
+    // hostage after removal would make tearing a connection down something a
+    // customer could not undo, and the next organization to claim it could
+    // never win.
+    const held = TERMINAL_STATES.includes(state.state)
+      ? []
+      : state.verifiedDomains;
+
+    await tx.ssoVerifiedDomain.deleteMany({
+      where: { connectionId, domain: { notIn: held.length > 0 ? held : [""] } },
+    });
+    if (held.length === 0) return;
+
+    const existing = await tx.ssoVerifiedDomain.findMany({
+      where: { domain: { in: held } },
+      select: { domain: true, connectionId: true },
+    });
+    const ownedByUs = new Set(
+      existing
+        .filter((row) => row.connectionId === connectionId)
+        .map((row) => row.domain),
+    );
+    const ownedByAnother = existing.filter(
+      (row) => row.connectionId !== connectionId,
+    );
+    if (ownedByAnother.length > 0) {
+      // The guard should have refused this before the fact was ever
+      // appended, so reaching here means the two raced. Losing loudly is the
+      // point: the alternative is two connections holding one domain and the
+      // router picking by planner order.
+      throw new Error(
+        `sso_domain_owned_elsewhere: ${connectionId} folded ${ownedByAnother
+          .map((row) => row.domain)
+          .join(", ")}, already owned by another connection`,
+      );
+    }
+
+    const missing = held.filter((domain) => !ownedByUs.has(domain));
+    if (missing.length === 0) return;
+    await tx.ssoVerifiedDomain.createMany({
+      data: missing.map((domain) => ({
+        domain,
+        connectionId,
+        organizationId: state.organizationId,
+      })),
+    });
+  }
+
+  /**
+   * The engine's provider row, folded from the same state in the same apply
+   * (D09 — see specs/identity/sso-idp-termination.feature).
+   *
+   * better-auth's single sign-on plugin owns those columns and every read of
+   * them, but it does not own whether a row exists: that is derived here, so
+   * the plugin's table is a projection of the connection log rather than a
+   * second source of truth somebody has to keep in step. Replay the ledger
+   * and both rows come back.
+   *
+   * Written after the head and not in a transaction with it, on purpose. The
+   * head is the commit marker this projection has always used, and the engine
+   * row is derived entirely FROM the head — so a crash between the two leaves
+   * a provider row that the next apply or the next replay rewrites, never a
+   * provider row that outlives the connection justifying it.
+   */
+  private async projectEngineProvider({
+    connectionId,
+    state,
+  }: {
+    connectionId: string;
+    state: SsoConnectionState;
+  }): Promise<void> {
+    if (this.engineProvider === undefined) return;
+    const row = await this.engineProvider({ connection: state });
+    if (row === null) {
+      // Deleted rather than disabled. A suspended or torn-down connection
+      // must stop being dialable, and a row the engine can still find is a
+      // row it will still authenticate through.
+      await this.prisma.ssoProvider.deleteMany({ where: { id: connectionId } });
+      return;
+    }
+    const columns = {
+      issuer: row.issuer,
+      oidcConfig: row.oidcConfig,
+      samlConfig: row.samlConfig,
+      providerId: row.providerId,
+      organizationId: row.organizationId,
+      domain: row.domain,
+    };
+    await this.prisma.ssoProvider.upsert({
+      where: { id: row.id },
+      create: { id: row.id, ...columns },
       update: columns,
     });
   }
 }
+
+/** The derivation the fold applies, as this store needs it: one connection's
+ *  state in, the engine's row or nothing out. */
+export type SsoEngineProviderDerivation = (args: {
+  connection: SsoConnectionState;
+}) => Promise<SsoEngineProviderRow | null>;
 
 /**
  * One stored row back into the reducer's state. Exported because the routing
@@ -123,20 +294,25 @@ export function rowToConnection(row: SsoConnection): SsoConnectionState {
     type: row.type as SsoConnectionType,
     state: row.state as SsoConnectionLifecycleState,
     claimedDomains: row.claimedDomains,
+    domainClaims: Array.isArray(row.domainClaims)
+      ? (row.domainClaims as unknown as SsoDomainClaim[])
+      : [],
     approvedDomains: row.approvedDomains,
     verifiedDomains: row.verifiedDomains,
     domainVerifications: Array.isArray(row.domainVerifications)
-      ? (row.domainVerifications as unknown as SsoDomainVerification[])
+      ? row.domainVerifications.map(toDomainVerification)
       : [],
     pendingVerification: row.pendingVerification
       ? (row.pendingVerification as unknown as {
           domain: string;
           method: SsoVerificationMethod;
           tokenHash: string;
+          expiresAtMs: number | null;
         })
       : null,
     idpMetadata: row.idpMetadata as unknown as SsoIdpMetadata,
-    allowsJit: row.allowsJit,
+    arrivalPolicy: row.arrivalPolicy as SsoArrivalPolicy,
+    arrivalPolicyDecidedAtMs: row.arrivalPolicyDecidedAt?.getTime() ?? null,
     source: row.source as SsoConnectionSource,
     testLoginAccountId: row.testLoginAccountId,
     rejection: row.rejection
@@ -146,5 +322,34 @@ export function rowToConnection(row: SsoConnection): SsoConnectionState {
     createdAtMs: row.createdAt.getTime(),
     updatedAtMs: row.updatedAt.getTime(),
     tearDownAfterMs: row.tearDownAfter?.getTime() ?? null,
+  };
+}
+
+/**
+ * One stored verification back into the reducer's shape, with the condition
+ * fields defaulted (ADR-123).
+ *
+ * Every proof recorded before re-verification existed was written without
+ * them, and the honest reading of such a row is exactly what it meant then: a
+ * domain nothing had contradicted, proved by a record whose hash we did not
+ * keep. Defaulting HERE rather than trusting the cast is what stops those
+ * rows decoding with an `undefined` proof state that every downstream
+ * comparison would then quietly get wrong — and the absent hash is what keeps
+ * the sweep from re-reading a domain it could not judge.
+ */
+function toDomainVerification(raw: unknown): SsoDomainVerification {
+  const entry = raw as Partial<SsoDomainVerification> & {
+    domain: string;
+    method: SsoVerificationMethod;
+  };
+  return {
+    domain: entry.domain,
+    method: entry.method,
+    actorId: entry.actorId ?? null,
+    verifiedAtMs: entry.verifiedAtMs ?? 0,
+    proofState: (entry.proofState ?? "VERIFIED") as SsoDomainProofState,
+    firstAbsentAtMs: entry.firstAbsentAtMs ?? null,
+    graceEndsAtMs: entry.graceEndsAtMs ?? null,
+    tokenHash: entry.tokenHash ?? null,
   };
 }

@@ -1,4 +1,4 @@
-import { Button, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { AlertTriangle } from "lucide-react";
 
 import { Dialog } from "~/components/ui/dialog";
@@ -38,10 +38,15 @@ export function ConfirmDialog({
       <Dialog.Content bg="bg" maxWidth="480px">
         <Dialog.Header>
           <HStack gap={3} align="start">
-            <AlertTriangle
-              size={20}
-              color={tone === "danger" ? "#E53E3E" : "#ED8936"}
-            />
+            {/* The glyph takes the tone's semantic token rather than a hex:
+                the token carries its own dark-mode reading, the hex did not. */}
+            <Box
+              color={tone === "danger" ? "red.solid" : "orange.solid"}
+              display="flex"
+              flexShrink={0}
+            >
+              <AlertTriangle size={20} />
+            </Box>
             <VStack align="start" gap={0}>
               <Dialog.Title>{title}</Dialog.Title>
             </VStack>

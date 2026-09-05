@@ -1,0 +1,41 @@
+{
+  "extends": "./tsconfig.tsgo.tests.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.cache/tsbuildinfo/tsgo-d05-scoped.tsbuildinfo"
+  },
+  "include": [
+    "./src/**/*.d.ts",
+    "./ee/**/*.d.ts",
+    "next-env.d.ts",
+    "src/server/app-layer/identity/**/*.ts",
+    "src/server/api/routers/ssoSetup.ts",
+    "src/server/api/routers/ssoConnections.ts",
+    "src/server/api/routers/scimToken.ts",
+    "src/server/api/rbac.ts",
+    "src/server/api-key/permission-categories.ts",
+    "src/server/breakGlassExpiryWorker.ts",
+    "src/server/featureFlag/**/*.ts",
+    "src/server/rbac/custom-role-permissions.ts",
+    "src/components/settings/SingleSignOnSetup.tsx",
+    "src/components/settings/singleSignOn/**/*.tsx",
+    "src/components/settings/__tests__/SingleSignOnSetup.serviceProvider.integration.test.tsx",
+    "src/components/settings/__tests__/SingleSignOnSetup.goLive.integration.test.tsx",
+    "src/components/access/IdentityRow.tsx",
+    "src/features/sso/logic/**/*.ts",
+    "src/server/api/routers/__tests__/ssoSetup.plan.unit.test.ts",
+    "src/utils/auth-client.tsx",
+    "src/pages/settings/single-sign-on.tsx",
+    "src/pages/settings/__tests__/single-sign-on.permissions.integration.test.tsx",
+    "src/server/app-layer/authz/__tests__/sso-permissions.unit.test.ts",
+    "src/utils/rbacVocabulary.ts",
+    "src/utils/dbOrganizationIdProtection.ts",
+    "ee/scim/**/*.ts",
+    "ee/sso/**/*.ts",
+    "src/features/errors/logic/codes.ts",
+    "src/features/errors/logic/presentation.ts",
+    "src/server/better-auth/**/*.ts",
+    "src/server/event-sourcing/pipelines/sso-connections/**/*.ts",
+    "src/features/sso/**/*.tsx",
+    "ee/admin/backoffice/resources/SsoConnectionsView.tsx"
+  ]
+}

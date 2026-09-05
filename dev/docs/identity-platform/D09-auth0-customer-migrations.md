@@ -11,7 +11,7 @@ Enterprise customers move off the Auth0 broker onto direct OIDC connections, one
 | Auth0 dependency today | What retires it | When |
 |---|---|---|
 | OIDC broker for enterprise SSO (genericOAuth `auth0`/`okta` providers) | Direct per-org `SsoConnection` (OIDC/SAML), one customer at a time | this deliverable, per tenant |
-| Front-door screens (Universal Login owned the unauthenticated visuals) | First-party screen set | D13, at the `IDENTITY_ROUTER_V2` flip |
+| Front-door screens (Universal Login owned the unauthenticated visuals) | First-party screen set | D13 — shipped; the flag and the legacy screens are removed |
 | `Organization.ssoDomain`/`ssoProvider` string routing | Connection-based routing | D04 (`SSOCONN_ROUTING`) |
 | `src/server/auth0/passwordService.ts` (Management API password ops) | Identifier-model password change (`change-password-auth0.feature` rewrite) | D10 |
 | Federated logout | Direct-connection logout semantics | this deliverable per tenant; code deleted D10 |

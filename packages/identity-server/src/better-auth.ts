@@ -53,6 +53,11 @@ export type {
   IdentityAccountRow,
   IdentityAccountSecrets,
   IdentityAccountsPort,
+  IdentityConnectionIssuersPort,
   IdentityResolution,
   IdentityResolutionPort,
 } from "./better-auth/storage-ports";
+export {
+  MfaCeremonies,
+  type MfaCeremoniesDeps,
+} from "./better-auth/mfa-ceremonies";

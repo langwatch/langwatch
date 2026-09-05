@@ -164,6 +164,13 @@ const ORG_ADMIN: readonly AuthzPermission[] = [
   "webhookEndpoints:manage",
   "gatewaySpend:view",
   "gatewaySpend:manage",
+  // The organization administrator IS the IT administrator on self-hosted:
+  // there is nobody else to hold single sign-on and directory sync, and a
+  // fresh install has no custom-role authoring surface to mint one. The
+  // license gates whether the capability exists; this only says who may use
+  // it where it does (D05, ADR-122).
+  "sso:view",
+  "sso:manage",
 ];
 
 const ORG_MEMBER: readonly AuthzPermission[] = [

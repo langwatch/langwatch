@@ -1,5 +1,5 @@
-import { Button, Container, Heading, Html, Img } from "@react-email/components";
 import { render } from "@react-email/render";
+import { EmailAction, EmailParagraph, EmailShell } from "./emailLayout";
 import { sendEmail } from "./emailSender";
 
 /**
@@ -16,43 +16,23 @@ export const sendSignUpVerificationEmail = async ({
   verificationUrl: string;
 }) => {
   const emailHtml = await render(
-    <Html lang="en" dir="ltr">
-      <Container
-        style={{
-          border: "1px solid #F2F4F8",
-          borderRadius: "10px",
-          padding: "24px",
-          paddingBottom: "12px",
-        }}
-      >
-        <Img
-          src="https://app.langwatch.ai/images/logo-icon.png"
-          alt="LangWatch Logo"
-          width="36"
-        />
-        <Heading as="h1">Confirm your email address</Heading>
-        <p>
-          Someone started creating a LangWatch account with this address (
-          <b>{email}</b>). Click the button below to confirm it and carry on:
-        </p>
-        <Button
-          href={verificationUrl}
-          style={{
-            padding: "10px 20px",
-            color: "white",
-            backgroundColor: "#ED8926",
-            textDecoration: "none",
-            borderRadius: "6px",
-          }}
-        >
-          Confirm my email address
-        </Button>
-        <p>
-          This link expires in 1 hour and can be used once. If this was not you,
-          you can ignore this email: nothing has been created.
-        </p>
-      </Container>
-    </Html>,
+    <EmailShell title="Confirm your email address">
+      <EmailParagraph>
+        Someone started creating a LangWatch account with this address (
+        <b>{email}</b>). Click the button below to confirm it and carry on:
+      </EmailParagraph>
+      <EmailAction href={verificationUrl} label="Confirm my email address" />
+      {/* "Nothing has been created" stopped being true when `user.register`
+          started making the account before sending this. Telling a stranger
+          nothing exists, while an unconfirmed account holds their address and
+          their own later sign-up is refused, is the untrue opening
+          `addressConfirmationEmail` was split out to avoid. */}
+      <EmailParagraph tone="muted" style={{ margin: 0 }}>
+        This link expires in 1 hour and can be used once. If this was not you,
+        you can ignore this email — the account cannot sign anybody in until
+        this address is confirmed, and it will not be used for anything else.
+      </EmailParagraph>
+    </EmailShell>,
   );
 
   await sendEmail({

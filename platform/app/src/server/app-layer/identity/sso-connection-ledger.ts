@@ -30,22 +30,24 @@ import {
   COMPLETE_TEARDOWN_COMMAND_TYPE,
   DISCARD_CONNECTION_COMMAND_TYPE,
   GRANDFATHER_CONNECTION_COMMAND_TYPE,
+  RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE,
+  RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE,
   REGISTER_CONNECTION_COMMAND_TYPE,
   REJECT_DOMAIN_CLAIM_COMMAND_TYPE,
   REQUEST_TEARDOWN_COMMAND_TYPE,
   REQUEST_VERIFICATION_COMMAND_TYPE,
   RESUME_CONNECTION_COMMAND_TYPE,
+  SET_ARRIVAL_POLICY_COMMAND_TYPE,
   type SsoConnectionCommand,
   type SsoConnectionCommandType,
   type SsoConnectionFact,
   type SsoConnectionFactInput,
   SUSPEND_CONNECTION_COMMAND_TYPE,
   VERIFY_DOMAIN_COMMAND_TYPE,
+  WITHDRAW_DOMAIN_COMMAND_TYPE,
 } from "@langwatch/identity";
 import type { SsoConnectionLedger } from "@langwatch/identity-server";
 import { createLogger } from "@langwatch/observability";
-import { tryGetApp } from "~/server/app-layer/app";
-import { createTenantId } from "~/server/event-sourcing";
 import type { AggregateType } from "~/server/event-sourcing/domain/aggregateType";
 import { ssoConnectionEventsFor } from "~/server/event-sourcing/pipelines/sso-connections/envelope";
 import type { SsoConnectionFoldState } from "~/server/event-sourcing/pipelines/sso-connections/projections/ssoConnectionState.foldProjection";
@@ -56,95 +58,114 @@ import {
 import type { SsoConnectionEvent } from "~/server/event-sourcing/pipelines/sso-connections/schemas/events";
 import type { StateProjectionStore } from "~/server/event-sourcing/projections/stateProjection.types";
 import type { EventStore } from "~/server/event-sourcing/stores/eventStore.types";
+import {
+  appPipelineSender,
+  resolveAppEventStore,
+  StagedLedgerWriter,
+  type StagedSender,
+} from "./staged-ledger-writer";
 
 const logger = createLogger("langwatch:identity:sso-connection-ledger");
-
-/** How long a command waits for the App handle before the append gives up. */
-const CONNECTION_APP_HANDLE_WAIT_MS = 5_000;
 
 /** The read-your-writes window, the identity ledger's convergence shape. */
 export const SSO_CONNECTION_CONVERGENCE_TIMEOUT_MS = 2_000;
 export const SSO_CONNECTION_CONVERGENCE_POLL_MS = 25;
 
-export type SsoConnectionStagedSender = {
-  send(data: unknown): Promise<unknown>;
-};
-
-const SENDER_NAME_BY_COMMAND: Record<SsoConnectionCommandType, string> = {
-  [REGISTER_CONNECTION_COMMAND_TYPE]: "registerConnection",
-  [CLAIM_DOMAIN_COMMAND_TYPE]: "claimDomain",
-  [APPROVE_DOMAIN_CLAIM_COMMAND_TYPE]: "approveDomainClaim",
-  [REJECT_DOMAIN_CLAIM_COMMAND_TYPE]: "rejectDomainClaim",
-  [DISCARD_CONNECTION_COMMAND_TYPE]: "discardConnection",
-  [REQUEST_VERIFICATION_COMMAND_TYPE]: "requestVerification",
-  [ATTEST_DOMAIN_COMMAND_TYPE]: "attestDomain",
-  [VERIFY_DOMAIN_COMMAND_TYPE]: "verifyDomain",
-  [ACTIVATE_CONNECTION_COMMAND_TYPE]: "activateConnection",
-  [SUSPEND_CONNECTION_COMMAND_TYPE]: "suspendConnection",
-  [RESUME_CONNECTION_COMMAND_TYPE]: "resumeConnection",
-  [REQUEST_TEARDOWN_COMMAND_TYPE]: "requestTeardown",
-  [COMPLETE_TEARDOWN_COMMAND_TYPE]: "completeTeardown",
-  [GRANDFATHER_CONNECTION_COMMAND_TYPE]: "grandfatherConnection",
-};
+/** Exported for the wiring pin only: the pipeline must carry every one of
+ *  these names, and the test that says so cannot read a private const. */
+export const SENDER_NAME_BY_COMMAND: Record<SsoConnectionCommandType, string> =
+  {
+    [REGISTER_CONNECTION_COMMAND_TYPE]: "registerConnection",
+    [CLAIM_DOMAIN_COMMAND_TYPE]: "claimDomain",
+    [APPROVE_DOMAIN_CLAIM_COMMAND_TYPE]: "approveDomainClaim",
+    [REJECT_DOMAIN_CLAIM_COMMAND_TYPE]: "rejectDomainClaim",
+    [DISCARD_CONNECTION_COMMAND_TYPE]: "discardConnection",
+    [REQUEST_VERIFICATION_COMMAND_TYPE]: "requestVerification",
+    [ATTEST_DOMAIN_COMMAND_TYPE]: "attestDomain",
+    [WITHDRAW_DOMAIN_COMMAND_TYPE]: "withdrawDomain",
+    [VERIFY_DOMAIN_COMMAND_TYPE]: "verifyDomain",
+    [ACTIVATE_CONNECTION_COMMAND_TYPE]: "activateConnection",
+    [SUSPEND_CONNECTION_COMMAND_TYPE]: "suspendConnection",
+    [RESUME_CONNECTION_COMMAND_TYPE]: "resumeConnection",
+    [REQUEST_TEARDOWN_COMMAND_TYPE]: "requestTeardown",
+    [COMPLETE_TEARDOWN_COMMAND_TYPE]: "completeTeardown",
+    [SET_ARRIVAL_POLICY_COMMAND_TYPE]: "setArrivalPolicy",
+    // The two re-check verbs the scheduler commands (ADR-123). They were
+    // missing from this map, which the `Record` had been quietly tolerating
+    // until another verb made the type complain about all three at once.
+    [RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE]: "recordDomainProofAbsent",
+    [RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE]: "recordDomainProofPresent",
+    [GRANDFATHER_CONNECTION_COMMAND_TYPE]: "grandfatherConnection",
+  };
 
 async function resolveEventStore(): Promise<EventStore<SsoConnectionEvent>> {
-  const deadline = Date.now() + CONNECTION_APP_HANDLE_WAIT_MS;
-  let app = tryGetApp();
-  while (!app && Date.now() < deadline) {
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    app = tryGetApp();
-  }
-  const eventStore = app?.eventSourcing?.isEnabled
-    ? app.eventSourcing.getEventStore<SsoConnectionEvent>()
-    : undefined;
-  if (!eventStore) {
-    // A plain Error on purpose (error doctrine): the caller cannot act on an
-    // unavailable event stack, and the command degrades to a retryable
-    // failure with a trace id.
-    throw new Error(
+  return resolveAppEventStore<SsoConnectionEvent>({
+    unavailableMessage:
       "sso connection ledger cannot append: the event-sourcing stack is unavailable",
-    );
-  }
-  return eventStore;
+  });
 }
 
-function resolveStagedSender(name: string): SsoConnectionStagedSender | null {
-  const app = tryGetApp();
-  if (!app?.eventSourcing?.isEnabled) return null;
-  try {
-    const pipeline = app.eventSourcing.getPipeline(
-      SSO_CONNECTION_PIPELINE_NAME as never,
-    ) as unknown as { commands: Record<string, SsoConnectionStagedSender> };
-    return pipeline.commands[name] ?? null;
-  } catch {
-    return null;
-  }
-}
+const resolveStagedSender = appPipelineSender({
+  pipelineName: SSO_CONNECTION_PIPELINE_NAME,
+});
 
 export interface SsoConnectionLedgerWriterDeps {
   projectionStore: StateProjectionStore<SsoConnectionFoldState>;
   /** Production resolves the App's event store lazily; tests hand one in. */
   eventStore?: () => Promise<EventStore<SsoConnectionEvent>>;
-  stagedSender?: (name: string) => SsoConnectionStagedSender | null;
+  stagedSender?: (name: string) => StagedSender | null;
   convergence?: { timeoutMs: number; pollMs: number };
 }
 
-export class SsoConnectionLedgerWriter implements SsoConnectionLedger {
-  private readonly projectionStore: StateProjectionStore<SsoConnectionFoldState>;
-  private readonly eventStore: () => Promise<EventStore<SsoConnectionEvent>>;
-  private readonly stagedSender: (
-    name: string,
-  ) => SsoConnectionStagedSender | null;
-  private readonly convergence: { timeoutMs: number; pollMs: number };
-
+export class SsoConnectionLedgerWriter
+  extends StagedLedgerWriter<
+    SsoConnectionCommand,
+    SsoConnectionEvent,
+    SsoConnectionFoldState
+  >
+  implements SsoConnectionLedger
+{
   constructor(deps: SsoConnectionLedgerWriterDeps) {
-    this.projectionStore = deps.projectionStore;
-    this.eventStore = deps.eventStore ?? resolveEventStore;
-    this.stagedSender = deps.stagedSender ?? resolveStagedSender;
-    this.convergence = deps.convergence ?? {
+    const convergence = deps.convergence ?? {
       timeoutMs: SSO_CONNECTION_CONVERGENCE_TIMEOUT_MS,
       pollMs: SSO_CONNECTION_CONVERGENCE_POLL_MS,
     };
+    super({
+      stagedSender: deps.stagedSender ?? resolveStagedSender,
+      waitedAppend: {
+        eventStore: deps.eventStore ?? resolveEventStore,
+        aggregateType: SSO_CONNECTION_AGGREGATE_TYPE as AggregateType,
+      },
+      readYourWrites: {
+        projectionStore: deps.projectionStore,
+        timeoutMs: convergence.timeoutMs,
+        pollMs: convergence.pollMs,
+        onTimeout: ({ aggregateId, eventCount }) => {
+          logger.warn(
+            { connectionId: aggregateId, commandCount: eventCount },
+            "sso connection projection did not land a command's events within the read-your-writes window; the append is durable and the fold will converge",
+          );
+        },
+        onUnreadableProjection: ({ aggregateId, error }) => {
+          logger.warn(
+            { connectionId: aggregateId, error },
+            "could not read the sso connection projection while waiting for convergence; continuing",
+          );
+        },
+      },
+    });
+  }
+
+  protected senderNameFor(command: SsoConnectionCommand): string {
+    return SENDER_NAME_BY_COMMAND[command.type];
+  }
+
+  protected onMissingSender({ senderName }: { senderName: string }): never {
+    // A wiring defect, not a transient: the pipeline exposed no sender for
+    // a command type it declares. Loud, because nothing downstream folds.
+    throw new Error(
+      `sso connection ledger cannot stage: the pipeline exposes no "${senderName}" sender`,
+    );
   }
 
   async commit({
@@ -158,96 +179,13 @@ export class SsoConnectionLedgerWriter implements SsoConnectionLedger {
     if (events.length === 0) return [];
     const { connectionId, tenantId } = command.data;
 
-    const eventStore = await this.eventStore();
-    await eventStore.storeEvents(
-      events,
-      { tenantId: createTenantId(tenantId) },
-      SSO_CONNECTION_AGGREGATE_TYPE as AggregateType,
-    );
-
+    await this.append({ events, tenantId });
     await this.stage({ command });
-    await this.awaitFold({ connectionId, tenantId, events });
-    return events as unknown as SsoConnectionFact[];
-  }
-
-  private async stage({
-    command,
-  }: {
-    command: SsoConnectionCommand;
-  }): Promise<void> {
-    const senderName = SENDER_NAME_BY_COMMAND[command.type];
-    const sender = this.stagedSender(senderName);
-    if (!sender) {
-      // A wiring defect, not a transient: the pipeline exposed no sender for
-      // a command type it declares. Loud, because nothing downstream folds.
-      throw new Error(
-        `sso connection ledger cannot stage: the pipeline exposes no "${senderName}" sender`,
-      );
-    }
-    await sender.send(command.data);
-  }
-
-  private async awaitFold({
-    connectionId,
-    tenantId,
-    events,
-  }: {
-    connectionId: string;
-    tenantId: string;
-    events: SsoConnectionEvent[];
-  }): Promise<void> {
-    const last = events[events.length - 1];
-    if (!last) return;
-    const context = {
+    await this.awaitConvergence({
       aggregateId: connectionId,
-      tenantId: createTenantId(tenantId),
-    };
-    // Wall-clock, not injectable business time: a frozen test clock would
-    // otherwise make this loop unable to time out.
-    const deadline = Date.now() + this.convergence.timeoutMs;
-    for (;;) {
-      if (await this.foldReached({ connectionId, context, last })) return;
-      if (Date.now() >= deadline) {
-        logger.warn(
-          { connectionId, commandCount: events.length },
-          "sso connection projection did not land a command's events within the read-your-writes window; the append is durable and the fold will converge",
-        );
-        return;
-      }
-      await new Promise((resolve) =>
-        setTimeout(resolve, this.convergence.pollMs),
-      );
-    }
-  }
-
-  private async foldReached({
-    connectionId,
-    context,
-    last,
-  }: {
-    connectionId: string;
-    context: {
-      aggregateId: string;
-      tenantId: ReturnType<typeof createTenantId>;
-    };
-    last: SsoConnectionEvent;
-  }): Promise<boolean> {
-    try {
-      const stored = await this.projectionStore.load(connectionId, context);
-      const cursor = stored?.cursor;
-      if (!cursor) return false;
-      return (
-        cursor.acceptedAt > last.createdAt ||
-        (cursor.acceptedAt === last.createdAt && cursor.eventId >= last.id)
-      );
-    } catch (error) {
-      // An unreadable projection is not a failed command: the facts are
-      // durable. Stop waiting and let the caller proceed.
-      logger.warn(
-        { connectionId, error },
-        "could not read the sso connection projection while waiting for convergence; continuing",
-      );
-      return true;
-    }
+      tenantId,
+      events,
+    });
+    return events as unknown as SsoConnectionFact[];
   }
 }

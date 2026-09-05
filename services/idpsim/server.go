@@ -102,6 +102,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /control/t/{tenant}/apps", s.handleControlRegisterApp)
 	mux.HandleFunc("POST /control/t/{tenant}/config", s.handleControlConfig)
 	mux.HandleFunc("POST /control/t/{tenant}/scim-push", s.handleControlSCIMPush)
+	mux.HandleFunc("POST /control/t/{tenant}/scim-pull", s.handleControlSCIMPull)
 	mux.HandleFunc("PUT /control/dns/txt", s.handleControlDNS)
 	mux.HandleFunc("DELETE /control/dns/txt", s.handleControlDNS)
 	mux.HandleFunc("PUT /control/verification", s.handleControlVerification)

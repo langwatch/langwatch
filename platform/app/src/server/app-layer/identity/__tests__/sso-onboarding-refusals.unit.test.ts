@@ -8,18 +8,21 @@
  *
  * The trap this guards is #5984's: since the tRPC boundary replaces a handled
  * error's wire message with its CODE, a surface that renders `error.message`
- * shows the reader `sso_saml_not_self_serve`. So the assertion is not that a
+ * shows the reader `sso_issuer_unreachable`. So the assertion is not that a
  * code exists — it is that the words registered for the code are words, and
  * that they are what a renderer would reach.
  */
 import {
+  SsoCertificateInvalidError,
   SsoConnectionActivationBlockedError,
   SsoConnectionDomainTakenError,
   SsoConnectionInvalidTransitionError,
   SsoConnectionOperatorActRequiredError,
   SsoConnectionStringEditRetiredError,
   SsoConnectionTeardownStrandsUsersError,
-  SsoSamlNotSelfServeError,
+  SsoCredentialsRequiredError,
+  SsoIssuerUnreachableError,
+  SsoSamlMetadataInvalidError,
 } from "@langwatch/identity";
 import { describe, expect, it } from "vitest";
 import {
@@ -40,7 +43,10 @@ const REFUSALS = [
   new SsoConnectionTeardownStrandsUsersError("detail"),
   new SsoConnectionOperatorActRequiredError("detail"),
   new SsoConnectionStringEditRetiredError("detail"),
-  new SsoSamlNotSelfServeError("detail"),
+  new SsoCredentialsRequiredError("detail"),
+  new SsoIssuerUnreachableError("detail"),
+  new SsoSamlMetadataInvalidError("detail"),
+  new SsoCertificateInvalidError("detail"),
 ];
 
 const shapeOf = (error: (typeof REFUSALS)[number]) => ({

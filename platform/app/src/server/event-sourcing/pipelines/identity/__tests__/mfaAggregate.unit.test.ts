@@ -202,6 +202,9 @@ describe("two-step verification event aggregate type", () => {
         identityGuards: null as never,
         mfaProjectionStore: noopStore,
         mfaGuards: new MfaGuards(new EnrollmentOf(ENABLED)),
+        // This scenario is about the aggregate type the pipeline declares,
+        // which no guard participates in.
+        linkProposalGuards: null as never,
       }).metadata.aggregateType;
 
       const events = await handler.handle(command(data) as never);

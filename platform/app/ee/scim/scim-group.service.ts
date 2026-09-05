@@ -62,12 +62,14 @@ export class ScimGroupService {
 
   async listGroups({
     organizationId,
+    connectionId = null,
     filter,
     startIndex = 1,
     count = 100,
     excludeMembers = false,
   }: {
     organizationId: string;
+    connectionId?: string | null;
     filter?: string;
     startIndex?: number;
     count?: number;
@@ -77,6 +79,12 @@ export class ScimGroupService {
 
     const where = {
       organizationId,
+      // A directory lists ITS groups. Another connection's are as absent as
+      // another organization's, and for the same reason: a token's reach is
+      // the connection it was minted for. Groups with no connection predate
+      // per-connection scoping and stay reachable by any of the
+      // organization's tokens.
+      OR: [{ scimConnectionId: connectionId }, { scimConnectionId: null }],
       scimSource: { not: null as string | null },
       ...(displayNameFilter
         ? { name: { equals: displayNameFilter, mode: "insensitive" as const } }
@@ -114,13 +122,19 @@ export class ScimGroupService {
   async getGroup({
     scimResourceId,
     organizationId,
+    connectionId = null,
     excludeMembers = false,
   }: {
     scimResourceId: string;
     organizationId: string;
+    connectionId?: string | null;
     excludeMembers?: boolean;
   }): Promise<ScimGroup | ScimError> {
-    const group = await this.findGroup({ scimResourceId, organizationId });
+    const group = await this.findGroup({
+      scimResourceId,
+      organizationId,
+      connectionId,
+    });
     if (!group)
       return this.scimError({ status: "404", detail: "Group not found" });
 
@@ -189,13 +203,19 @@ export class ScimGroupService {
   async replaceGroup({
     scimResourceId,
     organizationId,
+    connectionId = null,
     request,
   }: {
     scimResourceId: string;
     organizationId: string;
+    connectionId?: string | null;
     request: ScimReplaceGroupRequest;
   }): Promise<ScimGroup | ScimError> {
-    const group = await this.findGroup({ scimResourceId, organizationId });
+    const group = await this.findGroup({
+      scimResourceId,
+      organizationId,
+      connectionId,
+    });
     if (!group)
       return this.scimError({ status: "404", detail: "Group not found" });
 
@@ -247,13 +267,19 @@ export class ScimGroupService {
   async updateGroup({
     scimResourceId,
     organizationId,
+    connectionId = null,
     patchRequest,
   }: {
     scimResourceId: string;
     organizationId: string;
+    connectionId?: string | null;
     patchRequest: ScimPatchRequest;
   }): Promise<ScimGroup | ScimError> {
-    const group = await this.findGroup({ scimResourceId, organizationId });
+    const group = await this.findGroup({
+      scimResourceId,
+      organizationId,
+      connectionId,
+    });
     if (!group)
       return this.scimError({ status: "404", detail: "Group not found" });
 
@@ -275,11 +301,17 @@ export class ScimGroupService {
   async deleteGroup({
     scimResourceId,
     organizationId,
+    connectionId = null,
   }: {
     scimResourceId: string;
     organizationId: string;
+    connectionId?: string | null;
   }): Promise<ScimError | null> {
-    const group = await this.findGroup({ scimResourceId, organizationId });
+    const group = await this.findGroup({
+      scimResourceId,
+      organizationId,
+      connectionId,
+    });
     if (!group)
       return this.scimError({ status: "404", detail: "Group not found" });
 
@@ -332,11 +364,19 @@ export class ScimGroupService {
       });
       if (byIdentifier) return byIdentifier;
     }
+    // THE SAME REACH THE READS HAVE. Every other query in this service is
+    // scoped to the connection that asked (or to the pre-scoping rows, which
+    // carry no connection), and this fallback was not — so a second directory
+    // pushing a group name the first one already used was told the name
+    // exists, while `listGroups` and `findGroup` refused to show it the row.
+    // Entra creates "Engineering", Okta cannot create it and cannot see it,
+    // and its provider retries the create forever, 409ing each time.
     return this.prisma.group.findFirst({
       where: {
         organizationId,
         name: displayName,
         scimSource: { not: null },
+        OR: [{ scimConnectionId: connectionId }, { scimConnectionId: null }],
       },
     });
   }
@@ -352,15 +392,37 @@ export class ScimGroupService {
    * than re-pointed, because re-pointing it would break every identity
    * provider that has already stored the ids we handed out.
    */
+  /**
+   * The group a request names, or none — and "none" includes a group that
+   * belongs to a DIFFERENT connection in the same organization.
+   *
+   * `Group.scimConnectionId` records which directory owns a group, and the
+   * contract written on the column says a token minted for one connection can
+   * never touch another connection's people. Resolving by organization alone
+   * broke that for every group verb that takes an id: an Okta token could
+   * rename, re-member and delete the groups an Entra connection created — and
+   * `deleteGroup` reconciles grants, so it could strip role bindings the other
+   * directory granted.
+   *
+   * A group with no connection is reachable by any of the organization's
+   * tokens: those predate per-connection scoping and were written when the
+   * organization was the whole answer.
+   */
   private async findGroup({
     scimResourceId,
     organizationId,
+    connectionId,
   }: {
     scimResourceId: string;
     organizationId: string;
+    connectionId: string | null;
   }): Promise<Group | null> {
     return this.prisma.group.findFirst({
-      where: { id: scimResourceId, organizationId },
+      where: {
+        id: scimResourceId,
+        organizationId,
+        OR: [{ scimConnectionId: connectionId }, { scimConnectionId: null }],
+      },
     });
   }
 

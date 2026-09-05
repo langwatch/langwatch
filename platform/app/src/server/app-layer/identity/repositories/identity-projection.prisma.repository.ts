@@ -140,6 +140,24 @@ export class PrismaIdentityProjectionRepository
   }
 
   /**
+   * A newborn's heads before its first fold: the rows the ledger decided,
+   * written the way the fold writes them, and NOTHING else — no cursor, no
+   * lock release, no `Account` linkage. The fold does all of that when the
+   * queued command lands, overwriting these rows whole; until then the
+   * missing cursor is what marks them provisional (`IdentityHeadsRepository.
+   * hasFolded`).
+   */
+  async writeProvisionalHeads({
+    facts,
+  }: {
+    facts: IdentifierFact[];
+  }): Promise<void> {
+    for (const fact of facts) {
+      await this.writeIdentifier(fact);
+    }
+  }
+
+  /**
    * One identifier row, upserted whole.
    *
    * No database constraint arbitrates an ADDRESS collision here, and none

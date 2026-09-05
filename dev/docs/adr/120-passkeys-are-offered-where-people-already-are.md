@@ -8,7 +8,7 @@
 plan `../identity-platform/delivery-plan.md`, deliverable `D07-passkeys.md`.
 Specs: `specs/identity/passkeys.feature`.
 
-**Builds on:** ADR-117 (the front door and its method rail), ADR-119 (an
+**Builds on:** ADR-117 (the auth screens and its method rail), ADR-119 (an
 account always has a second way in).
 
 ## Context

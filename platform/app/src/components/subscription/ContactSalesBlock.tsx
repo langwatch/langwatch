@@ -1,7 +1,15 @@
 /**
  * Contact Sales Block - CTA for enterprise or higher-tier needs
  */
-import { Button, Card, Flex, HStack, SimpleGrid, Text } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Card,
+  Flex,
+  HStack,
+  SimpleGrid,
+  Text,
+} from "@chakra-ui/react";
 import { Check } from "lucide-react";
 import { Link } from "~/components/ui/link";
 import { CONTACT_SALES_URL } from "../../../ee/licensing/constants";
@@ -26,7 +34,11 @@ export function ContactSalesBlock() {
         >
           {ENTERPRISE_PLAN_FEATURES.map((feature) => (
             <HStack key={feature} gap={2} alignItems="start">
-              <Check size={16} color="var(--chakra-colors-orange-solid)" />
+              {/* The token prop, not the raw CSS var: `orange.solid` carries
+                  its own dark-mode reading. */}
+              <Box color="orange.solid" display="flex" flexShrink={0}>
+                <Check size={16} />
+              </Box>
               <Text fontSize="sm" color="fg.muted">
                 {feature}
               </Text>

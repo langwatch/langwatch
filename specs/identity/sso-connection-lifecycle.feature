@@ -212,6 +212,50 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
     Then the connection becomes TORN_DOWN through the process manager's wake
     And its domains route nowhere
 
+  @integration
+  Scenario: An administrator removes their own connection that never went live
+    Given "acme" registered a connection that is not yet ACTIVE
+    When "ana" removes it from the setup page
+    Then the connection is discarded and the journey opens on the register step again
+    And nothing about anybody's sign-in changed, and the history keeps what was tried
+
+  @integration
+  Scenario: An administrator removes their own live connection on teardown's terms
+    Given "acme"'s connection is ACTIVE and nobody would be stranded
+    When "ana" removes it from the setup page
+    Then the removal is scheduled with teardown's own grace, not completed at once
+    And another organization's administrator naming the connection is answered as if it did not exist
+
+  # The grace exists for the people signing in through the connection, and
+  # being ON is what makes a connection carry them. A paused connection has
+  # already stopped carrying anybody, so its removal owes nobody a week.
+  @unit
+  Scenario: A removal of a connection that is carrying nobody is scheduled for now
+    Given "acme"'s connection is paused
+    When "ana" removes it from the setup page
+    Then the teardown deadline is the moment of the ask
+    And the wake completes it as soon as it fires
+
+  @unit
+  Scenario: Asking again while a removal waits brings the date forward
+    Given a connection in TEARDOWN_PENDING with days of grace left
+    When the administrator removes it again
+    Then the deadline is re-derived from the new ask
+    And the stranded-users check runs again on the way through
+
+  # One button, two removals, and the aggregate refuses each from the other's
+  # states — so which one a press is has to be read from where the connection
+  # stands. Reading it from whether the connection is ACTIVE is the same
+  # question asked wrongly: a paused connection and one already being removed
+  # are both "not active", neither can be discarded, and the screen offered
+  # both a button whose only outcome was a refusal.
+  @integration @unimplemented
+  Scenario: Which removal a press sends is read from where the connection stands
+    Given "acme"'s connection is paused, or already scheduled for removal
+    When "ana" removes it from the setup page
+    Then the connection is torn down on teardown's terms, never discarded
+    And a connection already being removed says so on the page, and says when
+
   @unit
   Scenario: The projection replays whole-row like every identity projection
     Given a connection with a full lifecycle of events
@@ -249,12 +293,17 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
 
   # ── Routing flip ───────────────────────────────────────────────────────
 
+  # There is no fleet-wide flip, and the staged flag that was going to carry
+  # one was designed out rather than built. Routing asks the connection
+  # projection first and falls back to the columns per organization, so which
+  # of the two decides differs BY ORGANIZATION -- and a switch thrown for
+  # everybody could only ever have been wrong for somebody.
   @unit
-  Scenario: Shadow mode compares connection routing against string routing
-    Given the connection routing flag is in shadow
-    When any user signs in through a routed domain
-    Then both lookups run and a disagreement is logged with both answers
-    And the string-based answer keeps deciding the sign-in
+  Scenario: Which routing decides is asked per organization, never set fleet-wide
+    Given "acme"'s connection decides its sign-in and "globex" has none
+    When a staff member edits the legacy single sign-on strings
+    Then the edit is refused for "acme", named as derived from its connection
+    And it is still accepted for "globex", whose strings still decide
 
   @unit
   Scenario: After the flip, the strings stop being written

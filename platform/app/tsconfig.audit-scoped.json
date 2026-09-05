@@ -1,0 +1,30 @@
+{
+  "extends": "./tsconfig.tsgo.tests.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.cache/tsbuildinfo/tsgo-audit-scoped.tsbuildinfo"
+  },
+  "include": [
+    "./src/**/*.d.ts",
+    "./ee/**/*.d.ts",
+    "next-env.d.ts",
+    "src/server/better-auth/**/*.ts",
+    "src/server/better-auth/**/*.tsx",
+    "src/server/app-layer/identity/**/*.ts",
+    "src/server/app-layer/authz/**/*.ts",
+    "src/server/api/routers/**/*.ts",
+    "ee/scim/**/*.ts",
+    "ee/admin/**/*.ts",
+    "ee/admin/**/*.tsx",
+    "src/features/auth/**/*.ts",
+    "src/features/auth/**/*.tsx",
+    "src/features/sso/**/*.ts",
+    "src/features/sso/**/*.tsx",
+    "src/features/directory/**/*.ts",
+    "src/features/errors/**/*.ts",
+    "src/features/errors/**/*.tsx",
+    "src/components/settings/**/*.tsx",
+    "src/components/access/**/*.tsx",
+    "src/pages/auth/**/*.tsx",
+    "src/pages/settings/**/*.tsx"
+  ]
+}

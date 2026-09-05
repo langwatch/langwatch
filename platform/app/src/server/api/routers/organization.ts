@@ -15,6 +15,7 @@ import { getApp } from "~/server/app-layer/app";
 import {
   identityEmail,
   joinRequestsService,
+  memberProvenance,
 } from "~/server/app-layer/identity/runtime";
 import { LITE_MEMBER_VIEWER_ONLY_ERROR } from "~/server/app-layer/organizations/compute-effective-team-role-updates";
 import { MemberSeatLimitReachedError } from "~/server/app-layer/organizations/errors";
@@ -555,6 +556,36 @@ export const organizationRouter = createTRPCRouter({
       }
 
       return organization;
+    }),
+
+  /**
+   * Why each member of this organization is here — invited, admitted by a
+   * domain, or created by the identity provider.
+   *
+   * `organization:manage`, the same authority that gates the member list this
+   * decorates: how somebody got in is an administrator's question, and the
+   * answer names the domain that admitted them.
+   *
+   * The member list never waits on this. It is a second query on purpose, so
+   * a provenance read that fails leaves the list showing everybody with no
+   * chips rather than showing nobody at all.
+   */
+  getMemberProvenance: protectedProcedure
+    .input(z.object({ organizationId: z.string().min(1) }))
+    .permission("organization:manage")
+    .query(async ({ input, ctx }) => {
+      // Bounded by this organization's own membership, read here rather than
+      // taken from the caller: a user id list on the input would be a way to
+      // ask about somebody who is not a member.
+      const members = await ctx.prisma.organizationUser.findMany({
+        where: { organizationId: input.organizationId },
+        select: { userId: true },
+      });
+
+      return memberProvenance().forMembers({
+        organizationId: input.organizationId,
+        userIds: members.map((member) => member.userId),
+      });
     }),
 
   getMemberById: protectedProcedure

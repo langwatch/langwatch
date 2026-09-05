@@ -19,14 +19,14 @@ import { E2E_ENTERPRISE_LICENSE_KEY } from "../license.fixture";
  * Extracts the org slug from the Home link to build the URL.
  */
 export async function givenIAmOnTheMembersPage(page: Page) {
-  // Members settings is org-scoped at /settings/members (resolved via the
-  // session's active org), not project-prefixed — every app nav link uses this
-  // exact href (see platform/app/src/routes.tsx). The org context comes from the
-  // authenticated session, not the URL.
-  await page.goto(`/settings/members`);
-  await expect(
-    page.getByRole("heading", { name: "Organization Members" })
-  ).toBeVisible({ timeout: 15000 });
+  // Members is the first tab of the Directory. The old address still works —
+  // it forwards there — and the organization context comes from the
+  // authenticated session rather than the URL.
+  await page.goto("/settings/members");
+  await expect(page).toHaveURL(/\/settings\/directory/, { timeout: 15000 });
+  await expect(page.getByRole("heading", { name: "Directory" })).toBeVisible({
+    timeout: 15000,
+  });
 }
 
 // =============================================================================
@@ -34,10 +34,11 @@ export async function givenIAmOnTheMembersPage(page: Page) {
 // =============================================================================
 
 /**
- * Click the "Add members" button and wait for the dialog to appear.
+ * Open the invite drawer from the Directory's People tab. The button reads
+ * "Invite people"; the drawer it opens is still titled "Add members".
  */
 export async function whenIClickAddMembers(page: Page) {
-  await page.getByRole("button", { name: /Add members/i }).click();
+  await page.getByRole("button", { name: /Invite people/i }).click();
   // Wait for dialog - use last() for Chakra UI duplicate rendering
   await expect(
     page.getByRole("heading", { name: "Add members" }).last()
@@ -97,17 +98,20 @@ export async function whenICloseInviteLinkDialog(page: Page) {
 // =============================================================================
 
 /**
- * Assert that an email appears in the "Invites" list with an invited badge.
+ * Assert that an email appears in the People list with an invited badge. An
+ * invitation is one cut of the Directory's single list of people, so the row
+ * sits in the people list rather than in a table of its own.
  */
 export async function thenISeeSentInviteFor(page: Page, email: string) {
-  const invitesHeading = page.getByRole("heading", { name: "Invites" });
-  await expect(invitesHeading).toBeVisible({ timeout: 10000 });
+  const invitesList = page.getByTestId("people-list");
+  await expect(invitesList).toBeVisible({ timeout: 10000 });
 
-  const invitesSection = invitesHeading.locator("..");
-  const row = invitesSection.getByRole("row").filter({ hasText: email });
+  const row = invitesList.getByTestId("invite-row").filter({ hasText: email });
 
   await expect(row).toBeVisible({ timeout: 5000 });
-  await expect(row.getByText("Invited")).toBeVisible({ timeout: 5000 });
+  await expect(row.getByTestId("invite-status")).toHaveText("Invited", {
+    timeout: 5000,
+  });
 }
 
 /**

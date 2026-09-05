@@ -277,6 +277,34 @@ const parentEntryScoped = (): ScopedModelConfig => ({
 const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
   AiToolEntryTeam: parentEntryScoped(),
   AiToolEntryDepartment: parentEntryScoped(),
+  // Operational scheduling state owned by one SSO connection. The sweep
+  // writes the table directly, so every read or write must name the parent
+  // connection rather than receiving a blanket parent-table exemption.
+  SsoConnectionReproofCursor: {
+    validateWhere: (where) => {
+      const reason = "requires a connectionId in the where clause";
+      if (!where) return reason;
+      const ok = validateRecursive(
+        where,
+        (c) =>
+          typeof c.connectionId === "string" ||
+          (c.connectionId &&
+            Array.isArray(c.connectionId.in) &&
+            c.connectionId.in.length > 0),
+      );
+      return ok ? null : reason;
+    },
+    validateCreateData: (data) => {
+      const records = Array.isArray(data) ? data : [data];
+      for (const d of records) {
+        if (!d) return "create requires a data payload";
+        if (typeof d.connectionId !== "string") {
+          return "create requires a connectionId in the data payload";
+        }
+      }
+      return null;
+    },
+  },
   // Idempotency receipts carry their tenancy on `scopeId` alone: the project
   // on the gateway platform's creates, the organization on the webhook
   // platform's. Every query names either the row id just claimed or the

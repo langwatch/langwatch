@@ -2,22 +2,35 @@ import { identifierDomain, normalizeIdentifierValue } from "./identifier";
 
 /**
  * The identifier-first sign-in router (D03, ADR-117 §1): a PURE decision
- * engine. Email in, decision out — no Prisma, no env, no framework, no clock,
- * and deliberately no user-level read of any kind.
+ * engine. Email in, decision out — no Prisma, no env, no framework, no clock.
  *
- * Everything the engine needs is assembled by a composition layer from two
- * injected ports: an org-level domain lookup and an instance-level method
- * policy. That split is the whole point of ADR-117 §1's "the router carries
- * no per-user fork": domain routing is ORG data, method policy is INSTANCE
- * data, and resolving a *person* — sign-in by any verified email, an OAuth
- * subject — belongs to the ADR-116 storage adapter, which forks per user
- * inside itself. A router that read `Identifier` would be an account-existence
- * oracle wearing a routing hat.
+ * Everything the engine needs is assembled by a composition layer from
+ * injected ports: an org-level domain lookup, an instance-level method
+ * policy, and — since the 2026-08-25 revision — what the identified account
+ * holds.
  *
- * Because the engine sees no user data, ADR-117 §2 holds by construction
- * rather than by care: an unknown address and a known one on the same
- * non-routing domain produce the same decision object, field for field.
- * There is no branch here that could tell them apart.
+ * ── Why this engine now sees an account, when it was built not to ────────
+ *
+ * It was built existence-blind on purpose, so that ADR-117 §2's no-oracle
+ * held by construction rather than by care. That constraint is retired, and
+ * the ADR revision carries the argument in full; the short version is that
+ * the sign-up door already answers "does this address have an account" to
+ * anybody who asks (`EMAIL_ALREADY_REGISTERED`, Q12), so spending the
+ * router's architecture hiding the same fact bought nothing except a worse
+ * sign-in for the people who do have accounts — a password box in front of a
+ * passkey-only account, and a password box in front of no account at all.
+ *
+ * What the engine sees is deliberately the thinnest thing that answers the
+ * two questions the screen has: does an account exist, and what KINDS of
+ * method does it hold. It reads no credential, no hash, no passkey material
+ * and no session, and it is still pure — the lookup happens in the
+ * composition layer, and its answer arrives as a value.
+ *
+ * What did NOT change, and must not: a credential refusal is still one
+ * refusal (`identity_sign_in_refused` covers a wrong password and an unknown
+ * address alike), and the identifier lookup is still rate-limited at its
+ * entry point, so enumeration stays expensive in bulk even though any single
+ * answer is now cheap.
  */
 
 /**
@@ -33,9 +46,15 @@ export const SIGNIN_ROUTING_REASON_CODES = [
   "break_glass",
   /** The submitted address's domain belongs to a live connection. */
   "domain_routed",
-  /** Nothing routes the domain: the uniform picker, which is also the answer
-   *  for an address no account exists for. */
+  /** Nothing routes the domain, and the instance's default methods are the
+   *  answer: no address was submitted, or the account's own methods came back
+   *  empty because policy offers none of them. */
   "no_domain_match",
+  /** No account exists for the submitted address. The screen carries on as a
+   *  sign-up rather than asking for a credential nobody holds. */
+  "identifier_unknown",
+  /** An account exists, and the methods offered are the ones IT holds. */
+  "account_methods",
   /** A connection owns the domain but is not routing traffic right now. */
   "connection_suspended",
   /** A connection would route, but this deployment holds no license for
@@ -116,7 +135,7 @@ export interface SignInMethodPolicy {
    *  frozen. Per-request policy over a frozen gate IS startup semantics. */
   federationLicensed: boolean;
   /** Only a self-hosted deployment auto-redirects on a sole connection; on
-   *  cloud, one org's connection must never claim the front door. */
+   *  cloud, one org's connection must never claim the auth screens. */
   selfHosted: boolean;
 }
 
@@ -142,6 +161,13 @@ export function routingIdentifierOf(raw: string): RoutingIdentifier {
 export const SIGNIN_ROUTING_OUTCOMES = [
   "redirect_to_connection",
   "method_picker",
+  /**
+   * Nobody holds this address, so the journey is a sign-up. Its own outcome
+   * rather than a picker with an empty method set: the screen that answers it
+   * asks for a confirmation link, not for a credential, and a caller reading
+   * `methodSet` to decide what to draw would draw nothing.
+   */
+  "route_to_signup",
 ] as const;
 export type SignInRoutingOutcome = (typeof SIGNIN_ROUTING_OUTCOMES)[number];
 
@@ -152,6 +178,20 @@ export interface RoutingDecision {
   /** What the surface offers. On a redirect, the one method it redirects to. */
   methodSet: readonly SignInMethod[];
   reasonCode: SignInRoutingReasonCode;
+}
+
+/**
+ * What the identified account holds, as the account lookup answers it.
+ *
+ * Kinds, never material. "This account can sign in with a passkey" is what
+ * the screen needs to know to offer one; which passkey, on which device,
+ * registered when, is not, and the engine is the wrong place for any of it.
+ */
+export interface AccountSignInMethods {
+  hasPassword: boolean;
+  hasPasskey: boolean;
+  /** Connections this account already signs in through, by connection id. */
+  connectionIds: readonly string[];
 }
 
 export interface RoutingInput {
@@ -166,6 +206,61 @@ export interface RoutingInput {
   domainConnection: RoutableConnection | null;
   /** Connections this instance could auto-redirect to with no address at all. */
   activeConnections: readonly RoutableConnection[];
+  /**
+   * What the submitted address's account holds, or null when no account holds
+   * the address at all.
+   *
+   * `undefined` means the question was not asked — no address was submitted,
+   * or the composition layer skipped the lookup because the decision was
+   * already made without it (break-glass, and a domain that routes). The three
+   * states are distinct on purpose: "no account" is a routing answer, and "not
+   * asked" must never be mistaken for it.
+   */
+  account?: AccountSignInMethods | null;
+}
+
+/**
+ * The account's own methods, strongest first, and only the ones this
+ * deployment actually offers.
+ *
+ * Strongest-first is passkey, then a federated connection, then password, and
+ * the order is a security claim rather than a preference: a passkey cannot be
+ * phished or replayed, a federated sign-in inherits whatever the organization
+ * enforces centrally, and a password is the one a person can be talked out of
+ * over the telephone.
+ *
+ * The intersection with policy is what stops the account's history overruling
+ * the instance's rules: somebody who once set a password on a deployment that
+ * has since turned passwords off is not offered one, because it would not
+ * work.
+ */
+export function rankAccountMethods({
+  account,
+  policy,
+}: {
+  account: AccountSignInMethods;
+  policy: SignInMethodPolicy;
+}): readonly SignInMethod[] {
+  const offered = policy.defaultMethods;
+  const held = (method: SignInMethod): boolean => {
+    if (method.kind === "passkey") return account.hasPasskey;
+    if (method.kind === "password") return account.hasPassword;
+    return (
+      method.connectionId !== null &&
+      account.connectionIds.includes(method.connectionId)
+    );
+  };
+
+  const rankOf = (method: SignInMethod): number => {
+    if (method.kind === "passkey") return 0;
+    if (method.kind === "federated") return 1;
+    return 2;
+  };
+
+  return offered
+    .filter(held)
+    .slice()
+    .sort((a, b) => rankOf(a) - rankOf(b));
 }
 
 const picker = (
@@ -204,14 +299,24 @@ function redirectOrFall({
 }
 
 /**
- * The whole router. Read top to bottom, it is ADR-117 §1's table:
+ * The whole router. Read top to bottom, it is ADR-117 §1's table, as amended
+ * by the 2026-08-25 revision:
  *
  *   break-glass                → local method set     break_glass
  *   no address, sole conn      → redirect             sole_active_connection
  *   domain on a live conn      → redirect             domain_routed
  *   domain on a paused conn    → picker               connection_suspended
+ *   no account for the address → sign-up              identifier_unknown
+ *   account, methods it holds  → picker               account_methods
  *   anything else              → picker               no_domain_match
  *   policy refuses the method  → picker (local)       method_not_*
+ *
+ * The account branches sit BELOW domain routing, and that ordering is load
+ * bearing: an address on a connected domain redirects to its identity
+ * provider whether or not an account exists here yet, because just-in-time
+ * provisioning is exactly the case where it does not. Asking "do we know
+ * this person" before "does their organization own this domain" would send
+ * every genuine new hire to a sign-up form instead of to their employer.
  */
 export function routeSignIn(input: RoutingInput): RoutingDecision {
   const {
@@ -220,6 +325,7 @@ export function routeSignIn(input: RoutingInput): RoutingDecision {
     policy,
     domainConnection,
     activeConnections,
+    account,
   } = input;
 
   // Checked first, and unconditionally: break-glass exists precisely for the
@@ -239,27 +345,52 @@ export function routeSignIn(input: RoutingInput): RoutingDecision {
     });
   }
 
-  if (!domainConnection) {
-    return picker(policy.defaultMethods, "no_domain_match");
-  }
-  if (domainConnection.state === "SUSPENDED") {
+  if (domainConnection?.state === "SUSPENDED") {
     return picker(policy.defaultMethods, "connection_suspended");
   }
-  if (domainConnection.state !== "ACTIVE") {
+  if (domainConnection?.state === "ACTIVE") {
+    return redirectOrFall({
+      connection: domainConnection,
+      policy,
+      reasonCode: "domain_routed",
+    });
+  }
+
+  // Nothing routes the domain, so the account is the next question — when it
+  // was asked at all. A composition layer that did not ask keeps the old
+  // answer, which is what makes this revision additive: an instance that never
+  // wires the lookup behaves exactly as it did before.
+  if (account === undefined) {
     return picker(policy.defaultMethods, "no_domain_match");
   }
-  return redirectOrFall({
-    connection: domainConnection,
-    policy,
-    reasonCode: "domain_routed",
-  });
+
+  if (account === null) {
+    return {
+      outcome: "route_to_signup",
+      // Empty, and it has to be: there is no account, so there is no method it
+      // holds, and offering the instance's defaults here is the dead end this
+      // outcome exists to remove.
+      methodSet: [],
+      reasonCode: "identifier_unknown",
+    };
+  }
+
+  const held = rankAccountMethods({ account, policy });
+  // An account whose every method this deployment has since turned off. Not a
+  // sign-up — the account is real and somebody may yet re-enable the method —
+  // so it falls back to the uniform picker it would have got before, which at
+  // least offers the ways in that do work.
+  if (held.length === 0) {
+    return picker(policy.defaultMethods, "no_domain_match");
+  }
+  return picker(held, "account_methods");
 }
 
 /**
  * The router's decision, expressed in the one word the LEGACY path answers:
  * `resolveAuthProvider()` returns `"email"` or the id of the IdP the sign-in
  * page auto-redirects to, and that is the entire routing decision the legacy
- * front door makes. Projecting the router onto it is what makes shadow mode a
+ * auth screens makes. Projecting the router onto it is what makes shadow mode a
  * comparison rather than two unrelated logs (ADR-117 §7).
  */
 export function legacyProviderOf(decision: RoutingDecision): string {

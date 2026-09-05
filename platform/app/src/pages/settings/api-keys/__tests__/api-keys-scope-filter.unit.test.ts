@@ -79,7 +79,11 @@ describe("given the scope-filter feature is implemented", () => {
         .filter((f) => f.endsWith(".ts") || f.endsWith(".tsx"))
         .map((f) => fs.readFileSync(path.join(apiKeysDir, f), "utf8"));
       const combined = allFiles.join("\n");
-      expect(combined).not.toContain("filterKeysByScope");
+      // The banned thing is a second implementation of the org-tree CASCADE.
+      // `filterKeysByScopeKind` is a different question — which level of the
+      // tree a key sits on, for the chip row — and reimplements nothing, so the
+      // match stops at the exact name.
+      expect(combined).not.toMatch(/filterKeysByScope(?![A-Za-z])/);
     });
   });
 

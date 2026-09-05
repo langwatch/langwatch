@@ -3,6 +3,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PlansComparisonPage } from "../PlansComparisonPage";
@@ -120,8 +121,15 @@ describe("<PlansComparisonPage/>", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByText("€29 per seat/month")).toBeInTheDocument();
       const growthColumn = screen.getByTestId("plan-column-growth");
+      // The seat price is a FIGURE and a UNIT set as two pieces of type rather
+      // than one sentence — the figure is what the eye lands on, and it is
+      // what rolls when the currency changes. Same number, same wording, two
+      // nodes; this assertion followed the presentation, it did not change it.
+      expect(within(growthColumn).getByText("€29")).toBeInTheDocument();
+      expect(
+        within(growthColumn).getByText("per seat/month"),
+      ).toBeInTheDocument();
       expect(
         within(growthColumn).getByRole("link", { name: "Add Members" }),
       ).toBeInTheDocument();
@@ -218,6 +226,26 @@ describe("<PlansComparisonPage/>", () => {
     });
   });
 
+  describe("when the reader switches currency", () => {
+    it("shows the seat price in the currency they switched to", async () => {
+      const user = userEvent.setup();
+      render(
+        <PlansComparisonPage
+          activePlan={{ type: "GROWTH_SEAT_EUR_MONTHLY", free: false }}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      const growthColumn = screen.getByTestId("plan-column-growth");
+      expect(within(growthColumn).getByText("€29")).toBeInTheDocument();
+
+      await user.click(screen.getByTestId("currency-toggle"));
+
+      expect(within(growthColumn).queryByText("€29")).not.toBeInTheDocument();
+      expect(within(growthColumn).getByText(/^\$\d+$/)).toBeInTheDocument();
+    });
+  });
+
   describe("when comparing enterprise plan options", () => {
     it("shows enterprise commercial highlights and sales action", () => {
       render(
@@ -234,6 +262,24 @@ describe("<PlansComparisonPage/>", () => {
       ).toBeInTheDocument();
       expect(screen.getByText("Custom SSO / RBAC")).toBeInTheDocument();
       expect(screen.getByText("Uptime & Support SLA")).toBeInTheDocument();
+    });
+
+    it("reads the enterprise capabilities as grouped headings", () => {
+      render(
+        <PlansComparisonPage activePlan={{ type: "FREE", free: true }} />,
+        { wrapper: Wrapper },
+      );
+
+      const enterpriseColumn = screen.getByTestId("plan-column-enterprise");
+      expect(
+        within(enterpriseColumn).getByText("Governance and security"),
+      ).toBeInTheDocument();
+      expect(
+        within(enterpriseColumn).getByText("Deployment and data"),
+      ).toBeInTheDocument();
+      expect(
+        within(enterpriseColumn).getByText("Support and procurement"),
+      ).toBeInTheDocument();
     });
   });
 });

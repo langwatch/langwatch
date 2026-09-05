@@ -1,15 +1,10 @@
-import {
-  Badge,
-  Box,
-  Card,
-  Heading,
-  HStack,
-  IconButton,
-  Table,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, HStack, IconButton, Text } from "@chakra-ui/react";
 import { Mail, MoreVertical, RefreshCw, Trash2 } from "lucide-react";
-import { RandomColorAvatar } from "~/components/RandomColorAvatar";
+import {
+  IdentityChip,
+  IdentityRow,
+  IdentityRowList,
+} from "~/components/access/IdentityRow";
 import { Link } from "~/components/ui/link";
 import { Menu } from "~/components/ui/menu";
 import type { RouterOutputs } from "~/utils/api";
@@ -32,15 +27,31 @@ interface InvitesTableProps {
  * REVOKED are all visible, with expiry dates — an expired invitation is a
  * resendable state, not a row that silently vanished.
  */
-const STATUS_BADGES: Record<string, { label: string; colorPalette?: string }> =
-  {
-    PENDING: { label: "Invited" },
-    EXPIRED: { label: "Expired", colorPalette: "orange" },
-    REVOKED: { label: "Revoked", colorPalette: "gray" },
-    ACCEPTED: { label: "Accepted", colorPalette: "green" },
-    PAYMENT_PENDING: { label: "Awaiting payment", colorPalette: "orange" },
-  };
+const STATUS_CHIPS: Record<
+  string,
+  { label: string; tone?: "good" | "warning" | "bad" }
+> = {
+  PENDING: { label: "Invited" },
+  EXPIRED: { label: "Expired", tone: "warning" },
+  REVOKED: { label: "Revoked" },
+  ACCEPTED: { label: "Accepted", tone: "good" },
+  PAYMENT_PENDING: { label: "Awaiting payment", tone: "warning" },
+};
 
+/**
+ * People who have been invited, on the same identity row as the people who
+ * are already here.
+ *
+ * They used to be a table of their own at the bottom of the members page,
+ * with its own columns and its own idea of what a person looks like. Somebody
+ * mid-flight is still a person, and reading them as a different kind of
+ * object is what made "did I invite them or are they in?" a question worth
+ * asking.
+ *
+ * The invitation's provenance chip is `Invited`, which is exactly the chip
+ * they will carry once they accept — the row does not change shape when they
+ * cross over.
+ */
 export function InvitesTable({
   invites,
   isAdmin,
@@ -49,45 +60,23 @@ export function InvitesTable({
   onResendInvite,
   onRevokeInvite,
 }: InvitesTableProps) {
-  if (invites.length === 0) {
-    return null;
-  }
-
   return (
-    <VStack align="start" gap={4} paddingTop={4} width="full">
-      <Heading>Invites</Heading>
-
-      <Card.Root width="full" overflow="hidden">
-        <Card.Body paddingY={0} paddingX={0}>
-          <Table.Root variant="line" size="md" width="full">
-            <Table.Header>
-              <Table.Row>
-                <Table.ColumnHeader width="56px" />
-                <Table.ColumnHeader>Email</Table.ColumnHeader>
-                <Table.ColumnHeader>Status</Table.ColumnHeader>
-                <Table.ColumnHeader>Expires</Table.ColumnHeader>
-                <Table.ColumnHeader>Role</Table.ColumnHeader>
-                <Table.ColumnHeader>Teams</Table.ColumnHeader>
-                <Table.ColumnHeader width="60px"></Table.ColumnHeader>
-              </Table.Row>
-            </Table.Header>
-            <Table.Body>
-              {invites.map((invite) => (
-                <InviteRow
-                  key={invite.id}
-                  invite={invite}
-                  isAdmin={isAdmin}
-                  teams={teams}
-                  onViewInviteLink={onViewInviteLink}
-                  onResendInvite={onResendInvite}
-                  onRevokeInvite={onRevokeInvite}
-                />
-              ))}
-            </Table.Body>
-          </Table.Root>
-        </Card.Body>
-      </Card.Root>
-    </VStack>
+    <IdentityRowList
+      data-testid="invites-list"
+      empty="Nobody has an outstanding invitation."
+    >
+      {invites.map((invite) => (
+        <InviteRow
+          key={invite.id}
+          invite={invite}
+          isAdmin={isAdmin}
+          teams={teams}
+          onViewInviteLink={onViewInviteLink}
+          onResendInvite={onResendInvite}
+          onRevokeInvite={onRevokeInvite}
+        />
+      ))}
+    </IdentityRowList>
   );
 }
 
@@ -95,7 +84,12 @@ interface InviteRowProps extends Omit<InvitesTableProps, "invites"> {
   invite: OrganizationInvite;
 }
 
-const InviteRow = ({
+/**
+ * Exported because an invitation is one cut of the Directory's single list of
+ * people rather than a table of its own — the row travels, the table around it
+ * does not.
+ */
+export const InviteRow = ({
   invite,
   isAdmin,
   teams,
@@ -104,35 +98,48 @@ const InviteRow = ({
   onRevokeInvite,
 }: InviteRowProps) => {
   const displayStatus = invite.displayStatus;
-  const badge = STATUS_BADGES[displayStatus] ?? STATUS_BADGES.PENDING!;
+  const chip = STATUS_CHIPS[displayStatus] ?? STATUS_CHIPS.PENDING!;
   const roleLabel =
-    orgRoleOptions.find((o) => o.value === invite.role)?.label ?? invite.role;
+    orgRoleOptions.find((option) => option.value === invite.role)?.label ??
+    invite.role;
   const isOpen = displayStatus === "PENDING" || displayStatus === "EXPIRED";
   const canResend = isAdmin && isOpen;
   const canViewLink = displayStatus === "PENDING";
 
   return (
-    <Table.Row>
-      <Table.Cell>
-        <RandomColorAvatar size="2xs" name={invite.email} />
-      </Table.Cell>
-      <Table.Cell>{invite.email}</Table.Cell>
-      <Table.Cell>
-        <Badge size="sm" variant="surface" colorPalette={badge.colorPalette}>
-          {badge.label}
-        </Badge>
-      </Table.Cell>
-      <Table.Cell>
-        {isOpen && invite.expiration
-          ? new Date(invite.expiration).toLocaleDateString()
-          : "\u2014"}
-      </Table.Cell>
-      <Table.Cell>{roleLabel}</Table.Cell>
-      <Table.Cell>
-        <TeamIdsDisplay teamIds={invite.teamIds} teams={teams} />
-      </Table.Cell>
-      <Table.Cell>
-        <Box width="full" height="full" display="flex" justifyContent="end">
+    <IdentityRow
+      id={invite.id}
+      // An invitation names an address and nothing else: nobody has told us a
+      // name yet, and inventing one from the local part would be a guess the
+      // row presents as fact.
+      name={invite.email}
+      address={null}
+      data-testid="invite-row"
+      chips={
+        <>
+          <IdentityChip
+            label={chip.label}
+            tone={chip.tone}
+            data-testid="invite-status"
+          />
+          {isOpen && invite.expiration ? (
+            <Text fontSize="xs" color="fg.muted">
+              Lapses {new Date(invite.expiration).toLocaleDateString()}
+            </Text>
+          ) : null}
+        </>
+      }
+      trailing={
+        <HStack gap={3}>
+          <TeamIdsDisplay teamIds={invite.teamIds} teams={teams} />
+          <Text
+            fontSize="sm"
+            color="fg.muted"
+            minWidth="90px"
+            textAlign="right"
+          >
+            {roleLabel}
+          </Text>
           <InviteRowActions
             invite={invite}
             canViewLink={canViewLink}
@@ -141,9 +148,9 @@ const InviteRow = ({
             onResendInvite={onResendInvite}
             onRevokeInvite={onRevokeInvite}
           />
-        </Box>
-      </Table.Cell>
-    </Table.Row>
+        </HStack>
+      }
+    />
   );
 };
 
@@ -189,7 +196,7 @@ const InviteRowActions = ({
         {canResend && (
           <Menu.Item
             value="revoke"
-            color="red.500"
+            color="red.fg"
             onClick={() => onRevokeInvite(invite.id)}
           >
             <Trash2 size={16} />

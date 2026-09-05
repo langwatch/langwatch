@@ -1,6 +1,11 @@
+import { isIP } from "node:net";
 import { getConnInfo } from "@hono/node-server/conninfo";
 import type { Context } from "hono";
 import type { NextApiRequest } from "~/types/next-stubs";
+
+interface DirectPeerRequest {
+  socket?: { remoteAddress?: string };
+}
 
 // Array of possible IP headers, in order of preference
 const IP_HEADERS = [
@@ -62,6 +67,23 @@ export function getClientIp(
   }
 
   return undefined;
+}
+
+/**
+ * The address of the process directly connected to this server.
+ *
+ * Unlike `getClientIp`, this deliberately ignores forwarding headers. Those
+ * headers are caller-controlled until the deployment has an explicit trusted
+ * proxy-hop policy, so public auth budgets must key only on the socket peer.
+ */
+export function getDirectPeerIp(
+  req: DirectPeerRequest | undefined,
+): string | undefined {
+  const remoteAddress = req?.socket?.remoteAddress;
+  if (!remoteAddress) return undefined;
+
+  const normalized = remoteAddress.replace(/^::ffff:/, "").trim();
+  return isIP(normalized) === 0 ? undefined : normalized;
 }
 
 /**

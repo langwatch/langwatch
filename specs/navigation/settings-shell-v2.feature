@@ -7,19 +7,41 @@ Feature: Settings shell
   product dropdown (the icon rail marks its Settings tile instead), and
   the organization control stays. The sidebar opens with a back entry
   that returns to the product the user came from, then Quick Search,
-  then the settings menu regrouped with icons: ORGANIZATION, ACCESS,
-  AI INFRASTRUCTURE, DATA CONTROLS, PROJECT, and the internal OPS and
+  then the settings menu regrouped with icons: YOU, ORGANIZATION,
+  PEOPLE & ACCESS, AI INFRASTRUCTURE, DATA CONTROLS, PROJECT, and the internal OPS and
   BACKOFFICE groups with their current gates. Enterprise-plan entries
   carry a quiet grey pill, since it marks a plan rather than asking to
-  be read first. Every settings page keeps its address, and every
-  visibility gate keeps its current condition. The back entry and its
-  rule sit above the scroll region, so a long settings menu never
-  scrolls the way out of the column, and the entries are cut at that
-  rule as they pass under it.
+  be read first. Every visibility gate keeps its current condition. The
+  back entry and its rule sit above the scroll region, so a long
+  settings menu never scrolls the way out of the column, and the
+  entries are cut at that rule as they pass under it.
 
-  API Keys sits in the ORGANIZATION group, under General. In ACCESS it
-  came after four enterprise entries most readers cannot open, which put
-  a page they use often at the bottom of a group they have no use for.
+  YOU comes first and holds Profile and Security: the two pages that are
+  about the person reading them rather than about the organization they
+  are in. Everything below the first group is somebody's colleague's
+  business; these two are nobody's but theirs, and a reader hunting for
+  their own password should not have to work out which organization
+  heading hides it. Neither page asks for an organization permission,
+  because a member with no administrative authority at all still has a
+  name, a photo and a password.
+
+  API Keys sits in the ORGANIZATION group, under General. In the access
+  group it came after four enterprise entries most readers cannot open,
+  which put a page they use often at the bottom of a group they have no
+  use for.
+
+  PEOPLE & ACCESS holds Members, Teams & Projects, Roles, Authentication,
+  Directory, Access and Audit Log. Authentication is the ORGANIZATION's: how
+  everyone in it signs in, and how their accounts arrive. How the reader
+  themselves signs in is Security, under You, and the two are never the same
+  entry. Role Bindings is gone as an entry: it
+  is the second tab of Roles, and its address forwards there. Groups is
+  gone as an entry too: a group is a thing a directory sends, so group
+  management is a tab of Directory rather than a sibling of it. Directory
+  is the page an identity provider provisions people through, named for
+  what it holds rather than for the protocol it speaks. Access is offered
+  on every plan, because the rules it holds apply to every organization
+  and the card that is enterprise-only carries its own lock.
 
   @integration
   Scenario: The Settings sidebar opens with the way back
@@ -32,6 +54,29 @@ Feature: Settings shell
     Given I open Settings
     Then the sidebar shows the ORGANIZATION and ACCESS groups
     And General and Members keep their current addresses
+
+  @integration
+  Scenario: The You section comes first and is about the reader
+    Given I open Settings in a new navigation mode
+    Then the first group is called "You"
+    And it offers Profile and Security, in that order
+    And it sits above the organization group
+
+  @integration
+  Scenario: The personal pages ask for no organization permission
+    Given I hold no permission over my organization
+    When the settings sidebar renders in a new navigation mode
+    Then Profile and Security are both still offered
+
+  @integration
+  Scenario: The access group is named for people and holds the organization's pages
+    Given I open Settings in a new navigation mode
+    Then the group is called "People & access"
+    And it offers Members, Roles, Authentication, Directory and Access
+    And there is no separate Role Bindings entry, since it is a tab of Roles
+    And there is no separate Groups entry, since it is a tab of Directory
+    And Authentication is the organization's page, not the reader's own
+    And Access is offered on every plan
 
   @integration
   Scenario: Enterprise entries carry a quiet grey pill

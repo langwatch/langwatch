@@ -135,7 +135,7 @@ export function registeredMigrations(): SystemMigration[] {
     }),
     // D04 (ADR-117 §5): the organization's legacy SSO strings become
     // connection history, proved by routing. Dark — the connection projection
-    // decides nothing until `SSOCONN_ROUTING` is flipped.
+    // decides nothing until that organization's connection is turned on.
     connectionGrandfatherMigration(),
   ];
 }

@@ -135,7 +135,12 @@ describe("usageLimitEmail", () => {
     });
 
     it("uses correct progress bar color for different usage levels", async () => {
-      // Test red color for >= 100%
+      // The three bands are the auth screens' own colours now, not Tailwind's
+      // defaults: the refusal red from `auth.danger`, the brand orange
+      // from `auth.detail`, and a green cut to the same weight as the
+      // red. Only the meter carries them — nothing else in the mail paints a
+      // background in any of the three, so each assertion still fails if the
+      // band is picked wrongly.
       await sendUsageLimitEmail({
         ...baseProps,
         usagePercentage: 100,
@@ -147,11 +152,11 @@ describe("usageLimitEmail", () => {
       expect(call).toBeDefined();
       let html = call![0].html;
       // React Email renders styles without spaces after colons
-      expect(html).toContain("background-color:#dc2626"); // red
+      expect(html).toContain("background-color:#c53030"); // over the limit
 
       vi.clearAllMocks();
 
-      // Test orange color for >= 90%
+      // Test the brand orange for >= 90%
       await sendUsageLimitEmail({
         ...baseProps,
         usagePercentage: 92,
@@ -163,7 +168,7 @@ describe("usageLimitEmail", () => {
       expect(call).toBeDefined();
       html = call![0].html;
       // React Email renders styles without spaces after colons
-      expect(html).toContain("background-color:#f59e0b"); // orange
+      expect(html).toContain("background-color:#f56b1a"); // approaching
 
       vi.clearAllMocks();
 
@@ -179,7 +184,7 @@ describe("usageLimitEmail", () => {
       expect(call).toBeDefined();
       html = call![0].html;
       // React Email renders styles without spaces after colons
-      expect(html).toContain("background-color:#10b981"); // green
+      expect(html).toContain("background-color:#2f7a55"); // comfortable
     });
 
     it("includes action URL in button and project links", async () => {

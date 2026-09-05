@@ -7,6 +7,7 @@ import Head from "../utils/compat/next-head";
 import { AppHeaderUserMenu } from "./AppHeaderUserMenu";
 import { DashboardPageBody } from "./DashboardPageBody";
 import { FullLogo } from "./icons/FullLogo";
+import { SecureAccountNudge } from "./me/SecureAccountNudge";
 import { DevBadge } from "./ui/DevBadge";
 import { Link } from "./ui/link";
 
@@ -56,7 +57,12 @@ export const DashboardLayout = (dashboardProps: DashboardLayoutProps) => {
 
 const ShellDashboardLayout = (dashboardProps: DashboardLayoutProps) => {
   const mode = useNavigationMode();
-  return <NavigationV2Shell mode={mode} {...dashboardProps} />;
+  return (
+    <>
+      <SecureAccountNudge />
+      <NavigationV2Shell mode={mode} {...dashboardProps} />
+    </>
+  );
 };
 
 /**

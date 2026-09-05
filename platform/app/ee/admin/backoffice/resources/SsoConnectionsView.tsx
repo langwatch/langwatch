@@ -117,6 +117,15 @@ const METHOD_LABEL: Record<string, string> = {
   "legacy-configuration": "Earlier configuration",
 };
 
+/** The three answers in the words the customer's own screen uses, so an
+ *  operator reading a connection and the administrator who set it up are
+ *  looking at the same sentence. */
+const ARRIVAL_LABELS = {
+  admit: "Joins the organization",
+  request: "Asks to join, and waits for an administrator",
+  refuse: "Is turned away",
+} as const;
+
 interface ConnectionRow {
   connectionId: string;
   organizationId: string;
@@ -135,7 +144,7 @@ interface ConnectionRow {
   issuer: string | null;
   type: string;
   source: string;
-  allowsJit: boolean;
+  arrivalPolicy: "admit" | "request" | "refuse";
   testLoginAccountId: string | null;
   rejection: { domain: string; note: string } | null;
   pendingVerificationDomain: string | null;
@@ -594,8 +603,8 @@ function ConnectionFacts({ connection }: { connection: ConnectionRow }) {
           ? "Carried over from an earlier configuration"
           : "In the back office"}
       </Fact>
-      <Fact label="New people provisioned on first sign-in">
-        {connection.allowsJit ? "Yes" : "No"}
+      <Fact label="Somebody signing in who is not a member yet">
+        {ARRIVAL_LABELS[connection.arrivalPolicy]}
       </Fact>
     </SimpleGrid>
   );
@@ -633,7 +642,7 @@ function ConnectionDomains({ connection }: { connection: ConnectionRow }) {
       </VStack>
       {connection.claimedDomains.length > 0 && (
         <Text fontSize="sm" color="fg.muted" marginTop={2}>
-          Waiting for a decision: {connection.claimedDomains.join(", ")}
+          Claimed, not yet proved: {connection.claimedDomains.join(", ")}
         </Text>
       )}
       {connection.approvedDomains.length > 0 && (

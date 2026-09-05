@@ -73,6 +73,7 @@ import {
   declaredNoPermission,
   declaredServiceAuthorization,
 } from "../app-layer/authz/trpc-middleware";
+import { isAuditLogExempt } from "./auditLogExemptions";
 import type { OpsScope, PermissionMiddleware } from "./rbac";
 
 const logger = createLogger("langwatch:trpc");
@@ -96,6 +97,26 @@ interface CreateContextOptions {
    * singleton.
    */
   app?: App;
+  /**
+   * The two-step verification gate's dependencies, for a test that is not
+   * about the gate.
+   *
+   * The gate sits in the permission middleware, so it runs on the way to
+   * EVERY scoped procedure and reads the scope's owner from Prisma to do it.
+   * A router test that mocks `~/server/db` with the two models its own router
+   * touches then fails inside the pipeline rather than in the code it is
+   * testing — and, worse, only on a deployment where the gate is switched on,
+   * so the suite's colour depends on an environment variable.
+   *
+   * Passing `{ offered: () => false }` says "this suite is not about the
+   * second factor" once, at the seam the middleware already offers, instead
+   * of every Prisma double chasing whatever the pipeline reads next.
+   */
+  mfaGate?: {
+    offered?: () => boolean;
+    scopes?: unknown;
+    organizationMfa?: unknown;
+  };
   permissionChecked?: boolean;
   publiclyShared?: boolean;
   organizationRole?: OrganizationUserRole | null;
@@ -127,6 +148,7 @@ export const createInnerTRPCContext = (opts: CreateContextOptions) => {
     res: opts.res,
     prisma,
     app: opts.app,
+    mfaGate: opts.mfaGate,
     permissionChecked: opts.permissionChecked ?? false,
     publiclyShared: opts.publiclyShared ?? false,
     organizationRole: opts.organizationRole ?? undefined,
@@ -476,10 +498,12 @@ const auditLogTRPCErrors = t.middleware(
         error: result.error,
         req: ctx.req,
         // When an admin is impersonating, `session.user.id` reflects the
-        // impersonated user (correct for RBAC attribution). We stamp the
-        // real admin's identity in metadata so security forensics can
-        // filter on `metadata.impersonatorId` to find actions that were
-        // actually performed by an admin.
+        // impersonated user (correct for RBAC attribution) and this is the
+        // human who actually did it. A COLUMN rather than only metadata:
+        // "what did this operator do" is the question an incident asks, and
+        // answering it by scanning JSON is how it stops being asked.
+        // `metadata.impersonatorId` stays for readers written against it.
+        actorUserId: ctx.session.user.impersonator?.id ?? null,
         metadata: ctx.session.user.impersonator
           ? { impersonatorId: ctx.session.user.impersonator.id }
           : undefined,
@@ -585,25 +609,8 @@ function findFirstId(value: unknown): string | undefined {
   return undefined;
 }
 
-/**
- * Mutations that fire on a heartbeat / per-tab cadence and aren't worth
- * recording in the audit log. `presence.*` runs every ~15s per open tab
- * (heartbeat + cursor broadcasts + leave on pagehide); auditing them
- * buries every genuine action — project edits, deletions, role changes —
- * under a wall of `presence.update` rows. They're already silenced from
- * the request log via SILENCED_LOG_PATH_PREFIXES; this is the audit-log
- * equivalent.
- *
- * Add new entries here when a router's mutations exist purely for
- * ephemeral session state that doesn't need a permanent forensic record.
- */
-const AUDIT_LOG_EXEMPT_PATHS = new Set(["user.updateLastLogin"]);
-const AUDIT_LOG_EXEMPT_PATH_PREFIXES = ["presence."] as const;
-
-function isAuditLogExempt(path: string): boolean {
-  if (AUDIT_LOG_EXEMPT_PATHS.has(path)) return true;
-  return AUDIT_LOG_EXEMPT_PATH_PREFIXES.some((p) => path.startsWith(p));
-}
+// The exemption list lives in `auditLogExemptions.ts` so a test can ask
+// whether an action is audited without importing this module's whole graph.
 
 /**
  * Fields on a model-provider write whose values are secrets. All three ride
@@ -744,9 +751,10 @@ const auditLogMutations = t.middleware(
       req: ctx.req,
       targetKind: target.targetKind,
       targetId: target.targetId,
-      // Stamp the real admin id when the action is happening during
-      // impersonation. `userId` above is the impersonated target (the
-      // RBAC actor); metadata.impersonatorId is the human performing it.
+      // The real admin when the action happens under an impersonation.
+      // `userId` above is the impersonated target (the RBAC actor); this is
+      // the human performing it, in a column an incident can filter on.
+      actorUserId: ctx.session.user.impersonator?.id ?? null,
       metadata: ctx.session.user.impersonator
         ? { impersonatorId: ctx.session.user.impersonator.id }
         : undefined,

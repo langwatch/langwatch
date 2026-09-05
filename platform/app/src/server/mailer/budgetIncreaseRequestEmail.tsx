@@ -1,13 +1,15 @@
-import {
-  Button,
-  Container,
-  Heading,
-  Html,
-  Img,
-  Section,
-} from "@react-email/components";
 import { render } from "@react-email/render";
 import { env } from "../../env.mjs";
+import {
+  EmailAction,
+  EmailCallout,
+  EmailFacts,
+  EmailFinePrint,
+  EmailParagraph,
+  EmailSectionHeading,
+  EmailShell,
+  emailLinkStyle,
+} from "./emailLayout";
 import { sendEmail } from "./emailSender";
 
 export interface SendBudgetIncreaseRequestEmailInput {
@@ -23,23 +25,6 @@ export interface SendBudgetIncreaseRequestEmailInput {
   message?: string;
 }
 
-const labelCellStyle: React.CSSProperties = {
-  padding: "8px 12px 8px 0",
-  color: "#5f6c7b",
-  fontWeight: 500,
-  fontSize: "13px",
-  whiteSpace: "nowrap",
-  verticalAlign: "top",
-};
-
-const valueCellStyle: React.CSSProperties = {
-  padding: "8px 0",
-  color: "#1f2933",
-  fontSize: "13px",
-  fontFamily:
-    "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-};
-
 export const sendBudgetIncreaseRequestEmail = async (
   input: SendBudgetIncreaseRequestEmailInput,
 ): Promise<void> => {
@@ -48,100 +33,45 @@ export const sendBudgetIncreaseRequestEmail = async (
   const subject = `Budget increase requested by ${input.requesterEmail}`;
 
   const emailHtml = await render(
-    <Html lang="en" dir="ltr">
-      <Container
-        style={{
-          border: "1px solid #F2F4F8",
-          borderRadius: "10px",
-          padding: "24px",
-          paddingBottom: "16px",
-          fontFamily:
-            "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-        }}
-      >
-        <Img
-          src="https://app.langwatch.ai/images/logo-icon.png"
-          alt="LangWatch Logo"
-          width="36"
-        />
-        <Heading as="h1" style={{ fontSize: "20px", marginTop: "8px" }}>
-          Budget increase request
-        </Heading>
-        <p style={{ fontSize: "14px", lineHeight: 1.6 }}>
-          <strong>{input.requesterName ?? input.requesterEmail}</strong> (
-          <a href={`mailto:${input.requesterEmail}`}>{input.requesterEmail}</a>){" "}
-          has requested a budget increase in{" "}
-          <strong>{input.organizationName}</strong>.
-        </p>
-        <Section style={{ paddingTop: "8px" }}>
-          <table style={{ borderCollapse: "collapse", width: "100%" }}>
-            <tbody>
-              <tr>
-                <td style={labelCellStyle}>Scope</td>
-                <td style={valueCellStyle}>{input.scope}</td>
-              </tr>
-              <tr>
-                <td style={labelCellStyle}>Scope ID</td>
-                <td style={valueCellStyle}>{input.scopeId}</td>
-              </tr>
-              <tr>
-                <td style={labelCellStyle}>Period</td>
-                <td style={valueCellStyle}>{periodLabel}</td>
-              </tr>
-              <tr>
-                <td style={labelCellStyle}>Current limit</td>
-                <td style={valueCellStyle}>${input.limitUsd}</td>
-              </tr>
-              <tr>
-                <td style={labelCellStyle}>Spent so far</td>
-                <td style={valueCellStyle}>${input.spentUsd}</td>
-              </tr>
-            </tbody>
-          </table>
-        </Section>
-        {input.message && (
-          <Section style={{ paddingTop: "16px" }}>
-            <Heading as="h3" style={{ fontSize: "15px" }}>
-              Message from the user
-            </Heading>
-            <p
-              style={{
-                fontSize: "14px",
-                lineHeight: 1.6,
-                whiteSpace: "pre-wrap",
-              }}
-            >
-              {input.message}
-            </p>
-          </Section>
-        )}
-        <Section style={{ paddingTop: "16px" }}>
-          <Button
-            href={dashboardUrl}
-            style={{
-              padding: "10px 20px",
-              color: "white",
-              backgroundColor: "#ED8926",
-              textDecoration: "none",
-              borderRadius: "6px",
-            }}
-          >
-            Approve via LangWatch
-          </Button>
-        </Section>
-        <p
-          style={{
-            paddingTop: "12px",
-            fontSize: "12px",
-            color: "#5f6c7b",
-          }}
-        >
-          You're receiving this because you're an organization admin in
-          LangWatch. If this is unexpected, you can reply directly to{" "}
+    <EmailShell
+      title="Budget increase request"
+      footer={
+        <EmailFinePrint>
+          You&apos;re receiving this because you&apos;re an organization admin
+          in LangWatch. If this is unexpected, you can reply directly to{" "}
           {input.requesterEmail}.
-        </p>
-      </Container>
-    </Html>,
+        </EmailFinePrint>
+      }
+    >
+      <EmailParagraph>
+        <strong>{input.requesterName ?? input.requesterEmail}</strong> (
+        <a href={`mailto:${input.requesterEmail}`} style={emailLinkStyle}>
+          {input.requesterEmail}
+        </a>
+        ) has requested a budget increase in{" "}
+        <strong>{input.organizationName}</strong>.
+      </EmailParagraph>
+      <EmailFacts
+        rows={[
+          { label: "Scope", value: input.scope, mono: true },
+          { label: "Scope ID", value: input.scopeId, mono: true },
+          { label: "Period", value: periodLabel, mono: true },
+          { label: "Current limit", value: `$${input.limitUsd}`, mono: true },
+          { label: "Spent so far", value: `$${input.spentUsd}`, mono: true },
+        ]}
+      />
+      {input.message ? (
+        <>
+          <EmailSectionHeading>Message from the user</EmailSectionHeading>
+          <EmailCallout>
+            <EmailParagraph style={{ margin: 0, whiteSpace: "pre-wrap" }}>
+              {input.message}
+            </EmailParagraph>
+          </EmailCallout>
+        </>
+      ) : null}
+      <EmailAction href={dashboardUrl} label="Approve via LangWatch" />
+    </EmailShell>,
   );
 
   await sendEmail({ to: input.to, subject, html: emailHtml });

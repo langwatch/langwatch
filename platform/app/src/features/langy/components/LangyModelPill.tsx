@@ -179,7 +179,7 @@ export const LangyModelPill = memo(function LangyModelPill({
     });
   }, [allItems, query]);
 
-  // The catalogue is the right list and the wrong front door — see
+  // The catalogue is the right list and the wrong auth screens — see
   // logic/langyModelSuggestions.ts. A short derived shortlist leads; everything
   // else waits behind "More models".
   const searching = query.trim().length > 0;

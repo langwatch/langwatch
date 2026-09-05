@@ -20,6 +20,7 @@
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiKeysSection } from "../ApiKeysSection";
 
@@ -245,7 +246,8 @@ describe("<ApiKeysSection /> ingestion-key split", () => {
       });
 
       /** @scenario Ingestion keys render in their own labeled section */
-      it("shows the ingestion key's source tool and a revoke button without a permissions editor", () => {
+      it("shows the ingestion key's source tool and a revoke button without a permissions editor", async () => {
+        const user = userEvent.setup();
         mockApiKeyList.mockReturnValue({
           data: [
             makeIngestionKey("key-ingest", "claude_code ingest", "claude_code"),
@@ -262,7 +264,8 @@ describe("<ApiKeysSection /> ingestion-key split", () => {
         // Source tool is shown on the ingestion row.
         expect(screen.getByText("claude_code")).toBeInTheDocument();
 
-        // Revoke is available for the ingestion key; edit (permissions) is not.
+        // Revoke is available for the ingestion key; the ingestion row carries
+        // no overflow menu because revoke is its only action.
         expect(
           screen.getByRole("button", {
             name: "Revoke ingestion key claude_code ingest",
@@ -270,13 +273,17 @@ describe("<ApiKeysSection /> ingestion-key split", () => {
         ).toBeInTheDocument();
         expect(
           screen.queryByRole("button", {
-            name: /Edit API key claude_code ingest/,
+            name: "Actions for claude_code ingest",
           }),
         ).not.toBeInTheDocument();
 
-        // The regular key keeps its edit affordance.
+        // The regular key keeps its edit affordance, behind the row's overflow
+        // menu (dev/docs/best_practices/row-actions-overflow-menu.md).
+        await user.click(
+          screen.getByRole("button", { name: "Actions for CI Pipeline" }),
+        );
         expect(
-          screen.getByRole("button", { name: "Edit API key CI Pipeline" }),
+          await screen.findByRole("menuitem", { name: "Edit" }),
         ).toBeInTheDocument();
       });
     });

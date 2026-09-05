@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { createLogger } from "@langwatch/observability";
 import crypto from "crypto";
+import { env } from "~/env.mjs";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { isEnterpriseTier } from "~/server/api/enterprise";
 import { getApp } from "~/server/app-layer/app";
@@ -9,9 +11,49 @@ import {
   ScimConnectionNotFoundError,
   ScimConnectionRequiredError,
   ScimTokenNotFoundError,
+  ScimTokenTooShortError,
+  ScimTokenUnavailableError,
 } from "./errors";
+
+const logger = createLogger("langwatch:scim:tokens");
+
+/** How a stored digest was derived. */
+type ScimTokenHashScheme = "sha256" | "hmac-sha256";
+
+/**
+ * The key the token digests are HMAC'd under.
+ *
+ * The deployment's existing credential secret rather than one of our own: the
+ * SCIM feature already cannot run without it (the connection's client secret
+ * is encrypted with it), so there is no new thing for an operator to set and
+ * no new way for a deployment to be half-configured. Read per call so a
+ * rotation lands without a restart.
+ */
+function tokenPepper(): string {
+  const secret = env.CREDENTIALS_SECRET ?? env.NEXTAUTH_SECRET;
+  if (!secret) {
+    // Not a HandledError: nothing the caller did produced this, and nothing
+    // they can do fixes it. It degrades to "unknown" with a trace id, which is
+    // what an unconfigured deployment should look like.
+    throw new Error(
+      "CREDENTIALS_SECRET (or NEXTAUTH_SECRET) must be set to hash SCIM tokens",
+    );
+  }
+  return secret;
+}
+
 import { scimSyncLifecycle } from "./scim-sync.runtime";
 import type { ScimSyncLifecycle } from "./scim-sync.service";
+
+/**
+ * The shortest a token an administrator chose may be.
+ *
+ * Thirty-two, because that is what a minted one is worth in characters and a
+ * value somebody types should not be the weak half of the pair. It is a floor
+ * on LENGTH alone — see `ScimTokenTooShortError` for why there is no
+ * character-class rule beside it.
+ */
+const MINIMUM_TOKEN_LENGTH = 32;
 
 /**
  * The three answers a bearer credential can get from {@link ScimTokenService.verifyEntitled}:
@@ -23,7 +65,20 @@ import type { ScimSyncLifecycle } from "./scim-sync.service";
  */
 export type ScimTokenEntitlement =
   | { status: "invalid_token" }
-  | { status: "plan_not_entitled"; organizationId: string }
+  | {
+      status: "plan_not_entitled";
+      organizationId: string;
+      /**
+       * The connection the token names, kept rather than dropped.
+       *
+       * A lapsed plan is still a credential we recognise, so the refusal is
+       * recorded — and the only surface that reads those rows queries by a
+       * concrete connection id. Discarding this here filed every 403 where
+       * nobody could read it, which is precisely the case the request log
+       * exists for.
+       */
+      connectionId: string | null;
+    }
   | {
       status: "ok";
       organizationId: string;
@@ -93,10 +148,25 @@ export class ScimTokenService {
     organizationId,
     connectionId,
     description,
+    secret,
   }: {
     organizationId: string;
     connectionId?: string | null;
     description?: string;
+    /**
+     * A value the administrator already has, rather than one we mint.
+     *
+     * THE USUAL SEQUENCE IS THE OTHER WAY ROUND. Somebody configuring an
+     * identity provider is usually standing in the provider's console with
+     * both values already decided; making them come here, take ours, and go
+     * back and paste it is an errand we invented. Either direction works —
+     * what matters is that the two ends match — so both are offered.
+     *
+     * IT IS STILL ONLY EVER STORED AS A HASH. A supplied value takes exactly
+     * the same path as a minted one from here on; nothing about where it came
+     * from changes what we keep.
+     */
+    secret?: string;
   }): Promise<{ token: string; tokenId: string; connectionId: string }> {
     if (!connectionId) {
       throw new ScimConnectionRequiredError();
@@ -109,16 +179,49 @@ export class ScimTokenService {
       throw new ScimConnectionNotFoundError(connectionId);
     }
 
-    const token = crypto.randomBytes(32).toString("hex");
-    const hashedToken = this.hashToken(token);
+    // A FLOOR, NOT A POLICY. The one thing that would make a supplied token
+    // worse than a minted one is a short or guessable value, and this is the
+    // only place that can refuse it — the provider's console will accept
+    // anything. It is deliberately not a character-class rule: those push
+    // people towards `Password1!` and buy nothing against an attacker who is
+    // guessing rather than typing.
+    if (secret !== undefined && secret.trim().length < MINIMUM_TOKEN_LENGTH) {
+      throw new ScimTokenTooShortError(MINIMUM_TOKEN_LENGTH);
+    }
 
-    const scimToken = await this.prisma.scimToken.create({
-      data: {
-        organizationId,
-        connectionId,
-        hashedToken,
-        description: description ?? null,
+    const token = secret?.trim() ?? crypto.randomBytes(32).toString("hex");
+    const hashedToken = this.hashToken(token, "hmac-sha256");
+
+    // A value somebody else already chose. Refused generically and on purpose:
+    // "that token is taken" would confirm to one customer that another holds
+    // it, which is a probe rather than an error message.
+    //
+    // BOTH DIGESTS ARE ASKED FOR, and the unique index is why that matters.
+    // The index is on the COLUMN, so `hmac(T)` names at most one row and
+    // `sha256(T)` names at most one row — but those are two different values,
+    // so they can be two different rows in two different organizations.
+    // Checking only the new scheme meant an administrator could supply a
+    // value some legacy token already hashes to, the insert would not trip
+    // the constraint, and `findByToken` — which asks for both — would then
+    // match two rows and let the planner decide whose directory the caller
+    // was writing to.
+    const taken = await this.prisma.scimToken.findFirst({
+      where: {
+        hashedToken: {
+          in: [hashedToken, this.hashToken(token, "sha256")],
+        },
       },
+      select: { id: true },
+    });
+    if (taken) {
+      throw new ScimTokenUnavailableError();
+    }
+
+    const scimToken = await this.createTokenRow({
+      organizationId,
+      connectionId,
+      hashedToken,
+      description: description ?? null,
     });
 
     await this.syncLifecycle.tokenIssued({
@@ -280,7 +383,7 @@ export class ScimTokenService {
     const plan = await this.planProvider.getActivePlan({ organizationId });
 
     if (!isEnterpriseTier(plan.type)) {
-      return { status: "plan_not_entitled", organizationId };
+      return { status: "plan_not_entitled", organizationId, connectionId };
     }
 
     await this.recordUse(id);
@@ -288,9 +391,67 @@ export class ScimTokenService {
     return { status: "ok", organizationId, connectionId };
   }
 
-  private findByToken(token: string) {
-    return this.prisma.scimToken.findFirst({
-      where: { hashedToken: this.hashToken(token) },
+  /**
+   * The one row a presented token names, or none — and NONE when more than
+   * one row names it.
+   *
+   * Both digests are asked for, because a token minted before the pepper
+   * existed is still the credential its identity provider is configured with.
+   * The unique index is on the COLUMN, so each digest names at most one row —
+   * but `hmac(T)` and `sha256(T)` are two different values, so they can be
+   * two different rows belonging to two different organizations. `findFirst`
+   * over both then let the planner choose whose directory a caller could
+   * write to, which is the one thing this lookup must never do.
+   *
+   * Minting checks both digests now, so the pair cannot be created. This is
+   * the other half: a pair that already exists authenticates nobody rather
+   * than authenticating whoever the planner reaches first.
+   */
+  private async findByToken(token: string) {
+    const matches = await this.prisma.scimToken.findMany({
+      where: {
+        hashedToken: {
+          in: [
+            this.hashToken(token, "hmac-sha256"),
+            this.hashToken(token, "sha256"),
+          ],
+        },
+      },
+      take: 2,
+    });
+    if (matches.length !== 1) {
+      if (matches.length > 1) {
+        logger.error(
+          { rows: matches.length },
+          "a presented SCIM token names more than one row; refusing it",
+        );
+      }
+      return null;
+    }
+    return matches[0] ?? null;
+  }
+
+  /** One place the row is written, so the scheme it records and the digest it
+   *  stores cannot drift apart. */
+  private createTokenRow({
+    organizationId,
+    connectionId,
+    hashedToken,
+    description,
+  }: {
+    organizationId: string;
+    connectionId: string | null;
+    hashedToken: string;
+    description: string | null;
+  }) {
+    return this.prisma.scimToken.create({
+      data: {
+        organizationId,
+        connectionId,
+        hashedToken,
+        hashScheme: "hmac-sha256",
+        description,
+      },
     });
   }
 
@@ -309,7 +470,29 @@ export class ScimTokenService {
     });
   }
 
-  private hashToken(token: string): string {
-    return crypto.createHash("sha256").update(token).digest("hex");
+  /**
+   * The digest a token is stored and looked up as.
+   *
+   * Two schemes, and both have to be computable because tokens minted under
+   * the old one are still in people's identity providers.
+   *
+   * `sha256` is a bare digest. That is the right amount of work for 32 bytes
+   * of `crypto.randomBytes` — there is nothing to guess — and the wrong amount
+   * for a value a person chose, which is what a supplied secret is. A database
+   * dump of bare digests over human-chosen strings is a wordlist away from
+   * live SCIM credentials for every organization that typed its own.
+   *
+   * `hmac-sha256` is keyed on the deployment's own secret, so the dump on its
+   * own is inert: an attacker who has the rows but not the key has nothing to
+   * grind against. Every new row uses it.
+   */
+  private hashToken(token: string, scheme: ScimTokenHashScheme): string {
+    if (scheme === "sha256") {
+      return crypto.createHash("sha256").update(token).digest("hex");
+    }
+    return crypto
+      .createHmac("sha256", tokenPepper())
+      .update(token)
+      .digest("hex");
   }
 }

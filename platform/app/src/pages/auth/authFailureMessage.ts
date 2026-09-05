@@ -44,6 +44,12 @@ const CREDENTIAL_REJECTION_KEYS = new Set([
   "invalid_email_or_password",
   "credentialssignin",
   "user_not_found",
+  // Our own code for the same refusal. The auth route re-answers
+  // `INVALID_EMAIL_OR_PASSWORD` in the handled-error contract
+  // (`server/better-auth/handled-errors.ts`), so both spellings reach here and
+  // both have to mean exactly one thing — otherwise the translation itself
+  // becomes the oracle this set exists to close.
+  "identity_sign_in_refused",
 ]);
 
 /**

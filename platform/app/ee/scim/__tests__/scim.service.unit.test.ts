@@ -90,6 +90,7 @@ function buildMockUser(overrides: Partial<User> = {}): User {
     twoFactorEnabled: false,
     tracesExplorerTourDismissedAt: null,
     passkeyNudgeDismissedAt: null,
+    joinOfferDismissedDomains: [],
     ...overrides,
   };
 }

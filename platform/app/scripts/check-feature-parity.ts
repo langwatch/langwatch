@@ -79,6 +79,13 @@ const DEFAULT_TEST_ROOTS: string[] = [
   "mcp/typescript/src",
   "sdks/typescript/src",
   "sdks/python/src",
+  // The identity front-door e2e pass runs against a live app with no other
+  // suite behind it — a Playwright ceremony against a real virtual WebAuthn
+  // authenticator and a real Postgres-backed verification token is the only
+  // place several of these scenarios are proven end-to-end. Without this
+  // root their `@scenario` bindings would be invisible to the checker even
+  // though the tests exist and run in `e2e-ci.yml`.
+  "tests/agentic-e2e/tests",
   // The agent plugin is hand-authored manifests plus a bundle, so its only
   // tests are the ones that read those manifests and spawn that bundle. Without
   // this root, every scenario describing what the published plugin does could
@@ -305,7 +312,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/governance/routing-policy-aliases-and-rules.feature",
   "specs/ai-gateway/governance/routing-policy-scope-cascade.feature",
   "specs/ai-gateway/governance/self-hosted-setup.feature",
-  "specs/ai-gateway/governance/sessions-and-devices.feature",
   "specs/ai-gateway/governance/siem-export.feature",
   "specs/ai-gateway/governance/template-cross-bind-guard.feature",
   "specs/ai-gateway/governance/template-ottl-authoring.feature",
@@ -452,7 +458,6 @@ const LEGACY_INERT: string[] = [
   // specs ship ahead of the code, and the PR that builds each surface binds its
   // file as it lands. Remove each entry with its first binding.
   "specs/identity/org-admin-identity-surface.feature",
-  "specs/identity/platform-ops-identity-lookup.feature",
   "specs/langy/langy-agent-service-conventions.feature",
   "specs/langy/langy-baseline.feature",
   "specs/langy/langy-card-taxonomy.feature",

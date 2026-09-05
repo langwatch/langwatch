@@ -30,6 +30,8 @@ export const RECORD_SCIM_GROUP_MAPPING_COMMAND_TYPE =
   "lw.identity.record_scim_group_mapping" as const;
 export const RECORD_SCIM_APPLY_FAILURE_COMMAND_TYPE =
   "lw.identity.record_scim_apply_failure" as const;
+export const REDRIVE_SCIM_APPLY_COMMAND_TYPE =
+  "lw.identity.redrive_scim_apply" as const;
 export const REVOKE_SCIM_SYNC_COMMAND_TYPE =
   "lw.identity.revoke_scim_sync" as const;
 
@@ -38,6 +40,7 @@ export const SCIM_SYNC_COMMAND_TYPES = [
   RECORD_SCIM_USER_PUSH_COMMAND_TYPE,
   RECORD_SCIM_GROUP_MAPPING_COMMAND_TYPE,
   RECORD_SCIM_APPLY_FAILURE_COMMAND_TYPE,
+  REDRIVE_SCIM_APPLY_COMMAND_TYPE,
   REVOKE_SCIM_SYNC_COMMAND_TYPE,
 ] as const;
 export type ScimSyncCommandType = (typeof SCIM_SYNC_COMMAND_TYPES)[number];
@@ -110,6 +113,19 @@ export type RecordScimApplyFailureCommandData = z.infer<
   typeof recordScimApplyFailureCommandDataSchema
 >;
 
+/**
+ * Send a retired apply through again (ADR-122). The only verb here an
+ * operator issues rather than a directory, and the only one whose actor is a
+ * person: `retiredAtMs` names which dead letter, so the guard can refuse a
+ * failure that is still being retried rather than guess which one was meant.
+ */
+export const redriveScimApplyCommandDataSchema = commandDataSchema({
+  retiredAtMs: z.number().int().nonnegative(),
+});
+export type RedriveScimApplyCommandData = z.infer<
+  typeof redriveScimApplyCommandDataSchema
+>;
+
 export const revokeScimSyncCommandDataSchema = commandDataSchema({
   tokenId: z.string().min(1).nullable(),
   cause: scimRevokeCauseSchema,
@@ -131,6 +147,10 @@ export type ScimSyncCommand =
   | {
       type: typeof RECORD_SCIM_APPLY_FAILURE_COMMAND_TYPE;
       data: RecordScimApplyFailureCommandData;
+    }
+  | {
+      type: typeof REDRIVE_SCIM_APPLY_COMMAND_TYPE;
+      data: RedriveScimApplyCommandData;
     }
   | {
       type: typeof REVOKE_SCIM_SYNC_COMMAND_TYPE;
