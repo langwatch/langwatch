@@ -11,9 +11,12 @@
  * Because tool parts are persisted with the message (the sentinels were stripped
  * before persistence), the card now survives a refresh. It did not used to.
  *
+ * The last step carries the pull request's own URL when `gh pr create` printed
+ * one, so the PR pill is a link straight to it.
+ *
  * Spec: specs/langy/langy-github-prs.feature. Issue: #4747.
  */
-import { Box, HStack, Text } from "@chakra-ui/react";
+import { Box, HStack, Link, Text } from "@chakra-ui/react";
 import { Check } from "lucide-react";
 import type {
   GithubProgressEvent,
@@ -64,6 +67,8 @@ export function LangyGitHubProgressCard({
   const reached = new Set(events.map((e) => e.stage));
   const latest = events[events.length - 1]?.detail;
   const opened = reached.has("opened");
+  // `gh pr create` printed it, so the last pill can lead to the pull request.
+  const prUrl = events.find((event) => event.stage === "opened")?.url;
   // Single mono label line, e.g. "WORKING ON IT · PUSHING BRANCH…" while the
   // turn runs, and the furthest step reached once it has ended.
   const label = opened
@@ -97,20 +102,40 @@ export function LangyGitHubProgressCard({
       <HStack gap={1.5} flexWrap="wrap">
         {TRACK.map((step) => {
           const done = isDoneFor(step.stage, reached);
-          return (
-            <HStack
-              key={step.stage}
-              gap={1}
-              paddingX={2.5}
-              paddingY={1}
-              borderRadius="full"
-              borderWidth="1px"
-              borderColor={done ? "green.fg" : "border.muted"}
-              color={done ? "green.fg" : "fg.muted"}
-              textStyle="xs"
-            >
+          const href = step.stage === "opened" ? prUrl : undefined;
+          const pill = {
+            gap: 1,
+            paddingX: 2.5,
+            paddingY: 1,
+            borderRadius: "full",
+            borderWidth: "1px",
+            borderColor: done ? "green.fg" : "border.muted",
+            color: done ? "green.fg" : "fg.muted",
+            textStyle: "xs",
+          } as const;
+          const content = (
+            <>
               {done ? <Check size={12} /> : null}
               <Text>{step.label}</Text>
+            </>
+          );
+
+          return href ? (
+            <Link
+              key={step.stage}
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              display="inline-flex"
+              alignItems="center"
+              {...pill}
+              _hover={{ borderColor: "green.fg", textDecoration: "none" }}
+            >
+              {content}
+            </Link>
+          ) : (
+            <HStack key={step.stage} {...pill}>
+              {content}
             </HStack>
           );
         })}

@@ -16,9 +16,7 @@
  */
 
 import { githubPrsFromToolParts } from "~/shared/langy/githubPrCard";
-
-/** A pull request URL in a command's own output. */
-const PR_URL = /https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/(\d+)\b/g;
+import { pullRequestUrlsIn } from "~/shared/langy/githubPrUrl";
 
 /** A tool part on a streamed or persisted assistant message. */
 interface ToolPart {
@@ -43,19 +41,13 @@ export function pullRequestLinksFromToolParts(
 
   for (const part of parts) {
     if (part.state === "output-error") continue;
-    if (typeof part.output !== "string") continue;
-    addUrlsFromOutput(part.output, links);
+    for (const pr of pullRequestUrlsIn(part.output)) {
+      if (links.has(pr.number)) continue;
+      links.set(pr.number, pr.url);
+    }
   }
 
   return links;
-}
-
-function addUrlsFromOutput(text: string, links: Map<number, string>): void {
-  for (const match of text.matchAll(PR_URL)) {
-    const number = Number(match[1]);
-    if (!Number.isSafeInteger(number) || links.has(number)) continue;
-    links.set(number, match[0]);
-  }
 }
 
 /** A fenced or inline code span, which is never rewritten. */

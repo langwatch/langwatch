@@ -20,6 +20,8 @@
  * @see langy-cli-envelope.service.ts — the same trick for the `langwatch` CLI.
  */
 
+import { firstPullRequestUrlIn } from "~/shared/langy/githubPrUrl";
+
 /**
  * Does this command need the user's GitHub credentials to work?
  *
@@ -60,6 +62,12 @@ export type GithubProgressStage =
 export type GithubProgressEvent = {
   stage: GithubProgressStage;
   detail?: string;
+  /**
+   * The pull request's own URL, on the `opened` stage. It is not in the
+   * command, it is in the command's OUTPUT, which is why it is read separately
+   * from `detail` (a short human label: a branch, a commit subject, a repo).
+   */
+  url?: string;
 };
 
 /**
@@ -110,8 +118,9 @@ function stepOfSegment(tokens: string[]): GithubStep | null {
     if (rest[0] === "repo" && rest[1] === "clone") {
       return { begin: "cloning", end: "cloned", detail: repoSlug(rest[2]) };
     }
-    // `gh pr create --title x --body y`. The detail — the PR's own URL — is NOT
-    // in the command. It is in the command's OUTPUT, which the caller reads.
+    // `gh pr create --title x --body y`. The pull request's own URL is NOT in
+    // the command, it is in the command's OUTPUT, which `progressForPart`
+    // reads onto the opened event.
     if (rest[0] === "pr" && rest[1] === "create") {
       return { begin: "opening_pr", end: "opened" };
     }
@@ -163,6 +172,7 @@ export function githubProgressFromToolParts(
     type?: string;
     input?: unknown;
     state?: string;
+    output?: unknown;
   }[],
 ): GithubProgressEvent[] {
   return parts.flatMap((part) => progressForPart(part));
@@ -173,6 +183,7 @@ function progressForPart(part: {
   type?: string;
   input?: unknown;
   state?: string;
+  output?: unknown;
 }): GithubProgressEvent[] {
   if (typeof part.type !== "string" || !part.type.startsWith("tool-"))
     return [];
@@ -185,7 +196,16 @@ function progressForPart(part: {
   if (steps.length === 0) return [];
 
   if (part.state === "output-available") {
-    return steps.map((step) => progressEvent(step.end, step.detail));
+    // `gh pr create` prints the pull request's URL on stdout, so the opened
+    // step can link to it. Only a settled, successful call has that output.
+    const prUrl = firstPullRequestUrlIn(part.output);
+    return steps.map((step) =>
+      progressEvent(
+        step.end,
+        step.detail,
+        step.end === "opened" ? prUrl : undefined,
+      ),
+    );
   }
 
   // Still running: the card shows the FIRST step of the chain as under way. The
@@ -197,8 +217,13 @@ function progressForPart(part: {
 function progressEvent(
   stage: GithubProgressStage,
   detail: string | undefined,
+  url?: string,
 ): GithubProgressEvent {
-  return detail ? { stage, detail } : { stage };
+  return {
+    stage,
+    ...(detail ? { detail } : {}),
+    ...(url ? { url } : {}),
+  };
 }
 
 /** Step past git's global flags (`-C <path>`, `-c <cfg>`) to the subcommand. */

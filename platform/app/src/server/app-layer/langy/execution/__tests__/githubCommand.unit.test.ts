@@ -163,6 +163,50 @@ describe("githubProgressFromToolParts", () => {
     });
   });
 
+  describe("given the chain printed the pull request URL", () => {
+    /** @scenario "The pull request URL printed by the command reaches the opened step" */
+    it("carries the URL on the opened step", () => {
+      const events = githubProgressFromToolParts([
+        {
+          type: "tool-local_bash",
+          input: { command: chain },
+          state: "output-available",
+          output: [
+            "exit code: 0",
+            "",
+            "stdout:",
+            "branch 'langy/add-tracing' set up to track 'origin/langy/add-tracing'.",
+            "Warning: 1 uncommitted change",
+            "https://github.com/acme/support-agent/pull/12",
+          ].join("\n"),
+        },
+      ]);
+
+      expect(events.find((event) => event.stage === "opened")?.url).toBe(
+        "https://github.com/acme/support-agent/pull/12",
+      );
+      expect(
+        events.find((event) => event.stage === "pushed")?.url,
+      ).toBeUndefined();
+    });
+  });
+
+  describe("given a command that printed no pull request URL", () => {
+    /** @scenario "A command that opened no pull request leaves the opened step without a URL" */
+    it("leaves the opened step without a URL", () => {
+      const events = githubProgressFromToolParts([
+        {
+          type: "tool-local_bash",
+          input: { command: 'gh pr create --title "Add tracing" --body b' },
+          state: "output-available",
+          output: "exit code: 0\n\nstdout:\n",
+        },
+      ]);
+
+      expect(events).toEqual([{ stage: "opened" }]);
+    });
+  });
+
   describe("when the chain is still running", () => {
     it("shows only the first step as under way", () => {
       const events = githubProgressFromToolParts([

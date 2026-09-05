@@ -44,6 +44,36 @@ describe("LangyGitHubProgressCard", () => {
     });
   });
 
+  describe("given an opened step that carries the pull request URL", () => {
+    /** @scenario "The opened step links to the pull request" */
+    it("makes the PR step a link that opens in a new tab", () => {
+      renderCard({
+        events: [
+          { stage: "pushed" },
+          { stage: "opened", url: "https://github.com/acme/service-x/pull/12" },
+        ],
+      });
+
+      const link = screen.getByRole("link", { name: "PR" });
+
+      expect(link.getAttribute("href")).toBe(
+        "https://github.com/acme/service-x/pull/12",
+      );
+      expect(link.getAttribute("target")).toBe("_blank");
+      expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+    });
+  });
+
+  describe("given an opened step with no URL behind it", () => {
+    /** @scenario "The opened step stays readable without a URL" */
+    it("keeps the PR step as plain text", () => {
+      renderCard({ events: [{ stage: "pushed" }, { stage: "opened" }] });
+
+      expect(screen.getByText("PR")).toBeTruthy();
+      expect(screen.queryByRole("link")).toBeNull();
+    });
+  });
+
   describe("given a settled turn that stopped after the push", () => {
     /** @scenario "A finished turn that never opened a pull request says so plainly" */
     it("names the furthest step instead of working on it", () => {

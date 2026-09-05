@@ -108,6 +108,33 @@ Feature: Langy opens GitHub PRs via the installed GitHub App
     When the steps card reads that turn's tool parts
     Then no step of that command is reached
 
+  @unit
+  Scenario: The pull request URL printed by the command reaches the opened step
+    Given Langy ran "git add -A && git commit -m x && git push -u origin HEAD && gh pr create --title t --body b"
+    And the command printed a warning line and then the pull request URL
+    When the steps card reads that turn's tool parts
+    Then the opened step carries the pull request URL
+
+  @unit
+  Scenario: A command that opened no pull request leaves the opened step without a URL
+    Given Langy ran "gh pr create --title t --body b"
+    And the command printed no pull request URL
+    When the steps card reads that turn's tool parts
+    Then the opened step carries no URL
+
+  @integration
+  Scenario: The opened step links to the pull request
+    Given a settled steps card whose opened step carries a pull request URL
+    When I read that turn back
+    Then the PR step is a link to the pull request
+    And the link opens in a new tab
+
+  @integration
+  Scenario: The opened step stays readable without a URL
+    Given a settled steps card whose opened step carries no URL
+    When I read that turn back
+    Then the PR step is plain text rather than a link
+
   @integration
   Scenario: The steps card stops calling the turn work in progress once it ends
     Given a finished turn whose steps card reached the opened step
