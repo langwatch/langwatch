@@ -91,11 +91,10 @@ describe("TopicModelFoldProjection", () => {
   });
 
   describe("when a duplicate seed folds after the model already has topics", () => {
-    // Regression: nothing upstream enforces the `seed:v1` idempotency key
-    // (no queue dedup on recordTopics; ClickHouse inserts cannot be unique),
-    // so a boot seed racing the write-path seed during projection lag CAN
-    // append a second replace-mode seed with a later occurredAt. Folding it
-    // would delete the clustering delta recorded in between. A seed is only
+    // Regression: nothing upstream enforces the `seed:v1` idempotency key (no queue dedup on
+    // recordTopics; ClickHouse inserts cannot be unique), so a boot seed racing the write-path
+    // seed during projection lag CAN append a second replace-mode seed with a later occurredAt.
+    // Folding it would delete the clustering delta recorded in between. A seed is only
     // meaningful as the model's first record — later ones must be no-ops.
     it("folds as a no-op instead of replacing away the clustering delta", () => {
       // Write-path seed: legacy topics onto the empty model.

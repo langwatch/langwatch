@@ -20,12 +20,9 @@ import {
 } from "../adapters/eventing.topic.events";
 
 /**
- * One run in the project's history, accumulated across the run's pages.
- *
- * The raw error text is deliberately NOT part of this read model — the same
+ * One run in the project's history, accumulated across the run's pages. The raw error text is
+ * deliberately NOT part of this read model — the same
  * disclosure reasoning as the status service (ADR-051 §8): `errorCode` is
- * the whole contract with the UI, and the raw text stays in the run-status
- * projection for operators.
  */
 export const topicClusteringRunHistoryProjectionEntrySchema = z.object({
   runId: z.string(),
@@ -52,11 +49,9 @@ export type TopicClusteringRunHistoryEntry = z.infer<
 >;
 
 /**
- * Per-project run history (audit read model): the recent runs, newest first,
- * bounded to {@link TOPIC_CLUSTERING_RUN_HISTORY_LIMIT}. Stored as one row
- * per project; rebuildable by replaying the event log. A logical run spans
- * pages (one run_completed event per page, sharing runId) and appears as a
- * single entry whose counts accumulate every page.
+ * Per-project run history (audit read model): the recent runs, newest first, bounded to {@link
+ * TOPIC_CLUSTERING_RUN_HISTORY_LIMIT}. Stored as one row per project; rebuildable by replaying
+ * the event log.
  */
 export interface TopicClusteringRunHistoryData {
   ProjectId: string;

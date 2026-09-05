@@ -1,22 +1,7 @@
 /**
- * Price coverage guard.
- *
- * A model the gateway can route must not be able to produce a confident
- * zero-dollar bill. Three separate faults do that, and all three look
- * identical from the product: the request is metered, the spend row settles,
- * and the amount is zero.
- *
- * 1. Missing. No rate at all on the entry.
- * 2. Wrong unit. A rate that prices a unit the model never reports. This is
- *    the one that reached production: gpt-4o-transcribe carried a per-second
- *    rate while the transcription response returns tokens and no duration,
- *    so the rated quantity was zero on every call and the entry still looked
- *    complete.
- * 3. Unreachable. A rate on an entry the cost matcher never selects, because
- *    a shorter model id earlier in the registry prefix-matches first.
- *
- * The audio family is where this bites, because it is the only part of the
- * catalog that bills in more than one unit.
+ * Price coverage guard. A model the gateway can route must not be able to produce a confident
+ * zero-dollar bill. Three separate faults do that, and all three look identical from the
+ * product: the request is metered, the spend row settles, and the amount is zero. 1. Missing.
  */
 import { describe, expect, it } from "vitest";
 import { estimateCost, matchModelCost } from "../../model-cost";
@@ -40,18 +25,15 @@ const baseModels = baseModelCatalog.models;
 const overlayModels = overlayModelCatalog.models;
 
 /**
- * Models the catalog prices at zero on purpose.
- *
- * Codex bills the user's ChatGPT plan. Every `openrouter/` id is a router
- * rather than a model: the price comes from whichever model it picks.
+ * Models the catalog prices at zero on purpose. Codex bills the user's ChatGPT plan. Every
+ * `openrouter/` id is a router rather than a model: the price comes from whichever model it
+ * picks.
  */
 const PRICED_ELSEWHERE = [/^openai_codex\//, /^openrouter\//];
 
 /**
- * Models known to have no usable rate, each with the reason.
- *
- * This is debt, not permission. Removing a line is the goal; adding one
- * needs the reason written down.
+ * Models known to have no usable rate, each with the reason. This is debt, not permission.
+ * Removing a line is the goal; adding one needs the reason written down.
  */
 const KNOWN_UNPRICED: Record<string, string> = {
   "gemini/lyria-3-clip-preview":
@@ -113,11 +95,9 @@ const BILLING_UNITS: Record<string, "token" | "character" | "second"> = {
 };
 
 /**
- * Unit mismatches with a fix already in flight, each with where it is fixed.
- *
- * A line here is a promise to remove it. The honesty test below fails once
- * the entry is corrected, so the baseline cannot outlive the defect. Empty
- * is the goal state: every audio model prices a unit it can report.
+ * Unit mismatches with a fix already in flight, each with where it is fixed. A line here is a
+ * promise to remove it. The honesty test below fails once the entry is corrected, so the
+ * baseline cannot outlive the defect.
  */
 const KNOWN_UNIT_MISMATCH: Record<string, string> = {};
 
@@ -270,13 +250,11 @@ describe("overlay precedence", () => {
   describe("given gpt-audio-mini, whose generated audio rate is its text rate", () => {
     describe("when the catalog is merged", () => {
       it("prices audio input at the published rate, not the text rate", () => {
-        // One upstream source reports this model's audio input rate as its
-        // text rate, sixteen times under the published price. The overlay
-        // corrects it, which only works while the overlay wins the merge.
-        // The cost layer does not price audio tokens yet; langwatch#7021 adds
-        // that, and derives the output rate from the input rate asserted here.
-        // Correcting the input rate first is what stops that derivation from
-        // producing a wrong output rate.
+        // One upstream source reports this model's audio input rate as its text rate, sixteen
+        // times under the published price. The overlay corrects it, which only works while the
+        // overlay wins the merge. The cost layer does not price audio tokens yet;
+        // langwatch#7021 adds that, and derives the output rate from the input rate asserted
+        // here.
         const entry = llmModels.models["openai/gpt-audio-mini"];
         expect(entry).toBeDefined();
         expect(entry!.pricing.audioCostPerToken).toBe(1e-5);
@@ -328,12 +306,11 @@ describe("overlay precedence", () => {
 
     describe("when the overlay overrides a generated entry", () => {
       it("bills the overlay's rate, not the generated one", () => {
-        // Note on reach: today's only override, gpt-audio-mini, corrects
-        // `audioCostPerToken`, and the cost registry does not carry that
-        // field, so the token-rate assertions below cannot tell the two
-        // sources apart for it. Precedence itself is caught by the
-        // catalog-level test above. These bite the moment an override
-        // corrects a token rate, which is the common case.
+        // Note on reach: today's only override, gpt-audio-mini, corrects `audioCostPerToken`,
+        // and the cost registry does not carry that field, so the token-rate assertions below
+        // cannot tell the two sources apart for it. Precedence itself is caught by the
+        // catalog-level test above. These bite the moment an override corrects a token rate,
+        // which is the common case.
         const costs = getStaticModelCosts();
         for (const id of overlayOverriddenModelIds) {
           if (isPricedElsewhere(id)) continue;

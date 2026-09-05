@@ -1,8 +1,7 @@
 /**
- * Projected fields required by the trace-list read and mapper. This is
- * deliberately separate from the ingest fold state: the list query owns a
- * read-only projection of `trace_summaries` and never exposes Prisma or raw
- * ClickHouse rows.
+ * Projected fields required by the trace-list read and mapper. This is deliberately separate
+ * from the ingest fold state: the list query owns a read-only projection of `trace_summaries`
+ * and never exposes Prisma or raw ClickHouse rows.
  */
 export interface TraceListSummary {
   traceId: string;
@@ -98,10 +97,9 @@ export interface TraceListQuery {
 }
 
 /**
- * One page as the REPOSITORY answers it: the stored summary rows and the
- * total. Distinct from `TraceListPage` in `trace-list-view`, which is the
- * page the LIST VIEW publishes — rows mapped to `TraceListItem`, evaluations
- * joined on, and a keyset cursor.
+ * One page as the REPOSITORY answers it: the stored summary rows and the total. Distinct from
+ * `TraceListPage` in `trace-list-view`, which is the page the LIST VIEW publishes — rows mapped
+ * to `TraceListItem`, evaluations joined on, and a keyset cursor.
  */
 export interface TraceListRepositoryPage {
   rows: TraceListSummary[];
@@ -113,12 +111,9 @@ export interface FacetCountResult {
 }
 
 /**
- * Optional per-value aggregates the evaluator facet attaches alongside
- * its row counts so the sidebar drilldown can render verdict pills and
- * a score range slider inline without firing a second query per
- * evaluator. Other facets leave this absent. The shape is intentionally
- * generic ("aggregates") so future facets that want their own
- * per-value tallies can reuse the same plumbing.
+ * Optional per-value aggregates the evaluator facet attaches alongside its row counts so the
+ * sidebar drilldown can render verdict pills and a score range slider inline without firing a
+ * second query per evaluator. Other facets leave this absent.
  */
 export interface FacetValueAggregates {
   passedCount: number;
@@ -137,11 +132,8 @@ export interface FacetValueAggregates {
 }
 
 /**
- * Per-event-name metric value tallies the event facet attaches so its
- * sidebar drilldown (thumbs_up_down → vote values) renders from the
- * discover payload without a second query. One entry per metric key seen
- * on the event, values as stored — verbatim strings, never reformatted —
- * so a click round-trips exactly into `event.attribute.<key>:<value>`.
+ * Per-event-name metric value tallies the event facet attaches so its sidebar drilldown
+ * (thumbs_up_down → vote values) renders from the discover payload without a second query.
  */
 export interface EventMetricValues {
   /** Full storage key, e.g. `event.metrics.vote` — the UI strips the
@@ -233,10 +225,8 @@ export interface TraceListReadPort {
   }): Promise<{ min: number; max: number }>;
 
   /**
-   * Distinct integer values + counts for a discrete range facet (one declared
-   * `isDiscrete: true` on its `RangeFacetDef`), ascending, capped at `limit`.
-   * `distinctCount` is exact regardless of the cap so the sidebar can fall back
-   * to the slider once the distinct values exceed its threshold.
+   * Distinct integer values + counts for a discrete range facet (one declared `isDiscrete:
+   * true` on its `RangeFacetDef`), ascending, capped at `limit`.
    */
   findDiscreteValues(params: {
     tenantId: string;
@@ -278,9 +268,8 @@ export interface TraceListReadPort {
 
   /**
    * Distinct values for a single event-attribute key, read from
-   * `stored_spans.Events.Attributes` — the store the `event.attribute.`
-   * filter actually queries. Same sampling strategy and injection-safety
-   * contract as {@link findAttributeValues}.
+   * `stored_spans.Events.Attributes` — the store the `event.attribute.` filter actually
+   * queries.
    */
   findEventAttributeValues(params: {
     tenantId: string;

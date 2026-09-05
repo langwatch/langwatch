@@ -1,14 +1,5 @@
 /**
  * @vitest-environment node
- *
- * The tRPC surface itself: the four procedure names the clients call, the
- * membership gate that runs inside every organization-scoped one, the audit
- * record a disconnect leaves, and the orphan-project short circuit on the
- * pull-request read.
- *
- * The procedure handed in narrows its own context the way an authenticated
- * process procedure does, so this also pins that a process can hand over a
- * procedure it has already composed.
  */
 import type { GithubService } from "@langwatch/github-contract";
 import { initTRPC, TRPCError } from "@trpc/server";

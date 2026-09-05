@@ -1,13 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * Ported from platform/app/src/features/briefing/components/QuietHeadline.integration.test.tsx
- * (origin/main), adapted from the deleted per-hook mocks
- * (`~/features/langy/hooks/useShowLangy`, `useCanAskLangy`, `~/features/langy/stores/langyStore`,
- * `~/hooks/useOrganizationTeamProject`, `~/hooks/useReducedMotion`,
- * `~/utils/compat/next-router`) to a single `ProjectHomeHostProvider` stub and
- * a mock of `@langwatch/langy-web`'s `useLangyStore`.
- * See specs/home/signal-focused-home-rollout.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";

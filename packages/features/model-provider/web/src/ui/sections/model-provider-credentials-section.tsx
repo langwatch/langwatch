@@ -14,15 +14,8 @@ import { isSecretCredentialField } from "../../model/model-provider-helpers";
 import { SmallLabel } from "../elements/small-label";
 
 /**
- * Renders credential input fields (API keys, endpoints, etc.) based on the provider's schema.
- * For managed providers (enterprise deployments), displays a managed provider component instead of input fields.
- * Handles field validation, password masking, and optional field indicators.
- * @param state - Form state containing credential values and display configuration
- * @param actions - Form actions for updating credential values
- * @param provider - The model provider configuration
- * @param fieldErrors - Map of field names to validation error messages
- * @param setFieldErrors - Function to update field errors
- * @param organizationId - Optional organization identifier for managed providers
+ * Renders credential input fields based on the provider's schema, or a managed provider
+ * component instead for enterprise deployments.
  */
 export const CredentialsSection = ({
   state,

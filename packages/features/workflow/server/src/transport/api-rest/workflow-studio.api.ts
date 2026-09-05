@@ -1,27 +1,6 @@
 /**
- * The two doors the Optimization Studio editor talks to:
- * `POST /api/workflows/code-completion` and `POST /api/workflows/post_event`.
- *
- * Both are `handlerManagedAuth({ credential: "session" })` families: they
- * resolve the signed-in person themselves and publish a bare `{ error }` at
- * 401 and 403, which is the wire the editor has always read. Routing them onto
- * the framework's authenticate-then-authorize chain would change both bodies,
- * so the session arrives as a port instead — the same shape the run export
- * next door uses.
- *
- * What each door dispatches through is a port for the same reason it is on the
- * experiment run loop: the engine's address, the model a feature key resolves
- * to and the product-analytics sink are facts of the PROCESS, not of a
- * workflow. This family owns the wire — the status codes, the SSE framing and
- * the order the refusals come in — and nothing else.
- *
- * `post_event`'s ordering is load-bearing and is transcribed rather than
- * tidied: session, then permission, then `prepareStudioEvent` (whose two
- * expected failures answer 425 and 422 without reporting an incident), then
- * the event-type allow-list, then the retired optimization gate at 410, and
- * only then the stream. A run is WATCHED rather than awaited, so once the
- * stream opens a failure is reported as a studio event on the stream rather
- * than as a status code — that half lives in `WorkflowStudioDispatchService`.
+ * The two doors the Optimization Studio editor talks to: `POST /api/workflows/code-completion`
+ * and `POST /api/workflows/post_event`.
  */
 import { handlerManagedAuth } from "@langwatch/api";
 import {
@@ -54,11 +33,6 @@ export type WorkflowStudioRestDispatch = (input: {
 
 /**
  * What the studio editor's two doors reach that they do not own.
- *
- * `completeCode` is a port rather than a model call written here because WHICH
- * model answers an editor completion is the deployment's cascade, and the
- * prompt framing around it is the editor library's. The package that owns
- * neither is this one.
  */
 export interface WorkflowStudioRestPorts<TSession extends WorkflowStudioRestSession> {
   /** The live session behind this request, or null when there is none. */
@@ -84,12 +58,6 @@ export interface WorkflowStudioRestPorts<TSession extends WorkflowStudioRestSess
 
 /**
  * The handled CODE an error carries, or nothing.
- *
- * Read off the value rather than matched with `instanceof`: the two classes
- * this route tells apart are declared in another feature's SERVER package,
- * which this one may not name, and a code comparison is what the repository
- * asks for anywhere an error may have crossed a package or serialisation
- * boundary.
  */
 function handledCodeOf(error: unknown): string | undefined {
   if (typeof error !== "object" || error === null || !("code" in error)) return undefined;
@@ -104,10 +72,7 @@ const postEventBodySchema = z.object({
 
 /**
  * The event types the engine accepts.
- *
  * Stated as a set rather than a `switch` with a `@ts-expect-error` default,
- * which is what it was: the union widens whenever the contract does, and an
- * unknown type must answer 400 rather than reach the engine.
  */
 const DISPATCHABLE_EVENT_TYPES = new Set<StudioClientEvent["type"]>([
   "is_alive",

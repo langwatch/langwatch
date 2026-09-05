@@ -1,14 +1,5 @@
 /**
  * @vitest-environment node
- *
- * Covers specs/scenarios/http-agent-body-template-json-safety.feature.
- *
- * Regression: a customer's scenario against an n8n webhook failed with
- * `HTTP 422 ... Bad control character in string literal in JSON` because the
- * body template `{"chatInput": "{{ input }}"}` interpolated a conversation
- * turn containing a raw newline straight into a JSON string literal. The body
- * engine must JSON-escape scalar interpolations the way the URL engine
- * URL-encodes its own.
  */
 
 import type { FieldMapping, ScenarioInput } from "../index";

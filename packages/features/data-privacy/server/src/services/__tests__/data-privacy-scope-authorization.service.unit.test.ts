@@ -1,11 +1,5 @@
 /**
  * Who may write a privacy rule where.
- *
- * A project member's own permission (`project:update`) never reaches an
- * organization- or team-tier rule: {@link DataPrivacyScopeAuthorizationService}
- * checks the permission the TARGET tier demands, not whatever the caller
- * happens to hold anywhere else.
- *
  * Spec: specs/data-privacy/policy-configuration.feature
  */
 import { TRPCError } from "@trpc/server";

@@ -1,11 +1,5 @@
 /**
  * The docs site every remediation link points at.
- *
- * The registry is read only by server-side code, where the app's own
- * `getDocsBaseUrl()` already resolves to exactly this — its localhost branch is
- * gated on `window` being defined and on a Vite development build, neither of
- * which is true in a server process. Naming the constant here keeps the
- * registry free of a browser-only module without changing a single emitted URL.
  */
 const DOCS_BASE_URL = "https://docs.langwatch.ai";
 
@@ -14,17 +8,9 @@ function docsUrl(path: string): string {
 }
 
 /**
- * Central remediation registry for handled errors; every `tips` / docs link
- * an error class emits lives here, keyed by the error's `code`. Error classes
- * spread `remediation(code)` into their constructor options instead of
- * inlining copy.
- *
- * Why central: one place to audit the agent-facing copy, and `docsPath` is a
- * repo-relative docs path (not a URL) so CI can verify every linked page
- * actually exists under `docs/` (see __tests__/error-remediation.unit.test.ts).
- *
- * Dynamic content (ids, counts, hints) does NOT belong here; classes compose
- * it: `[dynamicTip, ...remediation(code).tips]`.
+ * Central remediation registry for handled errors; every `tips` / docs link an error class
+ * emits lives here, keyed by the error's `code`. Error classes spread `remediation(code)` into
+ * their constructor options instead of inlining copy.
  */
 
 interface RemediationEntry {
@@ -742,13 +728,9 @@ export function remediation(code: RemediationCode): {
 }
 
 /**
- * The tips for a code that is only known at runtime.
- *
- * One error can carry another's code: the UI-action channel wraps whatever the
- * page reported, and its own advice is "read meta.errorCode for the page's own
- * reason". Following that advice should then reach the inner code's tips rather
- * than end at its name, so the wrapper looks the inner code up here. Unknown
- * codes answer with nothing, because a code from a page is data.
+ * The tips for a code that is only known at runtime. One error can carry another's code: the
+ * UI-action channel wraps whatever the page reported, and its own advice is "read
+ * meta.errorCode for the page's own reason".
  */
 export function remediationFor(code: string | undefined): {
   tips?: readonly string[];

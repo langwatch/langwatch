@@ -37,17 +37,8 @@ type PreconditionTraceData = {
 type ResolvedValue = string | string[] | null;
 
 /**
- * Every precondition field this service can answer, and how.
- *
- * A table rather than a switch so the vocabulary reads as a list. That matters
- * because there is a SECOND implementation of these rules —
- * `platform/app/src/server/filters/precondition-matchers.ts`, which the monitor
- * sample preview uses — and it knows thirteen fields this one does not:
- * the nine `evaluations.*`, `traces.name`, `metadata.key` and
- * `events.metrics.value`. A precondition on any of those matches traces in the
- * preview and then never fires, because an unknown field resolves to null here
- * and `matches` reads null as "not met". See
- * dev/docs/plans/feature-cleanup/evaluation-precondition-divergence.md.
+ * Every precondition field this service can answer, and how. A table rather than a switch so
+ * the vocabulary reads as a list.
  */
 const FIELD_RESOLVERS: Record<
   string,

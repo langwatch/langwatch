@@ -6,10 +6,9 @@ import type { USAGE_UNKNOWN } from "./usage-counter.port";
 export type ProjectUsageCount = { projectId: string; count: number };
 
 /**
- * The per-project breakdown, or {@link USAGE_UNKNOWN} when the counting store
- * could not answer. The sentinel travels rather than a zero for the same
- * reason it does on a single count: an unreachable store and a quiet month are
- * different facts.
+ * The per-project breakdown, or {@link USAGE_UNKNOWN} when the counting store could not answer.
+ * The sentinel travels rather than a zero for the same reason it does on a single count: an
+ * unreachable store and a quiet month are different facts.
  */
 export type ProjectUsageCounts = ProjectUsageCount[] | typeof USAGE_UNKNOWN;
 
@@ -26,10 +25,9 @@ export abstract class UsageVolumeCounterPort {
 }
 
 /**
- * What enforcement needs of the organization graph: which organization a team
- * belongs to, which projects it owns, and the pricing model a licence override
- * is read against. The aggregate is another feature's, so this is the shape
- * rather than its repository.
+ * What enforcement needs of the organization graph: which organization a team belongs to, which
+ * projects it owns, and the pricing model a licence override is read against. The aggregate is
+ * another feature's, so this is the shape rather than its repository.
  */
 export abstract class UsageOrganizationPort {
   abstract tryGetOrganizationIdByTeamId(input: { teamId: string }): Promise<string | null>;
@@ -40,10 +38,9 @@ export abstract class UsageOrganizationPort {
 }
 
 /**
- * A short-lived per-key cache. Enforcement asks the same two questions on
- * every ingested batch, so the composition binds whatever it has — a Redis
- * cache shared across pods, or a per-pod map — and the absence of one only
- * costs repeated reads.
+ * A short-lived per-key cache. Enforcement asks the same two questions on every ingested batch,
+ * so the composition binds whatever it has — a Redis cache shared across pods, or a per-pod map
+ * — and the absence of one only costs repeated reads.
  */
 export abstract class UsageCachePort {
   abstract get<T>(key: string): Promise<T | undefined>;

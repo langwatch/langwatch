@@ -1,13 +1,6 @@
 /**
- * The sweep itself: how the service drives the repository page by page, what it
- * drops on the way, and when it stops.
- *
- * A hand-written repository stub rather than a mock library — the sweep's whole
- * contract is "ask for a page, follow the cursor, stop", and a stub that
- * actually paginates is the only way to observe that. It records the parameters
- * it was called with so scope can be asserted at the boundary the real
- * repository turns into SQL.
- *
+ * The sweep itself: how the service drives the repository page by page, what it drops on the
+ * way, and when it stops.
  * @see specs/scenarios/scenario-run-export.feature
  */
 
@@ -68,10 +61,9 @@ function createSimulationService(): SimulationService {
 }
 
 /**
- * Serves the given pages in order, one per call, and remembers every request.
- * `hasMore` and `nextCursor` follow from the position in the list, so a caller
- * that ignores the cursor loops forever and a caller that stops early is
- * visible in `calls`.
+ * Serves the given pages in order, one per call, and remembers every request. `hasMore` and
+ * `nextCursor` follow from the position in the list, so a caller that ignores the cursor loops
+ * forever and a caller that stops early is visible in `calls`.
  */
 function pagingService(pages: SimulationExportRun[][]): {
   simulations: SimulationService;
@@ -265,10 +257,9 @@ describe("ScenarioRunExportService", () => {
 
   describe("when the panel is scoped to a set, a scenario and a date range", () => {
     /**
-     * The service does not filter these itself — it hands them to the
-     * repository, which turns them into SQL. What is worth pinning is that it
-     * passes on every one of them: a scope silently dropped here exports more
-     * than the user was looking at.
+     * The service does not filter these itself — it hands them to the repository, which turns
+     * them into SQL. What is worth pinning is that it passes on every one of them: a scope
+     * silently dropped here exports more than the user was looking at.
      */
     it("passes the whole scope through to the repository", async () => {
       const { simulations, calls } = pagingService([[buildRun()]]);

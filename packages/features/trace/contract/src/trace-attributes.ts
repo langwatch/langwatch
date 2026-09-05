@@ -1,8 +1,6 @@
 /**
- * Canonical attribute key constants.
- *
- * These constants provide a single source of truth for all attribute keys
- * used in the canonicalization process, reducing magic strings and improving
+ * Canonical attribute key constants. These constants provide a single source of truth for all
+ * attribute keys used in the canonicalization process, reducing magic strings and improving
  * maintainability.
  */
 export const ATTR_KEYS = {
@@ -92,13 +90,9 @@ export const ATTR_KEYS = {
   AI_RESPONSE_OBJECT: "ai.response.object",
   AI_MODEL: "ai.model",
   AI_USAGE: "ai.usage",
-  // Vercel AI SDK cache token details (flat-dotted; opencode and other AI-SDK
-  // embedders emit these instead of gen_ai.usage.cache_*). cacheReadTokens and
-  // cacheWriteTokens live under inputTokenDetails; cachedInputTokens is the
-  // older flat alias for the read count. inputTokens is the FULL prompt total
-  // (cache included, per AI SDK semantics); noCacheTokens is the fresh
-  // remainder the canonical gen_ai.usage.input_tokens must carry so cache
-  // buckets add on top rather than overlap.
+  // Vercel AI SDK cache token details (flat-dotted; opencode and other AI-SDK embedders emit
+  // these instead of gen_ai.usage.cache_*). cacheReadTokens and cacheWriteTokens live under
+  // inputTokenDetails; cachedInputTokens is the older flat alias for the read count.
   AI_USAGE_INPUT_TOKENS: "ai.usage.inputTokens",
   AI_USAGE_CACHED_INPUT_TOKENS: "ai.usage.cachedInputTokens",
   AI_USAGE_CACHE_READ_TOKENS: "ai.usage.inputTokenDetails.cacheReadTokens",
@@ -152,12 +146,11 @@ export const ATTR_KEYS = {
   // LangWatch attributes
   LANGWATCH_INPUT: "langwatch.input",
   LANGWATCH_OUTPUT: "langwatch.output",
-  // The verbatim provider request/response bodies a Claude Code model call was
-  // folded from. The light gen_ai.input.messages / gen_ai.completion give the
-  // readable chat view; these carry the FULL payload (system prompt, every
-  // tool/skill schema, the whole message history with cache_control markers) so
-  // a call's cache_creation / cache_read token counts can be traced to what
-  // actually filled the prompt cache. Surfaced in the drawer's Span Attributes.
+  // The verbatim provider request/response bodies a Claude Code model call was folded from. The
+  // light gen_ai.input.messages / gen_ai.completion give the readable chat view; these carry
+  // the FULL payload (system prompt, every tool/skill schema, the whole message history with
+  // cache_control markers) so a call's cache_creation / cache_read token counts can be traced
+  // to what actually filled the prompt cache. Surfaced in the drawer's Span Attributes.
   CLAUDE_CODE_REQUEST_BODY: "langwatch.claude_code.request_body",
   CLAUDE_CODE_RESPONSE_BODY: "langwatch.claude_code.response_body",
   LANGWATCH_RESERVED_VALUE_TYPES: "langwatch.reserved.value_types",

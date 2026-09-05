@@ -1,30 +1,5 @@
 /**
  * Hono routes for the organization's GitHub App installation flow.
- *
- * Surfaces:
- *   GET  /api/github/install: start, a session-gated redirect to the App's
- *        public installation page on the configured GitHub host, with a signed
- *        state.
- *   GET  /api/github/setup: GitHub's post-install redirect. Verify the
- *        signed state, record the installation against the organization it was
- *        bound to, then postMessage the opener (popup) or 302 back (redirect).
- *   POST /api/github/webhook: GitHub webhooks. Verifies the
- *        X-Hub-Signature-256 HMAC, then keeps the installation row + repo
- *        selection fresh (created/deleted/suspend/unsuspend, repositories
- *        added/removed) and links a pull request to its head branch the moment
- *        `pull_request` says one exists. Idempotent.
- *
- * There is no per-user OAuth: an installation IS the access boundary, PRs are
- * bot-authored, and tokens are minted on demand from the App private key. The
- * public surfaces are protocol-mandated (GitHub's Setup URL + webhook delivery),
- * every sensitive read is guarded by the signed state or the HMAC.
- *
- * The route is just HTTP plumbing. DB writes + GitHub HTTP live behind the
- * composed GithubService; who is signed in, whether they may manage the
- * organization, where the command is audited and which coding-agent
- * application backfills its pull requests are the PROCESS's answers and arrive
- * as {@link GithubRestPorts}.
- *
  * Spec: specs/integrations/github-connection.feature.
  */
 
@@ -53,13 +28,9 @@ export type GithubRestPorts = Readonly<{
   /** Resolves the browser session both `/install` and `/setup` are bound to. */
   session: GithubRestSessionPort;
   /**
-   * Whether this person may connect GitHub for that organization.
-   *
-   * Connecting grants repository access to the whole organization, so it takes
-   * organization management: the same permission the tRPC surface demands for
-   * every write to the connection. A port because the check is
-   * ORGANIZATION-tier, which is the deployment's AuthZ graph rather than
-   * anything GitHub knows.
+   * Whether this person may connect GitHub for that organization. Connecting grants repository
+   * access to the whole organization, so it takes organization management: the same permission
+   * the tRPC surface demands for every write to the connection.
    */
   canManageOrganization: (input: { userId: string; organizationId: string }) => Promise<boolean>;
   /** Where a connection command — and a blocked rebind — is recorded. */
@@ -70,12 +41,8 @@ export type GithubRestPorts = Readonly<{
     args: Record<string, unknown>;
   }) => Promise<void>;
   /**
-   * Relinks the coding-agent sessions whose pull requests this installation
-   * can now be read through, where the process holds that application.
-   *
-   * Absent means the backfill does not run and the periodic recheck is the
-   * only path — slower, and correct: the mapping is a cache of what GitHub
-   * already knows.
+   * Relinks the coding-agent sessions whose pull requests this installation can now be read
+   * through, where the process holds that application.
    */
   backfillPullRequestMappings?: ((input: { organizationId: string }) => Promise<void>) | undefined;
 }>;
@@ -349,13 +316,9 @@ async function rejectUnauthorizedSetup({
 }
 
 /**
- * Record why the installation could not be written.
- *
- * A takeover attempt — an installation already owned by another organization,
- * or one this flow did not create — is a security event, not an ordinary
- * failure: audit it against the acting user/org so it is visible. The caller
- * still returns the generic message, so nothing leaks about whether the
- * installation id exists.
+ * Record why the installation could not be written. A takeover attempt — an installation
+ * already owned by another organization, or one this flow did not create — is a security event,
+ * not an ordinary failure: audit it against the acting user/org so it is visible.
  */
 async function reportInstallationFailure({
   err,
@@ -430,10 +393,6 @@ async function recordInstallAudit({
 
 // GitHub webhook events: installation created/deleted/suspend/unsuspend and
 // installation_repositories added/removed. Verified by HMAC; idempotent.
-//
-// A schema rather than a bare type, so an action GitHub adds later is REJECTED
-// here and acked by the guard below, instead of being cast to this union and
-// reaching a dispatcher that has no default case to catch it.
 /** The envelope both installation events share, parsed before any field read. */
 const installationEnvelopeSchema = z.object({
   action: z.unknown().optional(),
@@ -462,13 +421,9 @@ function verifyWebhookSignature(
 }
 
 /**
- * A `pull_request` delivery: link the head branch to its pull request now,
- * rather than waiting for that branch's next scheduled recheck, which for a
- * branch that has been asked about a few times already is up to a day away.
- *
- * Acked whatever happens, like every other event here. A payload this instance
- * cannot act on is not something a GitHub retry fixes, and the periodic recheck
- * is the backstop under a delivery that fails or never arrives at all.
+ * A `pull_request` delivery: link the head branch to its pull request now, rather than waiting
+ * for that branch's next scheduled recheck, which for a branch that has been asked about a few
+ * times already is up to a day away. Acked whatever happens, like every other event here.
  */
 async function applyPullRequestEvent({
   payload,
@@ -481,11 +436,10 @@ async function applyPullRequestEvent({
 }): Promise<void> {
   const event = service.tryParsePullRequestEvent(payload);
   if (!event) {
-    // The parser declines four different deliveries, and every one of them
-    // still answers 200. Without this line a linkage outage looks from the
-    // outside like an unbroken run of successful deliveries. The payload is
-    // deliberately not logged: the delivery id is enough to find it in
-    // GitHub's own redelivery view, and a raw body here would put customer
+    // The parser declines four different deliveries, and every one of them still answers 200.
+    // Without this line a linkage outage looks from the outside like an unbroken run of
+    // successful deliveries. The payload is deliberately not logged: the delivery id is enough
+    // to find it in GitHub's own redelivery view, and a raw body here would put customer
     // repository content in the logs.
     logger.info({ deliveryId }, "github pull request delivery dropped before linkage");
     return;
@@ -586,13 +540,11 @@ export function createGithubRestApp(options: {
     .access(publicEndpoint(WEBHOOK_PUBLIC_REASON))
     .post("/github/webhook", (c) => handleWebhook(c, ports));
 
-  // `/api/github-langy/setup` and `/api/github-langy/webhook` are an external
-  // contract, held by two sets of App registrations: the hosted App, and every
-  // self-hosted App an operator registered while the documentation named these
-  // paths. Both point their Setup URL and their webhook delivery here, so the
-  // aliases stay mounted on the same handlers until there is a deprecation path
-  // that can move a registration we do not own. /install needs no alias: it is
-  // ours to call, and every caller in this repo uses the canonical path.
+  // `/api/github-langy/setup` and `/api/github-langy/webhook` are an external contract, held by
+  // two sets of App registrations: the hosted App, and every self-hosted App an operator
+  // registered while the documentation named these paths. Both point their Setup URL and their
+  // webhook delivery here, so the aliases stay mounted on the same handlers until there is a
+  // deprecation path that can move a registration we do not own.
   secured
     .access(publicEndpoint(SETUP_PUBLIC_REASON))
     .get("/github-langy/setup", (c) => handleSetup(c, ports));

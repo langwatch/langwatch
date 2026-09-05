@@ -1,8 +1,7 @@
 /**
- * `llmModelCost`: the form behind every cost rule, opened from the Model
- * Costs table (Add/Edit/Clone) and the trace drawer's cost-mapping
+ * `llmModelCost`: the form behind every cost rule, opened from the Model Costs table
+ * (Add/Edit/Clone) and the trace drawer's cost-mapping
  * suggestion. Scope is a single organization's (ADR-021): editing keeps the
- * row's own scope, a new/cloned row defaults to the current project.
  */
 
 import { Button, Field, Heading, Input, Text } from "@chakra-ui/react";

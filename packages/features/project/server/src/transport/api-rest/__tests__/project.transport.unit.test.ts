@@ -106,10 +106,9 @@ function projectWithTeam(overrides: Partial<ProjectWithTeam> = {}): ProjectWithT
 }
 
 /**
- * A handled error as this boundary can recognise one without depending on the
- * package that defines it: a stable `code` and its own status. That is the
- * same duck-type the application's own handler falls back to for a payload
- * that has already crossed a serialisation boundary.
+ * A handled error as this boundary can recognise one without depending on the package that
+ * defines it: a stable `code` and its own status. That is the same duck-type the application's
+ * own handler falls back to for a payload that has already crossed a serialisation boundary.
  */
 type HandledShape = { code?: unknown; httpStatus?: unknown; message: string };
 
@@ -151,14 +150,9 @@ function mintedServiceKey(): { token: string; apiKey: ApiKey } {
 }
 
 /**
- * The enforcement the process owns and this package does not.
- *
- * `granted` is the set of permissions the presented credential holds at the
- * organization; `grantedOnProject` is what it holds at the project a route
- * names. They are separate because the base-key route is authorized at the
- * project's scope rather than the organization's, and a test that conflated
- * them could not tell an org-wide grant from a per-project one — which is the
- * whole subject of that route's policy.
+ * The enforcement the process owns and this package does not. `granted` is the set of
+ * permissions the presented credential holds at the organization; `grantedOnProject` is what it
+ * holds at the project a route names.
  */
 function spine(
   options: {
@@ -494,11 +488,8 @@ describe("createProjectRestApp", () => {
     });
 
     /**
-     * The listing is `anyAuthenticated`, not `requires("project:view")`: a
-     * credential whose reach is narrower than the organization gets exactly
-     * the projects it can see, with a 200. A 403 here would be the difference
-     * between "you may not ask" and "here is what you may see", and the answer
-     * is the second one.
+     * The listing is `anyAuthenticated`, not `requires("project:view")`: a credential whose
+     * reach is narrower than the organization gets exactly the projects it can see, with a 200.
      */
     describe("given a credential bound to some of the organization's projects", () => {
       /** @scenario "project-scoped key gets a filtered list, not a refusal" */
@@ -808,11 +799,9 @@ describe("createProjectRestApp", () => {
 
   describe("given the base key, which is a project-level write credential", () => {
     /**
-     * The route is authorized at the NAMED project's scope, not the
-     * organization's, and with `project:update` rather than `project:view` —
-     * the key it hands over grants writes, so reading it cannot be cheaper
-     * than holding them. The policy is what makes the three scenarios below
-     * true, so the policy itself is what is pinned.
+     * The route is authorized at the NAMED project's scope, not the organization's, and with
+     * `project:update` rather than `project:view` — the key it hands over grants writes, so
+     * reading it cannot be cheaper than holding them.
      */
     it("declares project:update at the route's own project scope", () => {
       buildApi();
@@ -923,10 +912,7 @@ describe("createProjectRestApp", () => {
   });
 
   /**
-   * Finding H4 of the 2026-09-04 feature-surface security pass. These four
-   * routes each name ONE project, so the permission belongs at that project's
-   * scope; resolved at the organization's, one org-wide grant reached every
-   * project in the tenant and a per-project grant reached none.
+   * Finding H4 of the 2026-09-04 feature-surface security pass.
    * Spec: specs/security/resource-scope-permission-checks.feature
    */
   describe("given a credential whose grant covers one project and not its sibling", () => {

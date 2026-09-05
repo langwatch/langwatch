@@ -14,21 +14,9 @@ import {
 import { buildMcpJson } from "../shared/build-mcp-config";
 
 /**
- * Regression suite for langwatch/langwatch#3104.
- *
- * Gemini CLI's chat-input parser extracts `@`-prefixed runs from pasted text
- * and calls `fs.lstatSync()` on each one (see google-gemini/gemini-cli
- * packages/cli/src/ui/hooks/atCommandProcessor.ts). If the tail path-component
- * of the extracted run exceeds the OS filesystem NAME_MAX (255 on macOS /
- * Linux), lstat throws `ENAMETOOLONG` and the Gemini process dies with an
- * unhandled rejection. Any LangWatch content a user might paste into Gemini
- * must therefore extract cleanly — not just as a short whole token, but as a
- * short longest-component after splitting on `/`.
- *
- * The regex below is copied verbatim from Gemini's
- * `AT_COMMAND_PATH_REGEX_SOURCE`. Its `"[^"]*"` alternative is the bug: it
- * matches across newlines, so a `"@langwatch/mcp-server"` sequence embedded in
- * a JSON block drags the rest of the block into a single match.
+ * Regression suite for langwatch/langwatch#3104. Gemini CLI's chat-input parser extracts
+ * `@`-prefixed runs from pasted text and calls `fs.lstatSync()` on each one (see
+ * google-gemini/gemini-cli packages/cli/src/ui/hooks/atCommandProcessor.ts).
  */
 const GEMINI_AT_COMMAND_PATH_REGEX_SOURCE = String.raw`(?:(?:"(?:[^"]*)")|(?:\\.|[^ \t\n\r,;!?()\[\]{}.]|\.(?!$|[ \t\n\r])))+`;
 const GEMINI_AT_COMMAND_REGEX = new RegExp(
@@ -37,13 +25,7 @@ const GEMINI_AT_COMMAND_REGEX = new RegExp(
 );
 
 /**
- * macOS and Linux cap a single filesystem path component at NAME_MAX = 255
- * bytes. Observed longest component for realistic content today: 121 bytes
- * (cloud) and 160 bytes (self-hosted with the longest LANGWATCH_API_KEY
- * format LangWatch issues — fixed at 54 bytes, see apiKeyGenerator.ts). A
- * 32-byte safety margin below NAME_MAX leaves headroom for future edits
- * while still catching any regression that reintroduces the issue-#3104
- * crash pattern (where the longest component was 2179 bytes).
+ * macOS and Linux cap a single filesystem path component at NAME_MAX = 255 bytes.
  */
 const NAME_MAX = 255;
 const SAFETY_MARGIN = 32;
@@ -95,12 +77,10 @@ describe("code-prompts Gemini CLI compatibility (issue #3104)", () => {
       });
 
       it("does not embed @langwatch/mcp-server inside a JSON string literal", () => {
-        // The crash trigger in issue #3104 is the sequence
-        //   "@langwatch/mcp-server"
-        // inside a JSON block: the closing `"` kicks off Gemini's
-        // `"[^"]*"` alternative, which eats across newlines through the
-        // rest of the JSON. Forbidding the exact pattern makes the regex
-        // match terminate at the next whitespace instead.
+        // The crash trigger in issue #3104 is the sequence "@langwatch/mcp-server" inside a
+        // JSON block: the closing `"` kicks off Gemini's `"[^"]*"` alternative, which eats
+        // across newlines through the rest of the JSON. Forbidding the exact pattern makes the
+        // regex match terminate at the next whitespace instead.
         expect(text).not.toContain('"@langwatch/mcp-server"');
       });
     });
@@ -133,13 +113,9 @@ describe("code-prompts Gemini CLI compatibility (issue #3104)", () => {
 });
 
 describe("buildMcpJson Gemini CLI compatibility (issue #3104)", () => {
-  // LangWatch API keys have a fixed format: `sk-lw-` + 48 alphanumeric
-  // characters = 54 bytes total (see server/utils/apiKeyGenerator.ts).
-  // The MCP config JSON is also pasteable via the onboarding "Copy Config"
-  // button, so it must extract cleanly under Gemini's regex too. The `/`
-  // in the scoped package name `@langwatch/mcp-server` naturally splits
-  // the match into shorter components, keeping each one well below
-  // NAME_MAX in practice — this test locks that invariant in.
+  // LangWatch API keys have a fixed format: `sk-lw-` + 48 alphanumeric characters = 54 bytes
+  // total (see server/utils/apiKeyGenerator.ts). The MCP config JSON is also pasteable via the
+  // onboarding "Copy Config" button, so it must extract cleanly under Gemini's regex too.
   const REALISTIC_API_KEY = "sk-lw-" + "a".repeat(48);
 
   describe("given a cloud config with a realistic API key", () => {

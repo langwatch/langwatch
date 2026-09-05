@@ -6,11 +6,9 @@ import type { DepartmentOption } from "../../behavior/use-department-column";
 import { useOrganizationToaster, useShowErrorToast } from "../../behavior/organization-feedback";
 
 /**
- * Inline single-select that assigns a person / team / project to a
- * department where it is already managed (members page, teams page, project
- * settings). Single-valued: picking a department replaces the previous one,
- * "Unassigned" clears it. Owns the assign mutation so call sites only pass
- * the current value + the option list.
+ * Inline single-select that assigns a person / team / project to a department where it is
+ * already managed (members page, teams page, project settings). Single-valued: picking a
+ * department replaces the previous one, "Unassigned" clears it.
  */
 export function DepartmentPicker({
   organizationId,

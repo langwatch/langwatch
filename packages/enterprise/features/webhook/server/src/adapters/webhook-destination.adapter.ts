@@ -10,21 +10,15 @@ import {
 
 /**
  * What a process must hold before it can deliver to either transport.
- *
- * Both are the deployment's, not the feature's: the egress service carries the
- * SSRF fence, the TLS policy and the one hourly dispatch cap, and the AWS
- * config carries the corporate proxy a self-hosted install routes through. A
- * package that built either for itself would quietly opt out of both.
  */
 export type WebhookDestinationDeps = Readonly<{
   egress: WebhookEgressService;
   allowInsecureLocal: boolean;
   awsClientConfig: AwsClientConfigPort;
   /**
-   * The counter the hourly dispatch cap is kept in. The HTTPS transport reads
-   * it off the egress service; a queue send never passes through that sender,
-   * so it has to be handed the same counter directly or a queue endpoint would
-   * be the one uncapped destination.
+   * The counter the hourly dispatch cap is kept in. The HTTPS transport reads it off the egress
+   * service; a queue send never passes through that sender, so it has to be handed the same
+   * counter directly or a queue endpoint would be the one uncapped destination.
    */
   rateLimiter?: WebhookDispatchRateLimiterPort | undefined;
 }>;

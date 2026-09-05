@@ -1,48 +1,5 @@
 /**
  * The ClickHouse trace READ stack, composed from this process's own graph.
- *
- * Everything a captured trace passes through between the columns it is stored
- * in and the shape a reader is allowed to see: the ten readers `TraceApp` is
- * built from, the caller's read-time redactions, the plan's visibility window,
- * the span display and redaction passes, Data Privacy's content catalogue, the
- * coding-agent log join, the AI composer, the reserved-metadata write and the
- * evaluator wizard's precondition engine.
- *
- * It is ONE composition rather than nine because it is one thing. Splitting it
- * would suggest a deployment could hold the readers without the redaction
- * passes, and a deployment that did would serve customer content to people the
- * policy hides it from.
- *
- * ## What each collaborator is, and where it comes from
- *
- *   - the CONNECTION is this process's tenant-keyed ClickHouse, the same one
- *     the charted reads run on. Absent, every read below refuses at the call
- *     with the message it always had;
- *   - the REDACTIONS are AuthZ's (`cost:view`) and Data Privacy's (the
- *     project's resolved policy), resolved per request because they depend on
- *     the caller;
- *   - the VISIBILITY WINDOW is the plan's, resolved through the one plan
- *     provider every allowance is read through, and it FAILS CLOSED: an
- *     unresolvable organization or a plan-store error applies the free-tier
- *     window, because a leak is irreversible and over-blurring is a refresh
- *     away;
- *   - the FILTER TRANSLATOR is Analytics's, joined here because a feature
- *     package may not reach into another feature's server package;
- *   - the MODEL for the AI composer resolves through the same cascade every
- *     other feature key does.
- *
- * ## What is named as absent inside it
- *
- *   - the SUMMARY PROJECTION store, the trace RECORD reads and the event
- *     derivation the packaged `TraceService` takes: this process folds no
- *     trace projections, so the span-tree and query-catalogue reads answer off
- *     the stored spans and the projection-backed ones answer empty;
- *   - the CANONICAL LOG READ, so a coding-agent transcript read refuses rather
- *     than deriving a transcript from the legacy log table alone — which has
- *     taken no write since the canonical cutover, and would answer "this agent
- *     did nothing" for every trace ingested since;
- *   - the EVALUATION summaries the grid labels its rows with, when the
- *     execution half composed none.
  */
 import {
   TraceReadRedactionService,
@@ -153,10 +110,9 @@ export type ApiTraceReadStackOptions = Readonly<{
   /** Resolves a project's team and organization, for the window and the policy. */
   projects: ProjectService;
   /**
-   * The project's resolved data-privacy policy — the one every read redacts
-   * by. Composed from `prisma` and `projects` when the process does not hand
-   * one in, so a caller cannot compose the stack without a policy resolver and
-   * quietly serve unredacted content.
+   * The project's resolved data-privacy policy — the one every read redacts by. Composed from
+   * `prisma` and `projects` when the process does not hand one in, so a caller cannot compose
+   * the stack without a policy resolver and quietly serve unredacted content.
    */
   dataPrivacy?: ApiTraceDataPrivacyResolver | undefined;
   /** The plan the visibility window comes from. */
@@ -182,11 +138,9 @@ export type ApiTraceReadStackOptions = Readonly<{
 }>;
 
 /**
- * The legacy trace grid's ports, minus the per-request redactions.
- *
- * Named here rather than written out, because it is the trace package's own
- * declaration: a second copy in the process is what goes stale when the
- * transport grows a port.
+ * The legacy trace grid's ports, minus the per-request redactions. Named here rather than
+ * written out, because it is the trace package's own declaration: a second copy in the process
+ * is what goes stale when the transport grows a port.
  */
 export type ApiTraceLegacyPorts = Omit<
   TracesTrpcPorts<TraceLegacyListInput, unknown, TraceLegacyFilterInput, unknown, unknown>,
@@ -194,19 +148,8 @@ export type ApiTraceLegacyPorts = Omit<
 >;
 
 /**
- * Offset pagination was dropped when trace search moved to ClickHouse: deep
- * OFFSET degrades badly, and keyset (`scrollId`) replaced it. The parameter was
- * left on the schema and in the published spec but no trace query has read it
- * since, so a non-zero value returned page 1 with HTTP 200 and no warning — an
- * offset-paginating export repeated the same page for as long as it ran (#6808).
- *
- * Rejected rather than deleted. Deleting the field is the worse option on the
- * public surface: the v1 route validates non-strictly, so an unknown key is
- * stripped and the request still succeeds — exactly the silence being fixed.
- * A rejection tells the caller what to use instead.
- *
- * 0 and absent stay valid. Every current caller that does not paginate sends
- * one or the other, so rejecting them would break working clients to no end.
+ * Offset pagination was dropped when trace search moved to ClickHouse: deep OFFSET degrades
+ * badly, and keyset (`scrollId`) replaced it.
  */
 const pageOffsetInput = z
   .number()
@@ -224,10 +167,6 @@ const pageOffsetInput = z
 
 /**
  * What a legacy trace read may be scoped by, and what a caller may send.
- *
- * Built on ANALYTICS's shared filter vocabulary rather than declared here,
- * because the same shape is the v1 REST search body and the charted read's
- * input: one definition is what keeps those three surfaces from drifting.
  */
 export const API_TRACE_FILTER_INPUT = sharedFiltersInputSchema.extend({
   pageOffset: pageOffsetInput,
@@ -247,11 +186,6 @@ export const API_TRACE_LIST_INPUT = API_TRACE_FILTER_INPUT.extend({
 
 /**
  * One configured precondition rule on the evaluator wizard's sample step.
- *
- * `field` is a string rather than the browser package's literal union: the
- * vocabulary is data-driven (a metadata key, an event type) and EVALUATION's
- * resolver table is the authority on which fields resolve, so a second
- * enumeration in the process would only go stale against it.
  */
 const apiPreconditionSchema = z.object({
   field: z.string().min(1),
@@ -520,11 +454,8 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
   }
 
   /**
-   * Whether the evaluator's own required inputs are present on this trace.
-   *
-   * Two rules, from two owners. `expected_output` is read off the trace here,
-   * because the sample step is the only caller that has one; the `contexts`
-   * rule is Evaluation's, and is asked of Evaluation rather than restated.
+   * Whether the evaluator's own required inputs are present on this trace. Two rules, from two
+   * owners.
    */
   private evaluatorRequiredFieldsMet(
     input: Readonly<{
@@ -655,14 +586,9 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
   }
 
   /**
-   * The trace TREE read, over the stored spans.
-   *
-   * Composed with no summary projection, no record reader and no event
-   * derivation: this process folds no trace projections, so the reads that
-   * would come off one answer empty rather than pretending. What it DOES serve
-   * is the span-tree walk and the query-field catalogue, which read the stored
-   * spans directly — and those are what the drawer's waterfall and the AI
-   * composer ask for.
+   * The trace TREE read, over the stored spans. Composed with no summary projection, no record
+   * reader and no event derivation: this process folds no trace projections, so the reads that
+   * would come off one answer empty rather than pretending.
    */
   private composeTree(): TraceTreeService {
     const resolve = this.options.resolveClickHouseClient;
@@ -696,21 +622,8 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
       repository: resolve
         ? new LogRecordStorageClickHouseRepository(resolve as never)
         : new NullLogRecordStorageRepository(),
-      // The CANONICAL LOG READ — `LogService.getLogsByTraceId` over the
-      // `log_records` table — is the log feature's, and this process composes
-      // none. It is the ONE collaborator keeping
-      // `GET /api/traces/{traceId}/transcript` off this process: the read
-      // above answers only `stored_log_records`, which stopped receiving
-      // writes at the canonical cutover, so every trace ingested since would
-      // derive an empty transcript that reads as "this agent said nothing".
-      //
-      // Composable only through `LogRuntimeAdapter` (`@langwatch/log-server`),
-      // whose `create` and `createUnavailable` BOTH require a
-      // `LogRedactionPort`. That port is the PII redaction service, and this
-      // process composes no privacy graph at all — no analysis transport, no
-      // tokenizer, no `tracePrivacy` config — so there is nothing here to
-      // build one from. The read cap it also takes is not the gap:
-      // `TRACE_LOG_READ_CAP` ships from `@langwatch/trace-server`.
+      // The CANONICAL LOG READ — `LogService.getLogsByTraceId` over the `log_records` table —
+      // is the log feature's, and this process composes none.
       canonical: refuseAll((capability) => this.refuse(capability), "the canonical log read"),
     }) as unknown as TraceAppDependencies["traces"]["logRecords"];
   }
@@ -742,11 +655,8 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
   }
 
   /**
-   * The closest preceding `langwatch.prompt.*` reference for an llm span,
-   * found by walking the trace's ancestor / sibling chain.
-   *
-   * Returns the span's own params merged with the resolved prompt attributes,
-   * or null when the walk found nothing, so the caller can skip the assignment.
+   * The closest preceding `langwatch.prompt.*` reference for an llm span, found by walking the
+   * trace's ancestor / sibling chain.
    */
   private async resolveAncestorPromptParams(input: {
     tenantId: string;
@@ -865,23 +775,9 @@ function tryActorId(ctx: unknown): string | undefined {
 }
 
 /**
- * What one caller may read of one project's captured content.
- *
- * Three independent sources, and they are independent on purpose. Spend
- * follows the caller's own PERMISSION — `cost:view`, the same question the
- * declared check on a cost-oriented read asks. Captured content follows the
- * project's DATA-PRIVACY policy, because whether a conversation may be read is
- * a customer setting rather than a role. The visibility CUTOFF follows the
- * plan, and it applies to public shares too: sharing a trace must not be the
- * bypass.
- *
- * It fails closed three times over. An unresolvable policy hides content and
- * hides EVERY custom attribute (a `*` pattern, not an empty list — the redact
- * helpers no-op on an empty one, which would leak exactly what the outage
- * should hide). An unresolvable plan applies the free-tier window. And a
- * `restrict` rule whose audience names groups is refused, because this process
- * cannot resolve a member's group membership and the safe reading of "I do not
- * know whether you are in the audience" is no.
+ * What one caller may read of one project's captured content. Three independent sources, and
+ * they are independent on purpose. Spend follows the caller's own PERMISSION — `cost:view`, the
+ * same question the declared check on a cost-oriented read asks.
  */
 type ApiTraceProtectionsOptions = ApiTraceReadStackOptions &
   Readonly<{ dataPrivacy: ApiTraceDataPrivacyResolver }>;
@@ -900,11 +796,9 @@ class ApiTraceProtections {
   }
 
   /**
-   * The plan's cutoff for one project, failing CLOSED.
-   *
-   * A leak is irreversible and over-blurring is a refresh away, so an
-   * unresolvable organization and a plan-store error both apply the free-tier
-   * window rather than answering "unbounded".
+   * The plan's cutoff for one project, failing CLOSED. A leak is irreversible and over-blurring
+   * is a refresh away, so an unresolvable organization and a plan-store error both apply the
+   * free-tier window rather than answering "unbounded".
    */
   async visibilityCutoffMs(projectId: string): Promise<number | null> {
     const dayMs = 24 * 60 * 60 * 1000;
@@ -1075,11 +969,6 @@ class ApiTraceCapabilityUnavailableError extends HandledError {
 
 /**
  * A stand-in whose every member refuses by name.
- *
- * A proxy rather than an object literal because these are collaborator
- * interfaces another package declared: writing out each member would be a
- * second declaration of somebody else's interface, and the copy is what goes
- * stale when the real one grows a method.
  */
 function refuseAll<T>(refuse: (capability: string) => Error, capability: string): T {
   return new Proxy(

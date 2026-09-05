@@ -28,10 +28,7 @@ function entry(overrides: Record<string, unknown> = {}) {
 }
 
 /**
- * One resource grant's full terms. The schema requires the resource's own
- * identity - what the shared thing is, and which project it lives in -
- * alongside the terms, so a fixture carrying only token and permission is
- * refused before any test here reaches the rule it is actually about.
+ * One resource grant's full terms.
  */
 const SHARE_TERMS = {
   kind: "trace",
@@ -287,11 +284,8 @@ describe("the revocation wire boundary", () => {
 
   describe("given a revocation naming no grant", () => {
     /**
-     * A revoke used to be able to name an IDENTITY instead of an id, and the
-     * fold swept every grant matching it. The aggregate is the grant now, so
-     * an event cannot address a set of them: resolving "every grant this
-     * principal holds" into ids is the caller's job, and the synchronous deny
-     * is what makes that safe.
+     * A revoke used to be able to name an IDENTITY instead of an id, and the fold swept every
+     * grant matching it.
      */
     it("refuses it rather than appending a fact that removes nothing", () => {
       expect(revoke({ reason: "seat removed" }).success).toBe(false);

@@ -7,12 +7,9 @@ import {
 import { SavedViewService } from "../services/saved-view.service";
 
 /**
- * The saved-view lifecycle over Postgres, in the shape the transport asks for.
- *
- * The service takes the create arguments nested under `input` and stores the
- * filters and the period as JSON; the port passes them flat, as the
- * client sends them. This adapter is that one translation and nothing else, so
- * the rows the client receives carry the same fields they always have.
+ * The saved-view lifecycle over Postgres, in the shape the transport asks for. The service
+ * takes the create arguments nested under `input` and stores the filters and the period as
+ * JSON; the port passes them flat, as the client sends them.
  */
 export class PostgresSavedViewAdapter {
   private constructor(private readonly options: { database: SavedViewDatabase }) {}

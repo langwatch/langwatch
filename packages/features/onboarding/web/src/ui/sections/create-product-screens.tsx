@@ -1,10 +1,7 @@
 /**
- * The screens each product flavour walks through.
- *
- * The model-provider step mounts the model-provider family's own credential
- * form through `model-provider/model-provider-setup` rather than a copy of it,
- * and only the "via the platform" flavour reaches it. It is skippable by
- * design, so nothing here may make it required.
+ * The screens each product flavour walks through. The model-provider step mounts the
+ * model-provider family's own credential form through `model-provider/model-provider-setup`
+ * rather than a copy of it, and only the "via the platform" flavour reaches it.
  */
 import { useEffect, useMemo, useRef } from "react";
 import { useAnalytics } from "react-contextual-analytics";

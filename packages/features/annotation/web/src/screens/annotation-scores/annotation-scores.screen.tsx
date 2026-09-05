@@ -1,15 +1,5 @@
 /**
- * The score metrics a project's reviewers can use, at
- * `/settings/annotation-scores`.
- *
- * ONE TABLE OVER ONE READ, and two writes a lite member never sees: a switch
- * that stops offering a definition without touching what has already been
- * scored against it, and a delete that removes it. The editor opens over the
- * page as an overlay whose ADDRESS is a query key, so a link to a definition
- * being edited is a link somebody else can open.
- *
- * The screen carries no chrome: the settings frame is applied by whichever
- * application serves the address.
+ * The score metrics a project's reviewers can use, at `/settings/annotation-scores`.
  */
 
 import {

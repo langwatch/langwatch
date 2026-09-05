@@ -1,27 +1,14 @@
 import type { WebhookDestinationKind } from "@langwatch/enterprise-webhook-contract";
 
 /**
- * A webhook endpoint's last hop.
- *
- * Everything above this line is one machinery no matter where an endpoint
- * delivers: the same coalescing buffer, the same Stripe retry ladder, the
- * same delivery log, the same signature over the same bytes. Only the hop
- * differs, and it differs behind this interface.
- *
- * The interface exists because the recorder used to re-derive the
- * retry-vs-terminal verdict from an HTTP status code, and a queue has no
- * status code. So a transport answers with the verdict ALREADY CLASSIFIED and
- * the recorder trusts it. Each transport owns the rules for its own failures,
- * which is the only place that knowledge exists.
+ * A webhook endpoint's last hop. Everything above this line is one machinery no matter where an
+ * endpoint delivers: the same coalescing buffer, the same Stripe retry ladder, the same
+ * delivery log, the same signature over the same bytes.
  */
 
 /**
- * What one delivery attempt amounted to.
- *
- * - `success`: the receiver has it. Clears the endpoint's failure streak.
- * - `retryable`: try again along the ladder.
- * - `terminal`: this batch will never be accepted as it stands; retrying
- *   only spams the receiver, so it dead-letters immediately.
+ * What one delivery attempt amounted to. - `success`: the receiver has it. Clears the
+ * endpoint's failure streak. - `retryable`: try again along the ladder.
  */
 export type WebhookDispatchVerdict = "success" | "retryable" | "terminal";
 
@@ -69,12 +56,8 @@ export interface WebhookDispatchRequest {
 export abstract class WebhookDestinationPort {
   abstract readonly kind: WebhookDestinationKind;
   /**
-   * Deliver one batch and say what happened.
-   *
-   * Returns a classified verdict for anything the receiving side answered.
-   * Throws `DispatchError` for a transport-level failure with no answer at
-   * all (DNS, a blocked address, a timeout), which is what the caller's
-   * existing catch records and re-raises.
+   * Deliver one batch and say what happened. Returns a classified verdict for anything the
+   * receiving side answered.
    */
   abstract send(request: WebhookDispatchRequest): Promise<WebhookDispatchResult>;
 }

@@ -1,14 +1,5 @@
 /**
- * Who changed this evaluator, and when.
- *
- * THE ONE OVERLAY OF THIS FAMILY THAT TRAVELLED. `evaluatorHistory` had exactly
- * one opener in the whole repository — the evaluators page — so unlike the
- * editor, the code editor and the category picker it is not an application
- * drawer at all, and the gateway family's ruling applies: the registry is
- * COMPOSITION and a screen only ever needed the ADDRESS. The screen keeps the
- * evaluator in its own query string (`?history=<id>`) and renders the panel
- * inline, and `platform/app`'s registered copy stays for the URL that still
- * names it.
+ * Who changed this evaluator, and when. THE ONE OVERLAY OF THIS FAMILY THAT TRAVELLED.
  */
 
 import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";

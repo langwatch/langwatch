@@ -1,8 +1,5 @@
 /**
  * @vitest-environment node
- *
- * The run note: what a caller may send, and what reaches the run metadata.
- *
  * @see specs/suites/run-notes.feature
  * @see specs/suites/run-note-metadata-convention.feature
  */

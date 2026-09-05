@@ -1,16 +1,6 @@
 /**
  * @vitest-environment node
- *
- * `spendByDepartment` — the bird's-eye widening. Reads spend across EVERY
- * project in the organization (not just the governance ingestion silo) and
- * rolls it up by the department resolved per trace. Seeds ClickHouse directly
- * so the read path is deterministic without the trace pipeline.
- *
- * Composed here because the read needs both halves at once: Governance's own
- * activity repository and the ClickHouse client this composition owns.
- *
  * Spec: specs/ai-gateway/governance/departments.feature (the @birds-eye
- * scenarios)
  */
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";

@@ -23,13 +23,11 @@ import { getRAGChunks, getRAGInfo } from "./trace-rag-extraction";
 const getSpanNameOrModel = (span: Span) =>
   span.name ?? (span.type === "llm" ? (span as LLMSpan).model : undefined);
 
-// Define a Trace type that includes annotations for use within this file
-// This assumes the Annotation type comes from Prisma.
-//
-// `user` asks for only the field this file reads (`author` uses `user.name`).
-// Requiring the whole Prisma `User` forced every caller to fetch every user
-// column — email, lastLoginAt and the rest — just to satisfy the type, which
-// is how those columns ended up being shipped to the browser.
+// Define a Trace type that includes annotations for use within this file This assumes the
+// Annotation type comes from Prisma. `user` asks for only the field this file reads (`author`
+// uses `user.name`). Requiring the whole Prisma `User` forced every caller to fetch every user
+// column — email, lastLoginAt and the rest — just to satisfy the type, which is how those
+// columns ended up being shipped to the browser.
 type TraceWithAnnotations = BaseTrace & {
   annotations?: (Annotation & {
     user?: { name?: string | null } | null;
@@ -69,8 +67,6 @@ export const SPAN_SUBFIELDS: SpanSubfield[] = [
 
 /**
  * Build span field children for the mapping UI.
- * Returns "* (any span)" (always available) plus dynamic span names from traces.
- *
  * @param spanNames - Dynamic span names extracted from project traces
  * @returns Array of span field children with nested subfields
  */
@@ -110,8 +106,6 @@ export const RESERVED_METADATA_KEYS = [
 
 /**
  * Build metadata field children for the mapping UI.
- * Returns "* (any key)" (always available) plus dynamic metadata keys from traces.
- *
  * @param metadataKeys - Dynamic metadata keys extracted from project traces
  * @returns Array of metadata field children
  */
@@ -280,18 +274,9 @@ const suggestionLabel = (annotation: TraceAnnotation): string =>
     : "suggested output";
 
 /**
- * One reviewer's annotation as a single line anyone can read, a person or an
- * LLM judge, without knowing how we store annotations:
- *
- *   <author>[ (on <part of the trace>)][: <comment>][ [thumbs up|thumbs down]]
- *   [ [<score name>: <value>[, reason: <reason>]]]...[ [suggested output: <text>]]
- *
- * Each part after the author appears only when the reviewer left it, so a bare
- * comment reads `Ada: too terse` and a bare rating reads `Ada [thumbs down]`.
- * A reviewer with no account name reads by their email, and by "Unknown" when
- * we have neither. A score with no value is left out; its name is the one the
- * project gave it, never its id. A suggestion on an input reads as a suggested
- * input rather than a suggested output, so the line says what was asked for.
+ * One reviewer's annotation as a single line anyone can read, a person or an LLM judge,
+ * without knowing how we store annotations. Each part after the author appears only when
+ * the reviewer left it, e.g. `Ada: too terse` or `Ada [thumbs down]`.
  */
 export function buildReadableAnnotation({
   annotation,
@@ -354,15 +339,9 @@ const namedScoreOptions = ({
 };
 
 /**
- * One reviewer's annotation as a record, carrying the same things the single
- * columns carry and under the same names: who wrote it, what part of the trace
- * it is about, the comment, the rating, the scores by name and the suggestion.
- *
- * Only what the reviewer actually left is in it. A row that says
- * `"is_thumbs_up": null, "expected_output": null` tells the reader nothing
- * except that our schema has those columns, and an LLM judge reading the row
- * has to spend attention deciding they mean nothing. Our storage shape stays
- * out of it too: no ids of ours, no `email` field standing in for the author.
+ * One reviewer's annotation as a record, carrying the same things the single columns carry and
+ * under the same names: who wrote it, what part of the trace it is about, the comment, the
+ * rating, the scores by name and the suggestion. Only what the reviewer actually left is in it.
  */
 export function buildAnnotationRecord({
   annotation,
@@ -780,12 +759,8 @@ export const TRACE_MAPPINGS = {
 >;
 
 /**
- * Whether mapping a source turns its expansion on for you.
- *
- * A trace has one annotation or a handful, so expanding them reads as the point
- * of mapping them at all. It has as many spans as it has work, and a dataset
- * built from them is a row per trace until someone says otherwise, so the span
- * expansions are opt-in.
+ * Whether mapping a source turns its expansion on for you. A trace has one annotation or a
+ * handful, so expanding them reads as the point of mapping them at all.
  */
 export const TRACE_EXPANSIONS = {
   "spans.llm.span_id": {
@@ -949,14 +924,11 @@ export const mappingStateSchema = z.object({
 
 export type MappingState = z.infer<typeof mappingStateSchema>;
 
-// Coerces legacy `{}` and other partial-shape payloads into a valid MappingState
-// before persisting. Without this, monitors created via API with `mappings: {}`
-// end up missing the `.mapping` subkey, which crashes downstream evaluator code
-// at `Object.values(mappingState.mapping)` (see threadMappingResolver.ts). The
-// read-side guard there is defensive; this is the canonical write-side fix.
-//
-// Using z.preprocess (vs z.unknown().transform().pipe()) so hono-openapi can
-// infer the output type from the inner mappingStateSchema for the OpenAPI spec.
+// Coerces legacy `{}` and other partial-shape payloads into a valid MappingState before
+// persisting. Without this, monitors created via API with `mappings: {}` end up missing the
+// `.mapping` subkey, which crashes downstream evaluator code at
+// `Object.values(mappingState.mapping)` (see threadMappingResolver.ts). The read-side guard
+// there is defensive; this is the canonical write-side fix.
 export const monitorMappingsSchema = z.preprocess((value) => {
   if (value === null || value === undefined) return value;
   if (typeof value === "object" && !Array.isArray(value) && "mapping" in (value as object)) {
@@ -1249,8 +1221,6 @@ export const THREAD_MAPPING_LABELS: Record<string, string | undefined> = {
 
 /**
  * Convert TRACE_MAPPINGS to AvailableSource format for the mapping UI.
- * Provides dynamic children for metadata and spans based on project traces.
- *
  * @param spanNames - Dynamic span names extracted from project traces
  * @param metadataKeys - Dynamic metadata keys extracted from project traces
  */

@@ -1,20 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * The evaluator library: what a reader sees, what a delete would take with it,
- * and which overlay each action asks the application for.
- *
- * THE PLATFORM PAGE HAD NO RENDER SUITE AT ALL. `pages/[project]/evaluators.tsx`
- * was 319 lines with three dialogs, four overlay requests and a two-branch
- * delete, and nothing mounted it. These are those behaviours, stated for the
- * first time.
- *
- * WHAT THIS FILE IS REALLY FOR is the delete. An evaluator's cascade DELETES
- * every online evaluation running on it, in production, with no undo on this
- * screen — so the two things worth pinning are that the reader is told before
- * they confirm, and that the branch is chosen by what the related-entities read
- * actually answered rather than by which button was pressed.
- *
  * Spec: specs/evaluations/evaluation-pages.feature
  */
 

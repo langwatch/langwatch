@@ -1,15 +1,7 @@
 /**
- * Total stored bytes for the projects a scope resolves to, RBAC-filtered to
- * the ones the caller may read.
- *
- * The Data Storage card uses this so the number tracks the page's scope
- * selector (organization / team / project) instead of only ever showing the
- * project on the top nav. Projects are always enumerated FROM the caller's
- * organization — a foreign team or project id resolves to no rows — and then
- * narrowed to `traces:view`, so a wider scope can never surface a project's
- * storage the caller could not otherwise see. Summing delegates to the
- * metering service's per-tenant path, which keeps the hardened ClickHouse
- * settings and the cache owned by the retention service.
+ * Total stored bytes for the projects a scope resolves to, RBAC-filtered to the ones the caller
+ * may read. The Data Storage card uses this so the number tracks the page's scope selector
+ * (organization / team / project) instead of only ever showing the project on the top nav.
  */
 import type { DataRetentionService } from "@langwatch/data-retention-contract";
 import type {

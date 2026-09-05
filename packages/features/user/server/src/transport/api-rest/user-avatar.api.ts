@@ -1,27 +1,6 @@
 /**
  * /api/user-avatar/:projectId/:id — serves a user's uploaded avatar bytes.
- *
- * Unlike /api/files (which gates each read behind the caller's `traces:view` /
- * `scenarios:view` on the owning project), an avatar is platform-level identity
- * that must be visible wherever a person is shown, so this route authorizes ANY
- * authenticated caller on the platform — not only users who share an
- * organization with the uploader. For exactly that reason it MUST only ever
- * serve objects whose purpose AND owner kind are the avatar ones. Anything else
- * is refused with {@link UserAvatarNotFoundError}, so this broad-read route can
- * never be used to exfiltrate the trace/scenario media that /api/files
- * protects. The refusal carries ONE code for every reason there is no avatar at
- * a URL — see that error for why the three are not told apart.
- *
- * That check is only as good as what the process's read hands it: a reader that
- * answered a row without `ownerKind` would fail the comparison on every object,
- * including real avatars. `StoredObjectFileRow` carries both columns for this
- * reason.
- *
- * (This is still strictly more private than the status quo: SSO provider photos
- * are fetched from fully public CDN URLs today.)
- *
  * Spec: specs/settings/user-avatar-upload.feature (serving), and
- * specs/settings/user-avatar.feature (the upload's refusals).
  */
 import { Readable } from "node:stream";
 
@@ -44,12 +23,8 @@ import {
 } from "@langwatch/api/rest";
 
 /**
- * A fixed-window counter, keyed on the caller.
- *
- * Structurally the same port `/api/files` takes, and the process binds one
- * implementation to both. It is declared here rather than imported because
- * `user` is a core feature and the stored-object REST family lives in another
- * feature's server package, which this one may not depend on.
+ * A fixed-window counter, keyed on the caller. Structurally the same port `/api/files` takes,
+ * and the process binds one implementation to both.
  */
 export type UserAvatarRateLimiter = (args: {
   key: string;
@@ -58,11 +33,9 @@ export type UserAvatarRateLimiter = (args: {
 }) => Promise<{ allowed: boolean; resetAt: number }>;
 
 /**
- * What the family's dual-auth verifier leaves on the request context.
- *
- * Named here rather than imported because the verifier itself is the
- * application's — the family only needs to know which of the two credential
- * kinds claimed the request, to key the rate limit on it.
+ * What the family's dual-auth verifier leaves on the request context. Named here rather than
+ * imported because the verifier itself is the application's — the family only needs to know
+ * which of the two credential kinds claimed the request, to key the rate limit on it.
  */
 export type UserAvatarDualAuthVariables = {
   apiKeyProjectId?: string;
@@ -136,10 +109,9 @@ export function createUserAvatarRestApp<
 >(options: {
   security: AppRestSecurity;
   /**
-   * Accepts either a project API key or a browser session, and refuses a
-   * request carrying both: a browser fires `<img src="/api/user-avatar/...">`
-   * with the cookie and no custom headers, so a key-only chain would 401 every
-   * member list.
+   * Accepts either a project API key or a browser session, and refuses a request carrying both:
+   * a browser fires `<img src="/api/user-avatar/...">` with the cookie and no custom headers,
+   * so a key-only chain would 401 every member list.
    */
   dualAuth: MiddlewareHandler;
   /**
@@ -196,11 +168,10 @@ export function createUserAvatarRestApp<
       return jsonResponse({ error: "avatar temporarily unavailable" }, 502);
     }
 
-    // A missing row, or ANY object that is not a user avatar, is refused — the
-    // purpose/owner check is the security boundary that keeps this broadly
-    // readable route from serving trace/scenario media (see file header). BOTH
-    // halves are checked: `purpose` says what the object is for and
-    // `owner_kind` says what produced it, and an object carrying one without
+    // A missing row, or ANY object that is not a user avatar, is refused — the purpose/owner
+    // check is the security boundary that keeps this broadly readable route from serving
+    // trace/scenario media (see file header). BOTH halves are checked: `purpose` says what the
+    // object is for and `owner_kind` says what produced it, and an object carrying one without
     // the other is not an avatar.
     if (
       !result ||

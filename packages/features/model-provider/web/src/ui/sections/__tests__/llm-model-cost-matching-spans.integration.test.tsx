@@ -1,10 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * Matching-spans preview inside the LLM model cost drawer: real component
- * tree (drawer + form + preview), with the tRPC client as the mocked
- * boundary.
- *
  * Spec: specs/model-providers/model-cost-matching-spans-preview.feature
  */
 import { cleanup, fireEvent, screen } from "@testing-library/react";

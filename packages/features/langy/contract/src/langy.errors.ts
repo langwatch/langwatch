@@ -4,37 +4,12 @@ import { remediation } from "./langy.error-remediation";
 
 /**
  * Langy conversation domain errors (ADR-046).
- *
- * These use the platform `HandledError` framework so they carry a serialisable
- * `kind` discriminant, renderable `meta`, an `httpStatus`, and OTel telemetry.
- * `kind` is cross-process- and cross-language-safe: a handled error raised in
- * the Go worker can proxy across the boundary as the same `kind`, and the
- * frontend renders a tailored experience by matching on it (never by parsing a
- * message string). Unhandled infrastructure errors stay opaque — surfaced as a
- * generic message and logged — via `HandledError.isUnhandled` / `toUserMessage`.
- *
- * Content rule: `message` and `meta` may hold ONLY what a user, an AI agent, or
- * the UI can act on — something to fix the problem or render a better
- * experience (here: the `conversationId` the caller already holds). Never put
- * internal or private detail, query internals, or over-engineered payloads on a
- * domain error — that belongs in server logs, not on the wire.
- *
- * `tips` mirror the client-side explainer copy
- * (`features/langy/logic/langyErrorExplainer.ts`) so API/CLI/MCP consumers get
- * the same remediation the UI renders.
  */
 
 /**
- * Langy is not rolled out to this account (HTTP 404). `release_langy_enabled`
- * (langyAccessGate) is the only lever — there is no staff bypass. A denied
- * caller gets NOT_FOUND, never FORBIDDEN, so the gate cannot double as a probe
- * for whether Langy exists for the account.
- *
- * It is a typed handled error (kind `langy_not_enabled`), NOT a bare tRPC
- * NOT_FOUND: a bare code carries no kind, so the panel could only fall back to a
- * generic "conversations aren't loading, try again" — wrong for a rollout gate,
- * which no retry fixes. With a kind the client can render a real "not enabled"
- * state and tell a gate apart from a transient load failure.
+ * Langy is not rolled out to this account (HTTP 404). `release_langy_enabled` (langyAccessGate)
+ * is the only lever — there is no staff bypass. A denied caller gets NOT_FOUND, never
+ * FORBIDDEN, so the gate cannot double as a probe for whether Langy exists for the account.
  */
 export class LangyNotEnabledError extends HandledError {
   declare readonly code: "langy_not_enabled";
@@ -80,16 +55,9 @@ export class LangyConversationNotOwnedError extends HandledError {
 }
 
 /**
- * A caller opted into conversation-id ADOPTION (`adoptConversationId: true`)
- * with an id that cannot be adopted: it fails the shape gate, or it collides
- * with an archived conversation whose closed history must not be silently
- * resurrected (HTTP 409).
- *
- * Loud on purpose. Adoption exists for callers that key continuity on an
- * externally-chosen id (scenario runs bind `{{ threadId }}` once per run); the
- * pre-adoption behavior — silently minting a fresh id — degraded every
- * multi-turn run to single-turn with no signal anywhere (#7187). An adoption
- * that cannot happen must therefore fail the turn, never fall back.
+ * A caller opted into conversation-id ADOPTION (`adoptConversationId: true`) with an id that
+ * cannot be adopted: it fails the shape gate, or it collides with an archived conversation
+ * whose closed history must not be silently resurrected (HTTP 409). Loud on purpose.
  */
 export class LangyConversationIdUnadoptableError extends HandledError {
   declare readonly code: "langy_conversation_id_unadoptable";
@@ -127,11 +95,8 @@ export class LangyModelNotConfiguredError extends HandledError {
 }
 
 /**
- * A model Langy may not run for this project (HTTP 400): it is not on the
- * project's Langy allowlist. The allowlist is the ONLY runnable-set gate —
- * the engine itself is provider-blind, dispatching whatever model it is
- * given with its full provider-prefixed id and letting the AI gateway's
- * prefix routing pick the provider.
+ * A model Langy may not run for this project (HTTP 400): it is not on the project's Langy
+ * allowlist.
  */
 export class LangyModelNotAllowedError extends HandledError {
   declare readonly code: "langy_model_not_allowed";
@@ -174,10 +139,8 @@ export class LangyInsufficientScopeError extends HandledError {
 }
 
 /**
- * The same idempotency key arrived with different content (HTTP 409). A retry
- * must replay the SAME send byte-for-byte; a new send mints a new key. Turn
- * identity is a hash of who+key+content, so this is detected structurally —
- * the derived turn id no longer matches the admitted one.
+ * The same idempotency key arrived with different content (HTTP 409). A retry must replay the
+ * SAME send byte-for-byte; a new send mints a new key.
  */
 export class LangyIdempotencyMismatchError extends HandledError {
   declare readonly code: "langy_idempotency_mismatch";
@@ -211,11 +174,9 @@ export class LangyEmptyMessageError extends HandledError {
 }
 
 /**
- * The caller is sending faster than the per-user Langy limit allows (HTTP 429).
- *
- * `meta.message` carries the sentence deliberately: `serialize()` does not put a
+ * The caller is sending faster than the per-user Langy limit allows (HTTP 429). `meta.message`
+ * carries the sentence deliberately: `serialize()` does not put a
  * HandledError's `message` on the wire, so per ADR-045 `meta.message` is the one
- * channel that reaches a client with no bespoke explainer case for the code.
  */
 export class LangyRateLimitedError extends HandledError {
   declare readonly code: "langy_rate_limited";
@@ -243,17 +204,9 @@ export class LangyTurnInProgressError extends HandledError {
 }
 
 /**
- * The stop names a turn this conversation does not have in flight (HTTP 409).
- *
- * A stop is the one client-supplied turn id that gets to write a DURABLE
- * terminal, so it may not be taken on trust. The turn's own actor is proven by
- * the live-access grant and needs nothing further; anyone else stopping a turn
- * — a second tab, a rejoin after a refresh — has to name the turn the record
- * actually has in flight, or the conversation's owner could terminate (and
- * fabricate an assistant message on) an arbitrary turn id.
- *
- * Distinct from a stop that merely arrived late: that turn IS the one in
- * flight until its terminal lands, and the terminal slot collapses the loser.
+ * The stop names a turn this conversation does not have in flight (HTTP 409). A stop is the one
+ * client-supplied turn id that gets to write a DURABLE terminal, so it may not be taken on
+ * trust.
  */
 export class LangyTurnNotStoppableError extends HandledError {
   declare readonly code: "langy_turn_not_stoppable";
@@ -300,16 +253,11 @@ export class LangyAgentUnavailableError extends HandledError {
   }
 }
 
-// ── the key-authed public turn surface (`/api/langy`) ─────────────────────
-//
-// Transport refusals, not domain rules: they say why a REQUEST could not be
-// admitted, before any conversation exists to have a rule about. They live
-// here rather than in the route so the route throws and never serialises —
+// ── the key-authed public turn surface (`/api/langy`) ───────────────────── Transport
+// refusals, not domain rules: they say why a REQUEST could not be admitted, before any
+// conversation exists to have a rule about. They live here rather than in the route so the
+// route throws and never serialises —
 // `createServiceApp`'s canonical envelope owns the wire shape (ADR-045).
-//
-// The flag-off refusal is deliberately absent from this list. A dark surface
-// answers the platform's generic `not_found`, because a Langy-specific code
-// would tell an unauthorised caller the surface exists.
 
 /** No credential presented at all. */
 export class LangyApiCredentialMissingError extends HandledError {
@@ -336,12 +284,9 @@ export class LangyApiCredentialInvalidError extends HandledError {
 }
 
 /**
- * The key authenticates but cannot be bridged to a user to act as.
- *
- * One class, three codes: the caller branches on the code, and the three cases
- * need genuinely different remediation (mint a personal key / ask an admin for
- * Langy access / the owner is gone). Splitting them into three classes would
- * duplicate the body for no caller-visible gain.
+ * The key authenticates but cannot be bridged to a user to act as. One class, three codes: the
+ * caller branches on the code, and the three cases need genuinely different remediation (mint a
+ * personal key / ask an admin for Langy access / the owner is gone).
  */
 export class LangyApiIdentityDeniedError extends HandledError {
   declare readonly code:
@@ -374,14 +319,9 @@ export class LangyApiRequestInvalidError extends HandledError {
 }
 
 /**
- * UI-action channel errors (specs/langy/langy-ui-actions.feature).
- *
- * Every refusal on the dispatch path is a handled error with a stable code,
- * because the primary reader is the AGENT: the CLI prints the envelope to
- * stderr and the model adapts its next step to the `code`. Only
- * `langy_ui_timeout` and `langy_ui_handler_failed` also reach a human (as a
- * toast on the page that tried to execute), so only those two carry
- * presentation copy beyond the registry defaults.
+ * UI-action channel errors (specs/langy/langy-ui-actions.feature). Every refusal on the
+ * dispatch path is a handled error with a stable code, because the primary reader is the AGENT:
+ * the CLI prints the envelope to stderr and the model adapts its next step to the `code`.
  */
 
 /** The conversation has no turn in flight, so no page is listening (HTTP 409). */
@@ -501,14 +441,6 @@ const UNTYPED_HANDLER_FAILURE = "langy_ui_handler_failed";
 
 /**
  * The action ran on the page or on the backend and failed there (HTTP 502).
- *
- * The fault follows `errorCode`: a code names the handler's own typed refusal
- * (a transform's `target_not_found`, an experiment with no saved state), which
- * the agent asked for and can act on, so the caller is at fault. No code, or
- * the generic one the browser sends for a throw that named none, is a failure
- * we cannot explain, so it stays a platform fault and keeps alerting. The
- * status stays 502 either way: the page is the upstream that did not carry the
- * action out, and `fault` is the axis log level and alerts read.
  */
 export class LangyUiHandlerFailedError extends HandledError {
   declare readonly code: "langy_ui_handler_failed";

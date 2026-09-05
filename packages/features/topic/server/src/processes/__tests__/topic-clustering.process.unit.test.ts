@@ -13,15 +13,10 @@ const PROJECT_ID = "project-1";
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
- * The EXACT definition the runtime mounts — built through the pipeline's own
- * `TopicClusteringProcess.processManager` applier and the runtime's `buildProcessDefinition`, so
- * these tests cover the generated evolve (clamping, intent-key prefixing,
- * undeclared-event guard) rather than a re-implementation. The executor is
- * a stub: evolve never dispatches.
+ * The EXACT definition the runtime mounts, so these tests cover the generated evolve rather
+ * than a re-implementation.
  */
-// buildProcessDefinition is untyped over State (the runtime treats every
-// process as unknown); the cast narrows the whole harness once so each
-// evolution's state reads as the domain type.
+// buildProcessDefinition is untyped over State; the cast narrows the whole harness once.
 const definition = buildProcessDefinition(
   buildProcessManager<TopicClusteringProcessingEvent>({
     name: TOPIC_CLUSTERING_PROCESS_NAME,

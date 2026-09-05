@@ -9,10 +9,8 @@ import {
 import type { LicenseCryptographyPort } from "../ports/license-cryptography.port";
 
 /**
- * Generates a signed, encoded license key.
- *
- * Pure business logic — no HTTP, no Prisma, no env var access.
- * Private key and all parameters passed explicitly.
+ * Generates a signed, encoded license key. Pure business logic — no HTTP, no Prisma, no env var
+ * access. Private key and all parameters passed explicitly.
  */
 export class LicenseGenerationService extends LicenseGenerationCapability {
   private constructor(private readonly cryptography: LicenseCryptographyPort) {

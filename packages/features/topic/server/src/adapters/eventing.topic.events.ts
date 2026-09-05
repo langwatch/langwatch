@@ -1,11 +1,7 @@
 /**
- * Full durable event schemas for the `topic_clustering` aggregate: the
- * server's event envelope (`EventSchema` — TenantId, AggregateType, ids,
- * timestamps) closed over each event's `type`/`version` literal and its
- * PAYLOAD schema.
- *
- * The payload schemas live in `@langwatch/topic-contract`; this module is
- * the server-only half, where the eventing dependency belongs.
+ * Full durable event schemas for the `topic_clustering` aggregate: the server's event envelope
+ * (`EventSchema` — TenantId, AggregateType, ids, timestamps) closed over each event's
+ * `type`/`version` literal and its PAYLOAD schema.
  */
 
 import { EventSchema } from "@langwatch/eventing";

@@ -17,6 +17,12 @@ function codeOfStudioError(error: unknown): string | undefined {
 interface StudioIsolatedErrorBoundaryProps {
   /** Human-readable error label shown when the crash carries no code. */
   scope?: string;
+  /**
+   * Whether the raw crash message is shown under the heading. This package
+   * cannot read the build, so the composing application says; production
+   * otherwise, which is what a customer must never see internals through.
+   */
+  isDevelopment?: boolean;
   resetKeys?: ReadonlyArray<unknown>;
   onError?: (error: Error, info: { componentStack?: string | null }) => void;
   children: React.ReactNode;
@@ -28,12 +34,15 @@ interface StudioIsolatedErrorBoundaryProps {
  */
 export const StudioIsolatedErrorBoundary: React.FC<StudioIsolatedErrorBoundaryProps> = ({
   scope,
+  isDevelopment = false,
   resetKeys,
   onError,
   children,
 }) => (
   <ErrorBoundary
-    FallbackComponent={(props) => <InlineError {...props} scope={scope} />}
+    FallbackComponent={(props) => (
+      <InlineError {...props} scope={scope} isDevelopment={isDevelopment} />
+    )}
     resetKeys={resetKeys ? [...resetKeys] : undefined}
     onError={(error, info) => {
       // eslint-disable-next-line no-console
@@ -45,12 +54,12 @@ export const StudioIsolatedErrorBoundary: React.FC<StudioIsolatedErrorBoundaryPr
   </ErrorBoundary>
 );
 
-const InlineError: React.FC<FallbackProps & { scope?: string }> = ({
+const InlineError: React.FC<FallbackProps & { scope?: string; isDevelopment: boolean }> = ({
   error,
   resetErrorBoundary,
   scope,
+  isDevelopment,
 }) => {
-  const isDev = process.env.NODE_ENV === "development";
   const rawMessage = error instanceof Error ? error.message : String(error);
   const isRegistered = codeOfStudioError(error) !== undefined;
   const heading = isRegistered ? "Something went wrong" : (scope ?? "Something went wrong");
@@ -79,7 +88,7 @@ const InlineError: React.FC<FallbackProps & { scope?: string }> = ({
         <Text textStyle="2xs" color="fg.muted">
           We've been notified. Try again in a moment.
         </Text>
-        {isDev && (
+        {isDevelopment && (
           <Text
             textStyle="2xs"
             color="fg.muted"

@@ -1,23 +1,6 @@
 /**
- * The licensing feature's application: what both of its doors call.
- *
- * It holds every service and port the feature's api files reach, and it is the
- * one typed thing a transport is given. Before it, `license.*` and
- * `licenseEnforcement.*` each declared a private bag of process ports and took
- * it as an argument of its own — two descriptions of one deployment's
- * licensing capabilities, agreeing by attention rather than by construction,
- * and neither reachable from the other. A limit check and the license that
- * sets the limit are the same subject; they had no way to say so.
- *
- * What lives here as a method is what a door would otherwise decide for
- * itself: why a deployment configured for single sign-on is not using it,
- * whether an uploaded key is acceptable, what a minted key contains, and what
- * "every limit" means. The doors keep their own wording for a refusal, because
- * an error's copy and its status belong to the transport that answers.
- *
- * A caller arrives as an argument, never read from a session or a request.
- * That is what lets one operation serve a browser session, an API key and a
- * background job without knowing which it is serving.
+ * The licensing feature's application: what both of its doors call. It holds every service and
+ * port the feature's api files reach, and it is the one typed thing a transport is given.
  */
 import {
   buildMintedPlan,
@@ -106,12 +89,6 @@ export class LicensingApp {
 
   /**
    * Why a deployment configured for single sign-on is not using it.
-   *
-   * Here rather than in the door because the shape of the answer IS the rule:
-   * a deployment that never asked for federation is neither unlicensed nor
-   * unmounted, and reporting it as `licensed: true, mounted: true` is what
-   * stops a settings page telling an operator to fix something that is not
-   * broken. A second door asking the same question must get the same answer.
    */
   async getSsoGateStatus(): Promise<SsoGateStatus> {
     const configuredProvider = this.dependencies.configuredAuthProvider();
@@ -128,11 +105,6 @@ export class LicensingApp {
 
   /**
    * Validates a pasted key and stores it, answering the plan it grants.
-   *
-   * The refusal is here rather than in the door because the service reports
-   * its verdict as a `LICENSE_ERRORS` literal — a server discriminant, not
-   * copy — and turning that into the code the presentation registry writes
-   * against is a decision about the domain, not about the transport.
    */
   async uploadLicense(input: Readonly<{ organizationId: string; licenseKey: string }>) {
     const result = await this.dependencies.licenses().validateAndStoreLicense({
@@ -151,16 +123,9 @@ export class LicensingApp {
   }
 
   /**
-   * Mints and signs a key from a private key the operator pasted in.
-   *
-   * Everything a key contains is decided here: which template the plan type
-   * resolves to, what the minted plan carries, and when the key was issued. A
-   * door that assembled it would be a second definition of what a LangWatch
-   * license IS.
-   *
-   * A signing failure is reported and rethrown rather than translated, because
-   * the copy an operator reads for a bad private key belongs to the door that
-   * answers them.
+   * Mints and signs a key from a private key the operator pasted in. Everything a key contains
+   * is decided here: which template the plan type resolves to, what the minted plan carries,
+   * and when the key was issued.
    */
   mintLicenseKey(input: MintLicenseInput): string {
     const template = getPlanTemplate(input.planType);
@@ -203,11 +168,9 @@ export class LicensingApp {
   }
 
   /**
-   * Every enforced limit at once, keyed by limit type.
-   *
-   * Which limits "every limit" means is the plan's business, not a door's: a
-   * screen that enumerated them itself would go stale the day a limit is
-   * added, and silently show one fewer.
+   * Every enforced limit at once, keyed by limit type. Which limits "every limit" means is the
+   * plan's business, not a door's: a screen that enumerated them itself would go stale the day
+   * a limit is added, and silently show one fewer.
    */
   async checkAllLimits(
     input: Readonly<{ organizationId: string; user: LicensingCaller }>,

@@ -1,12 +1,5 @@
 /**
  * The saved-views tRPC surface's actual CRUD, against a real Postgres row.
- *
- * Lifted from
- * `platform/app/src/server/api/routers/__tests__/savedViews.integration.test.ts`
- * (deleted with `platform/app`); the lifecycle lives in
- * `SavedViewService` + `SavedViewRepository` in this package now, so this
- * suite drives the service directly rather than a mounted tRPC router.
- *
  * @see specs/traces/saved-views.feature
  */
 import {

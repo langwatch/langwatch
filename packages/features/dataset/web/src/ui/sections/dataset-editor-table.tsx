@@ -1,22 +1,6 @@
 /**
- * The spreadsheet editor for one saved dataset: inline cell editing, type
- * validation, virtualized rows, a trailing phantom row, autosave and paging.
- *
- * A NARROWED family-local copy of
- * `platform/app/src/components/datasets/editor/DatasetEditorTable`, which the
- * workflow dataset node, the prompt demonstrations modal, the upload drawer and
- * the add-record drawer still render. Deletes-only forbids repointing those, so
- * the platform copy stays for them and this one travels with the dataset detail
- * screen.
- *
- * WHAT DID NOT TRAVEL, because the detail screen never passes it: the in-memory
- * mode (`inMemoryDataset` / `onUpdateDataset`), the imperative
- * `controllerRef` the AI-generation stream writes through, and the embedded
- * layout flags (`isEmbedded`, `hideButtons`, `bottomSpace`, `editorPortalRef`,
- * `canEditDatasetRecord`, `title`). A page renders one saved dataset, full
- * width, with every action. Half this component was the other callers' modes,
- * and carrying them into a package that serves one page would be carrying
- * dead code with a maintenance cost.
+ * The spreadsheet editor for one saved dataset: inline cell editing, type validation,
+ * virtualized rows, a trailing phantom row, autosave and paging.
  */
 
 import {
@@ -173,13 +157,10 @@ export function DatasetEditorTable({
     host.failed({ error: databaseDatasetError, fallbackTitle: "Couldn't load dataset" });
   }, [databaseDatasetError, host]);
 
-  // The PG-authoritative total record count from the last settled read (undefined
-  // until the first response; held across a page switch by the placeholder so it
-  // never momentarily resets mid-navigation). Deriving the page count from
-  // `count / pageSize` — rather than reading the server's `totalPages` — keeps it
-  // correct the instant the reader changes the rows-per-page. `pageCount` floors
-  // at 1 so an EMPTY dataset still reads as a single page and never asks for page
-  // 0 (which the server's `positive()` guard would reject).
+  // The PG-authoritative total record count from the last settled read (undefined until the
+  // first response; held across a page switch by the placeholder so it never momentarily resets
+  // mid-navigation). Deriving the page count from `count / pageSize` — rather than reading the
+  // server's `totalPages` — keeps it correct the instant the reader changes the rows-per-page.
   const serverRecordCount = databaseDataset.data?.count;
   const pageCount = Math.max(1, Math.ceil((serverRecordCount ?? 0) / pageSize));
   const currentPage = Math.min(page, pageCount);

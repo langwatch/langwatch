@@ -1,10 +1,7 @@
 /**
- * Which providers the onboarding step offers, in the order it offers them.
- *
- * Codex leads with a "Recommended" badge because a reader who already pays for
- * ChatGPT gets a working model without pasting a key; everything else keeps
- * registry order. Deprecated providers accept no new rows, so offering one
- * would be a card that leads to a refusal.
+ * Which providers the onboarding step offers, in the order it offers them. Codex leads with a
+ * "Recommended" badge because a reader who already pays for ChatGPT gets a working model
+ * without pasting a key; everything else keeps registry order.
  */
 
 import { modelProviders, providerDeprecation } from "@langwatch/model-provider-contract";

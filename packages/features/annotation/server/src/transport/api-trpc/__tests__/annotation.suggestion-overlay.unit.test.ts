@@ -1,10 +1,5 @@
 /**
  * @vitest-environment node
- *
- * The `create`/`updateByTraceId` procedures' suggestion-to-correction carry
- * (specs/traces-v2/trace-edit-overlay.feature): a suggested output changes
- * the trace's own correction before the comment is saved, and only when the
- * suggestion actually changed and the caller may update annotations.
  */
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";

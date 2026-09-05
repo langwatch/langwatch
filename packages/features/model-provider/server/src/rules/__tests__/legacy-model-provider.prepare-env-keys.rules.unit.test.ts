@@ -20,12 +20,13 @@ describe("prepareEnvKeys", () => {
   describe("given a provider whose credentials allow either a key or a base URL", () => {
     it("returns the anthropic credentials stored on the row", () => {
       expect(
-        prepareEnvKeys(
-          providerRow("anthropic", {
+        prepareEnvKeys({
+          modelProvider: providerRow("anthropic", {
             ANTHROPIC_API_KEY: "sk-ant-row",
             ANTHROPIC_BASE_URL: "http://vllm:8000",
           }),
-        ),
+          environment: {},
+        }),
       ).toEqual({
         ANTHROPIC_API_KEY: "sk-ant-row",
         ANTHROPIC_BASE_URL: "http://vllm:8000",
@@ -33,7 +34,12 @@ describe("prepareEnvKeys", () => {
     });
 
     it("returns the openai credentials stored on the row", () => {
-      expect(prepareEnvKeys(providerRow("openai", { OPENAI_API_KEY: "sk-openai-row" }))).toEqual({
+      expect(
+        prepareEnvKeys({
+          modelProvider: providerRow("openai", { OPENAI_API_KEY: "sk-openai-row" }),
+          environment: {},
+        }),
+      ).toEqual({
         OPENAI_API_KEY: "sk-openai-row",
       });
     });
@@ -41,7 +47,12 @@ describe("prepareEnvKeys", () => {
 
   describe("given a provider with a plain credentials object", () => {
     it("returns the credentials stored on the row", () => {
-      expect(prepareEnvKeys(providerRow("groq", { GROQ_API_KEY: "gsk-row" }))).toEqual({
+      expect(
+        prepareEnvKeys({
+          modelProvider: providerRow("groq", { GROQ_API_KEY: "gsk-row" }),
+          environment: {},
+        }),
+      ).toEqual({
         GROQ_API_KEY: "gsk-row",
       });
     });
@@ -49,7 +60,9 @@ describe("prepareEnvKeys", () => {
 
   describe("given an unknown provider", () => {
     it("returns no keys", () => {
-      expect(prepareEnvKeys(providerRow("not-a-provider", {}))).toEqual({});
+      expect(
+        prepareEnvKeys({ modelProvider: providerRow("not-a-provider", {}), environment: {} }),
+      ).toEqual({});
     });
   });
 });

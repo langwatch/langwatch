@@ -1,42 +1,5 @@
 /**
  * Refuses a statement that is not scoped to exactly one tenant.
- *
- * In this schema no identifier other than `TenantId` is unique across tenants -
- * a TraceId, a RunId or a SpanId can collide between customers - so a read that
- * omits the tenant predicate does not merely return too much, it returns
- * somebody else's rows. The failure is silent: the query succeeds, the shape is
- * right, and nothing looks wrong until a customer reports seeing data that is
- * not theirs.
- *
- * This is a guard against omission, not a security boundary. It matches on the
- * statement text, so the thing it has to stop is a normal engineer writing a
- * normal query and forgetting a WHERE clause. Real isolation is enforced by the
- * routing in ./tenancy.ts and by the credentials the server was given.
- *
- * A disjunction is refused rather than merely noted. `WHERE TenantId = {t} OR
- * Status = 'x'` contains the predicate and still returns every tenant's rows,
- * and it is not an exotic statement - it is what operator precedence produces
- * when somebody writes `WHERE TenantId = {t} AND A OR B` meaning `AND (A OR
- * B)`. Any `OR` at or above the predicate's parenthesis depth can weaken it, so
- * that is the rule: an `OR` nested deeper is inside a group and harmless, one
- * at the same depth or shallower is refused. Putting brackets round the
- * disjunction both satisfies the guard and fixes the query.
- *
- * Known and accepted limits, each pinned by a test in ./tenantGuard.test.ts so
- * they stay documented rather than becoming folklore. One match anywhere in the
- * statement satisfies the whole statement, so these still pass:
- *
- *   - a UNION whose second arm is unscoped.
- *   - a JOIN where only one side is scoped.
- *   - a scoped subquery or CTE beneath an unscoped outer query.
- *
- * Closing these needs a parser. If that day comes, the shape of this function
- * does not have to change - only `checkTenantScope`'s internals.
- *
- * The predicate must bind a parameter rather than inline a literal. An inlined
- * tenant is a string built by concatenation somewhere, which is the shape that
- * eventually becomes an injection, and it cannot be checked against the tenant
- * the caller claims to be acting for.
  */
 
 import { quietly } from "./observability";
@@ -61,28 +24,8 @@ const BOUND_TENANT_PREDICATE = /(?:^|[\s.(])TenantId\s*=\s*\{\s*([A-Za-z_][A-Za-
 const LITERAL_TENANT_PREDICATE = /(?:^|[\s.(])TenantId\s*=\s*(?:'[^']*'|"[^"]*")/i;
 
 /**
- * Returns the reason a statement is not tenant-scoped, or null when it is.
- *
- * Pure, so the rule can be exercised over a table of statements without a
- * driver, a server, or a pipeline.
- */
-/**
- * Blanks out comment bodies and string-literal bodies, keeping every other
- * character at its original index.
- *
- * Comments have to go before matching or the guard misses the case it most
- * exists for: someone debugging comments the WHERE clause out, and the
- * statement then reads every tenant's rows while still visibly "containing" the
- * predicate. String bodies go too, so that a literal containing `OR`, `--` or
- * `/*` cannot steer any of the checks below.
- *
- * Written as one pass rather than a pair of replaces because the obvious
- * `/\/\*[\s\S]*?\*\//` backtracks: against a long run of unterminated `/*` each
- * start position rescans to the end of the input, which is quadratic in the
- * length of the statement and reachable from any caller that builds SQL from
- * input it did not write. Here every character is visited once.
- *
- * Length is preserved so the returned indices still address the original text.
+ * Blanks out comment bodies and string-literal bodies, keeping every other character at its
+ * original index.
  */
 function maskNonCode(sql: string): string {
   const out = [...sql];
@@ -148,15 +91,9 @@ const isWordCharacter = (character: string | undefined): boolean =>
   character !== undefined && /[A-Za-z0-9_]/.test(character);
 
 /**
- * Reports an `OR` that can disjoin the tenant predicate away.
- *
- * Depth is the test. An `OR` nested inside a bracketed group cannot weaken a
- * predicate outside it, so only one at the predicate's own depth or shallower
- * counts. That accepts `TenantId = {t} AND (a OR b)` and refuses both
- * `TenantId = {t} OR a` and `(TenantId = {t}) OR a`.
- *
- * One pass, so this cannot become the quadratic thing `maskNonCode` just
- * stopped being.
+ * Reports an `OR` that can disjoin the tenant predicate away. Depth is the test. An `OR` nested
+ * inside a bracketed group cannot weaken a predicate outside it, so only one at the predicate's
+ * own depth or shallower counts.
  */
 function hasWeakeningDisjunction({
   masked,
@@ -234,15 +171,9 @@ export function checkTenantScope({
 }
 
 /**
- * The tenant predicate forms the repositories genuinely write.
- *
- * Wider than {@link BOUND_TENANT_PREDICATE} on purpose: that one backs the
- * `QueryRequest` path, where the bound value is also checked against the
- * caller's tenant and so has to name exactly one parameter. This one runs at
- * the vendor-client seam, where there is no claimed tenant to compare against
- * and a statement may legitimately scope to a list of projects
- * (`TenantId IN {ids:Array(String)}`) or, on the stored-object tables, to the
- * column's other name.
+ * The tenant predicate forms the repositories genuinely write. Wider than {@link
+ * BOUND_TENANT_PREDICATE} on purpose: that one backs the `QueryRequest` path, where the bound
+ * value is also checked against the caller's tenant and so has to name exactly one parameter.
  */
 const SCOPED_PREDICATE =
   /(?:^|[\s.(])(?:TenantId|tenant_id|project_id|ProjectId)\s*(?:=|IN)\s*\(?\s*\{\s*[A-Za-z_][A-Za-z0-9_]*\s*:/i;
@@ -251,16 +182,8 @@ const LITERAL_PREDICATE =
   /(?:^|[\s.(])(?:TenantId|tenant_id|project_id|ProjectId)\s*=\s*(?:'[^']*'|"[^"]*")/i;
 
 /**
- * Returns the reason a statement names no tenant, or null when it names one.
- *
- * Text only: no parameters, no claimed tenant. It exists for the seam the
- * repositories actually call - the wrapped vendor client, which is handed a
- * built SQL string and a bag of parameters and has no idea whose request it is
- * serving. The disjunction rule is deliberately not applied here. A statement
- * whose only predicate sits inside a subquery, with an `OR` in the outer
- * query, is a false positive at this seam, and refusing a working production
- * read is worse than missing a weakening `OR` that {@link checkTenantScope}
- * still catches wherever a tenant is claimed.
+ * Returns the reason a statement names no tenant, or null when it names one. Text only: no
+ * parameters, no claimed tenant.
  */
 export function checkStatementTenantScope({ sql }: { sql: string }): TenantScopeViolation | null {
   const statement = maskNonCode(sql);
@@ -311,11 +234,9 @@ export interface TenantGuardOptions {
 }
 
 /**
- * Refuses a statement that cannot name its tenant.
- *
- * Placed outermost by {@link ClickHouseQueryClient}: refusing costs nothing,
- * and it should happen before a rate-limit slot or a retry budget is spent on a
- * statement that must not run.
+ * Refuses a statement that cannot name its tenant. Placed outermost by {@link
+ * ClickHouseQueryClient}: refusing costs nothing, and it should happen before a rate-limit slot
+ * or a retry budget is spent on a statement that must not run.
  */
 export class TenantGuard {
   private readonly onUnscoped: ((request: QueryRequest) => void) | undefined;
@@ -325,19 +246,16 @@ export class TenantGuard {
   }
 
   /**
-   * Throws {@link TenantScopeError} unless the statement is tenant-scoped or
-   * declares a written reason for not being.
-   *
-   * Returns nothing on success rather than the request: it is a check, and a
-   * caller that had to remember to use a returned value could forget to.
+   * Throws {@link TenantScopeError} unless the statement is tenant-scoped or declares a written
+   * reason for not being. Returns nothing on success rather than the request: it is a check,
+   * and a caller that had to remember to use a returned value could forget to.
    */
   assert(request: QueryRequest): void {
     if (request.unscoped !== undefined) {
-      // Guarded because `onUnscoped` is host code - an audit log, a counter -
-      // and this branch is the one where the guard has already decided to
-      // allow. An exception from it would propagate out of `assert` and refuse
-      // a statement the guard just approved, which is a reporting hook
-      // deciding policy. Observability must not change what it observes; see
+      // Guarded because `onUnscoped` is host code - an audit log, a counter - and this branch
+      // is the one where the guard has already decided to allow. An exception from it would
+      // propagate out of `assert` and refuse a statement the guard just approved, which is a
+      // reporting hook deciding policy. Observability must not change what it observes; see
       // ./observability.ts.
       quietly(() => this.onUnscoped?.(request));
       return;

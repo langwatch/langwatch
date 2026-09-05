@@ -1,12 +1,5 @@
 /**
  * The gate that makes `/api/user-avatar` safe to read broadly.
- *
- * The route authorizes ANY authenticated caller on the platform, so the only
- * thing standing between it and one tenant pulling another's trace media is its
- * refusal of every object whose purpose AND owner kind are not the avatar ones.
- * Both halves are driven here, and the refusal is asserted on its CODE rather
- * than on the sentence, because the sentence is copy.
- *
  * Spec: specs/settings/user-avatar-upload.feature
  */
 import { createAppRestSecurity } from "@langwatch/api/rest";
@@ -115,11 +108,9 @@ function available(
 }
 
 /**
- * The family over a session-authenticated caller.
- *
- * The dual-auth verifier is the process's, and the handler keys its rate limit
- * on what that verifier leaves behind — so a pass-through setting nothing would
- * fail before any refusal was reached.
+ * The family over a session-authenticated caller. The dual-auth verifier is the process's, and
+ * the handler keys its rate limit on what that verifier leaves behind — so a pass-through
+ * setting nothing would fail before any refusal was reached.
  */
 function mountAvatars(read: UserAvatarStoredObjectRead) {
   const objects: UserAvatarObjectReader = { getById: async () => read };

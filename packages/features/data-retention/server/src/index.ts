@@ -8,14 +8,9 @@ export {
   type RetentionScopeTarget,
 } from "./transport/api-trpc/data-retention.api";
 /**
- * The retention POLICY, moved here whole from the platform application.
- *
- * The transport already declared it as a host port, and the port's own
- * docblock said why: every decision resolves organization/team/project lineage
- * and an active plan rather than retention state. That reasoning names the
- * three ports below rather than a home outside the feature — with them
- * declared, the rules themselves are retention's, and a process supplies only
- * its directory, its permission answers and its plan reading.
+ * The retention POLICY, moved here whole from the platform application. The transport already
+ * declared it as a host port, and the port's own docblock said why: every decision resolves
+ * organization/team/project lineage and an active plan rather than retention state.
  */
 export {
   DataRetentionDirectoryPort,

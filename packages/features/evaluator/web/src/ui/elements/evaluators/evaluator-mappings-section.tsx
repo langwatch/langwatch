@@ -7,6 +7,7 @@ import {
   VariablesSection,
 } from "@langwatch/prompt-web/surfaces/variables";
 import { validateEvaluatorMappingsWithFields } from "@langwatch/experiment-web/experiments-v3/utils/mappingValidation";
+import { useUiDeployment } from "@langwatch/ui-host/capabilities";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { useProjectSpanNames } from "@langwatch/trace-web/hooks/useProjectSpanNames";
 import { getThreadAvailableSources, getTraceAvailableSources } from "@langwatch/trace-contract";
@@ -152,6 +153,8 @@ export function EvaluatorMappingsSection({
     return undefined;
   }, [scrollToMissingOnMount, missingMappingIds]);
 
+  const { isDevelopment } = useUiDeployment();
+
   // Handler that updates local state AND persists to store
   const handleMappingChange = useCallback(
     (identifier: string, mapping: UIFieldMapping | undefined) => {
@@ -171,14 +174,14 @@ export function EvaluatorMappingsSection({
       // rather than silently dropping the user's mapping edit.
       if (onMappingChange) {
         onMappingChange(identifier, mapping);
-      } else if (process.env.NODE_ENV !== "production") {
+      } else if (isDevelopment) {
         logger.warn(
           { identifier },
           "Mapping change dropped: no onMappingChange callback registered. Callers must set `flowCallbacks.onMappingChange` before opening the evaluator editor drawer (see issue #3087).",
         );
       }
     },
-    [onMappingChange],
+    [onMappingChange, isDevelopment],
   );
 
   // Build variables from evaluator definition's required/optional fields

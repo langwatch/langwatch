@@ -87,11 +87,7 @@ export interface PromptTag {
 export type PromptFieldList = Array<{ identifier: string; type: string }>;
 
 /**
- * A single versioned prompt payload. `GET /api/v1/prompts/:id` returns the
- * requested version's data flattened to the top level (merged with the base
- * prompt data), and `GET /api/v1/prompts/:id/versions` returns an array of
- * entries in this same shape — there is no nested `versions` array on the
- * detail response.
+ * A single versioned prompt payload.
  */
 export interface PromptVersion {
   versionId?: string;
@@ -131,10 +127,9 @@ export class LangWatchApiError extends Error {
   readonly docsUrl?: string;
   readonly fault?: HandledErrorFault;
   /**
-   * The per-field failures behind this error, verbatim from the envelope.
-   * A validation failure carries the offending field and the values it would
-   * have accepted here — the difference between an agent correcting its own
-   * request and an agent guessing again.
+   * The per-field failures behind this error, verbatim from the envelope. A validation failure
+   * carries the offending field and the values it would have accepted here — the difference
+   * between an agent correcting its own request and an agent guessing again.
    */
   readonly reasons?: SerializedReason[];
 
@@ -173,12 +168,7 @@ interface ParsedErrorBody {
 const VALID_FAULTS: readonly HandledErrorFault[] = ["customer", "platform", "provider"];
 
 /**
- * Parses an error response body as a handled-error envelope. Accepts three
- * shapes: the canonical v1 envelope
- * (`{ error: { type, code, message, meta?, trace_id } }`), the clean framework
- * shape (`{ code, message?, tips?, docsUrl?, fault?, ... }`) and the legacy
- * non-framework one (`{ error: "<code>", message }`). Returns an empty object
- * when the body is not a recognizable error envelope.
+ * Parses an error response body as a handled-error envelope.
  */
 function parseErrorBody(responseBody: string): ParsedErrorBody {
   try {
@@ -229,13 +219,9 @@ function parseErrorBody(responseBody: string): ParsedErrorBody {
 }
 
 /**
- * The human line for one per-field failure: the field, what it would have
- * accepted, and what it got. Returns null when a reason names no field, so a
- * generic nested error adds no noise to the message.
- *
- * This exists because the MCP transport's only channel to the caller is the
- * error MESSAGE — an agent never sees the `reasons` array itself, so a
- * rejection whose remedy lives only there is unfollowable.
+ * The human line for one per-field failure: the field, what it would have accepted, and what it
+ * got. Returns null when a reason names no field, so a generic nested error adds no noise to
+ * the message.
  */
 function describeReason(reason: SerializedReason): string | null {
   const meta = reason.meta;
@@ -255,13 +241,9 @@ function describeReason(reason: SerializedReason): string | null {
 }
 
 /**
- * Sends an HTTP request to the LangWatch API.
- *
- * Builds the full URL from the configured endpoint, adds authentication,
- * and handles JSON serialization/deserialization.
- *
- * @throws LangWatchApiError with status code and response body when the
- * response is not OK.
+ * Sends an HTTP request to the LangWatch API. Builds the full URL from the configured endpoint,
+ * adds authentication, and handles JSON serialization/deserialization. @throws
+ * LangWatchApiError with status code and response body when the response is not OK.
  */
 export async function makeRequest(
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
@@ -319,12 +301,8 @@ export async function makeRequest(
 }
 
 /**
- * Searches traces with optional filters and pagination.
- *
- * Paging is by `scrollId` only: pass the one the previous response returned,
- * and stop when a response carries none. `pageOffset` used to be accepted here
- * but was never read by the server, so an offset walk silently re-served the
- * first page; it is rejected at the boundary now (#6808).
+ * Searches traces with optional filters and pagination. Paging is by `scrollId` only: pass the
+ * one the previous response returned, and stop when a response carries none.
  */
 export async function searchTraces(params: {
   query?: string;

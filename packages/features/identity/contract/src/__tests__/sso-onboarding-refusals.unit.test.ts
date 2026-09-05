@@ -1,14 +1,6 @@
 /**
- * Every refusal the single sign-on onboarding surfaces can produce, and what
- * a customer actually reads when one arrives.
- *
- * Corresponds to specs/identity/sso-onboarding-tiers.feature.
- *
- * Since #5984 the tRPC wire message for a handled error IS its code, so a
- * surface that renders `error.message` shows the reader `sso_saml_not_self_serve`.
- * The assertion here is not that a code exists — it is that the words
- * registered for the code are words, and that they are what a renderer
- * would reach.
+ * Every refusal the single sign-on onboarding surfaces can produce, and what a customer
+ * actually reads when one arrives. Corresponds to specs/identity/sso-onboarding-tiers.feature.
  */
 import { describe, expect, it } from "vitest";
 import {

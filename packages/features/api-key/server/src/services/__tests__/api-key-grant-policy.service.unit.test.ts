@@ -1,14 +1,7 @@
 /**
- * The ceiling on what a credential may be granted.
- *
- * This is the escalation boundary for API keys: whatever a key ends up holding
- * has to be something its creator already held, at that scope. Two halves make
- * that true, and both are pinned here — the permission each role actually
- * stands for, and the check that the granting user holds it.
- *
- * The scope checks below are the tenant boundary rather than a validation
- * nicety: a team or project from another organization must be refused, not
- * resolved.
+ * The ceiling on what a credential may be granted. This is the escalation boundary for API
+ * keys: whatever a key ends up holding has to be something its creator already held, at that
+ * scope.
  */
 
 import { describe, expect, it } from "vitest";

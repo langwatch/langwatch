@@ -4,14 +4,6 @@ import { MemberClassificationService } from "../member-classification.service";
 
 /**
  * Unit tests for member classification functions.
- *
- * These pure functions determine member types based on roles and permissions:
- * - isViewOnlyPermission: checks if a single permission is view-only
- * - isViewOnlyCustomRole: checks if all permissions in a role are view-only
- * - classifyMemberType: classifies as FullMember or LiteMember (Lite Member)
- * - isFullMember/isLiteMember: convenience predicates
- *
- * Note: The EXTERNAL enum value corresponds to "Lite Member" in user-facing terminology.
  */
 
 describe("isViewOnlyPermission", () => {

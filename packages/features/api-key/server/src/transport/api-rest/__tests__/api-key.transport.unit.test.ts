@@ -1,29 +1,5 @@
 /**
  * The `/api/api-keys` REST door.
- *
- * This family mints and revokes the credentials every other authenticated
- * request is checked against, so what it refuses matters more than what it
- * returns. Three rules live in the door itself and nowhere else, and each was
- * pinned by a suite that needed a real database to reach it:
- *
- *   - minting a key nobody owns, or one owned by somebody else, takes REAL
- *     organization adminness — not the `organization:manage` permission a
- *     custom role can carry;
- *   - the org-wide listing a credential acting as nobody receives is a wider
- *     disclosure than "my own keys", so it additionally requires
- *     `organization:manage`;
- *   - editing a key the caller does not own answers exactly as fetching one
- *     does: not found, never forbidden, because a 403 would confirm the id
- *     names a real key.
- *
- * Ported from `platform/app/src/app/api/api-keys/__tests__/`:
- * `api-keys-security.integration.test.ts`, `api-keys-management-rest-api.integration.test.ts`
- * and `pats-rest-api.integration.test.ts`. What those proved about the SERVICE
- * — that a binding cannot reach into somebody else's personal workspace, that
- * a key cannot be widened past its owner's ceiling — belongs to the API-key
- * service, so what is asserted here is that its refusal reaches the caller
- * with the right status and the right code.
- *
  * @see specs/api-keys/api-keys-management-rest-api.feature
  */
 import {
@@ -106,13 +82,9 @@ function apiKeyDetail(overrides: Partial<ApiKeyDetail> = {}): ApiKeyDetail {
 }
 
 /**
- * The enforcement and the audit sink the process owns.
- *
- * `granted` is what the route policy is checked against; `apiKeyPermissions`
- * is what `hasApiKeyPermission` answers, which the handler consults
- * separately. Keeping them apart is the point: the org-wide listing is
- * reachable under the route's `organization:view` and still refused when the
- * credential does not additionally hold `organization:manage`.
+ * The enforcement and the audit sink the process owns. `granted` is what the route policy is
+ * checked against; `apiKeyPermissions` is what `hasApiKeyPermission` answers, which the handler
+ * consults separately.
  */
 function spine(options: { granted?: readonly string[] } = {}) {
   const granted = new Set(options.granted ?? ["organization:view", "organization:manage"]);
@@ -552,11 +524,9 @@ describe("createApiKeysRestApp", () => {
 
   describe("given a service credential, which acts as nobody", () => {
     /**
-     * Ownerlessness, not `keyType`, is what makes a mint privileged: a
-     * credential acting as nobody asking for a "personal" key with no
-     * assignment produces the same unowned, org-wide-ADMIN key a service key
-     * would, so it takes the same adminness. Asking about `keyType` alone
-     * would wave it through.
+     * Ownerlessness, not `keyType`, is what makes a mint privileged: a credential acting as
+     * nobody asking for a "personal" key with no assignment produces the same unowned,
+     * org-wide-ADMIN key a service key would, so it takes the same adminness.
      */
     it("resolves its adminness from the credential rather than from a member", async () => {
       const create = vi.fn(async () => ({
@@ -721,10 +691,8 @@ describe("createApiKeysRestApp", () => {
     });
 
     /**
-     * Reading somebody else's key by id discloses what the org-wide listing
-     * discloses, one row at a time, so it takes the same pair: real adminness
-     * AND `organization:manage`. Holding one without the other is not enough,
-     * and the door has to say so before the service decides what to return.
+     * Reading somebody else's key by id discloses what the org-wide listing discloses, one row
+     * at a time, so it takes the same pair: real adminness AND `organization:manage`.
      */
     it("only widens the read past the caller's own keys when both halves are held", async () => {
       const readWith = async (options: { admin: boolean; manage: boolean }) => {

@@ -1,21 +1,5 @@
 /**
  * @vitest-environment node
- *
- * The `project.*` tRPC surface: the eight procedure names the clients call,
- * the named refusal each failure raises, the second permission probe
- * `archiveById` runs on the project it actually archives, the trace-share
- * revocation that follows turning sharing off, and the two best-effort side
- * effects (Langy's virtual key, the rotation audit) that must never fail the
- * call they hang off.
- *
- * Refusals are asserted by handled `code` and `httpStatus` rather than by tRPC
- * code, because that pair IS what the surface decides: the process's
- * handled-error middleware derives the tRPC code from the status, so pinning
- * the status pins the wire answer without restating the process's table here.
- *
- * The procedure handed in narrows its own context the way an authenticated
- * process procedure does, so this also pins that a process can hand over a
- * procedure it has already composed.
  */
 import { ApiKeyNotFoundError, type ApiKeyService } from "@langwatch/api-key-contract";
 import { HandledError } from "@langwatch/handled-error";
@@ -42,16 +26,8 @@ type TestContext = {
 };
 
 /**
- * The refusal the surface raised, read off the cause tRPC attached rather than
- * off the tRPC code: without the process's handled-error middleware in the
- * chain, every handled error arrives here as the cause of a generic wrapper.
- */
-/**
- * The refusal a process raises when it composed no clustering scheduler — the
- * API process is the deployment that does. Restated here rather than imported
- * because the composition root that raises it is a host of this package, not a
- * dependency of it; what this surface owes the caller is that a refusal shaped
- * like this one arrives intact.
+ * The refusal a process raises when it composed no clustering scheduler — the API process is
+ * the deployment that does.
  */
 class NoClusteringSchedulerError extends HandledError {
   declare readonly code: "service_unavailable";
@@ -149,13 +125,8 @@ function harness({
 describe("ProjectTrpcApi", () => {
   describe("given a process policy that reads the validated input", () => {
     /**
-     * tRPC appends the input parser as a middleware at the point `.input()`
-     * is called, so anything installed before it runs with `input ===
-     * undefined`. The process's real policy resolves the authorized scope id
-     * FROM the input, which is why this feature applies the decorator after
-     * its own parser. Installed the other way round, the authorization check,
-     * the scope-lineage guard and the audit row would all see nothing and
-     * every guard would still report green.
+     * tRPC appends the input parser as a middleware at the point `.input()` is called, so
+     * anything installed before it runs with `input === undefined`.
      */
     it("hands the policy the parsed input, not undefined", async () => {
       const seen: unknown[] = [];

@@ -34,14 +34,7 @@ function database(): PrismaClient {
 }
 
 /**
- * The issue #7016 wedge, reproduced against real Postgres leasing: a batch
- * leased up front whose sequential deliveries outlive the shared lease.
- * Before the lease hardening, the tail of every slow batch was re-leased by
- * the competing dispatcher while still queued behind the first one, the
- * superseded acknowledgements were silent zero-row updates, and the same
- * messages redelivered at attempt one forever. These tests pin the hardened
- * behavior: tails are released un-attempted, nothing is delivered twice, a
- * lapse-looping message retires, and a fenced acknowledgement is reported.
+ * The issue #7016 wedge, reproduced against real Postgres leasing.
  */
 // Assigned in beforeAll, only for a suite that isn't skipped — see
 // describe.skipIf(!databaseUrl) below.
@@ -99,14 +92,9 @@ describe.skipIf(!databaseUrl)("outbox backlog drain under slow deliveries", () =
       expect(result.outcome).toBe("committed");
 
       const invocations = new Map<string, number>();
-      // The wedge's arithmetic (10 x 16s of delivery against a 120s lease in
-      // prod), sized so the outcome does not depend on timing luck:
-      //   lease 1500ms, safety margin 20% = 300ms, so a delivery starts only
-      //   while elapsed <= 1200ms, admitting at most 15 of them.
-      // Both dispatchers therefore shed a tail even if they split the backlog
-      // evenly (20 each), and the last admitted delivery still acknowledges
-      // 220ms inside its lease (1200 + 80 handler vs 1500), which is the
-      // headroom the Postgres round trip needs on a loaded runner.
+      // The wedge's arithmetic (10 x 16s of delivery against a 120s lease in prod), sized so
+      // the outcome does not depend on timing luck: lease 1500ms, safety margin 20% = 300ms, so
+      // a delivery starts only while elapsed <= 1200ms, admitting at most 15 of them.
       const handlerMs = 80;
       const makeDispatcher = () =>
         new OutboxDispatcherService({
@@ -196,13 +184,10 @@ describe.skipIf(!databaseUrl)("outbox backlog drain under slow deliveries", () =
       const result = await store.commit(commit(messages(1)));
       expect(result.outcome).toBe("committed");
 
-      // Two facts have to hold before the rival is allowed to run: the slow
-      // delivery holds the lease, and it is already past the lease-budget
-      // guard so it cannot be shed un-attempted. Waiting for its handler to be
-      // entered establishes both, because the guard runs before the handler
-      // does. Sleeping only hopes for both, and on a loaded runner the slow
-      // dispatcher can lease nothing at all or shed the message on the way to
-      // the handler, either of which reports an empty `fenced`.
+      // Two facts have to hold before the rival is allowed to run: the slow delivery holds the
+      // lease, and it is already past the lease-budget guard so it cannot be shed un-attempted.
+      // Waiting for its handler to be entered establishes both, because the guard runs before
+      // the handler does.
       let announceDeliveryStarted!: () => void;
       const deliveryStarted = new Promise<void>((resolve) => {
         announceDeliveryStarted = resolve;
@@ -234,12 +219,11 @@ describe.skipIf(!databaseUrl)("outbox backlog drain under slow deliveries", () =
       });
 
       const slowRun = slow.runOnce({ now: Date.now() });
-      // If the delivery never starts there is no race to observe, and waiting
-      // on the signal alone would spend the whole 60s test timeout finding
-      // that out. Racing the run against the signal turns it into an
-      // assertion that names what went wrong instead. The rejection is
-      // absorbed here on purpose: `slowRun` is awaited again below, which is
-      // where a thrown error belongs.
+      // If the delivery never starts there is no race to observe, and waiting on the signal
+      // alone would spend the whole 60s test timeout finding that out. Racing the run against
+      // the signal turns it into an assertion that names what went wrong instead. The rejection
+      // is absorbed here on purpose: `slowRun` is awaited again below, which is where a thrown
+      // error belongs.
       const slowRunSettled = slowRun.then(
         () => "settled without delivering" as const,
         () => "settled without delivering" as const,

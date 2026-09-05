@@ -1,12 +1,6 @@
 /**
- * The round trip between the mapping UI's field mappings and the `MappingState`
- * a monitor stores, for the mixed trace + thread case.
- *
- * A trace-level evaluator may map a field to a THREAD source, so the type each
- * side stamps is what keeps the server resolving the field against the thread
- * rather than against the one trace that triggered the run.
- *
- * See specs/features/evaluations-v3/thread-variables-in-trace-evaluator.feature.
+ * The round trip between the mapping UI's field mappings and the `MappingState` a monitor
+ * stores, for the mixed trace + thread case.
  */
 import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-web/surfaces/variables";
 import { SERVER_ONLY_THREAD_SOURCES } from "@langwatch/trace-contract";

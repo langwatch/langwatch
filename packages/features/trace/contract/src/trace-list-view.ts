@@ -1,14 +1,7 @@
 /**
- * The trace list's read models: one row, one page, and the facet payloads the
- * sidebar renders.
- *
- * These live in the contract rather than beside the ClickHouse-backed service
- * that builds them because they are what the trace transport PUBLISHES. A
- * tRPC router built inside a generic `create<TContext extends ...>` resolves
- * its output types against the constraint rather than the instantiation, so a
- * payload type declared in the application narrows for every client the
- * moment the transport moves into a package. Keeping the shape here is what
- * makes that move type-preserving.
+ * The trace list's read models: one row, one page, and the facet payloads the sidebar renders.
+ * These live in the contract rather than beside the ClickHouse-backed service that builds them
+ * because they are what the trace transport PUBLISHES.
  */
 import type { EvaluationSummary } from "@langwatch/evaluation-contract";
 import type {
@@ -32,20 +25,15 @@ export interface TraceListItem {
   inputTokens: number | null;
   outputTokens: number | null;
   /**
-   * Cache + reasoning token sums folded onto the trace summary's reserved
-   * attribute keys. Null when the trace's model never reported them (no prompt
-   * caching, or a provider like Anthropic that emits no reasoning count). The
-   * list cell keeps showing the input+output delta; these drive the hover
-   * breakdown so a cached turn's true processed-token count is one hover away.
+   * Cache + reasoning token sums folded onto the trace summary's reserved attribute keys. Null
+   * when the trace's model never reported them (no prompt caching, or a provider like Anthropic
+   * that emits no reasoning count).
    */
   cacheReadTokens: number | null;
   cacheCreationTokens: number | null;
   reasoningTokens: number | null;
   /**
-   * How full the context window already was when the trace's first model call
-   * ran. Deliberately not a sum: an agent turn re-sends its conversation on
-   * every call, so the summed cache reads above run into the millions while
-   * this stays the one number a reader means by "how big was my context".
+   * How full the context window already was when the trace's first model call ran.
    */
   contextSizeTokens: number | null;
   models: string[];
@@ -60,10 +48,9 @@ export interface TraceListItem {
   status: "ok" | "error" | "warning";
   spanCount: number;
   /**
-   * Stored payload size of the trace in bytes — the MATERIALIZED
-   * `_size_bytes` column on `trace_summaries` (see migration 00032). Drives
-   * the optional Size column and is sortable. 0 when the column is absent on
-   * older rows that have not yet had the value drift onto disk.
+   * Stored payload size of the trace in bytes — the MATERIALIZED `_size_bytes` column on
+   * `trace_summaries` (see migration 00032). Drives the optional Size column and is sortable. 0
+   * when the column is absent on older rows that have not yet had the value drift onto disk.
    */
   sizeBytes: number;
   input: string | null;
@@ -151,12 +138,9 @@ export type FacetDescriptor =
 export interface DiscoverResult {
   facets: FacetDescriptor[];
   /**
-   * True when the cache was cold and a background compute was kicked
-   * off. Callers should treat this as a loading signal — the SSE
-   * `discover_updated` push will land the real values shortly. False
-   * means `facets` is the latest committed payload (possibly stale
-   * within the SWR window, with a background refresh already in
-   * flight).
+   * True when the cache was cold and a background compute was kicked off. Callers should treat
+   * this as a loading signal — the SSE `discover_updated` push will land the real values
+   * shortly.
    */
   pending: boolean;
 }

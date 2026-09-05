@@ -1,13 +1,6 @@
 /**
- * What `POST /api/evaluations/batch/log_results` tells a caller when the write
- * fails.
- *
- * The handler returned the caught error's own message, so a Prisma or
- * ClickHouse failure put the host, the port and the database name in front of
+ * What `POST /api/evaluations/batch/log_results` tells a caller when the write fails.
  * any project key. ADR-045 makes an unhandled cause generic.
- *
- * Covers @integration scenarios from
- * specs/security/feature-surface-secret-disclosure.feature.
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import { type ErrorHandler } from "hono";

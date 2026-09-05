@@ -2,12 +2,6 @@ import { type FS, Liquid, type LiquidOptions } from "liquidjs";
 
 /**
  * The Liquid engine every customer-authored template is rendered by.
- *
- * liquidjs defaults to the node file system rooted at `["."]`, so `{% render
- * 'x' %}` and `{% include 'x' %}` read files under the process working
- * directory and inline them into whatever the template is used to build — a
- * request body, a prompt, a notification. Nothing we render legitimately
- * includes a file, so the engine is given a file system that refuses.
  */
 
 const FILE_ACCESS_REFUSED = "Templates cannot read files: file inclusion is disabled.";

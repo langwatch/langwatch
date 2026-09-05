@@ -5,12 +5,8 @@ import { Task } from "@langwatch/task";
 const logger = createLogger("langwatch:task:user-data-erase");
 
 /**
- * Exactly the model delegate methods this task calls, picked from the real
- * `PrismaClient` rather than hand-typed: picking (not re-declaring) keeps
- * `findMany`'s real generic signature, so the row type at each call site
- * comes from the literal `select` passed there — no hand-maintained row
- * type to keep in sync, and a real `PrismaClient` satisfies this narrower
- * shape for free (more methods than picked is still a match).
+ * Exactly the model delegate methods this task calls, picked from the real `PrismaClient`
+ * rather than hand-typed, so a real `PrismaClient` satisfies this narrower shape for free.
  */
 type Delegate<Model extends keyof PrismaClient, Methods extends keyof PrismaClient[Model]> = Pick<
   PrismaClient[Model],
@@ -18,10 +14,9 @@ type Delegate<Model extends keyof PrismaClient, Methods extends keyof PrismaClie
 >;
 
 /**
- * Deliberately unprotected (no `projectId`/`organizationId` scoping): this
- * walk is cross-tenant by design — the one place in the product that
- * discovers and removes a single user's data across every organization they
- * touched, across ~25 tables no single feature's port fronts.
+ * Deliberately unprotected (no `projectId`/`organizationId` scoping): this walk is cross-tenant
+ * by design — the one place in the product that discovers and removes a single user's data
+ * across every organization they touched, across ~25 tables no single feature's port fronts.
  */
 export type GdprUserDataEraseDatabase = {
   user: Delegate<"user", "findUnique" | "delete">;
@@ -155,15 +150,9 @@ async function checkBlockingConditions(
 }
 
 /**
- * Deletes every trace of a user for a GDPR erasure request: the user row,
- * every organization/team/project they solely own, and every reference to
- * them elsewhere — nullified where the row outlives the user, anonymized for
- * `AuditLog` (the trail stays, the identity doesn't). Refuses if deleting
- * would strand another member (sole ADMIN of a shared org, or a sole-owned
- * org's team with other members) — those need a human to reassign first.
- *
- * Trace and evaluation data in ClickHouse is not touched here; that erase
- * path does not exist yet (tracked as a follow-up, same as upstream).
+ * Deletes every trace of a user for a GDPR erasure request: the user row, every
+ * organization/team/project they solely own, and every reference to them elsewhere. Refuses if
+ * deleting would strand another member.
  */
 export async function runGdprUserDataErase({
   database,

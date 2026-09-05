@@ -4,11 +4,6 @@ import { createSsrfUrlValidator } from "../url-validator";
 
 /**
  * Spec: packages/egress/specs/webhook-egress.feature
- *
- * The address rules, as literals. DNS is the one thing stubbed — the rest of
- * the decision runs for real, because what is being pinned here is which
- * ADDRESSES the policy admits, and a test that stubbed the classifier would
- * agree with any answer at all.
  */
 
 const strict = createSsrfUrlValidator({ blockLocal: true, allowedHosts: [] });

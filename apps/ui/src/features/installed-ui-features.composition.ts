@@ -15,6 +15,14 @@ export function createUiApplication(
 ): UiApplication {
   return composeUiApplication({
     ...install,
-    features: installedUiFeatures,
+    features: {
+      ...installedUiFeatures,
+      // The one reading of the build every screen shares. Read here because
+      // this is the composition root; a feature package may not read it.
+      capabilities: {
+        ...installedUiFeatures.capabilities,
+        deployment: { isDevelopment: import.meta.env.DEV },
+      },
+    },
   });
 }

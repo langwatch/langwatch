@@ -1,7 +1,7 @@
 /**
  * The client-side fetch deadline for nlpgo's /go/studio/execute_sync,
  * single-sourced for both code-agent and workflow-agent adapters after a
- * production bug (lw#7640): a raised engine ceiling left an independently-configured client abort cutting off still-legitimate runs. `resolveFloorFetchTimeoutMs` now DERIVES the deadline from the engine's own env var, so the two cannot drift apart again.
+ * production bug (lw#7640): a raised engine ceiling left an independently-configured client abort cutting off still-legitimate runs. The deadline is DERIVED from the engine's own ceiling, which the composition root reads under the engine's own name, so the two cannot drift apart again.
  */
 
 import { Agent, type Dispatcher, type RequestInit as UndiciRequestInit } from "undici";
@@ -42,70 +42,86 @@ export const NLP_FETCH_MAX_TIMEOUT_ENV = "NLP_FETCH_MAX_TIMEOUT_MS";
 export const NLP_FETCH_MAX_TIMEOUT_DEFAULT_MS = 900_000;
 
 /**
- * Parses an env var (seconds) to a positive whole number in ms, falling
- * back on anything that isn't one — clamp, never reject, matching the
- * engine's own parse (`services/nlpgo/cmd/root.go`). Fractional is rejected to agree with `clampCodeBlockTimeoutSeconds`'s integer-only Lambda clamp: when they disagreed, "0.5" ran the Lambda on 600s default while this side cut turns off at 30.5s.
+ * The two operator knobs above, as the composition root read them. Both are
+ * numbers a process parsed out of its own environment; anything that is not a
+ * usable one is clamped to the default here rather than refused.
  */
-function resolvePositiveSecondsEnvAsMs({
-  name,
-  fallbackSeconds,
-}: {
-  name: string;
-  fallbackSeconds: number;
-}): number {
-  const raw = process.env[name];
-  if (raw === undefined || raw.trim() === "") {
-    return fallbackSeconds * 1000;
-  }
-  const parsed = Number(raw);
-  if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed <= 0) {
-    return fallbackSeconds * 1000;
-  }
-  return parsed * 1000;
+export type NlpFetchTimeouts = {
+  /** {@link NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS_ENV}, in seconds. */
+  engineCodeBlockTimeoutSeconds?: number;
+  /** {@link NLP_FETCH_MAX_TIMEOUT_ENV}, in milliseconds. */
+  maxTimeoutMs?: number;
+};
+
+/**
+ * The two knobs as one process's environment spells them, for a composition
+ * root to read its own environment with. Anything unusable stays unusable and
+ * is clamped to the default where it is applied.
+ */
+export function nlpFetchTimeoutsFromEnvironment(
+  environment: Record<string, string | undefined>,
+): NlpFetchTimeouts {
+  return {
+    engineCodeBlockTimeoutSeconds: Number(environment[NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS_ENV]),
+    maxTimeoutMs: Number(environment[NLP_FETCH_MAX_TIMEOUT_ENV]),
+  };
 }
 
-/** Same parse as {@link resolvePositiveSecondsEnvAsMs}, but the env var is already milliseconds. */
-function resolvePositiveMsEnv({ name, fallbackMs }: { name: string; fallbackMs: number }): number {
-  const raw = process.env[name];
-  if (raw === undefined || raw.trim() === "") {
+/**
+ * Clamp, never reject, matching the engine's own parse
+ * (`services/nlpgo/cmd/root.go`). Fractional is rejected to agree with
+ * `clampCodeBlockTimeoutSeconds`'s integer-only Lambda clamp: when they
+ * disagreed, "0.5" ran the Lambda on the 600s default while this side cut
+ * turns off at 30.5s.
+ */
+function positiveWholeSecondsAsMs({
+  value,
+  fallbackSeconds,
+}: {
+  value: number | undefined;
+  fallbackSeconds: number;
+}): number {
+  if (value === undefined || !Number.isInteger(value) || value <= 0) {
+    return fallbackSeconds * 1000;
+  }
+  return value * 1000;
+}
+
+/** Same clamp as {@link positiveWholeSecondsAsMs}, but the value is already milliseconds. */
+function positiveMs({ value, fallbackMs }: { value: number | undefined; fallbackMs: number }) {
+  if (value === undefined || !Number.isFinite(value) || value <= 0) {
     return fallbackMs;
   }
-  const parsed = Number(raw);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return fallbackMs;
-  }
-  return parsed;
+  return value;
 }
 
 /**
  * The client-side floor for one NLP fetch: the engine's own code-block
- * ceiling plus {@link NLP_FETCH_HEADROOM_MS}, read per call (not cached) so a live env change and tests both see the real parse (env runs under `SKIP_ENV_VALIDATION`, hence the direct read, not the validated `~/env.mjs` proxy).
- * @internal Exported for testing.
+ * ceiling plus {@link NLP_FETCH_HEADROOM_MS}.
  */
-function resolveFloorFetchTimeoutMs(): number {
-  const engineCeilingMs = resolvePositiveSecondsEnvAsMs({
-    name: NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS_ENV,
+function floorFetchTimeoutMs(timeouts: NlpFetchTimeouts): number {
+  const engineCeilingMs = positiveWholeSecondsAsMs({
+    value: timeouts.engineCodeBlockTimeoutSeconds,
     fallbackSeconds: NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_DEFAULT_SECONDS,
   });
   return engineCeilingMs + NLP_FETCH_HEADROOM_MS;
 }
 
 /**
- * The platform's own maximum socket-hold for one scenario turn (distinct
- * from the engine's Python-execution ceiling) — without it an absurd `timeoutMs` parks a worker for as long as the number says. Its 15-minute default sits above {@link resolveFloorFetchTimeoutMs}'s (630s) so the engine reports its own timeout first, but that ordering is NOT enforced: raising the engine ceiling past this default needs this one raised too.
- * @internal Exported for testing.
+ * The platform's own maximum socket-hold for one scenario turn (distinct from
+ * the engine's Python-execution ceiling) — without it an absurd `timeoutMs`
+ * parks a worker for as long as the number says. Its 15-minute default sits
+ * above {@link floorFetchTimeoutMs}'s (630s) so the engine reports its own
+ * timeout first, but that ordering is NOT enforced.
  */
-function resolveMaxFetchTimeoutMs(): number {
-  return resolvePositiveMsEnv({
-    name: NLP_FETCH_MAX_TIMEOUT_ENV,
-    fallbackMs: NLP_FETCH_MAX_TIMEOUT_DEFAULT_MS,
-  });
+function maxFetchTimeoutMs(timeouts: NlpFetchTimeouts): number {
+  return positiveMs({ value: timeouts.maxTimeoutMs, fallbackMs: NLP_FETCH_MAX_TIMEOUT_DEFAULT_MS });
 }
 
 /**
  * Dispatcher cache keyed by effective `timeoutMs`: building a fresh `Agent`
  * per call (the original behaviour) leaked a socket/FD pool on every
- * scenario fetch and defeated keep-alive. `timeoutMs` is env-derived, so key cardinality is small and fixed for the process's life — no eviction needed.
+ * scenario fetch and defeated keep-alive. `timeoutMs` comes from the process's own configuration, so key cardinality is small and fixed for its life — no eviction needed.
  */
 const dispatchersByTimeoutMs = new Map<number, Dispatcher>();
 
@@ -140,21 +156,23 @@ async function closeNlpFetchDispatchers(): Promise<void> {
 
 /**
  * The undici transport every scenario call to nlpgo goes through: the
- * env-derived deadlines, and the memoized dispatcher that carries them.
+ * operator's deadlines, and the memoized dispatcher that carries them.
  */
 export class NlpFetchAdapter {
-  static create(): NlpFetchAdapter {
-    return new NlpFetchAdapter();
+  static create({ timeouts }: { timeouts?: NlpFetchTimeouts } = {}): NlpFetchAdapter {
+    return new NlpFetchAdapter(timeouts ?? {});
   }
+
+  private constructor(private readonly timeouts: NlpFetchTimeouts) {}
 
   /** The deadline derived from the engine's own code-block ceiling. */
   floorTimeoutMs(): number {
-    return resolveFloorFetchTimeoutMs();
+    return floorFetchTimeoutMs(this.timeouts);
   }
 
   /** This platform's own maximum for one scenario turn. */
   maxTimeoutMs(): number {
-    return resolveMaxFetchTimeoutMs();
+    return maxFetchTimeoutMs(this.timeouts);
   }
 
   /** The pooled dispatcher for one deadline, built once per distinct value. */

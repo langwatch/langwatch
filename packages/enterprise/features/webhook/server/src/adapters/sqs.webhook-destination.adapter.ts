@@ -17,44 +17,19 @@ import {
 import { parseSqsQueueUrl, sqsHostFor } from "../services/sqs-queue-url.rules";
 
 /**
- * How this process builds an AWS transport — the corporate proxy, the TLS
- * agent, the assumed role. A port because the answer belongs to the
- * deployment, not to one destination: a package that built its own would
- * bypass whatever proxy a self-hosted install routes its egress through.
+ * How this process builds an AWS transport — the corporate proxy, the TLS agent, the assumed
+ * role.
  */
 export type AwsClientConfigPort = (input: AwsClientConfigInput) => AwsClientConfig;
 
 /**
- * The Amazon SQS destination: the same batch, the same bytes, the same
- * signature, put on a queue instead of posted to a URL.
- *
- * **The body is byte-identical to the HTTP body.** `MessageBody` is the exact
- * `{"batch":[...]}` JSON the HTTPS transport would have posted, and the
- * signature, the delivery id and the attempt ride as message attributes under
- * the SAME NAMES they use as HTTP headers. So a consumer verifies with the
- * same call, over the same bytes, against the same golden vectors, and a
- * customer can move an integration from HTTP to a queue without touching
- * their verification code.
- *
- * An outer JSON wrapper was rejected for exactly that reason: it would force
- * a re-encode, which is a second chance to break the raw-bytes rule that
- * signature verification depends on, and it would spend the message size
- * limit on structure.
- *
- * **The footgun, first, because every consumer hits it:** `ReceiveMessage`
- * returns NO message attributes unless you ask for them by name. Pass
- * `MessageAttributeNames: ["All"]`. Forget it and the consumer sees a body
- * with no signature beside it and rejects every delivery it is sent.
+ * The Amazon SQS destination: the same batch, the same bytes, the same signature, put on a
+ * queue instead of posted to a URL.
  */
 
 /**
- * How large one delivery may be, counting the body AND the attributes (names,
- * types and values all count).
- *
- * This is OUR cap, not the queue's: Amazon SQS accepts a message up to 1 MiB.
- * A batch is one message, so the cap is what bounds how much a consumer must
- * hold in memory for a single receive, and lowering an endpoint's maximum
- * batch size is the way past it.
+ * How large one delivery may be, counting the body AND the attributes (names, types and values
+ * all count). This is OUR cap, not the queue's: Amazon SQS accepts a message up to 1 MiB.
  */
 export const SQS_MAX_MESSAGE_BYTES = 262_144;
 
@@ -63,10 +38,9 @@ const ATTEMPT_ATTRIBUTE = "X-LangWatch-Delivery-Attempt";
 const TEST_FIRE_ATTRIBUTE = "X-LangWatch-Test-Fire";
 
 /**
- * What one message weighs against {@link SQS_MAX_MESSAGE_BYTES}: the body plus
- * every attribute's name, type and value, all as UTF-8 bytes. Measured before
- * the send, because there is nothing about the next attempt that would make
- * the same bytes fit.
+ * What one message weighs against {@link SQS_MAX_MESSAGE_BYTES}: the body plus every
+ * attribute's name, type and value, all as UTF-8 bytes. Measured before the send, because there
+ * is nothing about the next attempt that would make the same bytes fit.
  */
 function sqsMessageBytes({
   body,
@@ -140,11 +114,9 @@ const TERMINAL_ERROR_NAMES = new Set([
 ]);
 
 /**
- * Errors that are this moment's problem rather than this configuration's.
- *
- * `ExpiredToken` is deliberately here: an SSO session expiring mid-run is a
- * credential that will be refreshed, and calling it terminal would make an
- * expiring session look exactly like a dead queue.
+ * Errors that are this moment's problem rather than this configuration's. `ExpiredToken` is
+ * deliberately here: an SSO session expiring mid-run is a credential that will be refreshed,
+ * and calling it terminal would make an expiring session look exactly like a dead queue.
  */
 const RETRYABLE_ERROR_NAMES = new Set([
   "ThrottlingException",
@@ -177,12 +149,7 @@ const RETRYABLE_NETWORK_CODES = new Set([
 ]);
 
 /**
- * Retry or retire, from what the SDK threw.
- *
- * Unknown failures are RETRYABLE. A queue we have never seen fail this way
- * before is more likely a passing condition than a permanent misconfiguration,
- * and the ladder gives up on its own after eleven attempts, whereas a wrongly
- * terminal verdict drops a billing event on the floor with no second chance.
+ * Retry or retire, from what the SDK threw. Unknown failures are RETRYABLE.
  */
 /** The three things an SDK failure can tell us apart by. */
 function failureShape(error: unknown): {
@@ -209,15 +176,9 @@ function verdictFromStatus(httpStatus: number): "retryable" | "terminal" {
 }
 
 /**
- * Failures that say "the identity we are using is not accepted right now".
- *
- * These are the ones a customer repairs on their side, by fixing the role's
- * trust policy or the key's permissions, and the repair is invisible to us.
- * The cached client holds a credential provider that has already resolved, so
- * without dropping it the repair does not take effect until the process
- * restarts. Hand testing hit exactly that: a trust policy corrected while the
- * app was running kept answering AccessDenied, and the same role assumed
- * cleanly from the AWS CLI with the same key and external id at the same time.
+ * Failures that say "the identity we are using is not accepted right now". These are the ones a
+ * customer repairs on their side, by fixing the role's trust policy or the key's permissions,
+ * and the repair is invisible to us.
  */
 const STALE_CREDENTIAL_ERROR_NAMES = new Set([
   "AccessDenied",
@@ -294,11 +255,9 @@ function attributesFor(request: WebhookDispatchRequest): Record<string, MessageA
 }
 
 /**
- * The refusal for a batch no queue message can carry, or null when it fits.
- *
- * Terminal, and it says what to change: the same bytes will never fit, and
- * splitting is not on the table because one batch is one message and the
- * batch id is the replay-safety key.
+ * The refusal for a batch no queue message can carry, or null when it fits. Terminal, and it
+ * says what to change: the same bytes will never fit, and splitting is not on the table because
+ * one batch is one message and the batch id is the replay-safety key.
  */
 function oversizeRefusal({
   bytes,
@@ -369,19 +328,8 @@ async function putOnQueue({
 }
 
 /**
- * The client for one endpoint's queue, cached and reused.
- *
- * A client per delivery would be two costs on the hot path. An assumed-role
- * provider caches its STS session INSIDE the provider instance, so a fresh one
- * per send re-assumes the role on every attempt, which is a round trip per
- * delivery and a straight line to an STS `ThrottlingException` that our own
- * ladder then retries by assuming the role again. And a destroyed client tears
- * down its connection pool, so every delivery pays a TLS handshake, which is
- * the opposite of what the shared socket-pool cache exists for.
- *
- * The key is the queue plus every credential field, so rotating a secret or
- * swapping a role produces a new client rather than reusing one that
- * authenticates as the old identity.
+ * The client for one endpoint's queue, cached and reused. A client per delivery would be two
+ * costs on the hot path.
  */
 const clients = new Map<string, SQSClient>();
 
@@ -439,11 +387,9 @@ function sqsClientFor(
 }
 
 /**
- * Drop every cached client for one queue, whatever credentials they hold.
- *
- * The queue alone is the key here, rather than the full credential key, because
- * the caller is reacting to a rejection and does not know which of the cached
- * identities for that queue is the stale one. There is normally exactly one.
+ * Drop every cached client for one queue, whatever credentials they hold. The queue alone is
+ * the key here, rather than the full credential key, because the caller is reacting to a
+ * rejection and does not know which of the cached identities for that queue is the stale one.
  */
 function dropSqsClient(queueUrl: string): void {
   for (const [key, client] of clients) {

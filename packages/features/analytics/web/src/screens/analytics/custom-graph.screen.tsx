@@ -1124,12 +1124,6 @@ function SeriesField({
 
   /**
    * The series filter editor, mounted here rather than opened from a registry.
-   *
-   * `platform/app` registered it as the `seriesFilters` drawer and handed it an
-   * `onChange` through `setFlowCallbacks` — a registry-wide side channel that
-   * exists only because an address can carry strings and not functions. Mounted
-   * inline, `onChange` is a prop, and the registry entry is deleted with the
-   * drawer.
    */
   const [editingSeriesFilters, setEditingSeriesFilters] = useState(false);
 
@@ -1497,19 +1491,8 @@ function GraphTypeField({ form }: { form: ReturnType<typeof useForm<CustomGraphF
 }
 
 /**
- * The chart builder, at both of its addresses.
- *
- * ONE SCREEN, TWO KEYS, AND THE MODE ARRIVES AS A PROP. `platform/app` had
- * `analytics/custom/index.tsx` (a new chart) and `analytics/custom/[id].tsx` (an
- * existing one), the second of which rendered the first with the stored graph
- * loaded. The route table gives each address its own page key, so `apps/ui`
- * maps a key to a mode and the builder is TOLD which it is rather than reading
- * the address back — the automations family's tab-as-prop shape, applied to a
- * form. The graph `:id` itself is a route PARAMETER, which the router captured.
- *
- * The loading and not-found states are the edit mode's own, unchanged: a graph
- * whose read refuses says so instead of opening a blank builder that would
- * save a second chart on submit.
+ * The chart builder, at both of its addresses. ONE SCREEN, TWO KEYS, AND THE MODE ARRIVES AS A
+ * PROP.
  */
 export default function CustomGraphScreen({ mode }: { mode: CustomGraphScreenMode }) {
   const host = useAnalyticsHost();

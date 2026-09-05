@@ -1,11 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * The project rail's coding-agent destinations: grown from the project's
- * recorded activity, gated behind the release flag and trace-read permission.
- *
- * MOVED from `platform/app/src/components/__tests__/MainMenu.codingAgentLinks.integration.test.tsx`.
- *
  * Spec: specs/coding-agent/project-menu-links.feature
  */
 

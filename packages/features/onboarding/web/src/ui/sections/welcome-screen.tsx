@@ -124,12 +124,10 @@ export const WelcomeScreen: React.FC = () => {
 
           host.hardRedirect(`/onboarding/product?${params.toString()}`);
         },
-        // Through the registry, not a hardcoded sentence. This threw the
-        // error away and told everyone to "try again or contact support" —
-        // advice that cannot resolve a plan limit, an address already in use,
-        // or a name that fails validation, which are the failures this call
-        // actually has. Signing up is the worst possible place to be told
-        // nothing.
+        // Through the registry, not a hardcoded sentence. This threw the error away and told
+        // everyone to "try again or contact support" — advice that cannot resolve a plan limit,
+        // an address already in use, or a name that fails validation, which are the failures
+        // this call actually has. Signing up is the worst possible place to be told nothing.
         onError: (error) => {
           host.failed({
             error,

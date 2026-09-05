@@ -57,26 +57,7 @@ export interface TopicClusteringProcessingPipelineDeps {
 
 /**
  * The topic-clustering-processing pipeline (ADR-051).
- *
- * Aggregate: `topic_clustering` (aggregateId = projectId, TenantId =
- * projectId) — one clustering stream per project.
- *
- * Operational Projection: topicClusteringRunStatus
- * - Per-project last-run facts (outcome, mode, skip reason, counts). Stored
- *   directly in Postgres; rebuildable by replay.
- *
- * Commands (write surface):
- * - requestClustering: manual/bootstrap ask -> topic_clustering.requested
- * - recordClusteringRunStarted: a page began -> run_started
- * - recordClusteringRunCompleted: one page finished -> run_completed
- * - recordClusteringRunFailed: retries exhausted -> run_failed
- *
  * Process manager: `topicClustering` (ADR-052 builder) — owns the per-project
- * daily wake, run lifecycle, and pagination continuation. It deliberately
- * declares no `.schedule()`: the cadence is each project's own daily hash
- * slot, so every handler returns its explicit `nextWakeAt`. `run_started` is
- * deliberately NOT handled — it exists for the run-status projection, and
- * the process learns nothing from its own announcement.
  */
 export class TopicClusteringEventingAdapter {
   private constructor(private readonly deps: TopicClusteringProcessingPipelineDeps) {}

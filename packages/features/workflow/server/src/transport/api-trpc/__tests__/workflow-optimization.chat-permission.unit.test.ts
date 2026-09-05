@@ -1,9 +1,6 @@
 /**
- * Finding H9 of the 2026-09-04 feature-surface security pass: `optimization.chat`
- * executes a published workflow — model spend, plus whatever the graph's code
- * and HTTP nodes do — so it declares the permission the public run endpoint
- * declares, not the permission to look at a workflow.
- *
+ * Finding H9 of the 2026-09-04 feature-surface security pass: `optimization.chat` executes a
+ * published workflow, so it declares the permission the public run endpoint declares.
  * Spec: specs/security/resource-scope-permission-checks.feature
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";

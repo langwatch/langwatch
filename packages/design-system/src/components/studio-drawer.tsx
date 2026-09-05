@@ -27,6 +27,11 @@ interface DrawerContentProps extends ChakraDrawer.ContentProps {
   withErrorBoundary?: boolean;
   /** Optional scope label shown by the error fallback. */
   errorScope?: string;
+  /**
+   * Whether this is a development build. This package cannot read the build,
+   * so the composing application says; production otherwise.
+   */
+  isDevelopment?: boolean;
 }
 
 export const DrawerContent = React.forwardRef<HTMLDivElement, DrawerContentProps>(
@@ -38,6 +43,7 @@ export const DrawerContent = React.forwardRef<HTMLDivElement, DrawerContentProps
       offset,
       withErrorBoundary = true,
       errorScope,
+      isDevelopment = false,
       ...rest
     } = props;
     const { marginTop: contextMarginTop } = React.useContext(DrawerOffsetContext);
@@ -63,7 +69,9 @@ export const DrawerContent = React.forwardRef<HTMLDivElement, DrawerContentProps
     // children so a render error renders an inline error panel within the
     // drawer frame instead.
     const safeChildren = withErrorBoundary ? (
-      <StudioIsolatedErrorBoundary scope={errorScope}>{children}</StudioIsolatedErrorBoundary>
+      <StudioIsolatedErrorBoundary scope={errorScope} isDevelopment={isDevelopment}>
+        {children}
+      </StudioIsolatedErrorBoundary>
     ) : (
       children
     );

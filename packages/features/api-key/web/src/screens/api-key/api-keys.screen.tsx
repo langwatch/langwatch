@@ -1,38 +1,6 @@
 /**
- * Settings > API Keys. One table of every credential that can talk to the
- * LangWatch API, plus the ingestion keys the CLI mints.
- *
- * Moved from `platform/app/src/pages/settings/api-keys/{index,ApiKeysSection}.tsx`,
- * which were a page shell and the component it rendered; the shell was
- * `SettingsLayout` plus a heading, and the layout is now
- * `apps/ui`'s `withUiSettingsLayout` around this screen, so the two collapse
- * into one.
- *
- * ## Credential hygiene, which is what this family is about
- *
- *  - **Nothing on this page's reads carries a key.** `apiKey.list` answers
- *    `ApiKeyListEntry`, whose `lookupIdPrefix` is five characters of the PUBLIC
- *    lookup id — which is why the table can render `sk-lw-<prefix>…` and can
- *    never render more, however the row is styled.
- *  - **Two surfaces here hold a real credential and both are mints.** Creating a
- *    key and rotating the legacy project key each answer a value once, and both
- *    go straight into `TokenCreatedDialog`, the one-time reveal. Closing it
- *    clears the state and no read can bring the value back.
- *  - **The legacy project key is the one exception, and it predates this move.**
- *    `project.apiKey` has always travelled to the browser inside the
- *    organization graph the shell holds; the row shows `sk-…` plus four
- *    characters and offers a copy action. Nothing here widens that, and the port
- *    says so where the value is declared.
- *
- * ## The page-level policy, unchanged
- *
- * NEITHER THE PLATFORM PAGE NOR THIS SCREEN CARRIES A PAGE-LEVEL GRANT. The page
- * was `SettingsLayout` and nothing else — no `withPermissionGuard`, no flag —
- * and it decides what a reader may DO from two things it reads inline: whether
- * `apiKey.orgMembers` answered anything (an organization admin, and nobody else,
- * gets a non-empty list) and `project:manage` for the legacy key's rotation.
- * A member sees their own keys and no edit controls on anybody else's, which is
- * the product's own answer and not one a move may change.
+ * Settings > API Keys. One table of every credential that can talk to the LangWatch API, plus
+ * the ingestion keys the CLI mints.
  */
 
 import {
@@ -84,11 +52,9 @@ export const PROJECT_KEY_ROTATE_PERMISSION = "project:manage";
 type ApiKeyRow = ApiKeyListEntry;
 
 /**
- * Actions for the legacy "Project API Key" row. The row intentionally has no
- * edit/revoke affordance — the only mutating action is rotation, and only when
- * the viewer can manage the project (`project:manage`). Rotation is the
- * supported, audited replacement for the base key that the unified-keys rework
- * removed.
+ * Actions for the legacy "Project API Key" row. The row intentionally has no edit/revoke
+ * affordance — the only mutating action is rotation, and only when the viewer can manage the
+ * project (`project:manage`).
  */
 function ProjectKeyActions({
   apiKey,

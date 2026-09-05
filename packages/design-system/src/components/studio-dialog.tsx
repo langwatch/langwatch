@@ -31,6 +31,12 @@ interface DialogContentProps extends ChakraDialog.ContentProps {
   withErrorBoundary?: boolean;
   /** Optional scope label shown by the error fallback. */
   errorScope?: string;
+  /**
+   * Whether this is a development build. This package cannot read the build,
+   * so the composing application says; production otherwise, which is what
+   * keeps the raw crash text and the misuse warning away from a customer.
+   */
+  isDevelopment?: boolean;
 }
 
 export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
@@ -44,6 +50,7 @@ export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps
       positionerProps,
       withErrorBoundary = true,
       errorScope,
+      isDevelopment = false,
       ...rest
     } = props;
 
@@ -51,14 +58,16 @@ export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps
     // children so a render error renders an inline error panel within the
     // dialog frame instead.
     const safeChildren = withErrorBoundary ? (
-      <StudioIsolatedErrorBoundary scope={errorScope}>{children}</StudioIsolatedErrorBoundary>
+      <StudioIsolatedErrorBoundary scope={errorScope} isDevelopment={isDevelopment}>
+        {children}
+      </StudioIsolatedErrorBoundary>
     ) : (
       children
     );
 
     // Strip background overrides defensively at runtime in addition to the
     // type-level Omit, in case a caller widens the type with `as any`.
-    const safeBackdropProps = stripBackdropBg(backdropProps);
+    const safeBackdropProps = stripBackdropBg({ props: backdropProps, isDevelopment });
 
     return (
       <Portal disabled={!portalled} container={portalRef}>
@@ -113,16 +122,20 @@ export const DialogRoot = function DialogRoot(props: DialogRootProps) {
   );
 };
 
-function stripBackdropBg(
-  props: DialogContentProps["backdropProps"] | undefined,
-): DialogContentProps["backdropProps"] | undefined {
+function stripBackdropBg({
+  props,
+  isDevelopment,
+}: {
+  props: DialogContentProps["backdropProps"] | undefined;
+  isDevelopment: boolean;
+}): DialogContentProps["backdropProps"] | undefined {
   if (!props) return props;
   const { bg, background, backgroundColor, style, ...rest } = props as ChakraDialog.BackdropProps;
   const safeStyle = style
     ? { ...style, background: "transparent", backgroundColor: "transparent" }
     : undefined;
   if (
-    process.env.NODE_ENV !== "production" &&
+    isDevelopment &&
     (bg !== undefined ||
       background !== undefined ||
       backgroundColor !== undefined ||

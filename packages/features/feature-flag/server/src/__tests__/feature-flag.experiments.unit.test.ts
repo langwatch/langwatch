@@ -1,11 +1,7 @@
 /**
- * Experiment precedence through the real service graph: availability, the
- * durable tenant policy, and the person's own enrolment, with the settings
- * repository actually written and read back.
- *
- * The registry is a fixture built for these tests. The shipped registry
- * marks nothing as an experiment yet, and mutating it would be reaching into
- * production state to make a test pass.
+ * Experiment precedence through the real service graph: availability, the durable tenant
+ * policy, and the person's own enrolment, with the settings repository actually written and
+ * read back. The registry is a fixture built for these tests.
  */
 import {
   createFeatureFlagRegistry,

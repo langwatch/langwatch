@@ -1,20 +1,7 @@
 /**
- * `useRouter`, once, for every browser feature that still spells it that way.
- *
- * Seven packages carried their own shim over their own feature host port, each
- * one a slightly different reading of the same address. That is the scope
- * hook's fault again: a component one family lends to another read a router
- * that only the lending family's routes mount. So the address is asked of the
- * two ports the application publishes — `UiRoutePort` for the reading,
- * `UiNavigationPort` for the move — and any screen may ask it.
- *
- * ABSENT IS A READING, NOT A CRASH. With no capabilities above it the hook
- * answers an empty address whose `push` does nothing and whose `isReady` is
- * false, which is what `isReady` is for.
- *
- * `query` MERGES THE PATH PARAMETERS OVER THE QUERY STRING, which is what the
- * Next router these call sites were written against did. `params` and `search`
- * are also published apart, for a caller that means one of them exactly.
+ * `useRouter`, once, for every browser feature that still spells it that way. Seven packages
+ * carried their own shim over their own feature host port, each one a slightly different
+ * reading of the same address.
  */
 
 import { useMemo } from "react";
@@ -24,11 +11,9 @@ import { useOptionalUiCapabilities } from "./capabilities";
 export type UiRouterValues = Readonly<Record<string, string | undefined>>;
 
 /**
- * An address, in either form the Next router took.
- *
- * A third of the navigations pass the object form because they are rewriting
- * the query while staying on the page, so both are accepted and both end up as
- * one address.
+ * An address, in either form the Next router took. A third of the navigations pass the object
+ * form because they are rewriting the query while staying on the page, so both are accepted and
+ * both end up as one address.
  */
 export type UiRouterTarget =
   | string
@@ -128,11 +113,9 @@ function asAddress(to: UiRouterTarget, currentPathname: string): string {
 }
 
 /**
- * The address this screen is rendering, and the two ways off it.
- *
- * A push whose address is only a query string never leaves the page: it is a
- * whole-query write, which is what `UiRoutePort.setQuery` takes. An address
- * with a path is a navigation.
+ * The address this screen is rendering, and the two ways off it. A push whose address is only a
+ * query string never leaves the page: it is a whole-query write, which is what
+ * `UiRoutePort.setQuery` takes. An address with a path is a navigation.
  */
 export function useRouter(): UiRouter {
   const capabilities = useOptionalUiCapabilities();

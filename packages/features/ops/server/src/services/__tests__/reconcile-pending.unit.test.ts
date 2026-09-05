@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { OpsMetricsCollectorService } from "../ops-metrics-collector.service";
 import { OpsMetricsTestAdapter } from "./ops-metrics.fixture";
+import { RedisOpsMetricsRepository } from "../../repositories/redis/redis.ops-metrics.repository";
 
 function createMockRedis() {
   return {
@@ -25,7 +26,7 @@ function createMockRedis() {
  */
 const runReconcile = async (ops: OpsMetricsTestAdapter) => {
   const collector = OpsMetricsCollectorService.create({
-    redis: createMockRedis(),
+    metrics: RedisOpsMetricsRepository.create({ redis: createMockRedis() }),
     ops,
   });
   await collector.discoverQueues();

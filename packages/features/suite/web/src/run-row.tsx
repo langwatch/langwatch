@@ -1,11 +1,7 @@
 /**
- * Collapsible row for a single batch run in the run history list.
- *
- * Header: [chevron] [suiteName] . [scenarioNames] . [timeAgo] . [spacer] . [statusIcon] [passRate%]
- * Expanded: shows ScenarioTargetRow (list) or ScenarioGridCard (grid) for each scenario run.
- *
- * The header is rendered as a direct child of the scroll container (no wrapper Box)
- * so that `position: sticky` works correctly within the scrollport.
+ * Collapsible row for a single batch run in the run history list. Header: [chevron] [suiteName]
+ * . [scenarioNames] . [timeAgo] . [spacer] . [statusIcon] [passRate%] Expanded: shows
+ * ScenarioTargetRow (list) or ScenarioGridCard (grid) for each scenario run.
  */
 
 import { Box, Button, HStack, Spinner, Text } from "@chakra-ui/react";

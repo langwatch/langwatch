@@ -1,12 +1,5 @@
 /**
  * The `AnnotationQueue` and `AnnotationQueueItem` rows, over Prisma.
- *
- * The queue rows are not Annotation's own aggregate — a queue names users and
- * annotation scores, and its items name traces — so the transport reads them
- * through the {@link AnnotationQueueStore} port rather than through
- * `AnnotationService`. This is that port's Postgres implementation, moved out
- * of the application process unchanged: every filter, include, ordering and
- * return shape is the one the reviewer's pages have always been served.
  */
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { AnnotationQueueStore } from "../../transport/api-trpc/annotation.api";
@@ -95,17 +88,7 @@ const callerQueueItemsFilter = ({
 
 /**
  * Only what the member list renders: the avatar and its tooltip.
- *
- * `include: { user: true }` selected every User column — `email`,
- * `emailVerified`, `pendingSsoSetup`, `twoFactorEnabled`, `lastLoginAt`,
- * `deactivatedAt`, `lastHomePath` and the per-user `userHashKey` that
  * ADR-101 §4 mints for identity event hashing — and `getQueueBySlugOrId`
- * returns this row unmodified with no output schema, so all of it reached
- * the browser for every member of every queue a viewer could open.
- *
- * The sibling `getByTraceIds` read was corrected the same way, and its note
- * says the same thing; this one was missed. The two screens that read a
- * member use `id`, `name` and `image`.
  */
 const queueMemberInclude = (organizationId: string) => ({
   where: {
@@ -134,18 +117,8 @@ const queueScoreInclude = (projectId: string) => ({
 });
 
 /**
- * The store for one request's Prisma client.
- *
- * The return type is deliberately INFERRED, never annotated as
- * {@link AnnotationQueueStore}: the port declares `unknown` wherever the
- * transport only hands a row straight back to the caller, so annotating it
- * would narrow every queue row the client receives to `unknown`. The
- * `satisfies` check at the end is what proves the port is answered in full
- * without erasing the concrete row types.
- */
-/**
- * Only the delegates this repository touches, so composition can name the
- * slice it needs instead of the whole generated client.
+ * Only the delegates this repository touches, so composition can name the slice it needs
+ * instead of the whole generated client.
  */
 export type AnnotationQueueDatabase = Pick<PrismaClient, "annotationQueue" | "annotationQueueItem">;
 

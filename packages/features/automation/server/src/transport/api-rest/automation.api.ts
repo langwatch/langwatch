@@ -91,14 +91,9 @@ function toTriggerResponse(trigger: Trigger) {
 }
 
 /**
- * REST for the project's automations, `/api/triggers`.
- *
- * The application arrives as a per-request provider rather than being read off
- * the Hono context, so this family can be mounted into any process that has
- * one and built with none by the OpenAPI generator. It is the SAME
- * {@link AutomationApp} the tRPC surface is given: the condition rule, the
- * "not in this project" refusal and the delete's three steps are decided once,
- * there, rather than once per door.
+ * REST for the project's automations, `/api/triggers`. The application arrives as a per-request
+ * provider rather than being read off the Hono context, so this family can be mounted into any
+ * process that has one and built with none by the OpenAPI generator.
  */
 export function createTriggerRestApp(options: {
   security: AppRestSecurity;

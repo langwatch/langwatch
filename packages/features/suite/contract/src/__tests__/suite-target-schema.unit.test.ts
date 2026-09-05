@@ -1,9 +1,5 @@
 /**
  * @vitest-environment node
- *
- * The basic shape of suiteTargetSchema: which target types validate, and
- * that a suite target with no fieldMappings still parses.
- *
  * @see specs/scenarios/scenario-input-mapping.feature
  */
 

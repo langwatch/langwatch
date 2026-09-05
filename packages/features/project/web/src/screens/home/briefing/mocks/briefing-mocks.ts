@@ -1,3 +1,4 @@
+import { useUiDeployment } from "@langwatch/ui-host/capabilities";
 import { useEffect, useState } from "react";
 import type { BriefingData, BriefingReceipt, ScenarioBar, StatusCell } from "../types";
 
@@ -7,9 +8,9 @@ import type { BriefingData, BriefingReceipt, ScenarioBar, StatusCell } from "../
  * The live briefing only renders what the project's real data supports, which
  * makes the fuller states hard to see on a quiet dev project. These mocks let
  * the switcher at the top of the home preview every state, so the layout can be
- * tuned against real variety. They are gated behind
- * `process.env.NODE_ENV === "development"` exactly like the home-view override,
- * and never resolve in production — not one fake number reaches a real user.
+ * tuned against real variety. They are gated on the deployment the composing
+ * application published, exactly like the home-view override, and never
+ * resolve in production — not one fake number reaches a real user.
  *
  * Rather than hand-write each state, the set is GENERATED from the dimensions
  * that actually vary the card — scenario health, which cases need a look, and
@@ -320,14 +321,12 @@ export function getBriefingMock(key: string): BriefingMock | undefined {
 
 const STORAGE_KEY = "langwatch:dev:briefing-mock";
 
-export const isBriefingMockAvailable = () => process.env.NODE_ENV === "development";
-
 // Same-tab fan-out: `storage` events only fire in OTHER tabs, so writes notify
 // hook instances in this tab by hand (the switcher and the page each hold one).
 const listeners = new Set<() => void>();
 
-function readBriefingMock(): string | null {
-  if (typeof window === "undefined" || !isBriefingMockAvailable()) return null;
+function readBriefingMock(isDevelopment: boolean): string | null {
+  if (typeof window === "undefined" || !isDevelopment) return null;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     return raw && getBriefingMock(raw) ? raw : null;
@@ -351,16 +350,17 @@ export function setBriefingMock(key: string | null): void {
 }
 
 export function useBriefingMock(): string | null {
+  const { isDevelopment } = useUiDeployment();
   const [key, setKey] = useState<string | null>(null);
   useEffect(() => {
-    setKey(readBriefingMock());
-    const onChange = () => setKey(readBriefingMock());
+    setKey(readBriefingMock(isDevelopment));
+    const onChange = () => setKey(readBriefingMock(isDevelopment));
     listeners.add(onChange);
     window.addEventListener("storage", onChange);
     return () => {
       listeners.delete(onChange);
       window.removeEventListener("storage", onChange);
     };
-  }, []);
+  }, [isDevelopment]);
   return key;
 }

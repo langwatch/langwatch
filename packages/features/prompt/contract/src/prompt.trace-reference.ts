@@ -2,11 +2,9 @@ import { z } from "zod";
 import { parsePromptShorthand } from "./prompt.shorthand";
 
 /**
- * Prompt metadata reconstructed from SDK span attributes.
- *
- * This is deliberately distinct from the service's `PromptReference`: it is
- * observational data and can be incomplete when an SDK emitted only part of
- * the Prompt metadata.
+ * Prompt metadata reconstructed from SDK span attributes. This is deliberately distinct from
+ * the service's `PromptReference`: it is observational data and can be incomplete when an SDK
+ * emitted only part of the Prompt metadata.
  */
 export type ParsedPromptTraceReference = {
   promptHandle: string | null;

@@ -8,6 +8,7 @@ import { type TracerProvider, trace } from "@opentelemetry/api";
 import type { Logger } from "@langwatch/observability";
 import { AgentTestScriptAdapter } from "./agent-test-script.adapter";
 import { buildRemoteTraceRunConfig } from "./remote-trace-run.adapter";
+import type { NlpFetchTimeouts } from "./nlp-fetch.adapter";
 import { SerializedAgentRegistryAdapter } from "./serialized-agent-registry.adapter";
 import { createJudgeModelFromParams, createModelFromParams } from "./litellm-model.adapter";
 import { selectRoleModelParams } from "./scenario-role-model.adapter";
@@ -32,6 +33,8 @@ export interface ScenarioChildRuntime {
   verbose: boolean;
   httpPort: ScenarioHttpPort;
   logger: Logger;
+  /** The operator's nlpgo deadlines, read by the process that started this. */
+  nlpTimeouts?: NlpFetchTimeouts;
 }
 
 export interface ScenarioChildExecutionResult {
@@ -102,7 +105,9 @@ async function executeScenarioChildValue({
   // sets LANGWATCH_API_KEY from the prefetched project telemetry key —
   // no need to duplicate it onto the job payload. The workflow/code
   // factories consume it as workflow.api_key; prompt and http ignore it.
-  const adapter = SerializedAgentRegistryAdapter.create().build({
+  const adapter = SerializedAgentRegistryAdapter.create({
+    nlpTimeouts: runtime.nlpTimeouts,
+  }).build({
     adapterData,
     modelParams,
     nlpServiceUrl,

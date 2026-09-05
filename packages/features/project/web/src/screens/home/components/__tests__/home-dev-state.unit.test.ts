@@ -4,14 +4,17 @@
  *
  * Two things matter here and neither is the list itself: a pinned state has to
  * come back out of the hook that the block reads (otherwise the preview shows
- * nothing), and the whole mechanism has to be inert once `import.meta.env.DEV`
- * is false — that is the only thing standing between a dev convenience and a
- * customer seeing a fabricated home page.
+ * nothing), and the whole mechanism has to be inert once the composing
+ * application says this is not a development build — that is the only thing
+ * standing between a dev convenience and a customer seeing a fabricated home.
  *
  * Spec: specs/home/langy-home.feature
  */
+import { UiCapabilityContextProvider, type UiCapabilities } from "@langwatch/ui-host/capabilities";
+import { createUiCapabilitiesFromHost } from "@langwatch/ui-host/testing";
 import { act, renderHook } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { createElement, type ReactNode } from "react";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   chartVariantFor,
   DEFAULT_HOME_CHART_VARIANT,
@@ -21,9 +24,21 @@ import {
 } from "../dev/home-dev-state";
 
 afterEach(() => {
-  vi.unstubAllEnvs();
   window.localStorage.clear();
 });
+
+/** The one capability this hook reads, published the way the shell does. */
+function withDeployment(isDevelopment: boolean) {
+  const capabilities: UiCapabilities = {
+    ...createUiCapabilitiesFromHost({
+      route: () => ({ params: {}, query: {} }),
+      navigate: () => void 0,
+    }),
+    deployment: { isDevelopment },
+  };
+  return ({ children }: { children: ReactNode }) =>
+    createElement(UiCapabilityContextProvider, { value: capabilities }, children);
+}
 
 describe("useHomeDevState()", () => {
   describe("given a development build", () => {
@@ -31,20 +46,24 @@ describe("useHomeDevState()", () => {
       /** @scenario Developers can preview every state of this home */
       it("reports every state the block can be in back to the page", () => {
         for (const { key } of HOME_DEV_STATES) {
-          const { result, unmount } = renderHook(() => useHomeDevState());
-          act(() => setHomeDevState(key));
+          const { result, unmount } = renderHook(() => useHomeDevState(), {
+            wrapper: withDeployment(true),
+          });
+          act(() => setHomeDevState({ state: key, isDevelopment: true }));
           expect(result.current).toBe(key);
           unmount();
         }
       });
 
       it("returns the page to the project's real data when it is cleared", () => {
-        const { result } = renderHook(() => useHomeDevState());
+        const { result } = renderHook(() => useHomeDevState(), {
+          wrapper: withDeployment(true),
+        });
 
-        act(() => setHomeDevState("empty"));
+        act(() => setHomeDevState({ state: "empty", isDevelopment: true }));
         expect(result.current).toBe("empty");
 
-        act(() => setHomeDevState(null));
+        act(() => setHomeDevState({ state: null, isDevelopment: true }));
         expect(result.current).toBeNull();
       });
     });
@@ -53,7 +72,9 @@ describe("useHomeDevState()", () => {
       it("ignores it rather than pinning a state that does not exist", () => {
         window.localStorage.setItem("langwatch:dev:home-state", "not-a-state");
 
-        const { result } = renderHook(() => useHomeDevState());
+        const { result } = renderHook(() => useHomeDevState(), {
+          wrapper: withDeployment(true),
+        });
 
         expect(result.current).toBeNull();
       });
@@ -63,10 +84,10 @@ describe("useHomeDevState()", () => {
   describe("given a production build", () => {
     /** @scenario Developers can preview every state of this home */
     it("pins nothing, so the control has no state to render", () => {
-      vi.stubEnv("DEV", false);
-
-      const { result } = renderHook(() => useHomeDevState());
-      act(() => setHomeDevState("empty"));
+      const { result } = renderHook(() => useHomeDevState(), {
+        wrapper: withDeployment(false),
+      });
+      act(() => setHomeDevState({ state: "empty", isDevelopment: false }));
 
       expect(result.current).toBeNull();
       expect(window.localStorage.getItem("langwatch:dev:home-state")).toBeNull();

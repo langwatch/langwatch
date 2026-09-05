@@ -4,18 +4,6 @@ import type { PlanInfo } from "./license-plan";
 
 /**
  * Plan limits embedded within a license (the signed payload).
- *
- * IMPORTANT: The workspace-structure fields (maxProjects, maxTeams) and the
- * experimentation fields below (maxWorkflows, maxPrompts, maxEvaluators,
- * maxScenarios, maxAgents, maxExperiments, maxOnlineEvaluations, maxDatasets,
- * maxDashboards, maxCustomGraphs) are NO LONGER ENFORCED — those resources are
- * OSS/Apache-2.0 and uncapped. They are retained in this schema purely for
- * backward compatibility: `verifySignature` re-serializes the Zod-parsed
- * `data`, and `z.object` strips unknown keys, so dropping a field here would
- * change the JSON for already-issued licenses and break their signature
- * verification. They are all optional (existing licenses that carry a value
- * still parse and re-serialize byte-identically); they are simply ignored
- * downstream.
  */
 export const licensePlanLimitsSchema = z.object({
   type: z.string(),
@@ -149,10 +137,9 @@ type InvalidLicenseStatus = {
   valid: false;
   corrupted?: false;
   /**
-   * True when the license is one LangWatch signed and its term simply ended,
-   * false when the signature does not check out. Only the first still meters
-   * seats, so the page needs the distinction and cannot derive it from
-   * `expiresAt`, which an unsigned payload controls.
+   * True when the license is one LangWatch signed and its term simply ended, false when the
+   * signature does not check out. Only the first still meters seats, so the page needs the
+   * distinction and cannot derive it from `expiresAt`, which an unsigned payload controls.
    */
   expired: boolean;
   plan: string;

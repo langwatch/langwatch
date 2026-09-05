@@ -35,12 +35,9 @@ export interface EventingClickHouseStreamingQueryResult extends EventingClickHou
 }
 
 /**
- * The wider read surface replay needs on top of {@link EventingClickHouseClient}:
- * streamed rows, so a batch's memory stays bounded by the accumulators rather
- * than its event count, and `command` for the post-replay `OPTIMIZE TABLE`.
- *
- * Declared standalone rather than extending the narrow client, so neither
- * surface constrains the other. A driver client satisfies both structurally.
+ * The wider read surface replay needs on top of {@link EventingClickHouseClient}: streamed
+ * rows, so a batch's memory stays bounded by the accumulators rather than its event count, and
+ * `command` for the post-replay `OPTIMIZE TABLE`.
  */
 export interface EventingClickHouseReplayClient {
   query(request: {

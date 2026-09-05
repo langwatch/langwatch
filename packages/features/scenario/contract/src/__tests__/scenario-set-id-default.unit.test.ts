@@ -1,10 +1,5 @@
 /**
  * @vitest-environment node
- *
- * scenarioSetId defaults to "default" on ingestion: an event sent without
- * the field, or with an empty string, is accepted rather than rejected, and
- * reads as "default".
- *
  * @see specs/scenarios/scenario-set-id-default.feature
  */
 import { describe, expect, it } from "vitest";

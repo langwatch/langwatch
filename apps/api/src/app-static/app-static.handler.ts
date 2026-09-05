@@ -32,24 +32,9 @@ const NO_STORE_CACHE = "no-store, max-age=0";
 const HTML_REVALIDATE_CACHE = "no-cache";
 
 /**
- * Production static file + SPA fallback handler.
- *
- * Returns true when the response was written (caller should not write further).
- * Returns false only when there is no index.html to fall back to (caller decides
- * how to 404).
- *
- * The HTML shell (the SPA fallback and any `.html` request) is read and
- * transformed to inject the runtime asset base and validated public boot
+ * Production static file + SPA fallback handler. Returns true when the response was written
+ * (caller should not write further).
  * configuration (ADR-086 and ADR-104), so it cannot be streamed raw like other
- * static files. Everything else is streamed straight off disk.
- *
- * Why missing /assets/* returns 404 instead of falling through to index.html:
- * Vite hashes asset filenames per build, so chunk URLs from a previous deploy
- * point to files that no longer exist. If we returned the SPA shell with a 200
- * status, a CDN with a "cache everything under /assets/* immutably" rule would
- * cache the HTML response under the JS URL — every subsequent visitor then hits
- * a strict-MIME violation in the browser, even after a roll-forward, until the
- * cache is manually purged.
  */
 export function serveStaticOrFallback({
   res,
@@ -98,10 +83,9 @@ export function serveStaticOrFallback({
 }
 
 /**
- * Open + stream a static file in one step, avoiding the TOCTOU race between
- * existsSync and createReadStream. Returns false when the file doesn't exist
- * or isn't a regular file so the caller can fall through. Never handles HTML —
- * `.html` is routed to tryServeHtml so the asset base can be injected.
+ * Open + stream a static file in one step, avoiding the TOCTOU race between existsSync and
+ * createReadStream. Returns false when the file doesn't exist or isn't a regular file so the
+ * caller can fall through.
  */
 function tryServeFile({
   res,
@@ -136,10 +120,9 @@ function tryServeFile({
 }
 
 /**
- * Read an HTML shell, inject the runtime asset base and public configuration,
- * and send it with a revalidate cache. Held open via fd (atomic, no TOCTOU)
- * while read. Returns false only when the file doesn't exist or isn't a regular
- * file, so the SPA fallback can decide how to 404.
+ * Read an HTML shell, inject the runtime asset base and public configuration, and send it with
+ * a revalidate cache. Held open via fd (atomic, no TOCTOU) while read. Returns false only when
+ * the file doesn't exist or isn't a regular file, so the SPA fallback can decide how to 404.
  */
 function tryServeHtml({
   res,

@@ -3,10 +3,8 @@ import { runActorLabelSchema } from "./run-actor";
 import { runParameterValuesSchema } from "./scenario.parameters";
 
 /**
- * Persisted and wire-visible state of one simulation run.
- *
- * `STALLED` remains readable for historical rows. New stalled executions end
- * as `ERROR` through the execution process manager.
+ * Persisted and wire-visible state of one simulation run. `STALLED` remains readable for
+ * historical rows. New stalled executions end as `ERROR` through the execution process manager.
  */
 export enum SimulationRunStatus {
   SUCCESS = "SUCCESS",
@@ -52,25 +50,13 @@ export const simulationRunMetadataSchema = z
     name: z.string().optional(),
     description: z.string().optional(),
     /**
-     * One short line describing why the batch was run. A TOP-LEVEL key, not a
-     * member of the reserved namespace: it is the person's own words about the
-     * run, not platform context.
-     *
+     * One short line describing why the batch was run. A TOP-LEVEL key, not a member of the
+     * reserved namespace: it is the person's own words about the run, not platform context.
      * @see specs/scenarios/run-note-on-runs.feature
      */
     note: z.string().optional(),
     /**
      * The reserved namespace the queue path stamps.
-     *
-     * Restated rather than imported from `langwatchMetadataSchema`: that
-     * module reaches `@ag-ui/core` through the event schemas, and importing it
-     * here closes an import cycle that leaves the ag-ui enums undefined at
-     * load. The two must stay in step, which the contract test pins.
-     *
-     * Loose rather than strict, so a field the writer stamps and this reader
-     * has not heard of yet survives the read instead of being dropped — which
-     * is how the API used to answer `scenarioVersion: null` for runs that had
-     * one.
      */
     langwatch: z
       .looseObject({
@@ -158,9 +144,6 @@ export const simulationBatchSummarySchema = z.object({
   note: z.string().nullable(),
   /**
    * The person who started this batch, or null when the batch names none.
-   * Every run of a batch carries the same actor, so it is read back off the
-   * runs themselves, the same way the note is.
-   *
    * @see specs/scenarios/run-actor-on-runs.feature
    */
   startedBy: z.object({ id: z.string(), label: runActorLabelSchema }).nullable(),

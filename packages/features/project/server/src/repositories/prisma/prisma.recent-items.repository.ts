@@ -9,16 +9,8 @@ import {
 } from "../recent-items.repository";
 
 /**
- * The audit-trail reads behind the home screen's recent strip, and the five
- * entity lookups that hydrate what it finds there.
- *
- * The client is INJECTED rather than imported: the repository moved out of the
- * web application with the service above it, and the connection it runs on
- * belongs to whichever process composed one.
- *
- * Every entity lookup is a `try*`: the strip reads an audit trail, so it names
- * rows that may since have been deleted, and absence is the ordinary answer
- * rather than a failure.
+ * The audit-trail reads behind the home screen's recent strip, and the five entity lookups that
+ * hydrate what it finds there.
  */
 export class PrismaRecentItemsRepository extends RecentItemsRepository {
   private constructor(private readonly prisma: PrismaClient) {

@@ -25,9 +25,8 @@ export abstract class SuiteService {
   abstract run(input: SuiteRunInput): Promise<SuiteRunResult>;
   abstract runAll(input: SuiteRunAllInput): Promise<SuiteRunAllResult>;
   /**
-   * Starts a run under a NAME, which is what identifies a run plan: the name
-   * either joins an existing plan and replaces its config, or creates one.
-   *
+   * Starts a run under a NAME, which is what identifies a run plan: the name either joins an
+   * existing plan and replaces its config, or creates one.
    * @see specs/suites/run-plan-identity-by-name.feature
    */
   abstract runPlan(input: SuiteRunPlanInput): Promise<SuiteRunPlanResult>;

@@ -18,6 +18,7 @@ import {
   type FetchInitWithDispatcher,
   NLP_FETCH_HEADROOM_MS,
   NlpFetchAdapter,
+  type NlpFetchTimeouts,
 } from "./nlp-fetch.adapter";
 import { SerializedAgentAdapter } from "./serialized-agent.base";
 
@@ -56,6 +57,7 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
     nlpServiceUrl: string;
     projectApiKey: string;
     parameters?: RunParameterValues;
+    timeouts?: NlpFetchTimeouts;
   }): SerializedCodeAgentAdapter {
     return new SerializedCodeAgentAdapter(options);
   }
@@ -80,23 +82,28 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
    * native types (a boolean stays a boolean, a number stays a number).
    */
   private readonly parameters: RunParameterValues;
+  /** The operator's deadlines, as the process that composed this read them. */
+  private readonly timeouts: NlpFetchTimeouts;
 
   constructor({
     config,
     nlpServiceUrl,
     projectApiKey,
     parameters,
+    timeouts,
   }: {
     config: CodeAgentData;
     nlpServiceUrl: string;
     projectApiKey: string;
     parameters?: RunParameterValues;
+    timeouts?: NlpFetchTimeouts;
   }) {
     super();
     this.config = config;
     this.nlpServiceUrl = nlpServiceUrl;
     this.projectApiKey = projectApiKey;
     this.parameters = parameters ?? {};
+    this.timeouts = timeouts ?? {};
     this.name = "SerializedCodeAgentAdapter";
   }
 
@@ -268,7 +275,7 @@ export class SerializedCodeAgentAdapter extends SerializedAgentAdapter {
    */
   private fetchTimeoutMs(): number {
     const { timeoutMs } = this.config;
-    const transport = NlpFetchAdapter.create();
+    const transport = NlpFetchAdapter.create({ timeouts: this.timeouts });
     const floorTimeoutMs = transport.floorTimeoutMs();
     const maxTimeoutMs = transport.maxTimeoutMs();
     if (timeoutMs === undefined) {

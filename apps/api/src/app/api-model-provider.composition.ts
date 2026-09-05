@@ -1,51 +1,5 @@
 /**
  * The model gateway, composed over this process's own graph.
- *
- * Until this module existed `modelProviders` was a host OPTION and nobody
- * supplied one, so the EXECUTION half — `workflow.*`, `optimization.*`,
- * `experiments.*` and `evaluations.*` — was structurally unreachable in
- * production: a Studio node's model is resolved per run, the workflow service
- * cannot be built without a gateway, and the six ports
- * `PostgresModelProviderAdapter` needs were all `platform/app` classes.
- *
- * They are not any more. Every one of the six is composed here: four are
- * answered from services this process ALREADY holds, and the implementations
- * that were platform-only moved into `@langwatch/model-provider-server` with
- * the originals deleted:
- *
- *   credentials      the deployment's stored-secret cipher — the SAME
- *                    `SecretEncryptionPort` the secret service is built on, so
- *                    a credential written by the platform app decrypts here
- *                    and one written here decrypts there. Its lenient read
- *                    (legacy plaintext row, absent column, undecryptable
- *                    column) moved into the package with it.
- *   rateLimiter      the process's own fixed-window counter, over the SAME
- *                    Redis the queue owns. The two windows a connection test
- *                    is bounded by are the feature's and moved with it.
- *   ids              the feature's three row prefixes over this process's
- *                    `nanoid`.
- *   catalog          the packaged registry plus three facts that are the
- *                    DEPLOYMENT's: which system providers it credentials,
- *                    whether it is the hosted install, and its guarded egress.
- *   codexRefresher   the OAuth device-flow account service, moved whole.
- *   translation      one model call through the moved resolution cascade.
- *
- * ## What is named absent, and what that costs
- *
- * **Codex handles.** A codex model executes on the AI gateway's Responses
- * endpoint under the project's virtual key, and this process composes no
- * virtual-key provisioner. The cascade therefore refuses a codex model BY NAME
- * rather than resolving it to something else — silently substituting a model
- * the customer did not choose is the failure that refusal exists to prevent.
- * Every other provider is unaffected.
- *
- * **Managed providers.** `ModelProviderManagedGatewayPort` decides whether
- * LangWatch supplies an organization's credentials. It is answered here from
- * the Enterprise managed-provider service, composed over the same project
- * service, so a managed-Bedrock organization's run gets the proxy credentials
- * it has always got. A deployment without the Enterprise configuration gets
- * the same service answering "no organization is managed", which is the true
- * answer rather than a default.
  */
 import type { AuthzService } from "@langwatch/authz-contract";
 import {
@@ -93,10 +47,8 @@ export type ApiModelProviderCompositionOptions = Readonly<{
   /** Decides who may read and write a provider row. */
   authorization: AuthzService;
   /**
-   * The deployment's stored-secret cipher.
-   *
-   * Required: a gateway composed without one could not read a single stored
-   * credential, and every provider would look configured-but-unusable. The
+   * The deployment's stored-secret cipher. Required: a gateway composed without one could not
+   * read a single stored credential, and every provider would look configured-but-unusable. The
    * process gates on it rather than composing a gateway that answers nothing.
    */
   encryption: SecretEncryptionPort;
@@ -107,22 +59,14 @@ export type ApiModelProviderCompositionOptions = Readonly<{
   /** Whether this is the hosted deployment; system providers exist only there. */
   isSaas: boolean;
   /**
-   * The address policy a credential probe is fenced by, and whether its TLS is
-   * verified.
-   *
-   * The deployment's, so it arrives whole from configuration: the metadata
-   * endpoints and the cloud-provider domains are refused by the fence itself
-   * whatever this says.
+   * The address policy a credential probe is fenced by, and whether its TLS is verified. The
+   * deployment's, so it arrives whole from configuration: the metadata endpoints and the
+   * cloud-provider domains are refused by the fence itself whatever this says.
    */
   egress: ModelProviderEgressPolicy;
   /**
-   * Where the NLP engine answers, which is also where a resolved model is
-   * executed: the OpenAI-compatible proxy hangs off it.
-   *
-   * Absent is a deployment that executes nothing, and it is the same shape the
-   * workflow NLP port has — the cascade still answers "you have configured no
-   * providers" and "that provider is switched off" first, because those are
-   * the answers a customer can act on.
+   * Where the NLP engine answers, which is also where a resolved model is executed: the
+   * OpenAI-compatible proxy hangs off it.
    */
   nlpServiceUrl: string | undefined;
   /** Names this process in a refusal a stand-in raises. */
@@ -176,14 +120,7 @@ export function composeApiModelProviders(
 }
 
 /**
- * The address a resolved model is executed against when no engine is
- * configured.
- *
- * A URL rather than an absence because the cascade's own answers — "you have
- * configured no providers", "the provider you chose is switched off" — are the
- * ones a customer can act on, and they come first. A deployment with no engine
- * reaches this only after resolving a model successfully, and the call then
- * fails as a connection failure to a name that says why.
+ * The address a resolved model is executed against when no engine is configured.
  */
 const UNCONFIGURED_EXECUTION_PROXY = "http://nlp-engine-not-configured.invalid";
 
@@ -223,12 +160,9 @@ class ApiManagedProviderConfigurationReporter extends ManagedProviderConfigurati
 }
 
 /**
- * The two managed-provider answers the catalogue asks for, from the Enterprise
- * service.
- *
- * A narrow adapter rather than the service itself, because the model-provider
- * package is not Enterprise and may not name an Enterprise contract. The
- * composition root is the one place both are in scope.
+ * The two managed-provider answers the catalogue asks for, from the Enterprise service. A
+ * narrow adapter rather than the service itself, because the model-provider package is not
+ * Enterprise and may not name an Enterprise contract.
  */
 class ApiManagedModelProviderGatewayAdapter extends ModelProviderManagedGatewayPort {
   static create(input: { service: ManagedProviderService }): ApiManagedModelProviderGatewayAdapter {
@@ -283,15 +217,9 @@ class ApiModelProviderRateLimitAdapter extends ModelProviderRateLimitPort {
 }
 
 /**
- * Names which precondition a model gateway is missing, so an operator reading
- * "no workflow surfaces" can tell a deployment that has no database from one
- * whose tenancy graph never composed.
- *
- * `no-encryption` is the third reason and the one no composition root reaches:
- * the tenancy graph is gated on the same cipher, so a half reached with a
- * composed tenancy provably holds one. It stays because the cipher is this
- * half's own non-optional input, and a gateway that vanished silently would be
- * worse than one that names the precondition it wanted.
+ * Names which precondition a model gateway is missing, so an operator reading "no workflow
+ * surfaces" can tell a deployment that has no database from one whose tenancy graph never
+ * composed.
  */
 export class LoggedApiModelProviderAbsence {
   static create(logger: Pick<Logger, "info">): LoggedApiModelProviderAbsence {

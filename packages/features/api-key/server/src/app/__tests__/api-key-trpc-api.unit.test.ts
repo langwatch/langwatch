@@ -1,23 +1,5 @@
 /**
  * @vitest-environment node
- *
- * The `apiKey.*` tRPC surface itself: the nine procedure names the drawers
- * call, the membership gate that runs inside every one of them before any key
- * is read, the admin gates on the two privileged create paths, the named
- * refusal each failure raises, and — the reason this file exists at all —
- * where key material is allowed to appear.
- *
- * Refusals are asserted by handled `code` and `httpStatus` rather than by tRPC
- * code, because that pair IS what the surface decides: the process's
- * handled-error middleware derives the tRPC code from the status.
- *
- * A minted token is returned exactly once, by `create`. Every read hands back
- * a five-character `lookupIdPrefix` and nothing more, and no audit record
- * carries the secret. Those are the assertions to break loudest.
- *
- * The procedure handed in narrows its own context the way an authenticated
- * process procedure does, so this also pins that a process can hand over a
- * procedure it has already composed.
  */
 import {
   ApiKeyAlreadyRevokedError,

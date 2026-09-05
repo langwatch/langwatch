@@ -1,12 +1,7 @@
 import * as os from "node:os";
 import { createLogger } from "@langwatch/observability";
 import {
-  LATENCY_HOUR_BUCKET_MS,
-  LATENCY_MINUTE_BUCKET_MS,
   SNAPSHOT_VERSION,
-  latencyAllTimeKey,
-  latencyHourBucketKey,
-  latencyMinuteBucketKey,
   mergeHistogramCounts,
   windowPercentiles,
 } from "@langwatch/ops-contract";
@@ -25,8 +20,7 @@ import type {
 } from "@langwatch/ops-contract";
 import { normalizeErrorMessage } from "../ops.error-normalizer";
 import { computeEngineCpuPercent, type RedisCpuSample } from "../ops.redis-engine-cpu";
-import type IORedis from "ioredis";
-import type { Cluster } from "ioredis";
+import type { OpsMetricsRepository } from "../repositories/ops-metrics.repository";
 import { totalInFlight as computeTotalInFlight } from "../ops.in-flight";
 
 const logger = createLogger("langwatch:ops:metrics-collector");
@@ -48,9 +42,10 @@ const DETAIL_CYCLE_INTERVAL_MS = 15_000;
 const MAX_ERROR_CLUSTERS = 50;
 const MAX_PARKED_TENANTS = 50;
 
-const REDIS_STATE_KEY = "ops:metrics:state";
-const KNOWN_PIPELINES_KEY = "ops:known-pipelines";
 const JOB_NAME_COUNTER_PREFIX = "jn:";
+
+/** How long a known pipeline path stays listed after it was last seen. */
+const KNOWN_PIPELINE_PATH_TTL_MS = 24 * 60 * 60 * 1000;
 
 interface PersistedMetricsState {
   version: 3;
@@ -186,7 +181,7 @@ function mergeThroughput({
  * The lease-elected snapshot writer (ADR-090).
  */
 export class OpsMetricsCollectorService {
-  private redis: IORedis | Cluster;
+  private metrics: OpsMetricsRepository;
   private groupQueueNames: string[] = [];
   private throughputBuffer: ThroughputPoint[] = [];
   private lastTotalInFlight = 0;
@@ -295,7 +290,7 @@ export class OpsMetricsCollectorService {
   private static singleton: OpsMetricsCollectorService | null = null;
 
   static create(params: {
-    redis: IORedis | Cluster;
+    metrics: OpsMetricsRepository;
     ops: OpsService;
     snapshots?: OpsSnapshotService | null;
     writerId?: string;
@@ -305,7 +300,7 @@ export class OpsMetricsCollectorService {
 
   /** The process-wide collector, started on first call. */
   static getSingleton(params: {
-    redis: IORedis | Cluster;
+    metrics: OpsMetricsRepository;
     ops: OpsService;
     snapshots?: OpsSnapshotService | null;
   }): OpsMetricsCollectorService {
@@ -441,12 +436,12 @@ export class OpsMetricsCollectorService {
   }
 
   private constructor(params: {
-    redis: IORedis | Cluster;
+    metrics: OpsMetricsRepository;
     ops: OpsService;
     snapshots?: OpsSnapshotService | null;
     writerId?: string;
   }) {
-    this.redis = params.redis;
+    this.metrics = params.metrics;
     this.ops = params.ops;
     this.snapshots = params.snapshots ?? null;
     this.writerId = params.writerId ?? `${os.hostname()}:${process.pid}`;
@@ -843,66 +838,20 @@ export class OpsMetricsCollectorService {
     }
   }
 
-  private buildLatencyReadPlan(nowMs: number): {
-    pipeline: ReturnType<IORedis["pipeline"]>;
-    plan: Array<"minute" | "hour" | "all">;
-  } {
-    const pipeline = this.redis.pipeline();
-    const plan: Array<"minute" | "hour" | "all"> = [];
-    for (const queueName of this.groupQueueNames) {
-      for (let i = 0; i < 60; i++) {
-        pipeline.hgetall(latencyMinuteBucketKey(queueName, nowMs - i * LATENCY_MINUTE_BUCKET_MS));
-        plan.push("minute");
-      }
-
-      for (let i = 0; i < 168; i++) {
-        pipeline.hgetall(latencyHourBucketKey(queueName, nowMs - i * LATENCY_HOUR_BUCKET_MS));
-        plan.push("hour");
-      }
-
-      pipeline.hgetall(latencyAllTimeKey(queueName));
-      plan.push("all");
-    }
-
-    return { pipeline, plan };
-  }
-
   private async readLatencyWindows(): Promise<LatencyWindows> {
-    const { pipeline, plan } = this.buildLatencyReadPlan(Date.now());
-    const results = (await pipeline.exec()) ?? [];
-
-    const minuteHashes: Array<Record<string, string>> = [];
-    const dayHashes: Array<Record<string, string>> = [];
-    const weekHashes: Array<Record<string, string>> = [];
-    const allHashes: Array<Record<string, string>> = [];
-    let hourIndex = 0;
-    for (let i = 0; i < plan.length; i++) {
-      const hash = (results[i]?.[1] as Record<string, string>) ?? {};
-      if (plan[i] === "minute") {
-        minuteHashes.push(hash);
-        continue;
-      }
-
-      if (plan[i] === "all") {
-        allHashes.push(hash);
-        continue;
-      }
-
-      // Hour buckets are emitted newest-first per queue; the first 24 of
-      // each queue's 168 belong to the day window as well as the week's.
-      if (hourIndex % 168 < 24) {
-        dayHashes.push(hash);
-      }
-
-      weekHashes.push(hash);
-      hourIndex++;
-    }
+    const { minute, hourByQueue, allTime } = await this.metrics.readLatencyHistograms({
+      queueNames: this.groupQueueNames,
+      nowMs: Date.now(),
+    });
+    // Hour buckets come back newest-first per queue; the first 24 of each
+    // queue's 168 belong to the day window as well as the week's.
+    const dayHashes = hourByQueue.flatMap((hours) => hours.slice(0, 24));
 
     return {
-      hour: windowPercentiles(mergeHistogramCounts(minuteHashes)),
+      hour: windowPercentiles(mergeHistogramCounts(minute)),
       day: windowPercentiles(mergeHistogramCounts(dayHashes)),
-      week: windowPercentiles(mergeHistogramCounts(weekHashes)),
-      allTime: windowPercentiles(mergeHistogramCounts(allHashes)),
+      week: windowPercentiles(mergeHistogramCounts(hourByQueue.flat())),
+      allTime: windowPercentiles(mergeHistogramCounts(allTime)),
     };
   }
 
@@ -962,38 +911,6 @@ export class OpsMetricsCollectorService {
   }
 
   /** Flattens a pipeline's per-queue `smembers` results into the set of paused job keys. */
-  private static extractPausedKeys(pausedResults: Array<[Error | null, unknown]>): Set<string> {
-    const pausedKeysSet = new Set<string>();
-    for (const [, result] of pausedResults) {
-      if (Array.isArray(result)) {
-        for (const key of result) {
-          pausedKeysSet.add(key as string);
-        }
-      }
-    }
-
-    return pausedKeysSet;
-  }
-
-  /** Flattens a pipeline's per-queue `lrange` results into finite, non-negative latency samples. */
-  private static extractLatenciesMs(latencyResults: Array<[Error | null, unknown]>): number[] {
-    const latencies: number[] = [];
-    for (const [, result] of latencyResults) {
-      if (!Array.isArray(result)) {
-        continue;
-      }
-
-      for (const raw of result) {
-        const ms = Number(raw);
-        if (Number.isFinite(ms) && ms >= 0) {
-          latencies.push(ms);
-        }
-      }
-    }
-
-    return latencies;
-  }
-
   private async computeJobMetrics({
     queues,
     elapsed,
@@ -1006,45 +923,28 @@ export class OpsMetricsCollectorService {
     let newCompleted = 0;
     let newFailed = 0;
 
-    const pipeline = this.redis.pipeline();
-    for (const name of this.groupQueueNames) {
-      pipeline.get(`${name}:gq:stats:completed`);
-      pipeline.get(`${name}:gq:stats:failed`);
-    }
+    const totals = await this.metrics.readQueueTotals({ queueNames: this.groupQueueNames });
+    for (let i = 0; i < this.groupQueueNames.length; i++) {
+      const name = this.groupQueueNames[i]!;
+      const { completed: completedTotal, failed: failedTotal } = totals[i]!;
 
-    const results = await pipeline.exec();
+      const prevC = this.prevCompleted.get(name) ?? 0;
+      const prevF = this.prevFailed.get(name) ?? 0;
 
-    if (results) {
-      for (let i = 0; i < this.groupQueueNames.length; i++) {
-        const name = this.groupQueueNames[i]!;
-        const completedTotal = Number(results[i * 2]?.[1] ?? 0);
-        const failedTotal = Number(results[i * 2 + 1]?.[1] ?? 0);
-
-        const prevC = this.prevCompleted.get(name) ?? 0;
-        const prevF = this.prevFailed.get(name) ?? 0;
-
-        if (this.prevCompleted.has(name)) {
-          newCompleted += Math.max(0, completedTotal - prevC);
-          newFailed += Math.max(0, failedTotal - prevF);
-        }
-
-        this.prevCompleted.set(name, completedTotal);
-        this.prevFailed.set(name, failedTotal);
+      if (this.prevCompleted.has(name)) {
+        newCompleted += Math.max(0, completedTotal - prevC);
+        newFailed += Math.max(0, failedTotal - prevF);
       }
+
+      this.prevCompleted.set(name, completedTotal);
+      this.prevFailed.set(name, failedTotal);
     }
 
     const latencies: number[] = [];
     if (newCompleted > 0 || !this.hasBaseline) {
-      const latencyPipeline = this.redis.pipeline();
-      for (const name of this.groupQueueNames) {
-        latencyPipeline.lrange(`${name}:gq:stats:latencies-ms`, 0, -1);
-      }
-
-      const latencyResults = await latencyPipeline.exec();
-
-      if (latencyResults) {
-        latencies.push(...OpsMetricsCollectorService.extractLatenciesMs(latencyResults));
-      }
+      latencies.push(
+        ...(await this.metrics.readLatencySamplesMs({ queueNames: this.groupQueueNames })),
+      );
     }
 
     if (latencies.length > 0) {
@@ -1083,34 +983,10 @@ export class OpsMetricsCollectorService {
       uniqueJobNames.add(compositeKey.split("::")[1] ?? compositeKey);
     }
 
-    const jobNameCounterPipeline = this.redis.pipeline();
-    const dedupedJobNames: string[] = [];
-    for (const jobName of uniqueJobNames) {
-      for (const queueName of this.groupQueueNames) {
-        jobNameCounterPipeline.get(`${queueName}:gq:stats:completed:${jobName}`);
-        jobNameCounterPipeline.get(`${queueName}:gq:stats:failed:${jobName}`);
-      }
-
-      dedupedJobNames.push(jobName);
-    }
-
-    const jobNameCounterResults =
-      dedupedJobNames.length > 0 ? await jobNameCounterPipeline.exec() : [];
-
-    const jobNameTotals = new Map<string, { completed: number; failed: number }>();
-    if (jobNameCounterResults) {
-      for (let i = 0; i < dedupedJobNames.length; i++) {
-        let completed = 0;
-        let failed = 0;
-        for (let q = 0; q < this.groupQueueNames.length; q++) {
-          const baseIdx = (i * this.groupQueueNames.length + q) * 2;
-          completed += Number(jobNameCounterResults[baseIdx]?.[1] ?? 0);
-          failed += Number(jobNameCounterResults[baseIdx + 1]?.[1] ?? 0);
-        }
-
-        jobNameTotals.set(dedupedJobNames[i]!, { completed, failed });
-      }
-    }
+    const jobNameTotals = await this.metrics.readJobNameTotals({
+      queueNames: this.groupQueueNames,
+      jobNames: [...uniqueJobNames],
+    });
 
     const metrics: JobNameMetrics[] = [];
     for (const [compositeKey, counts] of jobNameCounts) {
@@ -1169,7 +1045,7 @@ export class OpsMetricsCollectorService {
    */
   private async restoreState(): Promise<void> {
     try {
-      const raw = await this.redis.get(REDIS_STATE_KEY);
+      const raw = await this.metrics.readPersistedState();
       if (!raw) {
         return;
       }
@@ -1229,11 +1105,14 @@ export class OpsMetricsCollectorService {
       latestTotalCompleted: this.latestTotalCompleted,
       latestTotalFailed: this.latestTotalFailed,
     };
-    await this.redis.set(REDIS_STATE_KEY, JSON.stringify(state), "EX", REDIS_STATE_TTL_SECONDS);
+    await this.metrics.writePersistedState({
+      state: JSON.stringify(state),
+      ttlSeconds: REDIS_STATE_TTL_SECONDS,
+    });
   }
 
   private async getRedisInfo(): Promise<RedisInfo> {
-    const info = await this.redis.info();
+    const info = await this.metrics.readServerInfo();
     const get = (key: string): string => {
       const match = info.match(new RegExp(`${key}:(.+)`));
 
@@ -1321,17 +1200,9 @@ export class OpsMetricsCollectorService {
         sampledAt,
       };
 
-      const pausedPipeline = this.redis.pipeline();
-      for (const name of this.groupQueueNames) {
-        pausedPipeline.smembers(`${name}:gq:paused-jobs`);
-      }
-
-      const pausedResults = await pausedPipeline.exec();
-      const pausedKeysSet = pausedResults
-        ? OpsMetricsCollectorService.extractPausedKeys(pausedResults)
-        : new Set<string>();
-
-      this.currentPausedKeys = Array.from(pausedKeysSet);
+      this.currentPausedKeys = await this.metrics.readPausedJobKeys({
+        queueNames: this.groupQueueNames,
+      });
 
       const discoveredPaths = new Set<string>();
       for (const q of queues) {
@@ -1345,17 +1216,14 @@ export class OpsMetricsCollectorService {
 
       if (discoveredPaths.size > 0) {
         const timestamp = Date.now();
-        const pipelineBatch = this.redis.pipeline();
-        for (const path of discoveredPaths) {
-          pipelineBatch.zadd(KNOWN_PIPELINES_KEY, timestamp, path);
-        }
-
-        pipelineBatch.zremrangebyscore(KNOWN_PIPELINES_KEY, 0, timestamp - 86400 * 1000);
-        await pipelineBatch.exec();
+        await this.metrics.recordKnownPipelinePaths({
+          paths: [...discoveredPaths],
+          at: timestamp,
+          dropBefore: timestamp - KNOWN_PIPELINE_PATH_TTL_MS,
+        });
       }
 
-      const knownPaths = await this.redis.zrange(KNOWN_PIPELINES_KEY, 0, 9999);
-      this.knownPipelinePaths = knownPaths;
+      this.knownPipelinePaths = await this.metrics.readKnownPipelinePaths();
 
       // Reported on its own below as `pendingCount`, which stays pending-only.
       let totalPending = 0;

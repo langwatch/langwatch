@@ -111,11 +111,9 @@ function handlerOptions(handler: unknown): HandlerOptions {
 }
 
 /**
- * The invariant these tests exist for broke IRSA in production once: a
- * `credentials` object built from unset environment variables reaches the SDK
- * as `{accessKeyId: "", secretAccessKey: ""}`, which the SDK treats as a real
- * answer and stops looking with. The pod had a role, and we told it we had
- * keys.
+ * The invariant these tests exist for broke IRSA in production once: a `credentials` object
+ * built from unset environment variables reaches the SDK as `{accessKeyId: "", secretAccessKey:
+ * ""}`, which the SDK treats as a real answer and stops looking with.
  */
 class RecordingProxyResolver extends OutboundProxyResolverPort {
   readonly hosts: string[] = [];
@@ -242,10 +240,9 @@ describe("buildAwsClientConfig", () => {
     const paramsOfLastCall = () => vi.mocked(fromTemporaryCredentials).mock.lastCall![0]!;
 
     /**
-     * The ExternalId is what proves the AssumeRole request came from us rather
-     * than from anyone who learned the role's name, so it has to reach the
-     * provider. Asserting only that a function came back kept passing with the
-     * ExternalId deleted.
+     * The ExternalId is what proves the AssumeRole request came from us rather than from anyone
+     * who learned the role's name, so it has to reach the provider. Asserting only that a
+     * function came back kept passing with the ExternalId deleted.
      */
     it("passes the role, the external id and the session through to the provider", () => {
       const config = buildAwsClientConfig({
@@ -324,11 +321,8 @@ describe("buildAwsClientConfig", () => {
     });
 
     /**
-     * The China partition serves both SQS and STS under .amazonaws.com.cn, and
-     * queue URLs in that partition are admitted. The STS host is only ever
-     * handed to the proxy resolver, so spelling it .amazonaws.com asks the
-     * bypass rules about a host that does not exist: a rule written for the
-     * partition never matches, and the two legs take opposite proxy decisions.
+     * The China partition serves both SQS and STS under .amazonaws.com.cn, and queue URLs in
+     * that partition are admitted.
      */
     it("resolves the proxy against the China partition's own STS host", () => {
       outboundProxy = new RecordingProxyResolver((hostname) =>

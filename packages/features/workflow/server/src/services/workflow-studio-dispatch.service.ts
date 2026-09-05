@@ -1,17 +1,5 @@
 /**
  * One studio run, dispatched to the engine and streamed back event by event.
- *
- * This is the protocol half of the platform app's `studioBackendPostEvent`: the
- * sampling-parameter strip at the dispatch chokepoint, the server-sent event
- * framing, the abort protocol, and the rule that a stream failure is reported
- * to the caller AS a studio event rather than thrown at them.
- *
- * The last of those is the part worth stating. A studio run is watched, not
- * awaited: the browser has a node lit up and a Stop button, and a rejected
- * promise leaves both exactly as they were. So a failure becomes a
- * `component_state_change` for the node that was running, or a bare `error`
- * event when the message named no node — which is what turns a dead engine
- * into a red node with a message on it.
  */
 import { createLogger } from "@langwatch/observability";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
@@ -27,12 +15,9 @@ import { WorkflowNlpExecutionService } from "./workflow-nlp-execution.service";
 const logger = createLogger("langwatch:workflows:studio-dispatch");
 
 /**
- * How often the abort flag is polled while a read is still pending.
- *
- * The orchestrator signals an abort through a Redis flag rather than a push, so
- * a cell blocked on a slow model response only learns about one by asking. A
- * second keeps the Stop button responsive without adding meaningful load during
- * normal streaming, where reads resolve well before it fires.
+ * How often the abort flag is polled while a read is still pending. The orchestrator signals an
+ * abort through a Redis flag rather than a push, so a cell blocked on a slow model response
+ * only learns about one by asking.
  */
 const ABORT_POLL_INTERVAL_MS = 1000;
 
@@ -88,13 +73,9 @@ export class WorkflowStudioDispatchService {
   }
 
   /**
-   * Strips every sampling parameter a node's model does not list as supported.
-   *
-   * The dispatch is the chokepoint on purpose: a saved prompt-config blob an
-   * older edit left a stale `top_p` on is rejected by Bedrock and several
-   * others, and the author has no way to see it. Best-effort, so a
-   * registry-lookup miss forwards the original payload rather than blocking a
-   * run that would have worked.
+   * Strips every sampling parameter a node's model does not list as supported. The dispatch is
+   * the chokepoint on purpose: a saved prompt-config blob an older edit left a stale `top_p` on
+   * is rejected by Bedrock and several others, and the author has no way to see it.
    */
   private async stripUnsupportedParams(input: WorkflowStudioDispatchInput): Promise<void> {
     const workflow = studioWorkflowOf(input.event);
@@ -116,13 +97,9 @@ export class WorkflowStudioDispatchService {
   }
 
   /**
-   * The engine's server-sent events, decoded as they arrive.
-   *
-   * Frames are separated by a blank line, so a chunk is buffered until it holds
-   * one and the trailing partial frame is carried into the next read. Reading
-   * to the end without ever seeing a frame is a failure rather than an empty
-   * run: it means the engine answered something that was not a stream, and the
-   * body is what says what.
+   * The engine's server-sent events, decoded as they arrive. Frames are separated by a blank
+   * line, so a chunk is buffered until it holds one and the trailing partial frame is carried
+   * into the next read.
    */
   private async readStream(
     reader: ReadableStreamDefaultReader<Uint8Array>,
@@ -215,12 +192,8 @@ function studioWorkflowOf(event: StudioClientEvent): StudioWorkflow | null {
 }
 
 /**
- * A connection failure, named as one.
- *
- * A refused or timed-out socket reaches here as `fetch failed` with the real
- * reason on `cause.code`, which is unreadable in a toast. The engine being
- * unreachable is the single most common studio failure on a self-hosted
- * install, and it is worth saying in those words.
+ * A connection failure, named as one. A refused or timed-out socket reaches here as `fetch
+ * failed` with the real reason on `cause.code`, which is unreadable in a toast.
  */
 function asReachabilityError(error: unknown): Error {
   const cause = (error as { cause?: { code?: string } } | null)?.cause;
@@ -261,14 +234,9 @@ function reportAsStudioEvent(error: unknown, input: WorkflowStudioDispatchInput)
 }
 
 /**
- * Reads the next chunk, resolving to `"aborted"` if an abort is requested while
- * the read is still pending.
- *
- * Without the race an abort is only noticed BETWEEN chunks, so a cell blocked
- * on a slow model response keeps running until that response arrives.
- * Cancelling the reader afterwards closes the connection to the engine, whose
- * request context then cancels the in-flight execution — the Go engine treats a
- * client disconnect as the cancel signal and has no separate in-process stop.
+ * Reads the next chunk, resolving to `"aborted"` if an abort is requested while the read is
+ * still pending. Without the race an abort is only noticed BETWEEN chunks, so a cell blocked on
+ * a slow model response keeps running until that response arrives.
  */
 async function readChunkOrAbort(
   reader: ReadableStreamDefaultReader<Uint8Array>,

@@ -2,20 +2,9 @@ import { describe, expect, it } from "vitest";
 import { HttpWorkflowNlpRuntimeAdapter } from "../workflow-nlp-runtime.adapter";
 
 /**
- * Unit tests for the W3C traceparent header formatting in nlpgoFetch.
- *
- * Why this matters: the NLP runtime adapter is the dispatch boundary between TS
- * (eval-execution.service) and the nlpgo subprocess. Without a valid
- * `traceparent` header on the request, nlpgo's `startStudioSpan` cannot
- * extract a parent SpanContext and the eval workflow emits spans on a
- * brand-new trace_id — orphaned from the trace it was evaluating.
- *
- * This is the exact prod bug rchaves caught on 2026-05-14: the eval
- * ran, nlpgo emitted spans, but the spans landed under a separate
- * trace_id with no link back to the parent.
- *
- * These tests pin the wire-format contract so a future refactor can't
- * silently regress it.
+ * Unit tests for the W3C traceparent header formatting in nlpgoFetch. Why this matters: the NLP
+ * runtime adapter is the dispatch boundary between TS (eval-execution.service) and the nlpgo
+ * subprocess.
  */
 describe("formatTraceparent", () => {
   /** @scenario formatTraceparent builds a valid W3C traceparent header */

@@ -2,6 +2,7 @@
 import { Alert, Badge, HStack, Text, VStack } from "@chakra-ui/react";
 import type { SignInMethod } from "@langwatch/identity-contract";
 import type { ReactNode } from "react";
+import { useOptionalAuthHost } from "../../model/auth-host";
 import { signInMethodActionLabel } from "../../model/method-labels";
 import { signInRoutingReasonCopy } from "../../model/routing-reason-copy";
 import "../elements/auth-front-door.css";
@@ -15,9 +16,12 @@ import { SignInMethodIcon } from "../elements/sign-in-method-icon";
  * decision offers none of them — which would hide the whole social rail from
  * exactly the people iterating on it. In dev the rail shows the cloud's full
  * social set, wired to the real sign-in call; everywhere else the rail is
- * exactly what the decision offered.
+ * exactly what the decision offered. The deployment is the host's to say, and
+ * a fragment rendered with no host above it reads production.
  */
-const DEV_SHOWS_ALL_SOCIAL = import.meta.env.DEV;
+export function useShowsAllSocialMethods(): boolean {
+  return useOptionalAuthHost()?.publicEnvironment().NODE_ENV === "development";
+}
 
 /** The cloud's social set. Ids are the real provider ids, so a click dials
  *  the real provider and the marks and labels are the real ones. */
@@ -103,9 +107,15 @@ export function SignInMethodPicker({
  * layout's orphan "OR": ask this before passing `alternatives`, and pass
  * nothing when the answer is no.
  */
-export function hasAlternativeMethods(methodSet: readonly SignInMethod[]): boolean {
+export function hasAlternativeMethods({
+  methodSet,
+  showsAllSocial,
+}: {
+  methodSet: readonly SignInMethod[];
+  showsAllSocial: boolean;
+}): boolean {
   return (
-    DEV_SHOWS_ALL_SOCIAL ||
+    showsAllSocial ||
     methodSet.some((method) => method.kind === "federated" || method.kind === "passkey")
   );
 }
@@ -131,9 +141,10 @@ export function AlternativeMethods({
   /** A refused ceremony, sent to the card's one alert at the top. */
   onPasskeyError: (error: unknown) => void;
 }) {
+  const showsAllSocial = useShowsAllSocialMethods();
   const offered = methodSet.filter((method) => method.kind === "federated");
   const offeredIds = new Set(offered.map((method) => method.id));
-  const methods = DEV_SHOWS_ALL_SOCIAL
+  const methods = showsAllSocial
     ? [...offered, ...SOCIAL_METHODS.filter((method) => !offeredIds.has(method.id))]
     : offered;
 

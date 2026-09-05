@@ -25,10 +25,9 @@ export interface MetricClickHouseClient {
   insert(params: {
     table: string;
     /**
-     * Read-only on purpose: nothing here mutates the batch it is handed, and
-     * saying so is what lets a caller holding a `readonly` row array — the
-     * Eventing ClickHouse client a background worker composes from — satisfy
-     * this port without copying every insert.
+     * Read-only on purpose: nothing here mutates the batch it is handed, and saying so is what
+     * lets a caller holding a `readonly` row array — the Eventing ClickHouse client a
+     * background worker composes from — satisfy this port without copying every insert.
      */
     values: readonly unknown[];
     format?: DataFormat;
@@ -50,60 +49,27 @@ const logger = createLogger("langwatch:app-layer:metrics:metric-data-point-repos
 const INSERT_SETTINGS = { async_insert: 1, wait_for_async_insert: 1 } as const;
 
 /**
- * The upper cap on what one rollup query folds together: series per set of
- * array parameters for the successor read, and — halved — buckets per request
- * for the affected-bucket read. No statement grows with either number any more,
- * so this bounds how much one request may *read*, not how large it may be.
- *
- * Size is bounded separately, and first, by {@link SUCCESSOR_PARAM_BUDGET_CHARS}:
- * the successor read splits as soon as the encoded parameters would outgrow
- * that budget, which on this table's 64-character identifiers happens well
- * before 64 series. Raising this number therefore widens a read; it cannot make
- * a request larger than the byte budget allows.
+ * The upper cap on what one rollup query folds together: series per set of array parameters for
+ * the successor read, and — halved — buckets per request for the affected-bucket read.
  */
 const SEEKS_PER_QUERY = 64;
 
 /**
- * The ceiling one successor request's encoded `param_*` entries must stay
- * under, measured the way `@clickhouse/client` measures it: `formatQueryParams`
- * per value, then `new URLSearchParams(entries).toString().length`.
- *
- * The client has a threshold of its own, `MAX_URL_BIND_PARAM_LENGTH` = 4096,
- * above which it can route parameters through a multipart body instead of the
- * URL — but only when `use_multipart_params_auto` is on, and nothing here turns
- * it on, so `param_*` entries ride the URL at any length. This budget therefore
- * has to hold on its own, and it sits below the client's with enough headroom
- * that a longer identifier or an added scalar cannot cross the client's ceiling
- * without crossing this one first.
+ * The ceiling one successor request's encoded `param_*` entries must stay under, measured the
+ * way `@clickhouse/client` measures it: `formatQueryParams` per value, then `new
+ * URLSearchParams(entries).toString().length`.
  */
 const SUCCESSOR_PARAM_BUDGET_CHARS = 3500;
 
 /**
- * How far behind a bucket the first predecessor seek looks before the second
- * one widens to the retention window.
- *
- * An hour, which is two orders of magnitude more than the rollup interval and
+ * How far behind a bucket the first predecessor seek looks before the second one widens to the
+ * retention window. An hour, which is two orders of magnitude more than the rollup interval and
  * so covers any series still being written to, however coarsely it is scraped.
- * It is a latency/partition trade and nothing depends on the exact value: too
- * small only sends more buckets into the second pass, too large only widens
- * the first, and either way the pair reads the same range and the fold sees
- * the same predecessor.
  */
 const PREDECESSOR_LOOKBACK_MS = 60 * 60 * 1000;
 
 /**
  * The seeks whose predecessor the near pass failed to find.
- *
- * A bucket whose near pass returned nothing in [start - lookbackMs, start) has
- * no stored point in that window at all — the branch returns the newest there
- * is — so whatever precedes it is older than the window, and only then is the
- * wide seek worth its partitions.
- *
- * A row from a neighbouring affected bucket answers this just as well: if
- * anything at all sits in the window, then the newest thing in it does too,
- * and that is precisely what the near seek returned. So the check is against
- * every point the pass collected, indexed by series to keep it off the
- * seeks × points path.
  */
 function seeksWithoutPredecessor({
   seeks,
@@ -140,12 +106,9 @@ interface SeriesSpan {
 }
 
 /**
- * The append half of metric persistence, over one tenant-keyed client.
- *
- * Every statement below is tenant-scoped, so one resolver is all it can use:
- * a point names its tenant and the row it becomes is written to that tenant's
- * instance. The organization-keyed client the usage-estimate read needs lives
- * with that read, on {@link MetricDataPointClickHouseRepository}.
+ * The append half of metric persistence, over one tenant-keyed client. Every statement below is
+ * tenant-scoped, so one resolver is all it can use: a point names its tenant and the row it
+ * becomes is written to that tenant's instance.
  */
 export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAppendRepository {
   private readonly resolveClient: MetricClickHouseClientResolver;
@@ -269,16 +232,7 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
   }
 
   /**
-   * Recomputes a chunk's rollups with a fixed number of reads rather than one
-   * per point. Both reads a rollup needs — the successor that decides which
-   * buckets moved, and the authoritative points inside them — are index seeks,
-   * so the round trip, not the scan, is what a chunk pays for. Folding every
-   * seek in the chunk into a handful of statements makes the cost track the
-   * number of affected buckets instead of the number of points.
-   *
-   * Ensuring the raw points up front also makes the result independent of the
-   * order the chunk happens to arrive in: every decision below is taken
-   * against stored rows, never against the chunk's own sequence.
+   * Recomputes a chunk's rollups with a fixed number of reads rather than one per point.
    */
   async recomputeAffectedRollupsMany({
     points,
@@ -325,21 +279,6 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
 
   /**
    * The stored points that can succeed any of `points` within their own series.
-   * A successor is the only neighbour able to pull a second bucket into the
-   * affected set, so it is the only one worth a read — an earlier revision also
-   * fetched each point's predecessor and then discarded it.
-   *
-   * The statement is {@link SUCCESSOR_SEEK_QUERY}, which does not vary with the
-   * chunk. What chunking bounds is the request: {@link successorSeekChunks}
-   * splits the series so the encoded parameters stay inside
-   * {@link SUCCESSOR_PARAM_BUDGET_CHARS}, since the statement travels in the
-   * body but the parameters travel in the URL.
-   *
-   * The read stays payload-free (SEEK_SELECT, never the full row): running
-   * FINAL over a series while materialising the megabyte-scale payload column
-   * is what pushed one query past the server's per-query memory cap
-   * (MEMORY_LIMIT_EXCEEDED in ReplacingSorted). The seek only exists to order
-   * points and locate buckets.
    */
   private async successorsOf(points: CanonicalMetricDataPoint[]): Promise<MetricSequencePoint[]> {
     const tenantId = points[0]!.tenantId;
@@ -366,34 +305,8 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
   }
 
   /**
-   * Every point in the affected buckets, each preceded by the sample the fold
-   * differences it against, grouped by series. Buckets are fetched as their own
-   * narrow ranges rather than one span: a late point and a distant next sample
-   * would otherwise scan every partition between them only to discard the rows.
-   *
-   * The predecessor is sought in two passes, near before far, because the far
-   * pass is the expensive one and a bucket in a series that is being written to
-   * does not need it. The first pass looks back
-   * {@link PREDECESSOR_LOOKBACK_MS}; the second looks from there to the edge of
-   * retention, and only for the buckets the first pass left without a
-   * predecessor. The two ranges abut and do not overlap, so their union is the
-   * single retention-wide range this replaced — the same rows, reached without
-   * making every bucket pay the wide read.
-   *
-   * Two cases do reach the far pass every time, and both are bounded. A series
-   * whose first points are arriving has no predecessor at any distance, so its
-   * buckets fall through and the wide seek returns nothing; under series churn
-   * this is the common path, not the rare one, and it costs one extra round
-   * trip on top of what the single-pass read already cost. A gap longer than
-   * the near window is the other, and it is the case the far pass exists for.
-   * Neither is a regression, but neither is rare either.
-   *
-   * What the wide read costs is partitions. The table partitions by ISO week,
-   * so a retention-wide reverse seek opens every weekly part the series appears
-   * in — on the default retention, seven of them — to return one row. An hour
-   * of lookback opens one, or two across a week boundary. A live series is
-   * resolved by the near pass; only a series with an hour-wide hole in it pays
-   * for the far one, and it pays exactly what it paid before.
+   * Every point in the affected buckets, each preceded by the sample the fold differences it
+   * against, grouped by series.
    */
   private async pointsForAffectedBuckets({
     affectedBySeries,
@@ -460,14 +373,9 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
   }
 
   /**
-   * One pass of the affected-bucket read, collecting into `unique`.
-   *
-   * `predecessor` is the half-open window behind each bucket start the reverse
-   * seek may look in, as distances rather than instants so both bounds stay
-   * shared scalars however many buckets the chunk holds. `shouldReadBucketRows`
-   * is off for a pass that only widens the predecessor search: those buckets'
-   * own rows are already in hand, and re-reading them would double the
-   * statement to return what it just returned.
+   * One pass of the affected-bucket read, collecting into `unique`. `predecessor` is the
+   * half-open window behind each bucket start the reverse seek may look in, as distances rather
+   * than instants so both bounds stay shared scalars however many buckets the chunk holds.
    */
   private async readAffectedBuckets({
     client,
@@ -484,13 +392,9 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
     predecessor: { fromMs: number; toMs: number };
     shouldReadBucketRows: boolean;
   }): Promise<void> {
-    // Half the cap, and the divisor is a size bound rather than a
-    // statement-count one: the successor read emits one statement whatever its
-    // chunk holds, so there is no statement ceiling left here to match. What
-    // there is: this read binds two parameters per bucket, one of them a
-    // 64-character series identifier, so 32 buckets encode to roughly 3.5k
-    // characters of `param_*` entries - inside the client's own 4096-character
-    // ceiling on them, where 64 buckets would be half as far outside it again.
+    // Half the cap, and the divisor is a size bound rather than a statement-count one: the
+    // successor read emits one statement whatever its chunk holds, so there is no statement
+    // ceiling left here to match.
     for (const chunk of ClickHouseMetricDataPointAppendRepository.chunked(
       seeks,
       Math.floor(SEEKS_PER_QUERY / 2),
@@ -507,17 +411,11 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
       const selects = chunk.flatMap(({ seriesId, start }, index) => {
         params[`series${index}`] = seriesId;
         params[`from${index}`] = start;
-        // Both branches keep a seek per bucket rather than folding into one
-        // joined statement the way the successor read does. The predecessor
-        // branch is why: its bounds are per-seek, and a join can only apply
-        // those after the rows are read, so the single-row reverse index seek
-        // would become a read of every point in the series across the whole
+        // Both branches keep a seek per bucket rather than folding into one joined statement
+        // the way the successor read does. The predecessor branch is why: its bounds are
+        // per-seek, and a join can only apply those after the rows are read, so the single-row
+        // reverse index seek would become a read of every point in the series across the whole
         // window - the memory class #6493 fixed.
-        // The successor read folds safely because every bound there is the
-        // chunk's own span. ROLLUP_SELECT is exactly what the fold reads and
-        // nothing else: FINAL materialises every selected column for every row
-        // a granule covers, so a column the fold ignores is decompressed
-        // millions of times to be discarded.
         const predecessorSeek = `(SELECT ${ROLLUP_SELECT}
             FROM metric_data_points FINAL
             WHERE TenantId = {tenantId:String} AND SeriesId = {series${index}:String}
@@ -547,21 +445,9 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
   }
 
   /**
-   * One fixed statement carries point spans as arrays; successorSeekChunks keeps
-   * their encoded URL parameters below SUCCESSOR_PARAM_BUDGET_CHARS.
-   *
-   * Stored points inside each span cover every successor except the newest one.
-   * The first branch reads that closed span and the second seeks one row beyond
-   * it per series. affectedBucketsBySeries takes the earliest candidate.
-   *
-   * Tenant, series and lower-time predicates stay inside the FINAL CTE. Time is
-   * part of the dedup key, so range pruning cannot hide another version of a row.
-   * Keep SEEK_SELECT narrow: adding payload, attribute or bucket columns would
-   * turn LIMIT 1 BY into the expensive materialisation this query avoids.
-   *
-   * The scan bounds remain chunk-global, not per-series. Improving that requires
-   * real-server index plans and equivalence coverage because a bad upper bound
-   * would lose successors rather than merely cost time.
+   * One fixed statement carries point spans as arrays; successorSeekChunks keeps their encoded
+   * URL parameters below SUCCESSOR_PARAM_BUDGET_CHARS. Stored points inside each span cover
+   * every successor except the newest one.
    */
   private static readonly SUCCESSOR_SEEK_QUERY = `
     WITH spans AS (
@@ -605,16 +491,9 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
   `;
 
   /**
-   * The table's own row order, (TimeUnixMs, TimeUnixNano, PointId), compared
-   * against one end of a joined span. Written out rather than as a tuple
-   * comparison so the emitted predicate is the one the per-branch seeks already
-   * proved in production.
-   *
-   * It reads `series_points.SeekTime` and never `TimeUnixMs`, which is why the
-   * CTE keeps the raw `DateTime64` under that second name: SEEK_SELECT already
-   * binds `TimeUnixMs` to its epoch-milli alias, so a comparison written against
-   * that name would compare against the alias instead of the column. Do not
-   * "simplify" `SeekTime` away.
+   * The table's own row order, (TimeUnixMs, TimeUnixNano, PointId), compared against one end of
+   * a joined span. Written out rather than as a tuple comparison so the emitted predicate is
+   * the one the per-branch seeks already proved in production.
    */
   private static orderedAfter(bound: "From" | "To"): string {
     return `(series_points.SeekTime > spans.Span${bound}Time
@@ -653,15 +532,8 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
   }
 
   /**
-   * Which rollup buckets a chunk moved, per series, decided without another read.
-   *
-   * A chunk point's true successor is the smallest stored point after it. Every
-   * chunk point is already stored by the time this runs, and the seek returned
-   * the smallest stored point after each one, so the true successor is somewhere
-   * in the union of the two and no stored point can sit between them. Taking the
-   * minimum of that union — which is all `affectedRollupBuckets` does — therefore
-   * lands on exactly the row a per-point neighbour query would have returned,
-   * whatever order the chunk arrived in.
+   * Which rollup buckets a chunk moved, per series, decided without another read. A chunk
+   * point's true successor is the smallest stored point after it.
    */
   private static affectedBucketsBySeries({
     bySeries,
@@ -726,17 +598,8 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
   }
 
   /**
-   * Eleven parameters, whatever the chunk holds - seven of them arrays the server
-   * zips back into one row per series.
-   *
-   * Three are the constant time bounds the statement prunes partitions with, and
-   * they are the widest each scope can prove: `scanFrom` the earliest span start
-   * for the shared CTE, `latestSpanEnd` for the branch that reads within the
-   * spans, `earliestSpanEnd` for the branch that reads past them. The last two
-   * are both derived from span *ends* - the earliest span start is `scanFrom` -
-   * so widening either to a span start is a change of meaning, not a typo fix.
-   * Nanosecond values travel as strings because they exceed what a JSON number
-   * carries exactly; the statement casts them back with `toUInt64`.
+   * Eleven parameters, whatever the chunk holds - seven of them arrays the server zips back
+   * into one row per series.
    */
   private static successorSeekParams({
     tenantId,
@@ -761,14 +624,9 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
   }
 
   /**
-   * `@clickhouse/client`'s `formatQueryParams` for the value shapes this file
-   * binds - strings, numbers, and arrays of either. Mirrored rather than imported
-   * because the client exports it only from a path inside its `dist` tree.
-   *
-   * The unit test re-measures every request this chunker emits with the client's
-   * own `formatQueryParams`, so a divergence that made this under-measure fails
-   * there rather than silently shipping an oversized request. Over-measuring only
-   * costs a smaller chunk.
+   * `@clickhouse/client`'s `formatQueryParams` for the value shapes this file binds - strings,
+   * numbers, and arrays of either. Mirrored rather than imported because the client exports it
+   * only from a path inside its `dist` tree.
    */
   private static formatParamValue({
     value,
@@ -813,18 +671,8 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
   }
 
   /**
-   * Where the successor read splits: encoded parameter bytes first,
-   * {@link SEEKS_PER_QUERY} series as the upper cap.
-   *
-   * Series count is the wrong quantity to bound a request by. A series
-   * contributes seven values, three of them 64-character identifiers, so what
-   * fits in one request depends on the identifiers rather than on the count -
-   * which is how a shape that looked bounded at 64 series produced a request
-   * larger than the per-point shape it replaced. Measuring what actually travels
-   * keeps the request bounded whatever the batch holds.
-   *
-   * A single series whose own parameters exceed the budget is still sent alone:
-   * correctness first, and this table's identifier widths cannot reach that.
+   * Where the successor read splits: encoded parameter bytes first, {@link SEEKS_PER_QUERY}
+   * series as the upper cap. Series count is the wrong quantity to bound a request by.
    */
   private static successorSeekChunks({
     tenantId,

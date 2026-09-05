@@ -101,24 +101,8 @@ function toLeasedMessage(row: ProcessManagerOutbox): LeasedOutboxMessageRecord {
 }
 
 /**
- * Timeouts for the commit transaction. The two knobs cover different windows,
- * and only one of them covers the lock.
- *
- * `timeout` bounds the callback body, which is where the waiting happens: the
- * first thing the body does is take a BLOCKING `pg_advisory_xact_lock` on the
- * process reference, so this budget has to cover however long a concurrent
- * commit for the same process holds that lock, not just this commit's own
- * work. A suite finishing several runs at once produces exactly that
- * contention, and Prisma's 5s default was not enough for it — observed in
- * local dev as "timeout was 5000 ms, however 7737 ms passed".
- *
- * `maxWait` bounds the window *before* the callback runs: acquiring a
- * connection from the pool. It moves up too because the same contention keeps
- * connections busy, and a commit that never gets a connection fails without
- * ever reaching its `timeout`.
- *
- * The work inside is unchanged and still small: a lock, a dedup read, a
- * compare-and-swap on the instance, and the inbox/outbox inserts.
+ * Timeouts for the commit transaction. The two knobs cover different windows, and only one of
+ * them covers the lock.
  */
 const COMMIT_TRANSACTION_OPTIONS = {
   maxWait: 10_000,
@@ -346,14 +330,9 @@ export class PrismaProcessStore implements ProcessStore {
   }
 
   /**
-   * The transient path: one idempotent multi-row insert, no transaction, no
-   * advisory lock, no instance row and no inbox row. See
-   * {@link AppendIntentsResult} for the reasoning.
-   *
-   * `skipDuplicates` is what makes the absent transaction safe. It compiles to
-   * ON CONFLICT DO NOTHING against the (processName, projectId, messageKey)
-   * unique index, so a redelivery, a crash midway through an earlier attempt,
-   * and two workers racing the same event all converge on the same row set.
+   * The transient path: one idempotent multi-row insert, no transaction, no advisory lock, no
+   * instance row and no inbox row. See {@link AppendIntentsResult} for the reasoning.
+   * `skipDuplicates` is what makes the absent transaction safe.
    */
   async appendIntents(params: {
     ref: ProcessRef;
@@ -391,14 +370,10 @@ export class PrismaProcessStore implements ProcessStore {
     });
 
     const keys = params.messages.map((message) => message.messageKey);
-    // The overwhelmingly common case is a clean insert, and it costs no
-    // second read. Only a partial insert has to ask which keys were already
-    // there, and only to REPORT them — the rows themselves are already right
-    // either way, so this read is diagnostic and never load-bearing. Rows this
-    // call wrote carry exactly `at`, which is what separates them from earlier
-    // ones; a concurrent insert landing in the same millisecond would be
-    // reported as inserted rather than duplicate, and misattributing a log
-    // line is the whole cost of that.
+    // The overwhelmingly common case is a clean insert, and it costs no second read. Only a
+    // partial insert has to ask which keys were already there, and only to REPORT them — the
+    // rows themselves are already right either way, so this read is diagnostic and never
+    // load-bearing.
     if (inserted.count === keys.length) {
       return { insertedMessageKeys: keys, duplicateMessageKeys: [] };
     }
@@ -636,13 +611,10 @@ export class PrismaProcessStore implements ProcessStore {
   }
 
   async deleteDispatchedBefore(params: { processName: string; before: number }): Promise<number> {
-    // Cross-tenant retention sweep: this prunes dispatched outbox rows for a
-    // process name across every project, so it has no `projectId` predicate
-    // and the multitenancy guard would otherwise throw on every scheduled
+    // Cross-tenant retention sweep: this prunes dispatched outbox rows for a process name
+    // across every project, so it has no `projectId` predicate and the multitenancy guard would
+    // otherwise throw on every scheduled
     // prune tick. Opt out via the guard's sanctioned `-- @tenancy:` marker
-    // (see dbMultiTenancyProtection.ts and the scheduler's due-scan in
-    // scheduled-job.repository.ts for the same pattern) — this is a
-    // system-owned maintenance sweep, not a tenant-scoped read/write.
     const affected = await this.#prisma.$executeRaw`
       DELETE FROM "ProcessManagerOutbox"
       WHERE "processName" = ${params.processName}
@@ -653,16 +625,9 @@ export class PrismaProcessStore implements ProcessStore {
     return affected;
   }
 
-  // The three batched sweeps below share one shape: pick at most `limit` ids
-  // with a bounded SELECT, then delete exactly those. Putting the LIMIT in a
-  // subquery rather than on the DELETE is what keeps one statement's lock
-  // footprint bounded — an unbounded `DELETE ... WHERE age < x` against
-  // millions of rows holds row locks for the whole scan and is exactly the
-  // shape that made the pre-existing single-process prune unusable at volume.
-  //
-  // All three are cross-tenant by design (see the port docs), so each carries
+  // The three batched sweeps below share one shape: pick at most `limit` ids with a bounded
+  // SELECT, then delete exactly those.
   // the multitenancy guard's sanctioned `-- @tenancy:` marker, the same opt-out
-  // `deleteDispatchedBefore` above already uses.
 
   async deleteDispatchedOutboxBatch(params: { before: number; limit: number }): Promise<number> {
     if (params.limit <= 0) return 0;
@@ -680,18 +645,10 @@ export class PrismaProcessStore implements ProcessStore {
 
   async deleteDeadOutboxBatch(params: { before: number; limit: number }): Promise<number> {
     if (params.limit <= 0) return 0;
-    // Dead rows carry no `deadAt`; `updatedAt` is stamped by the markFailed
-    // that retired them, so it IS the moment the row became a failure record.
-    // No new index: `dead` is a rare status, so the existing
-    // (status, nextAttemptAt, leasedUntil) index already makes this selective.
-    //
-    // `discarded` is reaped on the same window and by the same sweep. It is
-    // the terminal state an operator writes rather than one the dispatcher
-    // writes, but it means the same thing to retention — a record of work
-    // that will never run, kept for as long as the operator might ask about
-    // it. Leaving it out is what would make it immortal: no other family's
-    // predicate matches it, and this is the highest-volume table in the
-    // system (specs/ops/dead-letter-recovery.feature).
+    // Dead rows carry no `deadAt`; `updatedAt` is stamped by the markFailed that retired them,
+    // so it IS the moment the row became a failure record. No new index: `dead` is a rare
+    // status, so the existing (status, nextAttemptAt, leasedUntil) index already makes this
+    // selective. `discarded` is reaped on the same window and by the same sweep.
     return await this.#prisma.$executeRaw`
       DELETE FROM "ProcessManagerOutbox"
       WHERE "id" IN (

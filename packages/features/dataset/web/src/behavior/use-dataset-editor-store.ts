@@ -1,13 +1,6 @@
 /**
- * Per-instance state for the standalone dataset editor (DatasetEditorTable).
- *
- * One editor = one dataset. Records are full rows keyed by column NAME
- * (matching how dataset records are stored server-side); columns carry
- * generated ids (`${name}_${index}`) for stable TanStack column identity.
- *
- * In saved mode every mutation is mirrored into pendingSavedChanges, which
- * useDatasetRecordSync drains to the database. In in-memory mode the caller
- * subscribes to record changes and owns persistence.
+ * Per-instance state for the standalone dataset editor (DatasetEditorTable). One editor = one
+ * dataset.
  */
 import { createStore, type StoreApi } from "zustand";
 
@@ -24,10 +17,9 @@ export type EditorColumn = {
 export type EditorRecord = { id: string } & Record<string, string>;
 
 /**
- * Maps records onto a new column set after a column edit. Values follow
- * column names; a pure in-place rename (same column count, the old name
- * gone, the new name fresh at the same position) carries values over by
- * position. Added columns start empty, removed columns drop their values.
+ * Maps records onto a new column set after a column edit. Values follow column names; a pure
+ * in-place rename (same column count, the old name gone, the new name fresh at the same
+ * position) carries values over by position.
  */
 export function rekeyEditorRecords(
   records: EditorRecord[],
@@ -232,13 +224,11 @@ export function createDatasetEditorStore(): StoreApi<DatasetEditorStore> {
 
       const datasetChanges = { ...pendingSavedChanges[dbDatasetId] };
       for (const record of removed) {
-        // Always queue a server deletion, overwriting any pending create or
-        // edit for the row. The backend persists locally-added rows under
-        // their client-generated "new_" id, so that prefix is not a reliable
-        // "never reached the server" signal: skipping the deletion for those
-        // is what made deleted rows reappear on reload. A row that genuinely
-        // never synced is a harmless no-op for deleteMany (it ignores unknown
-        // ids).
+        // Always queue a server deletion, overwriting any pending create or edit for the row.
+        // The backend persists locally-added rows under their client-generated "new_" id, so
+        // that prefix is not a reliable "never reached the server" signal: skipping the
+        // deletion for those is what made deleted rows reappear on reload. A row that genuinely
+        // never synced is a harmless no-op for deleteMany (it ignores unknown ids).
         datasetChanges[record.id] = { _delete: true };
       }
 

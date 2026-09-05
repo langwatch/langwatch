@@ -1,10 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
  * ADR-038: the intent screen's two cards and their copy are load-bearing —
- * the card text is what keeps a coding-agent-product builder out of the
- * governance track (S1 misroute guard), so it is pinned here.
- *
  * Spec: specs/features/onboarding/intent-fork.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

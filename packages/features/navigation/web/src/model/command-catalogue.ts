@@ -682,10 +682,9 @@ export const allStaticCommands: Command[] = [
 export type CommandFeatureFlagValues = Partial<Record<FrontendFeatureFlag, boolean>>;
 
 /**
- * Drops the commands whose release flag does not hold the value they need.
- * A command with no flag is always offered, and a flag that has not answered
- * yet keeps its command out until it does, so the bar never lists two routes
- * to the same work while the flag is in flight.
+ * Drops the commands whose release flag does not hold the value they need. A command with no
+ * flag is always offered, and a flag that has not answered yet keeps its command out until it
+ * does, so the bar never lists two routes to the same work while the flag is in flight.
  */
 export function filterCommandsByFeatureFlags({
   commands,

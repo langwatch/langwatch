@@ -1,29 +1,5 @@
 /**
  * @vitest-environment node
- *
- * Multi-turn regression for #6590 / #6594.
- *
- * Drives the real `SerializedPromptConfigAdapter` through the real
- * `createModelFromParams` client against a local server standing in for the
- * gateway proxy, and reproduces the scenario loop exactly as the SDK
- * implements it: the adapter's returned string becomes the next
- * `{ role: "assistant", content }`, and every message carries the `id` and
- * `traceId` `ScenarioState.addMessage` stamps on it.
- *
- * The model here replies with whatever it was shown — which is what the
- * reported run's model did, and what makes the compounding observable. On
- * `main` (a09e7c72f) this measured:
- *
- *   turn 1   319 B    turn 4  4630 B   (×14.5), each turn's rendered prompt
- *   containing the previous turn's verbatim, JSON-escaped one level deeper
- *   every turn.
- *
- * A control arm with a model that answers normally grew 319 → 1141 B with no
- * embedding at all, which is what rules out "conversations just get longer" as
- * the explanation.
- *
- * Covers the @integration scenarios in
- * specs/scenarios/prompt-agent-input-binding.feature.
  */
 
 import { createServer, type Server } from "node:http";

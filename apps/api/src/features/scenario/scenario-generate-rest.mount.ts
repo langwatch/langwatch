@@ -1,18 +1,6 @@
 /**
  * This process's composition of the scenario editor's author-assist
  * (`@langwatch/scenario-server`).
- *
- * The prompt, the schema and the three refusals the generator answers with
- * are the feature's. What is this process's is the session, the model, and the
- * TIME BUDGET one generation is allowed — the cap that keeps a hung gateway
- * from holding a request open long enough for a front proxy to substitute its
- * own HTML error page.
- *
- * The budget is resolved at call time rather than at composition, which is what
- * the route it replaces did: a test drives a real abort by stating a small one,
- * and a non-positive or unparseable value falls back to the generator's own
- * default rather than to no cap at all. The environment itself is read by the
- * composition root, which hands this mount the resolver.
  */
 import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
 import {

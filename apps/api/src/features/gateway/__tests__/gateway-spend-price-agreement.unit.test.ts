@@ -1,28 +1,13 @@
 /**
  * One confirmed outcome, three consumers, one price.
- *
- * The spend ledger, the attributed-user budget debits, and the webhook
- * envelope each consume the same `lw.gateway.spend.confirmed` event
- * independently: the gateway-server fold, the governance-server debit
- * process, and the enterprise webhook delivery process. This drives all
- * three off one stamped event and proves none of them re-rates the request
- * itself — each one only copies `cost_nano_usd`/`rate_version` off the event
- * data, so a consumer that priced the request again would answer with
- * whatever the catalog says the moment it happened to run, not what the
- * customer was actually charged.
- *
- * Composed here, in the composition root, because the three consumers live
- * in three different feature packages (gateway-server, governance-server,
- * enterprise-webhook-server) that may not import one another.
  */
 
 import { beforeEach, describe, expect, it } from "vitest";
 
 /**
- * The price the ingest seam stamped on the event, controlled by the test
- * rather than a real catalog lookup: what this pins is that a consumer repeats
- * the stamp, and a catalog that cannot be moved would make every assertion
- * below vacuous.
+ * The price the ingest seam stamped on the event, controlled by the test rather than a real
+ * catalog lookup: what this pins is that a consumer repeats the stamp, and a catalog that
+ * cannot be moved would make every assertion below vacuous.
  */
 const priceState = {
   costNanoUsd: 21_675,

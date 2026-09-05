@@ -1,13 +1,5 @@
 /**
- * Store-level resolution of a registered flag, with the database as the
- * only faked hop. The fake is a real table behind `findUnique` / `upsert`,
- * so an operator write and the read that follows it round-trip through the
- * repository, the row store and the service rather than through an
- * assertion on call arguments.
- *
- * The public service resolves through that repository path. An absent row
- * falls through to the registry default; callers do not reproduce that
- * nullable decision outside the service.
+ * Store-level resolution of a registered flag, with the database as the only faked hop.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PostgresFeatureFlagAdapter } from "../postgres.feature-flag.adapter";

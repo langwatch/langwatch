@@ -4,20 +4,6 @@ import { PrismaUsageMembershipRepository } from "../prisma.usage-membership.repo
 
 /**
  * Unit tests for PrismaUsageMembershipRepository.
- *
- * Tests the data access layer with mocked Prisma:
- * - Verifies correct where clauses for each method
- * - Confirms archivedAt: null filtering for projects
- * - Validates query structure for the surviving Prisma-based methods
- *
- * Note: Message/trace counting is NOT tested here because it lives in
- * TraceUsageService (ClickHouse, not Prisma). See
- * src/server/traces/__tests__/trace-usage.service.unit.test.ts.
- *
- * Note: Classification function tests (isViewOnlyPermission, isViewOnlyCustomRole,
- * classifyMemberType, isFullMember, isLiteMember) are in member-classification.unit.test.ts
- *
- * Terminology: The EXTERNAL enum value corresponds to "Lite Member" in user-facing text.
  */
 
 // Create mock Prisma client

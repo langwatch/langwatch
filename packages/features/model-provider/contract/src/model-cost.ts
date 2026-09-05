@@ -40,12 +40,9 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
 /**
- * One observed invocation priced under ONE rate.
- *
- * Exported because the cost-rule preview prices its sample spans under the
- * rate a customer is still typing, which has no catalogue entry to look up.
- * A second implementation of this arithmetic would show a customer a price
- * their rule does not actually charge.
+ * One observed invocation priced under ONE rate. Exported because the cost-rule preview prices
+ * its sample spans under the rate a customer is still typing, which has no catalogue entry to
+ * look up.
  */
 export const estimateCost = (input: {
   rate: ModelCostRate;
@@ -166,18 +163,9 @@ export const normalizeBedrockModelId = (model: string): string => {
 };
 
 /**
- * The one model-name matching cascade: raw, then normalized, then with the
- * provider subtype stripped, then with a Bedrock envelope normalized away —
- * each of those four candidates first as given and then normalized, and each
- * lookup falling back through `/`-separated prefixes.
- *
- * Exported because record-time cost enrichment matches the OPERATOR'S OWN cost
- * rules with it, not the static catalog `estimateModelCost` reads. Those rules
- * are regexes a customer wrote, stored per project, team or organization, and
- * the order the candidates are tried in decides which rule wins when two match.
- * A second implementation of this cascade would bill a span at a different
- * rate than the fold projection prices it, with nothing anywhere to show that
- * the two disagreed — so there is one, and both callers use it.
+ * The one model-name matching cascade: raw, then normalized, then with the provider subtype
+ * stripped, then with a Bedrock envelope normalized away — each of those four candidates first
+ * as given and then normalized, and each lookup falling back through `/`-separated prefixes.
  */
 export const matchModelCost = (
   model: string,

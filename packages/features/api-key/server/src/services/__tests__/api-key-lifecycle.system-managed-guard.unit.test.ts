@@ -1,10 +1,6 @@
 /**
- * System-managed API keys — the ephemeral Langy session key, one per chat
- * session with a short TTL — are minted and retired by the product. Absence
- * from listings is not immutability: `update` and `revoke` still load by id,
- * so a caller holding one could otherwise rename or revoke it out from under
- * a live Langy turn authenticating with it. Both report not-found, matching
- * the tenancy-mismatch branch rather than confirming the id exists.
+ * System-managed API keys — the ephemeral Langy session key, one per chat session with a short
+ * TTL — are minted and retired by the product.
  */
 import { LANGY_SESSION_API_KEY_NAME } from "@langwatch/api-key-contract";
 import { ApiKeyNotFoundError } from "@langwatch/api-key-contract";

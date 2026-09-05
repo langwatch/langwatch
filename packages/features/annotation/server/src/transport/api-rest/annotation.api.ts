@@ -1,21 +1,6 @@
 /**
- * The `/api/annotations` REST family.
- *
- * Three shapes of resource, six operations: the project's comments, one
- * comment by id, and the comments on one trace. Every route authenticates with
- * a PROJECT credential and nothing else — there is no reviewer behind a project
- * key, which is why the create is unattributed and `email` is the only identity
- * an external annotator can give.
- *
- * The credential is resolved inside the handler rather than by the framework's
- * authenticate-then-authorize chain, and that is deliberate rather than
- * historical: this family publishes its own refusal bodies (a bare
- * `{ message }` for an unauthenticated call, the full handled payload for a
- * ceiling denial), and deployed callers parse them. Routing it through the
- * framework chain would silently change both. So the family declares
- * `handlerManagedAuth` — which is what puts it in the route-policy registry
- * with its real permission, so an authorization audit still sees it — and takes
- * the resolution itself as a port. See {@link AnnotationRestCredentialPort}.
+ * The `/api/annotations` REST family. Three shapes of resource, six operations: the project's
+ * comments, one comment by id, and the comments on one trace.
  */
 import {
   ANNOTATION_ANCHOR_SCOPES,
@@ -45,15 +30,9 @@ export type AnnotationRestPermission =
   | "annotations:manage";
 
 /**
- * What a resolved project credential gives a handler, and what a refused one
- * answers with.
- *
- * `body` is the response body verbatim — a bare sentence for an unauthenticated
- * call, and the full handled payload (code, meta, tips, docsUrl, fault,
- * retryable) for a ceiling denial. The package does not build either: the first
- * is copy this family has published for years, the second is the process's own
- * error taxonomy rendered the way its error boundary renders it, and a second
- * rendering here is exactly how the two would drift.
+ * What a resolved project credential gives a handler, and what a refused one answers with.
+ * `body` is the response body verbatim — a bare sentence for an unauthenticated call, and the
+ * full handled payload (code, meta, tips, docsUrl, fault, retryable) for a ceiling denial.
  */
 export type AnnotationRestCredential =
   | Readonly<{
@@ -68,10 +47,9 @@ export type AnnotationRestCredential =
   | Readonly<{ ok: false; status: ContentfulStatusCode; body: object }>;
 
 /**
- * How this process turns a request into a project credential at one grain.
- *
- * A port because resolving it reads API keys and role bindings out of the
- * deployment's database, which a feature package has none of.
+ * How this process turns a request into a project credential at one grain. A port because
+ * resolving it reads API keys and role bindings out of the deployment's database, which a
+ * feature package has none of.
  */
 export type AnnotationRestCredentialPort = (input: {
   request: Request;
@@ -104,11 +82,7 @@ const annotationsManageAuth = handlerManagedAuth({
 });
 
 /**
- * Which comments a list endpoint returns. Absent means every comment on the
- * trace, each carrying the part of it that was commented on: an anchored
- * comment is the primary annotation now, so a list that left them out would
- * answer with silence exactly when a reviewer had spoken. `?anchor=trace` asks
- * for only what was said about the traces as a whole.
+ * Which comments a list endpoint returns.
  */
 function anchorScopeFromQuery(c: Context): AnnotationAnchorScope {
   const requested = c.req.query("anchor");

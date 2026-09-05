@@ -1,15 +1,5 @@
 /**
  * @vitest-environment node
- *
- * The `annotation.create` mutation's two side effects that are the router's
- * OWN logic (not the storage repository's): carrying a changed suggestion
- * into the trace correction before saving, and syncing every comment (span
- * or field anchored included) onto the trace so the has-annotation filter
- * sees it. Host ports (`writeTraceSuggestion`, `recordAnnotationOnTrace`,
- * `loadTraces`, queue persistence) are faked; `ctx.app.annotations` is a
- * real `AnnotationApp` over real Postgres.
- *
- * specs/traces-v2/anchored-comments.feature.
  */
 import { initTRPC } from "@trpc/server";
 import { nanoid } from "nanoid";

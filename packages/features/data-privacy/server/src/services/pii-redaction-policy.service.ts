@@ -1,28 +1,6 @@
 /**
- * The privacy DECISIONS one span, log record or metric point is redacted
- * under, separated from the shape being redacted.
- *
- * Everything here is shape-independent: resolving the scope's policy,
- * reconciling it with the level the ingestion call asked for, deciding whether
- * the native pass has anything to do, deciding what the analysis service is
- * still needed for, and building the request it is asked with. The application
- * keeps all of it inside
- * `platform/app/src/server/app-layer/traces/span-pii-redaction.service.ts`,
- * where three public methods — one per OTLP shape — share it as private
- * members. It is separated here because the shapes convert on different
- * timetables: the trace conversion needs the span half, and the log and metric
- * conversions will need these same decisions and their own walkers. A second
- * copy of the escalation rules per shape is exactly the drift this whole
- * harvest exists to avoid.
- *
- * Every member below is the application's member, body for body. Two things
- * changed and nothing else: the visibility, because the walker is now a caller
- * rather than the same class, and the three names that answer with `null`
- * carry the `try` prefix this repository's `fallible-result-naming` policy
- * requires of a public method that can express absence. `null` means the same
- * thing it means in the application — no native context, no analysis call
- * needed, no analysis pass to make — and the prefix is what says so at the
- * seam rather than in a comment.
+ * The privacy DECISIONS one span, log record or metric point is redacted under, separated from
+ * the shape being redacted.
  */
 
 import type { PiiLevel, ResolvedDataPrivacy } from "@langwatch/data-privacy-contract";
@@ -56,10 +34,6 @@ export type BatchClearPIIFunction = (
   options: PIICheckOptions,
 ) => Promise<(string | null)[]>;
 
-/**
- * The slice of the data-privacy service the redactor needs: resolving a
- * project's effective policy to drive the native secrets + essential-PII pass.
- */
 /**
  * Dependencies for OtlpSpanPiiRedactionService that can be injected for testing.
  */
@@ -137,11 +111,8 @@ function requestLevelToPiiLevel(level: PIIRedactionLevel): PiiLevel {
 }
 
 /**
- * The PII level to enforce, reconciling the resolved policy with the optional
- * per-request level carried on the ingestion command. A resolved level other
- * than the platform default ("essential") can only come from an explicit rule,
- * so it wins; at the default we honor the per-request level, so a single
- * ingestion call can still escalate or relax redaction without a policy rule.
+ * The PII level to enforce, reconciling the resolved policy with the optional per-request level
+ * carried on the ingestion command.
  */
 function reconcilePiiLevel(policyLevel: PiiLevel, requestLevel: PIIRedactionLevel): PiiLevel {
   if (policyLevel !== "essential") {
@@ -170,11 +141,8 @@ export class PiiRedactionPolicyService {
   }
 
   /**
-   * Resolve the native-redaction context for a tenant: the effective policy
-   * (PII level reconciled with the per-request level) and that level. Returns
-   * null when native enforcement is skipped — the kill switch is set, no tenant
-   * is known (older callers), or resolution failed — so the caller runs the
-   * analysis-service batch path and PII is never silently left in.
+   * Resolve the native-redaction context for a tenant: the effective policy (PII level
+   * reconciled with the per-request level) and that level.
    */
   async tryResolveNativeContext(
     tenantId: TenantId | undefined,
@@ -242,26 +210,9 @@ export class PiiRedactionPolicyService {
   }
 
   /**
-   * The analysis-service call a resolved policy still needs after the native
-   * pass: `{}` for strict (its default entity list), `{ entities }` for a custom
-   * level that selected analysis-service identifiers, or null to skip it.
-   *
-   * When the policy carries PII exception patterns, the strict call is scoped
-   * to the identifiers only the analysis service can detect (names, locations):
-   * the native floor already ran every pattern-based recognizer WITH the
-   * exceptions applied, and re-scanning those entities out-of-process would
-   * re-redact the very values an exception kept (the service returns anonymized
-   * text, so vetoes cannot be applied to its findings).
-   *
-   * Narrowing to name/location entities shrinks the blast radius, it does not
-   * close the gap: `exceptPatterns` still rides along on the returned options
-   * (tryBuildOptions), but `mainMethod` is always "presidio" here, and the
-   * Presidio batch call has no way to honor them (see the doc-comment on
-   * PIICheckOptions.exceptPatterns in piiCheck.ts). A name or location value
-   * that fully matches an exception can still be redacted by this call. That
-   * is a deliberate, tested contract, not a bug — see
-   * span-pii-redaction.nativeScopedPolicy.test.ts's "strict-only exception
-   * scoping" tests and the tooltip in data-privacy.tsx.
+   * The analysis-service call a resolved policy still needs after the native pass: `{}` for
+   * strict (its default entity list), `{ entities }` for a custom level that selected
+   * analysis-service identifiers, or null to skip it.
    */
   tryLambdaAfterNative(policy: ResolvedDataPrivacy): {
     entities?: readonly string[];

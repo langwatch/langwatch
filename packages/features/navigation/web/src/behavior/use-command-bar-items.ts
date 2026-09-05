@@ -34,14 +34,9 @@ export function useCommandBarItems(
 } {
   const availableTopLevelNav = useTopLevelNavigationCommands();
 
-  // The "Ask Langy" activation — the command bar's door into Langy. Synthesized
-  // (not a static registry command) so it can carry the live query and only
-  // appears where Langy can actually open: a real project, and the user in the
-  // rollout (langyEnabled mirrors useShowLangy). With a typed question,
-  // selecting it hands the question straight to the panel in one Enter; on an
-  // empty bar it flips the field into Langy's composer instead — see
-  // CommandPalette.handleSelect. The hint tells each apart, so the row promises
-  // exactly what selecting it does.
+  // The "Ask Langy" activation — the command bar's door into Langy. Synthesized (not a static
+  // registry command) so it can carry the live query and only appears where Langy can actually
+  // open: a real project, and the user in the rollout (langyEnabled mirrors useShowLangy).
   const askLangyItem = useMemo<ListItem | null>(() => {
     if (!langyEnabled || !projectSlug) return null;
     const trimmed = query.trim();
@@ -174,17 +169,10 @@ export function useCommandBarItems(
       for (const proj of filteredProjects) {
         items.push({ type: "project", data: proj });
       }
-      // Ask Langy sits under the real MATCHES and above the FALLBACKS.
-      //
-      // It used to trail everything, which sounds like the same rule but is
-      // not: "Search for X in traces" and "in docs" are offered for literally
-      // any string, so they are not matches at all — they are the two things
-      // we can always say. Ranking them above Langy meant typing a plain
-      // question and pressing Enter ran a substring search for that question,
-      // which is never what someone typing a question meant.
-      //
-      // Below genuine matches, though. A typed page name, a pasted id or a
-      // project still owns index 0, so Enter navigates the way it always did.
+      // Ask Langy sits under the real MATCHES and above the FALLBACKS. It used to trail
+      // everything, which sounds like the same rule but is not: "Search for X in traces" and
+      // "in docs" are offered for literally any string, so they are not matches at all — they
+      // are the two things we can always say.
       if (askLangyItem) {
         items.push(askLangyItem);
       }

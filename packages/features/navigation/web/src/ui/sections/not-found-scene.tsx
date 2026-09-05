@@ -1,10 +1,6 @@
 /**
- * The address that names no page.
- *
- * Moved from `platform/app/src/components/NotFoundScene.tsx` with its canvas
- * renderer. The only two platform reads were the router — now the host's
- * `back()` and `navigate()` — and `useReducedMotion`, whose module no longer
- * exists and which is a `matchMedia` read this package now makes for itself.
+ * The address that names no page. Moved from `platform/app/src/components/NotFoundScene.tsx`
+ * with its canvas renderer.
  */
 
 import { Box, Button, Center, HStack, Input, Text, VStack } from "@chakra-ui/react";

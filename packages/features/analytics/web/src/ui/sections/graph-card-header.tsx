@@ -78,23 +78,9 @@ export function GraphCardHeader({
   );
 
   /**
-   * THE ALERT BELL DID NOT TRAVEL, and this is the second of the two places it
-   * stopped being a compile break.
-   *
-   * Both entry points — "Add alert" and the bell that edits an existing one —
-   * called `openDrawer("automation", …)`. That registry entry was DELETED when
-   * the automations family moved out of `platform/app`, so these two call sites
-   * have not compiled since; they are two of the seven breaks that move
-   * recorded, and deleting this header retires them.
-   *
-   * Reinstating them means a cross-feature overlay capability that does not
-   * exist yet: authoring an alert is `@langwatch/automation-web`'s drawer, a
-   * web package may not import another web package, and the chrome layout route
-   * that would mount a registry for a packaged screen is separate work. The
-   * alerts themselves are untouched — every one already authored still fires,
-   * and the automations pages still edit them; what is gone is the shortcut
-   * from a chart to its alert. RECORDED, so whoever lands the overlay
-   * capability knows this is one of its first customers.
+   * THE ALERT BELL DID NOT TRAVEL, and this is the second of the two places it stopped being a
+   * compile break. Both entry points — "Add alert" and the bell that edits an existing one —
+   * called `openDrawer("automation", …)`.
    */
 
   return (

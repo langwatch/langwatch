@@ -1,9 +1,5 @@
 /**
  * @vitest-environment node
- *
- * The approval step of the hosted MCP OAuth flow mints a code carrying the
- * project's legacy API key, so what it demands has to match what it confers.
- * Covers specs/security/hosted-mcp-grant-fidelity.feature.
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import { beforeEach, describe, expect, it } from "vitest";

@@ -13,18 +13,8 @@ function isExpired(key: IngestionKeyRow): boolean {
 }
 
 /**
- * "Ingestion keys" section of the Settings > API Keys page: write-only,
- * project-scoped credentials the `langwatch <tool>` CLI mints (ApiKey rows with
- * a non-null `ingestSourceType`). Rendered below the regular API keys table and
- * only when at least one exists. These are not created from the "Create API
- * key" drawer, so the row exposes revoke (admins only) but no permissions/scope
- * editor.
- *
- * Moved from `platform/app/src/pages/settings/api-keys/IngestionKeysSection.tsx`.
- * The row type is the contract's `ApiKeyListEntry` rather than
- * `RouterOutputs["apiKey"]["list"][number]`, which is the same shape read
- * through an `AppRouter` a browser package may not name.
- *
+ * "Ingestion keys" section of the Settings > API Keys page: write-only, project-scoped
+ * credentials the `langwatch <tool>` CLI mints.
  * Spec: specs/api-keys/unified-api-keys.feature
  */
 export function IngestionKeysSection({

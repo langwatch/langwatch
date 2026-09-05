@@ -1,17 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * A refused API key used to be the end of the road: the drawer would not
- * save, and there was no way past it. The probe runs from our servers, so a
- * key restricted to the customer's own network, a provider outage, or a key
- * that has not finished propagating all look exactly like a bad key — and
- * the customer, holding a key they know works, had nowhere to go.
- *
- * Covers @integration scenarios from
- * specs/model-providers/credential-validation.feature.
- *
- * Only the boundaries are stubbed: the drawer's own state flow is what
- * decides whether the probe gates the save.
  */
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

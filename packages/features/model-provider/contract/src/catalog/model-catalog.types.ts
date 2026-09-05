@@ -1,8 +1,6 @@
 /**
- * Types for the LLM Model Registry
- *
- * These types define the structure of llmModels.json which contains
- * model metadata including pricing, parameters, and capabilities.
+ * Types for the LLM Model Registry These types define the structure of llmModels.json which
+ * contains model metadata including pricing, parameters, and capabilities.
  */
 
 // ============================================================================
@@ -17,22 +15,16 @@ export type LLMModelPricing = {
   outputCostPerToken: number;
   // Optional extended pricing fields
   inputCacheReadPerToken?: number;
-  // Writing to the prompt cache, priced by how long the entry lives.
-  // `inputCacheWritePerToken` is the short-lived rate (Anthropic's 5 minute
-  // entry, 1.25x the input rate); `inputCacheWrite1hPerToken` is the hour-long
-  // one (2x the input rate). Only the short-lived rate reaches us from the
-  // upstream catalog today, so the hour-long rate is derived for Anthropic
-  // models at load time; the field exists so a future sync can carry the real
-  // number and take precedence over the derivation.
+  // Writing to the prompt cache, priced by how long the entry lives. `inputCacheWritePerToken`
+  // is the short-lived rate (Anthropic's 5 minute entry, 1.25x the input rate);
+  // `inputCacheWrite1hPerToken` is the hour-long one (2x the input rate).
   inputCacheWritePerToken?: number;
   inputCacheWrite1hPerToken?: number;
-  // Image token rates for the token-billed image models (OpenAI's gpt-image
-  // family). `imageCostPerToken` is the price per INPUT image token, what an
-  // edit call pays for the pixels it reads; `imageOutputCostPerToken` is the
-  // price per OUTPUT image token, what every generated image is billed by.
-  // Text prompt tokens on the same call price at `inputCostPerToken`. The
-  // counts these price are disjoint from the text token counts. Hand-curated
-  // in llmModels.overlay.json.
+  // Image token rates for the token-billed image models (OpenAI's gpt-image family).
+  // `imageCostPerToken` is the price per INPUT image token, what an edit call pays for the
+  // pixels it reads; `imageOutputCostPerToken` is the price per OUTPUT image token, what every
+  // generated image is billed by. Text prompt tokens on the same call price at
+  // `inputCostPerToken`. The counts these price are disjoint from the text token counts.
   imageCostPerToken?: number;
   imageOutputCostPerToken?: number;
   // Audio token rates. `audioCostPerToken` is the INPUT side, the only one

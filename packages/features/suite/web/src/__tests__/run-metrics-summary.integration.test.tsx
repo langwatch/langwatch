@@ -1,11 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * Integration tests for RunMetricsSummary component.
- *
- * Tests the display logic for pass rate, progress indicators,
- * and status categorization in run accordion headers.
- *
  * @see specs/features/suites/sidebar-summary-status.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

@@ -7,13 +7,6 @@ import { LicenseStoragePort, type StoredLicense } from "../ports/license-storage
 
 /**
  * @see specs/licensing/seat-reconciliation.feature
- *
- * A self-hosted deployment runs uncapped without a license, so an
- * organization can already hold more active members than the seats a newly
- * bought license names. Activation must not fail on that: the org lands in an
- * over-seats state (enforced at invite time — see
- * invite-seat-reconciliation.unit.test.ts — and the license page) rather than
- * being locked out of activating the license that is meant to fix it.
  */
 class InMemoryLicenseStorage extends LicenseStoragePort {
   private stored: StoredLicense | null = null;

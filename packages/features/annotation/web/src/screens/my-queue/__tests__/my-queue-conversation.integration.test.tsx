@@ -1,10 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * What the reviewer reads while walking their annotation queue: the trace's
- * whole thread as a conversation, expanded, with the reviewed turn marked, and
- * a threadless trace still read as a single-turn conversation.
- * See packages/features/annotation/specs/annotation-queue-workflow.feature.
  */
 import { AnnotationTestHarness, StubAnnotationHost } from "../../../testing";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -97,13 +92,9 @@ vi.mock("@langwatch/trace-web", async (importOriginal) => ({
 }));
 
 /**
- * The thread's turns, as the walker reads them.
- *
- * `platform/app` mocked `~/utils/api` and got this for free: the page and the
- * conversation hook were on ONE tRPC client, so a mocked `tracesV2.list`
- * answered both. The hook is `@langwatch/trace-web`'s now and runs on that
- * package's own client, so the reading is stubbed where it is made — the same
- * three fields off the same `mocks` object, so every case below still drives it.
+ * The thread's turns, as the walker reads them. `platform/app` mocked `~/utils/api` and got
+ * this for free: the page and the conversation hook were on ONE tRPC client, so a mocked
+ * `tracesV2.list` answered both.
  */
 vi.mock("@langwatch/trace-web/explorer/hooks/useConversationTurns", () => ({
   useConversationTurns: () => ({
@@ -203,10 +194,9 @@ const setThreadQueue = ({ threadId }: { threadId: string }) => {
 };
 
 /**
- * The walker mounts the TRACE host as well as its own — the conversation view
- * and its turn hook read `@langwatch/trace-web`'s port — and the bridge that
- * answers it reads the annotation host above it, so the harness is what puts
- * both in place.
+ * The walker mounts the TRACE host as well as its own — the conversation view and its turn hook
+ * read `@langwatch/trace-web`'s port — and the bridge that answers it reads the annotation host
+ * above it, so the harness is what puts both in place.
  */
 const page = () => (
   <AnnotationTestHarness

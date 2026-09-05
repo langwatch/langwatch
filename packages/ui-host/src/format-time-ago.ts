@@ -1,11 +1,5 @@
 /**
  * How long ago something happened, in the two shapes this product prints.
- *
- * Sixteen web packages carried a copy of one or both of these, and the copies
- * had drifted: three returned "" for a falsy timestamp where the rest returned
- * undefined, and four reimplemented the compact ladder in arithmetic rather
- * than `date-fns`. Both readings are the same reading, so a row that moved an
- * hour ago now reads the same wherever it is drawn.
  */
 
 import {
@@ -23,11 +17,9 @@ const RELATIVE_WINDOW_HOURS = 24;
 const DEFAULT_DATE_FORMAT = "dd/MMM HH:mm";
 
 /**
- * "12 minutes ago" while it is recent, an absolute stamp once it is not.
- *
- * Undefined for a falsy timestamp, which is what the table cells check before
- * printing an em dash. The three copies that answered "" instead now read
- * `?? ""` at the call site, so nothing prints "undefined".
+ * "12 minutes ago" while it is recent, an absolute stamp once it is not. Undefined for a falsy
+ * timestamp, which is what the table cells check before printing an em dash. The three copies
+ * that answered "" instead now read `?? ""` at the call site, so nothing prints "undefined".
  */
 export function formatTimeAgo(
   timestamp: number,

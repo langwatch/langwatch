@@ -1,9 +1,7 @@
 /**
- * The `?scope=` address contract, as two settings families now share it.
- *
- * These cases were `platform/app`'s, on the hook that owned the URL before the
- * data-governance families moved; they are about the contract rather than about
- * the router, so they travel with the pure half.
+ * The `?scope=` address contract, as two settings families now share it. These cases were
+ * `platform/app`'s, on the hook that owned the URL before the data-governance families moved;
+ * they are about the contract rather than about the router, so they travel with the pure half.
  */
 
 import { describe, expect, it } from "vitest";

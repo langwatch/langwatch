@@ -1,22 +1,5 @@
 /**
  * @vitest-environment node
- *
- * The `/api/monitors` door: the six routes it publishes, the permission each
- * one declares, the wire shape a monitor goes out as, and the two statuses it
- * renders — the 404 it makes out of the application's `null`, and whatever
- * status a refusal already carries.
- *
- * Ported from `platform/app/src/app/api/monitors/__tests__/monitors-api.integration.test.ts`,
- * which drove the same family against Postgres. What that file proved about
- * the SERVICE — that a create with no evaluator is refused, that setting
- * `evaluatorId` to null is refused, that an omitted evaluator survives an
- * update — is already pinned by `monitor.service.unit.test.ts`. What was
- * proved about the DOOR and about nothing else is here: that those refusals
- * reach the wire with their own status and code rather than as a 500, and
- * that a legacy monitor with no evaluator still answers `evaluatorId: null`.
- *
- * The application is stubbed. This file asserts what the transport does, never
- * what the domain decides.
  */
 import {
   createAppRestSecurity,
@@ -56,11 +39,9 @@ const monitor: Monitor = {
 const legacyMonitor: Monitor = { ...monitor, id: "monitor-legacy", evaluatorId: null };
 
 /**
- * The process's own boundary renderer, reduced to the two facts these tests
- * read back: a refusal that knows its own status answers with that status, and
- * with its own `code` in the `error` field. The real renderer adds remediation
- * tips, a trace block and the log line; none of that is the door's, and none of
- * it is asserted here.
+ * The process's own boundary renderer, reduced to the two facts these tests read back: a
+ * refusal that knows its own status answers with that status, and with its own `code` in the
+ * `error` field.
  */
 const boundaryErrorHandler: ErrorHandler = (error, c) => {
   const handled = error as Error & { code?: string; httpStatus?: number };
@@ -135,14 +116,11 @@ function buildApi(overrides: Record<string, unknown> = {}) {
     security,
     app: () => stub,
     platformUrl: ({ projectSlug, path }) => `https://app.langwatch.test/${projectSlug}${path}`,
-    // Which trace sources a mapping may name is the trace vertical's
-    // vocabulary, injected by the process. The door only hands it to the
-    // validator, so its contents do not matter here — but its OPTIONALITY
-    // does: the door spreads this schema in as a bare key, so a required
-    // stub makes every body without `mappings` a 422, which the real
-    // `monitorMappingsSchema` (`.nullable().optional()`) never does. Under
-    // zod 4 a key is optional only if its schema accepts `undefined`, and
-    // `z.unknown()` alone does not.
+    // Which trace sources a mapping may name is the trace vertical's vocabulary, injected by
+    // the process. The door only hands it to the validator, so its contents do not matter here
+    // — but its OPTIONALITY does: the door spreads this schema in as a bare key, so a required
+    // stub makes every body without `mappings` a 422, which the real `monitorMappingsSchema`
+    // (`.nullable().optional()`) never does.
     mappingsSchema: z.unknown().optional(),
   });
 

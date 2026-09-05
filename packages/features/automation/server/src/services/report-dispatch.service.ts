@@ -35,11 +35,9 @@ export interface ReportDispatchDeps {
     emails: string[];
   }) => Promise<string[]>;
   /**
-   * The top-N traces matching the report's search query over its schedule
-   * window, newest first, as typed rows. Injected by the composition root so
-   * this module stays free of the trace-list service and its ClickHouse
-   * plumbing. Only called for `traceQuery` report sources. An empty `query`
-   * means "everything in the window".
+   * The top-N traces matching the report's search query over its schedule window, newest first,
+   * as typed rows. Injected by the composition root so this module stays free of the trace-list
+   * service and its ClickHouse plumbing. Only called for `traceQuery` report sources.
    */
   listReportTraces(params: {
     projectId: string;
@@ -120,19 +118,8 @@ export class ReportDispatchService {
   }
 
   /**
-   * The span a fire summarises: everything since the report's PREVIOUS scheduled
-   * slot, up to the slot being fired. Asking the schedule itself (in the report's
-   * own timezone) is the only way to get this right — the previous version
-   * pattern-matched the cron's SHAPE, so a monthly report (`0 9 1 * *`) fell
-   * through to a 7-day window and quietly dropped three weeks of its own data,
-   * while a six-hourly one looked back a full day and re-sent the same day four
-   * times over.
-   *
-   * DST comes out right for free: a daily 09:00 report spanning a spring-forward
-   * summarises 23 hours, because that is genuinely how long ago its last slot was.
-   *
-   * Falls back to a week only when the schedule cannot be read at all (a row we
-   * can no longer parse) — dispatch still sends something rather than nothing.
+   * The span a fire summarises: everything since the report's PREVIOUS scheduled slot, up to
+   * the slot being fired.
    */
   static reportWindowMs({
     cron,
@@ -164,12 +151,6 @@ export class ReportDispatchService {
 
   /**
    * ADR-044 Phase 3c: the scheduler's report handler. When a report's
-   * `ScheduledJob` comes due, load the trigger, fetch the data its source
-   * promises (matching traces, or the series behind each chart panel), and
-   * dispatch via the SAME notify pipeline alerts use (`renderTriggerEmail` /
-   * `renderTriggerSlack` + the rendered-form senders), against
-   * `REPORT_TRIGGER_DEFAULTS`. Registered on `schedulerRegistry` for the
-   * `reportTrigger` target type.
    */
   static async dispatchScheduledReport({
     deps,

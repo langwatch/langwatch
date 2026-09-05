@@ -1,13 +1,6 @@
 /**
- * Thread sources inside a TRACE-level evaluation.
- *
- * A trace-level evaluator fires once per incoming trace, and may still map one
- * of its inputs at the thread. This module is the single resolver both the
- * online execution path and the background evaluations worker run — the worker
- * composes the same `EvaluationExecutionService`, which calls straight into
- * here — so the mixed-mapping rules are pinned once.
- *
- * See specs/features/evaluations-v3/thread-variables-in-trace-evaluator.feature.
+ * Thread sources inside a TRACE-level evaluation. A trace-level evaluator fires once per
+ * incoming trace, and may still map one of its inputs at the thread.
  */
 import type { MappingState, Trace } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";

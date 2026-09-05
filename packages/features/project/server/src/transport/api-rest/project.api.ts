@@ -1,15 +1,5 @@
 /**
  * The organization-scoped `/api/projects` REST family.
- *
- * The project and API-key capabilities arrive as providers rather than being
- * read off the request, so this family can be mounted into any process that
- * has them — the same shape the graphs and model-defaults families use.
- *
- * The family keeps its own `onError`: its responses predate the canonical
- * envelope and its consumers parse the flat body, so the shared family handler
- * renders it and delegates anything it has not claimed to the process's own
- * boundary.
- *
  * Spec: specs/ai-governance/cli-onboarding/login-user-scoped-key.feature
  */
 import type { ApiKeyService } from "@langwatch/api-key-contract";
@@ -120,11 +110,6 @@ function asProjectUpdateHttpError(error: unknown): unknown {
 
 /**
  * The `/api/projects` family, built against one process's security.
- *
- * `projects` and `apiKeys` are resolved per request, as reading them off the
- * Hono context used to be: mounting a family must not force its services to be
- * constructed, which is what lets the OpenAPI generator and the route-registry
- * audits build it with none.
  */
 export function createProjectRestApp(options: {
   security: AppRestSecurity;
@@ -147,12 +132,9 @@ export function createProjectRestApp(options: {
     }),
   );
 
-  // The listing is not gated on organization-wide `project:view`: a credential
-  // whose view does not reach org scope gets a 200 with exactly the projects it
-  // holds `project:view` on (key bindings ∩ owner ceiling, resolved by
-  // `resolveVisibleProjects`) instead of a 403. Content, not access, is what the
-  // permission decides here, so the policy is anyAuthenticated and the handler
-  // does the scoping — the same shape the model-defaults family uses.
+  // The listing is not gated on organization-wide `project:view`: a credential whose view does
+  // not reach org scope gets a 200 with exactly the projects it holds `project:view` on (key
+  // bindings ∩ owner ceiling, resolved by `resolveVisibleProjects`) instead of a 403.
   // Spec: specs/ai-governance/cli-onboarding/login-user-scoped-key.feature
   secured
     .access(anyAuthenticated())
@@ -328,10 +310,8 @@ export function createProjectRestApp(options: {
   // ── API Key management ─────────────────────────────────────────────────────
 
   /**
-   * The base key is a project-level write credential, so reading it is gated
-   * with `project:update` to match the access it grants — not `project:view`.
-   * `requiresOnProject` resolves that at the named project's scope rather than
-   * the organization's, so one org-wide grant does not reach every project.
+   * The base key is a project-level write credential, so reading it is gated with
+   * `project:update` to match the access it grants — not `project:view`.
    */
   secured
     .access(requiresOnProject("project:update"))

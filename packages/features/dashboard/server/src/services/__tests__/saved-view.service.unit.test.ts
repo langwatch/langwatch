@@ -1,16 +1,5 @@
 /**
- * A project's saved views, and who may touch them.
- *
- * Two rules carry weight here. A personal view belongs to one person, and
- * reaching for someone else's is refused as NOT FOUND rather than forbidden —
- * the same answer as an id that does not exist, so a caller cannot use the
- * refusal to learn that somebody else's view is there.
- *
- * The other is the seeding. First access to a project seeds the default views,
- * and a project that already has them gets any new ones backfilled. Both are
- * for the legacy tab strip only: the traces-v2 lens UI seeds its own defaults
- * from code, so seeding server-side on its behalf would double-populate what
- * the customer sees.
+ * A project's saved views, and who may touch them. Two rules carry weight here.
  */
 
 import { describe, expect, it } from "vitest";

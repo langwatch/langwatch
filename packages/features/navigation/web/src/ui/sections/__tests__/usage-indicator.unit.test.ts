@@ -3,10 +3,6 @@ import { getUsageDisplay } from "../usage-indicator";
 
 /**
  * Spec: specs/usage-indicator-display.feature
- *
- * `pricingModel` arrives as the wire's own string (this package may not
- * import the Prisma `PricingModel` enum), so the two values that matter to
- * `getUsageDisplay` are named here literally: `"TIERED"` and `"SEAT_EVENT"`.
  */
 describe("getUsageDisplay()", () => {
   describe("given the deployment is self-hosted", () => {

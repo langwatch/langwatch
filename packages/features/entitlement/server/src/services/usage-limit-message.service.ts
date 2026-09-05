@@ -1,10 +1,9 @@
 import type { UsageUnit } from "@langwatch/entitlement-contract";
 
 /**
- * What the message needs to know about the install: whether it is the hosted
- * product, and the origin its own settings pages live at. Both were read off
- * the application's environment; a package reads none, so the composition
- * states them.
+ * What the message needs to know about the install: whether it is the hosted product, and the
+ * origin its own settings pages live at. Both were read off the application's environment; a
+ * package reads none, so the composition states them.
  */
 export interface UsageDeployment {
   isSaas: boolean;
@@ -17,12 +16,8 @@ export class UsageLimitMessageService {
   }
 
   /**
-   * Builds the human-readable limit message for 429 responses.
-   *
-   * Format: "{prefix} limit of {limit} {unit} reached. To increase your limits, {action}"
-   * - prefix: "Free" for free-tier orgs, "Monthly" for paid orgs
-   * - unit: "events" or "traces" based on the meter decision
-   * - action: SaaS users are told to upgrade; self-hosted users are told to buy a license
+   * Builds the human-readable limit message for 429 responses. Format: "{prefix} limit of
+   * {limit} {unit} reached.
    */
   static buildLimitMessage({
     isFree,

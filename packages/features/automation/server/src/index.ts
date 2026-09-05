@@ -113,12 +113,6 @@ export { AutomationGraphDeliveryPort } from "./ports/automation-graph-delivery.p
 export { AutomationRunawayPort, type ClaimLease } from "./ports/automation-runaway.port";
 /**
  * The containment POLICY behind that port.
- *
- * Published because the decision — is this automation misconfigured, has this
- * organization already been told today, may this process be the one to pause
- * it — belongs to the feature, and the only thing a composition root supplies
- * is the infrastructure the port names. A root that wrote the policy itself
- * would be free to pause on a different rule than the one the spec pins.
  */
 export {
   CONTAINMENT_CHECK_CLAIM_SECONDS,
@@ -235,10 +229,9 @@ export {
 } from "./app/automation.app";
 
 /**
- * The app-process REST family this feature owns. The process supplies the
- * bound REST security service, a resolver for the application and its own
- * platform-URL builder; the base path, access declarations, schemas and
- * delegation are the feature's.
+ * The app-process REST family this feature owns. The process supplies the bound REST security
+ * service, a resolver for the application and its own platform-URL builder; the base path,
+ * access declarations, schemas and delegation are the feature's.
  */
 export { createTriggerRestApp } from "./transport/api-rest/automation.api";
 export { createSlackTriggerRestApp } from "./transport/api-rest/slack-trigger.api";
@@ -264,13 +257,8 @@ export {
 } from "./services/report-chart.service";
 export { ReportTraceRowService } from "./services/report-trace-row.service";
 /**
- * The two Postgres reads a scheduled report fires through, published so a
- * background process can compose the handler over its own client.
- *
- * A report's fire is recorded in the SAME `TriggerSent` history the automations
- * page reads its last-sent from, and its panels are the SAME builder charts the
- * dashboard draws — so both are the feature's own repositories rather than two
- * queries a composition root writes for itself.
+ * The two Postgres reads a scheduled report fires through, published so a background process
+ * can compose the handler over its own client.
  */
 export { PrismaTriggerFireHistoryRepository } from "./repositories/prisma/prisma.trigger-fire-history.repository";
 export { PrismaCustomGraphRepository } from "./repositories/prisma/prisma.custom-graph.repository";

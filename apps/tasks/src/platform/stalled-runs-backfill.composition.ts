@@ -27,10 +27,9 @@ import { TASKS_PROCESS_NAME, type TasksEventingInfrastructure } from "./tasks-ev
 import type { TasksHost } from "./tasks-host.composition";
 
 /**
- * `finishUnsuccessfulRun` only reads `AgentService` when the input carries a
- * `target`, and this task's finder never resolves one — so the lookup never
- * fires. Every method still refuses by name rather than composing the Agent
- * feature into this process for a read it cannot reach.
+ * `finishUnsuccessfulRun` only reads `AgentService` when the input carries a `target`, and this
+ * task's finder never resolves one — so the lookup never fires. Every method still refuses by
+ * name rather than composing the Agent feature into this process for a read it cannot reach.
  */
 class UnreachableTasksAgentService extends AgentService {
   private refuse(capability: string): Promise<never> {
@@ -104,10 +103,9 @@ class UnreachableTasksAgentService extends AgentService {
 }
 
 /**
- * The eight simulation writes, dispatched onto this process's own
- * producer-only registration. Only `finishRun` is ever called by
- * stalled-runs-backfill; the rest refuse by name — this task submits and
- * cancels nothing, and streams no messages.
+ * The eight simulation writes, dispatched onto this process's own producer-only registration.
+ * Only `finishRun` is ever called by stalled-runs-backfill; the rest refuse by name — this task
+ * submits and cancels nothing, and streams no messages.
  */
 class TasksSimulationExecution extends SimulationExecutionPort {
   constructor(
@@ -188,11 +186,9 @@ class TasksScenarioExecution extends ScenarioExecutionService {
 }
 
 /**
- * Builds the `stalled-runs-backfill` task, deferred to `run()` — the same
- * reason `object-storage-migrate.composition.ts` defers: constructing the
- * real `execution` registers an Eventing pipeline, which needs Redis, and a
- * missing `REDIS_URL` must fail only THIS task, at run time, not every other
- * task at catalogue construction.
+ * Builds the `stalled-runs-backfill` task, deferred to `run()` — the same reason
+ * `object-storage-migrate.composition.ts` defers: constructing the real `execution`
+ * registers an Eventing pipeline, which needs Redis.
  */
 export function buildStalledRunsBackfillTask({
   host,

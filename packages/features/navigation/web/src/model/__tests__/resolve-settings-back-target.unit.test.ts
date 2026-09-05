@@ -1,15 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * The "Back to {product}" entry at the top of the Settings sidebar: the page
- * the reader came in from when this tab captured one, the remembered product's
- * home otherwise, and a plain "Back" when neither can be resolved.
- *
- * Written HERE rather than moved, for the same reason as the two suites beside
- * it: the platform test was swept before the module travelled. The
- * organization check is the case worth keeping honest — switching organization
- * inside Settings makes a captured project address belong to somewhere else.
- *
  * Spec: specs/navigation/navigation-v2-landing.feature
  */
 

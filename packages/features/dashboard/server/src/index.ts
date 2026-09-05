@@ -41,22 +41,15 @@ export {
 } from "./app/dashboard.app";
 
 /**
- * The REST families this feature owns. The process supplies the bound REST
- * security service, a resolver for the application and its own platform-URL
- * builder; the base paths, access declarations, schemas and delegation are the
- * feature's.
+ * The REST families this feature owns. The process supplies the bound REST security service, a
+ * resolver for the application and its own platform-URL builder; the base paths, access
+ * declarations, schemas and delegation are the feature's.
  */
 export { createGraphsRestApp } from "./transport/api-rest/graph.api";
 export { createDashboardsRestApp } from "./transport/api-rest/dashboard.api";
 
 /**
  * The two policies a process used to compose by hand.
- *
- * Both are Dashboard's own decisions expressed against collaborators it does
- * not own — the LangWatchQL validator over a saved chart's SQL, and the
- * workbench rollout flag over which graph kinds a project may place — so they
- * live here as adapters a composition root binds, rather than as a shape every
- * deployment restates.
  */
 export { AnalyticsSavedWorkbenchChartPolicyAdapter } from "./adapters/saved-workbench-chart-policy.adapter";
 export { mapDashboardSavedWorkbenchChartError } from "./transport/api-trpc/saved-workbench-chart.transport-errors";

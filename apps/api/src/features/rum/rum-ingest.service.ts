@@ -1,19 +1,5 @@
 /**
- * Accepts an OTLP/JSON trace export from a browser and forwards it to the
- * collector.
- *
- * Everything reaching this service is untrusted: the route is public by
- * necessity (a browser has no credential to present), so the payload is
- * attacker-controlled and the caller's identity is self-asserted. The service
- * therefore does not try to prove authorship — it bounds what a payload can
- * cost us and what it can claim to be:
- *
- *   - the body is capped in bytes before it is buffered, so an unbounded
- *     upload cannot exhaust the process
- *   - the span count is capped, because a small body can hold a lot of spans
- *   - identity-carrying resource attributes are *overwritten* rather than
- *     validated, so no payload can attribute itself to another service
- *
+ * Accepts an OTLP/JSON trace export from a browser and forwards it to the collector.
  * See ADR-058 and specs/observability/browser-rum-trace-correlation.feature.
  */
 
@@ -29,10 +15,6 @@ import { collectorHeaders, collectorTracesUrl } from "../../platform/config/rum-
 
 /**
  * One fixed-window counter, keyed on whatever the caller is identified by.
- *
- * A port rather than an import: the counter lives on the process's own Redis
- * and is SHARED with every other throttle this process meters through, so a
- * second instance here would give one caller two budgets for one rule.
  */
 export type RumRateLimiter = (input: {
   key: string;
@@ -92,12 +74,8 @@ export class RumRateLimitedError extends HandledError {
 }
 
 /**
- * Reads the request body, refusing to buffer more than the cap.
- *
- * The `content-length` header is only a hint — a chunked request need not send
- * one, and a lying one is free to send. So the limit is enforced against bytes
- * actually read: without this, `await c.req.text()` would happily materialise a
- * 500MB string before any size check could reject it.
+ * Reads the request body, refusing to buffer more than the cap. The `content-length` header is
+ * only a hint — a chunked request need not send one, and a lying one is free to send.
  */
 export async function readCappedBody(
   request: Request,
@@ -156,14 +134,7 @@ export function countSpans(resourceSpans: OtlpResourceSpans[]): number {
 }
 
 /**
- * Replaces the resource attributes that carry identity.
- *
- * Overwriting beats validating. A check for "does this claim to be someone
- * else" has to reason about a *repeated* attribute list where collectors take
- * the last value and a naive check takes the first — so appending a second
- * `service.name` slips a forged identity past any first-match test. Setting the
- * values ourselves removes the question: whatever the browser sent, what leaves
- * here is this service, marked as the platform describing itself.
+ * Replaces the resource attributes that carry identity. Overwriting beats validating.
  */
 export function stampIdentity(resourceSpans: OtlpResourceSpans[]): void {
   const owned = new Set(["service.name", "langwatch.origin"]);
@@ -185,16 +156,9 @@ const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
 /**
- * Confirms the export is walkable before anything walks it.
- *
- * Checking that `resourceSpans` is an array is not enough on its own, because
- * what runs next reaches inside it: `countSpans` iterates `scopeSpans` and
- * `stampIdentity` calls `.filter` on `resource.attributes`. A payload that
- * makes either of those a string or an object throws a `TypeError`, and the
- * route answers 500 to a body the caller chose. On a public endpoint that is a
- * way to provoke server errors at will, so a shape we cannot walk is refused as
- * the malformed input it is. Only the fields we touch are checked; everything
- * else still passes through to the collector untouched.
+ * Confirms the export is walkable before anything walks it. Checking that `resourceSpans` is an
+ * array is not enough on its own, because what runs next reaches inside it: `countSpans`
+ * iterates `scopeSpans` and `stampIdentity` calls `.filter` on `resource.attributes`.
  */
 export function assertWalkableExport(resourceSpans: unknown[]): void {
   const invalid = () => new RumPayloadInvalidError("Malformed payload");
@@ -225,13 +189,9 @@ export function assertWalkableExport(resourceSpans: unknown[]): void {
 }
 
 /**
- * Rate-limit buckets.
- *
- * The per-caller bucket is fairness, not defence: the session is self-asserted
- * and the address is only as trustworthy as the proxy in front of us, so an
- * abuser rotates either one and lands in a fresh bucket every time. The global
- * bucket is the actual bound — it caps what the whole route can push at the
- * collector no matter how many identities the traffic claims.
+ * Rate-limit buckets. The per-caller bucket is fairness, not defence: the session is
+ * self-asserted and the address is only as trustworthy as the proxy in front of us, so an
+ * abuser rotates either one and lands in a fresh bucket every time.
  */
 export const RUM_PER_CALLER_PER_MINUTE = 120;
 export const RUM_GLOBAL_PER_MINUTE = 6_000;
@@ -240,12 +200,11 @@ export async function enforceRateLimits(
   callerKey: string,
   rateLimit: RumRateLimiter,
 ): Promise<void> {
-  // The global bucket is checked first because the per-caller key is built from
-  // a value the caller chooses. Checking that one first means every request
-  // writes a fresh 60s key whenever the caller rotates its session header — so
-  // a flood that the global cap is already refusing would still mint a Redis
-  // key per request, turning a refusal into unbounded key churn. Refusing on
-  // the global bucket first writes nothing the caller controls the name of.
+  // The global bucket is checked first because the per-caller key is built from a value the
+  // caller chooses. Checking that one first means every request writes a fresh 60s key whenever
+  // the caller rotates its session header — so a flood that the global cap is already refusing
+  // would still mint a Redis key per request, turning a refusal into unbounded key churn.
+  // Refusing on the global bucket first writes nothing the caller controls the name of.
   const global = await rateLimit({
     key: "rum:global",
     windowSeconds: 60,
@@ -305,12 +264,11 @@ export async function ingestBrowserTraces({
 
   stampIdentity(resourceSpans);
 
-  // Not awaited. The browser has nothing to do with the answer — the outcome is
-  // never surfaced to it (see below) — so waiting would only hold a live
-  // connection open for as long as the collector takes to fail, which during an
-  // outage is every request for the full timeout. The app is a long-running
-  // Node process, not a serverless function, so the promise keeps running after
-  // the response is sent.
+  // Not awaited. The browser has nothing to do with the answer — the outcome is never surfaced
+  // to it (see below) — so waiting would only hold a live connection open for as long as the
+  // collector takes to fail, which during an outage is every request for the full timeout. The
+  // app is a long-running Node process, not a serverless function, so the promise keeps running
+  // after the response is sent.
   void forwardToCollector({ forwardTo, payload });
 }
 

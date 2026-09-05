@@ -1,10 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * The annotation queue walk: a bottom bar whose actions are named in words,
- * correcting the trace in the drawer, the traces this sitting counts, and the
- * hand-off that has to be answered before the queue celebrates.
- * See packages/features/annotation/specs/annotation-queue-workflow.feature.
  */
 import { AnnotationTestHarness, StubAnnotationHost } from "../../../testing";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
@@ -83,13 +78,11 @@ vi.mock("@langwatch/trace-web/explorer/components/TraceDrawer/conversationView",
   ConversationView: () => <div data-testid="conversation-view" />,
 }));
 
-// The real adapter loads Shiki's grammars and themes; the page cares about
-// none of it, and the conversation it highlights is mocked away above.
-//
-// PARTIAL, and it has to be: `@langwatch/trace-web` is that package's own
-// entry, and its internals import through it — `useDrawerProjectId` reads
-// `useDrawerStore` off the same module — so replacing the whole entry takes the
-// stores the walker's own conversation hook needs with it.
+// The real adapter loads Shiki's grammars and themes; the page cares about none of it, and the
+// conversation it highlights is mocked away above. PARTIAL, and it has to be:
+// `@langwatch/trace-web` is that package's own entry, and its internals import through it —
+// `useDrawerProjectId` reads `useDrawerStore` off the same module — so replacing the whole
+// entry takes the stores the walker's own conversation hook needs with it.
 vi.mock("@langwatch/trace-web", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useShikiAdapter: () => ({ getHighlighter: () => () => null }),
@@ -139,13 +132,9 @@ vi.mock("../../../behavior/annotation-api", () => ({
   },
 }));
 
-// The drawer store is the real one: "Edit trace" leaves the tab it lands on to
-// the shared helper, and what that helper does to the reader's remembered tab
-// is the point of the fallback.
-// Subpath rather than the barrel, and that is load-bearing: this file replaces
-// the whole `@langwatch/trace-web` barrel with a one-key factory and no
-// `importOriginal`, so importing the barrel here would hand the test the mock
-// and quietly contradict the comment above.
+// The drawer store is the real one: "Edit trace" leaves the tab it lands on to the shared
+// helper, and what that helper does to the reader's remembered tab is the point of the
+// fallback.
 const { useDrawerStore } = await import("@langwatch/trace-web/drawer.store");
 const { useAnnotationQueueSessionStore } = await import("@langwatch/trace-web");
 const {
@@ -178,10 +167,7 @@ const setItems = (items: TestQueueItem[]) => {
 // A fresh element every time: React skips re-rendering an element it is handed
 // by the same reference, which would hide the refreshed queue data.
 /**
- * The walker mounts the TRACE host as well as its own — the conversation view
- * and its turn hook read `@langwatch/trace-web`'s port — and the bridge that
- * answers it reads the annotation host above it, so the harness is what puts
- * both in place.
+ * The walker mounts the TRACE host as well as its own, so the bridge can reach both.
  */
 const page = () => (
   <AnnotationTestHarness

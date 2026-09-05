@@ -4,10 +4,6 @@ import { createSsrfUrlValidator } from "../url-validator";
 
 /**
  * Spec: specs/security/ssrf-blocking.feature
- *
- * The TS half of the TS+Go parity suite. Each `it` below carries the literal
- * Scenario Outline title (with its unexpanded `<impl>`/`<toggle>` tokens) —
- * the Go engine's own conformance test carries the same title for its half.
  */
 
 function resolvesTo(records: { a?: string[]; aaaa?: string[] }) {

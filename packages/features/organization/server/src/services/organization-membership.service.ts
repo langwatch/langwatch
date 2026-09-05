@@ -7,13 +7,13 @@ import {
   type OrganizationIntent,
   type OrganizationUserRole,
   PricingModel,
-  type PrismaClient,
   RoleBindingScopeType,
   type TeamUserRole,
   type User,
 } from "@langwatch/prisma-client/generated";
 import type { AuthzBindingForSynthesis } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
+import { PersonalWorkspaceNotManagedHereError } from "@langwatch/organization-contract";
 import slugify from "slugify";
 import { computeEffectiveTeamRoleUpdates } from "./compute-effective-team-role-updates";
 import { isCustomRole } from "./custom-role-naming";
@@ -24,7 +24,7 @@ import {
   MemberNotFoundError,
   MemberSeatLimitReachedError,
 } from "./organization-membership.errors";
-import { assertNoPersonalTeamScope, findSharedTeamIds } from "./personal-team-scope";
+
 import {
   OrganizationGrantCachePort,
   OrganizationPromptSeedPort,
@@ -66,30 +66,16 @@ type TeamMembershipLike = {
 };
 
 /**
- * The raw client behind the repository, for orchestrations that compose helpers operating on one (the
- * personal-team guard, shared-team enumeration, the license-enforcement repository). Absent only with
- * the null repository, where these operations are not meaningful.
- */
-function clientFromRepo(repo: OrganizationMembershipRepository): PrismaClient {
-  const client = repo.getClient?.();
-  if (!client) {
-    throw new Error("This operation requires a Prisma-backed organization repository");
-  }
-
-  return client;
-}
-
-/**
  * The union of permissions granted by the custom roles behind these team bindings, or
  * undefined when none apply. Feeds seat classification, which treats a member whose custom
  * roles grant only view permissions as a Lite Member.
  */
 async function collectCustomRolePermissions({
-  prisma,
+  repository,
   organizationId,
   currentTeamBindings,
 }: {
-  prisma: PrismaClient;
+  repository: OrganizationMembershipRepository;
   organizationId: string;
   currentTeamBindings: Array<{ customRoleId: string | null }>;
 }): Promise<string[] | undefined> {
@@ -100,17 +86,17 @@ async function collectCustomRolePermissions({
     return undefined;
   }
 
-  const customRoles = await prisma.customRole.findMany({
-    where: { id: { in: customRoleIds }, organizationId },
-    select: { permissions: true },
+  const permissionsPerRole = await repository.findCustomRolePermissions({
+    organizationId,
+    customRoleIds,
   });
   const allPermissions: string[] = [];
-  for (const customRole of customRoles) {
+  for (const permissions of permissionsPerRole) {
     // `permissions` is a Json column, so the row decides the shape, not the
     // type: read it defensively the way every other permission reader does.
-    if (Array.isArray(customRole.permissions)) {
+    if (Array.isArray(permissions)) {
       allPermissions.push(
-        ...customRole.permissions.filter(
+        ...permissions.filter(
           (permission): permission is string => typeof permission === "string",
         ),
       );
@@ -553,7 +539,6 @@ export class OrganizationMembershipService {
     planUser?: OrganizationPlanUser;
   }): Promise<UpdateMemberRoleResult> {
     const { organizationId, userId, role, teamRoleUpdates, currentUserId } = params;
-    const prisma = clientFromRepo(this.repo);
 
     const currentMember = await this.repo.tryFindMembership({
       organizationId,
@@ -566,32 +551,27 @@ export class OrganizationMembershipService {
     // A caller who names a personal workspace outright is told so. Without
     // this the shared-teams-only set below would answer "that team is not in
     // the organization", which is both wrong and no help.
-    await assertNoPersonalTeamScope({
-      client: prisma,
+    const personalTeam = await this.repo.findPersonalTeamInScopes({
       scopes: (teamRoleUpdates ?? []).map((update) => ({
         scopeType: RoleBindingScopeType.TEAM,
         scopeId: update.teamId,
       })),
     });
+    if (personalTeam) {
+      throw new PersonalWorkspaceNotManagedHereError(personalTeam.name);
+    }
 
     // Only the teams the organization shares. A seat decision is about the
     // person, so it applies to the teams they work in with other people and
     // leaves the workspace that is only theirs alone. Including it would ask
     // the organization to demote a team's last admin, which is refused, and
     // the whole role change would go down with the refusal.
-    const organizationTeamIds = await findSharedTeamIds({
-      client: prisma,
-      organizationId,
-    });
+    const organizationTeamIds = await this.repo.findSharedTeamIds({ organizationId });
 
-    const currentTeamBindings = await prisma.roleBinding.findMany({
-      where: {
-        organizationId,
-        userId,
-        scopeType: RoleBindingScopeType.TEAM,
-        scopeId: { in: organizationTeamIds },
-      },
-      select: { scopeId: true, role: true, customRoleId: true },
+    const currentTeamBindings = await this.repo.findTeamRoleBindings({
+      organizationId,
+      userId,
+      teamIds: organizationTeamIds,
     });
 
     const currentMemberships = currentTeamBindings.map((binding) => ({
@@ -600,7 +580,7 @@ export class OrganizationMembershipService {
     }));
 
     const userPermissions = await collectCustomRolePermissions({
-      prisma,
+      repository: this.repo,
       organizationId,
       currentTeamBindings,
     });

@@ -1,15 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * The hero's onboarding control: a new project leads with a prominent
- * "Send your first trace" above the ask chips, a populated project keeps the
- * quiet "Onboard your agent" beneath them.
- *
- * Ported from platform/app/src/components/home/__tests__/LangyHomeHero.integration.test.tsx
- * (origin/main), adapted from the deleted `~/features/command-bar/*`,
- * `~/features/langy/*` and `~/hooks/useOrganizationTeamProject` mocks to
- * `@langwatch/navigation-web/command-bar`, `@langwatch/langy-web` and
- * `ProjectHomeHostProvider`. See specs/home/langy-home.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

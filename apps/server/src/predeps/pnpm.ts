@@ -57,13 +57,10 @@ export const pnpmPredep: Predep = {
       };
     }
     // Fall through to user's system pnpm if it's a 10.x — pnpm 10's
-    // `manage-package-manager-versions: true` default handles the
-    // `packageManager: pnpm@10.24.0` lockfile pin transparently across
-    // patch versions (pnpm 10.30.x reads the field, self-fetches 10.24.0
-    // into its own cache when needed, runs scripts with the right
+    // `manage-package-manager-versions: true` default handles the `packageManager:
+    // pnpm@10.24.0` lockfile pin transparently across patch versions (pnpm 10.30.x reads the
+    // field, self-fetches 10.24.0 into its own cache when needed, runs scripts with the right
     // version). This is the same pattern uv.ts uses for the host's uv.
-    // Only download our bundled binary when no usable system pnpm exists
-    // — the bare-Linux case the predep was originally added for.
     const sysVersion = await resolveVersion("pnpm");
     if (sysVersion && sysVersion.startsWith("10.")) {
       return { installed: true, version: sysVersion, resolvedPath: "pnpm" };

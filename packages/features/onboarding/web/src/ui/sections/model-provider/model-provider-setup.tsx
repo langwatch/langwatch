@@ -1,11 +1,5 @@
 /**
  * The credential half of the onboarding model provider step.
- *
- * A SEAM, ON PURPOSE: the form belongs to the model-provider family and is
- * mounted here rather than copied, and the step's own test mocks this module so
- * what it proves is the placement and the advance, not the save mechanics.
- * `modelProviderId: "new"` keeps onboarding on a fresh row instead of editing
- * whatever the organization already holds for that provider.
  */
 
 import { EditModelProviderForm } from "@langwatch/model-provider-web/components/EditModelProviderForm";

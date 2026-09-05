@@ -40,11 +40,9 @@ type FormData = {
 };
 
 /**
- * Drawer for creating a new workflow-based evaluator.
- * Features:
- * - Creates a new workflow from the custom_evaluator template
- * - Creates an evaluator linked to the new workflow
- * - Navigates to the workflow studio for editing
+ * Drawer for creating a new workflow-based evaluator. Features: - Creates a new workflow from
+ * the custom_evaluator template - Creates an evaluator linked to the new workflow - Navigates
+ * to the workflow studio for editing
  */
 export function WorkflowSelectorForEvaluatorDrawer(props: WorkflowSelectorForEvaluatorDrawerProps) {
   const { project } = useOrganizationTeamProject();

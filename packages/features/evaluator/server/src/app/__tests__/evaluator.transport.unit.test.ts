@@ -1,20 +1,5 @@
 /**
  * @vitest-environment node
- *
- * The `/api/evaluators` door: the five routes it publishes, the permission
- * each declares, the immutability rule it enforces on `config.evaluatorType`,
- * the config merge a partial update performs, and the shape a rejected create
- * body comes back as.
- *
- * Ported from two files under `platform/app/src/app/api/evaluators/__tests__`:
- * `evaluators-api.integration.test.ts`, which drove this family against
- * Postgres, and `create-evaluator-validation.unit.test.ts`, which mounted the
- * create schema on a bare Hono. The schema now lives in this package
- * (`transport/api-rest/evaluator.schemas.ts`), so it is exercised here through
- * the real family instead.
- *
- * The application is stubbed. This file asserts what the transport does, never
- * what the domain decides.
  */
 import {
   createAppRestSecurity,
@@ -48,12 +33,9 @@ const evaluator = {
 const enriched = { ...evaluator, fields: [], outputFields: [] };
 
 /**
- * The process's own boundary renderer, reduced to what these tests read back.
- *
- * A handled error keeps its own status and code, and its `meta` is spread onto
- * the body — which is what puts `fields` beside `error` on a rejected request.
- * The real renderer adds remediation tips, a trace block and the log line;
- * none of that is the door's, and none of it is asserted here.
+ * The process's own boundary renderer, reduced to what these tests read back. A handled error
+ * keeps its own status and code, and its `meta` is spread onto the body — which is what puts
+ * `fields` beside `error` on a rejected request.
  */
 const boundaryErrorHandler: ErrorHandler = (error, c) => {
   if (HandledError.isHandled(error)) {

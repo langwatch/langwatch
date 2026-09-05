@@ -49,12 +49,6 @@ afterAll(async () => {
 describe("GroupStagingScripts", () => {
   describe("when a retry re-stages a job", () => {
     // The group's retry chain and the re-stage are ONE script (ADR-080).
-    // Since the staged id stopped carrying a `/r/<n>` marker, that chain is
-    // the only attempt carrier a re-staged SIBLING has — it comes back with
-    // its original envelope and no `__attempt`. A chain write that failed
-    // while the re-stage succeeded would hand the next sibling-led claim a
-    // fresh budget: an unbounded ladder, and a fold that re-applies events it
-    // had already recorded as applied.
     const attemptKey = () => `${keyPrefix()}group:group-a:attempt`;
 
     /** @scenario A sibling-led claim after a retry still sees the attempt the ladder reached */

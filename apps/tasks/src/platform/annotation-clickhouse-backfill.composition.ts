@@ -8,11 +8,8 @@ import { TASKS_PROCESS_NAME, type TasksEventingInfrastructure } from "./tasks-ev
 import type { TasksHost } from "./tasks-host.composition";
 
 /**
- * Dispatches `bulkSyncAnnotations` onto this process's own producer-only
- * registration of the `trace_processing` pipeline. `annotationIds` arrives as
- * `readonly string[]` off the port's own contract; the command's payload
- * (derived from the event's zod schema) wants a plain mutable array, so it is
- * copied rather than cast.
+ * Dispatches `bulkSyncAnnotations` onto this process's own producer-only registration of the
+ * `trace_processing` pipeline.
  */
 class TasksTraceAnnotationSync extends TraceAnnotationSyncPort {
   constructor(
@@ -42,11 +39,9 @@ class TasksTraceAnnotationSync extends TraceAnnotationSyncPort {
 }
 
 /**
- * Builds the `annotation-clickhouse-backfill` task, deferred to `run()` — the
- * same reason `stalled-runs-backfill.composition.ts` defers: constructing the
- * real `sync` registers an Eventing pipeline, which needs Redis, and a
- * missing `REDIS_URL` must fail only THIS task, at run time, not every other
- * task at catalogue construction.
+ * Builds the `annotation-clickhouse-backfill` task, deferred to `run()` — the same reason
+ * `stalled-runs-backfill.composition.ts` defers: constructing the real `sync` registers an
+ * Eventing pipeline, which needs Redis.
  */
 export function buildAnnotationClickHouseBackfillTask({
   host,

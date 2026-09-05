@@ -1,31 +1,6 @@
 /**
- * The API-key feature's application: what its doors call.
- *
- * It holds the service the feature's api files reach, and it is the one typed
- * thing a transport is given. Before it, `api-key.api.ts` declared its own
- * private `Readonly<{ apiKeys: ApiKeyService }>` — a description of the
- * process's composition that agreed with the process by attention rather than
- * by construction.
- *
- * What lives here as a method is what a door would otherwise have to know, and
- * every one of these was written out per procedure before:
- *
- *   - proving the caller is a member of the organization, which eight
- *     handlers did for themselves;
- *   - asking whether the caller is an organization admin, which four handlers
- *     did for themselves and then acted on differently;
- *   - refusing a service key or a key minted for somebody else to a
- *     non-admin, which was a transport error constructed in the handler;
- *   - deciding which user a new key belongs to.
- *
- * Authorization is deliberately not a declared permission: a personal API key
- * is the caller's own, and no `apiKey:*` permission exists to check. The
- * membership proof below IS the check, which is why it belongs to one
- * operation each rather than to a transport that could forget it.
- *
- * A caller arrives as an argument, never read from a session or a request.
- * That is what lets one operation serve a browser session, an API key and a
- * background job without knowing which it is serving.
+ * The API-key feature's application: what its doors call. It holds the service the feature's
+ * api files reach, and it is the one typed thing a transport is given.
  */
 import {
   ApiKeyAdminRequiredError,
@@ -83,33 +58,18 @@ export class ApiKeyApp {
   private constructor(private readonly dependencies: ApiKeyAppDependencies) {}
 
   /**
-   * The service itself, for the one thing this application deliberately is not
-   * about: turning a credential on the wire into a caller.
-   *
-   * Everything below is the MANAGEMENT surface — a signed-in member listing,
-   * minting and retiring keys in an organization they belong to. Resolving an
-   * inbound token (`tryResolveToken`, `markUsed`) is the opposite direction:
-   * it runs before anyone is authenticated, so there is no `by` to prove
-   * membership for, and it is what the Hono auth middleware and every
-   * key-authenticated REST family call on the way in. The CLI device-login
-   * lifecycle (`mintCliLoginKey`, `validateCliSelection`,
-   * `tryResolveDefaultCliSelection`, `revokeCliLoginKeysForDevice`) sits on the
-   * same seam: those run against a device grant, not a session.
-   *
-   * Modelling either as an operation here would mean this application
-   * answering "who is calling?" for its own callers, so the getter is the seam
-   * that remains — the same one `ModelProviderApp.providerService` keeps.
+   * The service itself, for the one thing this application deliberately is not about: turning a
+   * credential on the wire into a caller. Everything below is the MANAGEMENT surface — a
+   * signed-in member listing, minting and retiring keys in an organization they belong to.
    */
   get apiKeyService(): ApiKeyService {
     return this.dependencies.apiKeys;
   }
 
   /**
-   * The caller's own bindings in one organization, each with its scope named.
-   *
-   * Bindings on archived projects are dropped: the drawers mirror this list to
-   * cap what a new key may be given, and a scope that no longer exists is not
-   * something a key should be able to name.
+   * The caller's own bindings in one organization, each with its scope named. Bindings on
+   * archived projects are dropped: the drawers mirror this list to cap what a new key may be
+   * given, and a scope that no longer exists is not something a key should be able to name.
    */
   async listCallerBindings(
     input: Readonly<{ organizationId: string }>,
@@ -139,10 +99,9 @@ export class ApiKeyApp {
   }
 
   /**
-   * One key id resolved to a display name, for a caller who already has the id.
-   *
-   * Answers null identically for an id that does not exist and one that
-   * belongs to another organization, so it cannot be used to enumerate.
+   * One key id resolved to a display name, for a caller who already has the id. Answers null
+   * identically for an id that does not exist and one that belongs to another organization, so
+   * it cannot be used to enumerate.
    */
   async getKeyName(
     input: Readonly<{ organizationId: string; apiKeyId: string }>,
@@ -156,10 +115,9 @@ export class ApiKeyApp {
   }
 
   /**
-   * The organization's keys for an admin, the caller's own for everyone else.
-   *
-   * Never the secret: a key is identified by the first five characters of its
-   * lookup id, which is enough to recognise one and not enough to use it.
+   * The organization's keys for an admin, the caller's own for everyone else. Never the secret:
+   * a key is identified by the first five characters of its lookup id, which is enough to
+   * recognise one and not enough to use it.
    */
   async listKeys(
     input: Readonly<{ organizationId: string }>,
@@ -244,13 +202,8 @@ export class ApiKeyApp {
   }
 
   /**
-   * Mints a key and hands back its plaintext token — once, here, and nowhere
-   * else. Nothing stores it and no read returns it, so a caller who loses it
-   * revokes and mints again.
-   *
-   * Who the key belongs to is decided here rather than by a door: a service
-   * key belongs to nobody, an unassigned personal key belongs to its creator,
-   * and assigning one to somebody else takes organization admin.
+   * Mints a key and hands back its plaintext token — once, here, and nowhere else. Nothing
+   * stores it and no read returns it, so a caller who loses it revokes and mints again.
    */
   async createKey(
     input: CreateApiKeyRequest,
@@ -337,11 +290,9 @@ export class ApiKeyApp {
   }
 
   /**
-   * The organization's members, for assigning a key to one of them.
-   *
-   * Empty for a non-admin rather than refused: only an admin can assign a key
-   * to somebody else, so a non-admin has nobody to pick from and the picker is
-   * simply not offered.
+   * The organization's members, for assigning a key to one of them. Empty for a non-admin
+   * rather than refused: only an admin can assign a key to somebody else, so a non-admin has
+   * nobody to pick from and the picker is simply not offered.
    */
   async listOrganizationMembers(
     input: Readonly<{ organizationId: string }>,

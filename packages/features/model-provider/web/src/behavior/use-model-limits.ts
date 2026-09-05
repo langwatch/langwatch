@@ -7,7 +7,6 @@ export interface UseModelLimitsParams {
 
 /**
  * Hook to get model limits for a given model
- *
  * @param params - Parameters containing the model name
  * @returns Object with model limits data, loading state, and error state
  */

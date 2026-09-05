@@ -1,25 +1,6 @@
 /**
- * The `evaluation_processing` pipeline as a PRODUCER registers it.
- *
- * One definition, two registrations. The consumer — the worker — supplies real
- * stores, a real `executeEvaluation` intent and the real automation
- * subscribers, and drains every routing key the definition declares. A
- * producer registers the SAME definition only to obtain its command
- * dispatchers: `reportEvaluation` off a tRPC call, and nothing else. It starts
- * no consumer loop, holds no event log and folds nothing.
- *
- * The five dependencies the definition takes are all consumer-side, and a
- * producer has none of them. That is what this module supplies — stand-ins
- * that exist so the definition can be CONSTRUCTED and refuse by name if they
- * are ever CALLED. Refusing rather than no-op'ing is the whole point: a
- * silently-succeeding fold store in a process that was never meant to fold
- * would report a projection as written when nothing was, and the row would
- * simply never appear.
- *
- * Forking the definition instead — declaring only the commands a producer
- * sends — is the thing this avoids. The routing triple every job carries is
- * derived from the pipeline and command names, so two descriptions of one
- * event stream drift into jobs the worker cannot route.
+ * The `evaluation_processing` pipeline as a PRODUCER registers it. One definition, two
+ * registrations.
  */
 import type { AutomationEvaluationSubscriberService } from "@langwatch/automation-contract";
 import type { AppendStore, FoldProjectionStore } from "@langwatch/eventing";
@@ -92,11 +73,9 @@ export class EvaluationProcessingProducerAdapter {
   }
 
   /**
-   * Builds the evaluation-processing definition for a process that only sends
-   * commands on it.
-   *
-   * `processName` names the refusal, so a stand-in reached by accident says
-   * which process reached it rather than reporting an anonymous failure.
+   * Builds the evaluation-processing definition for a process that only sends commands on it.
+   * `processName` names the refusal, so a stand-in reached by accident says which process
+   * reached it rather than reporting an anonymous failure.
    */
   static createPipeline(input: { processName: string }) {
     const { processName } = input;

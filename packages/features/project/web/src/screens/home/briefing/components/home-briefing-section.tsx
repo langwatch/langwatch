@@ -8,20 +8,9 @@ import { LangyBriefing } from "./langy-briefing";
 import { useProjectHomeHost } from "../../../../model/project-home-host";
 
 /**
- * The briefing sheet that leads the home: Langy's read AND the project's
- * numbers on ONE Langy surface — headline, receipts, then the status grid
- * under a hairline rule, closed by the ask row. One sheet instead of a grid
- * of cards: the home used to sit a quick-links rail beside the briefing, but
- * it only repeated the sidebar (the page's own rule: home never repeats the
- * sidebar as cards) and left a mostly-empty card hanging next to a dense one.
- * Container-only: it fetches the real signals and hands them to the
- * presentational sheet.
- *
- * Progressive, shift-free load: the SAME structure renders whether data has
- * arrived or not, so content fills IN PLACE (skeleton → real) instead of
- * reshaping the sheet. `keepPreviousData` keeps cached figures on screen
- * through a refetch, which the overview marks with a subtle "refreshing" hint
- * rather than a skeleton swap.
+ * The briefing sheet that leads the home: Langy's read AND the project's numbers on ONE Langy
+ * surface — headline, receipts, then the status grid under a hairline rule, closed by the ask
+ * row.
  */
 export function HomeBriefingSection() {
   const { data, statusCells, isLoading, isAnalyticsLoading, isRefreshing } = useLangyBriefing();
@@ -31,12 +20,11 @@ export function HomeBriefingSection() {
   // Without Langy, every hand-to-Langy handler stays undefined so the sheet
   // offers only its own evidence links, never a panel that won't mount.
   const showLangy = useProjectHomeHost().langyVisibility().show;
-  // Reading Langy and STARTING a turn are different grants. Everything below
-  // that auto-sends a question needs `langy:create`; only the two that hand the
-  // reader a composer they finish themselves are safe on `langy:view`. With
-  // built-in roles the two always travel together, but the Langy permission
-  // category's read level is exactly `langy:view`, so a custom role or key can
-  // hold one without the other — and would otherwise meet a button that 403s.
+  // Reading Langy and STARTING a turn are different grants. Everything below that auto-sends a
+  // question needs `langy:create`; only the two that hand the reader a composer they finish
+  // themselves are safe on `langy:view`. With built-in roles the two always travel together,
+  // but the Langy permission category's read level is exactly `langy:view`, so a custom role or
+  // key can hold one without the other — and would otherwise meet a button that 403s.
   const canAsk = useProjectHomeHost().canAskLangy();
   const openPanel = useLangyStore((s) => s.openPanel);
   const askLangy = useLangyStore((s) => s.askLangy);
@@ -122,10 +110,7 @@ export function HomeBriefingSection() {
 }
 
 /**
- * The briefing card's first-paint placeholder. It mirrors the real card's shape
- * — the live eyebrow, a two-line headline, a receipts block, and a footer pinned
- * to the bottom — so content fills IN PLACE (skeleton → real) instead of the card
- * changing shape or height as the read lands.
+ * The briefing card's first-paint placeholder.
  */
 function BriefingHeadlineSkeleton() {
   return (

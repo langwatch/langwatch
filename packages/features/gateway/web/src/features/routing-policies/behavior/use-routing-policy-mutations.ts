@@ -1,9 +1,7 @@
 /**
- * The four routing-policy mutations, with their invalidation and their toasts
- * in one place so the page and the drawer cannot drift about what a successful
- * save looks like.
- *
- * Returns state and callbacks only, never JSX.
+ * The four routing-policy mutations, with their invalidation and their toasts in one place so
+ * the page and the drawer cannot drift about what a successful save looks like. Returns state
+ * and callbacks only, never JSX.
  */
 import { useGatewayToaster, useShowErrorToast } from "../../../behavior/gateway-feedback";
 import { useCallback, useState } from "react";

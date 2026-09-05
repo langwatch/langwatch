@@ -1,14 +1,5 @@
 /**
  * @vitest-environment node
- *
- * What a failed workflow evaluation reports back.
- *
- * The mapped result is served to the browser through the evaluation API, and
- * it carried the caught error's message and its Node stack — absolute server
- * paths and internal module names included.
- *
- * Covers @unit scenarios from
- * specs/security/feature-surface-secret-disclosure.feature.
  */
 import type { WorkflowService } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";

@@ -153,21 +153,15 @@ export class ClickHouseManagedClientService<
 
 /**
  * A statement that genuinely spans tenants, and the written reason it does.
- *
- * The same shape `QueryRequest.unscoped` already carries, declared here too
- * because the repositories reach ClickHouse through the vendor client's own
- * `query({ query, query_params })` call rather than through `QueryRequest`.
- * It never reaches the driver: the guard reads it and strips it.
  */
 export interface UnscopedStatementDeclaration {
   reason: string;
 }
 
 /**
- * Refuses a `query` whose SQL names no tenant, outermost of every policy so a
- * statement that must not run never spends a slot or a socket. The refusal is
- * a plain `Error`: a bug in a query we wrote, logged with table and statement
- * head. `insert` is not checked; every row carries its own `TenantId`.
+ * Refuses a `query` whose SQL names no tenant, outermost of every policy so a statement that
+ * must not run never spends a slot or a socket. The refusal is a plain `Error`: a bug in a
+ * query we wrote, logged with table and statement head.
  */
 export function withClickHouseTenantScope<Client extends ClickHouseVendorClient>({
   client,

@@ -20,11 +20,7 @@ const TABLE_NAME = "evaluation_runs" as const;
 const RESOLVER_RECENT_WINDOW_MS = 35 * 24 * 60 * 60 * 1000;
 const DEFAULT_SCHEDULED_AT_SLACK_MS = 7 * 24 * 60 * 60 * 1000;
 /**
- * Load-bearing. These reads alias a DateTime onto the column's own name, and
- * ClickHouse resolves an unqualified WHERE name to the select-list alias — so
- * the dedup predicate compared milliseconds against `max(UpdatedAt)`, matched
- * nothing, and every trace read answered with no evaluations. Qualifying the
- * predicate with this alias binds it to the column.
+ * Load-bearing.
  */
 const RUNS = "runs" as const;
 const TRACE_EVALUATION_COLUMNS_LIGHT = [

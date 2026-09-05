@@ -10,11 +10,9 @@ import {
 } from "@langwatch/analytics-contract";
 
 /**
- * The stored graph JSON as a report reads it. The full `CustomGraphInput` is a
- * BROWSER type (colour sets, chart heights, tooltip options) owned by
- * `@langwatch/analytics-web`, and no server module may value-import a browser
- * package. A report reads four fields off the row, so those four are declared
- * here rather than dragging the drawing type across the boundary.
+ * The stored graph JSON as a report reads it. The full `CustomGraphInput` is a BROWSER type
+ * (colour sets, chart heights, tooltip options) owned by `@langwatch/analytics-web`, and no
+ * server module may value-import a browser package.
  */
 export interface ReportGraphInput {
   graphType:
@@ -35,14 +33,8 @@ export interface ReportGraphInput {
 }
 
 /**
- * Turn a report's chart source — one custom graph, or every panel on a
- * dashboard — into the `ReportChart[]` the template context carries.
- *
- * The graph's stored JSON is the same `CustomGraphInput` the analytics UI
- * draws from, so a report renders exactly the series the author sees on the
- * dashboard, over the report's own window rather than the UI's date picker.
- * Unlike the graph-alert evaluator (which watches ONE series against a
- * threshold), a report plots every series on the graph.
+ * Turn a report's chart source — one custom graph, or every panel on a dashboard — into the
+ * `ReportChart[]` the template context carries.
  */
 
 export interface ReportChartDeps {
@@ -81,21 +73,12 @@ const MAX_SEGMENTS = 8;
 
 /**
  * Max panels a single report queries at once (ADR-044 §5 "Load & scale"). Each
- * panel is one heavy, cold-cache `getTimeseries` GROUP-BY; a large dashboard has
- * dozens, and at a shared schedule boundary several reports on several workers
- * fire together. An unbounded `Promise.all` would fan every panel out at once
- * and a burst of these can exhaust ClickHouse concurrency/memory for interactive
- * traffic. Bounding the per-report fan-out — composed with the worker firing
- * reports one at a time and the fleet's worker count — keeps the burst small
- * while still overlapping enough panels that a dashboard render stays prompt.
  */
 export const REPORT_CHART_QUERY_CONCURRENCY = 3;
 
 /**
- * Map `fn` over `items` with at most `concurrency` calls in flight, preserving
- * input order in the result. A rejected `fn` rejects the whole map (matching the
- * previous `Promise.all` all-or-nothing contract — a report either renders every
- * panel or fails and retries via the scheduler's lease).
+ * Map `fn` over `items` with at most `concurrency` calls in flight, preserving input order in
+ * the result.
  */
 async function mapWithConcurrency<T, R>(
   items: T[],
@@ -125,10 +108,9 @@ async function mapWithConcurrency<T, R>(
 const DAY_SCALE_MINUTES = 1440;
 
 /**
- * Axis label for one time bucket. The TEMPLATE cannot do this — it has no idea
- * whether a bucket is an hour or a week, so it would render every daily bucket
- * as "00:00". The scale is known here, so the label is resolved here and the
- * template just prints it.
+ * Axis label for one time bucket. The TEMPLATE cannot do this — it has no idea whether a bucket
+ * is an hour or a week, so it would render every daily bucket as "00:00". The scale is known
+ * here, so the label is resolved here and the template just prints it.
  */
 function formatBucketLabel({
   date,

@@ -1,11 +1,5 @@
 /**
  * @vitest-environment node
- *
- * Evaluator slug generation, exercised through `PrismaEvaluatorRepository.create()`
- * against a fake database. Current behaviour is a plain kebab-case of the name
- * (no nanoid suffix) — see the comment block at the top of
- * specs/monitors/evaluator-slug.feature: the suffix-bearing behaviour the
- * original scenarios describe was never carried into this repository.
  */
 import { describe, expect, it } from "vitest";
 import type { EvaluatorDatabase } from "../../evaluator.repository";

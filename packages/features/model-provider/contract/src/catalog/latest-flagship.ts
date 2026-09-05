@@ -1,12 +1,7 @@
 /**
- * Picks the newest "plain" flagship model from the LLM registry for a
- * given provider — `<provider>/<base>-<major>.<minor>` only, skipping
- * specialised variants (pro, codex, image, audio, nano, mini, dated, etc.).
- *
- * Used to derive a sensible "current model" without hard-coding a value
- * that drifts every time the registry advances. Lightweight on purpose
- * (only depends on the JSON registry, no Prisma types) so it's safe to
- * import from leaf modules like `~/utils/constants`.
+ * Picks the newest "plain" flagship model from the LLM registry for a given provider —
+ * `<provider>/<base>-<major>.<minor>` only, skipping specialised variants (pro, codex, image,
+ * audio, nano, mini, dated, etc.).
  */
 
 import { llmModels } from "./model-catalog";

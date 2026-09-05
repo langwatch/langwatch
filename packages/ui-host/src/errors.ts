@@ -1,22 +1,5 @@
 /**
  * What a browser feature does with a failure, in one place.
- *
- * Four packages carried their own copy of this over their own feature host
- * port, and each copy said the same thing in its own comment: the words a
- * customer reads belong to the code-keyed registry, so the failure must travel
- * WHOLE rather than as a sentence a screen composed. That is now true here,
- * once, and the registry is reachable — `@langwatch/handled-error/presentation`
- * is a contract package, so this module resolves the real copy instead of the
- * generic line every per-feature copy had to settle for.
- *
- * Nothing renders here: a report leaves through `UiFeedbackPort`, and the
- * application's toaster draws it. Explaining a failure for a surface that
- * renders it INTO the page (an alert, a dead-end state) is
- * `explainAnyError` from the presentation registry, imported directly.
- *
- * A SINGLETON, because most of these fire from a mutation's `onError` or a
- * promise rejection, where no hook can run. A failure reported with no host
- * mounted is warned about and dropped, never thrown.
  */
 
 import { explainAnyError } from "@langwatch/handled-error/presentation";
@@ -45,18 +28,15 @@ export function toError(value: unknown): Error {
 export type ShowErrorToastOptions = {
   error?: unknown;
   /**
-   * Headline for a failure the registry has no copy for.
-   *
-   * It names the action that failed ("Couldn't create project") so an
-   * unrecognised error still says what the reader was doing — a code the
-   * registry knows keeps its own, better title.
+   * Headline for a failure the registry has no copy for. It names the action that failed
+   * ("Couldn't create project") so an unrecognised error still says what the reader was doing —
+   * a code the registry knows keeps its own, better title.
    */
   fallbackTitle?: string;
   /**
-   * A sentence for a refusal the SCREEN can say more about than the registry.
-   *
-   * Ignored the moment the error carries a code the application has copy for,
-   * so it can never talk over registered copy.
+   * A sentence for a refusal the SCREEN can say more about than the registry. Ignored the
+   * moment the error carries a code the application has copy for, so it can never talk over
+   * registered copy.
    */
   description?: string;
   /** The single fix this failure offers, where there is one. */
@@ -66,13 +46,8 @@ export type ShowErrorToastOptions = {
 };
 
 /**
- * Reports a failure to the reader, correctly.
- *
- * This is the ONLY sanctioned way to report one from a feature screen. The
- * obvious thing — `toaster.create({ description: error.message })` — is wrong
- * in both directions: for a handled error the wire message is the code slug,
- * and for an unhandled one the message can carry internals. See
- * `dev/docs/best_practices/error-handling.md`.
+ * Reports a failure to the reader, correctly. This is the ONLY sanctioned way to report one
+ * from a feature screen.
  */
 export function showErrorToast({ error, ...options }: ShowErrorToastOptions): void {
   const host = currentUiFeedbackHost();
@@ -91,11 +66,9 @@ export function showErrorToast({ error, ...options }: ShowErrorToastOptions): vo
 }
 
 /**
- * The whole explanation as one string, for a slot that can only take text.
- *
- * Registry copy beats the caller's fallback for the same reason it does on a
- * toast: a code the registry knows describes this exact failure, where the
- * caller's headline only names the action.
+ * The whole explanation as one string, for a slot that can only take text. Registry copy beats
+ * the caller's fallback for the same reason it does on a toast: a code the registry knows
+ * describes this exact failure, where the caller's headline only names the action.
  */
 export function describeError({
   error,
@@ -116,10 +89,9 @@ export function describeError({
 export const FORM_SERVER_ERROR = "root.serverError";
 
 /**
- * As much of a react-hook-form as this helper touches.
- *
- * Structural and deliberately loose: the forms that pass one in are typed by
- * their own value shapes, and narrowing `setError` would make every caller cast.
+ * As much of a react-hook-form as this helper touches. Structural and deliberately loose: the
+ * forms that pass one in are typed by their own value shapes, and narrowing `setError` would
+ * make every caller cast.
  */
 type MinimalForm = {
   // oxlint-disable-next-line no-explicit-any
@@ -127,10 +99,9 @@ type MinimalForm = {
 };
 
 /**
- * Places a server's field-level rejection on the fields it named.
- *
- * Answers `true` when it placed something, which is the caller's signal NOT to
- * also raise a toast — a refusal reported twice reads as two failures.
+ * Places a server's field-level rejection on the fields it named. Answers `true` when it placed
+ * something, which is the caller's signal NOT to also raise a toast — a refusal reported twice
+ * reads as two failures.
  */
 export function applyHandledErrorToForm({
   error,

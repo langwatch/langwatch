@@ -1,7 +1,6 @@
 /**
- * Unit coverage for the run-scoped sandbox key mint: what it asks for, and
- * what a failed mint does to the run.
- *
+ * Unit coverage for the run-scoped sandbox key mint: what it asks for, and what a failed mint
+ * does to the run.
  * Spec: specs/agent-cache/agent-cache.feature
  */
 

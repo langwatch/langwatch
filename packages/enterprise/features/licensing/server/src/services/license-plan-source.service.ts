@@ -15,27 +15,7 @@ export type LicensePlanSourceOptions = {
 
 /**
  * What a signed licence entitles one organization to, in each deployment mode.
- *
- * The two questions are asked on different terms, and the difference is the
- * product's, not an implementation detail:
- *
- *   - **Cloud** treats the licence as a negotiated contract with a TERM. An
- *     expired one stops answering, so the subscription underneath it takes
- *     over rather than a lapsed contract holding a customer on old limits.
- *   - **Self-hosted** treats the licence as proof of purchase, and reads the
  *     signature ONLY (ADR-027: once a customer, never blocked). A term that
- *     ended still names the seats that were bought, because cutting a whole
- *     company's Enterprise surface on a routine upgrade is a blast radius the
- *     product deliberately does not have.
- *
- * Either way, no licence and an unreadable licence answer the same thing —
- * the unlimited baseline — so an unlicensed deployment is never narrowed by
- * this leg and a corrupt key never becomes a smaller plan than none at all.
- *
- * It is separate from {@link LicenseService} because plan resolution needs
- * exactly this and nothing else. The lifecycle service (activation, removal,
- * the status screen, seat counts) composes one of these and delegates, so the
- * screen and the plan provider cannot answer differently.
  */
 export class LicensePlanSourceService {
   static create(options: LicensePlanSourceOptions): LicensePlanSourceService {

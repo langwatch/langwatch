@@ -5,12 +5,9 @@ import { explainSerializedError } from "@langwatch/handled-error/presentation";
 import { api } from "./model-provider-api";
 
 /**
- * The refusal, in the words the registry chose for its code.
- *
- * A refused credential arrives as a serialized handled error on the result
- * rather than as a thrown one, so it is read with `explainSerializedError`
- * instead of `describeError`. Both end at the same registry; only the
- * transport differs.
+ * The refusal, in the words the registry chose for its code. A refused credential arrives as a
+ * serialized handled error on the result rather than as a thrown one, so it is read with
+ * `explainSerializedError` instead of `describeError`.
  */
 const describeRefusal = (domainError: SerializedHandledError): string => {
   const { title, description } = explainSerializedError(domainError);
@@ -19,18 +16,7 @@ const describeRefusal = (domainError: SerializedHandledError): string => {
 };
 
 /**
- * Hook for validating model provider API keys.
- * Provides validation state and functions to trigger validation.
- * Uses tRPC to call the backend validation endpoints.
- *
- * @param provider - The provider key (e.g., "openai", "gemini")
- * @param customKeys - The form state containing API keys and configuration
- * @param projectId - Project handle for the tenant, when there is one
- * @param organizationId - Organization handle for the tenant
- * @param scopes - Scopes the credential is being set up for. On the
- *   no-project path these are what the probe is authorized against, so a
- *   caller who cannot manage them cannot reach the outbound request.
- * @returns Object containing validation state and functions
+ * Hook for validating model provider API keys via tRPC, scoped to a project or organization.
  */
 export function useModelProviderApiKeyValidation(
   provider: string,

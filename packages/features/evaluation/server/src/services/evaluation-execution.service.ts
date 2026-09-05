@@ -109,11 +109,6 @@ function pickCausalityDepth(span: {
 
 /**
  * What the evaluator dispatch is handed, in the engine's own terms.
- *
- * Exported because {@link EvaluationExecutionService.executeForData} takes it,
- * and deliberately NOT re-exported from the package index: the published name
- * is the legacy REST family's own `DataForEvaluation`, whose `default` arm is
- * narrower and assignable to this one.
  */
 export type DataForEvaluation =
   | { type: "default"; data: Record<string, unknown> }
@@ -125,17 +120,9 @@ export type DataForEvaluation =
 
 export class EvaluationExecutionService {
   /**
-   * Extract the W3C `traceparent` context for the eval workflow from the
-   * parent trace. nlpgo needs both pieces (32-hex trace_id + 16-hex root
-   * span_id) so its emitted spans land as children of the parent trace
-   * in Studio's waterfall rather than as a separate orphan trace.
-   *
-   * Returns `undefined` when the parent trace doesn't have OTel-standard
-   * IDs (legacy `trace_<nanoid>` shape, missing root span) — in that
-   * case nlpgo falls back to body-supplied req.TraceID and emits without
-   * a parent linkage. Callers should NOT default-emit a synthesized
-   * parent: a synth parent_span_id would render under a non-existent
-   * span in the waterfall, which is worse UX than a separate trace.
+   * Extract the W3C `traceparent` context for the eval workflow from the parent trace. nlpgo
+   * needs both pieces (32-hex trace_id + 16-hex root span_id) so its emitted spans land as
+   * children of the parent trace in Studio's waterfall rather than as a separate orphan trace.
    */
   static extractParentTraceForNlpgo(
     trace: Trace | undefined,
@@ -144,12 +131,11 @@ export class EvaluationExecutionService {
       return undefined;
     }
 
-    // Broken / multi-source instrumentation can leave a trace with more
-    // than one parent-less span. `find()` would then pick whichever span
-    // happened to be ingested first — non-deterministic across re-runs.
-    // Sort by started_at (earliest is the true root in any sane trace)
-    // with span_id as the tie-breaker to keep two consecutive eval runs
-    // pinned to the same parent_span_id.
+    // Broken / multi-source instrumentation can leave a trace with more than one parent-less
+    // span. `find()` would then pick whichever span happened to be ingested first —
+    // non-deterministic across re-runs. Sort by started_at (earliest is the true root in any
+    // sane trace) with span_id as the tie-breaker to keep two consecutive eval runs pinned to
+    // the same parent_span_id.
     const rootCandidates = (trace.spans ?? []).filter((s) => !s.parent_id);
     if (rootCandidates.length === 0) {
       return undefined;
@@ -176,17 +162,9 @@ export class EvaluationExecutionService {
   }
 
   /**
-   * Returns the max `langwatch.causality_depth` across the supplied spans
-   * (0 if absent on all). The dispatcher uses this to pass the parent
-   * depth to nlpgo, which increments and stamps on every span it emits.
-   * Loop-prevention design lives in
-   * specs/monitors/online-evaluator-loop-prevention.feature.
-   *
-   * Real-world spans come from `mapNormalizedSpanToSpan` which unflattens
-   * OTLP dot-notation attributes into nested objects under `span.params`,
-   * so `langwatch.causality_depth` lives at `params.langwatch.causality_depth`.
-   * We also probe a few legacy / synthetic shapes used by tests and older
-   * span sources so the helper is robust to both.
+   * Returns the max `langwatch.causality_depth` across the supplied spans (0 if absent on all).
+   * The dispatcher uses this to pass the parent depth to nlpgo, which increments and stamps on
+   * every span it emits.
    */
   static maxCausalityDepthOfSpans(
     spans:
@@ -278,12 +256,11 @@ export class EvaluationExecutionService {
     const evaluationThreadId =
       isThreadLevel && trace.metadata?.thread_id ? trace.metadata.thread_id : undefined;
 
-    // A thread-based evaluation needs a thread_id to group the conversation.
-    // A trace without one can never be thread-evaluated, so skip it here —
-    // before building thread data (which would throw) and before calling the
-    // evaluator. Callers drop every skipped result silently so a thread monitor
-    // running over non-thread traces stays cheap instead of erroring on every
-    // trace.
+    // A thread-based evaluation needs a thread_id to group the conversation. A trace without
+    // one can never be thread-evaluated, so skip it here — before building thread data (which
+    // would throw) and before calling the evaluator. Callers drop every skipped result silently
+    // so a thread monitor running over non-thread traces stays cheap instead of erroring on
+    // every trace.
     if (isThreadLevel && !trace.metadata?.thread_id) {
       return {
         status: "skipped",
@@ -291,14 +268,10 @@ export class EvaluationExecutionService {
       };
     }
 
-    // Enrich evaluations: getTracesWithSpans does not populate
-    // `trace.evaluations`, but evaluator field mappings that read the
-    // `evaluations` source need them. Fetch and attach before building the
-    // mapped data so they aren't silently empty (parity with
-    // runEvaluationForTrace in runEvaluation.ts). Gated on the mappings
-    // actually reading the `evaluations` source — this runs on the hot
-    // live-monitor path and the fetch is a heavy Inputs-projection
-    // ClickHouse read that most evaluator mappings never need.
+    // Enrich evaluations: getTracesWithSpans does not populate `trace.evaluations`, but
+    // evaluator field mappings that read the `evaluations` source need them. Fetch and attach
+    // before building the mapped data so they aren't silently empty (parity with
+    // runEvaluationForTrace in runEvaluation.ts).
     if (mappingsReadEvaluationsSource(mappings)) {
       const evaluationsByTrace = await this.deps.traceService.getEvaluationsMultiple(
         projectId,
@@ -363,19 +336,6 @@ export class EvaluationExecutionService {
 
   /**
    * One evaluator over data the caller already holds, with no trace behind it.
-   *
-   * The same call {@link executeForTrace} makes once it has rendered a trace
-   * through its mappings — native, installed, code and workflow evaluators all
-   * dispatch from here — published because two doors ask the question without a
-   * trace to render: the gateway's inline guardrail check, which scores an
-   * input/output pair the data plane sent, and the legacy evaluate doors, which
-   * score whatever the SDK posted. Both used to reach a second copy of this
-   * dispatch in the platform application; one method is what stops a guardrail
-   * and a monitor disagreeing about what an evaluator does.
-   *
-   * There is no trace, so there are no dropped content categories and no
-   * causality depth to inherit; the augmenter is still applied, which is what
-   * keeps a redaction at ingestion visible in the result.
    */
   executeForData(params: {
     projectId: string;

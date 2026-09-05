@@ -88,12 +88,9 @@ export const getLastOutputAsText = (spans: Span[]): string => {
     return typedValueToText(singleTopLevelNode.output, true);
   }
 
-  // If the top-level node has no output, then for getting the best text that represents the output,
-  // we try to find the last span to finish, this is likely the one that came up with the final answer.
-  // Walk the finish-ordered list and return the first span whose output actually renders to non-empty
-  // text — the latest-finishing span may have an output whose type or shape collapses to "" (e.g. an
-  // unhandled type, a `list` with unstructured items, or a json whose "special key" is itself empty),
-  // in which case we fall back to the next candidate instead of showing an empty trace output.
+  // If the top-level node has no output, then for getting the best text that represents the
+  // output, we try to find the last span to finish, this is likely the one that came up with
+  // the final answer.
   const spansInFinishOrderDesc = [...spans]
     .sort(
       (a: (typeof spans)[number], b: (typeof spans)[number]) =>
@@ -191,13 +188,11 @@ export const typedValueToText = (
       })
       .join("");
   } else if (typed.type === "json") {
-    // A candidate value is "meaningful" when it's defined and not an empty
-    // string/array/object — applied RECURSIVELY so a shell like
-    // `{ output: { content: "" } }` is treated as empty at the top-level
-    // special-key check, letting the loop fall through to the next sibling
-    // key (e.g. `answer`). Without recursion, any object with keys short-
-    // circuited specialKeysMapping and the real payload on the next key was
-    // never seen. `seen` guards against circular references.
+    // A candidate value is "meaningful" when it's defined and not an empty string/array/object
+    // — applied RECURSIVELY so a shell like `{ output: { content: "" } }` is treated as empty
+    // at the top-level special-key check, letting the loop fall through to the next sibling key
+    // (e.g. `answer`). Without recursion, any object with keys short- circuited
+    // specialKeysMapping and the real payload on the next key was never seen.
     const hasNonEmptyValue = (value: unknown, seen: WeakSet<object> = new WeakSet()): boolean => {
       if (value === undefined || value === null) return false;
       if (typeof value === "string") return value.length > 0;

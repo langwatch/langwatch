@@ -11,12 +11,9 @@ import { Popover } from "@langwatch/design-system/popover";
 export type Period = { startDate: Date; endDate: Date };
 
 /**
- * Relative range presets. The key is what gets serialised into the URL as
- * `?period=<key>`. `minutes` is the lookback window from "now".
- *
- * `days` is the equivalent inclusive day count exposed to consumers via
- * `daysDifference`. For sub-day windows it clamps to 1 — analytics queries
- * already do their own `Math.max` so this stays compatible.
+ * Relative range presets. The key is what gets serialised into the URL as `?period=<key>`.
+ * `minutes` is the lookback window from "now". `days` is the equivalent inclusive day count
+ * exposed to consumers via `daysDifference`.
  */
 const RELATIVE_PRESETS = [
   { key: "15m", label: "Last 15 minutes", minutes: 15, days: 1 },
@@ -172,10 +169,9 @@ export const usePeriodSelector = (defaultNDays = 30) => {
     period,
     mode,
     /**
-     * True while the URL carries no range of its own, so `period` is this
-     * hook's own fallback rather than something the reader asked for. Surfaces
-     * where a default window would hide rows read this to filter only once a
-     * range has actually been picked.
+     * True while the URL carries no range of its own, so `period` is this hook's own fallback
+     * rather than something the reader asked for. Surfaces where a default window would hide
+     * rows read this to filter only once a range has actually been picked.
      */
     isDefault,
     setPeriod,
@@ -219,10 +215,8 @@ export const matchPeriodPreset = ({
 };
 
 /**
- * What the window is called, the way the trigger names it: the matched
- * preset's own label, or the start and end dates for a free range. A surface
- * that renders its own trigger text uses this for the accessible name, so the
- * name says what the control is set to rather than a day count.
+ * What the window is called, the way the trigger names it: the matched preset's own label, or
+ * the start and end dates for a free range.
  */
 export const describePeriod = ({ period, mode }: { period: Period; mode: PeriodMode }): string => {
   const preset = matchPeriodPreset({ period, mode });

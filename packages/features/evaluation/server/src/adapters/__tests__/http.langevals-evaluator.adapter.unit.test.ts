@@ -1,14 +1,5 @@
 /**
  * @vitest-environment node
- *
- * What an evaluator failure tells the caller.
- *
- * `meta` is a client contract that rides the experiment SSE stream to the
- * browser, and the adapter put the deployment's own internal evaluator address
- * in it. The address belongs in the log line beside the throw.
- *
- * Covers @unit scenarios from
- * specs/security/feature-surface-secret-disclosure.feature.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 

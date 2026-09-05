@@ -1,19 +1,5 @@
 /**
  * @vitest-environment node
- *
- * Unit tests for the scenario event WIRE validator (`scenarioEventSchema`) —
- * the exact schema the `/api/scenario-events` route hands to
- * `zValidator("json", scenarioEventSchema)`. A `safeParse` success here is a
- * faithful, DB-free proxy for "the route returns 201, not 400": the route only
- * 400s when this parse fails.
- *
- * Regression guard for #5149 (the missing WIRE leg of #4138): a
- * SCENARIO_MESSAGE_SNAPSHOT carrying a voice turn
- * (`[text, {type:"input_audio", input_audio:{data}}]`) was rejected here with a
- * Zod `invalid_union` 400 BEFORE `extractInlineMediaFromEvent` ever ran, so
- * voice audio never reached the externalizer the UI render leg (#4138) depends
- * on. These tests pin that the validator now ACCEPTS `input_audio` while still
- * accepting every previously-valid shape.
  */
 import { describe, expect, it } from "vitest";
 import { ScenarioEventType, scenarioEventSchema, scenarioMessageSnapshotSchema } from "../index";
@@ -113,12 +99,9 @@ describe("scenarioMessageSnapshotSchema — regression: previously-valid shapes 
 });
 
 /**
- * An adapter that returns Anthropic Messages API content as it is (the
- * response of the Anthropic SDK, or the stream-json transcript of Claude Code)
- * sends `tool_use`, `tool_result` and `thinking` blocks in its snapshots. The
- * union used to refuse every such snapshot with 400, so a run kept only the
- * turns before the first tool call.
- * specs/scenarios/anthropic-transcript-on-the-wire.feature
+ * An adapter that returns Anthropic Messages API content as it is (the response of the
+ * Anthropic SDK, or the stream-json transcript of Claude Code) sends `tool_use`, `tool_result`
+ * and `thinking` blocks in its snapshots.
  */
 describe("given a MESSAGE_SNAPSHOT carrying Anthropic-format content blocks", () => {
   function parseMessages(messages: unknown[]) {
@@ -325,12 +308,9 @@ describe("given a MESSAGE_SNAPSHOT carrying Anthropic-format content blocks", ()
 });
 
 /**
- * Regression guard for the image/file attachment wire leg: the typescript
- * scenario SDK stopped JSON-stringifying array content, so the documented
- * multimodal shapes (scenario docs: multimodal-images, multimodal-files)
- * started arriving as raw arrays and were 400-rejected here BEFORE
- * `extractInlineMediaFromEvent` ever ran — runs showed a report but zero
- * conversation turns in the simulations UI.
+ * Regression guard for the image/file attachment wire leg: the typescript scenario SDK
+ * stopped JSON-stringifying array content, so the documented multimodal shapes started
+ * arriving as raw arrays and were 400-rejected here.
  */
 describe("given a MESSAGE_SNAPSHOT wire event carrying attachment content", () => {
   const WEBP_DATA_URI = `data:image/webp;base64,${Buffer.from("fake-webp-bytes").toString(

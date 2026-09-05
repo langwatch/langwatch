@@ -1,20 +1,6 @@
 /**
- * Copying a Studio graph into another project, as the two flows that replicate
- * one perform it: the experiment workbench's workflow copy, and the
- * replication behind a workflow evaluator.
- *
- * The row and the version are written in two steps with the caller's own work
- * between them, which is why this is not `WorkflowService.copy`: the caller
- * decides what the first version says and commits it itself. What happens here
- * is the row, and the graph rewritten to belong to it.
- *
- * The dataset traversal is deliberately its own rather than
- * `WorkflowDatasetCopyService`'s. That one copies any parameter whose value
- * merely looks like a dataset reference; this one copies a parameter only
- * where the node declares its type as `dataset`, which is the narrowing the
- * Studio copy has always applied. Widening it here would copy datasets a
- * replicated evaluator never asked for.
- *
+ * Copying a Studio graph into another project, as the two flows that replicate one perform it:
+ * the experiment workbench's workflow copy, and the replication behind a workflow evaluator.
  * Spec: packages/features/workflow/specs/workflow-service.feature.
  */
 import type { DatasetService } from "@langwatch/dataset-contract";

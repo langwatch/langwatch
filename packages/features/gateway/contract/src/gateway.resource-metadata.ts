@@ -1,16 +1,7 @@
 /**
- * The two customer-owned fields every governed gateway resource carries:
- * `external_id`, the id the caller's own system knows the row by, and
- * `metadata`, a free-form string map this platform never interprets.
- *
- * Shared rather than restated per resource so a virtual key and a budget
- * cannot drift into two different definitions of the same two fields, and so
- * the caps below are asserted in one place.
- *
- * NOTHING here is read by the gateway. Neither field participates in routing,
- * authorization or spend attribution. A caller that puts a secret in
- * `metadata` has handed us a secret we will echo back to anyone who can read
- * the row, which is why the docs say bookkeeping and nothing else.
+ * The two customer-owned fields every governed gateway resource carries: `external_id`, the id
+ * the caller's own system knows the row by, and `metadata`, a free-form string map this
+ * platform never interprets.
  */
 
 import { z } from "zod";
@@ -49,12 +40,9 @@ export type ResourceMetadata = z.infer<typeof resourceMetadataSchema>;
 export type ExternalIdResource = "virtual_key" | "budget";
 
 /**
- * Read `metadata` off a stored row for the wire.
- *
- * The column is non-null with a `{}` default, but a row written before the
- * column existed still reads as SQL NULL through Prisma, and every caller of
- * this DTO expects an object. One coercion here beats the same `?? {}` on each
- * read path.
+ * Read `metadata` off a stored row for the wire. The column is non-null with a `{}` default,
+ * but a row written before the column existed still reads as SQL NULL through Prisma, and every
+ * caller of this DTO expects an object.
  */
 export function metadataFromRow(value: unknown): ResourceMetadata {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
@@ -66,23 +54,16 @@ export function metadataFromRow(value: unknown): ResourceMetadata {
 }
 
 /**
- * The `externalId` half of a create or patch.
- *
- * Explicit null clears the column back to SQL NULL, which is the value that
- * does not participate in the unique index, the same reason the column is
- * nullable at all. Absent leaves it alone.
+ * The `externalId` half of a create or patch. Explicit null clears the column back to SQL NULL,
+ * which is the value that does not participate in the unique index, the same reason the column
+ * is nullable at all. Absent leaves it alone.
  */
 export function externalIdPatch(next: string | null | undefined): string | null | undefined {
   return next === undefined ? undefined : (next ?? null);
 }
 
 /**
- * Both fields as one Prisma update fragment, omitting whichever the caller
- * left absent.
- *
- * Shared by the virtual-key and budget updates rather than spread inline in
- * each: the two `!== undefined` branches are identical on both sides, and an
- * update that already branches per field does not need two more.
+ * Both fields as one Prisma update fragment, omitting whichever the caller left absent.
  */
 export function identityPatchData(patch: {
   externalId?: string | null;
@@ -90,12 +71,11 @@ export function identityPatchData(patch: {
 }): { externalId?: string | null; metadata?: ResourceMetadata } {
   return {
     ...(patch.externalId !== undefined ? { externalId: externalIdPatch(patch.externalId) } : {}),
-    // `metadata` REPLACES rather than merges. A merge cannot express deleting a
-    // key without inventing a sentinel, and a caller that reads-modifies-writes
-    // the whole map — which is what every client library does — gets the same
-    // result either way. Absent leaves the stored map alone; `{}` empties it.
-    // Nothing to transform, unlike `externalId` above, which folds undefined
-    // and null apart.
+    // `metadata` REPLACES rather than merges. A merge cannot express deleting a key without
+    // inventing a sentinel, and a caller that reads-modifies-writes the whole map — which is
+    // what every client library does — gets the same result either way. Absent leaves the
+    // stored map alone; `{}` empties it. Nothing to transform, unlike `externalId` above, which
+    // folds undefined and null apart.
     ...(patch.metadata !== undefined ? { metadata: patch.metadata } : {}),
   };
 }

@@ -22,12 +22,9 @@ function safeUrlHost(url: string): string {
 }
 
 /**
- * Which langevals call path we're making. Drives:
- *   - the per-kind hard cap (eval vs topic clustering)
- *   - log attribution so we can split metrics in CloudWatch
- *
- * Adding a new kind is intentional friction — pick the right cap, don't
- * fall through to a generic default.
+ * Which langevals call path we're making. Drives: - the per-kind hard cap (eval vs topic
+ * clustering) - log attribution so we can split metrics in CloudWatch Adding a new kind is
+ * intentional friction — pick the right cap, don't fall through to a generic default.
  */
 export type LangevalsCallKind =
   | "evaluation"
@@ -53,9 +50,6 @@ export interface StagedFetchOptions {
   headers?: Record<string, string>;
   /**
    * Optional client deadline / cancellation, forwarded verbatim to fetch().
-   * Callers whose work is leased elsewhere (e.g. the topic-clustering outbox)
-   * must bound the call below their lease, or a slow response outlives the
-   * lease and a second replica re-runs the same work concurrently.
    */
   signal?: AbortSignal;
 }
@@ -74,13 +68,6 @@ export type LangevalsStagedPayloadConfig = {
 
 /**
  * Configured transport for callers composed at the application root.
- *
- * `staging` is optional and its absence is a SUPPORTED state rather than a
- * degradation: a self-hosted deployment talks to langevals over plain HTTP
- * with no 6 MB cap to dodge, so every payload goes inline and no object
- * storage is needed. A deployment that configured a staging threshold but
- * composed no staging refuses by name rather than silently posting a payload
- * the receiver will reject with a 413.
  */
 export class LangevalsStagedPayloadAdapter {
   static create(input: {
@@ -123,23 +110,9 @@ function maxBytesForKind(kind: LangevalsCallKind, config: LangevalsStagedPayload
 }
 
 /**
- * POST a JSON body to a langevals endpoint, auto-staging through the staging
- * port when the body exceeds the configured threshold.
- *
- * Why: langevals on SaaS is fronted by AWS Lambda whose sync request body is
- * capped at 6 MB. Topic clustering batches and long-input evaluators regularly
- * exceed that. Staging keeps the inbound request tiny (just the presigned URL
- * in a header) while the actual payload rides over object storage.
- *
- * Hard caps are per-kind and applied BEFORE any network call so we fail fast
- * with an actionable error rather than racing the upstream's 413.
- *
- * Returns the raw Response so callers keep full control over status / body
- * handling — same contract as a plain fetch().
- *
- * The free `stagedLangevalsFetch` that read four `LANGEVALS_*` variables off
- * the application environment is gone: the configuration is a value the
- * composition root supplies, and nothing imported that entrypoint.
+ * POST a JSON body to a langevals endpoint, auto-staging through the staging port when the body
+ * exceeds the configured threshold. Why: langevals on SaaS is fronted by AWS Lambda whose sync
+ * request body is capped at 6 MB.
  */
 async function postStagedLangevalsPayload(
   opts: StagedFetchOptions,
@@ -229,13 +202,10 @@ async function postStagedLangevalsPayload(
       ...(signal ? { signal } : {}),
     });
   } finally {
-    // Best-effort delete: by the time fetch() resolves, langevals has
-    // already fetched the presigned URL during its request handling, so
-    // the object is no longer needed. Staged bodies carry customer trace
-    // data and provider credentials (api keys, vertex_credentials,
-    // bedrock keys) so we don't want them lingering. A bucket lifecycle
-    // rule on the langevals-staging/ prefix is the orphan/crash fallback
-    // for the failure paths where this delete can't run.
+    // Best-effort delete: by the time fetch() resolves, langevals has already fetched the
+    // presigned URL during its request handling, so the object is no longer needed. Staged
+    // bodies carry customer trace data and provider credentials (api keys, vertex_credentials,
+    // bedrock keys) so we don't want them lingering.
     await staged.discard();
   }
 }

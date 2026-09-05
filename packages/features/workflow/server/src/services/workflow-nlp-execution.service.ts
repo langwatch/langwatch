@@ -188,12 +188,9 @@ export class WorkflowNlpExecutionService {
   }
 
   /**
-   * Strips every sampling parameter a node’s model does not list as supported.
-   *
-   * Public because there are TWO dispatch chokepoints, not one: the sync
-   * execute above and the streaming studio run. Both strip, and one
-   * implementation is what keeps them from disagreeing about which knobs a
-   * model accepts.
+   * Strips every sampling parameter a node’s model does not list as supported. Public because
+   * there are TWO dispatch chokepoints, not one: the sync execute above and the streaming
+   * studio run.
    */
   static stripUnsupportedParams(
     providers: Record<string, ModelProviderSummary>,

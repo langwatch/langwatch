@@ -1,9 +1,6 @@
 /**
- * The "Set up a model provider" onboarding step: the provider grid on its
- * onboarding surface (Codex leads, badged), the credential form for whichever
- * provider is picked, and a skip — a model is never required to finish
- * onboarding.
- *
+ * The "Set up a model provider" onboarding step: the provider grid, the credential form, and a
+ * skip — a model is never required to finish onboarding.
  * Spec: specs/features/onboarding/model-provider-step.feature
  */
 

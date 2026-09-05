@@ -1,9 +1,5 @@
 /**
  * The caps and clocks of connected agents (ADR-128), in one place.
- *
- * Payload caps are sized for multimodal turns: a turn carries the whole
- * conversation, and a message can carry base64 images and audio. A self-hosted
- * deployment raises them with `LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB`.
  */
 
 const MEBIBYTE = 1024 * 1024;
@@ -34,12 +30,6 @@ export interface RelayPayloadCaps {
 
 /**
  * The caps for one deployment.
- *
- * The override arrives as an argument rather than being read from the process
- * here: this package is the contract both sides of the relay read, and the
- * deployment knob (`LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB`) is resolved by the
- * process that composes the relay. Read per call rather than at module load,
- * so the gateway and the relay route always read the same number.
  */
 export function relayPayloadCaps(overrideMb?: number): RelayPayloadCaps {
   const envelopeMb =

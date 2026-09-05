@@ -56,13 +56,9 @@ export class AnalyticsSavedWorkbenchChartPolicyAdapter extends SavedWorkbenchCha
   }
 
   /**
-   * The same gate applied to a definition that has not been read yet.
-   *
-   * The tRPC transport admits a definition against the CALLER's own
-   * protections before the service is reached — the one place they are known —
-   * and needs the parsed value back to store. Parsing here rather than in the
-   * transport keeps the versioned schema and both governors in one place, so
-   * a definition this refuses is not a definition the service would keep.
+   * The same gate applied to a definition that has not been read yet. The tRPC transport admits
+   * a definition against the CALLER's own protections before the service is reached — the one
+   * place they are known — and needs the parsed value back to store.
    */
   admit(input: {
     projectId: string;

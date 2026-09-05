@@ -1,14 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * Integration tests for the ModelSelector empty-state contract:
- * when the project has zero enabled providers, the picker swaps for a
- * NoModelsConfiguredCallout instead of rendering the System fallback
- * model id as if it were a real selection.
- *
- * Covers both the standalone callout (used by callers that drive their
- * own selection options directly) and the ModelSelector primitive
- * (which mounts the callout itself).
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";

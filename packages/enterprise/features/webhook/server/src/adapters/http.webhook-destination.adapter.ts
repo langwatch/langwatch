@@ -30,15 +30,7 @@ export interface HttpWebhookDestinationAdapterOptions {
 }
 
 /**
- * The HTTPS destination: the transport every endpoint used before there was
- * more than one.
- *
- * It is a thin wrapper over the untouched egress service — same SSRF fence,
- * same timeout, same redirect refusal, same signature, same dispatch cap —
- * that turns the receiver's status into the verdict the recorder used to
- * derive for itself. The classification is `classifyWebhookStatus`, the same
- * function the throwing assertion uses, so this cannot drift from what the
- * platform has always done.
+ * The HTTPS destination: the transport every endpoint used before there was more than one.
  */
 export class HttpWebhookDestinationAdapter extends WebhookDestinationPort {
   readonly kind = "http" as const;

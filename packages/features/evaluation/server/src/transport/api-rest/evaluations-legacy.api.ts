@@ -1,26 +1,6 @@
 /**
- * REST for the legacy evaluation endpoints: the evaluator catalogue, the batch
- * result log, the three evaluate doors and the dataset evaluation.
- *
- * Was `platform/app/src/server/routes/evaluations-legacy.ts`, which itself
- * replaced six `pages/api` handlers. The shape is unchanged — one handler
- * still serves all three evaluate paths over one envelope — and everything the
- * routes reached through the platform's global application container is a port
- * now, grouped by what a mount costs:
- *
- *   - the CATALOGUE needs nothing. `AVAILABLE_EVALUATORS` is compiled in, so
- *     the route is always registered.
- *   - the BATCH half needs the experiment run writer and the evaluation
- *     pipeline. A process holding both serves `POST /api/evaluations/batch/
- *     log_results`; one holding neither leaves it off rather than accepting
- *     rows it drops, because an SDK that got a 200 never resends them.
- *   - the RUN half needs the evaluator RUNTIME — the thing that actually calls
- *     langevals, a workflow or a model. A process without it leaves all four
- *     evaluate doors off: a door that authenticates, validates, and then fails
- *     at the last step is one an SDK retries forever.
- *
- * The refusal bodies are transcribed rather than rewritten. Every one of them
- * is what a deployed SDK shows a customer.
+ * REST for the legacy evaluation endpoints: the evaluator catalogue, the batch result log, the
+ * three evaluate doors and the dataset evaluation.
  */
 import { handlerManagedAuth, publicEndpoint } from "@langwatch/api";
 import type { AppRestSecurity, SecuredApp } from "@langwatch/api/rest";
@@ -83,11 +63,9 @@ import {
 } from "./evaluations-legacy.schemas";
 
 /**
- * What the evaluator runtime is handed, as this family builds it.
- *
- * Two arms, because the two evaluator classes read their input differently: a
- * built-in evaluator takes the six canonical fields, and a custom or code
- * evaluator takes whatever its own graph declares.
+ * What the evaluator runtime is handed, as this family builds it. Two arms, because the two
+ * evaluator classes read their input differently: a built-in evaluator takes the six canonical
+ * fields, and a custom or code evaluator takes whatever its own graph declares.
  */
 export type DataForEvaluation =
   | Readonly<{ type: "default"; data: Record<string, string | number | undefined | null> }>
@@ -100,10 +78,6 @@ export type EvaluationsLegacyCredential =
 
 /**
  * How this process turns a request into a project credential.
- *
- * The permission is not a parameter: every route on this family except the
- * catalogue asks for `evaluations:manage`, which is the over-coarse grain the
- * access declarations above record rather than quietly widen.
  */
 export type EvaluationsLegacyCredentialPort = (input: {
   request: Request;
@@ -119,11 +93,6 @@ export interface EvaluationBatchExperimentPort {
 
 /**
  * What `POST /api/evaluations/batch/log_results` needs from the process.
- *
- * The experiment lookup-or-create and the run writer travel together because
- * they are one write: the rows are addressed by the experiment the first half
- * resolves, and a process that could resolve one but not record against it
- * would answer 200 to rows nobody can read back.
  */
 export interface EvaluationBatchRestPorts {
   findOrCreateExperiment(input: {
@@ -156,11 +125,6 @@ export type EvaluationRunCustomEvaluator = Readonly<{
 
 /**
  * What the four evaluate doors need from the process.
- *
- * `runEvaluation` is the one that decides whether they are mounted at all: it
- * is the evaluator RUNTIME — the model gateway, the managed providers, the
- * workflow service and the evaluator service behind one call — and a process
- * that cannot run an evaluator has nothing to answer these paths with.
  */
 export interface EvaluationRunRestPorts {
   /** Runs one evaluator over one input, and never rejects for a domain reason. */
@@ -203,10 +167,6 @@ export interface EvaluationRunRestPorts {
   }): Promise<ReadonlyArray<EvaluationRunCustomEvaluator> | null | undefined>;
   /**
    * The model the project's cascade resolves for one feature key, or null.
-   *
-   * Null rather than a thrown "not configured": the caller's only response to
-   * an unconfigured cascade is to fall back to the evaluator's own default, so
-   * the distinction the exception carried has no consumer here.
    */
   resolveModelForFeature(input: { projectId: string; featureKey: string }): Promise<string | null>;
   /** Records what a run of an evaluator cost. */
@@ -227,10 +187,6 @@ export interface EvaluationRunRestPorts {
   reportEvaluation(input: Record<string, unknown>): Promise<unknown>;
   /**
    * The evaluator-id slug rule for an evaluation that names no evaluator.
-   *
-   * A port rather than this package's own `EvaluationNameAutoslugService`
-   * call, so a process binds ONE instance of the rule for the collector, the
-   * custom-evaluation sync and this door: the derived id IS the key.
    */
   deriveEvaluatorId(name: string): string;
   reportError?: ((error: Error, context: { projectId: string }) => void) | undefined;
@@ -252,12 +208,7 @@ export type EvaluationsLegacyRestPorts = Readonly<{
 }>;
 
 /**
- * A `POST /api/dataset/evaluate` named an experiment slug this project holds
- * no experiment for.
- *
- * A handled 404 rather than the tRPC `NOT_FOUND` the platform route raised:
- * this is a REST door, its boundary serialises a handled error, and a tRPC
- * error reaching it rendered as an unrecognisable 500.
+ * A `POST /api/dataset/evaluate` named an experiment slug this project holds no experiment for.
  */
 class EvaluationRestExperimentNotFoundError extends HandledError {
   declare readonly code: "not_found";
@@ -274,53 +225,43 @@ class EvaluationRestExperimentNotFoundError extends HandledError {
 const logger = createLogger("langwatch:evaluations-legacy");
 
 /**
- * Whatever was thrown, as an Error the process's report port can take.
- *
- * A thrown non-Error carries no stack, so the sink would record a bare string
- * with nothing to correlate it by; wrapping keeps every report the same shape.
+ * Whatever was thrown, as an Error the process's report port can take. A thrown non-Error
+ * carries no stack, so the sink would record a bare string with nothing to correlate it by;
+ * wrapping keeps every report the same shape.
  */
 const toError = (value: unknown): Error =>
   value instanceof Error ? value : new Error(String(value));
 const AUTH_REASON = "project API key resolved in-handler";
 
 /**
- * The ksuid prefixes an evaluation and a cost row are minted with.
- *
- * STATED here rather than imported: the resource catalogue that names them is
- * a browser module, and a server package may not value-import one. Both are
- * persisted wire constants rather than decisions — changing either would key
- * new rows differently from every row already stored.
+ * The ksuid prefixes an evaluation and a cost row are minted with. STATED here rather than
+ * imported: the resource catalogue that names them is a browser module, and a server package
+ * may not value-import one.
  */
 const EVALUATION_KSUID_PREFIX = "eval";
 const COST_KSUID_PREFIX = "cost";
 
 /**
- * The model an evaluator falls back to when the project's cascade names none.
- *
- * Same reason as the ksuid prefixes: the constants module is a browser one.
- * `getEvaluatorDefaultSettings` keeps this as its last resort, which is what
- * the platform route passed it.
+ * The model an evaluator falls back to when the project's cascade names none. Same reason as
+ * the ksuid prefixes: the constants module is a browser one. `getEvaluatorDefaultSettings`
+ * keeps this as its last resort, which is what the platform route passed it.
  */
 const DEFAULT_MODEL = "openai/gpt-5";
 const DEFAULT_EMBEDDINGS_MODEL = "openai/text-embedding-3-small";
 
-// The static evaluator catalogue: the same list for every caller, with no
-// project data in it. The declared policy says `public` rather than `apiKey`
-// because that is what the handler enforces — it never resolves a token — and
-// a declaration nobody checks is worse than none: it reads as a credential
-// requirement to anyone auditing the registry while letting an unauthenticated
-// request straight through. Tightening it would break the SDKs that read the
-// catalogue before they have a key, which is the call this endpoint exists for.
+// The static evaluator catalogue: the same list for every caller, with no project data in it.
+// The declared policy says `public` rather than `apiKey` because that is what the handler
+// enforces — it never resolves a token — and a declaration nobody checks is worse than none: it
+// reads as a credential requirement to anyone auditing the registry while letting an
+// unauthenticated request straight through.
 const catalogueAuth = publicEndpoint(
   "static evaluator catalogue; the same list for every caller, no project data",
 );
-// Every other legacy route runs or records an evaluation.
-//
-// NOTE: these ask for `evaluations:manage` on what are append/create actions —
-// the same over-coarse grain that `POST /api/experiments/:slug/run` had, which
-// refuses any least-privilege key holding only `evaluations:create`. Declaring
-// it here does not fix it; it makes it VISIBLE, which is the precondition.
-// Tracked separately rather than widened in this change.
+// Every other legacy route runs or records an evaluation. NOTE: these ask for
+// `evaluations:manage` on what are append/create actions — the same over-coarse grain that
+// `POST /api/experiments/:slug/run` had, which refuses any least-privilege key holding only
+// `evaluations:create`. Declaring it here does not fix it; it makes it VISIBLE, which is the
+// precondition. Tracked separately rather than widened in this change.
 const legacyEvaluationAuth = handlerManagedAuth({
   reason: AUTH_REASON,
   permissions: ["evaluations:manage"],
@@ -329,12 +270,6 @@ const legacyEvaluationAuth = handlerManagedAuth({
 
 /**
  * The legacy evaluation family, built against one process's security.
- *
- * ORDERING inside the family is free: `/evaluations/list`,
- * `/evaluations/batch/log_results`, the two `/evaluations/:evaluator`
- * shapes, `/guardrails/:evaluator/evaluate` and `/dataset/evaluate` own
- * disjoint paths, and the two-segment evaluate form is distinguishable from
- * the one-segment form by arity rather than by registration order.
  */
 export function createEvaluationsLegacyRestApp(options: {
   security: AppRestSecurity;
@@ -345,13 +280,8 @@ export function createEvaluationsLegacyRestApp(options: {
 
   // ---------- GET /api/evaluations/list ----------
   /**
-   * The catalogue, built once.
-   *
-   * `zodToJsonSchema` over ~40 settings schemas is not free, and the answer is
-   * the same for every caller on every request: the evaluator list is compiled
-   * in. Building it per request turned an unauthenticated endpoint into a CPU
-   * amplifier; building it once at first use costs one pass for the life of the
-   * process.
+   * The catalogue, built once. `zodToJsonSchema` over ~40 settings schemas is not free, and the
+   * answer is the same for every caller on every request: the evaluator list is compiled in.
    */
   let evaluatorCatalogue: Record<string, unknown> | undefined;
 
@@ -565,10 +495,8 @@ export function createEvaluationsLegacyRestApp(options: {
     : undefined;
   if (run) {
     /**
-     * What every evaluate route documents.
-     *
-     * The three of them run one handler over one envelope, so they answer the same
-     * shapes; only the path parameters and the wording differ.
+     * What every evaluate route documents. The three of them run one handler over one envelope,
+     * so they answer the same shapes; only the path parameters and the wording differ.
      */
     const evaluateResponses = {
       200: {
@@ -969,14 +897,11 @@ export const getEvaluatorDataForParams = (
     expected_contexts: autoparseContexts(params.expected_contexts),
   });
 
-  // Preserve evaluator-specific fields (e.g. pairwise's candidate_a_id /
-  // candidate_a_output) that the legacy default schema strips. Bounded
-  // to the evaluator's declared required + optional fields so a stray
-  // mapping output on a non-pairwise evaluator can't ride through and
-  // trip a strict pydantic model on the langevals side — the spread is
-  // opt-in per evaluator, not a catch-all. The canonical 6 fields are
-  // normalized below; everything else listed in the evaluator's
-  // contract passes through as-is.
+  // Preserve evaluator-specific fields (e.g. pairwise's candidate_a_id / candidate_a_output)
+  // that the legacy default schema strips. Bounded to the evaluator's declared required +
+  // optional fields so a stray mapping output on a non-pairwise evaluator can't ride through
+  // and trip a strict pydantic model on the langevals side — the spread is opt-in per
+  // evaluator, not a catch-all.
   const canonicalKeys = new Set([
     "input",
     "output",
@@ -1017,17 +942,8 @@ export const getEvaluatorDataForParams = (
 };
 
 /**
- * Translates a legacy 2-slot pairwise payload (`candidate_a_id` /
- * `candidate_a_output` / ... `candidate_b_*`) into the N-way `candidates`
- * shape `langevals/select_best_compare` expects. The payload half of
- * `resolveDispatchEvaluatorType`'s redirect — the two travel together, at
- * the same call site, so they cannot disagree the way orchestrator.ts and
- * the old dispatch logic once did (#5528).
- *
- * A slot with no `candidate_*_id` is dropped rather than sent as an empty
- * candidate — an incomplete legacy config should surface as "missing
- * candidate output" the same way a native comparison with a missing variant
- * does, not as a judge call over a blank second candidate.
+ * Translates a legacy 2-slot pairwise payload (`candidate_a_id` / `candidate_a_output` / ...
+ * `candidate_b_*`) into the N-way `candidates` shape `langevals/select_best_compare` expects.
  */
 export const translateLegacyPairwisePayload = (
   data: Record<string, unknown>,
@@ -1067,18 +983,9 @@ export const translateLegacyPairwisePayload = (
 };
 
 /**
- * Removes a legacy pairwise `prompt` setting that select_best_compare cannot
- * render. The pairwise judge's template uses `{candidate_a_output}` /
- * `{candidate_b_output}` slots; the N-way judge only substitutes
- * `{candidates}` (plus `{input}` / `{golden}`). A saved prompt with no
- * `{candidates}` placeholder — including pairwise's own untouched default —
- * would reach the new judge with its instructions half-literal, so it's
- * dropped, letting the caller fall back to select_best_compare's default.
- *
- * A prompt that DOES contain `{candidates}` is kept: a user who already
- * migrated their wording to the new placeholder should keep it.
- * `droppedPrompt` is returned (rather than logged in here) so the caller owns
- * the log context, and pure-function tests stay dependency-free.
+ * Removes a legacy pairwise `prompt` setting that select_best_compare cannot render. The
+ * pairwise judge's template uses `{candidate_a_output}` / `{candidate_b_output}` slots; the
+ * N-way judge only substitutes `{candidates}` (plus `{input}` / `{golden}`).
  */
 export const stripIncompatiblePairwisePrompt = (
   settings: Record<string, unknown>,
@@ -1124,21 +1031,9 @@ export const getEvaluatorIncludingCustom = async (
 };
 
 /**
- * Resolves the project's cascade-configured DEFAULT and EMBEDDINGS models
- * into the `{ defaultModel, embeddingsModel }` shape that
- * `getEvaluatorDefaultSettings` consumes for its `model` / `embeddings_model`
- * fields.
- *
- * Without this, the legacy REST route fell through to the hardcoded global
- * `DEFAULT_MODEL` (`getLatestOpenAIChatFlagship()`), bypassing the project's
- * model cascade entirely for every API-triggered evaluation (issue #5468).
- *
- * The feature keys match the server-side evaluator-create path in
- * `app/api/evaluators/.../app.v1.ts` (`evaluator.create_default` for the LLM
- * model, `analytics.topic_clustering_embeddings` for the embeddings model).
- * When the cascade has nothing configured at any scope, the resolver returns
- * `null` and `getEvaluatorDefaultSettings` keeps the global fallback — no
- * regression for projects without a custom default.
+ * Resolves the project's cascade-configured DEFAULT and EMBEDDINGS models into the `{
+ * defaultModel, embeddingsModel }` shape that `getEvaluatorDefaultSettings` consumes for its
+ * `model` / `embeddings_model` fields.
  */
 export const resolveEvaluatorSettingsDefaults = async (
   run: EvaluationRunRestPorts,
@@ -1158,13 +1053,9 @@ export const resolveEvaluatorSettingsDefaults = async (
 // --- Evaluator call handler (used by evaluations + guardrails routes) ---
 
 /**
- * The verdict fields of a `reportEvaluation` payload, gated on the run
- * actually completing. A verdict is only real when the evaluator ran to
- * completion — an errored/skipped run's stray passed/score/label must not
- * reach analytics or triggers as a real result (#6833). Same gate as the
- * shared verdictGate helpers applied at the executeEvaluation command
- * boundary. Property presence is no defense: the custom-evaluator error
- * path spreads the raw evaluator result, so score/passed survive on it.
+ * The verdict fields of a `reportEvaluation` payload, gated on the run actually completing. A
+ * verdict is only real when the evaluator ran to completion — an errored/skipped run's stray
+ * passed/score/label must not reach analytics or triggers as a real result (#6833).
  */
 function gatedVerdictFields(result: {
   status: string;
@@ -1250,14 +1141,8 @@ async function handleEvaluatorCall(
     ? await run.tryGetMonitorBySlug({ projectId: project.id, slug: evaluatorSlug })
     : null;
 
-  // Every legacy `langevals/pairwise_compare` dispatch — from a saved
-  // evaluator, a monitor, or a bare slug — is transparently rerouted to
-  // select_best_compare here. This is the ONE place that makes that call
-  // (see resolveDispatchEvaluatorType's JSDoc), so a caller upstream (the
-  // Experiments Workbench orchestrator, a monitor's scheduled run) never
-  // needs to know the redirect happened; it keeps sending the 2-slot wire
-  // shape it always has, and isLegacyPairwiseDispatch below decides whether
-  // that shape needs translating before it reaches the new judge.
+  // Every legacy `langevals/pairwise_compare` dispatch — from a saved evaluator, a monitor, or
+  // a bare slug — is transparently rerouted to select_best_compare here.
   const isLegacyPairwiseDispatch = checkType === LEGACY_PAIRWISE_EVALUATOR_TYPE;
   checkType = resolveDispatchEvaluatorType(checkType) ?? checkType;
 
@@ -1313,14 +1198,9 @@ async function handleEvaluatorCall(
   let settings: any = ((evaluatorSettings ?? monitor?.parameters) as any) ?? {};
 
   try {
-    // NB: `select_best_compare`'s settings schema is non-strict, so a legacy
-    // `swap_and_confirm` key with no equivalent field is silently dropped by
-    // the parse below rather than translated — `randomize_order` then falls
-    // back to its own default (`true`). Both fields default `true`, so this
-    // only differs for a legacy row that explicitly set
-    // `swap_and_confirm: false`; that row's candidate-ordering behavior
-    // flips silently on reroute. Narrow enough (and low-impact enough) to
-    // document rather than special-case.
+    // NB: `select_best_compare`'s settings schema is non-strict, so a legacy `swap_and_confirm`
+    // key with no equivalent field is silently dropped by the parse below rather than
+    // translated — `randomize_order` then falls back to its own default (`true`).
     const mergedSettings = {
       // Custom evaluator definitions have no `settings` to derive defaults
       // from — getEvaluatorDefaultSettings returns {} for that arm instead of
@@ -1340,11 +1220,10 @@ async function handleEvaluatorCall(
     };
 
     // Drop a legacy pairwise `prompt` that can't render on the new judge (see
-    // stripIncompatiblePairwisePrompt), so select_best_compare's own default
-    // wins instead of forwarding unrendered pairwise placeholders. Stripped
-    // AFTER the full merge — including `params.settings` — so a prompt
-    // arriving via the request body can't bypass the strip the way stripping
-    // only the pre-merge DB/monitor settings would.
+    // stripIncompatiblePairwisePrompt), so select_best_compare's own default wins instead of
+    // forwarding unrendered pairwise placeholders. Stripped AFTER the full merge — including
+    // `params.settings` — so a prompt arriving via the request body can't bypass the strip the
+    // way stripping only the pre-merge DB/monitor settings would.
     const { settings: finalSettings, droppedPrompt } = isLegacyPairwiseDispatch
       ? stripIncompatiblePairwisePrompt(mergedSettings)
       : { settings: mergedSettings, droppedPrompt: false };
@@ -1424,13 +1303,11 @@ async function handleEvaluatorCall(
       );
       return c.json(
         {
-          // `error` keeps carrying the human-readable message, matching
-          // this endpoint's existing wire shape for external API consumers.
-          // `kind`/`meta` are additive so the workbench client can build a
-          // friendly message (e.g. map candidate_a_id -> "Variant A")
-          // without depending on the message being a specific string. The
-          // wire field is named `kind` for back-compat; it carries the
-          // HandledError `code`.
+          // `error` keeps carrying the human-readable message, matching this endpoint's
+          // existing wire shape for external API consumers. `kind`/`meta` are additive so the
+          // workbench client can build a friendly message (e.g. map candidate_a_id -> "Variant
+          // A") without depending on the message being a specific string. The wire field is
+          // named `kind` for back-compat; it carries the HandledError `code`.
           error: handledError.message,
           kind: handledError.code,
           meta: handledError.meta,

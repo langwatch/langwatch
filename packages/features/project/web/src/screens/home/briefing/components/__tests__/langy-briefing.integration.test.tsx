@@ -1,9 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * Ported from platform/app/src/features/briefing/components/LangyBriefing.unit.test.tsx
- * (origin/main); `LangyBriefing`'s own props are unchanged by the move.
- * See specs/home/signal-focused-home-rollout.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { fireEvent, render, screen } from "@testing-library/react";

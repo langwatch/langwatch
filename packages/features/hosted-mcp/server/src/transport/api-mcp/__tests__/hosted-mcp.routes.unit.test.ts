@@ -1,8 +1,5 @@
 /**
  * @vitest-environment node
- *
- * The hosted MCP family answers off the raw listener, so nothing records its
- * routes for it. Covers specs/security/hosted-mcp-grant-fidelity.feature.
  */
 import { getRoutePolicy } from "@langwatch/api/rest";
 import { describe, expect, it } from "vitest";

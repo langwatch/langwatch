@@ -1,10 +1,6 @@
 /**
- * One shared block per concern that `apps/api`, `apps/worker` and (where its
- * shape matches) `apps/tasks` all spread into their own definitions. What
- * belongs here is that each block reads its OWN declared variables into its
- * OWN declared leaves — the composition-simplification win these blocks exist
- * for is proven by app-side tests calling `resolveApiConfig` /
- * `resolveWorkerConfig` and getting the same values back.
+ * One shared block per concern that `apps/api`, `apps/worker` and (where its shape matches)
+ * `apps/tasks` all spread into their own definitions.
  */
 import { describe, expect, it } from "vitest";
 

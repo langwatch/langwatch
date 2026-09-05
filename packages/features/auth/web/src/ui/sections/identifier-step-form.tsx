@@ -22,27 +22,6 @@ export type IdentifierStepValues = z.infer<typeof identifierSchema>;
 /**
  * The address step: the whole of what the front door asks before it knows
  * anything (ADR-117 §2).
- *
- * It renders the same for every address, and the screen above it asks the same
- * question of the server for every address. Whether an account exists is not
- * knowable from this step, by construction rather than by care.
- *
- * The field is spelled the way a password manager expects to find it —
- * `type="email"`, `name="email"`, `autocomplete="username webauthn"` — so the
- * browser fills it, and so a passkey can be offered against the same field
- * when D07 brings them.
- *
- * A rejection is only ever an answer to something the person wrote. Three
- * rules, in the order they matter:
- *
- *   - An empty field is never an error until they ask to continue. Not on
- *     load, not on blur, not after autofocus lost the caret: empty means
- *     "not started", and "not started" is not wrong.
- *   - What they typed is judged when they leave the field, not while their
- *     hands are still on it. No error appears mid-keystroke.
- *   - A rejection already on screen lifts the moment the address becomes
- *     valid, so fixing it is rewarded live even though breaking it was
- *     never punished live.
  */
 export function IdentifierStepForm({
   submitLabel,
@@ -109,15 +88,10 @@ export function IdentifierStepForm({
                 {...FIELD_SURFACE}
                 _focusVisible={FIELD_FOCUS}
                 {...emailRegistration}
-                // "Required" is answered by coming back to the field, so it
-                // clears the moment somebody does — before a keystroke. The
-                // rejection said "this is empty"; reaching for it is the whole
-                // of the correction, and leaving it red while they type reads
-                // as the screen not noticing.
-                //
-                // Only the empty case. A rejection about the ADDRESS is about
-                // what is in the box, and that is still true on focus — it
-                // lifts on the keystroke that fixes it (`onChange` above).
+                // "Required" is answered by coming back to the field, so it clears the moment
+                // somebody does — before a keystroke. The rejection said "this is empty";
+                // reaching for it is the whole of the correction, and leaving it red while they
+                // type reads as the screen not noticing. Only the empty case.
                 onFocus={() => {
                   if (!form.getValues("email")) form.clearErrors("email");
                 }}

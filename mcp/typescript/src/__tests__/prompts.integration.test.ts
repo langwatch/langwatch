@@ -35,13 +35,9 @@ beforeEach(() => {
 });
 
 /**
- * Fixtures below mirror the real `GET /api/v1/prompts/:id` contract
- * (apiResponsePromptWithVersionDataSchema in
- * packages/features/prompt/server/src/transport/api-rest/prompt.api.ts):
- * the returned version's data is flattened to the top level, `parameters`
- * is an object map (runtimeParametersSchema, defaulting to {}), `tags` is
- * an array of { name, versionId } objects, and there is NO nested
- * `versions` array — version history lives behind GET /:id/versions.
+ * Fixtures below mirror the real `GET /api/v1/prompts/:id` contract: the returned version's
+ * data is flattened to the top level, and there is NO nested `versions` array — version
+ * history lives behind GET /:id/versions.
  */
 
 describe("handleGetPrompt()", () => {
@@ -355,17 +351,9 @@ describe("MCP server platform_get_prompt tool registration", () => {
 });
 
 /**
- * Write-path spec (issue #5666 AC5-9). After updatePrompt succeeds, the tool
- * re-fetches the prompt via getPrompt to derive authoritative state (the
- * mutation response alone does not carry applied tags). The GET response is
- * the prompt's latest version flattened to the top level, so the new version
- * is identified by matching the request's commitMessage against the
- * top-level commitMessage (falling back to GET /:id/versions), and
- * deployment state comes from the tags whose versionId points at it (the
- * built-in "latest" tag is never a deployment). On updatePrompt failure with
- * tags requested, the tool re-fetches and matches the same way to detect the
- * committed-but-untagged version (the platform commits the version before
- * assigning tags).
+ * Write-path spec (issue #5666 AC5-9). After updatePrompt succeeds, the tool re-fetches the
+ * prompt via getPrompt to derive authoritative state (the mutation response alone does not
+ * carry applied tags).
  */
 
 /** No single output line may pair a version number with a deployment tag name. */

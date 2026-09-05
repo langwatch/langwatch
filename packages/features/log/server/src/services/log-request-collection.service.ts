@@ -14,12 +14,6 @@ import type { LogTraceIoPort } from "../ports/log-trace-io.port";
 
 /**
  * Every field optional, all the way down.
- *
- * Stated here rather than imported: an OTLP export request arrives as JSON a
- * client assembled, so the transformer's own interface — which requires every
- * field — describes what a conforming exporter sends rather than what actually
- * lands. Was `platform/app/src/utils/types.ts`, a tree this migration only
- * deletes from.
  */
 type DeepPartial<T> = T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } : T;
 
@@ -32,15 +26,8 @@ export interface LogRequestCollectionDeps {
 }
 
 /**
- * The outcome of an OTLP log request.
- *
- * The two cases are deliberately separate shapes rather than a counter pair.
- * An OTLP `partialSuccess` body means the server rejected those records
- * *permanently* and the client must not re-send them, so folding a failure
- * that is ours — a queue outage, say — into `rejectedLogRecords` tells every
- * collector in the fleet to drop data it would otherwise have retried. As a
- * counter pair the two are one indistinguishable `+= n`; as a discriminated
- * union, conflating them is a type error at the call site.
+ * The outcome of an OTLP log request. The two cases are deliberately separate shapes rather
+ * than a counter pair.
  */
 export type LogRequestCollectionResult =
   | {
@@ -176,12 +163,11 @@ export class LogRequestCollectionService {
           try {
             await this.deps.recordLogContributions(contributions);
           } catch (error) {
-            // Correlation is deliberately best-effort and separate from log
-            // acceptance, matching the metric pipeline: the canonical record
-            // is already durably enqueued above, and it — not the trace
-            // contribution — is the source of truth. Counting these as
-            // rejections would tell the sender to discard logs we have in
-            // fact accepted.
+            // Correlation is deliberately best-effort and separate from log acceptance,
+            // matching the metric pipeline: the canonical record is already durably enqueued
+            // above, and it — not the trace contribution — is the source of truth. Counting
+            // these as rejections would tell the sender to discard logs we have in fact
+            // accepted.
             this.logger.error(
               {
                 error,

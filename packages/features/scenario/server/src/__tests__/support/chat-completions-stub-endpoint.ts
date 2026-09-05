@@ -1,10 +1,7 @@
 /**
- * Stub harness for judge-transport integration tests: a local HTTP server
- * standing in for the chat-completions endpoint behind the gateway proxy,
- * plus the provider-rejection fixtures and the surfaced-error reader.
- *
- * Support module only — imported by
- * judge-transport-tool-reasoning.integration.test.ts.
+ * Stub harness for judge-transport integration tests: a local HTTP server standing in for the
+ * chat-completions endpoint behind the gateway proxy, plus the provider-rejection fixtures and
+ * the surfaced-error reader.
  */
 
 import { createServer, type Server } from "node:http";
@@ -33,10 +30,8 @@ const UNRELATED_REJECTION = {
 };
 
 /**
- * A rejection carrying the same structured `param` as the one the retry answers,
- * but asking for nothing: the provider refused the reasoning setting without
- * saying what it would accept. Keying the retry on `param` alone would answer
- * this by re-sending the request with a value nobody requested.
+ * A rejection carrying the same structured `param` as the one the retry answers, but asking for
+ * nothing: the provider refused the reasoning setting without saying what it would accept.
  */
 const UNSPECIFIC_REASONING_REJECTION = {
   error: {
@@ -124,14 +119,8 @@ function responseFor(
 
 /**
  * Stands in for the chat-completions endpoint behind the gateway proxy.
- *
- * "reject-tools-without-reasoning-off" enforces the upstream rule.
- * "reject-reasoning-always" refuses reasoning even when it is off.
- * "reject-reasoning-without-remedy" refuses the reasoning setting without
- * naming a value it would accept.
- * "reject-unrelated" answers a 400 that has nothing to do with reasoning.
- * "reject-not-json" answers a 400 whose body is not JSON.
- * "accept" takes anything and exists only to record the wire body.
+ * "reject-tools-without-reasoning-off" enforces the upstream rule. "reject-reasoning-always"
+ * refuses reasoning even when it is off.
  */
 export async function startEndpoint(rule: EndpointRule = "accept"): Promise<StubEndpoint> {
   const bodies: Array<Record<string, unknown>> = [];

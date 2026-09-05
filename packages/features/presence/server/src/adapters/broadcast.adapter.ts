@@ -45,10 +45,9 @@ function redisChannel(eventType: BroadcastEventType): string {
 }
 
 /**
- * Event Broadcasting Service for managing real-time event emission to tRPC subscriptions.
- * If available, uses Redis pub/sub for high availability across multiple server instances.
- * If no redis, it will not orchestrate but send directly.
- * Manages EventEmitter instances that tRPC subscriptions listen to for real-time updates.
+ * Event Broadcasting Service for managing real-time event emission to tRPC subscriptions. If
+ * available, uses Redis pub/sub for high availability across multiple server instances. If no
+ * redis, it will not orchestrate but send directly.
  */
 export class BroadcastAdapter {
   private static readonly DRAIN_DELAY_MS = 2000;
@@ -191,11 +190,9 @@ export class BroadcastAdapter {
   }
 
   /**
-   * Rate-limited variant of broadcastToTenant.
-   *
-   * Checks the sender-side token bucket before publishing. Returns `false`
-   * (and silently drops the event) when the per-tenant per-tier bucket is
-   * exhausted, preventing upstream overload on high-frequency delta streams.
+   * Rate-limited variant of broadcastToTenant. Checks the sender-side token bucket before
+   * publishing. Returns `false` (and silently drops the event) when the per-tenant per-tier
+   * bucket is exhausted, preventing upstream overload on high-frequency delta streams.
    */
   async broadcastToTenantRateLimited(
     tenantId: string,

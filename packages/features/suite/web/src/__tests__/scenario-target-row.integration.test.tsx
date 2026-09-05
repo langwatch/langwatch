@@ -1,11 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * Integration tests for ScenarioTargetRow component.
- *
- * Tests the display of scenario x target pairs inside expanded run rows:
- * status icons, display name formatting, duration, and click handling.
- *
  * @see specs/suites/suite-workflow.feature - "Expand run to see scenario x target breakdown"
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

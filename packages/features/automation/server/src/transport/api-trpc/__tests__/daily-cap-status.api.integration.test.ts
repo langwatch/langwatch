@@ -1,12 +1,5 @@
 /**
  * @vitest-environment node
- *
- * `getDailyCapStatus` reads its own trigger ids from the project rather than
- * taking them from the caller, so the list's skipped-today badge covers every
- * automation the project owns, not just whatever page size a caller passed.
- *
- * Covers @integration scenarios from
- * specs/automations/runaway-automation-containment.feature.
  */
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";

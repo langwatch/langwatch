@@ -1,19 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * Credential requiredness in the model-provider drawer, exercised through
- * the real form tree: a provider that accepts either an API key or a base
- * URL must stop demanding the key the moment a base URL is entered, and
- * demand it again when that base URL goes away (#6172).
- *
- * Covers @integration scenarios from
- * specs/model-providers/provider-configuration.feature.
- *
- * `useModelProviderForm`, `useRequiredCredentialKeys` and `CredentialsSection`
- * are deliberately NOT mocked — requiredness is recomputed from the schema
- * as the customer types, so only the real state flow can show it moving.
- * Just the boundaries are stubbed: the tRPC client, the router-backed
- * drawer, feature flags, and the API-key probe.
  */
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

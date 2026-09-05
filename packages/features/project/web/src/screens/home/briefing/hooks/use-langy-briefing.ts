@@ -1,3 +1,4 @@
+import { useUiDeployment } from "@langwatch/ui-host/capabilities";
 import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
 import type { SeriesInputType } from "@langwatch/analytics-web/analytics-registry";
@@ -168,6 +169,7 @@ export function useLangyBriefing(): LangyBriefingResult {
   const canViewCost = hasPermission("cost:view");
   const canViewAnalytics = hasPermission("analytics:view");
   const canViewTraces = hasPermission("traces:view");
+  const { isDevelopment } = useUiDeployment();
 
   // Dev-only: the switcher at the top of the home can pin the briefing to a
   // mocked data state. While one is active the real queries stay disabled.
@@ -436,7 +438,7 @@ export function useLangyBriefing(): LangyBriefingResult {
      * derived from the label (stable across renders); production NEVER mocks.
      */
     const devMockDelta = (label: string): string | undefined => {
-      if (process.env.NODE_ENV !== "development") return undefined;
+      if (!isDevelopment) return undefined;
       let hash = 0;
       for (const ch of label) hash = (hash * 31 + ch.charCodeAt(0)) % 997;
       const pct = (hash % 37) - 18;
@@ -668,5 +670,6 @@ export function useLangyBriefing(): LangyBriefingResult {
     canViewAnalytics,
     canViewCost,
     canViewTraces,
+    isDevelopment,
   ]);
 }

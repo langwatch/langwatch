@@ -1,12 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * The Test section of the main menu carries one Agent Testing destination
- * once the release flag is on, and the Simulations group exactly as it is
- * while the flag is off.
- *
- * MOVED from `platform/app/src/components/__tests__/MainMenu.agentTesting.integration.test.tsx`.
- *
  * @see specs/features/agent-testing/page-structure.feature
  */
 

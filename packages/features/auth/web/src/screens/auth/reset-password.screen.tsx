@@ -40,11 +40,9 @@ const resetPasswordSchema = z
   });
 
 /**
- * Not every refusal is a dead link. Telling somebody whose password was
- * refused on policy — or who hit the rate limit — that their LINK expired
- * sends them to burn a fresh link and meet the same wall. Only an error that
- * is actually about the token gets the dead-link copy; everything else keeps
- * the form alive and says what happened.
+ * Not every refusal is a dead link. Telling somebody whose password was refused on policy — or
+ * who hit the rate limit — that their LINK expired sends them to burn a fresh link and meet the
+ * same wall.
  */
 function describeResetRefusal(error: {
   code?: string | null;

@@ -63,14 +63,9 @@ function backoffMsFor(attempts: number): number {
 }
 
 /**
- * Asking GitHub which pull requests a branch has, and writing down the answer.
- *
- * This is the half the fleet-wide sweep runs, so its collaborators are the ones
- * the sweep can actually supply: the pull-request rows, the installation that
- * covers a repository, an App token, and the host. A project is deliberately
- * absent — the sweep walks branch bookkeeping that spans every tenant and has
- * no project in hand, and the one write that needed one (recording that a
- * customer's project saw a pull request) belongs to the demand side that asked.
+ * Asking GitHub which pull requests a branch has, and writing down the answer. This is the half
+ * the fleet-wide sweep runs, so its collaborators are the ones the sweep can actually supply:
+ * the pull-request rows, the installation that covers a repository, an App token, and the host.
  */
 export class GithubBranchMappingService {
   static create(deps: BranchMappingDeps): GithubBranchMappingService {
@@ -118,11 +113,6 @@ export class GithubBranchMappingService {
 
   /**
    * Maps one branch, answering how many pull requests it recorded.
-   *
-   * The count is what the demand side reads: a project has seen a pull request
-   * when a mapping it asked for found one, and every other outcome here — an
-   * unmappable address, no installation covering the repository, a mapping
-   * another worker already holds the claim on, a rate limit — is a zero.
    */
   async map(target: BranchMappingTarget): Promise<number> {
     const scope = this.tryScope(target);
@@ -162,11 +152,9 @@ export class GithubBranchMappingService {
   }
 
   /**
-   * Pulls a branch's next sweep into the active window.
-   *
-   * Demand is what this records: a branch somebody just asked about is worth
-   * re-asking GitHub about soon, whatever backoff an earlier empty answer had
-   * pushed it out to.
+   * Pulls a branch's next sweep into the active window. Demand is what this records: a branch
+   * somebody just asked about is worth re-asking GitHub about soon, whatever backoff an earlier
+   * empty answer had pushed it out to.
    */
   async bringRecheckForward(target: BranchMappingTarget): Promise<void> {
     const scope = this.tryScope(target);

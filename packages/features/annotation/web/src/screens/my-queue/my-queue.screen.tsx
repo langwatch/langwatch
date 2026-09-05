@@ -61,23 +61,15 @@ const queueItemHref = ({
     : `/${projectSlug}/annotations/my-queue`;
 
 /**
- * How far the end of the walk has got.
- *
- * `walking` is a queue still being read, which is where the reviewer stays
- * until the last item is finished off. Choosing "Done" on it offers the
- * session's traces to a dataset (`handoff`) and then, if the reviewer closed
- * that offer, asks before the session ends without one (`asking`). Only `done`
- * celebrates, and only `done` finishes the item.
+ * How far the end of the walk has got. `walking` is a queue still being read, which is where
+ * the reviewer stays until the last item is finished off.
  */
 type QueueEnding = "walking" | "handoff" | "asking" | "done";
 
 /**
- * The end of the queue as a state rather than a race.
- *
- * The celebration is earned: it shows after the dataset add succeeds, or after
- * the reviewer confirms ending the session without one, and never under or
- * before the hand-off drawer. The last item is recorded as done at that same
- * moment, so a reviewer who backs out lands on an item that is still theirs.
+ * The end of the queue as a state rather than a race. The celebration is earned: it shows after
+ * the dataset add succeeds, or after the reviewer confirms ending the session without one, and
+ * never under or before the hand-off drawer.
  */
 function useQueueEnding({
   handoffWanted,
@@ -256,14 +248,10 @@ function QueueWalker() {
   const currentTraceId = currentQueueItem?.trace?.trace_id ?? currentQueueItem?.traceId ?? "";
   const conversationId = currentQueueItem?.trace?.metadata?.thread_id ?? null;
 
-  // The conversation only reads back 90 days, so a thread older than that
-  // answers with no turns even though the item's own trace loaded. Reading it
-  // as an empty conversation would hide the very turn the reviewer was sent
-  // here for, so once the read has settled on nothing the trace is handed over
-  // as the single turn instead.
-  // The read keeps the previous thread's turns while the next one loads, so
-  // `isPlaceholderData` is what tells "this thread holds nothing" apart from
-  // "these turns belong to the item before this one".
+  // The conversation only reads back 90 days, so a thread older than that answers with no turns
+  // even though the item's own trace loaded. Reading it as an empty conversation would hide the
+  // very turn the reviewer was sent here for, so once the read has settled on nothing the trace
+  // is handed over as the single turn instead.
   const conversationTurns = useConversationTurns(conversationId);
   const threadResolvedEmpty =
     !!conversationId &&
@@ -779,10 +767,6 @@ const AnnotationQueuePicker = ({
 
 /**
  * The walker, inside the trace host its conversation view asks for.
- *
- * The default export is the wrapped screen, so the host travels with the page
- * rather than with the address: this surface is mounted from one route today
- * and its own tests render it directly, and both need the bridge above it.
  */
 export default function TraceAnnotations() {
   return (

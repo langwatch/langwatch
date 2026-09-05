@@ -1,11 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * Only the drawer stack (`@langwatch/ui-drawer`) is mocked, standing in for
- * the real evaluator-list drawer this component navigates to. Everything
- * else — evaluator selection, the code block, and the copy/close affordances
- * — renders for real.
- *
  * @see specs/monitors/guardrails-drawer.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

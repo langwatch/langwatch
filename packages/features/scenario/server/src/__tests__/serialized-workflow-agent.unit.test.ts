@@ -136,10 +136,6 @@ describe("SerializedWorkflowAgentAdapter", () => {
     // without touching the mocked undici.Agent constructor, so agentOptions
     // stays empty and this test's assertions see stale/undefined values.
     await NlpFetchAdapter.create().close();
-    // Pin the timeout explicitly so the test doesn't rely on ambient env.
-    // Stubbed, not assigned: a raw assignment here outlives the file and
-    // reaches whatever else shares this vitest worker.
-    vi.stubEnv("NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS", "600");
     // clearAllMocks keeps implementations, so pin the no-active-context
     // default here; tests that need a trace context override it themselves.
     mockInjectTraceContextHeaders.mockImplementation(({ headers }) => ({
@@ -574,7 +570,10 @@ describe("SerializedWorkflowAgentAdapter", () => {
      * time. The deadline is not reported on a span or in the thrown message,
      * so bracketing it from both sides is the only way to pin the value.
      */
-    const abortsWithin = async (advanceMs: number): Promise<boolean> => {
+    const abortsWithin = async (
+      advanceMs: number,
+      engineCodeBlockTimeoutSeconds?: number,
+    ): Promise<boolean> => {
       mockFetch.mockImplementation(async (_url: string, opts: { signal: AbortSignal }) =>
         abortAwareFetch(opts.signal),
       );
@@ -585,6 +584,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
           config: defaultConfig,
           nlpServiceUrl,
           projectApiKey: apiKey,
+          timeouts: { engineCodeBlockTimeoutSeconds },
         });
         // Attach the rejection handler before advancing timers so the abort
         // doesn't surface as an unhandled rejection. The promise stays pending
@@ -599,10 +599,6 @@ describe("SerializedWorkflowAgentAdapter", () => {
       return aborted;
     };
 
-    afterEach(() => {
-      vi.unstubAllEnvs();
-    });
-
     it("still holds the socket just under the 630s default deadline", async () => {
       expect(await abortsWithin(629_999)).toBe(false);
     });
@@ -615,15 +611,11 @@ describe("SerializedWorkflowAgentAdapter", () => {
     });
 
     it("still holds the socket just under the 900s platform maximum when the engine ceiling is raised past it", async () => {
-      vi.stubEnv("NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS", "1200");
-
-      expect(await abortsWithin(899_999)).toBe(false);
+      expect(await abortsWithin(899_999, 1200)).toBe(false);
     });
 
     it("aborts at the 900s platform maximum when the engine ceiling is raised past it", async () => {
-      vi.stubEnv("NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS", "1200");
-
-      expect(await abortsWithin(900_001)).toBe(true);
+      expect(await abortsWithin(900_001, 1200)).toBe(true);
     });
 
     // The abort deadline is only one of the two clocks on this call: undici's

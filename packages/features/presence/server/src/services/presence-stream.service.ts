@@ -16,13 +16,8 @@ const logger = createLogger("langwatch:api:presence");
 type BroadcastFrame = { event: string; timestamp: number };
 
 /**
- * Turns a tenant's raw broadcast frames into the presence events a subscriber
- * is allowed to see.
- *
- * Everything a subscriber must never receive is decided here rather than at
- * the transport: a frame that is not JSON, a frame that is not a presence
- * event, a frame belonging to another project, a cursor for an anchor the
- * subscriber is not watching, and a subscriber's own cursor echoed back.
+ * Turns a tenant's raw broadcast frames into the presence events a subscriber is allowed to
+ * see.
  */
 export class PresenceStreamService {
   private constructor(

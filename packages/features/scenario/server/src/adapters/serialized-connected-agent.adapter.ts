@@ -86,6 +86,7 @@ export class SerializedConnectedAgentAdapter extends SerializedAgentAdapter {
     projectApiKey: string;
     parameters?: RunParameterValues;
     logger?: Logger;
+    logEnvironment?: NodeJS.ProcessEnv;
     fetchImpl?: FetchLike;
     sleep?: (ms: number) => Promise<void>;
   }): SerializedConnectedAgentAdapter {
@@ -97,6 +98,7 @@ export class SerializedConnectedAgentAdapter extends SerializedAgentAdapter {
     projectApiKey,
     parameters,
     logger,
+    logEnvironment,
     fetchImpl,
     sleep,
   }: {
@@ -105,6 +107,12 @@ export class SerializedConnectedAgentAdapter extends SerializedAgentAdapter {
     projectApiKey: string;
     parameters?: RunParameterValues;
     logger?: Logger;
+    /**
+     * The bindings a logger this adapter builds for itself is bound to, when
+     * no `logger` was handed down. The child process always hands one down,
+     * so this stays empty outside a test that builds the adapter bare.
+     */
+    logEnvironment?: NodeJS.ProcessEnv;
     /** The fetch the adapter posts with, replaceable in tests. */
     fetchImpl?: FetchLike;
     /** The wait between busy retries, replaceable in tests. */
@@ -116,7 +124,8 @@ export class SerializedConnectedAgentAdapter extends SerializedAgentAdapter {
     this.projectApiKey = projectApiKey;
     this.parameters = parameters ?? {};
     this.logger =
-      logger ?? createChildProcessLogger("langwatch:scenarios:connected-adapter", process.env);
+      logger ??
+      createChildProcessLogger("langwatch:scenarios:connected-adapter", logEnvironment ?? {});
     this.fetchImpl = fetchImpl ?? ((url, init) => fetch(url, init) as ReturnType<FetchLike>);
     this.sleep = sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
   }

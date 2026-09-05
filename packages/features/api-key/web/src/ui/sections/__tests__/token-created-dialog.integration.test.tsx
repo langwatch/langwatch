@@ -1,21 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * The one-time reveal, mounted.
- *
- * Consolidates `token-created-uniform` and `token-created-assistants` from
- * `platform/app/src/pages/settings/api-keys/__tests__` onto this package's host
- * harness. THE ONE STRUCTURAL CHANGE is the clipboard: the platform files
- * replaced `navigator.clipboard` and read what it was handed; here the copy goes
- * through the host, and the fake records it. What that buys is the assertion the
- * platform suite could only make indirectly — a copy that the browser REFUSED
- * shows no tick, which is pinned in `apps/ui/tests/api-key-host.adapter.unit.test.ts`.
- *
- * THE MASKING CASES ARE WHY THIS FILE EXISTS. What is DISPLAYED is masked until
- * the reader asks; what is COPIED is always the real value; and the Basic Auth
- * tab masks the BASE64 BLOB rather than the token, because a token is not a
- * substring of its own base64 and masking on it there would fail open.
- *
  * @see specs/api-keys/token-created-snippets.feature
  */
 

@@ -10,14 +10,18 @@ import { randomBytes } from "crypto";
 import { resolveFieldMappings } from "@langwatch/scenario-contract";
 import type { RunParameterValues, WorkflowAgentData } from "@langwatch/scenario-contract";
 import { type Response as UndiciResponse, fetch as undiciFetch } from "undici";
-import { type FetchInitWithDispatcher, NlpFetchAdapter } from "./nlp-fetch.adapter";
+import {
+  type FetchInitWithDispatcher,
+  NlpFetchAdapter,
+  type NlpFetchTimeouts,
+} from "./nlp-fetch.adapter";
 import { SerializedAgentAdapter } from "./serialized-agent.base";
 
 /**
  * How long to wait on the NLP service for one turn.
  */
-function fetchTimeoutMs(): number {
-  const transport = NlpFetchAdapter.create();
+function fetchTimeoutMs(timeouts: NlpFetchTimeouts): number {
+  const transport = NlpFetchAdapter.create({ timeouts });
 
   return Math.min(transport.maxTimeoutMs(), transport.floorTimeoutMs());
 }
@@ -32,6 +36,7 @@ export class SerializedWorkflowAgentAdapter extends SerializedAgentAdapter {
     nlpServiceUrl: string;
     projectApiKey: string;
     parameters?: RunParameterValues;
+    timeouts?: NlpFetchTimeouts;
   }): SerializedWorkflowAgentAdapter {
     return new SerializedWorkflowAgentAdapter(options);
   }
@@ -50,23 +55,28 @@ export class SerializedWorkflowAgentAdapter extends SerializedAgentAdapter {
    * The run's resolved parameter values.
    */
   private readonly parameters: RunParameterValues;
+  /** The operator's deadlines, as the process that composed this read them. */
+  private readonly timeouts: NlpFetchTimeouts;
 
   constructor({
     config,
     nlpServiceUrl,
     projectApiKey,
     parameters,
+    timeouts,
   }: {
     config: WorkflowAgentData;
     nlpServiceUrl: string;
     projectApiKey: string;
     parameters?: RunParameterValues;
+    timeouts?: NlpFetchTimeouts;
   }) {
     super();
     this.config = config;
     this.nlpServiceUrl = nlpServiceUrl;
     this.projectApiKey = projectApiKey;
     this.parameters = parameters ?? {};
+    this.timeouts = timeouts ?? {};
     this.name = "SerializedWorkflowAgentAdapter";
   }
 
@@ -188,7 +198,7 @@ export class SerializedWorkflowAgentAdapter extends SerializedAgentAdapter {
     };
 
     const controller = new AbortController();
-    const timeoutMs = fetchTimeoutMs();
+    const timeoutMs = fetchTimeoutMs(this.timeouts);
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
     try {

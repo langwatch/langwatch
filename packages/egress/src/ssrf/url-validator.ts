@@ -5,47 +5,8 @@ import { classify as classifyEgressAddress } from "./address";
 import { BLOCKED_CLOUD_DOMAINS, BLOCKED_METADATA_HOSTS } from "./blocked-hosts";
 
 /**
- * Which addresses a process may open a connection to, and what it must connect
- * to once it has decided.
- *
- * FROZEN TWIN of the validation half of
- * `platform/app/src/utils/ssrfProtection.ts`. That module is the application's
- * and stays as it is while both graphs send; this one is what a package or a
- * background process composes. The two must answer the same question the same
- * way — an address one admits and the other refuses is a customer whose webhook
- * works from one pod and fails from the next.
- *
- * ## What is refused, always
- * - Cloud metadata endpoints: by name (`BLOCKED_METADATA_HOSTS`), by address
- *   whatever its spelling, and by the addresses a name RESOLVES to. None of
- *   those three depend on `blockLocal`.
- * - Cloud provider internal domains (`BLOCKED_CLOUD_DOMAINS`, suffix match)
- *
- * An IPv6 literal arrives from `URL` in brackets. They come off before anything
- * judges the host, so `[::ffff:169.254.169.254]` is classified as the IMDS
- * address it is; the brackets go back on for the request line and `Host`.
- *
- * ## What is refused when `blockLocal` is set
- * Every non-globally-routable address, as classified by `./address` — one
- * table shared byte-for-byte with the Go services and held to one conformance
- * corpus. That is the whole IANA special-purpose registry, not just the classic
- * private ranges: loopback, RFC 1918, link-local, CGNAT, TEST-NET,
- * benchmarking, multicast and reserved on IPv4; `::1`, `::`, ULA, link-local,
- * NAT64, 6to4, Teredo and documentation on IPv6; IPv4-mapped IPv6 unmapped and
- * re-checked as IPv4; and any hostname that RESOLVES to one of those.
- *
- * ## Allowlist
- * `allowedHosts` is matched literally and case-insensitively against the URL
- * hostname. A match bypasses the local-address block and NEVER bypasses the
- * metadata refusal, which is already decided above it.
- *
- * ## DNS rebinding
- * The name is resolved once, here, and the resolved IP travels in the result so
- * the connection is pinned to the address that was actually judged. There is no
- * second lookup for an attacker to answer differently.
- *
- * Unlike the application's module this one reads no environment: the policy is
- * a parameter, because a package cannot know whose process it is composed in.
+ * Which addresses a process may open a connection to, and what it must connect to once it has
+ * decided. FROZEN TWIN of the validation half of `platform/app/src/utils/ssrfProtection.ts`.
  */
 
 const logger = createLogger("langwatch:ssrfProtection");
@@ -60,10 +21,6 @@ export interface SsrfPolicy {
 
 /**
  * A destination that passed the policy, and the address it was judged at.
- *
- * A discriminated union rather than an optional IP: "admitted but never
- * resolved" and "admitted at this exact address" are different facts, and a
- * caller that pins the connection needs to know which one it holds.
  */
 export type SsrfValidationResult =
   | SsrfResolvedResult
@@ -121,11 +78,9 @@ function isBareLocalhostOrLocal(hostname: string): boolean {
 }
 
 /**
- * Whether the hostname matches a blocked cloud-provider domain suffix.
- *
- * Bare `localhost` and `local` are excluded on purpose: they are the
- * local-address policy's business, which an operator may relax, not this
- * unconditional one.
+ * Whether the hostname matches a blocked cloud-provider domain suffix. Bare `localhost` and
+ * `local` are excluded on purpose: they are the local-address policy's business, which an
+ * operator may relax, not this unconditional one.
  */
 export function isBlockedCloudDomain(hostname: string): boolean {
   const lowerHostname = hostname.toLowerCase();
@@ -140,12 +95,9 @@ export function isBlockedCloudDomain(hostname: string): boolean {
 }
 
 /**
- * Whether an IP literal is non-globally-routable.
- *
- * Delegates to `./address` so this package, the application, the Go AI
- * gateway, the Go Langy egress proxy and the NLP service all agree on exactly
- * which addresses are unsafe to reach. A metadata address is non-global too, so
- * it is reported here as well as refused unconditionally above.
+ * Whether an IP literal is non-globally-routable. Delegates to `./address` so this package, the
+ * application, the Go AI gateway, the Go Langy egress proxy and the NLP service all agree on
+ * exactly which addresses are unsafe to reach.
  */
 export function isPrivateOrLocalhostIP(ip: string): boolean {
   return classifyEgressAddress(ip) !== "global";
@@ -173,11 +125,6 @@ function validateNotMetadataEndpoint(ctx: ValidationContext): void {
 
 /**
  * The metadata refusal on the addresses a name actually resolved to.
- *
- * Deliberately outside the `blockLocal` gate: a name whose A record is the IMDS
- * address is the same request as naming the address, and an operator relaxing
- * the local-address policy has not asked for instance credentials to be
- * reachable.
  */
 function validateAddressesNotMetadata(ctx: ValidationContext, addresses: string[]): void {
   const metadataAddresses = addresses.filter(isMetadataAddress);

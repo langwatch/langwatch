@@ -1,13 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * Why a Lite Member's own workspace keeps nothing they add.
- *
- * Their organization role caps what any of their role bindings can do, the admin
- * binding on their own workspace included, so reads work and writes do not. The
- * page renders in full either way and only the save fails, which reads as broken
- * rather than restricted unless the workspace says so itself.
- *
  * Spec: specs/ai-gateway/governance/personal-workspace-integrity.feature
  */
 import { cleanup, screen } from "@testing-library/react";

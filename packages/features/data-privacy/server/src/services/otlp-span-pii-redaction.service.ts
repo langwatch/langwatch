@@ -1,23 +1,6 @@
 /**
- * PII redaction over an OTLP span, harvested for a process composed from
- * packages.
- *
- * BYTE-FAITHFUL, SPAN HALF ONLY. Every member below is the application's
- * `platform/app/src/server/app-layer/traces/span-pii-redaction.service.ts`
- * member of the same name, body for body. The record-shaped half — `redactLog`,
- * `lambdaRedactLog`, `applyNativeLogPass`, `redactMetricAttributes`,
- * `lambdaRedactMetricAttributes`, `redactRecordNative`,
- * `createRedactionBatch`, `collectRecordEntries`, `applyRedactionBatch` and
- * the `RedactionBatch` type — came across when the application's copy was
- * deleted, because it is what answers `LogRedactionPort` and
- * `MetricRedactionPort` for the log and metric conversions and there was
- * nowhere else left for it to live.
- *
- * THE APPLICATION'S COPY STAYS AS IT IS while both graphs ingest. Everything
- * the two agree about is a data-protection contract between two processes
- * writing into the same store, and drift in it is silent in the worst
- * direction: a span redacted by one process and not the other leaves personal
- * data in ClickHouse with nothing in the row to say a pass was skipped.
+ * PII redaction over an OTLP span, harvested for a process composed from packages.
+ * BYTE-FAITHFUL, SPAN HALF ONLY.
  */
 
 import type { ResolvedDataPrivacy } from "@langwatch/data-privacy-contract";
@@ -49,22 +32,8 @@ type StringEntry = {
 };
 
 /**
- * Service responsible for redacting PII from OTLP span data.
- *
- * Two paths exist. With a scoped data-privacy policy resolvable for the tenant
- * (the normal ingestion path), the secrets scrubber and the native essential-PII
- * recognizers run in-process with no external call. The strict level runs that
- * same native floor first, then escalates to the analysis-service batch for the
- * names/locations the regex recognizers can't catch — so an unreachable (or, in
- * dev, unconfigured) analysis service downgrades strict to essential instead of
- * leaking. Without a tenant, or with the LANGWATCH_DATA_PRIVACY_ENFORCEMENT kill
- * switch set, the analysis-service batch path runs unchanged. This service is
- * applied BEFORE creating immutable events in the event sourcing pipeline.
- */
-/**
- * Accumulator used by the record-shaped redaction paths (logs, metrics).
- * Tracks parallel arrays of texts and back-references plus a cumulative
- * length budget enforced by `tryPush`.
+ * Accumulator used by the record-shaped redaction paths (logs, metrics). Tracks parallel arrays
+ * of texts and back-references plus a cumulative length budget enforced by `tryPush`.
  */
 type RedactionBatch = {
   texts: string[];
@@ -118,10 +87,9 @@ export class OtlpSpanPiiRedactionService {
   }
 
   /**
-   * Native in-process pass over every string attribute, event/link attribute,
-   * status message, and resource attribute of a span. Runs the secrets scrubber
-   * (when enabled) and essential-PII recognizers (when the effective level is
-   * essential). Mutates in place; no external call.
+   * Native in-process pass over every string attribute, event/link attribute, status message,
+   * and resource attribute of a span. Runs the secrets scrubber (when enabled) and
+   * essential-PII recognizers (when the effective level is essential).
    */
   private applyNativeSpanPass(
     span: OtlpSpan,
@@ -159,11 +127,9 @@ export class OtlpSpanPiiRedactionService {
   }
 
   /**
-   * Redacts the span + resource in place. Native secrets + essential PII run
-   * in-process when a policy is resolvable for the tenant; the strict level and
-   * any custom level that selected analysis-service identifiers escalate to the
-   * batch for those. Without a tenant (or with the kill switch set) the
-   * analysis-service batch path runs unchanged.
+   * Redacts the span + resource in place. Native secrets + essential PII run in-process when a
+   * policy is resolvable for the tenant; the strict level and any custom level that selected
+   * analysis-service identifiers escalate to the batch for those.
    */
   async redactSpan(
     span: OtlpSpan,
@@ -186,13 +152,10 @@ export class OtlpSpanPiiRedactionService {
           entities: lambda.entities,
           exceptPatterns: lambda.exceptPatterns,
         });
-        // Mark the span only when strict could not run because the analysis
-        // service is genuinely unavailable (not configured in dev): the native
-        // floor redacted the pattern-based identifiers but names/locations slip
-        // through, so the read path warns instead of implying it is fully
-        // scrubbed. When PII redaction is intentionally turned off by the kill
-        // switch the lambda is skipped on purpose (with langevals configured),
-        // so no warning is shown.
+        // Mark the span only when strict could not run because the analysis service is
+        // genuinely unavailable (not configured in dev): the native floor redacted the
+        // pattern-based identifiers but names/locations slip through, so the read path warns
+        // instead of implying it is fully scrubbed.
         if (!ran && !this.deps.isLangevalsConfigured) {
           this.markPiiAnalysisIncomplete(span);
         }
@@ -230,10 +193,9 @@ export class OtlpSpanPiiRedactionService {
   }
 
   /**
-   * The analysis-service batch path for spans: collects all string values from
-   * span attributes, events, links, status.message, and resource attributes,
-   * then sends them in a single batch to the PII detection service. Used for the
-   * strict level and the legacy (no-policy) fallback. Mutates in place.
+   * The analysis-service batch path for spans: collects all string values from span attributes,
+   * events, links, status.message, and resource attributes, then sends them in a single batch
+   * to the PII detection service.
    */
   private async lambdaRedactSpan(
     span: OtlpSpan,
@@ -289,11 +251,8 @@ export class OtlpSpanPiiRedactionService {
   }
 
   /**
-   * Every string this span offers the analysis service, with the budget
-   * enforced across all of them: attribute sets first, then the status
-   * message, then the resource. Lifted out of `lambdaRedactSpan` so the
-   * collection and the batch call are each readable on their own; the order,
-   * the budget arithmetic and the two flags are the application's.
+   * Every string this span offers the analysis service, with the budget enforced across all of
+   * them: attribute sets first, then the status message, then the resource.
    */
   private collectSpanEntries(
     span: OtlpSpan,
@@ -416,10 +375,8 @@ export class OtlpSpanPiiRedactionService {
   }
 
   /**
-   * `record` may be keyed by an addressing path rather than by the attribute
-   * name (the log and metric pipelines flatten a decoded OTLP tree into one).
-   * `attributeNames` restores the real name for the sensitive-NAME rules, which
-   * a path can never satisfy; without it those rules silently never fire.
+   * `record` may be keyed by an addressing path rather than by the attribute name (the log and
+   * metric pipelines flatten a decoded OTLP tree into one).
    */
   private redactRecordNative({
     record,
@@ -503,10 +460,7 @@ export class OtlpSpanPiiRedactionService {
       attributes: Record<string, string>;
       resourceAttributes: Record<string, string>;
       /**
-       * The real OTLP attribute name behind each key of `attributes`, where the
-       * two differ. Declared here because the native pass reads it: without it
-       * the public signature promises less than the method actually honours,
-       * and a caller building the argument inline could not pass it at all.
+       * The real OTLP attribute name behind each key of `attributes`, where the two differ.
        */
       attributeNames?: Record<string, string>;
     },

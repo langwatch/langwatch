@@ -22,13 +22,9 @@ type GithubConnectionDependencies = {
 };
 
 /**
- * The organization's GitHub connection as a surface reads and changes it.
- *
- * Reading the state is deliberately shallow — a member learns that a
- * connection exists and how wide it reaches, never which repositories it
- * names. Changing it cannot be done from here at all: GitHub only accepts an
- * uninstall from a human on GitHub, so disconnecting produces a deep link and
- * the webhook removes the local row once GitHub confirms.
+ * The organization's GitHub connection as a surface reads and changes it. Reading the state is
+ * deliberately shallow — a member learns that a connection exists and how wide it reaches,
+ * never which repositories it names.
  */
 export class GithubConnectionService {
   static create(dependencies: GithubConnectionDependencies): GithubConnectionService {
@@ -109,14 +105,8 @@ export class GithubConnectionService {
   }
 
   /**
-   * Where an install starts, or null on an instance that cannot start one.
-   * Built here so no client needs to know the App slug, or that the flow
-   * begins with a REST redirect at all.
-   *
-   * Null takes the same reading of "configured" the install route itself
-   * takes, which includes the App slug the deep link is built from. Reading it
-   * any other way hands the customer a button whose only possible outcome is
-   * the route's 503.
+   * Where an install starts, or null on an instance that cannot start one. Built here so no
+   * client needs to know the App slug, or that the flow begins with a REST redirect at all.
    */
   private installUrl(organizationId: string): string | null {
     if (!this.configured) {

@@ -102,10 +102,9 @@ export {
 } from "./services/webhook-health.service";
 
 /**
- * The feature's application: the one object both of its doors call. The
- * process composes it from the endpoint store, the health report, the
- * emitted-events log, the entitlement check, the delivery hop a test fire
- * uses, and the `Idempotency-Key` ledger.
+ * The feature's application: the one object both of its doors call. The process composes it
+ * from the endpoint store, the health report, the emitted-events log, the entitlement check,
+ * the delivery hop a test fire uses, and the `Idempotency-Key` ledger.
  */
 export {
   WebhookApp,
@@ -124,21 +123,15 @@ export {
 } from "./transport/api-trpc/webhook-endpoint.api";
 
 /**
- * The organization-key REST family this feature owns, `/api/webhooks/v1`. The
- * process supplies the bound REST security service, a resolver for the
- * application and its own canonical error mapping; every path, body, header,
- * status code and enum spelling is the feature's published contract.
+ * The organization-key REST family this feature owns, `/api/webhooks/v1`.
  */
 export { createWebhookRestApp } from "./transport/api-rest/webhook.api";
 
-// ---------------------------------------------------------------------------
-// An endpoint's LAST HOP
-//
-// Everything above the destination interface is one machinery no matter where
-// an endpoint delivers — the same coalescing buffer, the same retry ladder, the
-// same delivery log, the same signature over the same bytes. Only the hop
-// differs, and it differs behind `WebhookDestinationPort`.
-// ---------------------------------------------------------------------------
+// --------------------------------------------------------------------------- An endpoint's
+// LAST HOP Everything above the destination interface is one machinery no matter where an
+// endpoint delivers — the same coalescing buffer, the same retry ladder, the same delivery log,
+// the same signature over the same bytes. Only the hop differs, and it differs behind
+// `WebhookDestinationPort`.
 export {
   WebhookDestinationPort,
   type WebhookDispatchRequest,

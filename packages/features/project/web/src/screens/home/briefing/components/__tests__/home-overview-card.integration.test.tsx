@@ -1,11 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * `HomeOverviewCard` keeps cached figures on screen through a background
- * refetch (`keepPreviousData` upstream): `refreshing` adds a subtle breathing
- * dot beside the title, and the skeleton grid only ever renders when there is
- * NO data yet (`cells.length === 0 && isLoading`) — never as a swap over live
- * cells. See specs/home/langy-briefing-receipts.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render, screen } from "@testing-library/react";

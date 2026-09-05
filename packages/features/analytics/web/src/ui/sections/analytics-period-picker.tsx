@@ -1,19 +1,7 @@
 /**
- * The control that picks the range every chart on the page is drawn over.
- *
- * The RENDERING half of `platform/app/src/components/PeriodSelector.tsx`; the
- * reading half is pure in `model/analytics-period.ts` and bound in
- * `behavior/use-analytics-period.ts`. Splitting them is what makes "which
- * window does the address mean" a unit test rather than something only a
- * mounted router can answer — and it is what keeps a relative window from being
- * recomputed on every render, which is a refetch loop rather than a slow page.
- *
- * NOT NARROWED, unlike the audit log's copy of the same control: analytics is
- * where the absolute start and end inputs are actually used, so both halves of
- * the popover travel. `clearPeriod` ("All time") is still optional, and no
- * analytics page passes it — every chart here is a window by construction.
- *
- * The platform module stays: twenty-odd non-analytics modules render it.
+ * The control that picks the range every chart on the page is drawn over. The RENDERING half of
+ * `platform/app/src/components/PeriodSelector.tsx`; the reading half is pure in
+ * `model/analytics-period.ts` and bound in `behavior/use-analytics-period.ts`.
  */
 
 import type { ButtonProps, PopoverRootProps } from "@chakra-ui/react";

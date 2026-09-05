@@ -19,14 +19,6 @@ import {
 
 /**
  * Per-project topic clustering run status (ADR-051 §1/§7): the public read
- * model behind the settings page. One row per project; the process manager's
- * private state is deliberately NOT readable by the UI — decisions read
- * process state, screens read this projection.
- *
- * State = stored data: one type, not two. A logical run spans pages (one
- * run_completed event per page, sharing runId); in-progress pages accumulate
- * in the InProgress* fields and roll into the Last* fields when the final
- * page (no nextSearchAfter) or a failure lands.
  */
 export interface TopicClusteringRunStatusData {
   ProjectId: string;
@@ -49,11 +41,8 @@ export interface TopicClusteringRunStatusData {
   InProgressTraces: number;
   InProgressPages: number;
   /**
-   * Business time the in-progress run opened (its first event), carried
-   * unchanged across the run's pages — the projection-side mirror of the
-   * process's `startedAtMs`, so the read model can stop reporting a run whose
-   * terminal outcome write was lost on the SAME clock the scheduler uses to
-   * abandon it.
+   * Business time the in-progress run opened, carried unchanged across the run's pages — the
+   * projection-side mirror of the process's `startedAtMs`.
    */
   InProgressStartedAt: number | null;
   CreatedAt: number;

@@ -1,9 +1,5 @@
 /**
  * The handled errors of connected agents (ADR-128, "Contract").
- *
- * Every message is written so a customer could read it: the REST boundary
- * ships it in the response body. The words the app shows live in the client
- * presentation registry, keyed by `code`.
  */
 
 import { HandledError, remediation } from "@langwatch/handled-error";

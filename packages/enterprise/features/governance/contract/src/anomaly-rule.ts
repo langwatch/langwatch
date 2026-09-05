@@ -116,11 +116,9 @@ export function safeParseDestinationConfig(
 }
 
 /**
- * What a reader sees in place of a stored shared secret.
- *
- * The secret signs outbound SIEM alerts, so it never leaves the server; sent
- * back on an update it means "keep the one already stored", which is what lets
- * the editor round-trip a rule it was never shown the secret of.
+ * What a reader sees in place of a stored shared secret. The secret signs outbound SIEM alerts,
+ * so it never leaves the server; sent back on an update it means "keep the one already stored",
+ * which is what lets the editor round-trip a rule it was never shown the secret of.
  */
 export const SHARED_SECRET_REDACTED = "[redacted]";
 
@@ -145,12 +143,8 @@ function redactSharedSecrets(value: unknown, depth = 0): unknown {
 }
 
 /**
- * The incoming config with each marker put back to the secret already stored
- * for that destination, matched on its type and url.
- *
- * A marker naming a destination we hold no secret for is refused rather than
- * stored: the alternative is signing a customer's alerts with the literal
- * marker string.
+ * The incoming config with each marker put back to the secret already stored for that
+ * destination, matched on its type and url.
  */
 export function restoreKeptSharedSecrets({
   incoming,

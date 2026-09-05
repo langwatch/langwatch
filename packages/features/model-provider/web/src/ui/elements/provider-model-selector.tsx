@@ -42,10 +42,9 @@ function filterGroupModels(group: GroupedModelOptions[number], search: string): 
 }
 
 /**
- * Model selector across providers, grouped by provider icon (from each
- * model's prefix). `inheritOption`, when set, prepends an "Inherit" entry
- * that emits `INHERIT_SENTINEL` on pick, and renders as a faint placeholder
- * when `model` is empty.
+ * Model selector across providers, grouped by provider icon (from each model's prefix).
+ * `inheritOption`, when set, prepends an "Inherit" entry that emits `INHERIT_SENTINEL` on pick,
+ * and renders as a faint placeholder when `model` is empty.
  */
 export const ProviderModelSelector = React.memo(function ProviderModelSelector({
   model,

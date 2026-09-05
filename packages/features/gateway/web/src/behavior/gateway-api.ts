@@ -1,41 +1,6 @@
 /**
  * The procedures this package calls, and the hooks that call them.
- *
- * HAND-WRITTEN FOR NOW, MEANT TO BE GENERATED, exactly as `governance-api.ts`
- * says of its own map: the procedures live in `@langwatch/gateway-server`,
- * `@langwatch/enterprise-governance-server` and `@langwatch/enterprise-webhook-server`,
- * none of which a web package may import even for a type, and the router type
- * does not exist until a process instantiates it. Emitting this file from the
- * mounted router is the fix; writing it by hand is the interim, and it is honest
- * only because the payload types below are the contract's wherever the contract
- * has them.
- *
- * THE SEGMENT NAMES ARE LOAD-BEARING. `virtualKeys`, `gatewayBudgets` and the
- * rest are mount points on the root router, and tRPC hashes that path into the
- * React Query cache key; spell one differently and these hooks quietly stop
- * sharing a cache with the `api.virtualKeys.*` call sites that have not moved.
- *
  * THIS MODULE IS THE ONE GOVERNED-CLOSURE EXCEPTION IN THE PACKAGE. ADR-004
- * seals a screen's closure off from `@langwatch/platform-api-client`, and the
- * import below is the only one in the package. It buys a content-faithful move:
- * every `api.x.y.useQuery(...)` call site in the ten screens is the line it was
- * in `platform/app`. Replacing it means a port per procedure and a rewrite of
- * six thousand lines, which is a different change from a move. Recorded here so
- * the finding it raises is a decision rather than a surprise.
- *
- * DATE, STRING OR NUMBER IS NOT A CHOICE THIS FILE MAKES. The gateway routers
- * disagree with each other about how a timestamp reaches the browser, and the
- * disagreement is what the screens already render against: `virtualKeys`,
- * `gatewayBudgets` and `gatewayCacheRules` project through a DTO that calls
- * `.toISOString()`, so those fields are STRINGS; `gatewayGuardrails`,
- * `gatewaySpendEvents` and `webhookEndpoints` return the stored resource, so
- * theirs are DATES over superjson; `routingPolicy` returns epoch NUMBERS
- * (`createdAtMs`). Every entry below states which, because getting it wrong
- * typechecks in this file and fails at the call site.
- *
- * ADD A PROCEDURE when a hook in this package needs one. Do not add one
- * speculatively: every entry is a promise that the router still mounts it under
- * that name, and nothing checks that promise until the generator exists.
  */
 
 import { createFeatureApi } from "@langwatch/platform-api-client";
@@ -62,14 +27,6 @@ export type GatewayScopeAssignment = VirtualKeyApiScopeAssignment;
 
 /**
  * A VirtualKey as the wire carries it, which is not the row the server holds.
- *
- * `toCamelDto` drops the hashed secret, stringifies the `BigInt` revision and
- * calls `.toISOString()` on every instant, and adds two fields the column set
- * has no equivalent for: `traceProjectArchived`, true when the destination the
- * key points at is no longer live, and the `principalUser` display pair.
- *
- * DELIBERATELY NOT NAMED `VirtualKey`. The stored row is a different shape and
- * a consumer holding both would have two meanings for one word.
  */
 export type VirtualKeyView = {
   id: string;
@@ -102,10 +59,9 @@ export type VirtualKeyView = {
 export type VirtualKeyMinted = { virtualKey: VirtualKeyView; secret: string };
 
 /**
- * The budget a key carries on itself, as the create and edit drawers send it.
- *
- * Not the contract's `GatewayBudgetResource`: this is the nested input the
- * virtual-key writes accept, which the service turns into a budget row.
+ * The budget a key carries on itself, as the create and edit drawers send it. Not the
+ * contract's `GatewayBudgetResource`: this is the nested input the virtual-key writes accept,
+ * which the service turns into a budget row.
  */
 export type VirtualKeyBudgetInput = {
   /** A decimal string, greater than zero. */
@@ -116,11 +72,9 @@ export type VirtualKeyBudgetInput = {
 };
 
 /**
- * The writable half of a key's config.
- *
- * Every field of `virtualKeyConfigSchema` carries a default, so the parsed
- * output has them all and the INPUT has none of them — which is why this is
- * spelled out rather than being `Partial<VirtualKeyConfig>`.
+ * The writable half of a key's config. Every field of `virtualKeyConfigSchema` carries a
+ * default, so the parsed output has them all and the INPUT has none of them — which is why this
+ * is spelled out rather than being `Partial<VirtualKeyConfig>`.
  */
 export type VirtualKeyConfigInput = {
   modelsAllowed?: string[] | null;
@@ -141,11 +95,6 @@ export type VirtualKeyConfigView = VirtualKeyConfig;
 
 /**
  * A GatewayBudget as the wire carries it.
- *
- * `toDto` recomputes `currentPeriodStartedAt` and `resetsAt` for the window the
- * reader is in — a stored period that has rolled is not what the page should
- * print — stringifies the two `Decimal` money columns, and drops `updatedAt`,
- * `createdById`, `managedByVirtualKeyId`, `externalId` and `metadata`.
  */
 export type GatewayBudgetView = {
   id: string;
@@ -215,10 +164,8 @@ export type GatewayBudgetScopeInput =
   | { kind: "GROUP"; groupId: string };
 
 /**
- * A cache rule as the wire carries it.
- *
- * `mode` is renamed `modeEnum` by the DTO — the stored column and the `action`
- * both carry a mode, and the two are spelled differently on purpose.
+ * A cache rule as the wire carries it. `mode` is renamed `modeEnum` by the DTO — the stored
+ * column and the `action` both carry a mode, and the two are spelled differently on purpose.
  */
 export type GatewayCacheRuleView = {
   id: string;
@@ -283,10 +230,8 @@ export type GatewaySpendEventFilters = {
 };
 
 /**
- * A page of spend events.
- *
- * `clickHouseDisabled` rather than a thrown error: a deployment with no spend
- * source has no events rather than a broken page, and the page says so.
+ * A page of spend events. `clickHouseDisabled` rather than a thrown error: a deployment with no
+ * spend source has no events rather than a broken page, and the page says so.
  */
 export type GatewaySpendEventPage = {
   rows: GatewaySpendEventRow[];
@@ -353,11 +298,9 @@ export type RoutingPolicyView = {
 };
 
 /**
- * A configured SQS destination as the endpoint list renders it.
- *
- * `region`, `accountId` and `queueName` are parsed out of the queue URL by the
- * server, because every Amazon SQS URL opens with the same host and the table
- * would otherwise print an identical string on every row.
+ * A configured SQS destination as the endpoint list renders it. `region`, `accountId` and
+ * `queueName` are parsed out of the queue URL by the server, because every Amazon SQS URL opens
+ * with the same host and the table would otherwise print an identical string on every row.
  */
 export type WebhookDestinationView = {
   queueUrl: string;
@@ -406,13 +349,9 @@ export type WebhookEndpointHealth = {
 };
 
 /**
- * One event a webhook endpoint can subscribe to.
- *
- * Restated rather than imported: the catalogue is
- * `@langwatch/enterprise-webhook-contract`'s, and this is a core package — a
- * core-to-enterprise dependency is exactly the direction the manifest check
- * refuses. The shape is five fields, the router returns it verbatim, and the
- * drawer only reads it.
+ * One event a webhook endpoint can subscribe to. Restated rather than imported: the catalogue
+ * is `@langwatch/enterprise-webhook-contract`'s, and this is a core package — a
+ * core-to-enterprise dependency is exactly the direction the manifest check refuses.
  */
 export type WebhookEventType = {
   type: string;
@@ -448,11 +387,9 @@ export type WebhookSqsInput = {
 };
 
 /**
- * A model provider as the organization-wide list renders it.
- *
- * NOT the contract's `LegacyModelProvider`: the router maps through its own
- * projection, which is narrower and spells `customModels` differently. The
- * shape below is that projection.
+ * A model provider as the organization-wide list renders it. NOT the contract's
+ * `LegacyModelProvider`: the router maps through its own projection, which is narrower and
+ * spells `customModels` differently. The shape below is that projection.
  */
 export type OrganizationModelProviderView = {
   id: string;
@@ -472,12 +409,9 @@ export type OrganizationModelProviderView = {
 };
 
 /**
- * A monitor, narrowed to the five fields the guardrails page reads.
- *
- * The procedure returns `MonitorWithEvaluator` from `@langwatch/monitor-contract`,
- * a much wider row with its own evaluator relation. Declaring the narrow shape
- * is safe — a query output is only ever read — and it keeps this package from
- * taking a dependency on a foreign feature's contract for five fields.
+ * A monitor, narrowed to the five fields the guardrails page reads. The procedure returns
+ * `MonitorWithEvaluator` from `@langwatch/monitor-contract`, a much wider row with its own
+ * evaluator relation.
  */
 export type GuardrailEligibleMonitor = {
   id: string;
@@ -489,11 +423,9 @@ export type GuardrailEligibleMonitor = {
 };
 
 /**
- * An organization member, narrowed to what the budget drawer names them by.
- *
- * The procedure returns the whole `User` scalar row, PII included. Narrowing
- * here is not cosmetic: it is what stops a later edit reaching for a column
- * this package has no business rendering.
+ * An organization member, narrowed to what the budget drawer names them by. The procedure
+ * returns the whole `User` scalar row, PII included. Narrowing here is not cosmetic: it is what
+ * stops a later edit reaching for a column this package has no business rendering.
  */
 export type OrganizationMemberView = {
   id: string;
@@ -502,11 +434,9 @@ export type OrganizationMemberView = {
 };
 
 /**
- * One organization as the section reads it: its own row plus its teams.
- *
- * The same shape the host port publishes, restated here because a behavior
- * module may not import a screen's public boundary and the port lives in
- * `model`. Kept in step by the adapter that maps one onto the other.
+ * One organization as the section reads it: its own row plus its teams. The same shape the host
+ * port publishes, restated here because a behavior module may not import a screen's public
+ * boundary and the port lives in `model`.
  */
 export type GatewayOrganizationGraph = {
   id: string;
@@ -993,11 +923,6 @@ export type GatewayApiMap = {
     };
     /**
      * The organization graph the section's scope is resolved out of.
-     *
-     * Read by the frontend feature that mounts these screens rather than by a
-     * screen, and declared here so it lands on the same cache entry as the
-     * application shell's own read of it: the graph is fetched once per
-     * document however many halves of the product want it.
      */
     getAll: {
       query: {
@@ -1035,24 +960,16 @@ export type GatewayApiMap = {
 };
 
 /**
- * The gateway's typed tRPC hooks. Same machinery, same transport and same React
- * Query cache as the application's `api` proxy — see `createFeatureApi` for why
- * separate instances still share cache entries.
- *
- * INTERNAL to this package by convention: hooks here call it, and other
- * packages call the hooks. It is exported from `screens/gateway` only so the
- * process shell can mount `gatewayApi.Provider`.
+ * The gateway's typed tRPC hooks. Same machinery, same transport and same React Query cache as
+ * the application's `api` proxy — see `createFeatureApi` for why separate instances still share
+ * cache entries.
  */
 export const gatewayApi = createFeatureApi<GatewayApiMap>();
 
 /**
- * Every procedure's output, addressed the way the screens already address it.
- *
- * The application's `~/utils/api` exported `RouterOutputs` off the real
- * `AppRouter`, and the screens wrote `RouterOutputs["webhookEndpoints"]["list"][number]`.
- * Deriving the same shape from the map above keeps those type aliases exactly
- * as they were written, and keeps them honest: an output that changes here
- * changes at every alias, which is what a generated map will do too.
+ * Every procedure's output, addressed the way the screens already address it. The application's
+ * `~/utils/api` exported `RouterOutputs` off the real `AppRouter`, and the screens wrote
+ * `RouterOutputs["webhookEndpoints"]["list"][number]`.
  */
 type GatewayOutputOf<TNode> = TNode extends { query: { output: infer TOutput } }
   ? TOutput
@@ -1065,9 +982,7 @@ export type RouterOutputs = {
 };
 
 /**
- * The name the screens call it by.
- *
- * They were written against the application's `api` proxy and are moved
- * unchanged; the import line is what tells them which one they have.
+ * The name the screens call it by. They were written against the application's `api` proxy and
+ * are moved unchanged; the import line is what tells them which one they have.
  */
 export const api = gatewayApi;

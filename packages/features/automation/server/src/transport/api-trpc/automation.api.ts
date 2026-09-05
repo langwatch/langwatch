@@ -1,20 +1,6 @@
 /**
- * The automation authoring and activity surface over the process's tRPC
- * transport.
- *
- * Transport only: gates, input parsing, the shape rules an author's draft has
- * to satisfy, and delegation to the canonical `AutomationService`. Everything
- * that needs a secret, a Redis round trip or the trace query compiler arrives
- * as a port, because none of those are automation's to own.
- *
- * Two rules on this surface are load-bearing and easy to lose in a move:
- *
- *   - Secrets never travel outwards. `redactTriggerForRead` runs the provider
- *     registry's redact hook over every row that leaves — the encrypted Slack
  *     bot token (ADR-041) and webhook header values (ADR-040 §3).
  *   - A test fire is not an open relay (ADR-031). The email recipient is the
- *     authenticated session user, resolved here and never taken from the wire.
- *
  * Spec: ADR-026, ADR-031, ADR-040, ADR-041, ADR-043, ADR-044.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
@@ -86,16 +72,7 @@ const TRIGGER_KSUID_RESOURCE = "trigger";
 
 /**
  * The process supplies authentication; authorization arrives as `policy`.
- *
- * `app` is the slice of the process's application this feature reaches, not
- * the feature's application itself, because a tRPC root is shared by every
- * feature mounted on it and so carries all of them. The REST family, which is
- * built per family, holds {@link AutomationApp} directly. Both reach the same
- * object; only the path to it differs.
- *
- * `session` rather than `actor()` alone: the test fire resolves its recipient
  * from the caller's own email address, which is the whole of ADR-031's
- * open-relay fix.
  */
 export type AutomationTrpcContext = Readonly<{
   app: Readonly<{ automation: AutomationApp }>;
@@ -111,13 +88,8 @@ type AutomationTrpcProcedures<
   /** The process's authenticated procedure. */
   protected: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
   /**
-   * The process's tracing, logging, error, scope-lineage, authorization and
-   * audit policy for one declared permission.
-   *
-   * Applied by this feature AFTER its own input parser rather than composed
-   * ahead of it, because the authorization check reads its scope id from the
-   * validated input: tRPC runs middlewares in the order they were added, so a
-   * check installed before `.input()` would see no input at all.
+   * The process's tracing, logging, error, scope-lineage, authorization and audit policy for
+   * one declared permission.
    */
   policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
 }>;
@@ -141,10 +113,6 @@ type ActionParamsSchema = Readonly<{
 
 /**
  * The process capabilities this transport needs that automation does not own.
- *
- * Every provider entry reaches the process's secret handling: the encryption
- * key is the deployment's, not the feature's, so encrypting, redacting and
- * resolving a kept sentinel all stay on the process side of the seam.
  */
 export type AutomationTrpcPorts = Readonly<{
   /**
@@ -194,30 +162,8 @@ export type AutomationTrpcPorts = Readonly<{
 }>;
 
 /**
- * Re-raises a thrown value on the typed channel, and never returns.
- *
- * A `HandledError` is already on that channel and leaves untouched: the
- * process's tRPC policy maps its status to a code and its `serialize()` to
- * `data.error`, which is the whole reason this transport no longer builds a
- * `TRPCError` itself.
- *
- * A provider rejection (Slack `not_in_channel`, a dead webhook, a bad token)
- * arrives as a `DispatchError` with an already-actionable message, so it is
- * lifted onto the typed channel here rather than reaching the customer as a
- * generic 500.
- *
- * Anything else is re-raised exactly as it arrived. That is deliberate: an
- * unanticipated failure degrades to "unknown" plus a trace id at the boundary
- * (ADR-045), and dressing it up as handled would promise the caller an action
- * they do not have.
- */
-/**
- * The action a graph alert or a report may carry, or a refusal.
- *
- * Both kinds deliver a notification and have nowhere to put a row, which is
- * what their builders' input types have always said. The door did not enforce
- * it: a graph alert asking to add to a dataset was stored with that action and
- * then never delivered, because the dispatcher has no such path for it.
+ * Re-raises a thrown value on the typed channel, and never returns. Anything unhandled
+ * degrades to "unknown" plus a trace id at the boundary (ADR-045).
  */
 function notifyingActionOr(
   action: BuildGraphAlertTriggerDataInput["action"] | "ADD_TO_DATASET" | "ADD_TO_ANNOTATION_QUEUE",
@@ -240,10 +186,8 @@ function raiseAsHandled(err: unknown): never {
 }
 
 /**
- * The monitor ids a filter set names.
- *
- * A filter object nests, and the ids sit on the keys rather than the values,
- * so the whole structure is walked. Arrays are left alone: their entries are
+ * The monitor ids a filter set names. A filter object nests, and the ids sit on the keys rather
+ * than the values, so the whole structure is walked. Arrays are left alone: their entries are
  * selected values, never further filter fields.
  */
 function extractCheckKeys(inputObject: Record<string, unknown>): string[] {
@@ -268,10 +212,8 @@ function extractCheckKeys(inputObject: Record<string, unknown>): string[] {
 const KNOWN_FILTER_FIELDS = new Set<string>(automationFilterFieldSchema.options);
 
 /**
- * Splits an author's filter set into the fields this platform still supports
- * and the ones it no longer does.
- *
- * The unknown names are kept rather than dropped silently: an automation whose
+ * Splits an author's filter set into the fields this platform still supports and the ones it no
+ * longer does. The unknown names are kept rather than dropped silently: an automation whose
  * every condition is legacy would otherwise save as "matches everything".
  */
 function partitionFilterFields(filters: Record<string, unknown>): {
@@ -314,25 +256,19 @@ function resolveCadenceForUpdate(
   requested: NotificationCadence | undefined,
   isGraphAlert = false,
 ): NotificationCadence | undefined {
-  // Persist actions always pin to `immediate`. Returning `undefined`
-  // here when the client omits the field would skip the column update
-  // and leak a stale notify-class cadence onto a row that's been
-  // edited from notify → persist (since the digest cadence stays on
-  // the row but the dispatch path no longer reads it). Force the
-  // boundary invariant on every update.
+  // Persist actions always pin to `immediate`. Returning `undefined` here when the client omits
+  // the field would skip the column update and leak a stale notify-class cadence onto a row
+  // that's been edited from notify → persist (since the digest cadence stays on the row but the
+  // dispatch path no longer reads it). Force the boundary invariant on every update.
   if (!NOTIFY_TRIGGER_ACTIONS.has(action)) return "immediate";
   if (isGraphAlert) return "immediate";
   return requested;
 }
 
 /**
- * Validates recipient addresses by RFC shape only — external addresses are
- * intentionally allowed (Slack's "email to a channel" pattern, partner
- * inboxes, …). The UI surfaces an "External" warning badge for non-team
- * addresses so operators know what they're shipping.
- *
- * A future per-project "strict mode" flag may re-enable team-membership
- * enforcement.
+ * Validates recipient addresses by RFC shape only — external addresses are intentionally
+ * allowed (Slack's "email to a channel" pattern, partner inboxes, …). The UI surfaces an
+ * "External" warning badge for non-team addresses so operators know what they're shipping.
  */
 function validateEmailRecipientFormats(recipients: string[]): void {
   for (const email of recipients) {
@@ -451,10 +387,9 @@ export class AutomationTrpcApi {
       ),
 
       /**
-       * Removal is one operation on the application: the soft delete, the
-       * retirement of any scheduled-report entry, and the dispatch-cache
-       * invalidation. Doing it in three calls here left the REST family free to
-       * do two of the three, which is exactly what it did.
+       * Removal is one operation on the application: the soft delete, the retirement of any
+       * scheduled-report entry, and the dispatch-cache invalidation. Doing it in three calls
+       * here left the REST family free to do two of the three, which is exactly what it did.
        */
       deleteById: policy("triggers:delete")(
         procedure.input(automationApiTriggerScopeSchema),
@@ -535,17 +470,9 @@ export class AutomationTrpcApi {
       ),
 
       /**
-       * Today's confirmed-match count and skipped count per automation, so the
-       * list can say "N matches skipped today" instead of leaving the customer to
-       * wonder why an automation they can see running produced nothing. A Redis
-       * outage degrades to showing no skips rather than failing the page.
-       *
-       * The automations it covers are read here rather than taken from the caller.
-       * The page renders every automation in the project, so a caller-supplied list
-       * either has to be unbounded, which puts the read's size in the caller's
-       * hands, or capped, which silently drops the badge from every automation past
-       * the cap. Reading the ids here bounds the work by what the project actually
-       * owns, which is the same set the page is already rendering.
+       * Today's confirmed-match count and skipped count per automation, so the list can say "N
+       * matches skipped today" instead of leaving the customer to wonder why an automation they
+       * can see running produced nothing.
        */
       getDailyCapStatus: policy("triggers:view")(
         procedure.input(automationApiProjectScopeSchema),
@@ -680,14 +607,6 @@ export class AutomationTrpcApi {
       /**
        * List the Slack channels a bot token can see, to populate the channel
        * picker (ADR-041). Uses the freshly-typed token, or the saved automation's
-       * stored token (decrypted server-side, never returned). A missing
-       * `channels:read` scope comes back as `{ error: "missing_scope" }` so the UI
-       * degrades to manual entry instead of failing. A listing that succeeded but
-       * does not cover the whole workspace carries `gaps` saying why, so the picker
-       * can tell the author rather than presenting a short list as complete.
-       *
-       * triggers:update (not :view): this endpoint decrypts and exercises the
-       * stored Slack bot token — the same capability testFireTemplate gates on.
        */
       listSlackChannels: policy("triggers:update")(
         procedure.input(automationApiListSlackChannelsInputSchema),
@@ -737,13 +656,6 @@ export class AutomationTrpcApi {
         procedure.input(automationApiTestFireInputSchema),
       ).mutation(async ({ ctx, input }) => {
         // ADR-031: test fire is no longer an open relay. The client-supplied
-        // recipient list is gone from the input entirely — there is nothing to
-        // trust or validate. The email recipient is resolved server-side as the
-        // authenticated session user. A light per-user rate limit guards the
-        // mail provider against a stuck client loop (hygiene, not anti-abuse:
-        // the recipient is always the requester). Slack (webhook) is unchanged
-        // and intentionally exempt from the rate limit — it fires to the
-        // customer's own webhook, not our mail provider.
         try {
           // The webhook channel ships dark (ADR-040 §7): the type picker is
           // flag-gated client-side, and the server refuses the channel too so
@@ -808,13 +720,6 @@ export class AutomationTrpcApi {
           }
 
           // ADR-040 §3: header secrets never reach the client, so a saved
-          // automation's test fire carries the kept sentinel — resolve it
-          // against the stored ciphertext, exactly like the Slack bot token
-          // above. Unresolvable kept values (fresh draft, renamed header) are
-          // dropped rather than sent as the literal sentinel.
-          // Widened past the input schema on purpose: signingSecrets is
-          // resolved server-side from the saved trigger and is deliberately not
-          // accepted from the browser.
           let webhookDestination: TestFireWebhookDestination | null | undefined =
             input.webhookDestination;
           if (
@@ -922,12 +827,11 @@ export class AutomationTrpcApi {
             ) {
               throw new ReportChannelUnsupportedError();
             }
-            // Per-action shape validation: the provider registry's per-action
-            // Zod schema is the authoritative shape for actionParams. The
-            // contract's `automationApiActionParamsSchema` accepts the union for
-            // the wire format; this pass narrows by action, so a SEND_EMAIL
-            // upsert can't accidentally save a dataset config (and
-            // ADD_TO_DATASET can't persist an empty datasetId, etc.).
+            // Per-action shape validation: the provider registry's per-action Zod schema is the
+            // authoritative shape for actionParams. The contract's
+            // `automationApiActionParamsSchema` accepts the union for the wire format; this
+            // pass narrows by action, so a SEND_EMAIL upsert can't accidentally save a dataset
+            // config (and ADD_TO_DATASET can't persist an empty datasetId, etc.).
             const perAction = ports.providers.actionParamsSchemaFor(input.action);
             const perActionParsed = perAction.safeParse(input.actionParams);
             if (!perActionParsed.success) {
@@ -996,13 +900,7 @@ export class AutomationTrpcApi {
           }
 
           // ADR-041 Slack bot delivery: encrypt a freshly-entered bot token (or
-          // keep the stored ciphertext when the field was left blank on edit), and
-          // reject a bot connection saved with no token at all. The token is never
-          // returned to the client, so honouring "kept" means reading the saved row.
           // Provider persist hooks (ADR-041 / ADR-040 §3): encrypt secrets,
-          // resolve kept sentinels against the saved row (loaded lazily only
-          // when a provider needs it), and reject invalid payloads (missing bot
-          // token, kept headers after a URL change) as typed HandledErrors.
           const storedActionParams = await ports.providers.persistActionParamsFor(input.action, {
             incoming: parsedActionParams,
             loadExisting: async () =>
@@ -1016,15 +914,11 @@ export class AutomationTrpcApi {
                 : undefined,
           });
 
-          // Annotation-queue dispatch attributes created queue items to a user
-          // and skips the action when `createdByUserId` is absent. The drawer's
-          // provider slice doesn't carry it, so stamp the caller here — same as
-          // the legacy create mutation — or an edit would silently strip it and
-          // disable dispatch for the trigger.
-          // Force createdByUserId to the session user — never trust the client
-          // (builder5015-002). The schema deliberately declares the field so it
-          // survives to dispatch; this unconditional stamp is the entire
-          // anti-spoof guarantee.
+          // Annotation-queue dispatch attributes created queue items to a user and skips the
+          // action when `createdByUserId` is absent. The drawer's provider slice doesn't carry
+          // it, so stamp the caller here — same as the legacy create mutation — or an edit
+          // would silently strip it and disable dispatch for the trigger. Force createdByUserId
+          // to the session user — never trust the client (builder5015-002).
           const actionParams: Record<string, unknown> =
             input.action === TriggerAction.ADD_TO_ANNOTATION_QUEUE
               ? {
@@ -1033,12 +927,11 @@ export class AutomationTrpcApi {
                 }
               : { ...(storedActionParams as Record<string, unknown>) };
 
-          // Graph alerts: route the row shape through the SSOT builder so it's
-          // byte-identical to what `graphs.updateById` writes on the dashboard
-          // path (N1 — the sweep fixed graphs.ts but automations.ts was still
-          // hand-rolling the row). The dispatcher only knows one shape; drift
-          // between the two writers silently breaks dispatch for whichever
-          // format loses.
+          // Graph alerts: route the row shape through the SSOT builder so it's byte-identical
+          // to what `graphs.updateById` writes on the dashboard path (N1 — the sweep fixed
+          // graphs.ts but automations.ts was still hand-rolling the row). The dispatcher only
+          // knows one shape; drift between the two writers silently breaks dispatch for
+          // whichever format loses.
           let data: Omit<
             CreateTriggerCommand,
             "id" | "projectId" | "lastRunAt" | "notificationCadence" | "traceDebounceMs"
@@ -1142,13 +1035,11 @@ export class AutomationTrpcApi {
                 : {}),
             });
           } else {
-            // A graph alert owns its custom-graph's unique `customGraphId` slot.
-            // `deleteById` soft-deletes (keeps the row and its @unique
-            // customGraphId occupied), so a fresh `create` for a graph that ever
-            // had an alert would violate the unique index — an unhandled P2002 →
-            // 500, with no UI path to recover since the soft-deleted row is hidden.
-            // Reactivate the existing row instead, matching the legacy
-            // graphs.updateById upsert-by-customGraphId behaviour.
+            // A graph alert owns its custom-graph's unique `customGraphId` slot. `deleteById`
+            // soft-deletes (keeps the row and its @unique customGraphId occupied), so a fresh
+            // `create` for a graph that ever had an alert would violate the unique index — an
+            // unhandled P2002 → 500, with no UI path to recover since the soft-deleted row is
+            // hidden.
             const existingForGraph =
               isGraphAlert && input.customGraphId
                 ? await ctx.app.automation.tryGetByCustomGraphId({

@@ -150,12 +150,6 @@ export const GRAPH_TRIGGER_MAX_RESULT_ROWS = 10_000;
 /** Pure graph-evaluation helpers shared by the focused evaluator services. */
 /**
  * What the graph-trigger collaborators share.
- *
- * Everything else this class held moved to the one service that called it —
- * the series name and the too-large classification to series evaluation, the
- * fire digest and the no-data detail to alert delivery, and the incident
- * resolve was a pass-through its caller could make itself. This is the only
- * member with more than one caller.
  */
 export class TriggerEvaluatorService {
   private constructor() {}

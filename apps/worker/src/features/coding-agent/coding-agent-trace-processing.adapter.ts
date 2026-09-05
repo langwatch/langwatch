@@ -12,26 +12,9 @@ import {
 } from "@langwatch/trace-server";
 
 /**
- * The two things the coding-agent span-facts dispatcher asks Trace for, in one
- * object because the port declares them in one.
- *
- * THE READ IS WHY THIS FILE EXISTS. `normalizeSpan` was always composable from
- * packages — it is a rename over `SpanNormalizationPipelineService`, which the
- * canonicalisation service alone builds. `tryGetNormalizedSpan` was not: the
- * only implementation was one query inside the application's 1,970-line
- * `SpanStorageClickHouseRepository`, whose class additionally carries the
- * blob-offload resolver, the visibility gate and every UI read, so asking for
- * it meant asking for the application. It is now
- * `ClickHouseTraceStoredSpanReaderAdapter`, and this composes the two halves.
- *
+ * The two things the coding-agent span-facts dispatcher asks Trace for, in one object because
+ * the port declares them in one. THE READ IS WHY THIS FILE EXISTS.
  * WHAT THE READ IS FOR, because it decides how it must behave. ADR-069 made the
- * dispatcher carry LIFTED FACTS on the job rather than a store read, so the
- * normal path never asks. This answers the REDELIVERY path: a `span_referenced`
- * payload staged by an earlier release, or a full `span_received` the
- * dispatcher must resolve before it can contribute. It runs on the queue's
- * backoff, so a read that widened to an unbounded scan on a miss would re-scan
- * every weekly partition — cold S3 tier included — once per retry. The packaged
- * reader answers a miss as a miss for exactly that reason.
  */
 export class WorkerCodingAgentTraceProcessingAdapter extends CodingAgentTraceProcessingPort {
   private constructor(

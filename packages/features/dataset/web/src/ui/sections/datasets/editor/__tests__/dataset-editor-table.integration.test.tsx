@@ -1,10 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * Integration tests for the standalone DatasetEditorTable: the shared
- * TanStack dataset editor used by the /datasets pages, the workflow dataset
- * node, and prompt demonstrations. Renders the full component tree (table,
- * cells, portal editor); only the tRPC transport is mocked.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -533,13 +528,11 @@ describe("given a saved dataset larger than one page", () => {
   describe("when the next page is still loading", () => {
     /** @scenario Move between pages */
     it("stays on the requested page instead of bouncing back to page 1", async () => {
-      // react-query holds the previous page's result while the next page's key
-      // loads (keepPreviousData), flagging it `isPlaceholderData: true`. Simulate
-      // that faithfully: page 2 is not yet "ready", so the hook returns page 1's
-      // data marked as held — the page count must NOT momentarily reset and snap
-      // navigation back to page 1, and the held data must not re-hydrate the
-      // store (the guard skips it). Stable refs per (page, held) so the
-      // store-load effect can't loop.
+      // react-query holds the previous page's result while the next page's key loads
+      // (keepPreviousData), flagging it `isPlaceholderData: true`. Simulate that faithfully:
+      // page 2 is not yet "ready", so the hook returns page 1's data marked as held — the page
+      // count must NOT momentarily reset and snap navigation back to page 1, and the held data
+      // must not re-hydrate the store (the guard skips it).
       const ready = new Set([1]);
       const fresh = new Map<number, unknown>();
       const held = new Map<number, unknown>();
@@ -786,12 +779,11 @@ describe("given rows are deleted from a paginated dataset", () => {
     // Regression: count refresh must fire on batch settle via the error path
     // too — not a feature scenario.
     it("still refreshes the total — a committed delete must not be masked by an update error", async () => {
-      // Force the bug-triggering interleave: both ops are dispatched, the delete
-      // commits, and the update fails LAST — so the batch only reaches zero
-      // pending ops via the error path. The count refresh must fire from there
-      // too, or a committed delete leaves the pager count stale. (Settling the
-      // delete synchronously would hide the bug, since ops would hit zero on the
-      // delete's own success.)
+      // Force the bug-triggering interleave: both ops are dispatched, the delete commits, and
+      // the update fails LAST — so the batch only reaches zero pending ops via the error path.
+      // The count refresh must fire from there too, or a committed delete leaves the pager
+      // count stale. (Settling the delete synchronously would hide the bug, since ops would hit
+      // zero on the delete's own success.)
       let resolveDelete: (() => void) | undefined;
       let rejectUpdate: ((e: { message: string }) => void) | undefined;
       deleteManyMutate.mockImplementation((_args: unknown, opts?: { onSuccess?: () => void }) => {

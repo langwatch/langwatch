@@ -1,11 +1,5 @@
 /**
  * The membership and spend rows behind one organization's usage reading.
- *
- * Row access only: two member counts derived from the same classification
- * context (fetched once and shared, because both counts partition the same
- * set) and the month's spend, aggregated across the organization's projects.
- * No delegation to a second store — the message count is a ClickHouse rollup
- * and reaches this reading through {@link UsageCounterPort} instead.
  */
 import {
   INVITE_STATUS,
@@ -60,11 +54,8 @@ export class PrismaUsageMembershipRepository extends UsageMembershipPort {
   }
 
   /**
-   * Counts full members in organization:
-   * - Users with ADMIN or MEMBER org role
-   * - Users with EXTERNAL role BUT have a custom role with ANY non-view permission
-   * - PENDING invites (not expired, or no expiration) with ADMIN or MEMBER role
-   * - PENDING invites with custom role that has non-view permissions
+   * Counts full members: ADMIN/MEMBER role, EXTERNAL role with a non-view custom role, or a
+   * matching PENDING invite.
    */
   async getMemberCount(organizationId: string): Promise<number> {
     const context = await this.getMemberClassificationContext(organizationId);

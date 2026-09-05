@@ -23,12 +23,9 @@ function publicApiKey(row: StoredApiKey): ApiKey {
 }
 
 /**
- * Whether the key's own grants reach the project a caller named.
- *
- * An organization binding reaches every project in it, a team binding every
- * project on that team, a project binding only its own. Without this the
- * `X-Project-Id` header re-pointed a project-scoped key at any sibling project
- * in the same organization.
+ * Whether the key's own grants reach the project a caller named. An organization binding
+ * reaches every project in it, a team binding every project on that team, a project binding
+ * only its own.
  */
 function bindingsReachProject(
   // The two fields the answer turns on, rather than the whole binding: the

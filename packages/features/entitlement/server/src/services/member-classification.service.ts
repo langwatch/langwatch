@@ -1,24 +1,10 @@
 /**
  * Whether a seat is a full member or a lite one.
- *
- * The rule in one place, because three surfaces ask it and each would answer
- * it differently if it had to: the usage reading counts both, the invite path
- * checks the allowance before it sends, and a role change moves a person
- * between the two counts.
- *
- * `EXTERNAL` is the enum value behind "Lite Member" in the product's own
- * words — and it is elevated to a full member by a custom role that grants
- * anything beyond viewing, which is what stops a lite seat being sold the
- * permissions of a full one.
  */
 import { OrganizationUserRole } from "@langwatch/prisma-client/generated";
 
 /**
  * What a seat counts as against the plan's two member allowances.
- *
- * Stated here rather than imported from the Enterprise licensing contract: the
- * classification is what an OSS deployment counts members with too, and a core
- * package may not reach into an enterprise one for a two-member union.
  */
 export type MemberType = "FullMember" | "LiteMember";
 
@@ -55,10 +41,6 @@ export class MemberClassificationService {
 
   /**
    * Classifies a member as FullMember or LiteMember based on role and permissions.
-   *
-   * - ADMIN or MEMBER roles are always FullMember
-   * - EXTERNAL role with non-view permissions is FullMember (elevated to full access)
-   * - EXTERNAL role with no permissions or view-only permissions is Lite Member
    */
   static classifyMemberType(
     role: OrganizationUserRole,

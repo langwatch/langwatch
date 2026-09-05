@@ -1,11 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * Quick Search offers the Agent Testing destination behind the same release
- * flag as the main menu, and drops the Simulations entries it replaces.
- *
- * MOVED from `platform/app/src/features/command-bar/__tests__/commandBarAgentTesting.integration.test.tsx`.
- *
  * @see specs/features/agent-testing/page-structure.feature
  */
 

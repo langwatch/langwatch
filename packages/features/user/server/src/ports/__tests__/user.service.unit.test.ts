@@ -235,15 +235,7 @@ describe("UserService", () => {
 });
 
 /**
- * The one column an avatar lives in, and the four things that decide what it
- * holds.
- *
- * `User.image` is written by exactly two callers — the upload and the removal —
- * plus the identity provider at account creation. There is no precedence rule
- * to implement and none to test: the column has a single value and the last
- * writer owns it. What these pin is that the writers are the ones we think they
- * are, and that the sign-in path is not one of them.
- *
+ * The one column an avatar lives in, and the four things that decide what it holds.
  * Spec: specs/settings/user-avatar-upload.feature
  */
 describe("given a user whose photo came from their identity provider", () => {
@@ -340,13 +332,6 @@ describe("given a user whose photo came from their identity provider", () => {
 
 /**
  * A refused upload has to leave the account exactly as it was.
- *
- * The codec's own suite pins WHICH payloads are refused; what these pin is the
- * consequence — that a refusal happens before anything is written, so a
- * customer who picks the wrong file still has the photo they had. The order is
- * load-bearing: validation runs before the personal workspace is ensured and
- * before the store is reached.
- *
  * Spec: specs/settings/user-avatar-upload.feature
  */
 describe("given a signed-in user on their profile settings", () => {

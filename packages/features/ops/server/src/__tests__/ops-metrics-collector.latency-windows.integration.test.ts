@@ -8,6 +8,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { latencyAllTimeKey, latencyMinuteBucketKey } from "@langwatch/ops-contract";
 import { GroupQueueProcessor } from "@langwatch/group-queue";
 import { OpsMetricsCollectorService } from "../services/ops-metrics-collector.service";
+import { RedisOpsMetricsRepository } from "../repositories/redis/redis.ops-metrics.repository";
 import { OpsMetricsTestAdapter } from "../services/__tests__/ops-metrics.fixture";
 import { RedisOpsSnapshotRepository } from "../repositories/redis/redis.ops-snapshot.repository";
 import { DefaultOpsSnapshotService } from "../services/ops-snapshot-reader.service";
@@ -108,7 +109,11 @@ describe.skipIf(!hasRedis)("Ops dashboard latency tiles", () => {
           redis as unknown as OpsSnapshotRedisPort,
         );
         const snapshots = DefaultOpsSnapshotService.create(snapshotRepository);
-        const collector = OpsMetricsCollectorService.create({ redis, ops, snapshots });
+        const collector = OpsMetricsCollectorService.create({
+          metrics: RedisOpsMetricsRepository.create({ redis }),
+          ops,
+          snapshots,
+        });
         try {
           await collector.discoverQueues();
           // First collect acquires the lease and kicks the (unawaited) detail

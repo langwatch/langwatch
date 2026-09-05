@@ -9,11 +9,8 @@ import type { TasksObjectStorage } from "./infrastructure/tasks-stored-object-st
 import type { TasksHost } from "./tasks-host.composition";
 
 /**
- * Translates this process's own destination POLICY (BYOC first, then this
- * deployment's backend) into the simpler decision `DatasetObjectStorageResolverAdapter`
- * needs — bucket, endpoint and credentials stay resolved on Dataset's own
- * side (through its own `DatasetS3ClientResolver`), so only the backend KIND
- * crosses this seam.
+ * Translates this process's own destination POLICY (BYOC first, then this deployment's
+ * backend) into the simpler decision `DatasetObjectStorageResolverAdapter` needs.
  */
 class TasksDatasetStorageDestination extends DatasetStorageDestinationPort {
   constructor(private readonly policy: TasksObjectStorage["destination"]) {
@@ -28,10 +25,9 @@ class TasksDatasetStorageDestination extends DatasetStorageDestinationPort {
 }
 
 /**
- * Builds the `dataset-content-backfill` task, deferred to `run()` — resolving
- * the real `storage` reaches `TasksHost.objectStorage`, and a misconfigured
- * environment should fail only THIS task at run time, not every task at
- * catalogue construction.
+ * Builds the `dataset-content-backfill` task, deferred to `run()` — resolving the real
+ * `storage` reaches `TasksHost.objectStorage`, and a misconfigured environment should fail only
+ * THIS task at run time, not every task at catalogue construction.
  */
 export function buildDatasetContentBackfillTask({
   host,

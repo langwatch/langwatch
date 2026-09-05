@@ -1,17 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * The product-switcher shell's top bar: the product dropdown built from
- * the registry and the reachable set, the organization control, and the
- * product-native scope, mounted through the real navigation shell.
- *
- * Lifted from
- * `platform/app/src/features/navigation/__tests__/ProductSwitcherShell.integration.test.tsx`
- * (deleted with `platform/app`, which rendered the old `DashboardLayout`
- * dispatcher). `NavigationShell` is that dispatcher's replacement, and the
- * stub navigation host stands in for the fixture's Next-router and
- * `useOrganizationTeamProject` mocks.
- *
  * Spec: specs/navigation/product-switcher-navigation.feature
  */
 
@@ -369,14 +357,10 @@ describe("the product-switcher top bar", () => {
       // Enter alone opens it, which is the point of the highlight.
       fireEvent.keyDown(field, { key: "Enter", code: "Enter" });
       if (navigateMock.mock.calls.length === 0) {
-        // Once two or more Menu/Combobox machines have opened earlier in the
-        // same jsdom process, Ark's combobox can lag its own
-        // `aria-activedescendant` sync by a tick, so `Enter` closes the
-        // popup without picking anything (unreproducible as an isolated
-        // run, and nothing this package's own code decides — autohighlight
-        // is entirely Ark's). Reopening and clicking the same, by-then
-        // correctly labelled, result is the same pick outcome by a
-        // different path.
+        // Once two or more Menu/Combobox machines have opened earlier in the same jsdom
+        // process, Ark's combobox can lag its own `aria-activedescendant` sync by a tick, so
+        // `Enter` closes the popup without picking anything (unreproducible as an isolated run,
+        // and nothing this package's own code decides — autohighlight is entirely Ark's).
         await openProjectPicker();
         searchFor("billing");
         await waitFor(() => screen.getByText("Billing Sync"));

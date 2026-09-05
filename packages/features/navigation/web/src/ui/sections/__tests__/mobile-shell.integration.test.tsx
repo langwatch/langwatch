@@ -1,18 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * The navigation-v2 chrome on a phone-width viewport: the compact bar
- * with the scope and the menu button, and the full-screen menu overlay.
- *
- * Lifted from
- * `platform/app/src/features/navigation/__tests__/MobileShell.integration.test.tsx`
- * (deleted with `platform/app`), which mounted the real `DashboardLayout`
- * dispatcher. `MobileShell` is the component that dispatcher resolved to for
- * a phone-width viewport, so this mounts it directly against a
- * hand-built ready state and the stub navigation host, rather than the
- * viewport-detection seam (`useIsMobileViewport`, `useBreakpointValue`) that
- * chose it.
- *
  * Spec: specs/navigation/mobile-chrome.feature
  */
 

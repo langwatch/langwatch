@@ -14,11 +14,6 @@ import { OtlpSpanContentDropService } from "../otlp-span-content-drop.service";
 
 /**
  * Spec: packages/features/data-privacy/specs/span-content-drop.feature
- *
- * The drop is the only pass that can honour a customer's "never store this":
- * the event it runs before is immutable and nothing downstream can take a
- * stored value back. Every assertion here is about content that would
- * otherwise be in ClickHouse with no evidence that it should not have been.
  */
 
 function policy(

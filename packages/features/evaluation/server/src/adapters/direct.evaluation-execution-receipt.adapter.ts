@@ -12,17 +12,8 @@ import {
 const logger = createLogger("langwatch:evaluation:execution-receipt");
 
 /**
- * Runs the evaluator and writes its cost row, with the cost — and only the
- * cost — protected against a redelivery.
- *
- * The protection is the recorder's own: the cost id is derived from the
- * operation key, so a second delivery of the same command finds the row it
- * already wrote and returns that id rather than billing twice. What this does
- * NOT carry is the durable execution receipt the platform application put in
- * front of the evaluator call, so a redelivery after a crash CALLS THE
- * EVALUATOR AGAIN. That was already at-least-once by the platform receipt's own
- * docblock — it finalises after the provider has answered — so what is lost is
- * the narrower window, not the guarantee, and the money is unaffected.
+ * Runs the evaluator and writes its cost row, with the cost — and only the cost — protected
+ * against a redelivery.
  */
 export class DirectEvaluationExecutionReceiptAdapter extends EvaluationExecutionReceiptPort {
   static create(input: {

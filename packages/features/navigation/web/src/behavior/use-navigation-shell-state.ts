@@ -1,28 +1,6 @@
 /**
- * Session, workspace and address state for the navigation shell.
- *
- * Moved from
+ * Session, workspace and address state for the navigation shell. Moved from
  * `platform/app/src/features/navigation/shell/useNavigationV2ShellState.ts`.
- * The shell renders one of three outcomes, so this reports a STATUS rather
- * than the raw parts: the project in the address does not exist, the data
- * needed to draw the chrome has not arrived, or everything the shell draws.
- *
- * Every read that used to be its own platform hook — the workspace, the
- * session, the public environment, the one-shot `?org=` selection and the
- * analytics identify — is now either the host or gone:
- *
- * - The workspace, the reader and the deployment come off the host.
- * - The one-shot `?org=` selection is the application's address handling: it
- *   runs in `apps/ui`'s own `useUiOrgQueryParamSelection`, mounted by the
- *   application chrome above this shell rather than inside it.
- * - `usePostHogIdentify` did not travel. Product analytics is the
- *   application's, the line every family since the gateway has drawn.
- * - The Langy dock handshake did not travel either: the panel it reserves room
- *   for is mounted by the application, and a package that claimed a dock no
- *   host had opened would hold a shell nobody released.
- *
- * Specs: specs/navigation/product-switcher-navigation.feature,
- *        specs/navigation/icon-rail-navigation.feature
  */
 
 import { useBreakpointValue } from "@chakra-ui/react";

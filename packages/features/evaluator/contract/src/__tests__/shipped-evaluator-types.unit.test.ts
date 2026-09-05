@@ -1,19 +1,7 @@
 /**
- * Nothing we ship may teach an evaluator type the platform would reject.
- *
- * The failure this pins is not hypothetical: an agent created an evaluator
- * with `langevals/llm_judge` — a slug that has never existed — because our own
- * help text, empty-state hint and skill examples taught it. The request was
- * guaranteed a 422, and the recovery cost a handful of wasted tool calls.
- *
- * Correcting the known instances (as the original fix did) leaves the next
- * stale example free to appear the moment an evaluator is renamed. So the RULE
- * is pinned here rather than the values: every slug any shipped instruction
- * puts in an evaluator-type position is checked against the catalog the create
- * route actually validates against.
- *
- * A rename that breaks this test is telling the truth — update the examples it
- * names, do not widen the scan.
+ * Nothing we ship may teach an evaluator type the platform would reject. The failure this pins
+ * is not hypothetical: an agent created an evaluator with `langevals/llm_judge` — a slug that
+ * has never existed — because our own help text, empty-state hint and skill examples taught it.
  */
 import fs from "node:fs";
 import os from "node:os";

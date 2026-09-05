@@ -1,29 +1,15 @@
 import { z } from "zod";
 
-// ---------------------------------------------------------------------------
-// Tracer schemas (Zod-first). Every shared trace/span/evaluation shape is
-// defined as a Zod schema and its TypeScript type is inferred with z.infer,
-// so the schema and the type can never drift apart. The few ElasticSearch and
-// dataset shapes that are pure structural transforms (Omit/Partial of the
-// schemas above) stay as inferred-type derivations.
-//
-// This is the LangWatch trace format: the shape the collector accepts, the
-// shape a stored trace has, and the shape the SDK ships. It is not the OTLP
-// wire format — `trace.otlp.ts` owns that, and its `spanSchema`/`eventSchema`
-// describe an OTLP export span and an OTLP span event. The two spellings meet
-// in this package's barrel, so the LangWatch pair carries the qualifier:
-// `langWatchSpanSchema` and `langWatchEventSchema`, the same way
-// `LangWatchMessage` sits beside `OpenAIMessage` in trace-message.schemas.ts.
-// ---------------------------------------------------------------------------
+// --------------------------------------------------------------------------- Tracer schemas
+// (Zod-first). Every shared trace/span/evaluation shape is defined as a Zod schema and its
+// TypeScript type is inferred with z.infer, so the schema and the type can never drift apart.
+// The few ElasticSearch and dataset shapes that are pure structural transforms (Omit/Partial of
+// the schemas above) stay as inferred-type derivations.
 
 const chatRoleSchema = z.union([
   z.literal("system"),
   /**
-   * OpenAI Responses-dialect spelling of the system role. Accepted wherever
-   * chat messages are parsed and treated as a system-role message everywhere
-   * it matters (system-instruction extraction, transcript rendering) — a
-   * developer message must never fail schema validation into a raw-JSON
-   * fallback, and never render as a user bubble.
+   * OpenAI Responses-dialect spelling of the system role.
    */
   z.literal("developer"),
   z.literal("user"),
@@ -91,11 +77,9 @@ export const chatRichContentSchema = z.union([
     result: z.any().optional(),
   }),
   /**
-   * AG-UI binary content part. Used for audio/image/video/file attachments.
-   * Mutually-exclusive payload: exactly one of `data` (inline base64), `url`
-   * (already-externalized reference), or `id` (stored_objects id) is present.
-   * After ingest-side extraction (stored-objects pipeline), inline `data` is
-   * rewritten to `id` + `url` pointing at /api/files/{id}.
+   * AG-UI binary content part. Used for audio/image/video/file attachments. Mutually-exclusive
+   * payload: exactly one of `data` (inline base64), `url` (already-externalized reference), or
+   * `id` (stored_objects id) is present.
    */
   z.object({
     type: z.literal("binary"),
@@ -106,11 +90,9 @@ export const chatRichContentSchema = z.union([
     filename: z.string().optional(),
   }),
   /**
-   * OpenAI Realtime `input_audio` content part. Pre-extraction the payload is
-   * inline base64 (`{ data, format }`); after ingest-side stored-objects
-   * extraction it is rewritten to a reference (`{ url, mimeType }`) pointing at
-   * /api/files/{projectId}/{id}. Every field is optional so this validates both
-   * shapes. Mirrors `inputAudioContentPartSchema` in the scenario event schemas.
+   * OpenAI Realtime `input_audio` content part. Pre-extraction the payload is inline base64 (`{
+   * data, format }`); after ingest-side stored-objects extraction it is rewritten to a
+   * reference (`{ url, mimeType }`) pointing at /api/files/{projectId}/{id}.
    */
   z.object({
     type: z.literal("input_audio"),
@@ -136,11 +118,9 @@ export const chatRichContentSchema = z.union([
     }),
   }),
   /**
-   * AI-SDK image part. `image` is a data: URI pre-extraction, a
-   * /api/files/{projectId}/{id} reference after ingest-side extraction, or an
-   * external http(s) URL (passed through, never re-hosted). This is the shape
-   * the typescript scenario SDK ships for image attachments in simulated user
-   * messages (scenario docs: multimodal-images).
+   * AI-SDK image part. `image` is a data: URI pre-extraction, a /api/files/{projectId}/{id}
+   * reference after ingest-side extraction, or an external http(s) URL (passed through, never
+   * re-hosted).
    */
   z.object({
     type: z.literal("image"),
@@ -160,11 +140,9 @@ export const chatRichContentSchema = z.union([
     filename: z.string().optional(),
   }),
   /**
-   * OpenAI ChatCompletion file part (scenario docs: multimodal-files).
-   * `file_data` is a data: URI or raw base64; `file_id` references a file
-   * hosted on the provider side and carries no bytes, so it passes through
-   * extraction unchanged. Externalized at ingest to a `binary` reference
-   * preserving the filename.
+   * OpenAI ChatCompletion file part (scenario docs: multimodal-files). `file_data` is a data:
+   * URI or raw base64; `file_id` references a file hosted on the provider side and carries no
+   * bytes, so it passes through extraction unchanged.
    */
   z.object({
     type: z.literal("file"),
@@ -620,12 +598,11 @@ export const rESTEvaluationSchema = evaluationSchema
 export type RESTEvaluation = z.infer<typeof rESTEvaluationSchema>;
 
 export const tracePrivacySchema = z.object({
-  // Content categories that a `drop` privacy policy stripped before the spans
-  // were stored, derived at read time from the marker the drop stamps on each
-  // span. The content was never stored and cannot be recovered, which is what
-  // distinguishes it from a read-time `restrict` (the data is kept and hidden by
-  // audience, surfaced through the field-redaction path). Absent when nothing
-  // was dropped.
+  // Content categories that a `drop` privacy policy stripped before the spans were stored,
+  // derived at read time from the marker the drop stamps on each span. The content was never
+  // stored and cannot be recovered, which is what distinguishes it from a read-time `restrict`
+  // (the data is kept and hidden by audience, surfaced through the field-redaction path).
+  // Absent when nothing was dropped.
   droppedCategories: z.array(z.string()).optional(),
 });
 
@@ -782,10 +759,8 @@ const omittedForDataset = {
 } as const;
 
 /**
- * The runtime validator for {@link DatasetSpan}: a trace span reduced to what a
- * dataset row carries. It lives beside the type because it is derived from the
- * same span schemas — `@langwatch/dataset-contract` keeps a span-shaped record
- * so it need not depend on this package, which validates nothing.
+ * The runtime validator for {@link DatasetSpan}: a trace span reduced to what a dataset row
+ * carries.
  */
 export const datasetSpanSchema = z.union([
   baseSpanSchema.omit(omittedForDataset).extend(datasetSpanShape),

@@ -1,11 +1,5 @@
 /**
  * @vitest-environment node
- *
- * Integration tests for the in-app MCP HTTP handler.
- * Tests route reachability, auth flow, CORS, health, and token validation.
- *
- * The handler is tested by creating a real HTTP server (no Express) with
- * mocked Prisma and Redis dependencies.
  */
 import { createHash, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -121,13 +115,10 @@ function mcpInitializeBody() {
   };
 }
 
-// Canned docs page returned by the stubbed network boundary below. The
-// `fetch_langwatch_docs` / `fetch_scenario_docs` tools fetch live pages from
-// langwatch.ai, which redirects to GitHub raw content; GitHub rate-limits CI
-// runners (HTTP 429), so integration tests must not depend on that external
-// host. These tests only assert that the handler routes a tools/call through
-// to the docs tool and returns its content, so a fixed page is the right thing
-// to fake at the fetch boundary.
+// Canned docs page returned by the stubbed network boundary below. The `fetch_langwatch_docs` /
+// `fetch_scenario_docs` tools fetch live pages from langwatch.ai, which redirects to GitHub raw
+// content; GitHub rate-limits CI runners (HTTP 429), so integration tests must not depend on
+// that external host.
 const DOCS_PAGE_FIXTURE = [
   "# LangWatch Documentation",
   "",
@@ -139,11 +130,8 @@ const DOCS_PAGE_FIXTURE = [
 ].join("\n");
 
 /**
- * Replace global `fetch` for the duration of a docs-tool test so the tool
- * resolves a fixed page instead of reaching langwatch.ai / GitHub. Returns the
- * spy so the caller can restore it. The stub only serves the docs hosts and
- * delegates every other request to the real implementation, so tests that hit
- * the local server over `fetch` keep working.
+ * Replace global `fetch` for the duration of a docs-tool test so the tool resolves a fixed page
+ * instead of reaching langwatch.ai / GitHub. Returns the spy so the caller can restore it.
  */
 function stubDocsFetch(): MockInstance {
   const realFetch = globalThis.fetch;
@@ -192,14 +180,10 @@ function createPkceChallenge() {
   return { codeVerifier, codeChallenge };
 }
 
-// Matches TEST_REDIRECT_URI / TEST_CLIENT_ID below — the values every
-// /oauth/token test request in this file sends, since the token endpoint now
-// requires them to match what /mcp/authorize bound to the code.
+// Matches TEST_REDIRECT_URI / TEST_CLIENT_ID below, which every /oauth/token request in this
+// file sends.
 /**
- * Builds an `application/x-www-form-urlencoded` body. Interpolating the values
- * into a template works only while none of them contains a `&`, `=`, `+` or
- * `%`, and a redirect URI that grows a query string is exactly the case where
- * the shape assertions keep passing against a truncated value.
+ * Builds an `application/x-www-form-urlencoded` body.
  */
 function formBody(fields: Record<string, string>): string {
   return new URLSearchParams(fields).toString();
@@ -209,10 +193,9 @@ const TEST_REDIRECT_URI = "http://localhost/callback";
 const TEST_CLIENT_ID = "test_client";
 
 /**
- * The registration /oauth/register would have persisted for TEST_CLIENT_ID.
- * The token endpoint reads it to tell "your code is stale" apart from "your
- * registration is gone", so every token test that is not about a missing
- * registration needs it present.
+ * The registration /oauth/register would have persisted for TEST_CLIENT_ID. The token endpoint
+ * reads it to tell "your code is stale" apart from "your registration is gone", so every token
+ * test that is not about a missing registration needs it present.
  */
 const REGISTERED_CLIENT = JSON.stringify({
   redirectUris: [TEST_REDIRECT_URI],
@@ -602,23 +585,10 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
     });
   });
 
-  // --- Security: redirect_uri / client_id binding (RFC 6749 §10.6, §4.1.3),
-  //     and dynamic client registration persistence (RFC 7591) ---
-  //
-  // /mcp/authorize binds an issued code to the exact client_id + redirect_uri
-  // it validated (see mcp-authorize.rolebinding.unit.test.ts for the
-  // authorize-side registered-client check). The exchange below re-validates
-  // that binding — a code minted for one redirect_uri/client_id must never be
-  // redeemable with a different one, otherwise whoever crafted the original
-  // authorization request (not necessarily the user who approved it) could
-  // exfiltrate the code to a URI they control.
-  //
-  // Wrapped in its own rate-limiter reset: /oauth/token and /oauth/register
-  // share one IP-keyed limiter (10/min) across this whole file's ~30 other
-  // tests, several of which also hit these endpoints. Without resetting
-  // before AND after, this block's extra calls would push later tests (or
-  // get pushed by earlier ones) over the shared budget and 429 instead of
-  // exercising what they're actually testing.
+  // --- Security: redirect_uri / client_id binding (RFC 6749 §10.6, §4.1.3), and dynamic client
+  // registration persistence (RFC 7591) --- /mcp/authorize binds an issued code to the exact
+  // client_id + redirect_uri it validated (see mcp-authorize.rolebinding.unit.test.ts for the
+  // authorize-side registered-client check).
   describe("OAuth security: redirect_uri/client_id binding + registration", () => {
     beforeEach(() => {
       handler.clearRateLimiters();
@@ -785,13 +755,11 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
 
   // --- Bearer Token DB Validation ---
 
-  // --- OAuth discovery documents ---
-  //
-  // A client that only knows the resource URL asks for metadata at the
-  // resource's path under the well-known prefix (RFC 9728 §3.1), and current
-  // MCP clients try that form first. Unclaimed, those probes reach the
-  // single-page-app fallback and come back as 200 text/html, which the client
-  // reports as a JSON parse failure rather than falling back to the bare form.
+  // --- OAuth discovery documents --- A client that only knows the resource URL asks for
+  // metadata at the resource's path under the well-known prefix (RFC 9728 §3.1), and current
+  // MCP clients try that form first. Unclaimed, those probes reach the single-page-app fallback
+  // and come back as 200 text/html, which the client reports as a JSON parse failure rather
+  // than falling back to the bare form.
 
   describe("given the OAuth discovery documents are published", () => {
     async function getDiscovery(path: string) {
@@ -1505,15 +1473,10 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
     });
   });
 
-  // --- Tool Execution: AsyncLocalStorage Propagation ---
-  //
-  // These tests verify that the session's API key is correctly propagated
-  // to tool handlers through AsyncLocalStorage. In production (HTTP mode),
-  // there is NO global LANGWATCH_API_KEY — each client provides their own
-  // via OAuth. If the AsyncLocalStorage context is lost during MCP SDK
-  // tool dispatch, requireApiKey() fails with:
-  //   - "Config not initialized" (globalConfig null)
-  //   - "LANGWATCH_API_KEY is required" (globalConfig has no apiKey)
+  // --- Tool Execution: AsyncLocalStorage Propagation --- These tests verify that the session's
+  // API key is correctly propagated to tool handlers through AsyncLocalStorage. In production
+  // (HTTP mode), there is NO global LANGWATCH_API_KEY — each client provides their own via
+  // OAuth.
 
   describe("when search_traces is called within an authenticated session", () => {
     it("receives the API key from session config via AsyncLocalStorage", async () => {

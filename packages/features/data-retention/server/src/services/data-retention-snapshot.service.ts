@@ -1,13 +1,7 @@
 /**
- * What the retention settings page renders: the project's effective retention,
- * the override rows the caller may read, and the scopes they may write to.
- *
- * RBAC-filtered at every tier and deliberately so. `Map.has()` on a name map
- * only proves organization membership, which would leak unrelated team and
- * project rule names — AND the organization-default retention number — to any
- * member with `project:view` in the same organization. An ORGANIZATION-scoped
- * rule exposes a figure that can be a negotiated SLA bound, so it is gated on
- * `organization:manage`, the same permission required to edit it.
+ * What the retention settings page renders: the project's effective retention, the override
+ * rows the caller may read, and the scopes they may write to. RBAC-filtered at every tier and
+ * deliberately so.
  */
 import type {
   DataRetentionService,

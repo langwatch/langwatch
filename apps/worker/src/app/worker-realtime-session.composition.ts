@@ -19,10 +19,12 @@ import {
   type GatewayRealtimeSessionCollaborators,
   type GatewaySpendConfirmationPort,
 } from "@langwatch/gateway-server";
+import { PrismaGatewayElevenLabsCredentialRepository } from "@langwatch/gateway-server/composition/gateway-elevenlabs-credentials";
 import { EncryptedModelProviderCredentialAdapter } from "@langwatch/model-provider-server";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
+import { PrismaGatewayRealtimeSessionRepository } from "@langwatch/gateway-server/composition/gateway-realtime-sessions";
 
 const realtimeSessions = GatewayRealtimeSessionService.create();
 /**
@@ -62,7 +64,7 @@ export function tryCreateWorkerRealtimeSessionPoller(
 
   const logger = createLogger("langwatch:worker:realtime-session-poller");
   const collaborators: GatewayRealtimeSessionCollaborators = {
-    database,
+    sessions: PrismaGatewayRealtimeSessionRepository.create({ database }),
     // The one rating seam for the vertical: the session bills on duration, and
     // the vendor's own cost figure is stored beside the answer as evidence
     // rather than billed from.
@@ -171,7 +173,7 @@ class WorkerElevenLabsCredentials implements ElevenLabsCredentialReader {
     modelProviderId: string;
   }): Promise<{ apiKey: string; baseUrl: string } | null> {
     return GatewayElevenLabsCredentialService.create({
-      database: this.database,
+      providers: PrismaGatewayElevenLabsCredentialRepository.create({ database: this.database }),
       credentials: WorkerGatewayModelProviderCredentials.create(this.encryption),
     }).getApiCredential({ modelProviderId: input.modelProviderId });
   }

@@ -1,14 +1,6 @@
 /**
  * An in-application address, as an anchor, without reaching the router.
- *
  * ADR-004 seals the router off from a feature package, so an internal address
- * is an anchor whose click is handed to `UiNavigationPort` — the same
- * navigation, asked of the one port the application publishes. Modifier-clicks
- * and middle-clicks fall through to the browser, so "open in a new tab" still
- * works on every link.
- *
- * ABSENT IS A FULL PAGE LOAD, NOT A DEAD LINK. With no capabilities above it
- * the anchor is left to the browser, which reaches the same address the slow way.
  */
 
 import { Link as ChakraLink } from "@chakra-ui/react";

@@ -28,13 +28,6 @@ export interface ClickHouseEventRow {
 
 /**
  * The ADR-022 lean, supplied by the composition root.
- *
- * The transform belongs to the trace domain, which depends on this package, so
- * it cannot be imported here. It is a REQUIRED dependency rather than an
- * optional one with an identity default: replayed output is only byte-identical
- * to live output when the same lean runs at both seams, and a default would let
- * a composition that forgot it produce silently divergent projections instead of
- * failing to compile.
  */
 export type ReplayEventLean = (event: ReplayEvent) => ReplayEvent;
 
@@ -180,27 +173,9 @@ function occurredAtPredicate(bounds?: OccurredAtBounds): {
 }
 
 /**
- * Compute the `EventOccurredAt` min/max over ALL events of the given
- * aggregates (no event-type filter, full history).
- *
- * This is the provably-safe pruning bound for a replay batch's subsequent
- * cutoff/load queries: every event those queries must see already existed
- * when this query ran, so it lies within [min, max] by construction. Events
- * appended afterwards carry an `EventTimestamp` after the batch's cutoff and
+ * Compute the `EventOccurredAt` min/max over ALL events of the given aggregates (no event-type
+ * filter, full history).
  * are handled by live processing per the replay marker protocol (ADR-015),
- * so excluding them from the bounded queries is correct. (Bounding by the
- * replay's `since` instead would be UNSAFE: fold projections rebuild from
- * `init()` and need the aggregate's full history, which can predate `since`.)
- *
- * The query itself reads only the tiny `EventOccurredAt` column via the
- * primary-key filter — cheap compared to the payload-bearing load queries it
- * lets ClickHouse prune. `event_log` is ORDER BY (TenantId, AggregateType,
- * AggregateId, IdempotencyKey), so the `AggregateType` predicate is required
- * for the key filter to stay a binary search instead of degrading to a scan
- * of the whole tenant prefix.
- *
- * Returns undefined when the aggregates have no events (nothing to prune or
- * load).
  */
 export async function getAggregateOccurredAtBounds({
   client,
@@ -245,11 +220,9 @@ export async function getAggregateOccurredAtBounds({
 }
 
 /**
- * Get cutoff event info for a batch of aggregates in one query.
- *
- * `occurredAtBounds` (when available) enables partition pruning; pass bounds
- * from {@link getAggregateOccurredAtBounds} so no event of these aggregates
- * can fall outside the range.
+ * Get cutoff event info for a batch of aggregates in one query. `occurredAtBounds` (when
+ * available) enables partition pruning; pass bounds from {@link getAggregateOccurredAtBounds}
+ * so no event of these aggregates can fall outside the range.
  */
 export async function batchGetCutoffEventIds({
   client,
@@ -306,15 +279,9 @@ export async function batchGetCutoffEventIds({
 }
 
 /**
- * Compute occurred-at bounds for a batch of aggregates, then fetch their
- * cutoff event IDs bounded by those bounds — the shared "bounds first, then
- * cutoffs" sequence every replay batch path runs before loading events.
- *
- * Undefined bounds means the aggregates have zero events — the cutoff query
- * is skipped entirely, since it would otherwise scan every partition
- * unbounded just to return empty. In that case this returns empty cutoffs
- * plus `occurredAtBounds: undefined`, routing every aggregate down the
- * caller's without-cutoff/unmark path.
+ * Compute occurred-at bounds for a batch of aggregates, then fetch their cutoff event IDs
+ * bounded by those bounds — the shared "bounds first, then cutoffs" sequence every replay batch
+ * path runs before loading events.
  */
 export async function getBoundedCutoffs({
   client,
@@ -356,26 +323,8 @@ export async function getBoundedCutoffs({
 }
 
 /**
- * Stream every event a replay batch must apply for a set of aggregates, in a
- * single ClickHouse query, invoking `onEvent` per row in per-aggregate
- * `(EventTimestamp, EventId)` order.
- *
- * Two deliberate properties over the previous materialize-then-filter load:
- *
- * - **Union event-type filter.** Only events of the selected projections'
- *   types leave ClickHouse. The cutoffs were computed over the same union, so
- *   the boundary stays consistent — and payload bytes for types no projection
- *   consumes are never read, decompressed, or JSON-parsed.
- * - **Streaming.** Rows are applied as they arrive rather than collected into
- *   one array; memory stays bounded by the accumulators (fold states + write
- *   buffer), not the batch's event count, and CPU apply time overlaps the
- *   network read.
- *
- * Events past an aggregate's cutoff are dropped row-by-row (the cutoff map is
- * per aggregate; the query's bound is the batch-wide occurred-at range).
- * `onEvent` may return a promise ONLY when it needs to flush (the map
- * accumulator's incremental drain) — returning undefined on the hot path
- * keeps the loop free of per-row await overhead.
+ * Stream every event a replay batch must apply for a set of aggregates, in a single ClickHouse
+ * query, invoking `onEvent` per row in per-aggregate `(EventTimestamp, EventId)` order.
  */
 export async function streamEventsForAggregatesBulk({
   client,
@@ -528,11 +477,9 @@ export async function batchLoadAggregateEvents({
 }
 
 /**
- * The canonical `event_log` reader replay runs against.
- *
- * Reads only. It never dispatches to subscribers or process managers, and
- * offers no seam that could — replay rebuilds derived state and must not
- * re-fire the side effects the original events already caused.
+ * The canonical `event_log` reader replay runs against. Reads only. It never dispatches to
+ * subscribers or process managers, and offers no seam that could — replay rebuilds derived
+ * state and must not re-fire the side effects the original events already caused.
  */
 export class EventingClickHouseReplayEventSource implements ReplayEventSource {
   private readonly resolveClient: EventingClickHouseReplayClientResolver;

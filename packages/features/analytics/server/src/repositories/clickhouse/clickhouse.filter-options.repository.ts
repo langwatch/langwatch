@@ -3,11 +3,12 @@ import type { FilterField } from "@langwatch/analytics-contract";
 import { createLogger } from "@langwatch/observability";
 import { clickHouseFilters } from "../../filters/clickhouse/filter-definitions";
 import { buildScopeConditions } from "../../filters/clickhouse/query-helpers";
-import type {
-  FilterOption,
-  SupportedClickHouseFilterDefinition,
-} from "../../filters/clickhouse/types";
-import { FilterOptionsPort, type FindFilterOptionsInput } from "../../ports/filter-options.port";
+import type { SupportedClickHouseFilterDefinition } from "../../filters/clickhouse/types";
+import {
+  FilterOptionsPort,
+  type FilterOption,
+  type FindFilterOptionsInput,
+} from "../../ports/filter-options.port";
 
 /** How this repository reaches the tenant's ClickHouse client. */
 export type ClickHouseClientResolver = (tenantId: string) => Promise<ClickHouseClient>;

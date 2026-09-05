@@ -1,16 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * Roles & Permissions, driven the way an organization administrator drives it.
- *
- * `platform/app/src/pages/settings/roles.tsx` had no test of its own — only the
- * source-reading guard that pinned which permission wrapped it — so these are
- * new, and they pin what the move could plausibly have broken: the three-state
- * plan gate, the grant on the write control, the built-in role permissions now
- * that they come from the contract rather than from `~/server/api/rbac`, and
- * the failure path handing the raw error to the host rather than composing a
- * sentence out of it.
- *
  * Spec: specs/rbac/custom-role-permission-editing.feature
  */
 

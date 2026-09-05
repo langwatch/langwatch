@@ -1,19 +1,5 @@
 /**
  * @vitest-environment node
- *
- * Integration regression for the customer n8n failure:
- *
- *   HTTP 422: Unprocessable Entity ... {"code":422,"message":"Failed to parse
- *   request body","hint":"Bad control character in string literal in JSON ..."}
- *
- * Drives the real SerializedHttpAgentAdapter against a local server that
- * behaves like the n8n webhook did: it `JSON.parse`s the request body and
- * answers 422 with the same error shape when parsing fails. With a
- * conversation turn that contains a raw newline, quote and backslash, the body
- * the adapter sends must still be valid JSON.
- *
- * Covers the @integration scenario in
- * specs/scenarios/http-agent-body-template-json-safety.feature.
  */
 
 import { createServer, type Server } from "node:http";

@@ -29,15 +29,7 @@ export const TRACE_EDIT_OVERLAY_MAX_PATCH_BYTES = 2 * 1024 * 1024;
 const traceIOEditSchema = z.object({ value: z.string() });
 
 /**
- * One span's correction. `spanId` identifies the span; every other key is
- * optional:
- *   - key absent  -> that field is untouched
- *   - key present -> that field is replaced wholesale
- * A field that can be absent from a span in the first place (name, input,
- * output, params, error) also takes null, which clears it. `type` does not:
- * every span has one, so there is nothing for a cleared type to mean.
- * Field-level replacement (rather than a character diff) is what keeps a
- * correction meaningful while spans are still being ingested.
+ * One span's correction.
  */
 export const traceEditSpanPatchSchema = z.object({
   spanId: z.string().min(1),
@@ -69,14 +61,8 @@ export const TRACE_EDIT_TRACE_FIELDS = ["input", "output", "metadata"] as const;
 export type TraceEditTraceField = (typeof TRACE_EDIT_TRACE_FIELDS)[number];
 
 /**
- * The trace's own metadata as the correction leaves it, in the bare keys the
- * canonical `Trace.metadata` uses (`thread_id`, `labels`, and whatever the
- * caller sent). It is an overlay on the map rather than a replacement of it:
- * a key the correction names replaces what the trace recorded, a `null` value
- * removes that key, and a key the correction does not name stays as captured.
- * That is what lets a reviewer fix one label without the correction having to
- * restate every key the platform stamped. `null` in place of the whole map
- * clears the trace's metadata.
+ * The trace's own metadata as the correction leaves it, in the bare keys the canonical
+ * `Trace.metadata` uses (`thread_id`, `labels`, and whatever the caller sent).
  */
 const traceMetadataEditSchema = z.record(z.string(), z.unknown());
 
@@ -99,21 +85,9 @@ const traceEditOverlayPatchObjectSchema = z.object({
 });
 
 /**
- * Serialized size guard. UTF-8 uses between one and three bytes per UTF-16
- * code unit, so the two cheap comparisons decide every ordinary patch and only
- * a value inside the narrow band pays for an encode.
- */
-/**
- * `TextEncoder` is a WHATWG global, present in every browser and in Node from
- * 11 on — but its TYPE ships only in `lib.dom.d.ts` or `@types/node`, and this
- * package's tsconfig takes `lib: ["es2022"]` and neither of those. Declaring
- * the one member used here keeps the contract environment-neutral instead of
- * pulling a whole runtime's surface in behind it. Same treatment as
- * `identity-contract`'s password policy, for the same reason.
- *
- * Module-scoped rather than a `declare global`: an ambient global would travel
- * to every consumer — the package ships its TypeScript sources — and collide
- * with the real declaration in anything compiled with the DOM lib.
+ * `TextEncoder` is a WHATWG global, present in every browser and in Node from 11 on — but its
+ * TYPE ships only in `lib.dom.d.ts` or `@types/node`, and this package's tsconfig takes `lib:
+ * ["es2022"]` and neither of those.
  */
 declare const TextEncoder: new () => { encode(input: string): { length: number } };
 
@@ -150,10 +124,9 @@ export function emptyTraceEditOverlayPatch(): TraceEditOverlayPatch {
 }
 
 /**
- * Reads a stored patch. A row written by a future version, hand-edited, or
- * corrupted returns null: absence of a correction is a normal state the whole
- * read path already handles, so degrading is strictly better than failing a
- * trace read.
+ * Reads a stored patch. A row written by a future version, hand-edited, or corrupted returns
+ * null: absence of a correction is a normal state the whole read path already handles, so
+ * degrading is strictly better than failing a trace read.
  */
 export function parseTraceEditOverlayPatch(value: unknown): TraceEditOverlayPatch | null {
   const parsed = traceEditOverlayPatchSchema.safeParse(value);
@@ -173,10 +146,9 @@ export function patchHasAnyEdit(patch: TraceEditOverlayPatch): boolean {
 }
 
 /**
- * Chat transcripts are the only structured shape we recover from edited text,
- * and only when every entry looks like a message. `chatMessageSchema` leaves
- * every key optional, so a plain array of unrelated objects would otherwise
- * parse clean and silently lose its contents.
+ * Chat transcripts are the only structured shape we recover from edited text, and only when
+ * every entry looks like a message. `chatMessageSchema` leaves every key optional, so a plain
+ * array of unrelated objects would otherwise parse clean and silently lose its contents.
  */
 function asChatMessages(value: unknown): ChatMessage[] | null {
   if (!Array.isArray(value) || value.length === 0) return null;
@@ -190,12 +162,6 @@ function asChatMessages(value: unknown): ChatMessage[] | null {
 
 /**
  * Turns the text a reviewer typed back into a canonical captured value.
- *
- * The drawer edits strings while the trace stores typed values, so the same
- * encoder runs on the client (before the patch is sent) and on the server
- * (when a suggestion is merged), keeping one definition of what a given piece
- * of text means. `raw` and `text` stay verbatim: they were never structured,
- * and re-reading `"42"` as JSON would change what the trace says.
  */
 export function encodeSpanIOFromEditedText({
   text,

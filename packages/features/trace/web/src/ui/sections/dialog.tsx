@@ -1,6 +1,7 @@
 // eslint-disable-next-line no-restricted-imports
 import { Dialog as ChakraDialog, Portal } from "@chakra-ui/react";
 import * as React from "react";
+import { useUiDeployment } from "@langwatch/ui-host/capabilities";
 import { CloseButton } from "../elements/close-button";
 import { IsolatedErrorBoundary } from "./isolated-error-boundary";
 
@@ -38,6 +39,8 @@ export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps
       ...rest
     } = props;
 
+    const { isDevelopment } = useUiDeployment();
+
     // Crash inside the dialog body should NOT close the dialog. Wrap the
     // children so a render error renders an inline error panel within the
     // dialog frame instead.
@@ -49,7 +52,7 @@ export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps
 
     // Strip background overrides defensively at runtime in addition to the
     // type-level Omit, in case a caller widens the type with `as any`.
-    const safeBackdropProps = stripBackdropBg(backdropProps);
+    const safeBackdropProps = stripBackdropBg({ props: backdropProps, isDevelopment });
 
     return (
       <Portal disabled={!portalled} container={portalRef}>
@@ -99,16 +102,20 @@ export const DialogRoot = function DialogRoot(props: DialogRootProps) {
   );
 };
 
-function stripBackdropBg(
-  props: DialogContentProps["backdropProps"] | undefined,
-): DialogContentProps["backdropProps"] | undefined {
+function stripBackdropBg({
+  props,
+  isDevelopment,
+}: {
+  props: DialogContentProps["backdropProps"] | undefined;
+  isDevelopment: boolean;
+}): DialogContentProps["backdropProps"] | undefined {
   if (!props) return props;
   const { bg, background, backgroundColor, style, ...rest } = props as ChakraDialog.BackdropProps;
   const safeStyle = style
     ? { ...style, background: "transparent", backgroundColor: "transparent" }
     : undefined;
   if (
-    process.env.NODE_ENV !== "production" &&
+    isDevelopment &&
     (bg !== undefined ||
       background !== undefined ||
       backgroundColor !== undefined ||

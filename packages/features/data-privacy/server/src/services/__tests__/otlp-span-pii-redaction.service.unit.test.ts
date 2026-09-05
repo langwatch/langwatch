@@ -14,10 +14,6 @@ import { OtlpSpanPiiRedactionService } from "../otlp-span-pii-redaction.service"
 
 /**
  * Spec: packages/features/data-privacy/specs/span-pii-redaction.feature
- *
- * The harvested span half, driven end to end over fakes: a span with personal
- * data in it goes in, and what comes out has to be the same thing the
- * application would have produced from the same policy.
  */
 
 class FakePiiAnalysis extends PiiAnalysisPort {

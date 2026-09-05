@@ -1,24 +1,6 @@
 /**
- * Stops CSV writers from growing back outside the formula guard.
- *
- * A cell opening with `=`, `+`, `-`, `@`, TAB or CR is executed as a formula by
- * Excel and Sheets. RFC 4180 quoting does not stop that — quoting protects the
- * CSV grammar, not the spreadsheet reading it — so the only defence is a
- * leading apostrophe, and papaparse does not add one.
- *
- * The guard was written once and then bypassed seven times, because
- * `Parse.unparse` is the obvious call to reach for and nothing objected. Each
- * bypass was individually reasonable and collectively meant the property was
- * true of one export surface rather than of the product.
- *
- * A type cannot catch this: `unparse` takes strings and every offender passed
- * perfectly good strings. So it is caught structurally, by reading the tree and
- * asking which files call the raw serializer at all.
- *
- * Adding a file to GUARDED_WRITERS is a claim that it applies the guard to both
- * the header row and every data cell. This file checks the weak half of that
- * claim — the file does reach for the guard at all — and the per-writer tests
- * check the strong half, that the apostrophe reaches the bytes.
+ * Stops CSV writers from growing back outside the formula guard. A cell opening with `=`, `+`,
+ * `-`, `@`, TAB or CR is executed as a formula by Excel and Sheets.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
@@ -33,22 +15,14 @@ const ROOTS = ["packages", "apps"];
 const SKIPPED_DIRECTORIES = new Set(["node_modules", "dist", "build", ".claude", ".turbo"]);
 
 /**
- * Any reference to papaparse's serializer by name — a direct `Parse.unparse(`,
- * a destructured `import { unparse }`, or an alias like
- * `const serialize = Parse.unparse`. All of them have to write the word
- * somewhere, so matching the bare word catches the alias shapes a
- * call-site-only regex misses. The word boundaries keep "unparseable" (comments
- * and error codes) and `urlunparse(parts)` (a Python signature quoted in the
- * Monaco autocomplete table) from matching: both bury the word inside a longer
- * one, so the boundary fails.
+ * Any reference to papaparse's serializer by name — a direct `Parse.unparse(`, a destructured
+ * `import { unparse }`, or an alias like `const serialize = Parse.unparse`.
  */
 const UNPARSE_CALL = /\bunparse\b/;
 
 /**
- * An import of the guard package, by either entry point. Deliberately weaker
- * than "the guard is applied to the right arguments": a regex cannot tell those
- * apart. It catches the one regression a reader would otherwise miss entirely —
- * the guard call deleted while the file stays on the allow-list.
+ * An import of the guard package, by either entry point. Deliberately weaker than "the guard is
+ * applied to the right arguments": a regex cannot tell those apart.
  */
 const GUARD_IMPORT = /from\s+["'](?:@langwatch\/csv(?:\/download)?|\.\/formula-guard)["']/;
 
@@ -72,12 +46,8 @@ const GUARDED_WRITERS: Record<string, string> = {
 };
 
 /**
- * Serializers whose output is never handed to a person.
- *
- * `parse-tabular-file` converts an uploaded JSON file into the CSV text the
- * import parser reads back moments later. A leading apostrophe there would be
- * stored as part of the dataset value, so guarding it corrupts data rather than
- * protecting a reader.
+ * Serializers whose output is never handed to a person. `parse-tabular-file` converts an
+ * uploaded JSON file into the CSV text the import parser reads back moments later.
  */
 const INTERNAL_SERIALIZERS = new Set(["packages/features/dataset/web/src/model/parse-tabular-file.ts"]);
 

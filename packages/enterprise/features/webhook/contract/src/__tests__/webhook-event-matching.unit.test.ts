@@ -1,11 +1,6 @@
 /**
- * Ported from platform/app/ee/webhooks/__tests__/eventRegistry.unit.test.ts
- * (retired application). `eventRegistry.ts`'s selector-matching logic lives
- * on unchanged as `eventMatches` / `isValidEventSelector` in
- * `webhook.events.ts`; the "rejected at save time" scenario stayed behind —
- * that validation now runs inside `prisma.webhook-endpoint.repository.ts`,
- * a repository-layer integration seam this contract-only suite does not
- * reach.
+ * Ported from platform/app/ee/webhooks/__tests__/eventRegistry.unit.test.ts (retired
+ * application).
  */
 import { describe, expect, it } from "vitest";
 import { eventMatches, isValidEventSelector, WEBHOOK_EVENT_TYPES } from "../webhook.events";

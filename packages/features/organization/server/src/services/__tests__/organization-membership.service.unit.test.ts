@@ -23,7 +23,10 @@ const mockRevokeAllBrowserSessions = vi.fn();
 
 describe("OrganizationMembershipService", () => {
   const mockRepo: OrganizationMembershipRepository = {
-    getClient: vi.fn(),
+    findPersonalTeamInScopes: vi.fn(),
+    findSharedTeamIds: vi.fn(),
+    findTeamRoleBindings: vi.fn(),
+    findCustomRolePermissions: vi.fn(),
     tryGetUserOrgRole: vi.fn(),
     getUserOrgRoleByTeamId: vi.fn(),
     tryFindPrimaryIntentById: vi.fn(),
@@ -65,9 +68,12 @@ describe("OrganizationMembershipService", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    // The flows that compose raw-client helpers ask the repository for its
-    // client; the double is Prisma-backed as far as they are concerned.
-    vi.mocked(mockRepo.getClient!).mockReturnValue({} as unknown as PrismaClient);
+    // The directory reads the role-change flow makes, answered empty unless a
+    // test states otherwise.
+    vi.mocked(mockRepo.findPersonalTeamInScopes).mockResolvedValue(null);
+    vi.mocked(mockRepo.findSharedTeamIds).mockResolvedValue([]);
+    vi.mocked(mockRepo.findTeamRoleBindings).mockResolvedValue([]);
+    vi.mocked(mockRepo.findCustomRolePermissions).mockResolvedValue([]);
     service = OrganizationMembershipService.create({
       repository: mockRepo,
       prompts: mockPrompts,
@@ -161,14 +167,7 @@ describe("OrganizationMembershipService", () => {
      * @scenario "Non-enterprise org cannot assign custom roles via member role update"
      */
     it("refuses before writing when the plan gate rejects a custom team role", async () => {
-      vi.mocked(mockRepo.getClient!).mockReturnValue({
-        team: {
-          findFirst: vi.fn().mockResolvedValue(null),
-          findMany: vi.fn().mockResolvedValue([{ id: "team-1" }]),
-        },
-        project: { findFirst: vi.fn().mockResolvedValue(null) },
-        roleBinding: { findMany: vi.fn().mockResolvedValue([]) },
-      } as unknown as PrismaClient);
+      vi.mocked(mockRepo.findSharedTeamIds).mockResolvedValue(["team-1"]);
       vi.mocked(mockRepo.tryFindMembership).mockResolvedValue({
         role: OrganizationUserRole.MEMBER,
       } as never);

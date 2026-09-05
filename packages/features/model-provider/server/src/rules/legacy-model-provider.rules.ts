@@ -291,18 +291,37 @@ export const listProjectModelProvidersForFrontend = async (
   };
 };
 
-const getModelOrDefaultEnvKey = (modelProvider: LegacyModelProviderExecution, envKey: string) => {
+const getModelOrDefaultEnvKey = ({
+  modelProvider,
+  environment,
+  envKey,
+}: {
+  modelProvider: LegacyModelProviderExecution;
+  environment: Record<string, string | undefined>;
+  envKey: string;
+}) => {
   const storedValue = modelProvider.customKeys?.[envKey];
   return (
-    // Allow env var to be set to empty string '' on purpose to fallback to process.env defined one
-    (typeof storedValue === "string" ? storedValue : "") || process.env[envKey]
+    // Allow a key to be stored as the empty string on purpose, to fall back to
+    // the one the composing process was configured with.
+    (typeof storedValue === "string" ? storedValue : "") || environment[envKey]
   );
 };
 
 const getProviderDefinition = (provider: string) =>
   Object.entries(modelProviders).find(([providerKey]) => providerKey === provider)?.[1];
 
-export const prepareEnvKeys = (modelProvider: LegacyModelProviderExecution) => {
+/**
+ * `environment` is the composing process's own configuration, the fallback for
+ * every key this provider did not store one for.
+ */
+export const prepareEnvKeys = ({
+  modelProvider,
+  environment,
+}: {
+  modelProvider: LegacyModelProviderExecution;
+  environment: Record<string, string | undefined>;
+}) => {
   const providerDefinition = getProviderDefinition(modelProvider.provider);
   if (!providerDefinition) {
     return {};
@@ -312,7 +331,7 @@ export const prepareEnvKeys = (modelProvider: LegacyModelProviderExecution) => {
 
   return Object.fromEntries(
     Object.keys(getSchemaShape(providerDefinition.keysSchema))
-      .map((key) => [key, getModelOrDefaultEnvKey(modelProvider, key)])
+      .map((key) => [key, getModelOrDefaultEnvKey({ modelProvider, environment, envKey: key })])
       .map(([key, value]) => {
         if (key === "CUSTOM_API_KEY") {
           return ["OPENAI_API_KEY", value];

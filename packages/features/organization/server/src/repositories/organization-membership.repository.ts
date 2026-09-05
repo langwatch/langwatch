@@ -8,8 +8,8 @@ import type {
   OrganizationUser,
   OrganizationUserRole,
   PricingModel,
-  PrismaClient,
   Project,
+  RoleBindingScopeType,
   Team,
   TeamUser,
   TeamUserRole,
@@ -348,9 +348,36 @@ export abstract class OrganizationMembershipRepository {
   abstract setMemberDisabled(input: SetMemberDisabledInput): Promise<void>;
 
   /**
-   * The raw Prisma client behind this repository, when it has one.
+   * The personal team a set of role-binding scopes reaches, by the name its
+   * owner sees, or null when they reach only shared ground. Both TEAM and
+   * PROJECT scopes resolve, since a binding on the personal project reaches
+   * the same private space as one on the personal team.
    */
-  abstract getClient?(): PrismaClient | null;
+  abstract findPersonalTeamInScopes(params: {
+    scopes: Array<{ scopeType: RoleBindingScopeType; scopeId: string }>;
+  }): Promise<{ name: string } | null>;
+
+  /**
+   * The teams an organization actually shares, which is every team except the
+   * personal workspace each member gets to themselves.
+   */
+  abstract findSharedTeamIds(params: { organizationId: string }): Promise<string[]>;
+
+  /** One member's team-scoped role bindings, restricted to the named teams. */
+  abstract findTeamRoleBindings(params: {
+    organizationId: string;
+    userId: string;
+    teamIds: string[];
+  }): Promise<Array<{ scopeId: string; role: TeamUserRole; customRoleId: string | null }>>;
+
+  /**
+   * The stored `permissions` value of each named custom role. A Json column,
+   * so the caller decides what a row's shape means.
+   */
+  abstract findCustomRolePermissions(params: {
+    organizationId: string;
+    customRoleIds: string[];
+  }): Promise<unknown[]>;
 
   abstract updateMemberRole(input: UpdateMemberRoleInput): Promise<UpdateMemberRoleResult>;
 

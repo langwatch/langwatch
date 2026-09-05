@@ -4,17 +4,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { GroupStagingScripts } from "../scripts";
 
 /**
- * The `recordSpan` command's GroupQueue staging dedup identity: at most one
- * staged `:data` entry per `(tenant, trace, span)` within the dedup window,
- * so worker-side redelivery (past the ingestion-layer `SpanDedupService`
- * gate) cannot grow a group's staging hash unboundedly.
- *
- * The identity function mirrors `RECORD_SPAN_DEDUPLICATION.makeId` in
- * `packages/features/trace/server/src/adapters/eventing.record-span.adapter.ts`
- * (`${tenantId}:${traceId}:${spanId}`); this suite exercises the underlying
- * `GroupStagingScripts.stage` dedup mechanism directly rather than importing
- * trace-domain code into this package.
- *
+ * The `recordSpan` command's GroupQueue staging dedup identity: at most one staged `:data`
+ * entry per `(tenant, trace, span)` within the dedup window.
  * Spec: specs/traces/record-span-gq-dedup.feature
  */
 

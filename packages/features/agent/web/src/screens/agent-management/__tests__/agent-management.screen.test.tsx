@@ -2,13 +2,6 @@
 
 /**
  * The Agents page, driven the way a reader drives it.
- *
- * These assertions were `platform/app`'s, on the host adapter that composed this
- * page before the family moved; they are about the page rather than about that
- * application, so they come with it. What changed is where each action lands: an
- * overlay this package owns is a query key the screen writes, and an editor
- * still registered in `platform/app` is an address the host writes.
- *
  * Spec: specs/agents/agent-management.feature
  */
 

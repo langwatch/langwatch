@@ -1,17 +1,6 @@
 /**
- * `POST /api/mcp/authorize` — the approval step of the hosted MCP OAuth flow.
- *
- * The consent page posts here once a signed-in person has approved a client's
- * request. It verifies the client and its redirect URI, mints a short-lived
- * authorization code bound to the project's credential, and hands the page the
- * URL to send the client back to.
- *
- * The refusals answer `c.json` with a top-level `error` and
- * `error_description` rather than the handled-error envelope, deliberately:
- * OAuth clients parse those two fields at the top level of the body
- * (RFC 6749 §5.2), and a nested envelope reads to them as a malformed
- * response. This endpoint speaks the OAuth wire format, so the shape below is
- * the contract; do not "fix" it into the envelope.
+ * `POST /api/mcp/authorize` — the approval step of the hosted MCP OAuth flow. The consent page
+ * posts here once a signed-in person has approved a client's request.
  */
 import { handlerManagedAuth } from "@langwatch/api";
 import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
@@ -24,20 +13,9 @@ const REDIS_AUTH_CODE_PREFIX = "mcp:auth_code:";
 const AUTH_CODE_TTL_SECONDS = 600;
 
 /**
- * Schemes an OAuth redirect_uri may never use.
- *
- * TRANSCRIBED from `@langwatch/api-key-web`'s `redirect-schemes.ts` rather than
- * imported: the consent page that navigates to the URI is a browser module, and
- * no server transport may value-import one. The two copies are pinned by the
- * literal list below and by that module's own — a divergence would let this
- * door mint a code for a URI the page then refuses to follow, or worse.
- *
- * A deny-list rather than an `http:`/`https:` allow-list on purpose. Native MCP
- * clients complete the flow through a custom-scheme callback they register with
- * the operating system, and RFC 8252 §7.1 names exactly that as the redirect
- * for a native app; an allow-list would refuse every one of them. So the list
- * names what a BROWSER executes or resolves against our own origin, which is
- * the class that turns a redirect into script execution.
+ * Schemes an OAuth redirect_uri may never use. TRANSCRIBED from `@langwatch/api-key-web`'s
+ * `redirect-schemes.ts` rather than imported: the consent page that navigates to the URI is a
+ * browser module, and no server transport may value-import one.
  */
 const DISALLOWED_REDIRECT_SCHEMES: readonly string[] = [
   "javascript:",
@@ -57,10 +35,9 @@ function isAllowedRedirectScheme(candidate: string): boolean {
 }
 
 /**
- * The permission a caller must hold to mint an authorization code here. The
- * code embeds the project's legacy API key, which every REST family lets past
- * its RBAC check, so approving one confers the whole project. Same grain as
- * `GET /api/project/:id/api-key`, which reveals that key — never `project:view`.
+ * The permission a caller must hold to mint an authorization code here. The code embeds the
+ * project's legacy API key, which every REST family lets past its RBAC check, so approving one
+ * confers the whole project.
  */
 export const MCP_AUTHORIZE_PERMISSION = "project:update" as const;
 
@@ -92,11 +69,6 @@ export interface McpAuthorizeRestPorts {
   }): Promise<boolean>;
   /**
    * Whether the project is the globally-readable demo showcase.
-   *
-   * Its own port rather than a permission probe, because the demo project
-   * grants `project:view` to ANY caller — so a probe would PASS for it, and
-   * any authenticated person could mint a code embedding the demo project's
-   * API key. This is checked BEFORE the probe for exactly that reason.
    */
   isDemoProject(projectId: string): boolean;
   /** The at-rest cipher the embedded credential is written under. */
@@ -155,16 +127,10 @@ export function createMcpAuthorizeRestApp(options: {
         return c.json({ error: "redirect_uri uses a disallowed scheme" }, 400);
       }
 
-      // RFC 6749 §10.6: an authorization server must only ever issue a code to
-      // a redirect_uri that was registered for this client_id — otherwise
-      // whoever crafts the authorization request (which can be an attacker,
-      // not the approving user) can point it at a URI they control and the
-      // approved code is exfiltrated there. PKCE does not defend against this:
-      // it proves the token-exchanger holds the verifier for the challenge in
-      // the code, and an attacker who authored the request holds both. Exact
-      // string match against the client's registered redirect_uris — no
-      // scheme/host-only comparison, which a subdomain or path trick could
-      // slip past.
+      // RFC 6749 §10.6: an authorization server must only ever issue a code to a redirect_uri
+      // that was registered for this client_id — otherwise whoever crafts the authorization
+      // request (which can be an attacker, not the approving user) can point it at a URI they
+      // control and the approved code is exfiltrated there.
       const registeredClient = await RedisOAuthClientRepository.get({
         redis: ports.redis,
         clientId,
@@ -179,12 +145,11 @@ export function createMcpAuthorizeRestApp(options: {
         );
       }
 
-      // Past this point the client_id is registered and the redirect_uri is one
-      // of the URIs it registered, so RFC 6749 §4.1.2.1 says a failure belongs
-      // back at the client rather than on this page: the client is waiting on
-      // its redirect and an error rendered here leaves it hanging forever. The
-      // checks above deliberately stay local — an unverified redirect_uri is
-      // exactly what an attacker would supply, so nothing is ever sent to it.
+      // Past this point the client_id is registered and the redirect_uri is one of the URIs it
+      // registered, so RFC 6749 §4.1.2.1 says a failure belongs back at the client rather than
+      // on this page: the client is waiting on its redirect and an error rendered here leaves
+      // it hanging forever. The checks above deliberately stay local — an unverified
+      // redirect_uri is exactly what an attacker would supply, so nothing is ever sent to it.
       const errorRedirect = ({ error, description }: { error: string; description: string }) => {
         const url = new URL(redirectUri);
         url.searchParams.set("error", error);

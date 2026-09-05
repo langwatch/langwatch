@@ -1,22 +1,9 @@
 /**
  * Pure path predicates for the ADR-027 license-gated SSO decision. These
- * answer only *which BetterAuth endpoint is this?* — the license half of the
- * decision lives in `ee/sso/sso-gate.ts` (`platformSSOAllowed`), and the
- * before-hook in `src/server/better-auth/index.ts` composes the two.
- *
- * All matching is done on the NORMALIZED pathname (query stripped, trailing
- * slashes removed): the router (rou3) resolves `/sign-up/email/` to the same
- * handler as `/sign-up/email`, so suffix-matching the raw URL would let a
- * one-character variant walk past every block.
  */
 
 /**
  * ADR-027 gate site #2 — the SSO-initiation paths blocked when the platform
- * gate denies. Verified against better-auth 1.6.x + genericOAuth (v5 MAJOR
- * fix): `/oauth2/authorize` is a phantom (that's the OIDC-*provider* endpoint,
- * not a client one) and is deliberately excluded. `/link-social` +
- * `/oauth2/link` are included so a coerced-mode user can't pre-link a provider
- * that goes live after a later allow-flip.
  */
 export const GATED_SSO_INITIATION_SUFFIXES = [
   "/sign-in/social",
@@ -28,8 +15,6 @@ export const GATED_SSO_INITIATION_SUFFIXES = [
 /**
  * Credential-mutation endpoints blocked in EVERY gate state on an SSO-capable
  * deployment (ADR-027 Constants table) — no logged-in session can attach or
- * change a password. The password-reset pair is deliberately excluded: it is
- * gate-dependent (blocked on ALLOW, open on DENY) and handled separately.
  */
 const CREDENTIAL_MUTATION_SUFFIXES = [
   "/change-password",
@@ -78,14 +63,9 @@ export const isPasswordResetPath = (pathname: string): boolean =>
   endsWithAny(pathname, PASSWORD_RESET_SUFFIXES);
 
 /**
- * True for the only paths whose outcome the license gate can change: the
- * password-reset pair and the email-auth pair (refused while the gate allows)
- * and the SSO-initiation/callback set (refused while it denies).
- *
- * Everything else better-auth mounts, session reads and sign-out most of all,
- * returns from the hook unchanged in both gate states. Asking first would make
- * those requests wait on a licensing-store read that cannot affect them, so
- * a store that is merely slow would stall signed-in users.
+ * True for the only paths whose outcome the license gate can change: the password-reset pair
+ * and the email-auth pair (refused while the gate allows) and the SSO-initiation/callback set
+ * (refused while it denies).
  */
 export const isGateDependentPath = (url: string): boolean => {
   const pathname = normalizedRequestPathname(url);
@@ -94,17 +74,6 @@ export const isGateDependentPath = (url: string): boolean => {
 
 /**
  * ADR-027 gate site #2: true for any request refused while the platform SSO
- * gate denies, meaning the initiation paths plus ANY callback path.
- *
- * The callback test is a substring match on the normalized pathname, not an
- * anchored one, because the segment can sit anywhere: `/callback/auth0` and
- * `/oauth2/callback/okta` both have to match. Normalizing first is what makes
- * a bare substring safe here, since it strips the query (callbacks carry
- * `?code=&state=`) and guarantees a provider segment follows.
- *
- * This is the only interception point that sees the legacy
- * `/api/auth/callback/auth0|okta` rewrite (`redirectURI` pinned in index.ts),
- * so a path-prefix middleware on `/oauth2/*` alone would miss it entirely.
  */
 export const isGatedSsoPath = (url: string): boolean => {
   const pathname = normalizedRequestPathname(url);

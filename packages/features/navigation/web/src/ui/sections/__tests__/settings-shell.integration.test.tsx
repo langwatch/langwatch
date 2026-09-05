@@ -1,19 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * The Settings sidebar in the navigation-v2 shell: the way back, the
- * regrouped iconed menu with its gates, the fold state, the rule under
- * the back entry, and the top bar's static Settings title.
- *
- * Lifted from
- * `platform/app/src/features/navigation/__tests__/SettingsShellV2.integration.test.tsx`
- * (deleted with `platform/app`). The legacy chrome's `SettingsLayout` and
- * `DashboardLayout` are `SidebarContent surface="settings"` and
- * `ShellTopBar` now; the mocks that named that application's hooks are the
- * stub navigation host.
- *
- * Specs: specs/navigation/settings-shell-v2.feature,
- *        specs/navigation/ops-navigation-v2.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

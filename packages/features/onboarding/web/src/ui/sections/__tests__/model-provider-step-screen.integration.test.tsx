@@ -1,11 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * The step renders the real provider grid on its onboarding surface — Codex
- * leads, badged — and both finishing the setup and skipping advance the flow.
- * The credential form is mocked at its module seam: placement, copy and the
- * advance wiring are what is under test, not the save mechanics.
- *
  * Spec: specs/features/onboarding/model-provider-step.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

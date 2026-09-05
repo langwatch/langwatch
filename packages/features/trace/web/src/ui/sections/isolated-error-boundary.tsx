@@ -3,6 +3,8 @@ import { AlertTriangle, RotateCcw } from "lucide-react";
 import type * as React from "react";
 import { ErrorBoundary, type FallbackProps } from "react-error-boundary";
 
+import { useUiDeployment } from "@langwatch/ui-host/capabilities";
+
 import { explainAnyError } from "./errors";
 
 interface IsolatedErrorBoundaryProps {
@@ -62,7 +64,7 @@ const InlineError: React.FC<FallbackProps & { scope?: string }> = ({
   // headline is usually the generic one — and the caller's `scope` ("Couldn't
   // load this trace") names the surface that broke, which is more use.
   const heading = explanation.isRegistered ? explanation.title : (scope ?? explanation.title);
-  const isDev = process.env.NODE_ENV === "development";
+  const isDev = useUiDeployment().isDevelopment;
   const rawMessage = error instanceof Error ? error.message : String(error);
 
   return (

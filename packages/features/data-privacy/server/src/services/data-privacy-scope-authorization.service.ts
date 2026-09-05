@@ -1,20 +1,7 @@
 /**
- * Who may write a privacy rule where, and which organization a scope target
- * belongs to.
- *
- * Moved out of `platform/app`'s `server/data-privacy/dataPrivacyPolicy.authz.ts`
- * unchanged in behaviour. Two guards, and they answer different questions:
- *
- *  - {@link assertCanWriteScope} authorizes the TARGET at its own tier, so a
- *    project member cannot push a rule up to the organization;
- *  - {@link assertScopeBelongsToProjectOrganization} anchors that target to the
- *    organization of the project the caller is acting from, so a request
- *    pairing a project with a scope in an unrelated tenant is refused before
- *    either is written.
- *
- * The permission each tier demands MUST mirror what
- * {@link DataPrivacySnapshotService} advertises as writable, or the chip picker
- * offers a scope the save then rejects.
+ * Who may write a privacy rule where, and which organization a scope target belongs to. Moved
+ * out of `platform/app`'s `server/data-privacy/dataPrivacyPolicy.authz.ts` unchanged in
+ * behaviour.
  */
 import type { DataPrivacyScope, DataPrivacyScopeType } from "@langwatch/data-privacy-contract";
 import { TRPCError } from "@trpc/server";

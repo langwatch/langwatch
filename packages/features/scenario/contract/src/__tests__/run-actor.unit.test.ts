@@ -1,8 +1,5 @@
 /**
  * @vitest-environment node
- *
- * Which caller a REST run is recorded against.
- *
  * @see specs/scenarios/run-actor-on-runs.feature
  */
 

@@ -1,9 +1,5 @@
 /**
  * @vitest-environment node
- *
- * Package-owned persistence characterisation for GitHub branch mapping. The
- * external GitHub HTTP boundary is intercepted; the public composition adapter
- * owns the real mapping service and Prisma adapters.
  */
 import { generateKeyPairSync } from "crypto";
 import { GithubPrismaInstaller } from "@langwatch/github-server";

@@ -1,7 +1,5 @@
 /**
  * @vitest-environment node
- * @unit
- *
  * Spec: specs/licensing/usage-enforcement-plan-resolution.feature.
  */
 import { describe, expect, it, vi } from "vitest";

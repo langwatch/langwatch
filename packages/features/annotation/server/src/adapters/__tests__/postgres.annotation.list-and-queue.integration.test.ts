@@ -1,8 +1,5 @@
 /**
  * @vitest-environment node
- *
- * The project's annotations list, its export, and queue-item creation
- * against real Postgres — specs/traces-v2/anchored-comments.feature.
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

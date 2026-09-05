@@ -18,6 +18,8 @@ import {
   type GatewaySpendRatingPort,
 } from "@langwatch/gateway-server";
 import { PrismaGatewayChangeEventsRepository } from "@langwatch/gateway-server/composition/gateway-change-events";
+import { PrismaGatewayGuardrailRepository } from "@langwatch/gateway-server/composition/gateway-guardrails";
+import { PrismaGatewayElevenLabsCredentialRepository } from "@langwatch/gateway-server/composition/gateway-elevenlabs-credentials";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import { EncryptedModelProviderCredentialAdapter } from "@langwatch/model-provider-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -25,6 +27,9 @@ import type { ProjectService } from "@langwatch/project-contract";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
 
 import type { ApiGatewayComposition } from "./api-gateway.composition";
+import { PrismaGatewayScopeResolutionRepository } from "@langwatch/gateway-server/composition/gateway-scope-resolution";
+import { GatewayScopeResolutionService } from "@langwatch/gateway-server";
+import { PrismaGatewayRealtimeSessionRepository } from "@langwatch/gateway-server/composition/gateway-realtime-sessions";
 
 /**
  * The Codex OAuth refresh, as the gateway's recovery road reads it. Stated structurally
@@ -105,7 +110,9 @@ export function composeApiGatewayInternalRest(
   const changes = PrismaGatewayChangeEventsRepository.create(prisma);
   const jwt = GatewayJwtAdapter.create({ secret: jwtSecret });
   const materialiser = GatewayConfigMaterialiserService.create({
-    prisma,
+    scopeResolution: GatewayScopeResolutionService.create({
+      repository: PrismaGatewayScopeResolutionRepository.create({ database: prisma }),
+    }),
     projects,
     chRepo: gateway.budgetSpend ?? null,
     // The SAME decision store the console writes a budget through, so the
@@ -137,7 +144,13 @@ export function composeApiGatewayInternalRest(
     budgetSpend: () => gateway.budgetSpend,
     ...(options.refreshCodex ? { refreshCodex: options.refreshCodex } : {}),
     ...(monitors && runEvaluator
-      ? { guardrails: () => ({ database: prisma, monitors, runEvaluator }) }
+      ? {
+          guardrails: () => ({
+            repository: PrismaGatewayGuardrailRepository.create(prisma),
+            monitors,
+            runEvaluator,
+          }),
+        }
       : {}),
     ...(spendCommands ? { spend: () => ({ commands: spendCommands, rating }) } : {}),
     ...(realtimeSessions ? { realtimeSessions: () => realtimeSessions } : {}),
@@ -159,7 +172,7 @@ export function composeApiGatewayRealtimeSessions(options: {
   if (!options.spendConfirmation) return undefined;
 
   return {
-    database: options.prisma,
+    sessions: PrismaGatewayRealtimeSessionRepository.create({ database: options.prisma }),
     spendRating: options.rating ?? ModelCatalogGatewaySpendRatingAdapter.create(),
     spendConfirmation: options.spendConfirmation,
   };
@@ -188,7 +201,9 @@ export function composeApiElevenLabsWebhookRest(options: {
     security: options.security,
     ports: {
       credentials: {
-        database: options.prisma,
+        providers: PrismaGatewayElevenLabsCredentialRepository.create({
+          database: options.prisma,
+        }),
         credentials: ApiGatewayModelProviderCredentials.create(encryption),
       },
       sessions,

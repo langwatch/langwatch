@@ -8,23 +8,9 @@ import type {
 const logger = createLogger("langwatch:tasks:topic-clustering-run");
 
 /**
- * Manual, one-shot clustering run for a single project — the operator's
- * escape hatch for a project that needs a run outside its own cadence gate,
- * or a re-run after a langevals/model incident.
- *
- * Walks every page `runPage` returns until `nextSearchAfter` is empty. One
- * stable run identity for the whole walk, so re-recorded pages dedupe instead
- * of appending a fresh `topics_recorded` chain on every re-run.
- *
- * The composed entrypoint is still absent: a real {@link TopicClusteringRunPort}
- * needs a model-provider gateway, langevals and a Prisma repository —
- * `apps/tasks` composes none of them. The two producer-only Eventing
- * registrations this task would ALSO need now both have factories
- * (`TopicClusteringProcessingProducerAdapter.createPipeline` here,
- * `createTraceProcessingProducerPipeline` in `@langwatch/trace-server`, for
- * `TraceTopicAssignmentPort`); the model-provider/langevals/Prisma runner
- * collaborator graph is the remaining blocker. Full collaborator list:
- * `apps/tasks/src/tasks.catalogue.ts` and the launch-interface plan doc.
+ * Manual, one-shot clustering run for a single project — the operator's escape hatch for a
+ * project that needs a run outside its own cadence gate, or a re-run after a langevals/model
+ * incident. Walks every page `runPage` returns until `nextSearchAfter` is empty.
  */
 export class TopicClusteringRunTask extends Task {
   readonly name = "topic-clustering-run";

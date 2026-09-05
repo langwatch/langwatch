@@ -1,10 +1,5 @@
 /**
  * Which unit an organization's usage is counted in, and why.
- *
- * A pure decision with no I/O, because the two callers that need it disagree
- * about everything else: the usage panel resolves it per request off a plan it
- * already has, and the metering path resolves it on a cached organization row.
- * One decision keeps the panel and the meter from measuring different things.
  */
 import { PricingModel } from "@langwatch/prisma-client/generated";
 import type { UsageUnit } from "@langwatch/entitlement-contract";
@@ -30,15 +25,9 @@ export class UsageMeterPolicyService {
   }
 
   /**
-   * Resolves which counting unit to use for usage metering.
-   *
-   * Precedence:
-   *   1. License override with explicit usageUnit → use that unit
-   *   2. PricingModel SEAT_EVENT → always events
-   *   3. Free tier (isFree=true) → events regardless of pricing model
-   *   4. Paid non-SEAT_EVENT → traces
-   *
-   * This is a pure decision — no side effects, no I/O.
+   * Resolves which counting unit to use for usage metering. Precedence: 1. License override
+   * with explicit usageUnit → use that unit 2. PricingModel SEAT_EVENT → always events 3. Free
+   * tier (isFree=true) → events regardless of pricing model 4.
    */
   static resolveUsageMeter({
     pricingModel,

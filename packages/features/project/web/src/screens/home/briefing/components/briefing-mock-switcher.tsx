@@ -1,11 +1,7 @@
 import { chakra } from "@chakra-ui/react";
+import { useUiDeployment } from "@langwatch/ui-host/capabilities";
 import type { ChangeEvent } from "react";
-import {
-  BRIEFING_MOCKS,
-  isBriefingMockAvailable,
-  setBriefingMock,
-  useBriefingMock,
-} from "../mocks/briefing-mocks";
+import { BRIEFING_MOCKS, setBriefingMock, useBriefingMock } from "../mocks/briefing-mocks";
 
 /**
  * Development-only preview control for the Langy briefing's DATA states.
@@ -18,7 +14,8 @@ import {
  */
 export function BriefingMockSwitcher() {
   const active = useBriefingMock();
-  if (!isBriefingMockAvailable()) return null;
+  const { isDevelopment } = useUiDeployment();
+  if (!isDevelopment) return null;
 
   const onChange = (event: ChangeEvent<HTMLSelectElement>) => {
     setBriefingMock(event.target.value || null);

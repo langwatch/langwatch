@@ -1,8 +1,7 @@
 /**
- * Whether one more of something is within licence, click-then-modal (never
- * a disabled button, since that explains nothing). Optimistic while loading
- * — the server re-enforces on write, so worst case is a refusal one round
- * trip later.
+ * Whether one more of something is within licence, click-then-modal (never a disabled button,
+ * since that explains nothing). Optimistic while loading — the server re-enforces on write, so
+ * worst case is a refusal one round trip later.
  */
 
 import type { LimitType } from "@langwatch/enterprise-licensing-contract";

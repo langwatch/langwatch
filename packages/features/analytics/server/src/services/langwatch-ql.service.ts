@@ -29,7 +29,7 @@ import {
   DEFAULT_LWQL_RESULT_LIMITS,
   type LangWatchQLExecutor,
   type LangWatchQLResultLimits,
-  lwqlConnectionFromEnv,
+  lwqlConnectionFromEnvironment,
 } from "../langwatch-ql/executor";
 import {
   assertLangWatchQLGranularityDeclaration,
@@ -210,12 +210,13 @@ export class LangWatchQLService {
   }
 
   /**
-   * Builds the service from the environment.
+   * Builds the service from an environment a process handed over.
    */
   static fromEnvironment(
+    environment: Record<string, string | undefined>,
     overrides: Partial<LangWatchQLServiceDependencies> = {},
   ): LangWatchQLService {
-    const connection = lwqlConnectionFromEnv();
+    const connection = lwqlConnectionFromEnvironment(environment);
 
     return new LangWatchQLService({
       executor: connection ? createLangWatchQLExecutor(connection) : null,
@@ -225,8 +226,8 @@ export class LangWatchQLService {
   }
 
   /** The process-wide service, built from the environment on first use. */
-  static shared(): LangWatchQLService {
-    cached ??= LangWatchQLService.fromEnvironment();
+  static shared(environment: Record<string, string | undefined>): LangWatchQLService {
+    cached ??= LangWatchQLService.fromEnvironment(environment);
 
     return cached;
   }

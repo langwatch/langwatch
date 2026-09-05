@@ -1,11 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * The Automations workspace's own local navigation rail: the product
- * sidebar has no Automations sub-pages of its own, so this family keeps
- * a rail of its own page-local destinations rather than standing it
- * down the way Gateway and Governance do.
- *
  * Spec: specs/navigation/shared-section-navigation-layout.feature
  */
 

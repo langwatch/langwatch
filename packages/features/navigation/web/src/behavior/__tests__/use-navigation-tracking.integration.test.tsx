@@ -1,15 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * The navigation-v2 write points: product memory follows the pathname the
- * host reports, and entering Settings captures the page left so the back
- * entry can return there.
- *
- * MOVED from `platform/app/src/features/navigation/__tests__/useNavigationV2Tracking.integration.test.tsx`,
- * which drove a real memory router. That router is gone: this hook reads the
- * pathname off the navigation host, not off react-router, so a stub host
- * rerendered with a new pathname exercises the same write points.
- *
  * Spec: specs/navigation/navigation-v2-product-memory.feature
  */
 

@@ -1,21 +1,7 @@
 /**
- * MCP HTTP handler for the in-app Streamable HTTP transport.
- *
- * Mounts MCP routes inside the main LangWatch app's custom Node.js server,
- * handling authentication via Bearer tokens (direct API keys or OAuth-issued
- * access tokens), session management, and CORS.
- *
- * Routes handled:
- * - POST /mcp          — Streamable HTTP initialize/requests
- * - GET  /mcp          — Streamable HTTP polling
- * - DELETE /mcp        — Close session
- * - GET  /mcp/health   — Health check (no auth)
- * - GET  /sse          — SSE transport stream
- * - POST /messages, /sse/messages — SSE transport client messages
- * - GET  /.well-known/oauth-protected-resource[/mcp|/sse] — RFC 9728 metadata
- * - GET  /.well-known/oauth-authorization-server[/mcp|/sse] — OAuth metadata
- * - POST /oauth/register — Dynamic client registration
- * - POST /oauth/token  — OAuth token endpoint
+ * MCP HTTP handler for the in-app Streamable HTTP transport. Mounts MCP routes inside the main
+ * LangWatch app's custom Node.js server, handling authentication via Bearer tokens (direct API
+ * keys or OAuth-issued access tokens), session management, and CORS.
  */
 
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
@@ -60,10 +46,8 @@ const REDIS_SSE_SESSION_PREFIX = "mcp:sse:session:";
 const REDIS_SSE_SESSION_SET_PREFIX = "mcp:sse:sessions_by_key:";
 
 /**
- * Redis pub/sub channel prefix carrying a client message to whichever replica
- * holds the SSE stream for that session. An SSE stream is bound to the socket
- * that opened it, so a replica that receives a message for a session it does
- * not hold cannot answer it and cannot recreate the stream either.
+ * Redis pub/sub channel prefix carrying a client message to whichever replica holds the SSE
+ * stream for that session.
  */
 const REDIS_SSE_RELAY_CHANNEL_PREFIX = "mcp:sse:relay:";
 
@@ -143,12 +127,9 @@ function createRateLimiter({ windowMs, maxRequests }: { windowMs: number; maxReq
 // ---------------------------------------------------------------------------
 
 /**
- * Fields a route handler learned mid-request that belong on its access log
- * line. MCP requests return before the app's Hono stack, so this surface has
- * no access log of its own and a failing integration is otherwise invisible.
- *
- * Only identifiers go in here. Bearer tokens, API keys and authorization codes
- * never do: the log is the one place they would outlive the request.
+ * Fields a route handler learned mid-request that belong on its access log line. MCP requests
+ * return before the app's Hono stack, so this surface has no access log of its own and a
+ * failing integration is otherwise invisible. Only identifiers go in here.
  */
 const requestLogFields = new WeakMap<ServerResponse, Record<string, string>>();
 
@@ -169,10 +150,9 @@ interface SessionState {
   transport: StreamableHTTPServerTransport;
   apiKey: string;
   /**
-   * The OAuth-flowing user — populated when the session was minted via the
-   * /api/mcp/authorize PKCE flow, absent for direct-apiKey-as-Bearer sessions.
-   * Used by governance MCP tools to attribute audit rows + enforce RBAC at
-   * the tool layer.
+   * The OAuth-flowing user — populated when the session was minted via the /api/mcp/authorize
+   * PKCE flow, absent for direct-apiKey-as-Bearer sessions. Used by governance MCP tools to
+   * attribute audit rows + enforce RBAC at the tool layer.
    */
   userId?: string;
   lastActivityAt: number;
@@ -219,12 +199,9 @@ export interface McpHandler {
 export const HOSTED_MCP_FAMILY = "hosted-mcp";
 
 /**
- * The policy every route verb below wears.
- *
- * This family answers off the raw Node listener rather than the Hono stack, so
- * no `SecuredApp` records it and an authorization audit reading the registry
- * saw nothing here at all. The declarations are written by hand for exactly
- * that reason, and registered when the handler is composed.
+ * The policy every route verb below wears. This family answers off the raw Node listener rather
+ * than the Hono stack, so no `SecuredApp` records it and an authorization audit reading the
+ * registry saw nothing here at all.
  */
 const BEARER_SESSION_POLICY: AccessPolicy = handlerManagedAuth({
   reason:
@@ -322,22 +299,13 @@ export function registerHostedMcpRoutePolicies(): void {
 }
 
 /**
- * Creates an MCP handler instance that manages sessions, OAuth tokens,
- * and routes for the Streamable HTTP transport.
- *
- * Every collaborator is handed in. The endpoint used to reach a process-global
- * application object for its Redis connection, its database and its governance
- * service, which made it impossible to mount twice, impossible to test without
- * booting that object, and impossible to tell from the outside what it
- * actually touched.
+ * Creates an MCP handler instance that manages sessions, OAuth tokens, and routes for the
+ * Streamable HTTP transport. Every collaborator is handed in.
  */
 export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandler {
-  // Resolved once, here: the connection does not change for the life of the
-  // process. Null means no Redis is configured, and every use below branches on
+  // Resolved once, here: the connection does not change for the life of the process. Null means
+  // no Redis is configured, and every use below branches on
   // it — but not all the same way (ADR-093). Session storage degrades to the
-  // in-memory map, so a single process keeps working; the OAuth
-  // authorization-code exchange cannot, because the code is written by whichever
-  // process served the authorize request, so it answers 500 instead.
   const { redis, projects, grants, cipher, address, sessionTools } = dependencies;
   const encrypt = (plaintext: string): string => cipher.encrypt(plaintext);
   const decrypt = (ciphertext: string): string => cipher.decrypt(ciphertext);
@@ -456,11 +424,9 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
   ]);
 
   /**
-   * RFC 9728 §3.1 lets a client that only knows the resource URL ask for
-   * metadata at the resource's path under the well-known prefix, and modern
-   * MCP clients try that form before the bare one. Claiming the whole subtree
-   * keeps those probes from reaching the single-page-app fallback, which
-   * answers 200 text/html and leaves the client parsing markup as JSON.
+   * RFC 9728 §3.1 lets a client that only knows the resource URL ask for metadata at the
+   * resource's path under the well-known prefix, and modern MCP clients try that form before
+   * the bare one.
    */
   const OAUTH_METADATA_PREFIXES = [
     `${PROTECTED_RESOURCE_METADATA_PATH}/`,
@@ -529,10 +495,8 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
   }
 
   /**
-   * Reads a request body, answering the caller itself when it is too large.
-   * Returns `undefined` in that case — a response has already been sent and
-   * the caller must stop. Bodies that need their own parse failure (the form
-   * readers each answer with a different OAuth error) build on this.
+   * Reads a request body, answering the caller itself when it is too large. Returns `undefined`
+   * in that case — a response has already been sent and the caller must stop.
    */
   async function readRawBody(
     req: IncomingMessage,
@@ -578,23 +542,9 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
   }
 
   /**
-   * The rate-limit bucket for a caller.
-   *
-   * The socket address alone is the load balancer for every caller once the
-   * app runs behind Cloudflare and an NLB, which collapses every client in the
-   * world into one bucket and lets a single busy integration lock everyone
-   * else out. The proxy headers are the only per-client signal that survives
-   * that hop, so they are what we key on, with the socket address as the
-   * fallback for direct connections. Shares the header priority (and the
-   * address validation) with the rest of the app rather than re-deriving it.
-   *
-   * That priority puts `cf-connecting-ip` first, which is the header the edge
-   * writes itself: Cloudflare replaces any caller-supplied value before the
-   * request reaches an origin, so what we bucket on is edge-authored rather
-   * than caller-authored wherever the deployment keeps that edge in front. A
-   * deployment that exposes the origin directly is trusting these headers to
-   * the same degree as every other rate limit in the app, which is why the
-   * resolution stays shared instead of being re-derived here.
+   * The rate-limit bucket for a caller. The socket address alone is the load balancer for every
+   * caller once the app runs behind Cloudflare and an NLB, which collapses every client in the
+   * world into one bucket and lets a single busy integration lock everyone else out.
    */
   function getClientIp(req: IncomingMessage): string {
     return address.clientIp(req);
@@ -634,12 +584,9 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
   }
 
   /**
-   * Resolves a Bearer token to {apiKey, userId?}. The userId is set when
-   * the token was minted via the /mcp/authorize OAuth flow (we capture
-   * `session.user.id` at code creation), and undefined when the token is
-   * a direct project apiKey passed as Bearer. Governance MCP tools that
-   * need a caller identity (audit attribution, RBAC) read userId from
-   * here; tools that only need org context can ignore it.
+   * Resolves a Bearer token to {apiKey, userId?}. The userId is set when the token was minted
+   * via the /mcp/authorize OAuth flow (we capture `session.user.id` at code creation), and
+   * undefined when the token is a direct project apiKey passed as Bearer.
    */
   async function resolveSessionContext(
     token: string,
@@ -659,10 +606,8 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
   }
 
   /**
-   * Whether the project membership the bearer was minted from still holds.
-   * Probed on first use and every {@link GRANT_RECHECK_INTERVAL_MS} after.
-   * A probe that could not answer is never cached, so a database blip refuses
-   * the request in front of it without locking every session out for minutes.
+   * Whether the project membership the bearer was minted from still holds. Probed on first use
+   * and every {@link GRANT_RECHECK_INTERVAL_MS} after.
    */
   async function grantStillHolds(input: {
     token: string;
@@ -1084,10 +1029,9 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
   }
 
   /**
-   * `resourceSuffix` is the resource path a client asked about when it used
-   * the RFC 9728 path-suffixed form. It is echoed back as the `resource`
-   * identifier so a client validating the document against the URL it is
-   * about to call finds them equal.
+   * `resourceSuffix` is the resource path a client asked about when it used the RFC 9728
+   * path-suffixed form. It is echoed back as the `resource` identifier so a client validating
+   * the document against the URL it is about to call finds them equal.
    */
   function handleProtectedResourceMetadata(
     _req: IncomingMessage,
@@ -1105,10 +1049,9 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
   }
 
   /**
-   * Answers the OAuth discovery subtree this server claims but does not
-   * publish a document for. Falling through to the single-page app would give
-   * the client 200 text/html; a JSON 404 is what lets it move on to the
-   * document that does exist.
+   * Answers the OAuth discovery subtree this server claims but does not publish a document for.
+   * Falling through to the single-page app would give the client 200 text/html; a JSON 404 is
+   * what lets it move on to the document that does exist.
    */
   function handleUnknownMetadata(res: ServerResponse): void {
     sendJson(res, 404, {
@@ -1202,11 +1145,9 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
   }
 
   /**
-   * RFC 6749 §2.3.1 client credentials carried in an `Authorization: Basic`
-   * header. Public clients registered here have no secret, so the password
-   * half is expected to be empty and is not checked; the header is only
-   * another place a client may put its `client_id`. Both halves are
-   * form-urlencoded per the same section.
+   * RFC 6749 §2.3.1 client credentials carried in an `Authorization: Basic` header. Public
+   * clients registered here have no secret, so the password half is expected to be empty and is
+   * not checked; the header is only another place a client may put its `client_id`.
    */
   function clientIdFromBasicAuth(req: IncomingMessage): string | null {
     const header = req.headers.authorization;
@@ -1402,15 +1343,8 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
   }
 
   /**
-   * Rebuilds a Streamable HTTP session on this replica from its Redis record,
-   * for a session first created on another one. Returns null when no record
-   * exists or when the record belongs to a different project, and throws when
-   * the SDK internals the rebuild depends on have moved.
-   *
-   * Rebuilding is itself a side effect — it decrypts the stored key, connects
-   * a server bound to it and puts the session in this replica's map — so the
-   * caller's own key is checked against the record before any of that runs,
-   * rather than only checked on the response.
+   * Rebuilds a Streamable HTTP session on this replica from its Redis record, for a session
+   * first created on another one.
    */
   async function recoverStreamableSession({
     sessionId,
@@ -1425,13 +1359,11 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
     if (!redisApiKey) return null;
     if (redisApiKey !== callerApiKey) return null;
 
-    // WORKAROUND: The SDK transport starts uninitialized — we patch its
-    // inner state so it accepts non-init requests with the existing
-    // session ID. This accesses private fields of the SDK's
-    // StreamableHTTPServerTransport wrapper and the underlying
-    // WebStandardStreamableHTTPServerTransport.
-    // Tested against @modelcontextprotocol/sdk@1.29.0.
-    // See: https://github.com/modelcontextprotocol/typescript-sdk/issues/1658
+    // WORKAROUND: The SDK transport starts uninitialized — we patch its inner state so it
+    // accepts non-init requests with the existing session ID. This accesses private fields of
+    // the SDK's StreamableHTTPServerTransport wrapper and the underlying
+    // WebStandardStreamableHTTPServerTransport. Tested against
+    // @modelcontextprotocol/sdk@1.29.0.
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: () => sessionId,
     });
@@ -2066,10 +1998,9 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
   }
 
   /**
-   * Resolves once every session record this replica owns is gone from Redis.
-   * Shutdown waits on it: a released record frees a slot against the
-   * per-project concurrent-session limit, and a process that exits without
-   * waiting leaves those slots allocated until their TTL.
+   * Resolves once every session record this replica owns is gone from Redis. Shutdown waits on
+   * it: a released record frees a slot against the per-project concurrent-session limit, and a
+   * process that exits without waiting leaves those slots allocated until their TTL.
    */
   async function closeAllSessions(): Promise<void> {
     clearInterval(reaper);

@@ -17,10 +17,9 @@ function otlpAttributeName(value: UnknownRecord): string | undefined {
 }
 
 /**
- * `syntheticKey` addresses the leaf and is built from array indices, so it can
- * never satisfy a sensitive-NAME rule: a point attribute list yields
- * `point.0.value.stringValue`. The owning attribute's real name travels with it
- * so those rules can run on this pipeline at all.
+ * `syntheticKey` addresses the leaf and is built from array indices, so it can never satisfy a
+ * sensitive-NAME rule: a point attribute list yields `point.0.value.stringValue`. The owning
+ * attribute's real name travels with it so those rules can run on this pipeline at all.
  */
 function collectStringRefs({
   value,

@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 
 import { lwqlTenantCapability } from "../langwatch-ql/capability";
-import { lwqlConnectionFromEnv } from "../langwatch-ql/executor";
+import type { LangWatchQLConnection } from "../langwatch-ql/executor";
 import {
   lwqlKeyMapTableQualifiedName,
   productionLangWatchQLNames,
@@ -27,6 +27,7 @@ export class LwqlKeyMapService {
   private constructor(
     private readonly repository: LwqlKeyMapRepository,
     private readonly sourceDatabase: string,
+    private readonly connection: LangWatchQLConnection | null,
     private readonly errors: LwqlKeyMapErrorSinkPort,
   ) {}
 
@@ -38,11 +39,14 @@ export class LwqlKeyMapService {
   static create(options: {
     repository: LwqlKeyMapRepository;
     sourceDatabase: string;
+    /** The restricted identity, or `null` where a deployment provisioned none. */
+    connection: LangWatchQLConnection | null;
     errors?: LwqlKeyMapErrorSinkPort;
   }): LwqlKeyMapService {
     return new LwqlKeyMapService(
       options.repository,
       options.sourceDatabase,
+      options.connection,
       options.errors ?? new SilentLwqlKeyMapErrorSink(),
     );
   }
@@ -52,7 +56,7 @@ export class LwqlKeyMapService {
    * row, so project creation must not fail when ClickHouse is unavailable.
    */
   async syncProject(input: { projectId: string; lwqlKey: string | null }): Promise<void> {
-    const connection = lwqlConnectionFromEnv();
+    const { connection } = this;
     if (!connection) {
       return;
     }

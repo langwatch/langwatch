@@ -1,27 +1,6 @@
 /**
  * A dashboard's chart-builder graphs over a host's tRPC transport.
- *
- *   create:             a new chart on a dashboard, at a grid position.
- *   getAll:             the project's charts, each with the alert automation
- *                       watching it, if any.
- *   getById:            one chart, with its validated filters and the alert
- *                       the bell icon in its header edits.
- *   delete:             one chart.
- *   updateById:         a chart's name, payload and filters.
- *   updateLayout:       one chart's grid position.
- *   batchUpdateLayouts: the whole grid after a drag.
- *
- * Reading takes `analytics:view`; creating takes `analytics:create`, editing
- * `analytics:update`, and removing `analytics:delete`.
- *
- * Alert WRITING is not here: it lives on `automation.upsert` with a
  * `customGraphId` as of ADR-034 Phase 5.2, and the bell opens the automations
- * drawer. This surface only reads the persisted graph-alert trigger back.
- *
- * Transport only: policy and delegation to `DashboardApp`. The refusals it
- * raises are named `HandledError`s, which the process's tRPC policy maps to a
- * code and a status, so nothing here translates an error any more.
- *
  * Spec: packages/features/dashboard/specs/dashboard-service.feature.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
@@ -41,10 +20,6 @@ import type { DashboardApp } from "#app/dashboard.app";
 
 /**
  * The host supplies authentication; authorization arrives as `policy`.
- *
- * The same slice `dashboards.*` takes, and the same {@link DashboardApp}
- * object — including the alert lookup, which this surface reaches through the
- * application rather than through a second entry in a bag of its own.
  */
 export type GraphTrpcContext = Readonly<{ app: Readonly<{ dashboard: DashboardApp }> }>;
 
@@ -56,13 +31,8 @@ type GraphTrpcProcedures<
   /** The host's authenticated procedure. */
   protected: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
   /**
-   * The host's tracing, logging, error, scope-lineage, authorization and audit
-   * policy for one declared permission.
-   *
-   * Applied by this feature AFTER its own input parser rather than composed
-   * ahead of it, because the authorization check reads its scope id from the
-   * validated input: tRPC runs middlewares in the order they were added, so a
-   * check installed before `.input()` would see no input at all.
+   * The host's tracing, logging, error, scope-lineage, authorization and audit policy for one
+   * declared permission.
    */
   policy(permission: AuthzPermission): <TProcedure>(procedure: TProcedure) => TProcedure;
 }>;
@@ -72,10 +42,7 @@ type GraphTrpcProcedures<
  */
 export type GraphTrpcPorts<TFilterField extends string> = Readonly<{
   /**
-   * The filter fields a stored graph may name. Injected because the catalogue
-   * of filterable trace fields belongs to the host's filter registry, not to
-   * Dashboard: a graph stores whatever the builder wrote, and this is what
-   * decides which of those keys are still real when the graph is read back.
+   * The filter fields a stored graph may name.
    */
   filterFieldSchema: z.ZodType<TFilterField>;
   /**

@@ -20,12 +20,8 @@ export type RecentArchivableRow = RecentEntityRow & { archivedAt: Date | null };
 export type RecentSluggedRow = RecentEntityRow & { slug: string };
 
 /**
- * The audit-trail reads behind the home screen's recent strip, and the five
- * entity lookups that hydrate what it finds there.
- *
- * Every entity lookup is a `try*`: the strip reads an audit trail, so it names
- * rows that may since have been deleted, and absence is the ordinary answer
- * rather than a failure.
+ * The audit-trail reads behind the home screen's recent strip, and the five entity lookups that
+ * hydrate what it finds there.
  */
 export abstract class RecentItemsRepository {
   abstract getRecentAuditLogEntries(params: GetRecentItemsParams): Promise<AuditLog[]>;

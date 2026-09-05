@@ -110,12 +110,9 @@ describe("GroupQueueProcessor — decode-drop durability (#5538)", () => {
   }
 
   /**
-   * Stages a GQ2 s3-tier job directly (bypassing the dispatch loop) whose
-   * stored bytes are then mutated by the caller before a consumer claims it
-   * — so the corruption/deletion can never race the queue's own dispatcher.
-   * `consumerEnabled:false` on the staging queue is what makes that safe
-   * (same pattern as "given an offloaded job / when it is staged" in
-   * group-queue.gq2.integration.test.ts).
+   * Stages a GQ2 s3-tier job directly (bypassing the dispatch loop) whose stored bytes are then
+   * mutated by the caller before a consumer claims it — so the corruption/deletion can never
+   * race the queue's own dispatcher.
    */
   async function stageOffloaded({
     name,
@@ -202,13 +199,11 @@ describe("GroupQueueProcessor — decode-drop durability (#5538)", () => {
         // named it a drop. Reverting removes gq_jobs_dropped_total entirely, so
         // dropsFor() stays empty and the waitFor above times out.
         expect(entry!.labels.reason).toBe("retry_encode_failed");
-        // Unlike body-present decode failures, this path retires its lease:
-        // the body was already read, so keeping the lease buys a later worker
-        // nothing. Shared bytes remain for lazy lifecycle reclaim.
-        //
-        // Polled rather than asserted once: the drop counter increments in
-        // process memory, while the release is a Redis round-trip issued
-        // after it, so the two are not observable at the same instant.
+        // Unlike body-present decode failures, this path retires its lease: the body was
+        // already read, so keeping the lease buys a later worker nothing. Shared bytes remain
+        // for lazy lifecycle reclaim. Polled rather than asserted once: the drop counter
+        // increments in process memory, while the release is a Redis round-trip issued after
+        // it, so the two are not observable at the same instant.
         await vi.waitFor(
           async () => {
             expect(await redis.keys(`${name}:gq:blobleases:*`)).toHaveLength(0);
@@ -367,12 +362,11 @@ describe("GroupQueueProcessor — decode-drop durability (#5538)", () => {
         );
 
         const [entry] = await dropsFor(name);
-        // The whole point of the full label set: a bare {queue_name, reason}
-        // can't tell a dropped UI broadcast from a dropped billing event.
-        // Asserting the exact identity (not just "non-zero") is deliberate —
-        // "unknown" in any of these fields would still make this pass a
-        // weaker assertion, and "unknown" is exactly the failure this AC
-        // exists to catch.
+        // The whole point of the full label set: a bare {queue_name, reason} can't tell a
+        // dropped UI broadcast from a dropped billing event. Asserting the exact identity (not
+        // just "non-zero") is deliberate — "unknown" in any of these fields would still make
+        // this pass a weaker assertion, and "unknown" is exactly the failure this AC exists to
+        // catch.
         expect(entry!.value).toBe(1);
         expect(entry!.labels).toEqual({
           queue_name: name,
@@ -619,13 +613,9 @@ describe("GroupQueueProcessor — decode-drop durability (#5538)", () => {
       it("increments the drop counter with the transient-exhausted reason", async () => {
         const name = freshName();
         const groupId = `${TENANT}/transient-exhausted`;
-        // handleTransientDecode reads the attempt count straight from the
-        // envelope's header machinery (`__attempt`, see jobEnvelope.ts's
-        // readJobAttempt/withJobAttempt — the legacy id-segment marker this
-        // test originally crafted has been retired). Stamping the header at
-        // the ladder's own maxAttempts puts the job one failure from the end
-        // on its first claim, sidesteps ~2h of real exponential backoff (25
-        // attempts, capped at 600s each) with no fake timers.
+        // handleTransientDecode reads the attempt count straight from the envelope's header
+        // machinery (`__attempt`, see jobEnvelope.ts's readJobAttempt/withJobAttempt — the
+        // legacy id-segment marker this test originally crafted has been retired).
         const craftedStagedJobId = "victim";
 
         const flaky = new FlakyObjectStore(1); // one failure is all that's needed

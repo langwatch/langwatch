@@ -1,23 +1,7 @@
 /**
- * SpendSpikeAnomalyEvaluator — pure-function decision-logic unit tests.
- *
- * Sergey commit 3d2404170 (step 3e-i) shipped the evaluator. This test
- * exercises the pure `evaluateSpendSpike` function with synthesised
- * inputs — no I/O, no testcontainers, deterministic + fast.
- *
- * Coverage:
- *   - Fire when current >= baseline * ratio AND baseline >= minBaselineUsd
- *     AND no open alert in window
- *   - Skip 'below_baseline' when baseline < minBaselineUsd (signal too small)
- *   - Skip 'below_threshold' when current < baseline * ratio
- *   - Skip 'dedup' when an open alert already covers the window
- *   - Edge: exact threshold equality fires
- *   - Edge: zero baseline + zero current → skip below_baseline (default
- *     minBaselineUsd > 0)
- *   - Edge: large ratio doesn't fire on small spikes
- *
+ * SpendSpikeAnomalyEvaluator — pure-function decision-logic unit tests. Sergey commit 3d2404170
+ * (step 3e-i) shipped the evaluator.
  * Spec: specs/ai-gateway/governance/anomaly-rules.feature +
- *       specs/ai-gateway/governance/anomaly-detection.feature
  */
 import { describe, expect, it } from "vitest";
 

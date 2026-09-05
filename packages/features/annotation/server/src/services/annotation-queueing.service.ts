@@ -1,11 +1,6 @@
 /**
- * Queueing traces for annotation, for everything that can queue one: the trace
- * table's selection bar, the trace drawer, and the automations that hand traces
- * over on their own.
- *
- * Which of the ids sent actually address a trace this project holds is not
- * Annotation's answer — it lives in trace storage — so it arrives as
- * {@link FindExistingTraceIds} rather than being resolved here.
+ * Queueing traces for annotation, for everything that can queue one: the trace table's
+ * selection bar, the trace drawer, and the automations that hand traces over on their own.
  */
 import type { AnnotationService } from "@langwatch/annotation-contract";
 import { HandledError } from "@langwatch/handled-error";
@@ -15,13 +10,9 @@ import { z } from "zod";
 const logger = createLogger("langwatch:api:annotation");
 
 /**
- * An annotator reference that is neither `queue-<id>` nor `user-<id>`.
- *
- * A handled failure rather than a `TRPCError`: this is a service, and a
- * service that constructs a transport's error decides the wire shape for every
- * transport that will ever call it. The cause is nameable and the caller can
- * fix it, so it carries a stable code and the boundary picks the status — the
- * 400 this has always answered.
+ * An annotator reference that is neither `queue-<id>` nor `user-<id>`. A handled failure rather
+ * than a `TRPCError`: this is a service, and a service that constructs a transport's error
+ * decides the wire shape for every transport that will ever call it.
  */
 export class AnnotationAnnotatorReferenceInvalidError extends HandledError {
   declare readonly code: "annotation_annotator_reference_invalid";
@@ -59,14 +50,9 @@ export type FindExistingTraceIds = (args: {
 }) => Promise<string[]>;
 
 /**
- * The ids worth writing a queue item for, out of what a caller sent. A queue
- * item is a promise that there is something to review, so:
- *   - blank ids address no trace and are dropped;
- *   - a repeated id survives once. The upsert reopens a finished item
- *     (`doneAt: null`), so running it twice for one id in one call would
- *     un-finish work the reviewer had already completed;
- *   - an id no trace answers to is skipped. It would otherwise become an item
- *     the reviewer cannot read, cannot annotate, and cannot get past.
+ * The ids worth writing a queue item for, out of what a caller sent. A queue item is a promise
+ * that there is something to review, so: - blank ids address no trace and are dropped; - a
+ * repeated id survives once.
  */
 const resolveQueueableTraceIds = async ({
   traceIds,
@@ -100,15 +86,7 @@ export class AnnotationQueueingService {
 
   /**
    * Queues traces for annotation.
-   *
-   * An annotator reference that parses as neither `queue-<id>` nor `user-<id>`
-   * is a handled failure rather than a plain error, because the caller sent it
-   * and the caller can fix it. It carries the 400 this surface has always
-   * answered — see {@link AnnotationAnnotatorReferenceInvalidError}.
-   *
    * @returns how many ids were queued and how many were skipped (everything sent
-   *   that did not become work), so the surface that sent them can say what
-   *   actually happened.
    */
   static async createOrUpdateQueueItems({
     traceIds,

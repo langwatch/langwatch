@@ -1,16 +1,7 @@
 /**
- * One organization's usage against what its plan allows.
- *
- * Seven readings, issued together: the month's real volume, the month's spend,
- * the active plan, the allowance, the two member counts and the unit the
- * allowance is measured in. The panel renders all seven, so any of them
- * arriving a request later is a panel that renders twice.
- *
- * The count is the interesting one. It can come back UNKNOWN, which is not
- * zero: `currentMonthMessagesCount` is then null and the page says it cannot
- * show the figure, rather than asserting that a busy organization sent nothing
- * this month. The limit bar is still built (from zero) so it renders at rest
- * instead of crashing on a null.
+ * One organization's usage against what its plan allows. Seven readings, issued together: the
+ * month's real volume, the month's spend, the active plan, the allowance, the two member counts
+ * and the unit the allowance is measured in.
  */
 import type {
   MessageLimitInfo,
@@ -23,12 +14,8 @@ import { USAGE_UNKNOWN, UsageCounterPort } from "../ports/usage-counter.port";
 import type { UsageMembershipPort } from "../ports/usage-membership.port";
 
 /**
- * The message allowance a plan states when it means "we do not cap this".
- *
- * Stated rather than imported from the Enterprise billing contract, which a
- * core package may not reach into. It is a sentinel in the plan's own numbers,
- * so a self-hosted install with no billing package still reads an unlimited
- * plan as unlimited.
+ * The message allowance a plan states when it means "we do not cap this". Stated rather than
+ * imported from the Enterprise billing contract, which a core package may not reach into.
  */
 const UNLIMITED_MESSAGES = 999_999_999;
 
@@ -56,14 +43,6 @@ export type UsageStatsCaller = PlanProviderUser;
 
 /**
  * Service for retrieving organization usage statistics.
- *
- * Coordinates between:
- * - LicenseEnforcementRepository (Prisma queries)
- * - UsageService (orchestrated counting via meter policy)
- * - PlanProvider (plan info)
- *
- * This is the proper service layer - routers call this instead of
- * manually wiring dependencies.
  */
 export class UsageStatsService {
   static create(options: {
@@ -150,13 +129,11 @@ export class UsageStatsService {
       this.counter.getResolvedUsageUnit({ organizationId }),
     ]);
 
-    // Real metered/trace volume for the month — surfaced even for unlimited
-    // (seat-based) plans so the usage page shows actual billable events.
-    //
-    // `null` when the counting store could not answer. That is what the
-    // `number | null` on UsageStats was always for, and it is the difference
-    // between a page saying "we can't show this right now" and one asserting
-    // that a busy organization sent nothing this month.
+    // Real metered/trace volume for the month — surfaced even for unlimited (seat-based) plans
+    // so the usage page shows actual billable events. `null` when the counting store could not
+    // answer. That is what the `number | null` on UsageStats was always for, and it is the
+    // difference between a page saying "we can't show this right now" and one asserting that a
+    // busy organization sent nothing this month.
     const resolvedCount =
       currentMonthMessagesCount === USAGE_UNKNOWN ? null : currentMonthMessagesCount;
 
@@ -182,12 +159,8 @@ export class UsageStatsService {
   }
 
   /**
-   * Get the maximum monthly usage limit for the organization.
-   * FIXME: This was recently changed to return Infinity,
-   * but still takes the organizationId as a parameter.
-   *
-   * Either we remove the organizationId parameter from all the calls to this function,
-   * or we use to get the plan and return it correctly.
+   * Get the maximum monthly usage limit for the organization. FIXME: This was recently changed
+   * to return Infinity, but still takes the organizationId as a parameter.
    */
   private async getMaxMonthlyUsageLimit(_organizationId: string): Promise<number> {
     return Infinity;

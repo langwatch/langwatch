@@ -50,10 +50,9 @@ export const groupItemsByType = (items: RecentItem[]): Map<RecentItemType, Recen
 const MAX_RECENT_ROWS = 8;
 
 /**
- * One recent item as a dense, scannable row: what it is (icon + type), what
- * it's called, and how long ago you touched it — a work log line, not a tile.
- * More useful than the old card grid: twice the items in half the height,
- * with recency visible at a glance.
+ * One recent item as a dense, scannable row: what it is (icon + type), what it's called, and
+ * how long ago you touched it — a work log line, not a tile. More useful than the old card
+ * grid: twice the items in half the height, with recency visible at a glance.
  */
 function RecentItemRow({ item }: { item: RecentItem }) {
   const timeAgo = formatTimeAgo(item.updatedAt.getTime());

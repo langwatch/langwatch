@@ -1,9 +1,5 @@
 /**
  * @vitest-environment node
- *
- * The pure half of scenario versioning: what a snapshot holds, how two
- * states diff into a changed field list, and which updates count as a save.
- *
  * @see specs/scenarios/scenario-versioning.feature
  * @see specs/scenarios/scenario-version-restore.feature
  */

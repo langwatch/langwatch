@@ -1,13 +1,6 @@
 /**
  * @vitest-environment node
- *
- * The tRPC `register` mutation is the signup page's actual backend, not
  * better-auth's `/sign-up/email` — so the ADR-027 email-mode coercion must
- * apply here too: on an SSO-capable deployment the platform gate denies,
- * `resolveAuthProvider` resolves to "email", and registration must still
- * work (the fresh-signup recovery route). Once the gate grants SSO, the
- * resolved provider is no longer "email" and this path refuses outright.
- *
  * @see specs/licensing/sso-license-gating.feature
  */
 import { initTRPC, TRPCError } from "@trpc/server";

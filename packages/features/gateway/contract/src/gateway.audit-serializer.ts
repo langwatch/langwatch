@@ -1,17 +1,7 @@
 /**
- * BigInt-safe audit serialiser for Prisma model rows.
- *
- * Plain `JSON.stringify(row)` throws on any BigInt field, which is how the
- * control plane silently lost every VK-mutation audit write for any model
- * carrying a BigInt column (VK.revision, GatewayChangeEvent.revision).
- * Caught via unit test — see virtualKey.service.unit.test.ts.
- *
- * All gateway services that write to `AuditLog.before` /
- * `AuditLog.after` should go through this helper instead of reaching
- * for JSON.parse(JSON.stringify(row)) directly — it also keeps the
- * over-the-wire representation (decimal string for BigInt) consistent with
- * `GatewayConfigPayload.revision` so operators see the same shape whether
- * they're inspecting bundles or audit rows.
+ * BigInt-safe audit serialiser for Prisma model rows. Plain `JSON.stringify(row)` throws on any
+ * BigInt field, which is how the control plane silently lost every VK-mutation audit write for
+ * any model carrying a BigInt column (VK.revision, GatewayChangeEvent.revision).
  */
 import { z } from "zod";
 

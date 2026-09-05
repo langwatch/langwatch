@@ -1,17 +1,7 @@
 /**
- * React hook and context provider for managing saved views on the traces list page.
- *
- * Views are stored in the database (PostgreSQL) and shared across all team
- * members in a project via tRPC endpoints. The full views list is cached in
- * localStorage so it can be shown instantly on page load (no blink), with
- * tRPC refreshing in the background. The selected view ID is also in
- * localStorage (personal preference, not shared state).
- *
- * Pure logic functions (matching, normalization) live in saved-views-logic.ts
- * to enable unit testing without server dependencies.
- *
- * Use SavedViewsProvider at the page level, then useSavedViews() in any
- * child component to access shared state (SavedViewsBar, SaveAsViewButton, etc.)
+ * React hook and context provider for managing saved views on the traces list page. Views are
+ * stored in the database (PostgreSQL) and shared across all team members in a project via tRPC
+ * endpoints.
  */
 
 import { differenceInCalendarDays, subDays } from "date-fns";
@@ -109,12 +99,9 @@ function readCachedViews(projectId: string): SavedView[] | null {
 // ---------------------------------------------------------------------------
 
 /**
- * Builds a Next.js query object for router.push({ query }).
- * Preserves layout keys (view, group_by) and date params from the current URL,
- * then overlays the view's filters, query, and optional date overrides.
- *
- * NOTE: "project" is included because Next.js needs it to resolve the
- * dynamic [project] route segment — it won't appear in the actual URL.
+ * Builds a Next.js query object for router.push({ query }). Preserves layout keys (view,
+ * group_by) and date params from the current URL, then overlays the view's filters, query, and
+ * optional date overrides.
  */
 function buildViewQuery({
   routerQuery,

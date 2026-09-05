@@ -1,10 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * The product flow's shape per flavour: the platform flavour passes through the
- * skippable model provider step, and every other flavour goes straight to its
- * own setup screen.
- *
  * Spec: specs/features/onboarding/model-provider-step.feature
  */
 import { act, renderHook } from "@testing-library/react";

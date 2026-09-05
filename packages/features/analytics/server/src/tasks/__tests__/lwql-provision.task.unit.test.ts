@@ -9,7 +9,7 @@ describe("LwqlProvisionTask", () => {
         $executeRawUnsafe: vi.fn(),
         project: { findMany: vi.fn() },
       };
-      const task = LwqlProvisionTask.create({ database: () => database });
+      const task = LwqlProvisionTask.create({ database: () => database, source: {} });
       expect(task.name).toBe("lwql-provision");
 
       const controller = new AbortController();
@@ -27,7 +27,11 @@ describe("LwqlProvisionTask", () => {
         $executeRawUnsafe: vi.fn(),
         project: { findMany: vi.fn() },
       };
-      const task = LwqlProvisionTask.create({ database: () => database, skipped: true });
+      const task = LwqlProvisionTask.create({
+        database: () => database,
+        source: {},
+        skipped: true,
+      });
 
       await task.run({ args: [], signal: new AbortController().signal });
 

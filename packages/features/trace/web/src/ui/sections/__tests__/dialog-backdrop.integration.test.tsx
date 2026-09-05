@@ -4,13 +4,26 @@
  * @see specs/features/dialog-backdrop-transparency-blur.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { UiCapabilityContextProvider, type UiCapabilities } from "@langwatch/ui-host/capabilities";
+import { createUiCapabilitiesFromHost } from "@langwatch/ui-host/testing";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cssRulesForElement } from "./emotion-test-css";
 import { Dialog } from "../dialog";
 
+/** The misuse warning is a development affordance, so the shell says so here. */
+const capabilities: UiCapabilities = {
+  ...createUiCapabilitiesFromHost({
+    route: () => ({ params: {}, query: {} }),
+    navigate: () => void 0,
+  }),
+  deployment: { isDevelopment: true },
+};
+
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+  <ChakraProvider value={defaultSystem}>
+    <UiCapabilityContextProvider value={capabilities}>{children}</UiCapabilityContextProvider>
+  </ChakraProvider>
 );
 
 function renderOpenDialog(extra?: Parameters<typeof Dialog.Content>[0]) {

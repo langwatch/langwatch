@@ -11,6 +11,7 @@ import type {
   AnalyticsFilterValue as FilterParam,
   FilterField,
 } from "@langwatch/analytics-contract";
+import type { FilterOption } from "../../ports/filter-options.port";
 
 export type ClickHouseFilterQueryParams = {
   tenantId: string;
@@ -21,12 +22,6 @@ export type ClickHouseFilterQueryParams = {
   endDate: number;
   /** Optional filters for scoping results to a subset of traces */
   scopeFilters?: Partial<Record<FilterField, FilterParam>>;
-};
-
-export type FilterOption = {
-  field: string;
-  label: string;
-  count: number;
 };
 
 /**

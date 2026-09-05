@@ -1,18 +1,5 @@
 /**
  * @vitest-environment node
- *
- * The evaluator application: the rules that moved off its two doors onto it.
- *
- *   - the evaluator-id scheme, which three call sites used to mint for
- *     themselves;
- *   - "look it up by id, and failing that by slug", which is what an
- *     evaluator's public address MEANS rather than something the REST reader
- *     decided;
- *   - resolving the project's default model when a create names none, and
- *     tolerating a project that has configured no embeddings model;
- *   - refusing a code evaluator whose config carries no program.
- *
- * The services are stubbed. Nothing here speaks HTTP or tRPC.
  */
 import type {
   Evaluator,

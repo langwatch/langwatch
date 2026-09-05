@@ -13,11 +13,9 @@ import { statusLineCostLabel, TerminalView, type TurnDivider } from "@langwatch/
 const ROW_HEIGHT = 150;
 
 /**
- * jsdom lays nothing out: every element reports `offsetTop` zero, so the view
- * has no row to follow across a commit. Stack the screen's rows the way a
- * browser would, by reading each element's place among its siblings at a fixed
- * row height. Off by default, since the rest of the file drives the screen's
- * height by hand and expects no layout at all.
+ * jsdom lays nothing out: every element reports `offsetTop` zero, so the view has no row to
+ * follow across a commit. Stack the screen's rows the way a browser would, by reading each
+ * element's place among its siblings at a fixed row height.
  */
 let rowsAreLaidOut = false;
 Object.defineProperty(HTMLElement.prototype, "offsetTop", {
@@ -1150,10 +1148,8 @@ const GROWN_EARLIER_TURN: TranscriptEntry[] = [
 ];
 
 /**
- * jsdom has no layout engine, so `scrollHeight` and `clientHeight` are a hard
- * zero and the anchoring maths has nothing to work with. Drive the geometry by
- * hand and let the view do exactly what it does in a browser: read the numbers,
- * work out what moved, and set `scrollTop`.
+ * jsdom has no layout engine, so `scrollHeight` and `clientHeight` are a hard zero and the
+ * anchoring maths has nothing to work with.
  */
 function fakeBox(
   el: HTMLElement,

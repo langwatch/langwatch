@@ -85,11 +85,9 @@ const scopeRank = (scopeType?: string): number =>
   SCOPE_RANK[scopeType as keyof typeof SCOPE_RANK] ?? 0;
 
 /**
- * Provider keys whose registry models in `mode` must not be offered, because
- * the row `resolveServingRow` actually picks (its scope-collapse winner, not
- * the union of rows) cannot serve them. Ties resolve conservatively: if any
- * row that could win can't serve the mode, the models stay hidden. Exported
- * for tests.
+ * Provider keys whose registry models in `mode` must not be offered, because the row
+ * `resolveServingRow` actually picks (its scope-collapse winner, not the union of rows) cannot
+ * serve them.
  */
 export const providersWithoutRegistryModels = (
   rows: Array<{

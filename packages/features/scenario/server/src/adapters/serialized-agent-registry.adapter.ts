@@ -9,6 +9,7 @@ import {
   AgentAdapterFactoryPort,
   type AgentAdapterBuildInput,
 } from "../ports/agent-adapter-factory.port";
+import type { NlpFetchTimeouts } from "./nlp-fetch.adapter";
 import { SerializedCodeAgentAdapter } from "./serialized-code-agent.adapter";
 import { SerializedHttpAgentAdapter } from "./serialized-http-agent.adapter";
 import { SerializedPromptConfigAdapter } from "./serialized-prompt-config.adapter";
@@ -21,8 +22,19 @@ import { SerializedWorkflowAgentAdapter } from "./serialized-workflow-agent.adap
  * prompt, projectApiKey for workflow/code).
  */
 export class SerializedAgentRegistryAdapter extends AgentAdapterFactoryPort {
-  static create(): SerializedAgentRegistryAdapter {
-    return new SerializedAgentRegistryAdapter();
+  /**
+   * `nlpTimeouts` are the operator's nlpgo deadlines, read by the process that
+   * composed this registry — an unset one falls back to the same default the
+   * adapters have always applied.
+   */
+  static create({
+    nlpTimeouts,
+  }: { nlpTimeouts?: NlpFetchTimeouts } = {}): SerializedAgentRegistryAdapter {
+    return new SerializedAgentRegistryAdapter(nlpTimeouts ?? {});
+  }
+
+  private constructor(private readonly nlpTimeouts: NlpFetchTimeouts) {
+    super();
   }
 
   build(input: AgentAdapterBuildInput): AgentAdapter {
@@ -56,6 +68,7 @@ export class SerializedAgentRegistryAdapter extends AgentAdapterFactoryPort {
           nlpServiceUrl: input.nlpServiceUrl,
           projectApiKey: input.projectApiKey,
           parameters: input.parameters,
+          timeouts: this.nlpTimeouts,
         });
       }
       case "workflow": {
@@ -67,6 +80,7 @@ export class SerializedAgentRegistryAdapter extends AgentAdapterFactoryPort {
           nlpServiceUrl: input.nlpServiceUrl,
           projectApiKey: input.projectApiKey,
           parameters: input.parameters,
+          timeouts: this.nlpTimeouts,
         });
       }
       case "connected": {

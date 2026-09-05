@@ -1,10 +1,5 @@
 /**
  * @vitest-environment node
- * @unit
- *
- * The live status read: what each combination of GitHub's own fields means,
- * and what a reader gets when GitHub refuses to answer.
- *
  * @see specs/coding-agent/pull-request-linkage.feature
  */
 import { HandledError } from "@langwatch/handled-error";

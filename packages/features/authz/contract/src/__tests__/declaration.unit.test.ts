@@ -160,11 +160,8 @@ describe("resolveDeclaredScope", () => {
 
   describe("when the input names the scope field with a value that is not a string", () => {
     /**
-     * Only reachable past a bypassed type layer — every declaration parses its
-     * input before this runs, so a wrong-typed id is already a 400 by here.
-     * Pinned because the tempting "fix" is to call it `absent`, which would
-     * page an engineer for a caller's malformed request: the caller named the
-     * field, so the mistake is theirs to correct whatever they put in it.
+     * Only reachable past a bypassed type layer — every declaration parses its input before
+     * this runs, so a wrong-typed id is already a 400 by here.
      */
     it("answers the caller rather than reporting a wiring bug", () => {
       expect(
@@ -254,10 +251,9 @@ describe("resolveDeclaredScope", () => {
 });
 
 /**
- * The compile-time half: `ValidatePermissionForInput<P, I>` resolves to P
- * when the input carries a usable scope id, and to a `DeclarationError`
- * otherwise. These pin the declaration surface every framework (tRPC
- * builder, HTTP route policy) is typed against.
+ * The compile-time half: `ValidatePermissionForInput<P, I>` resolves to P when the input
+ * carries a usable scope id, and to a `DeclarationError` otherwise. These pin the declaration
+ * surface every framework (tRPC builder, HTTP route policy) is typed against.
  */
 describe("ValidatePermissionForInput", () => {
   describe("given a project-scoped permission and a matching input", () => {
@@ -314,10 +310,9 @@ describe("ValidatePermissionForInput", () => {
 });
 
 /**
- * The imperative facade's own scope argument: exactly one id, at a tier the
- * permission is grantable at. Backs `AuthzService.authorizePermission` and
- * `hasPermission`, which read their scope from this type rather than from a
- * validated tRPC input.
+ * The imperative facade's own scope argument: exactly one id, at a tier the permission is
+ * grantable at. Backs `AuthzService.authorizePermission` and `hasPermission`, which read their
+ * scope from this type rather than from a validated tRPC input.
  */
 describe("PermissionScopeArg", () => {
   describe("given a permission grantable at the project tier", () => {

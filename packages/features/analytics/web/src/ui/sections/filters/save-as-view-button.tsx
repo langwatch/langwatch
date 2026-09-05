@@ -1,10 +1,7 @@
 /**
- * SaveAsViewButton -- button next to "Filters" heading that opens a dialog
- * to save the current filter state as a named custom view.
- *
- * Rendered by QueryStringFieldsFilters only when filters are active and
- * ClickHouse is enabled. useSavedViews() is safe here because the parent
- * tree always has SavedViewsProvider when ClickHouse is on.
+ * SaveAsViewButton -- button next to "Filters" heading that opens a dialog to save the current
+ * filter state as a named custom view. Rendered by QueryStringFieldsFilters only when filters
+ * are active and ClickHouse is enabled.
  */
 
 import { Button, HStack, Input, Text } from "@chakra-ui/react";

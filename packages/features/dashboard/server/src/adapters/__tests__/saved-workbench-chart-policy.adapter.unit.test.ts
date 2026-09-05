@@ -1,18 +1,6 @@
 /**
- * The save gate for a workbench chart: what a definition has to survive before
- * anything is allowed to store it.
- *
- * This is the object `presets.ts` wires as the Dashboard feature's
- * `SavedWorkbenchChartPolicy`, and the one `root.ts` calls through `admit`
- * with the caller's own protections before the packaged service is reached.
- * Both governors run here — the LangWatchQL validator over the SQL, and the
- * Vega-Lite policy over the specification — so this is where their refusals
- * are pinned.
- *
- * That a refused definition never reaches storage is the service's half of the
- * contract, and lives with the service:
- * `packages/features/dashboard/server/src/services/__tests__/saved-workbench-chart.service.unit.test.ts`.
- *
+ * The save gate for a workbench chart: what a definition has to survive before anything is
+ * allowed to store it.
  * @see specs/analytics/lwql-saved-charts.feature
  */
 

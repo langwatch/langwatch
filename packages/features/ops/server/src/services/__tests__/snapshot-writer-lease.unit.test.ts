@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { OpsMetricsCollectorService } from "../ops-metrics-collector.service";
 import type { OpsSnapshotService } from "@langwatch/ops-contract";
 import { OpsMetricsTestAdapter } from "./ops-metrics.fixture";
+import { RedisOpsMetricsRepository } from "../../repositories/redis/redis.ops-metrics.repository";
 
 /**
  * the lease must return BEFORE scanning, not merely skip the write. A version that scanned and then discarded would still run
@@ -89,7 +90,7 @@ const makeWriter = (held: boolean) => {
   const ops = makeOps();
   const snapshots = makeSnapshots(held);
   const collector = OpsMetricsCollectorService.create({
-    redis: redisStub as any,
+    metrics: RedisOpsMetricsRepository.create({ redis: redisStub as any }),
     ops,
     snapshots,
     writerId: held ? "holder" : "loser",
@@ -152,7 +153,7 @@ describe("snapshot writer lease gate", () => {
       const redis = makeRedisHoldingState(FLEET_STATE);
       const snapshots = makeSnapshots(true);
       const collector = OpsMetricsCollectorService.create({
-        redis: redis as any,
+        metrics: RedisOpsMetricsRepository.create({ redis: redis as any }),
         ops: makeOps(),
         snapshots,
         writerId: "taking-over",
@@ -178,7 +179,7 @@ describe("snapshot writer lease gate", () => {
       // them destroys the fleet's only copy.
       const redis = makeRedisHoldingState(FLEET_STATE);
       const collector = OpsMetricsCollectorService.create({
-        redis: redis as any,
+        metrics: RedisOpsMetricsRepository.create({ redis: redis as any }),
         ops: makeOps(),
         snapshots: makeSnapshots(true),
         writerId: "taking-over",
@@ -203,7 +204,7 @@ describe("snapshot writer lease gate", () => {
       const snapshots = makeSnapshots(true);
       (snapshots.writeDetail as ReturnType<typeof vi.fn>).mockResolvedValue(false);
       const collector = OpsMetricsCollectorService.create({
-        redis: redisStub as any,
+        metrics: RedisOpsMetricsRepository.create({ redis: redisStub as any }),
         ops: makeOps(),
         snapshots,
         writerId: "fenced-out",

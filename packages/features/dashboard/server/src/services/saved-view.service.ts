@@ -16,11 +16,9 @@ const SEED_VIEWS = [
 ];
 
 /**
- * Service layer for saved view business logic.
- * Single Responsibility: Saved view lifecycle management.
- *
- * Framework-agnostic - no tRPC dependencies.
- * Throws domain-specific errors that can be mapped by the router layer.
+ * Service layer for saved view business logic. Single Responsibility: Saved view lifecycle
+ * management. Framework-agnostic - no tRPC dependencies. Throws domain-specific errors that can
+ * be mapped by the router layer.
  */
 export class SavedViewService {
   private constructor(private readonly repository: SavedViewRepository) {}
@@ -42,11 +40,9 @@ export class SavedViewService {
     projectId: string;
     userId?: string;
     /**
-     * Storage shape to read. Omit for the legacy default
-     * ("v1-traces-filter"). The new traces v2 lens UI passes
-     * "v2-traces-lens" so it never sees the legacy rows. Only the
-     * default kind triggers seed/backfill — the v2 client owns its own
-     * defaults code-side.
+     * Storage shape to read. Omit for the legacy default ("v1-traces-filter"). The new traces
+     * v2 lens UI passes "v2-traces-lens" so it never sees the legacy rows. Only the default
+     * kind triggers seed/backfill — the v2 client owns its own defaults code-side.
      */
     kind?: string;
   }): Promise<SavedViewRecord[]> {
@@ -117,12 +113,7 @@ export class SavedViewService {
   }
 
   /**
-   * Deletes a saved view.
-   * Personal views can only be deleted by their owner.
-   * @throws {SavedViewNotFoundError} if the view does not exist, and equally
-   *   if it is somebody else's personal view — deliberately the same answer,
-   *   so a caller cannot use the refusal to learn that the id names a real
-   *   view belonging to another user.
+   * Deletes a saved view. Personal views can only be deleted by their owner.
    */
   async delete({
     projectId,
@@ -153,12 +144,7 @@ export class SavedViewService {
   }
 
   /**
-   * Renames a saved view.
-   * Personal views can only be renamed by their owner.
-   * @throws {SavedViewNotFoundError} if the view does not exist, and equally
-   *   if it is somebody else's personal view — deliberately the same answer,
-   *   so a caller cannot use the refusal to learn that the id names a real
-   *   view belonging to another user.
+   * Renames a saved view. Personal views can only be renamed by their owner.
    */
   async rename({
     projectId,
@@ -236,10 +222,9 @@ export class SavedViewService {
   }
 
   /**
-   * Creates seed views that are missing from already-seeded projects — for
-   * example, a new "Gateway" default view that didn't exist when the
-   * project was first seeded. Identified by name only, so renamed views
-   * are not re-created and user customizations are preserved.
+   * Creates seed views that are missing from already-seeded projects — for example, a new
+   * "Gateway" default view that didn't exist when the project was first seeded. Identified by
+   * name only, so renamed views are not re-created and user customizations are preserved.
    */
   private async backfillMissingSeedViews({ projectId }: { projectId: string }) {
     const existing = await this.repository.findAll({ projectId });

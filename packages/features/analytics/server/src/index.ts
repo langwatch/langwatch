@@ -60,7 +60,7 @@ export {
 export {
   createLangWatchQLExecutor,
   DEFAULT_LWQL_RESULT_LIMITS,
-  lwqlConnectionFromEnv,
+  lwqlConnectionFromEnvironment,
   type LangWatchQLConnection,
   type LangWatchQLExecutor,
   type LangWatchQLResultLimits,
@@ -75,7 +75,7 @@ export { lwqlGranularityStepSchema, lwqlTimeWindowSchema } from "./langwatch-ql/
 export { FilterOptionsAdapter } from "./adapters/filter-options.adapter";
 export { FilterService, type GetFilterOptionsInput } from "./services/filter.service";
 export { FilterOptionsPort, type FindFilterOptionsInput } from "./ports/filter-options.port";
-export type { FilterOption } from "./filters/clickhouse/types";
+export type { FilterOption } from "./ports/filter-options.port";
 export {
   filterFieldRequiresKey,
   filterFieldRequiresSubkey,

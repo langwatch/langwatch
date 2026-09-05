@@ -17,10 +17,7 @@ const VALID_PRODUCTS: ProductSelection[] = [
 ];
 
 /**
- * The screens each flavour walks through after the selection screen. The
- * platform flavour passes through the model provider step first so the AI
- * assistant and AI assists have a model to run on; the step is skippable,
- * and the coding-agent flavours go straight to their setup screen.
+ * The screens each flavour walks through after the selection screen.
  */
 const PRODUCT_TO_SCREENS: Record<ProductSelection, [ProductScreenIndex, ...ProductScreenIndex[]]> =
   {

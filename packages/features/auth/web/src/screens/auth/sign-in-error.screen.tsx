@@ -9,12 +9,7 @@ import { usePublicEnv } from "../../behavior/use-public-env";
 
 /**
  * BetterAuth emits granular low-level error codes (e.g. `email_doesn't_match`,
- * `LINKING_DIFFERENT_EMAILS_NOT_ALLOWED`) from the link-account flow. Map
- * them back to the friendly uppercase codes this UI already handles, so
- * the same error page works for both the NextAuth-era codes we throw from
- * hooks and the BetterAuth-native ones coming out of the OAuth callback.
- *
- * Exported for unit testing.
+ * `LINKING_DIFFERENT_EMAILS_NOT_ALLOWED`) from the link-account flow.
  */
 export const normalizeErrorCode = (error: string | null | undefined): string | null => {
   if (!error) return null;
@@ -32,17 +27,8 @@ export const normalizeErrorCode = (error: string | null | undefined): string | n
 };
 
 /**
- * Auth errors that represent a *stable* failure the user has to act on (wrong
- * sign-in method / account collision), not a transient glitch we can silently
- * retry. For these we must NOT auto-redirect back to the identity provider:
- * the IdP still holds a live session for the failing identity, so bouncing
- * straight back silently re-authenticates the same identity and traps the user
- * in a loop (the exact symptom behind the "stuck in the sign-in loop" report).
- * Recovery instead goes through a federated logout so the IdP session is
- * cleared first and the next attempt lets them pick a different method.
- *
- * Shared between this page and the sign-in page so the two auto-redirect gates
- * can never drift apart.
+ * Auth errors that represent a *stable* failure the user has to act on (wrong sign-in method /
+ * account collision), not a transient glitch we can silently retry.
  */
 export const STABLE_AUTH_ERRORS = [
   "OAuthAccountNotLinked",
@@ -54,10 +40,9 @@ export const isStableAuthError = (error: string | null | undefined): boolean =>
   !!error && (STABLE_AUTH_ERRORS as readonly string[]).includes(error);
 
 /**
- * Server route that clears the app session and, on Auth0 deployments,
- * federates to Auth0 `/v2/logout` to clear the identity-provider session too
- * (see logoutHandler in server/routes/auth.ts). Other providers just clear the
- * app session and return to sign-in.
+ * Server route that clears the app session and, on Auth0 deployments, federates to Auth0
+ * `/v2/logout` to clear the identity-provider session too (see logoutHandler in
+ * server/routes/auth.ts). Other providers just clear the app session and return to sign-in.
  */
 export const FEDERATED_LOGOUT_PATH = "/api/auth/logout";
 

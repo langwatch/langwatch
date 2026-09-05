@@ -56,7 +56,11 @@ export * from "./adapters/child-process-spawn.adapter";
 export * from "./adapters/child-tls-env.adapter";
 export * from "./adapters/http-auth.adapter";
 export * from "./adapters/litellm-model.adapter";
-export { NlpFetchAdapter } from "./adapters/nlp-fetch.adapter";
+export {
+  NlpFetchAdapter,
+  nlpFetchTimeoutsFromEnvironment,
+  type NlpFetchTimeouts,
+} from "./adapters/nlp-fetch.adapter";
 export * from "./adapters/node-scenario-child-process.adapter";
 export { OtelScenarioProcessorMetricsAdapter } from "./adapters/otel.scenario-processor-metrics.adapter";
 export * from "./adapters/prompt-template.adapter";

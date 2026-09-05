@@ -46,10 +46,9 @@ function resolveNestedDefaultValue(
 }
 
 /**
- * Salvages one nested object field: recurses through `salvageValidData` when
- * there is a record of defaults to fall back to, otherwise tries a direct
- * parse and leaves the field undefined (so the caller's merge falls back to
- * `schemaDefaults`) when that also fails.
+ * Salvages one nested object field: recurses through `salvageValidData` when there is a record
+ * of defaults to fall back to, otherwise tries a direct parse and leaves the field undefined
+ * (so the caller's merge falls back to `schemaDefaults`) when that also fails.
  */
 function salvageNestedField(
   objectSchema: z.ZodObject<any>,

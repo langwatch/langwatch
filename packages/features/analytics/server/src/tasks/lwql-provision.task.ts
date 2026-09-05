@@ -9,7 +9,7 @@ import { createLogger } from "@langwatch/observability";
 
 import { parseConnectionUrl } from "@langwatch/clickhouse-client";
 import { Task } from "@langwatch/task";
-import { lwqlConnectionFromEnv } from "../langwatch-ql/executor";
+import { lwqlConnectionFromEnvironment } from "../langwatch-ql/executor";
 import {
   type LwqlKeyMapBackfillPlan,
   lwqlKeyMapTableQualifiedName,
@@ -43,10 +43,14 @@ export type LwqlProvisioningDatabase = {
  * credentials — never the restricted `LWQL_CLICKHOUSE_*` identity, which has
  * no DDL privileges by design.
  */
-async function withAdminClickHouseClient<T>(
-  fn: (client: ClickHouseClient) => Promise<T>,
-): Promise<T> {
-  const client = createClient({ url: process.env.CLICKHOUSE_URL });
+async function withAdminClickHouseClient<T>({
+  url,
+  fn,
+}: {
+  url: string | undefined;
+  fn: (client: ClickHouseClient) => Promise<T>;
+}): Promise<T> {
+  const client = createClient({ url });
   try {
     return await fn(client);
   } finally {
@@ -165,10 +169,13 @@ function errorMessage(error: unknown): string {
 
 export async function runLwqlProvisioningTask({
   database,
+  source,
 }: {
   database: LwqlProvisioningDatabase;
+  /** The environment the launching process was configured with. */
+  source: Record<string, string | undefined>;
 }): Promise<void> {
-  const connection = lwqlConnectionFromEnv();
+  const connection = lwqlConnectionFromEnvironment(source);
   if (!connection) {
     logger.info("LWQL not configured, skipping");
     return;
@@ -185,7 +192,7 @@ export async function runLwqlProvisioningTask({
   // The schema the tables actually live in (Prisma's `?schema=` URL
   // parameter), not a hardcoded `public` — the SaaS cloud deploys with
   // `schema=langwatch_db`, where `public."Annotation"` does not exist.
-  const postgresSchema = lwqlPostgresSchemaFromDatabaseUrl(process.env.DATABASE_URL);
+  const postgresSchema = lwqlPostgresSchemaFromDatabaseUrl(source.DATABASE_URL);
 
   try {
     await runPostgresStatements({
@@ -201,7 +208,7 @@ export async function runLwqlProvisioningTask({
       database,
       statements: productionPostgresReaderGrantStatements({
         schema: postgresSchema,
-        role: process.env.LWQL_POSTGRES_READER_ROLE,
+        role: source.LWQL_POSTGRES_READER_ROLE,
       }),
     });
   } catch (error) {
@@ -209,33 +216,36 @@ export async function runLwqlProvisioningTask({
     throw error;
   }
 
-  await withAdminClickHouseClient(async (client) => {
-    const statements = productionClickHouseObjectStatements({
-      names,
-      sourceDatabase,
-    });
+  await withAdminClickHouseClient({
+    url: source.CLICKHOUSE_URL,
+    fn: async (client) => {
+      const statements = productionClickHouseObjectStatements({
+        names,
+        sourceDatabase,
+      });
 
-    for (const [index, statement] of statements.entries()) {
-      try {
-        await client.command({ query: statement });
-      } catch (error) {
-        logger.error(
-          {
-            error: errorMessage(error),
-            statement: `${index + 1}/${statements.length}`,
-          },
-          "lwql provisioning failed creating ClickHouse objects",
-        );
-        throw error;
+      for (const [index, statement] of statements.entries()) {
+        try {
+          await client.command({ query: statement });
+        } catch (error) {
+          logger.error(
+            {
+              error: errorMessage(error),
+              statement: `${index + 1}/${statements.length}`,
+            },
+            "lwql provisioning failed creating ClickHouse objects",
+          );
+          throw error;
+        }
       }
-    }
 
-    // Fatal, exactly like the views above. The inline sync on project creation only ever covers projects created *after* a failure, so a backfill that fails on the
-    // first deploy leaves every pre-existing project without a key-map row until some later deploy happens to re-run this task. That state is not a degraded
-    // LangWatchQL, it is a silently wrong one: the row policies resolve an absent hash to an empty tenant set, so queries return zero rows with HTTP 200 rather than
-    // `lwql_unavailable`, and nothing in the request path detects it. Failing the deploy costs nothing extra in availability terms: this runs on the same admin client
-    // as the ClickHouse objects above, so any outage able to fail the backfill has already failed those and aborted the deploy one step earlier.
-    await backfillKeyMap({ client, database, names, sourceDatabase });
+      // Fatal, exactly like the views above. The inline sync on project creation only ever covers projects created *after* a failure, so a backfill that fails on the
+      // first deploy leaves every pre-existing project without a key-map row until some later deploy happens to re-run this task. That state is not a degraded
+      // LangWatchQL, it is a silently wrong one: the row policies resolve an absent hash to an empty tenant set, so queries return zero rows with HTTP 200 rather than
+      // `lwql_unavailable`, and nothing in the request path detects it. Failing the deploy costs nothing extra in availability terms: this runs on the same admin client
+      // as the ClickHouse objects above, so any outage able to fail the backfill has already failed those and aborted the deploy one step earlier.
+      await backfillKeyMap({ client, database, names, sourceDatabase });
+    },
   });
 
   logger.info("LangWatchQL provisioning complete");
@@ -253,6 +263,7 @@ export class LwqlProvisionTask extends Task {
 
   private constructor(
     private readonly database: () => LwqlProvisioningDatabase,
+    private readonly source: Record<string, string | undefined>,
     private readonly skipped: boolean,
   ) {
     super();
@@ -265,12 +276,15 @@ export class LwqlProvisionTask extends Task {
    */
   static create({
     database,
+    source,
     skipped = false,
   }: {
     database: () => LwqlProvisioningDatabase;
+    /** The environment the launching process was configured with. */
+    source: Record<string, string | undefined>;
     skipped?: boolean;
   }): LwqlProvisionTask {
-    return new LwqlProvisionTask(database, skipped);
+    return new LwqlProvisionTask(database, source, skipped);
   }
 
   async run(_input: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
@@ -278,6 +292,6 @@ export class LwqlProvisionTask extends Task {
       logger.info("SKIP_LWQL_PROVISION=true — skipping LangWatchQL provisioning");
       return;
     }
-    await runLwqlProvisioningTask({ database: this.database() });
+    await runLwqlProvisioningTask({ database: this.database(), source: this.source });
   }
 }

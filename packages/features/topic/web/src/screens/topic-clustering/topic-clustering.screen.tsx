@@ -1,16 +1,7 @@
 /**
- * The topic-clustering schedule, at `/settings/topic-clustering`.
- *
- * THREE CARDS OVER TWO READS: what the last run did and when the next one is
- * due, a button that asks for one now, and the log of recent runs. The two
- * reads poll only while something is actually underway — the status query stops
- * itself once a run settles, and the history query while no row says "running".
- *
- * WHAT THE SERVER SENDS ABOUT A FAILURE IS A CODE, never a provider's response
- * body: a langevals or provider payload carries tracebacks, internal hostnames
- * and echoed key prefixes, and none of that goes in front of a customer. The
- * copy below is keyed off that code, and a code with no entry is treated as
- * ours to fix.
+ * The topic-clustering schedule, at `/settings/topic-clustering`. THREE CARDS OVER TWO READS:
+ * what the last run did and when the next one is due, a button that asks for one now, and the
+ * log of recent runs.
  */
 
 import {
@@ -36,18 +27,9 @@ import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import { useTopicHost } from "../../model/topic-host";
 
 /**
- * Fixed copy per failure code. The classifier's code is the ONLY thing the
- * server sends about a failure — never the provider's response body, which is
- * a langevals/provider payload (tracebacks, internal hostnames, echoed key
- * prefixes) and not something to put in front of a customer.
- *
- * A code with no entry here is treated as ours to fix, which is also what an
- * unrecognised or mis-scoped classification degrades to.
- */
-/**
- * The server sends bare strings for codes/reasons/modes; these lookups narrow
- * them back onto the canonical unions so an unknown value falls through to
- * each call site's fallback instead of silently rendering nothing new.
+ * The server sends bare strings for codes/reasons/modes; these lookups narrow them back onto
+ * the canonical unions so an unknown value falls through to each call site's fallback instead
+ * of silently rendering nothing new.
  */
 function copyFor<K extends string, V>(
   map: Partial<Record<K, V>>,
@@ -101,10 +83,9 @@ export default function TopicClusteringScreen() {
 }
 
 /**
- * How long a just-requested run keeps the status card polling. Nothing is
- * recorded at the instant a run begins, so the card cannot see the run until
- * the request itself reaches the read model; without this window the card
- * would settle on the pre-click answer and sit there.
+ * How long a just-requested run keeps the status card polling. Nothing is recorded at the
+ * instant a run begins, so the card cannot see the run until the request itself reaches the
+ * read model; without this window the card would settle on the pre-click answer and sit there.
  */
 const REQUEST_SETTLE_WINDOW_MS = 30_000;
 

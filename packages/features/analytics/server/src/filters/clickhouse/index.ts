@@ -23,7 +23,6 @@ export type {
   ClickHouseFilterTable,
   FilterConditionBuilder,
   FilterConditionResult,
-  FilterOption,
   GenerateFilterConditionsResult,
   SupportedClickHouseFilterDefinition,
 } from "./types";

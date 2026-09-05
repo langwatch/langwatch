@@ -1,15 +1,7 @@
 /**
- * Turning a bearer token into a caller.
- *
- * This runs on every authenticated request, so its refusals are the product:
- * a revoked key, an expired one, and a wrong secret all have to come back as
- * "no", and the hashed secret has to stay on the server side of the boundary.
- *
- * Resolution is not authorization. It establishes who is calling and against
- * which project; whether that caller may do the thing is the ceiling check in
- * the auth middleware, which asks per permission at the project's scope. It
- * does fence WHICH project a key may speak for: an `X-Project-Id` naming a
- * project no binding of the key reaches resolves to nothing.
+ * Turning a bearer token into a caller. This runs on every authenticated request, so its
+ * refusals are the product: a revoked key, an expired one, and a wrong secret all have to come
+ * back as "no", and the hashed secret has to stay on the server side of the boundary.
  */
 
 import { describe, expect, it } from "vitest";

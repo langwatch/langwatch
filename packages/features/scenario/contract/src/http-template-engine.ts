@@ -71,13 +71,9 @@ function sessionContextValue(session: unknown): RawJson | string {
 }
 
 /**
- * The context keys a mapping filled from the held session.
- *
- * A mapping may alias the session to any identifier, so the name `session` is
- * not the only place the agent's own value reaches the template. The list
- * travels with the context rather than as an argument, so a caller cannot
- * build a context and forget to pass it. It is not enumerable, so the template
- * engine never renders it.
+ * The context keys a mapping filled from the held session. A mapping may alias the session to
+ * any identifier, so the name `session` is not the only place the agent's own value reaches the
+ * template.
  */
 const SESSION_DERIVED_KEYS = Symbol("sessionDerivedKeys");
 
@@ -169,14 +165,8 @@ function originOf(url: string): string | null {
 }
 
 /**
- * Refuses a URL whose host the held session decided.
- *
- * The session is the agent's own answer handed back on the next turn, so it
- * is the one value in the context the agent fully controls. The request
- * carries the configured headers, the authentication among them, so a
- * session that moves the host would send those credentials wherever it
- * named. Every other variable still reaches `ssrfSafeFetch`, which is what
- * refuses a private or link-local address.
+ * Refuses a URL whose host the held session decided. The session is the agent's own answer
+ * handed back on the next turn, so it is the one value in the context the agent fully controls.
  */
 function assertSessionDidNotChooseTheHost({
   template,

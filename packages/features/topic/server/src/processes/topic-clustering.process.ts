@@ -28,11 +28,6 @@ export const TOPIC_CLUSTERING_PROCESS_NAME = "topicClustering" as const;
 
 /**
  * The topic clustering process (ADR-051), authored for the ADR-052
- * `withProcessManager` builder: pure state logic only. The pipeline mounts
- * these handlers; the runtime owns the manager, outbox and wake workers.
- *
- * There is no `.schedule()` — the cadence is per-project (each project's
- * daily hash slot), so every handler returns its own explicit `nextWakeAt`.
  */
 
 /**
@@ -44,24 +39,16 @@ export interface TopicClusteringProcessState {
   projectId: string;
   enabled: boolean;
   /**
-   * The run currently in flight, or null when idle. Guards a wake or manual
-   * request from piling a second run onto an active backlog walk. Cleared by
-   * the final run_completed / run_failed, or abandoned once `startedAtMs` is
-   * older than the stale-run window.
+   * The run currently in flight, or null when idle. Guards a wake or manual request from piling
+   * a second run onto an active backlog walk. Cleared by the final run_completed / run_failed,
+   * or abandoned once `startedAtMs` is older than the stale-run window.
    */
   currentRun: {
     runId: string;
     page: number;
     updatedAtMs: number;
     /**
-     * When the run began. Staleness is measured from here, NOT from
-     * `updatedAtMs`: a long backlog walk refreshes `updatedAtMs` on every
-     * page, so a walk that starts near its slot and stalls hours later would
-     * still look fresh at the next slot and defer it — wedging the project
-     * for two days against a documented one-day bound.
-     *
-     * Optional for forward-compatibility with rows written before this field
-     * existed; those read as `updatedAtMs` and at worst allow one extra run.
+     * When the run began.
      */
     startedAtMs?: number;
   } | null;
@@ -91,21 +78,11 @@ export const INITIAL_TOPIC_CLUSTERING_STATE: TopicClusteringProcessState = {
 
 /**
  * When a project's topic clustering runs, and whether one is already running.
- *
- * Clustering is expensive and daily, so the process manager's whole job is to
- * hold exactly one run per project per day: pick the slot, refuse to start a
- * second while one is in flight, and recognise a completion as belonging to
- * the run that is actually current rather than to a stale predecessor.
- *
- * The slot is derived from the project id, not from the clock, so a thousand
- * projects do not all wake at midnight.
  */
 export class TopicClusteringProcess {
   /**
-   * Whether a run should still be treated as owning the project at `refMs`.
-   * Rows written before `startedAtMs` existed fall back to `updatedAtMs`.
-   * Staleness is measured from the run's START (TOPIC_CLUSTERING_STALE_RUN_MS),
-   * not its last page: a backlog walk refreshes `updatedAtMs` on every page.
+   * Whether a run should still be treated as owning the project at `refMs`. Rows written before
+   * `startedAtMs` existed fall back to `updatedAtMs`.
    */
   private static isRunInFlight(state: TopicClusteringProcessState, refMs: number): boolean {
     const run = state.currentRun;
@@ -117,12 +94,6 @@ export class TopicClusteringProcess {
   /**
    * The project's stable minute of the UTC day, derived from a sha256 of its
    * id (ADR-051 §"On wake").
-   *
-   * The legacy computation read the digest with `parseInt(hex, 16)` — 64 hex
-   * digits, far past Number.MAX_SAFE_INTEGER — so it rounded to a multiple of
-   * 2^203 and both `% 24` and `% 60` collapsed: the whole fleet landed in 15
-   * slots at hours 00, 08 and 16. Taking one remainder over the day's 1440
-   * minutes from 32 exact bits gives every minute, evenly.
    */
   private static dailySlotOffsetMs(projectId: string): number {
     const digest = crypto.createHash("sha256").update(projectId).digest();
@@ -131,20 +102,9 @@ export class TopicClusteringProcess {
   }
 
   /**
-   * `20260717T093000` — the scheduled run identity, from the instant the wake
-   * actually started the run (second precision).
-   *
-   * The instant — not just the UTC date — must be part of the identity. Two
-   * wakes CAN legitimately start runs on the same day: an outage that crosses
-   * midnight makes the missed slot fire as a catch-up at recovery, finish, and
-   * the day's real slot still arrives hours later. With a date-only id both
-   * runs mint the same `run:<id>:page-1` messageKey, and the outbox's unique
-   * index (status-independent, dispatched rows are not pruned) permanently
-   * drops the second insert — leaving `currentRun` set with no intent in
-   * flight: "Run now" no-ops behind the in-flight guard and the day's
-   * clustering is lost. Second precision suffices because a new run can only
-   * start after the previous one ended via a committed event, and the next
-   * wake slot is always a strictly later minute boundary.
+   * `20260717T093000` — the scheduled run identity, from the instant the wake actually started
+   * the run (second precision). The instant — not just the UTC date — must be part of the
+   * identity.
    */
   private static runIdForSlot(slotMs: number): string {
     return new Date(slotMs).toISOString().slice(0, 19).replace(/[-:]/g, "");
@@ -168,22 +128,15 @@ export class TopicClusteringProcess {
   }
 
   /**
-   * Whether an outcome event belongs to the run the process currently believes
-   * is in flight. Outcomes are delivered at least once and can arrive long
-   * after a stale-run recovery has moved on, so identity — not arrival order —
-   * decides whether an outcome may touch `currentRun`.
+   * Whether an outcome event belongs to the run the process currently believes is in flight.
    */
   private static isCurrentRun(state: TopicClusteringProcessState, runId: string): boolean {
     return state.currentRun?.runId === runId;
   }
 
   /**
-   * Clamp the scheduling reference to the present. `ctx.at` is business time,
-   * so a backed-up subscriber can deliver an event whose next daily slot has
-   * ALREADY passed. Scheduling from it writes a nextWakeAt in the past; that
-   * wake fires at once, regenerates a messageKey the outbox already
-   * dispatched, and the duplicate insert is dropped — leaving `currentRun`
-   * set with no intent in flight and a day of clustering silently skipped.
+   * Clamp the scheduling reference to the present. `ctx.at` is business time, so a backed-up
+   * subscriber can deliver an event whose next daily slot has ALREADY passed.
    */
   private static schedulingRef(ctx: Ctx): number {
     return Math.max(ctx.at, ctx.now);
@@ -209,10 +162,8 @@ export class TopicClusteringProcess {
   }
 
   /**
-   * The content boundary (`toPayload`): narrows a committed pipeline event to
-   * the identities-and-flags view the process is allowed to persist.
-   * Clustering events carry no customer content, but the boundary keeps the
-   * same shape discipline as other process managers.
+   * The content boundary (`toPayload`): narrows a committed pipeline event to the
+   * identities-and-flags view the process is allowed to persist.
    */
   static buildProcessEventView(
     event: TopicClusteringProcessingEvent,
@@ -228,10 +179,9 @@ export class TopicClusteringProcess {
   }
 
   /**
-   * The `topicClustering` process-manager topology, exported standalone so
-   * tests can build the exact definition the runtime mounts (clamping, key
-   * prefixing, undeclared-event guard included) via `buildProcessManager` +
-   * `buildProcessDefinition`.
+   * The `topicClustering` process-manager topology, exported standalone so tests can build the
+   * exact definition the runtime mounts (clamping, key prefixing, undeclared-event guard
+   * included) via `buildProcessManager` + `buildProcessDefinition`.
    */
   static processManager(
     dispatch: TopicClusteringDispatchDeps,
@@ -289,14 +239,11 @@ export class TopicClusteringProcess {
       // A live run is walking the backlog; the projection shows it.
       return TopicClusteringProcess.settle(base, refMs);
     }
-    // A run that is merely RECORDED — stale, its effect long dead — must not
-    // swallow the request. Deferring to it made "Run now" a silent no-op for
-    // as long as the wedge lasted while the UI reported success, which is
-    // exactly the state a user presses the button in.
-    //
-    // Identity comes from business time (`ctx.at`), never the clamped ref: a
-    // redelivered request must mint the same runId, or it would start a
-    // second run.
+    // A run that is merely RECORDED — stale, its effect long dead — must not swallow the
+    // request. Deferring to it made "Run now" a silent no-op for as long as the wedge lasted
+    // while the UI reported success, which is exactly the state a user presses the button in.
+    // Identity comes from business time (`ctx.at`), never the clamped ref: a redelivered
+    // request must mint the same runId, or it would start a second run.
     const runId = `manual-${ctx.at}`;
     return TopicClusteringProcess.settle(
       {
@@ -389,12 +336,11 @@ export class TopicClusteringProcess {
       return { state, nextWakeAt: null, intents: [] };
     }
 
-    // Clamp the reference instant to the present. A wake that fires late (the
-    // fleet was down for days) must schedule the NEXT slot from now, not from
-    // the slot it missed — otherwise every skipped day is replayed as its own
-    // run within seconds of recovery. Clustering re-derives its work from live
+    // Clamp the reference instant to the present. A wake that fires late (the fleet was down
+    // for days) must schedule the NEXT slot from now, not from the slot it missed — otherwise
+    // every skipped day is replayed as its own run within seconds of recovery. Clustering
+    // re-derives its work from live
     // unassigned traces, so one catch-up run covers the whole gap (ADR-051:
-    // "a schedule gap after recovery self-heals").
     const refMs = TopicClusteringProcess.schedulingRef(ctx);
 
     if (TopicClusteringProcess.isRunInFlight(state, refMs)) {

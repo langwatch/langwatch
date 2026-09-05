@@ -9,7 +9,7 @@ import {
 import {
   AzureDatasetStorageAdapter,
   DatasetAzureConfigResolver,
-  DatasetContentRepository,
+  PrismaDatasetContentRepository,
   DatasetNormalizationService,
   DatasetS3ClientResolver,
   DatasetStorageResolver,
@@ -69,7 +69,7 @@ export function createWorkerDatasetNormalization(options: {
 }): DatasetNormalizationWorkerPort {
   return new WorkerDatasetNormalizationAdapter(
     DatasetNormalizationService.create({
-      datasets: DatasetContentRepository.create(options.database),
+      datasets: PrismaDatasetContentRepository.create(options.database),
       storage: new WorkerDatasetStorageResolver(options.storage),
     }),
   );

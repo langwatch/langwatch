@@ -1,22 +1,5 @@
 /**
  * Everything one render of the data-privacy settings page is built from.
- *
- * Moved out of `platform/app`'s `server/data-privacy/dataPrivacyPolicy.read.ts`
- * — the read model the wire shape in `@langwatch/data-privacy-contract` was
- * declared against and could not yet be pointed at. Every rule it applies is
- * the one the page has always been served:
- *
- *   - `available` is RBAC-filtered and the rule LIST only carries scopes the
- *     caller may read, so an organization's policy landscape never leaks to a
- *     project-only viewer. ORGANIZATION and DEPARTMENT rules expose
- *     organization-level policy, and both gate on `organization:manage` — the
- *     same permission required to edit them.
- *   - the effective BASELINES are resolved from EVERY row, filtered or not.
- *     A team or organization baseline is exactly what already folds into the
- *     project effective the viewer can see, so it discloses nothing new.
- *   - a stored configuration that no longer parses is left out rather than
- *     failing the page: it is unrenderable and unresolvable either way, and the
- *     repository already warns about it on the resolution path.
  */
 import {
   dataPrivacyConfigSchema,
@@ -32,12 +15,9 @@ import type { DataPrivacyDirectoryPort } from "../ports/data-privacy-directory.p
 import type { DataPrivacyPermissionsPort } from "../ports/data-privacy-permissions.port";
 
 /**
- * The two policy reads the snapshot stands on.
- *
- * Named structurally rather than as `DataPrivacyService`, because the write
- * half of that service drags an organization service this read never asks
- * anything of. `DataPrivacyResolutionService` satisfies it, and so does the
- * wider service that composes it.
+ * The two policy reads the snapshot stands on. Named structurally rather than as
+ * `DataPrivacyService`, because the write half of that service drags an organization service
+ * this read never asks anything of.
  */
 export type DataPrivacySnapshotPolicies = Readonly<{
   getResolvedForProject(input: { projectId: string }): Promise<DataPrivacySnapshot["effective"]>;

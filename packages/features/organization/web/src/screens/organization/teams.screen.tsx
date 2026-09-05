@@ -1,11 +1,6 @@
 /**
- * The teams in an organization, at `/settings/teams`.
- *
- * A TEAM IS PROJECTS PLUS PEOPLE, and the list shows both: every project the
- * team owns, and everybody bound to the team DIRECTLY. A binding that arrives
- * through a group is deliberately not counted here — the groups page owns that
- * view, and mixing them would make a row's member count disagree with who can
- * actually be removed from it.
+ * The teams in an organization, at `/settings/teams`. A TEAM IS PROJECTS PLUS PEOPLE, and the
+ * list shows both: every project the team owns, and everybody bound to the team DIRECTLY.
  */
 
 import { useOrganizationHost } from "../../model/organization-host";

@@ -15,11 +15,9 @@ import { UsageLimitMessageService, type UsageDeployment } from "./usage-limit-me
 const logger = createLogger("langwatch:usage");
 
 /**
- * The allowance a plan states when it means "we do not cap this".
- *
- * Stated rather than imported from the Enterprise billing contract, which a
- * core package may not reach into — the same call `usage-stats.service.ts`
- * already makes for the same sentinel.
+ * The allowance a plan states when it means "we do not cap this". Stated rather than imported
+ * from the Enterprise billing contract, which a core package may not reach into — the same call
+ * `usage-stats.service.ts` already makes for the same sentinel.
  */
 const UNLIMITED_MESSAGES = 999_999_999;
 
@@ -27,11 +25,9 @@ const UNLIMITED_MESSAGES = 999_999_999;
 export type PlanResolver = (organizationId: string) => Promise<PlanInfo>;
 
 /**
- * No organization owns the team the caller named.
- *
- * A refusal rather than an allowance: enforcement was asked about a tenant
- * that does not resolve, and answering "within limits" would meter traffic
- * against nobody's plan.
+ * No organization owns the team the caller named. A refusal rather than an allowance:
+ * enforcement was asked about a tenant that does not resolve, and answering "within limits"
+ * would meter traffic against nobody's plan.
  */
 export class OrganizationNotFoundForTeamError extends Error {
   constructor(teamId: string) {
@@ -64,12 +60,9 @@ export interface UsageServiceDependencies {
 }
 
 /**
- * App-layer usage service.
- *
- * Orchestrates: plan → meter policy → counter.
- * The meter policy resolves the counting unit (traces/events).
- * Counting execution is delegated to TraceUsageService or
- * EventUsageService depending on the resolved meter.
+ * App-layer usage service. Orchestrates: plan → meter policy → counter. The meter policy
+ * resolves the counting unit (traces/events). Counting execution is delegated to
+ * TraceUsageService or EventUsageService depending on the resolved meter.
  */
 export class UsageService {
   private readonly organizations: UsageOrganizationPort;
@@ -108,16 +101,10 @@ export class UsageService {
     }
 
     if (count === USAGE_UNKNOWN) {
-      // Deliberately permissive, and deliberately loud. Enforcement cannot say
-      // whether this organization is over its cap, and locking a paying
-      // customer out of their own product because OUR counting store is down
-      // is the worse of the two errors — so traffic continues.
-      //
-      // What changed is that the decision is now made HERE, once, by the code
-      // that owns enforcement, instead of arriving pre-made as a `0` from a
-      // counting service that had no idea it was granting anyone anything. It
-      // is logged at warn so a metering outage is visible as a metering
-      // outage, rather than showing up as a suspiciously quiet month.
+      // Deliberately permissive, and deliberately loud. Enforcement cannot say whether this
+      // organization is over its cap, and locking a paying customer out of their own product
+      // because OUR counting store is down is the worse of the two errors — so traffic
+      // continues.
       logger.warn(
         { organizationId, plan: plan.name },
         "checkLimit: usage is unknown, allowing traffic without enforcement",
@@ -179,14 +166,8 @@ export class UsageService {
   }
 
   /**
-   * Always computes the real current-month usage count (events or traces per
-   * the resolved meter), regardless of whether the plan caps usage.
-   *
-   * Seat-based / metered plans (GROWTH_SEAT_*) have no monthly message cap but
-   * still accrue billable events that are metered and billed via Stripe. The
-   * usage page must surface that volume, so it cannot use getCurrentMonthCount
-   * (which short-circuits unlimited plans to "unlimited" for enforcement and
-   * would otherwise render as "0").
+   * Always computes the real current-month usage count (events or traces per the resolved
+   * meter), regardless of whether the plan caps usage.
    */
   async getCurrentMonthCountForDisplay({
     organizationId,

@@ -1,12 +1,5 @@
 /**
  * @vitest-environment node
- *
- * Resuming a paused automation must clear the platform's own pause record in
- * the same write, or a running automation keeps claiming it was paused for
- * runaway volume.
- *
- * Covers @integration scenarios from
- * specs/automations/runaway-automation-containment.feature.
  */
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";

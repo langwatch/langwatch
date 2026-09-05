@@ -1,25 +1,6 @@
 /**
  * @vitest-environment node
- *
  * @see specs/ai-gateway/governance/personal-workspace-integrity.feature
- *
- * A personal workspace is one team holding one project, and the project's own
- * `isPersonal` flag is a denormalized mirror of its team's. Moving a project
- * across that boundary, adding a second project to the workspace, or archiving
- * the one it has would each leave the pair disagreeing or the workspace
- * without the project the provisioning lookup needs, so `ProjectService`
- * refuses all four writes.
- *
- * Ported from `personal-workspace-invariants.integration.test.ts` on
- * platform/app, which drove the deleted `appRouter`. The guard itself moved
- * here: `personalWorkspaceMoveViolation` / `personalWorkspaceCreateViolation`
- * / `personalWorkspaceArchiveViolation` are enforced by this service.
- *
- * Every refusal is asserted twice — the write fails with a code, and the rows
- * it would have produced are proven absent — because a guard that rejects
- * while the damage lands anyway passes a test that only reads the error.
- *
- * Requires LANGWATCH_TEST_DATABASE_URL. Skips cleanly without it.
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

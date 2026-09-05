@@ -1,13 +1,6 @@
 /**
  * @vitest-environment node
- *
  * @see specs/scenarios/child-execution-contract.feature
- *
- * scenario-execution-data.ts is the validated stdin contract between the
- * worker and its isolated child. Only the code that builds or parses that
- * stdin payload — the contract definition itself, the server adapters that
- * serialize it, and the worker entrypoint that runs the child — may name one
- * of its schemas as a value. Suite authoring and the browser never should.
  */
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";

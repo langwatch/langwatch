@@ -1,10 +1,7 @@
 /**
- * The settings menu's gates, now that it is a function of them.
- *
- * It arrived as a hook that made six readings for itself, which is why it had
- * no suite: every gate needed a running application to move. As a pure builder
- * each one is a case, and the cases below are the ones that lose a reader a
- * page if they invert.
+ * The settings menu's gates, now that it is a function of them. It arrived as a hook that made
+ * six readings for itself, which is why it had no suite: every gate needed a running
+ * application to move.
  */
 
 import { describe, expect, it } from "vitest";

@@ -1,10 +1,5 @@
 /**
  * @vitest-environment node
- *
- * Covers the suite-target side of specs/scenarios/scenario-input-mapping.feature:
- * a prompt is authored in the prompt library and pointed at, so the binding
- * between a simulation and the prompt's declared inputs lives on the suite
- * target that made the pairing (#6590).
  */
 
 import { FieldMappingSchema } from "@langwatch/scenario-contract";

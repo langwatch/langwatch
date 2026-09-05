@@ -1,15 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * The navigation-v2 sidebar frame and its product bodies: Quick Search
- * first, the active product's real navigation components, and the pinned
- * bottom block.
- *
- * Lifted from
- * `platform/app/src/features/navigation/__tests__/ProductSidebar.integration.test.tsx`
- * (deleted with `platform/app`). The legacy chrome's Next-router and
- * `useOrganizationTeamProject` mocks are the stub navigation host now.
- *
  * Spec: specs/navigation/product-sidebars.feature
  */
 

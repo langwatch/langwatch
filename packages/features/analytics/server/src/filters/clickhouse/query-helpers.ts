@@ -1,5 +1,6 @@
 import { generateClickHouseFilterConditions } from "./filter-conditions";
-import type { ClickHouseFilterQueryParams, FilterOption } from "./types";
+import type { ClickHouseFilterQueryParams } from "./types";
+import type { FilterOption } from "../../ports/filter-options.port";
 
 /**
  * Attribute keys as stored in ClickHouse trace_summaries.Attributes map.

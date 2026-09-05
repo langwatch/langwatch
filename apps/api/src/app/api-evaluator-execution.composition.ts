@@ -497,7 +497,7 @@ class ApiEvaluationModelEnv extends EvaluationModelEnvPort {
     }
 
     if (embeddings) {
-      envResult = { ...envResult, ...prepareEnvKeys(modelProvider) };
+      envResult = { ...envResult, ...prepareEnvKeys({ modelProvider, environment: process.env }) };
     }
 
     return envResult;

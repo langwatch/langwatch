@@ -1,21 +1,6 @@
 /**
- * What the data will look like once Vega has it — checked before it gets there.
- *
- * Two questions, both answerable from the rows and the column types alone:
- *
- *   1. Is there anything to draw? A chart over rows that are all empty in every
- *      encoded column is not a chart, and an empty plotting area explains
- *      nothing. It gets its own state instead.
- *   2. Is there anything Vega cannot carry faithfully? Vega's scales are
- *      IEEE-754 doubles. `NaN` and the infinities have no position on an axis,
- *      and a 64-bit integer past 2^53 has no exact one. Vega will draw
- *      *something* for each — a gap, a clamp, a rounded value — and none of
- *      those says "this number did not survive". So they are reported as
- *      warnings and nothing is coerced: the rows Vega receives are the rows the
- *      query returned.
- *
- * Zero, null, and missing are none of that. They are representable, they mean
- * different things, and they are left alone.
+ * What the data will look like once Vega has it — checked before it gets there. Two questions,
+ * both answerable from the rows and the column types alone: 1. Is there anything to draw?
  */
 
 import { JSON_POINTER_ROOT, joinPointer, visitJsonObjects } from "./vega-lite-structure";
@@ -30,13 +15,6 @@ const WIDE_NUMERIC_TYPE = /\b(U?Int(64|128|256)|Decimal\d*)\b/;
 
 /**
  * Which columns of which dataset the specification reads.
- *
- * Every `field` in the document is collected and then intersected with each
- * read dataset's own columns, rather than re-deriving which dataset feeds which
- * branch — `validateFieldReferences` already did that walk and already refused
- * anything that does not resolve. Two datasets sharing a column name means one
- * extra column is scanned; scanning a column that is genuinely there costs a
- * pass over rows already bounded by the row ceiling, and reports nothing false.
  */
 export function encodedFieldsByDataset({
   spec,
@@ -131,10 +109,8 @@ function isWide(type: string | undefined): boolean {
 }
 
 /**
- * What one value is worth to a chart.
- *
- * `empty` is nothing to draw; `plottable` is a value an axis can carry as it
- * stands; the other two are the ways a value reaches Vega changed.
+ * What one value is worth to a chart. `empty` is nothing to draw; `plottable` is a value an
+ * axis can carry as it stands; the other two are the ways a value reaches Vega changed.
  */
 type ValueVerdict = "empty" | "plottable" | "non-finite" | "wide-integer";
 

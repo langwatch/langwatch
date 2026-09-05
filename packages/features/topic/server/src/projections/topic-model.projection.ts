@@ -13,20 +13,15 @@ import { TopicClusteringTopicsRecordedEventSchema } from "../adapters/eventing.t
 export type ProjectedTopic = Omit<TopicModelEntry, "firstRecordedAt"> & {
   firstRecordedAt: number;
   /**
-   * The `topics_recorded` event that recorded this topic — per-row
-   * provenance into the event log. A merge keeps untouched topics'
-   * provenance, so this names the event that actually carried the topic,
-   * not merely the last fold. Null only on states loaded from rows written
-   * before the column existed.
+   * The `topics_recorded` event that recorded this topic — per-row provenance into the event
+   * log. A merge keeps untouched topics' provenance, so this names the event that actually
+   * carried the topic, not merely the last fold.
    */
   recordedByEventId: string | null;
 };
 
 /**
  * The project's topic model (ADR-051): topics are facts on the clustering
- * stream, and the Postgres `Topic` table is THIS projection's write-through
- * store — nothing else writes it. Rebuildable by replay; ids pass through
- * unchanged so ClickHouse TopicId/SubTopicId references stay valid.
  */
 export interface TopicModelData {
   ProjectId: string;
@@ -75,16 +70,10 @@ export class TopicModelFoldProjection
     event: TopicClusteringTopicsRecordedEvent,
     state: TopicModelData,
   ): TopicModelData {
-    // A seed is only meaningful as the model's FIRST record: it exists to
-    // put pre-ownership Topic rows onto the stream. Once any event has
-    // folded topics, a seed is by definition stale — and it MUST fold as a
-    // no-op, because nothing upstream enforces the `seed:v1` idempotency
-    // key (the command has no queue dedup and ClickHouse inserts cannot be
-    // unique). Without this guard, a boot seed racing the write-path seed
-    // during projection lag appends a second replace-mode seed with a later
-    // occurredAt, which would fold last and delete the clustering delta.
-    // The guard also keeps live folds identical to replay, whose read path
-    // DOES collapse duplicate idempotency keys.
+    // A seed is only meaningful as the model's FIRST record: it exists to put pre-ownership
+    // Topic rows onto the stream. Once any event has folded topics, a seed is by definition
+    // stale — and it MUST fold as a no-op, because nothing upstream enforces the `seed:v1`
+    // idempotency key (the command has no queue dedup and ClickHouse inserts cannot be unique).
     if (event.data.source === TOPIC_MODEL_RECORD_SOURCE.SEED && state.Topics.length > 0) {
       return state;
     }

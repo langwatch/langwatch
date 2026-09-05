@@ -1,3 +1,4 @@
+import { useUiDeployment } from "@langwatch/ui-host/capabilities";
 import { useEffect, useState } from "react";
 
 /**
@@ -9,9 +10,9 @@ import { useEffect, useState } from "react";
  * in the air. Without a switch, the only way to see them is to break something
  * on purpose, so they go unlooked-at and rot.
  *
- * Gated on `import.meta.env.DEV`, which the production build replaces with a
- * literal `false` — so the branch is dead code before the bundler even looks at
- * it, and there is no runtime path by which any of this reaches a customer.
+ * Gated on the deployment the composing application published: production
+ * reads `isDevelopment` as false, and every entry point here refuses, so there
+ * is no runtime path by which any of this reaches a customer.
  *
  * Spec: specs/home/langy-home.feature
  */
@@ -74,8 +75,6 @@ export function chartVariantFor(state: HomeDevState | null): "full" | "strip" | 
 
 const STORAGE_KEY = "langwatch:dev:home-state";
 
-export const isHomeDevStateAvailable = () => import.meta.env.DEV;
-
 const isHomeDevState = (value: string): value is HomeDevState =>
   HOME_DEV_STATES.some((state) => state.key === value);
 
@@ -84,8 +83,8 @@ const isHomeDevState = (value: string): value is HomeDevState =>
 // one).
 const listeners = new Set<() => void>();
 
-function readHomeDevState(): HomeDevState | null {
-  if (typeof window === "undefined" || !isHomeDevStateAvailable()) return null;
+function readHomeDevState(isDevelopment: boolean): HomeDevState | null {
+  if (typeof window === "undefined" || !isDevelopment) return null;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     return raw && isHomeDevState(raw) ? raw : null;
@@ -94,8 +93,14 @@ function readHomeDevState(): HomeDevState | null {
   }
 }
 
-export function setHomeDevState(state: HomeDevState | null): void {
-  if (typeof window === "undefined" || !isHomeDevStateAvailable()) return;
+export function setHomeDevState({
+  state,
+  isDevelopment,
+}: {
+  state: HomeDevState | null;
+  isDevelopment: boolean;
+}): void {
+  if (typeof window === "undefined" || !isDevelopment) return;
   try {
     if (state === null) localStorage.removeItem(STORAGE_KEY);
     else localStorage.setItem(STORAGE_KEY, state);
@@ -106,19 +111,20 @@ export function setHomeDevState(state: HomeDevState | null): void {
 }
 
 export function useHomeDevState(): HomeDevState | null {
+  const { isDevelopment } = useUiDeployment();
   // Seeded null so the first client render matches the server's markup; the
   // real value arrives in the effect, exactly as the briefing's switcher does.
   const [state, setState] = useState<HomeDevState | null>(null);
   useEffect(() => {
-    if (!isHomeDevStateAvailable()) return;
-    setState(readHomeDevState());
-    const onChange = () => setState(readHomeDevState());
+    if (!isDevelopment) return;
+    setState(readHomeDevState(isDevelopment));
+    const onChange = () => setState(readHomeDevState(isDevelopment));
     listeners.add(onChange);
     window.addEventListener("storage", onChange);
     return () => {
       listeners.delete(onChange);
       window.removeEventListener("storage", onChange);
     };
-  }, []);
+  }, [isDevelopment]);
   return state;
 }

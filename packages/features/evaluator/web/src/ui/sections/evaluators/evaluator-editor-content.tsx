@@ -156,10 +156,9 @@ export function EvaluatorEditorContent({
 }
 
 /**
- * Thin wrapper around DynamicZodForm that hides the `prompt` field for
- * pairwise_compare when `has_golden_answer` is turned off. Isolated as a
- * child component so its `useWatch` call re-runs on toggle without
- * re-rendering the whole EvaluatorEditorContent tree.
+ * Thin wrapper around DynamicZodForm that hides the `prompt` field for pairwise_compare when
+ * `has_golden_answer` is turned off. Isolated as a child component so its `useWatch` call
+ * re-runs on toggle without re-rendering the whole EvaluatorEditorContent tree.
  */
 function PairwiseAwareDynamicZodForm({
   schema,

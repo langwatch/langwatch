@@ -1,20 +1,5 @@
 /**
- * The organization's audit trail, at `/settings/audit-log`.
- *
- * ONE TABLE OVER TWO WRITE SHAPES. Gateway mutations (virtual keys, budgets,
- * provider bindings, cache rules) and platform ones (members, settings, RBAC,
- * billing) land in the same `AuditLog` table; `source` is computed from whether
- * the row carries a `targetKind`, and the Source badge is how a reader tells
- * them apart at a glance.
- *
- * EVERY FILTER LIVES IN THE URL, which is the whole point of the surface: a
- * compliance reviewer's workflow is sending somebody else the exact view they
- * are looking at. The reading and the writes are pure functions in
- * `model/audit-log-filters.ts`; this screen only decides what to render.
- *
- * WHAT IS ENTERPRISE HERE IS THE READ, not the page. A reader below the plan
- * gets the page and a straight answer about what it would show, because hiding
- * a paid capability makes it look missing rather than purchasable.
+ * The organization's audit trail, at `/settings/audit-log`. ONE TABLE OVER TWO WRITE SHAPES.
  */
 
 import {
@@ -65,12 +50,8 @@ import { AuditPeriodPicker } from "../../ui/elements/audit-period-picker";
 import { Link } from "../../ui/elements/organization-link";
 
 /**
- * The grant the page carries.
- *
- * `organization:manage` one for one with the platform page's
- * `withPermissionGuard`. The audit trail names who did what from every address
- * in the organization, so it is an administrator's surface rather than a
- * member's, and the refusal is a page-level one rather than a per-control one.
+ * The grant the page carries. `organization:manage` one for one with the platform page's
+ * `withPermissionGuard`.
  */
 export const AUDIT_LOG_PAGE_PERMISSION = "organization:manage";
 
@@ -181,10 +162,9 @@ export default function AuditLogScreen() {
   };
 
   /**
-   * The whole filtered history, walked in batches and handed over as one file.
-   *
-   * `filters` is the SAME object the table above is reading with, which is the
-   * property that makes an export from a deep-link honest: it cannot widen.
+   * The whole filtered history, walked in batches and handed over as one file. `filters` is the
+   * SAME object the table above is reading with, which is the property that makes an export
+   * from a deep-link honest: it cannot widen.
    */
   const downloadCsv = async () => {
     setIsExporting(true);

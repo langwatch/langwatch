@@ -1,20 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * The icon-rail shell: the full-height product rail with one tile per
- * reachable product and a bottom Settings tile, and the top bar without
- * the product dropdown.
- *
- * Lifted from
- * `platform/app/src/features/navigation/__tests__/IconRailShell.integration.test.tsx`
- * (deleted with `platform/app`, which mounted the real `DashboardLayout`
- * dispatcher on the icon-rail mode). `NavigationShell` with `mode="icon-rail"`
- * is that dispatcher's replacement; the stub navigation host stands in for
- * the fixture's Next-router and `useOrganizationTeamProject` mocks.
- * `trackEvent("navigation_product_switch")` did not travel with the rail —
- * product analytics is the application's now — so this asserts the
- * navigation itself rather than a tracking call nothing fires any more.
- *
  * Spec: specs/navigation/icon-rail-navigation.feature
  */
 

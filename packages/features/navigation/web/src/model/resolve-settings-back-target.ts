@@ -3,12 +3,7 @@ import { type ProductId, productById, productFromPathname } from "./products";
 const RETURN_KEY = "langwatch:nav:settings-return:v1";
 
 /**
- * Where the "Back to {product}" entry at the top of the Settings sidebar
- * goes. Per tab: entering Settings from a product page captures that
- * page in sessionStorage, so two tabs on different products each return
- * to their own place. A fresh tab that opened Settings directly falls
- * back to the remembered product's home, then to the root.
- *
+ * Where the "Back to {product}" entry at the top of the Settings sidebar goes.
  * Spec: specs/navigation/navigation-v2-landing.feature
  */
 interface CapturedReturn {

@@ -8,14 +8,6 @@ export class ReportTraceRowService {
 
   /**
    * Map a trace-list item onto the report template context's typed trace row.
-   *
-   * Cost and duration stay NUMBERS here rather than being formatted into a
-   * string: a Block Kit table renders them as numeric cells (which Slack aligns
-   * and formats), and an email template can present them however it likes.
-   * Input/output are snipped so a report stays scannable; the templates pipe
-   * every string through `mrkdwn_escape`, so this does no escaping of its own.
-   * An input-less trace (e.g. teaser-redacted by the visibility window) yields an
-   * empty snippet, and the legacy `rows` line falls back to the bare trace id.
    */
   static toReportTraceRow({
     item,

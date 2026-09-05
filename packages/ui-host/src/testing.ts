@@ -1,17 +1,7 @@
 /**
- * The capabilities a test mounts when it renders a screen outside the shell.
- *
- * In the product the application shell answers `UiRoutePort`,
- * `UiNavigationPort` and `UiFeedbackPort` above every route, and a screen
- * rendered with none of them degrades — an empty address, an inert link. A
- * package's own test renders a screen with no shell at all, and usually already
- * has a feature host double that answers the same three questions, so this
- * turns that double into the capabilities rather than making every suite write
- * three port subclasses.
- *
- * TEST SCAFFOLDING, deliberately: nothing in the product publishes capabilities
- * this way. A family's provider republishing the address would make the two
- * disagree whenever the shell's answer moved.
+ * The capabilities a test mounts when it renders a screen outside the shell. In the product the
+ * application shell answers `UiRoutePort`, `UiNavigationPort` and `UiFeedbackPort` above every
+ * route, and a screen rendered with none of them degrades — an empty address, an inert link.
  */
 
 import {

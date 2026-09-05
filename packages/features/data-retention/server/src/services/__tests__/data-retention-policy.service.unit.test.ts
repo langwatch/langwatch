@@ -1,10 +1,6 @@
 /**
- * The write gates the settings page is bounded by: who may write a scope, what
- * a plan may persist, and who may switch retention off entirely.
- *
- * The read side advertises a scope as writable using exactly the permissions
- * asserted here, so the pair is what stops the chip picker offering a scope the
- * save then rejects.
+ * The write gates the settings page is bounded by: who may write a scope, what a plan may
+ * persist, and who may switch retention off entirely.
  */
 import { describe, expect, it } from "vitest";
 import { DataRetentionAdministratorPort } from "../../ports/data-retention-administrator.port";

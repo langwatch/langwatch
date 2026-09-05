@@ -7,18 +7,15 @@ import {
 } from "../saved-view.repository";
 
 /**
- * Only the delegate this repository touches, plus the transaction it reorders in.
- *
- * Composition can name this instead of the whole generated client, which keeps
+ * Only the delegate this repository touches, plus the transaction it reorders in. Composition
+ * can name this instead of the whole generated client, which keeps
  * `@langwatch/prisma-client/generated` an import of this directory alone.
  */
 export type SavedViewDatabase = Pick<PrismaClient, "savedView" | "$transaction">;
 
 /**
- * Repository layer for saved view data access.
- * Single Responsibility: Database operations for saved views.
- *
- * CRITICAL: Every query includes projectId for multitenancy protection.
+ * Repository layer for saved view data access. Single Responsibility: Database operations for
+ * saved views. CRITICAL: Every query includes projectId for multitenancy protection.
  */
 export class PrismaSavedViewRepository extends SavedViewRepository {
   private constructor(private readonly prisma: SavedViewDatabase) {

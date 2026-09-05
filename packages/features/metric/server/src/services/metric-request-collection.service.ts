@@ -14,12 +14,6 @@ import {
 
 /**
  * Every field optional, all the way down.
- *
- * Stated here rather than imported: an OTLP export request arrives as JSON a
- * client assembled, so the transformer's own interface — which requires every
- * field — describes what a conforming exporter sends rather than what actually
- * lands. Was `platform/app/src/utils/types.ts`, a tree this migration only
- * deletes from.
  */
 type DeepPartial<T> = T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } : T;
 
@@ -30,15 +24,8 @@ export interface MetricRequestCollectionDeps {
 }
 
 /**
- * The outcome of an OTLP metric request.
- *
- * The two cases are deliberately separate shapes rather than a counter pair.
- * An OTLP `partialSuccess` body means the server rejected those points
- * *permanently* and the client must not re-send them, so folding a failure
- * that is ours — a queue outage, say — into `rejectedDataPoints` tells every
- * collector in the fleet to drop data it would otherwise have retried. As a
- * counter pair the two are one indistinguishable `+= n`; as a discriminated
- * union, conflating them is a type error at the call site.
+ * The outcome of an OTLP metric request. The two cases are deliberately separate shapes rather
+ * than a counter pair.
  */
 export type MetricRequestCollectionResult =
   | {

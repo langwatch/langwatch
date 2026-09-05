@@ -1,17 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * Editing a provider that already holds a saved API key. Two failure modes
- * found while walking this flow are pinned here: the drawer stripped the
- * masked placeholder from the payload, so a base-URL edit deleted the
- * stored key; and emptying the base URL did not count as a change, so a
- * URL added by mistake could never be removed.
- *
- * Covers @integration scenarios from
- * specs/model-providers/provider-configuration.feature.
- *
- * Only the boundaries are stubbed (see the requiredness suite for why):
- * the drawer's own state flow is what shapes the save payload.
  */
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

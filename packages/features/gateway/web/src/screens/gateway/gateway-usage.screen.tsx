@@ -61,13 +61,8 @@ const PRESETS: Array<{ label: string; days: number | "mtd" }> = [
 ];
 
 /**
- * The period the Trace Explorer should open on for the period being read.
- *
- * Three of the five map onto presets the explorer already has. The other
- * two travel as exact instants: it has no 90-day preset at all, and its
- * "this month" starts in the reader's own timezone while this page's starts
- * in UTC, so the preset would open on a different set of days than the
- * numbers above it were computed from.
+ * The period the Trace Explorer should open on for the period being read. Three of the five map
+ * onto presets the explorer already has.
  */
 const TRACE_WINDOW_PRESETS: Record<number, string> = {
   1: "24h",

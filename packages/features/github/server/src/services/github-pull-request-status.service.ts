@@ -1,19 +1,5 @@
 /**
  * Live pull-request status.
- *
- * The stored `GithubPullRequest` row is a snapshot taken when the branch was
- * mapped, and a pull request's state is the one thing about it that moves after
- * that. Rather than have the queue chase every state change of every mapped
- * pull request, the reader asks GitHub when someone is actually looking, and a
- * 60-second Redis entry keeps a page of rows, a refresh and a second viewer
- * from each costing their own call.
- *
- * A per-ref failure is not a failure of the read. GitHub rate limiting us, the
- * App having been uninstalled, or the network being the network all degrade to
- * the stored label marked `snapshot`, because a stale label with an honest
- * provenance is better than an error page over a cost table. Only invalid input
- * fails the whole call.
- *
  * Spec: specs/coding-agent/pull-request-linkage.feature.
  */
 import { ValidationError } from "@langwatch/handled-error";
@@ -91,10 +77,9 @@ export class GithubPullRequestStatusService {
   }
 
   /**
-   * The current status of up to {@link MAX_STATUS_REFS} pull requests, in the
-   * order asked. Refs the organization has never mapped are omitted rather than
-   * guessed at: a status for a pull request we know nothing about would be an
-   * invention, and the caller reads absence.
+   * The current status of up to {@link MAX_STATUS_REFS} pull requests, in the order asked. Refs
+   * the organization has never mapped are omitted rather than guessed at: a status for a pull
+   * request we know nothing about would be an invention, and the caller reads absence.
    */
   async getLiveStatuses({
     organizationId,

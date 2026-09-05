@@ -1,9 +1,9 @@
 import { chakra } from "@chakra-ui/react";
+import { useUiDeployment } from "@langwatch/ui-host/capabilities";
 import type { ChangeEvent } from "react";
 import {
   HOME_DEV_STATES,
   type HomeDevState,
-  isHomeDevStateAvailable,
   setHomeDevState,
   useHomeDevState,
 } from "./home-dev-state";
@@ -18,10 +18,14 @@ import {
  */
 export function HomeStateSwitcher() {
   const active = useHomeDevState();
-  if (!isHomeDevStateAvailable()) return null;
+  const { isDevelopment } = useUiDeployment();
+  if (!isDevelopment) return null;
 
   const onChange = (event: ChangeEvent<HTMLSelectElement>) => {
-    setHomeDevState((event.target.value || null) as HomeDevState | null);
+    setHomeDevState({
+      state: (event.target.value || null) as HomeDevState | null,
+      isDevelopment,
+    });
   };
 
   return (

@@ -744,15 +744,11 @@ describe.skipIf(!databaseUrl)("PrismaProcessStore", () => {
   // pin is the database refusing the index row (SQLSTATE 54000) — an in-memory
   // store cannot express it, and a string-length assertion would not observe it.
   describe("given a source event id far past the btree index limit", () => {
-    // The filler has to be INCOMPRESSIBLE or this whole block is a test that
-    // cannot fail. Postgres pglz-compresses a datum before it goes into the
-    // index, so repetitive filler shrinks under the limit and inserts happily
-    // against the OLD index too. The production value was a base64 thought
-    // signature — high entropy, no compression — so the fixture chains sha256
-    // digests: deterministic across runs, and pglz cannot shrink it either.
-    // `is still rejected by the pre-fix index shape` below pins that against
-    // the real engine, so the fixture cannot silently degrade into one that
-    // would pass with or without the digest key.
+    // The filler has to be INCOMPRESSIBLE or this whole block is a test that cannot fail.
+    // Postgres pglz-compresses a datum before it goes into the index, so repetitive filler
+    // shrinks under the limit and inserts happily against the OLD index too. The production
+    // value was a base64 thought signature — high entropy, no compression — so the fixture
+    // chains sha256 digests: deterministic across runs, and pglz cannot shrink it either.
     const incompressible = (length: number): string => {
       let out = "";
       let block = createHash("sha256").update("langy-tool-call").digest("hex");
@@ -979,13 +975,9 @@ describe.skipIf(!databaseUrl)("PrismaProcessStore", () => {
     });
   });
 
-  // The retention sweep is the one caller that deliberately has no processName
-  // predicate: it reaps by age across every process manager, which is what
-  // makes it cover the six processes that never registered a prune of their
-  // own. That breadth is also why these fixtures sit at epoch 1970 — a cutoff
-  // of a few thousand milliseconds cannot reach any other suite's rows, which
-  // all timestamp from `Date.now()`, so the exact counts below stay exact even
-  // when integration files run in parallel against the same database.
+  // The retention sweep is the one caller that deliberately has no processName predicate: it
+  // reaps by age across every process manager, which is what makes it cover the six processes
+  // that never registered a prune of their own.
   describe("given retention-eligible rows across every process name", () => {
     describe("when the retention sweep runs", () => {
       const ancient = 1_000;

@@ -1,23 +1,5 @@
 /**
  * First-touch acquisition attribution.
- *
- * Captures `?ref=` + `utm_*` URL params and `document.referrer` into
- * sessionStorage (first-touch: never overwritten), and reads them back into
- * a structured `Attribution` object for downstream consumers (signup
- * mutation, Customer.io identify/track).
- *
- * Pure module — no React. The mount-time write effect is `./use-attribution-capture`,
- * which the application mounts at its outermost provider position; this module is
- * both the storage rule that effect writes through and the READER the onboarding
- * form needs.
- *
- * A STORAGE REFUSAL IS NO LONGER REPORTED, and that is deliberate rather than
- * an oversight. It used to reach `~/utils/posthogErrorCapture`, which is the
- * application's observability client; a feature package may not construct one,
- * and a port method the host could only answer with nothing is worse than its
- * absence. The refusal still degrades exactly as before — no attribution, and
- * the page carries on — and the `storageErrorReported` latch stays so the
- * decision is visible where the reporting used to be.
  */
 
 let storageErrorReported = false;

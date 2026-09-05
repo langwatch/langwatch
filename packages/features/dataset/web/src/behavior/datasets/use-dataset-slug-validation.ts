@@ -14,11 +14,9 @@ interface UseDatasetSlugValidationProps {
 }
 
 /**
- * Result of dataset slug validation.
- *
- * @property slug - The computed slug for the dataset name
- * @property hasConflict - Whether this slug conflicts with an existing dataset
- * @property conflictsWith - Name of the conflicting dataset (if any)
+ * Result of dataset slug validation. @property slug - The computed slug for the dataset name
+ * @property hasConflict - Whether this slug conflicts with an existing dataset @property
+ * conflictsWith - Name of the conflicting dataset (if any)
  */
 export type SlugValidationResult = {
   slug: string;
@@ -27,11 +25,6 @@ export type SlugValidationResult = {
 } | null;
 
 /**
- * Custom hook for dataset slug validation.
- * Fully self-contained: fetches project context, dataset from DB, and manages all slug state.
- *
- * Single Responsibility: Encapsulates all slug validation logic and state management.
- *
  * @param name - Current dataset name being validated
  * @param datasetId - Current dataset ID (for edit mode, fetches slug from DB)
  * @returns Validation state and computed display values

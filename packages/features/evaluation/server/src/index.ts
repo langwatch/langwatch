@@ -3,24 +3,12 @@ export {
   type EvaluationAdapterOptions,
 } from "./adapters/evaluation.clickhouse.adapter";
 /**
- * The `evaluation_runs` repository, for a process that needs one read and not
- * the service around it.
- *
- * Automation settlement re-checks a matched trace against its evaluation runs;
- * that is one ClickHouse read, and reaching it through `EvaluationAdapter`
- * would make the caller synthesise an executor and a whole workflow capability
- * it never touches. Exported so the read is reused rather than written twice.
+ * The `evaluation_runs` repository, for a process that needs one read and not the service
+ * around it.
  */
 export { ClickHouseEvaluationRepository } from "./repositories/clickhouse/evaluation.repository";
 /**
- * The monitors page's seven-day trend, for a process that reads it and
- * executes nothing.
- *
- * The same rule as the repository above, one layer up: the trend is a single
- * ClickHouse read, and reaching it through `EvaluationAdapter` would make the
- * caller synthesise an executor and a workflow capability the read never
- * touches. The adapter composes the service over a routed client; the
- * repository behind it stays private to this package.
+ * The monitors page's seven-day trend, for a process that reads it and executes nothing.
  */
 export { MonitorPerformanceAdapter } from "./adapters/monitor-performance.clickhouse.adapter";
 export { MonitorPerformanceService } from "./services/monitor-performance.service";
@@ -134,12 +122,10 @@ export {
 } from "./adapters/otel.evaluation-execution-metrics.adapter";
 export { DirectEvaluationExecutionReceiptAdapter } from "./adapters/direct.evaluation-execution-receipt.adapter";
 
-// ---------------------------------------------------------------------------
-// The legacy evaluation REST doors
-//
-// The evaluator catalogue, the batch result log and the four evaluate paths.
-// The catalogue needs nothing; the other two halves take what they cannot own
-// as port groups, so a process mounts the ones its own graph can answer.
+// --------------------------------------------------------------------------- The legacy
+// evaluation REST doors The evaluator catalogue, the batch result log and the four evaluate
+// paths. The catalogue needs nothing; the other two halves take what they cannot own as port
+// groups, so a process mounts the ones its own graph can answer.
 // ---------------------------------------------------------------------------
 export {
   createEvaluationsLegacyRestApp,

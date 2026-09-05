@@ -1,20 +1,6 @@
 /**
  * @vitest-environment node
- *
  * @see specs/home/recent-items-backend.feature
- *
- * `RecentItemsService` turns a user's AuditLog trail into the home screen's
- * recent strip: it filters entries to entity-related actions, extracts the
- * touched entity id per action prefix, and hydrates each with its current
- * name/href — skipping entries whose entity was since soft-deleted or
- * archived, since the strip should read as "what's live" not "what happened".
- *
- * Ported from `recent-items.integration.test.ts` on platform/app, which drove
- * the deleted `appRouter`'s `home.getRecentItems`. The service and its
- * Prisma-backed repository moved here; this test drives them directly rather
- * than through a router.
- *
- * Requires LANGWATCH_TEST_DATABASE_URL. Skips cleanly without it.
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

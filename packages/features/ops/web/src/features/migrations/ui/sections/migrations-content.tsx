@@ -39,11 +39,6 @@ const STATUS_LABEL: Record<string, string> = {
 
 /**
  * How a targeted run's outcome reads in the toast, per resulting status.
- * `migrated` here always means HELD - a step that merely waited reports
- * `migrated` too, and the server flags that separately (see the waiting
- * copy below), because telling an operator a parity proof found
- * disagreements when nothing ran sends them looking for a problem that does
- * not exist.
  */
 const RUN_OUTCOME_LABEL: Record<string, string> = {
   finalized: "The organization finalized: it is fully on the new behavior.",
@@ -54,10 +49,9 @@ const RUN_OUTCOME_LABEL: Record<string, string> = {
 };
 
 /**
- * What a targeted run's toast says. `waiting` comes first because it
- * overrides the status: a waiting step records `migrated` exactly as a held
- * one does, and reading it as held would tell the operator a parity proof
- * found disagreements when nothing ran at all.
+ * What a targeted run's toast says. `waiting` comes first because it overrides the status: a
+ * waiting step records `migrated` exactly as a held one does, and reading it as held would tell
+ * the operator a parity proof found disagreements when nothing ran at all.
  */
 function runOutcomeToast({ status, waiting }: { status: string | null; waiting: boolean }): {
   title: string;
@@ -325,10 +319,9 @@ function MigrationSection({
 }
 
 /**
- * The organization lookup every action dialog shares: search by name (or
- * paste an exact id - the search matches that too), pick from the results.
- * Selection is the only way to proceed, so an action can never fire against
- * a typo.
+ * The organization lookup every action dialog shares: search by name (or paste an exact id -
+ * the search matches that too), pick from the results. Selection is the only way to proceed, so
+ * an action can never fire against a typo.
  */
 function OrganizationPicker({
   value,
@@ -405,10 +398,9 @@ function OrganizationPicker({
 }
 
 /**
- * Enroll one organization for THIS migration. The preparation migrations
- * enroll on a plain confirm; the cutover is what lets the next pass change
- * which tables answer the organization's permission checks, so its dialog
- * says so and the mutation carries the typed confirmation.
+ * Enroll one organization for THIS migration. The preparation migrations enroll on a plain
+ * confirm; the cutover is what lets the next pass change which tables answer the organization's
+ * permission checks, so its dialog says so and the mutation carries the typed confirmation.
  */
 function EnrollAction({
   migrationName,
@@ -476,18 +468,8 @@ function EnrollAction({
 }
 
 /**
- * Enroll a sampled cohort for THIS migration in one action. The first
- * step's sample is drawn from organizations not yet enrolled; a later
- * step's from the step before it. The platform leaves out the ones it
- * already knows to hold back, by data: an active enterprise
- * subscription, or a dedicated data plane configured in the environment.
- * No organization is ever named in code to exclude it.
- *
- * Both are defaults an operator can lift, one at a time, which is how a
- * proven rollout is finished without enrolling the held-back
- * organizations one id at a time. The description says which of them this
- * draw will include, because "left out" and "included" must never be a
- * guess about a checkbox the reader has already ticked.
+ * Enroll a sampled cohort for THIS migration in one action. The first step's sample is drawn
+ * from organizations not yet enrolled; a later step's from the step before it.
  */
 function cohortDialogDescription({
   previousMigrationTitle,
@@ -530,10 +512,6 @@ function cohortDialogDescription({
 
 /**
  * The two classes a cohort leaves out by default, each on its own switch.
- * Separate because the risks are different in kind — an enterprise
- * organization is a commercial relationship, a dedicated-data-plane one
- * keeps its events in a ClickHouse instance of its own — and a single
- * "include everything" control would hide that from whoever ticks it.
  */
 function HeldBackClassFields({
   includeEnterprise,
@@ -714,10 +692,9 @@ function CohortDialog({
 }
 
 /**
- * Run THIS migration for one organization, now, without waiting for the
- * next boot's pass. The result toast reports the status the organization
- * ended the run in - the operator asked about one organization and gets its
- * answer, not a fleet summary.
+ * Run THIS migration for one organization, now, without waiting for the next boot's pass. The
+ * result toast reports the status the organization ended the run in - the operator asked about
+ * one organization and gets its answer, not a fleet summary.
  */
 function RunForOrganizationAction({
   migrationName,
@@ -778,10 +755,9 @@ function RunForOrganizationAction({
 }
 
 /**
- * The state machine's one human-driven edge: finalized → rolled_back. The
- * operator names the organization through the same picker as every other
- * action - finalized organizations are a count rather than a listing, so
- * they arrive here knowing which organization needs to go back.
+ * The state machine's one human-driven edge: finalized → rolled_back. The operator names the
+ * organization through the same picker as every other action - finalized organizations are a
+ * count rather than a listing, so they arrive here knowing which organization needs to go back.
  */
 function RollBackAction({
   migrationName,

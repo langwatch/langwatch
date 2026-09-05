@@ -1,12 +1,5 @@
 /**
  * The cells a run produced, in the shape the workbench persists.
- *
- * A run started with no browser attached streams the same orchestrator events
- * a browser run does, so the fold here mirrors the browser's SSE handler
- * (`@langwatch/experiment-web`'s `behavior/experiments-v3/use-execute-evaluation.ts`)
- * event for event. The merge
- * mirrors what that handler does to the store before a scoped run: the cells
- * the run covers are cleared and refilled, every other cell stays as it was.
  */
 
 import type { TargetRowMetadata } from "../../experiment-workbench";
@@ -30,11 +23,9 @@ export interface RunResultsDraft {
 }
 
 /**
- * How a run's cells fold into the ones already saved.
- *
- * `replace` for a full run, which covers every cell. `merge` for anything
- * narrower: only the cells the run started are cleared, and an evaluator-only
- * run keeps the target outputs it reused and touches one evaluator's column.
+ * How a run's cells fold into the ones already saved. `replace` for a full run, which covers
+ * every cell. `merge` for anything narrower: only the cells the run started are cleared, and an
+ * evaluator-only run keeps the target outputs it reused and touches one evaluator's column.
  */
 export type RunMergePlan =
   | { mode: "replace" }
@@ -70,10 +61,8 @@ export const emptyRunResultsDraft = (): RunResultsDraft => ({
 });
 
 /**
- * Folds one run event into the draft, in place.
- *
- * The draft belongs to a single run, so folding in place keeps a run of a few
- * thousand cells from copying every row array once per event.
+ * Folds one run event into the draft, in place. The draft belongs to a single run, so folding
+ * in place keeps a run of a few thousand cells from copying every row array once per event.
  */
 export const applyRunEvent = ({
   draft,
@@ -114,13 +103,7 @@ export const applyRunEvent = ({
 };
 
 /**
- * A cell that failed rather than answered. The engine reports it as its own
- * event instead of a result, and the cell still has to show the failure: a run
- * where everything failed writes those failures back, the same as the browser
- * does, rather than leaving the table reading "No output yet".
- *
- * An error naming no cell is the whole run failing. There is no cell to mark,
- * and the run's own status already carries it.
+ * A cell that failed rather than answered.
  */
 const applyCellError = ({
   draft,
@@ -225,10 +208,9 @@ const cloneEvaluatorRows = (rows: Record<string, Record<string, unknown[]>> | un
 };
 
 /**
- * Writes the rows the draft actually filled over the ones already there.
- *
- * Only the row indexes the run filled are copied: a row array is sparse by
- * design, and a run of two rows must not blank the rest of the column.
+ * Writes the rows the draft actually filled over the ones already there. Only the row indexes
+ * the run filled are copied: a row array is sparse by design, and a run of two rows must not
+ * blank the rest of the column.
  */
 const overlayRows = <T>(into: Record<string, T[]>, from: Record<string, T[]>): void => {
   for (const [key, rows] of Object.entries(from)) {
@@ -296,10 +278,9 @@ const clearCoveredCell = ({
 };
 
 /**
- * Opens the carried cell for one board position, or refuses it.
- *
- * Refuses a cell the run covers itself: that cell is about to be produced, and
- * a carried copy of it would be the stale half of the same position.
+ * Opens the carried cell for one board position, or refuses it. Refuses a cell the run covers
+ * itself: that cell is about to be produced, and a carried copy of it would be the stale half
+ * of the same position.
  */
 type OpenCarriedCell = (args: { rowIndex: number; targetId: string }) => CarriedOverCell | null;
 
@@ -371,10 +352,9 @@ const copyMetadataOnto = ({
 };
 
 /**
- * Metadata goes on last, and only onto cells something else already opened.
- *
- * A row holding cost but neither an output nor a failure is a leftover rather
- * than a result, and carrying it would draw an empty cell with a price on it.
+ * Metadata goes on last, and only onto cells something else already opened. A row holding cost
+ * but neither an output nor a failure is a leftover rather than a result, and carrying it would
+ * draw an empty cell with a price on it.
  */
 const carryMetadata = ({
   results,
@@ -394,14 +374,6 @@ const carryMetadata = ({
 
 /**
  * The board's cells, minus the ones the run covers, as the run carries them.
- *
- * Reads the same four groups `mergeRunResults` writes, so there is one
- * interpretation of the saved shape rather than two that can drift: a target's
- * output, its metadata, its failure, and its verdicts, each a sparse array
- * indexed by row.
- *
- * A cell with nothing on the board is not carried. Copying an empty cell would
- * write a row saying the target produced nothing, which reads as a result.
  */
 export const carriedOverCells = ({
   results,

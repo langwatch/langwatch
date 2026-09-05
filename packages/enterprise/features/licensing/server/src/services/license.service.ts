@@ -71,12 +71,9 @@ export class LicenseService extends LicensingServiceContract {
   private readonly logger: LicenseLoggerPort;
   private readonly configuration: LicenseServiceConfiguration;
   /**
-   * The plan half, composed rather than restated.
-   *
-   * `getActivePlan` and `getSelfHostedPlan` are the two questions the
-   * entitlement source asks, and a process that resolves plans composes the
-   * same service directly over the licence read alone. Delegating here is what
-   * keeps the status screen and the plan provider on one answer.
+   * The plan half, composed rather than restated. `getActivePlan` and `getSelfHostedPlan` are
+   * the two questions the entitlement source asks, and a process that resolves plans composes
+   * the same service directly over the licence read alone.
    */
   private readonly plans: LicensePlanSourceService;
 

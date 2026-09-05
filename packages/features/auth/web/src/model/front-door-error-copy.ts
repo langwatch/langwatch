@@ -1,26 +1,5 @@
 /**
  * The words a customer reads for the codes the FRONT DOOR raises.
- *
- * Harvested verbatim from `platform/app/src/features/errors/logic/presentation.ts`
- * — the same titles and the same `describe` bodies, comments included — for the
- * thirty-three codes reachable from a signed-out screen: the invitation
- * refusals, the identity ceremonies, joining an organization, and the four
- * generic ones every surface can meet.
- *
- * A RESTATEMENT, AND IT SAYS SO. The full registry is ~90 codes and 3,700
- * lines of the whole product's error copy; it has no package of its own yet
- * (the manifests have owed the harvest since the governance family) and a
- * feature-web package may not import `platform/app`. Copying the WHOLE thing
- * into one feature would be worse than copying the part that is this feature's
- * own subject — which is what this is. The obligation is the one
- * `@langwatch/enterprise-billing-contract` states about its Prisma enum copies
- * and the data-governance contracts state about their snapshots: these entries
- * and the registry's must stay aligned, and both die into one when the harvest
- * lands.
- *
- * Installed as the DEFAULT explainer, so a composition that installs nothing
- * still reads the right words; `installAuthErrorExplainer` replaces it, which
- * is how the application hands over the full registry once there is one.
  */
 
 import { safeProse, type AuthHandledError } from "./read-handled-error";
@@ -51,12 +30,11 @@ const num = (error: AuthHandledError, key: string, fallback: number): number => 
 
 export const FRONT_DOOR_ERROR_COPY: Readonly<Record<string, FrontDoorErrorEntry>> = {
   email_already_registered: {
-    // Reached from the sign-up screen, and the reader there is usually looking
-    // at their own account: either a previous sign-up created it and could not
-    // sign them in, or they were a member before and an invite asked them to
-    // create an account they already have. The screen retries the sign-in for
-    // them first, so by the time this copy renders the password they typed was
-    // not the account's, which leaves exactly two moves worth naming.
+    // Reached from the sign-up screen, and the reader there is usually looking at their own
+    // account: either a previous sign-up created it and could not sign them in, or they were a
+    // member before and an invite asked them to create an account they already have. The screen
+    // retries the sign-in for them first, so by the time this copy renders the password they
+    // typed was not the account's, which leaves exactly two moves worth naming.
     title: "That email already has an account",
     describe: () => "Sign in with it, or reset the password if you don't have it.",
   },
@@ -263,14 +241,8 @@ export const FRONT_DOOR_ERROR_COPY: Readonly<Record<string, FrontDoorErrorEntry>
   validation_error: {
     title: "Check your input",
     describe: (error) => {
-      // The registry's entry names the offending fields through a product-wide
-      // label map (`USER_VISIBLE_FIELDS`) that lives with it and covers every
-      // surface; it did not travel, because a front-door form is the one place
-      // the per-field detail already has a better home — `meta.fieldErrors`
-      // goes onto the fields themselves through `applyHandledErrorToForm`, and
-      // the alert above the form only has to say the submission was rejected.
-      // Field NAMES are deliberately not printed here: they are the input
-      // schema's wire identifiers, which is what the label map existed to hide.
+      // Field errors go onto the fields themselves through `applyHandledErrorToForm`. Field
+      // NAMES are deliberately not printed here: they are the input schema's wire identifiers.
       const formErrors = error.meta.formErrors;
       if (Array.isArray(formErrors)) {
         const first = formErrors.find((entry): entry is string => typeof entry === "string");

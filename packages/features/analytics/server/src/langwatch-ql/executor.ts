@@ -263,8 +263,8 @@ export function createLangWatchQLExecutor(connection: LangWatchQLConnection): La
 }
 
 /**
- * Reads the restricted identity's connection from the environment, or reports
- * that this deployment has none.
+ * Reads the restricted identity's connection out of the environment a process
+ * handed over, or reports that this deployment has none.
  *
  * `null` rather than a throw, and rather than a default pointing at the
  * application's own ClickHouse: an unconfigured deployment must refuse LangWatchQL
@@ -278,12 +278,14 @@ export function createLangWatchQLExecutor(connection: LangWatchQLConnection): La
  * optional entry there would not reject a misspelling either, while making them
  * required would refuse to boot every deployment that does not run this API.
  */
-export function lwqlConnectionFromEnv(): LangWatchQLConnection | null {
-  const url = process.env.LWQL_CLICKHOUSE_URL;
-  const username = process.env.LWQL_CLICKHOUSE_USER;
-  const password = process.env.LWQL_CLICKHOUSE_PASSWORD;
-  const database = process.env.LWQL_DATABASE;
-  const tenantSetting = process.env.LWQL_TENANT_SETTING;
+export function lwqlConnectionFromEnvironment(
+  environment: Record<string, string | undefined>,
+): LangWatchQLConnection | null {
+  const url = environment.LWQL_CLICKHOUSE_URL;
+  const username = environment.LWQL_CLICKHOUSE_USER;
+  const password = environment.LWQL_CLICKHOUSE_PASSWORD;
+  const database = environment.LWQL_DATABASE;
+  const tenantSetting = environment.LWQL_TENANT_SETTING;
 
   const required = [
     ["LWQL_CLICKHOUSE_URL", url],

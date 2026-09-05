@@ -1,19 +1,6 @@
 /**
- * Which evaluators this particular install can actually run.
- *
- * Moved from the platform app's `server/evaluations/installedEvaluators.ts`
- * unchanged. Every evaluator LangWatch knows about is listed in
- * `AVAILABLE_EVALUATORS`, but a given install does not necessarily carry the
- * code behind all of them: the PII detector ships a natural-language model
- * larger than the rest of the evaluator environment put together, and language
- * detection carries ~95MB of language models. Somebody who goes looking for
- * one of these deserves to be told that, rather than shown a working-looking
- * card that fails with "internal error" when they run it.
- *
- * The default is AVAILABLE, deliberately. Container and Kubernetes installs
- * build the evaluator environment with every extra and never set these
- * variables, so silence has to mean "present". Only an install that
- * deliberately skipped one says so.
+ * Which evaluators this particular install can actually run. Moved from the platform app's
+ * `server/evaluations/installedEvaluators.ts` unchanged.
  */
 import type { EvaluatorUnavailability } from "../transport/api-trpc/evaluation.api";
 
@@ -75,10 +62,9 @@ export class EvaluatorAvailabilityService {
   }
 
   /**
-   * The sentence shown when somebody runs an evaluator this install cannot run.
-   *
-   * One clause of what happened and one of what to do — the same pair the
-   * evaluator picker shows, so the two never tell different stories.
+   * The sentence shown when somebody runs an evaluator this install cannot run. One clause of
+   * what happened and one of what to do — the same pair the evaluator picker shows, so the two
+   * never tell different stories.
    */
   static unavailableEvaluatorMessage(input: { unavailability: EvaluatorUnavailability }): string {
     return `${input.unavailability.reason} ${input.unavailability.howToEnable}`;

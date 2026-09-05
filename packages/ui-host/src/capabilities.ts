@@ -223,8 +223,25 @@ export class BrowserUiDocumentTitle extends UiDocumentTitlePort {
   }
 }
 
+/**
+ * Which build a screen is running in, as the composing application knows it.
+ * Only `apps/ui` can read that; a screen asks for the reading instead.
+ */
+export type UiDeployment = {
+  /** A local development build: dev-only affordances and raw error text. */
+  isDevelopment: boolean;
+};
+
+/** What a composition that declared no deployment is read as. */
+const PRODUCTION_UI_DEPLOYMENT: UiDeployment = { isDevelopment: false };
+
 /** Every capability a screen can ask for, all of them answered. */
 export type UiCapabilities = {
+  /**
+   * Optional so a hand-built capability set stays valid without one;
+   * {@link resolveUiCapabilities} always fills it, production when absent.
+   */
+  deployment?: UiDeployment;
   documentTitle: UiDocumentTitlePort;
   feedback: UiFeedbackPort;
   navigation: UiNavigationPort;
@@ -261,6 +278,7 @@ export function resolveUiCapabilities({
   session,
 }: UiCapabilityResolution): UiCapabilities {
   return {
+    deployment: install.deployment ?? PRODUCTION_UI_DEPLOYMENT,
     documentTitle: install.documentTitle ?? documentTitle,
     feedback: install.feedback ?? UNAVAILABLE_UI_FEEDBACK,
     navigation: install.navigation ?? navigation,
@@ -284,6 +302,14 @@ export const UiCapabilityContextProvider = UiCapabilityContext.Provider;
  */
 export function useOptionalUiCapabilities(): UiCapabilities | undefined {
   return useContext(UiCapabilityContext);
+}
+
+/**
+ * The build this screen is running in. A screen mounted with no shell above
+ * it reads production, the same fail-closed reading every other port gives.
+ */
+export function useUiDeployment(): UiDeployment {
+  return useOptionalUiCapabilities()?.deployment ?? PRODUCTION_UI_DEPLOYMENT;
 }
 
 /**

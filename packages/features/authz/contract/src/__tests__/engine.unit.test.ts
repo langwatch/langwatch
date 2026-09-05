@@ -833,10 +833,8 @@ describe("authz engine explain()", () => {
   });
   describe("given a membership an admin disabled to free its seat", () => {
     /**
-     * The collector is what turns a disabled row into `isOrgMember: false`
-     * (its bindings do not even come back from the reader, which fences on an
-     * active membership). These cases pin what the ENGINE then does with that
-     * snapshot: deny everywhere a member could act, and say which gate closed.
+     * The collector is what turns a disabled row into `isOrgMember: false` (its bindings do not
+     * even come back from the reader, which fences on an active membership).
      */
     const disabled = (overrides: Partial<CollectedGrants> = {}): CollectedGrants =>
       makeGrants({

@@ -1,18 +1,7 @@
 /**
- * Who may change a project's retention, and to what.
- *
- * Every decision here is a refusal or nothing: the service either returns, or
- * it throws the answer the settings page has always shown. It is the WRITE
- * half of the pair whose read half is {@link DataRetentionSnapshotService}, and
- * the two must agree — the snapshot advertises a scope as writable using
- * exactly the permissions this refuses on, so the chip picker can never offer a
- * scope the save then rejects.
- *
- * The refusals stay `TRPCError` with the codes the platform application
- * answered (`FORBIDDEN`, `NOT_FOUND`). They are the customer-visible copy this
- * surface already had; turning them into new handled codes needs an entry in a
- * presentation registry that lives in the tree this migration only deletes
- * from, so they are carried across unchanged rather than renamed in flight.
+ * Who may change a project's retention, and to what. Every decision here is a refusal or
+ * nothing: the service either returns, or it throws the answer the settings page has always
+ * shown.
  */
 import {
   ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS,
@@ -40,13 +29,6 @@ export type DataRetentionPolicyServiceOptions = Readonly<{
 
 /**
  * Which retention values a plan tier may persist.
- *
- * Tiering is by exclusion: an uncapped plan (enterprise, or self-hosted) may
- * take any whole-week value at or above `customMin`, plus the paid short
- * presets as the sole sub-floor exceptions; every other non-free plan may take
- * ONLY the listed presets. An unrecognised tier resolves to `uncapped: false`
- * upstream and therefore fails CLOSED to the restrictive menu — the
- * data-loss-safe default, not fail-open.
  */
 type RetentionRule =
   | { kind: "fixed"; presetDays: readonly number[] }
@@ -63,19 +45,6 @@ function ruleForPlan(plan: DataRetentionPlan): RetentionRule {
 export class DataRetentionPolicyService {
   /**
    * Permission required to write a retention override at a given tier.
-   *
-   * This MUST mirror the read side, which advertises a scope as writable using
-   * exactly these permissions:
-   *   - ORGANIZATION → organization:manage
-   *   - TEAM         → team:manage
-   *   - PROJECT      → project:update
-   *
-   * PROJECT deliberately uses `project:update`, not `project:manage`: a team
-   * MEMBER holds `project:update` but not `project:manage`, and the snapshot
-   * already shows them their project as writable. Requiring `project:manage`
-   * here made the chip picker offer a scope that the save then rejected with
-   * FORBIDDEN. It also keeps these mutations consistent with the retroactive
-   * endpoints, which gate on `project:update`.
    */
   static requiredWritePermission(
     scopeType: RetentionScopeTarget["scopeType"],
@@ -110,14 +79,7 @@ export class DataRetentionPolicyService {
   }
 
   /**
-   * Throws FORBIDDEN if `plan` may not persist `retentionDays`. Pure — operates
-   * on an already-resolved plan and reads only the tier rule, so it is trivially
-   * unit-testable and does no I/O. This is the write-path prevention that stops a
-   * paid organization persisting an arbitrary window through the tRPC surface,
-   * independent of what the UI offers.
-   *
-   * No-ops on the indefinite sentinel (keep-forever is authorized separately, by
-   * the platform-administrator gate) and on free plans (blocked by the free gate).
+   * Throws FORBIDDEN if `plan` may not persist `retentionDays`.
    */
   static assertPlanAllowsRetentionValue(plan: DataRetentionPlan, retentionDays: number): void {
     if (retentionDays === INDEFINITE_RETENTION_DAYS) {
@@ -229,11 +191,8 @@ export class DataRetentionPolicyService {
   }
 
   /**
-   * Plan-gate a scope-targeted mutation against the organization that owns the
-   * SCOPE — never against the caller-supplied project id. Without this, a
-   * caller who manages a scope in a free organization and also has a paid
-   * project elsewhere could pass that paid project id alongside the free-org
-   * scope and bypass the paid-tier gate.
+   * Plan-gate a scope-targeted mutation against the organization that owns the SCOPE — never
+   * against the caller-supplied project id.
    */
   async assertPlanForScope(input: {
     actor: RetentionActor;
@@ -264,10 +223,8 @@ export class DataRetentionPolicyService {
   }
 
   /**
-   * The full write gate for a NEW value: resolve the scope's owning-organization
-   * plan ONCE, then apply the free gate and the value gate to it. Retroactive
-   * apply replays an already-stored value and is deliberately NOT value-gated;
-   * it still runs the free gate through {@link assertPlanForScope}.
+   * The full write gate for a NEW value: resolve the scope's owning-organization plan ONCE,
+   * then apply the free gate and the value gate to it.
    */
   async assertWriteAllowed(input: {
     actor: RetentionActor;

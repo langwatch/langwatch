@@ -1,10 +1,6 @@
 /**
- * The `license.*` tRPC surface: getStatus and upload, over a real
- * `LicensingApp` with a faked license service. Authorization itself (the
- * `policy()` chain) is the process's own concern and is exercised where that
- * chain is composed, not here — this suite proves the identity-policy caller
- * reaches the right application method with the right shape.
- *
+ * The `license.*` tRPC surface: getStatus and upload, over a real `LicensingApp` with a faked
+ * license service.
  * @see specs/licensing/license-router.feature
  */
 import { initTRPC } from "@trpc/server";

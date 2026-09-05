@@ -36,17 +36,15 @@ export abstract class GithubService {
     organizationId: string;
   }): Promise<boolean>;
   /**
-   * What the organization's settings surface renders: the installations,
-   * whether the App is configured on this instance, and where an install
-   * starts. The uninstall deep links are built here so no caller needs to know
-   * the host this instance is bound to.
+   * What the organization's settings surface renders: the installations, whether the App is
+   * configured on this instance, and where an install starts. The uninstall deep links are
+   * built here so no caller needs to know the host this instance is bound to.
    */
   abstract getConnectionStatus(input: { organizationId: string }): Promise<GithubConnectionStatus>;
   /**
    * Hands back the deep link that uninstalls the App on GitHub. Throws
-   * `GithubNotConnectedError` when the organization has no such installation —
-   * one owned by another organization answers identically, so an installation
-   * id cannot be probed.
+   * `GithubNotConnectedError` when the organization has no such installation — one owned by
+   * another organization answers identically, so an installation id cannot be probed.
    */
   abstract disconnect(input: {
     organizationId: string;

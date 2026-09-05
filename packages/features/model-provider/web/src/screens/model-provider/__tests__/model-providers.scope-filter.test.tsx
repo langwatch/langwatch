@@ -1,14 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * The page-level scope filter is an ADDRESS, not state.
- *
- * `platform/app` kept a `useState` synced to `?scope=` by an effect, so the
- * filter could disagree with the URL it was mirroring. The screen reads
- * `?scope=` on every render and writes the whole next query through the host,
- * which is the one thing that makes a filtered view shareable and survivable
- * across a reload.
- *
  * Spec: specs/model-providers/scope-filter.feature
  */
 

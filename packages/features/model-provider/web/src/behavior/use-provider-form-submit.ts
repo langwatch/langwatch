@@ -34,11 +34,9 @@ export type FormSnapshot = {
    */
   routingHandle: string;
   /**
-   * Tenant anchor for the write. A provider belongs to an organization
-   * and reaches the scopes attached to it, so the organization is always
-   * the answer and the project is the narrower handle when there is one.
-   * An organization on the agent-governance track has none, and the write
-   * path takes either.
+   * Tenant anchor for the write. A provider belongs to an organization and reaches the scopes
+   * attached to it, so the organization is always the answer and the project is the narrower
+   * handle when there is one.
    */
   projectId: string | undefined;
   organizationId: string | undefined;
@@ -97,11 +95,8 @@ export function useProviderFormSubmit({
 }: {
   getFormSnapshot: () => FormSnapshot;
   /**
-   * Returns the parsed advanced (gateway) fields to send in the same
-   * `update` round-trip, or `null` to skip. Throwing here (malformed
-   * JSON in providerConfig) aborts the submit so the parent form can
-   * surface the parse error inline; the toaster path covers any other
-   * server-side failure.
+   * Returns the parsed advanced (gateway) fields to send in the same `update` round-trip, or
+   * `null` to skip.
    */
   getAdvancedPayload?: () => AdvancedGatewayPayload | null;
   onSuccess?: () => void;
@@ -111,12 +106,11 @@ export function useProviderFormSubmit({
   const toaster = useModelProviderToaster();
   const showErrorToast = useShowErrorToast();
   const updateMutation = api.modelProvider.update.useMutation();
-  // B3 redesign: the user's onboarding picks for the three role models
-  // need to win over the additive seed (which fills in the registry
-  // flagship). After the provider create lands, we replay those picks
-  // through `setRoleAssignmentForScope` at every scope the provider
-  // covers so the new ModelDefault table reflects what the user chose
-  // rather than what the seed defaulted to.
+  // B3 redesign: the user's onboarding picks for the three role models need to win over the
+  // additive seed (which fills in the registry flagship). After the provider create lands, we
+  // replay those picks through `setRoleAssignmentForScope` at every scope the provider covers
+  // so the new ModelDefault table reflects what the user chose rather than what the seed
+  // defaulted to.
   const setRoleAssignmentMutation = api.modelProvider.setRoleAssignmentForScope.useMutation();
 
   const [isSaving, setIsSaving] = useState(false);
@@ -243,16 +237,10 @@ export function useProviderFormSubmit({
       let customKeysToSend: Record<string, unknown> | undefined;
       const userEnteredNewKey = hasUserEnteredNewApiKey(customKeys);
       if (!isUsingEnvVars) {
-        // When editing an existing provider, the stored key is shown masked.
-        // Decide whether anything changed by ignoring those placeholders — an
-        // untouched key must not count as an edit — but send the form as the
-        // customer left it, placeholders included: each one tells the server
-        // to keep the credential already on file. Sending the stripped object
-        // instead reads as "this provider has no key", and editing any other
-        // field (a base URL, most often) overwrites the stored key out of
-        // existence. When nothing changed, send `undefined` so the save is a
-        // no-op for credentials rather than a partial object validated
-        // against the provider's schema.
+        // When editing an existing provider, the stored key is shown masked. Decide whether
+        // anything changed by ignoring those placeholders — an untouched key must not count as
+        // an edit — but send the form as the customer left it, placeholders included: each one
+        // tells the server to keep the credential already on file.
         const hasRealChange = hasUserModifiedAnyCredential({
           customKeys,
           initialKeys,
@@ -264,13 +252,10 @@ export function useProviderFormSubmit({
         customKeysToSend = undefined;
       }
 
-      // Headers are not credentials. They have their own column, their own
-      // masked-placeholder merge (`mergeExtraHeaders`), and both readers take
-      // them from there: `prepareLitellmParams` builds `extra_headers` from
-      // `modelProvider.extraHeaders`, and the gateway materialiser reads
-      // `mp.extraHeaders`. Nothing reads a header out of `customKeys`, so
-      // folding them in wrote a value no one consumed and, when no credential
-      // had changed, replaced the whole credential bag with the headers.
+      // Headers are not credentials. They have their own column, their own masked-placeholder
+      // merge (`mergeExtraHeaders`), and both readers take them from there:
+      // `prepareLitellmParams` builds `extra_headers` from `modelProvider.extraHeaders`, and
+      // the gateway materialiser reads `mp.extraHeaders`.
 
       // Safety net: if placeholder stripping leaves an empty customKeys
       // object, send `undefined` so the server treats it as "no key change"
@@ -332,16 +317,10 @@ export function useProviderFormSubmit({
       // settings page owns hierarchical default-model writes per scope.
       // See specs/model-providers/hierarchical-default-models.feature.
 
-      // Replay the onboarding picks into ModelDefault. Mario's additive
-      // seed in `updateModelProvider` already wrote the registry flagship
-      // for each role at every scope this provider covers, but the user
-      // explicitly picked a Default / Topic-clustering / Embeddings
-      // model on this drawer — those picks need to win. We call
-      // `setRoleAssignmentForScope` (upsert semantics) per scope per
-      // role with the user's value. The Fast role is reused for the
-      // legacy "topic clustering" field (the feature registry binds
-      // `analytics.topic_clustering_llm` to FAST). See
-      // specs/model-providers/role-based-default-models.feature.
+      // Replay the onboarding picks into ModelDefault. Mario's additive seed in
+      // `updateModelProvider` already wrote the registry flagship for each role at every scope
+      // this provider covers, but the user explicitly picked a Default / Topic-clustering /
+      // Embeddings model on this drawer — those picks need to win.
       if (useAsDefaultProvider) {
         const targetScopes =
           scopes && scopes.length > 0
@@ -389,12 +368,11 @@ export function useProviderFormSubmit({
             });
           }
         }
-        // Best-effort: a single failed scope (e.g. RBAC blocks an org
-        // write for a non-admin) shouldn't kill the whole submit — the
-        // provider row is already created. But silent allSettled would
-        // also hide ALL three role writes failing, leaving the user
-        // with a "Model Provider Updated" success toast and an empty
-        // cascade. Capture rejections and surface them as a warning.
+        // Best-effort: a single failed scope (e.g. RBAC blocks an org write for a non-admin)
+        // shouldn't kill the whole submit — the provider row is already created. But silent
+        // allSettled would also hide ALL three role writes failing, leaving the user with a
+        // "Model Provider Updated" success toast and an empty cascade. Capture rejections and
+        // surface them as a warning.
         const results = await Promise.allSettled(writes.map((w) => w.promise));
         const failed = results
           .map((r, i) => ({ r, label: writes[i]!.label }))
@@ -427,21 +405,9 @@ export function useProviderFormSubmit({
         }
       }
 
-      // Invalidate every cached provider/resolved-default query so the
-      // prompts page, evaluation wizard, and any other surface that
-      // gates UI on "are there enabled providers?" picks up the new
-      // state without needing a window-focus refetch. getDefaultModelsForProject
-      // is in this unconditional list because the server's first-provider
-      // auto-seed (seedOnboardingDefaultsForProvider) runs regardless of
-      // the "use as default provider" checkbox — so the DefaultModelsSection
-      // card needs to refetch even when the user didn't opt into the replay.
-      // listAllForOrganizationForFrontend is here too: the settings table
-      // reads that org-wide list for org:view users, and this invalidation
-      // is awaited before onSuccess closes the drawer — omit it and the
-      // table re-renders with the stale pre-save list (no loading
-      // affordance), which reads as "the save didn't take" and drives
-      // users to re-add the same provider (the other duplicate-row path
-      // in #5380).
+      // Invalidate every cached provider/resolved-default query so the prompts page, evaluation
+      // wizard, and any other surface that gates UI on "are there enabled providers?" picks up
+      // the new state without needing a window-focus refetch.
       await invalidateModelProviderQueries(utils);
       // This save may have happened in a tab opened by
       // NoModelsConfiguredCallout's "Set up" link — broadcast so the

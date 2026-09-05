@@ -11,14 +11,9 @@ const DLQ_VIEWPORT_HEIGHT = 360;
 const DLQ_ROW_HEIGHT = 36;
 
 /**
- * Process-manager intents that retired, under the same heading as the queue's
- * dead letters.
- *
- * Two mechanisms, one question: an operator asking "what has stopped?" should
- * not have to know that a GroupQueue job and a process-manager intent retire
- * through different machinery. They still redrive from their own surfaces,
- * because those actions genuinely differ — so this states the problem and
- * links, rather than offering a control that would mean two things.
+ * Process-manager intents that retired, under the same heading as the queue's dead letters. Two
+ * mechanisms, one question: an operator asking "what has stopped?" should not have to know that
+ * a GroupQueue job and a process-manager intent retire through different machinery.
  */
 function ProcessOutboxDeadRow({
   byProcess,
@@ -279,14 +274,10 @@ export function DlqCard({ queueNames: _queueNames }: { queueNames: string[] }) {
   const processDeadTotal = processDead.reduce((sum, r) => sum + r.count, 0);
   const isStillLoading = dlqQuery.isLoading || processDeadQuery.isLoading;
 
-  // Two mechanisms, one heading: an operator asking "what has stopped?" should
-  // not have to know that a GroupQueue job and a process-manager intent retire
-  // through different machinery. They still redrive from their own surfaces,
-  // because the actions genuinely differ.
-  // Both sources gate the render. Without the process-dead query in here the
-  // card mounts on the queue answer alone and then flips a red row in a
-  // moment later, which on an ops surface reads as a new incident rather than
-  // as the same page finishing loading.
+  // Two mechanisms, one heading: an operator asking "what has stopped?" should not have to know
+  // that a GroupQueue job and a process-manager intent retire through different machinery. They
+  // still redrive from their own surfaces, because the actions genuinely differ. Both sources
+  // gate the render.
   if (isStillLoading || (groups.length === 0 && processDeadTotal === 0)) {
     return null;
   }

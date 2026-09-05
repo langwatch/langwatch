@@ -1,17 +1,6 @@
 /**
- * The generated Prisma shapes the studio's closure names, restated.
- *
- * `~/generated/prisma/client` is the application's generated client and a
- * browser package may not reach it. Each value below is an ENUM the product
- * offers in a picker, or the row shape a moved surface renders — restated with
- * the same alignment obligation `@langwatch/trace-web`'s own copy states: these
- * must stay identical to `schema.prisma` or a picker stops offering a value the
- * server accepts.
- *
- * Moved here from `@langwatch/workflow-web/model/prisma-types` so features
- * outside workflow can import it as a contract rather than a feature-web
- * internal. `@langwatch/trace-web/model/prisma-types` still restates
- * `Project` separately; the two stop being copies when trace's moves too.
+ * The generated Prisma shapes the studio's closure names, restated. `~/generated/prisma/client`
+ * is the application's generated client and a browser package may not reach it.
  */
 
 /** How an evaluator runs: on every trace, on a sample, or only when called. */

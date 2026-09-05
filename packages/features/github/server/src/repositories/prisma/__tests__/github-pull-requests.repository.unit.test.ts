@@ -1,21 +1,5 @@
 /**
  * The key a pull request is stored and found under.
- *
- * Every read and write here is addressed by (organization, host, repository,
- * branch or number), and two of those parts arrive from places that disagree
- * about case: `repositoryHost` comes straight off a public query parameter,
- * and a session records whatever casing its git remote carries. Folding them
- * on the way in AND on the way out is what stops one repository splitting in
- * two — a caller naming `GitHub.com` finding no row a caller naming
- * `github.com` wrote.
- *
- * `headBranch` is deliberately not folded: `feat/X` and `feat/x` really are
- * two branches.
- *
- * The other rule is the freshness guard. Snapshots arrive out of order from
- * GitHub, so every write is conditional on the stored row not being newer.
- * Without it a late delivery would overwrite a fresher one and the pull
- * request would appear to move backwards.
  */
 
 import { describe, expect, it } from "vitest";
@@ -159,12 +143,8 @@ describe("PrismaGithubPullRequestsRepository", () => {
   });
 
   /**
-   * The sweep's read, whose three predicates are matched literally by the
-   * org-tenancy guard's bound for this model: it is the one read here allowed
-   * to span tenants, and it earns that by asking for branches that mapped to
-   * nothing, are due now, and were demanded inside the activity window. Widen
-   * any of the three and a cross-tenant scan starts returning rows nobody
-   * asked about.
+   * The sweep's read is the one read here allowed to span tenants. Widen any of its three
+   * predicates and a cross-tenant scan starts returning rows nobody asked about.
    */
   describe("the cross-organization sweep read", () => {
     /** @scenario "Rechecks stop for branches with no recent session activity" */

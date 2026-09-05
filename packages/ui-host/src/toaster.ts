@@ -1,22 +1,5 @@
 /**
  * The toast singleton every browser feature calls, routed to one port.
- *
- * A feature package may not import a toast renderer, and it should not carry a
- * second one: `toaster.create({ title, type: "error" })` becomes
- * `UiFeedbackPort.failed`, everything else becomes `succeeded`, and the
- * application's own toaster — the one component that draws a toast — renders it
- * with the application's own copy rules. NOTHING IS RENDERED HERE.
- *
- * THE FAILURE TRAVELS WHOLE. `error` rides on the toast because the words a
- * customer reads are resolved from the error's `code` by the presentation
- * registry, and a call site that hands over only a title has thrown that away
- * before the port ever sees it.
- *
- * IT IS A SINGLETON BECAUSE THE CALL SITES ARE NOT COMPONENTS. Half of them
- * fire from a mutation callback or a store action, where no hook can run. The
- * host that is currently mounted registers itself here; a toast raised with no
- * host mounted is dropped with a warning rather than thrown, because a failed
- * toast must never be the thing that takes a page down.
  */
 
 import type { UiFailureNotice, UiSuccessNotice } from "./capabilities";
@@ -36,10 +19,8 @@ export type UiToast = {
   /** Likewise: a few toasts carry an action button in their body. */
   description?: unknown;
   /**
-   * The failure itself, for an `error` toast that has one.
-   *
-   * Handed to the host untouched, because the code-keyed registry is what turns
-   * it into words. A call site with nothing to give leaves it unset and the
+   * The failure itself, for an `error` toast that has one. Handed to the host untouched,
+   * because the code-keyed registry is what turns it into words.
    * notice degrades to its `title` plus ADR-045's unknown state.
    */
   error?: unknown;
@@ -64,10 +45,8 @@ export function currentUiFeedbackHost(): UiFeedbackSink | undefined {
 }
 
 /**
- * The toast's headline as a string.
- *
- * The feedback port takes text and a few call sites raise a node. A node
- * degrades to the description where there is one — never `[object Object]` in
+ * The toast's headline as a string. The feedback port takes text and a few call sites raise a
+ * node. A node degrades to the description where there is one — never `[object Object]` in
  * front of a customer.
  */
 function title(toast: UiToast): string {
@@ -105,12 +84,9 @@ export const toaster = {
   },
 
   /**
-   * The two lifecycle calls a call site makes on a toast it raised.
-   *
-   * The application's toaster owns dismissal and the feedback port has no
-   * handle to hand back, so these are no-ops rather than a pretence. What is
-   * lost is a spinner toast being replaced in place by its result; what the
-   * reader sees instead is two toasts.
+   * The two lifecycle calls a call site makes on a toast it raised. The application's toaster
+   * owns dismissal and the feedback port has no handle to hand back, so these are no-ops rather
+   * than a pretence.
    */
   dismiss(_id?: string): void {},
   remove(_id?: string): void {},

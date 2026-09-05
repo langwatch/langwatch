@@ -1,16 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * A governance signup gets an organization and no project yet, and lands
- * on chrome that mounts the project rail anyway. Every project
- * destination used to fall back to the sign-in page, so a signed-in
- * customer clicking Home was thrown out of the product.
- *
- * Lifted from
- * `platform/app/src/components/__tests__/MainMenu.noProject.integration.test.tsx`
- * (deleted with `platform/app`). The real `SideMenuLink` still renders here;
- * only the navigation host is stubbed.
- *
  * Spec: specs/navigation/project-scoped-destinations.feature
  */
 

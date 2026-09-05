@@ -1,10 +1,7 @@
 /**
- * Shared module for resolving thread-typed mappings within evaluation data.
- *
- * Both the online execution service and the background evaluations worker
- * need identical logic to detect thread mappings and resolve thread fields into
- * an existing data record. The I/O concern (how to fetch thread traces) is injected
- * via a `getThreadTraces` callback, following the Dependency Inversion principle.
+ * Shared module for resolving thread-typed mappings within evaluation data. Both the online
+ * execution service and the background evaluations worker need identical logic to detect thread
+ * mappings and resolve thread fields into an existing data record.
  */
 import {
   type MappingState,
@@ -43,11 +40,9 @@ export class EvaluationThreadMappingService {
   }
 
   /**
-   * Resolve thread-typed mappings and merge them into an existing data record.
-   *
-   * Used at trace level when the mapping config contains a mix of trace and thread
-   * sources. Thread fields that cannot be resolved (e.g. trace has no thread_id)
-   * default to empty values.
+   * Resolve thread-typed mappings and merge them into an existing data record. Used at trace
+   * level when the mapping config contains a mix of trace and thread sources. Thread fields
+   * that cannot be resolved (e.g. trace has no thread_id) default to empty values.
    */
   static async resolveThreadMappingsIntoData(params: {
     data: Record<string, unknown>;

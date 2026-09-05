@@ -5,8 +5,7 @@ import type {
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { getLangWatchTracer } from "langwatch";
-import type { FilterOption } from "../filters/clickhouse/types";
-import type { FilterOptionsPort } from "../ports/filter-options.port";
+import type { FilterOption, FilterOptionsPort } from "../ports/filter-options.port";
 
 export type GetFilterOptionsInput = {
   projectId: string;

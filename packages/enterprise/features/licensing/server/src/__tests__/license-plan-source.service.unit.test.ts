@@ -13,11 +13,6 @@ import { LicensePlanSourceService } from "../services/license-plan-source.servic
 
 /**
  * Spec: packages/enterprise/features/licensing/specs/licensing.feature
- *
- * The licence leg of plan resolution, over the REAL verifier. Nothing here is
- * a stub below the licence row: the keys are genuinely signed fixtures and the
- * signatures are genuinely checked, because the whole question this service
- * answers is whether a signature holds.
  */
 
 /** The one read the licence leg makes; nothing else is exercised. */
@@ -83,11 +78,6 @@ describe("given the plan a signed licence entitles an organization to", () => {
   describe("when a genuine licence's term has ended", () => {
     /**
      * The two readings deliberately disagree, and ADR-027 is why. On Cloud the
-     * licence is a contract with a term, so a lapsed one steps aside and the
-     * subscription underneath takes over. Self-hosted reads the signature
-     * only — once a customer, never blocked — because cutting a whole
-     * company's Enterprise surface on a routine upgrade is a blast radius the
-     * product does not have.
      */
     it("steps aside on the hosted reading and still holds on the self-hosted one", async () => {
       const plans = planSourceFor(EXPIRED_ENTERPRISE_LICENSE_KEY);

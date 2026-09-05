@@ -19,7 +19,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "@langwatch/prisma-client/generated";
-import { findSharedTeamIds } from "../../services/personal-team-scope";
+import { findPersonalTeamInScopes, findSharedTeamIds } from "../../services/personal-team-scope";
 import { projectAdminUserIdsWithoutDirectRole } from "../../services/effective-team-admins";
 import {
   isTeamRoleAllowedForOrganizationRole,
@@ -272,8 +272,49 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     private readonly writer: AuthzGrantsService,
   ) {}
 
-  getClient(): PrismaClient {
-    return this.prisma;
+  findPersonalTeamInScopes(params: {
+    scopes: Array<{ scopeType: RoleBindingScopeType; scopeId: string }>;
+  }): Promise<{ name: string } | null> {
+    return findPersonalTeamInScopes({ client: this.prisma, scopes: params.scopes });
+  }
+
+  findSharedTeamIds({ organizationId }: { organizationId: string }): Promise<string[]> {
+    return findSharedTeamIds({ client: this.prisma, organizationId });
+  }
+
+  async findTeamRoleBindings({
+    organizationId,
+    userId,
+    teamIds,
+  }: {
+    organizationId: string;
+    userId: string;
+    teamIds: string[];
+  }): Promise<Array<{ scopeId: string; role: TeamUserRole; customRoleId: string | null }>> {
+    return await this.prisma.roleBinding.findMany({
+      where: {
+        organizationId,
+        userId,
+        scopeType: RoleBindingScopeType.TEAM,
+        scopeId: { in: teamIds },
+      },
+      select: { scopeId: true, role: true, customRoleId: true },
+    });
+  }
+
+  async findCustomRolePermissions({
+    organizationId,
+    customRoleIds,
+  }: {
+    organizationId: string;
+    customRoleIds: string[];
+  }): Promise<unknown[]> {
+    const roles = await this.prisma.customRole.findMany({
+      where: { id: { in: customRoleIds }, organizationId },
+      select: { permissions: true },
+    });
+
+    return roles.map((role) => role.permissions);
   }
 
   async tryGetUserOrgRole({

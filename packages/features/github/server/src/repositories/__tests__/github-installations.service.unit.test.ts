@@ -1,10 +1,5 @@
 /**
  * @vitest-environment node
- *
- * Pins the installation service's business rules: recording an install from the
- * GitHub-fetched metadata, the webhook lifecycle (delete / suspend / repo
- * refresh), and per-turn token minting + repo resolution (explicit repo scopes
- * to one, no repo scopes to the whole installation, missing repo → null).
  */
 import { describe, expect, it, vi } from "vitest";
 
@@ -172,14 +167,9 @@ describe("recordInstallation", () => {
 
   describe("when two organizations race for the same fresh installation", () => {
     it("lets only the first writer claim it; the second sees the committed org and rejects", async () => {
-      // Pins the SERVICE's interpretation of an atomic repo result: given a
-      // repo that reports "claimed" for exactly one caller, the service must
-      // reject the other with the conflict error rather than, say, both
-      // succeeding or both throwing. The fake models atomicity synchronously
-      // (see its comment above) to exercise that branch — it does NOT prove
-      // Postgres actually serializes the concurrent writes; that guarantee is
-      // proven against a real database in
-      // github-installations.prisma.repository.integration.test.ts.
+      // Pins the SERVICE's interpretation of an atomic repo result: given a repo that reports
+      // "claimed" for exactly one caller, the service must reject the other with the conflict
+      // error rather than, say, both succeeding or both throwing.
       const repo = makeRepo();
       // The stub must echo back the requested id — the default stub returns a
       // fixed "inst-1" regardless of input, which would key both calls' rows

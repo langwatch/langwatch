@@ -117,21 +117,10 @@ export const useFilterParams = () => {
     }
   }
 
-  // Shallow-push helper that works on every page, including those with
-  // dynamic route params beyond [project] (e.g. /[project]/analytics/custom/[id]).
-  //
-  // The string form router.push("?" + qs) fails on dynamic-route pages in
-  // Next.js 15 Pages Router — the relative "?" URL isn't resolved correctly
-  // for shallow navigation, so the push silently does nothing.
-  //
-  // The (url, as) overload avoids this:
-  //   url  = { pathname, query: { ...routeParams, ...parsed } }
-  //   as   = currentPath + "?" + newQs
-  //
-  // The url's query is built from parsed newQs + dynamic route params only
-  // (not router.query which may carry stale keys). This ensures:
-  //   - Next.js detects a route change → re-renders components using useRouter()
-  //   - Deleted keys (e.g. cleared filters) are actually removed
+  // Shallow-push helper that works on every page, including those with dynamic route params
+  // beyond [project] (e.g. /[project]/analytics/custom/[id]). The string form router.push("?" +
+  // qs) fails on dynamic-route pages in Next.js 15 Pages Router — the relative "?" URL isn't
+  // resolved correctly for shallow navigation, so the push silently does nothing.
   const shallowPush = (newQs: string) => {
     const currentPath = router.asPath.split("?")[0] ?? router.asPath;
     const pathParamKeys = new Set(
@@ -142,13 +131,11 @@ export const useFilterParams = () => {
     );
     const parsed = qs.parse(newQs, URL_QS_PARSE_OPTIONS);
 
-    // Every caller of this changes which rows match, and a keyset cursor
-    // describes a position in the PREVIOUS result set. Carrying it across the
-    // change resumes the new list partway down — the first rows matching the
-    // filter the user just applied are the ones they never see, and the footer
-    // still reads "page 3", so nothing signals it. Dropping the cursor sends
-    // them to the first page of the new results, which is what applying a
-    // filter means.
+    // Every caller of this changes which rows match, and a keyset cursor describes a position
+    // in the PREVIOUS result set. Carrying it across the change resumes the new list partway
+    // down — the first rows matching the filter the user just applied are the ones they never
+    // see, and the footer still reads "page 3", so nothing signals it. Dropping the cursor
+    // sends them to the first page of the new results, which is what applying a filter means.
     if ("scrollId" in parsed) delete parsed.scrollId;
     const strippedQs = qs.stringify(parsed, {
       allowDots: true,

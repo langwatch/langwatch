@@ -207,13 +207,9 @@ export type LangyTurnAdmissionCapability = {
 };
 
 /**
- * The one cross-feature Langy capability. Transports must delegate to this.
- *
- * Eight members were removed here — listConversations, getConversation,
- * createConversation, archiveConversation, startTurn, listMessages,
- * resolveCredential and relay. They were the older repository-backed head of
- * the implementation, `LangyService.create` never supplied the repositories they
- * read, and no caller anywhere reached them.
+ * The one cross-feature Langy capability. Transports must delegate to this. Eight members were
+ * removed here — listConversations, getConversation, createConversation, archiveConversation,
+ * startTurn, listMessages, resolveCredential and relay.
  */
 export abstract class LangyService {
   abstract stopTurn(input: LangyStopTurnInput & { userId: string }): Promise<void>;

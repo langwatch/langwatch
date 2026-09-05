@@ -1,15 +1,5 @@
 /**
  * @vitest-environment node
- *
- * What a graph read may say about the alert watching it.
- *
- * `getAll` routes an alert's parameters through the redaction port; `getById`
- * hand-picked fields off the raw trigger and returned the Slack incoming-
- * webhook URL — a bearer credential letting the holder post as LangWatch in
- * the customer's Slack.
- *
- * Covers @unit scenarios from
- * specs/security/feature-surface-secret-disclosure.feature.
  */
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";

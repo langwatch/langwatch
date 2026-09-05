@@ -12,34 +12,8 @@ import { serveStaticOrFallback } from "./app-static.handler";
 import { buildSecurityHeaders } from "./app-static.security-headers";
 
 /**
- * The built browser bundle, served by the API process.
- *
- * ONE image serves both halves. `apps/ui` is a Vite build, not a process: it
- * emits `dist/client` and nothing runs it. The Helm chart has one Deployment
- * for the interactive tier and no static one, so the pod that answers `/api/*`
- * is also the pod a browser asks for `/`. Standing up a second Deployment to
- * serve files would give a rolling deploy two independent rollouts of one
- * artifact, and a browser could then load the shell from the new one and its
- * chunks from the old.
- *
- * It is a raw surface rather than a Hono route for the same reason the hosted
- * MCP endpoint is: the handler streams files straight off disk into the Node
- * response. Unlike MCP, this one is a FALLBACK, so its `handles` predicate is
- * a complement — everything the API has claimed is refused here and reaches
- * Hono untouched. The refusals are exact rather than a `/api/` prefix test:
- *
- * - `/api/*` — every REST, tRPC and SSE family, plus `/api/health`.
- * - `/metrics` — the process's own scrape endpoint.
- * - the canonical and misconfigured OTLP paths (`/v1/traces` and friends).
- *   An exporter handed the site root posts there, and the SPA fallback would
- *   answer the HTML shell with a 200, which the exporter reads as success
- *   before dropping the batch.
- * - `/.well-known/openapi` and `/llms.txt`. Root-level by convention, which is
- *   the point of them; a discovery URL that returns HTML and calls it success
- *   is worse than one that 404s.
- *
- * Both lists are imported from the modules that own them rather than restated,
- * so a path added to the API cannot start being answered with the SPA shell.
+ * The built browser bundle, served by the API process. ONE image serves both halves. `apps/ui`
+ * is a Vite build, not a process: it emits `dist/client` and nothing runs it.
  */
 export class ApiStaticSurface extends ApiRawRequestSurfacePort {
   private constructor(
@@ -55,10 +29,9 @@ export class ApiStaticSurface extends ApiRawRequestSurfacePort {
     clientDistDir: string;
     publicConfig: PublicAppConfig;
     /**
-     * Applied to every response this surface writes, including the 404. The
-     * browser reads the Content-Security-Policy off the document that loads
-     * the bundle, so it belongs on the surface that serves the document
-     * rather than on the API families Hono answers.
+     * Applied to every response this surface writes, including the 404. The browser reads the
+     * Content-Security-Policy off the document that loads the bundle, so it belongs on the
+     * surface that serves the document rather than on the API families Hono answers.
      */
     securityHeaders?: Record<string, string>;
     /** Normalized `LANGWATCH_ASSET_BASE`; "/" serves assets same-origin. */
@@ -104,10 +77,8 @@ export function normalizePathname(url: string): string {
 }
 
 /**
- * True when the API serves this path, so the SPA fallback must not.
- *
- * Exported for the test that pins the complement: every claimed shape refused,
- * every browser route accepted.
+ * True when the API serves this path, so the SPA fallback must not. Exported for the test that
+ * pins the complement: every claimed shape refused, every browser route accepted.
  */
 export function pathIsClaimedByTheApi(pathname: string): boolean {
   if (pathname === "/api" || pathname.startsWith("/api/")) return true;
@@ -117,12 +88,9 @@ export function pathIsClaimedByTheApi(pathname: string): boolean {
 }
 
 /**
- * Where the built browser bundle sits relative to this module.
- *
- * `apps/ui` builds to `apps/ui/dist/client`, and the image copies both apps
- * side by side under `/app/apps`, so the artifact is a fixed relative walk from
- * `apps/api/src/app-static/`. `LANGWATCH_UI_DIST_DIR` overrides it for a
- * deployment that stages the bundle somewhere else.
+ * Where the built browser bundle sits relative to this module. `apps/ui` builds to
+ * `apps/ui/dist/client`, and the image copies both apps side by side under `/app/apps`, so the
+ * artifact is a fixed relative walk from `apps/api/src/app-static/`.
  */
 export function resolveClientDistDir(source: {
   LANGWATCH_UI_DIST_DIR?: string | undefined;
@@ -134,12 +102,6 @@ export function resolveClientDistDir(source: {
 
 /**
  * The static surface, or `undefined` when this process has no bundle to serve.
- *
- * Absence is the correct answer in development — `apps/ui` runs its own Vite
- * server there and proxies `/api/*` here — and it is announced rather than
- * assumed: a production image whose `apps/ui` build did not land would
- * otherwise answer every browser route with the API's 404 and look like a
- * routing bug rather than a missing artifact.
  */
 export function tryCreateApiStaticSurface(options: {
   /** The process environment, read once by the composition root and passed in. */
@@ -173,13 +135,9 @@ export function tryCreateApiStaticSurface(options: {
 }
 
 /**
- * Serves several raw surfaces from the one hook the listener offers.
- *
- * Order is the contract: the specific surfaces are asked first and the SPA
- * fallback, which claims everything left, is asked last. A composite rather
- * than a second listener hook because "which surface answers this path" is one
- * decision, and splitting it across two places is how a fallback ends up ahead
- * of the endpoint it was meant to fall back from.
+ * Serves several raw surfaces from the one hook the listener offers. Order is the contract: the
+ * specific surfaces are asked first and the SPA fallback, which claims everything left, is
+ * asked last.
  */
 export class CompositeApiRawSurface extends ApiRawRequestSurfacePort {
   private constructor(private readonly surfaces: readonly ApiRawRequestSurfacePort[]) {

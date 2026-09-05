@@ -26,6 +26,7 @@ import { IdentifierStepForm } from "./identifier-step-form";
 import {
   AlternativeMethods,
   hasAlternativeMethods,
+  useShowsAllSocialMethods,
   SignInMethodPicker,
 } from "../blocks/sign-in-method-picker";
 
@@ -63,6 +64,7 @@ export function IdentifierFirstSignIn() {
   const { decide } = routing;
   const askedOnMount = useRef(false);
   const [instanceMethods, setInstanceMethods] = useState<readonly SignInMethod[]>([]);
+  const showsAllSocial = useShowsAllSocialMethods();
   const [lastUsedMethodId] = useState(() => readLastUsedMethodId());
   const [signingUp, setSigningUp] = useState<string | null>(null);
   // Every failure this card can have shows in one place, at the top. A
@@ -221,7 +223,7 @@ export function IdentifierFirstSignIn() {
         onSubmit={({ email }) => decide({ identifier: email, breakGlass })}
         footer={<SignUpLink callbackUrl={callbackUrl} label="Don't have an account? Sign up" />}
         alternatives={
-          hasAlternativeMethods(instanceMethods) ? (
+          hasAlternativeMethods({ methodSet: instanceMethods, showsAllSocial }) ? (
             <AlternativeMethods
               methodSet={instanceMethods}
               lastUsedMethodId={lastUsedMethodId}

@@ -93,10 +93,10 @@ export class CodexAccountService {
     private readonly fetchImpl: typeof fetch = fetch,
     issuer?: string,
   ) {
-    // The env override exists for tests (a local stand-in issuer) and for
+    // The override exists for tests (a local stand-in issuer) and for
     // debugging against a staging identity service; production always runs
-    // on the real issuer.
-    this.issuer = issuer ?? process.env.CODEX_OAUTH_ISSUER ?? CODEX_OAUTH_ISSUER;
+    // on the real issuer, so the composing process passes nothing.
+    this.issuer = issuer ?? CODEX_OAUTH_ISSUER;
   }
 
   async startDeviceSignIn(): Promise<CodexDeviceCode> {

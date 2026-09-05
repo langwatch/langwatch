@@ -2,19 +2,16 @@ import type { Liquid, Template } from "liquidjs";
 import { createSandboxedLiquid } from "./sandboxed-liquid";
 
 /**
- * Per-template wall-clock budget. A render that exceeds it is abandoned and
- * the caller falls back to the framework default. This is a best-effort guard
- * against runaway templates — it bounds wall-clock time but cannot interrupt a
+ * Per-template wall-clock budget. A render that exceeds it is abandoned and the caller falls
+ * back to the framework default.
  * synchronous CPU-bound loop mid-iteration (see ADR-036).
  */
 export const RENDER_TIMEOUT_MS = 500;
 
 /**
- * Object-creation budget for a single render (LiquidJS `memoryLimit`, counted in
- * units of new objects/array-concats/strftime allocations, not bytes). Bounds a
- * template that tries to balloon memory (e.g. nested loops building huge arrays)
- * regardless of the wall-clock budget. 1e6 is generous for any legitimate
- * notification template while still tripping on hostile growth.
+ * Object-creation budget for a single render (LiquidJS `memoryLimit`, counted in units of new
+ * objects/array-concats/strftime allocations, not bytes). Bounds a template that tries to
+ * balloon memory (e.g. nested loops building huge arrays) regardless of the wall-clock budget.
  */
 export const RENDER_MEMORY_LIMIT = 1_000_000;
 
@@ -23,18 +20,9 @@ type PathSegment = string | number;
 let engine: Liquid | undefined;
 
 /**
- * Shared Liquid engine for customer-authored notification templates.
- *
- * - `createSandboxedLiquid` refuses file inclusion, so `{% render %}` cannot
- *   read a file under the process working directory.
- * - `strictFilters` rejects unknown filters (caught upstream, falls back to default).
- * - `strictVariables: false` renders missing variables as empty rather than throwing,
- *   so a customer typo degrades gracefully instead of breaking dispatch.
- * - LiquidJS's built-in `cache` option only populates on `renderFile` / file-path
- *   keys, so it does NOT help here — `parseAndRender(string, ...)` re-parses on
- *   every call. We layer a process-local string-keyed cache in `renderLiquid`
- *   (`PARSED_TEMPLATE_CACHE` below) so repeated digest renders of the same
- *   template source reuse the parsed AST.
+ * Shared Liquid engine for customer-authored notification templates. - `createSandboxedLiquid`
+ * refuses file inclusion, so `{% render %}` cannot read a file under the process working
+ * directory.
  */
 export function getLiquidEngine(): Liquid {
   if (!engine) {
@@ -46,23 +34,18 @@ export function getLiquidEngine(): Liquid {
       // Set explicitly rather than relying on LiquidJS's default, which could
       // change on a minor bump.
       ownPropertyOnly: true,
-      // DoS guards: `renderLimit` bounds wall-clock time *inside* a synchronous
-      // render (interrupting a CPU-bound loop the Promise.race backstop can't),
-      // and `memoryLimit` caps object creation. Both are interruption-capable in
-      // liquidjs >=10.6, so a hostile template no longer pins the worker. The
-      // liquidjs version range is pinned in package.json (pnpm.overrides) to keep
-      // that floor — do not loosen the lower bound below the interruption-capable
-      // version.
+      // DoS guards: `renderLimit` bounds wall-clock time *inside* a synchronous render
+      // (interrupting a CPU-bound loop the Promise.race backstop can't), and `memoryLimit` caps
+      // object creation. Both are interruption-capable in liquidjs >=10.6, so a hostile
+      // template no longer pins the worker.
       renderLimit: RENDER_TIMEOUT_MS,
       memoryLimit: RENDER_MEMORY_LIMIT,
     });
-    // Slack mrkdwn escaping for user-controlled content (trace input/output,
-    // evaluation labels). Mirrors `escapeMrkdwn` in the legacy Slack webhook
-    // host delivery adapter: Slack treats only `&`,
-    // `<`, `>` as control characters in message text, so escaping them stops
-    // user-authored content from forging mrkdwn links (`<https://evil|click>`)
-    // or broadcasts (`<!channel>`). See the Slack-mrkdwn-injection finding;
-    // applied in the default Slack templates (defaults.ts) before `| json`.
+    // Slack mrkdwn escaping for user-controlled content (trace input/output, evaluation
+    // labels). Mirrors `escapeMrkdwn` in the legacy Slack webhook host delivery adapter: Slack
+    // treats only `&`, `<`, `>` as control characters in message text, so escaping them stops
+    // user-authored content from forging mrkdwn links (`<https://evil|click>`) or broadcasts
+    // (`<!channel>`).
     engine.registerFilter("mrkdwn_escape", (value: unknown): string =>
       String(value ?? "")
         .replace(/&/g, "&amp;")
@@ -74,10 +57,9 @@ export function getLiquidEngine(): Liquid {
 }
 
 /**
- * Process-local cache of parsed templates keyed by source string. `parseAndRender`
- * doesn't go through LiquidJS's internal file-path cache, so without this layer
- * every digest re-parses the same source — wasted CPU under any load. Capacity
- * is bounded so a misbehaving caller can't grow it without limit.
+ * Process-local cache of parsed templates keyed by source string. `parseAndRender` doesn't go
+ * through LiquidJS's internal file-path cache, so without this layer every digest re-parses the
+ * same source — wasted CPU under any load.
  */
 const PARSED_TEMPLATE_CACHE_LIMIT = 256;
 const PARSED_TEMPLATE_CACHE = new Map<string, Template[]>();
@@ -100,11 +82,7 @@ function getParsedTemplate(source: string): Template[] {
 }
 
 /**
- * Process-local cache of the referenced-variable segment paths for a template
- * source. `globalVariableSegmentsSync` re-parses the source on every call, so
- * without this layer the missing-variable diagnostic pays a full parse on every
- * render even when the AST is already in `PARSED_TEMPLATE_CACHE`. Keyed by the
- * same source string and bounded the same way.
+ * Process-local cache of the referenced-variable segment paths for a template source.
  */
 const REFERENCED_SEGMENTS_CACHE = new Map<string, PathSegment[][]>();
 
@@ -115,12 +93,9 @@ function getReferencedSegments(source: string): PathSegment[][] {
     REFERENCED_SEGMENTS_CACHE.set(source, cached);
     return cached;
   }
-  // `globalVariableSegmentsSync` returns each referenced variable as an array of
-  // property segments (e.g. `project.nmae` → `["project", "nmae"]`), excluding
-  // locals (for-loop vars, `{% assign %}`, `{% capture %}`). It types segments as
-  // `(string | number | SegmentArray)[]` to cover bracketed/grouped expressions;
-  // for the variable surfaces we expose, only flat string/number segments make
-  // sense, so anything exotic gets dropped here rather than later per render.
+  // `globalVariableSegmentsSync` returns each referenced variable as an array of property
+  // segments (e.g. `project.nmae` → `["project", "nmae"]`), excluding locals (for-loop vars,
+  // `{% assign %}`, `{% capture %}`).
   const referenced = getLiquidEngine().globalVariableSegmentsSync(source);
   const normalized: PathSegment[][] = [];
   for (const raw of referenced) {

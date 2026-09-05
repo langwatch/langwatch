@@ -61,13 +61,8 @@ export class GithubInstallationsService {
   }
 
   /**
-   * Binds an installation to the organization whose flow produced it.
-   *
-   * `flowStartedAt` is the signed state's issue time. An installation id is
-   * attacker-chosen — it arrives in GitHub's redirect query string, and the
-   * App's own JWT resolves ANY installation — so a first claim is accepted only
-   * for an installation GitHub says this flow created. Anything older already
-   * belongs to whoever installed it, whether or not we ever recorded a row.
+   * Binds an installation to the organization whose flow produced it. `flowStartedAt` is the
+   * signed state's issue time.
    */
   async recordInstallation(input: {
     installationId: string;
@@ -212,10 +207,9 @@ export class GithubInstallationsService {
 const INSTALLATION_CREATION_SKEW_MS = 60_000;
 
 /**
- * Whether GitHub's creation stamp puts the installation inside this flow.
- *
- * An installation GitHub declines to date cannot be shown to belong to the
- * flow, so it is refused: the whole point is that an unproven claim fails.
+ * Whether GitHub's creation stamp puts the installation inside this flow. An installation
+ * GitHub declines to date cannot be shown to belong to the flow, so it is refused: the whole
+ * point is that an unproven claim fails.
  */
 function installationBelongsToFlow(createdAt: string | null, flowStartedAt: number): boolean {
   if (!createdAt) {

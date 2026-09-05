@@ -8,15 +8,8 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 export const WEBHOOK_DELIVERY_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
- * The two system-owned maintenance sweeps the delivery log needs.
- *
- * Deliberately global and deliberately raw. The two channels used to prune
- * differently: the platform swept the whole table in one statement, while the
- * automations side enumerated every Project and issued one delete per tenant,
- * purely because the Prisma tenancy guard refuses a cross-tenant deleteMany.
- * That loop cost one statement per project to delete rows nobody is scoped to
- * read anyway. Retention is system-owned maintenance, not a tenant operation,
- * so it takes the raw-SQL opt-out the guard provides and states why inline.
+ * The two system-owned maintenance sweeps the delivery log needs. Deliberately global and
+ * deliberately raw.
  */
 export class PrismaWebhookRetentionRepository {
   private constructor(private readonly prisma: PrismaClient) {}
@@ -39,13 +32,9 @@ export class PrismaWebhookRetentionRepository {
   }
 
   /**
-   * Drops idempotency receipts whose window has closed.
-   *
-   * Receipts expire lazily today: a key is only re-examined when it is presented
-   * again, and a key that is never retried is never revisited. That is correct for
-   * replay semantics and wrong for the table, which only grows. The `expiresAt`
-   * index exists precisely so a sweep can do this in bulk, and nothing was calling
-   * it. Returns the row count.
+   * Drops idempotency receipts whose window has closed. Receipts expire lazily today: a key is
+   * only re-examined when it is presented again, and a key that is never retried is never
+   * revisited. That is correct for replay semantics and wrong for the table, which only grows.
    */
   async pruneExpiredIdempotencyReceipts({
     now = new Date(),

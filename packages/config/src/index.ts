@@ -168,10 +168,7 @@ function parseTelemetryResourceAttributes(raw: string | undefined): Record<strin
 }
 
 /**
- * Parse an env-string into a positive safe integer, or `undefined` when it
- * isn't one. The result never carries junk: a non-numeric value, `NaN`,
- * `Infinity`, a decimal, zero, or a negative all collapse to `undefined`
- * rather than a value the downstream config would treat as valid.
+ * Parse an env-string into a positive safe integer, or `undefined` when it isn't one.
  */
 export function positiveSafeIntegerOrUndefined(raw: string | undefined): number | undefined {
   const parsed = Number(raw);

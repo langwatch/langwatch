@@ -10,11 +10,6 @@ import {
 
 /**
  * The catalogue's own rates, under the name this suite has always used.
- *
- * Moved here with the arithmetic it covers: the pricing cascade lives in
- * `model-cost.ts` now, and this is the only suite that exercises every branch
- * of it — the cache split, the audio split, the character and second rates,
- * and the fallbacks a Bedrock-shaped model id needs to match a catalogue key.
  */
 const getStaticModelCosts = getStaticModelCostRates;
 
@@ -24,11 +19,6 @@ const matchModelCostWithFallbacks = (model: string, costs: readonly ModelCostRat
 
 /**
  * Prices one invocation, defaulting every quantity the caller did not name.
- *
- * The arithmetic takes each quantity as a required number so no caller can
- * leave one to a default it did not choose; a test that names two of them
- * means the other seven are zero, and saying so once here is what keeps each
- * case reading as the one thing it asserts.
  */
 const estimateCost = (input: {
   llmModelCost: ModelCostRate;
@@ -670,10 +660,9 @@ describe("estimateCost", () => {
 });
 
 /**
- * Anthropic bills a prompt-cache write by how long the entry lives: a
- * short-lived one at 1.25x the input rate, an hour-long one at 2x. An emitter
- * that knows the split reports the hour-long portion; the rest, and every
- * emitter that reports no split at all, prices short-lived.
+ * Anthropic bills a prompt-cache write by how long the entry lives: a short-lived one at 1.25x
+ * the input rate, an hour-long one at 2x. An emitter that knows the split reports the hour-long
+ * portion; the rest, and every emitter that reports no split at all, prices short-lived.
  */
 describe("cache write TTL pricing", () => {
   const model = {

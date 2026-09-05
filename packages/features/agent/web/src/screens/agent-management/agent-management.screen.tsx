@@ -38,33 +38,7 @@ import {
 
 /**
  * The Agents page, as `/:project/agents` serves it.
- *
- * What used to be `platform/app/src/runtime/ui/features/agent-ui-host.adapter.tsx`
- * — three hundred and forty-seven lines that were entirely adapter: a browser
- * transport, four generic dialogs, a card wrapper and the four navigations the
- * list offers. The list itself has always been this package's. The adapter's
  * halves split along the line ADR-004 draws: the application-shaped half is the
- * host port `apps/ui` answers, and everything below is here.
- *
- * TWO OVERLAYS ARE THIS SCREEN'S OWN, addressed by query keys it names itself —
- * `?history=<agentId>` and `?new=agent`. That is the shape the gateway family
- * established and every family since has copied: the application's drawer
- * registry is a composition a feature-web package may not carry, and a screen
- * only ever needed the address. The platform registry's `agentHistory` entry is
- * deleted with the adapter, because this screen was its only opener.
- *
- * THE THREE EDITORS ARE NOT. `agentCodeEditor`, `agentHttpEditor` and
- * `agentWorkflowEditor` stay registered in `platform/app` for the scenario
- * editor, the experiments workbench, the agent-testing dialog and the Agent list
- * drawer, all of which still open them; their closures reach the optimization
- * studio and the application's own variables surface. So this screen names the
- * drawer and the application writes the address the rest of the product already
- * produces for an agent — the same `?drawer.open=…&drawer.agentId=…` that
- * `agent-platform-url.ts` and Langy's deep links emit. KNOWN GAP, recorded in
- * `dev/docs/plans/ui-family-move-manifests.md` and shared with every family
- * before this one: nothing mounts that registry above a screen served from
- * `apps/ui` until the chrome layout route exists, so the address is right and
- * the drawer does not open yet.
  */
 
 /** The query key the history overlay is addressed by. */

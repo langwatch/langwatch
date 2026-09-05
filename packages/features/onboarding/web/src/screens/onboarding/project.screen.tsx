@@ -1,11 +1,5 @@
 /**
  * `/onboarding/:team/project` — the first project a new organization creates.
- *
- * `TechStackSelector` and `ProjectFormData` are `@langwatch/project-web`'s: the
- * picker moved there with the project settings page, and `RadioCard` — which
- * used to live in THIS file and which that package imported back out of it —
- * went with it as a local element. Importing the block is what keeps the two
- * surfaces that ask "which language and framework" asking it the same way.
  */
 
 import {

@@ -14,10 +14,9 @@ export const RUN_ALL_SUITE_LABEL = "managed:run-all";
 export const RUN_ALL_SUITE_NAME = "All test cases";
 
 /**
- * Label the CLI puts on the throwaway plan it makes for `langwatch scenario
- * run`, archived as soon as the run is queued. A plan resolved by name skips
- * these rows: joining one would attach a person's run to a plan about to
- * disappear from every list.
+ * Label the CLI puts on the throwaway plan it makes for `langwatch scenario run`, archived as
+ * soon as the run is queued. A plan resolved by name skips these rows: joining one would attach
+ * a person's run to a plan about to disappear from every list.
  */
 export const CLI_EPHEMERAL_LABEL = "cli-ephemeral";
 
@@ -102,14 +101,8 @@ export const suiteSchema = z
 export type Suite = z.infer<typeof suiteSchema>;
 
 /**
- * The named values a run carries.
- *
- * The name is bounded in a refinement rather than as `z.string().min(1)` on
- * the key. A key schema's refusal is reported as zod's `invalid_key`, wrapping
- * the real issue a level down, so `flatten()` — which is what the boundary
- * sends a caller — reduces it to "Invalid key in record": it names neither the
- * offending parameter nor what was wrong with it, and "record" is our storage
- * rather than the caller's vocabulary.
+ * The named values a run carries. The name is bounded in a refinement rather than as
+ * `z.string().min(1)` on the key.
  */
 export const suiteRunParametersSchema = z
   .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
@@ -138,9 +131,8 @@ export const suiteRunInputSchema = z
     parameters: suiteRunParametersSchema.optional(),
     note: runNoteSchema,
     /**
-     * Who started the run. Every run of the batch records it. Absent when the
-     * surface names no person, and then the runs record no actor at all.
-     *
+     * Who started the run. Every run of the batch records it. Absent when the surface names no
+     * person, and then the runs record no actor at all.
      * @see specs/scenarios/run-actor-on-runs.feature
      */
     actor: runActorSchema.optional(),
@@ -173,11 +165,8 @@ export const runPlanConfigSchema = z
 export type RunPlanConfigInput = z.infer<typeof runPlanConfigSchema>;
 
 /**
- * Starts a run under a NAME: the run either joins the plan of that name and
- * replaces its config, or creates one. A caller that sends none gets a name
- * derived from what the run covers and what it runs against; a name of only
- * spaces is refused rather than silently treated as absent.
- *
+ * Starts a run under a NAME: the run either joins the plan of that name and replaces its
+ * config, or creates one.
  * @see specs/suites/run-plan-identity-by-name.feature
  */
 export const suiteRunPlanInputSchema = suiteRunInputSchema

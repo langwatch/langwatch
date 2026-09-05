@@ -1,43 +1,6 @@
 /**
  * The procedures this package calls, and the hooks that call them.
- *
- * HAND-WRITTEN FOR NOW, MEANT TO BE GENERATED, exactly as `gateway-api.ts` and
- * `governance-api.ts` say of their own maps: the procedures live in
- * `@langwatch/ops-server`, `@langwatch/enterprise-sso-server` and the process's
- * own composition, none of which a web package may import even for a type, and
- * the router type does not exist until a process instantiates it. Emitting this
- * file from the mounted router is the fix; writing it by hand is the interim,
- * and it is honest only because every payload below is the CONTRACT's wherever
- * the contract has one — which for Ops is nearly everywhere, because
- * `@langwatch/ops-contract` already carries the view types the transport
- * publishes.
- *
- * THE SEGMENT NAMES ARE LOAD-BEARING. `ops`, `bugReports` and `ssoConnections`
- * are mount points on the root router, and tRPC hashes that path into the React
- * Query cache key; spell one differently and these hooks quietly stop sharing a
- * cache with the other `ops.*` call sites — the navigation badge, which polls
- * `ops.getBadgeCounts` from `@langwatch/navigation-web`'s own map, is exactly
- * such a call site.
- *
  * THIS MODULE IS THE ONE GOVERNED-CLOSURE EXCEPTION IN THE PACKAGE. ADR-004
- * seals a screen's closure off from `@langwatch/platform-api-client`, and the
- * import below is the only one in the package. It buys a content-faithful move:
- * every `api.ops.x.useQuery(...)` call site in the fourteen screens is the line
- * it was in `platform/app`. Recorded here so the finding it raises is a
- * decision rather than a surprise.
- *
- * WHAT IS DELIBERATELY ABSENT: `ops.dashboardStream`. It is a tRPC
- * SUBSCRIPTION, and `apps/ui`'s transport declares none — the host routes
- * subscriptions over a WebSocket it configures from its own environment, and a
- * feature that needs one is the signal to move that configuration rather than
- * guess at it. The dashboard already carried the fallback and now always takes
- * it: `ops.getDashboardSnapshot` on a five-second poll. Recorded in the
- * manifests as this move's one live-data loss.
- *
- * THREE RESTATED SHAPES, all for the same reason and each said where it is
- * declared: `OpsProjectionRegistration`, `OpsEventSubscriberRegistration` and
- * `BackofficeSsoConnection` are published by transports rather than by a
- * contract, so there is no package a browser may import them from.
  */
 
 import { createFeatureApi } from "@langwatch/platform-api-client";
@@ -93,10 +56,6 @@ export type OpsAcknowledgement = { ok: boolean };
 
 /**
  * One registered projection, as the process's pipeline registry publishes it.
- *
- * Restated from `@langwatch/ops-server`'s `OpsProjectionRegistration`, which is
- * a transport type rather than a contract one: the registry is the process's
- * own composition, and there is no package a browser may name it from.
  */
 export type OpsProjectionRegistration = Readonly<{
   projectionName: string;
@@ -160,10 +119,6 @@ export type BugReportDetail = BugReportListingRow & {
 
 /**
  * One SSO connection as the back office reads it.
- *
- * Restated from `@langwatch/enterprise-sso-server`'s `BackofficeSsoConnection`
- * for the same reason as the two registrations above, and with the extra one
- * that a core web package may not name an enterprise package at all.
  */
 export type BackofficeSsoConnection = Readonly<{
   connectionId: string;
@@ -193,13 +148,6 @@ export type BackofficeSsoConnection = Readonly<{
 
 /**
  * One organization, as the Foundry's project picker reads the graph.
- *
- * The same `organization.getAll` the application shell asks for, and the same
- * cache entry under tRPC's path-plus-input key — the graph is fetched once for
- * the document however many halves of the product want it. Only the fields the
- * picker prints are named: it is a view of the wire, not the whole of it, and
- * `apiKey` is on it because a generated trace is sent with the project's own
- * key.
  */
 export type OpsOrganizationGraph = {
   id: string;
@@ -678,24 +626,14 @@ export type OpsApiMap = {
 };
 
 /**
- * The hooks every Ops screen calls.
- *
- * One instance for the package. `@trpc/react-query` keys its React Query
- * entries on the procedure PATH alone, so this instance and the application's
- * own `api` proxy share cache entries given the same QueryClient — which is
- * what keeps the navigation badge's `ops.getBadgeCounts`, declared in
- * `@langwatch/navigation-web`, and this package's `ops.listDeadLetterCounts`
- * reading one another's invalidations while the two halves are split across
- * packages.
+ * The hooks every Ops screen calls. One instance for the package.
  */
 export const opsApi = createFeatureApi<OpsApiMap>();
 
 /**
- * Every procedure's output, addressed the way the screens already address it.
- *
- * The application's `~/utils/api` exported `RouterOutputs` off the real
- * `AppRouter`; deriving the same shape from the map above keeps those aliases
- * exactly as they were written.
+ * Every procedure's output, addressed the way the screens already address it. The application's
+ * `~/utils/api` exported `RouterOutputs` off the real `AppRouter`; deriving the same shape from
+ * the map above keeps those aliases exactly as they were written.
  */
 type OpsOutputOf<TNode> = TNode extends { query: { output: infer TOutput } }
   ? TOutput
@@ -708,9 +646,7 @@ export type RouterOutputs = {
 };
 
 /**
- * The name the screens call it by.
- *
- * They were written against the application's `api` proxy and are moved
- * unchanged; the import line is what tells them which one they have.
+ * The name the screens call it by. They were written against the application's `api` proxy and
+ * are moved unchanged; the import line is what tells them which one they have.
  */
 export const api = opsApi;

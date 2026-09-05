@@ -1,10 +1,7 @@
 /**
- * First-touch attribution capture, the WRITE half of `./attribution`.
- *
- * Mounted at the application's outermost provider position so it runs on every
- * landing URL — the unauthenticated ones included — before any navigation can
- * drop the query string. `setAttributionIfAbsent` owns the first-touch rule, so
- * a remount never overwrites what the first pageview recorded.
+ * First-touch attribution capture, the WRITE half of `./attribution`. Mounted at the
+ * application's outermost provider position so it runs on every landing URL — the
+ * unauthenticated ones included — before any navigation can drop the query string.
  */
 
 import { useEffect } from "react";

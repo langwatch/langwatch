@@ -1,10 +1,6 @@
 /**
- * Budget window math. Pure functions — no DB, no I/O. Given a window type
- * and an anchor time, compute the next reset instant.
- *
- * For now windows are computed in UTC. An org-level timezone override is on
- * the roadmap (see contract §12 open question); when we add it, this module
- * gets a `timezone?: string` parameter and defers to a date library.
+ * Budget window math. Pure functions — no DB, no I/O. Given a window type and an anchor time,
+ * compute the next reset instant. For now windows are computed in UTC.
  */
 import type { GatewayBudgetWindow } from "./gateway.budget";
 
@@ -24,12 +20,8 @@ export const CYCLIC_WINDOWS = [
 ] as const satisfies readonly CyclicWindow[];
 
 /**
- * Fixed-length windows: every period is exactly this many milliseconds, so
- * an anchored period start is plain modulo arithmetic off the anchor.
- *
- * These lengths are wall-clock UTC and DST cannot reach them: the whole
- * module works in epoch milliseconds and UTC calendar fields, so a DAY
- * anchored at 02:30Z stays 86400s apart through every local clock change.
+ * Fixed-length windows: every period is exactly this many milliseconds, so an anchored period
+ * start is plain modulo arithmetic off the anchor.
  */
 const FIXED_CYCLE_MS: Record<Exclude<CyclicWindow, "MONTH">, number> = {
   MINUTE: 60_000,
@@ -39,15 +31,9 @@ const FIXED_CYCLE_MS: Record<Exclude<CyclicWindow, "MONTH">, number> = {
 };
 
 /**
- * When a budget's window starts, ends and resets.
- *
- * Two families of answer live here and must not be confused: the calendar
- * ones, where a MONTH budget rolls on the first, and the anchored ones, where
- * it rolls on the phase the budget was given. `nextBoundaryFor` is the one
- * that picks between them, and everything else is a step it or a caller needs.
- *
- * `daysInUtcMonth` and `monthlyCycleStart` are private because nothing outside
- * this file ever called them, despite the module exporting everything.
+ * When a budget's window starts, ends and resets. Two families of answer live here and must not
+ * be confused: the calendar ones, where a MONTH budget rolls on the first, and the anchored
+ * ones, where it rolls on the phase the budget was given.
  */
 export class GatewayWindow {
   private static daysInUtcMonth({
@@ -62,14 +48,8 @@ export class GatewayWindow {
   }
 
   /**
-   * The start of the nth monthly cycle after `anchorAt`, clamped into months
-   * too short to hold the anchor's day.
-   *
-   * The clamp reads the day off the ORIGINAL anchor every time and never
-   * rewrites it, which is what makes a 31st anchor spring back: Jan 31 gives
-   * Feb 28, then Mar 31 again, not Mar 28. Rewriting the day on the short
-   * month would walk the cycle backwards a few days a year until it settled
-   * on the 28th, silently moving a customer's billing day.
+   * The start of the nth monthly cycle after `anchorAt`, clamped into months too short to hold
+   * the anchor's day.
    */
   private static monthlyCycleStart({ anchorAt, cycles }: { anchorAt: Date; cycles: number }): Date {
     const anchorDay = anchorAt.getUTCDate();
@@ -93,11 +73,9 @@ export class GatewayWindow {
   }
 
   /**
-   * First instant of the current calendar month, UTC.
-   *
-   * The default floor of every spend window: a read with no `from` reports the
-   * month to date, and both doors into the gateway take it from here so the
-   * default cannot be phrased two ways.
+   * First instant of the current calendar month, UTC. The default floor of every spend window:
+   * a read with no `from` reports the month to date, and both doors into the gateway take it
+   * from here so the default cannot be phrased two ways.
    */
   static startOfCurrentMonthUTC(now: Date = new Date()): Date {
     return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
@@ -108,18 +86,8 @@ export class GatewayWindow {
   }
 
   /**
-   * Start of the anchored period containing `now`, for a budget whose cycle
-   * is phased to `anchorAt` instead of the calendar.
-   *
-   * Boundaries belong to the period they open: at the exact boundary instant
-   * this returns that instant, which is the bound a spend read compares with
-   * `OccurredAt >= floor`, so no debit can land in the gap between two
-   * periods.
-   *
-   * Before the anchor there is no period yet, and this returns the anchor
-   * itself. A read floored there totals nothing, which is what makes a future
-   * anchor ("start on the 1st of next month") work without a special case
-   * anywhere downstream.
+   * Start of the anchored period containing `now`, for a budget whose cycle is phased to
+   * `anchorAt` instead of the calendar.
    */
   static anchoredPeriodStart({
     window,
@@ -238,10 +206,9 @@ export class GatewayWindow {
   }
 
   /**
-   * The next boundary for a budget however it is phased: its own anchored
-   * schedule when it carries an anchor, the calendar otherwise. TOTAL and
-   * MANUAL keep the far-future sentinel whether or not a stray anchor sits on
-   * the row, because neither window rolls.
+   * The next boundary for a budget however it is phased: its own anchored schedule when it
+   * carries an anchor, the calendar otherwise. TOTAL and MANUAL keep the far-future sentinel
+   * whether or not a stray anchor sits on the row, because neither window rolls.
    */
   static nextBoundaryFor({
     budget,

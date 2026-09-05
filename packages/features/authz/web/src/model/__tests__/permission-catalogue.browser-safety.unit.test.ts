@@ -1,10 +1,6 @@
 /**
- * The role editor's permission checkboxes read `permission-catalogue.ts`
- * directly in the browser bundle. If that module's import graph ever pulled
- * in a Node-only package that runs something at import time (a logger, a
- * metrics client, a DB driver), the chunk would die with "process is not
- * defined" before the app mounts — and none of typecheck, lint, or the unit
- * suite would catch it, because none of them load a browser.
+ * The role editor's permission checkboxes read `permission-catalogue.ts` directly in the
+ * browser bundle.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";

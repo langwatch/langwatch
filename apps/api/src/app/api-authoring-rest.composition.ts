@@ -1,31 +1,5 @@
 /**
- * The four doors a person reaches while AUTHORING something, composed for this
- * process.
- *
- * The Studio's code completion and its run dispatch, the model playground, the
- * dataset editor's row generator and the scenario editor's author-assist are
- * four families in four feature packages, and they are composed together
- * because they share one fact: every one of them is
- * `handlerManagedAuth({ credential: "session" })`. They resolve the signed-in
- * person themselves and answer a bare `{ error }` at 401 and 403, which is the
- * wire the browser reads — so a process with no browser-session transport
- * mounts NONE of them rather than four doors that refuse everybody.
- *
- * Beyond the session each has its own second condition, and each is named
- * rather than filled with a stand-in:
- *
- *   code completion   a model. Absent gateway, absent door.
- *   post_event        the workflow application AND the studio dispatch.
- *   playground        the execution proxy's address. A playground with no
- *                     proxy to dial fails after the customer has already been
- *                     shown a streaming response, which is the one failure
- *                     they cannot tell from a bad answer.
- *   dataset generate  a model.
- *   scenario generate a model.
- *
- * The two Studio doors travel together because they are one Hono app on one
- * base path; a process holding a gateway but no workflow application would
- * publish half of it, so the family requires both.
+ * The four doors a person reaches while AUTHORING something, composed for this process.
  */
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { Logger } from "@langwatch/observability";

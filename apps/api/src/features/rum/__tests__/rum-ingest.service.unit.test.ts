@@ -1,13 +1,6 @@
 /**
  * @vitest-environment node
- *
- * Binds the ingest scenarios in
- * specs/observability/browser-rum-trace-correlation.feature — the ones about
  * treating the payload as untrusted. See ADR-058.
- *
- * The route is public and unauthenticated by necessity, so these tests are
- * written from the attacker's side: what does a hostile payload cost us, and
- * what can it claim to be?
  */
 import { RUM_MAX_BODY_BYTES, RUM_SERVICE_NAME } from "@langwatch/react-rum/constants";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -29,11 +22,6 @@ import {
 
 /**
  * A fixed-window counter in a Map, standing in for the process's Redis one.
- *
- * It is the counter itself rather than a stub of the service, because two of
- * these scenarios are about WHICH key the limiter is asked for and in what
- * order — a stub that always answers "allowed" would pass both while the route
- * churned a key per request.
  */
 function memoryRateLimiter(): RumRateLimiter & { keyCount: () => number } {
   const buckets = new Map<string, number>();

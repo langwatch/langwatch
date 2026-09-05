@@ -4,10 +4,9 @@ import { TraceQueryClickHouseAdapter } from "@langwatch/trace-server";
 import { resolveTracesHrefForKey, tracesHrefForKey } from "../model/traces-href-for-key";
 
 /**
- * The link is only as good as the two contracts it spans: the Trace
- * Explorer's fragment format, and the query language's attribute syntax.
- * Both are exercised for real here rather than asserted as a string, so a
- * change to either breaks this test instead of the feature.
+ * The link is only as good as the two contracts it spans: the Trace Explorer's fragment format,
+ * and the query language's attribute syntax. Both are exercised for real here rather than
+ * asserted as a string, so a change to either breaks this test instead of the feature.
  */
 describe("tracesHrefForKey", () => {
   const href = tracesHrefForKey({

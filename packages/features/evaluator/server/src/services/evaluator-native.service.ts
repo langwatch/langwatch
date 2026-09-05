@@ -49,12 +49,8 @@ export class EvaluatorNativeService {
   }
 
   /**
-   * Re-fails a passing result when the content it judged had already been
-   * redacted, or was dropped, at ingestion.
-   *
-   * An evaluator that sees `<PERSON>` where a name was finds no PII and passes,
-   * which is the wrong answer about the trace: the PII was there, ingestion took
-   * it out. The same holds for content dropped entirely.
+   * Re-fails a passing result when the content it judged had already been redacted, or was
+   * dropped, at ingestion.
    */
   augment(input: EvaluatorResultAugmentationInput): SingleEvaluationResult {
     const kind = AUGMENT_KIND[input.evaluatorType];
@@ -74,11 +70,9 @@ export class EvaluatorNativeService {
   }
 
   /**
-   * How many values of this kind the redaction pass already took out.
-   *
-   * A secret evaluator counts only the secret marker; a PII evaluator counts
-   * every other entity, narrowed to the ones its settings enable — absent
-   * settings mean all of them.
+   * How many values of this kind the redaction pass already took out. A secret evaluator counts
+   * only the secret marker; a PII evaluator counts every other entity, narrowed to the ones its
+   * settings enable — absent settings mean all of them.
    */
   private countRedactedValues(
     kind: AugmentKind,

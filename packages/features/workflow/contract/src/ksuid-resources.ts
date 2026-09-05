@@ -1,9 +1,6 @@
 /**
- * Moved here from `@langwatch/workflow-web/utils/constants`: the prefix a
- * KSUID-backed id is minted with, per resource. It names resources across
- * many features (scenario, trace, prompt, organization, ...), never only
- * workflow's, so it lives on the contract rather than any one feature-web
- * package.
+ * Moved here from `@langwatch/workflow-web/utils/constants`: the prefix a KSUID-backed id is
+ * minted with, per resource.
  */
 export const KSUID_RESOURCES = {
   BATCH_RESULT: "batchresult",

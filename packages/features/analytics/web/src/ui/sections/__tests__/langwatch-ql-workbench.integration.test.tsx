@@ -1,10 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * The workbench end to end, with the transport stubbed at the tRPC client: what
- * goes on the wire when the member presses Run, what does not go on the wire
- * when they do nothing, and where a refusal about parameters is shown.
- *
  * Spec: packages/features/analytics/specs/analytics-lwql-workbench.feature
  */
 
@@ -115,13 +110,11 @@ vi.mock("../../../behavior/analytics-api", () => ({
   },
 }));
 
-// The extracted editor code-splits Monaco directly. Standing a textarea in for
-// that browser-only dependency leaves the workbench, editor component and
-// saved-chart wiring real, which is what this suite is about.
-//
-// The stub deliberately never announces a mount: the workbench then falls back
-// to appending inserted text to the draft, which is the path this suite can
-// observe.
+// The extracted editor code-splits Monaco directly. Standing a textarea in for that
+// browser-only dependency leaves the workbench, editor component and saved-chart wiring real,
+// which is what this suite is about. The stub deliberately never announces a mount: the
+// workbench then falls back to appending inserted text to the draft, which is the path this
+// suite can observe.
 vi.mock("@monaco-editor/react", () => {
   function StubMonacoEditor(props: {
     value?: string;
@@ -140,12 +133,11 @@ vi.mock("@monaco-editor/react", () => {
   return { __esModule: true, default: StubMonacoEditor };
 });
 
-// Chart mode's own behavior is covered by its own suites; what belongs to THIS
-// suite is the wiring — which result and which label the workbench hands the
-// chart slot. The stub makes both observable.
-// It also stands in for the member editing a specification: the text it is
-// given is on screen, and the button writes one back. Chart mode holds none of
-// that state, which is exactly what this suite has to be able to see.
+// Chart mode's own behavior is covered by its own suites; what belongs to THIS suite is the
+// wiring — which result and which label the workbench hands the chart slot. The stub makes both
+// observable. It also stands in for the member editing a specification: the text it is given is
+// on screen, and the button writes one back. Chart mode holds none of that state, which is
+// exactly what this suite has to be able to see.
 vi.mock("../lazy-langwatch-ql-chart-mode", () => ({
   LazyLangWatchQLChartMode: (props: {
     result: { rows: readonly Record<string, unknown>[] };
@@ -169,11 +161,9 @@ vi.mock("../lazy-langwatch-ql-chart-mode", () => ({
 const SQL = "SELECT trace_id FROM analytics.traces_daily WHERE id = {since:String}";
 
 /**
- * The page period every case runs under unless it says otherwise.
- *
- * Absolute rather than a relative preset, so the window is the same instant on
- * every run — a relative preset is anchored to "now" and would make the values
- * the request carries untestable.
+ * The page period every case runs under unless it says otherwise. Absolute rather than a
+ * relative preset, so the window is the same instant on every run — a relative preset is
+ * anchored to "now" and would make the values the request carries untestable.
  */
 const PAGE_PERIOD = {
   startDate: "2026-02-20T00:00:00.000Z",
@@ -679,15 +669,8 @@ describe("the LangWatchQL workbench", () => {
         expect(input).not.toHaveProperty("granularitySeconds");
       });
 
-      // The two cases below pin `useWorkbenchGranularity`'s own state, held
-      // across renders and keyed on `openedRevision` rather than derived from
-      // the live result. Deriving "does this statement declare the step" from
-      // the result it feeds `setGranularity` fed back into staleness and
-      // looped the render; writing the shown default into the draft on
-      // appearance marked the refusal snapshot stale and withdrew every other
-      // annotation the refusal carried, including the member's own missing
-      // parameters. Neither failure is visible from a single chart — both
-      // need the multi-run, multi-chart sequence these reproduce.
+      // The two cases below pin `useWorkbenchGranularity`'s own state, held across renders and
+      // keyed on `openedRevision` rather than derived from the live result.
       describe("when a saved chart is opened after the picker was showing", () => {
         /** @scenario "The step a statement declares is offered as a control, not as a parameter to fill in" */
         it("hides the picker for a statement that does not declare the step, and never sends the previous chart's chosen step", async () => {

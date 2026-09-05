@@ -1,28 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * Issue #5837: the owner-reported production repro named TWO surfaces
- * rendering a raw model id instead of the configured Display Name — the
- * Default Models editor (covered in
- * default-model-override-drawer.display-name.integration.test.tsx) and "the
- * prompt-config selector (`ModelSelector`)" (the issue's own words).
- * `ModelSelector` is the picker `LLMConfigField` and the prompt "Model"
- * field render — it shares `useModelSelectionOptions` with every other
- * picker (specs/model-providers/custom-model-display-name.feature,
- * "Shared model pickers show the configured display name").
- *
- * The resolver itself (`buildCustomModelDisplayNames` /
- * `modelDisplayLabel`) is unit-tested elsewhere in this package — this
- * file pins the WIRING for the exact reported repro data shape (an azure
- * custom model), not the resolution logic.
- *
- * Renders the real `ModelSelector` against a mocked studio-host boundary.
- *
- * Query strategy: `ModelSelector` renders through the design-system
- * `Select`, so `Select.HiddenSelect` mirrors every item as a native
- * `<option>` sibling. Queries are scoped to the listbox (mounted in the
- * DOM regardless of open state) to avoid matching that hidden mirror.
- *
  * @see specs/model-providers/custom-model-display-name-resolution.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

@@ -1,9 +1,7 @@
 /**
- * Resolver coverage for the registry-driven feature flag service.
- *
- * The graph is real — service, row store and repository — with only the
- * database and the environment held in process, so these exercise the code
- * path production runs rather than a double of it.
+ * Resolver coverage for the registry-driven feature flag service. The graph is real — service,
+ * row store and repository — with only the database and the environment held in process, so
+ * these exercise the code path production runs rather than a double of it.
  */
 import { resolveFeatureFlagConfig } from "@langwatch/feature-flag-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";

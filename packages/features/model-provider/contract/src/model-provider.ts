@@ -175,18 +175,9 @@ export type ModelProviderTestConnectionInput = z.infer<
 >;
 
 /**
- * Why a credential check never reached the provider.
- *
- * These used to be indistinguishable from a pass, which was safe for exactly
- * as long as the answer stayed inside the save path: a skip should not block
- * a save, so `valid: true` was the right thing to return. Put the same value
- * in front of a customer and it becomes a claim we cannot support — six of
- * the sixteen registered providers reach one of these paths, so a control
- * that read `valid` alone would report more than a third of the list as
- * working without having sent a packet.
- *
- * `valid` still says what the save path needs. `outcome` says what a reader
- * needs. Neither has to lie for the other.
+ * Why a credential check never reached the provider. These used to be indistinguishable from a
+ * pass, which was safe for exactly as long as the answer stayed inside the save path: a skip
+ * should not block a save, so `valid: true` was the right thing to return.
  */
 export const modelProviderUncheckedReasonSchema = z.enum([
   /** Complex or non-probeable auth — AWS, gcloud, subscription-key services. */
@@ -203,20 +194,9 @@ export const modelProviderUncheckedReasonSchema = z.enum([
 export type ModelProviderUncheckedReason = z.infer<typeof modelProviderUncheckedReasonSchema>;
 
 /**
- * The answer to "does this credential work".
- *
- * Three verdicts, not two, and the third is why this type lives in the
- * contract rather than behind the service that produces it. "We could not
- * check this" is an answer, not a soft yes, and a reader that collapses it
- * into a boolean reports a third of the provider list as working without
- * having sent a packet. The packaged transport and the browser both read this
- * declaration, so neither can drift from the other by restating it.
- *
- * A refusal travels as a serialized `HandledError`, not as a sentence. It is
- * still a RETURN value rather than a throw — asking a provider and being told
+ * The answer to "does this credential work". Three verdicts, not two, and the third is why this
+ * type lives in the contract rather than behind the service that produces it.
  * no is a successful question, and ADR-045 reserves throwing for the absence
- * of an answer — but the words the customer reads come from the code-keyed
- * registry in `features/errors`, the same as every other failure in the app.
  */
 export const modelProviderCredentialVerdictSchema = z.discriminatedUnion("outcome", [
   z.object({ outcome: z.literal("verified"), valid: z.literal(true) }).strict(),
@@ -466,12 +446,11 @@ export const modelCostRateSchema = z
     cacheCreation1hCostPerToken: z.number().optional(),
     inputAudioCostPerToken: z.number().optional(),
     outputAudioCostPerToken: z.number().optional(),
-    // Per-token rates for image tokens on the token-billed image models.
-    // OpenAI bills gpt-image output image tokens at $30 to $40 per million
-    // against $5 for text input, so an image priced off a flat token total
-    // comes out a fraction of what it cost. The counts these price are
-    // disjoint from the text token counts and, unlike the audio rates,
-    // there is no text fallback.
+    // Per-token rates for image tokens on the token-billed image models. OpenAI bills gpt-image
+    // output image tokens at $30 to $40 per million against $5 for text input, so an image
+    // priced off a flat token total comes out a fraction of what it cost. The counts these
+    // price are disjoint from the text token counts and, unlike the audio rates, there is no
+    // text fallback.
     inputImageCostPerToken: z.number().optional(),
     outputImageCostPerToken: z.number().optional(),
     inputCostPerCharacter: z.number().optional(),

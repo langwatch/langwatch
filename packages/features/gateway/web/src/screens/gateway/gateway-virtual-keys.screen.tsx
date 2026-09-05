@@ -58,12 +58,8 @@ function usageHrefForKey(virtualKeyId: string): string {
 }
 
 /**
- * What the status column says, which is not always what the column stores.
- *
- * Expiry is a date on an ACTIVE key rather than a status value, so the badge
- * derives it. The stored stops come first: a revoked key that also carried a
- * date is revoked, and reporting it as expired would offer a fix that does
- * not exist.
+ * What the status column says, which is not always what the column stores. Expiry is a date on
+ * an ACTIVE key rather than a status value, so the badge derives it.
  */
 function statusBadge(vk: { status: string; expiresAt?: string | null }): {
   label: string;
@@ -111,12 +107,10 @@ function VirtualKeysPage() {
     { organizationId: orgId },
     { enabled: !!orgId },
   );
-  // Current-calendar-month spend per visible key, read from the same
-  // cost path the Usage tab reads. The click-through deep-links Usage's
-  // "This month" preset, the same UTC month-to-date window this column
-  // is computed over, so both surfaces show the same total. On a fetch
-  // error the cell shows n/a: an unread ledger must not render as a
-  // confident $0.00.
+  // Current-calendar-month spend per visible key, read from the same cost path the Usage tab
+  // reads. The click-through deep-links Usage's "This month" preset, the same UTC month-to-date
+  // window this column is computed over, so both surfaces show the same total. On a fetch error
+  // the cell shows n/a: an unread ledger must not render as a confident $0.00.
   const spendQuery = api.virtualKeys.spendThisMonth.useQuery(
     { organizationId: orgId },
     { enabled: !!orgId },

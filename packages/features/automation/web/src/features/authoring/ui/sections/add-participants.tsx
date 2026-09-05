@@ -1,18 +1,7 @@
 /**
- * Who an annotation-queue automation sends its matched traces to.
- *
- * A family-local copy of `platform/app`'s `components/traces/AddParticipants`,
- * narrowed to the one caller that travels with this move. The application's
- * version serves the trace drawer too, where the same control also sends a
- * trace to a queue immediately and offers "Add New Queue"; on this surface both
- * were already inert — the automation provider passed a no-op for the drawer
- * and `isTrigger` hid the send button — so the copy is the half that was ever
- * live here.
- *
- * The avatar is a coloured initial rather than the application's
- * `RandomColorAvatar`: that one reaches the member's uploaded photo, which this
- * read does not carry, and a letter in a stable colour is what it fell back to
- * for everyone else anyway.
+ * Who an annotation-queue automation sends its matched traces to. A family-local copy of
+ * `platform/app`'s `components/traces/AddParticipants`, narrowed to the one caller that travels
+ * with this move.
  */
 
 import {

@@ -1,11 +1,6 @@
 // @vitest-environment jsdom
 /**
- * The drawer content panel is the surface a customer keeps their bearings
- * through: it is blurred and partly transparent so the page behind it stays
- * readable as context. Both values are routed through CSS variables, whose
- * defaults are the contract — a hardcoded value here would silently opt every
- * drawer in the product out of reduced-graphics mode.
- *
+ * The drawer content panel is blurred and partly transparent so the page stays readable.
  * @see specs/features/drawer-backdrop-transparency-blur.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

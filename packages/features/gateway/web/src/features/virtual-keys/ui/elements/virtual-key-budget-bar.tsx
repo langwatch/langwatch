@@ -27,10 +27,9 @@ function windowAdjective(window: string): string {
 }
 
 /**
- * What the bar is saying, in one line. The period is named because the
- * value above the bar is the calendar month and this one is not: a key
- * at $2.50 for the month can be at $0.50 of a $1.00 day, and the reader
- * has to be able to tell which number is which.
+ * What the bar is saying, in one line. The period is named because the value above the bar is
+ * the calendar month and this one is not: a key at $2.50 for the month can be at $0.50 of a
+ * $1.00 day, and the reader has to be able to tell which number is which.
  */
 export function budgetBarLabel(value: VirtualKeyBudgetBarValue): string {
   const adjective = windowAdjective(value.window);
@@ -52,10 +51,9 @@ function fillColorFor(ratio: number): string {
 }
 
 /**
- * Current-period spend against the budget a key carries on itself, in
- * the trace table's meter style. Only keys with a budget of their own
- * render one, because an empty track under every other key would read as
- * a limit that is not there.
+ * Current-period spend against the budget a key carries on itself, in the trace table's meter
+ * style. Only keys with a budget of their own render one, because an empty track under every
+ * other key would read as a limit that is not there.
  */
 export function VirtualKeyBudgetBar({
   value,

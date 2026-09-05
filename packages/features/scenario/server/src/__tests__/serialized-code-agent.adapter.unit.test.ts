@@ -145,10 +145,6 @@ describe("SerializedCodeAgentAdapter", () => {
     // without touching the mocked undici.Agent constructor, so agentOptions
     // stays empty and this test's assertions see stale/undefined values.
     await NlpFetchAdapter.create().close();
-    // Pin the timeout explicitly so the test doesn't rely on ambient env.
-    // Stubbed, not assigned: a raw assignment here outlives the file and
-    // reaches whatever else shares this vitest worker.
-    vi.stubEnv("NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS", "600");
     // clearAllMocks keeps implementations, so pin the no-active-context
     // default here; tests that need a trace context override it themselves.
     mockInjectTraceContextHeaders.mockImplementation(({ headers }) => ({
@@ -1117,22 +1113,17 @@ describe("SerializedCodeAgentAdapter", () => {
     /** A code budget large enough that only the ceiling can decide the result. */
     const hugeBudget = { ...defaultConfig, timeoutMs: Number.MAX_SAFE_INTEGER };
 
-    const callWith = async (config: CodeAgentData) => {
+    const callWith = async (config: CodeAgentData, maxTimeoutMs?: number) => {
       const adapter = new SerializedCodeAgentAdapter({
         config,
         nlpServiceUrl: nlpServiceUrl,
         projectApiKey: apiKey,
+        timeouts: { maxTimeoutMs },
       });
       await adapter.call(defaultInput);
     };
 
-    afterEach(() => {
-      vi.unstubAllEnvs();
-    });
-
     it("falls back to 15 minutes when NLP_FETCH_MAX_TIMEOUT_MS is unset", async () => {
-      vi.stubEnv("NLP_FETCH_MAX_TIMEOUT_MS", undefined);
-
       await callWith(hugeBudget);
 
       expect(armedFetchTimeoutMs()).toBe(900_000);
@@ -1143,51 +1134,41 @@ describe("SerializedCodeAgentAdapter", () => {
       // 900s must be able to raise this one too, or the platform aborts the
       // fetch first and the caller sees a generic fetch-side timeout instead
       // of the engine's diagnosis.
-      vi.stubEnv("NLP_FETCH_MAX_TIMEOUT_MS", "1800000");
-
-      await callWith(hugeBudget);
+      await callWith(hugeBudget, 1_800_000);
 
       expect(armedFetchTimeoutMs()).toBe(1_800_000);
     });
 
     it("honors a lowered ceiling", async () => {
-      vi.stubEnv("NLP_FETCH_MAX_TIMEOUT_MS", "300000");
-
-      await callWith(hugeBudget);
+      await callWith(hugeBudget, 300_000);
 
       expect(armedFetchTimeoutMs()).toBe(300_000);
     });
 
     it.each([
-      ["an empty value", ""],
-      ["a non-numeric value", "banana"],
-      ["a zero", "0"],
-      ["a negative value", "-5000"],
-      ["a whitespace-only value", "   "],
-      ["an infinite value", "Infinity"],
+      ["an empty value", Number("")],
+      ["a non-numeric value", Number("banana")],
+      ["a zero", 0],
+      ["a negative value", -5000],
+      ["a whitespace-only value", Number("   ")],
+      ["an infinite value", Number.POSITIVE_INFINITY],
     ])("falls back to 15 minutes on %s", async (_label, raw) => {
       // Clamp, never reject: the same contract the engine keeps for its own
       // knobs. A nonsensical ceiling must not fail the scenario run.
-      vi.stubEnv("NLP_FETCH_MAX_TIMEOUT_MS", raw);
-
-      await callWith(hugeBudget);
+      await callWith(hugeBudget, raw);
 
       expect(armedFetchTimeoutMs()).toBe(900_000);
     });
 
     it("clamps a large code budget down to the configured ceiling", async () => {
-      vi.stubEnv("NLP_FETCH_MAX_TIMEOUT_MS", "200000");
-
       // 300s + the 30s headroom would be 330s, above the 200s ceiling.
-      await callWith({ ...defaultConfig, timeoutMs: 300_000 });
+      await callWith({ ...defaultConfig, timeoutMs: 300_000 }, 200_000);
 
       expect(armedFetchTimeoutMs()).toBe(200_000);
     });
 
     it("bounds the default deadline too when set below the floor", async () => {
-      vi.stubEnv("NLP_FETCH_MAX_TIMEOUT_MS", "45000");
-
-      await callWith(defaultConfig);
+      await callWith(defaultConfig, 45_000);
 
       expect(armedFetchTimeoutMs()).toBe(45_000);
     });
@@ -1198,14 +1179,12 @@ describe("SerializedCodeAgentAdapter", () => {
       expect(armedFetchTimeoutMs()).toBe(630_000);
     });
 
-    it("is read per call, so a change between turns takes effect", async () => {
-      vi.stubEnv("NLP_FETCH_MAX_TIMEOUT_MS", "300000");
-      await callWith(hugeBudget);
+    it("is read per turn, so a re-composed adapter takes a new ceiling", async () => {
+      await callWith(hugeBudget, 300_000);
       expect(armedFetchTimeoutMs()).toBe(300_000);
 
       withActiveSpanCalls.length = 0;
-      vi.stubEnv("NLP_FETCH_MAX_TIMEOUT_MS", "600000");
-      await callWith(hugeBudget);
+      await callWith(hugeBudget, 600_000);
       expect(armedFetchTimeoutMs()).toBe(600_000);
     });
   });

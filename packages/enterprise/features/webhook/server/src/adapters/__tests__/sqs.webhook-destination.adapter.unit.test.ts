@@ -346,13 +346,9 @@ describe("SqsWebhookDestinationAdapter", () => {
   });
 
   /**
-   * A cached client holds a credential provider that has ALREADY resolved, so
-   * what happens to that cache decides whether a customer's repair reaches us.
-   * The customer corrects the role's trust policy or the key's permissions on
-   * their own side, and we are never told. Hand testing hit exactly that: a
-   * corrected trust policy kept answering AccessDenied for as long as the
-   * process lived, while the AWS CLI assumed the same role with the same key
-   * and external id at the same moment.
+   * A cached client holds a credential provider that has ALREADY resolved, so what happens to
+   * that cache decides whether a customer's repair reaches us. The customer corrects the role's
+   * trust policy or the key's permissions on their own side, and we are never told.
    */
   describe("given a cached queue client", () => {
     beforeEach(() => SqsWebhookDestinationAdapter.resetClientCache());

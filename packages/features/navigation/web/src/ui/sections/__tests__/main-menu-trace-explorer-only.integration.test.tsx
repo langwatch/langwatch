@@ -1,9 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * The legacy Traces page is gone from the sidebar; Trace Explorer is the
- * project menu's only traces destination.
- *
  * @see specs/traces-v2/default-drawer-routing.feature
  */
 

@@ -1,9 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * The code-evaluator drawer creates AND edits a custom Python evaluator. Editing
- * loads the saved code, inputs and outputs (not just the mapping), so a code
- * evaluator can actually be edited from the evaluators page and the workbench.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";

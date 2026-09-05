@@ -1,25 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * Which body a card draws, and which header controls it offers.
- *
- * The routing is decided by one field — `kind` — and both directions of getting
- * it wrong are silent. A workbench row sent to `CustomGraph` hands a builder
- * renderer a saved SQL statement in place of the series payload it expects; a
- * builder row sent to the widget asks the saved-chart procedures for a row they
- * will not find. Neither shows up as a type error, because `graph` is `unknown`
- * on the way through.
- *
- * The alert bell is the same shape of mistake with a longer fuse. The alert path
- * reads a builder payload's `series` to name what it thresholds, and a saved
- * statement has no series to read — so a bell offered on a workbench card
- * authors an alert the threshold dispatcher can never evaluate. It is excluded
- * on purpose, and this pins that it stays excluded.
- *
- * Both children are mocked to markers: the claim is *which* component receives
- * the row, and mounting the real Vega and tRPC stacks to prove it would test the
- * harness instead.
- *
  * @see specs/analytics/lwql-saved-charts.feature
  */
 
@@ -111,13 +91,9 @@ describe("a dashboard grid card", () => {
     });
 
     /**
-     * THE ALERT BELL IS GONE, and this scenario says so rather than pretending.
-     *
-     * `platform/app` asserted the bell was offered on a builder card; the two
-     * call sites behind it opened the automations drawer, whose registry entry
-     * was deleted when that family moved. The card offers no alert authoring
-     * now, on either kind of chart — which is what makes the workbench card's
-     * "offers no alert bell" scenario below no longer a distinction.
+     * THE ALERT BELL IS GONE, and this scenario says so rather than pretending. `platform/app`
+     * asserted the bell was offered on a builder card; the two call sites behind it opened the
+     * automations drawer, whose registry entry was deleted when that family moved.
      */
     it("offers no way to author an alert", () => {
       renderCard({ kind: "builder" });

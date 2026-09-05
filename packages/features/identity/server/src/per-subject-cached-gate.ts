@@ -1,32 +1,6 @@
 /**
- * The cache behind the authz engine gate (../authz/engine-gate.ts) and the
- * identity write gate (../identity/write-gate.ts): a boolean
- * answer, asked once per check, cached per SUBJECT - an organization for
- * authz, a user for identity - with a TTL so a finishing migration takes
- * effect fleet-wide without a deploy. Each gate owns its question; this
- * module owns the caching once.
- *
- * Three behaviours live here that the hand-rolled caches this replaced did
- * not have:
- *
- *   - A read that throws is LOGGED, not swallowed. A silent catch turned a
- *     genuine outage into "the fallback is still on" or "not cut over yet"
- *     with no trace anywhere that the projection was actually unreadable -
- *     correct behaviour, invisible cause.
- *   - Concurrent asks for the same COLD key share one read. Without this, a
- *     burst of permission checks against an organization neither gate has
- *     cached yet each starts its own `findUnique`, which is the same
- *     stampede a cache exists to prevent - just deferred to the first
- *     request after every expiry instead of the first request ever.
- *   - `invalidate` beats a racing read. Dropping only the cached entry left
- *     a hole: a read that started (or coalesced) just before a projection
- *     write could settle just after it and cache the pre-write answer for a
- *     further TTL. Invalidation therefore also detaches the in-flight read
- *     and strips its right to cache - its already-coalesced callers still
- *     get its answer once, but nothing remembers it.
- *
- * Browser-safety: no module-scope Prisma or Redis - callers hand in their own
- * client through `read`.
+ * The cache behind the authz engine gate and the identity write gate: a boolean answer, cached
+ * per SUBJECT with a TTL so a finishing migration takes effect fleet-wide without a deploy.
  */
 import { createLogger } from "@langwatch/observability";
 
@@ -35,12 +9,7 @@ const logger = createLogger("langwatch:app-layer:per-subject-cached-gate");
 type CacheEntry = { isOn: boolean; expiresAt: number };
 
 /**
- * One in-flight read, plus the right to cache what it resolves. `invalidate`
- * flips `isStale` on the entry it removes, so a read that started BEFORE the
- * invalidation still answers the callers already coalesced onto it (that
- * answer was unavoidable - the read had begun) but never writes the cache:
- * without the flag, a read racing a projection write could settle AFTER the
- * invalidation and re-cache the pre-write answer for a further TTL.
+ * One in-flight read, plus the right to cache what it resolves.
  */
 type InFlightEntry = { promise: Promise<boolean>; isStale: boolean };
 
@@ -63,13 +32,6 @@ export type PerSubjectCachedFlag = {
 
 /**
  * Default hard cap on distinct subjects one gate holds at once.
- *
- * A subject that is only ever read once (a stale customer, a
- * decommissioned tenant, a user who never returns) would otherwise leave its entry in the map for the
- * life of the pod, since nothing revisits it to notice it expired. So a
- * write amortized-sweeps expired entries once size crosses this cap, and if
- * the map is still over it afterwards, the oldest entries (by insertion
- * order) are evicted until it is not.
  */
 export const MAX_CACHE_ENTRIES = 5_000;
 
@@ -94,11 +56,7 @@ export function perSubjectCachedFlag({
   name: string;
   ttlMs: number;
   /**
-   * Hard cap on distinct subjects this gate holds at once (default
-   * `MAX_CACHE_ENTRIES`). Size it to the subject's cardinality: a
-   * high-cardinality subject (a user) warrants a larger cap than a
-   * low-cardinality one (an organization), or hot subjects evict each
-   * other and every check re-reads the source.
+   * Hard cap on distinct subjects this gate holds at once (default `MAX_CACHE_ENTRIES`).
    */
   maxEntries?: number;
 }): PerSubjectCachedFlag {

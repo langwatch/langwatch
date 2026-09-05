@@ -26,11 +26,6 @@ const SCHEDULE = { cron: "0 9 * * *", timezone: "UTC" };
 
 /**
  * The mail gateway a report actually leaves through, faked.
- *
- * It captures what `ReportDispatchService.dispatchScheduledReport` handed the transport rather than
- * standing in for the dispatch itself: every assertion below reads the rendered
- * subject and body of a real send, so a report that renders an empty message or
- * never reaches the transport fails here rather than passing on a spy call.
  */
 class FakeMailGateway extends AutomationNotificationDeliveryPort {
   readonly emails: Array<{ recipients: string[]; subject: string; html: string }> = [];

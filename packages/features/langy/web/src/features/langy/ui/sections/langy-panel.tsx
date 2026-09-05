@@ -88,6 +88,7 @@ import { Menu } from "@langwatch/design-system/menu";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import { toaster } from "@langwatch/design-system/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { useUiDeployment } from "@langwatch/ui-host/capabilities";
 import { showErrorToast } from "@langwatch/ui-host/errors";
 import { ModelProviderScreen } from "../../../../ui/sections/model-provider-setup-gap";
 import { useDrawer } from "@langwatch/ui-drawer";
@@ -229,17 +230,18 @@ function useViewportWidth(): number {
   return width;
 }
 
-function onLangyProfilerRender(
-  id: string,
-  phase: "mount" | "update" | "nested-update",
-  actualDuration: number,
-  baseDuration: number,
-  startTime: number,
-  commitTime: number,
-) {
-  // Keep the profiler mounted in every build so React DevTools can inspect it,
-  // but only log genuinely expensive commits during local investigation.
-  if (import.meta.env.DEV && actualDuration >= 16) {
+function langyProfilerRender(isDevelopment: boolean) {
+  return (
+    id: string,
+    phase: "mount" | "update" | "nested-update",
+    actualDuration: number,
+    baseDuration: number,
+    startTime: number,
+    commitTime: number,
+  ) => {
+    // Keep the profiler mounted in every build so React DevTools can inspect
+    // it, but only log genuinely expensive commits during local investigation.
+    if (!isDevelopment || actualDuration < 16) return;
     console.debug("[Langy profiler]", {
       id,
       phase,
@@ -248,7 +250,7 @@ function onLangyProfilerRender(
       startTime: Math.round(startTime),
       commitTime: Math.round(commitTime),
     });
-  }
+  };
 }
 
 /**
@@ -456,6 +458,8 @@ function LangyPanel({
   const organizationId = organization?.id;
   const utils = api.useUtils();
   const router = useRouter();
+  const { isDevelopment } = useUiDeployment();
+  const onProfilerRender = useMemo(() => langyProfilerRender(isDevelopment), [isDevelopment]);
 
   // ── Client/UI state (single store) ────────────────────────────────────────
   const isOpen = useLangyStore((s) => s.isOpen);
@@ -1874,7 +1878,7 @@ function LangyPanel({
   }, [conversations, activeConversationId]);
 
   return (
-    <Profiler id="LangyPanel" onRender={onLangyProfilerRender}>
+    <Profiler id="LangyPanel" onRender={onProfilerRender}>
       {/* OUTSIDE the panel box on purpose: the panel clips its own overflow
           (it owns its scroller and has to contain the fold), so a drawer
           sliding out of its left edge has to be a fixed sibling rather than a

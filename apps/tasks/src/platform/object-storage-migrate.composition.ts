@@ -13,12 +13,8 @@ import {
 import type { TasksHost } from "./tasks-host.composition";
 
 /**
- * This process has no per-project ClickHouse routing — a single
- * `CLICKHOUSE_URL` answers every project, the same simplification
- * `ClickHouseMigrateTask` and `LwqlProvisionTask` make. A deployment whose
- * stored objects are routed across multiple clusters (BYOC) is out of scope
- * for this task today; migrating one of those tenants still needs the API's
- * routed connection.
+ * This process has no per-project ClickHouse routing — a single `CLICKHOUSE_URL` answers every
+ * project, the same simplification `ClickHouseMigrateTask` and `LwqlProvisionTask` make.
  */
 class TasksStoredObjectsClickHouse extends StoredObjectsClickHousePort {
   constructor(private readonly client: () => unknown) {
@@ -31,10 +27,9 @@ class TasksStoredObjectsClickHouse extends StoredObjectsClickHousePort {
 }
 
 /**
- * No outbound proxy for this process's object storage migration.
- *
- * `apps/tasks` has no proxy configuration of its own yet, matching the API's
- * and worker's mail/object-storage compositions.
+ * No outbound proxy for this process's object storage migration. `apps/tasks` has no proxy
+ * configuration of its own yet, matching the API's and worker's mail/object-storage
+ * compositions.
  */
 class TasksNoOutboundProxy extends OutboundProxyResolverPort {
   tryResolveForHost(): string | undefined {
@@ -43,12 +38,9 @@ class TasksNoOutboundProxy extends OutboundProxyResolverPort {
 }
 
 /**
- * Builds the `object-storage-migrate` task, deferred to `run()`.
- *
- * The BYOC exclusion (`privateOrganizations`) is empty here: this process
- * composes no route map of privately-hosted organizations, so every project
- * this task sees is treated as eligible. A private-route tenant is the API's
- * migration to run, not this process's.
+ * Builds the `object-storage-migrate` task, deferred to `run()`. The BYOC exclusion
+ * (`privateOrganizations`) is empty here: this process composes no route map of
+ * privately-hosted organizations, so every project this task sees is treated as eligible.
  */
 export function buildObjectStorageMigrateTask({
   host,

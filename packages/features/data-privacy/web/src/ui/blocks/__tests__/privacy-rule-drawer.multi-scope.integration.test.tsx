@@ -1,11 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * A privacy rule drawer save can target several scopes at once — the caller
- * (the data-privacy screen) writes one rule per selected scope, but the
- * drawer's own contract is what carries every scope the picker holds through
- * to a single `onSave` call.
- *
  * Spec: specs/data-privacy/policy-configuration.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -42,10 +36,8 @@ const TWO_PROJECT_SCOPES: PrivacyScopeEntry[] = [
 ];
 
 /**
- * Stands in for the real chip picker: a button that picks both projects at
- * once, the way clicking two chips would. Firing from a click (not on mount)
- * matters — the drawer's own open effect seeds `scopes` to a single default
- * project on mount, so a mount-time onChange would race it.
+ * Stands in for the real chip picker: a button that picks both projects at once, the way
+ * clicking two chips would.
  */
 function TwoScopePicker({
   onChange,

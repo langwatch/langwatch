@@ -1,9 +1,6 @@
 /**
- * Unit coverage for the CLI login key mint mechanics: re-login and racing
- * logins never leave more than one active key per device label, and a failed
- * device-revoke rolls the just-minted replacement back rather than leaving a
- * half-minted key beside a previous one that outlived the failure.
- *
+ * Unit coverage for the CLI login key mint mechanics: re-login and racing logins never
+ * leave more than one active key per device label.
  * Spec: specs/ai-governance/cli-onboarding/login-user-scoped-key.feature
  */
 import { describe, expect, it, vi } from "vitest";

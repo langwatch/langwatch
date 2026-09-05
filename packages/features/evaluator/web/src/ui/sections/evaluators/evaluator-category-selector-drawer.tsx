@@ -70,10 +70,8 @@ const PANEL_STYLE = {
 };
 
 /**
- * Unified drawer for the new-evaluator flow.
- *
- * Hosts all three steps (category → type → editor) inside a single
- * Drawer.Root with a shared direction-aware slide animation between them.
+ * Unified drawer for the new-evaluator flow. Hosts all three steps (category → type → editor)
+ * inside a single Drawer.Root with a shared direction-aware slide animation between them.
  */
 export function EvaluatorCategorySelectorDrawer(props: EvaluatorCategorySelectorDrawerProps) {
   const { closeDrawer, openDrawer, canGoBack, goBack } = useDrawer();

@@ -5,10 +5,6 @@ import { createSandboxedLiquid } from "../sandboxed-liquid";
 
 /**
  * Spec: specs/security/template-file-inclusion.feature
- *
- * `package.json` is the file under the working directory the tags are pointed
- * at: it is always there, and a stock engine really does inline it, which is
- * what makes the refusal below a measurement rather than a restatement.
  */
 
 const A_FILE_IN_THE_WORKING_DIRECTORY = "package.json";

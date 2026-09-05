@@ -1,9 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
  * ADR-038: the intent screen blocks progression until a choice is made —
- * pure hook state, no rendering beyond renderHook.
- *
  * Spec: specs/features/onboarding/intent-fork.feature
  */
 import { act, renderHook } from "@testing-library/react";

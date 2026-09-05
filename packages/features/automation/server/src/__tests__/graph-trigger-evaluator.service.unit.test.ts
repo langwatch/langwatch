@@ -744,12 +744,11 @@ describe("evaluateGraphTrigger", () => {
     });
   });
 
-  // Regression (dispatch5015-P1, Finding 3): the dispatch result used to be
-  // discarded, so an alert that delivered NOTHING still opened its incident.
-  // The UI then showed it "currently firing", nobody had been told, and the open
-  // incident suppressed every future notification until the metric recovered.
-  // The scheduled-report path deliberately does the opposite (`report-dispatch.ts`
-  // gates `recordFire` on delivery) — this pins the alert path to match.
+  // Regression (dispatch5015-P1, Finding 3): the dispatch result used to be discarded, so an
+  // alert that delivered NOTHING still opened its incident. The UI then showed it "currently
+  // firing", nobody had been told, and the open incident suppressed every future notification
+  // until the metric recovered. The scheduled-report path deliberately does the opposite
+  // (`report-dispatch.ts` gates `recordFire` on delivery) — this pins the alert path to match.
   describe("given a breach whose dispatch delivers nothing", () => {
     beforeEach(() => {
       harness.dispatch.mockResolvedValue({

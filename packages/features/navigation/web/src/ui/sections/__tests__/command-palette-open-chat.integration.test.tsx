@@ -1,10 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * Selecting the "Open Chat" entry in the command palette hands control
- * straight to the host's support chat and closes the palette. The palette
- * only lists the command on a SaaS deployment (see use-filtered-commands.ts).
- *
  * Spec: specs/support/crisp-bubble-suppression.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

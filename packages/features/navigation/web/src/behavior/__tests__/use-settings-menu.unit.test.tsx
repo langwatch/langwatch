@@ -1,9 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * A plan still arriving must never show the enterprise settings entries — a
- * self-hosted install with no license key, or any deployment whose plan
- * query never settles, must keep them hidden rather than stuck visible.
  * Spec: specs/navigation/settings-shell-v2.feature
  */
 import { renderHook } from "@testing-library/react";

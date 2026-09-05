@@ -34,11 +34,8 @@ import type { FeatureFlagRepository } from "../repositories/feature-flag.reposit
 import type { FeatureFlagRowStore } from "../stores/feature-flag-row.store";
 
 /**
- * An organization's creation date never changes, so this window bounds how
- * many rows a process holds rather than how stale an answer may be. It is
- * deliberately longer than the flag row's own window: an operator editing an
- * age rule must see the new rule within a cache window, but the dates it
- * compares against are immutable history.
+ * An organization's creation date never changes, so this window bounds how many rows a process
+ * holds rather than how stale an answer may be.
  */
 const ORGANIZATION_CREATED_AT_TTL_MS = 10 * 60_000;
 const ORGANIZATION_CREATED_AT_MAX_KEYS = 10_000;
@@ -380,14 +377,8 @@ export class FeatureFlagService extends FeatureFlagServiceContract {
   }
 
   /**
-   * Fills in `organizationCreatedAt` for a read whose flag carries a "new
-   * organizations" rule, so no caller has to know the rule exists.
-   *
-   * Every flag read would otherwise have to carry the creation date, which
-   * means every call site — the per-event kill-switch path included — paying
-   * for a lookup no rule asks for. It is resolved here instead, only when
-   * this flag's own rules name it, and cached per organization. A flag with
-   * no age rule reads exactly what it read before.
+   * Fills in `organizationCreatedAt` for a read whose flag carries a "new organizations" rule,
+   * so no caller has to know the rule exists.
    */
   private async withOrganizationAge(
     rules: FeatureFlagRules,
@@ -413,10 +404,9 @@ export class FeatureFlagService extends FeatureFlagServiceContract {
   }
 
   /**
-   * Reads an organization's creation date, memoised per process. A failed
-   * read resolves to null, which matches no age rule — the same fail-closed
-   * choice the matcher makes for an unknown date, so a database blip cannot
-   * hand a rollout to organizations it excludes.
+   * Reads an organization's creation date, memoised per process. A failed read resolves to
+   * null, which matches no age rule — the same fail-closed choice the matcher makes for an
+   * unknown date, so a database blip cannot hand a rollout to organizations it excludes.
    */
   private async getOrganizationCreatedAt(organizationId: string): Promise<Date | null> {
     const now = Date.now();
@@ -457,10 +447,8 @@ export class FeatureFlagService extends FeatureFlagServiceContract {
   }
 
   /**
-   * A Map iterates in insertion order, so the fallback drops the oldest entry
-   * rather than the least recently used one. That is the intended trade:
-   * tracking recency would mean writing to the map on every read, and the
-   * entry being protected is a date that is only worth one query anyway.
+   * A Map iterates in insertion order, so the fallback drops the oldest entry rather than the
+   * least recently used one.
    */
   private evictOrganizationCreatedAt(now: number): void {
     for (const [id, entry] of this.organizationCreatedAt) {

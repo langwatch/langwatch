@@ -228,15 +228,9 @@ describe(
     type IntervalId = ReturnType<typeof setInterval>;
 
     /**
-     * Records every interval the code under test arms so a test can tick them
-     * at a chosen moment, and drops a handle the moment the implementation
-     * clears it. Real timers stay in play — nothing here fakes the clock; the
-     * probe only fires callbacks the implementation has LEFT armed.
-     *
-     * The cast is to the global's own signature: there is no exported seam for
+     * Records every interval the code under test arms so a test can tick them at a chosen
+     * moment, and drops a handle the moment the implementation clears it.
      * "which intervals are currently armed", and the whole point of ADR-080's
-     * heartbeat ordering is that the interval is gone before the re-stage is
-     * issued.
      */
     function captureArmedIntervals(): {
       fireArmed: () => void;
@@ -274,11 +268,6 @@ describe(
 
     /**
      * Ticks every still-armed interval at the WORST moment ADR-080 describes:
-     * the re-stage has been sent and the worker is still tidying up. A beat
-     * that lands there names an id the re-stage has just re-used, so
-     * `REFRESH_LUA` matches and stretches a sub-second backoff into the full
-     * active window (the worker's heartbeat is armed for the life of the job,
-     * at `activeTtlSec / 3`).
      */
     function lateHeartbeatProbe(
       afterRestage?: (args: {
@@ -1072,13 +1061,10 @@ describe(
           // Pre-ADR-080 nothing on the message or the chain moved at all: the
           // count lived only in a segment appended to the id.
           expect(rungs.map((r) => r.onMessage)).toEqual([1, 2, 3]);
-          // The chain is written INSIDE retryRestage, and this samples on the
-          // way in — so each rung sees what the PREVIOUS one recorded, and the
-          // first sees nothing because no re-stage has happened yet. That lag
-          // is the property: the chain only ever advances together with a
-          // re-stage that actually landed. It used to be written by the caller
-          // beforehand, which is how a failed write could leave a re-staged
-          // job with no record of its attempt anywhere.
+          // The chain is written INSIDE retryRestage, and this samples on the way in — so each
+          // rung sees what the PREVIOUS one recorded, and the first sees nothing because no
+          // re-stage has happened yet. That lag is the property: the chain only ever advances
+          // together with a re-stage that actually landed.
           expect(rungs.map((r) => r.onChain)).toEqual([null, "1", "2"]);
           // And the last rung's write did land, so nothing is lost by the lag.
           expect(await groupAttempt(name, groupId)).toBe("3");

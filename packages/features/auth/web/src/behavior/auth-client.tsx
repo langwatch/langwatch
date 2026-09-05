@@ -5,20 +5,9 @@ import { createAuthClient } from "better-auth/react";
 import { type ReactElement, type ReactNode, useCallback, useEffect, useState } from "react";
 
 /**
- * Client-side auth wrapper exposing a NextAuth-compatible API surface over
- * BetterAuth. Consumers import `useSession`, `signIn`, `signOut`, `getSession`
- * from this module instead of `next-auth/react` during the migration.
- *
- * The adapter normalizes BetterAuth's `{ session, user }` response shape into
- * the flat Session type that the rest of the app expects.
- */
-/**
- * The passkey plugin is declared unconditionally, and the METHOD SET decides
- * whether anyone is offered one: the server registers its half only when
- * `PASSKEYS_ENABLED` is on, and the sign-in router never names a passkey
- * unless the same env says so. Gating the client half too would mean a second
- * place for the two to disagree, and the failure would be a button that
- * exists calling an endpoint that does not.
+ * The passkey plugin is declared unconditionally, and the METHOD SET decides whether anyone is
+ * offered one: the server registers its half only when `PASSKEYS_ENABLED` is on, and the
+ * sign-in router never names a passkey unless the same env says so.
  */
 const client = createAuthClient({ plugins: [passkeyClient()] });
 
@@ -79,18 +68,9 @@ interface UseSessionOptions {
 
 /**
  * Fetches the impersonation-aware session from our custom endpoint.
- *
- * BetterAuth's built-in `client.useSession()` calls `/api/auth/get-session`
- * which returns the raw admin session — no impersonation rewrite. Our
- * `/api/auth/session` endpoint runs through `getServerAuthSession` which
- * reads the `Session.impersonating` JSON column and rewrites `session.user`
- * to the impersonated identity. This mirrors how NextAuth's `useSession`
- * worked — both server and client saw the same impersonation-aware session.
  */
-// Module-level session cache — survives component unmount/remount so
-// navigating between pages doesn't flash <LoadingScreen /> while the
-// session is re-fetched. The first successful fetch populates this;
-// subsequent mounts of useSession() start with the cached value.
+// Module-level session cache — survives component unmount/remount so navigating between pages
+// doesn't flash <LoadingScreen /> while the session is re-fetched.
 let _cachedSession: CompatSession | null = null;
 // Dedup in-flight fetches: multiple useSession() hooks mounting at the
 // same time share a single /api/auth/session request instead of each
@@ -242,17 +222,11 @@ export const signIn = async (
     return { ok: true };
   }
 
-  // Every provider goes through signIn.social, social (google, github,
-  // gitlab, microsoft) and generic-OAuth (see `PLAIN_OIDC_PROVIDERS` and the
-  // named entries beside it in `ee/sso/providers.ts`) alike: the social plugin
-  // and the generic-oauth plugin both honor the same providerId. BetterAuth
-  // handles the redirect to the provider URL itself when `disableRedirect`
-  // is unset.
-  //
-  // Normalize `azure-ad` to `microsoft` (BetterAuth's internal provider id)
-  // to match `linkAccount()` which does the same mapping. Also honor
-  // `redirect: false` by passing `disableRedirect: true` so the caller can
-  // handle navigation itself.
+  // Every provider goes through signIn.social, social (google, github, gitlab, microsoft) and
+  // generic-OAuth (see `PLAIN_OIDC_PROVIDERS` and the named entries beside it in
+  // `ee/sso/providers.ts`) alike: the social plugin and the generic-oauth plugin both honor the
+  // same providerId. BetterAuth handles the redirect to the provider URL itself when
+  // `disableRedirect` is unset.
   const mappedProvider = provider === "azure-ad" ? "microsoft" : provider;
   const result = await client.signIn.social({
     provider: mappedProvider as "google",
@@ -290,11 +264,9 @@ export const navigate = (href: string): void => {
 };
 
 /**
- * True if `url` resolves to the same origin as `origin` (default:
- * `window.location.origin`). Used to guard against open redirects — a
- * protocol-relative value like `//evil.com` or a cross-origin absolute URL
- * resolves to a different origin and returns false. Invalid URLs (e.g.
- * `javascript:...`) also return false rather than throwing.
+ * True if `url` resolves to the same origin as `origin` (default: `window.location.origin`).
+ * Used to guard against open redirects — a protocol-relative value like `//evil.com` or a
+ * cross-origin absolute URL resolves to a different origin and returns false.
  */
 export const isSameOrigin = (
   url: string,
@@ -308,17 +280,7 @@ export const isSameOrigin = (
 };
 
 /**
- * Same-origin redirect guard. Blocks open-redirect attempts like
- * `?callbackUrl=https://evil.com`, `?callbackUrl=//evil.com`, or the
- * backslash variant `?callbackUrl=/\evil.com` (the WHATWG URL parser treats
- * a leading `/\`, `\/`, or `\\` as authority-introducing for special
- * schemes, same as `//`) by rejecting anything that isn't a same-origin
- * destination. Always resolves through `new URL()` rather than a string
- * prefix check, so there is exactly one place that decides what counts as
- * "same origin" — no fast path that a parser quirk can slip past.
- *
- * Exported for unit testing. `origin` defaults to `window.location.origin`
- * in the browser runtime and is passed explicitly by tests.
+ * Same-origin redirect guard.
  */
 export const safeRedirectTarget = (
   callbackUrl: string | undefined,
@@ -347,33 +309,17 @@ export const signOut = async (opts?: {
     if (!res.ok) throw new Error("Logout failed");
     return;
   }
-  // Navigate directly to the logout endpoint as a full page navigation.
-  // This guarantees the Set-Cookie headers are applied by the browser
-  // (no fetch/AJAX race conditions). The endpoint clears cookies and
-  // redirects to /auth/signin. We always go to /auth/signin (not /)
-  // because / renders client-side and in Auth0 mode the signin page
-  // auto-fires signIn("auth0") which silently re-authenticates via
-  // Google SSO before the user even sees the page.
+  // Navigate directly to the logout endpoint as a full page navigation. This guarantees the
+  // Set-Cookie headers are applied by the browser (no fetch/AJAX race conditions). The endpoint
+  // clears cookies and redirects to /auth/signin. We always go to /auth/signin (not /) because
+  // / renders client-side and in Auth0 mode the signin page auto-fires signIn("auth0") which
+  // silently re-authenticates via Google SSO before the user even sees the page.
   navigate("/api/auth/logout");
 };
 
 /**
- * Link an OAuth account to the currently signed-in user. This is distinct
- * from `signIn(provider)` — which creates/switches sessions. Linking routes
- * through BetterAuth's `/link-social`, which enforces same-email matching via
- * `accountLinking.allowDifferentEmails !== true`, blocking the "sign in while
- * logged in and silently switch sessions" regression that a naive
- * `signIn(provider)` call exhibited.
- *
- * ONE endpoint, since better-auth 1.7. Generic-oauth providers used to link
- * through the plugin's own `/oauth2/link` and everything else through
- * `/link-social`; the plugin no longer mounts endpoints at all, because it
- * registers each configured provider as a first-class social provider. So the
- * fork is gone and an Okta account links exactly the way a GitHub one does.
- *
- * The caller passes the same provider id used in `NEXTAUTH_PROVIDER` and we
- * map `azure-ad` → `microsoft` internally so the UI doesn't need to know the
- * BetterAuth internal naming.
+ * Link an OAuth account to the currently signed-in user. This is distinct from
+ * `signIn(provider)` — which creates/switches sessions.
  */
 export const linkAccount = async (
   provider: string,
@@ -399,13 +345,8 @@ export const linkAccount = async (
 };
 
 /**
- * Browser-only session fetch. Calls BetterAuth's React client which uses
- * `document.cookie` for session token retrieval. **Do not call this from
- * server-side code (getServerSideProps, API routes, etc.) — it has no
- * access to the request context and will always return null on the
- * server.** Server-side callers must use `getServerAuthSession` from
- * `~/server/auth` instead, which reads cookies from request headers via
- * `auth.api.getSession`.
+ * Browser-only session fetch. Calls BetterAuth's React client which uses `document.cookie` for
+ * session token retrieval.
  */
 export const getSession = async (): Promise<CompatSession | null> => {
   if (typeof window === "undefined") {

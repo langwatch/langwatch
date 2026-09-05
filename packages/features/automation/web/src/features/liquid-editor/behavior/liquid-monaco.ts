@@ -4,11 +4,7 @@ import { substituteLiquidForJsonValidation } from "../model/liquid-json-substitu
 import { registerJsonSchema } from "../model/monaco-schemas";
 
 /**
- * Rich variable info the autocomplete uses: path + TypeScript-ish type +
- * optional description. Lives next to the editor that consumes it; the
- * paired `templates/scaffold.ts` re-exports the canonical list as
- * `TEMPLATE_VARIABLES` and a drift-prevention test pins it to the server's
- * `TEMPLATE_VARIABLES`.
+ * Rich variable info the autocomplete uses: path + TypeScript-ish type + optional description.
  */
 export interface VariableInfo {
   path: string;
@@ -17,11 +13,9 @@ export interface VariableInfo {
 }
 
 /**
- * Client-side Monaco support for editing trigger notification templates: a
- * lightweight Liquid language (tokens for `{{ }}` / `{% %}`), autocomplete for
- * the known template variables, and validation that flags references to a
- * variable root the context does not provide. The variable contract itself
- * comes from the server (`getTemplates.variables`) so editor and renderer agree.
+ * Client-side Monaco support for editing trigger notification templates: a lightweight Liquid
+ * language (tokens for `{{ }}` / `{% %}`), autocomplete for the known template variables, and
+ * validation that flags references to a variable root the context does not provide.
  */
 
 export type MonacoTextModel = editor.ITextModel;
@@ -89,10 +83,9 @@ function variablesForModel(model: MonacoTextModel): VariableInfo[] {
 }
 
 /**
- * Registers the Liquid language and its completion/hover providers
- * (idempotent). Call from Monaco's `beforeMount` so the language exists
- * before the model is created. The providers resolve variables per model
- * via `setModelVariables`.
+ * Registers the Liquid language and its completion/hover providers (idempotent). Call from
+ * Monaco's `beforeMount` so the language exists before the model is created. The providers
+ * resolve variables per model via `setModelVariables`.
  */
 export function registerLiquidLanguage(monaco: Monaco): void {
   if (!languageRegistered) {
@@ -296,11 +289,9 @@ export interface UnknownVariable {
 }
 
 /**
- * Finds `{{ ... }}` output expressions whose leading variable has a root the
- * context does not provide — the common typo case (`{{ tigger.name }}`).
- * For-loop / assign / capture locals declared in the document are treated as
- * known. Filters (after `|`), literals, and tag syntax are ignored; tag syntax
- * is validated server-side. Pure (no Monaco) so it can be unit-tested.
+ * Finds `{{ ... }}` output expressions whose leading variable has a root the context does not
+ * provide — the common typo case (`{{ tigger.name }}`). For-loop / assign / capture locals
+ * declared in the document are treated as known.
  */
 export function detectUnknownVariables(text: string, variables: VariableInfo[]): UnknownVariable[] {
   const known = new Set(variables.map((v) => rootOf(v.path)));
@@ -565,16 +556,9 @@ function registerLiquidJsonBridges(monaco: Monaco): void {
 }
 
 /**
- * Wires JSON Schema validation onto a `liquid-json` editor model. Liquid is
- * not valid JSON, so we maintain a hidden "shadow" model with the same
- * length-preserving content where Liquid spans are replaced by placeholders
- * (`liquidJsonSubstitution`). Monaco's built-in JSON language service
- * validates the shadow against the supplied schema; any markers it produces
- * are mirrored onto the real model — positions are identical because the
- * substitution preserves byte length and newline placement.
- *
- * Returns a `dispose` function: callers must invoke it on unmount, otherwise
- * the shadow model leaks across editor mounts.
+ * Wires JSON Schema validation onto a `liquid-json` editor model. Liquid is not valid JSON, so
+ * we maintain a hidden "shadow" model with the same length-preserving content where Liquid
+ * spans are replaced by placeholders (`liquidJsonSubstitution`).
  */
 export function setupLiquidJsonSchema(params: {
   monaco: Monaco;
@@ -586,12 +570,11 @@ export function setupLiquidJsonSchema(params: {
 }): { dispose: () => void } {
   const { monaco, realModel, schema, shadowUri } = params;
 
-  // Route through the shared registry in automation-web so this call
-  // doesn't wipe schemas registered by sibling editors. Match the shadow
-  // model by basename — per Monaco's docs the `**` wildcard spans path
-  // separators while a plain `*` does not, so `**/<basename>` is the right
-  // shape. Basenames must be unique per editor — that's the caller's
-  // responsibility (different editors must use different shadow URIs).
+  // Route through the shared registry in automation-web so this call doesn't wipe schemas
+  // registered by sibling editors. Match the shadow model by basename — per Monaco's docs the
+  // `**` wildcard spans path separators while a plain `*` does not, so `**/<basename>` is the
+  // right shape. Basenames must be unique per editor — that's the caller's responsibility
+  // (different editors must use different shadow URIs).
   registerJsonSchema(monaco, shadowUri, schema, [`**/${basenameOfUri(shadowUri)}`]);
   const shadowResource = monaco.Uri.parse(shadowUri);
   // Re-mount safety: another instance with the same shadow URI may have left

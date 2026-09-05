@@ -1,11 +1,5 @@
 /**
  * Characterisation of `/api/annotations`, through the real Hono app.
- *
- * What is pinned here is the WIRE, because this family predates both response
- * envelopes and deployed callers parse what it writes: the `{ data }` wrapper
- * on every success, the `{ status, message }` shape of every refusal it
- * authors itself, the two field-specific 400 sentences, and the fact that the
- * credential's last-used clock moves only after a successful answer.
  */
 import { AnnotationApp } from "#app/annotation.app";
 import { AnnotationNotFoundError } from "@langwatch/annotation-contract";
@@ -186,11 +180,9 @@ function annotationApp(methods: Record<string, unknown>): AnnotationApp {
 }
 
 /**
- * The family over a security spine that authenticates nothing.
- *
- * Every route on it declares `handlerManagedAuth`, so the framework chain is
- * empty by construction and the credential port IS the authentication — which
- * is exactly what these tests need to drive.
+ * The family over a security spine that authenticates nothing. Every route on it declares
+ * `handlerManagedAuth`, so the framework chain is empty by construction and the credential port
+ * IS the authentication — which is exactly what these tests need to drive.
  */
 function mount(options: { app: AnnotationApp; credential?: AnnotationRestCredentialPort }) {
   const markUsed = vi.fn();

@@ -34,20 +34,8 @@ const LANTERN_COLORS = ["#f56b1a", "#ffb380", "#6e57d2"];
 const LANTERN_COLORS_DARK = ["#a8480d", "#f56b1a", "#5b41c2"];
 
 /**
- * The Langy mark as the homebar announcement's identity — its own instance,
- * deliberately NOT the panel's.
- *
- * Same grey as every other slide's glyph: in the ticker each announcement's
- * icon is quiet identification, not branding, and one coloured mark in the
- * row would outrank the words beside it. The mark's shape says Langy; the
- * paint stays the row's. Own paint-server id for the same reason the
- * launcher has one — duplicate SVG gradient ids resolve to whichever comes
- * first in the DOM.
- *
- * Same footprint as every other slide's glyph — 14px, bare. The mark's
- * wireframe reads softer this small, but a bigger tile made the banner row
- * change height whenever this slide was the active one, and a row that
- * breathes per-slide costs more than a crisper mark buys.
+ * The Langy mark as the homebar announcement's identity — its own instance, deliberately
+ * NOT the panel's. Same grey as every other slide's glyph: quiet identification, not branding.
  */
 const LANGY_HOMEBAR_MARK_GRADIENT_ID = "langy-homebar-mark-grad";
 
@@ -68,13 +56,9 @@ function LangyHomebarMark() {
 }
 
 /**
- * The Langy announcement, carried only by the Langy home.
- *
- * It names the loop the agent actually runs end to end (read the traces, find
- * the cause, open the pull request), because that IS the loop: see the GitHub
- * skill and the matching row in the panel's own suggestions. It stops at
- * opening a PR, and so does this copy. Anything further would be a headline
- * the product then fails to deliver.
+ * The Langy announcement, carried only by the Langy home. It names the loop the agent actually
+ * runs end to end (read the traces, find the cause, open the pull request), because that IS the
+ * loop: see the GitHub skill and the matching row in the panel's own suggestions.
  */
 const LANGY_SLIDE: Slide = {
   id: "langy-ships-the-fix",
@@ -246,14 +230,9 @@ const SLIDES: Slide[] = [
 ];
 
 /**
- * Which announcements this home is carrying.
- *
- * Langy is never PROMOTED here. A banner inviting someone to try Langy, sat
- * directly above a composer that already is Langy, is the same offer made
- * twice, and the banner is the worse of the two. What the Langy home does get
- * is a genuine announcement about what Langy can do, on the same footing as
- * every other feature announcement, and only for the readers who have it: an
- * announcement about a capability you cannot reach is just noise.
+ * Which announcements this home is carrying. Langy is never PROMOTED here. A banner inviting
+ * someone to try Langy, sat directly above a composer that already is Langy, is the same offer
+ * made twice, and the banner is the worse of the two.
  */
 function useSlides(
   _projectId: string | undefined,
@@ -319,29 +298,17 @@ function lerpMesh(a: Mesh, b: Mesh, t: number): Mesh {
 // ---- The carousel -------------------------------------------------------
 
 /**
- * The home-page announcement slot, as a morphing carousel.
- *
- * Rotates through every eligible slide (each owns its own per-project 7-day
- * snooze). On a change the single shader canvas MORPHS its palette and shape
- * from one slide to the next while the copy crossfades — both on the same clock
- * and easing, so the whole thing lands as one coordinated dissolve rather than
- * two separate animations.
- *
- * A radial countdown ring shows time to the next slide. Hovering eases the
- * auto-advance to a gentle stop (never a hard cut), so nothing changes under
- * the pointer; leaving eases it back up. Reduced-motion holds on one slide
- * with the dots still available. Renders nothing when every slide is snoozed.
+ * The home-page announcement slot, as a morphing carousel. Rotates through every eligible slide
+ * (each owns its own per-project 7-day snooze).
  */
 export function HomePageBanners({
   variant = "briefing",
   children,
 }: {
   /**
-   * `lantern` is the Langy home's block: this component keeps owning the one
-   * shared canvas, the announcement compresses to a single line of chrome
-   * across the top, and `children` (the composer and its capability row) are
-   * laid over the same ground beneath it. It is a variant rather than a second
-   * component precisely so there is never a second canvas on the page.
+   * `lantern` is the Langy home's block: this component keeps owning the one shared canvas, the
+   * announcement compresses to a single line of chrome across the top, and `children` (the
+   * composer and its capability row) are laid over the same ground beneath it.
    */
   variant?: "briefing" | "legacy" | "lantern";
   /** Lantern only: what sits under the chrome line, over the same ground. */
@@ -471,12 +438,11 @@ export function HomePageBanners({
       }
     }
 
-    // Ease the advance speed toward its target (0 while hovered / reduced /
-    // single-slide, 1 otherwise) so hovering slows to a stop, not a cut.
-    // The lantern's ticker is the exception: its segment fill IS the
-    // countdown, and a bar that freezes under the pointer (or right after
-    // picking a slide, while the pointer is still on the control) reads as
-    // stuck rather than polite. There the rotation simply keeps running.
+    // Ease the advance speed toward its target (0 while hovered / reduced / single-slide, 1
+    // otherwise) so hovering slows to a stop, not a cut. The lantern's ticker is the exception:
+    // its segment fill IS the countdown, and a bar that freezes under the pointer (or right
+    // after picking a slide, while the pointer is still on the control) reads as stuck rather
+    // than polite. There the rotation simply keeps running.
     const wantMoving =
       (variant === "lantern" || !hoveredRef.current) &&
       !reduceMotionRef.current &&
@@ -513,12 +479,10 @@ export function HomePageBanners({
     }
   });
 
-  // Nothing renders until the project resolves: the snooze map is keyed per
-  // project, so before `projectId` exists every slide would look eligible —
-  // snoozed users would see a flash, and the CTA would push /undefined/...
-  //
-  // The lantern is the exception to "no slide, no banner": it is the block the
-  // composer lives in, so it still has to render once every announcement has
+  // Nothing renders until the project resolves: the snooze map is keyed per project, so before
+  // `projectId` exists every slide would look eligible — snoozed users would see a flash, and
+  // the CTA would push /undefined/... The lantern is the exception to "no slide, no banner": it
+  // is the block the composer lives in, so it still has to render once every announcement has
   // been dismissed. It just renders without a chrome line.
   if (!hasMounted || !projectId) return null;
   if (variant !== "lantern" && (eligible.length === 0 || !slide)) return null;
@@ -528,12 +492,11 @@ export function HomePageBanners({
       surface: "home_banner",
       projectId,
     });
-    // Following the link is NOT dismissing the announcement. It used to snooze
-    // the slide for a week, which meant the people most interested in a feature
-    // were the ones who lost the way back to it: one click to look, and the
-    // link was gone from their home page. Interest is not "seen it, thanks".
-    // Only the explicit dismiss (the X) snoozes, which is the control that
-    // actually says so.
+    // Following the link is NOT dismissing the announcement. It used to snooze the slide for a
+    // week, which meant the people most interested in a feature were the ones who lost the way
+    // back to it: one click to look, and the link was gone from their home page. Interest is
+    // not "seen it, thanks". Only the explicit dismiss (the X) snoozes, which is the control
+    // that actually says so.
     slideToOpen.navigate({ go: navigate, projectSlug, askLangy });
   };
 
@@ -784,13 +747,10 @@ export function HomePageBanners({
                           height="2px"
                           borderRadius="full"
                           overflow="hidden"
-                          // Three bright chunks with gaps read as a progress
-                          // control — steps to get through — which is the wrong
-                          // promise for pagination. A hairline at low alpha
-                          // recedes to being punctuation: seen when you look at
-                          // it, never competing with the sentence above. Only
-                          // the ACTIVE segment darkens — position, not history;
-                          // shading the already-shown ones read as a checklist.
+                          // Three bright chunks with gaps read as a progress control — steps to
+                          // get through — which is the wrong promise for pagination. A hairline
+                          // at low alpha recedes to being punctuation: seen when you look at
+                          // it, never competing with the sentence above.
                           background={i === active ? "fg.muted/40" : "fg.muted/15"}
                           transition="background 200ms ease"
                           /* The fill's accent, resolved per colour mode here

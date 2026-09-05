@@ -1,55 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * Issue #5759: the Default Models override drawer builds its own
- * `displayNames` map (`buildCustomModelDisplayNames`) from the project's
- * provider rows and threads it into every role's `ProviderModelSelector`.
- * The map-build itself is covered by the contract's own unit tests, and
- * `ProviderModelSelector`'s rendering of a `displayNames` prop is covered
- * separately - but nothing exercised the WIRING between them: "drawer
- * fetches provider rows" -> "drawer builds displayNames" -> "drawer passes
- * displayNames={displayNames} to <ProviderModelSelector>". That chain was
- * pinned only by manual screenshots. `displayNames` is an OPTIONAL prop,
- * so a refactor that silently drops `displayNames={displayNames}` from a
- * role row's <ProviderModelSelector> still compiles and still passes
- * every other existing test.
- *
- * Renders the real `DefaultModelOverrideDrawer` (not a stub) with only
- * the tRPC boundary + peripheral hooks mocked, so the whole chain - map
- * build, prop threading, dropdown + trigger render - runs for real.
- *
- * Query strategy - two layers:
- *
- * 1. Select.Content (role="listbox") is mounted-but-hidden regardless of
- *    open state, and Select.HiddenSelect mirrors every item as a native
- *    <option>, so unscoped getByText can double-match. That harness
- *    handles it by scoping to a single global listbox/trigger - not
- *    available here, because this drawer renders THREE role rows
- *    (Default/Fast/Embeddings), each with its OWN <ProviderModelSelector>.
- *
- * 2. The design-system Select's Content portals by default, so a role's
- *    listbox is NOT a DOM descendant of its own `role-row-<role>`
- *    container - plain DOM-containment scoping can't isolate "the
- *    Default role's dropdown" from the other two. Worse, Default and
- *    Fast share the exact same chat-model pool (`modelOptionsByRole` in
- *    default-model-override-drawer.tsx builds one `chatOptions` list and
- *    reuses it for both roles), so the renamed model is a legitimate,
- *    real option in BOTH dropdowns - an unscoped
- *    `getAllByRole("listbox")[0]` guess would be fragile even if it
- *    happened to pass.
- *
- *    @zag-js/select's `getTriggerProps()` stamps
- *    `"aria-controls": dom.getContentId(scope)` on the trigger
- *    (role="combobox"), and `getContentProps()` stamps the SAME id plus
- *    `role: "listbox"` on its own Content. That id pairing is per-
- *    <Select.Root> instance and portal-proof, so resolving a role's
- *    listbox FROM its own row's trigger (found by plain DOM containment,
- *    since only Content portals - the trigger does not) is the one
- *    collision-proof way to scope to a single role's dropdown.
- *
- * `ScopeChipPicker` is stubbed - it's orthogonal to display-name
- * threading, and the assertions below never touch scope-picking UI.
- *
  * @see specs/model-providers/custom-model-display-name.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

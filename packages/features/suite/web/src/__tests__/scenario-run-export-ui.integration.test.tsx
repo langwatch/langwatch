@@ -1,14 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * The export's front door: the button that offers it, the dialog that asks how
- * deep, and what the header shows while a file is streaming.
- *
- * Rendered rather than asserted on props, because every one of these is a claim
- * about what a person sees — that the depths are labelled by what one row IS,
- * that the button is not offered when it would write nothing, and that a
- * running export can be called off.
- *
  * @see specs/scenarios/scenario-run-export.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

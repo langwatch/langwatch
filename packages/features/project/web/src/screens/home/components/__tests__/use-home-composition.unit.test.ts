@@ -1,11 +1,6 @@
 /**
  * The home page's precedence rule, exhaustively.
- *
- * Ported from platform/app/src/components/home/__tests__/useHomeComposition.unit.test.ts
- * (origin/main); the function's own shape is unchanged by the move.
- *
  * Spec: specs/home/signal-focused-home-rollout.feature,
- *       specs/home/langy-home.feature
  */
 import { describe, expect, it } from "vitest";
 import { resolveHomeComposition } from "../use-home-composition";

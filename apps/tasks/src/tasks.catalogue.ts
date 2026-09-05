@@ -32,12 +32,9 @@ import { PrismaMigrateTask } from "./tasks/prisma-migrate.task";
 import type { TasksHost } from "./platform/tasks-host.composition";
 
 /**
- * The one list this process's tasks live in: a feature's task is here or it
- * does not exist as far as `apps/tasks` is concerned, composed over
- * `TasksHost` and, for Eventing dispatch, `TasksEventingInfrastructure`.
- * One `Task` subclass — `topic-clustering-run` — stays unregistered, naming
- * its own blocker in its file; full reasoning:
- * `dev/docs/plans/tasks-launch-interface-and-saas.md`.
+ * The one list this process's tasks live in: a feature's task is here or it does not exist as
+ * far as `apps/tasks` is concerned, composed over `TasksHost` and, for Eventing dispatch,
+ * `TasksEventingInfrastructure`.
  */
 export function buildTasksCatalogue({
   host,
@@ -52,6 +49,7 @@ export function buildTasksCatalogue({
     ClickHouseMigrateTask.create({ source: process.env }),
     LwqlProvisionTask.create({
       database: () => host.requirePrisma(),
+      source: process.env,
       skipped: process.env.SKIP_LWQL_PROVISION === "true",
     }),
     ModelProviderCustomModelsMigrateTask.create({ database: () => host.requirePrisma() }),

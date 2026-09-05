@@ -236,10 +236,8 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
 type CodeEvaluatorFormState = ReturnType<typeof useCodeEvaluatorForm>;
 
 /**
- * Creates or edits a custom CODE evaluator: a Python code block with its inputs
- * and outputs, exactly like the studio code component, stored on the evaluator
- * itself (no workflow record). In the workbench it also maps each input to a
- * source, merged into the inputs list like the prompt drawer.
+ * Creates or edits a custom CODE evaluator: a Python code block with its inputs and outputs,
+ * exactly like the studio code component, stored on the evaluator itself (no workflow record).
  */
 export function CodeEvaluatorEditorDrawer(props: CodeEvaluatorEditorDrawerProps) {
   const { closeDrawer, canGoBack, goBack } = useDrawer();

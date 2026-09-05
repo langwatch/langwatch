@@ -1,11 +1,5 @@
 /**
  * The settings menu, resolved against the host this shell is mounted in.
- *
- * The gates the menu turns on — the plan tier, the lite membership role, the
- * grants, whether this is the hosted product, and how far the reader reaches
- * into the operations pages — are all answers the host already holds, so this
- * asks once and hands them to the pure builder.
- *
  * Spec: specs/navigation/settings-shell-v2.feature
  */
 

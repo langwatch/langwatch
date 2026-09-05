@@ -33,22 +33,8 @@ import { Slider } from "@langwatch/design-system/slider";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
 /**
- * The filter editor, bound to the address.
- *
- * TWO BUTTONS DID NOT TRAVEL WITH IT, and both are somebody else's overlay:
- *
- * - "Save as view" opened the saved-views dialog. Saved views are written and
- *   read by `SavedViewsBar`, which `DashboardPageBody` mounts — application
- *   chrome a screen served from `apps/ui` has nothing above it to supply — so
- *   the button would have opened a dialog whose bar is not on the page.
- * - "Add Automation" called `openDrawer("automation")`. That registry entry was
- *   DELETED when the automations family moved, so this call site has not
- *   compiled since; it is one of the seven breaks that move recorded, and this
- *   is where two of them stop being breaks.
- *
- * Both are recorded rather than reinvented: an overlay belonging to another
- * feature is the chrome gap every family since coding-agent has carried, and
- * inventing a cross-feature overlay capability is not a page move's to design.
+ * The filter editor, bound to the address. TWO BUTTONS DID NOT TRAVEL WITH IT, and both are
+ * somebody else's overlay: - "Save as view" opened the saved-views dialog.
  */
 export function QueryStringFieldsFilters() {
   const { nonEmptyFilters, setFilters, filterParams } = useFilterParams();
@@ -63,11 +49,9 @@ export function QueryStringFieldsFilters() {
 }
 
 /**
- * The filter's own value list, as the pickers below take it.
- *
- * Stated structurally rather than as the tRPC result types the application
- * named: those reach for the tRPC client, its React Query bindings and the
- * process's own root router type, none of which a governed screen may import.
+ * The filter's own value list, as the pickers below take it. Stated structurally rather than as
+ * the tRPC result types the application named: those reach for the tRPC client, its React Query
+ * bindings and the process's own root router type, none of which a governed screen may import.
  */
 type FilterDataQuery = {
   data: { options: AnalyticsFilterOption[] } | undefined;

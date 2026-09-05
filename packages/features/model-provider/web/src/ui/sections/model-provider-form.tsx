@@ -109,17 +109,10 @@ export const EditModelProviderForm = ({
     useState<ModelProviderAdvancedDraft>(EMPTY_ADVANCED_DRAFT);
   const [advancedJsonError, setAdvancedJsonError] = useState<string | null>(null);
 
-  // Find the row this form is editing. Three inputs to the lookup:
-  //   - `modelProviderId === "new"` → always blank, never pre-fill from
-  //     an existing row. The Add Model Provider menu sets this so the
-  //     user can stand up a second instance of an already-configured
-  //     provider type without colliding with the first.
-  //   - `modelProviderId === "<cuid>"` → edit that specific row, resolved
-  //     via the shared `findModelProviderById` against the flat list —
-  //     see useAllModelProvidersList for why the collapsed `providers`
-  //     Record above is the wrong source for this lookup (#5380).
-  //   - `modelProviderId` undefined → no specific target, fresh blank
-  //     (deep-link from evaluator selector or similar).
+  // Find the row this form is editing. Three inputs to the lookup: - `modelProviderId ===
+  // "new"` → always blank, never pre-fill from an existing row. The Add Model Provider menu
+  // sets this so the user can stand up a second instance of an already-configured provider type
+  // without colliding with the first.
   const isTargetingSpecificRow = isResolvableProviderId(modelProviderId);
   const existingRow = useMemo(
     () =>
@@ -129,29 +122,23 @@ export const EditModelProviderForm = ({
     [isTargetingSpecificRow, allProviders, modelProviderId],
   );
 
-  // Two DISTINCT concerns, deliberately not collapsed into one flag:
-  //   - Whether we can SUBMIT. An id-targeted edit that didn't resolve to a
-  //     real row must never submit, in EVERY load state (loading, disabled,
-  //     errored, or genuinely empty), so this gates purely on "targeting a
-  //     row we couldn't resolve". Otherwise Save ships `id: undefined`, the
-  //     server treats it as a create, and a phantom duplicate row is written
-  //     (#5380 P2).
+  // Two DISTINCT concerns, deliberately not collapsed into one flag: - Whether we can SUBMIT.
+  // An id-targeted edit that didn't resolve to a real row must never submit, in EVERY load
+  // state (loading, disabled, errored, or genuinely empty), so this gates purely on "targeting
+  // a row we couldn't resolve". Otherwise Save ships `id: undefined`, the server treats it as a
+  // create, and a phantom duplicate row is written (#5380 P2).
   const cannotResolveTarget = isTargetingSpecificRow && !existingRow;
-  //   - Whether to show the "no longer exists" copy. This is the subset of
-  //     `cannotResolveTarget` where the flat list has DEFINITIVELY arrived, so
-  //     the row is known absent rather than merely unresolved. Gating on
-  //     readiness stops the copy flashing mid-load and stops it lying when the
-  //     list simply failed to load. (An `allProviders.length > 0` proxy
-  //     mis-reads a legitimately empty org as "not loaded" and never fires —
-  //     the original #5380 stale-miss hole.)
+  // - Whether to show the "no longer exists" copy. This is the subset of `cannotResolveTarget`
+  // where the flat list has DEFINITIVELY arrived, so the row is known absent rather than merely
+  // unresolved. Gating on readiness stops the copy flashing mid-load and stops it lying when
+  // the list simply failed to load.
   const isStaleMiss = cannotResolveTarget && isAllProvidersReady;
 
   // Memoized so the blank template keeps a stable identity across renders:
-  // useModelProviderForm's reset effect lists `provider.extraHeaders` in its
-  // deps, so a fresh `{ ..., extraHeaders: [] }` literal on every render would
-  // refire that effect each render → setState → re-render → "Maximum update
-  // depth exceeded" and a wiped-out Add form. Keyed on the resolved row (or
-  // its absence) and the provider key only.
+  // useModelProviderForm's reset effect lists `provider.extraHeaders` in its deps, so a fresh
+  // `{ ..., extraHeaders: [] }` literal on every render would refire that effect each render →
+  // setState → re-render → "Maximum update depth exceeded" and a wiped-out Add form. Keyed on
+  // the resolved row (or its absence) and the provider key only.
   const provider: ModelProviderEditorValue = useMemo(
     () =>
       existingRow ?? {
@@ -175,13 +162,11 @@ export const EditModelProviderForm = ({
     (!provider.customKeys ||
       Object.keys(provider.customKeys as Record<string, unknown>).length === 0);
 
-  // Reset advanced draft when the *drawer subject* changes — i.e. the
-  // user opened the drawer on a different provider row. We intentionally
-  // do NOT re-seed on every underlying-value change: a background
-  // refetch (window focus, invalidation, concurrent edit in another
-  // tab) re-runs this effect and would overwrite the user's in-progress
-  // draft + clear their JSON error with no warning. Keying on the row
-  // id + the flag preserves typed values across silent refetches.
+  // Reset advanced draft when the *drawer subject* changes — i.e. the user opened the drawer on
+  // a different provider row. We intentionally do NOT re-seed on every underlying-value change:
+  // a background refetch (window focus, invalidation, concurrent edit in another tab) re-runs
+  // this effect and would overwrite the user's in-progress draft + clear their JSON error with
+  // no warning. Keying on the row id + the flag preserves typed values across silent refetches.
   const providerId = (provider as { id?: string }).id;
   useEffect(() => {
     if (!gatewayMenuEnabled) {
@@ -276,14 +261,10 @@ export const EditModelProviderForm = ({
     customKeys: state.customKeys,
   });
 
-  // oauth-device providers (codex) credential through the provider's own
-  // sign-in flow: the drawer swaps the API-key fields for it, and Save
-  // (name / scope edits) skips every API-key validation path, since the
-  // sign-in already persisted the credentials server-side. Their model
-  // list comes from the registry catalog, so the custom-models section
-  // is hidden too. (The registry keeps literal entry types via
-  // `satisfies`, so widen to read the optional authFlow: same pattern
-  // as CredentialsSection's optionalKeys read.)
+  // oauth-device providers (codex) credential through the provider's own sign-in flow: the
+  // drawer swaps the API-key fields for it, and Save (name / scope edits) skips every API-key
+  // validation path, since the sign-in already persisted the credentials server-side. Their
+  // model list comes from the registry catalog, so the custom-models section is hidden too.
   const isOAuthDeviceProvider =
     (providerDefinition as { authFlow?: "api-key" | "oauth-device" } | undefined)?.authFlow ===
     "oauth-device";
@@ -358,15 +339,7 @@ export const EditModelProviderForm = ({
       }
     }
 
-    // Only probe the upstream provider when the user has actually entered
-    // a new API key. Re-probing the stored credentials on every save —
-    // including saves that only touch unrelated fields like name or scope —
-    // makes those edits depend on third-party uptime and rate-limits, and
-    // blocks the user with a misleading "Invalid API key" toast whenever
-    // the stored key has drifted out-of-band (rotated in the provider's
-    // console, hit a temporary 401, etc.). Safety providers like
-    // azure_safety also skip this — their endpoints can't answer the
-    // OpenAI-compatible probe at all.
+    // Only probe the upstream provider when the user has actually entered a new API key.
     if (isLlmProvider && !isOAuthDeviceProvider && userEnteredNewApiKey && probeRequired) {
       const isValid = await validateApiKey();
       if (!isValid) {

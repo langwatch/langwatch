@@ -1,15 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
- * The Support menu: where the human-chat entry lives, and what focus does
- * when the menu closes by pointer versus by keyboard.
- *
- * Lifted from
- * `platform/app/src/components/sidebar/__tests__/SupportMenu.chatPlacement.integration.test.tsx`
- * (deleted with `platform/app`). The `usePublicEnv`/`crispBubblePolicy` mocks
- * that used to stand in for "does this deployment have a chat bubble" are the
- * host's `supportChat()` reading now.
- *
  * Spec: specs/navigation/product-sidebars.feature
  */
 

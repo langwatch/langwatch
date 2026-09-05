@@ -22,21 +22,8 @@ const USAGE_DIMENSIONS: Record<MetricUsageEstimateQuery["groupBy"], string[]> = 
 };
 
 /**
- * The whole metric surface over ClickHouse: the append half, and the two reads
- * only a query graph makes.
- *
- * The appends are delegated rather than reimplemented. There is one rollup
- * recomputation, one successor seek and one insert path in this package, and a
- * graph that consumes `metric_processing` composes the same
- * {@link ClickHouseMetricDataPointAppendRepository} this class holds — so the
- * two graphs cannot come to disagree about what an append does.
- *
- * Both resolvers are required on purpose. The organization-wide usage query
- * relies on its client being resolved from the organization — that is what
- * makes `OrganizationId` a real isolation boundary rather than a convention
- * (see the carve-out in dev/docs/best_practices/clickhouse-queries.md).
- * Defaulting this to the project resolver would hand it an organization id
- * to look up as a project.
+ * The whole metric surface over ClickHouse: the append half, and the two reads only a query
+ * graph makes. The appends are delegated rather than reimplemented.
  */
 export class MetricDataPointClickHouseRepository extends MetricDataPointRepository {
   private readonly append: ClickHouseMetricDataPointAppendRepository;
@@ -124,12 +111,11 @@ export class MetricDataPointClickHouseRepository extends MetricDataPointReposito
       );
     }
     const client = await this.resolveClient(tenantId);
-    // Two hops in one query: the series catalog names the label-matched
-    // SeriesIds (deduped with argMax per the catalog's documented
-    // partition/dedup mismatch — its reader must never rely on the engine
-    // having merged), then the rollups, whose buckets are delta-converged,
-    // sum to the series total. `has(PointAttributeKeys, ...)` gates the JSON
-    // extraction to rows that can match at all.
+    // Two hops in one query: the series catalog names the label-matched SeriesIds (deduped with
+    // argMax per the catalog's documented partition/dedup mismatch — its reader must never rely
+    // on the engine having merged), then the rollups, whose buckets are delta-converged, sum to
+    // the series total. `has(PointAttributeKeys, ...)` gates the JSON extraction to rows that
+    // can match at all.
     const result = await client.query({
       query: `
         WITH matched AS (

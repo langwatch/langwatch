@@ -1,10 +1,5 @@
 /**
  * @vitest-environment node
- *
- * The `/api/workflows/:id/evaluate` route: it delegates the whole decision to
- * the injected `triggerEvaluation` port and renders whatever outcome comes
- * back, so these tests assert the transport's mapping, not the evaluations
- * pipeline itself.
  */
 import {
   createAppRestSecurity,
