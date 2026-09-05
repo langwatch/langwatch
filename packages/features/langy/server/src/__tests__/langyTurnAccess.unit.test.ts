@@ -1,12 +1,5 @@
 /**
  * @vitest-environment node
- *
- * The synchronous gate that lets Stream B actually run.
- *
- * Stream B gated on an asynchronous projection, but the browser subscribes the
- * instant it reads the turn-id header. On the first turn the projection could be
- * absent and the gate would 404. This record is written synchronously in the
- * POST, so the answer is there when the browser asks.
  */
 import { describe, expect, it } from "vitest";
 import { LangyTurnAccessAdapter } from "@langwatch/langy-server";

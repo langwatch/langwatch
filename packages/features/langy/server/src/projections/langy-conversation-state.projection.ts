@@ -1,10 +1,7 @@
 /**
- * The `langy_conversation` aggregate: its full durable event schemas and the
- * fold that projects them into conversation state.
- *
- * The schemas are the server's branded envelope closed over each event's
+ * The `langy_conversation` aggregate: its full durable event schemas and the fold that projects
+ * them into conversation state.
  * payload schema, which lives in `@langwatch/langy-contract` (ADR-059). They
- * sit beside the fold that consumes them, the way the identity aggregate's do.
  */
 import type { Projection, StateProjectionStore } from "@langwatch/eventing";
 import { AbstractFoldProjection, EventSchema, type FoldEventHandlers } from "@langwatch/eventing";

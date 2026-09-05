@@ -14,10 +14,9 @@ export const langyTurnAccessSchema = z
 export type LangyTurnAccess = z.infer<typeof langyTurnAccessSchema>;
 
 /**
- * Who is allowed to watch a turn stream, for the window the turn is live.
- *
- * A seam because the answer has to survive one process asking about a turn
- * another process started, which is what makes it stored rather than derived.
+ * Who is allowed to watch a turn stream, for the window the turn is live. A seam because the
+ * answer has to survive one process asking about a turn another process started, which is what
+ * makes it stored rather than derived.
  */
 export abstract class LangyTurnAccessPort {
   /** Records the actor this turn belongs to. */

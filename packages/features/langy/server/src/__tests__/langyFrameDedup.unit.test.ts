@@ -1,8 +1,5 @@
 /**
- * The frameNonce dedup is the relay's intra-turn replay guard. These drive it
- * against an in-memory Redis SET fake to lock the contract: a nonce is fresh
- * exactly once, per (conversation, turn), and the TTL is only (re)armed on a
- * genuine insert so a duplicate can never extend the window.
+ * The frameNonce dedup is the relay's intra-turn replay guard.
  */
 import { describe, expect, it, vi } from "vitest";
 import { LangyFrameDedupAdapter, type LangyFrameDedupRedis } from "@langwatch/langy-server";

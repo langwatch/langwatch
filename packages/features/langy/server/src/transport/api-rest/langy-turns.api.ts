@@ -1,16 +1,6 @@
 /**
- * Public project-API-key turn surface. Refusal order is credential (401),
- * per-project rollout (dark 404), ceiling and Langy access (403), then the
- * composed Langy application. The rollout check must follow credential
- * resolution and precede the ceiling: it is evaluated for that key's project
- * and a dark route cannot reveal itself with a 403. That chain is
- * {@link resolveLangyRestCaller}, shared with the UI-action surface.
- *
- * The dark branch must stay `c.notFound()` — see the chain's docblock for why
- * a handled 404 would be a leak.
- *
- * `Prefer: wait=<seconds>` waits for the durable fold and returns the same turn
- * result with terminal fields; expiry preserves the normal 202 response.
+ * Public project-API-key turn surface. Refusal order is credential (401), per-project rollout
+ * (dark 404), ceiling and Langy access (403), then the composed Langy application.
  */
 
 import { handlerManagedAuth } from "@langwatch/api";
@@ -35,10 +25,7 @@ const AUTH_REASON =
   "project API key resolved by the process's credential port and checked against the API-key ceiling, then bridged to an owning user by resolveLangyKeyIdentity";
 
 /**
- * A turn is text plus small structured parts, never an upload. The cap is well
- * above any real conversation and well below what would let an authenticated
- * key buffer the process into trouble; the service builder applies no limit of
- * its own, so a route that reads a body has to declare one.
+ * A turn is text plus small structured parts, never an upload.
  */
 const MAX_TURN_BODY_BYTES = 1024 * 1024;
 
@@ -67,12 +54,9 @@ export type LangyTurnsRestPorts = LangyRestCredentialPorts &
   }>;
 
 /**
- * One user turn on the wire. Parts stay opaque; the app layer bounds them.
- *
- * `content` is the plain-text shorthand a generic HTTP client (a script, a
- * scenario HTTP agent's body template) can produce without restructuring its
- * own message shape; it normalizes to a single text part. When both are sent,
- * `parts` wins — it is the richer form.
+ * One user turn on the wire. Parts stay opaque; the app layer bounds them. `content` is the
+ * plain-text shorthand a generic HTTP client (a script, a scenario HTTP agent's body template)
+ * can produce without restructuring its own message shape; it normalizes to a single text part.
  */
 const messageSchema = z
   .object({
@@ -90,25 +74,15 @@ const turnBodySchema = z.object({
   idempotencyKey: z.string().min(1),
   modelOverride: z.string().min(1).optional(),
   /**
-   * Adopt the path's conversation id as a NEW conversation when it does not
-   * exist yet, instead of minting a fresh one. This is how a caller that keys
-   * continuity on an externally-chosen id — a scenario run POSTing every turn
-   * to `/conversations/{{ threadId }}/messages` — gets one stable conversation
-   * across turns: turn 1 adopts the id, turns 2+ find it owned and resume with
-   * the durable history. Without it, an unknown id silently yields a fresh
-   * conversation per turn, which degrades every multi-turn run to single-turn
-   * (#7187). Only meaningful on the `/:conversationId/messages` route.
+   * Adopt the path's conversation id as a NEW conversation when it does not exist yet, instead
+   * of minting a fresh one.
    */
   adoptConversationId: z.boolean().optional(),
 });
 
 /**
- * `Prefer: wait=<seconds>` (RFC 7240) opts a caller into synchronous delivery:
- * the request is held until the turn settles and the assistant's reply comes
- * back in the body. The ceiling exists because this connection crosses an
- * ingress with its own idle timeout; a caller asking for more simply gets the
- * ceiling (RFC 7240 §3: a preference is not a contract), and on expiry the
- * response degrades to the exact 202 the async path returns.
+ * `Prefer: wait=<seconds>` (RFC 7240) opts a caller into synchronous delivery: the request is
+ * held until the turn settles and the assistant's reply comes back in the body.
  */
 const MAX_WAIT_SECONDS = 120;
 
@@ -122,11 +96,7 @@ function requestedWaitSeconds(c: Context): number | null {
 }
 
 /**
- * Parse and validate a turn request body. Throws `LangyApiRequestInvalidError`
- * on malformed JSON, schema mismatch, or `adoptConversationId` without an id
- * in the path — adoption without a path id is a caller mistake, and the silent
- * reading (ignore the flag, mint fresh) is exactly the ghost-conversation
- * failure the flag exists to prevent.
+ * Parse and validate a turn request body.
  */
 async function parseTurnBody(c: Context, conversationId: string | null) {
   const parsed = turnBodySchema.safeParse(await c.req.json().catch(() => null));
@@ -155,12 +125,7 @@ export function createLangyTurnsRestApp(options: {
   });
 
   /**
-   * Start or continue a turn.
-   *
-   * Nothing is caught. A domain `HandledError` already carries the status, code
-   * and fault the app layer decided on, and anything unhandled is a platform
-   * fault the shared handler logs and masks behind a trace id — re-classifying
-   * either one here could only lose information.
+   * Start or continue a turn. Nothing is caught.
    */
   const startTurn = async ({
     c,

@@ -31,10 +31,6 @@ import { LangyFeedbackPromptPolicy } from "../ports/langy-feedback-prompt.port";
 
 /**
  * How this process opens a relay connection for a conversation runtime.
- *
- * A callback rather than the relay's own options because the relay is a Redis
- * adapter: which connection it rides and how it is configured is the composing
- * process's business, and this service only decides WHEN one is opened.
  */
 export type OpenLangyRelay = (conversations: LangyService) => LangyRelayConnection;
 

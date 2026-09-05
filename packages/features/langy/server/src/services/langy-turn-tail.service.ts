@@ -61,11 +61,9 @@ export class LangyTurnTailService {
   private constructor() {}
 
   /**
-   * Polls the turn's durable fold + per-turn heartbeat while its live edge is
-   * tailed, and resolves to what should end the tail — or null if the stream
-   * ended first (aborted) or the turn is still going. The two gates live in
-   * `decideSyntheticTerminal` and `shouldAbandonWedgedTurn`; both want the same
-   * reading confirmed over several polls, so one blip can never end a stream.
+   * Polls the turn's durable fold + per-turn heartbeat while its live edge is tailed, and
+   * resolves to what should end the tail — or null if the stream ended first (aborted) or the
+   * turn is still going.
    */
   async watchForMissedTerminal({
     readHealth,
@@ -135,15 +133,9 @@ export class LangyTurnTailService {
   }
 
   /**
-   * The live edge from `fromId` on, ending when the turn ends, the reader goes
-   * away, or the turn is given up for wedged.
-   *
-   * A refresh mid-turn can miss the worker's terminal frame (its relay connection
-   * dropped before it). follow() would then block until the reader goes away,
-   * leaving the UI on the startup status for minutes though the turn already
-   * finished. So while the live edge is tailed, the durable fold + per-turn
-   * heartbeat are watched too; if the turn has settled with no terminal in the
-   * buffer, one is synthesized so the client resolves.
+   * The live edge from `fromId` on, ending when the turn ends, the reader goes away, or the
+   * turn is given up for wedged. A refresh mid-turn can miss the worker's terminal frame (its
+   * relay connection dropped before it).
    */
   private async *followLiveEdge({
     fromId,

@@ -1,20 +1,7 @@
 /**
- * Langy token buffer — the short-lived Redis transport for a turn's live edge
- * (ADR-044 part 3).
- *
- * Durability split: TOKENS and transient progress ticks live ONLY here (a Redis
- * Stream with a TTL); they NEVER become durable events. Milestones and the
- * final answer are durable events on the `langy_conversation` aggregate.
- *
- * Why a Redis Stream (not List + pub/sub): one primitive gives ordered ids +
- * gap-free replay (`XRANGE`) + a live blocking read (`XREAD BLOCK`), so a chunk
- * emitted between "replay the tail" and "attach live" is never lost — the
- * pub/sub race the plan calls out. The reader captures the last-seen id from the
- * tail replay and blocks from there.
- *
- * The heartbeat key (`langy:hb:{conv}:{turn}`) is a separate TTL key: a live
- * worker refreshes it; a dead pod's key lapses. Authoritative liveness is the
- * TTL, not the event log (ADR-044 part 2).
+ * Langy token buffer: the short-lived Redis transport for a turn's live edge
+ * (ADR-044 part 3). Tokens and progress ticks live only here, never as
+ * durable events (ADR-044 part 2).
  */
 
 import {
@@ -60,9 +47,8 @@ export class LangyTokenBufferAdapter extends LangyTokenBufferPort {
   private readonly firstFlushDone = new Set<string>();
   /**
    * Turns that emitted at least one delta with a non-whitespace character.
-   * Separate from `firstFlushDone` because a delta of pure whitespace still
-   * has to be buffered (it is the space between two words) while leaving the
-   * panel with nothing the user can read.
+   * Separate from `firstFlushDone`: a whitespace-only delta still must be
+   * buffered, though it leaves nothing for the panel to show.
    */
   private readonly sawVisibleText = new Set<string>();
   /** Per-turn time-arm timers: flush pending text FLUSH_AFTER_MS after the first pending token. */
@@ -117,16 +103,8 @@ export class LangyTokenBufferAdapter extends LangyTokenBufferPort {
   }
 
   /**
-   * Buffer a token delta, flushed on a HYBRID policy:
-   *
-   *   - the very FIRST delta of a turn flushes immediately — time-to-first-token
-   *     is the number the user feels, and nothing may sit invisible;
-   *   - then: flush once ~CHUNK_TOKENS words accumulate (the size arm, bounds
-   *     XADD volume on a fast stream) OR ~FLUSH_AFTER_MS after the first
-   *     pending token (the time arm, so a slow stream still types live).
-   *
-   * The old size-only policy meant NOTHING rendered until 64 words had
-   * accumulated — a short answer appeared all at once as the turn ended.
+   * Buffers a token delta with a hybrid flush policy: the first delta of a
+   * turn flushes immediately, then flushes on a size or time threshold.
    * Call `flush` at end-of-turn to drain the tail.
    */
   async appendChunk({
@@ -207,12 +185,9 @@ export class LangyTokenBufferAdapter extends LangyTokenBufferPort {
   }
 
   /**
-   * Ephemeral run of the model's reasoning (thinking). Live edge ONLY — it is
-   * never flushed to the durable final and never survives a reload; the browser
-   * shows it while it streams and drops it when the turn settles. Providers can
-   * emit reasoning one token at a time, so coalesce it on the same short cadence
-   * as visible answer text. That avoids rerendering the entire panel per token
-   * without making the thinking indicator feel delayed.
+   * Ephemeral run of the model's reasoning (thinking): live-edge only, never
+   * flushed to the durable final and never surviving a reload. Providers emit
+   * it one token at a time, so coalesce it on the same cadence as answer text.
    */
   async appendReasoning({
     conversationId,
@@ -256,11 +231,9 @@ export class LangyTokenBufferAdapter extends LangyTokenBufferPort {
   }
 
   /**
-   * Mirror a plan snapshot onto the live stream so an attached client renders
-   * the checklist immediately. A whole-list snapshot per call (last wins). The
-   * durable `plan_updated` event is dispatched separately; this is best-effort
-   * live UI. Flushes buffered tokens first so the checklist lands after the
-   * prose that preceded it, in order.
+   * Mirrors a plan snapshot onto the live stream (whole-list, last wins);
+   * the durable `plan_updated` event is dispatched separately. Flushes
+   * buffered tokens first so the checklist lands in order.
    */
   async appendPlan({
     conversationId,
@@ -330,14 +303,9 @@ export class LangyTokenBufferAdapter extends LangyTokenBufferPort {
   }
 
   /**
-   * Push a live-only navigate instruction. `href` must already be a
-   * same-app relative path — the caller (LangyTurnRelayAdapter) resolves it from a
-   * platform-computed link before ever calling this, so nothing agent-authored
-   * reaches the stream. No durable event is ever written for this: a navigate
-   * fires at most once, on the live edge, and reopening a past conversation
-   * (the durable fold) can never replay it. Buffered tokens are flushed first,
-   * so the line that says where the agent is going arrives before the page
-   * moves there.
+   * Pushes a live-only navigate instruction; `href` is already resolved to a
+   * same-app path by the caller. Fires at most once on the live edge, never
+   * as a durable event, flushing buffered tokens first.
    */
   async appendNavigate({
     conversationId,
@@ -353,17 +321,9 @@ export class LangyTokenBufferAdapter extends LangyTokenBufferPort {
   }
 
   /**
-   * Push a live-only UI action for the attached page to claim and execute.
-   * The caller (the UI-action service) has already validated `kind` against
-   * the page manifest and `payload` against that kind's schema, and pinned the
-   * action to this conversation + turn in Redis; nothing agent-authored
-   * reaches the stream unvalidated. No durable event is ever written: like
-   * `navigate`, an action fires at most once, on the live edge.
-   *
-   * Buffered tokens are flushed first, as `appendPlan` and `appendTool` do.
-   * The agent says what it is about to do and then does it, so the page has to
-   * receive those words before the change they announce. Without the flush a
-   * column can appear while the line explaining it is still in the buffer.
+   * Pushes a live-only UI action for the attached page to claim and execute;
+   * the caller has already validated `kind`, `payload`, and pinned the
+   * action to this turn. Fires at most once, never as a durable event.
    */
   async appendUiAction({
     conversationId,
@@ -388,10 +348,9 @@ export class LangyTokenBufferAdapter extends LangyTokenBufferPort {
   }
 
   /**
-   * Mirror a tool-call transition onto the live stream. `phase:"start"` when the
-   * agent invokes a tool (name + input known), `phase:"end"` when it returns
-   * (`output` + `isError`). Flushes any buffered tokens first so the card lands
-   * after the prose that preceded it, in order.
+   * Mirrors a tool-call transition onto the live stream: `phase:"start"` on
+   * invoke, `phase:"end"` on return. Flushes buffered tokens first so the
+   * card lands after the prose that preceded it.
    */
   async appendTool({
     conversationId,
@@ -435,13 +394,8 @@ export class LangyTokenBufferAdapter extends LangyTokenBufferPort {
 
   /**
    * Terminal marker: the live stream is over. Flushes buffered tokens first.
-   *
-   * `backstopSilentTurn` asks for the empty-turn fallback line, and only a
-   * genuinely completed turn may ask. A user Stop and an ADR-048 handoff both
-   * end the stream too, and neither is a turn that finished without writing a
-   * reply: Stop usually lands on a real partial answer, and a handoff is
-   * re-driven on a fresh worker. Telling either one "I finished this turn
-   * without writing a reply" is wrong on both halves of the sentence.
+   * `backstopSilentTurn` asks for the empty-turn fallback line, which only a
+   * genuinely completed turn (never a Stop or an ADR-048 handoff) may ask.
    */
   async markEnd({
     conversationId,
@@ -477,12 +431,8 @@ export class LangyTokenBufferAdapter extends LangyTokenBufferPort {
 
   /**
    * Did this turn already write something the user can read?
-   *
-   * `sawVisibleText` is in-memory and a buffer is built per relay request, so a
-   * worker that reconnects mid-turn ends the stream on an instance that never
-   * saw the earlier deltas. The stream is the durable record of what the user
-   * got, so it decides. Only reached when instance memory says nothing was
-   * written, which is the rare case, so the normal path pays no read.
+   * `sawVisibleText` is in-memory per relay request, so a reconnecting
+   * worker may never have seen earlier deltas; the durable stream decides.
    */
   private async streamCarriesVisibleText({
     conversationId,
@@ -555,10 +505,9 @@ export class LangyTokenBufferAdapter extends LangyTokenBufferPort {
   }
 
   /**
-   * Async iterator over the live edge from `fromId`, ending after the terminal
-   * (`end`/`error`) entry is delivered. Each `XREAD BLOCK` waits up to
-   * FOLLOW_BLOCK_MS then re-checks, so a caller can bound total wait / observe
-   * an aborted signal between blocks.
+   * Async iterator over the live edge from `fromId`, ending after the
+   * terminal entry is delivered. Each `XREAD BLOCK` waits up to
+   * FOLLOW_BLOCK_MS then re-checks, so a caller can bound total wait.
    */
   async *follow({
     conversationId,

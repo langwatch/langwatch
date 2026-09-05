@@ -1,29 +1,6 @@
 /**
- * The Langy feature's application: what its doors call.
- *
- * It holds every service and process capability the feature's api files reach,
- * and it is the one typed thing a transport is given. Before it, the
- * conversation door declared `Readonly<{ langy; redis; broadcast }>` and the
- * egress door declared `Readonly<{ langy }>` — two descriptions of the same
- * composition, agreeing by attention rather than by construction, and neither
- * reachable from the other.
- *
- * Most operations are `LangyService`'s own, delegated straight through. What
- * lives here as a rule of its own is what a door would otherwise have to
- * decide for itself:
- *
- *   - who may watch a turn's live stream, which reads the Redis turn-access
- *     record AND the durable visibility rule and must never widen either;
- *   - whether the caller can see a conversation at all before a side effect is
- *     attributed to it — three handlers ran that check for themselves;
- *   - the turn-start operation create and continue share, including the
- *     `requestId` wire alias, which is one rule two procedures used;
- *   - that a null egress allow-list means monitor-only, which both egress
- *     procedures shaped separately.
- *
- * A caller arrives as an argument, never read from a session or a request.
- * That is what lets one operation serve a browser session, an API key and a
- * background job without knowing which it is serving.
+ * The Langy feature's application: what its doors call. It holds every service and process
+ * capability the feature's api files reach, and it is the one typed thing a transport is given.
  */
 import { HandledError, ValidationError } from "@langwatch/handled-error";
 import {
@@ -64,17 +41,9 @@ export type LangyBroadcast = Readonly<{
 }>;
 
 /**
- * No credential session behind an otherwise authenticated caller.
- *
- * A turn mints this user's worker credentials from the session, so refusing is
- * the only safe answer: a session synthesized from the actor id alone would
- * provision credentials under an incomplete user. `unauthorized` rather than a
- * Langy-specific code because the cause and the remedy are the platform's own
- * — the registry's copy for it already says "you're not signed in, sign in
- * again", which is exactly the action available. 401, which is the status the
- * bare `TRPCError({ code: "UNAUTHORIZED" })` this replaces already answered;
- * what changes is that the refusal now arrives with `data.error` populated,
- * so the client's explainer can tell it from an internal crash.
+ * No credential session behind an otherwise authenticated caller. A turn mints this user's
+ * worker credentials from the session, so refusing is the only safe answer: a session
+ * synthesized from the actor id alone would provision credentials under an incomplete user.
  */
 export class LangySessionRequiredError extends HandledError {
   declare readonly code: "unauthorized";
@@ -132,17 +101,8 @@ export class LangyApp {
   private constructor(private readonly dependencies: LangyAppDependencies) {}
 
   /**
-   * The service itself, for the paths that are not a Langy door.
-   *
-   * Everything below serves a person looking at a conversation. These do not:
-   * the worker posts its turn result back over `/api/internal/langy`
-   * (`turnExists`, `ingestAgentTurnResult`, `revokeWorkerSessionKey`), the
-   * frame relay opens a long-lived ndjson connection (`openRelayConnection`),
-   * and the wait path on the public HTTP turn API takes a `LangyService` as a
-   * parameter. Each runs against a worker session key rather than a person, so
-   * modelling them here would put the agent's own callbacks in the same surface
-   * as the panel's reads. Until they move, this getter is the seam that
-   * remains — the same one `WorkflowApp.workflowService` keeps.
+   * The service itself, for the paths that are not a Langy door. Everything below serves a
+   * person looking at a conversation.
    */
   get langyService(): LangyService {
     return this.dependencies.langy;
@@ -172,11 +132,9 @@ export class LangyApp {
   }
 
   /**
-   * The conversation, or null when it is not visible to this caller.
-   *
-   * Absence is a real answer here: a freshness poll of a just-started
-   * conversation runs before its fold is projected, so the throwing form would
-   * fail every first turn.
+   * The conversation, or null when it is not visible to this caller. Absence is a real answer
+   * here: a freshness poll of a just-started conversation runs before its fold is projected, so
+   * the throwing form would fail every first turn.
    */
   tryFindVisible(input: {
     id: string;
@@ -187,12 +145,9 @@ export class LangyApp {
   }
 
   /**
-   * Whether this caller may attribute a side effect to this conversation.
-   *
-   * Lifted out of `claimUiAction`, `recordFeedback` and `feedbackPromptShown`,
-   * which each ran the same visible-read and each decided for themselves what
-   * absence meant. It is one rule — never act on a conversation id the caller
-   * cannot see — and three copies of it is three chances to widen it.
+   * Whether this caller may attribute a side effect to this conversation. Lifted out of
+   * `claimUiAction`, `recordFeedback` and `feedbackPromptShown`, which each ran the same
+   * visible-read and each decided for themselves what absence meant.
    */
   async isVisibleToCaller(input: {
     id: string;
@@ -247,14 +202,9 @@ export class LangyApp {
   }
 
   /**
-   * Renames a conversation the caller owns.
-   *
-   * The service already raises the same typed not-found for "no such
-   * conversation" and "not yours" (deliberately indistinguishable), so the
-   * null branch is unreachable in practice. It stays because the service's
-   * declared return permits null and a silent `undefined` would be worse than
-   * a redundant refusal — and it lives here so one door cannot keep it while
-   * another forgets it.
+   * Renames a conversation the caller owns. The service already raises the same typed not-found
+   * for "no such conversation" and "not yours" (deliberately indistinguishable), so the null
+   * branch is unreachable in practice.
    */
   async renameConversation(input: {
     id: string;
@@ -288,15 +238,9 @@ export class LangyApp {
   }
 
   /**
-   * Starts a turn for the caller's session.
-   *
-   * Create and continue are the SAME operation — `adoptConversationId` is the
-   * only difference, and it is what lets a first message land on the
-   * conversation a panel-open warm already booted a worker for. Both
-   * procedures used to call one module-private helper here; putting it on the
-   * application is what stops a second door writing a second copy of the
-   * `requestId` alias rule, whose whole job is to keep pre-rename client
-   * bundles working.
+   * Starts a turn for the caller's session. Create and continue are the SAME operation —
+   * `adoptConversationId` is the only difference, and it is what lets a first message land on
+   * the conversation a panel-open warm already booted a worker for.
    */
   startTurn(
     input: LangyTurnRequest,
@@ -339,11 +283,9 @@ export class LangyApp {
   // -- the project's egress allow-list ---------------------------------------
 
   /**
-   * The project's egress allow-list and whether it is enforced.
-   *
-   * `null` from the service means monitor-only — watch, never block. Both
-   * egress procedures translated that null for themselves, which is one rule
-   * written twice about a network policy.
+   * The project's egress allow-list and whether it is enforced. `null` from the service means
+   * monitor-only — watch, never block. Both egress procedures translated that null for
+   * themselves, which is one rule written twice about a network policy.
    */
   async egressAllowlist(input: { projectId: string }): Promise<LangyEgressState> {
     return toEgressState(await this.dependencies.langy.tryGetEgressAllowlist(input));
@@ -371,13 +313,6 @@ export class LangyApp {
 
   /**
    * May this caller watch this turn's live stream?
-   *
-   * The fast path confirms the turn's own actor from the synchronously-written
-   * turn-access record, so a just-started turn does not report not-found
-   * before its fold is projected; otherwise it falls back to the durable
-   * visibility rule (owner or shared). It never widens access — and it reads
-   * BOTH the Redis record and the service, which is exactly why no door should
-   * hold the two halves itself.
    */
   async canWatchTurn(input: {
     projectId: string;
@@ -402,10 +337,9 @@ export class LangyApp {
   }
 
   /**
-   * The durable token buffer for one turn, with its own blocking connection.
-   *
-   * Null when the deployment has no Redis: there is then no live buffer and
-   * the client falls back to the Postgres conversation/message read.
+   * The durable token buffer for one turn, with its own blocking connection. Null when the
+   * deployment has no Redis: there is then no live buffer and the client falls back to the
+   * Postgres conversation/message read.
    */
   tryOpenTurnStream(): LangyTurnStream | null {
     const connection = this.dependencies.redis;
@@ -418,13 +352,9 @@ export class LangyApp {
   }
 
   /**
-   * Polls the durable fold and the per-turn heartbeat while the live edge is
-   * tailed, and answers with the terminal to synthesize once the turn has
-   * settled without one — or null if it never does.
-   *
-   * A refresh mid-turn can miss the worker's terminal frame, and the follow
-   * would then block until the hard per-turn deadline while the UI sits on a
-   * startup status for minutes though the turn already finished.
+   * Polls the durable fold and the per-turn heartbeat while the live edge is tailed, and
+   * answers with the terminal to synthesize once the turn has settled without one — or null if
+   * it never does.
    */
   async watchForMissedTerminal(input: {
     projectId: string;

@@ -57,11 +57,7 @@ class NoopAuthService extends AuthService {
 }
 
 /**
- * The operator delete path against a live Redis. The point under test is the
- * lease guard: it lives inside the delete script, so a job that acquires a
- * reference between "is it referenced?" and "delete it" is refused by the same
- * eval that would have removed the blob — the check-then-act race a Node-side
- * guard would leave open.
+ * The operator delete path against a live Redis.
  */
 describe.skipIf(!hasRedis)("Ops blob store delete", () => {
   let redis: RedisClient;

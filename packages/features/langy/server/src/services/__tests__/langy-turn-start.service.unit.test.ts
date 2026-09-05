@@ -1,9 +1,7 @@
 /**
- * LangyTurnStartService owns admission: it claims the durable slot before any
- * preparation work runs, and rejects fast on a busy/mismatched/replayed claim
- * or an unconfigured model — before ever touching the worker, session keys,
- * or the acceptance command. Exercised through the public LangyTurnService
- * facade, since the collaborator itself has no public surface of its own.
+ * LangyTurnStartService owns admission: it claims the durable slot before any preparation work
+ * runs, and rejects fast on a busy/mismatched/replayed claim or an unconfigured model — before
+ * ever touching the worker, session keys, or the acceptance command.
  */
 import {
   LangyEmptyMessageError,

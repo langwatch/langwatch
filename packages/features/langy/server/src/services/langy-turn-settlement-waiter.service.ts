@@ -30,11 +30,9 @@ export type LangyTurnSettlementReader = {
 };
 
 /**
- * One turn's live edge, opened by the caller.
- *
- * Handed in rather than built here: the buffer is a Redis adapter, and which
- * connection it duplicates for its blocking read is the composing process's
- * business, not this waiter's. `release` gives that connection back.
+ * One turn's live edge, opened by the caller. Handed in rather than built here: the buffer is a
+ * Redis adapter, and which connection it duplicates for its blocking read is the composing
+ * process's business, not this waiter's. `release` gives that connection back.
  */
 export type LangyTurnBufferWatch = { buffer: LangyTokenBufferPort; release: () => void };
 export type OpenLangyTurnBuffer = () => LangyTurnBufferWatch | null;

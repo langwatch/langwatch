@@ -1,19 +1,5 @@
 /**
- * Internal Langy control-plane endpoints — the Go agent's OUTBOUND calls back
- * to the app. Mounted at `/api/internal/langy`, protected by the shared bearer
- * secret `LANGY_INTERNAL_SECRET` (the same secret the control plane presents to
- * the agent on its `/worker/*` turn endpoints). Never expose publicly — the Helm chart
- * blocks `/api/internal` at the ingress by default, and in-cluster callers reach
- * the app through its internal Service rather than the ingress.
- *
- * This is the durable half of the turn lifecycle (see
- * specs/langy/langy-turn-lifecycle.md): the agent posts its final result here
- * over HTTP, independently of the best-effort NDJSON relay, so a completed turn
- * survives the relay dropping mid-stream. Ingest is idempotent on `turnId`.
- *
- * It also hosts `credentials/revoke`, moved here from the public `/api/langy`
- * surface — the Go revoker already dials `/api/internal/langy/credentials/revoke`,
- * so the old registration was a latent path mismatch (a 404 the agent swallowed).
+ * Internal Langy control-plane endpoints — the Go agent's OUTBOUND calls back to the app.
  */
 
 import { internalSecret, isInternalSecretValid } from "@langwatch/api";
@@ -29,12 +15,9 @@ import type { LangyApp } from "#app/langy.app";
 const logger = createLogger("langwatch:langy:internal");
 
 /**
- * The counters the durable half publishes.
- *
- * A port because a metric registry is process-wide state a feature package may
- * not own: two registries would give one deployment two answers for the same
- * rate. A process that keeps none passes a no-op and loses the graph, not the
- * behaviour.
+ * The counters the durable half publishes. A port because a metric registry is process-wide
+ * state a feature package may not own: two registries would give one deployment two answers for
+ * the same rate.
  */
 export type LangyInternalMetricsPort = Readonly<{
   /** One completed or failed turn, by outcome. */
@@ -48,21 +31,17 @@ export type LangyInternalRestPorts = Readonly<{
   /** The SAME application every other Langy door reads. */
   langy: () => LangyApp;
   /**
-   * The shared bearer this surface is gated on, or none.
-   *
-   * A function rather than a value: the deployment may configure it after the
-   * family is built, and an unset secret must answer 503 rather than let the
-   * gate fall open.
+   * The shared bearer this surface is gated on, or none. A function rather than a value: the
+   * deployment may configure it after the family is built, and an unset secret must answer 503
+   * rather than let the gate fall open.
    */
   internalSecret: () => string | undefined;
   metrics: LangyInternalMetricsPort;
 }>;
 
 /**
- * Constant-time bearer check against the shared manager secret, applied as the
- * builder chain for every route (uniform with gateway-internal's verifySecret).
- * A plain `===` leaks the secret one byte at a time to anything that can time
- * our responses, and this surface is reachable from inside the cluster.
+ * Constant-time bearer check against the shared manager secret, applied as the builder chain
+ * for every route (uniform with gateway-internal's verifySecret).
  */
 export function verifyLangyInternalSecret(secretOf: () => string | undefined): MiddlewareHandler {
   return async (c: Context, next: Next) => {
@@ -143,10 +122,9 @@ export function createLangyInternalRestApp(options: {
   });
 
   /**
-   * The agent's durable final for a turn. Idempotent on `turnId`: re-posting the
-   * same final (the agent's bounded retry, or a final the relay already recorded)
-   * collapses to one event at the store. Returns 202 either way — accepted, and
-   * the event log is the source of truth for whether it changed anything.
+   * The agent's durable final for a turn. Idempotent on `turnId`: re-posting the same final
+   * (the agent's bounded retry, or a final the relay already recorded) collapses to one event
+   * at the store.
    */
   secured.access(langyInternalPolicy()).post("/turn/:turnId/result", async (c) => {
     const turnId = c.req.param("turnId");
@@ -162,14 +140,11 @@ export function createLangyInternalRestApp(options: {
     }
     const body = parsed.data;
 
-    // Cross-check the triple before writing. `projectId`/`conversationId` are
-    // body fields the bearer alone would otherwise let through unverified — the
-    // sibling relay proves the same thing with an HMAC over the runToken, but
-    // this durable path has only the shared secret. A turn row exists only if
-    // the turn was really accepted under this conversation in this project, so
-    // this rejects a forged triple and a benign cross-tenant mix-up alike.
-    // 404 (not 4xx-with-detail) so a probe never confirms a cross-tenant id;
-    // the manager treats 4xx as terminal, so it will not retry-loop.
+    // Cross-check the triple before writing. `projectId`/`conversationId` are body fields the
+    // bearer alone would otherwise let through unverified — the sibling relay proves the same
+    // thing with an HMAC over the runToken, but this durable path has only the shared secret. A
+    // turn row exists only if the turn was really accepted under this conversation in this
+    // project, so this rejects a forged triple and a benign cross-tenant mix-up alike.
     const turnExists = await ports.langy().langyService.turnExists({
       projectId: body.projectId,
       conversationId: body.conversationId,
@@ -217,10 +192,9 @@ export function createLangyInternalRestApp(options: {
   // ── credentials/revoke (relocated from /api/langy) ────────────────────────
 
   /**
-   * The agent hands back a session-key handle on worker shutdown so the app can
-   * revoke it. The app can only revoke — never mint — keeping the trust boundary
-   * where it was. `revokeWorkerSessionKey` refuses any key that is not a Langy
-   * session key.
+   * The agent hands back a session-key handle on worker shutdown so the app can revoke it. The
+   * app can only revoke — never mint — keeping the trust boundary where it was.
+   * `revokeWorkerSessionKey` refuses any key that is not a Langy session key.
    */
   secured.access(langyInternalPolicy()).post("/credentials/revoke", async (c) => {
     const parsed = revokeCredentialsSchema.safeParse(await c.req.json().catch(() => null));

@@ -1,19 +1,7 @@
 /**
- * THE "run it" BUG. The agent's memory of a conversation lives only inside its
- * live worker process, and that process is reaped after ten idle minutes,
- * killed when the turn's capabilities change, and gone whenever the fleet
- * rolls. The control plane must not send a turn nothing but the latest user
- * sentence, or "run it" arrives with no "it" in sight.
- *
- * These pin the plumbing: the conversation's own history and any resource it
- * touched reach the dispatched turn, whatever the worker does or does not
- * remember.
- *
- * Ported from platform/app/src/server/app-layer/langy/__tests__/langy-turn.service.unit.test.ts
- * (origin/main)'s "when a follow-up turn depends on what an earlier turn
- * created" block, adapted to the split `LangyTurnServiceDeps` fixture (see
- * langy-turn-preparation.service.unit.test.ts). See
- * specs/langy/langy-conversation-memory.feature.
+ * THE "run it" BUG. The agent's memory of a conversation lives only inside its live worker
+ * process, and that process is reaped after ten idle minutes, killed when the turn's
+ * capabilities change, and gone whenever the fleet rolls.
  */
 import type { LangyMessageRow } from "@langwatch/langy-contract";
 import { describe, expect, it, vi } from "vitest";

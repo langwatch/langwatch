@@ -1,14 +1,5 @@
 /**
  * The token buffer's hybrid flush policy.
- *
- * The old policy was size-only: a `delta` entry reached the stream only once
- * ~64 words had accumulated, so nothing rendered until a turn was nearly over
- * (a short answer appeared in one burst at the end). The hybrid policy is:
- *
- *   - the very FIRST delta of a turn flushes immediately (time-to-first-token);
- *   - then flush on size (~CHUNK_TOKENS words) OR on time (~FLUSH_AFTER_MS
- *     after the first pending token), whichever comes first.
- *
  * @see specs/langy/langy-dual-stream.feature
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

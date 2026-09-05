@@ -14,13 +14,6 @@ import {
 
 /**
  * Spec: specs/langy/langy-worker-prewarm.feature
- *
- * The reads LangyTurnPreparationService gates behind `conversation.isNew` are
- * lag-tolerant: asked about a conversation whose projection cannot exist yet,
- * `tryFindByIdVisible` spends its whole handoff grace window before answering
- * "not found" — a flat delay in front of every first message. A brand new
- * conversation has no projection row by construction, so the preparation step
- * must skip both reads rather than pay that wait.
  */
 function makeFixture(over: Partial<LangyTurnServiceDeps> = {}) {
   const tryFindByIdVisible = vi.fn(async () => ({
@@ -121,10 +114,6 @@ describe("LangyTurnService.startConversationTurn", () => {
 
 /**
  * Spec: specs/langy/langy-ui-actions.feature
- *
- * The turn block advertises `langwatch ui actions` only while the dispatch
- * route would answer it. The real context renderer is used so the assertion
- * reads the prompt the worker is handed, not a call on a double.
  */
 describe("LangyTurnService.startConversationTurn ui-action surface", () => {
   describe("when the page the user is on accepts live UI actions", () => {
@@ -535,10 +524,8 @@ describe("LangyTurnPreparationService golden path", () => {
 });
 
 /**
- * The runToken is the HMAC key the worker signs every frame with, and the
- * relay verifies against. It must never degrade to a sentinel: an empty key
- * is publicly computable, and the relay maps "no token" to a rejection, so a
- * turn signed with "" emits nothing and never terminates — a silent hang.
+ * The runToken is the HMAC key the worker signs every frame with, and the relay verifies
+ * against.
  */
 describe("when the conversation's runToken cannot be resolved", () => {
   /** @scenario Langy reports the agent unavailable instead of hanging the turn */

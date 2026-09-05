@@ -1,15 +1,7 @@
 /**
- * The model a turn actually runs on: the project's configured default when
- * nothing overrides it, a per-send override that wins over it, and any
- * allowlisted provider's model dispatched with its full id (the engine is
- * provider-blind — no branch here may key on a provider name).
- *
- * Ported from platform/app/src/server/app-layer/langy/__tests__/langy-turn.service.unit.test.ts
- * (origin/main)'s `LangyTurnService.startConversationTurn` block, adapted to
- * the split `LangyTurnServiceDeps` (permits/sessionKeys/admission grouped,
- * `models.resolve` in place of the flat `resolveModel`), mirroring
- * langy-turn-preparation.service.unit.test.ts's fixture. See
- * specs/langy/langy-model-selection.feature.
+ * The model a turn actually runs on: the project's configured default when nothing overrides
+ * it, a per-send override that wins over it, and any allowlisted provider's model dispatched
+ * with its full id (the engine is provider-blind — no branch here may key on a provider name).
  */
 import { describe, expect, it, vi } from "vitest";
 import {

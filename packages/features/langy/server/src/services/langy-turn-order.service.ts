@@ -1,24 +1,6 @@
 /**
- * The order a turn actually happened in, read off its own live stream.
- *
- * A turn is a sequence: a paragraph, a call, another paragraph, another call.
- * The durable record used to keep none of that — every call first, then the
- * text the agent wrote after its LAST call — so a reader who refreshed got a
- * pile of cards and one closing paragraph, and the account of what happened in
- * between was gone. The agent was even told to hoard its text to the end
- * because of it.
- *
- * The stream already carries the true order: `delta` entries for the prose and
- * `tool` entries for the calls, in arrival order. This folds that into the
- * compact account `buildFinalAssistantParts` records:
- *
- *   - consecutive deltas become ONE text segment (the paragraph between calls);
- *   - a call is placed where it STARTED, which is where its card belongs and
- *     where the live panel already draws it. A result that lands after the
- *     agent has written more text does not move the card down past that text.
- *
- * Everything else on the stream — status, progress, reasoning, plan, navigate,
- * ui — is live-only signal and holds no place in the record.
+ * The order a turn actually happened in, read off its own live stream. A turn is a sequence: a
+ * paragraph, a call, another paragraph, another call.
  */
 import type { LangyStreamEntry } from "@langwatch/langy-contract";
 
@@ -26,11 +8,9 @@ import type { LangyStreamEntry } from "@langwatch/langy-contract";
 export type LangyTurnSegment = { kind: "text"; text: string } | { kind: "tool"; id: string };
 
 /**
- * Fold a turn's stream entries into its ordered account.
- *
- * A call is recorded once, at its first appearance: an `end` without a `start`
- * still takes a place (the harness may only report a completed call), but an
- * `end` that follows its own `start` does not take a second one.
+ * Fold a turn's stream entries into its ordered account. A call is recorded once, at its first
+ * appearance: an `end` without a `start` still takes a place (the harness may only report a
+ * completed call), but an `end` that follows its own `start` does not take a second one.
  */
 export class LangyTurnOrderService implements LangyTurnOrderReader {
   static create(buffer: LangyTurnStreamTail): LangyTurnOrderService {
@@ -85,10 +65,9 @@ export interface LangyTurnStreamTail {
 }
 
 /**
- * Reads a turn's ordered account. Injected into the conversation service so
- * BOTH finalize paths record the same shape: the relay's terminal frame and the
- * agent's own HTTP post race each other, the ingest keeps whichever lands
- * first, and a turn's order must not depend on who won.
+ * Reads a turn's ordered account. Injected into the conversation service so BOTH finalize paths
+ * record the same shape: the relay's terminal frame and the agent's own HTTP post race each
+ * other, the ingest keeps whichever lands first, and a turn's order must not depend on who won.
  */
 export interface LangyTurnOrderReader {
   readTurnOrder(a: { conversationId: string; turnId: string }): Promise<LangyTurnSegment[]>;

@@ -1,10 +1,7 @@
 /**
- * The resource-link store is Langy's per-CONVERSATION memory of which platform
- * address a lookup surfaced for a resource — the only thing a later
- * `langwatch navigate open <id>` may resolve an address from. These pin the
- * Redis shape choices: one hash per conversation (so conversations can never
- * read each other's links) and a TTL refreshed on every write (so an active
- * conversation's links never lapse mid-session).
+ * The resource-link store is Langy's per-CONVERSATION memory of which platform address a lookup
+ * surfaced for a resource — the only thing a later `langwatch navigate open <id>` may resolve
+ * an address from.
  */
 import { describe, expect, it, vi } from "vitest";
 import { LangyResourceLinksAdapter, type LangyLinkRedis } from "@langwatch/langy-server";
