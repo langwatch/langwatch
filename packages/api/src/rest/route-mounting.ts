@@ -7,6 +7,7 @@ import { buildEndpointMiddlewareStack, buildWithdrawnMiddlewareStack } from "./p
 import {
   mountFamilyRoute,
   mountOptionalVersionRoutes,
+  mountRoute,
   mountStaticVersionRoutes,
 } from "./public-rest-routing.js";
 import type { BaseApp, ServiceConfig, VersionStatus } from "./types.js";
@@ -16,6 +17,57 @@ import { canonicalV1Path } from "./v1-alias.js";
 
 type ProviderMap<TProject> = Record<string, (base: BaseApp<TProject>, context: Context) => unknown>;
 type ErrorHandler = NonNullable<ServiceConfig["onError"]>;
+
+/**
+ * Mounts the latest catalogue at the family's own paths and nothing else: no
+ * dated namespace, no alias, and no version guard — a family based at bare
+ * `/api` would claim `/api/:apiVersion{…}/*` and shadow every sibling.
+ */
+function mountBareRoutes<TProject>({
+  app,
+  basePath,
+  onError,
+  providers,
+  serviceConfig,
+  versionMap,
+}: {
+  app: Hono;
+  basePath: string;
+  onError: ErrorHandler;
+  providers: ProviderMap<TProject>;
+  serviceConfig: ServiceConfig;
+  versionMap: Map<string, ResolvedEndpoint[]>;
+}): void {
+  const latest = versionMap.get(VERSION_LATEST);
+  if (!latest) return;
+
+  for (const endpoint of latest) {
+    const method = endpoint.method === "sse" ? "get" : endpoint.method;
+    const path = endpoint.path || "/";
+    const status = "latest" as const;
+    const version = VERSION_LATEST;
+    const stack = endpoint.withdrawn
+      ? buildWithdrawnMiddlewareStack({ ep: endpoint, serviceConfig, status, version })
+      : buildEndpointMiddlewareStack({
+          ep: endpoint,
+          onError,
+          providers,
+          serviceConfig,
+          status,
+          version,
+        });
+    const absolute = mergePath(basePath, path);
+    mountRoute({ app, method, path: absolute, stack });
+    serviceConfig.onRouteMounted?.({
+      method,
+      path: absolute,
+      version,
+      status,
+      withdrawn: endpoint.withdrawn === true,
+      config: endpoint.config,
+    });
+  }
+}
 
 /**
  * Mounts every resolved version namespace, the bare alias, and the two
@@ -36,6 +88,11 @@ export function mountResolvedRoutes<TProject>({
   serviceConfig: ServiceConfig;
   versionMap: Map<string, ResolvedEndpoint[]>;
 }): void {
+  if (serviceConfig.bareMount) {
+    mountBareRoutes({ app, basePath, onError, providers, serviceConfig, versionMap });
+    return;
+  }
+
   if (serviceConfig.staticVersioning ?? serviceConfig.publicRest?.staticVersioning) {
     mountStaticVersionRoutes({
       app,

@@ -3,7 +3,7 @@
  * organization-exclusive permission is refused at team or project scope at
  * write time rather than silently never granting (ADR-021).
  */
-import type { EndpointVariables, ServiceContext } from "@langwatch/api/rest";
+import type { EndpointVariables, OrganizationScopedContext } from "@langwatch/api/rest";
 import {
   roleBindingScopeTypeSchema,
   teamUserRoleSchema,
@@ -11,18 +11,19 @@ import {
   type AuthzService,
 } from "@langwatch/authz-contract";
 import type { OrganizationLedgerActor } from "@langwatch/organization-contract";
-import type { Context, MiddlewareHandler } from "hono";
+import type { MiddlewareHandler } from "hono";
 import { z } from "zod";
 
 import {
   type AppRestSecurity,
   MANAGEMENT_API_VERSION,
   type MountableRestApp,
+  organizationOf,
 } from "@langwatch/api/rest";
 import { optimisticBindingWire } from "../../rules/role-binding-read-back.rules";
 
 /** The handler context: the framework's variables plus the family's provider. */
-type RoleBindingsContext = ServiceContext<
+type RoleBindingsContext = OrganizationScopedContext<
   EndpointVariables & { authz: AuthzService; grants: AuthzGrantsService }
 >;
 
@@ -121,14 +122,6 @@ const rowMatchesFilters = (row: OrgBindingRow, query: z.infer<typeof listQuerySc
   (query.scopeId === undefined || row.scopeId === query.scopeId);
 
 /**
- * The organization the request is scoped to, as this transport reads it.
- */
-type RequestOrganization = { id: string };
-
-const organizationOf = (c: Context): RequestOrganization =>
-  c.get("organization") as RequestOrganization;
-
-/**
  * The just-written binding as the list reports it, so a write's response is
  * byte-compatible with a later read — or null while the grants projection is still behind
  * the append that created it.
@@ -165,7 +158,7 @@ export function createRoleBindingsRestApp(options: {
   permissions: () => AuthzService;
   grants: () => AuthzGrantsService;
   /** Who a REST write is attributed to in the grants ledger (ADR-092). */
-  ledgerActor: (c: Context<any>) => OrganizationLedgerActor;
+  ledgerActor: (c: RoleBindingsContext) => OrganizationLedgerActor;
 }): MountableRestApp {
   const { security, enterpriseGate, permissions, grants, ledgerActor } = options;
 

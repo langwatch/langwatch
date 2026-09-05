@@ -397,6 +397,13 @@ export interface ServiceConfig<TApp = unknown> {
    * generation segment, so the routes answer exactly where they do today.
    */
   staticVersioning?: StaticRestVersioning;
+  /**
+   * Mount each route ONCE, at the family's own base path, with no version
+   * namespace of any kind. For the families based at bare `/api`, whose
+   * published URLs are their whole contract and which cannot take a version
+   * guard without shadowing every sibling mounted under the same prefix.
+   */
+  bareMount?: true;
   /** @internal Enables the additive `/api/v1/{service}` REST surface. */
   publicRest?: {
     versionHeader: string;

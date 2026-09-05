@@ -1,5 +1,4 @@
 import {
-  type AppRestProjectVariables,
   type AppRestSecurity,
   BadRequestError,
   createFamilyErrorHandler,
@@ -8,7 +7,8 @@ import {
   type MountableRestApp,
   NotFoundError,
   type PlatformUrlBuilder,
-  type ServiceContext,
+  type ProjectScopedContext,
+  projectOf,
 } from "@langwatch/api/rest";
 import {
   dashboardDeletedResponseSchema,
@@ -19,7 +19,6 @@ import {
   type DashboardSummary,
 } from "@langwatch/dashboard-contract";
 import { isZodLikeError, ValidationError } from "@langwatch/handled-error";
-import type { Context } from "hono";
 import { z } from "zod";
 import {
   DashboardNotThereError,
@@ -105,10 +104,7 @@ export function createDashboardsRestApp(options: {
       }),
   });
 
-  type DashboardContext = ServiceContext<EndpointVariables>;
-
-  const projectOf = (c: Context): AppRestProjectVariables["project"] =>
-    c.get("project") as AppRestProjectVariables["project"];
+  type DashboardContext = ProjectScopedContext<EndpointVariables>;
 
   const linkTo = (project: { slug: string }, dashboardId: string): string =>
     platformUrl({

@@ -5,7 +5,6 @@ import {
   MANAGEMENT_API_VERSION,
   type MountableRestApp,
   type PlatformUrlBuilder,
-  promoteSchemaFailures,
   resolver,
 } from "@langwatch/api/rest";
 import {
@@ -113,12 +112,10 @@ export function createTriggerRestApp(options: {
     // one-word body its callers already parse, and a request-schema failure,
     // which reaches the process's renderer as a bare zod-shaped error carrying
     // no status of its own.
-    errorHandler: (boundary) =>
-      promoteSchemaFailures((error, c) =>
-        error instanceof TriggerNotFoundError
-          ? c.json({ error: "Trigger not found" }, 404)
-          : boundary(error, c),
-      ),
+    errorHandler: (boundary) => (error, c) =>
+      error instanceof TriggerNotFoundError
+        ? c.json({ error: "Trigger not found" }, 404)
+        : boundary(error, c),
   });
 
   const automationDrawerPath = (triggerId: string) =>

@@ -123,6 +123,44 @@ on every answer. `registerAnyMethodRoute(path, version, handler, define)` mounts
 for every method, undocumented on purpose: a catch-all and a 405 method guard have no
 operation to publish.
 
+## A rejected request is a typed refusal, wherever it was raised
+
+The endpoint pipeline used to throw a bare zod-shaped error. Only `createErrorHandler`
+recognised it, so a family that installed an `errorHandler` of its own answered **500** for
+a request every other family answered 422 for. Two workarounds grew around that —
+`promoteSchemaFailures` in the package and `promoteZodError` in the api process — and both
+are gone: `requestValidationErrorFrom` raises the `RequestValidationError` at the point of
+rejection, so there is one refusal for a rejected request whatever raised it and whichever
+boundary is installed.
+
+## A family whose published paths are its whole contract
+
+`bareMount: true` mounts each route ONCE, at the family's own paths: no dated namespace, no
+`latest` alias, no `/api/v1` twin, and — the reason the mode exists — no version guard. Six
+families sit at bare `/api`; a guard there claims `/api/:apiVersion{…}/*` and shadows every
+sibling under the same prefix. The route registry names such a family for itself rather than
+for the shared prefix, which would have recorded all six as `api`.
+
+## Reading the scope, without a dependency on Hono
+
+`projectOf(c)` / `organizationOf(c)` on `@langwatch/api/rest`, plus the
+`ProjectScopedContext` / `OrganizationScopedContext` aliases and `RestErrorHandler`. They
+take a structural reader rather than a whole `ServiceContext`, because Hono's context is
+invariant in its variables map and a parameter naming one concrete map would refuse every
+family that added a provider of its own. They throw rather than answering `undefined` when
+the door did not run: a handler that read a missing project would query with a blank id,
+which widens the read rather than refusing it. `@langwatch/dashboard-server` dropped its
+`hono` dependency as a result.
+
+## A header that differs per answer — no new seam
+
+`c.header("Retry-After", …)` in the handler, then return the value as normal. The framework
+serialises through the same context the handler set it on, so the header survives and the
+declared output is still validated. `withHeaders(...)` remains the way to state the headers
+EVERY answer carries; `withRawResponse` + a whole `Response` is for an answer that is not
+JSON at all. Pinned by a test, so the cheapest of the three does not get replaced by a seam
+later.
+
 ## Still to build
 
 Nothing from the survey's twelve. What a family may still need beyond them: the better-auth

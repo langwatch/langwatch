@@ -574,6 +574,12 @@ export interface VersionedAppOptions {
    * ends in that segment, so its routes answer exactly where they do today.
    */
   staticGeneration?: string;
+  /**
+   * Mount each route ONCE, at the family's own paths, with no version
+   * namespace at all. For a family at bare `/api`, where a version guard would
+   * claim `/api/:apiVersion{…}/*` and shadow every sibling under the prefix.
+   */
+  bareMount?: true;
 }
 
 /**
@@ -674,7 +680,9 @@ function versionedFamily({
   verifySecret?: MiddlewareHandler;
 }): RestApiVersionedFamily {
   const { name, basePath, routeMiddleware = [] } = options;
-  const family = familyFromBasePath(basePath);
+  // A family based at bare `/api` derives no name from its path, and every one
+  // of them would land in the registry as `api`. Its own name is the answer.
+  const family = options.bareMount ? name : familyFromBasePath(basePath);
   const envelope: ApiErrorEnvelope = options.errorEnvelope ?? "canonical";
   const boundary = envelope === "legacy" ? ports.legacyErrorHandler : ports.canonicalErrorHandler;
   const onError = options.errorHandler ? options.errorHandler(boundary) : boundary;
@@ -701,6 +709,7 @@ function versionedFamily({
     basePath,
     middleware: [ports.appContext],
     ...(staticVersioning ? { staticVersioning } : {}),
+    ...(options.bareMount ? { bareMount: options.bareMount } : {}),
     ...(auth ? { auth } : {}),
     onError,
     ...(options.v1Alias === false ? { v1Alias: false } : {}),

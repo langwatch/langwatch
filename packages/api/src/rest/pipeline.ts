@@ -17,12 +17,7 @@ import {
   ProjectInputMismatchError,
   ScopeInputMismatchError,
 } from "../errors.js";
-import {
-  createApiSchemaError,
-  parseApiSchemaSync,
-  type ApiSchema,
-  type ApiSchemaIssue,
-} from "../schema.js";
+import { parseApiSchemaSync, type ApiSchema } from "../schema.js";
 import {
   appendPublicRestDocumentationValidators,
   parsePublicRestInput,
@@ -37,6 +32,7 @@ import {
   type IdempotentRunner,
 } from "./idempotency.js";
 import { serializeEndpointResult } from "./response.js";
+import { requestValidationErrorFrom } from "./validation.js";
 import { createSSEResponse } from "./sse.js";
 import { ENDPOINT_INPUT, ENDPOINT_ROUTE, REQUEST_FAMILY } from "./types.js";
 import type {
@@ -493,16 +489,15 @@ function appendValidationMiddleware({
     return;
   }
 
-  /**
-   * The validation failure, as the error the boundary knows how to answer with.
-   */
-  const asZodError = (error: unknown): unknown =>
-    Array.isArray(error) ? createApiSchemaError(error as ApiSchemaIssue[]) : error;
-
   const addValidator = (target: "param" | "query" | "json", schema: ApiSchema | undefined) => {
     if (!schema) return;
     const middleware = zValidator(target, schema, (result) => {
-      if (!result.success) throw asZodError(result.error);
+      // The typed refusal, raised here rather than left for a boundary to
+      // recognise: a family that installs an `onError` of its own must not
+      // answer 500 for a request every other family answers 422 for.
+      if (!result.success) {
+        throw requestValidationErrorFrom({ target, error: result.error, input: result.data });
+      }
     }) as unknown as MiddlewareHandler;
     if (!documented) {
       // hono-openapi's validator carries OpenAPI metadata under uniqueSymbol,
@@ -521,8 +516,15 @@ function appendValidationMiddleware({
     // extraction instead; the failure travels the same ZodError path.
     const schema = ep.config.params;
     stack.push(async (c, next) => {
-      const parsed = parseApiSchemaSync(schema, c.get("routeParams") ?? {});
-      if (!parsed.success) throw parsed.error;
+      const routeParams = c.get("routeParams") ?? {};
+      const parsed = parseApiSchemaSync(schema, routeParams);
+      if (!parsed.success) {
+        throw requestValidationErrorFrom({
+          target: "param",
+          error: parsed.error,
+          input: routeParams,
+        });
+      }
       c.set("params", parsed.data);
       await next();
     });
@@ -741,8 +743,7 @@ function handlerMiddleware<TProject>({
 /**
  * One replayable create: the key is read and bounds-checked, the ledger
  * decides whether the handler runs, and a replay is written from the stored
- * bytes rather than re-serialised, so it cannot drift by so much as a key
- * order. @see rest/idempotency.ts
+ * bytes rather than re-serialised. @see rest/idempotency.ts
  */
 async function replayableResponse({
   c,

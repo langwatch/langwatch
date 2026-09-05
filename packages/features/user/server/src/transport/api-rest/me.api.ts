@@ -8,7 +8,6 @@ import {
   baseResponses,
   MANAGEMENT_API_VERSION,
   type MountableRestApp,
-  promoteSchemaFailures,
   resolvePersonalCaller,
 } from "@langwatch/api/rest";
 
@@ -145,7 +144,6 @@ export function createMeRestApp(options: {
     errorEnvelope: "legacy",
     // A request-schema failure reaches the process's renderer as a bare
     // zod-shaped error, which carries no status of its own.
-    errorHandler: (boundary) => promoteSchemaFailures(boundary),
   });
 
   const view = policy("project:view");

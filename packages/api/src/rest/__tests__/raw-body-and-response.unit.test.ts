@@ -190,6 +190,44 @@ describe("withHeaders", () => {
   });
 });
 
+describe("a header that differs per answer", () => {
+  /** @scenario "An endpoint declares the headers every answer carries" */
+  it("is set by the handler with c.header, and survives the declared output", async () => {
+    const app = service()
+      .registerRoute(
+        "post",
+        "/calls",
+        "2026-08-07",
+        async (c, input: { retryAfter?: number }) => {
+          // A per-answer header needs no seam of its own: the framework
+          // serialises through the same context the handler set it on.
+          if (input.retryAfter !== undefined) c.header("Retry-After", String(input.retryAfter));
+          return { queued: input.retryAfter !== undefined };
+        },
+        (b) =>
+          b
+            .withInput(z.object({ retryAfter: z.number().optional() }))
+            .withOutput(z.object({ queued: z.boolean() })),
+      )
+      .build();
+
+    const throttled = await app.request(at("/calls"), {
+      method: "POST",
+      body: JSON.stringify({ retryAfter: 30 }),
+      headers: { "content-type": "application/json" },
+    });
+    const accepted = await app.request(at("/calls"), {
+      method: "POST",
+      body: JSON.stringify({}),
+      headers: { "content-type": "application/json" },
+    });
+
+    expect(throttled.headers.get("retry-after")).toBe("30");
+    expect(await throttled.json()).toEqual({ queued: true });
+    expect(accepted.headers.get("retry-after")).toBeNull();
+  });
+});
+
 describe("registerAnyMethodRoute", () => {
   /** @scenario "One path answers every method when that is the surface" */
   it("answers whatever method arrives, and publishes no operation", async () => {

@@ -25,7 +25,6 @@ import {
   HttpError,
   MANAGEMENT_API_VERSION,
   type MountableRestApp,
-  promoteSchemaFailures,
 } from "@langwatch/api/rest";
 import {
   CREATE_API_KEY,
@@ -353,13 +352,11 @@ export function createApiKeysRestApp(options: {
     basePath: "/api/api-keys",
     errorEnvelope: "legacy",
     errorHandler: (boundary) =>
-      promoteSchemaFailures(
-        createFamilyErrorHandler({
-          loggerName: "langwatch:api:api-keys:errors",
-          label: "API Keys Error",
-          boundary,
-        }),
-      ),
+      createFamilyErrorHandler({
+        loggerName: "langwatch:api:api-keys:errors",
+        label: "API Keys Error",
+        boundary,
+      }),
   });
 
   const listHandler = async (c: Context) => {

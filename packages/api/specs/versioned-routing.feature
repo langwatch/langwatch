@@ -104,3 +104,11 @@ Feature: Explicit compatibility version namespaces
     When it is built
     Then its routes answer once, at that path
     And no dated namespace or latest alias is mounted beside them
+
+  @unit
+  Scenario: A family at a shared prefix mounts its own paths and nothing else
+    Given a family declares that its published paths are its whole contract
+    When it is built
+    Then each route answers at its literal path
+    And no dated namespace, no version alias and no version guard is mounted
+    And the route registry names the family for itself rather than for the shared prefix

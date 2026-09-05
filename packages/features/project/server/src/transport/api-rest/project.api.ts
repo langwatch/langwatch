@@ -32,7 +32,6 @@ import {
   MANAGEMENT_API_VERSION,
   type MountableRestApp,
   NotFoundError,
-  promoteSchemaFailures,
 } from "@langwatch/api/rest";
 import {
   ARCHIVE_PROJECT,
@@ -147,13 +146,11 @@ export function createProjectRestApp(options: {
     v1Alias: false,
     errorEnvelope: "legacy",
     errorHandler: (boundary) =>
-      promoteSchemaFailures(
-        createFamilyErrorHandler({
-          loggerName: "langwatch:api:projects:errors",
-          label: "Projects API Error",
-          boundary,
-        }),
-      ),
+      createFamilyErrorHandler({
+        loggerName: "langwatch:api:projects:errors",
+        label: "Projects API Error",
+        boundary,
+      }),
   });
 
   /** The project this route addresses, refusing anything outside the organization. */

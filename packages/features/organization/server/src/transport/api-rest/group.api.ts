@@ -33,7 +33,6 @@ import {
   createFamilyErrorHandler,
   MANAGEMENT_API_VERSION,
   type MountableRestApp,
-  promoteSchemaFailures,
 } from "@langwatch/api/rest";
 
 const paginationQuerySchema = z.object({
@@ -89,13 +88,11 @@ export function createGroupRestApp(options: {
     // answers 402 from every route in this family, and the shared handler logs
     // anything under 500 below error level for exactly that reason.
     errorHandler: (boundary) =>
-      promoteSchemaFailures(
-        createFamilyErrorHandler({
-          loggerName: "langwatch:api:groups:errors",
-          label: "Groups API Error",
-          boundary,
-        }),
-      ),
+      createFamilyErrorHandler({
+        loggerName: "langwatch:api:groups:errors",
+        label: "Groups API Error",
+        boundary,
+      }),
   });
 
   const manage = policy("organization:manage");

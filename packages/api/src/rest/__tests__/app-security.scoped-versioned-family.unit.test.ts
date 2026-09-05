@@ -438,3 +438,39 @@ describe("a stream on a family that is not organization-scoped", () => {
     ).toEqual({ kind: "permission", permission: "agentCache:manage" });
   });
 });
+
+describe("a family whose published URLs are its whole contract", () => {
+  /** @scenario "A family at a shared prefix mounts its own paths and nothing else" */
+  it("answers at its literal path, mounts no version namespace, and is named for itself", async () => {
+    const { service, policy } = securityUnder().createProjectVersionedApp({
+      name: "toy-annotation",
+      basePath: "/api",
+      bareMount: true,
+    });
+    const app = service
+      .registerRoute(
+        "get",
+        "/annotations",
+        MANAGEMENT_API_VERSION,
+        async () => ({ ok: true }),
+        (b) => policy("agentCache:manage")(b).withOutput(okOutput),
+      )
+      .build();
+
+    const served = await app.request("/api/annotations");
+    const dated = await app.request(`/api/${MANAGEMENT_API_VERSION}/annotations`);
+    const aliased = await app.request("/api/v1/annotations");
+    // The guard a dated family claims would answer here, shadowing every
+    // sibling family mounted under the same prefix.
+    const sibling = await app.request("/api/latest/some-other-family");
+
+    expect(served.status).toBe(200);
+    expect(dated.status).toBe(404);
+    expect(aliased.status).toBe(404);
+    expect(sibling.status).toBe(404);
+
+    const registered = getRoutePolicy("GET", "/api/annotations");
+    expect(registered?.family).toBe("toy-annotation");
+    expect(registered?.canonicalPath).toBeUndefined();
+  });
+});

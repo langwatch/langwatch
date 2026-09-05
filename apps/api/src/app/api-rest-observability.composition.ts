@@ -1,4 +1,4 @@
-import { HandledError, isZodLikeError, ValidationError } from "@langwatch/handled-error";
+import { HandledError } from "@langwatch/handled-error";
 import {
   apiErrorBody,
   loggerMiddleware,
@@ -60,8 +60,7 @@ const passThrough: MiddlewareHandler = async (_context, next) => {
  * collapses to a generic 500 — an unanticipated failure must never put its
  * own message in front of a caller.
  */
-const renderLegacy: ErrorHandler = (rawError, context) => {
-  const error = promoteZodError(rawError);
+const renderLegacy: ErrorHandler = (error, context) => {
   const status = statusOf(error);
   log(error, context, status);
 
@@ -99,8 +98,7 @@ export function legacyErrorBody(error: HandledError): Record<string, unknown> {
  * The canonical envelope, built by the package's own `apiErrorBody` so `type` is derived
  * from the status rather than invented here.
  */
-const renderCanonical: ErrorHandler = (rawError, context) => {
-  const error = promoteZodError(rawError);
+const renderCanonical: ErrorHandler = (error, context) => {
   const status = statusOf(error);
   log(error, context, status);
   return context.json(canonicalErrorFor(error).body, status);
@@ -135,19 +133,6 @@ export function canonicalErrorFor(error: unknown): {
           error instanceof HTTPException && status < 500 ? error.message : UNKNOWN_ERROR_MESSAGE,
       });
   return { status, body };
-}
-
-/**
- * A schema rejection raised by the framework's own request validators arrives
- * as a bare zod error, which carries neither a status nor a fault. Promoting
- * it to the `ValidationError` the rest of the boundary already understands is
- * what keeps a rejected body a 422 the caller can act on instead of a 500
- * reported as our outage. `createErrorHandler` does the same for the families
- * that use the framework's default boundary; a family that installs a
- * process-owned one must not lose it.
- */
-function promoteZodError(error: Error): Error {
-  return isZodLikeError(error) ? ValidationError.fromZodError(error) : error;
 }
 
 /**

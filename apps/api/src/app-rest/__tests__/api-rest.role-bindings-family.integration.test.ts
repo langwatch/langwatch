@@ -2,6 +2,7 @@
  * The role-bindings REST family (`/api/role-bindings`), driven through the real Hono app
  * `createApiProcessRestFeatures` returns.
  */
+import { createErrorHandler } from "@langwatch/api";
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import {
   ApiKeyNotInOrganizationError,
@@ -521,7 +522,10 @@ function passThroughSecurity(): AppRestSecurity {
     requestLogger: () => noop,
     requestTracer: () => noop,
     legacyErrorHandler: renderHandled,
-    canonicalErrorHandler: renderHandled,
+    // The framework's own renderer, not a second hand-rolled one: these
+    // families publish the canonical envelope, and a stub that answered the
+    // flat legacy body for both made every `code` assertion read `undefined`.
+    canonicalErrorHandler: createErrorHandler(),
     authenticateProject: () => noop,
     authorizeProjectPermission: () => noop,
     authorizeApiKeyCeiling: () => noop,

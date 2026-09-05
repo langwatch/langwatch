@@ -142,6 +142,33 @@ export class RequestValidationError extends HandledError {
   }
 }
 
+/**
+ * The typed refusal for a rejection raised outside {@link validator} — the
+ * endpoint pipeline's own validators, and the path-parameter check the
+ * date-namespace fallback runs for itself.
+ *
+ * There is one refusal for a rejected request, whatever raised it. Throwing a
+ * bare zod error instead left the status and the code to whichever boundary
+ * happened to be installed: `createErrorHandler` promoted it to 422, and a
+ * family that had installed an `onError` of its own answered 500 for the same
+ * request.
+ */
+export function requestValidationErrorFrom({
+  target,
+  error,
+  input,
+}: {
+  target: keyof ValidationTargets;
+  error: unknown;
+  input?: unknown;
+}): RequestValidationError {
+  const issues = issuesOf(error as ValidationResult["error"]);
+  return new RequestValidationError({
+    target,
+    violations: issues.map((issue) => violationOf(issue, input)),
+  });
+}
+
 /** A zod issue, read into the shape above. */
 function violationOf(issue: ZodIssue, input: unknown): FieldViolation {
   return {

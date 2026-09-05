@@ -18,7 +18,6 @@ import {
   createFamilyErrorHandler,
   MANAGEMENT_API_VERSION,
   type MountableRestApp,
-  promoteSchemaFailures,
 } from "@langwatch/api/rest";
 
 const paginationQuerySchema = z.object({
@@ -88,13 +87,11 @@ export function createTeamsRestApp(options: {
     basePath: "/api/teams",
     errorEnvelope: "legacy",
     errorHandler: (boundary) =>
-      promoteSchemaFailures(
-        createFamilyErrorHandler({
-          loggerName: "langwatch:api:teams:errors",
-          label: "Teams API Error",
-          boundary,
-        }),
-      ),
+      createFamilyErrorHandler({
+        loggerName: "langwatch:api:teams:errors",
+        label: "Teams API Error",
+        boundary,
+      }),
   });
 
   const organizationId = (c: Context): string => c.get("organization").id;

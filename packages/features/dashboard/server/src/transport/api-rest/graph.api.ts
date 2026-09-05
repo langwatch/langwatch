@@ -1,12 +1,13 @@
 import {
-  type AppRestProjectVariables,
   type AppRestSecurity,
   baseResponses,
   type EndpointVariables,
   MANAGEMENT_API_VERSION,
   type MountableRestApp,
+  type ProjectScopedContext,
+  type RestErrorHandler,
+  projectOf,
   type RouteResponse,
-  type ServiceContext,
 } from "@langwatch/api/rest";
 import {
   graphDeletedResponseSchema,
@@ -15,7 +16,6 @@ import {
 } from "@langwatch/dashboard-contract";
 import { isZodLikeError, ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import type { Context, ErrorHandler } from "hono";
 import { z } from "zod";
 import { DashboardNotThereError, GraphNotThereError, type DashboardApp } from "#app/dashboard.app";
 
@@ -27,7 +27,7 @@ const logger = createLogger("langwatch:api:graphs");
  * rejected body stays a 422.
  */
 const graphErrorHandler =
-  (boundary: ErrorHandler): ErrorHandler =>
+  (boundary: RestErrorHandler): RestErrorHandler =>
   (error, c) => {
     if (error instanceof GraphNotThereError) {
       return c.json({ error: "Graph not found" }, 404);
@@ -113,10 +113,7 @@ export function createGraphsRestApp(options: {
     errorHandler: graphErrorHandler,
   });
 
-  type GraphContext = ServiceContext<EndpointVariables>;
-
-  const projectOf = (c: Context): AppRestProjectVariables["project"] =>
-    c.get("project") as AppRestProjectVariables["project"];
+  type GraphContext = ProjectScopedContext<EndpointVariables>;
 
   const listGraphsHandler = async (
     c: GraphContext,

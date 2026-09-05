@@ -2,6 +2,7 @@
  * The product REST families this process composes for itself, driven through the real
  * Hono app `createApiProcessRestFeatures` returns.
  */
+import { createErrorHandler } from "@langwatch/api";
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import type { AnalyticsApp } from "@langwatch/analytics-server";
 import type { AuthzService } from "@langwatch/authz-contract";
@@ -319,7 +320,10 @@ function passThroughSecurity(): AppRestSecurity {
     requestLogger: () => noop,
     requestTracer: () => noop,
     legacyErrorHandler: renderHandled,
-    canonicalErrorHandler: renderHandled,
+    // The framework's own renderer: a family declaring the canonical envelope
+    // must be answered in it, and a stub rendering the flat legacy body for
+    // both made every `code` assertion read `undefined`.
+    canonicalErrorHandler: createErrorHandler(),
     authenticateProject: () => asProject,
     authorizeProjectPermission: () => noop,
     authorizeApiKeyCeiling: () => noop,
