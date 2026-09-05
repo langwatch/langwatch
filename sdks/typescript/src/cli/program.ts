@@ -2720,9 +2720,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     annotationCmd
       .command("create <traceId>")
       .description("Create an annotation for a trace")
-      .option("--comment <comment>", "Annotation comment")
-      .option("--thumbs-up", "Mark as thumbs up")
-      .option("--thumbs-down", "Mark as thumbs down")
+      .option("--comment <comment>", "Annotation comment (required)")
+      .option("--thumbs-up", "Mark as thumbs up (exactly one of --thumbs-up/--thumbs-down)")
+      .option("--thumbs-down", "Mark as thumbs down (exactly one of --thumbs-up/--thumbs-down)")
       .option("--email <email>", "Email of the annotator")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (traceId: string, options: { comment?: string; thumbsUp?: boolean; thumbsDown?: boolean; email?: string }) => {

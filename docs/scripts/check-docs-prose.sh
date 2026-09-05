@@ -2,12 +2,16 @@
 set -euo pipefail
 
 # Docs prose linter. Fails when a docs/*.mdx file contains banned words or
-# patterns from the docs-writing-rules. Diff-scoped by default: in CI it
-# checks only added or modified .mdx files; pass --all to check the whole
-# docs/ tree (useful for a one-off sweep).
+# patterns from the docs-writing-rules, or a paragraph longer than
+# MAX_PARAGRAPH_WORDS. Diff-scoped by default: in CI it checks only added or
+# modified .mdx files; pass --all to check the whole docs/ tree (useful for a
+# one-off sweep).
 #
 # The word list comes from docs-writing-rules (rules 3, 10, 17) and the
-# house-wide bans in CLAUDE.md. Add new entries to PATTERNS below.
+# house-wide bans in CLAUDE.md. Add new entries to PATTERNS below. The
+# paragraph limit is rule 13 (one idea per paragraph): a paragraph is a run of
+# consecutive prose lines, so a list item counts as its own paragraph, while
+# tables, headings, JSX tags, imports and frontmatter are left out.
 
 DOCS_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 REPO_ROOT="$(cd "$DOCS_DIR/.." && pwd)"
@@ -63,6 +67,8 @@ encode_property() {
   printf '%s' "$value"
 }
 
+MAX_PARAGRAPH_WORDS="${DOCS_PROSE_MAX_PARAGRAPH_WORDS:-80}"
+
 MODE="diff"
 if [[ "${1:-}" == "--all" ]]; then
   MODE="all"
@@ -94,8 +100,23 @@ for file in "${FILES[@]}"; do
   # Blank out code fences (including indented ones, up to 3 spaces per the
   # CommonMark spec) and founder-decision exemptions. Print blank lines for
   # skipped records so grep -n reports the real source line number.
+  #
+  # A fence closes only on the same character, repeated at least as many
+  # times as the fence that opened it. Pages that show markdown inside
+  # markdown wrap a ``` block in a ```` one, and a toggle on every run of
+  # three would read the inner fence as a close and treat the code that
+  # follows as prose.
   cleaned=$(awk '
-    /^ {0,3}(`{3,}|~{3,})/ { in_code = !in_code; print ""; next }
+    match($0, /^ {0,3}(`{3,}|~{3,})/) {
+      run = substr($0, RSTART, RLENGTH)
+      sub(/^ +/, "", run)
+      ch = substr(run, 1, 1)
+      len = length(run)
+      if (!in_code) { in_code = 1; fence_ch = ch; fence_len = len }
+      else if (ch == fence_ch && len >= fence_len) { in_code = 0 }
+      print ""
+      next
+    }
     in_code                 { print ""; next }
     /\{\/\* Founder decision:/  { print ""; next }
     { print }
@@ -120,11 +141,40 @@ for file in "${FILES[@]}"; do
       done <<< "$matches"
     fi
   done <<< "$PATTERNS"
+
+  # Paragraph length. Frontmatter, headings, tables, JSX tags, imports and
+  # blank lines end a paragraph and are not counted; everything else is prose.
+  long=$(echo "$cleaned" | awk -v max="$MAX_PARAGRAPH_WORDS" '
+    function flush() {
+      if (words > max) printf "%d\t%d\n", start, words
+      words = 0; start = 0
+    }
+    NR == 1 && /^---$/   { in_front = 1; next }
+    in_front && /^---$/  { in_front = 0; next }
+    in_front             { next }
+    /^[[:space:]]*$/     { flush(); next }
+    /^#/                 { flush(); next }
+    /^[[:space:]]*[|<]/  { flush(); next }
+    /^import /           { flush(); next }
+    /^[[:space:]]*([-*]|[0-9]+\.)[[:space:]]/ { flush(); start = NR; words = NF; next }
+    {
+      if (words == 0) start = NR
+      words += NF
+    }
+    END { flush() }
+  ')
+  if [[ -n "${long:-}" ]]; then
+    while IFS=$'\t' read -r lineno count; do
+      [[ -z "$lineno" ]] && continue
+      echo "::error file=$(encode_property "$rel"),line=$lineno::This paragraph has $count words, the limit is $MAX_PARAGRAPH_WORDS. Split it by idea, one idea per paragraph (docs-writing-rules, rule 13). Read https://nexus.langwatch.ai/wiki/docs-writing-rules to learn how to write better docs."
+      ERRORS=$((ERRORS + 1))
+    done <<< "$long"
+  fi
 done
 
 if [[ $ERRORS -gt 0 ]]; then
   echo ""
-  echo "Found $ERRORS banned-word violation(s) in docs/. See docs-writing-rules on Nexus."
+  echo "Found $ERRORS prose violation(s) in docs/. See docs-writing-rules on Nexus."
   exit 1
 fi
 
