@@ -61914,10 +61914,15 @@ tamper-evidence, requires an **Enterprise** license.
 
 <Note>
   The 49-day window in the tables below is the retention LangWatch applies by
-  default. It is not a period any of these frameworks prescribe. Set the window
-  your own obligations require: paid plans, and self-hosted deployments with a
-  license, configure it per organization, team or project. See
-  [Data Retention](/platform/data-retention).
+  default. It is not a period any of these frameworks prescribe.
+
+  What you can set instead depends on the plan, per organization, team or
+  project. Paid cloud plans choose 35 or 63 days. Enterprise plans and licensed
+  self-hosted deployments choose those or any whole number of weeks from 49
+  days up, and a self-hosted platform administrator can keep data indefinitely.
+  The free plan and an unlicensed self-hosted deployment stay on the default.
+  See [Data Retention](/platform/data-retention) and
+  [Pricing](/pricing#extending-retention).
 </Note>
 
 The right tier for your organization depends on which mechanisms you
@@ -61998,13 +62003,16 @@ require Enterprise.
 | Art. 33, breach notification | Anomaly rule dispatch (Slack, PagerDuty, SIEM webhook, email) | **Enterprise** |
 | Art. 35, DPIA evidence | OCSF/SIEM export bundle | **Enterprise** |
 
-If your processor agreement requires retention longer than 49 days OR a
-named breach-notification mechanism (Art. 33's "without undue delay,
-where feasible, not later than 72 hours"), Enterprise is the right tier.
+If your processor agreement requires retention longer than the 49-day
+default OR a named breach-notification mechanism (Art. 33's "without
+undue delay, where feasible, not later than 72 hours"), Enterprise is
+the right tier. Self-hosted, a license is what opens a longer window at
+all.
+
 This reaches customers outside the EU as well, but only where Art. 3
-puts them in scope: an establishment in the EU, an offer of goods or
-services to people in the EU, or monitoring of their behavior in the
-EU.
+puts them in scope: processing in the context of the activities of an
+establishment in the EU, an offer of goods or services to people in the
+EU, or monitoring of their behavior in the EU.
 
 One retention clause to state explicitly in DPAs: **billing spend
 records** (the per-request metering ledger under
@@ -62028,11 +62036,16 @@ technical safeguards map cleanly onto the open-core split:
 - **§164.312(e) Transmission security**: Apache 2.0 (TLS at gateway + dataplane)
 
 **HIPAA-most-uses**: covered entities with PHI in LLM traces should
-treat Apache 2.0 as the floor for technical safeguards; the
-§164.316(b)(2)(i) 6-year retention requirement and §164.312(c)(1)
-integrity (when you
-need cryptographic tamper-evidence) push toward Enterprise. For BAAs
-with explicit retention clauses, Enterprise is required.
+treat Apache 2.0 as the floor for technical safeguards. Read the two
+retention rules apart: §164.312(b) requires an audit-control mechanism
+and sets no period for the logs themselves, while §164.316(b)(2)(i)'s
+six years covers the documentation the rule requires you to keep, not
+the traces.
+
+What pushes trace retention to multi-year windows is a BAA clause or
+another obligation you have taken on. That, with §164.312(c)(1)
+integrity when you need cryptographic tamper-evidence, is what points
+to Enterprise.
 
 ## EU AI Act: Art. 12 logging + Art. 18 record-keeping
 
