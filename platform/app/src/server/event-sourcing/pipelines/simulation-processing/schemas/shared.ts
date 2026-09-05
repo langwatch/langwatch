@@ -5,10 +5,14 @@ import { scenarioEvaluationResultSchema } from "~/server/scenarios/schemas/event
  * Status values stored in ClickHouse.
  * STALLED is never written: stalled runs finish ERROR via the process-manager
  * stall watchdog, and nothing derives STALLED at read time anymore.
+ * PENDING_EVALUATION is written by the fold when a run finishes owing its
+ * evaluator results, and replaced by the gated terminal status when they are
+ * recorded.
  */
 export const SIMULATION_RUN_STATUS = [
   "PENDING",
   "IN_PROGRESS",
+  "PENDING_EVALUATION",
   "SUCCESS",
   "FAILURE",
   "ERROR",

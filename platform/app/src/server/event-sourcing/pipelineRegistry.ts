@@ -1750,6 +1750,8 @@ export class PipelineRegistry {
         recordEvaluationsCommand,
         computeRunMetricsCommand,
         simulationRunExecution: {
+          getAttachedEvaluators: (params) =>
+            scenarioEvaluationDeps.suites.getAttachedEvaluators(params),
           getPool: () => scenarioExecutionPool.get(),
           publishCancellation: async ({ projectId, scenarioRunId }) => {
             const publisher = this.deps.eventSourcing.redisConnection ?? null;

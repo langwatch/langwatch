@@ -49,8 +49,10 @@ export enum ScenarioRunStatus {
    * run's suite and plan attach have not been recorded yet, so the run may
    * still be failed by a required one.
    *
-   * Derived when a run is read, never stored: the stored status is the
-   * terminal one the judge decided.
+   * Stored by the fold when the run finishes, the way QUEUED is, and
+   * replaced by the gated terminal status when the evaluated event records
+   * the results. A grading job that is lost is recorded as errored evaluators
+   * once its deadline passes, so a run never stays here for good.
    *
    * @see specs/scenarios/scenario-evaluation-pending.feature
    */

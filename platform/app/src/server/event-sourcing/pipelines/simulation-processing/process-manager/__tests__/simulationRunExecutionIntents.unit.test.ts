@@ -6,12 +6,14 @@ import {
   createCancelExecutionHandler,
   createExecuteRunHandler,
   createFinishRunHandler,
+  createRecordEvaluationsHandler,
   type SimulationRunExecutionDispatchDeps,
 } from "../simulationRunExecutionIntentHandlers";
 import type {
   CancelExecutionIntent,
   ExecuteRunIntent,
   FinishRunIntent,
+  RecordEvaluationsIntent,
 } from "../simulationRunExecutionProcess.types";
 
 const RUN_ID = "run-1";
@@ -48,9 +50,13 @@ function makeDeps(
   overrides: Partial<SimulationRunExecutionDispatchDeps> = {},
 ): SimulationRunExecutionDispatchDeps {
   return {
+    getAttachedEvaluators: vi.fn().mockResolvedValue(new Map()),
     getPool: () => ({ submit: vi.fn() }),
     publishCancellation: vi.fn().mockResolvedValue(undefined),
-    commands: () => ({ finishRun: vi.fn().mockResolvedValue(undefined) }),
+    commands: () => ({
+      finishRun: vi.fn().mockResolvedValue(undefined),
+      recordEvaluations: vi.fn().mockResolvedValue(undefined),
+    }),
     ...overrides,
   };
 }
@@ -191,5 +197,70 @@ describe("createFinishRunHandler", () => {
     expect(finishRun).toHaveBeenCalledWith(
       expect.not.objectContaining({ error: expect.anything() }),
     );
+  });
+});
+
+describe("createRecordEvaluationsHandler", () => {
+  const payload: RecordEvaluationsIntent = {
+    scenarioRunId: RUN_ID,
+    projectId: PROJECT_ID,
+    evaluators: [
+      { evaluatorId: "eval-1", required: true },
+      { evaluatorId: "eval-2", required: false },
+    ],
+    details: "The evaluation did not complete",
+  };
+
+  /** @scenario "The lost-job results reach the run through the record evaluations command" */
+  it("records one errored result per evaluator, named after the saved evaluator", async () => {
+    const recordEvaluations = vi.fn().mockResolvedValue(undefined);
+    const run = createRecordEvaluationsHandler(
+      makeDeps({
+        getAttachedEvaluators: vi
+          .fn()
+          .mockResolvedValue(new Map([["eval-1", { name: "Exact match" }]])),
+        commands: () => ({
+          finishRun: vi.fn(),
+          recordEvaluations,
+        }),
+      }),
+    );
+
+    await run(payload, makeContext());
+
+    expect(recordEvaluations).toHaveBeenCalledWith({
+      tenantId: PROJECT_ID,
+      scenarioRunId: RUN_ID,
+      evaluations: [
+        {
+          evaluatorId: "eval-1",
+          name: "Exact match",
+          required: true,
+          status: "error",
+          details: "The evaluation did not complete",
+        },
+        {
+          evaluatorId: "eval-2",
+          name: "eval-2",
+          required: false,
+          status: "error",
+          details: "The evaluation did not complete",
+        },
+      ],
+      occurredAt: expect.any(Number),
+    });
+  });
+
+  it("propagates a command failure so the outbox retries", async () => {
+    const run = createRecordEvaluationsHandler(
+      makeDeps({
+        commands: () => ({
+          finishRun: vi.fn(),
+          recordEvaluations: vi.fn().mockRejectedValue(new Error("store down")),
+        }),
+      }),
+    );
+
+    await expect(run(payload, makeContext())).rejects.toThrow("store down");
   });
 });

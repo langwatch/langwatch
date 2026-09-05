@@ -9,11 +9,12 @@
  * next runs and never the ones already queued, and a retry of the evaluation
  * job grades exactly what the first attempt would have.
  *
- * A finished run that owes results reads with the status PENDING_EVALUATION
- * until they are recorded. The stored status stays the terminal one the judge
- * decided; the pending status is derived at read time and expires with
- * {@link EVALUATION_PENDING_GRACE_MS}, so a job that never completes cannot
- * hold a run open for good.
+ * A finished run that owes results is stored with the status
+ * PENDING_EVALUATION, the way a scheduled run is stored QUEUED, until the
+ * evaluated event records them and the gate writes the terminal status. A
+ * grading job that is lost outright is recorded as errored evaluators by the
+ * run execution process manager once its deadline passes, so a required
+ * evaluator that never ran fails the run instead of leaving it pending.
  *
  * @see specs/scenarios/scenario-evaluation-pending.feature
  */
@@ -32,17 +33,6 @@ export const runEvaluatorsSchema = z.object({
 });
 export type RunEvaluators = z.infer<typeof runEvaluatorsSchema>;
 
-/**
- * How long a finished run may report PENDING_EVALUATION.
- *
- * The job retries for about three minutes while the trace arrives and then
- * grades, and an evaluator is one model call per attachment, so the window is
- * generous. Past it the run reports the status the judge decided: a job that
- * is never coming back is a failure to grade, not a reason to leave every
- * waiter hanging.
- */
-export const EVALUATION_PENDING_GRACE_MS = 15 * 60 * 1000;
-
 /** The statuses a finished run can hold with no conversation to grade. */
 export const UNGRADED_RUN_STATUSES: ReadonlySet<string> = new Set([
   ScenarioRunStatus.ERROR,
@@ -56,8 +46,9 @@ export const UNGRADED_RUN_STATUSES: ReadonlySet<string> = new Set([
  * it. A run that errored or was cancelled has nothing to grade. Everything
  * else owes one result per attachment it was queued with.
  *
- * The fold and the subscriber that queues the job both read this, so the
- * status a run reports and the work actually queued for it cannot disagree.
+ * The fold, the subscriber that queues the job and the process manager that
+ * watches for a lost job all read this, so the status a run is stored with,
+ * the work queued for it and the deadline armed for it cannot disagree.
  */
 export function runAwaitsEvaluations({
   status,
@@ -71,21 +62,4 @@ export function runAwaitsEvaluations({
   if (hasOwnEvaluations) return false;
   if (status && UNGRADED_RUN_STATUSES.has(status)) return false;
   return attachmentCount > 0;
-}
-
-/**
- * Whether a stored run should be reported as awaiting evaluation, given how
- * long ago it finished.
- */
-export function evaluationIsStillPending({
-  awaitsEvaluation,
-  finishedAt,
-  now,
-}: {
-  awaitsEvaluation: boolean;
-  finishedAt: number | null;
-  now: number;
-}): boolean {
-  if (!awaitsEvaluation || finishedAt == null) return false;
-  return now - finishedAt < EVALUATION_PENDING_GRACE_MS;
 }

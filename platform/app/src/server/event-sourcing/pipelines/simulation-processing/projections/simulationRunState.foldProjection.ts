@@ -2,6 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import { isRecord } from "~/server/app-layer/traces/canonicalisation/extractors/_guards";
 import { ValidationError } from "~/server/event-sourcing/services/errorHandling";
 import { gatedStatus } from "~/server/scenarios/scenario-evaluation-gate";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { runAwaitsEvaluations } from "~/server/scenarios/scenario-run-evaluators";
 import type { ScenarioEvaluationResult } from "~/server/scenarios/schemas/event-schemas";
 import type { Projection } from "../../../";
@@ -209,15 +210,6 @@ export interface SimulationRunStateData {
    * were recorded. Stored as the `Evaluations.*` parallel arrays.
    */
   Evaluations: ScenarioEvaluationResult[];
-  /**
-   * Whether the run finished owing evaluator results, so a required evaluator
-   * may still turn it red. Set from the attachments the finished event carries
-   * and cleared when the results are recorded. A reader turns it into the
-   * PENDING_EVALUATION status for as long as the grace period allows.
-   *
-   * @see specs/scenarios/scenario-evaluation-pending.feature
-   */
-  EvaluationsPending: boolean;
   DurationMs: number | null;
   TotalCost: number | null;
   RoleCosts: Record<string, number[]>;
@@ -407,7 +399,6 @@ export class SimulationRunStateFoldProjection
       UnmetCriteria: [],
       Error: null,
       Evaluations: [],
-      EvaluationsPending: false,
       DurationMs: null,
       TotalCost: null,
       RoleCosts: {},
@@ -657,15 +648,29 @@ export class SimulationRunStateFoldProjection
 
     const results = event.data.results;
     const verdict = results?.verdict ?? null;
-    const status = finishedStatusOf({
+    const judgeStatus = finishedStatusOf({
       explicitStatus: event.data.status,
       verdict,
     });
+    // The run owes results when its suite or plan attached evaluators and
+    // nothing has recorded them. It is stored PENDING_EVALUATION until the
+    // evaluated event lands and the gate writes the terminal status. An
+    // evaluated event that folded first already recorded them, so the judge's
+    // status stands.
+    const awaitsEvaluations =
+      state.Evaluations.length === 0 &&
+      runAwaitsEvaluations({
+        status: judgeStatus,
+        hasOwnEvaluations: results?.evaluations != null,
+        attachmentCount: event.data.evaluators?.attachments.length ?? 0,
+      });
 
     return {
       ...state,
       ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
-      Status: status,
+      Status: awaitsEvaluations
+        ? ScenarioRunStatus.PENDING_EVALUATION
+        : judgeStatus,
       Verdict: verdict,
       Reasoning: results?.reasoning ?? null,
       MetCriteria: results?.metCriteria ?? [],
@@ -675,16 +680,6 @@ export class SimulationRunStateFoldProjection
       // event. An evaluated event that folded before this one (business time
       // can land it first) already wrote its results, which stay.
       Evaluations: results?.evaluations ?? state.Evaluations,
-      // The run owes results when its suite or plan attached evaluators and
-      // nothing has recorded them. An evaluated event that folded first
-      // already recorded them, so the run owes nothing.
-      EvaluationsPending:
-        state.Evaluations.length === 0 &&
-        runAwaitsEvaluations({
-          status,
-          hasOwnEvaluations: results?.evaluations != null,
-          attachmentCount: event.data.evaluators?.attachments.length ?? 0,
-        }),
       // Derived when the event does not carry it, which is every real run:
       // the SDK ingest path dispatches finishRun with results and status only.
       // Left underived, DurationMs was null for every run a customer actually
@@ -711,14 +706,24 @@ export class SimulationRunStateFoldProjection
     // reads the state's own status, so a run that errored or was cancelled
     // keeps that status whatever the evaluators said, and the judge's
     // reasoning and criteria stay as the judge wrote them.
+    //
+    // A run stored PENDING_EVALUATION holds the judge's verdict but not the
+    // judge's status, so that status is recomputed from the verdict first.
+    // Only a judged run ever goes pending, so the recomputation is exact.
     const verdict = event.data.verdict;
+    const judgeStatus =
+      state.Status === ScenarioRunStatus.PENDING_EVALUATION
+        ? finishedStatusOf({
+            explicitStatus: undefined,
+            verdict: state.Verdict,
+          })
+        : state.Status;
     return {
       ...state,
       ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
       Evaluations: event.data.evaluations,
-      EvaluationsPending: false,
       Verdict: verdict ?? state.Verdict,
-      Status: gatedStatus({ status: state.Status, verdict }),
+      Status: gatedStatus({ status: judgeStatus, verdict }),
     };
   }
 

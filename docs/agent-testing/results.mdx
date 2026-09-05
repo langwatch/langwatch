@@ -73,7 +73,7 @@ An [evaluator](/agent-testing/evaluators) attached to the test suite or to the r
 
 The run header shows a pill per evaluator: the pass rate for one with a verdict, the mean for one with a score. The verdict of a run is settled when the evaluators are in. A run whose evaluators all pass, or that has none, keeps the judge's verdict.
 
-Between the judge's verdict and the evaluator results the run reads as `PENDING_EVALUATION`, `evaluating` in the interface. `langwatch test-suite run ... --wait` and the batch counts treat such a run as still going, so nothing reports a batch as green while a required evaluator can still fail one of its runs.
+Between the judge's verdict and the evaluator results the run reads as `PENDING_EVALUATION`, `evaluating` in the interface. `langwatch test-suite run ... --wait` and the batch counts treat such a run as still going, so nothing reports a batch as green while a required evaluator can still fail one of its runs. The run stays pending until its evaluators are recorded. A grading job that is lost is recorded as errored evaluators once its deadline passes, so a required evaluator that never ran fails the run instead of leaving it pending.
 
 The evaluators a run is graded with are fixed when the run is scheduled. Editing the suite or the run plan while a batch executes changes the runs scheduled after the edit, never the ones already queued.
 

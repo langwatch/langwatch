@@ -3,14 +3,12 @@ import {
   ScenarioRunStatus,
   Verdict,
 } from "~/server/scenarios/scenario-event.enums";
-import { EVALUATION_PENDING_GRACE_MS } from "~/server/scenarios/scenario-run-evaluators";
 import {
   type ClickHouseSimulationRunRow,
   mapClickHouseRowToScenarioRunData,
 } from "../simulation-run.mappers";
 
 const FINISHED_AT = 2_200;
-const NOW = FINISHED_AT + 1_000;
 
 function makeRow(
   overrides: Partial<ClickHouseSimulationRunRow> = {},
@@ -49,12 +47,11 @@ function makeRow(
 }
 
 describe("mapping a run that awaits its evaluators", () => {
-  describe("when the row awaits evaluation and finished a moment ago", () => {
+  describe("when the row is stored PENDING_EVALUATION", () => {
     /** @scenario "A pending run reads as PENDING_EVALUATION" */
     it("reads as PENDING_EVALUATION while still reporting the judge's verdict", () => {
       const run = mapClickHouseRowToScenarioRunData(
-        makeRow({ EvaluationsPending: 1 }),
-        { now: NOW },
+        makeRow({ Status: "PENDING_EVALUATION" }),
       );
 
       expect(run.status).toBe(ScenarioRunStatus.PENDING_EVALUATION);
@@ -62,39 +59,25 @@ describe("mapping a run that awaits its evaluators", () => {
     });
   });
 
-  describe("when the row awaits evaluation and finished longer ago than the grace period", () => {
-    /** @scenario "The pending status expires so a lost job cannot hold a run open" */
-    it("reads with the status the judge decided", () => {
-      const run = mapClickHouseRowToScenarioRunData(
-        makeRow({ EvaluationsPending: 1 }),
-        { now: FINISHED_AT + EVALUATION_PENDING_GRACE_MS + 1 },
+  describe("when the row is stored with a terminal status", () => {
+    /** @scenario "A settled run reads with its stored status" */
+    it("reads with the status the gate wrote", () => {
+      const passed = mapClickHouseRowToScenarioRunData(
+        makeRow({ Status: "SUCCESS" }),
+      );
+      const failed = mapClickHouseRowToScenarioRunData(
+        makeRow({ Status: "FAILURE", Verdict: "failure" }),
       );
 
-      expect(run.status).toBe(ScenarioRunStatus.SUCCESS);
-    });
-  });
-
-  describe("when the row awaits nothing", () => {
-    /** @scenario "A run that never awaited evaluation reads with its own status" */
-    it("reads with the status the judge decided", () => {
-      const stored = mapClickHouseRowToScenarioRunData(
-        makeRow({ EvaluationsPending: 0 }),
-        { now: NOW },
-      );
-      const predatingTheColumn = mapClickHouseRowToScenarioRunData(makeRow(), {
-        now: NOW,
-      });
-
-      expect(stored.status).toBe(ScenarioRunStatus.SUCCESS);
-      expect(predatingTheColumn.status).toBe(ScenarioRunStatus.SUCCESS);
+      expect(passed.status).toBe(ScenarioRunStatus.SUCCESS);
+      expect(failed.status).toBe(ScenarioRunStatus.FAILED);
     });
   });
 
   describe("when the run has not finished", () => {
     it("still reads as IN_PROGRESS", () => {
       const run = mapClickHouseRowToScenarioRunData(
-        makeRow({ EvaluationsPending: 1, FinishedAt: null }),
-        { now: NOW },
+        makeRow({ Status: "PENDING_EVALUATION", FinishedAt: null }),
       );
 
       expect(run.status).toBe(ScenarioRunStatus.IN_PROGRESS);

@@ -1674,8 +1674,7 @@ describe("SimulationClickHouseRepository (integration)", () => {
             ScenarioSetId: setId,
             BatchRunId: batchRunId,
             ScenarioRunId: scenarioRunId,
-            Status: "SUCCESS",
-            EvaluationsPending: 1,
+            Status: "PENDING_EVALUATION",
           }),
         );
 
@@ -1705,7 +1704,6 @@ describe("SimulationClickHouseRepository (integration)", () => {
             BatchRunId: batchRunId,
             ScenarioRunId: scenarioRunId,
             Status: "SUCCESS",
-            EvaluationsPending: 0,
           }),
         );
 
@@ -1721,6 +1719,35 @@ describe("SimulationClickHouseRepository (integration)", () => {
         expect(run?.status).toBe(ScenarioRunStatus.SUCCESS);
         expect(summary?.settledCount).toBe(1);
         expect(summary?.runningCount).toBe(0);
+      });
+
+      /** @scenario "The batch and the set aggregates agree on a pending run" */
+      it("is counted as running by the batch and as unsettled by the set", async () => {
+        const setId = `set-pending-agree-${nanoid()}`;
+        const batchRunId = `batch-pending-agree-${nanoid()}`;
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioSetId: setId,
+            BatchRunId: batchRunId,
+            ScenarioRunId: `run-pending-agree-${nanoid()}`,
+            Status: "PENDING_EVALUATION",
+          }),
+        );
+
+        const summary = await repo.getBatchSummary({
+          projectId: tenantId,
+          batchRunId,
+        });
+        const sets = await repo.getExternalSetSummaries({
+          projectId: tenantId,
+        });
+        const set = sets.find((s) => s.scenarioSetId === setId);
+
+        expect(summary?.runningCount).toBe(1);
+        expect(summary?.settledCount).toBe(0);
+        expect(set?.totalCount).toBe(0);
+        expect(set?.passedCount).toBe(0);
       });
     });
   });

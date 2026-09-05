@@ -19,6 +19,11 @@ export const SIMULATION_RUN_EXECUTION_INTENT_TYPES = {
   CANCEL: "cancel",
   /** Write the terminal finished event via the pipeline commands. */
   FINISH: "finish",
+  /**
+   * Record one errored result per evaluator the run still owes, via the
+   * pipeline commands, when the grading job was lost.
+   */
+  RECORD_EVALUATIONS: "record_evaluations",
 } as const;
 
 /**
@@ -29,11 +34,39 @@ export const SIMULATION_RUN_EXECUTION_INTENT_TYPES = {
  */
 export const CANCEL_GRACE_MS = 60_000;
 
+/**
+ * How long a finished run may owe its evaluator results before the process
+ * records them as errored.
+ *
+ * The evaluation job records a result for every attachment on its final
+ * attempt, so the evaluated event normally always arrives: its retries span
+ * about three minutes while the trace lands, plus one evaluator call per
+ * attachment. The deadline only catches a job lost outright, a wiped queue or
+ * a worker that died with no retry, so it sits well above that window.
+ */
+export const EVALUATION_DEADLINE_MS = 15 * 60_000;
+
+/** What the lost-job results say. */
+export const EVALUATION_LOST_DETAILS =
+  "The evaluation did not complete: its grading job was lost before it recorded a result";
+
 export type SimulationRunExecutionPhase =
   | "queued"
   | "running"
   | "cancelling"
+  | "evaluating"
   | "terminal";
+
+/**
+ * One evaluator the run still owes a result to: the saved evaluator's id and
+ * whether a missing result fails the run. Nothing else of the attachment is
+ * kept, so the persisted state stays ids and flags.
+ */
+export const pendingEvaluatorSchema = z.object({
+  evaluatorId: z.string(),
+  required: z.boolean(),
+});
+export type PendingEvaluator = z.infer<typeof pendingEvaluatorSchema>;
 
 /**
  * Compact private process state (ADR-052): only what evolve() decisions
@@ -62,6 +95,23 @@ export interface SimulationRunExecutionProcessState {
    * moved on so a late/redelivered queued event can still honour it.
    */
   cancelRequestedAtMs: number | null;
+  /**
+   * When the run finished owing evaluator results, scheduling time, or null.
+   * The evaluation deadline wake measures from here.
+   */
+  finishedAtMs: number | null;
+  /**
+   * The evaluators the run still owes a result to, or null when it owes none.
+   * The lost-job results are built from this list.
+   */
+  pendingEvaluators: PendingEvaluator[] | null;
+  /**
+   * Whether an evaluated event has been seen. Kept even before the finished
+   * event, since business time can land the evaluated event first, so the
+   * finished event then goes terminal instead of waiting on results that are
+   * already in.
+   */
+  evaluationsRecorded: boolean;
 }
 
 export const INITIAL_SIMULATION_RUN_EXECUTION_STATE: SimulationRunExecutionProcessState =
@@ -72,6 +122,9 @@ export const INITIAL_SIMULATION_RUN_EXECUTION_STATE: SimulationRunExecutionProce
     queuedAtMs: 0,
     lastActivityAtMs: 0,
     cancelRequestedAtMs: null,
+    finishedAtMs: null,
+    pendingEvaluators: null,
+    evaluationsRecorded: false,
   };
 
 /**
@@ -116,12 +169,28 @@ export const finishRunIntentSchema = z.object({
 export type FinishRunIntent = z.infer<typeof finishRunIntentSchema>;
 
 /**
+ * The lost-job intent payload: the evaluators the run still owes a result
+ * to, and the reason every result carries. The executor records one errored
+ * result per evaluator through the pipeline's record evaluations command.
+ */
+export const recordEvaluationsIntentSchema = z.object({
+  scenarioRunId: z.string(),
+  projectId: z.string(),
+  evaluators: z.array(pendingEvaluatorSchema),
+  details: z.string(),
+});
+export type RecordEvaluationsIntent = z.infer<
+  typeof recordEvaluationsIntentSchema
+>;
+
+/**
  * The content-stripped view of a pipeline event the process consumes.
  * Optional-at-the-source fields are null here (never undefined): the view is
  * persisted verbatim as the inbox payload, and undefined is not JSON-safe.
  *
  * Deliberately narrowed so this module does NOT depend on the enriched
- * finished-event fields landing — only `status` is read from it.
+ * finished-event fields landing: `status`, the evaluator ids the finished
+ * event carries and whether its results carry evaluations are all it reads.
  */
 export const simulationRunProcessEventViewSchema = z.object({
   eventType: z.string(),
@@ -137,6 +206,17 @@ export const simulationRunProcessEventViewSchema = z.object({
       referenceId: z.string(),
     })
     .nullable(),
+  /**
+   * The evaluators the finished event says the run is graded with, ids and
+   * required flags only, or null when the event carries none. Defaulted so
+   * inbox rows persisted before evaluators existed still parse.
+   */
+  evaluators: z.array(pendingEvaluatorSchema).nullable().default(null),
+  /**
+   * Whether the finished event's results carry evaluations of their own, in
+   * which case the run owes nothing to the evaluation job.
+   */
+  hasOwnEvaluations: z.boolean().default(false),
   /**
    * The run's resolved parameter values, as recorded on the queued event —
    * customer-chosen configuration, not conversation content. Defaulted rather
@@ -171,5 +251,8 @@ export type SimulationRunExecutionIntents = {
   >;
   [SIMULATION_RUN_EXECUTION_INTENT_TYPES.FINISH]: IntentSpec<
     typeof finishRunIntentSchema
+  >;
+  [SIMULATION_RUN_EXECUTION_INTENT_TYPES.RECORD_EVALUATIONS]: IntentSpec<
+    typeof recordEvaluationsIntentSchema
   >;
 };

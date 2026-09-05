@@ -9,10 +9,15 @@ import { runParameterValuesSchema } from "~/server/scenarios/parameters";
 import { runSecretCiphertextSchema } from "~/server/scenarios/run-secret-values";
 import { STALL_THRESHOLD_MS } from "~/server/scenarios/scenario.constants";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import { runAwaitsEvaluations } from "~/server/scenarios/scenario-run-evaluators";
 
 import type { SimulationProcessingEvent } from "../schemas/events";
 import {
   CANCEL_GRACE_MS,
+  EVALUATION_DEADLINE_MS,
+  EVALUATION_LOST_DETAILS,
+  type PendingEvaluator,
+  pendingEvaluatorSchema,
   type SimulationRunExecutionIntents,
   type SimulationRunExecutionProcessState,
   type SimulationRunProcessEventView,
@@ -25,10 +30,12 @@ import {
  * per scenario run (process key = scenarioRunId). It replaces the old
  * fire-and-forget execution subscriber, the ephemeral Redis-only cancellation
  * path, and read-time stall derivation with durable state: the outbox owns
- * dispatch retries, and the wake owns the stall and cancel-grace backstops.
+ * dispatch retries, and the wake owns the stall, cancel-grace and
+ * evaluation-deadline backstops.
  *
  * There is no `.schedule()` — wakes are per-run deadlines (stall threshold,
- * cancel grace), so every handler returns its own explicit `nextWakeAt`.
+ * cancel grace, evaluation deadline), so every handler returns its own
+ * explicit `nextWakeAt`.
  */
 
 type Ctx = ProcessHandlerContext<SimulationRunExecutionIntents>;
@@ -42,6 +49,25 @@ const finishStalledKey = (scenarioRunId: string) =>
   `finish:${scenarioRunId}:stalled`;
 const finishUnexecutableKey = (scenarioRunId: string) =>
   `finish:${scenarioRunId}:unexecutable`;
+const recordEvaluationsLostKey = (scenarioRunId: string) =>
+  `record_evaluations:${scenarioRunId}:lost`;
+
+/**
+ * The evaluators a finished event says the run is graded with, narrowed to
+ * ids and required flags. Null when the event carries none, or a shape this
+ * version cannot read: the fold and the job read the same field with the same
+ * schema, so a run the process cannot watch is one the job is not queued for.
+ */
+function pendingEvaluatorsOf(
+  data: Record<string, unknown>,
+): PendingEvaluator[] | null {
+  const evaluators = data.evaluators;
+  if (typeof evaluators !== "object" || evaluators === null) return null;
+  const parsed = z
+    .array(pendingEvaluatorSchema)
+    .safeParse((evaluators as Record<string, unknown>).attachments);
+  return parsed.success ? parsed.data : null;
+}
 
 /**
  * The content boundary (`toPayload`): narrows a committed pipeline event to
@@ -55,8 +81,9 @@ const finishUnexecutableKey = (scenarioRunId: string) =>
  * conversation content: the parameter values are customer-chosen run
  * configuration, already durable on the queued event itself.
  *
- * Reads the finished event's `status` only, so it compiles whether or not
- * the enriched finished-event fields have landed yet.
+ * Reads three things off the finished event: `status`, the evaluator ids and
+ * required flags it carries, and whether its results carry evaluations of
+ * their own. The rest of the enriched finished-event fields are not read.
  */
 export function buildSimulationRunEventView(
   event: SimulationProcessingEvent,
@@ -122,6 +149,11 @@ export function buildSimulationRunEventView(
     parameters,
     secretParameters,
     secretParameterNames,
+    evaluators: pendingEvaluatorsOf(data),
+    hasOwnEvaluations:
+      typeof data.results === "object" &&
+      data.results !== null &&
+      (data.results as Record<string, unknown>).evaluations != null,
   };
 }
 
@@ -138,6 +170,10 @@ function currentWake(state: SimulationRunExecutionProcessState): number | null {
       return state.cancelRequestedAtMs === null
         ? null
         : state.cancelRequestedAtMs + CANCEL_GRACE_MS;
+    case "evaluating":
+      return state.finishedAtMs === null
+        ? null
+        : state.finishedAtMs + EVALUATION_DEADLINE_MS;
     default:
       return state.lastActivityAtMs + STALL_THRESHOLD_MS;
   }
@@ -233,6 +269,9 @@ export const handleRunQueued: EventHandler<
     // stalled.
     lastActivityAtMs: refMs,
     cancelRequestedAtMs: state.cancelRequestedAtMs,
+    finishedAtMs: null,
+    pendingEvaluators: null,
+    evaluationsRecorded: state.evaluationsRecorded ?? false,
   };
 
   if (state.cancelRequestedAtMs !== null) {
@@ -306,9 +345,10 @@ export const handleRunActivity: EventHandler<
   if (state.phase === "terminal") {
     return { state, nextWakeAt: null };
   }
-  if (state.phase === "cancelling") {
-    // The child is being torn down; activity no longer resets anything, but
-    // the grace wake must survive.
+  if (state.phase === "cancelling" || state.phase === "evaluating") {
+    // The child is being torn down, or the run is over and only its
+    // evaluators are outstanding; activity no longer resets anything, but the
+    // grace or deadline wake must survive.
     return { state, nextWakeAt: currentWake(state) };
   }
   const refMs = schedulingRef(ctx);
@@ -381,7 +421,7 @@ export const handleCancelRequested: EventHandler<
   }
 };
 
-/** FINISHED / DELETED: the run reached a recorded terminal state. */
+/** DELETED: the run reached a recorded terminal state. */
 export const handleTerminal: EventHandler<
   SimulationRunExecutionProcessState,
   unknown,
@@ -391,6 +431,80 @@ export const handleTerminal: EventHandler<
   nextWakeAt: null,
   intents: [],
 });
+
+/**
+ * FINISHED: the conversation is over. A run that owes its evaluator results
+ * is not terminal yet: it waits in `evaluating` under the evaluation deadline,
+ * carrying the evaluators it owes, until the evaluated event lands or the
+ * wake records the lost job. Every other run goes terminal here.
+ *
+ * The rule is the fold's own (`runAwaitsEvaluations`), read off the same
+ * fields of the same event, so a run stored PENDING_EVALUATION is exactly a
+ * run this process is watching.
+ */
+export const handleRunFinished: EventHandler<
+  SimulationRunExecutionProcessState,
+  unknown,
+  SimulationRunExecutionIntents
+> = (state, payload, ctx) => {
+  // A run finishes exactly once: a redelivered finished event must not
+  // re-arm a deadline the evaluated event already cleared, nor push one back.
+  if (state.phase === "terminal" || state.phase === "evaluating") {
+    return { state, nextWakeAt: currentWake(state) };
+  }
+
+  const view = simulationRunProcessEventViewSchema.parse(payload);
+  const evaluators = view.evaluators ?? [];
+  const awaitsEvaluations =
+    !(state.evaluationsRecorded ?? false) &&
+    runAwaitsEvaluations({
+      status: view.status?.toUpperCase(),
+      hasOwnEvaluations: view.hasOwnEvaluations,
+      attachmentCount: evaluators.length,
+    });
+  if (!awaitsEvaluations) {
+    return { state: { ...state, phase: "terminal" }, nextWakeAt: null };
+  }
+
+  const refMs = schedulingRef(ctx);
+  return {
+    state: {
+      ...state,
+      phase: "evaluating",
+      // Finishing is the run's last sign of life. Stamped so the wake's
+      // untouched-process guard does not clear a deadline for a run whose
+      // finished event is the only one this process ever saw.
+      lastActivityAtMs: refMs,
+      finishedAtMs: refMs,
+      pendingEvaluators: evaluators,
+    },
+    nextWakeAt: refMs + EVALUATION_DEADLINE_MS,
+  };
+};
+
+/**
+ * EVALUATED: the results are in. A run waiting on them goes terminal and its
+ * deadline is cleared. A run that has not finished yet (business time can
+ * land the evaluated event first) records that they are in, so its finished
+ * event goes terminal instead of waiting on nothing.
+ */
+export const handleRunEvaluated: EventHandler<
+  SimulationRunExecutionProcessState,
+  unknown,
+  SimulationRunExecutionIntents
+> = (state) => {
+  if (state.phase === "terminal") {
+    return { state, nextWakeAt: null };
+  }
+  const recorded = { ...state, evaluationsRecorded: true };
+  if (state.phase === "evaluating") {
+    return {
+      state: { ...recorded, phase: "terminal", pendingEvaluators: null },
+      nextWakeAt: null,
+    };
+  }
+  return { state: recorded, nextWakeAt: currentWake(state) };
+};
 
 export const simulationRunExecutionWake: WakeHandler<
   SimulationRunExecutionProcessState,
@@ -428,6 +542,30 @@ export const simulationRunExecutionWake: WakeHandler<
       };
     }
     return { state, nextWakeAt: requestedAtMs + CANCEL_GRACE_MS };
+  }
+
+  if (state.phase === "evaluating") {
+    const finishedAtMs = state.finishedAtMs ?? ctx.now;
+    if (ctx.now - finishedAtMs >= EVALUATION_DEADLINE_MS) {
+      // The evaluated event never came: the grading job was lost outright,
+      // since a job that runs records a result for every evaluator on its
+      // final attempt. Recording one errored result per evaluator hands the
+      // decision to the gate: a required evaluator fails the run, an optional
+      // one leaves the judge's verdict.
+      return {
+        state: { ...state, phase: "terminal", pendingEvaluators: null },
+        nextWakeAt: null,
+        intents: [
+          ctx.intents.record_evaluations(recordEvaluationsLostKey(ctx.key), {
+            scenarioRunId: ctx.key,
+            projectId: ctx.projectId,
+            evaluators: state.pendingEvaluators ?? [],
+            details: EVALUATION_LOST_DETAILS,
+          }),
+        ],
+      };
+    }
+    return { state, nextWakeAt: finishedAtMs + EVALUATION_DEADLINE_MS };
   }
 
   // queued | running

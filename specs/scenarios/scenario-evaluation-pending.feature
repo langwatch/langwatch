@@ -11,67 +11,79 @@ Feature: A run reports that its evaluators have not run yet
     could all read it as passed and then watch a required evaluator turn it
     red.
 
-    A finished run that still owes evaluator results reads with the status
-    PENDING_EVALUATION instead. The stored status stays the terminal one the
-    judge decided, so nothing about recovery changes; the pending status is
-    derived when the run is read, and it lasts until the results are recorded
-    or until the grace period after the run finished runs out, so a job that
-    never completes cannot hold a run open forever.
+    A finished run that still owes evaluator results is stored with the status
+    PENDING_EVALUATION instead, the same way a scheduled run is stored QUEUED.
+    The stored status is the only truth: nothing derives it when the run is
+    read, and no clock is involved. The judge's verdict, reasoning and criteria
+    are stored as they were decided. When the evaluated event records the
+    results, the gate writes the terminal status: a required evaluator that
+    failed or errored fails the run, otherwise the judge's status stands.
 
-  # --- The pending state ---
+    The evaluation job records a result for every attachment on its final
+    attempt, so the evaluated event normally always arrives. The one gap is a
+    job lost outright, a wiped queue or a worker that died with no retry. The
+    run execution process manager covers it: a run that finishes owing results
+    arms a deadline, and if no evaluated event has landed when it passes, one
+    errored result per evaluator is recorded, so a required evaluator that
+    never ran fails the run instead of leaving it pending for good.
+
+  # --- The stored status ---
 
   @unit
-  Scenario: A finished run whose suite attaches evaluators is pending evaluation
+  Scenario: A finished run whose suite attaches evaluators is stored pending evaluation
     Given a run that finished with the verdict "success"
     And its finished event carries two evaluator attachments
     When the run's state is folded
-    Then the run awaits evaluation
+    Then the stored status is PENDING_EVALUATION
+    And the judge's verdict is stored
 
   @unit
-  Scenario: A finished run with no attachments is not pending evaluation
+  Scenario: A finished run with no attachments is stored with the judge's status
     Given a run that finished with the verdict "success"
     And its finished event carries no evaluator attachments
     When the run's state is folded
-    Then the run does not await evaluation
+    Then the stored status is SUCCESS
 
   @unit
-  Scenario: A run that sent its own evaluations is not pending evaluation
+  Scenario: A run that sent its own evaluations is stored with the judge's status
     Given a run whose finished results carry evaluations
     And its finished event carries two evaluator attachments
     When the run's state is folded
-    Then the run does not await evaluation
+    Then the stored status is SUCCESS
 
   @unit
-  Scenario: A run that errored or was cancelled is not pending evaluation
+  Scenario: A run that errored or was cancelled is never pending evaluation
     Given a run that finished with the status ERROR and two evaluator attachments
     When the run's state is folded
-    Then the run does not await evaluation
+    Then the stored status is ERROR
     And the same holds for a run that finished CANCELLED
 
   @unit
-  Scenario: Recording the evaluations clears the pending state
-    Given a run that awaits evaluation
-    When an evaluated event lands
-    Then the run no longer awaits evaluation
+  Scenario: Recording the evaluations writes the gated terminal status
+    Given a run stored PENDING_EVALUATION with the verdict "success"
+    When an evaluated event lands whose evaluators all passed
+    Then the stored status is SUCCESS
+    And when the evaluated event carries a failed required evaluator instead
+    Then the stored status is FAILURE
+
+  @unit
+  Scenario: An evaluated event that lands before the finished event settles the run
+    Given a run whose evaluated event folded before its finished event
+    When the finished event lands carrying two evaluator attachments
+    Then the stored status is the judge's, not PENDING_EVALUATION
 
   # --- What a reader sees ---
 
   @unit
   Scenario: A pending run reads as PENDING_EVALUATION
-    Given a stored run row that finished as SUCCESS and awaits evaluation
+    Given a stored run row with the status PENDING_EVALUATION and the verdict "success"
     When the row is mapped to run data
     Then the status reads PENDING_EVALUATION
     And the judge's verdict is still reported
 
   @unit
-  Scenario: The pending status expires so a lost job cannot hold a run open
-    Given a stored run row that awaits evaluation and finished longer ago than the grace period
-    When the row is mapped to run data
-    Then the status reads SUCCESS
-
-  @unit
-  Scenario: A run that never awaited evaluation reads with its own status
-    Given a stored run row that finished as SUCCESS and does not await evaluation
+  Scenario: A settled run reads with its stored status
+    Given a stored run row with the status SUCCESS
     When the row is mapped to run data
     Then the status reads SUCCESS
 
@@ -89,11 +101,60 @@ Feature: A run reports that its evaluators have not run yet
 
   @integration
   Scenario: A run with attached evaluators reads as pending until they are recorded
-    Given a stored run that finished as SUCCESS and owes its evaluator results
+    Given a stored run with the status PENDING_EVALUATION and the verdict "success"
     When the run and its batch are read back
     Then the run answers the status PENDING_EVALUATION with the judge's verdict
     And the batch counts it as running rather than settled
-    And a run whose results are recorded answers its graded status and settles
+    And a run stored SUCCESS answers that status and settles
+
+  @integration
+  Scenario: The batch and the set aggregates agree on a pending run
+    Given a set whose only batch holds one run stored PENDING_EVALUATION
+    When the batch summary and the set summaries are read back
+    Then the batch counts one running run and no settled run
+    And the set counts no settled run and no passed run
+
+  # --- The lost grading job ---
+
+  @unit
+  Scenario: A run that finishes owing evaluator results arms the evaluation deadline
+    Given the run execution process of a running run
+    When the finished event lands carrying two evaluator attachments
+    Then the process waits for the evaluators with a wake at the evaluation deadline
+    And it keeps the evaluators the run owes
+
+  @unit
+  Scenario: A run that finishes owing nothing goes terminal
+    Given the run execution process of a running run
+    When the finished event lands with no attachments, with its own evaluations, or errored
+    Then the process goes terminal and clears its wake
+
+  @unit
+  Scenario: The evaluated event ends the wait
+    Given the run execution process of a run waiting for its evaluators
+    When the evaluated event lands
+    Then the process goes terminal and clears its wake
+
+  @unit
+  Scenario: A lost grading job is recorded as errored evaluators after the deadline
+    Given the run execution process of a run waiting for its evaluators
+    When the wake fires after the evaluation deadline with no evaluated event
+    Then the process records one errored result per evaluator the run owes
+    And the results say the evaluation did not complete
+    And the process goes terminal
+
+  @unit
+  Scenario: The deadline wake stays armed while the deadline has not passed
+    Given the run execution process of a run waiting for its evaluators
+    When the wake fires before the evaluation deadline
+    Then the process keeps waiting with the same deadline
+
+  @unit
+  Scenario: The lost-job results reach the run through the record evaluations command
+    Given a record evaluations intent for two evaluators, one required
+    When the intent is executed
+    Then the record evaluations command receives one errored result per evaluator
+    And each result carries the evaluator's name and whether it is required
 
   # --- What the run is graded against ---
 
