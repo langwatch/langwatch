@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.3.2](https://github.com/langwatch/langwatch/compare/python-sdk@v1.3.1...python-sdk@v1.3.2) (2026-09-05)
+
+
+### Bug Fixes
+
+* **python-sdk:** give ConnectedAgent the scenario agent role ([#7871](https://github.com/langwatch/langwatch/issues/7871)) ([ddcf2e8](https://github.com/langwatch/langwatch/commit/ddcf2e8e673aaf2def5780d70bf9d08791c91f2e))
+* **python-sdk:** only fall back on a missing scenario package ([#7876](https://github.com/langwatch/langwatch/issues/7876)) ([7b67528](https://github.com/langwatch/langwatch/commit/7b6752831d0990528464d1bed93abb73645bda71))
+
+
+### Documentation
+
+* **improve-your-agent:** follow-ups: plain connected target, native GEPA tracking, writing-rules sweep ([#7897](https://github.com/langwatch/langwatch/issues/7897)) ([a710273](https://github.com/langwatch/langwatch/commit/a7102738c0f13b9c8dd8152c3b947d72f4b604c4))
+* **improve-your-agent:** the agent improvement loop and the optimization guides ([#7868](https://github.com/langwatch/langwatch/issues/7868)) ([c96d20f](https://github.com/langwatch/langwatch/commit/c96d20f35b9644a84e2345a4e98e8e810b87e936))
+
 ## [1.3.1](https://github.com/langwatch/langwatch/compare/python-sdk@v1.3.0...python-sdk@v1.3.1) (2026-09-01)
 
 
