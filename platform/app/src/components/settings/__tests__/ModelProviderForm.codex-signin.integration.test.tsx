@@ -14,11 +14,9 @@
  *   Save has nothing left to do) and queues the coding-defaults ask to the
  *   page-level host instead of mounting a dialog inside the drawer.
  *
- * Mirrors ModelProviderForm.azure-safety.integration.test.tsx's mock
- * setup; the api mock additionally feeds CodexSignIn's status/sign-in
- * endpoints so the real component renders.
+ * Uses the shared model-provider drawer harness; the api mock also feeds
+ * CodexSignIn's status/sign-in endpoints so the real component renders.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
   cleanup,
   fireEvent,
@@ -33,113 +31,24 @@ import type {
   UseModelProviderFormState,
 } from "../../../hooks/useModelProviderForm";
 import type { MaybeStoredModelProvider } from "../../../server/modelProviders/registry";
-
-// ---------------------------------------------------------------------------
-// Mocks
-// ---------------------------------------------------------------------------
-
-const {
-  mockUseModelProviderForm,
-  mockUseModelProvidersSettings,
-  mockListAllForOrgQuery,
-  mockListAllForProjectQuery,
-  mockCloseDrawer,
-  mockCodexSignInStart,
-  mockCodexSignInPoll,
-} = vi.hoisted(() => ({
-  mockUseModelProviderForm: vi.fn(),
-  mockUseModelProvidersSettings: vi.fn(),
-  mockListAllForOrgQuery: vi.fn(),
-  mockListAllForProjectQuery: vi.fn(),
-  mockCloseDrawer: vi.fn(),
-  mockCodexSignInStart: vi.fn(),
-  mockCodexSignInPoll: vi.fn(),
-}));
-
-vi.mock("../../../hooks/useModelProviderForm", () => ({
-  useModelProviderForm: (...args: unknown[]) =>
-    mockUseModelProviderForm(...args),
-}));
-
-vi.mock("../../../hooks/useModelProvidersSettings", () => ({
-  useModelProvidersSettings: (...args: unknown[]) =>
-    mockUseModelProvidersSettings(...args),
-}));
-
-vi.mock("../../../hooks/useDrawer", () => ({
-  useDrawer: () => ({
-    closeDrawer: mockCloseDrawer,
-    openDrawer: vi.fn(),
-  }),
-}));
-
-vi.mock("../../../hooks/useOrganizationTeamProject", () => ({
-  useOrganizationTeamProject: () => ({
-    project: { id: "proj-1", slug: "test-project", defaultModel: null },
-    organization: { id: "org-1" },
-    hasPermission: () => false,
-  }),
-}));
-
-vi.mock("../../../hooks/useModelProviderApiKeyValidation", () => ({
-  useModelProviderApiKeyValidation: () => ({
-    validate: vi.fn().mockResolvedValue(true),
-    validateWithCustomUrl: vi.fn().mockResolvedValue(true),
-    isValidating: false,
-    validationError: undefined,
-    clearError: vi.fn(),
-  }),
-}));
-
-vi.mock("../../../hooks/useFeatureFlag", () => ({
-  useFeatureFlag: () => ({ enabled: false, isLoading: false }),
-}));
-
-vi.mock("../../../utils/api", () => ({
-  api: {
-    useUtils: () => ({
-      modelProvider: { invalidate: vi.fn() },
-    }),
-    modelProvider: {
-      isManagedProvider: {
-        useQuery: () => ({ data: { managed: false } }),
-      },
-      listAllForOrganizationForFrontend: { useQuery: mockListAllForOrgQuery },
-      listAllForProjectForFrontend: { useQuery: mockListAllForProjectQuery },
-      // CodexSignIn's own endpoints: idle, not yet connected.
-      codexStatus: {
-        useQuery: () => ({ data: { connected: false }, isLoading: false }),
-      },
-      codexSignInStart: {
-        useMutation: () => ({
-          mutateAsync: mockCodexSignInStart,
-          isLoading: false,
-        }),
-      },
-      codexSignInPoll: {
-        useMutation: () => ({
-          mutateAsync: mockCodexSignInPoll,
-          isLoading: false,
-        }),
-      },
-      delete: {
-        useMutation: () => ({ mutateAsync: vi.fn(), isLoading: false }),
-      },
-    },
-  },
-}));
-
-// Import after mocks
+import {
+  modelProviderDrawerMocks,
+  resetModelProviderDrawerMocks,
+  Wrapper,
+} from "./modelProviderDrawerHarness";
 import { useCodexCodingDefaultsAskStore } from "../CodexCodingDefaultsAsk";
 import { EditModelProviderForm } from "../ModelProviderForm";
 
-// ---------------------------------------------------------------------------
-// Test helpers
-// ---------------------------------------------------------------------------
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
+const {
+  mockListAllForOrganizationForFrontendQuery: mockListAllForOrgQuery,
+  mockListAllForProjectForFrontendQuery: mockListAllForProjectQuery,
+  mockCloseDrawer,
+  mockCodexSignInStart,
+  mockCodexSignInPoll,
+  mockUseModelProviderForm,
+  mockUseModelProvidersSettings,
+  mockUseOrganizationTeamProject,
+} = modelProviderDrawerMocks;
 
 function buildState(
   overrides: Partial<UseModelProviderFormState> = {},
@@ -224,6 +133,27 @@ function primeHooksForProvider({
   state?: Partial<UseModelProviderFormState>;
   actions?: Partial<UseModelProviderFormActions>;
 }) {
+  mockUseOrganizationTeamProject.mockReturnValue({
+    project: {
+      id: "proj-1",
+      name: "Web App",
+      slug: "test-project",
+      defaultModel: null,
+    },
+    team: { id: "team-1", name: "Platform" },
+    organization: {
+      id: "org-1",
+      name: "Acme",
+      teams: [
+        {
+          id: "team-1",
+          name: "Platform",
+          projects: [{ id: "proj-1", name: "Web App" }],
+        },
+      ],
+    },
+    hasPermission: () => false,
+  });
   const provider = buildProvider({ provider: providerKey });
   mockUseModelProvidersSettings.mockReturnValue({
     providers: { [providerKey]: provider },
@@ -268,7 +198,7 @@ function renderForm(providerKey: string) {
 
 describe("Feature: Codex model provider form rendering", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    resetModelProviderDrawerMocks();
     useCodexCodingDefaultsAskStore.setState({ pending: null });
   });
 
