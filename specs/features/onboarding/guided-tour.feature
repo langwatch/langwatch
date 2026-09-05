@@ -192,6 +192,13 @@ Feature: Guided onboarding tour
     Then the drawer's own submit runs, so the key is created for real
 
   @unit
+  Scenario: a replay of the gateway tour never mints a duplicate key name
+    Given the organization already has a key named "production-app"
+    When the name step types the key name
+    Then it types the first name the listed keys do not carry: "production-app-2", then "-3" and so on
+    And the caption still reads "I'll name it for you."
+
+  @unit
   Scenario: the secret step reveals the secret
     Given the create request was sent by the previous step
     Then the secret step waits up to fifteen seconds for the key to be created
@@ -271,8 +278,9 @@ Feature: Guided onboarding tour
   @unit
   Scenario: replay from the card runs the tour from step 1
     Given the tour was completed
-    When the card asks for a replay
-    Then the tour runs again from step 1
+    When the card asks for a replay, naming the kickoff's path
+    Then that path's tour runs again from step 1
+    And it runs even after a reload, when nothing has run on this page yet
     And no kickoff is queued when it ends
 
   # ============================================================================

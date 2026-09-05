@@ -14,6 +14,7 @@ import { Drawer } from "~/components/ui/drawer";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
+import { freeName } from "~/features/guided-onboarding/tour/freeName";
 import { useRegisterTourActions } from "~/features/guided-onboarding/tour/tourRegistry";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
@@ -316,7 +317,9 @@ export function VirtualKeyCreateDrawer({
   // The guided tour types the name and submits through the drawer's own
   // state and submit, so the key it mints is a real one. The submit is read
   // through a ref: the handlers register once, the submit closes over the
-  // latest form. Spec: specs/features/onboarding/guided-tour.feature
+  // latest form. The name it types is the first one the organization's
+  // listed keys do not carry yet, so a replay never mints a duplicate.
+  // Spec: specs/features/onboarding/guided-tour.feature
   const submitRef = useRef(handleSubmit);
   submitRef.current = handleSubmit;
   const typingTimers = useRef<number[]>([]);
@@ -328,7 +331,12 @@ export function VirtualKeyCreateDrawer({
   );
   const tourActions = useMemo(
     () => ({
-      typeVirtualKeyName: (typed: string) => {
+      typeVirtualKeyName: (wanted: string) => {
+        const listed = utils.virtualKeys.list.getData({ organizationId }) ?? [];
+        const typed = freeName({
+          wanted,
+          taken: listed.map((key) => key.name),
+        });
         for (const t of typingTimers.current) clearTimeout(t);
         typingTimers.current = [];
         setName("");
@@ -340,7 +348,7 @@ export function VirtualKeyCreateDrawer({
       },
       submitVirtualKeyCreate: () => void submitRef.current(),
     }),
-    [],
+    [utils, organizationId],
   );
   useRegisterTourActions(tourActions);
 

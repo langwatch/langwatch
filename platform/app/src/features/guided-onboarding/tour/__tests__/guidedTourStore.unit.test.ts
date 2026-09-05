@@ -65,9 +65,19 @@ describe("guided tour store", () => {
       expect(onEnd).toHaveBeenCalledTimes(1);
     });
 
-    it("does nothing before any tour ran", () => {
+    it("does nothing before any tour ran when no path is named", () => {
       useGuidedTourStore.getState().replay();
       expect(useGuidedTourStore.getState().running).toBe(false);
+    });
+
+    /** @scenario replay from the card runs the tour from step 1 */
+    it("runs the path the card names, even before any tour ran here", () => {
+      useGuidedTourStore.getState().replay("gateway");
+      const s = useGuidedTourStore.getState();
+      expect(s.running).toBe(true);
+      expect(s.path).toBe("gateway");
+      expect(s.stepIndex).toBe(0);
+      expect(s.onEnd).toBeNull();
     });
   });
 

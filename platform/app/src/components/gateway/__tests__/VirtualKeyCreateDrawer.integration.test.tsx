@@ -11,11 +11,12 @@
  * Spec: specs/ai-gateway/virtual-key-creation.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { useTourRegistry } from "~/features/guided-onboarding/tour/tourRegistry";
 import { VirtualKeyCreateDrawer } from "../VirtualKeyCreateDrawer";
 
 const ORG_ID = "org-acme";
@@ -77,7 +78,10 @@ vi.mock("~/utils/api", () => ({
   api: {
     useUtils: () => ({
       virtualKeys: {
-        list: { invalidate: async () => undefined },
+        list: {
+          invalidate: async () => undefined,
+          getData: () => listedKeys,
+        },
         applicableBudgets: { invalidate: async () => undefined },
       },
     }),
@@ -150,6 +154,8 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
+let listedKeys: { name: string }[] = [];
+
 const Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
@@ -184,9 +190,39 @@ describe("given the new-virtual-key drawer", () => {
     });
     applicableBudgetsData.rows = [];
     capturedApplicableInputs.length = 0;
+    listedKeys = [];
   });
 
   afterEach(() => cleanup());
+
+  describe("when the guided tour types the key name", () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    const typeThroughTheTour = (wanted: string) => {
+      act(() => {
+        useTourRegistry.getState().actions.typeVirtualKeyName?.(wanted);
+      });
+      act(() => vi.advanceTimersByTime(60 * (wanted.length + 3)));
+      return (
+        screen.getByPlaceholderText("e.g. codex-prod") as HTMLInputElement
+      ).value;
+    };
+
+    /** @scenario a replay of the gateway tour never mints a duplicate key name */
+    it("types the wanted name when no listed key carries it", () => {
+      listedKeys = [{ name: "staging-app" }];
+      renderDrawer();
+      expect(typeThroughTheTour("production-app")).toBe("production-app");
+    });
+
+    /** @scenario a replay of the gateway tour never mints a duplicate key name */
+    it("types the first free suffix when the name is already taken", () => {
+      listedKeys = [{ name: "production-app" }, { name: "production-app-2" }];
+      renderDrawer();
+      expect(typeThroughTheTour("production-app")).toBe("production-app-3");
+    });
+  });
 
   describe("when it opens for the current project", () => {
     /** @scenario The drawer states where this key's traces and costs will land */

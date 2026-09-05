@@ -40,7 +40,7 @@ export function GuidedTourCard({
   const tone = CARD_TAXONOMY.activity;
 
   const replay = () => {
-    useGuidedTourStore.getState().replay();
+    useGuidedTourStore.getState().replay(kickoff.path);
     if (organizationId) {
       recordTour.mutate({ organizationId, status: "replayed" });
     }

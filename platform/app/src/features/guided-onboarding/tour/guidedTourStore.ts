@@ -33,8 +33,12 @@ interface GuidedTourState {
     path: GuidedPath,
     options?: { onEnd?: (status: TourEndStatus) => void },
   ) => void;
-  /** Runs the last path's tour again from step 1, queueing nothing at the end. */
-  replay: () => void;
+  /**
+   * Runs a tour again from step 1, queueing nothing at the end: `path`'s,
+   * or the last one run when none is named. The card names the path, so a
+   * replay works after a reload, when this store has run nothing yet.
+   */
+  replay: (path?: GuidedPath) => void;
   goToStep: (index: number) => void;
   /** Ends the run: the layer takes over with the handoff animation. */
   end: (status: TourEndStatus) => void;
@@ -66,11 +70,12 @@ export const useGuidedTourStore = create<GuidedTourState>()((set, get) => ({
     }));
   },
 
-  replay: () => {
-    const { path } = get();
+  replay: (wanted) => {
+    const path = wanted ?? get().path;
     if (!path || TOUR_STEPS[path].length === 0) return;
     set((state) => ({
       running: true,
+      path,
       stepIndex: 0,
       handoff: null,
       runId: state.runId + 1,
