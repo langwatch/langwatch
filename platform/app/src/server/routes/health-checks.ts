@@ -19,11 +19,17 @@ import type {
 import crypto from "crypto";
 import { nanoid } from "nanoid";
 import { env } from "~/env.mjs";
-import { createServiceApp, publicEndpoint } from "~/server/api/security";
+import {
+  createServiceApp,
+  internalSecret,
+  publicEndpoint,
+} from "~/server/api/security";
 import { prisma } from "~/server/db";
 import { sendCanary } from "~/server/health-probes/canary.service";
+import { runScenarioHealthCanary } from "~/server/health-probes/scenario-canary.service";
 import type { CollectorRESTParams } from "~/server/tracer/types";
 import type { DeepPartial } from "~/utils/types";
+import { validateInternalSecret } from "./_lib/internal-secret";
 
 const logger = createLogger("langwatch:health-checks");
 
@@ -529,6 +535,78 @@ secured
       status: response?.status,
       body: await response?.json(),
     });
+  });
+
+// ── GET /scenarios ───────────────────────────────────────────────────
+
+// Fires a real scenario run for the run plan named by `?runPlanId=<SimulationSuite
+// id>` (a `run_plan` suite holding exactly one scenario and one target) and
+// reports what broke. The plan's own row supplies the project, scenario and
+// target — nothing else on the request can redirect the run. Authenticated by
+// the shared internal secret (a status-page poller has no user session and no
+// project API key), checked BEFORE the run plan is read or any run is queued.
+//
+//   400 { message }                                         no runPlanId given
+//   200 { status: "ok", scenarioRunId, durationMs }         healthy
+//   503 { status: "unhealthy", reason, scenarioRunId?, durationMs }
+//   429 { status: "busy" }                                  already in flight
+//
+// Every response carries `Cache-Control: no-store` — a monitor must see each
+// run's real result, never a cached one.
+//
+// @see specs/scenarios/scenario-canary-healthcheck.feature
+secured
+  .access(
+    internalSecret(
+      "scenario canary health probe — CRON_API_KEY shared secret checked " +
+        "in-handler via validateInternalSecret before any run is queued",
+    ),
+  )
+  .get("/scenarios", async (c) => {
+    // A monitor may poll this on an interval; a cached 200/503 would hide the
+    // next run's real result, so no response on any path is cacheable. Set once
+    // before the branches so every return below inherits it.
+    c.header("Cache-Control", "no-store");
+
+    if (!c.req.header("authorization")) {
+      return c.json(
+        { message: "Authentication token is required." },
+        { status: 401 },
+      );
+    }
+    if (!validateInternalSecret(c)) {
+      return c.json({ message: "Invalid auth token." }, { status: 403 });
+    }
+
+    const runPlanId = c.req.query("runPlanId")?.trim();
+    if (!runPlanId) {
+      return c.json(
+        { message: "runPlanId query parameter is required." },
+        { status: 400 },
+      );
+    }
+
+    const result = await runScenarioHealthCanary(runPlanId);
+
+    if ("busy" in result) {
+      return c.json({ status: "busy" }, { status: 429 });
+    }
+    if (result.healthy) {
+      return c.json({
+        status: "ok",
+        scenarioRunId: result.scenarioRunId,
+        durationMs: result.durationMs,
+      });
+    }
+    return c.json(
+      {
+        status: "unhealthy",
+        reason: result.reason,
+        scenarioRunId: result.scenarioRunId,
+        durationMs: result.durationMs,
+      },
+      { status: 503 },
+    );
   });
 
 export const app = secured.hono;
