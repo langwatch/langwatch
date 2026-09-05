@@ -101,6 +101,16 @@ describe("resolveNavigateFallbackUrl", () => {
     });
   });
 
+  describe("given the governance sources page name", () => {
+    /** @scenario "The governance path asks where to start" */
+    it("resolves the inventory page on its sources tab under the project slug", async () => {
+      expect(await resolve("governance-sources")).toBe(
+        "https://app.langwatch.ai/acme/governance/inventory?tab=sources",
+      );
+      expect(getScenarioRunData).not.toHaveBeenCalled();
+    });
+  });
+
   describe("given a scenario-run id the project can see", () => {
     it("looks the run up with the project's own access and returns the platform-computed drawer url", async () => {
       getScenarioRunData.mockResolvedValue({ scenarioRunId: RUN_ID });

@@ -61062,7 +61062,7 @@ Langy asks which way to use the first time a request needs a code change. Reques
     Ask Langy for something that lives in your code: "instrument my traces", "fix the agent behind this failing scenario", "add a plan parameter to my connected agent". Langy explains what it will change and shows the code access card with two options: share your local folder, or use GitHub.
   </Step>
   <Step title="Run the command in the folder">
-    Pick "Share my local folder". The card shows one command. Run it in the folder you want Langy to work in:
+    Pick "Share local folder". The card shows one command. Run it in the folder you want Langy to work in:
 
     ```bash
     npx langwatch@latest langy --share-control

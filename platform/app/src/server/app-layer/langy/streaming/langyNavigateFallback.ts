@@ -57,6 +57,7 @@ const NAVIGATE_PAGES: Record<string, string> = {
   analytics: "/analytics",
   annotations: "/annotations",
   automations: "/automations",
+  "governance-sources": "/governance/inventory?tab=sources",
 };
 
 /**

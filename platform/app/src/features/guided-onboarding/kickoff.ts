@@ -42,6 +42,11 @@ export const guidedKickoffInputSchema = z.object({
 });
 export type GuidedKickoffInput = z.infer<typeof guidedKickoffInputSchema>;
 
+/** What the tour hands the panel: the input plus the attached conversation, if any. */
+export type GuidedKickoff = GuidedKickoffInput & {
+  conversationId?: string | null;
+};
+
 export const guidedKickoffPartSchema = z
   .object({ type: z.literal(GUIDED_ONBOARDING_KICKOFF_PART_TYPE) })
   .and(guidedKickoffInputSchema);
@@ -136,7 +141,7 @@ export function planGuidedKickoffSend({
   kickoff,
   organizationId,
 }: {
-  kickoff: GuidedKickoffInput & { conversationId?: string | null };
+  kickoff: GuidedKickoff;
   organizationId: string | null;
 }): {
   continuing: boolean;

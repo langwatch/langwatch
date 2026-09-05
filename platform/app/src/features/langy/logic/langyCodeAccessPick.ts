@@ -2,7 +2,7 @@
  * Which way the developer chose to reach their code, for one card (ADR-129).
  *
  * The card asks until the developer answers, and the answer has to survive a
- * reload: picking "Share my local folder" turns the card into the command and
+ * reload: picking "Share local folder" turns the card into the command and
  * the countdown, and a refresh while the terminal is still being opened must
  * show the same card rather than the question again.
  *

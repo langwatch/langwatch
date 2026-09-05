@@ -11,6 +11,23 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { LangyDerivedChoicesCard } from "@langwatch/langy";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("~/utils/compat/next-router", () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
+
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+  useOrganizationTeamProject: () => ({
+    project: { id: "p_demo", slug: "demo" },
+  }),
+}));
+
+vi.mock("~/utils/api", () => ({
+  api: {
+    useUtils: () => ({}),
+    publicEnv: { useQuery: () => ({ data: {} }) },
+  },
+}));
+
 import { LangyChoicesCard } from "../components/derived-cards/LangyChoicesCard";
 
 afterEach(cleanup);
@@ -50,7 +67,7 @@ describe("given an open choices card whose second option is quiet", () => {
     expect(go!.getAttribute("data-quiet")).toBeNull();
     expect(chat!.getAttribute("data-quiet")).toBe("true");
     expect(chat!.textContent).toBe("Chat about this");
-    expect(getComputedStyle(chat!).textDecorationLine).toContain("underline");
+    expect(getComputedStyle(chat!).textDecoration).toContain("underline");
     expect(
       go!.compareDocumentPosition(chat!) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();

@@ -55,9 +55,9 @@ export const LANGY_CODE_ACCESS_OPTIONS = {
   DESCRIBE: "describe",
 } as const;
 
-const LOCAL_LABEL = "Share my local folder";
+const LOCAL_LABEL = "Share local folder";
 const LOCAL_SUBTITLE = "Fastest: I run the toolchain you already have";
-const GITHUB_LABEL = "Use GitHub";
+const GITHUB_LABEL = "Connect to GitHub";
 const GITHUB_SUBTITLE =
   "I open a pull request through the LangWatch GitHub App";
 /** The quiet third way out, offered only when the tool asked for it. */
