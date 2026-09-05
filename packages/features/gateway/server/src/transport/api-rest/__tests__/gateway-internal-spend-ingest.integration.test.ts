@@ -1,16 +1,6 @@
 /**
  * @vitest-environment node
- *
- * Attribution enrichment at the spend-command ingest seam, against real
- * Postgres and the real signed internal route.
- *
- * The gateway knows the key and the project; the team and the key's
- * principal live on control-plane rows it never reads. This suite pins the
- * join the ingest seam does on its behalf, and the two ways it can come up
- * short: a MISSING row degrades one record and says so, an unreadable
- * database fails the whole batch so the drainer comes back.
- *
- * Spec: specs/ai-gateway/billing-spend-events.feature
+ * Real Postgres + real signed internal route. The gateway knows the key and project; team and principal live on control-plane rows it never reads. Pins the ingest seam's join and its two failure modes: a MISSING row degrades one record and says so; an unreadable database fails the whole batch so the drainer retries. Spec: specs/ai-gateway/billing-spend-events.feature
  */
 import { nanoid } from "nanoid";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";

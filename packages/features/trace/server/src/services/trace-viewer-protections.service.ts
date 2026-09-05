@@ -8,10 +8,7 @@ export interface CategoryVisibility {
   /** Whether the viewer may read this category's content. */
   canSee: boolean;
   /**
-   * Human audience label for a `restrict` rule on this category ("Admins,
-   * Security group" or "no one"), set whether or not the viewer can see it: it
-   * names the audience on a hidden placeholder AND tells an in-audience viewer
-   * the content is restricted (rather than ordinary). Null for plain capture.
+   * Human audience label for a `restrict` rule on this category ("Admins, Security group" or "no one"), set whether or not the viewer can see it: it names the audience on a hidden placeholder AND tells an in-audience viewer the content is restricted (rather than ordinary). Null for plain capture.
    */
   restrictVisibleTo: string | null;
 }
@@ -36,12 +33,11 @@ export interface Protections {
   // placeholder naming `visibleTo`. Patterns may carry `*` wildcards. Absent or
   // empty when nothing is hidden for the viewer.
   hiddenAttributes?: Array<{ pattern: string; visibleTo: string }>;
-  // ALL custom-attribute `restrict` rules the read path surfaces (not only the
-  // ones hidden from this viewer), each with whether THIS viewer may read a
-  // matching value. The trace view marks matching attribute rows and tells an
-  // in-audience viewer (`canSee: true`) which audience the attribute is limited
-  // to. `hiddenAttributes` is the `canSee: false` subset kept for the redaction
-  // mappers. Patterns may carry `*` wildcards.
+  // ALL custom-attribute `restrict` rules the read path surfaces (not only the ones
+  // hidden from this viewer), each with whether THIS viewer may read a matching value.
+  // The trace view marks matching rows and tells an in-audience viewer (`canSee: true`)
+  // which audience the attribute is limited to; `hiddenAttributes` is the `canSee: false`
+  // subset for the redaction mappers. Patterns may carry `*` wildcards.
   restrictedAttributes?: Array<{
     pattern: string;
     visibleTo: string;
@@ -61,16 +57,7 @@ export class TraceViewerProtectionsService {
   }
 
   /**
-   * Whether this viewer may read text the model wrote FROM the conversation, as
-   * opposed to a fact about it.
-   *
-   * Both sides are required. A summary, a title or an evaluator's prose
-   * routinely paraphrases the prompt and the reply together, so a viewer allowed
-   * only one of them could read the other out of it.
-   *
-   * The one place this rule is written down: every surface carrying such text
-   * (the Sessions lens, the Sessions screen, the pull request detail, evaluator
-   * verdicts) asks here, so none of them can drift behind the others.
+   * Whether this viewer may read text the model wrote FROM the conversation, as opposed to a fact about it. Both sides are required — a summary, title or evaluator's prose routinely paraphrases the prompt and reply together, so a viewer allowed only one could read the other out of it. The one place this rule is written down: every surface carrying such text (Sessions lens, Sessions screen, pull request detail, evaluator verdicts) asks here, so none can drift behind the others.
    */
   static canReadCapturedContent = (protections: Protections): boolean =>
     protections.canSeeCapturedInput === true && protections.canSeeCapturedOutput === true;

@@ -47,11 +47,7 @@ export interface ExpressionCategoricalDef extends BaseFacetDef {
   kind: "categorical";
   expression: string;
   /**
-   * In-memory accessor mirroring `expression`, letting the filter compiler
-   * evaluate this field against fold state without a ClickHouse round-trip.
-   * Present on the auto-derived `trace_summaries` facets (cheap reads over
-   * `TraceSummaryData`); cross-table facets attach their per-collection read in
-   * `filter-to-clickhouse/build-handlers.ts` instead.
+   * In-memory accessor mirroring expression, letting the filter compiler evaluate this field against fold state without a ClickHouse round-trip. Present on auto-derived trace_summaries facets (cheap TraceSummaryData reads); cross-table facets attach their per-collection read in filter-to-clickhouse/build-handlers.ts instead.
    */
   read?: CategoricalRead;
 }
@@ -65,12 +61,7 @@ export interface RangeFacetDef extends BaseFacetDef {
   kind: "range";
   expression: string;
   /**
-   * When true, this integer facet can ALSO be presented as a "Discrete"
-   * tick-list (distinct values + counts), not just a min/max slider. Discover
-   * computes the distinct values for these facets; the sidebar falls back to
-   * the slider when the distinct count exceeds the discrete threshold. Only
-   * set on small, naturally-bounded integer columns (e.g. prompt version,
-   * span count) — each flag adds one GROUP BY query to discovery.
+   * When true, this integer facet can ALSO present as a "Discrete" tick-list (distinct values + counts), not just min/max. Discover computes distinct values; sidebar falls back to the slider past the discrete threshold. Only set on small, naturally-bounded columns (prompt version, span count) — each flag adds one GROUP BY to discovery.
    */
   isDiscrete?: boolean;
   /** In-memory accessor mirroring `expression`. See {@link ExpressionCategoricalDef.read}. */
@@ -227,12 +218,11 @@ export class ClickHouseFacetRegistryAdapter {
       label: "Annotation",
       group: "trace",
       table: "trace_summaries",
-      // `HasAnnotation` is `Nullable(Bool)` and is written as NULL for traces
-      // that were never annotated, so a bare `if(HasAnnotation, ...)` returns
-      // NULL — not `'unannotated'` — and those traces drop out of both the facet
-      // counts and the `annotation:unannotated` filter, while the `read` below
-      // calls them unannotated. Coalesce, matching the analytics filter's
-      // `HasAnnotation = false OR HasAnnotation IS NULL`.
+      // HasAnnotation is Nullable(Bool), written NULL for never-annotated
+      // traces, so a bare if(HasAnnotation, ...) returns NULL, not
+      // 'unannotated' — dropping those traces from both facet counts and
+      // the annotation:unannotated filter. Coalesce, matching the analytics
+      // filter's HasAnnotation = false OR HasAnnotation IS NULL.
       expression: "if(ifNull(HasAnnotation, false), 'annotated', 'unannotated')",
       read: (t) => (t.summary.annotationIds.length > 0 ? "annotated" : "unannotated"),
     },
@@ -389,12 +379,10 @@ export class ClickHouseFacetRegistryAdapter {
       read: (t) => t.summary.spanCount,
     },
     {
-      // Stored payload size of the trace in bytes — the materialised
-      // `_size_bytes` column (CH-native `byteSize(...)` over the heavy
-      // payload columns; see migration 00032). SELECT-only: it's a
-      // MATERIALIZED column so it never appears in INSERTs. High-cardinality,
-      // so it stays a min/max slider (no `isDiscrete`). Cells humanise the
-      // value (`1.4 MB`), so no unit lives in the label.
+      // Stored trace payload size in bytes — the materialised _size_bytes
+      // column (CH-native byteSize(...), migration 00032). SELECT-only
+      // (MATERIALIZED, never in INSERTs). High-cardinality, so it stays a
+      // min/max slider (no isDiscrete); cells humanise the value (1.4 MB).
       key: "size",
       kind: "range",
       label: "Storage size",
@@ -428,13 +416,11 @@ export class ClickHouseFacetRegistryAdapter {
       label: "Evaluator verdict",
       group: "evaluation",
       table: "evaluation_runs",
-      // Surface a 5-way label so users can pick pass / fail / error / skipped /
-      // unknown without dealing with the 0/1/null underlying UInt8 storage.
-      // `error` and `skipped` take precedence: a run that crashed or never ran
-      // has a meaningless Passed column, and mapping either to 'unknown' buried
-      // it next to score-only runs where it could not be filtered for (#6835).
-      // The sidebar's "Errored" pill counts `Status = 'error'`, so the error
-      // arm must stay aligned with it.
+      // Surfaces a 5-way label (pass/fail/error/skipped/unknown) over the
+      // 0/1/null UInt8 storage. error/skipped take precedence: a crashed or
+      // never-run run has a meaningless Passed column, and mapping either to
+      // 'unknown' buried it next to score-only runs, unfilterable (#6835).
+      // Errored pill counts Status='error', so this arm must stay aligned.
       expression:
         "multiIf(Status = 'error', 'error', Status = 'skipped', 'skipped', Passed = 1, 'pass', Passed = 0, 'fail', 'unknown')",
     },

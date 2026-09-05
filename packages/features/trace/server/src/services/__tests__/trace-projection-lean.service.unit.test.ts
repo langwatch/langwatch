@@ -1,12 +1,6 @@
 /**
- * Unit tests for `TraceProjectionLeanService.leanForProjection` — ADR-022 §"Interposition derives lean shapes".
- *
- * These tests FAIL at unit runtime (TraceProjectionLeanService.leanForProjection throws "not implemented")
- * but pass typecheck. They are the TDD contract for Step 5 of the ADR-022
- * implementation plan.
- *
- * BDD structure: describe("given X") → describe("when Y") → it("…").
- * No "should" in it() names (project convention).
+ * @see ADR-022 §"Interposition derives lean shapes"
+ * Unit tests for leanForProjection. These tests FAIL at unit runtime (throws "not implemented") but pass typecheck — the TDD contract for Step 5 of the ADR-022 plan.
  */
 
 import { TraceProjectionLeanService } from "../trace-projection-lean.service";
@@ -349,10 +343,7 @@ describe("given a SpanReceived event with gen_ai.input.messages exceeding IO_PRE
 // ---------------------------------------------------------------------------
 
 /**
- * The real Langy/opencode shape: a chat array whose FIRST message is a huge
- * developer-role system prompt (alone over the 64 KB budget) and whose LAST
- * message is the user's short text. A blind byte cut kept only unparseable
- * developer-prompt JSON — the user's "hi" lives past the cut.
+ * The real Langy/opencode shape: a chat array whose FIRST message is a huge developer-role system prompt (alone over the 64 KB budget) and whose LAST message is the user's short text. A blind byte cut kept only unparseable developer-prompt JSON — the user's "hi" lives past the cut.
  */
 function chatPayloadWithHugeDeveloperPrompt(): string {
   return JSON.stringify([

@@ -1,10 +1,7 @@
 /**
  * @see specs/ai-gateway/budgets.feature
- *
- * Which period an anchored budget row is in, and the floor a spend read for
- * it has to honor. The cycle arithmetic these sit on is exercised next door
- * in anchoredBudgetCycles.unit.test.ts; this file is about what the stored
- * columns of a row mean once the anchor is applied to them.
+ * Which period an anchored budget row is in, and the floor a spend read
+ * for it must honor (cycle arithmetic itself: anchoredBudgetCycles.unit.test.ts).
  */
 
 import { describe, expect, it, vi } from "vitest";
@@ -198,12 +195,8 @@ describe("GatewayService.create with a cycle anchor", () => {
   }
 
   /**
-   * The process's own composition, over the fake database.
-   *
-   * `GatewayService` takes a repository and a `ProjectService` now rather than
-   * a `PrismaClient`, and the anchor refusal itself moved into
-   * `PrismaGatewayBudgetRepository.create`. Composing the pair the way
-   * `PrismaGatewayAdapter` composes it is what keeps that refusal reachable.
+   * Composed the way `PrismaGatewayAdapter` composes it — see
+   * dev/docs/best_practices/service-repository-adapter-port.md.
    */
   function serviceOver(prisma: PrismaClient) {
     return PrismaGatewayAdapter.create({

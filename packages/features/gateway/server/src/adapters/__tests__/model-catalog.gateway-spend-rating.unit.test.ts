@@ -20,11 +20,9 @@ vi.mock("@langwatch/observability", () => ({
 }));
 
 /**
- * Rating for the quantities that are not token classes.
- *
- * The regression this pins: a character-priced call rated at zero because
- * the wire dropped its characters, so $0.18 of speech synthesis moved a
- * budget $0.0002 in production (langwatch/langwatch#6934).
+ * Rating for non-token-class quantities. Regression: a character-priced
+ * call rated at zero because the wire dropped its characters, so $0.18 of
+ * speech synthesis moved a budget $0.0002 in production (#6934).
  */
 
 const usage = (overrides: Partial<SpendUsage>): SpendUsage => ({
@@ -177,9 +175,8 @@ describe("rateSpendNanoUsd", () => {
 
   /**
    * A request that burned something and was charged nothing is a catalog
-   * fault, and it has to say so. The gpt-4o transcribe pair proved the quiet
-   * case: the model matched an entry, the entry priced seconds, the provider
-   * reported tokens, and every call settled at $0 with real usage on the row.
+   * fault. The gpt-4o transcribe pair proved it: model matched, entry
+   * priced seconds, provider reported tokens, call settled at $0.
    */
   describe("given a model the catalog prices at zero on purpose", () => {
     beforeEach(() => {

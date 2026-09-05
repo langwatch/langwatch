@@ -1,8 +1,6 @@
 /**
- * Sessions lens service: cursor codec, DTO mapping, and the coding-agent
- * enrichment overlay.
- *
  * @see specs/traces-v2/sessions-lens.feature
+ * Sessions lens service: cursor codec, DTO mapping, and the coding-agent enrichment overlay.
  */
 import { VisibilityWindowService } from "../trace-visibility-window.service";
 import { TraceSessionGroupsCursorService } from "../trace-session-groups-cursor.service";
@@ -18,12 +16,7 @@ import { SessionGroupsService } from "../trace-session-groups.service";
 import type { CodingAgentService } from "@langwatch/coding-agent-contract";
 
 /**
- * The coding-agent lookup this read issues, and nothing else.
- *
- * The platform app had a whole `CodingAgentService` double in its test-utils;
- * this suite reaches exactly one method of it, so the double states that one
- * and refuses the rest by name rather than carrying another feature's whole
- * surface into this package.
+ * The coding-agent lookup this read issues, and nothing else. The platform app had a whole CodingAgentService double in its test-utils; this suite reaches exactly one method, so the double states that one and refuses the rest by name rather than carrying another feature's whole surface into this package.
  */
 class TestCodingAgentService {
   static create(): TestCodingAgentService {

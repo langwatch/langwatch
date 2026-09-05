@@ -29,31 +29,14 @@ export class GatewaySpendCursorAdapter {
   }
 
   /**
-   * Opaque page cursor for the summaries rollup: base64url of the JSON array of
-   * group-key parts last served, one per grouping dimension. Same encoding
-   * conventions as {@link encodeSpendEventsCursor} so a caller treats both
-   * surfaces' cursors identically: opaque, and passed back verbatim.
-   *
-   * The parts are carried as an array rather than joined, because a group key
-   * is a caller-supplied value (a model name, an end user id) and any separator
-   * chosen for it is a separator some caller's data already contains.
+   * Opaque page cursor for the summaries rollup: base64url JSON array of group-key parts, one per dimension, same conventions as {@link encodeSpendEventsCursor}. Kept as an array since a group key is caller data and any separator is one some data already carries.
    */
   encodeSpendSummariesCursor(groupKey: string[]): string {
     return Buffer.from(JSON.stringify(groupKey), "utf8").toString("base64url");
   }
 
   /**
-   * The group-key parts a summaries cursor names, or null when it is not a
-   * cursor this service minted.
-   *
-   * Anything that is not a JSON array of strings is one part: cursors minted
-   * before a rollup could group by two dimensions are plain base64url text, and
-   * a caller can be mid-walk across the deploy that changed this.
-   *
-   * The decision is made by parsing, never by looking at the first character.
-   * Group keys are caller data, so a model or end-user id may legitimately open
-   * with `[`, and sniffing would refuse that caller's perfectly good cursor and
-   * restart their walk from the first page.
+   * Group-key parts a summaries cursor names, or null if not one this service minted. Decided by parsing, never the first character — group keys are caller data and may legitimately open with `[`.
    */
   decodeSpendSummariesCursor(encoded: string): string[] | null {
     try {

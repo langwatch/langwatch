@@ -6,11 +6,7 @@ import { OtlpSpanCostEnrichmentService } from "../span-cost-enrichment.service";
 
 /**
  * Spec: packages/features/trace/specs/record-time-cost-enrichment.feature
- *
- * The pins here are LITERALS, not reads of the application's source. Every one
- * of them fails silently in the direction of billing: a span enriched from the
- * wrong rule, or from no rule at all, is stored with a cost attribute that no
- * reader can tell apart from a correct one.
+ * Pins here are LITERALS, not reads of the application's source. Each fails silently toward billing risk: a span enriched from the wrong rule, or no rule at all, stores a cost attribute indistinguishable from a correct one.
  */
 
 function span(

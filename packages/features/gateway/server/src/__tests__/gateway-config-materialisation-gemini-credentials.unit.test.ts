@@ -1,11 +1,5 @@
 /**
- * Gemini's credential can name one of two Google doors: a bare key goes to
- * the Gemini API, a key with a project and location goes to Agent Platform.
- * The materialiser is where that shape leaves the control plane, so the
- * pair-or-nothing contract is pinned here.
- *
- * Covers @unit scenarios from
- * specs/model-providers/google-agent-platform.feature.
+ * A bare Gemini key routes to the Gemini API; a key with project+location routes to Agent Platform. Pins the pair-or-nothing contract at the materialiser. Covers specs/model-providers/google-agent-platform.feature.
  */
 
 import { describe, expect, it } from "vitest";

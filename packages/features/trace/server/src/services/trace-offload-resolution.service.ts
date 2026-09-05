@@ -1,25 +1,5 @@
 /**
- * Read-time recompute of offloaded trace event refs (ADR-022).
- *
- * When the `release_trace_blob_offload` flag is on at ingestion time, the
- * live pipeline writes the FULL event to event_log and dispatches a leaned
- * shape to projection handlers. `leanForProjection` rewrites over-threshold
- * IO attribute values to a bounded preview and attaches a
- * `langwatch.reserved.eventref.<attrKey>` pointer carrying `{ field: <attrKey> }`.
- * The fold therefore writes a preview-based computedInput/computedOutput into
- * trace_summaries.
- *
- * On the **read path** this module restores the full values:
- *   1. Extract eventref pointers from each span's spanAttributes.
- *   2. Fetch the full bytes from event_log via TraceBlobStoreService.getFromEventLog.
- *   3. Replace the span's spanAttributes with the resolved (full-value) map.
- *   4. If any span was resolved, re-run TraceIOExtractionService over the
- *      resolved spans so trace.input / trace.output reflect the full content
- *      rather than the preview stored in trace_summaries.
- *
- * Error policy: a missing event_log row must NOT break the read — log at
- * warn level and keep the preview in place, marked via anyResolved=false on
- * the affected trace.
+ * Read-time recompute of offloaded trace event refs (ADR-022). When `release_trace_blob_offload` is on at ingestion, the live pipeline writes the FULL event to event_log and dispatches a leaned shape to projections — `leanForProjection` rewrites over-threshold IO values to a bounded preview with a `langwatch.reserved.eventref.<attrKey>` pointer, so the fold writes a preview-based computedInput/computedOutput. On the **read path** this restores full values: extract eventref pointers, fetch full bytes via TraceBlobStoreService.getFromEventLog, replace spanAttributes with the resolved map, and re-run TraceIOExtractionService when any span resolved so trace.input/output reflect full content. Error policy: a missing event_log row must NOT break the read — log at warn and keep the preview, marked via anyResolved=false.
  */
 import { TraceEventRefParsingService } from "./trace-eventref-parsing.service";
 import type { Logger as PinoLogger } from "@langwatch/observability";
@@ -61,27 +41,9 @@ export class TraceOffloadResolutionService {
   }
 
   /**
-   * Resolves offloaded event refs for a single trace's normalized spans.
-   *
-   * For each span that carries `langwatch.reserved.eventref.*` attributes:
-   *   - Calls TraceBlobStoreService.getFromEventLog to fetch the full bytes from event_log.
-   *   - Replaces the span's spanAttributes with the resolved map (ref keys
-   *     stripped; full values in place of previews).
-   *   - If any span was resolved, re-runs TraceIOExtractionService over the
-   *     resolved spans to produce a fresh recomputedInput / recomputedOutput.
-   *
-   * A missing event_log row (any error thrown by getFromEventLog) causes the span
-   * to be returned unchanged (preview intact). The error is logged at warn level;
-   * it does NOT propagate — a stale ref must not break trace listing.
-   *
-   * @param projectId - The tenantId / projectId for this trace.
-   * @param normalizedSpans - The raw NormalizedSpan array for a single trace.
-   * @param blobStore - TraceBlobStoreService providing getFromEventLog.
-   * @param ioExtractionService - Recomputes trace-level IO from the resolved spans.
-   *   Each span's eventId is read from its own embedded eventref pointer (not a
-   *   caller-supplied arg); spans without eventrefs are returned unchanged.
-   * @param aggregateType - Aggregate type for event_log lookup (default: "trace").
-   * @param logger - Logger for missing-ref warnings.
+   * Resolves offloaded event refs for a single trace's normalized spans: for each span carrying `langwatch.reserved.eventref.*`, fetches full bytes (getFromEventLog), replaces spanAttributes with the resolved map, and re-runs TraceIOExtractionService when any span resolved. A missing event_log row leaves that span unchanged (preview intact) and is logged at warn, never propagated — a stale ref must not break trace listing.
+   * @param projectId/normalizedSpans/blobStore/ioExtractionService - Tenant, per-trace spans, blob store, and IO recomputation (each span's eventId comes from its own embedded pointer; spans without eventrefs pass through unchanged).
+   * @param aggregateType/logger - event_log aggregate type (default "trace") and logger for missing-ref warnings.
    */
   static async resolveOffloadedTraces({
     projectId,

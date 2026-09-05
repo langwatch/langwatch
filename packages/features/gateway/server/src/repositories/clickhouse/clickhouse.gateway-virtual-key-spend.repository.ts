@@ -1,24 +1,5 @@
 /**
- * Per-virtual-key spend, read from the cost path rather than the budget
- * ledger.
- *
- * The budget ledger holds rows ONLY for keys that have at least one
- * applicable budget, and one row per applicable budget.
- * Reading spend from it therefore reports $0.00 for every key nobody has
- * capped, and multiplies spend by the number of budgets for every key
- * somebody has capped twice. Neither is a number to put in front of a
- * customer, and both disagree with the Usage tab a click-through is
- * supposed to land on.
- *
- * `trace_summaries` carries the enriched per-trace cost and the
- * `langwatch.virtual_key_id` attribute the gateway stamps on every span, so
- * it answers "what did this key cost" for every key, budget or not, and it
- * is the same store the rest of the product bills and reports from.
- *
- * Dedup: `trace_summaries` is a ReplacingMergeTree keyed on
- * (TenantId, TraceId), so every read collapses a trace with
- * `argMax(..., UpdatedAt)` before summing. Without it an unmerged
- * re-projection counts twice.
+ * Per-virtual-key spend, read from the cost path rather than the budget ledger: the ledger holds rows only for keys with an applicable budget (one per budget), so reading it reports $0.00 for uncapped keys and multiplies spend for doubly-capped ones. trace_summaries carries per-trace cost + langwatch.virtual_key_id on every span, answering "what did this key cost" for every key — the same store the rest of the product bills from. Dedup: RMT keyed (TenantId, TraceId), collapsed with argMax(..., UpdatedAt) before summing, or an unmerged re-projection double-counts.
  */
 import { createLogger } from "@langwatch/observability";
 
@@ -47,16 +28,7 @@ export class GatewayVirtualKeySpendRepository extends GatewayVirtualKeySpendPort
   }
 
   /**
-   * Spend per key over a window, summed across the given project tenants.
-   *
-   * Tenants are plural because a key's traces land in whichever project
-   * resolved as its trace destination: for org- and team-scoped keys that
-   * is the org's governance project, not the project an admin happens to
-   * be looking at. Reading a single tenant is how those keys came to show
-   * nothing at all.
-   *
-   * Keys with no traffic are absent from the result; callers render $0.00
-   * for them rather than a blank.
+   * Spend per key over a window, summed across the given project tenants (plural, because a key's traces land in whichever project resolved as its trace destination — for org/team-scoped keys that's the org's governance project, not whatever an admin is looking at; reading a single tenant is how those keys showed nothing). Keys with no traffic are absent from the result; callers render $0.00 for them.
    */
   async spendByVirtualKey(args: {
     tenantIds: string[];
@@ -136,12 +108,7 @@ export class GatewayVirtualKeySpendRepository extends GatewayVirtualKeySpendPort
   }
 
   /**
-   * The Usage tab's slices (per key, per model, per day, totals, blocked
-   * count), aggregated inside ClickHouse over the deduped traces. One
-   * grouped query keeps every slice consistent with the others while the
-   * result stays bounded by keys x models x days, not by traffic: a busy
-   * project's 90-day window is millions of traces but only a page of
-   * buckets.
+   * The Usage tab's slices (per key/model/day, totals, blocked count), aggregated in one grouped ClickHouse query over deduped traces so every slice stays consistent and bounded by keys x models x days, not by traffic — a busy project's 90-day window is millions of traces but only a page of buckets.
    */
   async usageBuckets(args: {
     tenantIds: string[];
@@ -232,20 +199,14 @@ export class GatewayVirtualKeySpendRepository extends GatewayVirtualKeySpendPort
   }
 
   /**
-   * The most recent gateway traces in the window, one row per trace,
-   * deduped, newest first. `limit` is required: this is the query for a
-   * "recent debits" list, and an unbounded pull of raw traces into Node
-   * is exactly what `usageBuckets` exists to avoid.
+   * Most recent gateway traces in the window, one row per trace, deduped, newest first. `limit` is required — this is the "recent debits" list, and an unbounded pull of raw traces is exactly what usageBuckets exists to avoid.
    */
   async gatewayTraces(args: {
     tenantIds: string[];
     window: GatewaySpendWindow;
     virtualKeyIds?: string[];
     /**
-     * Narrow to one model, named the way `usageBuckets` names it: the first
-     * of the trace's models, or "unknown" when it recorded none. Applied
-     * after the dedup, on the winning version's array, because a filter on
-     * the raw rows would answer from whichever version happened to match.
+     * Narrow to one model, named the way usageBuckets names it: the trace's first model, or "unknown" if none. Applied after dedup, on the winning version's array — a filter on raw rows would answer from whichever version happened to match.
      */
     model?: string;
     limit: number;

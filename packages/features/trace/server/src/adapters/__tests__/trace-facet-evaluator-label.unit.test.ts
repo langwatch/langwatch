@@ -10,10 +10,7 @@ const translate = (query: string) =>
   TraceQueryClickHouseAdapter.translateFilter(query, TENANT, TIME_RANGE);
 
 /**
- * `evaluatorLabel` is wired the same way as `evaluatorVerdict`: a categorical
- * facet on `evaluation_runs`, auto-derived into a partition-pruned subquery on
- * the `Label` column. The drilldown's clickable label rows depend on this
- * field translating cleanly.
+ * evaluatorLabel is wired the same way as evaluatorVerdict: a categorical facet on evaluation_runs, auto-derived into a partition-pruned subquery on the Label column. The drilldown's clickable label rows depend on this field translating cleanly.
  */
 describe("evaluatorLabel facet", () => {
   describe("when registered", () => {

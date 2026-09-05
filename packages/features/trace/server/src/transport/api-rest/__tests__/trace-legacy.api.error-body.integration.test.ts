@@ -1,12 +1,5 @@
 /**
- * What `GET /api/trace/:id` answers a customer when the read fails for a
- * reason nobody anticipated.
- *
- * The family used to render that failure itself — the internal message, the
- * absolute source paths and the stack frames, straight into the response body
- * — while its sibling `GET /api/traces/:traceId`, on the same failure in the
- * same process, degraded to the generic unknown. Finding F4 of
- * `dev/docs/plans/e2e-walk-2026-09-04.md`.
+ * What `GET /api/trace/:id` answers a customer when the read fails for a reason nobody anticipated. The family used to render that failure itself (internal message, absolute source paths, stack frames straight into the body) while its sibling `GET /api/traces/:traceId`, on the same failure in the same process, degraded to the generic unknown. Finding F4 of `dev/docs/plans/e2e-walk-2026-09-04.md`.
  */
 import {
   createAppRestSecurity,

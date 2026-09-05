@@ -1,15 +1,5 @@
 /**
- * The two refusals a filter gets before any SQL is built.
- *
- * Neither is the injection defence — every value and every attribute key is
- * BOUND as a `{name:String}` parameter, which is what makes the query safe.
- * These are the bounds and the readable refusal on top of that: an attribute
- * key is an identifier, so a key full of punctuation is a typo rather than a
- * filter that should quietly match nothing, and an unbounded value would be
- * carried into the query as-is.
- *
- * Both were unguarded until this test: removing the key's character check
- * failed nothing in the suite.
+ * The two refusals a filter gets before any SQL is built. Neither is the injection defence — every value/key is BOUND as a {name:String} parameter, which makes the query safe. These are the bounds and readable refusal on top: an attribute key is an identifier (punctuation is a typo, not a silent no-match filter), and an unbounded value would carry into the query as-is. Both were unguarded until this test — removing the key's character check failed nothing.
  */
 
 import { describe, expect, it } from "vitest";

@@ -109,15 +109,7 @@ export type PulledUsageTotals = {
 
 export abstract class GatewayBudgetSpendPort {
   /**
-   * Read targets for a plain list of budgets, with no request context. A
-   * GROUP budget has no single member here, so it sums every member bucket.
-   *
-   * `now` is the instant the periods are resolved at, and it is the same one
-   * the rollup read uses. Passing it here rather than letting each floor read
-   * the wall clock is what makes an injected clock mean one thing across both
-   * halves of the read; an anchored budget in particular has a floor that
-   * moves with the clock, so the two halves would otherwise disagree about
-   * which period they are totalling.
+   * Read targets for a plain list of budgets, no request context (a GROUP budget sums every member bucket, having no single member here). `now` is the instant periods are resolved at, shared with the rollup read — passing it explicitly rather than each floor reading the wall clock is what keeps an anchored budget's moving floor in agreement across both halves of the read.
    */
   static targetsForBudgets({
     budgets,

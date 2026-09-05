@@ -1,31 +1,6 @@
 /**
- * Hono routes for internal gateway control-plane endpoints.
- *
- * Consumed only by the LangWatch AI Gateway (Go) service. All paths are
- * protected by the shared HMAC secret `LW_GATEWAY_INTERNAL_SECRET` +
- * `X-LangWatch-Gateway-Signature` header. Never expose publicly — the Helm chart
- * blocks `/api/internal` at the ingress by default, and in-cluster callers reach
- * the app through its internal Service rather than the ingress.
- *
- * Contract source of truth:
- *   specs/ai-gateway/_shared/contract.md §4 (v0.1)
- *
- * ## What arrives rather than being reached for
- *
- * Moved whole out of the retired application's `server/routes/gateway-internal.ts`,
- * where it was a module-level app over `getApp()`, a module-level `prisma` and
- * `process.env`. None of those cross into a feature package, so each became a
- * member of {@link GatewayInternalRestPorts} and the family is built per
- * process. Nothing about the wire changed: every status, code and body below is
- * the one the data plane already parses.
- *
- * Three of those members are OPTIONAL, and each absence is a route that refuses
- * by name rather than a family that fails to mount. A deployment with no
- * evaluator runtime cannot check a guardrail; one with no spend pipeline cannot
- * accept spend commands; one with no realtime-session store cannot book a voice
- * session. Answering any of those with a success would be worse than refusing:
- * a guardrail that silently allows is a protection that is not there, and a
- * spend command accepted and dropped is a billing record that never existed.
+ * Contract: specs/ai-gateway/_shared/contract.md §4 (v0.1)
+ * Hono routes for internal gateway control-plane endpoints, consumed only by the Go AI Gateway. All paths protected by HMAC (LW_GATEWAY_INTERNAL_SECRET + X-LangWatch-Gateway-Signature); never expose publicly (Helm blocks /api/internal at ingress). Moved whole out of the retired application's module-level app/prisma/env, each becoming an OPTIONAL member of GatewayInternalRestPorts — an absent one refuses its route by name (503) rather than the family failing to mount or, worse, silently succeeding (a guardrail that allows or a spend command accepted and dropped is worse than a refusal).
  */
 
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
@@ -77,13 +52,7 @@ const realtimeSessionService = GatewayRealtimeSessionService.create();
 const logger = createLogger("langwatch:gateway-internal");
 
 /**
- * The spend pipeline's command senders, as this family dispatches to them.
- *
- * Structural rather than the eventing runtime's own type: what a route needs
- * is a named sender per command, and a batched form where the command exposes
- * one. A registration that is missing a sender is a 503 the caller can act on,
- * which is why the shape admits `undefined` per name rather than assuming the
- * three are always there.
+ * Spend pipeline's command senders, as this family dispatches to them — structural, not the eventing runtime's own type: a named sender per command, admitting undefined per name so a missing registration is a 503 the caller can act on rather than an assumption all three exist.
  */
 export interface GatewaySpendCommandSender {
   sendBatch?: (payloads: unknown[]) => Promise<unknown>;
@@ -93,11 +62,7 @@ export interface GatewaySpendCommandSender {
 /** Everything the internal control plane reaches that it does not own. */
 export type GatewayInternalRestPorts = Readonly<{
   /**
-   * The shared HMAC secret the Go data plane signs with, or none.
-   *
-   * A function rather than a value: the deployment may configure it after the
-   * family is built, and an unset secret must answer 500 rather than let the
-   * gate fall open.
+   * Shared HMAC secret the Go data plane signs with, or none. A function, not a value — the deployment may configure it after the family is built, and an unset secret must answer 500 rather than let the gate fall open.
    */
   internalSecret: () => string | undefined;
   /** The SAME virtual-key service every other gateway door reads. */
@@ -113,18 +78,11 @@ export type GatewayInternalRestPorts = Readonly<{
   /** Builds one key's warm-cache configuration bundle. */
   config: () => GatewayConfigMaterialiserService;
   /**
-   * The budget ledger, or none.
-   *
-   * Absent on a deployment with no ClickHouse. The bucket read then reports
-   * zero spend rather than inventing a figure, so enforcement stays permissive
-   * — which is the behaviour the retired application had.
+   * Budget ledger, or none — absent on a deployment with no ClickHouse. The bucket read then reports zero spend rather than inventing a figure, keeping enforcement permissive (the retired application's own behaviour).
    */
   budgetSpend: () => GatewayBudgetSpendPort | undefined;
   /**
-   * Refreshes a provider row's stored Codex OAuth session, or none.
-   *
-   * Absent where this process composed no model-provider service; the recovery
-   * road for a 401 from OpenAI's codex backend then refuses by name.
+   * Refreshes a provider row's stored Codex OAuth session, or none — absent where this process composed no model-provider service, so the recovery road for a 401 from OpenAI's codex backend refuses by name.
    */
   refreshCodex?:
     | ((input: {
@@ -136,15 +94,7 @@ export type GatewayInternalRestPorts = Readonly<{
       >)
     | undefined;
   /**
-   * The monitor directory and the evaluator runtime one guardrail check runs
-   * on, or none.
-   *
-   * All three together or none: a guardrail names a monitor that carries the
-   * check type, the attachment it is scoped by is a row, and running it needs
-   * the evaluator. A process holding some of them refuses the route by name
-   * rather than allowing every request, because a guardrail that cannot
-   * produce a verdict and answers `allow` is a protection that has quietly
-   * stopped protecting.
+   * Monitor directory + evaluator runtime for one guardrail check, or none — all three together or none, since a guardrail names a monitor (carrying the check type), the attachment scoping it, and the evaluator to run it. Partial composition refuses the route by name rather than allowing every request — a guardrail that can't verdict and answers allow has quietly stopped protecting.
    */
   guardrails?:
     | (() => {
@@ -154,11 +104,7 @@ export type GatewayInternalRestPorts = Readonly<{
       })
     | undefined;
   /**
-   * The gateway spend pipeline's commands and its one pricing seam, or none.
-   *
-   * Absent where this process registered no spend pipeline; `/spend-commands`
-   * then answers 503 `spend_pipeline_disabled`, which is the code the data
-   * plane's drainer already spools against.
+   * Gateway spend pipeline's commands and its one pricing seam, or none — absent where this process registered no spend pipeline, so /spend-commands answers 503 spend_pipeline_disabled, the code the data plane's drainer already spools against.
    */
   spend?:
     | (() =>
@@ -169,21 +115,13 @@ export type GatewayInternalRestPorts = Readonly<{
         | undefined)
     | undefined;
   /**
-   * What a brokered realtime voice session is booked, correlated and settled
-   * against, or none.
-   *
-   * Absent where this process composed no spend confirmation path: a session
-   * booked with nowhere to report its usage is a call that runs and is never
-   * billed.
+   * What a brokered realtime voice session is booked, correlated and settled against, or none — absent where this process composed no spend confirmation path, meaning a booked session would run with nowhere to report usage, i.e. never billed.
    */
   realtimeSessions?: (() => GatewayRealtimeSessionCollaborators) | undefined;
 }>;
 
 /**
- * Contract 4.6. The directions are the wire vocabulary the data plane sends,
- * which is deliberately not the Prisma enum: an earlier version of this schema
- * used the storage values, so every real gateway call failed validation and the
- * data plane fell back to allowing the request.
+ * Contract 4.6. Directions are the wire vocabulary the data plane sends, deliberately not the Prisma enum — an earlier schema version used storage values, so every real gateway call failed validation and the data plane fell back to allowing the request.
  */
 const guardrailCheckRequestSchema = z.object({
   vk_id: z.string().min(1),
@@ -213,12 +151,7 @@ const gatewayPolicy = () =>
   );
 
 /**
- * The refusal every realtime-session route answers on a process that composed
- * no session store.
- *
- * A 503 rather than a booking that succeeds and reports nothing: the gateway
- * refuses the mint when this refuses, which is what makes the per-key cap real
- * and what stops a voice call running with no spend record behind it.
+ * Refusal every realtime-session route answers on a process with no session store — a 503, not a booking that succeeds and reports nothing: the gateway refuses the mint when this refuses, which is what makes the per-key cap real and stops an unbilled call running.
  */
 const realtimeSessionsUnavailable = {
   error: {
@@ -252,34 +185,7 @@ export function computeGatewaySignature(secret: string, canonical: string): stri
 }
 
 /**
- * Verify the gateway's HMAC signature with a replay-protection timestamp.
- *
- * Canonical string:
- *   method + "\n" + path + "\n" + unix_timestamp + "\n" + hex(sha256(body))
- *
- * Headers:
- *   X-LangWatch-Gateway-Signature: hex(hmac_sha256(LW_GATEWAY_INTERNAL_SECRET, canonical))
- *   X-LangWatch-Gateway-Timestamp: unix seconds (±300s window)
- *   X-LangWatch-Gateway-Node: advisory, unsigned
- *
- * Verification order (by design — matches `services/gateway/internal/auth`):
- *   1. Missing headers → 401 (cheap check)
- *   2. Signature compare (constant-time) → 401 if bad
- *   3. Timestamp window → 401 if drifted
- *
- * Doing the HMAC compare before the timestamp check prevents timing-side
- * channels from leaking which failed (invalid sig vs. replayed request).
- * Machine-to-machine only; never touches the user session.
- */
-/**
- * Emit the auth-decision code at WARN level so the generic
- * loggerMiddleware's `status=401` line gets a sibling that names
- * the specific reason (missing_signature / invalid_signature /
- * timestamp_out_of_window / virtual_key_not_found / ...). Without
- * this, a dogfooder seeing 401 in the api log has to guess between
- * five paths since the response body isn't echoed by the request
- * logger. Includes the gateway node ID when present so multi-node
- * deployments can correlate which gateway sent the bad request.
+ * Verify gateway HMAC with replay protection: canonical = method+"\n"+path+"\n"+unix_ts+"\n"+hex(sha256(body)); X-LangWatch-Gateway-Signature = hex(hmac_sha256(secret, canonical)); X-LangWatch-Gateway-Timestamp within ±300s. Checks missing headers, then signature (constant-time), then timestamp, in that order — HMAC before timestamp prevents a timing channel revealing which failed. Emits the specific decision code at WARN (loggerMiddleware only logs status=401) so a dogfooder isn't left guessing between five causes.
  */
 function logAuthDecision(
   c: Context,
@@ -416,12 +322,8 @@ function notImplemented(c: Context) {
 // ── routes ──────────────────────────────────────────────────────────────
 
 /**
- * §4.1 — resolve a raw virtual key to a signed JWT + current revision.
- *
- * Request:  { key_presented: "vk-lw-01HZX...", gateway_node_id: "gw-eks-abc" }
- * Response: { jwt, revision, key_id, display_prefix }
+ * §4.1 — resolve a raw virtual key to a signed JWT + current revision. Request: {key_presented, gateway_node_id}; response: {jwt, revision, key_id, display_prefix}. A refusal uses the contract's error shape.
  */
-/** A refusal to resolve a presented key, in the contract's error shape. */
 interface KeyAuthRejection {
   status: 401 | 403;
   type: string;
@@ -457,16 +359,9 @@ function virtualKeyParseRejection(presented: string): KeyAuthRejection | null {
   }
 }
 
-/** Why a resolved key bars itself from serving, or null when it may.
- *  Each stop carries its own code: a tenant must be able to tell "we turned
- *  you off" from "your credential is wrong" from "your key ran out", and the
- *  platform's own tooling branches on this code.
- *
- *  Expiry is a date rather than a status, so it is checked here rather than
- *  read off the row's status: the key stays ACTIVE past the date, which is
- *  what keeps extending the date an ordinary edit. A key that expires now
- *  stops being resolved immediately, and a token minted before then ends at
- *  the date itself, because the mint clamps its exp to the key's expiry. */
+/**
+ * Why a resolved key bars itself from serving, or null if it may — each stop carries its own code so a tenant can tell "we turned you off" from "your credential is wrong" from "your key ran out" (platform tooling branches on it). Expiry is a date, checked here rather than read off status (extending it is an ordinary edit); a key expiring now stops resolving immediately, and a token minted before then ends at the date since the mint clamps exp to it.
+ */
 function virtualKeyStatusRejection({
   status,
   expiresAt,
@@ -501,35 +396,21 @@ function virtualKeyStatusRejection({
   return null;
 }
 
-// §4.5: `/budget/debit` is removed. Cost recording rides the spend
-// commands the gateway posts below: the debits process manager
-// (platform/app/ee/governance/process-manager/gatewayDebits.process.ts) joins
-// each request's admission to its outcome and writes the ClickHouse
-// `gateway_budget_ledger_events` table, once per applicable budget. Single
-// source of truth, no PG dual-write. See the migration
-// 00017_create_gateway_budget_ledger.sql for the CH schema.
+// §4.5: /budget/debit is removed. Cost recording rides the spend commands
+// posted below — the debits process manager joins each admission to its
+// outcome and writes gateway_budget_ledger_events once per applicable
+// budget (single source of truth, no PG dual-write). See migration
+// 00017_create_gateway_budget_ledger.sql.
 
 /**
- * §9 — startup bootstrap. Paginated stream of all non-revoked VK JWTs so the
- * gateway can serve traffic if the control-plane is offline on cold start.
- * Enterprise opt-in (env `LW_GATEWAY_BOOTSTRAP_PULL=true` on gateway side).
- *
- * Query: ?cursor=<opaque>&limit=1000
- * Response: { jwts: [...], next_cursor: null | string, current_revision }
+ * §9 — startup bootstrap: paginated stream of all non-revoked VK JWTs so the gateway can serve traffic if the control plane is offline on cold start. Enterprise opt-in (LW_GATEWAY_BOOTSTRAP_PULL=true). Query: ?cursor=<opaque>&limit=1000. Response: {jwts, next_cursor, current_revision}.
  */
 
 // ── attributed-user bucket spend ────────────────────────────────────────
 
 /**
- * Per-bucket spend read for ATTRIBUTED_USER templates. The bundle carries
- * the template entry only (per-user cardinality is unbounded), so the
- * gateway resolves the request's own bucket here, caches it briefly, and
- * enforces against the returned figure. The read honors the template's
- * period boundary and any single-bucket boundary from a per-user reset:
- * whichever is later bounds the sum.
+ * Per-bucket spend for ATTRIBUTED_USER templates: the bundle carries only the template entry (per-user cardinality is unbounded), so the gateway resolves and briefly caches the request's own bucket here, honoring whichever is later of the template's period boundary or a per-user reset boundary. An org with no projects has nothing to read, so it reports zero.
  */
-/** Spend in one budget bucket, in micro USD. An organization with no
- *  projects has nothing to read, so it reports zero. */
 async function bucketSpentMicroUsd(params: {
   store: GatewayInternalStorePort;
   budgetRepository: GatewayBudgetSpendPort;
@@ -586,16 +467,7 @@ interface SpendCommandReject {
 }
 
 /**
- * The single seam that prices a gateway outcome. The wire carries
- * quantities, never money, so the server rates here, once, and the
- * appended event carries the figure from then on: the fold, the
- * attributed-user debits, and the webhook envelope all copy it instead of
- * each pricing the same request at its own instant against a model
- * catalog that moves under them.
- *
- * The gateway always names a model on an outcome (the resolved identity
- * once dispatch settled it, the requested one before that), which is the
- * identity the ledger stores for the request.
+ * The single seam that prices a gateway outcome. The wire carries quantities, never money, so the server rates here once and the appended event carries the figure from then on — fold, attributed-user debits and webhook envelope all copy it instead of each pricing the request at its own instant against a moving catalog. The gateway always names a model on an outcome (resolved once dispatch settled it, requested before that), the identity the ledger stores.
  */
 function pricedOutcomeData(
   data: Record<string, unknown>,
@@ -750,16 +622,7 @@ function attributedIdentity(command: Record<string, unknown>): {
 }
 
 /**
- * Advance `lastUsedAt` on the keys this batch admitted.
- *
- * Admission is the one moment that sees every kind of use: the requests the
- * gateway went on to block over a budget or a guardrail, and the ones whose
- * outcome never arrives, are all admitted first. One conditional write per
- * drain batch, decided off the rows the enrichment already read, and a batch
- * whose keys were all touched recently writes nothing.
- *
- * Best effort: the column is oversight, not enforcement, and failing the
- * batch over it would cost the drainer a retry of records that appended.
+ * Advances lastUsedAt on keys this batch admitted. Admission sees every kind of use (including requests later blocked, or whose outcome never arrives), so one conditional write per drain batch, decided off rows already read; a batch touching only recently-used keys writes nothing. Best effort: the column is oversight, not enforcement, so failing the batch over it would cost a retry of records that already appended.
  */
 async function touchAdmittedVirtualKeys(
   store: GatewayInternalStorePort,
@@ -781,28 +644,7 @@ async function touchAdmittedVirtualKeys(
 }
 
 /**
- * Join every admission to the attribution the gateway cannot see: the key's
- * principal and the tenant project's team. Two batched reads answer for a
- * whole batch of up to 500 records, and the appended event carries the
- * result from then on, so nothing downstream re-reads identity per request.
- *
- * The two ways this can come up short are deliberately not treated alike. A
- * MISSING row (a key deleted between dispatch and drain, a project without a
- * team) is a fact about the world: that one record degrades to empty
- * attribution, still owes its organization, project and key debits, and logs
- * the ids so the team, principal and group budgets it skipped can be
- * reconciled from the log. A prisma FAILURE is not a fact, it is an unknown,
- * and an event is immutable once appended, so it propagates to a 500 and the
- * drainer retries the whole batch.
- */
-/**
- * What the control plane could not resolve for one admission, reported and
- * never dropped.
- *
- * The record is already durable on the gateway's side, and discarding an
- * admission loses the outcome that follows it, so each of these is a
- * control-plane inconsistency to chase rather than a reason to lose billing
- * evidence.
+ * Joins every admission to attribution the gateway can't see (key's principal, tenant project's team) via two batched reads for up to 500 records; the appended event carries the result so nothing downstream re-reads identity. MISSING (a deleted key, a teamless project) is a fact about the world — that record degrades to empty attribution, still owes org/project/key debits, and logs ids so skipped team/principal/group budgets can be reconciled. A Prisma FAILURE is an unknown, not a fact, and an event is immutable once appended, so it 500s and the drainer retries the whole batch. What couldn't be resolved is always reported, never dropped — the admission is already durable on the gateway's side, so each is a control-plane inconsistency to chase, not a reason to lose billing evidence.
  */
 function reportAttributionGaps({
   identity,
@@ -841,13 +683,11 @@ async function enrichAttributedCommands({
   admits: Array<Record<string, unknown>>;
   outcomes: Array<Record<string, unknown>>;
 }): Promise<void> {
-  // An outcome emitted by a build that predates attribution-on-outcome names
-  // no key, so there is nothing to join it against. Those requests keep the
-  // admit-time join in the consuming process managers, which is exactly what
-  // `outcome_carries_attribution` on their admission tells those processes to
-  // do — so skipping here is the correct no-op, not a dropped join. Silent by
-  // design: one line per record through a fleet roll is a log flood that says
-  // nothing an operator can act on.
+  // An outcome from a build predating attribution-on-outcome names no key,
+  // so there's nothing to join against — those requests keep the admit-time
+  // join in the consuming process managers (outcome_carries_attribution tells
+  // them to do exactly that), so skipping here is the correct no-op. Silent
+  // by design: one line per record through a fleet roll says nothing actionable.
   const attributableOutcomes = outcomes.filter(
     (outcome) => String(outcome.virtual_key_id ?? "") !== "",
   );
@@ -928,10 +768,7 @@ const reserveRealtimeSessionSchema = z.object({
 });
 
 /**
- * A patch has to change something. Both fields are optional on their own, so
- * the refinement is what enforces the rule the 400 message states: without it
- * a body carrying only `project_id` parses, applies nothing, and answers 404
- * as though the session were missing.
+ * A patch has to change something. Both fields are optional on their own, so this refinement enforces the 400 the message states — without it, a body carrying only project_id parses, applies nothing, and answers 404 as though the session were missing.
  */
 const patchRealtimeSessionSchema = z
   .object({
@@ -954,11 +791,7 @@ const reportRealtimeUsageSchema = z.object({
 });
 
 /**
- * Builds the `/api/internal/gateway` family over one process's ports.
- *
- * `verifySecret` applies the HMAC verifier as the builder chain for every
- * route rather than an app-wide `secured.use(...)`, which is what keeps every
- * route's access policy declared where the route is.
+ * Builds the /api/internal/gateway family over one process's ports. verifySecret applies the HMAC verifier per route in the builder chain rather than an app-wide secured.use(...), keeping each route's access policy declared where the route is.
  */
 export function createGatewayInternalRestApp(options: {
   security: AppRestSecurity;
@@ -971,15 +804,7 @@ export function createGatewayInternalRestApp(options: {
   });
 
   /**
-   * §4.7: connectivity probe for the gateway's public /health endpoint.
-   *
-   * The Go gateway's statusprobe monitor calls this on its own clock
-   * (default every 15s per gateway pod) and serves the cached verdict to
-   * the status page. Riding the signed channel is the point: a 200 proves
-   * not just that the app is up but that the shared HMAC secret matches,
-   * the misconfig where every pod looks green while every virtual-key
-   * resolve is refused. Body deliberately static; the gateway only reads
-   * the status code.
+   * §4.7: connectivity probe for the public /health endpoint. The Go gateway's statusprobe calls this every 15s and serves the cached verdict to the status page — riding the signed channel is the point, since a 200 proves the shared HMAC secret matches too (the misconfig where every pod looks green while every VK resolve is refused). Body deliberately static; only the status code is read.
    */
   secured.access(gatewayPolicy()).get("/health", (c) => {
     return c.json({ status: "ok" });
@@ -1070,17 +895,8 @@ export function createGatewayInternalRestApp(options: {
   });
 
   /**
-   * Codex token refresh — the gateway's recovery road for a 401 from OpenAI's
-   * codex backend. Refreshes the provider row's stored OAuth session (single
-   * issuer round-trip under concurrent 401 bursts — see the service) and hands
-   * back a fresh access token; a dead session comes back as
-   * `codex_session_expired`, which the gateway forwards so Langy can render
-   * the re-authenticate card. Spec:
-   * specs/model-providers/codex-account-provider.feature
-   *
-   * Request:  { provider_row_id }
-   * Response: { access_token, account_id } | error codex_session_expired /
-   *           codex_not_connected
+   * Spec: specs/model-providers/codex-account-provider.feature
+   * Codex token refresh — the gateway's recovery road for a 401 from OpenAI's codex backend. Refreshes the provider row's stored OAuth session (single issuer round-trip under concurrent 401 bursts) and returns a fresh access token; a dead session answers codex_session_expired, forwarded so Langy renders the re-authenticate card. Request: {provider_row_id}. Response: {access_token, account_id} | error.
    */
   secured.access(gatewayPolicy()).post("/codex/refresh", async (c) => {
     const parsed = codexRefreshRequestSchema.safeParse(await c.req.json().catch(() => null));
@@ -1181,11 +997,10 @@ export function createGatewayInternalRestApp(options: {
     }
 
     // EC4 — the CH repo lets the materialiser stamp current-period spend
-    // (sumMerge from the rollup) onto each applicable budget. The gateway's
-    // existing Bundle.Config.Budget.Scopes.SpentMicroUSD -> Precheck path
-    // then sees fresh state on every re-materialise after a BUDGET_UPDATED
-    // eviction. Without this the wire output reads the stale
-    // `GatewayBudget.spentUsd` PG column that no writer updates.
+    // (sumMerge from the rollup) onto each applicable budget, so the
+    // gateway's existing Precheck path sees fresh state on every
+    // re-materialise after a BUDGET_UPDATED eviction — without this the
+    // wire output reads the stale spentUsd PG column no writer updates.
     const payload = await materialiser.materialise(vk);
     return c.json(payload, 200, {
       ETag: currentETag,
@@ -1194,14 +1009,7 @@ export function createGatewayInternalRestApp(options: {
   });
 
   /**
-   * §4.3 — mutations since a given revision. Short, polite long-poll:
-   * Hono isn't the right place for 25s held sockets, so we do a brief loop
-   * with 2s sleeps for a maximum of ~10s per request. The Go client falls
-   * straight back into the next long-poll on 204.
-   *
-   * Query: ?since=<revision>&timeout_s=10
-   * Response: { current_revision, changes: [{kind, vk_id, revision}, ...] }
-   * Returns 204 No Content when no diff within timeout.
+   * §4.3 — mutations since a given revision. Short, polite long-poll: Hono isn't right for 25s held sockets, so this loops briefly (2s sleeps, ~10s max); the Go client falls straight back into the next long-poll on 204. Query: ?since=<revision>&timeout_s=10. Response: {current_revision, changes:[{kind,vk_id,revision}]}. 204 when no diff within timeout.
    */
   secured.access(gatewayPolicy()).get("/changes", async (c) => {
     const sinceParam = c.req.query("since") ?? "0";
@@ -1270,20 +1078,7 @@ export function createGatewayInternalRestApp(options: {
   });
 
   /**
-   * §4.6 — inline guardrail pipeline.
-   *
-   * Request:  { vk_id, project_id, direction, guardrail_ids, content, metadata }
-   * Response: { decision: allow|block|modify, reason, modified_content, policies_triggered }
-   *
-   * Runs every guardrail the virtual key references for this direction in
-   * parallel and aggregates them: any block blocks. A guardrail whose evaluator
-   * cannot produce a verdict falls to its own failure mode rather than passing,
-   * so a broken evaluator cannot quietly disable an active protection.
-   *
-   * project_id is required. It scopes the guardrail lookup, which is what stops
-   * one project's key from naming another project's guardrail. A key with no
-   * trace project materialises no guardrails, so the data plane never reaches
-   * this endpoint for one.
+   * §4.6 — inline guardrail pipeline. Request: {vk_id, project_id, direction, guardrail_ids, content, metadata}. Response: {decision, reason, modified_content, policies_triggered}. Runs every referenced guardrail in parallel and aggregates (any block blocks); an evaluator that can't verdict falls to its own failure mode rather than passing, so a broken evaluator can't quietly disable protection. project_id is required — it scopes the lookup so one project's key can't name another's guardrail; a key with no trace project materialises none.
    */
   secured.access(gatewayPolicy()).post("/guardrail/check", async (c) => {
     let body: unknown;
@@ -1407,22 +1202,7 @@ export function createGatewayInternalRestApp(options: {
   });
 
   /**
-   * Async spend-command ingest. The gateway's drainer posts spooled batches
-   * here at-least-once; every command carries a per-(request, step)
-   * idempotency key at the event store, so redelivery is a no-op and the
-   * drainer can retry the whole batch safely.
-   *
-   * Per-record acceptance: one malformed record must not wedge the spool
-   * (the drainer would retry a permanently rejected batch forever), so bad
-   * records are reported back by index and the rest append. The gateway
-   * counts rejects; a nonzero rate is a contract bug, and a rejected outcome
-   * still surfaces later when settlement flags the admission for
-   * reconciliation (the pod-seq gap detector only covers admits).
-   *
-   * Admissions are enriched before they append, which is the one thing here
-   * that can fail the whole batch: attribution the gateway cannot see has to
-   * be right on an immutable event, so an unreadable database answers 500 and
-   * lets the drainer come back rather than appending a guess.
+   * Async spend-command ingest: the drainer posts spooled batches at-least-once; every command carries a per-(request,step) idempotency key at the event store, so redelivery is a no-op and the whole batch retries safely. Per-record acceptance — one malformed record must not wedge the spool, so bad records are reported by index while the rest append (rejects are counted; a nonzero rate is a contract bug, and a rejected outcome still surfaces later via reconciliation). Admissions are enriched before appending, the one thing that can fail the whole batch — an unreadable database answers 500 rather than appending a guessed attribution.
    */
   secured.access(gatewayPolicy()).post("/spend-commands", async (c) => {
     const parsed = spendCommandBatchSchema.safeParse(await c.req.json().catch(() => null));
@@ -1482,13 +1262,7 @@ export function createGatewayInternalRestApp(options: {
   });
 
   /**
-   * Books a voice session and decides the key's open-session cap in the same
-   * transaction that inserts the row.
-   *
-   * The gateway calls this BEFORE it mints, and refuses the mint when this
-   * refuses. That ordering is what makes the cap real: a mint that ran first
-   * would already have handed out a working credential by the time the count
-   * said no.
+   * Books a voice session and decides the key's open-session cap in the same transaction that inserts the row. The gateway calls this BEFORE minting and refuses the mint when this refuses — that ordering is what makes the cap real, since minting first would hand out a working credential before the count said no.
    */
   secured.access(gatewayPolicy()).post("/realtime-sessions", async (c) => {
     const parsed = reserveRealtimeSessionSchema.safeParse(await c.req.json().catch(() => null));
@@ -1599,12 +1373,7 @@ export function createGatewayInternalRestApp(options: {
   });
 
   /**
-   * Closes an OpenAI voice session with the usage its socket reported.
-   *
-   * OpenAI reports a realtime session's usage over the socket, and that socket
-   * runs client to vendor, so the client posting it back is the only path by
-   * which those numbers reach billing. The gateway has already made the audio
-   * and text counts disjoint.
+   * Closes an OpenAI voice session with the usage its socket reported. OpenAI reports usage over a socket running client-to-vendor, so the client posting it back is the only path those numbers reach billing; the gateway has already made audio and text counts disjoint.
    */
   secured.access(gatewayPolicy()).post("/realtime-sessions/:session_id/usage", async (c) => {
     const parsed = reportRealtimeUsageSchema.safeParse(await c.req.json().catch(() => null));

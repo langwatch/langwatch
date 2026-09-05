@@ -16,18 +16,7 @@ export class ClickHouseEventsFacetAdapter {
   }
 
   /**
-   * Span event names + per-event metric value aggregates. Each `stored_spans`
-   * row carries parallel arrays `Events.Name` / `Events.Attributes`; we zip
-   * them before exploding via `arrayJoin` so every metric entry stays scoped
-   * to the event that emitted it, then group by name.
-   *
-   * The metric buckets ride the SAME discover query (evaluator-facet
-   * precedent) so the drilldown renders with zero extra queries per click.
-   * Values are aggregated as stored — verbatim strings, never reformatted —
-   * so a click round-trips exactly into `event.attribute.event.metrics.<k>:<v>`.
-   *
-   * The facet key is `event` (matching the search-bar field) so toggles
-   * round-trip cleanly with the `event:` filter handler.
+   * Span event names + per-event metric value aggregates: zips stored_spans' parallel Events.Name/Events.Attributes arrays before arrayJoin-exploding, so each metric entry stays scoped to its event, then groups by name. Metric buckets ride the SAME discover query (evaluator-facet precedent) for zero extra queries per click, aggregated verbatim so a click round-trips exactly into event.attribute.event.metrics.<k>:<v>. Facet key is 'event' to match the search-bar field.
    */
   static buildEventsFacetQuery(ctx: FacetQueryContext): FacetQuery {
     const where = ClickHouseFacetQueryAdapter.buildTimeWhere("StartTime");

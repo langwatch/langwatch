@@ -1,11 +1,6 @@
 /**
- * Unit tests for the TraceLegacyReadClickHouseRepository → blob-resolution seam (ADR-022).
- *
- * Mocks only the lowest-level CH driver (getClickHouseClientForTenant) and
- * wires a real TraceBlobStoreService (via getFromEventLog stub) + real TraceIOExtractionService
- * so the full resolution + recomputed-IO pipeline fires end-to-end.
- *
- * BDD structure: given/when nested describes, action-based it() names.
+ * @see ADR-022
+ * Unit tests for the TraceLegacyReadClickHouseRepository -> blob-resolution seam. Mocks only the lowest-level CH driver (getClickHouseClientForTenant), wires a real TraceBlobStoreService (via getFromEventLog stub) + real TraceIOExtractionService so full resolution + recomputed-IO fires end-to-end.
  */
 
 import { TraceOffloadResolutionService } from "../../../services/trace-offload-resolution.service";
@@ -27,12 +22,7 @@ const { mockClickHouseQuery } = vi.hoisted(() => ({
 }));
 
 /**
- * The process's tenant-keyed connection, as this suite supplies it.
- *
- * It arrives as a CONSTRUCTOR argument now. The suite used to mock the
- * platform application's singleton and let the repository reach for it; the
- * repository takes the resolver instead, so the fake is stated where every
- * other dependency of the read is.
+ * The process's tenant-keyed connection, as this suite supplies it — arrives as a CONSTRUCTOR argument now. The suite used to mock the platform application's singleton; the repository takes the resolver instead, so the fake sits where every other dependency of the read does.
  */
 const testResolveClickHouseClient = () => Promise.resolve({ query: mockClickHouseQuery } as never);
 
@@ -216,13 +206,11 @@ describe("TraceLegacyReadClickHouseRepository — eventref resolution seam (ADR-
   describe("getTracesWithSpans()", () => {
     describe("given a span carrying a reserved eventref for langwatch.output", () => {
       describe("when getTracesWithSpans is called with a real resolver", () => {
-        // NOTE: assertions on the full restored trace.output value require
-        // accurately mocking the SQL → row → TraceSummaryData → mapper pipeline
-        // (parseComputedOutput, multi-step JOINs, etc.). The end-to-end
-        // restored-output behavior is proven by the integration test at
-        // src/server/app-layer/traces/__tests__/large-trace-blob-offload.integration.test.ts.
-        // This file covers the CH-specific surface: that the resolver IS invoked
-        // and the reserved eventref attr is stripped from the returned span.
+        // Full restored trace.output assertions need accurately mocking the
+        // SQL -> row -> TraceSummaryData -> mapper pipeline; end-to-end
+        // restored-output behavior is proven by
+        // large-trace-blob-offload.integration.test.ts. This file covers the
+        // CH-specific surface: the resolver IS invoked and eventref is stripped.
         it("strips the reserved eventref attr from the returned span", async () => {
           setupGetTracesWithSpansMocks("trace-1", "span-1");
 

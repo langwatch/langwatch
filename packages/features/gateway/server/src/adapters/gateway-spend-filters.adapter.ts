@@ -1,16 +1,7 @@
 /**
- * The filter vocabulary the gateway spend reads share.
- *
- * Both reads answer questions about the same rows, so a filter that exists
- * on one and not the other makes the surface unusable for its actual job: a
- * reconciliation checksums the rollups and then diffs the events, and it can
- * only do that if it can ask both the same question. One module owns the
- * query shape, the domain type and the SQL so the two cannot drift, and a
- * unit test pins that both routes mount this shape.
- *
- * Project, team and external-id filters are deliberately NOT here. They name
- * things that live in Postgres and are resolved to tenant ids and virtual key
- * ids before a query is built, so ClickHouse only ever sees ids it stores.
+ * Filter vocabulary shared by both gateway spend reads: one module owns the
+ * query shape, domain type and SQL. Project/team/external-id filters are absent —
+ * those resolve to Postgres ids before a query is built.
  */
 
 import { z } from "zod";
@@ -19,10 +10,9 @@ import type { SpendFilters, SpendMetadataFilter } from "../ports/gateway-spend-e
 export type SpendEventStatus = "admitted" | "confirmed" | "failed" | "settled";
 
 /**
- * The lifecycle status a spend row carries while its outcome has not landed
- * yet. Named once because two places depend on it meaning the same thing: the
- * rollup read excludes it from every sum, and the rollup's status filter
- * refuses it rather than accepting a narrowing that can only answer nothing.
+ * Lifecycle status for a spend row with no outcome yet — named once so
+ * the rollup sum excludes it and the rollup's status filter refuses it,
+ * rather than accepting a narrowing that can only answer nothing.
  */
 export const SPEND_STATUS_IN_FLIGHT = "admitted" as const;
 
@@ -44,14 +34,9 @@ export const SPEND_STATUS_FILTERS = [
 export const spendStatusFilter = z.enum(SPEND_STATUS_FILTERS);
 
 /**
- * The rollups read's status filter: the same vocabulary minus the in-flight
- * status, DERIVED by exclusion so a status added to one is added to both.
- *
- * A rollup sums the cost of requests past admission, so an admitted request
- * contributes nothing to it and the read excludes those rows outright.
- * Accepting the narrowing anyway would answer every such query with a
- * confident zero, and a reconciliation that checksums against that zero
- * decides the books agree.
+ * Rollup status filter: shared vocabulary minus in-flight, DERIVED by exclusion
+ * so a new status is added to both automatically — accepting in-flight here would
+ * answer a confident zero a reconciliation could mistake for agreement.
  */
 export const spendSummaryStatusFilter = spendStatusFilter.exclude([SPEND_STATUS_IN_FLIGHT]);
 
@@ -70,11 +55,9 @@ const LEGACY_STATUS_ALIASES = new Map<string, SpendEventStatus>([
 ]);
 
 /**
- * How many values one filter may name. Each becomes an element of a bound
- * ClickHouse array and each metadata entry becomes a predicate of its own, so
- * an unbounded repeat is an unbounded query on a billing read. A caller who
- * genuinely needs more is naming a team or an organization, and both of those
- * are filters in their own right.
+ * Max values one filter may name — each becomes a bound ClickHouse array
+ * element, so an unbounded repeat is an unbounded query on a billing read.
+ * A caller needing more is really naming a team or organization instead.
  */
 export const MAX_FILTER_VALUES = 100;
 
@@ -82,14 +65,9 @@ const id = z.string().min(1).max(100);
 const longId = z.string().min(1).max(256);
 
 /**
- * `key:value`, split on the FIRST colon so a value may contain one. The key
- * cannot: a metadata key with a colon in it is unaddressable here, which is
- * a limit worth naming rather than a shape worth guessing at.
- *
- * Both halves have to be non-empty. ClickHouse answers a missing Map key with
- * the value type's default, so `tier:` would read as `'' IN ('')` and match
- * every row that has no `tier` at all, which is the exact opposite of the
- * narrowing the caller asked for. Refusing beats returning wrong spend.
+ * `key:value`, split on the FIRST colon (value may hold one, key may not).
+ * Both halves must be non-empty: a missing Map key answers with the type
+ * default, so `tier:` would match every row with no `tier` at all.
  */
 const metadataPair = z
   .string()
@@ -157,12 +135,9 @@ const IN_COLUMNS: ReadonlyArray<readonly [keyof SpendFilters, string]> = [
 ];
 
 /**
- * The filters a spend read accepts, from the query string to the SQL clause.
- *
- * One vocabulary for two surfaces: every filter here is accepted by both the
- * events read and the rollup read, so a caller that narrows one can narrow the
- * other with the same parameters. Parsing them in one place is what keeps that
- * promise true.
+ * Query-string-to-SQL filters for a spend read. One vocabulary for both
+ * the events and rollup reads, parsed in one place, so a caller narrowing
+ * one can narrow the other with the same parameters.
  */
 export class GatewaySpendFiltersAdapter {
   static create(): GatewaySpendFiltersAdapter {
@@ -172,10 +147,9 @@ export class GatewaySpendFiltersAdapter {
   private constructor() {}
 
   /**
-   * A filter the caller may repeat. Hono hands a query parameter back as a
-   * string when it appears once and an array when it appears more than once,
-   * so a schema that accepted only one of those shapes would reject the
-   * commoner half of the traffic.
+   * A repeatable filter: Hono returns a query param as a string when it
+   * appears once and an array when it repeats, so accepting only one
+   * shape would reject the commoner half of real traffic.
    */
   repeatable(inner: z.ZodType<string, string>): z.ZodType<string[], string | string[]> {
     return z
@@ -184,11 +158,9 @@ export class GatewaySpendFiltersAdapter {
   }
 
   /**
-   * The lifecycle status a filter token names, DERIVED from
-   * {@link SPEND_STATUS_FILTERS} rather than restated. Restating it would let
-   * the boundary accept a status this rejects: a new entry in the tuple would
-   * pass `spendStatusFilter` and then throw here, turning a validated request
-   * into a 500.
+   * Status a filter token names, DERIVED from {@link SPEND_STATUS_FILTERS}
+   * rather than restated — restating risks a new tuple entry passing
+   * validation here and then throwing downstream as a 500.
    */
   normalizeStatusFilter(status: string): SpendEventStatus | undefined {
     if (status === "") return undefined;
@@ -207,11 +179,9 @@ export class GatewaySpendFiltersAdapter {
   }
 
   /**
-   * Group repeated pairs by key: repeating a key widens that key (any of the
-   * values match), while naming two keys narrows (both must match). Treating
-   * a repeated key as another AND would make `tier:gold` plus `tier:silver`
-   * match nothing at all, which reads as "no such spend" rather than as the
-   * caller having asked an impossible question.
+   * Status a filter token names, DERIVED from {@link SPEND_STATUS_FILTERS}
+   * rather than restated — restating risks a new tuple entry passing here
+   * and throwing downstream instead, turning a validated request into a 500.
    */
   parseMetadataFilters(raw: string[]): SpendMetadataFilter[] {
     const byKey = new Map<string, string[]>();
@@ -235,10 +205,9 @@ export class GatewaySpendFiltersAdapter {
   }
 
   /**
-   * Both lists must hold for a row to match, so an absent list is "no opinion"
-   * and two present lists intersect. Naming a key directly and naming it by the
-   * customer's own external id is one narrowing expressed twice, and naming two
-   * different keys that way is a question with no answer, not a wider one.
+   * Both lists must hold to match: absent is "no opinion", two present lists
+   * intersect. Naming a key directly and via external id is one narrowing said
+   * twice; naming two different keys that way is unanswerable, not wider.
    */
   intersectIds(a: string[] | undefined, b: string[] | undefined): string[] | undefined {
     if (a === undefined) return b;
@@ -274,16 +243,9 @@ export class GatewaySpendFiltersAdapter {
   }
 
   /**
-   * Render the filters as bare ClickHouse predicates, binding a placeholder only
-   * for the filters actually present so a query never references a parameter it
-   * did not supply. Bare, because callers differ in how they join: one appends
-   * to a fixed WHERE, another joins a condition list.
-   *
-   * A filter that is PRESENT but empty still emits its predicate. That is the
-   * whole point: a team filter naming a team with no projects, or an external
-   * id matching no key, must answer nothing rather than collapse into an
-   * absent predicate and hand back the organization's entire spend under a
-   * narrowing the caller asked for.
+   * Bare ClickHouse predicates, one per filter actually present (callers join
+   * differently). A present-but-empty filter still emits its predicate — otherwise
+   * it hands back the org's entire spend under a narrowing the caller asked for.
    */
   buildSpendFilterClauses({ filters }: { filters: SpendFilters }): {
     clauses: string[];

@@ -1,9 +1,6 @@
 /**
  * @vitest-environment node
- *
- * Service behavior around the stored correction: validation on write, merging
- * an output-only correction into an existing one, and degrading a stored patch
- * this build cannot interpret.
+ * Service behavior around the stored correction: validation on write, merging an output-only correction into an existing one, and degrading a stored patch this build cannot interpret.
  */
 import { describe, expect, it, vi } from "vitest";
 import type {

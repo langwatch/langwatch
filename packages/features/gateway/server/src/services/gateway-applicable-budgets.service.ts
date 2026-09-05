@@ -1,15 +1,5 @@
 /**
- * "Already applies": the budgets that will constrain a key, answered for
- * a key that may not exist yet.
- *
- * The create drawer has to show this before anything is saved, so the
- * input is a draft: the scopes the creator has picked plus, for a personal
- * key, who it belongs to. The resolution itself is the same call the
- * gateway bundle and the request-time check make, so the list cannot
- * promise a constraint that will not be enforced, or miss one that will.
- *
- * Spend comes from the same rollup the budgets page reads, so a limit and
- * its "spent so far" agree wherever they are shown.
+ * "Already applies": budgets that will constrain a key, answered for a key that may not exist yet. Create drawer input is a draft (picked scopes + owner for a personal key); resolution is the same call the gateway bundle and request-time check make, so the list can't promise a constraint that won't be enforced or miss one that will. Spend comes from the same rollup the budgets page reads, so a limit and its "spent so far" agree everywhere.
  */
 import type { ProjectService } from "@langwatch/project-contract";
 
@@ -57,10 +47,7 @@ export type ApplicableBudget = {
    */
   isPerMember: boolean;
   /**
-   * Set when this row is the budget a key's drawer field manages. The
-   * edit drawer seeds its field from this row and hides it from the
-   * inherited list; independently created key-targeted budgets show as
-   * inherited constraints like any other.
+   * Set when this row is the budget a key's drawer field manages. Edit drawer seeds its field from this row and hides it from the inherited list; independently created key-targeted budgets show as inherited constraints like any other.
    */
   managedByVirtualKeyId: string | null;
 };
@@ -86,18 +73,11 @@ export class GatewayApplicableBudgetsService {
     draft: DraftVirtualKey,
     chRepo?: GatewayBudgetSpendPort,
   ): Promise<ApplicableBudget[]> {
-    // Where this key's traces land, which is what decides whether team- and
-    // project-scoped budgets reach it at all.
-    //
-    // A key that exists has a stored destination, and the answer has to be the
-    // one the gateway will act on: the same pointer the materialiser follows,
-    // archived or not. Deciding it again here would show an empty list for a
-    // key whose destination the customer deleted, while its project and team
-    // budgets went on enforcing.
-    //
-    // A draft has no key row and no stored destination yet, so the honest
-    // answer is the decision the save is about to make. A draft the save would
-    // refuse previews as no destination, which is what an incomplete form is.
+    // Where this key's traces land decides whether team/project-scoped
+    // budgets reach it. An existing key's stored destination is the same
+    // pointer the materialiser follows — deciding it again here would empty
+    // the list for a key whose destination was deleted while its team/
+    // project budgets kept enforcing. A draft previews the decision the save is about to make.
     const traceProject = draft.virtualKeyId
       ? draft.traceProjectId
         ? await projects.tryGetTraceDestination(draft.traceProjectId)
@@ -123,10 +103,7 @@ export class GatewayApplicableBudgetsService {
   }
 
   /**
-   * Same decoration for a caller that already knows the exact resolution
-   * target (team, project, key, principal) and does not need the draft's
-   * trace-project inference. The budget-overview service reads this with
-   * the user's personal workspace as the target.
+   * Same decoration for a caller that already knows the exact resolution target (team, project, key, principal) and skips the draft's trace-project inference. Read by budget-overview with the user's personal workspace as the target.
    */
   async resolveApplicableBudgetsForTarget(
     target: GatewayBudgetResolutionTarget,

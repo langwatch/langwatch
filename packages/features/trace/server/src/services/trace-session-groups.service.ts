@@ -13,10 +13,7 @@ import type {
 import type { CodingAgentService } from "@langwatch/coding-agent-contract";
 
 /**
- * The Sessions lens read (specs/traces-v2/sessions-lens.feature): true
- * per-session rollups over `trace_summaries`, enriched with the pre-folded
- * coding-agent session counters when the conversation id matches a
- * coding-agent session (session id == `gen_ai.conversation.id`).
+ * The Sessions lens read (specs/traces-v2/sessions-lens.feature): true per-session rollups over `trace_summaries`, enriched with pre-folded coding-agent session counters when the conversation id matches a coding-agent session (session id == `gen_ai.conversation.id`).
  */
 
 /** Lens sort column ids (frontend vocabulary) → repository sort dimensions. */
@@ -42,11 +39,7 @@ const emptyToNull = (value: string | null | undefined): string | null =>
   value === null || value === undefined || value === "" ? null : value;
 
 /**
- * One session past the caller's visibility window: the conversation content it
- * carries is teased, its rollup numbers are untouched, mirroring the trace
- * list's gate. The generated title is written FROM the conversation, so it is
- * teased with the previews; the git identity is operational metadata about
- * where the session ran and stays whole.
+ * One session past the caller's visibility window: conversation content it carries is teased, rollup numbers are untouched, mirroring the trace list's gate. The generated title is written FROM the conversation so it is teased with the previews; the git identity is operational metadata about where the session ran and stays whole.
  */
 function teasedSession(session: SessionGroupDto): SessionGroupDto {
   return {
@@ -226,12 +219,7 @@ export class SessionGroupsService {
   }
 
   /**
-   * Attach each session to the pull request its branch's history says it
-   * belongs to, for the whole page in ONE lookup.
-   *
-   * Best-effort like the enrichment it decorates: an organization that never
-   * connected GitHub, a repository no installation reaches, and a failed read
-   * all leave the rows unlinked rather than failing the list.
+   * Attach each session to the pull request its branch's history says it belongs to, for the whole page in ONE lookup. Best-effort like the enrichment it decorates: an organization that never connected GitHub, a repository no installation reaches, and a failed read all leave the rows unlinked rather than failing the list.
    */
   private async linkPullRequests({
     tenantId,

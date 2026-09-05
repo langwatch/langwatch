@@ -1,15 +1,6 @@
 /**
  * @vitest-environment node
- *
- * The ElevenLabs post-call webhook, end to end over real Postgres.
- *
- * A brokered ElevenLabs conversation reports nothing over its socket, so this
- * route and the reconciler are the only two paths by which a voice call
- * reaches billing. What is asserted here is which deliveries are allowed to
- * close a session, because a session closed wrongly is confirmed spend the
- * fold will never downgrade.
- *
- * Spec: specs/ai-gateway/realtime-sessions.feature
+ * Real Postgres. A brokered ElevenLabs conversation reports nothing over its socket, so this route and the reconciler are the only two paths to billing — asserts which deliveries may close a session, since a wrongly closed one is confirmed spend the fold never downgrades. Spec: specs/ai-gateway/realtime-sessions.feature
  */
 import { createHmac } from "crypto";
 import { nanoid } from "nanoid";

@@ -1,8 +1,6 @@
 /**
  * @vitest-environment node
- *
- * Unit tests for CSV serializers (summary and full mode).
- * Pure function tests — no mocking needed.
+ * Unit tests for CSV serializers (summary and full mode). Pure function tests — no mocking needed.
  */
 
 import { TraceExportService } from "../trace-export.service";
@@ -625,17 +623,8 @@ describe("when an export spans several batches", () => {
 });
 
 /**
- * These files exist to be opened in a spreadsheet, and a cell opening with `=`
- * is a formula Excel and Sheets run on the reader's machine. RFC 4180 quoting
- * does not stop it — quoting protects the CSV grammar, not the reader — so the
- * cell has to carry a leading apostrophe, which both tools strip on display.
- *
- * Everything asserted here is a value somebody typed: a trace's input and
- * output arrive from the instrumented application, labels are set on the trace,
- * and an evaluator's display name is chosen in the project and reaches the
- * header row.
- *
  * @see src/utils/csvFormulaGuard.ts
+ * These files open in a spreadsheet, and a cell opening with = is a formula Excel/Sheets run on the reader's machine. RFC 4180 quoting protects the CSV grammar, not the reader, so the cell needs a leading apostrophe (stripped on display by both tools). Everything asserted here is a value somebody typed: input/output from the instrumented application, labels set on the trace, an evaluator's display name reaching the header row.
  */
 describe("spreadsheet formula injection", () => {
   const FORMULA = "=cmd|' /c calc'!A1";

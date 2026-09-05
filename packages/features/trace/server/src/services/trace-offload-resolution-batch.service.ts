@@ -1,24 +1,5 @@
 /**
- * Bulk read-path resolution of offloaded trace event refs (ADR-022, #4991).
- *
- * The per-trace {@link ./resolve-offloaded-traces#resolveOffloadedTraces} is the
- * right tool for a single-trace detail read (#4984). The BULK consumers —
- * export, thread, annotation queue, dataset/sample builders — read whole result
- * sets, where resolving each trace independently would fan out an unbounded
- * N×M burst of `event_log` SELECTs (one per offloaded field × every row),
- * exhausting the ClickHouse connection pool on a large export.
- *
- * This module resolves a WHOLE result set in one pass:
- *   1. Decode the eventref pointers off every span across every trace.
- *   2. Dedupe identical `(aggregateId, eventId, field)` refs to one fetch.
- *   3. Stream the `event_log` reads through a bounded-concurrency pool — peak
- *      in-flight CH reads is a CONSTANT regardless of result-set size (AC6).
- *   4. Scatter the resolved full values back onto each span, strip the reserved
- *      eventref keys, and recompute trace-level IO per trace.
- *
- * Error policy (AC7): a missing/failed event_log row must NOT break the read —
- * the affected field keeps its preview and a warning is logged; every other
- * field and trace still resolves.
+ * Bulk read-path resolution of offloaded trace event refs (ADR-022, #4991). The per-trace resolver is right for a single-trace detail read (#4984); BULK consumers (export, thread, annotation queue, dataset/sample builders) read whole result sets, where resolving each trace independently would fan out an unbounded N×M burst of `event_log` SELECTs, exhausting the ClickHouse connection pool. This module instead: decodes eventref pointers off every span across every trace, dedupes identical `(aggregateId, eventId, field)` refs to one fetch, streams reads through a bounded-concurrency pool (constant peak in-flight CH reads regardless of result-set size, AC6), then scatters resolved values back and recomputes trace-level IO. Error policy (AC7): a missing/failed row must NOT break the read — the affected field keeps its preview and logs a warning, every other field and trace still resolves.
  */
 import { TraceEventRefParsingService } from "./trace-eventref-parsing.service";
 import type { TraceBlobStoreService } from "./trace-blob-store.service";
@@ -28,11 +9,7 @@ import type { NormalizedAttributes, NormalizedSpan } from "@langwatch/trace-cont
 import type { ResolvedTraceSpans, WarnLogger } from "./trace-offload-resolution.service";
 
 /**
- * Maximum number of concurrent `event_log` reads in flight at once across an
- * entire result set. Bounds the bulk read path's load on ClickHouse so a large
- * export/thread streams its blob fetches instead of firing all of them at once
- * (#4991 AC6). Sized to keep the CH client's connection pool busy without
- * saturating it.
+ * Maximum concurrent `event_log` reads in flight across an entire result set. Bounds the bulk read path's load on ClickHouse so a large export/thread streams its blob fetches instead of firing all at once (#4991 AC6), sized to keep the CH client's connection pool busy without saturating it.
  */
 export const EVENT_LOG_RESOLVE_CONCURRENCY = 25;
 
@@ -57,11 +34,7 @@ interface SpanPlan {
 type FetchResult = { ok: true; value: string } | { ok: false; error: unknown };
 
 /**
- * Builds the dedup key for a fetch task. NUL separator can't collide with ids.
- *
- * Named params, not positional: all three args are plain strings, so a caller
- * that transposed two of them would compile cleanly and silently dedupe/fetch
- * the wrong event_log row onto the wrong span.
+ * Builds the dedup key for a fetch task (NUL separator can't collide with ids). Named params, not positional: all three args are plain strings, so a caller that transposed two would compile cleanly and silently dedupe/fetch the wrong event_log row onto the wrong span.
  */
 function fetchKeyOf({
   aggregateId,
@@ -138,16 +111,8 @@ export class TraceOffloadResolutionBatchService {
   }
 
   /**
-   * Resolves offloaded event refs for a whole result set of traces in one bounded
-   * pass. See the module doc for the algorithm and error policy.
-   *
-   * @param projectId - The tenantId / projectId all traces belong to.
-   * @param spansPerTrace - The NormalizedSpan array for each trace, in result order.
-   * @param blobStore - TraceBlobStoreService providing getFromEventLog.
-   * @param ioExtractionService - Recomputes trace-level IO from resolved spans.
-   * @param logger - Logger for resolution-failure warnings.
-   * @param aggregateType - Aggregate type for event_log lookup (default: "trace").
-   * @param concurrency - Max concurrent event_log reads (default {@link EVENT_LOG_RESOLVE_CONCURRENCY}).
+   * @param projectId/spansPerTrace/blobStore/ioExtractionService/logger - Tenant, per-trace NormalizedSpan arrays (result order), blob store, IO recomputation, and warning logger. Resolves refs for a whole result set in one bounded pass — see module doc.
+   * @param aggregateType/concurrency - event_log aggregate type (default "trace") and max concurrent reads (default {@link EVENT_LOG_RESOLVE_CONCURRENCY}).
    * @returns One {@link ResolvedTraceSpans} per input trace, aligned to input order.
    */
   static async resolveOffloadedTracesBatch({

@@ -1,19 +1,6 @@
 /**
  * @vitest-environment node
- *
- * End-to-end coverage for the guardrail check the Go data plane calls.
- *
- * Hits real PG. Only the evaluator call itself is injected, because it is the
- * one boundary this service does not own. Everything the service is actually
- * responsible for — project scoping, archive filtering, direction bucketing,
- * failure modes and aggregation — runs against real rows, and the enabled
- * guardrail monitors are read back from those rows too.
- *
- * This endpoint used to be a stub that returned allow for every request while
- * the UI showed guardrails as active, so these tests exist to make an
- * always-allow regression impossible to land quietly.
- *
- * Spec: specs/ai-gateway/guardrail-check-endpoint.feature
+ * Real Postgres. Only the evaluator call is injected; everything else runs against real rows. Guards against the endpoint's old always-allow stub regressing. Spec: specs/ai-gateway/guardrail-check-endpoint.feature
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

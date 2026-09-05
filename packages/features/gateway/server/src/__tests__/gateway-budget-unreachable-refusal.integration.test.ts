@@ -1,14 +1,6 @@
 /**
  * @vitest-environment node
- *
- * A budget that can never accrue is refused at the moment it is written.
- *
- * Real Postgres, no mocks: whether a budget is reachable depends on virtual
- * key scopes and on the project a key's traces land in, which is exactly the
- * pair a stub would have to fake, and faking it would only prove the stub
- * agrees with itself.
- *
- * Spec: specs/ai-gateway/gateway-budget-targeting.feature
+ * Real Postgres, no mocks: reachability depends on virtual key scopes and the project a key's traces land in — exactly what a stub would fake. Spec: specs/ai-gateway/gateway-budget-targeting.feature
  */
 import {
   PrismaConfigService,

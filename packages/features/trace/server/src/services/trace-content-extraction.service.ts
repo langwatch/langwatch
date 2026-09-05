@@ -1,33 +1,5 @@
 /**
- * content-extractor.ts — walks scenario message payloads, externalizes inline media.
- *
- * For every message content part that carries inline byte data, this module:
- *  1. Decodes the base64 payload.
- *  2. Calls `service.storeFromBytes` to content-address the bytes.
- *  3. Rewrites the part to reference the stored object by URL.
- *
- * The walker speaks the langwatch tracer's `chatRichContentSchema` shape (the
- * production contract — see @langwatch/trace-contract), not AG-UI's
- * `InputContentSchema`. The two vocabularies overlap on `binary` but diverge
- * on image carriers: production sends `{type:"image_url", image_url:{url}}`
- * (OpenAI-shaped, possibly a `data:` URI). The visitor's `legacyImageUrl`
- * branch handles that case.
- *
- * Shape rules:
- *  - `binary` with `data` set → extract, rewrite to `id + url + data:undefined`
- *  - `image_url` with `image_url.url` starting `data:` → extract, rewrite to
- *    `image_url.url = /api/files/<projectId>/<id>`
- *
- * Minted URLs carry the owning `<projectId>` (issue #4947) so the read path
- * (`/api/files`) resolves the owner directly from the URL and
- * reads via the project-scoped ClickHouse client — no cross-tenant owner
- * lookup. Legacy id-only URLs (`/api/files/<id>`) minted before #4947 stay
- * resolvable via the retained cross-tenant fallback on the read route.
- *  - everything else (text, tool_call, tool_result, image_url with http URLs,
- *    bare image, unknown shapes) → pass through unchanged
- *
- * The walker is deliberately narrow: it only touches the fields it understands
- * and leaves everything else untouched ("degraded, not broken").
+ * Walks scenario message payloads, externalizing inline media: decodes base64, calls storeFromBytes to content-address the bytes, rewrites the part to reference the stored object by URL. Speaks the tracer's chatRichContentSchema shape (production contract), not AG-UI's InputContentSchema — they overlap on binary but diverge on image carriers (production's OpenAI-shaped image_url with a data: URI, handled by legacyImageUrl). binary with data set extracts to id+url+data:undefined; image_url with a data: URI extracts to image_url.url=/api/files/<projectId>/<id> — minted URLs carry the owning projectId (#4947) so the read route resolves ownership directly, no cross-tenant lookup (legacy id-only URLs stay resolvable via the retained fallback). Everything else passes through unchanged ("degraded, not broken") — the walker only touches fields it understands.
  */
 
 import { z } from "zod";
@@ -44,16 +16,7 @@ import {
 import { isReadbackSafe } from "@langwatch/stored-object-contract";
 
 /**
- * Runtime invariant: an AG-UI `binary` content part must carry exactly one
- * of `data`, `url`, or `id`. Anything else is structurally ambiguous —
- * "is this inline bytes or a reference?" — and the extractor would do
- * the wrong thing depending on which field it checked first.
- *
- * The shared `chatRichContentSchema` binary variant (@langwatch/trace-contract)
- * only checks that each field is a string-or-absent; mutual exclusion is a
- * stricter, ingest-time constraint that doesn't belong on the broad shared
- * shape. Wrapping it here keeps the constraint in one place that the extractor
- * and the scenario-events route can both call.
+ * Runtime invariant: an AG-UI binary content part must carry exactly one of data, url, or id — anything else is structurally ambiguous and the extractor would do the wrong thing depending on which field it checked first. The shared chatRichContentSchema only checks each field is string-or-absent; mutual exclusion is a stricter ingest-time constraint wrapped here so the extractor and the scenario-events route can both call it.
  */
 
 export const binaryInputPartSchema = z
@@ -118,20 +81,7 @@ interface ExtractionParams {
 }
 
 /**
- * Walks a single message's `content` array, externalizing inline media.
- *
- * - Returns the same message reference when nothing was rewritten (no
- *   content array, or no part contained extractable bytes). Reference
- *   identity lets the event dispatcher above detect "no-op" without
- *   diffing the bytes.
- * - On `storeFromBytes` failure, the error propagates out — the caller
- *   maps it to a 5xx and rolls back the event.
- *
- * No upstream Zod gate: each part is dispatched to the visitor by shape,
- * unknown shapes pass through unchanged. This is intentionally lenient
- * because the production message vocabulary (`chatRichContentSchema` —
- * see @langwatch/trace-contract) covers more variants than any single
- * library schema, including `image_url` with data URIs.
+ * Walks a single message's content array, externalizing inline media. Returns the same message reference when nothing was rewritten, so the dispatcher can detect a no-op without diffing bytes; on storeFromBytes failure the error propagates (caller maps to 5xx, rolls back the event). No upstream Zod gate — each part dispatches to the visitor by shape, unknown shapes pass through, intentionally lenient since production's chatRichContentSchema covers more variants than any single library schema (incl. image_url with data URIs).
  */
 async function rewriteMessage(
   rawMessage: Record<string, unknown>,
@@ -168,11 +118,7 @@ async function rewriteMessage(
 }
 
 /**
- * Walks every message in an event's `messages` array.
- *
- * Returns the original `messages` reference (and an empty refs list) when
- * no message changed. Preserves reference identity at the event level so
- * the dispatcher can short-circuit cleanly.
+ * Walks every message in an event's messages array. Returns the original messages reference (and empty refs) when no message changed, preserving identity at the event level so the dispatcher can short-circuit cleanly.
  */
 async function rewriteMessageArray(
   messages: unknown[],
@@ -211,14 +157,7 @@ export class TraceContentExtractionService {
   }
 
   /**
-   * Rewrites a single content part, storing any inline bytes via the service.
-   * Returns the (possibly new) part and an optional ref. `part` is unknown
-   * because the upstream walker no longer pre-validates against a single
-   * schema — the visitor's shape-dispatch handles each variant directly.
-   *
-   * Exported for the generic value walker (`value-media-extractor.ts`), which
-   * finds media parts in arbitrary JSON values (trace span attributes) rather
-   * than the scenario event's message/messages envelope.
+   * Rewrites a single content part, storing inline bytes via the service. Returns the (possibly new) part and an optional ref; part is unknown since the upstream walker no longer pre-validates against one schema — the visitor's shape-dispatch handles each variant. Exported for the generic value walker (value-media-extractor.ts), which finds media in arbitrary JSON (span attributes), not the scenario event envelope.
    */
   static async processContentPart({
     part,
@@ -304,15 +243,11 @@ export class TraceContentExtractionService {
       },
 
       async binary(binPart) {
-        // Unlike the media/document handler above, this path deliberately has
-        // no isReadbackSafe gate: binary parts render as a download chip, not
-        // inline, so a non-allowlisted type (text/csv, application/json, ...)
-        // coming back as application/octet-stream still round-trips the exact
-        // bytes — and the chip carries the original filename for the save.
-        //
-        // Enforce exactly-one-of(data, url, id) at the boundary before touching.
-        // AG-UI's InputContentSchema permits the ambiguous cases; rejecting them
-        // here matches the runtime invariant the extractor depends on.
+        // Unlike the media/document handler above, this path has no
+        // isReadbackSafe gate: binary parts render as a download chip, not
+        // inline, so a non-allowlisted type still round-trips the exact
+        // bytes with its original filename. Enforces exactly-one-of(data,
+        // url, id) at the boundary, matching the runtime invariant the extractor depends on.
         const refined = binaryInputPartSchema.safeParse(binPart);
         if (!refined.success) {
           logger.debug(
@@ -347,14 +282,11 @@ export class TraceContentExtractionService {
         };
 
         const original = part as Record<string, unknown>;
-        // File shapes (AI-SDK `{type:"file", mediaType, data}` and OpenAI
-        // `{type:"file", file:{file_data, filename}}`) are dispatched here by
-        // the visitor when the mime type is not audio/*. Normalise to a clean
-        // `binary` shape (the same canonical form the inputAudio handler
-        // produces for the audio path) so the rewrite is not a chimera of
-        // `type:"file"` + binary externalised fields. The filename comes from
-        // the dispatched part — the visitor already resolved it from whichever
-        // nesting the wire shape used.
+        // File shapes (AI-SDK {type:"file", mediaType, data}; OpenAI
+        // {type:"file", file:{file_data, filename}}) are dispatched here
+        // when mime type isn't audio/*. Normalises to the same clean binary
+        // shape the inputAudio handler produces, so the rewrite isn't a
+        // chimera of type:"file" + binary fields; filename is already resolved by the visitor.
         const isFileShape = original.type === "file";
         const rewrittenPart = isFileShape
           ? {
@@ -420,14 +352,11 @@ export class TraceContentExtractionService {
         return { part: rewrittenPart, ref };
       },
 
-      // OpenAI Realtime API: {type:"input_audio", input_audio:{data:"<base64>", format:"wav"}}.
-      // This is the shape the langwatch python-sdk emits for scenario audio
-      // turns today, and the shape the typescript-sdk's
-      // convert-core-messages-to-agui-messages translates AI-SDK file+audio
-      // parts to. Mime type resolution priority: explicit `mimeType` (set by
-      // the file-part dispatch path in visit-content-part for AI-SDK
-      // `audio/pcm16` etc.) > format-to-mimeType allowlist > a final
-      // `application/octet-stream` fallback when neither is recognised.
+      // OpenAI Realtime API: {type:"input_audio", input_audio:{data,
+      // format:"wav"}} — the shape python-sdk emits for scenario audio
+      // turns, and what convert-core-messages-to-agui-messages produces
+      // from AI-SDK file+audio parts. Mime priority: explicit mimeType >
+      // format-to-mimeType allowlist > application/octet-stream fallback.
       async inputAudio(audioPart) {
         // Already-externalized: nothing to extract, pass through unchanged.
         if (!audioPart.data) {
@@ -451,12 +380,11 @@ export class TraceContentExtractionService {
 
         let bytes = Buffer.from(audioPart.data, "base64");
 
-        // Raw, header-less realtime formats (pcm16, G.711) are unplayable when
-        // served back as-is — no container, so <audio> rejects them. Wrap them
-        // into a WAV container AT STORE TIME so the externalized reference is
-        // plain playable audio/wav everywhere. Applies identically on the
-        // scenario and trace extraction paths, so the same recording still
-        // hashes to one stored object.
+        // Raw, header-less realtime formats (pcm16, G.711) are unplayable
+        // served back as-is (no container, <audio> rejects them). Wrapped
+        // into a WAV container AT STORE TIME so the externalized reference
+        // is playable everywhere, identically on scenario and trace
+        // extraction paths, so the same recording hashes to one object.
         const rawFormat = resolveRawPcmFormat(format, mimeType);
         if (rawFormat) {
           const wrapped = wrapRawPcmToWav(new Uint8Array(bytes), rawFormat);
@@ -557,24 +485,7 @@ export class TraceContentExtractionService {
   }
 
   /**
-   * Walks an event payload, finds inline media parts in message content arrays,
-   * externalizes them via `service.storeFromBytes`, and returns a new event
-   * with the parts rewritten to reference stored objects by URL.
-   *
-   * Supports two event shapes:
-   *  - Shape A: `event.message` (TEXT_MESSAGE_END) — one message.
-   *  - Shape B: `event.messages[]` (MESSAGE_SNAPSHOT) — an array of messages.
-   *
-   * Behaviour:
-   *  - If the event has no recognizable message field, returns it unchanged
-   *    with an empty refs list.
-   *  - If a content part fails AG-UI `InputContentSchema` validation, the
-   *    whole message passes through unchanged ("degraded, not broken").
-   *  - On `storeFromBytes` failure, the error is rethrown — the route maps
-   *    it to a 5xx.
-   *
-   * Adding a new event shape with media content: implement a third dispatch
-   * branch below; the per-message walker is reusable as-is.
+   * Walks an event payload, finds inline media in message content arrays, externalizes via storeFromBytes, returns a new event with parts rewritten to reference stored objects by URL. Supports event.message (TEXT_MESSAGE_END, one message) and event.messages[] (MESSAGE_SNAPSHOT, an array). No recognizable message field returns the event unchanged with empty refs; a part failing AG-UI InputContentSchema passes the whole message through unchanged ("degraded, not broken"); a storeFromBytes failure rethrows (route maps to 5xx). Adding a new event shape: implement a third dispatch branch — the per-message walker is reusable as-is.
    */
   static async extractInlineMediaFromEvent({
     event,

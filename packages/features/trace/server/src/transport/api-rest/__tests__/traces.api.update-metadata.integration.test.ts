@@ -98,15 +98,15 @@ function buildApi() {
       getEvaluationsMultiple: vi.fn(),
     }),
     getProtections: vi.fn().mockResolvedValue({}),
-    platformUrl: ({ projectSlug, path }) => `https://app.test/${projectSlug}${path}`,
+    platformUrl: ({ projectSlug, path: pathname }) => `https://app.test/${projectSlug}${pathname}`,
     updateTraceMetadata: mockUpdateTraceMetadata,
   };
 
   const app = createTracesRestApp({ security: testSecurity(), ports });
 
   return {
-    fetch: (path: string, init?: RequestInit) =>
-      app.hono.fetch(new Request(`http://api.test${path}`, init)),
+    fetch: (urlPath: string, init?: RequestInit) =>
+      app.hono.fetch(new Request(`http://api.test${urlPath}`, init)),
   };
 }
 
@@ -213,10 +213,7 @@ describe("given PATCH /api/traces/:traceId/metadata", () => {
         return dir;
       }
 
-      const docsPath = path.join(
-        repoRoot(),
-        "docs/api-reference/traces/update-trace-metadata.mdx",
-      );
+      const docsPath = path.join(repoRoot(), "docs/api-reference/traces/update-trace-metadata.mdx");
       expect(fs.existsSync(docsPath), `expected the endpoint's docs page at ${docsPath}`).toBe(
         true,
       );

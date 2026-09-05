@@ -467,16 +467,11 @@ describe("TraceIOExtractionService", () => {
     });
   });
 
-  // ─────────────────────────────────────────────────────────────────────
-  // Anthropic / Claude Code double-wrap normalization
-  //
-  // Some agent runtimes wrap every typed content block (thinking /
-  // tool_use / tool_result) inside a generic `{type:"text", text:"<JSON
-  // of the real block>"}` envelope. The extractor unwraps that shape at
-  // ingest time so we store proper Anthropic content arrays end-to-end.
-  // These tests pin both the unwrap behavior AND the conservative rules
-  // that prevent us from touching legitimate text blocks.
-  // ─────────────────────────────────────────────────────────────────────
+  // Anthropic/Claude Code double-wrap normalization: some agent runtimes
+  // wrap every typed content block (thinking/tool_use/tool_result) inside
+  // a generic {type:"text", text:"<JSON of the real block>"} envelope. The
+  // extractor unwraps that shape at ingest time; these tests pin both the
+  // unwrap behavior AND the conservative rules protecting legitimate text.
   describe("normalization of double-wrapped typed blocks", () => {
     describe("when assistant content wraps a thinking block in a text envelope", () => {
       it("unwraps the thinking block on the raw output", () => {
@@ -820,12 +815,11 @@ describe("TraceIOExtractionService", () => {
     });
   });
 
-  // A Langy turn as it really lands: an empty-IO `langy.turn` root plus a
-  // doStream-style LLM child whose chat payload STARTS with a huge
+  // A Langy turn as it really lands: an empty-IO langy.turn root plus a
+  // doStream-style LLM child whose chat payload starts with a huge
   // developer-role message and ends with the user's short text — over the
   // ingest preview budget, so the child's attribute is the LEANED preview.
-  // The trace headline must still be the user's text and the reply, never the
-  // raw JSON of the (truncated) developer prompt.
+  // The trace headline must still be the user's text and reply, never the raw truncated prompt.
   describe("given a langy.turn root with empty IO and a doStream child carrying a developer-first chat payload", () => {
     const fullInput = JSON.stringify([
       {

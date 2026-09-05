@@ -22,17 +22,7 @@ import {
   settleSpendCommandDataSchema,
 } from "../processes/gateway-spend-commands.process";
 /**
- * The four spend commands are pure appends: validate, stamp identity, emit
- * one event. The aggregate is the gateway request itself (ULID), so the id
- * exists before the provider is called and stays the idempotency key
- * everywhere: internal dedup here, the external webhook event_id, and
- * replay all key off it.
- *
- * Idempotency: one event per (tenant, request, lifecycle step). A
- * redelivered or double-posted command re-uses the same idempotency key and
- * the event store drops the duplicate, so at-least-once emission from the
- * gateway spool can never double a request, and a confirm retried after a
- * crash cannot double-rate it.
+ * The four spend commands are pure appends: validate, stamp identity, emit one event. Aggregate is the gateway request itself (ULID), the id staying the idempotency key everywhere (internal dedup, external webhook event_id, replay). One event per (tenant, request, lifecycle step): a redelivered or double-posted command reuses the same key and the store drops the duplicate, so at-least-once emission can never double a request or a crash-retried confirm double-rate it.
  */
 
 function idempotencyKey({
@@ -230,15 +220,7 @@ export class SettleSpendCommand implements CommandHandler<
 }
 
 /**
- * The envelope is the framework's, not this feature's.
- *
- * It was a hand-written `z.object` here, and it disagreed with
- * `@langwatch/eventing`'s in three ways that matter: no `createdAt`,
- * `occurredAt` as a `Date` rather than the epoch milliseconds the store
- * writes, and plain strings where the framework brands `tenantId`,
- * `aggregateType` and `type`. Every event type below therefore failed the
- * `Event` constraint the pipeline, the command handlers and the process
- * manager all declare — eight compile errors saying the same thing.
+ * The envelope is the framework's, not this feature's — a hand-written z.object here disagreed with @langwatch/eventing's in three ways (no createdAt, occurredAt as Date vs epoch ms, plain strings vs branded tenantId/aggregateType/type), so every event type below failed the Event constraint the pipeline, handlers and process manager all declare.
  */
 const eventEnvelope = EventSchema.extend({
   version: z.literal(GATEWAY_SPEND_EVENT_VERSION_LATEST),
@@ -269,11 +251,7 @@ export const gatewaySpendSettledEventSchema = eventEnvelope.extend({
 export type GatewaySpendSettledEvent = z.infer<typeof gatewaySpendSettledEventSchema>;
 
 /**
- * Every event the spend pipeline folds and its process manager wakes on.
- *
- * Declared here because it is this module's own union; the pipeline, the
- * settlement process manager and the fold projection each named it and none
- * of them could resolve it.
+ * Every event the spend pipeline folds and its process manager wakes on. Declared here because it is this module's own union; the pipeline, the settlement process manager and the fold projection each named it and none of them could resolve it.
  */
 export type GatewaySpendProcessingEvent =
   | GatewaySpendAdmittedEvent

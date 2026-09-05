@@ -1,12 +1,5 @@
 /**
- * Thin adapter that lets gateway services write governance rows to the
- * shared `AuditLog` table using the gateway-shape (action enum,
- * targetKind, before/after diff). Same call sites as before; the table
- * underneath is now the unified one — see migration
- * `20260425000000_consolidate_gateway_audit_into_audit_log`.
- *
- * Gateway services pass an `actorUserId` through to keep attribution
- * consistent with the platform `auditLog()` helper.
+ * Thin adapter writing governance rows to the shared AuditLog table using the gateway shape (action enum, targetKind, before/after diff) — same call sites as before, table now unified (migration 20260425000000_consolidate_gateway_audit_into_audit_log). actorUserId passes through to keep attribution consistent with the platform auditLog() helper.
  */
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { z } from "zod";

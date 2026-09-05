@@ -1,22 +1,8 @@
 import type { ExpressionCategoricalDef } from "./trace-facet-registry.clickhouse.adapter";
 
 /**
- * OpenTelemetry status code mapping. The wire-level `StatusCode` is a
- * `Nullable(UInt8)`:
- *
- *   - `0` (or `NULL`) → unset (no explicit status reported)
- *   - `1`             → ok
- *   - `2`             → error
- *
- * Surfacing the human label as the facet value (rather than the integer)
- * means saved queries / lenses round-trip as `spanStatus:error` which
- * matches the user's mental model and the search-bar suggestions in
- * `FIELD_VALUES.spanStatus`.
+ * OTel status: wire-level StatusCode is Nullable(UInt8) — 0/NULL=unset, 1=ok, 2=error. Surfacing the human label (not the integer) as the facet value lets saved queries round-trip as spanStatus:error, matching the search-bar's FIELD_VALUES.spanStatus. A NULL comparison yields NULL, not 'unset', so a NULL-status span would drop out of the filter entirely — coalesce before comparing to agree with spanStatusRead.
  */
-// `StatusCode` is Nullable(UInt8), and a comparison against NULL yields NULL —
-// not the `'unset'` fallback — so a NULL-status span would drop out of the
-// filter entirely instead of reading as unset. Coalesce before comparing, so
-// this agrees with `spanStatusRead` and with the doc above.
 const STATUS_EXPRESSION =
   "if(ifNull(StatusCode, 0) = 2, 'error', if(ifNull(StatusCode, 0) = 1, 'ok', 'unset'))";
 
@@ -26,13 +12,7 @@ export class ClickHouseSpanStatusFacetAdapter {
   }
 
   /**
-   * Span Status facet: surfaces the OTel status of any span on the trace.
-   *
-   * Cross-table categorical against `stored_spans` — auto-translated into
-   * an `IN`-tuple subquery joining back on TraceId. There's no roll-up
-   * column on `trace_summaries` for span-level status today; if discover
-   * latency on this facet ever becomes a problem, the right move is a
-   * `ContainsErrorSpanStatus` flag at ingest, not a faster ad-hoc query.
+   * Span Status facet: OTel status of any span on the trace. Cross-table categorical against stored_spans, auto-translated into an IN-tuple subquery joined on TraceId — no rollup column on trace_summaries today; if latency ever matters, add a ContainsErrorSpanStatus flag at ingest rather than a faster ad-hoc query.
    */
   static readonly SPAN_STATUS_FACET: ExpressionCategoricalDef = {
     key: "spanStatus",

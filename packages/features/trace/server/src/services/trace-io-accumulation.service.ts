@@ -6,7 +6,6 @@ import {
   TraceMediaReferencePort,
 } from "../ports/trace-media-reference.port";
 import { TraceIoExtractionPort } from "../ports/trace-io-extraction.port";
-import type { LogRecordReceivedEventData } from "@langwatch/trace-contract";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
 
 export const OUTPUT_SOURCE = {

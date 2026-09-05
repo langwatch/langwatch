@@ -1,15 +1,6 @@
 /**
  * @vitest-environment node
- *
- * The gateway spend filter vocabulary, against real Postgres + real
- * ClickHouse.
- *
- * These pin the properties that make a filtered reconciliation trustworthy
- * rather than merely available: a narrowing that matches nothing answers
- * nothing, a team resolves to the projects it owns, and metadata written
- * before the derived column existed is still matched.
- *
- * Spec: specs/ai-gateway/gateway-spend-rest.feature
+ * Real Postgres + real ClickHouse. Pins filtered-reconciliation trust: nothing-matching narrowing answers nothing, a team resolves to owned projects. Spec: specs/ai-gateway/gateway-spend-rest.feature
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
@@ -440,12 +431,10 @@ describe.skipIf(!databaseUrl || !chUrl)("gateway spend filtering (real PG + real
   describe("when metadata predates the derived column", () => {
     /** @scenario "Metadata recorded before the filter shipped is still matched" */
     it("still matches rows written before the column was added", async () => {
-      // The riskiest property in this work: if the server served the type
-      // default for parts written before the ALTER, every historical request
-      // would silently drop out of a filtered reconciliation and the books
-      // would agree on a subset. A table name is an identifier, not a
-      // bindable value, and nanoid's alphabet includes `-`, which would end
-      // the identifier mid-token, so it is sanitised into the DDL below.
+      // Riskiest property here: parts written before the ALTER must not
+      // silently get the type default, or historical requests drop from a
+      // filtered reconciliation. Table name is sanitised into the DDL below
+      // since nanoid's alphabet includes `-`, which would break the identifier.
       const table = `gateway_spend_premigration_${suffix.replace(/[^A-Za-z0-9_]/g, "_")}`;
       await ch().command({
         query: `

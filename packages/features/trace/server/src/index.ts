@@ -2,10 +2,7 @@ export { TraceSpanCostMatchingService } from "./services/trace-span-cost-matchin
 export { ClickHouseTraceAdapter } from "./adapters/clickhouse.trace.adapter";
 export { TraceCanonicalisationService } from "./services/trace-canonicalisation.service";
 /**
- * The platform's retention policy in the shape the ClickHouse package asks
- * for. Exported because Evaluation's own ClickHouse repository takes the same
- * floor port, and a second floor would let a trace and the evaluations behind
- * it disagree about how far back a project's rows go.
+ * The platform's retention policy in the shape the ClickHouse package asks for. Exported because Evaluation's own ClickHouse repository takes the same floor port, and a second floor would let a trace and the evaluations behind it disagree about how far back a project's rows go.
  */
 export { TraceRetentionFloorService } from "./services/trace-retention-floor.service";
 export { NullTraceListAdapter } from "./adapters/null-trace-list.adapter";
@@ -358,15 +355,11 @@ export {
 } from "./services/trace-edit-overlay.service";
 export { TraceProcessingProducerAdapter } from "./adapters/trace-processing-producer.adapter";
 
-// ---------------------------------------------------------------------------
-// The ClickHouse trace READ stack
-//
-// Everything a captured trace passes through between the columns it is stored
-// in and the shape a reader is allowed to see: the legacy read and its
-// repository, the explorer's list / sessions / spans / summary / log readers,
-// the offload resolution behind a full read, the redaction and display passes,
-// the coding-agent log join, the AI composer and the reserved-metadata write.
-// ---------------------------------------------------------------------------
+// The ClickHouse trace READ stack: everything a captured trace passes
+// through between stored columns and what a reader may see — legacy read +
+// repository, the explorer's list/sessions/spans/summary/log readers,
+// offload resolution behind a full read, redaction/display passes, the
+// coding-agent log join, the AI composer and the reserved-metadata write.
 export {
   TraceLegacyReadClickHouseRepository,
   type TraceLegacyFilterConditions,
@@ -445,14 +438,10 @@ export { TraceEditOverlayRedactionService } from "./services/trace-edit-overlay-
 export { TraceEditOverlayRestoreService } from "./services/trace-edit-overlay-restore.service";
 export { TraceCollectorSpanService } from "./services/trace-collector-span.service";
 
-// ---------------------------------------------------------------------------
-// The OTLP receiver
-//
-// `POST /api/otel/v1/{traces,logs,metrics}` and the re-dispatcher that serves
-// the paths a misconfigured exporter produces. Each signal's collection is a
-// port, so a process composes the ones it holds and mounts nothing for the
-// rest.
-// ---------------------------------------------------------------------------
+// The OTLP receiver: POST /api/otel/v1/{traces,logs,metrics} and the
+// re-dispatcher serving the paths a misconfigured exporter produces. Each
+// signal's collection is a port, so a process composes the ones it holds
+// and mounts nothing for the rest.
 export {
   classifyTokenType,
   createOtlpIngestRestApp,
@@ -494,14 +483,10 @@ export {
 } from "./services/ingest-key-provenance.rules";
 export type { TraceRequestCollectionResult } from "./services/trace-ingestion.service";
 
-// ---------------------------------------------------------------------------
-// The download half of the trace read
-//
-// The streaming CSV / JSONL export: the batched read, the two serialisers, the
-// evaluation merge every reader shares, and the two refusals the transport
-// publishes. `filters` is joined to the analytics schema at the mount; see
-// `trace-export.vocabulary.ts`.
-// ---------------------------------------------------------------------------
+// The download half of the trace read: streaming CSV/JSONL export — the
+// batched read, the two serialisers, the evaluation merge every reader
+// shares, and the two refusals the transport publishes. filters is joined
+// to the analytics schema at the mount; see trace-export.vocabulary.ts.
 export { TraceExportService } from "./services/trace-export.service";
 export {
   exportFormatSchema,
@@ -527,12 +512,7 @@ export { RESERVED_METADATA_KEYS } from "./services/trace-export-columns.rules";
 export { enrichTracesWithEvaluations } from "./services/trace-evaluation-enrichment.rules";
 
 /**
- * The EDGE media path: what a span carries inline, lifted into the object
- * store before the span is folded. Was
- * `platform/app/src/server/app-layer/traces/edge-media-extraction.ts` and the
- * four content-part extractors that sat under `server/stored-objects/` — they
- * walk TRACE content parts and media markers, so they belong to this vertical
- * rather than to Stored Objects.
+ * The EDGE media path: what a span carries inline, lifted into the object store before the span folds. Was platform/app's edge-media-extraction.ts + four content-part extractors under server/stored-objects/ — they walk TRACE content parts and media markers, so they belong to this vertical, not Stored Objects.
  */
 export {
   TRACE_MEDIA_PURPOSE,
@@ -568,14 +548,11 @@ export {
   type ResolvedField,
 } from "./services/trace-projection-catalog.service";
 
-// ---------------------------------------------------------------------------
-// The trace READ doors and the SDK collector
-//
-// `POST /api/traces/search` and its three siblings, the five deprecated
-// `/api/trace/*` and `/api/thread/*` endpoints, and `POST /api/collector` —
-// the door an SDK posts a whole trace to. Each takes what it cannot own as a
-// port, so a process mounts the ones its own graph can answer.
-// ---------------------------------------------------------------------------
+// The trace READ doors and the SDK collector: POST /api/traces/search and
+// its three siblings, the five deprecated /api/trace/*, /api/thread/*
+// endpoints, and POST /api/collector (the door an SDK posts a whole trace
+// to). Each takes what it cannot own as a port, so a process mounts the
+// ones its own graph can answer.
 export {
   createTracesRestApp,
   traceSearchBodyExtensions,

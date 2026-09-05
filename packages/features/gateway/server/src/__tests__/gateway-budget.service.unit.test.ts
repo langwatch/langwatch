@@ -69,15 +69,8 @@ function mockPrismaWithBudgets(budgets: GatewayBudget[]): PrismaClient {
 }
 
 /**
- * The process's own composition, over the fake database and spend port.
- *
- * `GatewayService` takes a repository and a `ProjectService` now rather than a
- * `PrismaClient`: the tenant ids a check is scoped by come from
- * `projects.listIdsByOrganization`, and the project names a scope target is
- * rendered with from `projects.listNamesByIds` — both were `project.findMany`
- * reads on the client before. Composing the pair the way
- * `PrismaGatewayAdapter` composes it keeps the decision arithmetic below
- * running over the production code that computes it.
+ * Composed the way `PrismaGatewayAdapter` composes it — see
+ * dev/docs/best_practices/service-repository-adapter-port.md.
  */
 function serviceOver(prisma: PrismaClient, spend?: GatewayBudgetClickHouseRepository) {
   return PrismaGatewayAdapter.create({
@@ -204,13 +197,9 @@ describe("GatewayService.check", () => {
     });
   });
 
-  // Regression for iter-111 finding: after the outbox/debit
-  // replacement by the ClickHouse ledger, `GatewayBudget.spentUsd` is
-  // a dormant PG column. `check()` correctly reads live spend
-  // from CH into `scopes[]`, but `blockedBy[]` used to also read from
-  // the stale PG column — so the block decision was right, but the
-  // reported spent_usd was wrong by any amount accumulated since
-  // cutover. The UI + error messages surface that number directly.
+  // Regression (iter-111): after CH-ledger cutover, spentUsd is a dormant
+  // PG column. check() reads live spend into scopes[], but blockedBy[]
+  // used to still read stale spentUsd, understating reported spend.
   describe("when CH rollup > 0 and legacy PG spentUsd is stale", () => {
     it("reports blockedBy[].spentUsd from CH, not from the dormant PG column", async () => {
       const budget = stubBudget({
@@ -357,10 +346,9 @@ describe("GatewayService.check", () => {
 });
 
 /**
- * Scope-target resolution prism test. Each scope kind hits a different
- * table (organization / team / project / virtualKey / user) and the
- * resolver must return the right shape with the right human-friendly
- * name. Covered under one describe so the full prism is visible.
+ * Scope-target resolution prism: each scope kind (org/team/project/
+ * virtualKey/user) hits a different table and must resolve the right
+ * shape and human-friendly name — all seven under one describe.
  */
 describe("GatewayService.tryGetDetail", () => {
   type Findable = {
@@ -399,12 +387,9 @@ describe("GatewayService.tryGetDetail", () => {
       },
       virtualKey: {
         findUnique: vi.fn(async () => scopeRow),
-        // Two reads now ask for the VK, and the target needs both: the
-        // service resolves the key's PROJECT scope (`select.scopes`) so the
-        // slug map can be built, then the scope-target resolver reads the
-        // key's own name and prefix (`select.displayPrefix`). The ledger
-        // VK-name join and scope-reach ask for neither, so they still see
-        // nothing.
+        // Two reads now resolve the VK: scopes for the slug map, then
+        // name/prefix for the scope-target resolver. Ledger VK-name join
+        // and scope-reach ask for neither, so they still see nothing.
         findMany: vi.fn(
           async (args?: { select?: { scopes?: unknown; displayPrefix?: unknown } }) => {
             if (args?.select?.scopes) {

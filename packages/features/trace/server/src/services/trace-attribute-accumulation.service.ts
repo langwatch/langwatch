@@ -5,7 +5,7 @@ import {
   TRACE_OUTPUT_MEDIA_REFERENCE_ATTRIBUTE,
 } from "../ports/trace-media-reference.port";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
-import { parseJsonStringArray, stringAttr } from "./trace-summary-attributes.rules";
+import { parseJsonStringArray } from "./trace-summary-attributes.rules";
 import { TraceOriginService } from "./trace-origin.service";
 import { TraceAttributeExtractionService } from "./trace-attribute-extraction.service";
 

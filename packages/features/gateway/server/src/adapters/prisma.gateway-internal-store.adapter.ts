@@ -8,13 +8,7 @@ import { gatewayRoutingPolicySelect } from "../ports/gateway-virtual-key.port";
 const logger = createLogger("langwatch:gateway:internal-store");
 
 /**
- * The internal control plane's row reads, over one Postgres connection.
- *
- * Every query below is transcribed from the route handler it was inline in,
- * including its `include` and `select` clauses, because those clauses are the
- * contract: the config read's `routingPolicy` selection is what carries the
- * model aliases and the deny rules, and a materialisation that lost it would
- * publish a bundle the gateway happily serves with no aliases and no policy.
+ * Every query below is transcribed from the route handler it replaced, include/select clauses intact — those clauses ARE the contract (e.g. the config read's routingPolicy selection carries model aliases and deny rules; losing it would serve a bundle with neither).
  */
 export class PrismaGatewayInternalStoreAdapter extends GatewayInternalStorePort {
   static create(options: { database: PrismaClient }): PrismaGatewayInternalStoreAdapter {

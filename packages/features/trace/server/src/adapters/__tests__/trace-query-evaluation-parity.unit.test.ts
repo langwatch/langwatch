@@ -641,18 +641,11 @@ describe("evaluateQueryInMemory", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Both-sides parity: the table above only pins the in-memory half against
-// hand-written booleans, which is how `origin`'s SQL/read divergence shipped
-// (the `read` defaulted a missing origin to "application", the `expression`
-// was the bare map access, which ClickHouse resolves to '' — so the dispatcher
-// matched every unstamped trace and the identical trace-list query matched
-// none). These tests run the ClickHouse compiler too, and tie the two halves of
-// each FieldDef together so that class of drift can't come back.
-//
-// Executing the compiled SQL against real rows needs a ClickHouse container —
-// that lives in `filter-parity.integration.test.ts`.
-// ---------------------------------------------------------------------------
+// hand-written booleans, which is how origin's SQL/read divergence shipped
+// (a bare map access resolved to '' in SQL but defaulted in-memory) — these
+// run the CH compiler too, tying both halves of each FieldDef together.
+// Compiled-SQL-against-real-rows lives in filter-parity.integration.test.ts.
 
 type ExpressionFacet = ExpressionCategoricalDef | RangeFacetDef;
 
@@ -715,18 +708,11 @@ describe("FieldDef SQL/read parity", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Prototype-pollution regression: field names come from a user-authored filter
-// string, so `constructor` / `toString` / `__proto__` used to resolve off
-// `Object.prototype`. The inherited value is truthy, so it slipped past the
-// `!def` / `!handler` guards on BOTH paths: the save-time gate accepted the
-// query, and the dispatcher's "fail-closed" evaluator threw
-// `def.evaluateInMemory is not a function` out of `handleSettle` — one saved
-// automation poisoning trigger dispatch for the whole project.
-//
-// These execute the paths; asserting on generated strings would not have caught
-// the throw.
-// ---------------------------------------------------------------------------
+// Prototype-pollution regression: user-authored filter field names let
+// constructor/toString/__proto__ resolve truthy off Object.prototype,
+// slipping past !def/!handler on BOTH paths — the save-time gate and the
+// dispatcher's fail-closed evaluator, poisoning trigger dispatch for the
+// whole project. These execute the paths; string assertions wouldn't catch it.
 
 const PROTOTYPE_FIELDS = [
   "constructor",

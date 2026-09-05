@@ -6,10 +6,7 @@ import type {
 } from "./trace-facet-registry.clickhouse.adapter";
 
 /**
- * Cap on the distinct emitted-label values surfaced per evaluator. The
- * drilldown renders these as clickable filter rows; beyond ~10 the list stops
- * being a quick picker and starts bloating the discover payload, so we keep
- * only the most frequent values (ties broken by ClickHouse's sort).
+ * Cap on distinct emitted-label values surfaced per evaluator. Drilldown renders these as clickable filter rows; beyond ~10 the list stops being a quick picker and bloats the discover payload, so only the most frequent survive (ties broken by ClickHouse's sort).
  */
 const LABEL_VALUES_TOP_N = 10;
 
@@ -19,19 +16,7 @@ export class ClickHouseEvaluatorFacetAdapter {
   }
 
   /**
-   * Evaluator facet: distinct `EvaluatorId`s labelled by the evaluator's
-   * display name (falling back to the id when no name is recorded). The
-   * evaluator type is intentionally omitted from the label — in practice a
-   * project's evaluators are mostly the same type, so the prefix added
-   * noise and ate the horizontal room the name needs. The id still
-   * round-trips through `facet_value` for saved queries.
-   *
-   * Each row also carries the result aggregates the sidebar drilldown
-   * renders inline: per-evaluator pass/fail counts, score min/max, and
-   * a hasLabel/hasScore discriminator the UI uses to choose which
-   * result picker to show (verdict pills, score slider, label list).
-   * Computed in the same query so the sidebar doesn't pay a separate
-   * round-trip per evaluator.
+   * Evaluator facet: distinct EvaluatorIds labelled by display name (falling back to id). Type is intentionally omitted from the label — a project's evaluators are mostly one type, so the prefix just ate horizontal room the name needs; the id still round-trips via facet_value for saved queries. Each row also carries the aggregates the sidebar drilldown renders inline (pass/fail counts, score min/max, hasLabel/hasScore) computed in the same query so the sidebar avoids a per-evaluator round-trip.
    */
   static buildEvaluatorFacetQuery(ctx: FacetQueryContext): FacetQuery {
     const where = ClickHouseFacetQueryAdapter.buildTimeWhere("ScheduledAt");

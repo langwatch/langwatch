@@ -1,15 +1,6 @@
 /**
- * The billing reconciliation REST surface: the cursor-paged pull over the
- * per-request spend record, its rollup fast path, one end user's standing,
- * and replay onto a webhook endpoint.
- *
- * Organization-scoped and gated on the webhook platform's plan flag
- * (ADR-072: "the spend-events pull API gates under the same flag") — pull and
- * push are two views of one enterprise capability, so they answer the same
- * envelopes from the same ledger.
- *
- * Every refusal leaves as the canonical envelope, so a reconciliation client
- * reads one shape here, on the platform routes, and from the Go data plane.
+ * @see ADR-072 (pull gates under the same plan flag as push)
+ * Billing reconciliation REST surface: cursor-paged pull over per-request spend, its rollup fast path, one end user's standing, and replay onto a webhook endpoint. Organization-scoped, gated on the webhook platform's plan flag — pull and push are two views of one Enterprise capability, answering the same envelopes from the same ledger. Every refusal is the canonical envelope, so a client reads one shape here, on the platform routes, and from the Go data plane.
  */
 import { createLogger } from "@langwatch/observability";
 import type { Context, ErrorHandler, MiddlewareHandler } from "hono";
@@ -55,10 +46,7 @@ const spendGrouping = GatewaySpendGroupingAdapter.create();
 const logger = createLogger("langwatch:api:gateway-spend");
 
 /**
- * Route documentation is part of the contract: the fixed 13-month window and
- * the downstream dedup guidance are load-bearing for reconciliation
- * consumers, so they are pinned here as constants rather than written inline
- * at each route.
+ * Route documentation is part of the contract: the fixed 13-month window and downstream dedup guidance are load-bearing for reconciliation consumers, so they're pinned here as constants rather than written inline at each route.
  */
 export const SPEND_EVENTS_PULL_DESCRIPTION =
   "Cursor-paged pull over the per-request spend record, ascending by insert order so rows folded late are never skipped by an in-flight cursor. Events are the same canonical objects webhook deliveries carry. Retention is a fixed 13 months, which bounds reconciliation and replay. When feeding a downstream biller, mind its dedup window (Metronome 34 days and Stripe meters 24h+ at the time of writing; both vendors own those numbers, so confirm the current one before you rely on it): re-pulling older ranges into a biller past its window can double-bill. Every filter here is accepted by /spend-summaries too, so a checksum that disagrees can be diffed on exactly the same narrowing; the one difference is `status=admitted`, which only this read answers, because an admitted request is still in flight and contributes no cost to a rollup. Repeat a filter to widen it (`model=a&model=b` matches either); name two different filters to narrow. `metadata` is written `key:value`, split on the first colon, and repeating a key widens that key. `team_id` and `external_id` name Postgres records and are resolved to the projects and keys they cover, so a team with no projects or an external id nobody minted answers with no spend rather than with everything.";
@@ -70,22 +58,7 @@ export const END_USER_SPEND_DESCRIPTION =
   "Windowed spend rollup for one external end user across the organization (the /customer/info-style read a rebilling integration polls). `caps` lists every attributed-user budget that applies to this end user, each with its limit and the spend against it. It is an empty array until such a budget template applies, never null.";
 
 /**
- * The seam between the billing reconciliation REST surface and its process.
- *
- * Two kinds of entry. The first is a capability the process composed once and
- * shares with the workers and the tRPC ledger screen — the spend-events
- * reader, the budget ledger, the webhook endpoint/event/delivery trio — so
- * this family reads exactly what the push path writes. The second is a
- * decision the application still owns: which Postgres records a filter names
- * and what they resolve to in ClickHouse, how long an outcome may still
- * arrive, and what the application calls its datastore being down.
- *
- * The webhook half of that seam is described structurally rather than by
- * name: the endpoint registry, the emitted-event log, the delivery path, the
- * envelope wire format and the subscription grammar all belong to the webhook
- * platform, which is an Enterprise feature this core package may not depend
- * on. What is written here is exactly what these four routes call, and the
- * process binds the real implementations to it.
+ * Seam between the billing reconciliation REST surface and its process. Two kinds of entry: capabilities the process composed once and shares with workers + the tRPC ledger screen (spend-events reader, budget ledger, webhook endpoint/event/delivery trio, so this family reads exactly what push writes), and decisions the application still owns (which Postgres records a filter names and what they resolve to in CH, how long an outcome may still arrive, what "datastore down" means). The webhook half is described structurally, not by name — its registry, log, delivery path, envelope and subscription grammar all belong to the Enterprise webhook platform this core package may not depend on; what's written here is exactly what these four routes call, and the process binds the real implementations.
  */
 
 /** One row of the spend ledger, as the events reader hands it over. */
@@ -166,10 +139,7 @@ export type GatewaySpendRestPorts = Readonly<{
   spendEventEnvelope(row: SpendLedgerRow): GatewaySpendEnvelope;
 
   /**
-   * Whether an endpoint's subscriptions cover one envelope type. The selector
-   * grammar — an exact type, a `family.*` wildcard, `*` — is the webhook
-   * platform's, and a second reading of it here could disagree with the one
-   * the push path applies.
+   * Whether an endpoint's subscriptions cover one envelope type. The selector grammar (exact type, family.* wildcard, *) is the webhook platform's; a second reading of it here could disagree with the one the push path applies.
    */
   endpointAcceptsEvent(input: { enabledEvents: readonly string[]; eventType: string }): boolean;
 
@@ -180,10 +150,7 @@ export type GatewaySpendRestPorts = Readonly<{
   settlementPolicy: GatewaySettlementPolicyPort;
 
   /**
-   * The spend filters that name Postgres records — projects, teams, the
-   * caller's own external ids — resolved into the tenant and virtual-key ids
-   * ClickHouse actually stores. A filter that resolves to nothing resolves to
-   * an EMPTY list, never to "unfiltered".
+   * Spend filters naming Postgres records (projects, teams, the caller's own external ids), resolved into the tenant/VK ids ClickHouse actually stores. A filter resolving to nothing resolves to an EMPTY list, never to "unfiltered".
    */
   resolveSpendScope(input: {
     organizationId: string;
@@ -210,11 +177,7 @@ export type GatewaySpendRestPorts = Readonly<{
 }>;
 
 /**
- * The spend-events reader, or the process's own refusal.
- *
- * The ledger is the only store spend accrues in, so a deployment without it
- * has no figures to report and says so rather than answering a reconciliation
- * query with a zero that cannot be told apart from a quiet month.
+ * The spend-events reader, or the process's own refusal. The ledger is the only store spend accrues in, so a deployment without it has no figures and says so rather than answering with a zero indistinguishable from a quiet month.
  */
 function requireSpendEvents(ports: GatewaySpendRestPorts): GatewaySpendEventsService {
   const service = ports.spendEvents;
@@ -223,16 +186,7 @@ function requireSpendEvents(ports: GatewaySpendRestPorts): GatewaySpendEventsSer
 }
 
 /**
- * One end of a read window, in milliseconds.
- *
- * The unit is published rather than left to the reader: seconds and
- * milliseconds are both plausible for a bare integer, and a caller who picks
- * the wrong one gets a valid-looking response over the wrong window instead of
- * an error. An epoch in seconds lands in 1970 and reads as empty.
- *
- * Bounded by hand rather than with `.safe()`, which publishes a symmetric
- * minimum of -9007199254740991 and so documents a negative epoch as
- * acceptable while the server refuses it.
+ * One end of a read window, in milliseconds — published rather than left to the reader, since seconds and ms are both plausible for a bare integer and the wrong one silently answers over the wrong window (a seconds epoch lands in 1970 and reads empty). Bounded by hand, not .safe(), which would publish a symmetric minimum documenting a negative epoch as acceptable when the server actually refuses it.
  */
 const epochMs = z.coerce.number().int().positive().max(Number.MAX_SAFE_INTEGER).meta({
   description:
@@ -386,15 +340,7 @@ function okResponse(description: string, schema: z.ZodTypeAny) {
 }
 
 /**
- * One or two dimensions, comma separated. Two is the ceiling because a third
- * multiplies the group count past what a single cursor walk serves at a
- * useful page size, and a caller who wants a third is really asking for the
- * events read.
- *
- * Validated inside the transform rather than piped into an array schema so a
- * refusal names `group_by` and not `group_by.0`. The caller sent one string;
- * an index they never wrote maps onto nothing a client can point at, and
- * `meta.fields` exists precisely so a client can point at something.
+ * One or two dimensions, comma separated — two is the ceiling since a third multiplies the group count past what one cursor walk serves usefully, and a caller wanting a third really wants the events read. Validated inside the transform, not piped into an array schema, so a refusal names group_by, not group_by.0 — an index the caller never wrote maps onto nothing a client can point at.
  */
 const groupBySchema = z
   .string()
@@ -426,17 +372,7 @@ const QUERY_BOOLEAN_TRUE = ["true", "1", "yes"];
 const QUERY_BOOLEAN_FALSE = ["false", "0", "no", ""];
 
 /**
- * A boolean spelled in a query string.
- *
- * `z.coerce.boolean()` is JavaScript `Boolean()`, so every non-empty string is
- * true and `allow_unstable=false` would turn the guard OFF. The most obvious
- * way to spell "off" must not mean "on", and a spelling this does not know is
- * refused by name rather than guessed at.
- *
- * Case is folded because the caller's HTTP library picks it, not the caller:
- * `requests` renders a Python `True` as `True`, `httpx` renders it as `true`.
- * This parameter is documented for Python, so refusing `True` would reject the
- * exact request our own documentation asks that caller to make.
+ * A boolean spelled in a query string. z.coerce.boolean() is JS Boolean(), so every non-empty string is true and allow_unstable=false would turn the guard OFF — the most obvious spelling of "off" must not mean "on", and an unrecognised spelling is refused by name. Case is folded since the caller's HTTP library picks it, not the caller (Python requests renders True, httpx renders true) — this param is documented for Python, so refusing True would reject the exact request our docs ask for.
  */
 const queryBoolean = z
   .string()
@@ -506,14 +442,7 @@ const REPLAY_MAX_ENVELOPES = 10_000;
 const REPLAY_PAGE_SIZE = 200;
 
 /**
- * Walks the window counting only what this endpoint subscribes to, and
- * refuses the call as soon as the count passes the cap.
- *
- * This runs before a single envelope is queued. Replay exists to reach
- * past a consumer's dedup window, so enqueueing part of a window and then
- * answering with an error is the worst outcome available: the receiver
- * takes delivery of envelopes the caller was told never shipped, and the
- * natural retry mints a fresh replay id and ships them again.
+ * Walks the window counting only what this endpoint subscribes to, refusing as soon as the count passes the cap — BEFORE a single envelope is queued. Replay exists to reach past a consumer's dedup window, so enqueueing part of one and then erroring is the worst outcome: the receiver gets envelopes the caller was told never shipped, and the natural retry mints a fresh replay id and ships them again.
  */
 async function assertReplayWindowWithinCap({
   events,
@@ -660,14 +589,7 @@ function handleGatewaySpendApiError(
 }
 
 /**
- * The billing reconciliation REST family, built against one process's
- * security and one process's spend ledger.
- *
- * `spend()` is resolved per request rather than held, so mounting the family
- * constructs nothing and the spec generator can build every route with no
- * running process. The plan gate and the canonical error mapping are supplied
- * at construction instead: both are installed as middleware when a route is
- * declared, which happens before any request exists.
+ * Billing reconciliation REST family, built against one process's security and spend ledger. spend() resolves per request rather than being held, so mounting constructs nothing and the spec generator can build every route with no running process; the plan gate and canonical error mapping are installed as middleware at route declaration, before any request exists.
  */
 export function createGatewaySpendRestApp(options: {
   security: AppRestSecurity;
@@ -679,10 +601,7 @@ export function createGatewaySpendRestApp(options: {
    */
   billingPlanGate: MiddlewareHandler;
   /**
-   * Any thrown value as the canonical envelope, in the application's own
-   * error taxonomy. The family installs its own `onError` to log what the
-   * caller actually received, and delegates the rendering here rather than
-   * keeping a second mapping of its own.
+   * Any thrown value as the canonical envelope, in the application's own error taxonomy. The family installs its own onError to log what the caller received, delegating rendering here rather than keeping a second mapping of its own.
    */
   canonicalError: (
     error: unknown,
@@ -719,14 +638,11 @@ export function createGatewaySpendRestApp(options: {
       const ports = spend();
       const organization = c.get("organization");
       const query = c.req.valid("query");
-      // Same contract as /spend-events: a present-but-garbled cursor is refused
-      // rather than silently restarting the walk from the first key. A cursor
-      // that decodes but names a different number of dimensions is refused for
-      // the same reason: it belongs to a walk over another shape, and carrying
-      // on without it would re-serve the first page under a fresh cursor with
-      // nothing in the response to say the walk had reset. That reaches a
-      // caller who changed `group_by` or `bucket` mid-walk, and a caller
-      // holding a cursor minted before a rollup could group by two dimensions.
+      // Same contract as /spend-events: a garbled cursor is refused rather
+      // than silently restarting from the first key. A cursor decoding but
+      // naming a different dimension count is refused too — a different walk
+      // shape, and continuing would re-serve page one under a fresh cursor
+      // with nothing saying the walk reset.
       if (query.cursor !== undefined) {
         const parts = spendCursors.decodeSpendSummariesCursor(query.cursor);
         const dimensionCount = query.group_by.length + (query.bucket === "none" ? 0 : 1);

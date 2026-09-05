@@ -15,7 +15,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceLogRecordReader } from "../claude-code-log-enrichment.service";
-import type { NormalizedSpan, Span, Trace } from "@langwatch/trace-contract";
+import type { Span, Trace } from "@langwatch/trace-contract";
 import type { EvaluationService } from "@langwatch/evaluation-contract";
 import type { Protections } from "@langwatch/trace-server";
 

@@ -1,8 +1,5 @@
 /**
- * The Sessions lens forwards a query's positive free-text terms to the
- * transcript content search (specs/traces-v2/sessions-lens.feature). Only
- * implicit-field terms qualify: structured tags already translate to trace
- * predicates, and negated terms must not become positive content matches.
+ * The Sessions lens forwards a query's positive free-text terms to the transcript content search (specs/traces-v2/sessions-lens.feature). Only implicit-field terms qualify: structured tags already translate to trace predicates, and negated terms must not become positive content matches.
  */
 import { describe, expect, it } from "vitest";
 import { TraceQueryClickHouseAdapter } from "../trace-query.clickhouse.adapter";

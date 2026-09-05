@@ -1,8 +1,5 @@
 /**
- * The virtual-key cipher, as the write path sees it: mint a secret, read its
- * display prefix back, and hash or verify one. The cipher itself is an
- * adapter, so a process composes the peppered implementation and the service
- * never reaches for it.
+ * The virtual-key cipher, as the write path sees it: mint a secret, read its display prefix back, hash or verify one. The cipher itself is an adapter, so a process composes the peppered implementation and the service never reaches for it.
  */
 export abstract class GatewayVirtualKeyCryptoPort {
   abstract mintSecret(nowMs?: number): string;

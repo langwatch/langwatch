@@ -13,7 +13,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { VirtualKeyService } from "../services/virtual-key.service";
 import { TestProjectService } from "./support/test-project-service";
 
 import { createVirtualKeyServiceForTest } from "../testing";

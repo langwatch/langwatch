@@ -32,15 +32,9 @@ type WithDateWrites<T, K extends keyof T> = {
 };
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "@langwatch/data-retention-contract";
 import type { DerivedTraceEvent } from "@langwatch/trace-contract";
-import {
-  type NormalizedAttributes,
-  type NormalizedSpan,
-  NormalizedSpanKind,
-  NormalizedStatusCode,
-} from "@langwatch/trace-contract";
+import { type NormalizedAttributes, type NormalizedSpan } from "@langwatch/trace-contract";
 import type { ElasticSearchEvent, Span } from "@langwatch/trace-contract";
 import {
-  deserializeAttributes,
   ensureStringRecord,
   type FullSpanRow,
   mapChRowToNormalized,

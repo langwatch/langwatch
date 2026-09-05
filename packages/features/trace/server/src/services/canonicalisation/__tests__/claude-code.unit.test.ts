@@ -609,11 +609,7 @@ describe("salvageTruncatedRequestBody (claude's 60KB inline cap)", () => {
 });
 
 /**
- * Anthropic bills an hour-long cache entry at twice the input rate against the
- * 1.25x a five-minute entry costs, and states which is which only in the
- * response body. That body reaches us on the log stream, never on the span, so
- * the span side records how much was written and leaves the lifetime to the
- * log side rather than asserting one it cannot see.
+ * Anthropic bills an hour-long cache entry at twice the input rate vs. 1.25x for a five-minute entry, stating which only in the response body — which reaches us on the log stream, never the span. The span side records how much was written and leaves lifetime to the log side rather than asserting one it can't see.
  */
 describe("ClaudeCodeCanonicaliser.apply cache lifetime", () => {
   describe("given a claude code model call that wrote to its cache", () => {

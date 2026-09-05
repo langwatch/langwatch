@@ -1,12 +1,7 @@
 /**
  * @see specs/ai-gateway/budgets.feature
- *
- * Anchored budget cycles: a budget created with a `cycleAnchorAt` rolls from
- * that instant instead of from the calendar. The arithmetic is all UTC epoch
- * milliseconds and UTC calendar fields, so no local clock change can reach it.
- *
- * Pure cycle math only. What a stored budget row makes of it, floors and
- * reported periods, is in gateway-budget-period-floor.unit.test.ts.
+ * Cycles roll from `cycleAnchorAt`, not the calendar, in UTC epoch math so
+ * no local clock change can shift them.
  */
 import { describe, expect, it } from "vitest";
 import { CYCLIC_WINDOWS, GatewayWindow } from "@langwatch/gateway-contract";

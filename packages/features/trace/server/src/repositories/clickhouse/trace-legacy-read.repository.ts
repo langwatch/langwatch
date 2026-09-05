@@ -229,6 +229,29 @@ const FORBIDDEN_SCORE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
  * and recent traces (common on the updated axis) scans a few small ranges rather
  * than one range spanning every weekly partition between them.
  */
+/**
+ * Adds the labels named by one `trace_summaries` row's `labels_json` value
+ * into `labelsSet` — a JSON array of strings, each added individually, or
+ * (when the value doesn't parse as JSON) the raw string itself as a single
+ * label.
+ */
+function addLabelsFromRow(labelsJson: string, labelsSet: Set<string>): void {
+  try {
+    const labels = JSON.parse(labelsJson);
+    if (!Array.isArray(labels)) {
+      return;
+    }
+    for (const label of labels) {
+      if (typeof label === "string") {
+        labelsSet.add(label);
+      }
+    }
+  } catch {
+    // If not valid JSON, treat as single label
+    labelsSet.add(labelsJson);
+  }
+}
+
 function buildEventOccurrenceWindows(occurredAts: number[]): {
   outer: string;
   inner: string;
@@ -1038,7 +1061,11 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
               : input.endDate;
 
           // Build the query with keyset pagination
-          let { traces, totalHits, lastTrace } = await this.fetchTracesWithPagination({
+          const {
+            traces: fetchedTraces,
+            totalHits,
+            lastTrace,
+          } = await this.fetchTracesWithPagination({
             projectId: input.projectId,
             pageSize,
             sortDirection,
@@ -1055,6 +1082,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             dateField,
             scrollStart,
           });
+          let traces = fetchedTraces;
 
           // Spans are fetched when the caller wants them OR when it wants full
           // IO — because those are not the same thing.
@@ -1387,19 +1415,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           // Parse labels from JSON arrays
           const labelsSet = new Set<string>();
           for (const row of labelsRows) {
-            try {
-              const labels = JSON.parse(row.labels_json);
-              if (Array.isArray(labels)) {
-                for (const label of labels) {
-                  if (typeof label === "string") {
-                    labelsSet.add(label);
-                  }
-                }
-              }
-            } catch {
-              // If not valid JSON, treat as single label
-              labelsSet.add(row.labels_json);
-            }
+            addLabelsFromRow(row.labels_json, labelsSet);
           }
 
           return {

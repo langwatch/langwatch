@@ -29,14 +29,7 @@ import type { GatewaySpendProcessingEvent } from "../intents/gateway-spend.inten
 import { GatewaySpendFoldProjection } from "../projections/gateway-spend.projection";
 
 /**
- * A process manager another feature owns, mounted on this pipeline under the
- * name its durable rows are already keyed by.
- *
- * The name travels with the applier because it is the storage key for every
- * inbox, state and outbox row the process has written: renaming it strands
- * them. Webhook delivery (ADR-073) and the Governance debits both live in
- * packages this one must not depend on, so the composition root builds each
- * applier and hands it over with its name intact.
+ * A process manager another feature owns, mounted here under the name its durable rows are already keyed by — renaming loses inbox/state/outbox rows. Webhook delivery (ADR-073) and Governance debits live in packages this one may not depend on.
  */
 export interface GatewaySpendProcessManagerMount {
   name: string;
@@ -68,33 +61,7 @@ export interface EventingGatewaySpendAdapterOptions {
 }
 
 /**
- * The gateway spend pipeline (spend-command spine), and the worker-facing
- * capability that composes it.
- *
- * Aggregate: `gateway_request`, one aggregate per gateway REQUEST, id is
- * the gateway's own ULID, minted before the provider is dispatched. The
- * Go gateway emits the commands asynchronously through its bounded local
- * spool (never a synchronous networked write on the request path, never a
- * refused request for recordability); the internal ingest route validates
- * batches and appends here.
- *
- * Write surface:
- * - admitSpend:   attribution + end user + metadata, before any outcome
- * - confirmSpend: usage quantities + rate identity after the provider
- * - failSpend:    the full error taxonomy, partial usage
- * - settleSpend:  the settlement process manager (M2) resolves admissions
- *                 whose confirmation never arrived, visibly
- *
- * Projection: gatewaySpend (fold) → `gateway_spend`, one row per request,
- * rated in the fold to integer nano-USD. Consumption is projections + (in
- * M2) a process manager, no subscribers, per the post-event-work ADR line.
- *
- * `connectSettlement` is the loop this feature cannot close alone: the
- * sweeper sends `settleSpend`, and that sender is produced by the very
- * registration that mounts the sweeper. The legacy registry closed it by
- * looking the pipeline up by name from inside the sweep, which meant a
- * mis-registered graph failed at settlement time, tenant by tenant. Binding
- * it once, straight after registration, moves that failure to boot.
+ * The gateway spend pipeline (spend-command spine). One aggregate per request (gateway's own ULID); rated in the fold to integer nano-USD. connectSettlement binds the sweeper's sender at registration, not settlement, so a mis-registered graph fails at boot, not per tenant.
  */
 export class EventingGatewaySpendAdapter {
   static create(options: EventingGatewaySpendAdapterOptions): EventingGatewaySpendAdapter {

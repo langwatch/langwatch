@@ -1,13 +1,7 @@
 /**
  * @vitest-environment node
- *
- * Edge media extraction (specs/trace-processing/trace-media-blob-extraction.feature).
- *
- * A fake `TraceMediaStorePort` content-addresses bytes the same way the real
- * `StoredObjectsService` does (same bytes -> same id, `isDuplicate: true` on
- * the second write), so dedup scenarios exercise real behaviour rather than a
- * mock returning canned answers. `TraceEdgeMediaExtractionService.maybeExtractSpanMedia` is production code;
- * only its storage and feature-flag boundaries are faked.
+ * Spec: specs/trace-processing/trace-media-blob-extraction.feature
+ * A fake TraceMediaStorePort content-addresses bytes the same way the real StoredObjectsService does (same bytes -> same id, isDuplicate:true on the second write), so dedup scenarios exercise real behaviour, not a mock returning canned answers. maybeExtractSpanMedia is production code; only its storage and feature-flag boundaries are faked.
  */
 import { TraceEdgeMediaExtractionService } from "../trace-edge-media-extraction.service";
 import { createHash } from "node:crypto";

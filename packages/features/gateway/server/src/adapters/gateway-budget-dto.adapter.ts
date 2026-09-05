@@ -1,10 +1,7 @@
 /**
- * Shared DTO shape for GatewayBudget on the public REST wire, the budget
- * counterpart to `gateway-virtual-key-dto.adapter.ts`.
- *
- * Lives outside the route file so the money and availability rules it encodes
- * can be asserted directly, without standing up a request to find out what a
- * budget with no spend source renders as.
+ * Shared DTO shape for GatewayBudget on the public REST wire (budget
+ * counterpart to gateway-virtual-key-dto.adapter.ts). Lives outside the
+ * route file so the money/availability rules can be asserted directly.
  */
 
 import {
@@ -18,21 +15,7 @@ import {
 } from "@langwatch/gateway-contract";
 
 /**
- * What this row reports as spend, in both units, or null when there is no
- * total this row can honestly carry.
- *
- * Two rows have no total. `spendAvailable` false means spend could not be
- * read at all, and the stored `spentUsd` is then a stale column rather than
- * spend. A per-person template has no single total by construction: it is one
- * allowance per end user, so its spend is a distribution, and the seats it is
- * watching are reported as `end_users_seen` / `end_users_over` instead. Both
- * answer null, because a caller that ignored the distinction used to read a
- * confident figure as real money, and null is the only value that cannot be
- * misread that way.
- *
- * When there is a total, the integer is the ledger's own and the string is
- * that integer rendered. Deriving the pair the other way round, from the
- * decimal, cannot recover digits the decimal never carried.
+ * Spend in both units, or null when it can't be honestly carried: spendAvailable=false and per-person templates (a distribution, not one total) both answer null, never a figure mistaken for real money.
  */
 function spendFields(b: GatewayBudgetWithSeats, spendAvailable: boolean) {
   if (!spendAvailable || b.scopeType === "ATTRIBUTED_USER") {
@@ -54,13 +37,7 @@ export class GatewayBudgetDtoAdapter {
   private constructor() {}
 
   /**
-   * The budget row on the wire.
-   *
-   * `readAt` is the instant the spend on the row was totalled at, for the
-   * callers that read spend before serialising. The period is bracketed at
-   * that same instant so a boundary crossing between the two reads cannot
-   * print a fresh period beside the previous period's figure. Callers with no
-   * spend read take the wall clock.
+   * readAt is when spend was totalled, so callers with no spend read take the wall clock; the period brackets to that same instant so a boundary crossing can't print a fresh period beside the old figure.
    */
   toBudgetDto({
     budget: b,

@@ -1,9 +1,5 @@
 /**
- * Shared parsing of `langwatch.reserved.eventref.*` pointers off a span's flat
- * spanAttributes (ADR-022 read path). Used by BOTH the per-trace resolver
- * ({@link ./resolve-offloaded-traces}) and the bulk batch resolver
- * ({@link ./resolve-offloaded-traces-batch}) so the eventref shape is decoded
- * in exactly one place.
+ * Shared parsing of `langwatch.reserved.eventref.*` pointers off a span's flat spanAttributes (ADR-022 read path), used by both the per-trace resolver and the bulk batch resolver so the eventref shape is decoded in exactly one place.
  */
 import { EVENTREF_ATTR_PREFIX } from "@langwatch/trace-contract";
 import type { NormalizedAttributes } from "@langwatch/trace-contract";
@@ -39,13 +35,7 @@ export class TraceEventRefParsingService {
   }
 
   /**
-   * Splits a span's flat attributes into the preview attributes (reserved keys
-   * stripped) and the well-formed eventref pointers to resolve.
-   *
-   * - A reserved key missing/empty `eventId` is recorded in `missingEventIdKeys`
-   *   (the caller logs a warning and keeps the preview) — never resolved.
-   * - A reserved key with malformed JSON is silently dropped (the preview already
-   *   sits in `cleanedAttrs` under the non-reserved IO key).
+   * Splits a span's flat attributes into preview attributes (reserved keys stripped) and well-formed eventref pointers to resolve. A reserved key missing/empty `eventId` is recorded in `missingEventIdKeys` (caller logs and keeps the preview) but never resolved; one with malformed JSON is silently dropped, since the preview already sits in `cleanedAttrs` under the non-reserved IO key.
    */
   static parseSpanEventRefs(attrs: NormalizedAttributes): ParsedSpanEventRefs {
     const cleanedAttrs: NormalizedAttributes = {};

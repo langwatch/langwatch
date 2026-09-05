@@ -3,15 +3,7 @@ import { describe, expect, it } from "vitest";
 import { getStaticModelCostRates, matchModelCost } from "@langwatch/model-provider-contract";
 
 /**
- * Claude Code appends "[1m]" to the model id when the 1M-token context
- * window is active. Registry regexes are prefix-anchored, so the suffix is
- * absorbed by the base entry. Per Anthropic's published pricing, Claude
- * 4.6+ models bill the full 1M window at standard per-token rates with no
- * premium above 200K input tokens, so the base entry's rates are the
- * correct [1m] rates.
- *
- * Anthropic Opus 5 price sheet: input $5/MTok, output $25/MTok, 5m cache
- * write $6.25/MTok, cache read $0.50/MTok.
+ * Claude Code appends "[1m]" to the model id when the 1M-token context window is active. Registry regexes are prefix-anchored, so the suffix is absorbed by the base entry. Per Anthropic's published pricing, Claude 4.6+ bills the full 1M window at standard per-token rates with no premium above 200K input, so the base entry's rates are the correct [1m] rates (Opus 5: input $5/MTok, output $25/MTok, 5m cache write $6.25/MTok, cache read $0.50/MTok).
  */
 const OPUS_5_INPUT = 0.000005;
 const OPUS_5_OUTPUT = 0.000025;

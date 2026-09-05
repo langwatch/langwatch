@@ -102,12 +102,9 @@ describe("given the shared spend filter vocabulary", () => {
 
     it("refuses a metadata key the query spelling could not express", () => {
       // A key with a colon is unaddressable in `key:value`, so accepting it
-      // here would let the screen set a filter no reconciliation script can
-      // reproduce, which is the drift this module exists to prevent.
-      //
-      // The path is asserted, not just the rejection: this input is otherwise
-      // valid, so a test that only proves "something threw" would keep passing
-      // if the colon rule were dropped and some unrelated rule tripped instead.
+      // would let the screen set a filter no reconciliation script can
+      // reproduce. The path is asserted, not just the rejection, since this
+      // input is otherwise valid.
       expect(
         issuePaths(
           spendFiltersSchema.safeParse({

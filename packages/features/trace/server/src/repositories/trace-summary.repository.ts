@@ -4,20 +4,12 @@ import type { TraceSummaryData } from "@langwatch/trace-contract";
 
 export interface FindByTraceIdOptions {
   /**
-   * Approximate trace timestamp (ms since epoch). When provided, the repo
-   * narrows the scan to a window around it so ClickHouse can prune
-   * partitions instead of scanning across all of cold storage. The value
-   * is a hint — drift up to a few hours is fine.
+   * Approximate trace timestamp (ms since epoch). When given, the repo narrows the scan to a window around it so ClickHouse can prune partitions instead of scanning cold storage. A hint — drift up to a few hours is fine.
    */
   occurredAtMs?: number;
 
   /**
-   * An explicit time bound, applied verbatim with NO internal miss fallback —
-   * the caller declared the width (the fold's `options.readWindow`) and owns
-   * the retry (the fold executor re-reads without the window on a miss).
-   * Takes precedence over `occurredAtMs`, which exists for callers that only
-   * hold a point-in-time hint and want the repository to widen it AND recover
-   * a miss itself (resolve the trace's real OccurredAt, bound a retry).
+   * An explicit time bound, applied verbatim with NO internal miss fallback — the caller declared the width (fold's options.readWindow) and owns the retry (executor re-reads without the window on a miss). Takes precedence over occurredAtMs, for callers holding only a point hint who want the repository to widen it AND recover a miss itself.
    */
   window?: { fromMs: number; toMs: number };
 }

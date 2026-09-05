@@ -1,22 +1,6 @@
 /**
  * @vitest-environment node
- *
- * The billing reconciliation REST surface over the REAL ledger: real
- * ClickHouse for the spend and budget rows, real Postgres for the tenancy the
- * filters name.
- *
- * These are the properties no double can stand in for — insert-order paging
- * that never skips a late fold, the tenant fence, and the arithmetic the
- * rollups and the end-user read publish. The boundary decisions in front of
- * them (auth, plan gate, cursor and window validation) are pinned in
- * `apps/api`, against the process's own credential chain.
- *
- * The organization on the context is installed the way the process's chain
- * installs it; everything behind it is production code.
- *
- * Spec: specs/ai-gateway/gateway-spend-rest.feature
- * Spec: specs/ai-gateway/billing-spend-events.feature
- * Spec: specs/ai-gateway/end-user-attribution.feature
+ * Real ClickHouse (spend/budget rows) + real Postgres (tenancy filters name). Pins what no double can stand in for: insert-order paging that never skips a late fold, the tenant fence, and rollup/end-user arithmetic. Boundary decisions in front (auth, plan gate, cursor/window validation) are pinned in apps/api against the process's own credential chain; the org on this context is installed the same way, everything behind it is production code. Spec: specs/ai-gateway/gateway-spend-rest.feature, billing-spend-events.feature, end-user-attribution.feature
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
@@ -77,12 +61,7 @@ let budgets: GatewayBudgetClickHouseRepository;
 let app: ReturnType<typeof createGatewaySpendRestApp>;
 
 /**
- * The canonical envelope, reduced to the two fields these scenarios read.
- *
- * The wire format itself belongs to the Enterprise webhook platform, which
- * this package may not depend on and whose mapping is pinned in its own
- * suite. What matters here is that the id carries the request and its family,
- * so a page walk and a tenant fence can be asserted on the join key.
+ * Canonical envelope, reduced to the two fields these scenarios read. Wire format belongs to the Enterprise webhook platform (this package may not depend on it; its mapping is pinned in its own suite) — what matters here is the id carries the request + family, so a page walk and tenant fence can be asserted on the join key.
  */
 function testEnvelope(row: SpendEventRow) {
   const family = row.status === "confirmed" ? "completed" : row.status;

@@ -39,13 +39,7 @@ function spanTypeToKind(type: SpanTypes): SpanKind {
 }
 
 /**
- * Recursively flattens a nested params object into dot-notation OTEL attributes.
- *
- * - Primitive values (string, number, boolean) are set directly
- * - Plain objects are recursed into
- * - Arrays are JSON.stringified
- * - null/undefined values are skipped
- * - The `_keys` field is skipped (indexing artifact)
+ * Recursively flattens a nested params object into dot-notation OTEL attributes: primitives set directly, plain objects recursed, arrays JSON.stringified, null/undefined skipped, and the `_keys` field skipped (indexing artifact).
  */
 function flattenParams({
   params,
@@ -175,11 +169,7 @@ export class TraceReadableSpanService {
   }
 
   /**
-   * A whole trace's spans rendered as the one readable digest a judge reads.
-   *
-   * The formatter is the scenario judge's, because the digest a judge is shown
-   * and the digest an evaluator is shown have to be the same text — a second
-   * renderer here would grade one thing and display another.
+   * A whole trace's spans rendered as the one readable digest a judge reads. The formatter is the scenario judge's, because the digest a judge is shown and the digest an evaluator is shown have to be the same text — a second renderer here would grade one thing and display another.
    */
   static formatSpansDigest(spans: Span[]): Promise<string> {
     const readableSpans = spans.map(TraceReadableSpanService.langwatchSpanToReadableSpan);

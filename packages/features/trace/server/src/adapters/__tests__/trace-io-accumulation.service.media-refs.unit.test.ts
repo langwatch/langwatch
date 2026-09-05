@@ -1,12 +1,5 @@
 /**
- * The accumulator's TEXT choice and its MEDIA collection, driven through the
- * real canonicalisation pass and the real media-reference adapter so the
- * refs a span carries on the wire are what the trace ends up quoting.
- *
- * Background — 2026-05-14 prod UX regression: trace summaries showed the raw
- * JSON wrapper (e.g. `{"output":"Hey there"}`) instead of the extracted
- * human-readable text (`Hey there`). The accumulator was stringifying the raw
- * payload instead of using the already-extracted `text`.
+ * Accumulator's TEXT choice and MEDIA collection, driven through the real canonicalisation pass and media-reference adapter. Background (2026-05-14 prod regression): summaries showed the raw JSON wrapper instead of extracted text, since the accumulator stringified the raw payload instead of using the already-extracted text.
  */
 import type { NormalizedSpan, TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";

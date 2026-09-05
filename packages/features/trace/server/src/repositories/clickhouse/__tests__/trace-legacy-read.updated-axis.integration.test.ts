@@ -1,30 +1,5 @@
 /**
- * Mechanism-level integration coverage for the updated date-axis keyset
- * pagination (Track 1, API Export Traces RFC). The seam with
- * `trace-legacy-read.projection-search.integration.test.ts`: that file
- * proves the projected OUTPUT shape; this file proves the QUERY MECHANISM the
- * updated axis relies on —
- *
- *   - the dedup collapses every version of a trace to its GLOBAL latest
- *     (max UpdatedAt across all versions), then applies the window/cursor to
- *     that aggregate — so a trace whose latest version moved past the window is
- *     excluded even if an older version falls inside it (no double-emit across
- *     adjacent CDC windows), and
- *   - the HAVING-on-max(UpdatedAt) cursor seek paginates completely: each trace
- *     surfaces exactly once across pages, ordered by its latest UpdatedAt.
- *
- * This is the subtle correctness the occurred axis gets "for free" (OccurredAt
- * is immutable per trace) but the updated axis must enforce explicitly, because
- * UpdatedAt is the mutable RMT version column.
- *
- * Was `platform/app/src/server/traces/__tests__/clickhouse-trace-updated-axis.integration.test.ts`,
- * against its own `~/server/clickhouse/clickhouseClient` and `~/server/db`
- * mocks routed through the platform's two-door `getApp()` access. The service
- * (`TraceLegacyReadClickHouseRepository`, now exported from `../trace-legacy-read.repository`)
- * takes `resolveClickHouseClient` as a plain constructor dep, so this test
- * uses the shape the sibling projection-search integration test already
- * uses — `createTestClickHouseClient`/`testClickHouseUrl`, skipped when no
- * test ClickHouse is configured — with no app-layer mocking needed at all.
+ * Mechanism-level coverage for the updated date-axis keyset pagination. Companion to trace-legacy-read.projection-search.integration.test.ts (that proves output shape; this proves the QUERY MECHANISM): dedup collapses every trace version to its GLOBAL latest (max UpdatedAt) before applying window/cursor, so a trace whose latest moved past the window is excluded even if an older version falls inside (no double-emit across CDC windows); the HAVING-on-max(UpdatedAt) cursor seek surfaces each trace exactly once across pages. This is correctness the occurred axis gets for free (OccurredAt is immutable) but the updated axis must enforce explicitly, since UpdatedAt is the mutable RMT version column.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";

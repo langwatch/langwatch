@@ -1,12 +1,5 @@
 /**
- * The scoped data-privacy content DROP wired into RecordSpanCommand.
- *
- * The drop runs at this single command choke point, so the emitted
- * SpanReceivedEvent carries the already-dropped span: both the span store and
- * the trace-summary fold (driven here for real) see no dropped content. The
- * policy is supplied directly (the DB-backed resolution path has its own
- * tests in @langwatch/data-privacy-server); the real drop logic + real fold
- * run end-to-end.
+ * The scoped data-privacy content DROP wired into RecordSpanCommand — runs at this single command choke point, so the emitted SpanReceivedEvent carries the already-dropped span and both the span store and trace-summary fold see no dropped content. Policy is supplied directly (DB-backed resolution has its own tests in @langwatch/data-privacy-server); the real drop logic + real fold run end-to-end.
  */
 import { createTenantId, type Command, type TenantId } from "@langwatch/eventing";
 import {

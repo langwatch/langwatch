@@ -486,19 +486,24 @@ export function peekCustomerTraceIds(
   } catch {
     return [];
   }
+  const ids = collectDecodedTraceIds(request, max);
+  return Array.from(ids);
+}
+
+/** Walks every span in the request, decoding trace ids until `max` are collected. */
+function collectDecodedTraceIds(request: IExportTraceServiceRequest, max: number): Set<string> {
   const ids = new Set<string>();
   for (const resourceSpans of request.resourceSpans ?? []) {
     for (const scopeSpans of resourceSpans.scopeSpans ?? []) {
       for (const span of scopeSpans.spans ?? []) {
         const decoded = decodeBase64OpenTelemetryId(span.traceId);
-        if (decoded) {
-          ids.add(decoded);
-          if (ids.size >= max) return Array.from(ids);
-        }
+        if (!decoded) continue;
+        ids.add(decoded);
+        if (ids.size >= max) return ids;
       }
     }
   }
-  return Array.from(ids);
+  return ids;
 }
 
 /**

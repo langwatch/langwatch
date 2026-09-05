@@ -1,11 +1,6 @@
 /**
  * @vitest-environment node
- *
- * Virtual-key expiry against real Postgres and the real internal auth route:
- * the date is read at resolve time, it has its own rejection code, and the
- * stored stops still win over it.
- *
- * Spec: specs/ai-gateway/virtual-key-lifecycle.feature
+ * Real Postgres + real internal auth route. Expiry date read at resolve time, own rejection code, stored stops still win over it. Spec: specs/ai-gateway/virtual-key-lifecycle.feature
  */
 
 import { nanoid } from "nanoid";

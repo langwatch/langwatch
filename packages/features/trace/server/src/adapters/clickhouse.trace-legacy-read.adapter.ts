@@ -16,12 +16,8 @@ import { TraceOffloadResolutionService } from "../services/trace-offload-resolut
 const logger = createLogger("langwatch:traces:clickhouse-legacy-read");
 
 /**
- * Builds the per-trace and bulk resolver callbacks from the blob-offload
- * dependencies (ADR-022): given a project and a trace's normalized spans,
- * restores the field values `leanForProjection` offloaded to event_log and
- * recomputes the trace IO from the resolved spans.
- *
- * Absent, the store falls back to the preview values on trace_summaries.
+ * @see ADR-022
+ * Builds per-trace and bulk resolver callbacks from the blob-offload dependencies: given a project and a trace's normalized spans, restores the field values leanForProjection offloaded to event_log and recomputes trace IO from the resolved spans. Absent, the store falls back to the preview values on trace_summaries.
  */
 class OffloadedSpanResolver {
   constructor(private readonly deps: BlobResolutionDeps) {}

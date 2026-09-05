@@ -105,10 +105,7 @@ export {
 } from "./transport/api-trpc/virtual-key.api";
 
 /**
- * The public REST family this feature owns. The process supplies the bound REST
- * security service and the application; the routes, wire casing and access
- * declarations are the feature's, so the REST and tRPC doors cannot drift
- * apart.
+ * The public REST family this feature owns. The process supplies the bound REST security service and the application; routes, wire casing and access declarations are the feature's, so the REST and tRPC doors cannot drift apart.
  */
 export { createGatewayPlatformRestApp } from "./transport/api-rest/gateway-platform.api";
 export {
@@ -133,13 +130,7 @@ export {
 export { type VirtualKeyTrpcSchemas } from "./transport/api-trpc/virtual-key.api";
 
 /**
- * The gateway control plane, moved out of the retired application.
- *
- * Virtual keys and their scope authorization, the budget overview and the
- * budgets applicable to one target, guardrail evaluation, the realtime voice
- * session record, the ElevenLabs credential read, and the configuration
- * bundle the Go data plane long-polls for — plus the four ports those need
- * that belong to other features or to the deployment.
+ * The gateway control plane, moved out of the retired application: virtual keys and scope authorization, budget overview and applicable budgets, guardrail evaluation, realtime voice sessions, the ElevenLabs credential read, and the config bundle the Go data plane long-polls for — plus the four ports those need from other features or the deployment.
  */
 export {
   VirtualKeyService,

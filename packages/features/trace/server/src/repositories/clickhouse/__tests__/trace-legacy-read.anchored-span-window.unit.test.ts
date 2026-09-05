@@ -1,18 +1,6 @@
 /**
- * The joined span read must never emit an empty time predicate (ADR-087).
- *
- * `fetchTracesWithSpansJoined` derived its `stored_spans` window solely from the
- * matched summaries' `OccurredAt`, keeping only positive values. A page of
- * log-only traces carries the epoch sentinel in that column, so nothing
- * survived, `queryWindowed` was called with a null hint and `fallback: "none"`,
- * and BOTH the inner and outer time filters rendered as empty strings — leaving
- * a read of `ResourceAttributes`, `SpanAttributes`, `Events.Attributes` and
- * `Links.*` with no partition predicate at all, over every weekly part including
- * cold S3 tiers. That is the read production died on with
- * MEMORY_LIMIT_EXCEEDED (code 241).
- *
- * These tests assert on the SQL the service issues, because the defect IS the
- * SQL: the interpolated fragment is either there or it is not.
+ * @see ADR-087
+ * The joined span read must never emit an empty time predicate. fetchTracesWithSpansJoined derived its stored_spans window solely from matched summaries' OccurredAt, keeping only positive values — a page of log-only traces (epoch sentinel) left nothing, so queryWindowed got a null hint + fallback:"none" and BOTH time filters rendered empty, scanning every weekly part (cold S3 included) and dying with MEMORY_LIMIT_EXCEEDED (241). These assert on the SQL itself, since the defect IS the SQL.
  */
 import { describe, expect, it, vi } from "vitest";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
@@ -24,12 +12,7 @@ const { mockClickHouseQuery } = vi.hoisted(() => ({
 const traceCanonicalisation = TraceCanonicalisationService.create();
 
 /**
- * The process's tenant-keyed connection, as this suite supplies it.
- *
- * It arrives as a CONSTRUCTOR argument now. The suite used to mock the
- * platform application's singleton and let the repository reach for it; the
- * repository takes the resolver instead, so the fake is stated where every
- * other dependency of the read is.
+ * The process's tenant-keyed connection, as this suite supplies it — arrives as a CONSTRUCTOR argument now. The suite used to mock the platform application's singleton; the repository takes the resolver instead, so the fake sits where every other dependency of the read does.
  */
 const testResolveClickHouseClient = () => Promise.resolve({ query: mockClickHouseQuery } as never);
 
@@ -94,14 +77,7 @@ function summaryRow(traceId: string, occurredAtMs: number) {
 }
 
 /**
- * The three reads `fetchTracesWithSpansJoined` fires when the caller supplies no
- * time range: the light min/max resolve, the summary read, then the span read.
- *
- * Routed by query shape rather than by call order, so a read gained or dropped
- * upstream surfaces here as an unmatched query rather than as the wrong payload
- * handed to the wrong read two frames away. Every shape is matched explicitly
- * and anything else throws: a default payload would hand a new read a valid-
- * looking fixture and hide exactly the break this routing exists to expose.
+ * The three reads fetchTracesWithSpansJoined fires with no time range (light min/max resolve, summary read, span read), routed by query shape rather than call order, so a read gained/dropped upstream surfaces as an unmatched query, not a wrong payload two frames away. Every shape is matched explicitly and anything else throws — a default payload would hide exactly the break this routing exists to expose.
  */
 function mockReads({
   resolved,
@@ -135,13 +111,7 @@ function matchRows({
 }
 
 /**
- * Drives the read and hands back the span query it issued.
- *
- * A missing span read is a broken fixture, not a failed expectation — the
- * scenarios below are all about the SHAPE of that query, so there is nothing to
- * assert if it never ran. Throwing keeps the assertions in the `it` blocks where
- * `noMisplacedAssertion` expects them, and reports a setup break as a setup
- * break rather than as a confusing `undefined` assertion failure.
+ * Drives the read and hands back the span query it issued. A missing span read is a broken fixture, not a failed expectation — these scenarios are all about the query's SHAPE, so throwing (rather than returning undefined) keeps assertions in the it blocks and reports a setup break as a setup break.
  */
 async function readTraces(traceIds: string[]) {
   const { TraceLegacyReadClickHouseRepository } = await import("../trace-legacy-read.repository");

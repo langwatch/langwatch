@@ -12,14 +12,11 @@ function pushDecoded(out: ChatMessage[], raw: string, defaultRole: "user" | "ass
     return;
   }
 
-  // Track baseline so we can detect the "all branches matched a
-  // structure but produced zero entries" case — e.g. `{type:"chat_
-  // messages", value:[]}` or `{type:"chat_messages", value:[{bad}]}`
-  // where every item failed the filter. Without this guard the
-  // attribute would be silently dropped from the playground resume
-  // even though we had a payload to surface. Falling back to a single
-  // raw-content turn keeps something visible in the chat instead of
-  // pretending the LLM said nothing.
+  // Track baseline so we can detect the "all branches matched a structure but"
+  // "produced zero entries" case (e.g. `{type:"chat_messages", value:[]}` or every
+  // item failing the filter). Without this guard the attribute would be silently
+  // dropped from the playground resume; falling back to a single raw-content turn
+  // keeps something visible instead of pretending the LLM said nothing.
   const before = out.length;
 
   if (
@@ -95,37 +92,7 @@ export class TraceLlmSpanMessagesService {
   }
 
   /**
-   * Parses the input (request prompt) + output (assistant reply) messages
-   * carried on an LLM-kind span's attributes into a flat ordered list, the
-   * shape the trace→playground "Open in Prompts" loader feeds into the chat.
-   *
-   * Reads, in fallback order:
-   *
-   *   - input:  `gen_ai.input.messages` → `gen_ai.prompt` → `langwatch.input`
-   *   - output: `gen_ai.completion` → `gen_ai.output.messages` → `langwatch.output`
-   *
-   * Each attribute is a JSON-encoded string emitted by the producing SDK.
-   * Three wire shapes are accepted because different SDKs serialize the
-   * same logical thing differently:
-   *
-   *   1. TypedValueJson wrapper: `{"type":"chat_messages","value":[...]}` —
-   *      the LangWatch python-sdk's canonical shape for explicit
-   *      input/output rendering on a span.
-   *   2. Bare array of `{role, content}` message objects — what nlpgo's
-   *      `langwatch.input` on an LLM span carries (`[]app.ChatMessage`
-   *      JSON-encoded).
-   *   3. Bare SINGLE message object `{role, content}` — what nlpgo's
-   *      `langwatch.output` on an LLM span carries (a single
-   *      `app.ChatMessage` JSON-encoded, NOT an array). This shape was
-   *      not handled pre-fix and the assistant reply was silently
-   *      dropped from the playground "Open in Prompts" resume.
-   *
-   * Falls back to wrapping the raw string as a single user/assistant turn
-   * when JSON parsing fails or the shape is unrecognized, so the resume
-   * never crashes on a stranger trace.
-   *
-   * Default role is `user` for input, `assistant` for output. Embedded
-   * roles always win when the shape carries them.
+   * Parses input (request prompt) + output (assistant reply) messages carried on an LLM-kind span's attributes into a flat ordered list, the shape the trace→playground "Open in Prompts" loader feeds into the chat. Reads, in fallback order, input `gen_ai.input.messages` → `gen_ai.prompt` → `langwatch.input` and output `gen_ai.completion` → `gen_ai.output.messages` → `langwatch.output`; each is a JSON-encoded string in one of three SDK-dependent wire shapes (TypedValueJson wrapper, bare message array, or bare single message object — the last was previously unhandled and silently dropped the assistant reply). Falls back to wrapping the raw string as a single turn when parsing fails or the shape is unrecognized. Default role is `user` for input, `assistant` for output; embedded roles win when present.
    */
   static parseLLMSpanMessages(attrs: Record<string, unknown>): ChatMessage[] {
     const messages: ChatMessage[] = [];

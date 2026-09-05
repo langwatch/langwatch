@@ -3,34 +3,7 @@ import type { NormalizedAttributes } from "@langwatch/trace-contract";
 import { TraceModelCostPort } from "../ports/trace-model-cost.port";
 
 /**
- * Fold-time span cost, priced from the platform's immutable model catalog.
- *
- * It IS `TraceSpanCostMatchingService.computeSpanCost` — the application's own function, now this package's
- * (`services/trace-span-cost-matching.service.ts`), which the legacy span
- * mapper and the stored-span reader also price through. It was a frozen twin
- * while both graphs ingested; now there is one, and the SURVEY THAT SHRANK THE
- * WORK TO NOTHING still explains why: those 36 lines are
- * `estimateModelCost(input, getStaticModelCosts())`, and `getStaticModelCosts`
- * is `getStaticModelCostRates()` with a `projectId: ""` stamped on each rate —
- * a field `estimateModelCost` never reads. Both functions were already in
- * `@langwatch/model-provider-contract`. So the application's fold prices spans
- * from the STATIC catalog, and this is the same cascade over the same rates,
- * not a second implementation of it.
- *
- * THIS CORRECTS A RECORDED BLOCKER. The extraction ledger has Scenario's
- * `deriveScenarioRoleMetrics` blocked because it is "the App's per-project
- * span-cost matching, not the static-catalog trick". It is the static-catalog
- * trick: `TraceReadDerivationService` builds its `SpanCostService` over this
- * same `TraceSpanCostMatchingService.computeSpanCost`. Per-project, per-team and per-organization override
- * rules are read by RECORD-TIME enrichment (`getCustomLLMModelCosts` ->
- * `OtlpSpanCostEnrichmentService`), which is a different pass, already
- * harvested, and correctly still needs a database. Nothing on the fold path
- * does.
- *
- * A customer's own rates are not missing here either: an override that applied
- * at record time rides on the span as `custom_input_rate` and its siblings,
- * which `estimateModelCost` reads before it consults the catalog. So a tenant
- * who repriced a model is priced identically by both graphs.
+ * Fold-time span cost, priced from the platform's immutable model catalog — IS TraceSpanCostMatchingService.computeSpanCost, the same function the legacy span mapper and stored-span reader price through (no longer a frozen twin; one cascade over the STATIC catalog now). Per-project/team/org override rules are applied at RECORD time (getCustomLLMModelCosts -> OtlpSpanCostEnrichmentService), a separate, already-harvested pass — nothing on the fold path needs a database. A repriced tenant's own rates still ride on the span as custom_input_rate (+siblings), which estimateModelCost reads before the catalog, so both graphs price identically.
  */
 export class ModelCatalogTraceModelCostAdapter extends TraceModelCostPort {
   static create(): ModelCatalogTraceModelCostAdapter {

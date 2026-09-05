@@ -1,14 +1,6 @@
 /**
  * @vitest-environment node
- *
- * The `gatewaySpendEvents` transport: filter and cursor passthrough to the
- * repository page read, virtual-key display-name resolution, the
- * ClickHouse-absent degrade, and the declared scope.
- *
- * Moved here with the surface itself. The refusal case now stands on the
- * policy the process hands in rather than on the app's RBAC middleware — the
- * transport's side of that contract is that the handler never runs when the
- * policy refuses, which is what is asserted.
+ * The gatewaySpendEvents transport: filter/cursor passthrough, VK display-name resolution, ClickHouse-absent degrade, declared scope. Refusal now stands on the policy the process hands in, not the app's RBAC middleware — asserts the handler never runs when the policy refuses.
  */
 import type { ProjectService } from "@langwatch/project-contract";
 import { initTRPC, TRPCError } from "@trpc/server";

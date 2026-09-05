@@ -1,13 +1,6 @@
 /**
  * @vitest-environment node
- *
- * The record of open realtime voice sessions, against real Postgres: the cap
- * that bounds how many voice calls one key runs at once, the lock that makes
- * it a cap under concurrency, the expiry that stops a session nobody reported
- * from holding a slot forever, and the match that refuses to guess which call
- * a vendor report belongs to.
- *
- * Spec: specs/ai-gateway/realtime-sessions.feature
+ * Real Postgres. The cap bounding concurrent voice calls per key, the lock making it a cap under concurrency, the expiry freeing an unreported session's slot, and the match refusing to guess. Spec: specs/ai-gateway/realtime-sessions.feature
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -47,11 +40,9 @@ const connection = databaseUrl
 const prisma = connection?.client as PrismaClient;
 
 /**
- * The spend pipeline and the trace collector are recorded rather than run, so
- * the two writes a settlement makes can be asserted on their own. What each
- * one then does (rate and debit every budget the key is under; fold the span
- * into the trace summary) is tested where it lives, and this file's subject is
- * the session record that produces both.
+ * Spend pipeline and trace collector are recorded, not run, so a
+ * settlement's two writes can be asserted independently; this file's
+ * subject is the session record that produces both.
  */
 const sentConfirmations: ConfirmSpendCommandData[] = [];
 const ingestedSpans: Record<string, any>[] = [];

@@ -1,29 +1,5 @@
 /**
- * The mapping and redaction layer both trace-view transports share.
- *
- * `tracesV2.*` (authenticated) and `sharedTrace.get` (the one anonymous read
- * ADR-057 allows) render the same trace out of the same rows. Every mapper
- * here is applied by BOTH, which is the point: a redaction added to one and
- * forgotten in the other silently leaks to share viewers, so there is exactly
- * one implementation and both doors go through it.
- *
- * It sits under `transport/api-trpc/` beside the gates for the same reason those do
- * (see `trace-view-gates.api.ts`): it is transport-shaped presentation, not a
- * service, and strict layout version 0 admits nothing else here.
- *
- * ## What arrives as a port
- *
- * Three capabilities are the APPLICATION'S, not Trace's, and arrive as
- * arguments rather than imports:
- *
- *   - how a span's captured input/output is rendered as display text,
- *   - the legacy span-protection pass and its redaction extraction,
- *   - the data-privacy vertical's content-key catalog, its per-span markers
- *     and its chat-turn stripper.
- *
- * Each one belongs to a vertical this package does not own. Injecting them
- * keeps the mapping here without dragging three other features' modules along
- * with it.
+ * The mapping and redaction layer both trace-view transports share. `tracesV2.*` (authenticated) and `sharedTrace.get` (the one anonymous read ADR-057 allows) render the same trace out of the same rows — every mapper here is applied by BOTH, so a redaction added to one and forgotten in the other can't silently leak to share viewers. Sits under `transport/api-trpc/` beside the gates (see `trace-view-gates.api.ts`) since it is transport-shaped presentation, not a service, and strict layout v0 admits nothing else here. Three capabilities are the APPLICATION'S, not Trace's, and arrive as arguments rather than imports: captured input/output display rendering, the legacy span-protection pass, and the data-privacy vertical's content catalog/markers/chat-turn stripper — each belongs to a vertical this package does not own, so injecting them avoids dragging three other features' modules along.
  */
 import { CONTENT_CATEGORIES, type ContentCategory } from "@langwatch/data-privacy-contract";
 import type {
@@ -209,15 +185,7 @@ export function mapTraceSummaryToHeader(summary: TraceSummaryData): TraceHeader 
 }
 
 /**
- * Trace-level DROP banner. A `drop` disposition strips the category at
- * ingestion, so the computed content was never stored and is empty. The check
- * uses the ORIGINAL computed content (the pre-redaction header), not the
- * redacted one: an old pre-rule trace still has its content, so the banner
- * won't show even though the now-`drop` policy hides it; restricted content
- * has disposition "restrict" (not "drop") so it can't be mislabeled here.
- * Resolution failures must not break the header — the derivation just yields
- * no banner. Shared by the internal `tracesV2.header` read and the anonymous
- * share payload (`sharedTrace.get`). See ADR-057.
+ * Trace-level DROP banner. A `drop` disposition strips the category at ingestion, so the computed content was never stored and is empty. The check uses the ORIGINAL computed content (pre-redaction header), not the redacted one: an old pre-rule trace still has its content, so the banner won't show even though the now-`drop` policy hides it; restricted content has disposition "restrict" (not "drop") so it can't be mislabeled here. Resolution failures must not break the header — the derivation just yields no banner. Shared by `tracesV2.header` and `sharedTrace.get`. See ADR-057.
  */
 export async function deriveTraceDropPrivacy(
   rawHeader: Pick<TraceHeader, "input" | "output">,
@@ -311,19 +279,7 @@ export function buildSpanContentRedactions(
 }
 
 /**
- * The full per-span redaction pipeline behind bulk span reads: span-level
- * protections (category visibility, restricted custom attributes, hidden
- * content scrubbed out of params), the DTO mapping, the content redaction
- * pass, and the privacy annotations. The single implementation is shared by
- * the internal `tracesV2.spansFull` read and the anonymous share payload
- * (`sharedTrace.get`) — the two surfaces must never drift apart, because a
- * redaction added to one and forgotten in the other silently leaks to share
- * viewers. See ADR-057.
- *
- * Per-span events are deliberately absent (the `[]` below): only the
- * single-span `tracesV2.spanDetail` read fetches them. The trace-level events
- * timeline covers the shared view; per-span events in the share payload are an
- * ADR-057 follow-up.
+ * The full per-span redaction pipeline behind bulk span reads: span-level protections (category visibility, restricted custom attributes, hidden content scrubbed from params), DTO mapping, content redaction pass, privacy annotations. Single implementation shared by `tracesV2.spansFull` and `sharedTrace.get` — the two surfaces must never drift apart, since a redaction added to one and forgotten in the other silently leaks to share viewers (ADR-057). Per-span events are deliberately absent (the `[]` below): only the single-span `tracesV2.spanDetail` read fetches them; per-span events in the share payload are an ADR-057 follow-up.
  */
 export function mapSpansToDetailDtos(
   spans: Span[],
@@ -375,12 +331,7 @@ export type V2Protections = {
 };
 
 /**
- * System instructions and tool calls ride INSIDE the captured input/output
- * conversation as system/tool role turns and assistant `tool_calls`. When the
- * viewer is outside their audience the surviving input/output string must have
- * those turns stripped, mirroring the ingestion-time drop, so the transcript
- * never renders content the policy hides. Returns the roles to remove and
- * whether to drop `tool_calls`, derived from per-category visibility.
+ * System instructions and tool calls ride INSIDE the captured input/output conversation as system/tool role turns and assistant `tool_calls`. When the viewer is outside their audience the surviving input/output string must have those turns stripped, mirroring the ingestion-time drop, so the transcript never renders content the policy hides. Returns the roles to remove and whether to drop `tool_calls`, derived from per-category visibility.
  */
 function turnsHiddenForViewer(protections: V2Protections): {
   roles: Set<string>;
@@ -401,28 +352,7 @@ function turnsHiddenForViewer(protections: V2Protections): {
 }
 
 /**
- * The free-text terms the session search is allowed to match against
- * transcript bodies, for this viewer.
- *
- * These compile into `positionCaseInsensitive` predicates over `log_records`,
- * against BOTH `BodyText` (captured prompts, tool content, raw request
- * bodies) and `AttributesFlatJson` (every attribute on the record, flattened
- * to one JSON blob). Whether a session matches a term IS that content: a
- * viewer who cannot read it must not be able to probe it either, one guess at
- * a time, through which rows come back and what the total says. Redacting the
- * previews afterwards does not help, because the answer already rode out in
- * the row list.
- *
- * So a viewer under ANY content protection searches the trace-level columns
- * only, the same ones the filter translator already applies to them, and the
- * transcript reach is dropped rather than narrowed: the body is one blob, it
- * cannot be matched per category or per attribute key. This covers three
- * independent protection dimensions, and any one of them drops the whole
- * search: whole-category visibility (`canSeeCapturedInput`/`Output`),
- * per-turn-role visibility (`contentCategories`, system/tools), and custom
- * attribute restrict rules (`hiddenAttributes`) — a rule can hide one
- * attribute's value while leaving input/output and every category fully
- * visible, and `AttributesFlatJson` carries that value the same as any other.
+ * The free-text terms the session search is allowed to match against transcript bodies, for this viewer. These compile into `positionCaseInsensitive` predicates over `log_records`, against both `BodyText` and `AttributesFlatJson` — whether a session matches a term IS that content, so a viewer who cannot read it must not be able to probe it either, one guess at a time; redacting previews afterwards doesn't help since the answer already rode out in the row list. So a viewer under ANY content protection searches trace-level columns only and the transcript reach is dropped rather than narrowed, since the body is one blob that cannot be matched per category or attribute key. Three independent protection dimensions each drop the whole search: whole-category visibility, per-turn-role visibility, and custom attribute restrict rules — a rule can hide one attribute's value while leaving input/output fully visible, and `AttributesFlatJson` carries that value the same as any other.
  */
 export function contentSearchTermsForViewer({
   terms,
@@ -442,11 +372,7 @@ export function contentSearchTermsForViewer({
 }
 
 /**
- * Synthetic hidden-attribute rules for the standalone system/tools attribute
- * keys (`gen_ai.system_instructions`, `gen_ai.tool.call.*`, …) when those
- * categories are hidden from the viewer, so their values are replaced by the
- * audience-naming placeholder in the attributes table just like a custom
- * restrict rule — the conversation turns are handled separately.
+ * Synthetic hidden-attribute rules for the standalone system/tools attribute keys (`gen_ai.system_instructions`, `gen_ai.tool.call.*`, …) when those categories are hidden from the viewer, so their values are replaced by the audience-naming placeholder in the attributes table just like a custom restrict rule — the conversation turns are handled separately.
  */
 function hiddenCategoryAttributeRules(
   protections: V2Protections,
@@ -469,13 +395,7 @@ function hiddenCategoryAttributeRules(
 }
 
 /**
- * Recursively remove hidden chat turns from any attribute value: drop messages
- * whose role is hidden, strip assistant `tool_calls` when tool calls are hidden,
- * and apply the same to JSON-string-encoded conversations. This covers the raw
- * chat-array attributes (`gen_ai.input.messages`, `langwatch.input`, …) the
- * attributes table can expand — they are input/output-category keys, so the
- * placeholder rules above do not touch them, yet they still carry the system and
- * tool turns. Returns a new value; the input is not mutated.
+ * Recursively remove hidden chat turns from any attribute value: drop messages whose role is hidden, strip assistant `tool_calls` when tool calls are hidden, and apply the same to JSON-string-encoded conversations. Covers raw chat-array attributes (`gen_ai.input.messages`, `langwatch.input`, …) the attributes table can expand — they are input/output-category keys, so the placeholder rules above don't touch them, yet they still carry system/tool turns. Returns a new value; the input is not mutated.
  */
 function stripHiddenChatTurnsDeep(
   node: unknown,
@@ -618,12 +538,7 @@ export function redactV2Content<
 }
 
 /**
- * One turn of a session, as `conversationContext` lists it. Carries the
- * permission-nulled input/output AND the redaction flags so a hidden turn
- * renders the "Redacted" marker in the conversation strip / view instead of an
- * empty "(no message)" placeholder that would read as a genuinely-absent turn.
- * Carries the turn's totals so the terminal's bottom bar can count the
- * session's turns above its loaded window without reading their transcripts.
+ * One turn of a session, as `conversationContext` lists it. Carries the permission-nulled input/output AND the redaction flags so a hidden turn renders the "Redacted" marker instead of an empty "(no message)" placeholder that would read as genuinely-absent. Carries the turn's totals so the terminal's bottom bar can count turns above its loaded window without reading their transcripts.
  */
 export function toConversationContextTurn({
   trace: t,
@@ -714,10 +629,7 @@ export function readPiiIncompleteFromParams(
 }
 
 /**
- * The generic per-category privacy status for the drawer, combining the
- * read-time restrict decision (from the resolved policy, retroactive) with the
- * per-span drop marker (which follows the data). Drop wins when both apply: the
- * content is genuinely gone, so there is nothing left to restrict.
+ * The generic per-category privacy status for the drawer, combining the read-time restrict decision (from the resolved policy, retroactive) with the per-span drop marker (which follows the data). Drop wins when both apply: the content is genuinely gone, so there is nothing left to restrict.
  */
 export function buildContentPrivacy(
   protections: {
@@ -760,30 +672,7 @@ export type TraceDerivedAttrPrefixes = Readonly<{
 }>;
 
 /**
- * Enforce captured-content visibility on one trace-correlated log record before
- * it leaves the API. The raw log records carry their content under PER-EVENT
- * attribute keys — `prompt` for a user prompt, `response` / `response_text` for
- * a reply, `arguments` / `tool_input` and `output` for a tool run — plus the
- * top-level OTLP body for content-of-record emitters. Every one of those keys
- * is withheld behind the SAME `canSeeCapturedInput` / `canSeeCapturedOutput`
- * visibility the sibling span endpoints enforce, from `logContentKeys`, the one
- * table the read-path enrichment surfaces content from — a key surfaced by one
- * and missed by the other is a policy bypass.
- *
- * Gating is per KEY, not per record: a codex `tool_result` carries the call's
- * `arguments` (input) and its `output` (output) together, so one verdict for
- * the whole record could only ever be right in one direction.
- *
- * Ingest also stamps DERIVED content onto the attributes
- * (`langwatch.gen_ai.output.text`, `…output.tool_calls`, …input counts): the
- * same captured content re-shaped, so each is stripped behind the category it
- * was computed from.
- *
- * A key whose category the table does not know fails closed and needs BOTH
- * visibilities. Only content is withheld: event name, `request_id`,
- * `cost_usd`, `query_source` and every other metadata attribute (and cost,
- * governed by its own permission) pass through untouched, so a structural
- * record like the `api_request` cost anchor is returned intact.
+ * Enforce captured-content visibility on one trace-correlated log record before it leaves the API. Raw log records carry content under PER-EVENT attribute keys (`prompt`, `response`/`response_text`, `arguments`/`tool_input`, `output`) plus the top-level OTLP body; every key is withheld behind the SAME `canSeeCapturedInput`/`canSeeCapturedOutput` visibility the sibling span endpoints enforce, from `logContentKeys` — a key surfaced by one and missed by the other is a policy bypass. Gating is per KEY, not per record: a codex `tool_result` carries both `arguments` (input) and `output` (output), so one verdict for the whole record could only ever be right in one direction. Ingest also stamps DERIVED content onto the attributes (the same captured content re-shaped), each stripped behind the category it was computed from. A key whose category the table does not know fails closed and needs BOTH visibilities; only content is withheld — metadata (event name, request_id, cost_usd, query_source, and cost, governed separately) passes through untouched.
  */
 export function redactTraceLogContent(
   row: TraceLogRecordDto,
@@ -861,18 +750,7 @@ export function redactTraceLogContent(
 }
 
 /**
- * Apply BOTH gates to one trace-correlated log record: the free-plan teaser
- * window and the viewer's captured-content permission.
- *
- * A record older than the plan `visibilityCutoffMs` has its captured content
- * withheld regardless of the viewer's permission — a plan gate, not an audience
- * gate, so it offers no "visible to …" label (there is no group that can see
- * it, only a plan upgrade). This mirrors the sibling span reads, which
- * teaser-redact pre-cutoff spans via `applyVisibilityGate`. Post-cutoff records
- * (and every record when `visibilityCutoffMs` is null — a paid plan with no
- * window) fall through to the viewer's real captured-input / captured-output
- * visibility. Fails closed: a pre-cutoff record is gated as if no captured
- * content were visible.
+ * Apply BOTH gates to one trace-correlated log record: the free-plan teaser window and the viewer's captured-content permission. A record older than the plan `visibilityCutoffMs` has its captured content withheld regardless of the viewer's permission — a plan gate, not an audience gate, so it offers no "visible to …" label (only a plan upgrade helps). Mirrors the sibling span reads, which teaser-redact pre-cutoff spans via `applyVisibilityGate`. Post-cutoff records (and every record when `visibilityCutoffMs` is null, a paid plan with no window) fall through to the viewer's real captured-input/output visibility. Fails closed: a pre-cutoff record is gated as if no captured content were visible.
  */
 export function gateTraceLogVisibility(
   row: TraceLogRecordDto,

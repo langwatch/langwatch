@@ -1,10 +1,7 @@
 /**
- * World for the per-key budget integration suite: the ids, the anchor
- * instant, and the builders that put an organization, its keys, their
- * budgets and their ledger debits into real Postgres + real ClickHouse.
- *
- * Split out of the test so the suite itself stays readable as a list of
- * given/when cases rather than a wall of setup.
+ * World for the per-key budget integration suite: ids, anchor instant,
+ * and builders seeding an org, its keys, budgets and ledger debits into
+ * real Postgres + real ClickHouse. Split out so the suite reads as given/when cases.
  */
 import { nanoid } from "nanoid";
 import { usdToNanoUsd } from "@langwatch/gateway-contract";
@@ -28,10 +25,9 @@ export const VK_BOTH_ID = `vk_vkb_both_${suffix}`;
 /** Covered only by the project budget: no cap of its own. */
 export const VK_INHERITED_ID = `vk_vkb_inherited_${suffix}`;
 /**
- * A neighbouring pair with identical budgets, one used and one not. They
- * exist to prove the bar reads its own bucket: same org, same project,
- * same window, same limit, so a prefix match or a scope-level read would
- * hand the unused one its neighbour's money.
+ * A neighbouring pair with identical budgets, one used and one not —
+ * proves the bar reads its own bucket, since a prefix or scope-level
+ * read would hand the unused one its neighbour's money.
  */
 export const VK_NEIGHBOUR_USED_ID = `vk_vkb_neighbour_used_${suffix}`;
 export const VK_NEIGHBOUR_UNUSED_ID = `vk_vkb_neighbour_unused_${suffix}`;
@@ -45,10 +41,9 @@ export const BUDGET_NEIGHBOUR_USED_ID = `bdg-vkb-neigh-used-${suffix}`;
 export const BUDGET_NEIGHBOUR_UNUSED_ID = `bdg-vkb-neigh-unused-${suffix}`;
 
 /**
- * Midday UTC of the current day. Anchoring both the debits and the read
- * to one instant keeps the period arithmetic away from the wall clock: a
- * run at 23:59:59 UTC must not straddle midnight between the write and
- * the read.
+ * Midday UTC of the current day: anchoring debits and read to one
+ * instant keeps period arithmetic away from the wall clock, so a run at
+ * 23:59:59 UTC can't straddle midnight between write and read.
  */
 export const NOW = (() => {
   const d = new Date();

@@ -1,9 +1,6 @@
 /**
- * OTLP exporters (the Langy worker relay among them) set reserved keys via
- * RESOURCE attributes rather than span attributes, so they must be hoisted
- * from the resource the same way they are from span attributes.
- *
  * @see specs/langy/langy-otel-tracing.feature
+ * OTLP exporters (the Langy worker relay among them) set reserved keys via RESOURCE attributes rather than span attributes, so they must be hoisted from the resource the same way they are from span attributes.
  */
 import { describe, expect, it } from "vitest";
 import type { NormalizedSpan } from "@langwatch/trace-contract";

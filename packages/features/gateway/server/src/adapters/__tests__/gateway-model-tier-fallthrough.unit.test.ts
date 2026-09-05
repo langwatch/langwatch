@@ -1,8 +1,7 @@
 /**
  * @vitest-environment node
- *
  * Spec: specs/ai-gateway/governance/admin-routing-policies.feature
- *       (Rule: A model tier is a reserved name a policy gives a meaning to)
+ * (Rule: A model tier is a reserved name a policy gives a meaning to)
  */
 import { describe, expect, it } from "vitest";
 

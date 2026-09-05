@@ -30,11 +30,7 @@ export interface ClickHouseEvaluationRunRow {
 }
 
 /**
- * evaluation_runs columns that back {@link ClickHouseEvaluationRunRow}, minus the
- * heavy `Inputs` payload. Keep in sync with the interface above. Reading these
- * explicitly avoids `SELECT *`, which also pulls columns no reader consumes
- * (ErrorDetails, CostId, ArchivedAt, CreatedAt) — and, on the deduped read path,
- * pulls them across every version before the IN-tuple discards the stale ones.
+ * evaluation_runs columns backing {@link ClickHouseEvaluationRunRow}, minus the heavy `Inputs` payload — keep in sync with the interface above. Reading these explicitly avoids `SELECT *`, which also pulls columns no reader consumes and, on the deduped read path, pulls them across every stale version before the IN-tuple discards it.
  */
 export const EVALUATION_RUN_COLUMNS_LIGHT = [
   "ProjectionId",
@@ -74,7 +70,6 @@ export class TraceEvaluationMappingService {
 
   /**
    * Maps a ClickHouse evaluation_runs row to the canonical TraceEvaluation type.
-   *
    * @param record - A row from the evaluation_runs table
    * @returns TraceEvaluation in camelCase
    */
@@ -109,14 +104,9 @@ export class TraceEvaluationMappingService {
   }
 
   /**
-   * Maps a legacy ES Evaluation (snake_case) to the canonical TraceEvaluation type.
-   *
-   * The ES Evaluation type has error as ErrorCapture | null. We extract just the
-   * message string for the canonical type.
-   *
+   * Maps a legacy ES Evaluation (snake_case, `error: ErrorCapture | null` reduced to just the message string) to the canonical TraceEvaluation type.
    * @param evaluation - An Evaluation from the ES trace data
    * @param traceId - The trace ID this evaluation belongs to
-   * @returns TraceEvaluation in camelCase
    */
   static mapEsEvaluationToTraceEvaluation(
     evaluation: Evaluation,
@@ -144,9 +134,7 @@ export class TraceEvaluationMappingService {
   }
 
   /**
-   * Reverse mapper: converts TraceEvaluation records back to legacy Evaluation format
-   * for backward compatibility with existing callers (e.g. TraceService).
-   *
+   * Reverse mapper: converts TraceEvaluation records back to legacy Evaluation format for backward compatibility with existing callers (e.g. TraceService).
    * @param result - Record of traceId to TraceEvaluation arrays
    * @returns Record of traceId to legacy Evaluation arrays
    */

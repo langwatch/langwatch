@@ -1,15 +1,7 @@
 /**
  * @vitest-environment node
  * @integration
- *
- * Integration coverage for the trace search projection DSL (Track 1, API Export
- * Traces RFC) — the END-TO-END projected SHAPE.
- *
- * Proves the feature-spec scenarios (`specs/traces/trace-search-projection.feature`)
- * against real infrastructure: the compiler plans, the ClickHouse read path runs
- * the bounded events JOIN over real `stored_spans`, the annotations JOIN runs
- * (through a fake `AnnotationService`, since Postgres has no testcontainer here),
- * and the per-trace projector renders the requested shape.
+ * Integration coverage for the trace search projection DSL (API Export Traces RFC, Track 1) — the END-TO-END projected shape. Proves specs/traces/trace-search-projection.feature against real infra: compiler plans, CH read runs the bounded events JOIN over real stored_spans, annotations JOIN runs via a fake AnnotationService (no PG testcontainer here), and the per-trace projector renders the requested shape.
  */
 import { TraceProjectionCompileService } from "../../../services/trace-projection-compile.service";
 import type { AnnotationScoreName } from "@langwatch/annotation-contract";

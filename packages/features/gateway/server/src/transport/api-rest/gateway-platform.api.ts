@@ -1,20 +1,5 @@
 /**
- * Public REST API for managing AI Gateway resources from SDKs, CLIs, and
- * CI pipelines. Parallels the `virtualKeys` / `gatewayBudgets` /
- * `gatewayUsage` tRPC routers consumed by the UI.
- *
- * Auth: standard project API key (`Authorization: Bearer <projectApiKey>`
- * or `X-Auth-Token`), or a scoped API key. There is exactly one
- * implementation of every write rule: handlers call the SAME operations on
- * `GatewayApp` that the tRPC mutations call — `authorizeVirtualKeyCreate`,
- * `authorizeVirtualKeyUpdate`, `authorizeVirtualKeyOperation` — so the two
- * doors cannot drift apart. Handlers translate wire casing and map TRPCError
- * onto HTTP; they add no business rules of their own.
- *
- * Writes are audited to `AuditLog` (gateway shape). Which actor a credential
- * writes as — the key's owning user for a scoped API key, a synthetic machine
- * principal for a legacy project key that carries none — is the process's
- * decision and arrives as `actorForCredential`.
+ * Public REST API for managing AI Gateway resources (SDKs, CLIs, CI), paralleling the virtualKeys/gatewayBudgets/gatewayUsage tRPC routers. Auth: project API key or scoped API key. One implementation of every write rule — handlers call the SAME GatewayApp operations tRPC mutations call, so the two doors can't drift; handlers only translate wire casing and map TRPCError onto HTTP. Writes are audited to AuditLog (gateway shape); which actor a credential writes as is the process's decision, arriving as actorForCredential.
  */
 
 import { apiKeyPermission } from "@langwatch/api";
@@ -223,12 +208,7 @@ const spendSummaryDtoSchema = z.object({
 });
 
 /**
- * The spend window, in epoch milliseconds.
- *
- * This route used to take ISO-8601 strings while every other spend endpoint
- * took epoch-ms integers, so one reconciliation script had to hold two time
- * formats for the same concept. The echoed `window` is in the same unit as the
- * input, so a caller can feed a response straight back as the next request.
+ * Spend window, in epoch milliseconds — this route used to take ISO-8601 while every other spend endpoint took epoch-ms, forcing one reconciliation script to hold two time formats for the same concept. Echoed window matches the input unit so a caller can feed a response straight back as the next request.
  */
 const vkSpendWindowSchema = z.object({
   from: z.coerce.number().int().positive().safe().optional(),
@@ -284,11 +264,7 @@ const nextCursorSchema = z
 // ── Request wire schemas ────────────────────────────────────────────────
 
 /**
- * The page controls every unbounded list takes, matching /spend-events.
- *
- * `cursor` is opaque and passed back verbatim. A present-but-garbled cursor is
- * a 400 rather than a silent restart from the first row, which would re-serve
- * everything the caller already has.
+ * Page controls every unbounded list takes, matching /spend-events. cursor is opaque, passed back verbatim; a present-but-garbled cursor is a 400 rather than a silent restart that would re-serve everything the caller already has.
  */
 const pageQuerySchema = z.object({
   cursor: z.string().max(500).optional(),
@@ -302,12 +278,7 @@ const pageQuerySchema = z.object({
 });
 
 /**
- * The `?external_id=` filter both governed lists take.
- *
- * Exact match on the caller's own id, which makes the list the lookup for a
- * resource whose LangWatch id the caller never stored. It returns a page
- * rather than a single row so one shape serves both readings, and so a caller
- * that has not yet claimed the id back gets an empty page, not a 404.
+ * The ?external_id= filter both governed lists take: exact match on the caller's own id, making the list the lookup for a resource whose LangWatch id was never stored. Returns a page, not a single row, so one shape serves both readings and an unclaimed id gets an empty page, not a 404.
  */
 const externalIdFilterSchema = z
   .string()
@@ -375,10 +346,7 @@ const scopeWireSchema = z.object({
 });
 
 /**
- * A positive USD amount on the wire: a number, or a decimal string (the
- * form that survives JSON round-trips without float drift). The string
- * branch is validated here so a malformed value answers 400 instead of
- * exploding into a Prisma Decimal parse further down.
+ * A positive USD amount on the wire: a number, or a decimal string (the form that survives JSON round-trips without float drift). The string branch is validated here so a malformed value answers 400 instead of exploding into a Prisma Decimal parse further down.
  */
 const usdAmountSchema = z
   .number()
@@ -410,11 +378,7 @@ const createVirtualKeySchema = z.object({
    */
   scopes: z.array(scopeWireSchema).min(1).optional(),
   /**
-   * Where this key's traces and costs land. NOT a scope: it grants no
-   * visibility and no operate rights on the key. Omit it and the
-   * destination is taken from the key's single project scope, or from the
-   * organization's governance project when there is nothing else to name.
-   * Either way the answer is stored on the key.
+   * Where this key's traces and costs land. NOT a scope — grants no visibility or operate rights. Omit it and the destination comes from the key's single project scope, or the org's governance project when nothing else names one; either way it's stored on the key.
    */
   trace_project_id: z.string().nullable().optional(),
   routing_policy_id: z.string().nullable().optional(),
@@ -433,10 +397,7 @@ const createVirtualKeySchema = z.object({
   /** Customer-owned bookkeeping. Never read by the gateway. */
   metadata: resourceMetadataSchema.optional(),
   /**
-   * Only "user". Product-managed purposes (langy) are provisioned by the
-   * product itself, never over the public API — a product-managed key is
-   * hidden from reads and refuses mutations, which is nothing a customer
-   * can ever want to mint.
+   * Only "user". Product-managed purposes (langy) are provisioned by the product itself, never over the public API — a product-managed key is hidden from reads and refuses mutations, nothing a customer can ever want to mint.
    */
   purpose: z.literal("user").optional(),
 });
@@ -562,13 +523,7 @@ const createBudgetSchema = z.object({
 type GatewayContext = Context<{ Variables: AppRestProjectVariables }>;
 
 /**
- * The identity this request authorizes as, plus the id audit rows record.
- *
- * Which principal a credential stands for is the process's decision — a
- * scoped API key acts as its owning user, a legacy project key carries none
- * and acts as a synthetic machine principal for its project — so the
- * application answers it and this transport only supplies the two facts it
- * holds.
+ * Identity this request authorizes as, plus the id audit rows record. Which principal a credential stands for is the process's decision (a scoped API key acts as its owning user; a legacy project key carries none and acts as a synthetic machine principal for its project) — the application answers it, this transport only supplies the two facts it holds.
  */
 function actorForRequest(
   c: GatewayContext,
@@ -581,11 +536,8 @@ function actorForRequest(
 }
 
 /**
- * Budgets and cache rules are organization-owned rows that a project
- * credential addresses by id, so every write on one reaches the whole tenant.
- * The route's declared permission resolves at the caller's OWN project; this
- * resolves the same permission at the organization the write acts on
- * (security pass 2026-09-04, finding H12).
+ * security pass 2026-09-04, finding H12
+ * Budgets and cache rules are org-owned rows a project credential addresses by id, so every write reaches the whole tenant. The route's declared permission resolves at the caller's OWN project; this resolves the same permission at the organization the write actually acts on.
  */
 async function authorizeOrganizationWide(
   c: GatewayContext,
@@ -611,10 +563,7 @@ const TRPC_HTTP_STATUS: Record<string, ContentfulStatusCode> = {
 };
 
 /**
- * Answer `error` as the canonical envelope, with this route family's status.
- *
- * One helper for every refusal a handler raises, so a code path cannot
- * hand-build a body that drifts from {@link apiErrorSchema}.
+ * Answers error as the canonical envelope with this family's status — one helper for every refusal, so a code path can't hand-build a body that drifts from {@link apiErrorSchema}.
  */
 function errorResponse(
   c: GatewayContext,
@@ -629,11 +578,7 @@ function errorResponse(
 }
 
 /**
- * Map a service-layer TRPCError onto the canonical error envelope. The
- * service messages follow the `snake_code: detail` convention, so the machine
- * code (`trace_project_required`, `group_budget_requires_clickhouse`, …)
- * survives onto the wire for SDKs to branch on. Anything that is not a
- * TRPCError is rethrown for the app-level error handler.
+ * Maps a service-layer TRPCError onto the canonical error envelope. Service messages follow snake_code: detail, so the machine code survives onto the wire for SDKs to branch on. Anything not a TRPCError is rethrown for the app-level error handler.
  */
 function trpcErrorResponse(c: GatewayContext, error: unknown): Response {
   // The service layer and the shared preconditions raise HandledErrors
@@ -709,12 +654,7 @@ function budgetFromWire(
 }
 
 /**
- * The public REST surface for the AI Gateway control plane, built against one
- * process's security and one process's gateway application.
- *
- * `gateway()` is resolved per request rather than held: mounting the family
- * must not construct a service, which is what lets the OpenAPI generator and
- * the route-registry audits build every route with no running process.
+ * Public REST surface for the AI Gateway control plane, built against one process's security and gateway application. gateway() resolves per request rather than being held — mounting the family must not construct a service, letting the OpenAPI generator and route-registry audits build every route with no running process.
  */
 export function createGatewayPlatformRestApp(options: {
   security: AppRestSecurity;
@@ -877,12 +817,11 @@ export function createGatewayPlatformRestApp(options: {
               { projectId: project.id, vkId: virtualKey.id },
               "Created virtual key via REST",
             );
-            // The secret is minted once and stored only as a hash, so a caller
-            // that loses this response has no second way to read it. That is the
-            // whole reason this route takes an idempotency key, and the reason
-            // the receipt holding this response is encrypted at rest: a replay
-            // that withheld the secret would hand back a key nobody can ever
-            // use, so the secret has to transit the receipt.
+            // Secret is minted once and stored only as a hash, so a caller
+            // losing this response has no second way to read it — the whole
+            // reason this route takes an idempotency key, and the receipt
+            // holding this response is encrypted at rest, since a replay that
+            // withheld the secret would hand back a key nobody can ever use.
             return {
               status: 201,
               body: { virtual_key: await app.toVirtualKeySnakeDto(virtualKey), secret },

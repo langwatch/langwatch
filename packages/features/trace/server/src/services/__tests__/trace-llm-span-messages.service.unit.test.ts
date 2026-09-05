@@ -22,11 +22,10 @@ describe("TraceLlmSpanMessagesService.parseLLMSpanMessages()", () => {
 
   describe("when chat_messages typed-wrapper items omit role (CR consistency)", () => {
     // Pre-fix, the typed-wrapper branch trusted the ChatMessage type
-    // assertion and let `{content}` items through with `role` left
-    // `undefined`. The bare-array and single-object branches both
-    // default missing roles to `defaultRole` — the wrapper branch now
-    // matches them so the shape coming out is consistent regardless
-    // of which envelope carried the payload.
+    // assertion and let {content} items through with role undefined. The
+    // bare-array and single-object branches both default missing roles to
+    // defaultRole — the wrapper branch now matches, so output is consistent
+    // regardless of which envelope carried the payload.
     it("defaults missing role to defaultRole, matching the other branches", () => {
       const attrs = {
         "langwatch.input": JSON.stringify({
@@ -63,14 +62,11 @@ describe("TraceLlmSpanMessagesService.parseLLMSpanMessages()", () => {
   });
 
   describe("when output carries the single-object app.ChatMessage shape (nlpgo langwatch.output)", () => {
-    // Real-world regression caught during dogfood: nlpgo's endLLMSpan
-    // stamps langwatch.output as a JSON-encoded single app.ChatMessage
-    // ({"role":"assistant","content":"You're welcome."}) — NOT an
+    // Real-world dogfood regression: nlpgo's endLLMSpan stamps
+    // langwatch.output as a JSON-encoded single app.ChatMessage, NOT an
     // array, NOT wrapped in {type, value}. Pre-fix, every branch in
     // extractPromptStudioDataFromClickHouse missed this shape and the
-    // assistant reply was silently dropped from the playground
-    // "Open in Prompts" resume even though the trace drawer's OUTPUT
-    // panel rendered it inline.
+    // assistant reply silently dropped from the playground resume.
     it("emits the assistant reply as a chat message", () => {
       const attrs = {
         "langwatch.output": JSON.stringify({
@@ -151,12 +147,11 @@ describe("TraceLlmSpanMessagesService.parseLLMSpanMessages()", () => {
   });
 
   describe("when a recognized envelope produces zero entries (CR fallback guard)", () => {
-    // Without the `before = out.length` guard added per the major CR
-    // on TraceLlmSpanMessagesService.parseLLMSpanMessages.ts:87, these cases silently dropped the
-    // payload from the playground resume even though raw content was
-    // present on the attribute. Falling back to a single raw-content
-    // turn keeps something visible instead of pretending the LLM said
-    // nothing — visible-but-ugly beats invisible-and-lost.
+    // Without the before=out.length guard (per parseLLMSpanMessages.ts:87
+    // CR), these cases silently dropped the payload from the playground
+    // resume even though raw content was present. Falling back to a single
+    // raw-content turn keeps something visible instead of pretending the
+    // LLM said nothing — visible-but-ugly beats invisible-and-lost.
 
     it("falls back to raw content when chat_messages envelope has an empty value array", () => {
       const attrs = {

@@ -70,12 +70,11 @@ describe("ClickHouseSpanAttributeKeysFacetAdapter.buildSpanAttributeKeysFacetQue
     });
 
     it("short-circuits empty maps via the keys subcolumn, not the whole Map", () => {
-      // The empty-map check must probe `SpanAttributes.keys`, never
-      // `SpanAttributes`: `length(SpanAttributes)` makes ClickHouse
-      // materialise the entire Map (keys AND values) just to count entries,
-      // pulling the heavy values column into memory and tipping busy tenants
-      // into MEMORY_LIMIT_EXCEEDED. Reproduced against a real ClickHouse in
-      // span-attribute-keys.integration.test.ts.
+      // Empty-map check must probe SpanAttributes.keys, never SpanAttributes:
+      // length(SpanAttributes) makes ClickHouse materialise the entire Map
+      // (keys AND values) just to count entries, pulling the heavy values
+      // column into memory and risking MEMORY_LIMIT_EXCEEDED. Reproduced
+      // against real ClickHouse in span-attribute-keys.integration.test.ts.
       expect(query.sql).toMatch(/length\(SpanAttributes\.keys\)\s*>\s*0/);
       expect(query.sql).not.toMatch(/length\(SpanAttributes\)\s*>\s*0/);
     });

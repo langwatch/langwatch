@@ -1,31 +1,6 @@
 /**
- * TDD-red tests for issue #4888 — opt-in full blob resolution on the trace-detail
- * read path.
- *
- * These tests target the resolver layer (TraceOffloadResolutionService.resolveOffloadedTraces) and are written
- * BEFORE the TraceService full-flag wiring lands. They encode the AC behaviours
- * that must become green once the fix is in.
- *
- * ACs covered here:
- *   AC1 — full resolution: >64 KB span attribute byte-identical to event_log,
- *          parameterized over {langwatch.input, langwatch.output,
- *          gen_ai.input.messages, gen_ai.output.messages}, UTF-8 boundary char.
- *   AC3 — eventref resolves + reserved langwatch.reserved.* keys stripped.
- *   AC4 — no-eventref fast path: identical output, anyResolved=false, 0 CH calls.
- *   AC5 — resolution failure (BlobNotFoundError / BlobFieldNotFoundError /
- *          CH-unconfigured) degrades to preview, never throws, logger.warn called.
- *   AC6 — partial/mixed: resolved + un-resolved in same trace.
- *
- * AC2 (list path spy) and AC7 (cross-tenant) are covered in
- * trace-service-full-flag.unit.test.ts (TraceService layer).
- * AC8 is a git-diff review check — no runtime test.
- *
- * Conventions matched from resolve-offloaded-traces.unit.test.ts:
- *   - vitest, vi.mock("langwatch", ...) tracer passthrough
- *   - BDD nested describe (given / when)
- *   - Assertions grouped per behavior; single expectation per it() where practical
- *   - No "should" in test names
- *   - fakeBlobStore / makeSpan helpers consistent with sibling test file
+ * @see #4888
+ * TDD-red tests for opt-in full blob resolution on the trace-detail read path, targeting resolveOffloadedTraces, written BEFORE TraceService's full-flag wiring lands. ACs covered: AC1 full resolution (>64KB attribute byte-identical to event_log, across the four IO fields, UTF-8 boundary char); AC3 eventref resolves + reserved keys stripped; AC4 no-eventref fast path (0 CH calls); AC5 resolution failure degrades to preview, never throws, warns; AC6 partial/mixed resolution in one trace. AC2/AC7 are covered in trace-service-full-flag.unit.test.ts; AC8 is a git-diff review check.
  */
 
 import { TraceOffloadResolutionService } from "../trace-offload-resolution.service";
@@ -160,16 +135,7 @@ function makeLargeValue(byteCount: number = LARGE_BYTE_COUNT): string {
 }
 
 /**
- * AC1 UTF-8 multibyte boundary: a string whose boundary character straddles the
- * 65536-byte split.  The preview would cut before the char, losing it; full
- * resolution returns it intact.
- *
- * We build a string where bytes 0..65533 are ASCII "a" (1 byte each) and then
- * append a 4-byte emoji (🎉 = U+1F389, 4 UTF-8 bytes) so the emoji starts at
- * byte 65534 and ends at byte 65537 — straddling the IO_PREVIEW_BYTES boundary.
- * Total: 65534 ASCII bytes + 4 emoji bytes = 65538 bytes (just over threshold).
- * A preview truncating at 65536 MUST cut mid-emoji; full resolution returns the
- * emoji intact.
+ * AC1 UTF-8 multibyte boundary: a string whose boundary character straddles the 65536-byte split — the preview would cut before the char, losing it; full resolution returns it intact. Built as 65534 ASCII bytes + a 4-byte emoji straddling byte 65534-65537 (65538 total, just over threshold), so a 65536-cut preview MUST cut mid-emoji.
  */
 const MULTIBYTE_BOUNDARY_EMOJI = "🎉"; // 4 UTF-8 bytes
 const MULTIBYTE_BOUNDARY_VALUE = "a".repeat(IO_PREVIEW_BYTES - 2) + MULTIBYTE_BOUNDARY_EMOJI;
@@ -182,10 +148,7 @@ const MULTIBYTE_BOUNDARY_VALUE = "a".repeat(IO_PREVIEW_BYTES - 2) + MULTIBYTE_BO
 // ---------------------------------------------------------------------------
 
 /**
- * AC1: full=true on a detail surface resolves a >64 KB offloaded field:
- * span attribute byte-identical to event_log.EventPayload.
- * Parameterized over {langwatch.input, langwatch.output,
- * gen_ai.input.messages, gen_ai.output.messages}.
+ * AC1: full=true on a detail surface resolves a >64KB offloaded field, byte-identical to event_log.EventPayload, across {langwatch.input, langwatch.output, gen_ai.input.messages, gen_ai.output.messages}.
  */
 const IO_ATTR_KEYS = [
   "langwatch.input",

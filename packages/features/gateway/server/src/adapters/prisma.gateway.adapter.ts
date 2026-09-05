@@ -21,12 +21,7 @@ import { GatewayGuardrailService } from "../services/gateway-guardrail.service";
 import { GatewayService } from "../services/gateway.service";
 
 /**
- * Everything Gateway persistence touches, as the three private repositories
- * below declare it.
- *
- * A composed slice rather than the generated client: a process hands the one
- * it already holds and it fits, while this file — and every layer above it —
- * names no generated declaration at all.
+ * Everything Gateway persistence touches, as the three private repositories below declare it — a composed slice rather than the generated client, so a process just hands the one it already holds and this file (and every layer above it) names no generated declaration at all.
  */
 export type GatewayPersistence = GatewayBudgetDatabase &
   GatewayCacheRuleDatabase &

@@ -1,36 +1,5 @@
 /**
- * Claude Code span content enrichment (PURE core).
- *
- * Claude Code's real OTLP `llm_request` spans carry tokens / model /
- * `request_id` but NO message content — the content lives in separate OTLP LOG
- * records (`api_request_body`, `api_response_body`, `user_prompt`,
- * `assistant_response`). This module joins the two: given a trace's real
- * `llm_request` spans and its content log records, it computes the
- * `input` / `output` {@link SpanInputOutput} to attach to each span so the
- * legacy trace/span API can return whole spans (exports + evals depend on
- * `Span.input` / `Span.output`).
- *
- * Join rules
- * ----------
- * - Output (exact): each `llm_request` span carries the model call's
- *   `request_id`. The matching `api_response_body` / `assistant_response` log
- *   carries the same `request_id`, so output is joined exactly. The assistant
- *   text is pulled with {@link extractAssistantOutputFromResponseBody} (which
- *   keeps `tool_use` markers so a tool-deciding turn still shows what it did),
- *   or taken from the `assistant_response` body directly.
- * - Input (positional): `api_request_body` / `user_prompt` carry NO
- *   `request_id`. A single agent's model calls are sequential, so within one
- *   `query_source` the Nth request body pairs with the Nth span (both in call
- *   order — spans by their given array order, logs by `timeUnixMs`). The parsed
- *   multi-turn messages from {@link buildInputMessagesFromRequestBody} are
- *   preferred; when the request body is absent or truncated (claude caps large
- *   bodies inline, breaking JSON), the `user_prompt` text is the fallback.
- *
- * This function is PURE — no IO, no DB. The caller (TraceService / read path)
- * adapts either a `Span` or a `NormalizedSpan` into the normalized
- * {@link ClaudeSpanRef} / {@link ClaudeContentLog} shapes below, so this core
- * never hardcodes which attribute keys the caller reads. It is idempotent and a
- * no-op (empty map) when there are no claude content logs.
+ * Claude Code span content enrichment (PURE core). Real OTLP llm_request spans carry tokens/model/request_id but no content, which lives in separate OTLP LOG records (api_request_body, api_response_body, user_prompt, assistant_response). Joins the two: given real llm_request spans + content log records, computes input/output to attach to each span. Output (exact): joined by request_id, text pulled via extractAssistantOutputFromResponseBody (keeps tool_use markers) or the assistant_response body directly. Input (positional): request bodies/prompts carry no request_id, so within one query_source the Nth request body pairs with the Nth span (both in call order); parsed multi-turn messages preferred, user_prompt text is the fallback when the body is absent/truncated. PURE — no IO/DB; the caller adapts a Span/NormalizedSpan into the normalized ClaudeSpanRef/ClaudeContentLog shapes, so this core never hardcodes attribute keys. Idempotent, no-op when there are no claude content logs.
  */
 import { capPayloadString } from "@langwatch/trace-server";
 import type { ChatMessage, SpanInputOutput } from "@langwatch/trace-contract";
@@ -53,17 +22,11 @@ export interface ClaudeContentLog {
    */
   body: string | null;
   /**
-   * The assistant's reply text, parsed out of the raw response body ONCE at
-   * ingest (`deriveLogContentAttributes`) so reads don't re-parse a 60 KB blob.
-   * Text only — it carries no `tool_use` markers, hence
-   * {@link derivedToolCallCount} below.
+   * Assistant's reply text, parsed out of the raw response body ONCE at ingest (deriveLogContentAttributes) so reads don't re-parse a 60 KB blob. Text only — no tool_use markers, hence {@link derivedToolCallCount} below.
    */
   derivedOutputText?: string | null;
   /**
-   * How many tools that response asked for, also derived at ingest. When it is
-   * greater than zero the derived TEXT alone would lose the tool calls, so the
-   * read falls back to the full parse. Zero means the text is the whole reply
-   * and the shortcut is safe.
+   * How many tools that response asked for, also derived at ingest. Greater than zero means the derived TEXT alone would lose the tool calls, so the read falls back to the full parse; zero means the text is the whole reply and the shortcut is safe.
    */
   derivedToolCallCount?: number | null;
 }
@@ -89,13 +52,7 @@ const USER_PROMPT_EVENT = "user_prompt";
 const ASSISTANT_RESPONSE_EVENT = "assistant_response";
 
 /**
- * Grouping key for logs / spans whose `query_source` is null (older claude
- * builds and other emitters don't stamp the field). Null-sourced spans pair
- * only with null-sourced logs, never leaking across a named source's group.
- * The NUL prefix keeps the key uncollidable with any real `query_source`
- * value; it MUST stay written as the `\u0000` escape, never a raw NUL byte,
- * which makes git treat this whole source file as binary (no diffs
- * rendered, grep and lint tooling silently skip it).
+ * Grouping key for logs/spans whose query_source is null (older builds/other emitters don't stamp it). Null-sourced spans pair only with null-sourced logs, never leaking across a named source's group. The NUL prefix keeps the key uncollidable with any real query_source — MUST stay the \u0000 escape, never a raw NUL byte, which makes git treat this file as binary.
  */
 const NULL_QUERY_SOURCE_KEY = "\u0000__null_query_source__";
 
@@ -104,10 +61,7 @@ type ChatRole = (typeof CHAT_ROLES)[number];
 const CHAT_ROLE_SET: ReadonlySet<string> = new Set(CHAT_ROLES);
 
 /**
- * Index output content by `request_id`. `api_response_body` (parsed) takes
- * precedence over `assistant_response` (raw text) for the same request id, and
- * the first log of each kind wins. Bodies are bounded by `capPayloadString`
- * (the response-body extractor caps internally; the raw text is capped here).
+ * Indexes output content by request_id. api_response_body (parsed) takes precedence over assistant_response (raw text) for the same id; first log of each kind wins. Bodies are bounded by capPayloadString (response-body extractor caps internally; raw text capped here).
  */
 function buildOutputIndex(
   logs: ClaudeContentLog[],
@@ -166,23 +120,7 @@ function buildOutputIndex(
 }
 
 /**
- * Index input content by `spanId` via positional pairing within each
- * `query_source`: the Nth span (call order) pairs with the Nth `api_request_body`
- * (time order). The parsed messages are preferred; a truncated/absent body falls
- * back to the turn's `user_prompt` text.
- *
- * Residual limitation (accepted): the pairing is positional, not id-keyed —
- * `api_request_body` / `user_prompt` carry NO `request_id`, so there is nothing
- * to join on. It holds because ONE agent's model calls are sequential within its
- * `query_source`, so the Nth span and Nth body are the same turn. Two CONCURRENT
- * sub-agents that share a `query_source` (e.g. two parallel Task tools both
- * emitting under `repl_main_thread`) break the invariant: their spans and bodies
- * interleave in one group by time, so span index i can pair with the other
- * agent's body i. Output stays correct (joined exactly by `request_id`); only
- * the input transcript can be mis-attributed. Real Claude Code sub-agents
- * carry distinct `query_source`s (each isolates into its own group above), so
- * this only bites a same-source concurrent emitter — narrow and content-only,
- * hence accepted rather than solved with per-turn correlation.
+ * Indexes input content by spanId via positional pairing within each query_source: the Nth span (call order) pairs with the Nth api_request_body (time order), preferring parsed messages, falling back to user_prompt text when the body is truncated/absent. Residual limitation (accepted): pairing is positional, not id-keyed, since neither body nor prompt carries request_id — holds because one agent's calls are sequential within its query_source, but TWO CONCURRENT sub-agents sharing a query_source interleave in one group by time, so span i can pair with the other agent's body i. Output stays correct (exact request_id join); only input transcript can mis-attribute. Real sub-agents carry distinct query_sources, so this only bites a same-source concurrent emitter — narrow and content-only, accepted rather than solved with per-turn correlation.
  */
 function buildInputIndex({
   spans,
@@ -196,13 +134,11 @@ function buildInputIndex({
   const bySpanId = new Map<string, SpanInputOutput>();
 
   const spansByQuerySource = groupBy(spans, (s) => querySourceKey(s.querySource));
-  // Grouping by `query_source` isolates concurrent sources from each other,
-  // but it only works while BOTH sides carry the field. Claude Code 2.1.x
-  // stamps it on the log events and not on the `llm_request` span, so keying
-  // the logs by it puts every body in a group no span can reach, and every
-  // model call silently degrades to the bare `user_prompt` text: no history,
-  // no system prompt, no tool definitions. When no span declares a source
-  // there is nothing to keep apart, so the whole trace pairs as one group.
+  // Grouping by query_source isolates concurrent sources, but only while
+  // BOTH sides carry the field. Claude Code 2.1.x stamps it on log events,
+  // not on the llm_request span, so keying logs by it puts every body out
+  // of any span's reach, degrading every model call to bare user_prompt
+  // text. When no span declares a source, the whole trace pairs as one group.
   const spansDeclareQuerySource = spans.some((s) => s.querySource !== null);
   const requestBodiesByQuerySource = new Map<string, ClaudeContentLog[]>();
   const promptsByQuerySource = new Map<string, ClaudeContentLog[]>();
@@ -244,13 +180,7 @@ function buildInputIndex({
 }
 
 /**
- * Claude re-sends the identical system prompt (and tool definitions) on every
- * call of a session, so a 20-call trace repeats the same 40KB of context 20
- * times in the drawer payload. Keep the full text on the FIRST call that
- * carries each distinct system message (in span order, which the caller feeds
- * time-sorted) and replace later identical copies with a short reference, so
- * the reader still sees on every call THAT the context rode along, without
- * shipping it again.
+ * Claude re-sends the identical system prompt (+tool definitions) on every call of a session, so a 20-call trace repeats the same 40KB of context 20 times. Keeps the full text on the FIRST call carrying each distinct system message (span order, time-sorted) and replaces later identical copies with a short reference, so the reader sees on every call that context rode along, without shipping it again.
  */
 function dedupeRepeatedSystemMessages({
   spans,
@@ -365,10 +295,7 @@ function buildSpanInput({
 }
 
 /**
- * Choose the `user_prompt` text to stand in for a truncated/absent request
- * body: the latest non-empty prompt at or before the request body's time (the
- * user turn that triggered this model call), else the earliest non-empty
- * prompt. Null when no prompt carries text.
+ * Chooses the user_prompt text standing in for a truncated/absent request body: the latest non-empty prompt at or before the request body's time (the triggering user turn), else the earliest non-empty prompt. Null when no prompt carries text.
  */
 function pickPromptFallback({
   prompts,
@@ -584,10 +511,7 @@ export class ClaudeCodeSpanEnrichmentService {
   }
 
   /**
-   * Compute the input/output content to attach to each `llm_request`-style span
-   * from the trace's claude_code content logs. Returns a map keyed by `spanId`; a
-   * span appears only when it gained input or output, so an unrelated span (or a
-   * trace with no claude logs) is left untouched.
+   * Computes input/output to attach to each llm_request-style span from the trace's claude_code content logs. Returns a map keyed by spanId; a span appears only when it gained input or output, so an unrelated span (or a trace with no claude logs) is left untouched.
    */
   static computeClaudeSpanEnrichment({
     spans,
@@ -619,19 +543,7 @@ export class ClaudeCodeSpanEnrichmentService {
   }
 
   /**
-   * Compute input/output for the trace's tool spans from its tool event logs —
-   * an EXACT join by `tool_use_id` (both sides carry it), no positional risk.
-   *
-   * Input: the `tool_result`'s real `tool_input` JSON, else its derived
-   * `tool_parameters`, else the `tool_decision`'s parameters.
-   *
-   * Output: the actual result content when the trace's request bodies carry it
-   * (`contentLogs` — see {@link extractToolResultsFromRequestBody}: claude ships
-   * tool stdout only as `tool_result` blocks of the NEXT model call's request
-   * body). Without bodies (light path), a structured summary of what the
-   * telemetry does state: status, success, duration, result size, decision. A
-   * rejected tool (decision without a result — it never ran) reports
-   * `status: "rejected"`.
+   * Computes input/output for the trace's tool spans from tool event logs — an EXACT join by tool_use_id (both sides carry it, no positional risk). Input: the tool_result's real tool_input JSON, else derived tool_parameters, else the tool_decision's parameters. Output: actual result content when request bodies carry it (claude ships tool stdout only as tool_result blocks of the NEXT model call's request body); without bodies (light path), a structured summary (status, success, duration, result size, decision) — a rejected tool (decision without a result) reports status:"rejected".
    */
   static computeClaudeToolSpanEnrichment({
     spans,
@@ -692,12 +604,7 @@ export class ClaudeCodeSpanEnrichmentService {
   }
 
   /**
-   * The interaction (turn) span's OUTPUT: the last conversational assistant
-   * reply that falls inside the turn's window (+`slackMs` for the exporter
-   * flushing the reply just after the span closes). `api_response_body` beats
-   * `assistant_response` at the same timestamp (parsed body keeps `tool_use`
-   * markers); both are gated on {@link isConversationalQuerySource} so a
-   * utility reply (title generation, autosuggest) can never headline the turn.
+   * The interaction (turn) span's OUTPUT: the last conversational assistant reply falling inside the turn's window (+slackMs for the exporter flushing just after close). api_response_body beats assistant_response at the same timestamp (parsed body keeps tool_use markers); both gated on isConversationalQuerySource so a utility reply (title gen, autosuggest) can never headline the turn.
    */
   static computeClaudeInteractionOutput({
     logs,

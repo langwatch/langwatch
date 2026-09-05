@@ -1,18 +1,6 @@
 /**
  * @vitest-environment node
- *
- * Which providers a virtual key actually dispatches to, and why the ones it
- * does not were dropped — against real Postgres.
- *
- * Three rules meet in the bundle. A routing policy narrows the chain to the
- * providers it names. A key's own allowlist narrows within that set and cannot
- * widen past it. And a safety-type provider holds evaluator credentials rather
- * than a chat door, so it is never dispatchable at all. The bundle also has to
- * say which providers each of the first two rules dropped, because that is the
- * only way the gateway can name a reason instead of a bare "no provider".
- *
- * Spec: specs/ai-gateway/governance/vk-provider-access.feature
- *       specs/ai-gateway/model-provider-scoping.feature
+ * Real Postgres. Three rules narrow a key's provider bundle: routing policy, the key's own allowlist (narrows only), and safety-type providers (never dispatchable). Spec: specs/ai-gateway/governance/vk-provider-access.feature
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

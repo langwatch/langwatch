@@ -1,17 +1,6 @@
 /**
  * @vitest-environment node
- *
- * Provider credential rotation has to reach the gateway.
- *
- * Every 60 seconds the gateway revalidates a cached bundle with
- * `If-None-Match`. The token has to move when the config behind it moves, or
- * the control plane answers 304 to a bundle that is no longer current and the
- * safety net confirms stale credentials forever. This is the path that covers
- * a write which never went through a service, such as a seeding script.
- *
- * Runs against real Postgres.
- *
- * Spec: specs/ai-gateway/governance/provider-credential-rotation.feature
+ * Real Postgres. Every 60s the gateway revalidates via If-None-Match; the token must move when config moves, including writes that bypass the service. Spec: specs/ai-gateway/governance/provider-credential-rotation.feature
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

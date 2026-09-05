@@ -1,22 +1,6 @@
 /**
  * @vitest-environment node
- *
- * The settlement sweeper's read side, against real ClickHouse.
- *
- * The sweeper no longer remembers anything: a cleared wake, a wake never
- * armed, and a duplicate wake are all one behavior of this query now — a
- * request it does not select. The fold writes one ReplacingMergeTree version
- * per lifecycle transition, so a request that resolved still has its
- * superseded `admitted` version on disk, and a read that saw it would settle
- * a live request and ship a spurious `gateway.request.settled`.
- *
- * The query is cross-tenant BY DESIGN (settlement is install-wide), so the
- * usual `WHERE TenantId =` isolation is unavailable to it. Two things stand
- * in for it: every fixture carries a per-run tenant id that the assertions
- * filter on, and both windows sit in months no other spend fixture writes
- * to, so a foreign row cannot enter the window the sweep is given.
- *
- * Spec: specs/ai-gateway/billing-spend-events.feature
+ * Real ClickHouse. A cleared/never-armed/duplicate wake are all one behavior: a request the query does not select, since the fold's ReplacingMergeTree keeps a resolved request's superseded `admitted` version on disk. Cross-tenant BY DESIGN (settlement is install-wide) — fixtures use per-run tenant ids in months no other spend fixture writes to, standing in for the usual WHERE TenantId isolation. Spec: specs/ai-gateway/billing-spend-events.feature
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";

@@ -443,10 +443,10 @@ export function createCollectorRestApp(options: {
           typeof span.outputs !== "undefined"
         ) {
           //@ts-expect-error
-          if (span.outputs.length == 0) {
+          if (span.outputs.length === 0) {
             span.output = null;
             //@ts-expect-error
-          } else if (span.outputs.length == 1) {
+          } else if (span.outputs.length === 1) {
             //@ts-expect-error
             span.output = span.outputs[0];
             //@ts-expect-error
@@ -505,7 +505,7 @@ export function createCollectorRestApp(options: {
       const traceIds = Array.from(
         new Set(spans.filter((span) => span.trace_id).map((span) => span.trace_id)),
       );
-      if (traceIds[0] && (traceIds.length > 1 || traceIds[0] != traceId)) {
+      if (traceIds[0] && (traceIds.length > 1 || traceIds[0] !== traceId)) {
         logger.error({ projectId: project.id, traceId, traceIds }, "trace ids are not the same");
 
         return c.json({ message: "All spans must have the same trace id" }, 400);

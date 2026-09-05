@@ -1,21 +1,5 @@
 /**
- * The ClickHouse surface this feature uses, structurally, so the package does
- * not depend on the driver.
- *
- * `clickhouse_settings` values are scalars only. The driver's own type also
- * admits a nested map setting, and declaring that here made the real client
- * un-assignable to this port: a parameter position is contravariant, so a port
- * that accepts MORE than the driver does cannot be satisfied by the driver.
- * Nothing in this feature has ever passed a map setting — every call site
- * passes `async_insert`, `wait_for_async_insert` or `max_execution_time` — so
- * the narrow type is both correct and what makes the driver fit.
- *
- * `insert` answers `unknown` for the mirror-image reason. The driver resolves
- * an `InsertResult`, and `Promise<InsertResult>` is not assignable to
- * `Promise<void>` — the return-position void relaxation applies to a function
- * type, not through a `Promise` instantiation — so declaring `void` here made
- * the real client un-assignable again. No call site in this feature reads what
- * `insert` answers; every one of the three awaits it and discards it.
+ * The ClickHouse surface this feature uses, structurally, so the package does not depend on the driver. clickhouse_settings is scalars-only: the driver's type also admits a nested map, and declaring that here made the real client un-assignable (a parameter position is contravariant), yet nothing here ever passes a map setting. insert answers unknown for the mirror reason — Promise<InsertResult> isn't assignable to Promise<void> — and no call site reads what insert answers anyway.
  */
 export type GatewayClickHouseClient = {
   query(input: {

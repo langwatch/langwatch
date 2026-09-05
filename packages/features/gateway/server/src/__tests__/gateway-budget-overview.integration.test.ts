@@ -1,15 +1,6 @@
 /**
  * @vitest-environment node
- *
- * The budget overview against real Postgres + real ClickHouse: what a
- * member sees about the budgets that bind their key, read through the one
- * service every member-facing surface (the /me page, the CLI login
- * epilogue, and the REST mirror behind it) reads.
- *
- * The world these assertions read against lives in
- * `support/budget-overview.fixture`.
- *
- * Spec: specs/ai-gateway/budget-overview.feature
+ * Real Postgres + real ClickHouse. What a member sees about budgets binding their key, via the one service the /me page, CLI epilogue and REST mirror share. Spec: specs/ai-gateway/budget-overview.feature
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 

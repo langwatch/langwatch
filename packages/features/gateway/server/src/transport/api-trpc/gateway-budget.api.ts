@@ -1,16 +1,5 @@
 /**
- * Gateway budget administration over the process's tRPC transport.
- *
- * A budget is always organization-scoped, but the thing it constrains is one of
- * ORGANIZATION / TEAM / PROJECT / VIRTUAL_KEY / PRINCIPAL / GROUP. The screens
- * pass a scope kind plus the target id; normalising that onto `scopeType` and
- * the matching typed column is the service's job, not this transport's.
- *
- * Transport only: procedure names, input parsing, the wire DTO, and delegation
- * to the process's one budget-decision service. The two reads this surface
- * makes that are not the budget service's own — proving the organization
- * exists, and resolving provider display labels and group targets — arrive as
- * ports rather than a Prisma client, so no persistence reaches the transport.
+ * Gateway budget administration over tRPC. A budget is always org-scoped, but constrains one of ORGANIZATION/TEAM/PROJECT/VIRTUAL_KEY/PRINCIPAL/GROUP; normalising a screen's (scope kind, target id) onto scopeType + the typed column is the service's job, not this transport's. Transport only: procedure names, input parsing, wire DTO, delegation to the one budget-decision service. The two non-budget reads (org existence, provider/group label resolution) arrive as ports, not a Prisma client, so no persistence reaches the transport.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
@@ -43,12 +32,7 @@ export type GatewayBudgetTrpcContext = Readonly<{
 }>;
 
 /**
- * A process middleware chain applied to one already-parsed procedure.
- *
- * Returned rather than composed ahead of `.input()`, because tRPC appends the
- * input parser at the point it is called: a check installed before it reads
- * `input === undefined`, and every declaration here takes its scope id from the
- * validated input.
+ * A middleware chain applied to one already-parsed procedure, returned rather than composed ahead of .input() — tRPC appends the input parser at the call site, so a check installed earlier would read input === undefined; every declaration here takes its scope id from the validated input.
  */
 type ProcedureDecorator = <TProcedure>(procedure: TProcedure) => TProcedure;
 
@@ -191,10 +175,7 @@ export class GatewayBudgetTrpcApi {
       ),
 
       /**
-       * The groups a budget can target, for whoever may create budgets.
-       * `group.listAll` exposes role-binding maps and demands
-       * organization:manage; a budget creator only needs names and sizes, so
-       * this stays gated by the same permission as the create it serves.
+       * Groups a budget can target, for whoever may create budgets. group.listAll exposes role-binding maps and demands organization:manage; a budget creator only needs names and sizes, so this stays gated by the same permission as the create it serves.
        */
       groupTargets: policy("gatewayBudgets:create")(
         procedure.input(gatewayBudgetApiOrganizationInputSchema),

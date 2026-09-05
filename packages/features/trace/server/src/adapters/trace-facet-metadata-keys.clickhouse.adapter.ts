@@ -12,14 +12,7 @@ export class ClickHouseMetadataKeysFacetAdapter {
   }
 
   /**
-   * Discover query for trace metadata attribute keys: every distinct
-   * `Attributes` map key on `trace_summaries`. Mirrors
-   * `buildSpanAttributeKeysFacetQuery` shape but against the trace table —
-   * the two run independently so the sidebar can render them as separate
-   * sections without one query masking the other on failure.
-   *
-   * The actual filter side (`trace.attribute.<k>:value` / legacy
-   * `attribute.<k>:value`) is handled in `filter-to-clickhouse/ast.ts`.
+   * Discover query for trace metadata attribute keys on trace_summaries.Attributes, mirroring buildSpanAttributeKeysFacetQuery's shape but against the trace table — run independently so the sidebar renders separate sections without one query masking the other on failure. The filter side is handled in filter-to-clickhouse/ast.ts.
    */
   static buildMetadataKeysFacetQuery(ctx: FacetQueryContext): FacetQuery {
     const where = ClickHouseFacetQueryAdapter.buildTimeWhere("OccurredAt");
@@ -57,12 +50,7 @@ export class ClickHouseMetadataKeysFacetAdapter {
   }
 
   /**
-   * Metadata-scoped sibling of {@link ClickHouseMetadataKeysFacetAdapter.buildMetadataKeysFacetQuery}: forces the
-   * `metadata.` namespace onto the prefix so discovery surfaces ONLY
-   * `metadata.<name>` keys (e.g. `metadata.environment`), never bare trace
-   * attributes like `langwatch.origin` / `service.name`. Any user sub-search is
-   * still honoured by appending it after the namespace (`metadata.<search>`), so
-   * the facet's "Filter keys…" box keeps working on the stripped portion.
+   * Metadata-scoped sibling of {@link ClickHouseMetadataKeysFacetAdapter.buildMetadataKeysFacetQuery}: forces the metadata. namespace onto the prefix so discovery surfaces ONLY metadata.<name> keys, never bare trace attributes. A user sub-search is still honoured by appending it after the namespace.
    */
   static buildTraceMetadataKeysFacetQuery(ctx: FacetQueryContext): FacetQuery {
     return ClickHouseMetadataKeysFacetAdapter.buildMetadataKeysFacetQuery({

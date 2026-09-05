@@ -17,17 +17,7 @@ interface MemoEntry {
 }
 
 /**
- * A trace's span events, read once per fold version.
- *
- * The memo is the whole point. A coalesced fold batch dispatches its
- * subscribers once per event but at ONE shared final state, so an events read
- * issued per subscriber would run once per span in the backlog — the read
- * amplification that re-saturates ClickHouse during a drain. Keying on the
- * fold's `spanCount` means one read serves the whole batch and a fold that has
- * advanced re-reads.
- *
- * Without a `foldVersion` the read passes straight through: a live read with no
- * watermark is non-deterministic over time and must never be served from cache.
+ * A trace's span events, read once per fold version. The memo is the whole point: a coalesced fold batch dispatches subscribers once per event but at ONE shared final state, so a per-subscriber read would re-read once per span in the backlog — the amplification that re-saturates ClickHouse during a drain. Keying on `spanCount` means one read serves the whole batch; with no `foldVersion` the read passes straight through, since a live read with no watermark must never be served from cache.
  */
 export class TraceEventDerivationService {
   static create(options: { spans: TraceDerivationSpanReaderPort }): TraceEventDerivationService {

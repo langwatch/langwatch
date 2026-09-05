@@ -18,12 +18,7 @@ export class TraceStreamBufferService {
   }
 
   /**
-   * Buffers a Readable into a single Buffer.
-   *
-   * `maxBytes` bounds the total: once the accumulated size would exceed it, the
-   * stream is destroyed and {@link StreamTooLargeError} is thrown rather than
-   * letting an oversized object exhaust memory. Omit it only when the source is
-   * already size-bounded upstream.
+   * Buffers a Readable into a single Buffer. `maxBytes` bounds the total: once the accumulated size would exceed it, the stream is destroyed and {@link StreamTooLargeError} is thrown rather than letting an oversized object exhaust memory. Omit it only when the source is already size-bounded upstream.
    */
   static async streamToBuffer(stream: Readable, maxBytes?: number): Promise<Buffer> {
     const chunks: Buffer[] = [];

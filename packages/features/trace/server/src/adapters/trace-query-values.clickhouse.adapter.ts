@@ -6,30 +6,17 @@ export const MAX_ATTRIBUTE_KEY_LENGTH = 256;
 const ATTRIBUTE_KEY_PATTERN = /^[a-zA-Z0-9_./:-]+$/;
 
 /**
- * Trace-level attribute filter: matches `Attributes[<key>]` on `trace_summaries`.
- * Two prefixes accepted — the legacy `attribute.<key>` and the namespaced
- * `trace.attribute.<key>` form. Both translate to the same SQL. The namespaced
- * form is the preferred surface (root-prefix is unique), but old saved queries
- * keep working without a migration.
+ * Trace-level attribute filter: matches Attributes[<key>] on trace_summaries. Two prefixes accepted (legacy attribute.<key>, namespaced trace.attribute.<key>) translating to the same SQL — namespaced is preferred (unique root-prefix), but old saved queries keep working unmigrated.
  */
 export const TRACE_ATTRIBUTE_PREFIX_LEGACY = "attribute.";
 export const TRACE_ATTRIBUTE_PREFIX = "trace.attribute.";
 /**
- * Prefix for event-attribute filtering. Drills into per-event
- * `Events.Attributes` maps via a span-level subquery (event attributes live
- * on spans, not on the trace summary). `event.attribute.<key>` is the
- * canonical surface; `event.<key>` is kept as an alias so old saved queries
- * still work, distinguishing it from the bare `event:<name>` filter that
- * matches `Events.Name`.
+ * Prefix for event-attribute filtering: drills into per-event Events.Attributes via a span-level subquery (event attributes live on spans, not the trace summary). event.attribute.<key> is canonical; event.<key> is a back-compat alias, distinct from the bare event:<name> filter matching Events.Name.
  */
 export const EVENT_ATTRIBUTE_PREFIX_LEGACY = "event.";
 export const EVENT_ATTRIBUTE_PREFIX = "event.attribute.";
 /**
- * Prefix for span-level attribute filtering: `span.attribute.<key>:value`.
- * Drills into `stored_spans.SpanAttributes` via a partition-pruned
- * `arrayExists`/map-lookup subquery — the trace summary doesn't carry
- * arbitrary span attrs, but the per-span row does. Same shape as the
- * event-attribute filter.
+ * Prefix for span-level attribute filtering: span.attribute.<key>:value, drilling into stored_spans.SpanAttributes via a partition-pruned arrayExists/map-lookup subquery — the trace summary doesn't carry arbitrary span attrs, the per-span row does. Same shape as the event-attribute filter.
  */
 export const SPAN_ATTRIBUTE_PREFIX = "span.attribute.";
 
@@ -38,13 +25,7 @@ export const SPAN_ATTRIBUTE_PREFIX = "span.attribute.";
 // ---------------------------------------------------------------------------
 
 /**
- * Values and parameters on their way into a ClickHouse trace query.
- *
- * The leaf of the query translator: nothing here knows about fields, tables or
- * filters, only about turning a caller's value into something safe to bind.
- * Two of these are the reason it is a layer at all — `nextParam` mints the
- * placeholder names so a value is never interpolated into SQL, and
- * `validateValueLength` and `validateAttributeKey` refuse before that happens.
+ * Values and parameters on their way into a CH trace query — the leaf of the translator, knowing nothing about fields/tables/filters, only how to make a value safe to bind. nextParam mints placeholder names so a value is never interpolated into SQL; validateValueLength/validateAttributeKey refuse before that happens.
  */
 export class TraceQueryValuesAdapter {
   static create(): TraceQueryValuesAdapter {
@@ -78,11 +59,7 @@ export class TraceQueryValuesAdapter {
   }
 
   /**
-   * Generate a unique parameter name for the ClickHouse SDK to bind. Pass a
-   * semantic `base` (e.g. `"traceId"`) so the resulting query reads naturally —
-   * `WHERE TraceId = {traceId_0:String}` instead of `{f0:String}`. The trailing
-   * counter keeps names unique when the same field appears multiple times in
-   * one query.
+   * Unique parameter name for the CH SDK to bind. Pass a semantic base ("traceId") so the query reads naturally (WHERE TraceId = {traceId_0:String}, not {f0:String}); the trailing counter keeps names unique when a field repeats in one query.
    */
   static nextParam(ctx: TranslationContext, base = "f"): string {
     const name = `${base}${base === "f" ? "" : "_"}${ctx.paramCounter}`;
@@ -117,15 +94,7 @@ export class TraceQueryValuesAdapter {
   }
 
   /**
-   * Own-property read of an attribute map, mirroring ClickHouse's
-   * `Attributes[<key>]` — own keys only, `''` when the key is absent.
-   *
-   * Filter keys are user-supplied, so a bare `attrs[key]` resolves `constructor`
-   * / `toString` / `__proto__` off `Object.prototype` and hands back a function
-   * (or the prototype object) that ClickHouse would never produce. That is not
-   * cosmetic: `has:attribute.constructor` read `(attrs[key] ?? "") !== ""` as
-   * `true` on every trace while the compiled `Attributes['constructor'] != ''`
-   * matched none of them.
+   * Own-property read of an attribute map, mirroring CH's Attributes[<key>] (own keys only, '' when absent). Filter keys are user-supplied, so a bare attrs[key] would resolve constructor/toString/__proto__ off Object.prototype — not cosmetic: has:attribute.constructor read (attrs[key]??"")!=="" as true on every trace while the compiled Attributes['constructor']!='' matched none.
    */
   static readAttribute(attrs: Record<string, string>, key: string): string {
     return Object.hasOwn(attrs, key) ? (attrs[key] ?? "") : "";
@@ -145,10 +114,7 @@ export class TraceQueryValuesAdapter {
   }
 
   /**
-   * Parses a JSON-encoded string array stored on `Attributes` (`langwatch.labels`
-   * / `langwatch.prompt_ids`), mirroring the trigger matcher's `parseJsonArray`.
-   * `JSON.parse` already strips the surrounding quotes the SQL side trims with
-   * `trim(BOTH '"' FROM …)`. Returns `null` for absent/malformed values.
+   * Parses a JSON-encoded string array on Attributes (langwatch.labels/prompt_ids), mirroring the trigger matcher's parseJsonArray. JSON.parse already strips the quotes the SQL side trims with trim(BOTH '"' FROM …). Returns null for absent/malformed values.
    */
   static parseJsonStringArray(raw: string | undefined): string[] | null {
     if (!raw) return null;

@@ -3,15 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { PrismaGatewayBudgetResolutionRepository } from "../prisma.gateway-budget-resolution.repository";
 
 /**
- * The team a request belongs to used to be read only from where its traces
- * land, which for a key that is not scoped to exactly one project is the
- * organization's governance project. A team-scoped key therefore reported
- * the governance team, and a budget on the team that owns the key matched
- * nothing.
- *
- * These assert on the query the resolver builds rather than on what the
- * stub echoes back, because the whole defect was an OR clause that never
- * named the team, not a row that failed to come back.
+ * A team-scoped key's team used to be read only from where its traces land (the org's governance project for a multi-project key), so it reported the governance team and a budget on the key's own team matched nothing. Asserts on the query the resolver BUILDS, not on what the stub echoes back — the defect was an OR clause never naming the team, not a row failing to come back.
  */
 function prismaStub({ teamScopeIds }: { teamScopeIds: string[] }) {
   const findMany = vi.fn().mockResolvedValue([]);
@@ -31,10 +23,7 @@ function prismaStub({ teamScopeIds }: { teamScopeIds: string[] }) {
 }
 
 /**
- * Every TEAM clause in the built query, not just the first. A second clause
- * would widen what the budget matches without any of these assertions
- * noticing, and an empty `{ in: [] }` matches nothing while reading as a
- * clause that is present.
+ * Every TEAM clause in the built query, not just the first — a second clause would widen the match unnoticed, and an empty `{ in: [] }` matches nothing while reading as present.
  */
 function teamClauses(findMany: ReturnType<typeof vi.fn>): unknown[] {
   const ors = findMany.mock.calls[0]?.[0]?.where?.OR ?? [];

@@ -1,18 +1,6 @@
 /**
  * @vitest-environment node
- *
- * The traces-with-spans memory-limit fallback must not exhaust the heap.
- *
- * On OOM the read is retried in batches of 25 and every batch merged into one
- * map, which bounds ClickHouse's peak memory and not ours — the same full
- * result set is rebuilt on this side of the socket. A 980-trace read did that
- * on every worker at once and produced 50 V8 heap deaths over six days.
- *
- * The read has already failed in ClickHouse before the fallback runs, so
- * refusing it costs the caller nothing it had; what it buys is that the failure
- * stays inside one job instead of taking the process.
- *
- * Spec: specs/clickhouse/bounded-reads.feature
+ * The traces-with-spans memory-limit fallback must not exhaust the heap. On OOM the read retries in batches of 25, merged into one map — bounds ClickHouse's peak memory, not ours, since the full result set is rebuilt on this side of the socket (a 980-trace read did that on every worker at once, causing 50 V8 heap deaths over six days). The CH read already failed before the fallback runs, so refusing costs nothing extra, but keeps the failure inside one job instead of taking the process. Spec: specs/clickhouse/bounded-reads.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
@@ -20,12 +8,7 @@ import { TraceCanonicalisationService } from "@langwatch/trace-server";
 const mockClickHouseQuery = vi.hoisted(() => vi.fn());
 
 /**
- * The process's tenant-keyed connection, as this suite supplies it.
- *
- * It arrives as a CONSTRUCTOR argument now. The suite used to mock the
- * platform application's singleton and let the repository reach for it; the
- * repository takes the resolver instead, so the fake is stated where every
- * other dependency of the read is.
+ * The process's tenant-keyed connection, as this suite supplies it — arrives as a CONSTRUCTOR argument now. The suite used to mock the platform application's singleton; the repository takes the resolver instead, so the fake sits where every other dependency of the read does.
  */
 const testResolveClickHouseClient = () => Promise.resolve({ query: mockClickHouseQuery } as never);
 
@@ -92,16 +75,7 @@ function spanRow({ traceId, spanIndex }: { traceId: string; spanIndex: number })
 }
 
 /**
- * Refuses the first whole-list span read for memory — which is what triggers
- * the fallback — then serves each batched retry with `spansPerTrace` rows per
- * requested trace. Trace ids ride in query_params, not the SQL text.
- *
- * `max_result_rows` is honoured the way the server honours it, because that is
- * the behaviour under test: the fallback's whole point is that an over-budget
- * batch is refused BEFORE its rows are decoded, and a mock that hands back
- * every row regardless cannot tell that apart from a cap checked afterwards.
- * `spanRowsServed` records what actually crossed the socket, so a test can
- * assert the heap never saw the rows.
+ * Refuses the first whole-list span read for memory (triggering the fallback), then serves each batched retry with spansPerTrace rows per trace; trace ids ride in query_params, not SQL text. max_result_rows is honoured the way the server honours it — a mock returning every row regardless couldn't distinguish a pre-decode refusal from a post-decode cap. spanRowsServed records what actually crossed the socket, so a test can assert the heap never saw the rows.
  */
 function clickHouseThatOOMsThenBatches({ spansPerTrace }: { spansPerTrace: number }) {
   let refusedOnce = false;

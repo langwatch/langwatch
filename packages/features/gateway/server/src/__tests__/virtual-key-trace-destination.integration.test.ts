@@ -26,7 +26,6 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { GatewayVirtualKeyDtoAdapter } from "../adapters/gateway-virtual-key-dto.adapter";
-import { VirtualKeyService } from "../services/virtual-key.service";
 import { TraceDestinationProjectService } from "./support/trace-destination-project-service";
 
 import { createVirtualKeyServiceForTest } from "../testing";

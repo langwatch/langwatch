@@ -11,24 +11,7 @@ import { GatewaySpendRatingPort } from "../ports/gateway-spend-rating.port";
 import type { SpendUsage } from "../processes/gateway-spend-commands.process";
 
 /**
- * Rating for the gateway spend pipeline: quantities in, integer nano-USD out.
- *
- * Money discipline (spend-command spine): integers only, and the request's
- * cost is quantized to nano-USD exactly once, here. Token counts are exact
- * integers; the per-token registry rates are applied through the same
- * `estimateCost` cascade the trace pipeline prices with (so a request never
- * prices differently in billing than in observability), and the resulting
- * USD figure is rounded to integer nano-USD (1e-9). Downstream sums stay in
- * integers; the single further rounding belongs to the customer's invoice.
- *
- * float64 is exact for integers to 2^53 (~$9e6 in nano-USD would need one
- * request to cost $9.2M before precision entered the picture), so a JS
- * number carries the value losslessly into ClickHouse's Int64 column.
- *
- * Rating is deterministic per (model, quantities, rate_version): a replay
- * re-rates to the identical value unless the registry changed, and then the
- * changed `rate_version` stamp says so. That is what makes re-rating a
- * projection rebuild instead of a correction event stream.
+ * Rating for the gateway spend pipeline: quantities in, integer nano-USD out, quantized exactly once here via the same estimateCost cascade the trace pipeline prices with. float64 is exact for integers to 2^53, so a JS number carries losslessly into ClickHouse's Int64. Rating is deterministic per (model, quantities, rate_version): a replay re-rates identically unless the registry changed, which is what makes re-rating a projection rebuild rather than a correction event stream.
  */
 
 export const NANO_USD_PER_USD = 1_000_000_000;
@@ -59,13 +42,7 @@ export const UNPRICED_QUANTITIES_CODE = "spend_rating.unpriced_quantities";
 export const NO_RATE_RULE_CODE = "spend_rating.no_rate_rule";
 
 /**
- * Whether the rule prices anything at all.
- *
- * A rule whose every rate is zero is a deliberately free or bundled model, the
- * shape the codex entries take because that usage counts against the caller's
- * own subscription. Charging nothing is the right answer there, so it is not a
- * catalog fault and never warns. A rule that prices SOMETHING but nothing this
- * request reported is the fault worth stating.
+ * A rule whose every rate is zero is a deliberately free/bundled model (e.g. codex entries billed via the caller's own subscription) — charging nothing is correct there, not a catalog fault. A rule that prices SOMETHING but nothing this request reported IS the fault worth stating.
  */
 function pricesAnything(rule: ModelCostRate): boolean {
   return [
@@ -84,19 +61,7 @@ function pricesAnything(rule: ModelCostRate): boolean {
 }
 
 /**
- * States, once per request, that the catalog could not price it.
- *
- * Two faults reach this point and only the first was ever visible. A model
- * with no entry at all was warned about. A model WITH an entry that prices
- * none of the quantities the request reported was not: the gpt-4o transcribe
- * pair carried a per-second rate while the provider reports tokens and no
- * duration, so every call multiplied that rate by zero seconds and settled at
- * $0 with real usage on the row, indistinguishable from a free request. Both
- * faults are only visible here, where quantities meet rates.
- *
- * A request that measured nothing is not a fault of either kind, so a rule
- * that prices it at zero says nothing. An unknown model still warns even then,
- * because the catalog gap is worth knowing about before a call carries usage.
+ * States once per request that pricing failed. Two faults land here: an unknown model (warned elsewhere) and a model whose entry prices none of the reported quantities (e.g. gpt-4o transcribe priced per-second while the provider reports tokens, settling at $0 indistinguishable from free) — only visible where quantities meet rates. A request that measured nothing is not a fault; an unknown model still warns.
  */
 function warnUnpriced({
   model,
@@ -127,14 +92,7 @@ function warnUnpriced({
 }
 
 /**
- * The vertical's ONE rating seam, over the static model-cost catalog.
- *
- * A class satisfying {@link GatewaySpendRatingPort} rather than a bare
- * function, because the port is what the voice settlement and the data plane's
- * own drainer both take: two rating implementations would price the same call
- * twice and give a customer two answers for what it cost. The arithmetic is
- * {@link rateSpendNanoUsd}, unchanged, so a replay re-rates to the identical
- * value unless the catalog moved — and then the `rate_version` stamp says so.
+ * The vertical's ONE rating seam over the static catalog: a class satisfying {@link GatewaySpendRatingPort}, not a bare function, since voice settlement and the data plane's drainer both take the same port — two implementations would price one call twice. Arithmetic is {@link rateSpendNanoUsd}, unchanged, so a replay re-rates identically unless the catalog moved.
  */
 export class ModelCatalogGatewaySpendRatingAdapter extends GatewaySpendRatingPort {
   static create(): ModelCatalogGatewaySpendRatingAdapter {

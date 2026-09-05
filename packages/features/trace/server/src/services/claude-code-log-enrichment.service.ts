@@ -1,25 +1,5 @@
 /**
- * Read-time Claude Code log→span content enrichment.
- *
- * Claude Code's real OTLP `llm_request` spans carry tokens / `request_id` but NO
- * message content. That lives only in the trace's OTLP LOG records
- * (`user_prompt` / `assistant_response` on the LIGHT path; `api_*_body` when
- * `OTEL_LOG_RAW_API_BODIES=1`), so every read path that wants whole spans (the
- * traces-v2 drawer, the legacy trace/span API, exports, evals) must join the
- * two server-side.
- *
- * Cost is NOT joined here. It is computed from the span's own tokens at ingest
- * and stored alongside every other cost in the product, so the drawer header,
- * the analytics graphs and the terminal footer are all reading one number
- * rather than two that can drift apart.
- *
- * This module adapts the stored log rows and the legacy {@link Span} shape into
- * the pure {@link ClaudeCodeSpanEnrichmentService.computeClaudeSpanEnrichment} join, then attaches the (already
- * capped) `input` / `output` back onto the spans.
- *
- * {@link ClaudeCodeLogEnrichmentService.enrichSpansWithClaudeLogContent} is pure (no IO); the caller supplies
- * the log rows. {@link ClaudeCodeLogEnrichmentService.enrichCodingAgentSpansFromLogs} is the IO wrapper both
- * read paths call: it gates, reads the logs, and never fails the read.
+ * Read-time Claude Code log->span content enrichment. Real OTLP llm_request spans carry tokens/request_id but no message content, which lives only in OTLP LOG records (user_prompt/assistant_response on the LIGHT path; api_*_body when OTEL_LOG_RAW_API_BODIES=1) — every read path wanting whole spans must join the two server-side. Cost is NOT joined here; it's computed from the span's own tokens at ingest and stored once, so header/analytics/footer all read one number. Adapts stored log rows + the legacy Span shape into computeClaudeSpanEnrichment's pure join, then attaches the (already-capped) input/output back onto spans. enrichSpansWithClaudeLogContent is pure; enrichCodingAgentSpansFromLogs is the IO wrapper both read paths call (gates, reads logs, never fails the read).
  */
 import { ClaudeCodeSpanEnrichmentService } from "./claude-code-span-enrichment.service";
 import type { Logger } from "@langwatch/observability";
@@ -37,13 +17,7 @@ import { DERIVED_ATTRS } from "./trace-log-content-derivation.service";
 import type { SpanSummaryRow } from "@langwatch/trace-contract";
 
 /**
- * The trace-log read this join issues for itself, and the row it answers with.
- *
- * Taken off the trace application rather than off this process's storage
- * service, because `getApp().traces.logRecords` is what both read paths hand
- * in and what the packaged traces-v2 transport declares its port with. The
- * storage service still satisfies it: the read row is the stored row without
- * the `traceId` this join never looks at.
+ * The trace-log read this join issues for itself, and the row it answers with. Taken off the trace application, not this process's storage service — getApp().traces.logRecords is what both read paths hand in and what the packaged traces-v2 transport declares its port with. The storage service still satisfies it: the read row is the stored row minus the traceId this join never looks at.
  */
 export type TraceLogRecordReader = TraceApp["logRecords"];
 type TraceLogRecordReadRow = Awaited<ReturnType<TraceLogRecordReader["getLogsByTraceId"]>>[number];
@@ -56,10 +30,7 @@ type TraceLogRecordReadRow = Awaited<ReturnType<TraceLogRecordReader["getLogsByT
 export const CODING_AGENT_ORIGIN = "coding_agent";
 
 /**
- * OTLP log attribute keys the metadata (non-content) attributes carry — all
- * string-valued in ClickHouse. The CONTENT keys live in
- * `coding-agent-log-content.ts`, which the API's redaction reads from the same
- * table, so a key surfaced here can never be one the gate does not know.
+ * OTLP log attribute keys the metadata (non-content) attributes carry — all string-valued in ClickHouse. CONTENT keys live in coding-agent-log-content.ts, which the API's redaction reads from the same table, so a key surfaced here can never be one the gate doesn't know.
  */
 const EVENT_NAME_ATTR = "event.name";
 const REQUEST_ID_ATTR = "request_id";
@@ -158,12 +129,7 @@ export class ClaudeCodeLogEnrichmentService {
   }
 
   /**
-   * Map the trace's model-call spans to {@link ClaudeSpanRef}. Only spans that
-   * carry a `request_id` (the real `llm_request` spans) participate: they are the
-   * ones the logs join to, and restricting the set keeps the positional input
-   * pairing (Nth span ↔ Nth request body / user prompt) aligned to model calls.
-   * Sorted by start time so the positional order the pure fn relies on is the
-   * call order.
+   * Maps the trace's model-call spans to {@link ClaudeSpanRef}. Only spans carrying request_id (real llm_request spans) participate — they're what logs join to, and restricting the set keeps positional input pairing (Nth span <-> Nth request body/prompt) aligned to model calls. Sorted by start time so positional order matches call order.
    */
   static mapSpansToClaudeRefs(spans: Span[]): ClaudeSpanRef[] {
     return spans
@@ -186,10 +152,7 @@ export class ClaudeCodeLogEnrichmentService {
   }
 
   /**
-   * True when the trace has ANY span the claude log join could add content to:
-   * a model call (`request_id`), a tool call (`tool_use_id`), or the turn's
-   * interaction root. The gate every caller runs BEFORE reading logs, so a
-   * trace with nothing to enrich never touches the log store.
+   * True when the trace has ANY span the claude log join could add content to: a model call (request_id), a tool call (tool_use_id), or the turn's interaction root. The gate every caller runs BEFORE reading logs, so a trace with nothing to enrich never touches the log store.
    */
   static hasCodingAgentJoinableSpans(spans: Span[]): boolean {
     return spans.some(
@@ -201,10 +164,7 @@ export class ClaudeCodeLogEnrichmentService {
   }
 
   /**
-   * True when THIS span could gain content from the claude join — the
-   * single-span (spanDetail) twin of {@link ClaudeCodeLogEnrichmentService.hasCodingAgentJoinableSpans}. The
-   * name prefix is included so future claude_code.* span shapes at least
-   * attempt the join instead of silently skipping.
+   * True when THIS span could gain content from the claude join — the single-span (spanDetail) twin of hasCodingAgentJoinableSpans. The name prefix is included so future claude_code.* span shapes at least attempt the join instead of silently skipping.
    */
   static isCodingAgentShapedSpan(span: Span): boolean {
     return (
@@ -291,11 +251,7 @@ export class ClaudeCodeLogEnrichmentService {
   }
 
   /**
-   * Attach the joined `input` / `output` onto the trace's spans: model calls
-   * (request_id join), tool calls (tool_use_id join), and the interaction root
-   * (own attr + windowed reply). Returns a new spans array (spans are
-   * shallow-cloned only where enriched); untouched spans are returned as-is. The
-   * attribute-only interaction input applies even with zero logs.
+   * Attaches joined input/output onto the trace's spans: model calls (request_id join), tool calls (tool_use_id join), and the interaction root (own attr + windowed reply). Returns a new array (shallow-cloned only where enriched); untouched spans returned as-is. Attribute-only interaction input applies even with zero logs.
    */
   static enrichSpansWithClaudeLogContent({
     spans,
@@ -401,13 +357,7 @@ export class ClaudeCodeLogEnrichmentService {
   }
 
   /**
-   * The IO wrapper both read paths share: gate on the trace actually having
-   * Claude model-call spans, do one lazy, partition-pruned log read, and join the
-   * content + cost onto the spans.
-   *
-   * Best-effort by design — a log-read failure returns the un-enriched spans
-   * rather than failing the whole trace read, since the spans themselves (tokens,
-   * timings, tool calls) are still worth showing without their content.
+   * The IO wrapper both read paths share: gates on the trace having Claude model-call spans, does one lazy partition-pruned log read, joins content + cost onto the spans. Best-effort by design — a log-read failure returns un-enriched spans rather than failing the whole trace read, since tokens/timings/tool calls are still worth showing without content.
    */
   static async enrichCodingAgentSpansFromLogs({
     logRecords,
@@ -458,11 +408,7 @@ export class ClaudeCodeLogEnrichmentService {
   }
 
   /**
-   * Light summary rows → {@link ClaudeSpanRef}s for the single-span join: the
-   * positional input pairing needs the WHOLE trace's model-call order, which the
-   * summary read supplies without the full-span cost. Rows arrive start-time
-   * sorted from the repository; sorted again here so the invariant doesn't hang
-   * on the caller.
+   * Light summary rows -> {@link ClaudeSpanRef}s for the single-span join: positional input pairing needs the WHOLE trace's model-call order, which the summary read supplies without full-span cost. Rows arrive start-time sorted from the repository; sorted again here so the invariant doesn't depend on the caller.
    */
   static mapSummaryRowsToClaudeRefs(rows: SpanSummaryRow[]): ClaudeSpanRef[] {
     return rows
@@ -477,10 +423,7 @@ export class ClaudeCodeLogEnrichmentService {
   }
 
   /**
-   * The single-span (spanDetail) join: enrich ONE fetched span using the
-   * trace's logs plus (for model-call spans) the light summary refs that give
-   * the positional input pairing its sibling order. PURE — the tracesV2 layer
-   * owns the reads. Never overwrites a non-null field.
+   * The single-span (spanDetail) join: enriches ONE fetched span using the trace's logs plus (for model-call spans) the light summary refs giving positional pairing its sibling order. PURE — tracesV2 owns the reads. Never overwrites a non-null field.
    */
   static enrichSingleSpanWithClaudeLogContent({
     span,
@@ -507,11 +450,10 @@ export class ClaudeCodeLogEnrichmentService {
     let next = enriched!;
 
     // The bulk pass's tool join (exact, by tool_use_id) and interaction joins
-    // (own attr + windowed reply) are single-span safe. Its model-call INPUT is
-    // not: positional pairing needs the whole trace's call order, and a
-    // one-span array degenerates to "this is the group's first call" — so for
-    // model calls that input is discarded and the full-refs join below is the
-    // only input source. Output is an exact request_id join either way.
+    // are single-span safe. Its model-call INPUT is not: positional pairing
+    // needs the whole trace's call order, and a one-span array degenerates
+    // to "this is the group's first call" — discarded for model calls, the
+    // full-refs join below is the only input source. Output is exact either way.
     if (isModelCall) {
       if (next !== span && next.input !== span.input) {
         next = { ...next, input: span.input };

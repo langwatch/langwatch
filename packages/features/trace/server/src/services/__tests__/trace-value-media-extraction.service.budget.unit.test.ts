@@ -1,12 +1,7 @@
 /**
  * @vitest-environment node
- *
- * The generic value media walker's BUDGET and MARKER GATE
- * (specs/trace-processing/trace-media-blob-extraction.feature).
- *
- * A fake media store records every storeFromBytes call and returns
- * deterministic ids; the walker, the visitor dispatch, and the per-part
- * rewriting are the production code.
+ * Spec: specs/trace-processing/trace-media-blob-extraction.feature
+ * The generic value media walker's BUDGET and MARKER GATE. A fake media store records every storeFromBytes call and returns deterministic ids; the walker, visitor dispatch, and per-part rewriting are production code.
  */
 import { TraceValueMediaExtractionService } from "../trace-value-media-extraction.service";
 import { containsMediaMarkers } from "@langwatch/trace-contract";

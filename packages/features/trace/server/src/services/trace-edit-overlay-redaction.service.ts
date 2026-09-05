@@ -43,10 +43,7 @@ function deniedCategoriesFor({
 }
 
 /**
- * One corrected field as this viewer may read it, or undefined when it is
- * withheld (or was never edited). Restricted attribute rules apply to a
- * corrected `params` exactly as they do to a captured one, so a reviewer cannot
- * widen an attribute's audience by editing the span it sits on.
+ * One corrected field as this viewer may read it, or undefined when withheld (never edited, or restricted). Restricted-attribute rules apply to a corrected `params` exactly as to a captured one — a reviewer cannot widen an attribute's audience by editing the span it sits on.
  */
 function readableFieldValue({
   field,
@@ -134,10 +131,7 @@ export type TraceMetadataEdits = NonNullable<
 >;
 
 /**
- * Corrected metadata under the viewer's restrict rules. The rules are written
- * against the attribute paths the trace was ingested with, so the map is put
- * back into that spelling to be matched and read out of it again, keeping one
- * definition of which attributes are hidden.
+ * Corrected metadata under the viewer's restrict rules. The rules are written against the attribute paths the trace was ingested with, so the map is put back into that spelling to be matched and read out of it again, keeping one definition of which attributes are hidden.
  */
 function redactMetadataEdits({
   metadata,
@@ -252,19 +246,7 @@ export class TraceEditOverlayRedactionService {
   }
 
   /**
-   * The correction as this viewer is allowed to read it.
-   *
-   * A correction quotes the trace it corrects, so handing one out unfiltered
-   * would hand out captured content the privacy policy or the plan's visibility
-   * window withholds. Content edits (trace input/output, span input/output/params)
-   * drop out when the viewer may not read that category or the trace is beyond
-   * the visibility window; corrected `params` that survive still go through the
-   * restricted-attribute rules. Structural edits (renames, type changes, cleared
-   * errors, deleted spans) always stay: they say what the trace should have
-   * looked like without quoting any of it.
-   *
-   * Pure, and returns the very same patch when the viewer may read all of it, so
-   * the common case allocates nothing.
+   * The correction as this viewer is allowed to read it: content edits (trace/span input/output/params) drop out when the viewer may not read that category or the trace is beyond the visibility window, and any surviving corrected `params` still go through restricted-attribute rules; structural edits (renames, type changes, cleared errors, deleted spans) always stay since they describe shape, not content. Pure, and returns the same patch object when the viewer may read all of it.
    */
   static redactPatchForViewer({
     patch,

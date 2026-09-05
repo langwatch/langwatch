@@ -98,12 +98,7 @@ export abstract class GatewayVirtualKeysPort {
     transaction?: GatewayPersistenceTransaction,
   ): Promise<GatewayVirtualKeyRecord | null>;
   /**
-   * Just the name and prefix, for a set of keys the caller already has ids
-   * for — the usage surfaces label rows they read out of the spend ledger.
-   *
-   * Scoped to the organization even though the ids alone would find the rows:
-   * a read that can only answer within one tenant cannot be made to leak by a
-   * caller that assembled its id list somewhere unexpected.
+   * Just name and prefix, for keys the caller already has ids for (usage surfaces label ledger rows). Scoped to the organization even though ids alone would find the rows — a read answerable within only one tenant can't be made to leak by a caller's id list from somewhere unexpected.
    */
   abstract findMetaByIds(input: {
     organizationId: string;

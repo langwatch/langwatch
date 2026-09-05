@@ -1,18 +1,5 @@
 /**
- * Gateway spend, the per-request billing record, projected from the
- * gateway_spend_processing command pipeline.
- *
- * One row per gateway REQUEST at its latest lifecycle status (admitted ->
- * confirmed | failed | settled), keyed (TenantId, GatewayRequestId) on a
- * ReplacingMergeTree whose version is the fold's monotonic updatedAt. The
- * fold is the only writer; every read here is replacement-aware (FINAL)
- * because RMT dedup is eventual and these reads back reconciliation.
- *
- * Money: CostNanoUSD is integer nano-USD rated in the fold. The row's
- * `costUsd` string is derived at the read boundary for response-shape
- * stability; sums downstream should prefer the integer.
- *
- * See: migration 00067_create_gateway_spend.sql
+ * Gateway spend, the per-request billing record, projected from the gateway_spend_processing pipeline: one row per REQUEST at its latest lifecycle status, keyed (TenantId, GatewayRequestId) on a ReplacingMergeTree versioned by the fold's monotonic updatedAt — every read here is FINAL since RMT dedup is eventual. CostNanoUSD is the integer of record; costUsd is derived at the read boundary for response shape. See migration 00067_create_gateway_spend.sql.
  */
 
 import { createLogger } from "@langwatch/observability";
@@ -45,10 +32,7 @@ const spendCursors = GatewaySpendCursorAdapter.create();
 const TABLE = "gateway_spend" as const;
 
 /**
- * Deadline for one page of the rollup walk. Generous, because a reconciliation
- * over a closed month is expected to be slow and is worth waiting for; finite,
- * because the aggregation is rebuilt per page and an unbounded one would let a
- * single wide query hold a reader open for as long as it liked.
+ * Deadline for one page of the rollup walk. Generous, since a closed-month reconciliation is expected to be slow and worth waiting for; finite, since the aggregation rebuilds per page and an unbounded one would hold a reader open indefinitely.
  */
 const SUMMARIES_MAX_EXECUTION_SECONDS = 60;
 
@@ -81,10 +65,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
   }
 
   /**
-   * Fold-store writer: one ReplacingMergeTree version per apply-batch
-   * commit. Absolute state in, absolute row out; the RMT version is the
-   * fold's monotonic updatedAt, so redelivered batches that re-set the
-   * same state replace rather than duplicate.
+   * Fold-store writer: one ReplacingMergeTree version per apply-batch commit. Absolute state in, absolute row out; version is the fold's monotonic updatedAt, so a redelivered batch re-setting the same state replaces rather than duplicates.
    */
   async upsertFromFold(
     entries: Array<{
@@ -146,11 +127,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
   }
 
   /**
-   * Read-back for the fold store: the latest committed state for one
-   * request, or null. Only rows stamped with the CURRENT projection
-   * version decode; an older stamp reports a miss so the projection
-   * refolds that aggregate once from the log instead of trusting a shape
-   * it cannot fully decode.
+   * Read-back for the fold store: latest committed state for one request, or null. Only rows stamped with the CURRENT projection version decode; an older stamp reports a miss so the projection refolds that aggregate from the log instead of trusting an undecodable shape.
    */
   async tryReadForFold({
     tenantId,
@@ -312,12 +289,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
   }
 
   /**
-   * Org-wide cursor page for the reconciliation pull surface
-   * (GET /api/gateway/v1/spend-events). Ordered ASCENDING by
-   * (EventTimestamp, GatewayRequestId): EventTimestamp is the fold's
-   * replacement version, so rows written or restated late still sort AFTER
-   * an in-flight cursor and are never skipped. `from`/`to` remain
-   * OccurredAt bounds (billing periods are request-time periods).
+   * Org-wide cursor page for the reconciliation pull surface. Ordered ASCENDING by (EventTimestamp, GatewayRequestId) — EventTimestamp is the fold's replacement version, so late-restated rows sort after an in-flight cursor and are never skipped. from/to stay OccurredAt bounds (billing periods are request-time periods).
    */
   async walkSpendEvents({
     tenantIds,
@@ -378,25 +350,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
   }
 
   /**
-   * Windowed rollup for one external end user across the org's tenants
-   * (GET /api/gateway/v1/end-users/:id/spend). Sums the integer nano
-   * column; the USD string is derived once from the summed integer.
-   * Admitted/settled rows carry zero quantities and zero cost, so
-   * including them keeps requestCount honest without touching money.
-   */
-  /**
-   * Reconciliation checksum fast path: per-key rollups over the spend
-   * records, grouped by virtual key or end user. Money sums only priced
-   * outcomes (confirmed and failed); settled requests are counted
-   * SEPARATELY so unpriced spend is visible in the checksum instead of
-   * silently reading as zero cost. Admitted rows are in-flight and
-   * excluded. FINAL keeps the read replacement-aware.
-   *
-   * Paged by GROUP KEY ascending, not by cost descending. A checksum is only
-   * a checksum if it covers every key, and a cursor over a cost ordering is
-   * not walkable: the sums it orders by keep moving as late folds land, so a
-   * key can cross the page boundary between two calls and be served twice or
-   * skipped entirely. The group key is immutable, so the walk is exact.
+   * Windowed end-user rollup: sums the integer nano column, deriving the USD string once. Reconciliation checksum fast path sums only priced outcomes (confirmed/failed); settled requests are counted SEPARATELY so unpriced spend stays visible rather than reading as zero, and admitted rows are excluded. Paged by GROUP KEY ascending, not cost descending — a cost ordering keeps moving as late folds land, so a key could cross the page boundary and be served twice or skipped; the group key is immutable, so this walk is exact.
    */
   async readSpendSummaries({
     tenantIds,
@@ -480,16 +434,11 @@ export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
       `,
       query_params: params,
       format: "JSONEachRow",
-      // LIMIT bounds the rows returned, not the rows aggregated: every page of
-      // the walk rebuilds the whole group set under FINAL before discarding all
-      // but one page of it. A wide window bucketed by hour and grouped on two
-      // dimensions is therefore paid for once per page, so the walk gets a
-      // deadline instead of running for as long as the group set takes.
-      //
-      // Memory is deliberately NOT capped here: the server profile already
-      // enforces a per-query ceiling and the shared defaults spill GROUP BY
-      // state to disk, so a client-side cap could only raise the ceiling
-      // (server/clickhouse/queryDefaults.ts).
+      // LIMIT bounds rows returned, not rows aggregated: every page rebuilds
+      // the whole group set under FINAL before discarding all but one page,
+      // so the walk gets a deadline instead of running as long as the group
+      // set takes. Memory is deliberately uncapped here — the server profile
+      // already enforces a per-query ceiling (server/clickhouse/queryDefaults.ts).
       clickhouse_settings: {
         max_execution_time: SUMMARIES_MAX_EXECUTION_SECONDS,
       },
@@ -621,10 +570,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
   }
 
   /**
-   * The cursor and filter predicates of a spend-events walk, as clause fragments
-   * already carrying their leading AND plus the bound parameters they name. Each
-   * fragment is optional; an absent filter contributes neither a clause nor a
-   * parameter, so the query never binds a placeholder it does not reference.
+   * Cursor and filter predicates of a spend-events walk, as clause fragments already carrying their leading AND plus bound parameters. Each is optional; an absent filter contributes neither clause nor parameter, so the query never binds a placeholder it doesn't reference.
    */
   private static spendEventsWalkFilter({
     decoded,
@@ -688,16 +634,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
   }
 
   /**
-   * Tuple comparison over the grouping expressions: the one predicate that
-   * advances a multi-dimension walk without serving a boundary group twice.
-   *
-   * A cursor whose arity does not match the grouping names a walk over a
-   * different shape entirely, and is refused. Dropping the predicate instead
-   * would serve page one again under a fresh cursor, with nothing in the
-   * response to say the walk had reset, and a reconciliation would fold the
-   * same groups into its checksum twice. The REST boundary refuses this by
-   * comparing the two before the read, so anything reaching here is a caller
-   * bug.
+   * Tuple comparison over the grouping expressions: the one predicate advancing a multi-dimension walk without serving a boundary group twice. A cursor whose arity mismatches the grouping names a different shape and is refused — dropping the predicate instead would silently reset to page one, letting a reconciliation fold the same groups twice. The REST boundary refuses this before the read, so reaching here is a caller bug.
    */
   private static summariesWalkClause({
     cursor,
@@ -792,19 +729,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEventsPort {
   }
 
   /**
-   * The quantities a spend row carries, or null when it measured nothing.
-   *
-   * The quantity columns beyond the five token classes are read straight off
-   * the raw row rather than through {@link mapSpendEventRow}: the mapped row
-   * shapes the REST and UI surfaces, and widening it would change those
-   * response bodies. The fold needs them regardless, because a late admission
-   * folding over a confirmed request rewrites the whole row from this state,
-   * so a quantity that does not decode here is a quantity zeroed on the next
-   * write.
-   *
-   * Any measured quantity counts as usage, not the token classes alone: a
-   * character-priced call has zero tokens and 4000 characters, and reading it
-   * back as "no usage" would drop them.
+   * Quantities a spend row carries, or null if it measured nothing. Non-token columns are read straight off the raw row, not through {@link mapSpendEventRow} (which shapes REST/UI responses) — the fold needs them regardless, since a late admission folding over a confirmed request rewrites the whole row, and a quantity that doesn't decode here zeroes on the next write. Any measured quantity counts as usage, not tokens alone (e.g. a character-priced call has zero tokens and 4000 characters).
    */
   private static foldUsage(row: SpendEventRow, raw: Record<string, unknown>): SpendUsage | null {
     const quantity = (column: string): number => Number(raw[column] ?? 0);

@@ -19,11 +19,7 @@
 import { GatewaySettlementPolicyPort } from "../ports/gateway-settlement-policy.port";
 
 import { GatewaySpendGroupByUnstableError } from "@langwatch/gateway-contract";
-import {
-  SPEND_GROUP_BY_KEYS,
-  type SpendBucket,
-  type SpendGroupByKey,
-} from "../ports/gateway-spend-events.port";
+import { type SpendBucket, type SpendGroupByKey } from "../ports/gateway-spend-events.port";
 
 /**
  * The keys the fold rewrites after admission. Requested model and provider

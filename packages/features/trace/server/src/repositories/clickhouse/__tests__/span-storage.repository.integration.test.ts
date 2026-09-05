@@ -29,7 +29,6 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
-import type { SpanInsertData } from "@langwatch/trace-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -336,7 +335,7 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
      * neighbouring tenant has to say so explicitly.
      */
     function rollupRow({
-      traceId,
+      traceId: rowTraceId,
       spanId,
       events,
       overrides = {},
@@ -349,7 +348,7 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
       return makeEventRow(
         spanId,
         events.map((e) => ({ ts: e.ts, name: e.name, attrs: {} })),
-        { TenantId: rollupTenantId, TraceId: traceId, ...overrides },
+        { TenantId: rollupTenantId, TraceId: rowTraceId, ...overrides },
       );
     }
 

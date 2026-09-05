@@ -18,11 +18,7 @@ import { parsePythonInsideJson } from "@langwatch/trace-contract";
 const DROP_CATEGORY_ORDER = ["input", "output", "system", "tools"];
 
 /**
- * Reads the drop marker that `stripOtlpSpanContent` stamps on a span when a
- * `drop` privacy policy is active, listing the content categories it removed.
- * The span mapper unflattens dotted attribute keys into nested objects, so the
- * `langwatch.privacy.dropped` attribute arrives at the matching nested path
- * inside `span.params` rather than as a flat key.
+ * Reads the drop marker that `stripOtlpSpanContent` stamps on a span when a `drop` privacy policy is active, listing content categories it removed. The span mapper unflattens dotted attribute keys into nested objects, so `langwatch.privacy.dropped` arrives at the matching nested path inside `span.params` rather than as a flat key.
  */
 function readSpanDropMarker(span: Span): string[] {
   let node: unknown = span.params;
@@ -69,10 +65,7 @@ export class TraceReadRedactionService {
   }
 
   /**
-   * Extracts string values from an object for redaction purposes.
-   * When input/output is not visible, we need to collect all string values
-   * so they can be redacted from any visible fields.
-   *
+   * Extracts string values from an object for redaction: when input/output is not visible, all string values must be collected so they can be redacted from any visible fields.
    * @param object - The object to extract redaction strings from
    * @returns Array of strings that should be redacted
    */
@@ -110,9 +103,7 @@ export class TraceReadRedactionService {
 
   /**
    * Redacts sensitive values from an object.
-   *
-   * @param object - The object to redact
-   * @param redactions - Set of strings that should be replaced with [REDACTED]
+   * @param object - The object to redact; @param redactions - Set of strings to replace with [REDACTED]
    * @returns The redacted object
    */
   static redactObject<T>(object: T, redactions: Set<string>): T {
@@ -162,7 +153,6 @@ export class TraceReadRedactionService {
 
   /**
    * Extracts redaction strings from all span inputs.
-   *
    * @param spans - Array of spans to extract input redactions from
    * @returns Array of strings that should be redacted
    */
@@ -174,7 +164,6 @@ export class TraceReadRedactionService {
 
   /**
    * Extracts redaction strings from all span outputs.
-   *
    * @param spans - Array of spans to extract output redactions from
    * @returns Array of strings that should be redacted
    */
@@ -186,10 +175,7 @@ export class TraceReadRedactionService {
 
   /**
    * Applies redaction protections to a span.
-   *
-   * @param span - The span to apply protections to
-   * @param protections - The protection settings
-   * @param redactions - Set of strings to redact
+   * @param span/protections/redactions - Span to protect, protection settings, and strings to redact
    * @returns The span with protections applied
    */
   static applySpanProtections(span: Span, protections: Protections, redactions: Set<string>): Span {
@@ -293,13 +279,7 @@ export class TraceReadRedactionService {
   }
 
   /**
-   * Applies redaction protections to the v2 derived trace events (the events
-   * timeline / exceptions pane). Event attributes are captured content —
-   * exception messages quote application state — so they are blanked entirely
-   * for a viewer who cannot read content or when the event predates the plan's
-   * visibility cutoff; otherwise the restricted-attribute rules apply. Used by
-   * both the in-app `tracesV2.traceEvents` read and the shared-trace payload,
-   * so the two surfaces can never drift apart.
+   * Applies redaction protections to the v2 derived trace events (events timeline / exceptions pane). Event attributes are captured content — exception messages quote application state — so they are blanked entirely for a viewer who cannot read content or when the event predates the plan's visibility cutoff; otherwise the restricted-attribute rules apply. Used by both the in-app `tracesV2.traceEvents` read and the shared-trace payload, so the two surfaces can never drift apart.
    */
   static applyDerivedTraceEventProtections(
     events: DerivedTraceEvent[],
@@ -328,9 +308,7 @@ export class TraceReadRedactionService {
 
   /**
    * Applies redaction protections to a trace and its spans.
-   *
-   * @param trace - The trace to apply protections to
-   * @param protections - The protection settings
+   * @param trace/protections - Trace to apply protections to, and the protection settings
    * @returns The trace with protections applied
    */
   static applyTraceProtections(trace: Trace, protections: Protections): Trace {

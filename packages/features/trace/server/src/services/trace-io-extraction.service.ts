@@ -609,6 +609,37 @@ function stringifyForText(value: unknown): string | null {
  * stays array; a JSON string is parsed-and-renormalized when possible,
  * otherwise returned unchanged).
  */
+/**
+ * Attempts to unwrap a "text" content block's `text`, when it is itself a
+ * JSON-encoded typed block with a non-"text" inner `type`, into that inner
+ * block (recursively normalized). Reports no unwrap on a parse failure or an
+ * object that isn't itself a differently-typed block, so the caller keeps
+ * the text wrapper as-is.
+ */
+function tryUnwrapJsonTextBlock(
+  t: string,
+  seen: WeakSet<object>,
+): { unwrapped: true; value: unknown } | { unwrapped: false } {
+  try {
+    const inner = JSON.parse(t) as Record<string, unknown>;
+    if (
+      inner &&
+      typeof inner === "object" &&
+      typeof inner.type === "string" &&
+      inner.type !== "text"
+    ) {
+      // Recurse into the unwrapped block in case the inner shape
+      // also has nested wrappers (e.g. tool_result.content).
+      return { unwrapped: true, value: normalizeChatPayload(inner, seen) };
+    }
+
+    return { unwrapped: false };
+  } catch {
+    // not clean JSON — fall through and keep the text wrapper
+    return { unwrapped: false };
+  }
+}
+
 function normalizeChatPayload(value: unknown, seen: WeakSet<object> = new WeakSet()): unknown {
   if (typeof value === "string") {
     const trimmed = value.trim();
@@ -648,20 +679,9 @@ function normalizeChatPayload(value: unknown, seen: WeakSet<object> = new WeakSe
     if (obj.type === "text" && typeof obj.text === "string") {
       const t = obj.text.trim();
       if (t.startsWith("{") && t.endsWith("}") && t.includes('"type":"')) {
-        try {
-          const inner = JSON.parse(t) as Record<string, unknown>;
-          if (
-            inner &&
-            typeof inner === "object" &&
-            typeof inner.type === "string" &&
-            inner.type !== "text"
-          ) {
-            // Recurse into the unwrapped block in case the inner shape
-            // also has nested wrappers (e.g. tool_result.content).
-            return normalizeChatPayload(inner, seen);
-          }
-        } catch {
-          // not clean JSON — fall through and keep the text wrapper
+        const result = tryUnwrapJsonTextBlock(t, seen);
+        if (result.unwrapped) {
+          return result.value;
         }
       }
 

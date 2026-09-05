@@ -1,9 +1,6 @@
 /**
  * @vitest-environment node
- *
- * The correction row's write path. Prisma compiles an upsert on a table with a
- * second unique constraint into a SELECT followed by an INSERT, so two first
- * saves for the same trace can both decide to insert.
+ * The correction row's write path. Prisma compiles an upsert on a table with a second unique constraint into a SELECT followed by an INSERT, so two first saves for the same trace can both decide to insert.
  */
 
 import { describe, expect, it, vi } from "vitest";

@@ -1,9 +1,6 @@
 /**
  * @vitest-environment node
- *
- * The `traceEditOverlay.*` tRPC surface's authorization wiring: writing a
- * correction is annotation-update work, refused for a caller who may only
- * view the project (specs/traces-v2/trace-edit-overlay.feature).
+ * The `traceEditOverlay.*` tRPC surface's authorization wiring: writing a correction is annotation-update work, refused for a caller who may only view the project (specs/traces-v2/trace-edit-overlay.feature).
  */
 import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
@@ -52,11 +49,7 @@ function harness({ canUpdateAnnotations = true }: { canUpdateAnnotations?: boole
     restoreWithheldEdits: ({ incoming }) => incoming,
   };
 
-  const router = TraceEditOverlayTrpcApi.create(
-    trpc,
-    { protected: authenticated, policy },
-    ports,
-  );
+  const router = TraceEditOverlayTrpcApi.create(trpc, { protected: authenticated, policy }, ports);
 
   const caller = router.createCaller({
     app: { traces },

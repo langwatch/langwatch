@@ -50,7 +50,6 @@ import {
   bucketPeriodFloorMs,
   budgetPeriodFloorMs,
   currentPeriodStart,
-  bucketScopeIdFor,
   PROVIDER_BUCKET_SEPARATOR,
   nanoUsdToDecimalString,
   parseSummedNanoUsd,

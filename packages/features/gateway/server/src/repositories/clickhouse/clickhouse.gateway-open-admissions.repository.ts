@@ -11,22 +11,7 @@ import { MAX_OPEN_ADMISSIONS_PER_SWEEP } from "../../intents/gateway-spend-settl
 const TABLE_NAME = "gateway_spend" as const;
 
 /**
- * Finds every request still at `admitted` whose grace has elapsed, across
- * all tenants on one ClickHouse instance.
- *
- * Replacement-aware by the IN-tuple pattern the table's own migration
- * mandates: the fold writes one ReplacingMergeTree version per lifecycle
- * transition, so reading without collapsing to `max(EventTimestamp)` would
- * see a confirmed request's superseded `admitted` row and settle a request
- * that already resolved. Only key columns cross the subquery, so the scan
- * stays memory-bounded.
- *
- * Cross-tenant sweep BY DESIGN, so it omits the per-tenant `WHERE TenantId =`
- * filter clickhouse-queries.md mandates for tenant-scoped reads: settlement
- * is install-wide infrastructure with no single tenant to scope to. TenantId
- * is SELECTed rather than filtered, and every settle command downstream is
- * scoped to its own row's tenant — the same carve-out the stalled-run sweep
- * documents.
+ * Every request still `admitted` whose grace has elapsed, across all tenants. Replacement-aware via the IN-tuple pattern (not max(EventTimestamp)) so a confirmed request's superseded `admitted` row is never re-settled; only key columns cross the subquery, keeping the scan memory-bounded. Cross-tenant BY DESIGN, so it omits the per-tenant WHERE TenantId= filter clickhouse-queries.md otherwise mandates — settlement is install-wide, TenantId is SELECTed not filtered, and every settle command downstream re-scopes to its own row's tenant.
  */
 export class ClickHouseGatewayOpenAdmissionsRepository extends GatewayOpenAdmissionsPort {
   static create(client: GatewayClickHouseClient): ClickHouseGatewayOpenAdmissionsRepository {

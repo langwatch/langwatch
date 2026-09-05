@@ -1,18 +1,6 @@
 /**
  * @vitest-environment node
- *
- * GET /api/internal/gateway/config/:vk_id, the route the Go gateway calls on
- * every bundle cache miss, against the real family and real Postgres.
- *
- * The materialiser reads `vk.routingPolicy` off whatever the caller included,
- * so a materialiser test that does its own include cannot catch the route
- * forgetting one: the bundle just comes back with an empty alias map and empty
- * deny lists, and the gateway silently stops resolving aliases and enforcing
- * model policy. This exercises the route's own query.
- *
- * Spec: specs/ai-gateway/provider-routing.feature
- *       specs/ai-gateway/governance/routing-policy-aliases-and-rules.feature
- *       specs/ai-gateway/auth-cache.feature
+ * Real family + real Postgres. GET /api/internal/gateway/config/:vk_id: the materialiser reads vk.routingPolicy off whatever the caller included, so a materialiser test with its own include can't catch the route forgetting one (bundle comes back with empty alias map/deny lists, silently breaking policy). Spec: specs/ai-gateway/provider-routing.feature, governance/routing-policy-aliases-and-rules.feature, auth-cache.feature
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

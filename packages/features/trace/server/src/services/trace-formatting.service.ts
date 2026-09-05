@@ -2,15 +2,7 @@ import type { LLMModeTrace, Span, Trace } from "@langwatch/trace-contract";
 import { format, formatDistanceToNow } from "date-fns";
 
 /**
- * "3 minutes ago", or a date once that stops being useful.
- *
- * Stated here rather than imported: the shared helper was
- * `platform/app/src/utils/formatTimeAgo.ts`, a tree this migration only deletes
- * from, and `@langwatch/evaluator-web` already carries the same narrowing for
- * the browser. A server module may not import a browser package, so the two
- * sides state it separately. Wording and thresholds must stay identical — the
- * digest a customer reads and the list they read it beside are the same
- * sentence.
+ * "3 minutes ago", or a date once that stops being useful. Stated here rather than imported: the shared helper (`platform/app/src/utils/formatTimeAgo.ts`) is a tree this migration only deletes from, and a server module may not import the browser package (`@langwatch/evaluator-web`) that carries the same narrowing — so the two sides state it separately. Wording and thresholds must stay identical: the digest a customer reads and the list they read it beside are the same sentence.
  */
 const formatTimeAgo = (timestamp: number, dateFormat = "dd/MMM HH:mm", maxHours = 24) => {
   const timestampDate = timestamp ? new Date(timestamp) : undefined;
@@ -63,15 +55,7 @@ export class TraceFormattingService {
   }
 
   /**
-   * Generate an ASCII tree representation from a list of spans.
-   *
-   * Produces output like:
-   * ```
-   * .
-   * └── llm: chat (gpt-4)
-   *     ├── rag: retrieve
-   *     └── tool: search
-   * ```
+   * Generate an ASCII tree representation from a list of spans, e.g. `.` / `└── llm: chat (gpt-4)` / `    ├── rag: retrieve` / `    └── tool: search`.
    */
   static generateAsciiTree = (spans: Span[]): string => {
     const tree = buildTree(spans);

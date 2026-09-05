@@ -1,46 +1,7 @@
 /**
- * ElevenLabs post-call webhook.
- *
- * Surface:
- *   POST /api/elevenlabs/webhook/:modelProviderId
- *
- * Customers do not paste this URL anywhere. The documented one is on the
- * gateway, `POST /v1/convai/webhook/{model_provider_id}`, which relays the
- * raw bytes here and returns whatever this answers. A webhook has to be
- * reachable from the vendor's network, the gateway is public by design, and
- * this app is the admin surface that a self-hosted customer often keeps
- * behind a VPN. Verification stays here because the per-tenant secret is in
- * this database.
- *
- * The route is unchanged by the move. It is the relay's target, and a
- * deployment that already points ElevenLabs at it keeps working — which is
- * why the whole HMAC, its tolerance window and every acknowledgement below
- * are transcribed rather than reshaped.
- *
- * A brokered ElevenLabs conversation reports nothing over its socket. Cost
- * and duration arrive afterwards, on this webhook, and it is the only path by
- * which a voice call reaches billing (ADR-097).
- *
- * The tenant is the path parameter, verified against the provider row it
- * names. That keeps the signature check one HMAC computation instead of a
- * walk over every configured provider, and an id that names no configured
- * webhook answers 404 so the ids cannot be probed.
- *
- * Every delivery this handler can parse is acknowledged, and that is not
- * politeness. A retry is not guaranteed: ElevenLabs does not retry every
- * failed delivery, and retries are off for HIPAA workflows. The webhook is
- * also disabled once it has 10 or more consecutive failures and its last
- * success is older than 7 days or never happened, which would stop delivery
- * for every tenant on the endpoint.
- *
- * That is why this webhook is an optimisation and not the billing path. The
- * Gateway reconciliation worker asks the vendor for the same numbers
- * on a schedule, so a lost or rejected delivery costs latency rather than
- * money, and a webhook that was never registered at all still bills correctly.
- * An unmatched call is not lost either: its spend record settles as
- * cost-unknown at the grace, visibly, and a later report supersedes it.
- *
- * Spec: specs/ai-gateway/realtime-sessions.feature.
+ * @see ADR-097
+ * Spec: specs/ai-gateway/realtime-sessions.feature
+ * POST /api/elevenlabs/webhook/:modelProviderId. The gateway's public POST /v1/convai/webhook/{model_provider_id} relays raw bytes here since the per-tenant secret lives in this database (the admin surface, often VPN-only); route and HMAC are transcribed unchanged so existing ElevenLabs configs keep working. A brokered conversation reports nothing over its socket, so this is the only path to billing besides the reconciler. Tenant is the path parameter verified against its own provider row (one HMAC, not a walk; unmatched id 404s so ids can't be probed). Every parsable delivery is acknowledged — not politeness: retries aren't guaranteed (off for HIPAA) and 10+ consecutive failures disable the webhook for every tenant on the endpoint. This is why the webhook is an optimisation, not the billing path: the reconciliation worker re-asks the vendor on a schedule, so a lost delivery costs latency not money, and an unmatched call settles cost-unknown at grace, visibly, until a later report supersedes it.
  */
 
 import { publicEndpoint } from "@langwatch/api";
@@ -69,22 +30,12 @@ const WEBHOOK_PUBLIC_REASON =
   "row the path names.";
 
 /**
- * How far out of date a delivery's own timestamp may be.
- *
- * The timestamp is inside the signed payload, so an attacker cannot move it
- * without breaking the signature. Bounding it stops a captured delivery from
- * being replayed later; thirty minutes is well past any delivery retry the
- * vendor performs.
+ * How far out of date a delivery's own signed timestamp may be — bounding it (30 min, well past any vendor retry) stops a captured delivery from being replayed later; an attacker can't move it without breaking the signature.
  */
 const SIGNATURE_TOLERANCE_SECONDS = 30 * 60;
 
 /**
- * The one event type this handler acts on.
- *
- * A workspace can enable other post-call events in its ElevenLabs dashboard.
- * `post_call_audio` and `call_initiation_failure` both carry a
- * `data.conversation_id` for the same conversation and no `data.metadata`, so
- * without this check they match the open session and close it at zero.
+ * The one event type this handler acts on. post_call_audio and call_initiation_failure both carry data.conversation_id for the same conversation with no data.metadata, so without this check they'd match the open session and close it at zero.
  */
 const BILLABLE_EVENT_TYPE = "post_call_transcription";
 
@@ -126,11 +77,7 @@ const postCallSchema = z.object({
 });
 
 /**
- * Verifies the `ElevenLabs-Signature: t=<unix>,v0=<hex>` header.
- *
- * The signed payload is the timestamp, a dot, then the raw request bytes, so
- * the body must be read as text and never re-serialized: a JSON round trip
- * reorders keys and the signature stops matching.
+ * Verifies ElevenLabs-Signature: t=<unix>,v0=<hex>. Signed payload is timestamp + dot + raw request bytes, so the body must be read as text and never re-serialized — a JSON round trip reorders keys and the signature stops matching.
  */
 export function verifyElevenLabsSignature(params: {
   rawBody: string;
@@ -224,15 +171,11 @@ async function handleElevenLabsWebhook(
     return c.json({ error: "Invalid payload" }, { status: 400 });
   }
 
-  // The type must be present AND billable. An absent type is not a
-  // transcription report either: real deliveries always carry one, so a
-  // payload without it is malformed, and letting it through would match a
-  // session and settle it from fields it does not have.
-  //
-  // Acknowledged, not refused. A retry is not guaranteed, and ten consecutive
-  // failures disable the webhook, so answering non-2xx to an event this
-  // handler does not act on risks stopping delivery of the one it does act
-  // on, for every tenant sharing the endpoint.
+  // Type must be present AND billable — an absent type is malformed (real
+  // deliveries always carry one), and letting it through would settle a
+  // session from fields it doesn't have. Acknowledged, not refused: a retry
+  // isn't guaranteed, and 10 consecutive failures disable the webhook, so a
+  // non-2xx here risks stopping delivery for every tenant on the endpoint.
   if (payload.type !== BILLABLE_EVENT_TYPE) {
     return c.json({ received: true });
   }
@@ -262,12 +205,11 @@ async function applyPostCallReport(params: {
 }): Promise<void> {
   const data = params.payload.data;
 
-  // No positive duration means no quantity to confirm. A confirmed spend
-  // record of zero is one the fold never downgrades, so no later report could
-  // correct it. That covers an absent duration, a negative one, and one that
-  // rounds to zero: a call the vendor timed at under half a second is an
-  // anomaly worth seeing rather than a call that cost nothing. Returning here
-  // leaves the admission to settle as cost-unknown on its grace, visibly.
+  // No positive duration means no quantity to confirm — a confirmed spend of
+  // zero is one the fold never downgrades, so no later report could correct
+  // it. Covers absent, negative, and zero-rounding durations (a sub-half-
+  // second call is an anomaly worth seeing). Leaves the admission to settle
+  // as cost-unknown on its grace, visibly.
   const reportedSecs = data?.metadata?.call_duration_secs;
   if (
     typeof reportedSecs !== "number" ||

@@ -1324,7 +1324,7 @@ function diffGuardrailAttachments(
 function serialiseForAudit(vk: VirtualKeyWithScopes): GatewayAuditJson {
   // Strip secret material. The base serializer already handles BigInt
   // (revision) safely — see auditSerializer.ts.
-  const { hashedSecret, previousHashedSecret, ...safe } = vk;
+  const { hashedSecret: _hashedSecret, previousHashedSecret: _previousHashedSecret, ...safe } = vk;
 
   return serializeRowForAudit(safe as unknown as Record<string, unknown>);
 }

@@ -1,14 +1,7 @@
 /**
- * Whether a spending limit can actually catch any traffic.
- *
- * This is the answer behind "no active keys reach this budget" in the UI, so a
- * wrong `reachable` is a money bug in either direction: claim reachable and the
- * customer trusts a limit that never fires; claim unreachable and they go
- * looking for a problem that is not there.
- *
- * Each scope type reads a different field off the key, and crossing any two of
- * them is invisible in a single-scope test — so all seven are pinned, each
- * against a key that matches on its own field and on no other.
+ * Whether a spending limit can actually catch any traffic — a wrong
+ * `reachable` is a money bug either way. Each scope type reads a different
+ * key field; crossing any two is invisible in a single-scope test.
  */
 
 import { describe, expect, it } from "vitest";

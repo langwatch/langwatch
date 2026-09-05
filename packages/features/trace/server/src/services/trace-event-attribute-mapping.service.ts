@@ -1,10 +1,5 @@
 /**
- * Maps the `event.*` attributes of a stored_spans row into a trace Event.
- *
- * The events projection JOIN extracts only the `event.*` map entries from
- * stored_spans (mapFilter). This mapper turns one such row into the public
- * Event shape — mirroring extractEventsFromSpans (trace-summary.mapper) but
- * reading directly off the ClickHouse map rather than an unflattened span.
+ * Maps the `event.*` attributes of a stored_spans row into a trace Event. The events projection JOIN extracts only the `event.*` map entries from stored_spans (mapFilter); this mirrors extractEventsFromSpans (trace-summary.mapper) but reads directly off the ClickHouse map rather than an unflattened span.
  */
 
 import type { Event } from "@langwatch/trace-contract";

@@ -1,12 +1,5 @@
 /**
- * Materialise the payload returned from `GET /api/internal/gateway/config/:vk_id`.
- *
- * Bundle shape lives in contract §4.2. Source of truth changed in the
- * VK-binding collapse: GatewayProviderCredential is gone, ModelProvider
- * absorbed its advanced gateway fields, and the VK's eligible-provider
- * set is now computed from the VirtualKeyScope graph + an optional
- * RoutingPolicy.modelProviderIds ordering. See `scopeResolver.ts` for
- * the cascade walker.
+ * Materialise GET /api/internal/gateway/config/:vk_id (bundle shape: contract §4.2). Source of truth post VK-binding-collapse: GatewayProviderCredential is gone, ModelProvider absorbed its gateway fields, and the VK's eligible-provider set computes from the VirtualKeyScope graph + optional RoutingPolicy.modelProviderIds ordering (scopeResolver.ts).
  */
 import type {
   GatewayBudget,
@@ -60,40 +53,25 @@ export type ProviderSlot = {
   slot: string;
   type: string;
   /**
-   * Opaque per-provider credentials blob. Shape matches what the Go
-   * gateway's pcToBifrostKey expects for each provider type:
-   * - OpenAI / Anthropic / Gemini / default: `{api_key}`
-   * - Azure: `{api_key, endpoint, api_version?}`
-   * - Bedrock: `{access_key, secret_key, session_token?, region?}`
-   * - Vertex: `{project_id, project_number, region, auth_credentials}`
-   * Decrypted from ModelProvider.customKeys (AES-256-GCM at rest).
+   * Opaque per-provider credentials blob, matching the Go gateway's pcToBifrostKey shape per provider type (OpenAI/Anthropic/Gemini: {api_key}; Azure: +endpoint/api_version; Bedrock: access/secret/session/region; Vertex: project/region/auth_credentials). Decrypted from ModelProvider.customKeys (AES-256-GCM at rest).
    */
   credentials: Record<string, unknown>;
   base_url?: string;
   region?: string;
   deployment_map?: Record<string, string>;
   /**
-   * The operator-chosen routing handle of this ModelProvider row. A caller
-   * writes it where a provider family goes ("eu/claude-sonnet-5") to reach
-   * THIS instance rather than whichever instance of the family the key's chain
-   * order reaches first. Absent when the operator set none.
+   * Operator-chosen routing handle for this ModelProvider row — a caller writes it where a provider family goes ("eu/claude-sonnet-5") to reach THIS instance rather than whichever the key's chain order reaches first. Absent when the operator set none.
    */
   handle?: string;
   /**
-   * What this provider declares it serves, for ROUTING a bare model name to
-   * the provider that owns it. Absent when the row declares nothing, which the
-   * gateway reads as "this provider said nothing" rather than "this provider
-   * serves nothing". Authorization stays with `models_allowed`.
+   * What this provider declares it serves, for ROUTING a bare model name to its owner. Absent means "said nothing", not "serves nothing" — authorization stays with models_allowed.
    */
   models?: string[];
   config: Record<string, unknown>;
 };
 
 /**
- * A ModelProvider row the gateway will not dispatch to, named so a
- * request-time block can say why. `type` is the provider kind (ModelProvider.provider),
- * carried alongside the row id because the gateway matches a resolved request
- * by provider kind and these rows are absent from `providers[]`.
+ * A ModelProvider row the gateway won't dispatch to, named so a request-time block can say why. type carries ModelProvider.provider alongside the row id, since the gateway matches a resolved request by provider kind and these rows are absent from providers[].
  */
 export type ProviderExclusionWire = {
   id: string;
@@ -113,13 +91,7 @@ export type GatewayConfigPayload = {
   display_prefix: string;
   organization_id: string;
   /**
-   * project_id / project_otlp_token / team_id are populated when the VK
-   * has a single PROJECT scope, or when the org has an
-   * `internal_governance` project (TEAM/ORG-scoped VKs route traces
-   * there so the AI Governance ingestion view shows VK + receiver spans
-   * under one filter). Null for older self-hosted orgs without a
-   * governance project — the gateway skips span export rather than
-   * failing the config fetch.
+   * project_id/project_otlp_token/team_id populate when the VK has a single PROJECT scope, or the org has an internal_governance project (TEAM/ORG-scoped VKs route traces there so Governance shows VK + receiver spans under one filter). Null for older self-hosted orgs without one — the gateway skips span export rather than failing the config fetch.
    */
   project_id: string | null;
   project_otlp_token: string | null;
@@ -138,35 +110,15 @@ export type GatewayConfigPayload = {
   model_aliases: Record<string, string>;
   models_allowed: string[] | null;
   /**
-   * Explicit provider allowlist. `null` means every provider the key can
-   * reach through its scope graph, now and in the future, the semantic a
-   * key gets when its creator ticks "All providers", so a provider added
-   * next month is usable without editing the key. A list narrows to those
-   * ModelProvider ids; `providers[]` is already filtered to match, and the
-   * field ships so the gateway can surface WHY a model is unavailable.
+   * Explicit provider allowlist. null means every provider the key can reach through its scope graph, now and future — the semantic "All providers" gives, so a provider added next month is usable unedited. A list narrows to those ModelProvider ids (providers[] is already filtered to match); shipped so the gateway can say WHY a model is unavailable.
    */
   providers_allowed: string[] | null;
   /**
-   * How the key behaves when its provider fails. "none" = no failover
-   * (the default for keys created after the routing-mode split);
-   * "fallback_all" = walk every eligible provider; "policy" = the linked
-   * RoutingPolicy decides.
+   * How the key behaves when its provider fails: "none" = no failover (default post routing-mode split); "fallback_all" = walk every eligible provider; "policy" = the linked RoutingPolicy decides.
    */
   routing_mode: "none" | "fallback_all" | "policy";
   /**
-   * Contract §4.2. Providers a request could resolve to but the gateway will
-   * NOT dispatch to, split by WHY, so a request-time block can name the
-   * reason instead of failing opaque. Each entry is a ModelProvider row id
-   * plus its provider type, the same `{id, type}` shape `providers[]` carries,
-   * because the gateway matches the provider a request resolved to by TYPE and
-   * these rows are absent from `providers[]`.
-   *
-   * routing_excluded_providers: reachable from the key's scope AND inside its
-   * provider access, but dropped by the routing policy (named by
-   * routing_policy_name). access_excluded_providers: reachable from scope but
-   * outside providers_allowed (empty when the key allows all providers). A
-   * provider in neither list and absent from `providers[]` is not reachable
-   * from the key's scope at all.
+   * Contract §4.2. Providers a request could resolve to but the gateway will NOT dispatch to, split by WHY, each carrying the {id, type} shape providers[] uses (matched by TYPE). routing_excluded_providers: reachable + in access, dropped by the routing policy. access_excluded_providers: reachable, outside providers_allowed. Absent from both and from providers[] means unreachable from the key's scope at all.
    */
   routing_excluded_providers: ProviderExclusionWire[];
   access_excluded_providers: ProviderExclusionWire[];
@@ -211,18 +163,11 @@ export type GatewayConfigPayload = {
     /** Only set for "group": the member this bucket belongs to. */
     principal_id?: string;
     /**
-     * Only set for "attributed_user": the entry is a TEMPLATE ("each
-     * distinct end user on this anchor: this limit per window"). scope_id
-     * stays the ANCHOR; per-user spend is unbounded-cardinality and never
-     * materialises here, the gateway fetches the request's bucket through
-     * its cached bucket-spend read. spent_micro_usd is 0 on templates.
+     * Only set for "attributed_user": the entry is a TEMPLATE (per-window limit for each distinct end user on this anchor). scope_id stays the ANCHOR; per-user spend is unbounded cardinality and never materialises here — the gateway fetches the request's bucket via its cached bucket-spend read. spent_micro_usd is 0 on templates.
      */
     per_user?: true;
     /**
-     * Provider filter. Null = the budget counts every dispatch; set = it
-     * counts and constrains only dispatches to that ModelProvider id, so a
-     * breach removes that provider from the chain instead of blocking the
-     * whole request.
+     * Provider filter. Null = the budget counts every dispatch; set = it counts and constrains only dispatches to that ModelProvider id, so a breach removes that provider from the chain instead of blocking the whole request.
      */
     provider_key: string | null;
     window: string;
@@ -249,10 +194,7 @@ export type GatewayConfigPayload = {
     };
   }>;
   /**
-   * ADR-061 mirror tier. Present and non-skip ONLY for Langy virtual keys, so
-   * the gateway never mirrors ordinary customer traffic. The gateway reads this
-   * (never a client header) to decide whether to duplicate the gen_ai span into
-   * the mirror project.
+   * ADR-061 mirror tier. Present and non-skip ONLY for Langy virtual keys, so the gateway never mirrors ordinary customer traffic — read here (never a client header) to decide whether to duplicate the gen_ai span into the mirror project.
    */
   langy_mirror_tier: LangyMirrorTier;
   metadata: Record<string, unknown>;
@@ -261,16 +203,7 @@ export type GatewayConfigPayload = {
   // Explorer "Label" filter) and matches cache-rule vk_tags against them.
   vk_tags: string[];
   /**
-   * The date the key stops serving, in unix seconds, and `null` for a key that
-   * never expires. Always present, because the gateway tells an explicit null
-   * ("this key has no date") apart from a field a control plane older than it
-   * never sent ("keep the date you already hold").
-   *
-   * The key's expiry also travels on the auth token as `vk_expires_at`, which
-   * is the mint-time floor. Carrying it here as well is what bounds how long
-   * the gateway can hold an out-of-date value: the ETag moves on every
-   * mutation, so a shortened or extended date reaches the gateway on its next
-   * config revalidation even while the change feed is unavailable.
+   * Key's expiry, unix seconds, null if never — always present so the gateway can tell an explicit null apart from a field an older control plane never sent ("keep the date you hold"). Also travels on the auth token as vk_expires_at (mint-time floor); carrying it here too bounds how long the gateway can hold a stale value, since the ETag moves on every mutation and a changed date reaches the gateway on its next revalidation even while the change feed is down.
    */
   expires_at: number | null;
 };
@@ -281,11 +214,7 @@ export class GatewayConfigMaterialiserService {
     private readonly projects: ProjectService,
     private readonly chRepo: GatewayBudgetSpendPort | null,
     /**
-     * The process's own Gateway service. Required rather than defaulted:
-     * building one here meant the bundle read composed a second service per
-     * request, over the same tables the App already had a service for, and the
-     * default could not be completed once that service grew its guardrail and
-     * cache-rule collaborators.
+     * The process's own Gateway service. Required, not defaulted — building one here meant composing a second service per request over the same tables the App already had one for, and the default couldn't be completed once that service grew guardrail/cache-rule collaborators.
      */
     private readonly budgetDecisions: GatewayService,
     /**
@@ -325,13 +254,7 @@ export class GatewayConfigMaterialiserService {
   }
 
   /**
-   * The providers this key dispatches to, plus the three wire fields that let
-   * the gateway name why a resolved provider was not used. An explicit allowlist
-   * narrows dispatch; absence means every scope-reachable provider, now and
-   * later, so the filter runs here rather than being frozen into stored scope
-   * rows. `eligibleProviders` is already routing-policy-applied, so the
-   * scope-reachable set minus dispatch is what the policy dropped, and the
-   * allowlist complement is what provider access dropped.
+   * Providers this key dispatches to, plus the three wire fields naming why a resolved provider wasn't used. An explicit allowlist narrows dispatch; absence means every scope-reachable provider, now and later — filtered here, not frozen into stored scope rows. eligibleProviders is already routing-policy-applied, so scope-reachable minus dispatch is what the policy dropped, and the allowlist complement is what access dropped.
    */
   private async dispatchAndExclusions(
     vk: VirtualKeyWithScopes,
@@ -366,13 +289,7 @@ export class GatewayConfigMaterialiserService {
   }
 
   /**
-   * The version token for the bundle this materialiser would build for `vk`.
-   *
-   * It lives beside `materialise` because it describes that output: the token
-   * has to move whenever the bundle would come back different, and the two
-   * drifting apart is what lets a 304 confirm a bundle that is no longer
-   * current. See `configETag.ts` for what it covers and what it leaves to the
-   * change feed.
+   * Version token for the bundle materialise would build for vk. Lives beside materialise since it describes that output — the token must move whenever the bundle would differ, and drifting apart is what lets a 304 confirm a stale bundle. See configETag.ts for what it covers vs the change feed.
    */
   async versionToken(vk: VirtualKeyWithScopes): Promise<string> {
     return await this.assembly.versionToken(vk);
@@ -456,10 +373,7 @@ export class GatewayConfigMaterialiserService {
   }
 
   /**
-   * CH spend rollup. Best-effort: falls back to PG `spentUsd` when CH
-   * isn't wired (test fixtures, deploys without CH). Tenant set = every
-   * project under the VK's organization so ORG/TEAM/PRINCIPAL-scoped
-   * budgets see ledger rows under whichever project emitted the trace.
+   * CH spend rollup, best-effort: falls back to PG spentUsd when CH isn't wired (test fixtures, CH-less deploys). Tenant set = every project under the VK's org, so ORG/TEAM/PRINCIPAL budgets see ledger rows under whichever project emitted the trace.
    */
   private async loadCurrentSpend(
     vk: VirtualKeyWithScopes,
@@ -507,13 +421,7 @@ export class GatewayConfigMaterialiserService {
   }
 
   /**
-   * Every budget that applies to this VK. ORG-scope + VK-scope always
-   * apply; TEAM/PROJECT-scope only when a trace project resolves
-   * (single-project-scope VK or governance fallback); PRINCIPAL and
-   * per-member GROUP only when the key carries a principal. The scope
-   * semantics live in the shared resolver, which the request-time check
-   * and the debits process also call, so the bundle can never disagree
-   * with what they pick.
+   * Every budget applying to this VK: ORG/VK-scope always apply; TEAM/PROJECT only when a trace project resolves (single-project-scope VK or governance fallback); PRINCIPAL and per-member GROUP only when the key carries a principal. Scope semantics live in the shared resolver the request-time check and debits process also call, so the bundle can never disagree with them.
    */
   private async applicableBudgets(
     vk: VirtualKeyWithScopes,
@@ -529,18 +437,11 @@ export class GatewayConfigMaterialiserService {
   }
 }
 
-// Resolve the policy-side of the bundle (model aliases + policy rules)
-// from the VK's RoutingPolicy when present, falling back to the VK
-// config defaults otherwise. Post-bug-7 step (iv) the legacy VK config
-// keys are stripped so the fallback is always the empty default shape;
-// the RP read becomes the source of truth as soon as the VK has a
-// routingPolicyId pointing at a populated policy.
-//
-// Empty-rules normalize: the DB columns can hold `{}` (default at
-// creation time) but the bundle wire shape is contracted at
-// `{tools:{deny:[],allow:null}, mcp:..., urls:..., models:...}`.
-// Materialise the wire-correct shape regardless of DB content so the Go
-// resolver gets a stable structure (ariana R-lane CR pin from step (i)).
+// Resolves the policy-side of the bundle (model aliases + rules) from the
+// VK's RoutingPolicy when present, else the VK config defaults — legacy VK
+// config keys are stripped post bug-7 step (iv), so the fallback is always
+// empty and the RP read becomes source of truth once routingPolicyId is set.
+// Empty-rules normalize to the wire-contracted shape regardless of DB content.
 type BundlePolicyRules = GatewayConfigPayload["policy_rules"];
 
 const EMPTY_POLICY_RULE_DIM = {
@@ -634,23 +535,11 @@ function buildProviderSlot(
 ): ProviderSlot {
   const credentials = assembly.buildCredentials(mp, credentialReader);
   const customKeys = credentialReader.readCustomKeys(mp.customKeys);
-  // Providers whose base-URL override the gateway consumes (see mapProvider
-  // in bifrost.go): "custom" and "openai" route it to Bifrost's VLLM
-  // (OpenAI-compat) adapter; "anthropic" derives a per-endpoint custom
-  // provider so /v1/messages reaches self-hosted Anthropic-compatible
-  // servers (vLLM >= 0.24) instead of api.anthropic.com. Other providers
-  // with an endpointKey resolve their endpoint elsewhere (Azure/Vertex via
-  // credentials.endpoint), so emitting a per-slot base_url for them would
-  // be a dead field. Scope the override to what's consumed.
-  // "elevenlabs" is on the list for the realtime session mint, which dials
-  // the vendor directly and must reach the residency host the customer
-  // chose: a signed URL minted against the default host is signed in the
-  // wrong region.
-  //
-  // The registry is indexed by the narrowed literal rather than a widened
-  // key, so the registry itself proves each of these four declares an
-  // `endpointKey`. A registry entry losing one fails here rather than
-  // silently emitting a slot with no base_url.
+  // Base-URL override the gateway consumes (mapProvider in bifrost.go):
+  // "custom"/"openai" route to Bifrost's VLLM adapter; "anthropic" derives
+  // a custom provider for self-hosted /v1/messages; "elevenlabs" needs it
+  // for realtime session residency. Registry indexed by the narrowed literal,
+  // so a losing endpointKey entry fails here, not by silently emitting no base_url.
   const endpointKey =
     mp.provider === "custom" ||
     mp.provider === "openai" ||
@@ -680,10 +569,7 @@ function buildProviderSlot(
 }
 
 /**
- * The routing half of a provider slot: the handle that addresses this exact
- * instance, and the models it declares it serves. Both are absent rather than
- * empty when there is nothing to say, which is what the gateway reads as "this
- * provider said nothing" instead of "this provider serves nothing".
+ * Routing half of a provider slot: the handle addressing this exact instance, and the models it declares served. Both absent (not empty) means nothing to say — read as "said nothing", not "serves nothing".
  */
 function routingWire({
   mp,
@@ -765,21 +651,14 @@ function providerExclusionWire(mp: ModelProvider): ProviderExclusionWire {
 }
 
 /**
- * The key's expiration date as the gateway reads it: unix SECONDS, and null for
- * a key that never expires. Seconds because the gateway decodes the field as a
- * unix timestamp, the same unit the `vk_expires_at` token claim uses;
- * milliseconds would put the date tens of thousands of years out and lift the
- * expiry cap off the key.
+ * Key's expiration as the gateway reads it: unix SECONDS (matching the vk_expires_at token claim), null if never — milliseconds would put the date tens of thousands of years out and lift the expiry cap off the key.
  */
 function expiresAtWire(expiresAt: Date | null): number | null {
   return expiresAt ? Math.floor(expiresAt.getTime() / 1000) : null;
 }
 
 /**
- * Splits the scope-reachable providers the dispatch chain drops into the two
- * reasons the gateway names at request time: the routing policy dropped it
- * (inside provider access, but not dispatchable), or provider access dropped it
- * (outside the allowlist). A provider that dispatches is in neither list.
+ * Splits scope-reachable providers the dispatch chain drops into the two reasons named at request time: routing policy dropped it (in access, not dispatchable), or provider access dropped it (outside the allowlist). A dispatching provider is in neither list.
  */
 function providerExclusions({
   scopeReachable,
@@ -802,10 +681,7 @@ function providerExclusions({
 type BudgetWire = GatewayConfigPayload["budgets"][number];
 
 /**
- * The current-period figure the bundle ships for one budget. Templates carry
- * no aggregate: spend is per end-user bucket and the gateway fetches the
- * request's bucket on demand. Every other scope takes the CH rollup when it
- * was loaded, falling back to the PG column when it was not.
+ * Current-period figure the bundle ships for one budget. Templates carry no aggregate (spend is per end-user bucket, fetched on demand); every other scope takes the CH rollup when loaded, falling back to the PG column when not.
  */
 function budgetSpentMicroUSD(
   budget: GatewayBudgetResource,

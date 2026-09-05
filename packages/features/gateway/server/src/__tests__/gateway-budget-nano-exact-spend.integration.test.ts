@@ -1,28 +1,6 @@
 /**
  * @vitest-environment node
- *
- * A budget totals what its requests cost, to the nano-USD.
- *
- * Real Postgres + real ClickHouse, no mocks. Debits go in through the same
- * repository call the debits writer makes and come back out through the real
- * repository, service and wire DTO, which is the whole path a customer's
- * number travels.
- *
- * A request is priced exactly once, as an integer number of nano-USD, and the
- * spend events publish that integer. The budget ledger used to divide it by
- * 1e9 and store six decimals, so every debit was rounded to the nearest
- * micro-USD BEFORE it was summed. Rounding each debit and then adding is not
- * the same number as adding and then rounding, and the difference compounds
- * with request count instead of cancelling: on live data a budget read 219000
- * nano against a true 212250, and one serving small requests read 100000
- * against a true 55050. The REST surface published that figure as the
- * canonical integer the spend events carry, so the two did not reconcile.
- *
- * Every amount here is deliberately NOT a whole number of microdollars. That
- * is the only kind of amount that can tell an exact total from a rounded one,
- * and real per-request costs are routinely this shape.
- *
- * Spec: specs/ai-gateway/budgets.feature
+ * Real Postgres + real ClickHouse. Debits used to be rounded to micro-USD before summing rather than summed then rounded, so totals drifted with request count. Spec: specs/ai-gateway/budgets.feature
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -76,12 +54,8 @@ const MANUAL_VK = `vk_nano_manual_${suffix}`;
 const SEAT_VK = `vk_nano_seat_${suffix}`;
 
 /**
- * A cost that is not a whole number of microdollars, and the same total
- * arrived at in three parts.
- *
- * 24650 rounds to 25000 on its own, so three of them rounded first come to
- * 75000 rather than 73950. That 1050-nano gap is the whole bug, and it is the
- * gap that grows with every further request.
+ * 24650 rounds to 25000 alone; three pre-rounded sum to 75000 vs the true
+ * 73950 — the 1050-nano gap that grows with every further request.
  */
 const ODD_NANO = 73_950;
 const THIRD_NANO = 24_650;

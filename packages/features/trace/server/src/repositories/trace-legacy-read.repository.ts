@@ -14,10 +14,7 @@ import type {
 } from "../services/trace-legacy-read.types";
 
 /**
- * The partition-key bound a multi-trace read prunes on: the earliest and latest
- * occurrence time (epoch ms) in the requested set. A caller reading one trace
- * passes an exact point range (`from === to`); the store widens it by its own
- * safety margin.
+ * Partition-key bound a multi-trace read prunes on: earliest and latest occurrence time (epoch ms) in the requested set. A one-trace caller passes an exact point range (from===to); the store widens it by its own safety margin.
  */
 export interface TraceOccurredAtRange {
   from: number;

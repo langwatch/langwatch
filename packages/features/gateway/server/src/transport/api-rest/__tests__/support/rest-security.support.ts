@@ -1,13 +1,5 @@
 /**
- * A REST security spine for the families in this directory.
- *
- * It supplies only the framework parts every `SecuredApp` needs — context,
- * logging, tracing and the two error renderers. The credential chain is
- * whatever the caller passes: the internal control plane carries its own HMAC
- * gate and needs none, while the organization-scoped spend family is driven
- * with a middleware that installs the organization the process's real chain
- * would have installed. Anything not supplied throws, so a family that starts
- * leaning on a check this spine does not have fails loudly.
+ * REST security spine for the families in this directory, supplying only the framework parts every SecuredApp needs (context, logging, tracing, error renderers). Credential chain is whatever the caller passes — internal control plane carries its own HMAC and needs none, spend family is driven with organization-installing middleware. Anything not supplied throws, so a family leaning on an unsupported check fails loudly.
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import type { ErrorHandler, MiddlewareHandler } from "hono";

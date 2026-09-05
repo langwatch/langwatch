@@ -1,23 +1,6 @@
 /**
  * @vitest-environment node
- *
- * Keys that predate the explicit routing choice keep falling back -
- * against real Postgres, replaying the shipped migration.
- *
- * The old implicit default was "a null routing policy means fall back
- * across every eligible provider". routingMode made that choice
- * explicit, with NONE as the safer default for NEW keys only; the
- * migration pinned every existing row to the behaviour it already had.
- *
- * Only the backfill-replay half of the original suite is ported here. The
- * other two scenarios drove the bundle `GatewayConfigMaterialiserService`
- * produces (`new GatewayConfigMaterialiserService(prisma).materialise(vk)`), and
- * that class now takes a `GatewayService` and a model-provider credentials
- * port in its constructor — a DI reshape too large to adapt mechanically.
- * See the batch report for those two scenario titles.
- *
- * Spec: specs/ai-gateway/fallback.feature,
- *       specs/ai-gateway/virtual-key-creation.feature
+ * Real Postgres, replaying the shipped migration: routingMode made the old implicit "null = fall back everywhere" explicit, with NONE as the safer default for new keys only. Spec: specs/ai-gateway/fallback.feature
  */
 import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";

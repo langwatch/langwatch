@@ -1,14 +1,5 @@
 /**
- * Cursor pagination for the Postgres-backed REST lists.
- *
- * Same contract the ClickHouse-backed /spend-events walk publishes: an opaque
- * cursor passed back verbatim, `limit` defaulting to 50 and capped at 200, and
- * a `next_cursor` that is null exactly when the walk is exhausted. A caller
- * writes one pagination loop for the whole surface.
- *
- * The keyset is on VALUES, not on Prisma's row cursor. A row cursor has to
- * still exist to resolve, so archiving the row a caller is paused on would
- * strand the walk; comparing values does not care whether that row survived.
+ * Cursor pagination for Postgres-backed REST lists, matching the ClickHouse /spend-events contract: opaque cursor, limit defaulting to 50 capped at 200, next_cursor null iff exhausted. Keyset is on VALUES not Prisma's row cursor, so an archived row a caller paused on can't strand the walk.
  */
 
 const CURSOR_SEPARATOR = "\x00";
@@ -39,12 +30,7 @@ export class GatewayWirePaginationAdapter {
   }
 
   /**
-   * The values a cursor names, or null when it is not a cursor this surface
-   * minted or does not carry the arity the caller's sort key needs.
-   *
-   * Null rather than a throw, matching the spend walk: the ROUTE decides that a
-   * garbled cursor is a 400, because silently restarting the walk would re-serve
-   * everything the caller already has.
+   * Values a cursor names, or null if not minted here or wrong arity. Null rather than a throw, matching the spend walk — the ROUTE decides a garbled cursor is a 400, since silently restarting would re-serve everything.
    */
   decodePageCursor(encoded: string, arity: number): string[] | null {
     try {
@@ -59,13 +45,7 @@ export class GatewayWirePaginationAdapter {
   }
 
   /**
-   * The Prisma `OR` that continues a walk after the row `columns` describes.
-   *
-   * The tuple comparison `(a, b, c) > (x, y, z)` has no Prisma spelling, so it
-   * expands to one branch per column: each branch pins the more significant
-   * columns to equality and compares the current one, in that column's own
-   * direction. With the last column unique, the walk can neither skip a row nor
-   * serve one twice.
+   * The Prisma OR continuing a walk past `columns`: tuple comparison (a,b,c)>(x,y,z) has no Prisma spelling, so it expands to one branch per column, each pinning more-significant columns to equality. Last column unique means no row is skipped or served twice.
    */
   keysetAfter(columns: KeysetColumn[]): Array<Record<string, unknown>> {
     return columns.map((column, index) => {
@@ -80,10 +60,7 @@ export class GatewayWirePaginationAdapter {
   }
 
   /**
-   * The cursor for the next page, or null when this page exhausted the walk.
-   *
-   * A page shorter than `limit` means the query had nothing more to give, which
-   * is the only honest end-of-walk signal available without an extra count.
+   * Next-page cursor, or null when this page exhausted the walk — a page shorter than `limit` is the only honest end-of-walk signal without an extra count.
    */
   nextPageCursor<T>(
     rows: T[],

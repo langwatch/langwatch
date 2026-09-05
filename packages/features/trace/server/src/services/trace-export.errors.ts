@@ -1,27 +1,7 @@
 import { HandledError } from "@langwatch/handled-error";
 
 /**
- * The export could not be produced.
- *
- * Raised when an export fails to START — the service could not be built, or the
- * count query that sizes it blew up — and the underlying failure has nothing
- * handled to say for itself. Before this, that path answered
- * `{ error: "Internal server error" }`, which the browser read as an unhandled
- * failure and reported as "Something went wrong. We've been notified." — true,
- * but it never told the user the one thing that matters here: nothing was
- * changed, so trying again (or exporting a smaller slice) is safe.
- *
- * Deliberately NOT a wrapper for every infra fault. A failure that is ALREADY
- * handled — `query_timeout`, `clickhouse_unavailable`, `time_range_too_wide` —
- * says something more specific than this does and travels on its own; dressing
- * it up as an export failure would hide the sentence that actually helps. The
- * unhandled cause rides the reason chain instead, so the log line keeps it
- * while the customer gets copy written for them.
- *
- * `fault: platform` explicitly. This is a 5xx, and the default is `customer`,
- * so an unannotated one would log a real incident as routine noise.
- *
- * The words live in the presentation registry under `export_failed`.
+ * The export could not be produced — raised when it fails to START (service could not be built, or the sizing count query blew up) and the underlying failure has nothing handled to say. Deliberately NOT a wrapper for every infra fault: an already-handled failure (`query_timeout`, `clickhouse_unavailable`, `time_range_too_wide`) says something more specific and travels on its own, with the unhandled cause riding the reason chain so the log keeps it while the customer gets copy written for them (registry: `export_failed`). `fault: platform` explicit since this is an unannotated-would-be-routine-noise 5xx.
  */
 export class ExportFailedError extends HandledError {
   declare readonly code: "export_failed";
@@ -37,11 +17,7 @@ export class ExportFailedError extends HandledError {
 }
 
 /**
- * No live auth session behind the request.
- *
- * A known cause the customer can act on — sign in again — which is exactly what
- * the registry's `unauthorized` copy says, and a 401 rather than the generic
- * string body this route used to hand-roll.
+ * No live auth session behind the request — a known cause the customer can act on (sign in again), which is exactly what the registry's `unauthorized` copy says, and a 401 rather than the generic string body this route used to hand-roll.
  */
 export class ExportUnauthenticatedError extends HandledError {
   declare readonly code: "unauthorized";

@@ -270,11 +270,7 @@ describe("TraceSpanCostMatchingService.computeSpanCost", () => {
 });
 
 /**
- * The figures here are a real Claude Code call, taken from its own api_request
- * event: 2 fresh input tokens, 210 output, 18443 read from the cache and 17854
- * written to it, on claude-opus-5, which the agent reported costing
- * 0.1930215 USD. Pricing the writes as hour-long reproduces that number
- * exactly; pricing them short-lived lands about a third low.
+ * Figures here are a real Claude Code call from its own api_request event: 2 fresh input tokens, 210 output, 18443 cache-read, 17854 cache-write, on claude-opus-5, reported by the agent as costing 0.1930215 USD. Pricing the writes as hour-long reproduces that exactly; short-lived pricing lands about a third low.
  */
 describe("cache write TTL pricing through TraceSpanCostMatchingService.computeSpanCost", () => {
   const CLAUDE_CALL = {

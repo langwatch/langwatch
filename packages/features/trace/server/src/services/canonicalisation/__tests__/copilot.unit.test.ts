@@ -271,12 +271,10 @@ describe("CopilotCanonicaliser", () => {
     /** @scenario Captured content payloads survive canonicalisation as span input and output */
     it("content on gen_ai.input/output.messages survives the chain unmodified", () => {
       // Copilot emits content on ALREADY-canonical gen_ai.input/output.messages
-      // keys. The chain's processing here is (1) parseJsonStringValues turning
-      // the JSON strings into structured messages and (2) the remaining()
-      // merge carrying them to the result — genAi.ts deliberately skips
-      // re-extraction of canonical keys. Asserting the parsed structure pins
-      // both: a chain member that take()s the content without re-emitting it,
-      // or a parse regression, fails this test.
+      // keys. Processing here is (1) parseJsonStringValues turning JSON
+      // strings into structured messages and (2) the remaining() merge
+      // carrying them to the result — genAi.ts deliberately skips
+      // re-extraction of canonical keys. This asserts both hold.
       const result = canonicalize({
         "gen_ai.operation.name": "chat",
         "gen_ai.input.messages": JSON.stringify([{ role: "user", content: "fix the bug" }]),

@@ -1,18 +1,8 @@
 /**
- * The world every budget-overview assertion reads against: one
- * organization with a work project, a retired one, the member's personal
- * workspace and key, a department they share with a colleague, and five
- * budgets with spend recorded across three project tenants.
- *
- * Lives beside the test rather than inside it so the spec file reads as
- * assertions, and so a second suite can stand up the same world without
- * copying 300 lines of seed.
+ * The world every budget-overview assertion reads against: an org, a retired project, a member's personal workspace, a shared department, and five budgets spent across three tenants. Lives beside the test so a second suite can reuse it.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
-import {
-  usdToNanoUsd,
-  groupBucketScopeId,
-} from "@langwatch/gateway-contract";
+import { usdToNanoUsd, groupBucketScopeId } from "@langwatch/gateway-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { nanoid } from "nanoid";
 

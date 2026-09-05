@@ -154,10 +154,7 @@ describe("GatewayCacheRuleService", () => {
 
   describe("when the matcher or action is not the shape the gateway can evaluate", () => {
     /**
-     * The three refusals the displaced App service hand-rolled as TRPCErrors.
-     * They are the canonical schema's now, and they still have to happen
-     * BEFORE persistence: a rule the Go side cannot evaluate is one the bundle
-     * ships and every request then skips silently.
+     * The three refusals the displaced App service hand-rolled as TRPCErrors, now the canonical schema's — still must happen BEFORE persistence, or a rule the Go side can't evaluate ships and every request skips it silently.
      */
     it("refuses vk_tags that is not a list of strings", () => {
       const repository = new MemoryCacheRuleRepository(null);

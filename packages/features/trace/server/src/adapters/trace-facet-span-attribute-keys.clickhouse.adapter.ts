@@ -12,29 +12,7 @@ export class ClickHouseSpanAttributeKeysFacetAdapter {
   }
 
   /**
-   * Discover query for span attribute keys: every distinct `SpanAttributes`
-   * map key seen across `stored_spans` rows, ordered by frequency.
-   *
-   * The output is a key list — *not* a (key, value) cross-product — because
-   * the sidebar drills into values lazily via `facetValues` once the user
-   * expands a key. Keeping this query cheap is the whole point of the
-   * `dynamic_keys` indirection: a full enumeration of every span attribute
-   * value across a tenant would be unbounded.
-   *
-   * I/O notes:
-   *   - `SpanAttributes.keys` is the keys subcolumn of the Map. Reading it
-   *     directly skips loading the values column entirely — meaningful at
-   *     scale because span attribute values can be large strings.
-   *   - The empty-map short-circuit also probes `SpanAttributes.keys`, never
-   *     `SpanAttributes` itself: `length(SpanAttributes) > 0` makes ClickHouse
-   *     materialise the whole Map (keys *and* values) just to count entries,
-   *     which pulls the heavy values column into memory and tips busy tenants
-   *     into MEMORY_LIMIT_EXCEEDED. `length(SpanAttributes.keys)` reads only
-   *     the keys subcolumn, keeping the whole query on the keys side of the Map.
-   *
-   * The actual filter side (`span.attribute.<k>:value`) is already wired
-   * through `filter-to-clickhouse/ast.ts` — this facet only feeds the
-   * discovery list.
+   * Discover query for span attribute keys, ordered by frequency — a key list, not a (key,value) cross-product, since values load lazily via facetValues once a key expands (a full value enumeration would be unbounded). SpanAttributes.keys reads only the keys subcolumn, skipping the (often large) values column; the empty-map check probes .keys too, never length(SpanAttributes), which would materialise the whole Map into memory and risk MEMORY_LIMIT_EXCEEDED. Filtering is wired through filter-to-clickhouse/ast.ts; this only feeds discovery.
    */
   static buildSpanAttributeKeysFacetQuery(ctx: FacetQueryContext): FacetQuery {
     const where = ClickHouseFacetQueryAdapter.buildTimeWhere("StartTime");

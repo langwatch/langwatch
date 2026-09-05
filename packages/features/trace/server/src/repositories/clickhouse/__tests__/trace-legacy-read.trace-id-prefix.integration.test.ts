@@ -1,18 +1,5 @@
 /**
- * Integration tests for trace-ID prefix resolution.
- *
- * The CLI `trace search` table truncates trace IDs to 20 characters for
- * readability. Copy-pasting that truncated ID into `trace get` used to hit
- * a 404 because the backend required exact matches. This exercises the
- * git-style prefix lookup that unblocks that workflow.
- *
- * Was
- * `platform/app/src/server/traces/__tests__/clickhouse-trace-prefix.integration.test.ts`,
- * against `TraceLegacyReadClickHouseRepository` from `clickhouse-trace.service.ts`. The
- * class now lives here as `trace-legacy-read.repository.ts`, built via
- * `TraceLegacyReadClickHouseRepository.create({ prisma, resolveClickHouseClient,
- * traceCanonicalisation })` rather than resolving its client through a
- * mocked application singleton.
+ * Integration tests for trace-ID prefix resolution. The CLI trace search table truncates trace IDs to 20 characters for readability; copy-pasting that into trace get used to 404 since the backend required exact matches. Exercises the git-style prefix lookup that unblocks that workflow.
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";

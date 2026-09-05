@@ -186,23 +186,23 @@ export class SpanNormalizationPipelineService {
         },
       },
       (span) => {
-        const result = this.traceCanonicalisation.canonicalizeSpanAttributes({
+        const canonicalized = this.traceCanonicalisation.canonicalizeSpanAttributes({
           spanAttributes: normalizedSpan.spanAttributes,
           events: normalizedSpan.events,
           span: normalizedSpan,
         });
 
         span.setAttributes({
-          applied_rules: result.appliedRules,
+          applied_rules: canonicalized.appliedRules,
         });
         this.logger.debug(
           {
-            appliedRules: result.appliedRules,
+            appliedRules: canonicalized.appliedRules,
           },
           "Canonicalized span attributes",
         );
 
-        return result;
+        return canonicalized;
       },
     );
 

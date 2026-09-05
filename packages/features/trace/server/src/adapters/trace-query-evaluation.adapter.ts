@@ -28,18 +28,7 @@ import {
 const logger = createLogger("langwatch:traces:filter-evaluate");
 
 /**
- * Evaluating a saved query against one trace, in memory.
- *
- * The same query also compiles to ClickHouse SQL, and an automation decides
- * whether to fire from THIS answer while the trace list shows the other, so
- * the two have to agree. That is why the walk below mirrors the compiler's
- * node for node rather than being written the way an in-memory matcher
- * naturally would be.
- *
- * Everything here fails CLOSED. A parse error, an unknown field, a query past
- * the node or parameter caps, or a tag that cannot be positively decided at
- * dispatch time all answer `false` — never a false `true`, because a false
- * `true` fires an automation on a trace nobody asked about.
+ * Evaluating a saved query against one trace, in memory — the same query also compiles to CH SQL, and an automation fires from THIS answer while the trace list shows the other, so the walk below mirrors the compiler node-for-node rather than a natural in-memory matcher. Fails CLOSED everywhere: parse error, unknown field, over-cap query, or an undecidable tag all answer false, never a false true (which would fire an automation on a trace nobody asked about).
  */
 export class TraceQueryEvaluationAdapter {
   static create(): TraceQueryEvaluationAdapter {
@@ -47,14 +36,7 @@ export class TraceQueryEvaluationAdapter {
   }
 
   /**
-   * Evaluate a liqe query against an in-memory trace, mirroring the ClickHouse
-   * compiler's node walk so the two agree.
-   *
-   * Fail-closed: the whole query returns `false` — never a false `true` — on any
-   * parse error, unknown field, over-complex query (the exact MAX_NODE_COUNT /
-   * MAX_PARAM_COUNT caps), or any tag that can't be positively evaluated at
-   * dispatch time ({@link UNSUPPORTED}). An empty query has no constraints, so it
-   * matches every trace (`true`), mirroring the compiler returning no WHERE clause.
+   * Evaluate a liqe query against an in-memory trace, mirroring the CH compiler's node walk. Fail-closed: false — never a false true — on any parse error, unknown field, over-cap query (MAX_NODE_COUNT/MAX_PARAM_COUNT), or an undecidable tag ({@link UNSUPPORTED}). An empty query has no constraints, so it matches every trace, mirroring the compiler's no-WHERE-clause case.
    */
   static matches(queryText: string, trace: InMemoryTrace): boolean {
     // Reuse the compiler as the validation gate — it enforces the exact
@@ -85,12 +67,11 @@ export class TraceQueryEvaluationAdapter {
     const state: WalkState = { nodeCount: 0, unsupportedFields: [] };
     const result = TraceQueryEvaluationAdapter.evaluateNode(ast, false, trace, state);
 
-    // A field that can never evaluate positively at dispatch (span-scoped fields,
-    // `size`, the scenario dimensions) compiles to valid SQL and passes the
-    // save-time gate, so the query looks healthy — it just fails closed on every
-    // trace, forever, and the automation silently never fires. Whether that
-    // should be rejected at save time or made evaluable is a product call; until
-    // then, at least make the silence audible.
+    // A field that can never evaluate positively at dispatch (span-scoped
+    // fields, size, scenario dimensions) compiles to valid SQL and passes the
+    // save-time gate, so the query looks healthy — it just fails closed on
+    // every trace forever, silently never firing. Rejecting at save time vs.
+    // making it evaluable is a product call; until then, make the silence audible.
     if (state.unsupportedFields.length > 0) {
       logger.warn(
         {
@@ -257,25 +238,11 @@ export class TraceQueryEvaluationAdapter {
   }
 
   private static evaluateFreeText(tag: TagToken, negated: boolean, trace: InMemoryTrace): boolean {
-    // Mirrors `translateFreeText`'s `(ComputedInput ILIKE %v% OR ComputedOutput
-    // ILIKE %v% OR ifNull(TraceName,'') ILIKE %v% OR <span-name subquery>)`,
-    // including ClickHouse's three-valued logic over the Nullable(String) I/O
-    // columns: `NULL ILIKE …` is NULL, `NULL OR true` is true, `NULL OR false` is
-    // NULL, `NOT NULL` is NULL, and a NULL predicate excludes the row. So a match
-    // on one column counts even when the other is NULL, but a negated free-text
-    // filter never matches a trace whose non-matching side includes a NULL column.
-    //
-    // `traceName` mirrors the SQL side's `ifNull(...)` wrapper: a definite
-    // true/false, never a NULL that propagates.
-    //
-    // Span names are the one branch that needs rows the dispatcher may not have
-    // loaded (`needs` asks for them; today's callers still pass none). When
-    // they are absent this mirror is deliberately NARROWER than the SQL clause:
-    // it can miss a span-name-only match. The alternative, treating unloaded
-    // spans as unknown and failing the tag closed, would make every negated
-    // free-text filter stop matching, which is a live dispatch behaviour. Missing
-    // the narrow span-name-only case costs less than breaking that, and a
-    // dispatcher that starts loading spans becomes exact with no change here.
+    // Mirrors translateFreeText's OR of ILIKE checks, including CH's
+    // three-valued logic over Nullable(String) I/O — a match on one column
+    // counts even when the other is NULL, but a negated filter never matches
+    // a trace whose non-matching side has a NULL column. Span names need rows
+    // the dispatcher may not load; absent, this is deliberately NARROWER than SQL.
     const value = TraceQueryValuesAdapter.extractStringValue(tag).toLowerCase();
     const inputMatch = TraceQueryEvaluationAdapter.ilikeContains(
       trace.summary.computedInput,

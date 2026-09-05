@@ -1,16 +1,5 @@
 /**
- * The budget a key carries on itself, with what it has spent in the
- * budget's own current period.
- *
- * Distinct from the key's calendar-month spend: a daily cap is measured
- * against today, so a key that spent $2.50 this month can still be at
- * $0.50 of its $1.00 day. Both numbers are true and neither substitutes
- * for the other, which is why the table shows the month total and the
- * period bar side by side.
- *
- * Spend comes from the same rollup read the drawer's "already applies"
- * list and the Budgets page use, with bucket-exact targets, so a limit
- * and its "spent so far" agree wherever they are shown.
+ * The budget a key carries on itself, with spend in its own current period — distinct from calendar-month spend (a daily cap measures against today, so $2.50/month spent can still be $0.50 of a $1.00 day, both true, neither substituting). Spend comes from the same rollup read the drawer's "already applies" list and Budgets page use, so a limit and its "spent so far" agree everywhere.
  */
 import type { GatewayBudget, PrismaClient } from "@langwatch/prisma-client/generated";
 import { createLogger } from "@langwatch/observability";
@@ -30,12 +19,7 @@ export type VirtualKeyDirectBudget = {
 };
 
 /**
- * One budget per key, from the rows that target them.
- *
- * A key can carry more than one cap: the one its drawer manages plus any
- * created independently on the Budgets page. The drawer's row is the one
- * the key's own field controls, so it is the one the key's row reports;
- * otherwise the oldest wins, so the choice is stable across renders.
+ * One budget per key, from the rows that target them. A key can carry more than one cap (drawer-managed plus independently created on the Budgets page); the drawer's row is what the key's own field controls and reports, otherwise the oldest wins for stable rendering.
  */
 function chooseOnePerKey(
   budgets: GatewayBudget[],
@@ -57,13 +41,7 @@ function chooseOnePerKey(
 }
 
 /**
- * The visible key a budget row reports against, or null when it reports
- * against none.
- *
- * The scope is the budget's target and wins when the caller can see it. A
- * drawer-managed row whose target is outside the visible set still belongs
- * to the key whose field manages it, so that is the fallback rather than
- * dropping the row.
+ * Visible key a budget row reports against, or null if none. The budget's scope target wins when the caller can see it; a drawer-managed row whose target is outside the visible set still belongs to the key managing it, so that key is the fallback rather than dropping the row.
  */
 function keyThisBudgetBelongsTo(budget: GatewayBudget, visibleKeyIds: Set<string>): string | null {
   const scoped = budget.scopeType === "VIRTUAL_KEY" ? budget.scopeId : null;
@@ -141,13 +119,7 @@ export class VirtualKeyDirectBudgetService {
   }
 
   /**
-   * Resolve one direct budget per key, keyed by virtual key id. Keys with
-   * no budget of their own are absent from the map.
-   *
-   * "Direct" is the key's own row: a VIRTUAL_KEY-scoped budget targeting
-   * it, or the row its drawer's budget field manages. Budgets that reach
-   * the key through its organization, team, project or account are not
-   * the key's own cap and belong to the drawer's inherited list.
+   * Resolve one direct budget per key, keyed by VK id — keys with none are absent. "Direct" means the key's own row: a VIRTUAL_KEY-scoped budget targeting it, or the row its drawer's field manages. Budgets reached via org/team/project/account are not the key's own cap and belong to the drawer's inherited list.
    */
   async loadDirectBudgetsForKeys(args: {
     organizationId: string;

@@ -1,19 +1,7 @@
 /**
  * @vitest-environment node
- *
- * Budgets on every dimension, against real Postgres + real ClickHouse.
- *
- * Covers the control-plane half of the initiative: which budgets apply to a
- * key (including per-member group budgets and provider filters), how their
- * spend is kept apart in the ledger, what the gateway bundle carries, and the
- * key create / revoke invariants around a key's own budget.
- *
- * Spec: specs/ai-gateway/gateway-budget-targeting.feature
- *       specs/ai-gateway/budgets.feature
- *       specs/ai-gateway/virtual-key-creation.feature
- *       specs/ai-gateway/provider-routing.feature
- *       specs/ai-gateway/fallback.feature
- *       specs/ai-gateway/governance/vk-provider-access.feature
+ * Real Postgres + real ClickHouse. Covers which budgets apply to a key, ledger spend separation, gateway bundle contents, and key create/revoke invariants.
+ * Spec: specs/ai-gateway/gateway-budget-targeting.feature, budgets.feature, virtual-key-creation.feature, provider-routing.feature, fallback.feature, governance/vk-provider-access.feature
  */
 import { nanoid } from "nanoid";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
@@ -65,10 +53,7 @@ const connection = databaseUrl
 const prisma = connection?.client as PrismaClient;
 
 /**
- * The three Project reads this suite's subjects make: where a new key's
- * traffic lands, where an existing key's lands, and whether a budget's scope
- * is reachable from any live key. All three are answered from the rows the
- * suite itself writes.
+ * The three Project reads this suite makes (new key's landing, existing key's landing, scope reachability) — all answered from rows the suite itself writes.
  */
 class SuiteProjectService extends TestProjectService {
   override async tryGetTraceDestination(

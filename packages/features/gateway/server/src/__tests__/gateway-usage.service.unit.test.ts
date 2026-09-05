@@ -22,11 +22,10 @@ function mockProjects(): GatewayUsageProjectsPort {
   return { listIdsByOrganization: async () => ["proj_01"] };
 }
 
-/** Names and prefixes for the keys the ledger reported spend against. */
 /**
- * Labels only for keys of the organization asked about — the real repository
- * filters on both, so a fake that ignored the organization would let a
- * mis-scoped read look correct here.
+ * Names and prefixes for keys of the organization asked about — the real
+ * repository filters on both, so a fake that ignored organization would
+ * let a mis-scoped read look correct here.
  */
 function mockVirtualKeys(
   virtualKeys: Array<{ id: string; name: string; displayPrefix: string; organizationId?: string }>,

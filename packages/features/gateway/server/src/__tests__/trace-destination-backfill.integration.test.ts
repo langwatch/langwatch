@@ -1,21 +1,6 @@
 /**
  * @vitest-environment node
- *
- * Every key that already exists gets the destination the resolution chain
- * was giving it, written down - against real Postgres, replaying the
- * shipped migration.
- *
- * The chain answered on every read: the key's own `traceProjectId`, then its
- * single PROJECT access scope, then the organization's oldest live
- * governance project. The backfill answers it once and stores the result, so
- * the column becomes the whole story and no key's traffic moves.
- *
- * Every legacy shape is seeded here, including the two that only look alike:
- * a pointer at a project the customer deleted and a pointer at a project of
- * another organization both stop being destinations, and the rules below
- * have to answer for those keys rather than leave them pointing there.
- *
- * Spec: specs/ai-gateway/virtual-key-creation.feature
+ * Real Postgres, replaying the shipped migration: the resolution chain's per-read answer gets backfilled once into the column, including the deleted-project and cross-org pointer edge cases. Spec: specs/ai-gateway/virtual-key-creation.feature
  */
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -99,12 +84,9 @@ function backfillStatements(): string[] {
 }
 
 /**
- * Replay the shipped statements, narrowed to this test's own keys.
- *
- * The migration's own WHERE clauses are blanket, which is what a one-shot
- * backfill has to be; narrowing them here keeps the replay from taking a row
- * lock on every VirtualKey in the shared test database until the rollback,
- * which would block any suite running beside it.
+ * Replay narrowed to this test's own keys — the migration's own WHERE
+ * clauses are blanket, and replaying them unnarrowed would row-lock every
+ * VirtualKey until rollback, blocking suites running beside it.
  */
 async function replayBackfill(tx: Prisma.TransactionClient, keyIds: string[]): Promise<void> {
   const scope = keyIds.map((id) => `'${id}'`).join(", ");

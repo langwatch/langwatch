@@ -1,12 +1,7 @@
 /**
- * The per-person standing the budgets list, the detail page, and the
- * management API all read.
- *
- * One computation feeds three surfaces, so the counting rules live here
- * rather than in each renderer: how many people a template has seen, and
- * how many of them the gateway would now refuse. Getting the comparator
- * wrong by one boundary is invisible on screen and wrong in exactly the
- * case that matters, someone sitting exactly on their limit.
+ * The per-person standing the budgets list, detail page, and management
+ * API all read — one computation, not one per renderer. A wrong boundary
+ * comparator is invisible on screen and wrong exactly where it matters.
  */
 
 import { describe, expect, it, vi } from "vitest";
@@ -73,14 +68,8 @@ function mockPrisma(budgets: GatewayBudget[], boundaries: unknown[] = []) {
 }
 
 /**
- * The process's own composition, over the fake database and spend port.
- *
- * `GatewayService` takes a repository and a `ProjectService` now, not a
- * `PrismaClient`: the tenant ids every list is scoped by come from
- * `projects.listIdsByOrganization`, where they used to come from a
- * `project.findMany` on the client. Building the pair the way
- * `PrismaGatewayAdapter` builds it keeps the standing arithmetic below running
- * over the production code that computes it.
+ * Composed the way `PrismaGatewayAdapter` composes it — see
+ * dev/docs/best_practices/service-repository-adapter-port.md.
  */
 function serviceOver(prisma: PrismaClient, spend: GatewayBudgetClickHouseRepository) {
   return PrismaGatewayAdapter.create({

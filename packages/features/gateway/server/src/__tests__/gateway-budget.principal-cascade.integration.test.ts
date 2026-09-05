@@ -1,20 +1,6 @@
 /**
  * @vitest-environment node
- *
- * Integration coverage for PRINCIPAL-scope budgets in the
- * strictest-wins cascade. Hits real Postgres (testcontainers), no
- * mocks of the budget service.
- *
- * Pins:
- *   1. PRINCIPAL kind round-trips through GatewayService.create
- *      and persists with `scopeType=PRINCIPAL` and the user as `scopeId`.
- *   2. Cross-org guard rejects principalUserId from outside the org.
- *   3. With ALL 5 scopes (org+team+project+VK+principal) configured,
- *      the cascade BLOCKs when only the PRINCIPAL is over-limit.
- *   4. With NO PRINCIPAL budget, applicableForRequest returns 4 rows
- *      and the cascade behaves identically.
- *
- * Spec: specs/ai-gateway/budgets-principal-cascade.feature
+ * Real Postgres (testcontainers), no mocks. Pins PRINCIPAL-scope budgets in the strictest-wins cascade, incl. BLOCK when only PRINCIPAL is over-limit among all 5 scopes. Spec: specs/ai-gateway/budgets-principal-cascade.feature
  */
 
 import {
@@ -54,9 +40,7 @@ const prisma = connection?.client as PrismaClient;
 
 /**
  * The one Project read the budget guards make: a PROJECT-scoped budget is
- * refused unless the project's team belongs to the budget's organization, and
- * the rows this suite writes are what that has to be answered from. The rest of
- * the contract stays unused, which the base class states by refusing it.
+ * refused unless its project's team belongs to the budget's org.
  */
 class SuiteProjectService extends TestProjectService {
   override async tryGetWithTeam(id: string): ReturnType<ProjectService["tryGetWithTeam"]> {

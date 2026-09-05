@@ -78,10 +78,7 @@ export interface SpendEventsPageCursor {
 
 export interface SpendSummaryRow {
   /**
-   * The first grouping dimension's value. It stays the first dimension so a
-   * consumer written against the single-dimension surface keeps reading what
-   * it always did. Two dimensions can share one flat key; `group` is the
-   * field that tells them apart.
+   * The first grouping dimension's value, kept first so a consumer written against the single-dimension surface keeps reading what it always did; `group` is what tells two dimensions sharing one flat key apart.
    */
   key: string;
   /** Every grouping dimension by name, e.g. `{ model: "gpt-5-mini" }`. */

@@ -499,7 +499,7 @@ describe("TraceSpanStorageClickHouseRepository.tryFindNormalizedSpanById", () =>
       const { clickhouse, repo } = readRepository();
       clickhouse.rows = [storedRow()];
 
-      const span = await repo.tryFindNormalizedSpanById({
+      const foundSpan = await repo.tryFindNormalizedSpanById({
         tenantId: "project-1",
         traceId: "trace-1",
         spanId: "span-1",
@@ -510,8 +510,8 @@ describe("TraceSpanStorageClickHouseRepository.tryFindNormalizedSpanById", () =>
       expect(read?.query).not.toContain("Events.");
       expect(read?.query).not.toContain("Links.");
       expect(read?.query).toContain("SpanAttributes");
-      expect(span?.events).toEqual([]);
-      expect(span?.links).toEqual([]);
+      expect(foundSpan?.events).toEqual([]);
+      expect(foundSpan?.links).toEqual([]);
     });
 
     /** @scenario "The derivation read never asks for the nested columns" */
@@ -538,14 +538,14 @@ describe("TraceSpanStorageClickHouseRepository.tryFindNormalizedSpanById", () =>
       const { clickhouse, repo } = readRepository();
       clickhouse.rows = [storedRow()];
 
-      const span = await repo.tryFindNormalizedSpanById({
+      const foundSpan = await repo.tryFindNormalizedSpanById({
         tenantId: "project-1",
         traceId: "trace-1",
         spanId: "span-1",
         occurredAtMs: 1_700_000_000_000,
       });
 
-      expect(span).toMatchObject({
+      expect(foundSpan).toMatchObject({
         tenantId: "project-1",
         traceId: "trace-1",
         spanId: "span-1",
@@ -562,14 +562,14 @@ describe("TraceSpanStorageClickHouseRepository.tryFindNormalizedSpanById", () =>
       const { clickhouse, repo } = readRepository();
       clickhouse.rows = [];
 
-      const span = await repo.tryFindNormalizedSpanById({
+      const foundSpan = await repo.tryFindNormalizedSpanById({
         tenantId: "project-1",
         traceId: "trace-1",
         spanId: "span-1",
         occurredAtMs: 1_700_000_000_000,
       });
 
-      expect(span).toBeNull();
+      expect(foundSpan).toBeNull();
       expect(clickhouse.queries).toHaveLength(1);
       expect(clickhouse.queries[0]?.query).toContain("StartTime BETWEEN");
     });

@@ -12,16 +12,7 @@ import type {
 export { parseJsonStringAttrs };
 
 /**
- * Creates a real ExtractorContext for extractor unit tests.
- *
- * Builds real AttributeBag / EventBag / SpanDataBag instances so extractors
- * exercise their actual production code paths, while `recordRule`, `setAttr`,
- * and `setAttrIfAbsent` are wrapped in vi.fn() for easy assertion.
- *
- * JSON-looking string values in attrs are auto-parsed to match the production
- * pipeline's `parseJsonStringValues()` step — pass `skipJsonParsing` to feed
- * raw string values instead, exercising an extractor's own defensive
- * safeJsonParse path.
+ * Creates a real ExtractorContext for extractor unit tests: real AttributeBag/EventBag/SpanDataBag instances so extractors exercise production code paths, with recordRule/setAttr/setAttrIfAbsent wrapped in vi.fn() for assertion. JSON-looking string values auto-parse to match the pipeline's parseJsonStringValues() step; pass skipJsonParsing to feed raw strings, exercising an extractor's own defensive safeJsonParse path.
  */
 export function createExtractorContext(
   attrs: Record<string, unknown>,
@@ -62,11 +53,7 @@ export function createExtractorContext(
 }
 
 /**
- * Creates a real LogExtractorContext for extractor.applyLog unit
- * tests. Builds a real LogRecordDataBag so extractors exercise their
- * actual production code paths; recordRule / setAttr / setAttrIfAbsent
- * are vi.fn() wrappers around an `out` bag that mirrors production
- * shape for easy assertion.
+ * Creates a real LogExtractorContext for extractor.applyLog unit tests. Builds a real LogRecordDataBag so extractors exercise production code paths; recordRule/setAttr/setAttrIfAbsent are vi.fn() wrappers around an out bag mirroring production shape for easy assertion.
  */
 export function createLogExtractorContext(
   scopeName: string,

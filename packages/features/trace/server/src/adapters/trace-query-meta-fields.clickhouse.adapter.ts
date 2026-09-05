@@ -263,13 +263,7 @@ const SCENARIO_STATUS_DEF: FieldDef = {
 };
 
 /**
- * The trace fields that are not columns.
- *
- * `trace_id` is matched against a normalised form rather than the stored
- * string, and the existence fields — has evaluations, has events — are
- * answered by a bounded subquery over another table rather than by reading
- * anything on the trace itself. Both need to know which table to reach, which
- * is what `existenceNeeds` answers for the evaluation path.
+ * Trace fields that are not columns: trace_id matches a normalised form, not the stored string; existence fields (has evaluations, has events) are answered by a bounded subquery over another table, not by reading the trace itself. Both need to know which table to reach — existenceNeeds answers that for the evaluation path.
  */
 export class TraceQueryMetaFieldsAdapter {
   static create(): TraceQueryMetaFieldsAdapter {
@@ -277,10 +271,7 @@ export class TraceQueryMetaFieldsAdapter {
   }
 
   /**
-   * Returns the trailing key for either `trace.attribute.<k>` (canonical) or
-   * the legacy single-namespace `attribute.<k>`, or `null` when the value
-   * isn't a trace-attribute reference at all. Folds the back-compat alias
-   * into one call so callers don't have to branch on the prefix flavour.
+   * Trailing key for either trace.attribute.<k> (canonical) or the legacy attribute.<k>, or null if not a trace-attribute reference at all. Folds the back-compat alias into one call so callers don't branch on prefix flavour.
    */
   private static stripTraceAttributePrefix(value: string): string | null {
     if (value.startsWith("trace.attribute.")) {
@@ -464,10 +455,7 @@ export class TraceQueryMetaFieldsAdapter {
   }
 
   /**
-   * Which auxiliary collection a `has:<value>` / `none:<value>` reads, or `null`
-   * when it's answered from the trace summary alone. `has` is value-polymorphic
-   * so it carries no static `FieldDef.needs`;
-   * `TraceQueryEvaluationAdapter.needs` consults this instead.
+   * Which auxiliary collection a has:<value>/none:<value> reads, or null if answered from the trace summary alone. has is value-polymorphic so it carries no static FieldDef.needs; TraceQueryEvaluationAdapter.needs consults this instead.
    */
   static existenceNeeds(value: string): "evaluations" | "events" | null {
     if (value === "eval") return "evaluations";

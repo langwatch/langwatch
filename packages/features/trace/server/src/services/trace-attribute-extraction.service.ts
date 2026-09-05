@@ -1,10 +1,5 @@
 /**
- * Reads ONE span's attributes into the shape a trace summary uses.
- *
- * Separate from accumulation because it is a different job with a different
- * dependency: this reads a span and needs nothing else, while folding those
- * readings across a trace needs the origin service. Keeping them in one class
- * put a 190-line mapping vocabulary in the same file as the fold rules.
+ * Reads ONE span's attributes into the shape a trace summary uses. Separate from accumulation because it's a different job with a different dependency: this reads a span and needs nothing else, while folding across a trace needs the origin service. One class would have put a 190-line mapping vocabulary beside the fold rules.
  */
 
 import { ATTR_KEYS } from "@langwatch/trace-contract";
@@ -48,11 +43,10 @@ export const SPAN_ATTR_MAPPINGS = [
   [ATTR_KEYS.GEN_AI_REQUEST_REASONING_EFFORT, "gen_ai.request.reasoning_effort"],
   [ATTR_KEYS.LANGWATCH_LANGGRAPH_THREAD_ID, "langgraph.thread_id"],
   // AI Gateway markers — stamped on every gateway-emitted customer span by
-  // services/aigateway/adapters/customertracebridge/emitter.go. They are
-  // what joins a trace back to the key and the request that produced it,
-  // which is the read the gateway usage views and per-key spend serve.
-  // Budget debits do not come from here: they ride the gateway's own spend
-  // commands, which carry attribution the trace never sees.
+  // services/aigateway/adapters/customertracebridge/emitter.go, joining a
+  // trace back to the key and request that produced it (gateway usage
+  // views, per-key spend). Budget debits don't come from here — they ride
+  // the gateway's own spend commands, carrying attribution the trace never sees.
   ["langwatch.virtual_key_id", "langwatch.virtual_key_id"],
   ["langwatch.gateway_request_id", "langwatch.gateway_request_id"],
   // The provider the request was actually dispatched to (a ModelProvider
@@ -63,12 +57,11 @@ export const SPAN_ATTR_MAPPINGS = [
   // rewrote it. gen_ai.request.model holds the model that was dispatched,
   // so this is what answers which tier or which legacy name a caller uses.
   ["langwatch.requested_model", "langwatch.requested_model"],
-  // Governance ingest markers — stamped on every span by the
-  // /api/ingest/otel/:sourceId receiver (platform/app/src/server/routes/ingest/ingestionRoutes.ts).
-  // Hoisted into trace_summaries so the ActivityMonitorService dashboard
-  // queries can roll up spend / users / events by ingestion source without
-  // having to scan stored_spans. The receiver is the only emitter of
-  // these keys; non-governance traces never carry them.
+  // Governance ingest markers, stamped on every span by the
+  // /api/ingest/otel/:sourceId receiver. Hoisted into trace_summaries so
+  // the ActivityMonitorService dashboard can roll up spend/users/events by
+  // ingestion source without scanning stored_spans. The receiver is the
+  // only emitter of these keys; non-governance traces never carry them.
   ["langwatch.origin.kind", "langwatch.origin.kind"],
   ["langwatch.ingestion_source.id", "langwatch.ingestion_source.id"],
   ["langwatch.ingestion_source.organization_id", "langwatch.ingestion_source.organization_id"],
@@ -76,18 +69,7 @@ export const SPAN_ATTR_MAPPINGS = [
 ] as const;
 
 /**
- * Resource attributes that carry trace identity (thread_id, user_id,
- * customer_id) need to be promoted to their canonical trace-summary
- * forms. The REST collector (`/api/collector`) writes the
- * `metadata.thread_id` field as a RESOURCE attribute (see
- * `collectorSpan.utils.ts#buildResource`), but the canonicalisation
- * extractor that maps to `gen_ai.conversation.id` only runs on
- * per-SPAN attributes. Without this hoist a trace posted via the docs
- * `metadata: { thread_id: "..." }` example never picks up a
- * conversationId and conversation grouping silently breaks.
- *
- * Each entry: list of resource keys to look at (priority order) → the
- * canonical trace-summary key we want to populate.
+ * Resource attributes carrying trace identity (thread_id, user_id, customer_id) need promotion to canonical trace-summary forms: the REST collector writes metadata.thread_id as a RESOURCE attribute, but the canonicalisation extractor mapping to gen_ai.conversation.id only runs on per-SPAN attributes — without this hoist, a trace posted via the docs' metadata example never picks up a conversationId. Each entry: resource keys to look at (priority order) -> the canonical trace-summary key to populate.
  */
 export const RESOURCE_ATTR_CANONICAL_MAPPINGS = [
   {
@@ -118,13 +100,7 @@ export const RESOURCE_ATTR_CANONICAL_MAPPINGS = [
 ] as const;
 
 /**
- * Resource attributes that carry a cost-classification signal rather than
- * trace identity. They are consumed per span at fold time (the bundled
- * portion is rolled into NonBilledCost) and must NOT be hoisted onto the
- * trace's attribute map — a trace's cost split is two real amounts, not a
- * single trace-level boolean. Existing rows that still carry the key keep it;
- * the read layer treats the column as authoritative and the key as a
- * fallback only.
+ * Resource attributes carrying a cost-classification signal, not trace identity — consumed per span at fold time (bundled portion rolled into NonBilledCost) and must NOT be hoisted onto the trace's attribute map, since a trace's cost split is two real amounts, not a single boolean. Existing rows keep the key; the read layer treats the column as authoritative and the key as fallback only.
  */
 const NON_HOISTED_RESOURCE_KEYS: ReadonlySet<string> = new Set(["langwatch.cost.non_billable"]);
 
@@ -266,14 +242,11 @@ export class TraceAttributeExtractionService {
     resourceAttrs: NormalizedSpan["resourceAttributes"];
     result: Record<string, string>;
   }): void {
-    // Labels may arrive on span attrs (OTLP-direct path, where
-    // otelAttributesToNestedAttributes JSON-parses the string to an array)
-    // or on resource attrs (POST /api/collector and
-    // PATCH /api/traces/{id}/metadata, where buildResource writes
-    // JSON.stringify(labels) and parseJsonStringValues later converts it
-    // back to an array). Honor both sources so labels sent via the
-    // documented REST endpoints actually reach the trace's attribute map
-    // and the labels facet SQL. Mirrors the tag.tags handling below.
+    // Labels may arrive on span attrs (OTLP-direct, JSON-parsed to an array)
+    // or resource attrs (POST /api/collector, PATCH .../metadata, where
+    // buildResource writes JSON.stringify(labels) and parseJsonStringValues
+    // converts it back). Honor both so labels sent via documented REST
+    // endpoints reach the attribute map and labels facet SQL (mirrors tag.tags below).
     const labels =
       spanAttrs[ATTR_KEYS.LANGWATCH_LABELS] ?? resourceAttrs[ATTR_KEYS.LANGWATCH_LABELS];
     if (typeof labels === "string") {
@@ -282,13 +255,11 @@ export class TraceAttributeExtractionService {
       result["langwatch.labels"] = JSON.stringify(labels);
     }
 
-    // `tag.tags` is the reserved labels key of the legacy OTLP path
-    // (otel.traces.ts maps it to reservedTraceMetadata.labels) and what the
-    // Langy worker emits via OPENCODE_RESOURCE_ATTRIBUTES (tag.tags=langy).
-    // Honor the same contract here: fold span- or resource-level tag.tags
+    // tag.tags is the reserved labels key of the legacy OTLP path (mapped to
+    // reservedTraceMetadata.labels) and what the Langy worker emits via
+    // OPENCODE_RESOURCE_ATTRIBUTES. Folds span- or resource-level tag.tags
     // (comma-separated string or array) into langwatch.labels so the trace
-    // actually carries the tag in the UI/filters. langwatch.labels wins on
-    // conflict; tag.tags values are unioned in.
+    // carries the tag; langwatch.labels wins on conflict, tag.tags is unioned in.
     const tagTags = spanAttrs["tag.tags"] ?? resourceAttrs["tag.tags"];
     const tagList = Array.isArray(tagTags)
       ? tagTags.filter((t): t is string => typeof t === "string")

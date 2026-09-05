@@ -1,25 +1,6 @@
 /**
  * @vitest-environment node
- *
- * A character-priced call moves the budget it was admitted under.
- *
- * Real Postgres + real ClickHouse. The path a synthesis request's money
- * travels: the quantities the gateway measured, rated by the same service
- * the ingest seam prices with, debited through the same repository the
- * debits writer uses, read back through the same repository the budgets
- * surfaces read.
- *
- * The regression: the wire dropped the character count, so the request rated
- * at zero and the ledger recorded nothing. Three tts-1 calls worth $0.18
- * moved a production budget $0.0002 (langwatch/langwatch#6934).
- *
- * The debits process manager that used to drive this suite lives in the
- * Enterprise governance package, which a core feature package may not depend
- * on, so the rated cost is handed to the repository directly. The rating and
- * the ledger read — the two halves the regression sat between — are the real
- * ones.
- *
- * Spec: specs/ai-gateway/audio-endpoints.feature
+ * Real Postgres + real ClickHouse. Regression for #6934: the wire dropped the character count, so tts calls rated at zero and the ledger recorded nothing.
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

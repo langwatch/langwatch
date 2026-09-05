@@ -1,25 +1,6 @@
 /**
  * @vitest-environment node
- *
- * Two budgets on one key each report what the request cost, not what the two
- * of them recorded between them.
- *
- * Real Postgres + real ClickHouse, no mocks on the read: spend is written to
- * the real ledger and read back through the real repository and service, so
- * this covers the path enforcement runs on: debit -> ledger -> rollup ->
- * decision.
- *
- * The ledger writes one row per (budget, request), so a request resolving a
- * hard cap and a soft cap on the same virtual key writes two rows carrying the
- * same cost. Reads that identified a budget's rows by scope alone summed both
- * into each budget, and the rollup, keyed without the budget, folded them into
- * one aggregate that could not be unpicked afterwards. Every budget then
- * reported N times its true spend for N budgets sharing its bucket: a $5.00
- * cap refusing traffic at $2.50, an 80% warning firing at 40%. A hard cap and
- * a soft cap on one key is the standard way to provision one, so this is the
- * shape that has to stay correct.
- *
- * Spec: specs/ai-gateway/budgets.feature
+ * Real Postgres + real ClickHouse. Ledger writes one row per (budget, request); reads keyed by scope alone used to sum both into each, so N sibling budgets each reported N times true spend. Spec: specs/ai-gateway/budgets.feature
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -89,10 +70,8 @@ const SEATS_VK = `vk_sib_seat_${suffix}`;
 const ANCHOR_VK = `vk_sib_anch_${suffix}`;
 
 /**
- * A month cycle anchored to the 17th, and the two instants that tell the
- * anchored budget apart from the calendar one: the first sits inside the
- * anchored period that opened on 17 June, the second after it rolled on
- * 17 July. A debit on 20 June is in neither July calendar month.
+ * Month anchored to the 17th: one instant inside the period opened 17
+ * June, one after it rolled 17 July — a 20 June debit is in neither.
  */
 const CYCLE_ANCHOR = new Date("2026-06-17T09:00:00.000Z");
 const BACKDATED_DEBIT_AT = new Date("2026-06-20T00:00:00.000Z");
@@ -117,13 +96,9 @@ type ServedRequest = {
 };
 
 /**
- * The debit burst one served request writes: every budget the request
- * resolves gets its own ledger row, carrying that request's whole cost.
- *
- * The enterprise debits process manager owns this shape in production. It
- * lives in a package a gateway suite may not depend on, so the fan-out is
- * spelled out here over the same resolver and the same repository it calls —
- * the read under test is downstream of both either way.
+ * One served request's debit burst: every budget it resolves gets its own
+ * ledger row carrying the full cost (production's Enterprise-only debits
+ * process manager owns this shape; unreachable here, so spelled out directly).
  */
 async function writeDebits(request: ServedRequest): Promise<void> {
   const providerKey = null;
@@ -208,10 +183,8 @@ async function createBudget(input: {
 }
 
 /**
- * What each of these budgets reports as spent, in the order asked for, as of
- * `now`. The clock is an argument because an anchored budget's period moves
- * with it, and the whole point of one is which side of its own boundary a
- * debit falls on.
+ * Spent-as-of-`now` per budget. The clock is an argument because an
+ * anchored period moves with it — which side of the boundary a debit falls on.
  */
 async function spentUsdFor({
   budgetIds,

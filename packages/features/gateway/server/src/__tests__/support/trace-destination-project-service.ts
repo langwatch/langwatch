@@ -18,11 +18,9 @@ const DESTINATION_SELECT = {
 } as const;
 
 /**
- * The trace-destination half of the Project contract, answered from the rows
- * a suite seeds. The queries are the ones `PrismaProjectRepository` runs and
- * the ladder is the one `ProjectService.resolveTraceDestination` walks;
- * gateway-server depends on the project CONTRACT only, so the Project half is
- * mirrored here (and covered by project-server's own unit tests).
+ * The trace-destination half of the Project contract, from seeded rows —
+ * mirrors PrismaProjectRepository's queries and resolveTraceDestination's
+ * ladder, since gateway-server depends on the Project CONTRACT only.
  */
 export class TraceDestinationProjectService extends TestProjectService {
   constructor(private readonly prisma: PrismaClient) {

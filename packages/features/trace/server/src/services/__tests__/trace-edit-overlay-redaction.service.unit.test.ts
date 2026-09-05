@@ -1,11 +1,6 @@
 /**
  * @vitest-environment node
- *
- * Cutting a correction down to what a viewer may read, and putting back what
- * was cut when that viewer saves. This runs before the correction is handed to
- * the drawer and before it is applied to a trace on the dataset path, so it is
- * the one place that decides whether corrected content ever reaches a reader,
- * and the one place that keeps a reader from deleting what it hid from them.
+ * Cutting a correction down to what a viewer may read, and putting back what was cut when that viewer saves. Runs before the correction reaches the drawer and before it applies to a trace on the dataset path — the one place deciding whether corrected content reaches a reader, and the one place stopping a reader from deleting what it hid from them.
  */
 import { TraceEditOverlayRestoreService } from "../trace-edit-overlay-restore.service";
 import { TraceEditOverlayRedactionService } from "../trace-edit-overlay-redaction.service";

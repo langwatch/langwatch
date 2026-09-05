@@ -1,14 +1,5 @@
 /**
- * Unit tests proving that the v2 read path (SpanStorageService.getSpansByTraceId
- * and SpanStorageService.getSpanById) resolves ADR-022 offloaded eventref
- * pointers before returning spans to the caller.
- *
- * The fix: SpanStorageService now accepts optional SpanReadBlobResolutionDeps.
- * When present, getSpansByTraceId/getSpanById call getNormalizedSpansByTraceId
- * → resolveOffloadedTraces → mapNormalizedSpansToSpans instead of delegating
- * directly to getSpansByTraceId/tryGetSpanByIds on the repository.
- *
- * BDD structure: given/when nested describes, action-based it() names.
+ * Unit tests proving the v2 read path (getSpansByTraceId, getSpanById) resolves ADR-022 offloaded eventref pointers before returning spans. The fix: SpanStorageService now accepts optional SpanReadBlobResolutionDeps; when present, both calls route through getNormalizedSpansByTraceId -> resolveOffloadedTraces -> mapNormalizedSpansToSpans instead of delegating directly to the repository.
  */
 
 import { describe, expect, it, vi } from "vitest";
@@ -90,10 +81,7 @@ function makeNormalizedSpan(
 }
 
 /**
- * Builds a SpanStorageRepository stub whose getNormalizedSpansByTraceId
- * returns the given spans, and whose getSpansByTraceId / tryGetSpanByIds delegate
- * to the NullSpanStorageRepository (return empty/null) so any resolved result
- * must come from the resolution path, not the raw-Span path.
+ * Builds a SpanStorageRepository stub whose getNormalizedSpansByTraceId returns the given spans, while getSpansByTraceId/tryGetSpanByIds delegate to NullSpanStorageRepository (empty/null) — so any resolved result must come from the resolution path, not the raw-Span path.
  */
 function makeStubRepository(normalizedSpans: NormalizedSpan[]): SpanStorageRepository {
   const nullRepo = new NullSpanStorageRepository();

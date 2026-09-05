@@ -1,19 +1,5 @@
 /**
- * Cold-scan detection for ClickHouse SELECTs.
- *
- * Several of our largest tables are partitioned by a time expression and tier
- * old partitions to S3 (see clickhouse-serverless storage policy). A SELECT
- * that filters one of these tables WITHOUT a predicate on its partition time
- * column cannot prune partitions, so ClickHouse walks every weekly/monthly
- * partition including the cold ones on S3. Each such scan turns into a burst of
- * S3 GET requests, which is the dominant driver of our S3 request bill.
- *
- * This module flags those queries so the resilient client can warn on them.
- * It is detection-only: it never changes the query or its behaviour.
- *
- * The table list itself, {@link TIME_PARTITIONED_TABLES}, lives in
- * `@langwatch/clickhouse-client` — analytics-server's JOIN time-bound guard
- * reads the same map, so the two cannot drift.
+ * Cold-scan detection for ClickHouse SELECTs. Several of our largest tables partition by a time expression and tier old partitions to S3; a SELECT with no predicate on the partition time column can't prune, so ClickHouse walks every partition including cold S3 ones — the dominant driver of our S3 request bill. This module flags those queries so the resilient client can warn on them; detection-only, never changes the query or behaviour. The table list ({@link TIME_PARTITIONED_TABLES}) lives in @langwatch/clickhouse-client, shared with analytics-server's JOIN time-bound guard so the two can't drift.
  */
 
 import { TIME_PARTITIONED_TABLES } from "@langwatch/clickhouse-client";
@@ -24,14 +10,7 @@ function stripComments(sql: string): string {
 }
 
 /**
- * Does the SQL use `column` in a filter comparison (not merely a projection or
- * ORDER BY)? Only a comparison lets ClickHouse derive a partition bound.
- *
- * This is the crux: a query like `SELECT toUnixTimestamp64Milli(StartTime) ...
- * ORDER BY StartTimeMs` references StartTime but still scans every partition
- * (verified on prod: 252/252 parts). A query with `WHERE StartTime >= {from}`
- * prunes (41/255). So we look for the column adjacent to a comparison operator
- * or BETWEEN/IN on either side.
+ * Does the SQL use `column` in a filter comparison (not merely a projection or ORDER BY)? Only a comparison lets ClickHouse derive a partition bound — e.g. ORDER BY StartTimeMs still scans every partition (252/252 parts in prod) while WHERE StartTime >= {from} prunes (41/255). So this looks for the column adjacent to a comparison operator or BETWEEN/IN.
  */
 function hasTimePredicate(sql: string, column: string): boolean {
   const col = column.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -49,13 +28,7 @@ export class TraceColdScanDetectorService {
   }
 
   /**
-   * Returns the name of a time-partitioned table that the query reads without any
-   * filter predicate on its partition time column, or null if the query is fine
-   * (or not a SELECT against a tracked table).
-   *
-   * Errs toward flagging: a projection or ORDER BY mention of the time column does
-   * NOT clear the flag, because those do not enable partition pruning. A false
-   * positive is a cheap advisory log line; a false negative misses real S3 cost.
+   * Returns the name of a time-partitioned table the query reads without a filter predicate on its partition time column, or null if fine (or not a tracked SELECT). Errs toward flagging: a projection/ORDER BY mention does NOT clear it, since neither enables pruning — a false positive is a cheap log line, a false negative misses real S3 cost.
    */
   static detectColdScan(query: string): string | null {
     if (typeof query !== "string" || query.length === 0) {

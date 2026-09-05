@@ -18,10 +18,7 @@ const TABLE_NAME = "trace_summaries" as const;
 const CONVERSATION_ID_EXPR = "Attributes['gen_ai.conversation.id']" as const;
 
 /**
- * Buffer applied around the trace time range when bounding the `log_records`
- * content-search subquery. Log records land around their session's trace
- * activity, so +/- 2 days guarantees a matching record near the boundary is
- * never pruned away. Matches the span-pruning margin used by the trace list.
+ * Buffer around the trace time range bounding the log_records content-search subquery. Log records land near their session's trace activity, so +/-2 days guarantees a boundary-adjacent matching record is never pruned. Matches the trace list's span-pruning margin.
  */
 const LOG_WINDOW_BUFFER_MS = 2 * 24 * 60 * 60 * 1000;
 
@@ -29,11 +26,7 @@ const LOG_WINDOW_BUFFER_MS = 2 * 24 * 60 * 60 * 1000;
 const MODELS_PER_SESSION_LIMIT = 20;
 
 /**
- * Aggregate expressions per sortable dimension. Float aggregates are rounded
- * IN SQL so the value we hand back as a cursor and the value the next page's
- * HAVING recomputes are bit-identical, parallel Float64 summation is not
- * deterministic at full precision, and an unrounded sum can wobble past the
- * keyset boundary between requests, duplicating or skipping a row.
+ * Aggregate expressions per sortable dimension. Float aggregates round IN SQL so the cursor value and the next page's HAVING recompute stay bit-identical — parallel Float64 summation isn't deterministic at full precision, and an unrounded sum can wobble past the keyset boundary, duplicating or skipping a row.
  */
 const SORT_EXPRESSIONS: Record<SessionGroupSortColumn, string> = {
   lastActivity: "toFloat64(max(toUnixTimestamp64Milli(OccurredAt)))",
@@ -215,13 +208,7 @@ export class SessionGroupsClickHouseRepository implements SessionGroupsRepositor
   }
 
   /**
-   * Membership predicate for filtered reads. A session matches when any of
-   * its traces matches the trace-level filter, OR when its transcript content
-   * in `log_records` contains every free-text term. Applied as an IN over
-   * session ids so the outer rollup still sums ALL traces of a matching
-   * session, filtering rows before GROUP BY would truncate the totals to the
-   * matching traces only, which is exactly the page-local bug this lens
-   * replaces.
+   * Membership predicate for filtered reads: a session matches when any trace matches the trace-level filter, OR its log_records transcript contains every free-text term. Applied as an IN over session ids so the outer rollup still sums ALL traces of a matching session — filtering rows before GROUP BY would truncate totals to matching traces only, the page-local bug this lens replaces.
    */
   private buildSessionMatchClause(
     query: SessionGroupsQuery,

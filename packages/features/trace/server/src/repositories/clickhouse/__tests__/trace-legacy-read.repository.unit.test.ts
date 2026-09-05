@@ -13,12 +13,7 @@ const { mockClickHouseQuery, mockPrismaFindUnique } = vi.hoisted(() => ({
 }));
 
 /**
- * The process's tenant-keyed connection, as this suite supplies it.
- *
- * It arrives as a CONSTRUCTOR argument now. The suite used to mock the
- * platform application's singleton and let the repository reach for it; the
- * repository takes the resolver instead, so the fake is stated where every
- * other dependency of the read is.
+ * The process's tenant-keyed connection, as this suite supplies it — arrives as a CONSTRUCTOR argument now. The suite used to mock the platform application's singleton; the repository takes the resolver instead, so the fake sits where every other dependency of the read does.
  */
 const testResolveClickHouseClient = () => Promise.resolve({ query: mockClickHouseQuery } as never);
 
@@ -1037,14 +1032,11 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         expect(traces[0]!.spans).toHaveLength(1);
         expect(traces[0]!.spans[0]!.span_id).toBe("span-1");
 
-        // The span read is the heavy one: uncapped, a trace whose summaries
-        // carry no usable OccurredAt scans every partition and gets stopped by
-        // the server's OvercommitTracker, which picks its victim across the
-        // whole cluster, so one bad read degrades unrelated queries.
-        //
-        // Pinning the cap to this specific call is the point. A cap that is
-        // merely present somewhere, or that drifts onto the summary query,
-        // reads as protection while protecting nothing.
+        // The span read is the heavy one: uncapped, a trace with no usable
+        // OccurredAt scans every partition and gets stopped by the server's
+        // OvercommitTracker, which picks its victim cluster-wide — one bad
+        // read degrades unrelated queries. Pinning the cap to this specific
+        // call is the point; a cap merely present somewhere protects nothing.
         const spanQuery = mockClickHouseQuery.mock.calls[4]?.[0];
         expect(spanQuery.query).toContain("FROM stored_spans");
         expect(spanQuery.clickhouse_settings).toHaveProperty("max_memory_usage");
@@ -1301,15 +1293,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
 
 describe("isClickHouseMemoryLimitError", () => {
   /**
-   * The two handled errors the resilient ClickHouse client raises, as this
-   * suite states them.
-   *
-   * Named here rather than imported: they are the ANALYTICS package's, raised
-   * by the client assembly that translates a driver error after its retries
-   * are exhausted, and this predicate reads only their `code` and `reasons`.
-   * The suite asserted against a platform module that never exported them, so
-   * every construction was `new undefined(...)` and all three of these were
-   * red before the read stack moved.
+   * The two handled errors the resilient ClickHouse client raises, as this suite states them — named here rather than imported, since they're the ANALYTICS package's, raised by client assembly after retries exhaust, and this predicate reads only code/reasons. The suite used to assert against a platform module that never exported them, so every construction was new undefined(...) and all three were red before the read stack moved.
    */
   class TranslatedClickHouseError extends HandledError {
     constructor(code: "query_memory_exceeded" | "clickhouse_unavailable", reasons: Error[]) {

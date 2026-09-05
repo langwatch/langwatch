@@ -21,10 +21,7 @@ import {
 import { TestCodingAgentService } from "../../../services/__tests__/support/coding-agent.service.fake";
 
 /**
- * The data-privacy vocabulary the mappers take as a port, wired to the REAL
- * catalog and chat-turn stripper so these assertions still cover the keys
- * ingestion actually classifies. Only the resolved-policy read is absent —
- * nothing here derives the trace-level DROP banner.
+ * The data-privacy vocabulary the mappers take as a port, wired to the REAL catalog and chat-turn stripper so these assertions still cover the keys ingestion actually classifies. Only the resolved-policy read is absent — nothing here derives the trace-level DROP banner.
  */
 const contentPrivacy: TraceContentPrivacyPort = {
   contentKeyCatalog: CONTENT_KEY_CATALOG,
@@ -479,11 +476,7 @@ describe("buildContentPrivacy", () => {
 });
 
 /**
- * R2 security gap: the `traceLogs` procedure returned raw log bodies (captured
- * prompts / responses) with NO content-privacy enforcement, unlike the sibling
- * span endpoints. `redactTraceLogContent` closes that — a viewer without
- * captured-input / captured-output visibility must not read the raw content
- * through this procedure.
+ * R2 security gap: the `traceLogs` procedure returned raw log bodies (captured prompts/responses) with NO content-privacy enforcement, unlike the sibling span endpoints. `redactTraceLogContent` closes that — a viewer without captured-input/captured-output visibility must not read the raw content through this procedure.
  */
 describe("redactTraceLogContent", () => {
   function logRow(
@@ -650,10 +643,7 @@ describe("redactTraceLogContent", () => {
   });
 
   /**
-   * Only Claude Code emits bare event names. codex and gemini namespace theirs,
-   * and the transcript derivation resolves both through the canonical
-   * vocabulary — so the gate has to as well, or a namespaced record matches no
-   * known content key and leaves with its payload intact.
+   * Only Claude Code emits bare event names. codex and gemini namespace theirs, and the transcript derivation resolves both through the canonical vocabulary — so the gate has to as well, or a namespaced record matches no known content key and leaves with its payload intact.
    */
   describe("given a namespaced agent's wire spelling", () => {
     const blind = { canSeeCapturedInput: false, canSeeCapturedOutput: false };
@@ -741,12 +731,7 @@ describe("redactTraceLogContent", () => {
 });
 
 /**
- * R2 teaser window: the sibling span reads teaser-redact spans older than the
- * free-plan visibility cutoff, but the `traceLogs` read applied only the
- * captured-content permission gate — so a free-plan viewer WITH captured-content
- * permission could read raw prompts / responses older than their window through
- * the logs endpoint, a bypass of the teaser the span reads enforce.
- * `gateTraceLogVisibility` closes that.
+ * R2 teaser window: the sibling span reads teaser-redact spans older than the free-plan visibility cutoff, but `traceLogs` applied only the captured-content permission gate — so a free-plan viewer WITH captured-content permission could read raw prompts/responses older than their window, a bypass of the teaser the span reads enforce. `gateTraceLogVisibility` closes that.
  */
 describe("gateTraceLogVisibility", () => {
   function logRow(

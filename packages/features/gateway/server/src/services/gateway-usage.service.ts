@@ -1,26 +1,5 @@
 /**
- * Aggregate read-side queries for the AI Gateway usage surfaces.
- *
- * Spend comes from `trace_summaries`, the enriched per-trace cost the rest
- * of the product bills and reports from, keyed on the
- * `langwatch.virtual_key_id` attribute the gateway stamps on every span.
- *
- * It used to come from `gateway_budget_ledger_events`, which is written
- * once per applicable budget and not at all when a key has none. That made
- * the page structurally unable to show spend for an uncapped key ($0.00
- * forever) and made it report double or triple for a key covered by
- * several budgets. The budget ledger stays the source for the debit list
- * on a budget's own page, where "one row per budget" is the point.
- *
- * The virtual-keys table's spend column reads the same repository, because
- * a number you can click has to match the page it lands on.
- *
- * Every read spans the organization's projects, not just one: traces land
- * in the tenant of a key's trace destination (its explicit trace project,
- * else its single PROJECT scope, else the org's governance project), which
- * is rarely the project the viewer happens to have selected. Reading one
- * project is how the Usage page rendered "No usage in this window" while
- * the keys table showed spend for the same keys.
+ * Aggregate read-side queries for AI Gateway usage surfaces. Spend comes from trace_summaries (enriched per-trace cost, keyed on langwatch.virtual_key_id), not gateway_budget_ledger_events — the ledger writes once per applicable budget and never for an uncapped key, structurally showing $0.00 forever or double/triple-counting a multi-budget key (it stays the source for a budget's own debit list, where one-row-per-budget is the point). The VK table's spend column reads the same repository so a clickable number matches its page. Every read spans the org's projects, not one, since traces land in a key's trace destination (explicit project, else PROJECT scope, else governance project) — reading one project is how Usage showed no data while the keys table showed spend.
  */
 import { Prisma } from "@langwatch/prisma-client/generated";
 
@@ -28,10 +7,7 @@ import type { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port"
 import type { GatewayVirtualKeySpendPort } from "../ports/gateway-virtual-key-spend.port";
 
 /**
- * The one project read these surfaces make: which tenants an organization's
- * gateway traces can land in. Narrower than ProjectService on purpose — a
- * ProjectService satisfies it, and so does anything else that can answer the
- * question, which is what a test needs.
+ * The one project read these surfaces make: which tenants an org's gateway traces can land in. Narrower than ProjectService on purpose — anything that can answer the question satisfies it, which is what a test needs.
  */
 export type GatewayUsageProjectsPort = {
   listIdsByOrganization(input: { organizationId: string }): Promise<string[]>;
@@ -108,10 +84,7 @@ export class GatewayUsageService {
   ) {}
 
   /**
-   * Both repos are required keys with optional values: a deploy without
-   * ClickHouse passes `undefined` explicitly and gets empty summaries by
-   * configuration, while a caller that forgets the dependency fails to
-   * compile instead of silently reporting $0.00.
+   * Both repos are required keys with optional values: a CH-less deploy passes undefined explicitly and gets empty summaries by configuration, while a caller forgetting the dependency fails to compile instead of silently reporting $0.00.
    */
   static create(args: {
     projects: GatewayUsageProjectsPort;
@@ -123,11 +96,7 @@ export class GatewayUsageService {
   }
 
   /**
-   * Spend per key over a window, for every key in an organization.
-   *
-   * Reads across every project in the org, not just one: a key's traces
-   * land in whichever project resolved as its trace destination, which for
-   * org- and team-scoped keys is the governance project.
+   * Spend per key over a window, for every key in an org — reads across every project, not one, since a key's traces land in whichever project resolved as its trace destination (governance project for org/team-scoped keys).
    */
   async spendByVirtualKey(args: {
     organizationId: string;
@@ -160,13 +129,7 @@ export class GatewayUsageService {
   }
 
   /**
-   * The Usage page's org-wide rollup.
-   *
-   * `virtualKeyIds` is the caller's visible-key set, computed by the
-   * router with the same membership rule the keys table applies, so the
-   * page totals exactly the keys the table lists. The aggregation itself
-   * happens in ClickHouse: the buckets are keys x models x days, so a
-   * busy org's window never streams per-trace rows into this process.
+   * The Usage page's org-wide rollup. virtualKeyIds is the caller's visible-key set, computed by the router with the same membership rule the keys table applies, so the page totals exactly the keys listed. Aggregation happens in ClickHouse (keys x models x days buckets), so a busy org's window never streams per-trace rows into this process.
    */
   async summary(args: {
     organizationId: string;
@@ -233,20 +196,14 @@ export class GatewayUsageService {
   }
 
   /**
-   * One key's usage, read across the organization's projects so the total
-   * matches the spend column that deep-links here. Key visibility is the
-   * router's job (the same membership rule as `virtualKeys.get`); by the
-   * time this runs the caller is allowed to see the key.
+   * One key's usage, read across the org's projects so the total matches the spend column that deep-links here. Key visibility is the router's job (same membership rule as virtualKeys.get); by the time this runs the caller may already see the key.
    */
   async summaryForVirtualKey(args: {
     organizationId: string;
     virtualKeyId: string;
     window: UsageWindow;
     /**
-     * Narrows the recent-activity list to one model, and only that list.
-     * The totals, the daily series and the per-model breakdown stay whole:
-     * the breakdown is the control the model is picked from, so filtering
-     * it with the table would leave the reader one row and no way back.
+     * Narrows the recent-activity list to one model, and only that list — totals, daily series and per-model breakdown stay whole, since the breakdown is the control the model is picked from and filtering it too would leave no way back.
      */
     model?: string;
   }): Promise<VirtualKeyUsageSummary> {

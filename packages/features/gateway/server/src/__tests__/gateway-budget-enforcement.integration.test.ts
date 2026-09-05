@@ -1,21 +1,6 @@
 /**
  * @vitest-environment node
- *
- * A blocking budget must actually block, and must warn before it does.
- *
- * Real Postgres + real ClickHouse, no mocks. Spend goes in through the same
- * repository call the debits writer makes and comes back out through the real
- * service, so this covers the control-plane path the gateway enforces from:
- * debit -> ledger -> rollup -> decision. The Enterprise process manager that
- * used to drive the writer is not reachable from a core feature package, so
- * the request's debit rows are handed to the repository directly.
- *
- * Regression guard for issue #6141, where budgets accrued nothing on four of
- * six windows and so never warned and never blocked however much traffic ran.
- * A budget that silently never enforces is worse than no budget, so this fails
- * if the ladder from allow to warn to block ever stops working.
- *
- * Spec: specs/ai-gateway/budgets.feature
+ * Real Postgres + real ClickHouse. Regression for #6141: budgets accrued nothing on 4 of 6 windows, so warn/block never fired. Spec: specs/ai-gateway/budgets.feature
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

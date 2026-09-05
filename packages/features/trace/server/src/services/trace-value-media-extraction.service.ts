@@ -1,47 +1,5 @@
 /**
- * value-media-extractor.ts — finds inline media parts in an ARBITRARY JSON
- * value and externalizes them to stored objects, under an explicit cost
- * budget.
- *
- * The scenario path (`content-extractor.ts`) walks a known envelope:
- * `event.message` / `event.messages[]` → `content[]` → parts. Trace span
- * attributes have no such contract — the same media part can appear as:
- *
- *  - a message array:            [{role, content:[{type:"file", ...}]}]
- *  - a typed value envelope:     {type:"chat_messages", value:[...]}
- *  - a typed RAW value whose payload is a JSON *string*:
- *                                {type:"raw", value:"[{\"role\":...}]"}
- *  - a bare content array, a single message, a part nested inside a
- *    tool_result — at any depth — or a whole-attribute bare `data:` URI.
- *
- * Because this runs inside the synchronous collector request, the work is
- * done in three phases so the storage cost is bounded and concurrent:
- *
- *  1. SYNC COLLECT — walk the value (arrays, objects, media-marker-gated
- *     nested JSON strings) and record the location of every candidate part.
- *     An object is a candidate when the shared `visitContentPart` dispatcher
- *     recognizes it AND it carries inline bytes; url-only parts are already
- *     externalized and skipped. No I/O.
- *  2. STORE — externalize candidates through the same `TraceContentExtractionService.processContentPart`
- *     the scenario extractor uses, in bounded-concurrency waves, respecting
- *     the caller's `ExtractionBudget`: a per-span part cap and a deadline.
- *     A part whose store fails (or that falls past the cap/deadline) simply
- *     stays inline — parts already stored keep their references, so no
- *     stored bytes are ever left unreferenced by a later failure.
- *  3. REBUILD — clone-on-write only along the paths of rewritten parts
- *     (re-serializing any nested JSON string boundary they sit behind), so
- *     an untouched subtree keeps reference identity and the caller can
- *     cheaply detect "no-op".
- *
- * Nested JSON strings are only parsed when `containsMediaMarkers` passes —
- * a linear scan for the part-type/base64 markers — so plain-text and
- * ordinary JSON payloads are never speculatively parsed. When a nested
- * string IS rewritten it is re-serialized with `JSON.stringify`, which may
- * normalize whitespace; acceptable because the content changed anyway.
- *
- * The walk mirrors the render-side collector (`shared/traces/mediaParts.ts`):
- * same depth ceiling, same part-first-stop rule, same generic recursion.
- * `media-walk-parity.unit.test.ts` pins the agreement.
+ * Finds inline media parts in an ARBITRARY JSON value (not the scenario path's known envelope — trace span attributes carry message arrays, typed value envelopes, typed RAW string payloads, bare content arrays/messages, tool_result-nested parts, or whole-attribute `data:` URIs, at any depth) and externalizes them under an explicit cost budget. Runs in three bounded phases inside the synchronous collector request: SYNC COLLECT walks the value recording candidate part locations (no I/O; url-only parts already externalized are skipped); STORE externalizes candidates via the same `TraceContentExtractionService.processContentPart` the scenario extractor uses, in bounded-concurrency waves respecting the caller's `ExtractionBudget` (per-span part cap + deadline — a failed/over-budget part simply stays inline, already-stored parts keep their references); REBUILD clone-on-writes only along rewritten paths so untouched subtrees keep reference identity. Nested JSON strings are only parsed when `containsMediaMarkers` passes (a linear scan), and re-serialized with `JSON.stringify` when rewritten. Mirrors the render-side collector (`shared/traces/mediaParts.ts`) depth ceiling and part-first-stop rule; `media-walk-parity.unit.test.ts` pins the agreement.
  */
 
 import { TraceContentExtractionService } from "./trace-content-extraction.service";
@@ -55,19 +13,12 @@ import type { TraceMediaStorePort } from "../ports/trace-media-store.port";
 const MAX_NESTED_JSON_BYTES = 50 * 1024 * 1024;
 
 /**
- * At most this many parts are externalized per span. A realtime voice span
- * can carry hundreds of turns; storing them all inside the collector request
- * would serialize hundreds of storage round trips. Parts past the cap stay
- * inline and the drop is surfaced to the caller — never silent.
+ * At most this many parts are externalized per span. A realtime voice span can carry hundreds of turns; storing them all inside the collector request would serialize hundreds of storage round trips. Parts past the cap stay inline and the drop is surfaced to the caller — never silent.
  */
 export const MAX_MEDIA_PARTS_PER_SPAN = 16;
 
 /**
- * Wall-clock budget for the whole span's extraction (all attribute values).
- * Once exceeded, no further parts are stored; parts already stored keep
- * their references. Sized well under typical SDK export deadlines (10-30s)
- * so a slow object store degrades to inline payloads instead of client
- * timeouts and re-sent batches.
+ * Wall-clock budget for the whole span's extraction (all attribute values). Once exceeded, no further parts are stored; parts already stored keep their references. Sized well under typical SDK export deadlines (10-30s) so a slow object store degrades to inline payloads instead of client timeouts and re-sent batches.
  */
 export const EXTRACTION_DEADLINE_MS = 5_000;
 
@@ -373,12 +324,7 @@ export class TraceValueMediaExtractionService {
   }
 
   /**
-   * True when the object IS a media part carrying inline bytes — i.e. the
-   * shapes `TraceContentExtractionService.processContentPart` would externalize. Url-only parts (already
-   * externalized) and non-part objects return false. Uses the same
-   * `visitContentPart` dispatcher as the store phase, so the two cannot
-   * disagree on shape vocabulary — only on the payload-presence checks below,
-   * which the parity test pins against `TraceContentExtractionService.processContentPart`'s behavior.
+   * True when the object IS a media part carrying inline bytes — the shapes `TraceContentExtractionService.processContentPart` would externalize. Url-only parts (already externalized) and non-part objects return false. Uses the same `visitContentPart` dispatcher as the store phase, so the two cannot disagree on shape vocabulary — only on the payload-presence checks below, pinned by the parity test.
    */
   static isExtractableMediaPart(part: unknown): boolean {
     if (typeof part !== "object" || part === null) {
@@ -404,17 +350,7 @@ export class TraceValueMediaExtractionService {
   }
 
   /**
-   * Walks `value` (any JSON-compatible value, or a JSON string) and
-   * externalizes inline media parts found at any depth, including through
-   * media-marker-gated nested JSON strings and whole-string `data:` URIs.
-   *
-   * Storage runs in bounded-concurrency waves under `budget` (a per-span cap
-   * and deadline shared across a span's attribute values — pass the same
-   * budget object to every call for one span). Per-part store failures are
-   * fail-open: the failed part stays inline, `budget.failedParts` is
-   * incremented, and every part stored before the failure keeps its reference.
-   *
-   * Returns the original `value` reference when nothing was rewritten.
+   * Walks `value` (any JSON-compatible value, or a JSON string) and externalizes inline media parts at any depth, including through media-marker-gated nested JSON strings and whole-string `data:` URIs. Storage runs in bounded-concurrency waves under `budget` (a per-span cap and deadline shared across a span's attribute values — pass the same budget object to every call for one span); per-part store failures are fail-open (part stays inline, `budget.failedParts` increments, prior stores keep their references). Returns the original `value` reference when nothing was rewritten.
    */
   static async extractInlineMediaFromValue({
     value,

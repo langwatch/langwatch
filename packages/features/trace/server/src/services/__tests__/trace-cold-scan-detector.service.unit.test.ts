@@ -92,8 +92,7 @@ function partitionedTablesIn(up: string): Map<string, string> {
   const found = new Map<string, string>();
   const createRe = /CREATE TABLE[^(]*?[.`]?(\w+)[\s`]*?\(/gi;
 
-  let match: RegExpExecArray | null;
-  while ((match = createRe.exec(up)) !== null) {
+  for (let match = createRe.exec(up); match !== null; match = createRe.exec(up)) {
     const table = match[1];
     if (!table) continue;
     const partitionBy = /PARTITION BY\s+([^\n]+)/i.exec(statementAt(up, match.index));

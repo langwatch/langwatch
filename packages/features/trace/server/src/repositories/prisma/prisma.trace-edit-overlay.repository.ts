@@ -1,9 +1,5 @@
 /**
- * The stored reviewer correction for a trace, over Prisma.
- *
- * Moved out of the application process unchanged: every filter, include and
- * return shape — and the two-constraint upsert retry below — is the one a
- * reviewer's save has always run through.
+ * The stored reviewer correction for a trace, over Prisma. Moved out of the application process unchanged: every filter, include and return shape — and the two-constraint upsert retry below — is the one a reviewer's save has always run through.
  */
 import { generate } from "@langwatch/ksuid";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
@@ -14,12 +10,7 @@ import {
 } from "../trace-edit-overlay.repository";
 
 /**
- * The id prefix every correction carries.
- *
- * Stated rather than imported: the application's `KSUID_RESOURCES` table is a
- * browser-shared constant map, and one entry of it reaching a server package
- * would drag the whole map. The value is the wire format of every id already
- * stored.
+ * The id prefix every correction carries. Stated rather than imported: the application's KSUID_RESOURCES is a browser-shared constant map, and one entry reaching a server package would drag the whole map. The value is the wire format of every id already stored.
  */
 const TRACE_EDIT_OVERLAY_KSUID_RESOURCE = "traceedit";
 
@@ -77,13 +68,7 @@ export class PrismaTraceEditOverlayRepository extends TraceEditOverlayRepository
   }
 
   /**
-   * The row has a primary key as well as its (projectId, traceId) unique, and
-   * Prisma cannot push a two-constraint upsert down to a single INSERT ... ON
-   * CONFLICT; it compiles to a SELECT followed by an INSERT. Two reviewers
-   * saving the first correction for the same trace at the same moment therefore
-   * both decide to insert, and the loser gets a unique violation. The loser
-   * wanted the row to hold its patch, which is exactly an update, so it retries
-   * as one instead of surfacing an error the reviewer cannot act on.
+   * The row has a primary key as well as its (projectId, traceId) unique, and Prisma can't push a two-constraint upsert to a single INSERT ... ON CONFLICT — it compiles to SELECT then INSERT. Two reviewers saving the first correction for the same trace at once both decide to insert; the loser gets a unique violation but wanted an update, so it retries as one instead of surfacing an error the reviewer can't act on.
    */
   async upsert({
     projectId,

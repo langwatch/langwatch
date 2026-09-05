@@ -13,9 +13,8 @@ const spendGrouping = GatewaySpendGroupingAdapter.create();
 const NOW = 1_800_000_000_000;
 /**
  * Read rather than assumed: the grace is overridable through
- * LW_SPEND_SETTLEMENT_GRACE_MS, so pinning the default here would make these
- * windows mean something else on a runner that sets it. Asserted positive so
- * a zero grace cannot make both windows the same window.
+ * LW_SPEND_SETTLEMENT_GRACE_MS. Asserted positive so a zero grace cannot
+ * make both windows the same window.
  */
 const settlementPolicy = FixedGatewaySettlementPolicyAdapter.create(30 * 60 * 1000);
 const GRACE_MS = settlementPolicy.graceMs();

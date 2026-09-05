@@ -3,14 +3,7 @@ import type { GatewayModelProviderCredentialsPort } from "./gateway-model-provid
 import type { VirtualKeyWithScopes } from "./gateway-virtual-key.port";
 
 /**
- * What the gateway bundle is assembled from besides the materialiser's own
- * logic: the version token the gateway revalidates with, the reserved model
- * tiers a routing policy falls through to, and the catalog of models a
- * provider row declares it serves.
- *
- * A port because each of the three reads something outside the service — the
- * provider graph, the tier vocabulary, the shipped model registry — and a
- * process composes the concrete reader.
+ * What the gateway bundle is assembled from besides the materialiser's own logic: the version token, the reserved model tiers a routing policy falls through to, and the model catalog a provider row declares it serves. A port because each reads something outside the service (provider graph, tier vocabulary, shipped registry); a process composes the concrete reader.
  */
 export abstract class GatewayConfigAssemblyPort {
   /** The `ETag` for one key's bundle. */

@@ -10,12 +10,7 @@ import type { TraceIOExtractionService } from "./trace-io-extraction.service";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 
 /**
- * Optional blob-offload resolution dependencies for the `full` read path
- * (ADR-022). When provided, `getByTraceId({ full: true })` re-reads the
- * trace's spans, resolves any `langwatch.reserved.eventref.*` pointers from
- * event_log, and recomputes input/output so the header shows the complete
- * content instead of the ≤64KB preview stored in trace_summaries. When
- * omitted, `full` is a no-op — identical to the plain summary read.
+ * Optional blob-offload resolution dependencies for the `full` read path (ADR-022). When provided, `getByTraceId({ full: true })` re-reads the trace's spans, resolves any `langwatch.reserved.eventref.*` pointers from event_log, and recomputes input/output so the header shows complete content instead of the ≤64KB preview stored in trace_summaries. When omitted, `full` is a no-op — identical to the plain summary read.
  */
 export interface TraceSummaryFullResolutionDeps {
   spanStorageRepository: SpanStorageRepository;
@@ -95,10 +90,7 @@ export class TraceSummaryService {
   }
 
   /**
-   * Recomputes input/output from the trace's spans with offloaded values
-   * restored. Any failure — spans read, event_log read, a stale ref — falls
-   * back to the stored preview: a degraded header read must never become a
-   * failed one.
+   * Recomputes input/output from the trace's spans with offloaded values restored. Any failure (spans read, event_log read, a stale ref) falls back to the stored preview: a degraded header read must never become a failed one.
    */
   private async withFullIO(tenantId: string, summary: TraceSummaryData): Promise<TraceSummaryData> {
     const deps = this.fullResolutionDeps;

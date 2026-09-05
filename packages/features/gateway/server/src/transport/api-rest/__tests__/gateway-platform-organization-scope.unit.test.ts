@@ -1,11 +1,5 @@
 /**
- * Finding H12 of the 2026-09-04 feature-surface security pass: the gateway
- * platform family is a PROJECT app, so its declared permission resolves at the
- * caller's own project — while every by-id budget and cache-rule handler
- * widens to the organization before it writes. The write is authorized where
- * it acts.
- *
- * Spec: specs/security/resource-scope-permission-checks.feature
+ * Finding H12 (2026-09-04 feature-surface security pass): the gateway platform family is a PROJECT app, so its declared permission resolves at the caller's own project, while every by-id budget/cache-rule handler widens to the organization before writing — authorized where it acts. Spec: specs/security/resource-scope-permission-checks.feature
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import { PermissionDeniedError } from "@langwatch/authz-contract";
@@ -19,7 +13,10 @@ const PROJECT_ID = "project_caller";
 const ORGANIZATION_ID = "organization_1";
 
 const renderUnexpected: ErrorHandler = (error, c) =>
-  c.json({ error: { type: "internal_error", code: "internal_error", message: String(error) } }, 500);
+  c.json(
+    { error: { type: "internal_error", code: "internal_error", message: String(error) } },
+    500,
+  );
 
 function testSecurity(): AppRestSecurity {
   const pass: MiddlewareHandler = async (_c, next) => next();

@@ -1,11 +1,5 @@
 /**
- * What one end user's spending allowances look like.
- *
- * This is the figure a customer sees next to their own name, so it is read
- * from two stores that must agree: the allowance and its period boundary come
- * from Postgres, the amount spent from the ledger. The join between them is
- * the bucket scope id, and getting it wrong shows somebody else's spend — or,
- * more quietly, zero.
+ * One end user's spending allowance, read from two stores that must agree: allowance + period boundary from Postgres, spend from the ledger. The join is the bucket scope id — get it wrong and you show someone else's spend, or quietly zero.
  */
 
 import { describe, expect, it } from "vitest";

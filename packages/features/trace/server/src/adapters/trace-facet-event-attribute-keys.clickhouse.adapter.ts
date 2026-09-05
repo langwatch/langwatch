@@ -12,20 +12,7 @@ export class ClickHouseEventAttributeKeysFacetAdapter {
   }
 
   /**
-   * Discover query for event attribute keys: every distinct key seen across
-   * the per-event `Events.Attributes` maps on `stored_spans`. The column is
-   * `Array(Map(LowCardinality(String), String))` — one map per event per
-   * span — so we double-`arrayJoin` to flatten down to a single key column
-   * before deduping.
-   *
-   * Mirrors `span-attribute-keys.ts`: returns just the key list, with values
-   * loaded lazily once the user expands a key. Keeping discovery cheap is
-   * the whole point — a tenant can have unbounded distinct event-attribute
-   * values, so a full `(key, value)` enumeration would not scale.
-   *
-   * Filtering (`event.attribute.<k>:value`) is already wired through
-   * `filter-to-clickhouse/ast.ts`'s `translateEventAttribute`; this facet
-   * only feeds the sidebar's discovery list.
+   * Discover query for event attribute keys across stored_spans' Events.Attributes maps (Array(Map) per event per span, so this double-arrayJoins to flatten to one key column). Mirrors span-attribute-keys.ts: returns only the key list, values loaded lazily on expand, since a full (key,value) enumeration wouldn't scale against unbounded cardinality. Filtering itself is wired through translateEventAttribute; this only feeds the sidebar's discovery list.
    */
   static buildEventAttributeKeysFacetQuery(ctx: FacetQueryContext): FacetQuery {
     const where = ClickHouseFacetQueryAdapter.buildTimeWhere("StartTime");

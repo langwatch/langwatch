@@ -1,28 +1,5 @@
 /**
- * The one budget-overview read: which budgets bind a person's gateway
- * usage, with labels precise enough to say so out loud.
- *
- * Every member-facing surface that says "budget" reads this service: the
- * /me page, the CLI login epilogue, and the REST mirror behind it. Before
- * it existed each surface collapsed the applicable set to a single number
- * and lost the scope, so a whole-organization cap rendered as "Month
- * budget: $100" and read as personal. The item here keeps every budget
- * that binds the user's own keys and names each one's scope
- * ("whole organization budget", "team budget (Core)", "personal budget"),
- * so no consumer has to guess what a number governs.
- *
- * Resolution reuses the same stack the gateway enforces with
- * (`resolveApplicableBudgets` via `resolveApplicableBudgetsForTarget`),
- * targeted at the user's personal workspace + personal key + own
- * principal. What this lists is exactly what will block them.
- *
- * Authorization tier: a member reads their OWN overview. That is the
- * same self-scope their personal-team ADMIN role binding already grants
- * over the personal project, so no org-level virtualKeys:manage is
- * required; callers gate on org membership (organization:view) and the
- * service re-checks membership itself, fail closed.
- *
- * Spec: specs/ai-gateway/budget-overview.feature
+ * The one budget-overview read, shared by /me, the CLI login epilogue and the REST mirror: before it existed each surface collapsed the applicable set to a single number and lost scope, so a whole-org cap read as personal. Keeps every budget binding the user's own keys with its scope named. Resolution reuses the enforcement stack (resolveApplicableBudgets via resolveApplicableBudgetsForTarget) targeted at the user's own workspace/key/principal, so what's listed is exactly what will block them. A member reads their OWN overview via the personal-team ADMIN binding they already hold, not org-level virtualKeys:manage; the service re-checks org membership itself, fail closed. Spec: specs/ai-gateway/budget-overview.feature
  */
 
 import type { FeatureFlagService } from "@langwatch/feature-flag-contract";
@@ -42,12 +19,7 @@ import { scopeTargetKey, type GatewayService, GatewayWindow } from "@langwatch/g
 import { GatewayProviderLabelRepository } from "../repositories/gateway-provider-label.repository";
 
 /**
- * How binding a budget scope is to the person reading, most binding
- * first. Personal caps beat key caps beat the shared pools; every
- * surface that can only show a few lines truncates in this order.
- *
- * `satisfies` over the Prisma enum keeps the map exhaustive: a new scope
- * kind fails to compile here rather than silently sorting last.
+ * How binding a scope is to the reader, most binding first (personal > key > shared pools) — the truncation order for surfaces with only a few lines. `satisfies` over the Prisma enum keeps the map exhaustive: a new scope kind fails to compile rather than silently sorting last.
  */
 export const BUDGET_SCOPE_RANK = {
   PRINCIPAL: 0,
@@ -82,19 +54,11 @@ export type BudgetOverviewItem = ApplicableBudget & {
    */
   scopePhrase: string;
   /**
-   * When the current window's spend goes back to zero, in UTC. Every
-   * budget resets on that clock: the rollup buckets periods with
-   * `toStartOfDay`/`Week`/`Month` on UTC `OccurredAt`, and `budget.timezone`
-   * has no reader on the reset path (see `budgetWindow.ts`), so this
-   * matches when the ledger actually rolls over regardless of the column.
-   * Null for TOTAL windows, which never reset.
+   * When the current window's spend resets to zero, in UTC. Matches the rollup's own toStartOfDay/Week/Month bucketing on UTC OccurredAt — budget.timezone has no reader on the reset path (budgetWindow.ts) — regardless of the column. Null for TOTAL windows, which never reset.
    */
   resetsAt: string | null;
   /**
-   * Top models by spend in the user's personal workspace this month.
-   * Only attached to personal-class items, and only when the caller
-   * asked (`includeTopModels`), so lightweight surfaces skip the extra
-   * ClickHouse read.
+   * Top models by spend in the personal workspace this month. Attached only to personal-class items, and only when the caller asked (includeTopModels), so lightweight surfaces skip the extra ClickHouse read.
    */
   topModels?: Array<{ model: string; spentUsd: number }>;
 };
@@ -118,10 +82,7 @@ type PersonalVirtualKeyReader = {
 };
 
 /**
- * The two shapes the Enterprise personal-usage reader speaks, restated here
- * rather than imported: governance is an Enterprise feature and a core package
- * may not depend on one. Structural, so the Enterprise reader satisfies this
- * without either side naming the other.
+ * The two shapes the Enterprise personal-usage reader speaks, restated here rather than imported — governance is Enterprise-only and a core package may not depend on it. Structural, so the Enterprise reader satisfies this without either side naming the other.
  */
 type PersonalUsageQuery = {
   personalProjectId: string;
@@ -183,10 +144,7 @@ export class BudgetOverviewService {
   }
 
   /**
-   * Every budget that binds this user's own keys in this organization,
-   * most binding first, with spend from the same rollup enforcement
-   * reads. Empty-safe: a user with no personal workspace yet still sees
-   * the org, principal, and department budgets that will bind them.
+   * Every budget binding this user's own keys in this org, most binding first, spend from the same rollup enforcement reads. Empty-safe: a user with no personal workspace still sees the org/principal/department budgets that will bind them.
    */
   async overviewForUser(input: {
     organizationId: string;
@@ -273,11 +231,7 @@ export class BudgetOverviewService {
   }
 
   /**
-   * One budget in the same item shape, for surfaces looking at the
-   * budget itself rather than at a person (the settings detail page).
-   * No user in context, so a GROUP budget reports the whole group's
-   * spend and person-relative classes ("personal", "this key's budget")
-   * fall back to their absolute phrases.
+   * One budget in the same item shape, for surfaces looking at the budget itself (settings detail page) rather than a person. No user in context, so a GROUP budget reports the whole group's spend and person-relative labels fall back to absolute phrases.
    */
   async overviewForBudget(input: {
     organizationId: string;
@@ -431,10 +385,7 @@ const SCOPE_CLASS_BY_TYPE = {
 } as const satisfies Record<GatewayBudgetScopeType, BudgetOverviewScopeClass>;
 
 /**
- * Null for a scope kind this module does not know. Callers must then name
- * the target rather than assert a scope: labelling an unrecognised scope
- * "whole organization budget" is the same mislabel, in the other
- * direction, that this service exists to remove.
+ * Null for a scope kind this module doesn't know — callers must then name the target rather than assert a scope, since mislabelling an unrecognised scope "whole organization budget" is the same mislabel this service exists to remove.
  */
 function absoluteScopeClass(scopeType: string): BudgetOverviewScopeClass | null {
   return SCOPE_CLASS_BY_TYPE[scopeType as keyof typeof SCOPE_CLASS_BY_TYPE] ?? null;

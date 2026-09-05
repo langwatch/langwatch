@@ -13,13 +13,7 @@ import type {
 } from "../repositories/gateway-budget.repository";
 
 /**
- * The attributed-user budget allowances that apply to one end user, with what
- * each has spent.
- *
- * Two stores answer this: the templates and their bucket boundaries come from
- * Postgres through the budget repository, the spend from the ledger through
- * the spend port. Neither is a PrismaClient — this used to take one and query
- * it directly, which put a database handle in a service.
+ * Attributed-user budget allowances for one end user, with spend. Two stores answer this: templates + bucket boundaries from Postgres via the budget repository, spend from the ledger via the spend port. Neither is a PrismaClient — this used to take one and query it directly, putting a database handle in a service.
  */
 export class GatewayEndUserCapsService {
   static create(options: {

@@ -1,9 +1,6 @@
 /**
- * Unit tests for the TraceOffloadResolutionService.resolveOffloadedTraces helper — per-trace span-level
- * eventref resolution and TraceIO recompute (read-resolution half of ADR-022).
- * Each test covers one assertion.
- *
- * BDD structure: given/when nested describes, action-based it() names.
+ * @see ADR-022
+ * Unit tests for resolveOffloadedTraces — per-trace span-level eventref resolution and TraceIO recompute (the read-resolution half). Each test covers one assertion.
  */
 import { TraceOffloadResolutionService } from "../trace-offload-resolution.service";
 import { describe, expect, it, vi } from "vitest";

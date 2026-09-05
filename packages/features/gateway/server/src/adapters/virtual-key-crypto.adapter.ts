@@ -1,26 +1,5 @@
 /**
- * Virtual-key crypto primitives. Mint, hash, verify, and inspect.
- *
- * Format: `vk-lw-<26-char Crockford base32 ULID>` (32 chars total).
- *   - Fixed prefix `vk-lw-` is grep/DLP-friendly + function-named, paired
- *     with `sk-lw-` (secret / ingestion keys) and `pat-lw-` (legacy).
- *   - Body is a monotonic ULID (128 random bits, 48 ms timestamp), encoded in
- *     Crockford base32 — sortable by creation time in dashboards.
- *
- * Storage:
- *   - Raw secret: displayed to the user exactly once, never stored.
- *   - `hashedSecret` column: `HMAC-SHA256(pepper, secret)` hex string (64 chars).
- *     Deterministic so we can look up a presented secret by hash directly in
- *     one indexed query.
- *   - `displayPrefix` column: first 13 chars (`vk-lw-01HZX9N`) — safe to
- *     surface in UI, logs, and traces.
- *
- * Why HMAC-SHA256 instead of argon2id? The secret body has 128+ bits of
- * entropy so offline brute-force is not a threat that password-KDFs are
- * needed to mitigate. HMAC is what Stripe, GitHub, and similar API-key
- * systems use — it is fast (hot path cold-resolve) and deterministic
- * (enables single-query lookup-by-hash). The pepper (`LW_VIRTUAL_KEY_PEPPER`)
- * ensures a database leak alone is not sufficient to recover plaintext.
+ * Virtual-key crypto: mint/hash/verify vk-lw-<ULID>. hashedSecret is HMAC-SHA256(pepper, secret) for deterministic lookup-by-hash in one indexed query; HMAC over argon2id since the secret already carries 128+ bits of entropy (no offline brute-force to mitigate) and must stay fast on the hot resolve path — same choice Stripe/GitHub API keys make. The pepper (LW_VIRTUAL_KEY_PEPPER) keeps a DB leak alone from recovering plaintext.
  */
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 import { GatewayVirtualKeyCryptoPort } from "../ports/gateway-virtual-key-crypto.port";

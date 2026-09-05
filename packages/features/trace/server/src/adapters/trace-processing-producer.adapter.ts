@@ -1,25 +1,5 @@
 /**
- * The `trace_processing` pipeline as a PRODUCER registers it.
- *
- * One definition, two registrations. The consumer — the worker — supplies the
- * real span store, the three projection stores, the canonicaliser and the
- * span-preparation chain, and drains every routing key the definition
- * declares. A producer registers the SAME definition only to obtain its
- * command dispatchers: `addAnnotation` and `removeAnnotation` off a tRPC call,
- * and nothing else. It starts no consumer loop, holds no event log and folds
- * nothing.
- *
- * Every dependency the definition takes is consumer-side, and a producer has
- * none of them. That is what this module supplies — stand-ins that exist so the
- * definition can be CONSTRUCTED and refuse by name if they are ever CALLED.
- * Refusing rather than no-op'ing is the whole point: a silently-succeeding fold
- * store in a process that was never meant to fold would report a projection as
- * written when nothing was, and the row would simply never appear.
- *
- * Forking the definition instead — declaring only the two commands a producer
- * sends — is the thing this avoids. The routing triple every job carries is
- * derived from the pipeline and command names, so two descriptions of one event
- * stream drift into jobs the worker cannot route.
+ * The trace_processing pipeline as a PRODUCER registers it: one definition, two registrations. The worker (consumer) supplies the real span store, projection stores, canonicaliser and span-prep chain, draining every routing key; a producer registers the SAME definition only to obtain addAnnotation/removeAnnotation, starting no consumer loop, holding no event log, folding nothing. Every dependency the definition takes is consumer-side, so this module supplies stand-ins that construct successfully but refuse by name if ever CALLED — refusing beats a silently-succeeding fold that reports a projection as written when nothing was. Forking the definition (declaring only the two producer commands) is what this avoids: the routing triple derives from pipeline+command names, so two descriptions of one stream would drift into unroutable jobs.
  */
 import type { AppendStore, FoldProjectionStore, TenantId } from "@langwatch/eventing";
 import {
@@ -84,11 +64,7 @@ class ProducerOnlyAppendStore<TRow> implements AppendStore<TRow> {
 }
 
 /**
- * The canonicaliser this process does not hold.
- *
- * Every member throws rather than returning an empty answer: canonicalisation
- * is what decides what a span MEANS, and a stand-in answering "nothing" would
- * be read as a span that carried nothing.
+ * The canonicaliser this process does not hold. Every member throws rather than returning an empty answer — canonicalisation decides what a span MEANS, and a stand-in answering "nothing" would be read as a span that carried nothing.
  */
 class ProducerOnlyCanonicalisation extends TraceCanonicalisationService {
   constructor(private readonly processName: string) {
@@ -234,11 +210,7 @@ export class TraceProcessingProducerAdapter {
   }
 
   /**
-   * Builds the trace-processing definition for a process that only sends
-   * commands on it.
-   *
-   * `processName` names the refusal, so a stand-in reached by accident says which
-   * process reached it rather than reporting an anonymous failure.
+   * Builds the trace-processing definition for a process that only sends commands on it. processName names the refusal, so a stand-in reached by accident says which process reached it rather than reporting an anonymous failure.
    */
   static createTraceProcessingProducerPipeline(input: { processName: string }) {
     const { processName } = input;

@@ -217,19 +217,7 @@ describe("computeClaudeSpanEnrichment", () => {
 
   describe("given two CONCURRENT sub-agents sharing one query_source (known-fragile positional input pairing)", () => {
     /**
-     * Residual limitation, characterized deliberately. Input logs
-     * (`api_request_body` / `user_prompt`) carry NO `request_id`, so input can
-     * only be paired positionally: the Nth span (array/call order) to the Nth
-     * body (time order). That holds for ONE sequential agent. Two concurrent
-     * sub-agents emitting under the SAME `query_source` interleave in a single
-     * group, so when the span array order and the body time order disagree, span
-     * i pairs with the OTHER agent's body i — input is mis-attributed.
-     *
-     * This is accepted: output still joins EXACTLY by `request_id` (asserted
-     * below), only the input transcript can cross; and real Claude Code
-     * sub-agents each carry a distinct `query_source`, which isolates them
-     * into separate groups (see the two-query_sources test above). This test
-     * pins the behavior so a future correlation fix has a red-to-green target.
+     * Residual limitation, characterized deliberately: input logs (api_request_body/user_prompt) carry no request_id, so input pairs positionally (Nth span to Nth body) — holds for ONE sequential agent, but two concurrent sub-agents sharing a query_source interleave in one group, so a disagreement between span-array order and body-time order mis-attributes input across agents. Accepted since output still joins EXACTLY by request_id, only input can cross, and real sub-agents each carry a distinct query_source isolating them into separate groups. Pins the behavior so a future fix has a red-to-green target.
      */
     it("joins output exactly by request_id but can cross the positional input", () => {
       const REQ_A = "req_agentA";

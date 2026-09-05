@@ -1,12 +1,5 @@
 /**
- * The seam between what the gateway posts and what the pipeline appends.
- *
- * Two shapes have to keep agreeing across a deploy: the wire schema, which
- * the Go emitter is built against and must not grow requirements, and the
- * command schema, which is what already-appended events are read back
- * through. A field added to the command schema without a default turns
- * every event written before the deploy into a parse failure, so the
- * defaults are the compatibility contract and are pinned here.
+ * The seam between what the gateway posts and what the pipeline appends. A field added to the command schema without a default turns every event written before deploy into a parse failure, so defaults are the compatibility contract, pinned here.
  */
 
 import { describe, expect, it } from "vitest";

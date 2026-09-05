@@ -1,5 +1,3 @@
-import { TraceOffloadResolutionBatchService } from "./trace-offload-resolution-batch.service";
-import { TraceOffloadResolutionService } from "./trace-offload-resolution.service";
 import { TraceEditOverlayRedactionService } from "./trace-edit-overlay-redaction.service";
 import { ClaudeCodeLogEnrichmentService } from "./claude-code-log-enrichment.service";
 import { TraceEvaluationMappingService } from "./trace-evaluation-mapping.service";
@@ -13,7 +11,6 @@ import {
   type TraceLogRecordReader,
 } from "./claude-code-log-enrichment.service";
 import type { TraceIOExtractionService } from "#services/trace-io-extraction.service";
-import type { NormalizedSpan } from "@langwatch/trace-contract";
 import type { Evaluation, Trace } from "@langwatch/trace-contract";
 import type { Protections } from "@langwatch/trace-server";
 import type { TraceLegacyReadRepository } from "../repositories/trace-legacy-read.repository";

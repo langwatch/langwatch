@@ -1,10 +1,5 @@
 /**
- * Ingest-time derivation of the useful content out of raw LLM API bodies.
- *
- * An emitter that logs its raw provider request/response ships a 60 KB JSON blob
- * per model call, and every consumer wants the same few things out of it. We
- * parse it ONCE here and stamp the result on the record, so reads are cheap and
- * the data becomes queryable as ordinary log attributes.
+ * Ingest-time derivation of useful content out of raw LLM API bodies. An emitter logging its raw provider request/response ships a 60 KB JSON blob per call, and every consumer wants the same few things from it — parsed ONCE here and stamped on the record, so reads stay cheap and the data becomes queryable as ordinary log attributes.
  */
 import { TraceLogContentDerivationService } from "../trace-log-content-derivation.service";
 import { describe, expect, it } from "vitest";

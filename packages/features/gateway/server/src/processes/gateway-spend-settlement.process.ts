@@ -33,16 +33,7 @@ type SpendSettlementIntents = {
 };
 
 /**
- * Arms the next sweep and hands the work to the outbox.
- *
- * Declared out here with an explicit intents type rather than inline in the
- * applier, the same way every other scheduled process does it: the builder
- * infers a wake handler's intents from the handler itself, so an inline one
- * types `ctx.intents.sweep` as possibly-undefined and cannot be called.
- *
- * Wake handlers must be pure and synchronous — the commit that persists this
- * evolution is what fences racing workers — so the query and the sends run
- * behind the outbox lease as an intent instead.
+ * Declared out here with an explicit intents type rather than inline — inline, the builder infers a wake handler's intents from the handler itself and types ctx.intents.sweep as possibly-undefined. Wake handlers must be pure/synchronous, so the query and sends run behind the outbox lease as an intent instead.
  */
 export const spendSettlementWake: WakeHandler<SpendSettlementState, SpendSettlementIntents> = (
   state,
@@ -53,24 +44,7 @@ export const spendSettlementWake: WakeHandler<SpendSettlementState, SpendSettlem
 });
 
 /**
- * The settlement sweeper: ONE process instance for the whole install, woken
- * on a schedule, asking the spend record which admissions are still open
- * past their grace and settling each one.
- *
- * It used to be one instance per gateway request, each holding a durable row
- * and a wake armed at admission + grace. That is the right shape for a
- * long-lived entity and the wrong one for a request: the aggregate is
- * per-request, so the framework keyed an instance per request, and
- * `ProcessManagerInstance` has no retention sweep because it is documented as
- * bounded by entity population rather than by traffic. A timer per LLM call
- * made that false.
- *
- * The join those rows existed to perform is already done: the fold writes one
- * `gateway_spend` row per request and leaves it at `admitted` until an
- * outcome arrives, so "which requests are still open" is a query, not a
- * memory. Settlement latency becomes grace + at most one sweep interval, and
- * the settle command is idempotent by (tenant, request, step), so a
- * re-settled row is a no-op rather than a double charge.
+ * The settlement sweeper: ONE process instance for the whole install, woken on a schedule, asking the spend record which admissions are open past grace. Replaces one instance per request (wrong shape — ProcessManagerInstance has no retention sweep, being bounded by entity population, and a timer per LLM call broke that). The fold already writes one gateway_spend row per request, staying "admitted" until an outcome lands, so "which requests are open" is a query, and settle is idempotent by (tenant, request, step) so a re-settled row is a no-op.
  */
 export function spendSettlementPM(
   deps: SpendSettlementProcessDeps,

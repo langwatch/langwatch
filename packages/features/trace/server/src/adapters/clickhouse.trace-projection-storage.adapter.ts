@@ -1,5 +1,4 @@
 import type { TraceSummaryData } from "@langwatch/trace-contract";
-import type { TraceAnalyticsRow } from "../projections/trace-derived.projection";
 import type { TraceClickHouseWriteResolver } from "../ports/clickhouse.port";
 import {
   TraceAnalyticsProjectionPort,

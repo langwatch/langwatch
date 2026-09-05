@@ -1,10 +1,7 @@
 /**
  * @vitest-environment node
- *
- * TraceService's `withEditOverlay` read seam (specs/traces-v2/trace-edit-overlay.feature):
- * the single-trace add-to-dataset read, the opt-out default, thread mode
- * applying each trace its own correction, and the correction winning over
- * whatever the ClickHouse read already resolved.
+ * Spec: specs/traces-v2/trace-edit-overlay.feature
+ * TraceService's withEditOverlay read seam: single-trace add-to-dataset read, opt-out default, thread mode applying each trace its own correction, and the correction winning over whatever the ClickHouse read already resolved.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Protections } from "@langwatch/trace-server";

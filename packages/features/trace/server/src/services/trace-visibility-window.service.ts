@@ -4,10 +4,7 @@ import type { ErrorCapture, Span, SpanInputOutput, Trace } from "@langwatch/trac
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
- * Teaser truncation rule: keep the first
- * max(TEASER_MIN_CHARS, min(TEASER_MAX_CHARS, ceil(len * TEASER_FRACTION)))
- * characters of each content field. The floor keeps tiny traces legible as
- * teasers; the cap stops large payloads from leaking meaningful content.
+ * Teaser truncation rule: keep the first max(TEASER_MIN_CHARS, min(TEASER_MAX_CHARS, ceil(len * TEASER_FRACTION))) characters of each content field. The floor keeps tiny traces legible as teasers; the cap stops large payloads from leaking meaningful content.
  */
 export const TEASER_FRACTION = 0.1;
 export const TEASER_MIN_CHARS = 50;
@@ -133,14 +130,8 @@ const teaserOfParams = (
 };
 
 /**
- * Resolves the plan-based visibility cutoff for an organization.
- * Design rationale: dev/docs/adr/028-visibility-blur-teaser-redaction.md.
- *
- * Stateless by design: every call evaluates the CURRENT plan, so upgrades
- * unblur on the next read and downgrades re-blur the same way. Plan-resolution
- * failures PROPAGATE — the caller owns the fail-closed fallback (free-tier
- * window + alert + no caching), so a transient plan-store error is never
- * mistaken for a real plan answer.
+ * @see dev/docs/adr/028-visibility-blur-teaser-redaction.md
+ * Resolves the plan-based visibility cutoff for an organization. Stateless by design: every call evaluates the CURRENT plan, so upgrades unblur on the next read and downgrades re-blur the same way. Plan-resolution failures PROPAGATE — the caller owns the fail-closed fallback (free-tier window + alert + no caching), so a transient plan-store error is never mistaken for a real plan answer.
  */
 export class VisibilityWindowService {
   static create(planProvider: PlanProvider): VisibilityWindowService {

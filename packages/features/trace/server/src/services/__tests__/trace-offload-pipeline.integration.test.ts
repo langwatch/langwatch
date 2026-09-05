@@ -1,31 +1,6 @@
 /**
- * Integration test for the large-trace blob offload pipeline (#4215 / ADR-022).
- *
- * Environment choice: in-process stubs only (no testcontainers, no real S3).
- *
- * Rationale: the goal of this test is pipeline WIRING, not S3 fidelity or
- * ClickHouse SQL correctness — those are separately covered by unit tests
- * (trace-blob-store.service.unit.test.ts, trace-offload-resolution.service.unit.test.ts).
- * The full pipeline wiring is exercised by:
- *   - Simulating the dispatch interposition: calling `TraceProjectionLeanService.leanForProjection` on a
- *     synthetic SpanReceived event whose IO attr exceeds IO_PREVIEW_BYTES.
- *   - Verifying the lean event carries the eventref pointer and the preview.
- *   - Feeding the lean span attributes directly into `TraceOffloadResolutionService.resolveOffloadedTraces`
- *     backed by a fake TraceBlobStoreService.getFromEventLog, which returns the full value.
- *   - Asserting TraceIOExtractionService recomputes trace.output correctly.
- *
- * This approach exercises every production module in the pipeline without
- * requiring infrastructure, and the assertions are identical to what the real
- * read path delivers.
- *
- * Was
- * `platform/app/src/server/app-layer/traces/__tests__/large-trace-blob-offload.integration.test.ts`.
- * `TraceProjectionLeanService.leanForProjection` now lives in `trace-projection-lean.service`,
- * `TraceOffloadResolutionService.resolveOffloadedTraces` in `trace-offload-resolution.service`. The
- * "over-threshold command is spooled to S3" scenario is retired — see the
- * lane report.
- *
- * BDD structure: `describe("given …")` -> `describe("when …")` -> `it("…")`.
+ * @see #4215, ADR-022
+ * Integration test for the large-trace blob offload pipeline. In-process stubs only (no testcontainers, no real S3) — the goal is pipeline WIRING, not S3 fidelity or CH SQL correctness (covered separately in trace-blob-store.service.unit.test.ts, trace-offload-resolution.service.unit.test.ts). Exercises: leanForProjection on a synthetic SpanReceived event over IO_PREVIEW_BYTES; the lean event carrying the eventref pointer + preview; feeding lean attributes into resolveOffloadedTraces backed by a fake getFromEventLog returning the full value; and TraceIOExtractionService recomputing trace.output correctly — every production module in the pipeline, with assertions identical to the real read path.
  */
 import { TraceProjectionLeanService } from "../trace-projection-lean.service";
 import { TraceOffloadResolutionService } from "../trace-offload-resolution.service";

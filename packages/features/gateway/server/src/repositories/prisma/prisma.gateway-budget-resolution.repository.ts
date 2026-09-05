@@ -1,31 +1,5 @@
 /**
- * The one resolver: which gateway budgets constrain a given request, key,
- * or draft key.
- *
- * Every surface that needs "what budgets apply here" reads this: the
- * config materialiser baking the bundle, the debits process deciding
- * where to attribute spend, the pre-request `budget.check`, and the VK
- * drawer's "already applies" list. They used to hand-mirror the same OR
- * list in three places, which is exactly how a scope silently stops being
- * enforced on one path while the UI keeps promising it on another.
- *
- * Two things make the result richer than "a row from GatewayBudget":
- *
- *   - GROUP budgets are per member. One row means "everyone in this
- *     group gets this much, each"; it resolves to one bucket per
- *     (budget, member). A request only ever has one member, the
- *     principal, so a request-time resolve yields at most one bucket per
- *     GROUP budget, keyed `<groupId>:<userId>` so members never share a
- *     pot. Membership is read live, so joining or leaving a group takes
- *     effect on the next materialisation.
- *
- *   - A budget can carry a provider filter (`providerKey`). It still
- *     applies to the key, but it only counts and constrains spend
- *     dispatched to that provider, so callers that know the dispatched
- *     provider must narrow with `budgetAppliesToProvider`.
- *
- * Spec: specs/ai-gateway/gateway-budget-targeting.feature
- *       specs/ai-gateway/budgets-principal-cascade.feature
+ * The one resolver for which gateway budgets constrain a request, key or draft key — read by the config materialiser, the debits process, pre-request budget.check, and the VK drawer, which used to hand-mirror the same OR list in three places (exactly how a scope silently stops being enforced on one path while the UI still promises it on another). GROUP budgets resolve to one bucket per (budget, member), keyed <groupId>:<userId>, membership read live. A providerKey filter still applies to the key but only constrains spend to that provider, so dispatch-aware callers must narrow with budgetAppliesToProvider. Spec: specs/ai-gateway/gateway-budget-targeting.feature, specs/ai-gateway/budgets-principal-cascade.feature
  */
 import type { GatewayBudget, Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import {
@@ -52,10 +26,7 @@ export type BudgetResolutionTarget = {
   virtualKeyId?: string | null;
   principalUserId?: string | null;
   /**
-   * External end-user id on the request, when the caller supplied one.
-   * ATTRIBUTED_USER templates resolve to a per-user bucket only when this
-   * is set; without it the template resolves as itself (the bundle entry,
-   * enforcement fetches buckets on demand).
+   * External end-user id, when supplied. ATTRIBUTED_USER templates resolve to a per-user bucket only when this is set; without it the template resolves as itself (enforcement fetches buckets on demand).
    */
   endUserId?: string | null;
 };
@@ -87,15 +58,7 @@ export type ResolvedBudget = {
 type PrismaLike = Pick<PrismaClient, "gatewayBudget" | "groupMembership" | "virtualKeyScope">;
 
 /**
- * Which budgets a request is subject to.
- *
- * A budget names a SCOPE, not the requests it covers, so answering this means
- * expanding every scope kind a request could sit under — its key, project,
- * team, principal, groups — and taking the union. Getting one kind wrong does
- * not fail: it silently stops enforcing a budget somebody set.
- *
- * The result is ordered, because a caller that stops at the first blocking
- * budget must stop at the same one every time.
+ * Which budgets a request is subject to: a budget names a SCOPE, not requests, so this expands every scope kind a request could sit under (key, project, team, principal, groups) and unions them — one kind wrong silently stops enforcing a budget somebody set. Ordered, so a caller stopping at the first blocking budget stops at the same one every time.
  */
 export class PrismaGatewayBudgetResolutionRepository {
   private constructor() {}
@@ -105,10 +68,7 @@ export class PrismaGatewayBudgetResolutionRepository {
   }
 
   /**
-   * Which budget scopes this request could match, as one OR list.
-   *
-   * A scope missing here is a budget that silently never fires, so each arm
-   * says what it covers rather than leaving it to the reader.
+   * Which budget scopes this request could match, as one OR list — a scope missing here is a budget that silently never fires, so each arm says what it covers.
    */
   private async scopePredicatesFor({
     client,
@@ -124,16 +84,11 @@ export class PrismaGatewayBudgetResolutionRepository {
       ors.push({ scopeType: "VIRTUAL_KEY", scopeId: target.virtualKeyId });
     }
 
-    // A request belongs to the team its traces land in AND to every team its
-    // key is scoped to. Those two differ whenever the key is not scoped to
-    // exactly one project, because the trace project then falls back to the
-    // organization's governance project: a team-scoped key reported the
-    // governance team, and a budget on the team that owns the key matched
-    // nothing while both sides looked correctly configured.
-    //
-    // Reading the key's scopes here rather than making every caller pass
-    // them is what puts the fix on all four paths at once, the debit path
-    // included, and that is the one that actually accrues spend.
+    // A request belongs to the team its traces land in AND every team its
+    // key is scoped to — these differ whenever the key isn't scoped to
+    // exactly one project (trace project falls back to the org's governance
+    // project), which is why a team-scoped key used to match no budget on
+    // its own team. Reading the key's scopes here fixes all four paths at once.
     const teamIds = this.presentIds([
       target.teamId,
       ...(target.scopedTeamIds ??
@@ -186,10 +141,7 @@ export class PrismaGatewayBudgetResolutionRepository {
   }
 
   /**
-   * The teams a key is scoped to. Empty when there is no key in context,
-   * which is the draft path before the key exists; that caller passes
-   * `scopedTeamIds` instead so the drawer previews the same set the key will
-   * resolve once it is saved.
+   * Teams a key is scoped to. Empty when there's no key in context (the draft path); that caller passes scopedTeamIds instead so the drawer previews the same set the key will resolve once saved.
    */
   private async keyTeamScopeIds({
     client,

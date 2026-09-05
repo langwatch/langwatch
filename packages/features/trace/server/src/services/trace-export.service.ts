@@ -1,11 +1,5 @@
 /**
- * TraceExportService — the download half of the trace read.
- *
- * Orchestrates batch fetching of traces via TraceService and serialization
- * via CSV/JSON serializers. Yields chunks progressively through an
- * AsyncGenerator, enabling the API layer to stream directly to an HTTP response.
- *
- * Memory-efficient: only one batch of traces (up to 100) is held in memory at a time.
+ * TraceExportService — the download half of the trace read. Orchestrates batch fetching via TraceService and serialization via CSV/JSON serializers, yielding chunks progressively through an AsyncGenerator so the API layer streams directly to the HTTP response; only one batch (up to 100 traces) is held in memory at a time.
  */
 
 import { createLogger } from "@langwatch/observability";
@@ -29,16 +23,7 @@ const BATCH_SIZE = 100;
 const logger = createLogger("langwatch:export");
 
 /**
- * Domain service for exporting traces in batches.
- *
- * @example
- * ```ts
- * const service = TraceExportService.create({ traceService });
- * for await (const { chunk, progress } of service.exportTraces(request)) {
- *   response.write(chunk);
- *   updateProgress(progress);
- * }
- * ```
+ * Domain service for exporting traces in batches: `TraceExportService.create({ traceService })`, then `for await (const { chunk, progress } of service.exportTraces(request))` to stream chunks to the response while updating progress.
  */
 export class TraceExportService {
   private readonly traceService: TraceLegacyReadPort;
@@ -85,14 +70,7 @@ export class TraceExportService {
   }
 
   /**
-   * Export traces as an async generator yielding serialized chunks with progress.
-   *
-   * Each yielded chunk is a string containing either:
-   * - CSV rows (first chunk includes header; subsequent chunks are data-only)
-   * - JSONL lines (one JSON object per line)
-   *
-   * The generator fetches traces in batches of 100 using scroll pagination
-   * to maintain constant memory usage regardless of total trace count.
+   * Export traces as an async generator yielding serialized chunks with progress. Each chunk is either CSV rows (first chunk includes header; later chunks are data-only) or JSONL lines. Fetches traces in batches of 100 via scroll pagination to keep memory usage constant regardless of total trace count.
    */
   async *exportTraces({
     request,
@@ -139,12 +117,11 @@ export class TraceExportService {
         {
           downloadMode: true,
           includeSpans,
-          // DATA LOSS (#4991): summary mode reads no span content, but it still
-          // emits trace-level `trace.input`/`trace.output` (see the csv/json
-          // summary serializers) — so it is content-consuming too. Gating on
-          // `includeSpans` therefore shipped the truncated 64 KB preview for any
-          // offloaded trace, silently. Resolve for every export mode; the batch
-          // resolver keeps the extra event_log reads bounded.
+          // DATA LOSS (#4991): summary mode reads no span content, but it still emits
+          // trace-level `trace.input`/`trace.output` (csv/json summary serializers), so it
+          // is content-consuming too — gating on `includeSpans` shipped the truncated 64 KB
+          // preview for any offloaded trace, silently. Resolve for every export mode; the
+          // batch resolver keeps the extra event_log reads bounded.
           resolveBlobs: true,
           scrollId: scrollId ?? null,
         },
@@ -210,14 +187,7 @@ export class TraceExportService {
   }
 
   /**
-   * Remove the first line (header) from a CSV string.
-   *
-   * Must search for the same sequence the serializer wrote. Splitting on "\n"
-   * while the rows are terminated with "\r\n" leaves a stray carriage return at
-   * the head of the chunk, which becomes a phantom leading field.
-   *
-   * Exported for the batch-boundary tests, which concatenate chunks exactly as
-   * this service does. A test-local copy could pass while this regressed.
+   * Remove the first line (header) from a CSV string. Must search for the same sequence the serializer wrote — splitting on "\n" while rows are terminated with "\r\n" leaves a stray carriage return at the head of the chunk (a phantom leading field). Exported for the batch-boundary tests, which concatenate chunks exactly as this service does; a test-local copy could pass while this regressed.
    */
   static stripCsvHeader(csv: string): string {
     const firstBreak = csv.indexOf(CSV_NEWLINE);

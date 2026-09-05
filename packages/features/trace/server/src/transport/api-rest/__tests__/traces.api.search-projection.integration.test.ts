@@ -1,16 +1,5 @@
 /**
- * `POST /api/traces/search`, through the real Hono route family, focused on
- * the projection DSL (`from`/`select`) surface — when to compile a
- * projection, what the compiled plan changes about the response envelope,
- * and how an invalid `from`/`select` request is refused.
- *
- * Was
- * `platform/app/src/app/api/traces/[[...route]]/__tests__/search-traces.unit.test.ts`,
- * against the route's own `app.v1.ts`. The route now lives in this package as
- * `createTracesRestApp`; the projection compiler is mocked here the same way
- * it was there, so these stay surface tests independent of the compiler
- * implementation (covered separately by
- * `trace-projection-compile.service.unit.test.ts`).
+ * `POST /api/traces/search`, through the real Hono route family, focused on the projection DSL (`from`/`select`) surface. Was `platform/app/src/app/api/traces/[[...route]]/__tests__/search-traces.unit.test.ts` against the route's own `app.v1.ts`; the route now lives here as `createTracesRestApp`, with the projection compiler mocked the same way it was there, so these stay surface tests independent of the compiler implementation (covered separately by `trace-projection-compile.service.unit.test.ts`).
  */
 import {
   createAppRestSecurity,

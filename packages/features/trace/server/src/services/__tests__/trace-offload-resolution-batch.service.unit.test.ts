@@ -1,16 +1,6 @@
 /**
- * Unit tests for TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch — the BULK read-path resolver
- * (#4991, "2 of 2" of #4888). Where resolveOffloadedTraces resolves one trace's
- * spans (detail reads, #4984), this resolves a WHOLE result set (export, thread,
- * annotation, sample builders) with a single bounded-concurrency pass over
- * event_log so a large export never fires an unbounded N×M burst of CH reads.
- *
- * AC6 — resolution is streamed: peak concurrent event_log reads is bounded by a
- *        constant regardless of result-set size; identical refs are deduped.
- * AC7 — a failed resolution degrades to the preview WITH a warn log (no silent
- *        truncation), per-ref, without failing the rest of the batch.
- *
- * BDD structure: given/when nested describes, action-based it() names.
+ * @see #4991, #4888
+ * Unit tests for resolveOffloadedTracesBatch, the BULK read-path resolver. Where resolveOffloadedTraces resolves one trace's spans (detail reads), this resolves a WHOLE result set (export, thread, annotation, sample builders) with a single bounded-concurrency pass over event_log, so a large export never fires an unbounded N×M burst of CH reads. AC6: streamed, peak concurrency bounded by a constant regardless of result-set size, identical refs deduped. AC7: a failed resolution degrades to preview with a warn log, per-ref, without failing the rest of the batch.
  */
 import { TraceOffloadResolutionBatchService } from "../trace-offload-resolution-batch.service";
 import { describe, expect, it, vi } from "vitest";

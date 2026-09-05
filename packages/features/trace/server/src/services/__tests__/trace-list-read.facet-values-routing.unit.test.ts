@@ -1,13 +1,6 @@
 /**
- * computeFacetValues routes dynamic attribute drilldowns by prefix:
- * "attribute.<key>" reads trace_summaries.Attributes (legacy alias kept),
- * "event.attribute.<key>" reads stored_spans.Events.Attributes, and
- * "span.attribute.<key>" reads stored_spans.SpanAttributes — each via its
- * own repository method so values come from the store the filter actually
- * queries. See specs/traces-v2/search.feature, Rule "Attribute sections
- * list values from their own attribute store".
- *
  * @vitest-environment node
+ * computeFacetValues routes dynamic attribute drilldowns by prefix: attribute.<key> reads trace_summaries.Attributes (legacy alias kept), event.attribute.<key> reads stored_spans.Events.Attributes, span.attribute.<key> reads stored_spans.SpanAttributes — each via its own repository method so values come from the store the filter actually queries. See specs/traces-v2/search.feature, Rule "Attribute sections list values from their own attribute store".
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -26,11 +19,7 @@ function makeService() {
     findEventAttributeValues: ReturnType<typeof vi.fn>;
     findSpanAttributeValues: ReturnType<typeof vi.fn>;
   };
-  const service = new TraceListService(
-    repository,
-    undefined as never,
-    undefined as never,
-  );
+  const service = new TraceListService(repository, undefined as never, undefined as never);
   return { repository, service };
 }
 
@@ -56,9 +45,7 @@ describe("TraceListService facet-value routing", () => {
     it("routes event.attribute.<key> to the event-attribute value lookup", async () => {
       const { repository, service } = makeService();
 
-      await service.getFacetValues(
-        params("event.attribute.event.metrics.vote"),
-      );
+      await service.getFacetValues(params("event.attribute.event.metrics.vote"));
 
       expect(repository.findEventAttributeValues).toHaveBeenCalledWith(
         expect.objectContaining({ attributeKey: "event.metrics.vote" }),
@@ -69,9 +56,9 @@ describe("TraceListService facet-value routing", () => {
     it("rejects keys outside the attribute-key whitelist", async () => {
       const { repository, service } = makeService();
 
-      await expect(
-        service.getFacetValues(params("event.attribute.bad'key")),
-      ).rejects.toThrow(/Invalid attribute key/);
+      await expect(service.getFacetValues(params("event.attribute.bad'key"))).rejects.toThrow(
+        /Invalid attribute key/,
+      );
       expect(repository.findEventAttributeValues).not.toHaveBeenCalled();
     });
   });
@@ -81,9 +68,7 @@ describe("TraceListService facet-value routing", () => {
     it("routes span.attribute.<key> to the span-attribute value lookup", async () => {
       const { repository, service } = makeService();
 
-      await service.getFacetValues(
-        params("span.attribute.gen_ai.request.model"),
-      );
+      await service.getFacetValues(params("span.attribute.gen_ai.request.model"));
 
       expect(repository.findSpanAttributeValues).toHaveBeenCalledWith(
         expect.objectContaining({ attributeKey: "gen_ai.request.model" }),

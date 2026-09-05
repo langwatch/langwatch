@@ -37,11 +37,7 @@ const FALLBACK_ATTRIBUTE_MAPPINGS: Record<string, keyof TraceMetadata> = {
 };
 
 /**
- * Clearly named sibling for the OTel log-record count: it counts log records
- * correlated to the trace, not model/API calls, and the raw
- * `langwatch.reserved.log_record_count` key keeps flowing unchanged because
- * external consumers already parse it. A caller-supplied metadata key with
- * this name wins (set by the generic passthrough before this runs).
+ * Clearly named sibling for the OTel log-record count: it counts log records correlated to the trace, not model/API calls, while the raw `langwatch.reserved.log_record_count` key keeps flowing unchanged since external consumers already parse it. A caller-supplied metadata key with this name wins (set by the generic passthrough before this runs).
  */
 function addOtelLogRecordCountAlias(
   metadata: TraceMetadata,
@@ -54,12 +50,7 @@ function addOtelLogRecordCountAlias(
 }
 
 /**
- * Reserved token attributes stamped by the trace-summary fold, surfaced as
- * typed metric fields on the legacy trace shape (and selectable through the
- * projection DSL's `metrics.*` paths). Additive next to the six legacy metric
- * fields: an absent attribute adds no key, and nothing existing is renamed or
- * removed because the search/export response is a compatibility surface for
- * BI consumers.
+ * Reserved token attributes stamped by the trace-summary fold, surfaced as typed metric fields on the legacy trace shape (and selectable through the projection DSL's `metrics.*` paths). Additive next to the six legacy metric fields: an absent attribute adds no key, and nothing existing is renamed or removed, since the search/export response is a compatibility surface for BI consumers.
  */
 const RESERVED_TOKEN_METRIC_ATTRIBUTES = {
   cache_read_input_tokens: "langwatch.reserved.cache_read_tokens",
@@ -128,10 +119,7 @@ const OUTPUT_FIELD_NAMES = [
 const MAX_STATE_OBJECT_RECURSION_DEPTH = 32;
 
 /**
- * Extracts text from a state object by looking for common field names.
- *
- * @param obj - The state object to extract from
- * @param fieldNames - Array of field names to try (in priority order)
+ * @param obj - State object; @param fieldNames - Field names to try, priority order
  * @param depth - Internal recursion counter; callers should leave at default
  * @returns The extracted text, or null if not found
  */
@@ -180,10 +168,7 @@ function isStructuredValue(data: unknown): data is { type: string; value: unknow
 }
 
 /**
- * Extracts human-readable text from various message formats.
- * Handles: chat messages arrays, structured values, state objects.
- *
- * @param data - The data to extract text from
+ * @param data - Chat message arrays, structured values, or state objects to extract text from
  * @param mode - Whether extracting input or output (affects field priority)
  * @returns The extracted text, or null if extraction failed
  */
@@ -250,12 +235,8 @@ function hasAnnotatedType(
 }
 
 /**
- * Parses the computed input string to TraceInput format.
- * Uses value type annotations from attributes when available to avoid
- * heuristic guessing.
- *
- * @param computedInput - The computed input string from ClickHouse
- * @param attributes - Trace summary attributes (for value type hints)
+ * Parses the computed input string to TraceInput format (value type annotations from attributes are used when available to avoid heuristic guessing).
+ * @param computedInput - The computed input string from ClickHouse; @param attributes - Trace summary attributes (for value type hints)
  * @returns TraceInput with extracted text value
  */
 function parseComputedInput(
@@ -298,12 +279,8 @@ function parseComputedInput(
 }
 
 /**
- * Parses the computed output string to TraceOutput format.
- * Uses value type annotations from attributes when available to avoid
- * heuristic guessing.
- *
- * @param computedOutput - The computed output string from ClickHouse
- * @param attributes - Trace summary attributes (for value type hints)
+ * Parses the computed output string to TraceOutput format (value type annotations from attributes are used when available to avoid heuristic guessing).
+ * @param computedOutput - The computed output string from ClickHouse; @param attributes - Trace summary attributes (for value type hints)
  * @returns TraceOutput with extracted text value
  */
 function parseComputedOutput(
@@ -369,10 +346,7 @@ export class TraceLegacySummaryMappingService {
   }
 
   /**
-   * Maps TraceSummaryData.attributes to the legacy TraceMetadata format.
-   *
-   * The Attributes map in ClickHouse stores various metadata using semantic
-   * convention keys. These need to be mapped to the flat TraceMetadata structure.
+   * Maps TraceSummaryData.attributes to the legacy TraceMetadata format. The Attributes map in ClickHouse stores various metadata using semantic convention keys, which need to be mapped to the flat TraceMetadata structure.
    */
   static mapAttributesToMetadata(
     attributes: Record<string, string>,
@@ -433,12 +407,11 @@ export class TraceLegacySummaryMappingService {
       }
     }
 
-    // The fold stamps `metadata.models` as a JSON array string (the set of
-    // models the trace's spans used, most-recent-first); surface it as a real
-    // array like labels/prompt_ids. `metadata.model` (the primary) flows
-    // through the generic passthrough below as a plain string.
-    // A value that is not a JSON array is not ours: it stays reachable through
-    // the generic passthrough below with its original string value.
+    // The fold stamps `metadata.models` as a JSON array string (the set of models the
+    // trace's spans used, most-recent-first); surface it as a real array like
+    // labels/prompt_ids. `metadata.model` (the primary) flows through the generic
+    // passthrough below as a plain string. A value that is not a JSON array is not ours:
+    // it stays reachable through the generic passthrough with its original string value.
     const modelsStr = attributes["metadata.models"];
     let modelsParsedAsArray = false;
     if (modelsStr) {

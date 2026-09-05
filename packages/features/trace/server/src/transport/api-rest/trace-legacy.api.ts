@@ -1,18 +1,5 @@
 /**
- * REST for the deprecated trace endpoints: `GET /api/trace/:id`,
- * `POST /api/trace/:id/share`, `POST /api/trace/:id/unshare`,
- * `POST /api/trace/search` and `GET /api/thread/:id`.
- *
- * Was `platform/app/src/server/routes/traces-legacy.ts`, which itself replaced
- * five `pages/api` handlers. Every route carries `Deprecation: true` and a
- * successor `Link` where it has one; the bodies and the sentences are
- * transcribed rather than rewritten, because a deployed SDK parses them.
- *
- * The family resolves its own credential (`handlerManagedAuth`) because its
- * refusals predate the framework envelope: a bare `{ message }` for an
- * unauthenticated call and the full handled payload for a ceiling denial.
- * That resolution arrives as {@link TraceLegacyCredentialPort} so this door
- * and the framework chain decide the same thing about the same caller.
+ * REST for the deprecated trace endpoints: `GET /api/trace/:id`, `POST /api/trace/:id/share`, `POST /api/trace/:id/unshare`, `POST /api/trace/search`, `GET /api/thread/:id`. Was `platform/app/src/server/routes/traces-legacy.ts`, itself a replacement for five `pages/api` handlers; every route carries `Deprecation: true` and a successor `Link` where it has one, with bodies transcribed rather than rewritten since a deployed SDK parses them. The family resolves its own credential (`handlerManagedAuth`) because its refusals predate the framework envelope (a bare `{ message }` for unauthenticated, the full handled payload for a ceiling denial); that resolution arrives as {@link TraceLegacyCredentialPort} so this door and the framework chain decide the same thing about the same caller.
  */
 import { TraceReadableSpanService } from "#services/trace-readable-span.service";
 import { TraceFormattingService } from "#services/trace-formatting.service";
@@ -39,12 +26,7 @@ export type TraceLegacyCredential =
   | Readonly<{ ok: false; status: ContentfulStatusCode; body: object }>;
 
 /**
- * How this process turns a request plus one permission ceiling into a project
- * credential.
- *
- * The permission travels with the request because the family is split by
- * grain: the reads ask for `traces:view`, and the share pair asks for
- * `traces:share`, which mints a PUBLIC link.
+ * How this process turns a request plus one permission ceiling into a project credential. The permission travels with the request because the family is split by grain: reads ask for `traces:view`, the share pair asks for `traces:share`, which mints a PUBLIC link.
  */
 export type TraceLegacyCredentialPort = (input: {
   request: Request;
@@ -89,18 +71,11 @@ export interface TraceLegacyRestPorts<TSearchBody, TSearchBodyRaw> {
   /** The share ledger, resolved the same way. */
   shares(): TraceLegacySharePort;
   /**
-   * The API KEY caller's read-time redactions for one project. Same
-   * resolution the v1 family uses — a key is not a person, so the content
-   * categories resolve as they do for a caller with no session, and costs
-   * are visible because a project key carries full project access.
+   * The API KEY caller's read-time redactions for one project. Same resolution the v1 family uses — a key is not a person, so content categories resolve as they do for a caller with no session, and costs are visible because a project key carries full project access.
    */
   getProtections(input: Readonly<{ projectId: string }>): Promise<unknown>;
   /**
-   * The search body a caller may send: the deployment's shared analytics
-   * filter vocabulary plus this family's own four additive fields. Parsed
-   * STRICTLY here, unlike the v1 family — that is the behaviour this
-   * deprecated endpoint has always had, and loosening it would silently
-   * accept a typo the caller currently gets told about.
+   * The search body a caller may send: the deployment's shared analytics filter vocabulary plus this family's own four additive fields. Parsed STRICTLY here, unlike the v1 family — this deprecated endpoint has always behaved that way, and loosening it would silently accept a typo the caller currently gets told about.
    */
   searchBodySchema: z.ZodType<TSearchBody, TSearchBodyRaw>;
   /** Renders a schema failure as the one sentence this family answers with. */
@@ -118,12 +93,7 @@ export type TraceLegacySearchFields = Readonly<{
 }>;
 
 /**
- * The deprecated trace family, built against one process's security.
- *
- * Split by grain in the ACCESS declaration rather than by handler: the reads
- * and the share pair are different powers, and `traces:share` creates PUBLIC
- * links — exactly the sort of thing that must be legible in the route-policy
- * registry rather than buried in a handler.
+ * The deprecated trace family, built against one process's security. Split by grain in the ACCESS declaration rather than by handler: reads and the share pair are different powers, and `traces:share` creates PUBLIC links — exactly the sort of thing that must be legible in the route-policy registry rather than buried in a handler.
  */
 export function createTraceLegacyRestApp<
   TSearchBody extends TraceLegacySearchFields,

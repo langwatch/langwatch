@@ -20,7 +20,6 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { GatewayVirtualKeyDtoAdapter } from "../adapters/gateway-virtual-key-dto.adapter";
-import { VirtualKeyService } from "../services/virtual-key.service";
 import type { ProjectService } from "@langwatch/project-contract";
 import { TestProjectService } from "./support/test-project-service";
 

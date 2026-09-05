@@ -1,18 +1,6 @@
 /**
  * @vitest-environment node
- *
- * The per-key budget the virtual-keys table draws its bar from, against
- * real Postgres + real ClickHouse.
- *
- * The point the bar exists to make is that a key's month total and its
- * budget standing are different measurements: a key that spent $2.50 this
- * month can still be at $0.50 of its $1.00 day. That only holds if the
- * read is bucketed to the budget's own current period, so the fixture
- * writes debits on both sides of a period boundary.
- *
- * World and builders live in `support/virtual-key-direct-budget.fixture`.
- *
- * Spec: specs/ai-gateway/budgets.feature
+ * Real Postgres + real ClickHouse. Month total and budget standing are different measurements, which only holds if the read buckets to the budget's own period. Spec: specs/ai-gateway/budgets.feature
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 

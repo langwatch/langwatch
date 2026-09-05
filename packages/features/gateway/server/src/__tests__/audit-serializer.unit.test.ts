@@ -4,14 +4,8 @@ import { Prisma } from "@langwatch/prisma-client/generated";
 import { serializeRowForAudit } from "@langwatch/gateway-contract";
 
 /**
- * The serializer exists to solve one specific bug class: default
- * JSON.stringify throws on BigInt, which would crash any audit write for a
- * Prisma model with a BigInt column. VirtualKey.revision already has that
- * shape today; new columns added tomorrow will inherit the protection.
- *
- * These tests pin the contract so a future engineer doesn't "simplify" the
- * replacer away. See virtualKey.service.unit.test.ts for the context where
- * the bug originally surfaced.
+ * Guards the replacer that lets JSON.stringify handle BigInt columns
+ * (e.g. VirtualKey.revision) without throwing during an audit write.
  */
 describe("serializeRowForAudit", () => {
   describe("when the row contains a BigInt field", () => {

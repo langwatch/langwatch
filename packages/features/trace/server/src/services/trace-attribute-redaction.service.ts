@@ -21,18 +21,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * Read-time enforcement for RESTRICTED custom attribute rules: replaces the
- * values of span/trace attributes whose dotted path matches a hidden pattern
- * with a placeholder naming who CAN see them. Works on both flat dotted-key
- * records ({"gen_ai.prompt.id": "x"}) and nested objects
- * ({gen_ai: {prompt: {id: "x"}}}); arrays are treated as leaves (a matched
- * array is replaced whole, never entered). The input is never mutated, and the
- * SAME reference comes back when nothing matched, so memoized consumers stay
- * cheap.
- *
- * One redactor holds the compiled patterns, so a request that redacts many
- * records — a trace's spans and their events — compiles them once and reuses
- * them, rather than passing a matcher list from call to call.
+ * Read-time enforcement for RESTRICTED custom attribute rules: replaces values whose dotted path matches a hidden pattern with a placeholder naming who CAN see them. Works on flat dotted-key records and nested objects; arrays are leaves (a matched array is replaced whole, never entered). Input is never mutated, and the SAME reference returns when nothing matched, so memoized consumers stay cheap. One redactor holds compiled patterns, so a request redacting many records (a trace's spans and events) compiles once and reuses them.
  */
 export class TraceAttributeRedactionService {
   static create(hidden: Protections["hiddenAttributes"]): TraceAttributeRedactionService {

@@ -1,15 +1,5 @@
 /**
- * Reads the stored ElevenLabs credential for one provider row.
- *
- * Two callers need it and neither has a session to authorize with. The
- * post-call webhook route is authenticated by the vendor's HMAC, and the
- * reconciler is a background worker, so `ModelProviderService` does not fit:
- * it takes an authz context. This is the service layer for both, which keeps
- * the Prisma query and the decryption out of the route and out of the worker.
- *
- * Nothing here throws. A provider that cannot serve is `null`, and each
- * caller decides what that means: the webhook answers 404 so the ids cannot
- * be probed, and the reconciler leaves the session for the spend grace.
+ * Reads the stored ElevenLabs credential for one provider row. Two callers need it with no session to authorize with (the webhook route authenticated by vendor HMAC, and the background reconciler), so ModelProviderService (which takes an authz context) doesn't fit — this is the service layer for both. Nothing here throws: a provider that can't serve is null, and each caller decides what that means (webhook 404s so ids can't be probed; reconciler leaves the session for spend grace).
  */
 
 import { createLogger } from "@langwatch/observability";
@@ -74,12 +64,7 @@ export class GatewayElevenLabsCredentialService {
   }
 
   /**
-   * The workspace post-call webhook secret stored on one provider row.
-   *
-   * The organization comes back with it because the webhook has no other way to
-   * know whose session a delivery may close: the tenant is the path parameter,
-   * and the match has to be scoped to the organization that owns the secret the
-   * delivery was signed with.
+   * Workspace post-call webhook secret on one provider row. Organization comes back with it since the webhook has no other way to know whose session a delivery may close — tenant is the path parameter, so the match scopes to the org owning the secret the delivery was signed with.
    */
   async getWebhookSecret({
     modelProviderId,
@@ -100,13 +85,7 @@ export class GatewayElevenLabsCredentialService {
   }
 
   /**
-   * The API key and host to read a conversation back with.
-   *
-   * The host is validated here as well as on write. A row stored before the
-   * registry constrained the field would otherwise send the customer's API key
-   * to whatever host it names, and the SSRF policy only refuses private
-   * addresses. A bad host falls back to the vendor default rather than
-   * refusing, because the reconciler still has a real call to settle.
+   * API key and host to read a conversation back with. Host is validated here as well as on write, since a row stored before the registry constrained the field could send the customer's API key to whatever host it names (SSRF policy only refuses private addresses) — a bad host falls back to the vendor default rather than refusing, since the reconciler still has a real call to settle.
    */
   async getApiCredential({
     modelProviderId,

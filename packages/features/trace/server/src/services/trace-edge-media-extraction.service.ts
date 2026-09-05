@@ -1,34 +1,5 @@
 /**
- * Edge media extraction for trace spans.
- *
- * `TraceEdgeMediaExtractionService.maybeExtractSpanMedia` runs inside the processCommandData edge hook
- * (TraceRequestCollectionService), after the span is normalized and BEFORE
- * the ADR-022 `maybeSpool` size check. It walks the span's attribute values
- * (and span-event attribute values) for inline media parts — base64 audio
- * turns, data-URI images, file attachments — and externalizes their bytes to
- * the content-addressed stored-objects store, rewriting each part to a
- * lightweight `/api/files/{projectId}/{id}` reference.
- *
- * Ordering rationale: extracting the heavy media part FIRST usually brings
- * the remaining payload back under COMMAND_INLINE_THRESHOLD, so the
- * transient whole-payload spool (PUT + GET + DELETE) is replaced by a single
- * permanent, deduplicated PUT. A scenario run's recording and the same
- * recording observed on its trace hash to the same stored object — stored
- * once, referenced from both.
- *
- * Receiving guarantee: the whole function is fail-open. The cheap media
- * marker gate keeps the no-media hot path free of any I/O; every stage that
- * can fail (flag store, data-privacy probe, object store) falls back to the
- * unmodified command data with a warn log and a fail-open counter, so
- * ingestion is never blocked and the worst case is today's inline behavior.
- * Content-addressed PUTs are idempotent, so SDK retries and queue re-stages
- * never double-store.
- *
- * Privacy interlock: the data-privacy content drop runs later, at the
- * RecordSpanCommand choke point. Persisting media bytes at the edge for a
- * project whose policy then drops that content would retain what the policy
- * discards — so any project with drop rules skips extraction entirely and
- * keeps today's behavior end to end.
+ * Edge media extraction (`maybeExtractSpanMedia`), run in the processCommandData hook after span normalization and BEFORE the ADR-022 `maybeSpool` size check: externalizing the heavy media part first usually brings the payload back under COMMAND_INLINE_THRESHOLD, replacing a transient whole-payload spool with one permanent, deduplicated, idempotent PUT. Fail-open throughout — any failing stage falls back to unmodified command data with a warn log; any project whose data-privacy policy drops span content skips extraction entirely, since persisting bytes here for content the policy later discards would defeat that policy.
  */
 
 import { TraceValueMediaExtractionService } from "./trace-value-media-extraction.service";
@@ -53,11 +24,7 @@ export interface EdgeMediaExtractionLogger {
 export interface EdgeMediaExtractionDeps {
   featureFlags: FeatureFlagService;
   /**
-   * True when the project's resolved data-privacy policy drops any span
-   * content. REQUIRED rather than defaulted: a default that answered `false`
-   * would store media at the edge for exactly the projects whose policy is
-   * about to discard that content, which is the interlock this hook exists to
-   * honour.
+   * True when the project's resolved data-privacy policy drops any span content. REQUIRED rather than defaulted — a default of `false` would store media at the edge for exactly the projects whose policy is about to discard it, defeating this interlock.
    */
   hasContentDropRules: (projectId: string) => Promise<boolean>;
   /** The fail-open counters this hook reports; absent means unreported. */
@@ -147,10 +114,7 @@ export class TraceEdgeMediaExtractionService {
   }
 
   /**
-   * Externalizes inline media from the span's attribute values, returning the
-   * command data with parts rewritten to stored-object references — or the
-   * original command data unchanged when there is no media, the flag is off,
-   * the project has content-drop rules, or anything fails (fail-open).
+   * Externalizes inline media from the span's attribute values, returning rewritten command data with stored-object references — or the original data unchanged when there is no media, the flag is off, the project has content-drop rules, or anything fails (fail-open).
    */
   static async maybeExtractSpanMedia({
     data,

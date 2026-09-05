@@ -30,29 +30,12 @@ export const GATEWAY_SPEND_PROCESSING_EVENT_TYPES = [
 export const GATEWAY_SPEND_EVENT_VERSION_LATEST = "2026-07-29" as const;
 
 /**
- * Schema-snapshot version of the gatewaySpend fold (calendar date). The
- * projected row stamps it; the store's read-back only trusts rows carrying
- * the current stamp, so a row written by an older shape refolds once from
- * the event log instead of decoding column defaults into wrong state.
+ * Schema-snapshot version of the gatewaySpend fold (calendar date), stamped on the projected row; the store's read-back only trusts the current stamp, so an older-shape row refolds once from the event log instead of decoding column defaults into wrong state.
  */
 export const GATEWAY_SPEND_PROJECTION_VERSION_LATEST = "2026-07-29";
 
 /**
- * Command payloads for the gateway_spend_processing pipeline.
- *
- * The `*WireSchema` shapes are the contract of the internal ingest route
- * the Go gateway posts command batches to, so every field the gateway
- * resolves at admission (attribution, end user, metadata echo, labels) or
- * learns at completion (usage by token class, error taxonomy) is declared
- * there and nowhere else. No cost crosses that boundary: quantities
- * travel, the server prices them.
- *
- * The command schemas are what the pipeline appends, and an outcome is
- * priced exactly once, at the ingest seam that mints the command. The
- * event then CARRIES the money: the fold, the attributed-user debits, and
- * the webhook envelope all copy the same `cost_nano_usd`, so no two of
- * them can disagree about what one request cost no matter when each runs.
- * No prompt or response content, no PII.
+ * Command payloads for the gateway_spend_processing pipeline. *WireSchema shapes are the internal ingest route's contract with the Go gateway — every admission/completion field is declared there and nowhere else, and no cost crosses that boundary (quantities travel, the server prices them). An outcome is priced exactly once at the ingest seam; the event then CARRIES the money (fold, attributed-user debits and webhook envelope all copy the same cost_nano_usd) so no two can disagree. No prompt/response content, no PII.
  */
 
 /** Bounds mirror the gateway edge: ids are opaque tokens, metadata is a
@@ -85,27 +68,7 @@ const occurredAtMs = z
   .max(Date.UTC(2100, 0, 1));
 
 /**
- * Every quantity a provider bills by, one named integer field each.
- *
- * Named rather than a generic map: a map kills the `sumIf` rollups, loses the
- * per-field default, and turns a typo into a silently unpriced quantity. Every
- * field defaults to zero, so a payload a previous gateway build wrote parses
- * with the quantities it never knew about reading as none.
- *
- * `input_audio_tokens` and `output_audio_tokens` are DISJOINT from
- * `input_tokens` and `output_tokens`: the gateway takes them out of the
- * provider's totals before emitting, because audio tokens price several times
- * higher and charging both would double the audio portion.
- * `input_image_tokens` and `output_image_tokens` are DISJOINT the same way:
- * the token-billed image models price output image tokens at six to eight
- * times text input, and an image call carries most of its cost there.
- * `image_count` is how many images the response carried, reported for
- * display and never priced.
- * `reasoning_tokens` is the exception and stays a subset of `output_tokens`,
- * reported for display and never priced.
- *
- * `audio_ms` is whole milliseconds. Money is integer nano-USD and quantities
- * are integers with it; the one division by 1000 happens at the rating seam.
+ * Every quantity a provider bills by, one named integer field each — not a map, which would kill sumIf rollups, lose per-field defaults, and turn a typo into a silently unpriced quantity; every field defaults to zero. input/output_audio_tokens and input/output_image_tokens are DISJOINT from the text token counts (audio/image price several times higher; charging both would double that portion); image_count is display-only; reasoning_tokens stays a subset of output_tokens, also display-only. audio_ms is whole milliseconds; the one division by 1000 happens at the rating seam.
  */
 export const spendUsageSchema = z.object({
   input_tokens: z.number().int().min(0).default(0),
@@ -145,18 +108,7 @@ export const EMPTY_SPEND_USAGE: SpendUsage = {
 };
 
 /**
- * Who a request is billed against, as the gateway itself knows it.
- *
- * Admission has always carried this. The outcomes carry it too, so a
- * consumer that needs attribution to do its job can read it off the one
- * event it is handling instead of keeping durable per-request state purely
- * to join admission to outcome. `outcomeFor` in the Go emitter fills it from
- * the same `call.Bundle` admission reads, so the two can never disagree.
- *
- * Every field defaults. These rows ride a bounded spool on the gateway and
- * an outbox payload here, so a record written by the previous build is read
- * back by this one, and a field without a default turns that record into a
- * permanent parse failure rather than a billed request.
+ * Who a request is billed against, as the gateway knows it — carried on both admission and outcome so a consumer can read attribution off the one event it's handling, rather than keeping durable per-request state to join them; the Go emitter fills it from the same call.Bundle admission reads, so the two can never disagree. Every field defaults, since a record from a previous build is read back by this one and a field without a default would be a permanent parse failure rather than a billed request.
  */
 export const spendAttributionWireSchema = z.object({
   organization_id: z.string().max(256).default(""),
@@ -206,28 +158,14 @@ export const admitSpendWireSchema = z.object({
   pod_id: z.string().max(128).default(""),
   pod_seq: z.number().int().min(0).default(0),
   /**
-   * The emitter that sent this admission will repeat the attribution on the
-   * outcome, so a consumer joining the two need not persist anything at
-   * admission time.
-   *
-   * It is the admission that declares this rather than the outcome, because
-   * the decision has to be made when the admission is handled — before the
-   * outcome exists. Both come from the same pod and the same build, so the
-   * pair is always self-consistent: an old build omits it and keeps the
-   * durable join, a new build sets it and skips it. That is what lets the
-   * gateway and the control plane roll in either order.
-   *
-   * Removable once no fleet runs a build that omits it.
+   * The emitter repeats this attribution on the outcome, so a consumer joining the two need not persist anything at admission time. Declared on the admission (the decision must be made before the outcome exists), and always self-consistent since both come from the same pod/build — letting gateway and control plane roll in either order. Removable once no fleet runs a build that omits it.
    */
   outcome_carries_attribution: z.boolean().default(false),
 });
 
-/** What the ingest seam appends once it has joined the control-plane
- *  attribution the gateway cannot see: `team_id` is the tenant project's
- *  team, resolved per drain batch alongside the key's principal. The debits
- *  process manager is its only reader, so the fold, the webhook process
- *  manager and the delivered envelope keep the shapes they were frozen at;
- *  adopting the team on any of them later costs no wire change. */
+/**
+ * What the ingest seam appends after joining control-plane attribution the gateway can't see: team_id, resolved per drain batch alongside the key's principal. The debits process manager is its only reader, so the fold, webhook process manager and delivered envelope keep their frozen shapes — adopting team_id later costs no wire change.
+ */
 export const admitSpendCommandDataSchema = admitSpendWireSchema.extend({
   team_id: z.string().max(256).default(""),
 });
@@ -302,14 +240,7 @@ export const settleSpendCommandDataSchema = z.object({
   ...spendAttributionWireSchema.shape,
   ...spendControlPlaneAttributionSchema.shape,
   /**
-   * The model identity ADMISSION requested. A settlement resolved no model
-   * of its own — that is what makes it a settlement — but the request still
-   * named one, and the settled envelope has always carried it.
-   *
-   * It rides the command rather than being recovered downstream because the
-   * consumer that builds the envelope no longer keeps the admission: it
-   * reads what the outcome states, and a settlement that stated no model
-   * would silently empty the field on every settled delivery.
+   * The model identity ADMISSION requested — a settlement resolves none of its own, but the request still named one, and the settled envelope has always carried it. Rides the command rather than being recovered downstream because the consumer building the envelope no longer keeps the admission; reading only the outcome would silently empty the field on every settled delivery.
    */
   model: z.string().max(512).default(""),
   model_provider_id: z.string().max(256).default(""),

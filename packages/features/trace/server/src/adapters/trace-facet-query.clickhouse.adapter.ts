@@ -6,22 +6,7 @@
 import type { FacetQueryContext } from "./trace-facet-registry.clickhouse.adapter";
 
 /**
- * Per-query memory guard for the unbounded key-discovery facets
- * (`metadata-keys`, `span-attribute-keys`, `event-attribute-keys`). Each
- * flattens an attribute-map's keys with `arrayJoin` and groups by key over the
- * whole time window. A tenant that stuffs high-cardinality data into key names
- * (per-user / UUID keys) turns the GROUP BY into millions of groups, and the
- * read of the keys subcolumn can allocate gigabytes — observed tripping
- * `MEMORY_LIMIT_EXCEEDED` in prod.
- *
- * `max_bytes_before_external_group_by` spills that aggregation to disk so the
- * facet completes instead of OOMing, and `max_memory_usage` caps the read so a
- * pathological tenant fails its own discovery query rather than allocating
- * against the server total — where the OvercommitTracker resolves the pressure
- * by killing whichever query is allocating, degrading unrelated requests. Same
- * rationale as the span repo's `SINGLE_TRACE_READ_SETTINGS`. The ceiling sits
- * above any normal facet read and below the global per-query limit, so it only
- * trips on the pathological tail.
+ * Per-query memory guard for unbounded key-discovery facets (metadata/span/event-attribute-keys): each flattens an attribute map with arrayJoin and groups by key over the whole window, and high-cardinality key names (per-user/UUID) turn GROUP BY into millions of groups, tripping MEMORY_LIMIT_EXCEEDED in prod. max_bytes_before_external_group_by spills to disk so the facet completes; max_memory_usage caps the read so a pathological tenant fails its own query rather than triggering the OvercommitTracker to kill an unrelated one (same rationale as SINGLE_TRACE_READ_SETTINGS). Sits above any normal read and below the global limit.
  */
 export const KEY_DISCOVERY_SETTINGS: Record<string, string> = {
   // ClickHouse settings are string-typed over the wire.
@@ -35,14 +20,8 @@ export class ClickHouseFacetQueryAdapter {
   }
 
   /**
-   * `WHERE` predicate that pins every facet query to the right tenant and
-   * time window. The time column varies per table — `OccurredAt` for
-   * `trace_summaries`, `StartTime` for `stored_spans`, `ScheduledAt` for
-   * `evaluation_runs`. See `TABLE_TIME_COLUMNS` in `facet-registry.ts`.
-   *
-   * TenantId comes first in the predicate list because of how the
-   * cross-tenant index is laid out — the multitenancy review in
-   * `dev/docs/best_practices/clickhouse-queries.md` calls this out.
+   * See dev/docs/best_practices/clickhouse-queries.md (multitenancy review)
+   * WHERE predicate pinning every facet query to the right tenant + time window. Time column varies per table (OccurredAt/StartTime/ScheduledAt — see TABLE_TIME_COLUMNS in facet-registry.ts); TenantId comes first in the predicate list because of how the cross-tenant index is laid out.
    */
   static buildTimeWhere(timeColumn: string): string {
     return [

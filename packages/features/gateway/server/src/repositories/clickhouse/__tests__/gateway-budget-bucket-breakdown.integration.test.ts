@@ -17,7 +17,7 @@
  */
 
 import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import type { GatewayBudget, GatewayBudgetWindow } from "@langwatch/prisma-client/generated";
 import { Prisma } from "@langwatch/prisma-client/generated";
 import {
@@ -34,7 +34,6 @@ const chUrl = testClickHouseUrl();
 
 const suffix = nanoid(8);
 const ORG_ID = `org-breakdown-${suffix}`;
-const TEAM_ID = `team-breakdown-${suffix}`;
 const TENANT_ID = `proj-breakdown-${suffix}`;
 const PROVIDER_KEY = `prov-openai-${suffix}`;
 

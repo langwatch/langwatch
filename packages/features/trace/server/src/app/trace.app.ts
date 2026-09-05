@@ -1,37 +1,5 @@
 /**
- * The trace feature's application: what all five of its doors call.
- *
- * It holds every service and port the feature's api modules reach, and it is
- * the one typed thing a transport is given. Before it, each door declared its
- * own private bag — `SpansApplication`, `TracesApplication`,
- * `TraceEditOverlayApplication`, `SharedTraceApplication`,
- * `TracesV2Application` — five descriptions of one application, agreeing by
- * attention rather than by construction, and none of them reachable from
- * another. The anonymous share read and the authenticated explorer issue the
- * SAME five span reads; they could not see each other's declaration of them.
- *
- * Most operations are a service's own, reached through {@link dependencies}.
- * What lives here as a rule is what a door would otherwise have to know:
- *
- *   - **Attribution.** `changeTraceName` and the reviewer-correction write both
- *     stamp the caller who asked for them. Three copies of one rule became one,
- *     and the caller arrives as an argument rather than being read off a
- *     session, which is what lets one operation serve a browser session, an API
- *     key and a background job without knowing which it is serving.
- *   - **Full resolution (#4991).** A read that CONSUMES trace content resolves
- *     offloaded values in full; a read that merely lists it stays on the stored
- *     preview. That was six `{ full: true }` literals across two doors.
- *   - **The partition-pruning hint.** `occurredAtMs` must be OMITTED, never
- *     passed as `undefined`, or the read loses its partition pruning. Fourteen
- *     conditional spreads became one per read.
- *   - **The visibility-window verdict.** Whether the plan's window teases a
- *     trace, and the fail-closed answer when its summary cannot be read.
- *   - **The sample draw.** List for ids, then read those traces in full — the
- *     evaluator wizard and the dataset builder both did it for themselves.
- *
- * A door may still shape what it ASKS for: its own paging, its own limits, its
- * own redactions on the way out. What it may not do is decide, privately, what
- * the application does.
+ * The trace feature's application: the one typed thing every door is given, replacing five previously-private bags (SpansApplication, TracesApplication, TraceEditOverlayApplication, SharedTraceApplication, TracesV2Application) that agreed by attention, not construction, and couldn't see each other's declarations. What lives here as a rule rather than a service's own concern: attribution (changeTraceName + reviewer-correction stamp the caller as an argument, not a session read, so one op serves a browser/API-key/job caller alike); full resolution (#4991: a content-consuming read resolves offloads, a listing read stays on preview); the partition-pruning hint (occurredAtMs must be OMITTED, never undefined); the visibility-window verdict; and the sample draw (list ids, then read those traces in full). A door may still shape its own paging/limits/redactions, but not decide privately what the application does.
  */
 import type { CodingAgentService } from "@langwatch/coding-agent-contract";
 import type { EvaluationService } from "@langwatch/evaluation-contract";
@@ -178,10 +146,7 @@ export type TracesV2SpanReader = Readonly<{
 }>;
 
 /**
- * The trace's own summary read, in the one shape all three readers of it need.
- * The union of what the drawer header, the correction overlay and the share
- * page each declared: `occurredAtMs` prunes partitions, `visibilityCutoffMs`
- * applies the plan's window, `full` resolves offloaded values.
+ * The trace's own summary read, in the one shape all three readers need: occurredAtMs prunes partitions, visibilityCutoffMs applies the plan's window, full resolves offloaded values — the union of what the drawer header, correction overlay and share page each declared separately.
  */
 export type TraceSummaryReader = Readonly<{
   getByTraceId(
@@ -301,12 +266,7 @@ export interface TraceAppDependencies {
 }
 
 /**
- * The partition-pruning hint, as a read must receive it.
- *
- * Present or absent — never present and `undefined`. Passing the key with no
- * value turns a bounded read into a scan of every weekly partition, cold S3
- * storage included, which is the difference between a 100 ms read and a
- * multi-second one.
+ * The partition-pruning hint, as a read must receive it: present or absent, never present-and-undefined. Passing the key with no value turns a bounded read into a scan of every weekly partition, cold S3 included — the difference between a 100ms read and a multi-second one.
  */
 function occurredAtHint(occurredAtMs?: number): { occurredAtMs: number } | Record<string, never> {
   return occurredAtMs !== undefined ? { occurredAtMs } : {};
@@ -319,16 +279,11 @@ export class TraceApp {
 
   private constructor(private readonly dependencies: TraceAppDependencies) {}
 
-  // -------------------------------------------------------------------------
-  // Collaborators handed to a process port as VALUES
-  //
-  // The coding-agent log join reads the trace's logs itself and runs
-  // canonicalisation per span, so it takes these three as objects rather than
-  // being called with their results. They are exposed rather than wrapped
-  // because the join's port type is declared by the transport, and an
-  // application importing its own transport would invert the dependency the
-  // strict layout exists to hold.
-  // -------------------------------------------------------------------------
+  // Collaborators handed to a process port as VALUES: the coding-agent log
+  // join reads the trace's logs itself and canonicalises per span, so it
+  // takes these three as objects, not call results. Exposed rather than
+  // wrapped since the join's port type is declared by the transport, and
+  // an application importing its own transport would invert the layout.
 
   /** The trace-log read the coding-agent join issues for itself. */
   get logRecords(): TraceLogRecordReader {
@@ -350,12 +305,7 @@ export class TraceApp {
   // -------------------------------------------------------------------------
 
   /**
-   * The project's list/search read, keyset-paged.
-   *
-   * Stays on the stored preview: a grid lists content, it does not consume it,
-   * and resolving every offloaded value for a page of rows is exactly what
-   * #4991 kept off it. The download and the sample draws below, which DO
-   * consume the content, ask for it in full.
+   * The project's list/search read, keyset-paged. Stays on the stored preview: a grid lists content, it doesn't consume it, and resolving every offloaded value for a page is exactly what #4991 kept off it. The download and sample draws below, which DO consume content, ask for it in full.
    */
   listTraces(input: {
     query: TraceLegacyListInput;
@@ -375,11 +325,7 @@ export class TraceApp {
   }
 
   /**
-   * One trace with its spans, resolved in full.
-   *
-   * A drawer read consumes the content it shows, so it never serves the 64 KB
-   * preview (#4991). Answers `undefined` when the project holds no such trace;
-   * turning that into a transport error is the door's business.
+   * One trace with its spans, resolved in full — a drawer read consumes the content it shows, so it never serves the 64 KB preview (#4991). Answers undefined when the project holds no such trace; turning that into a transport error is the door's business.
    */
   readTrace(input: {
     projectId: string;
@@ -419,11 +365,7 @@ export class TraceApp {
   }
 
   /**
-   * The same traces, on the stored preview.
-   *
-   * The one read that deliberately does NOT resolve in full: it runs over a
-   * whole page of traces at once to render each as a digest, and resolving
-   * every offloaded value on all of them is what #4991 kept off the grid.
+   * The same traces, on the stored preview — the one read that deliberately does NOT resolve in full: it runs over a whole page at once to render each as a digest, and resolving every offload on all of them is what #4991 kept off the grid.
    */
   readTracesWithSpansPreview(input: {
     projectId: string;
@@ -441,12 +383,7 @@ export class TraceApp {
   }
 
   /**
-   * One trace's spans in the order a waterfall reads: earliest start first,
-   * and where two spans start together the longer one first, so a parent is
-   * never drawn under the child it contains.
-   *
-   * Answers no spans — rather than failing — when the project holds no such
-   * trace, or when the trace carries none.
+   * One trace's spans in waterfall order: earliest start first, and where two start together, the longer one first, so a parent is never drawn under the child it contains. Answers no spans, rather than failing, when the project holds no such trace or the trace carries none.
    */
   async readOrderedSpansForTrace(input: {
     projectId: string;
@@ -509,13 +446,7 @@ export class TraceApp {
   }
 
   /**
-   * A page of traces drawn for a wizard's sample step, resolved in full.
-   *
-   * Two reads, in this order and no other: the list read for ids only (it
-   * reads no content, so it stays on the preview), then the named traces in
-   * full because the sample builder and the dataset builder both persist what
-   * comes back and a truncated row corrupts what they write. Both wizards did
-   * this for themselves, one `pageSize` apart.
+   * A page of traces drawn for a wizard's sample step, resolved in full — two reads, in this order only: list for ids (no content, stays on preview), then the named traces in full, since sample/dataset builders persist what comes back and a truncated row corrupts the write. Both wizards did this for themselves, one pageSize apart.
    */
   async readSampleTraces(input: {
     query: TraceLegacyListInput;
@@ -683,16 +614,7 @@ export class TraceApp {
   }
 
   /**
-   * Whether the plan's visibility window teases this trace's content.
-   *
-   * Only free plans have a window, so a plan without one answers without
-   * reading anything; when there is one, the trace's own summary decides it —
-   * the same read the drawer header makes, which is what keeps the two from
-   * disagreeing.
-   *
-   * A summary that cannot be read answers "teased". A correction quotes
-   * captured content, so a trace whose age we cannot establish must not open
-   * it: the failure is logged and the answer is the closed one.
+   * Whether the plan's visibility window teases this trace's content. Only free plans have a window, so a plan without one answers without reading anything; with one, the trace's own summary decides it — the same read the drawer header makes, keeping the two from disagreeing. A summary that can't be read answers "teased": a correction quotes captured content, so an age we can't establish must not open it — logged, and closed.
    */
   async isTraceWindowRedacted(input: {
     projectId: string;
@@ -919,12 +841,7 @@ export class TraceApp {
   // -------------------------------------------------------------------------
 
   /**
-   * Renames a trace, attributed to the caller who asked for it.
-   *
-   * The attribution is here rather than in the door because "who renamed this"
-   * is a property of the act, not of the transport it arrived over. The name
-   * itself is validated before it gets here: an invalid one is a rejection of
-   * the request, which is the door's to report.
+   * Renames a trace, attributed to the caller who asked for it. Attribution lives here, not the door, because "who renamed this" is a property of the act, not the transport it arrived over. The name itself is validated before it gets here; an invalid one is the door's rejection to report.
    */
   changeTraceName(
     input: { projectId: string; traceId: string; newName: string; occurredAt?: number },
@@ -951,11 +868,7 @@ export class TraceApp {
   }
 
   /**
-   * Saves the correction, attributed to the caller who asked for it.
-   *
-   * The door used to stamp the reviewer twice — once on the first correction a
-   * trace ever gets, once on every replacement — which is two chances to stamp
-   * it differently or not at all.
+   * Saves the correction, attributed to the caller who asked for it. The door used to stamp the reviewer twice — once on a trace's first correction, once on every replacement — two chances to stamp it differently or not at all.
    */
   saveTraceEditOverlay(
     input: { projectId: string; traceId: string; patch: unknown },

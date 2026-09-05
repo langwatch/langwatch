@@ -1,16 +1,5 @@
 /**
- * Shared DTO shape for VirtualKey. Consumed by both the tRPC router
- * (camelCase for the UI) and the public Hono REST API (snake_case for
- * SDK / CLI clients).
- *
- * Post-collapse: the legacy `providerCredentialIds` + `providerChain`
- * fields are gone from the wire. The VK's eligible-provider set is
- * derived from the scope graph + optional RoutingPolicy at request time
- * (see `scopeResolver.ts`); the DTO exposes the scope set + the
- * `routingPolicyId` so callers can render the binding-equivalent view.
- *
- * The token format is `vk-lw-<ulid>` with no live/test discriminator;
- * the gateway never branches on environment, so there is no env field.
+ * Shared DTO for VirtualKey (tRPC camelCase, REST snake_case). Post-collapse: providerCredentialIds/providerChain are gone from the wire — eligible providers derive from the scope graph + RoutingPolicy at request time (scopeResolver.ts). Token is vk-lw-<ulid>, no env field since the gateway never branches on environment.
  */
 import type { ProjectService } from "@langwatch/project-contract";
 
@@ -18,13 +7,7 @@ import type { VirtualKeyWithScopes } from "../ports/gateway-virtual-key.port";
 import { metadataFromRow, type ResourceMetadata, toWireEnum } from "@langwatch/gateway-contract";
 
 /**
- * The one fact about a key's trace destination that is not on the key row.
- *
- * A key follows its stored pointer even after the project behind it is
- * deleted: the spans keep landing there, intact, and reappear if the customer
- * restores it. That is the right thing to do and the one thing a reader
- * cannot work out from the row, since the destination still resolves and the
- * traffic still flows. So it is read once per listing and published.
+ * A key follows its stored trace-destination pointer even after the project behind it is deleted — spans keep landing there and reappear if restored — which a reader can't work out from the row alone, so it's read once per listing and published.
  */
 export type TraceDestinationFacts = {
   archivedProjectIds: ReadonlySet<string>;
@@ -70,12 +53,7 @@ export type VirtualKeyCamelDto = {
   lastUsedAt: string | null;
   revokedAt: string | null;
   /**
-   * When the key stops serving, or null for a key that never expires.
-   *
-   * `status` stays "active" past this moment on purpose: the three status
-   * values are what clients switch on, and "expired" is a fact any of them
-   * can read off this date. It also keeps the key editable, which is the
-   * whole point of a date over a status.
+   * `status` stays "active" past the expiry date on purpose: the three status values are what clients switch on, and "expired" is derivable from this date by any of them — keeping the key editable, the point of a date over a status.
    */
   expiresAt: string | null;
 };
@@ -166,10 +144,7 @@ export class GatewayVirtualKeyDtoAdapter {
   private constructor() {}
 
   /**
-   * Load the flag for a page of keys in one query, whatever the page's size.
-   * Passed to the DTO explicitly rather than defaulted, because a caller that
-   * forgets it would publish `trace_project_archived: false` for a deleted
-   * project, which is the failure this field exists to prevent.
+   * Loads the flag for a page of keys in one query. Passed to the DTO explicitly, not defaulted, since a caller that forgets it would publish trace_project_archived: false for a deleted project.
    */
   async loadTraceDestinationFacts({
     projects,

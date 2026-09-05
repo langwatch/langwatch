@@ -68,13 +68,7 @@ const spanStatusRead: CategoricalRead = (t) =>
     : t.spans.map((s) => (s.statusCode === 2 ? "error" : s.statusCode === 1 ? "ok" : "unset"));
 
 /**
- * How one field's definition is built.
- *
- * A field needs two answers that must agree: the SQL predicate a filter
- * compiles to, and the in-memory evaluation used where there is no query to
- * run. These five builders pair them, so a field cannot be given one without
- * the other — which is the failure mode this shape exists to prevent, since a
- * field that filters in SQL but not in memory silently disagrees with itself.
+ * How one field's definition is built. A field needs two answers that must agree: the SQL predicate a filter compiles to, and the in-memory evaluation used with no query to run. These five builders pair them so a field can't be given one without the other — a field that filters in SQL but not in memory would silently disagree with itself.
  */
 export class TraceQueryFieldsAdapter {
   static create(): TraceQueryFieldsAdapter {
@@ -114,10 +108,7 @@ export class TraceQueryFieldsAdapter {
   }
 
   /**
-   * Cross-table categorical (evaluation_runs / stored_spans): subquery SQL from
-   * the registry expression, paired with a per-collection in-memory read (the
-   * read iterates `trace.evaluations` / `trace.spans` and fails closed when the
-   * collection isn't loaded).
+   * Cross-table categorical (evaluation_runs/stored_spans): subquery SQL from the registry expression, paired with a per-collection in-memory read (iterates trace.evaluations/trace.spans, fails closed when the collection isn't loaded).
    */
   static crossCategoricalFacet(key: string, needs: FieldNeeds, read: CategoricalRead): FieldDef {
     const def = TraceQueryFieldsAdapter.expressionFacet(key);
@@ -150,15 +141,11 @@ export class TraceQueryFieldsAdapter {
   }
 }
 
-// ---------------------------------------------------------------------------
-// FIELD_DEFS — the exhaustive registry of filter fields.
-//
-// `satisfies Record<KnownField, FieldDef>` is the drift guardrail: because
-// `FieldDef` requires BOTH a `toClickHouse` and an `evaluateInMemory`, and
-// `KnownField` is an independent exhaustive union, TypeScript rejects a field
-// wired with only one side, a field missing from this object, or a stray key.
-// Insertion order is preserved so `KNOWN_FIELDS` matches the historical order.
-// ---------------------------------------------------------------------------
+// FIELD_DEFS — the exhaustive registry of filter fields. satisfies
+// Record<KnownField, FieldDef> is the drift guardrail: FieldDef requires
+// BOTH toClickHouse and evaluateInMemory, and KnownField is an independent
+// exhaustive union, so TypeScript rejects a one-sided field, a field missing
+// here, or a stray key. Insertion order matches KNOWN_FIELDS' historical order.
 
 /** Every filter field name, mirrored by {@link FIELD_DEFS}'s keys. */
 export type KnownField =
@@ -296,16 +283,7 @@ export const FIELD_DEFS = {
 } satisfies Record<KnownField, FieldDef>;
 
 /**
- * Field lookup for both the ClickHouse compiler and the in-memory evaluator.
- *
- * A `Map`, not a plain object: field names come straight from a user-authored
- * filter string, and a plain-object index resolves `constructor` / `toString` /
- * `__proto__` off `Object.prototype`. That inherited value is truthy, so it
- * slipped past both `if (!handler)` (the save-time unknown-field gate, which
- * then compiled `constructor:x` into nonsense instead of rejecting it) and
- * `if (!def)` in the evaluator (which then threw `def.evaluateInMemory is not a
- * function` straight out of the supposedly fail-closed matcher). `Map.get`
- * has own-key semantics, so an inherited name is simply an unknown field.
+ * Field lookup for both the CH compiler and the in-memory evaluator. A Map, not a plain object: field names come from a user-authored filter string, and a plain-object index resolves constructor/toString/__proto__ off Object.prototype (truthy), slipping past both the save-time !handler gate (compiling constructor:x into nonsense) and the evaluator's !def check (throwing out of the fail-closed matcher). Map.get has own-key semantics, so an inherited name is simply unknown.
  */
 export const FIELD_DEF_BY_NAME: ReadonlyMap<string, FieldDef> = new Map(Object.entries(FIELD_DEFS));
 

@@ -1,15 +1,5 @@
 /**
- * The one resolver for "what does this budget scope point at, for humans".
- *
- * Every budget surface needs the same lookup: given (scopeType, scopeId)
- * pairs, return the target's display name plus the secondary bits each
- * view renders (slug, email, member count, VK prefix). The budgets list,
- * the budget detail page, the VK drawer's "already applies" list and the
- * budget-overview service all read this module, so the same team can
- * never render under two different names depending on the page.
- *
- * Batch-shaped: one findMany per scope kind regardless of how many
- * budgets are being labelled.
+ * The one resolver for "what does this budget scope point at, for humans": given (scopeType, scopeId) pairs, the display name plus the secondary bits each view renders (slug, email, member count, VK prefix). Read by the budgets list, detail page, VK drawer and budget-overview service, so one team never renders under two names. Batch-shaped: one findMany per scope kind regardless of how many budgets are labelled.
  */
 import { scopeTargetKey } from "@langwatch/gateway-contract";
 import type { ProjectIdentity } from "@langwatch/project-contract";
@@ -41,14 +31,7 @@ type AddTargetArgs = {
 };
 
 /**
- * Which spend targets a set of budgets resolves to.
- *
- * A budget names a scope, not the rows that scope covers, and the six `add*`
- * steps below are the six ways a scope expands: by name, project, virtual key,
- * principal, group and attributed user. They only exist to serve the batch
- * resolve, which is why they are private, and they are collected here rather
- * than left loose because a scope kind that expands differently from the rest
- * is the bug this shape makes visible.
+ * Which spend targets a set of budgets resolves to. A budget names a scope, not the rows it covers; the six private add* steps below are the six ways a scope expands (name, project, VK, principal, group, attributed user), collected here so a scope kind expanding differently from the rest is a visible bug rather than a loose one.
  */
 export class PrismaGatewayBudgetScopeTargetRepository {
   private constructor() {}
@@ -232,10 +215,7 @@ export class PrismaGatewayBudgetScopeTargetRepository {
   }
 
   /**
-   * Resolve display targets for a set of budget scopes, grouped by scopeType
-   * so each scope kind costs at most one findMany. VK, GROUP and PRINCIPAL
-   * lookups are pinned to `organizationId` so a stray scopeId can never
-   * surface another tenant's name, key or member.
+   * Resolve display targets for budget scopes, grouped by scopeType so each kind costs at most one findMany. VK, GROUP and PRINCIPAL lookups pin organizationId so a stray scopeId can never surface another tenant's name, key or member.
    */
   async resolveScopeTargetsBatch(
     prisma: GatewayBudgetScopeTargetDatabase,

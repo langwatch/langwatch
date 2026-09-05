@@ -1,11 +1,6 @@
 /**
  * @see specs/security/api-endpoint-authorization.feature
- *
- * The budget create() guards PRINCIPAL scope against cross-org targeting; this
- * covers the matching TEAM / PROJECT guard. organizationId is derived from the
- * authenticated caller's project, but the scope id is request-supplied, so a
- * caller could otherwise create a budget targeting another tenant's team or
- * project (the Team/Project FK is org-agnostic).
+ * Covers the TEAM/PROJECT cross-org guard on create(): scopeId is request-supplied and the Team/Project FK is org-agnostic, so a caller could otherwise target another tenant's team or project.
  */
 
 import { describe, expect, it, vi } from "vitest";
@@ -35,12 +30,9 @@ function mockPrisma(overrides: { team?: unknown; project?: unknown }): PrismaCli
 }
 
 /**
- * The process's own composition, over the fake database.
- *
- * The two guards live one layer apart now: the TEAM check is
- * `PrismaGatewayBudgetRepository.create`'s, and the PROJECT check is the
- * service's, proved through the `ProjectService` it is built with. Composing
- * the pair the way `PrismaGatewayAdapter` composes it keeps both under test.
+ * Composed like `PrismaGatewayAdapter` composes it — see
+ * dev/docs/best_practices/service-repository-adapter-port.md. The TEAM
+ * guard lives in the repository's create(); PROJECT lives in the service.
  */
 function serviceOver(prisma: PrismaClient, project: unknown) {
   return PrismaGatewayAdapter.create({

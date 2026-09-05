@@ -1,20 +1,6 @@
 /**
  * @vitest-environment node
- *
- * What a virtual key has spent, against real Postgres + real ClickHouse.
- *
- * These pin the two properties the "Spent this month" column and the Usage
- * tab both depend on, and that the budget-ledger source could not provide:
- * a key with no budget still reports its spend, and a key covered by
- * several budgets is not counted once per budget.
- *
- * They also pin the window boundary, because the reported symptom was
- * spend appearing about a day late. The window the pages ask for is a
- * rolling `[now - N days, now)`, so a request from a minute ago has to be
- * inside it, and a request from just before the start has to be outside.
- *
- * Spec: specs/ai-gateway/budgets.feature
- *       specs/ai-gateway/virtual-key-creation.feature
+ * Real Postgres + real ClickHouse. Pins: spend reports even with no budget, and one key's spend isn't multiplied by however many budgets cover it. Window is rolling [now-N days, now). Spec: specs/ai-gateway/budgets.feature
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";

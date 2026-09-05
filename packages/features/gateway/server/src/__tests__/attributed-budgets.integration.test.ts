@@ -1,14 +1,7 @@
 /**
  * @vitest-environment node
- *
- * Attributed-user templates, the MANUAL window, and period resets against
- * real Postgres + real ClickHouse: the boundary semantics that make
- * "reset" a boundary move instead of a counter wipe, and the per-budget
- * ledger discipline that lets one request's template row and key-cap row
- * coexist.
- *
- * Spec: specs/ai-gateway/end-user-attribution.feature
- *       specs/ai-gateway/gateway-budget-targeting.feature
+ * Real Postgres + real ClickHouse; "reset" moves the window, it does not wipe the counter.
+ * Spec: specs/ai-gateway/end-user-attribution.feature, specs/ai-gateway/gateway-budget-targeting.feature
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";

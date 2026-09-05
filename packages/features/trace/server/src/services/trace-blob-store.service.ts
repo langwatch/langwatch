@@ -6,13 +6,7 @@ import { Ksuid } from "@langwatch/ksuid";
 import type { Logger } from "@langwatch/observability";
 import { z } from "zod";
 /**
- * The one read this store issues, in the DEFAULT `JSON` format.
- *
- * Declared here rather than taken from the package's `TraceClickHouseClient`,
- * which pins `format: "JSONEachRow"`: this read consumes `response.data`, the
- * envelope the default format answers with, and switching it to row-per-line
- * would leave every offloaded value reading as "not found" while the query
- * itself still succeeded.
+ * The one read this store issues, in the DEFAULT JSON format. Declared here rather than taken from the package's TraceClickHouseClient, which pins format:"JSONEachRow": this read consumes response.data, the envelope the default format answers with, and switching would leave every offloaded value reading as "not found" while the query itself still succeeded.
  */
 interface BlobStoreClickHouseClient {
   query(input: {
@@ -31,10 +25,7 @@ export interface S3ClientResolution {
 }
 
 /**
- * Cap on a spool object read. The spool holds one over-threshold command, and
- * `capOversizedAttributes` already bounds a span well below this — the cap
- * exists so a tampered or corrupt object cannot OOM the worker, not to enforce
- * a product limit.
+ * Cap on a spool object read. The spool holds one over-threshold command, and capOversizedAttributes already bounds a span well below this — the cap exists so a tampered/corrupt object can't OOM the worker, not to enforce a product limit.
  */
 export const MAX_SPOOL_BYTES = 50 * 1024 * 1024;
 
@@ -66,12 +57,7 @@ export interface SpoolStorage {
 }
 
 /**
- * Half-width (ms) of the `EventOccurredAt` window applied to event_log blob
- * reads. The KSUID creation time and `EventOccurredAt` are stamped from the
- * same ingestion clock, so they land within queue lag of each other; ±2 days
- * comfortably covers that skew while still pruning to the one or two weekly
- * partitions the row can live in. Matches the ±2-day span partition hint used
- * on the trace-fetch path.
+ * Half-width (ms) of the EventOccurredAt window for event_log blob reads. KSUID creation time and EventOccurredAt are stamped from the same ingestion clock, landing within queue lag of each other; ±2 days comfortably covers that skew while pruning to the one or two weekly partitions the row can live in. Matches the ±2-day span partition hint on the trace-fetch path.
  */
 const EVENT_LOG_OCCURRED_AT_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
 
@@ -129,23 +115,7 @@ export class BlobFieldNotFoundError extends Error {
 const eventLogRowSchema = z.object({ EventPayload: z.string() });
 
 /**
- * Span attribute entry inside EventPayload.
- *
- * EventPayload stores RAW OTLP spans (`EventPayload` IS `event.data`), whose
- * attribute `value` is an OTLP `AnyValue` oneof —
- * `stringValue | intValue | boolValue | doubleValue | arrayValue | kvlistValue |
- * bytesValue` (see schemas/otlp.ts). The read path only ever needs the offloaded
- * IO fields, which are stored as `stringValue`, so this schema reads ONLY
- * `stringValue` and leaves it optional.
- *
- * Critically, `span.attributes` is parsed PER-ELEMENT and defensively (see the
- * extraction loop in `getFromEventLog`): a single non-string or malformed
- * sibling attribute can never fail the whole-array parse and mask the offloaded
- * field. The old strict shape `value: { stringValue: z.string() }` rejected
- * EVERY real span that carried a numeric/boolean attribute (e.g.
- * `gen_ai.usage.input_tokens` = `{ intValue: "100" }`), which failed
- * `z.array(...)`, failed `eventPayloadSchema.safeParse`, and degraded every
- * > 64 KB read to the 64 KB preview (#4888).
+ * Span attribute entry inside EventPayload. EventPayload stores RAW OTLP spans (IS event.data), whose attribute value is an OTLP AnyValue oneof; the read path only needs offloaded IO fields (stored as stringValue), so this schema reads ONLY stringValue, optional. Critically, span.attributes is parsed PER-ELEMENT and defensively (getFromEventLog's extraction loop) — a malformed sibling can never fail the whole-array parse and mask the offloaded field. The old strict shape rejected EVERY span carrying a numeric/boolean attribute (e.g. gen_ai.usage.input_tokens={intValue}), degrading every >64KB read to the 64KB preview (#4888).
  */
 const spanAttributeSchema = z.object({
   key: z.string(),
@@ -153,18 +123,8 @@ const spanAttributeSchema = z.object({
 });
 
 /**
- * Parsed EventPayload structure (ADR-022: full event as stored by the command worker).
- *
- * EventPayload IS event.data (stored as `event.data ?? {}` by eventToRecord).
- * The span write shape from recordSpanCommand is `{ span, resource, instrumentationScope }`
- * with the span at the TOP level — there is NO outer `data` wrapper. Log-record events
- * instead carry the (full) log body at the top-level `body`, which `leanForProjection`
- * tags with an eventref whose field is `"body"` (resolved by `getFromEventLog`).
- *
- * `span.attributes` is modeled as `z.array(z.unknown())` so a single malformed
- * or non-string sibling attribute can never fail the whole-array parse; each
- * entry is validated per-element by `spanAttributeSchema` in the extraction loop
- * below (#4888).
+ * @see ADR-022
+ * Parsed EventPayload structure (full event as stored by the command worker). EventPayload IS event.data; the span write shape is {span, resource, instrumentationScope} at the TOP level, no outer data wrapper. Log-record events carry the full body at top-level body, tagged by leanForProjection with a "body" eventref. span.attributes is z.array(z.unknown()) so a malformed sibling can never fail the whole-array parse; each entry validates per-element via spanAttributeSchema below (#4888).
  */
 const eventPayloadSchema = z.object({
   span: z
@@ -180,23 +140,12 @@ const eventPayloadSchema = z.object({
 // ---------------------------------------------------------------------------
 
 /**
- * Prefix for all transient spool objects, kept at the TOP of the object path
- * (above the tenant segment) so a bucket/container lifecycle rule can match it
- * with a plain prefix filter. S3 lifecycle prefix filters cannot wildcard a
- * leading tenant segment, so `{projectId}/trace-blobs/spool/…` would be
- * unexpirable and orphans would accumulate forever. Do not reorder.
+ * Prefix for all transient spool objects, kept at the TOP of the object path (above the tenant segment) so a lifecycle rule can match it with a plain prefix filter — S3 lifecycle filters can't wildcard a leading tenant segment, so a tenant-first path would be unexpirable and orphans would accumulate forever. Do not reorder.
  */
 const SPOOL_KEY_PREFIX = "trace-blobs/spool";
 
 /**
- * Marker carried by a spooled command instead of a storage path.
- *
- * The v1 format put the raw object key in the command and the read path parsed
- * the tenant id back out of that string to pick a bucket — so whoever could
- * influence the queue message could steer a read at another tenant's object.
- * v2 carries no location at all: `getSpool`/`deleteSpool` re-derive it from the
- * command's own trusted `tenantId` + span ids, exactly as `putSpool` derived it
- * (the same discipline `TieredBlobStore`'s `BlobRef` follows).
+ * Marker carried by a spooled command instead of a storage path. v1 put the raw object key in the command and the read path parsed the tenant id back out to pick a bucket, so an influenced queue message could steer a read at another tenant's object. v2 carries no location — getSpool/deleteSpool re-derive it from the command's own trusted tenantId + span ids, exactly as putSpool derived it (same discipline as TieredBlobStore's BlobRef).
  */
 export const SPOOL_REF_V2 = "spool:v2";
 
@@ -220,20 +169,7 @@ export class SpoolDestinationUnsupportedError extends Error {
 const SAFE_PATH_SEGMENT = /^[A-Za-z0-9_-]+$/;
 
 /**
- * Reduces one id to a single path component.
- *
- * Percent-encoding is NOT sufficient on its own. It survives URI construction,
- * but `LocalFilesystemDriver.parseFileUri` round-trips through
- * `decodeURIComponent`, which turns `..%2F..%2F` straight back into `../../`
- * before `mkdir`/`writeFile` see it — so an id of `../../…` escaped the object
- * root entirely. `idSchema` accepts arbitrary strings, so anyone able to ingest
- * a span could pick that path.
- *
- * Anything outside the safe class is replaced by a hash of the id rather than
- * escaped: a hash cannot contain a separator or a `..` no matter what decodes
- * it downstream, and it stays deterministic, so the read and delete paths
- * re-derive the identical location. Ordinary hex ids are untouched and remain
- * legible in a bucket listing.
+ * Reduces one id to a single path component. Percent-encoding alone isn't enough: it survives URI construction, but LocalFilesystemDriver.parseFileUri round-trips through decodeURIComponent, turning ..%2F..%2F back into ../../ before mkdir/writeFile see it, so an id of ../../... could escape the object root (idSchema accepts arbitrary strings). Anything outside the safe class is replaced by a HASH of the id, not escaped — a hash can't contain a separator or .. no matter what decodes it downstream, and stays deterministic so read/delete re-derive the identical location. Ordinary hex ids stay legible in a listing.
  */
 function safePathSegment(id: string): string {
   if (SAFE_PATH_SEGMENT.test(id) && id !== "." && id !== "..") {
@@ -264,42 +200,22 @@ function buildSpoolObjectPath({
 }
 
 /**
- * True when `spoolRef` has the shape of a v1 reference — a raw S3 key minted
- * before this deployment. Commands already queued when the new code rolls out
- * still carry these, so both formats must resolve for one release.
- *
- * Matched by prefix rather than by "not v2": treating every unrecognised string
- * as a v1 key would send it to the raw bucket+key read below, which is the very
- * dereference this change exists to remove. An unrecognised reference instead
- * falls through to the v2 path, where the location is derived and the reference
- * ignored.
- *
- * TODO(langwatch/langwatch-saas#837): drop the v1 branch one release after this
- * ships. By then no in-flight command can still carry a v1 ref — the spool's
- * own lifecycle expiry is 3 days, so nothing can resolve one after that.
+ * True when spoolRef has the v1 shape — a raw S3 key minted before this deployment; in-flight commands still carry these, so both formats must resolve for one release. Matched by PREFIX, not "not v2" — treating every unrecognised string as v1 would re-dereference the very thing this change removes; an unrecognised reference falls through to v2, where location is derived and the reference ignored.
+ * TODO(langwatch-saas#837): drop the v1 branch one release after this ships (spool lifecycle expiry is 3 days).
  */
 function isLegacySpoolRef(spoolRef: string): boolean {
   return spoolRef.startsWith(`${SPOOL_KEY_PREFIX}/`);
 }
 
 /**
- * Extracts the projectId segment from a v1 spool key.
- *
- * The caller must check it against the command's authenticated tenant before
- * dereferencing — see {@link assertLegacySpoolKeyBelongsTo}.
+ * Extracts the projectId segment from a v1 spool key. Caller must check it against the command's authenticated tenant before dereferencing — see {@link assertLegacySpoolKeyBelongsTo}.
  */
 function projectIdFromLegacySpoolKey(spoolRef: string): string {
   return spoolRef.split("/")[SPOOL_KEY_PREFIX.split("/").length] ?? "";
 }
 
 /**
- * Refuses a v1 key whose tenant segment is not the tenant the command was
- * authenticated as.
- *
- * The v1 format is the one place a location still travels inside the command,
- * so it is the one place a tampered reference could still steer a read. Pinning
- * it to the command's own tenant keeps the compatibility window from reopening
- * the hole the v2 format closes.
+ * Refuses a v1 key whose tenant segment isn't the tenant the command was authenticated as. v1 is the one place a location still travels inside the command, so it's the one place a tampered reference could steer a read — pinning it to the command's own tenant keeps the compatibility window from reopening the hole v2 closes.
  */
 function assertLegacySpoolKeyBelongsTo(spoolRef: string, projectId: string): void {
   const keyProjectId = projectIdFromLegacySpoolKey(spoolRef);
@@ -311,10 +227,7 @@ function assertLegacySpoolKeyBelongsTo(spoolRef: string, projectId: string): voi
 }
 
 /**
- * Refuses a destination that cannot bound an orphaned spool object.
- *
- * WRITE PATH ONLY. This is a rule about creating new objects, not about the
- * ones already out there — see the `purpose` note on `TraceBlobStoreService.mintSpoolUri`.
+ * Refuses a destination that cannot bound an orphaned spool object. WRITE PATH ONLY — a rule about creating new objects, not the ones already out there (see the purpose note on mintSpoolUri).
  */
 function assertDestinationCanHostSpool({
   destination,
@@ -323,17 +236,11 @@ function assertDestinationCanHostSpool({
   destination: ProjectStorageDestination;
   azureRetentionConfirmed: boolean;
 }): void {
-  // The spool is the one stored-objects consumer that depends on something
-  // OUTSIDE the object store to stay bounded: it deletes eagerly after the
-  // event_log INSERT, and leans on a lifecycle rule to reap whatever a crash
-  // between those two steps leaves behind. A filesystem has no such rule, so
-  // on this destination an orphan is permanent and the volume is what fills.
-  //
-  // Refusing here is not a regression. Before this consumer moved onto the
-  // shared layer it built an S3 client, and on a local install that resolved
-  // to the hardcoded "langwatch" bucket, which does not exist — so the PUT
-  // failed and `maybeSpool` fell open to an inline payload every time. This
-  // makes that same outcome explicit and loud instead of incidental.
+  // The spool is the one stored-objects consumer depending on something
+  // OUTSIDE the store to stay bounded: eager delete after event_log INSERT,
+  // plus a lifecycle rule reaping whatever a crash between the two leaves.
+  // A filesystem has no such rule, so here an orphan is permanent. Refusing
+  // is not a regression — before this moved onto the shared layer it hit a hardcoded nonexistent bucket and silently fell open to inline payloads.
   if (destination.kind === "file") {
     throw new SpoolDestinationUnsupportedError(
       "The trace spool has no local-filesystem path: orphaned spool objects are reaped by a " +
@@ -344,16 +251,10 @@ function assertDestinationCanHostSpool({
   }
 
   // Same rule, applied consistently. Azure CAN express the lifecycle policy
-  // the orphan bound depends on — but nothing here can confirm it exists.
-  // The policy is a MANAGEMENT-plane resource
-  // (Microsoft.Storage/storageAccounts/managementPolicies); this deployment
-  // holds a data-plane key only, so reading it back would mean asking every
-  // operator for ARM credentials and a subscription id the feature otherwise
-  // has no use for. Refusing to check is not the same as refusing to care:
-  // the operator asserts it at deploy time, in the same config that turns the
-  // spool on, and the default is off. An Azure install that enables the flag
-  // without provisioning retention therefore degrades to inline payloads
-  // rather than accumulating customer trace data nothing will ever reap.
+  // the orphan bound depends on, but nothing here can confirm it exists —
+  // the policy is a MANAGEMENT-plane resource this deployment's data-plane
+  // key can't read. The operator asserts it at deploy time (default off);
+  // enabling without provisioning retention degrades to inline payloads.
   if (destination.kind === "azure" && !azureRetentionConfirmed) {
     throw new SpoolDestinationUnsupportedError(
       "The trace spool is disabled on Azure Blob until orphan retention is provisioned. A crash " +
@@ -368,24 +269,8 @@ function assertDestinationCanHostSpool({
 }
 
 /**
- * Provides transient spool operations (ADR-022 write path) and event_log
- * read operations (ADR-022 read path).
- *
- * Spool: a per-span transient object used to carry over-threshold command
- * payloads from the edge to the command worker. Eagerly deleted after the
- * event_log INSERT succeeds; 3-day lifecycle policy as safety net for orphans
- * (3 days covers weekend incidents that need catch-up time).
- *
- * Spool writes go through the shared `stored-objects` layer, so the spool
- * lands wherever the project's storage destination points — S3, Azure Blob, or
- * the local filesystem. It used to speak the AWS SDK directly, which made it
- * the one byte-writing surface that silently ignored a deployment's Azure
- * configuration (langwatch/langwatch-saas#800).
- *
- * Event log: the durable source of truth. `getFromEventLog` performs a
- * SELECT on `event_log` keyed by (TenantId, AggregateType, AggregateId,
- * EventId). TenantId is the FIRST predicate, structurally blocking
- * cross-tenant reads. ADR-022.
+ * @see ADR-022
+ * Transient spool operations (write path) + event_log read operations (read path). Spool: a per-span transient object carrying over-threshold command payloads from edge to worker, eagerly deleted after the event_log INSERT, with a 3-day lifecycle policy as an orphan safety net (covers weekend incidents). Spool writes go through the shared stored-objects layer, landing wherever the project's storage destination points (S3/Azure/local) — used to speak the AWS SDK directly, silently ignoring Azure configs (langwatch-saas#800). Event log: the durable source of truth — getFromEventLog SELECTs by (TenantId, AggregateType, AggregateId, EventId), TenantId FIRST, structurally blocking cross-tenant reads.
  */
 export class TraceBlobStoreService {
   static create(options: {
@@ -398,20 +283,9 @@ export class TraceBlobStoreService {
   }
 
   /**
-   * @param resolveS3Client - Resolver for per-org S3 client + bucket. Used ONLY
-   *   to read back v1 spool refs written before this deployment; every new
-   *   write goes through `objectStoreFor`.
-   * @param resolveClickHouseClient - Optional per-tenant ClickHouseClient resolver for ADR-022
-   *   event_log reads. When provided, `getFromEventLog` resolves the correct client for the
-   *   given tenantId (supporting multi-cluster tenants). When absent, `getFromEventLog` throws
-   *   "ClickHouseClient not configured".
-   * @param spoolStorage - The destination-agnostic object store the spool
-   *   writes to, injected so this class stays free of env coupling and the
-   *   tests exercise it without infrastructure. When absent, spool writes
-   *   throw — `maybeSpool` is fail-open, so ingestion degrades to inline
-   *   payloads rather than breaking.
-   * @param logger - Optional; used only to surface a refused cross-tenant
-   *   delete, which `deleteSpool`'s best-effort swallow would otherwise hide.
+   * @param resolveS3Client - Reads back v1 spool refs only; new writes use objectStoreFor.
+   * @param resolveClickHouseClient - Optional per-tenant CH client for event_log reads; absent, getFromEventLog throws.
+   * @param spoolStorage - Object store for spool writes (absent throws; maybeSpool degrades to inline). @param logger - optional, surfaces a refused cross-tenant delete.
    */
   private readonly resolveS3Client: S3ClientResolver;
   private readonly resolveClickHouseClient?: ClickHouseClientResolver;
@@ -436,18 +310,7 @@ export class TraceBlobStoreService {
   }
 
   /**
-   * Re-derives the spool object's URI from server-trusted inputs. Never reads a
-   * location out of the command.
-   *
-   * `purpose` decides whether the destination guards below apply. They exist to
-   * stop a NEW object landing where nothing will reap it, so they are a
-   * write-time rule only. Applying them to a read or a delete would punish the
-   * objects already on disk: an operator who turns the retention assertion back
-   * off — the documented remediation, and what a chart rollback does — would
-   * make every in-flight spooled span permanently unreadable (`getSpool` does
-   * not fail open, and the edge already cleared the attributes), and would stop
-   * the eager delete that is the spool's FIRST line of cleanup, manufacturing
-   * exactly the orphan the guard is there to prevent.
+   * Re-derives the spool object's URI from server-trusted inputs, never a location out of the command. purpose gates the destination guards below, a WRITE-time rule only: applying them to a read/delete would punish objects already on disk — an operator flipping the retention assertion back off (documented remediation, what a chart rollback does) would make every in-flight spooled span permanently unreadable and stop the eager delete, manufacturing exactly the orphan the guard prevents.
    */
   private async mintSpoolUri({
     projectId,
@@ -485,16 +348,9 @@ export class TraceBlobStoreService {
   }
 
   /**
-   * Fetches a field value from the event_log ClickHouse table (ADR-022 read path).
-   *
-   * Issues a SELECT on `event_log` by `(TenantId, AggregateType, AggregateId, EventId)` —
-   * the TenantId is the FIRST predicate in the WHERE clause, structurally blocking
-   * cross-tenant reads. Parses `EventPayload` JSON, extracts the named field, and returns it.
-   *
-   * @throws {BlobNotFoundError} When the SELECT returns no rows (including cross-tenant attempts).
-   * @throws {BlobFieldNotFoundError} When the EventPayload parses successfully but the
-   *   requested field is absent.
-   * @throws {Error} When EventPayload JSON is corrupt or ClickHouseClient is not configured.
+   * Fetches a field value from event_log (ADR-022 read path). SELECTs by
+   * (TenantId, AggregateType, AggregateId, EventId), TenantId FIRST, blocking cross-tenant reads. Parses EventPayload JSON, extracts the named field.
+   * @throws {BlobNotFoundError} No rows. @throws {BlobFieldNotFoundError} Field absent. @throws {Error} Corrupt JSON / no ClickHouseClient.
    */
   async getFromEventLog({
     eventId,
@@ -515,21 +371,11 @@ export class TraceBlobStoreService {
 
     const clickHouseClient = await this.resolveClickHouseClient(tenantId);
 
-    // Prune partitions using the time embedded in the EventId itself. EventIds
-    // are KSUIDs (generated by generateEventId), so the id we already look up by
-    // carries its own creation timestamp — and EventOccurredAt is stamped from
-    // the same ingestion clock (`Date.now()` at collection), so the KSUID time
-    // lands in the same weekly partition. event_log is
-    // PARTITION BY toYearWeek(EventOccurredAt), monotonic in EventOccurredAt, so
-    // a window around that time prunes to the one or two weeks the row can live
-    // in instead of walking every partition (cold ones tier to S3, turning each
-    // blob read into a burst of S3 GETs).
-    //
-    // Deriving the bound from the id (rather than a caller-supplied time) keeps
-    // this correct for every caller with nothing to thread, and avoids anchoring
-    // on a different clock such as a span's start time, which can sit days
-    // before the event's ingestion for late-arriving or replayed spans and would
-    // then prune away the very partition holding the row.
+    // Prunes partitions using the time embedded in the EventId (a KSUID, so
+    // it carries its own creation timestamp matching EventOccurredAt's
+    // ingestion clock). event_log is PARTITION BY toYearWeek(EventOccurredAt),
+    // so a window around that time prunes to the weeks the row can live in.
+    // Derived from the id, not a caller-supplied time, so it's correct with nothing to thread.
     const occurredAtMs = parseKsuidCreatedAtMs(eventId);
     const occurredAtPredicate =
       occurredAtMs !== null
@@ -638,23 +484,9 @@ export class TraceBlobStoreService {
   }
 
   /**
-   * Fetches the full span body from the transient spool object.
-   * Called by the command worker when a command carries a `spoolRef`.
-   *
-   * The object's location is re-derived from `projectId` / `traceId` / `spanId`
-   * — all read from the command itself, which the queue authenticated — rather
-   * than from `spoolRef`. A tampered reference therefore cannot redirect this
-   * read at another tenant's bytes; the worst it can do is name a v1 format and
-   * miss.
-   *
-   * NOT fail-open, deliberately: the edge cleared `span.attributes` before
-   * spooling, so returning nothing here would write an empty span to
-   * `event_log` — permanent, silent loss in the sole source of truth. Throwing
-   * lets the command retry.
-   *
-   * @returns The raw body buffer as stored by `putSpool`.
-   * @throws {Error} If the object is absent, unreadable, or exceeds
-   *   {@link MAX_SPOOL_BYTES}.
+   * Fetches the full span body from the transient spool object. Location is
+   * re-derived from projectId/traceId/spanId (queue-authenticated), never
+   * spoolRef, so a tampered reference can't redirect this read. NOT fail-open, since the edge already cleared span.attributes before spooling.
    */
   async getSpool({
     spoolRef,
@@ -704,15 +536,7 @@ export class TraceBlobStoreService {
   }
 
   /**
-   * Writes the transient spool object for an over-threshold command payload and
-   * returns the reference the command will carry.
-   *
-   * The object lands at whichever backend the project's storage destination
-   * names. Object path: `trace-blobs/spool/{projectId}/{traceId}/{spanId}` —
-   * transient, eagerly deleted after the event_log INSERT succeeds. The
-   * bucket/container MUST have a 3-day lifecycle rule on the
-   * `trace-blobs/spool/` prefix as the safety net for orphans (3 days covers
-   * weekend incidents that need catch-up time).
+   * Writes the transient spool object for an over-threshold command and returns the reference the command carries. Lands at whichever backend the project's storage destination names, path trace-blobs/spool/{projectId}/{traceId}/{spanId}, eagerly deleted after event_log INSERT; the bucket/container MUST have a 3-day lifecycle rule on that prefix as the orphan safety net.
    */
   async putSpool({
     projectId,
@@ -737,11 +561,8 @@ export class TraceBlobStoreService {
   }
 
   /**
-   * Best-effort deletion of the transient spool object.
-   * Called after the event_log INSERT succeeds. Errors are swallowed — the
-   * 3-day lifecycle rule is the safety net for orphans. Returns void in all cases.
-   *
-   * @throws Never — all errors are swallowed internally.
+   * Best-effort deletion of the transient spool object, called after event_log INSERT succeeds. Errors are swallowed — the 3-day lifecycle rule is the orphan safety net.
+   * @throws Never — all errors swallowed internally.
    */
   async deleteSpool({
     spoolRef,

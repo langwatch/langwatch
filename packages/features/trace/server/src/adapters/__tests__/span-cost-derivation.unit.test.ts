@@ -9,11 +9,7 @@ import { SpanCostService } from "../../services/span-cost.service";
 import { ModelCatalogTraceModelCostAdapter } from "../model-catalog.trace-model-cost.adapter";
 
 /**
- * `SpanCostService.deriveStorageCost` computes the per-span cost persisted on
- * `stored_spans`. These tests pin that it matches
- * `SpanCostService.extractTokenMetrics().cost` (the value the trace-summary
- * fold accumulates) and that it splits the non-billable portion the same way
- * the fold derives `NonBilledCost`.
+ * SpanCostService.deriveStorageCost computes the per-span cost persisted on stored_spans. Pins it matches extractTokenMetrics().cost (what the trace-summary fold accumulates) and splits the non-billable portion the same way the fold derives NonBilledCost.
  */
 
 const canonicalisation = TraceCanonicalisationService.create();

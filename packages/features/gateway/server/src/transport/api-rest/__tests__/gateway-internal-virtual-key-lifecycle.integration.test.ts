@@ -1,11 +1,6 @@
 /**
  * @vitest-environment node
- *
- * Reversible virtual-key disable and enable against real Postgres and the
- * real internal auth route: the state machine (grace preservation, revoke
- * terminality) and the distinct rejection a disabled key's traffic gets.
- *
- * Spec: specs/ai-gateway/virtual-key-lifecycle.feature
+ * Real Postgres + real internal auth route. Reversible disable/enable: the state machine (grace preservation, revoke terminality) and the distinct rejection a disabled key's traffic gets. Spec: specs/ai-gateway/virtual-key-lifecycle.feature
  */
 
 import jsonwebtoken from "jsonwebtoken";

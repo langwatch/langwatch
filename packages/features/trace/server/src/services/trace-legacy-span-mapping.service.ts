@@ -74,8 +74,8 @@ function isLegacyWrapper(v: unknown): v is { type: string; value: unknown } {
  */
 function unwrapLegacyWrapper(
   wrapper: { type: string; value: unknown },
-  spanAttributes: NormalizedAttributes,
-  attrKey: string,
+  _spanAttributes: NormalizedAttributes,
+  _attrKey: string,
 ): SpanInputOutput {
   const { type, value } = wrapper;
   if (type === "chat_messages" && Array.isArray(value)) {
