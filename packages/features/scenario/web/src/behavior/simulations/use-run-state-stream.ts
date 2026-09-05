@@ -7,7 +7,7 @@ import { useEffect } from "react";
 import { useSimulationStreamingState } from "../use-simulation-streaming-state";
 import { useSimulationUpdateListener } from "../use-simulation-update-listener";
 import { api, type RouterOutputs } from "../scenario-api";
-import { getRunStatePollInterval } from "../../index";
+import { getRunStatePollInterval } from "../..";
 
 /** The run record as the run-state read returns it. */
 export type ScenarioRunState = RouterOutputs["scenarios"]["getRunState"];

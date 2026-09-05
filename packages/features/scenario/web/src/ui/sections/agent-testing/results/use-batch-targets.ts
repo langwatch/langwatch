@@ -22,7 +22,7 @@ import {
   targetParametersLabel,
   targetSortKey,
 } from "@langwatch/suite-contract";
-import type { TargetKind } from "../../../elements/agent-testing/shared/target-mark";
+import type { TargetKind } from "../../../../model/target-kind";
 import { targetColor } from "../../../elements/agent-testing/shared/target-colors";
 
 /** One target of a run, as the run detail reads it. */

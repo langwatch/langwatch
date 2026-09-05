@@ -5,7 +5,7 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { navigationApi } from "@langwatch/navigation-web/screens/landing";
+import { navigationApi } from "@langwatch/navigation-web/screens/navigation";
 import { NavigationShell } from "@langwatch/navigation-web/chrome";
 import {
   WithStubNavigationHost,
@@ -53,7 +53,7 @@ vi.mock("@langwatch/notification-web/screens/email-suppressions", () => ({
   NotificationHostProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-vi.mock("@langwatch/enterprise-licensing-web/screens/license", () => ({
+vi.mock("@langwatch/enterprise-licensing-web/screens/licensing", () => ({
   licensingApi: apiNode(),
   licensingScreens: { license: screenFor("the license page") },
   LicensingHostPort: class {},
@@ -86,7 +86,7 @@ vi.mock("@langwatch/annotation-web/screens/annotation-scores", () => ({
   AnnotationScoresHostProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-vi.mock("@langwatch/project-web/screens/project", () => ({
+vi.mock("@langwatch/project-web/screens/project-settings", () => ({
   projectApi: apiNode(),
   projectScreens: { projectSettings: screenFor("the general settings page") },
   ProjectHostPort: class {},

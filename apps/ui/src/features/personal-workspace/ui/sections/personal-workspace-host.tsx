@@ -23,7 +23,7 @@ import {
 } from "../../../../behavior/ui-passkeys";
 import { useRefreshUiSession } from "../../../../behavior/ui-session-refresh";
 import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
-import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/sections/ui-page-fallbacks";
 import {
   resolvePersonalWorkspaceOrganization,
   resolvePersonalWorkspaceProject,

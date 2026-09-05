@@ -54,12 +54,10 @@ export const useLambdaWarmup = () => {
           clearInterval(intervalRef.current);
         }
         intervalRef.current = setInterval(sendWarmup, WARMUP_INTERVAL_MS);
-      } else {
+      } else if (intervalRef.current) {
         // Page hidden, stop sending warmup requests
-        if (intervalRef.current) {
-          clearInterval(intervalRef.current);
-          intervalRef.current = null;
-        }
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
     };
 

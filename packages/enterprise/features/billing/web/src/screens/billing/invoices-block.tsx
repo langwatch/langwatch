@@ -7,7 +7,11 @@
 import { Badge, Card, Flex, HStack, Skeleton, Table, Text, VStack } from "@chakra-ui/react";
 import { Download, ExternalLink } from "lucide-react";
 import { billingApi } from "../../behavior/billing-api";
-import { formatInvoiceAmount, formatInvoiceDate, getInvoiceStatusColor } from "../../invoice-utils";
+import {
+  formatInvoiceAmount,
+  formatInvoiceDate,
+  getInvoiceStatusColor,
+} from "../../model/invoice-utils";
 import { Link } from "../../ui/elements/link";
 
 export function InvoicesBlock({

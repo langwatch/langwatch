@@ -14,7 +14,7 @@ import { useLocation } from "react-router";
 
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
-import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/sections/ui-page-fallbacks";
 import { mergeTraceQuery } from "../../behavior/trace-merge-query";
 
 export function TraceHost({ children }: { children: ReactNode }) {

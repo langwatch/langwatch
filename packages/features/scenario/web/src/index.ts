@@ -6,7 +6,7 @@ export * from "./ui/elements/scenario-library-controls";
 export * from "./model/scenario-list.types";
 export * from "./ui/elements/scenario-parameter-definitions-input";
 export * from "./ui/elements/scenario-table";
-export * from "./ui/elements/scenario-target-selector";
+export * from "./ui/sections/scenario-target-selector";
 export * from "./ui/elements/scenario-welcome";
 export * from "./behavior/use-new-scenario-flow";
 export * from "./behavior/use-scenario-label-filter";

@@ -20,7 +20,7 @@ import {
   WorkflowSelectorDrawerFromUrl,
 } from "@langwatch/scenario-web/drawers";
 
-import { fromDrawerAddress } from "../../../drawers";
+import { fromDrawerAddress } from "../../../../model/ui-drawer-address";
 import { withScenarioDrawerHost } from "./host";
 
 export const AgentCodeEditorDrawer = withScenarioDrawerHost(

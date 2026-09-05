@@ -12,7 +12,7 @@
 
 import { builtinRolePermissions } from "@langwatch/authz-contract";
 import { describe, expect, it } from "vitest";
-import { LITE_MEMBER_EXPLANATION, LITE_MEMBER_SHORT_DESCRIPTION } from "../seat-type-copy";
+import { LITE_MEMBER_EXPLANATION, LITE_MEMBER_SHORT_DESCRIPTION } from "../model/seat-type-copy";
 
 const EXTERNAL_MEMBER_PERMISSIONS = [...builtinRolePermissions("lite-member")];
 

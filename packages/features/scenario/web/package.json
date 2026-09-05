@@ -18,10 +18,6 @@
       "types": "./src/screens/simulations/index.ts",
       "default": "./src/screens/simulations/index.ts"
     },
-    "./screens/agent-testing": {
-      "types": "./src/screens/agent-testing/index.ts",
-      "default": "./src/screens/agent-testing/index.ts"
-    },
     "./drawers": {
       "types": "./src/screens/drawers.ts",
       "default": "./src/screens/drawers.ts"

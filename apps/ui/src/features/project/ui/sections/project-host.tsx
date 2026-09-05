@@ -10,15 +10,15 @@ import {
   type ProjectHostOrganization,
   type ProjectHostPort,
   type ProjectHostProject,
-} from "@langwatch/project-web/screens/project";
+} from "@langwatch/project-web/screens/project-settings";
 import { useDrawer } from "@langwatch/ui-drawer";
 import { useMemo, type ReactNode } from "react";
 
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { useUiOrganizationFacts } from "../../../../behavior/ui-organization-facts";
 import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
-import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
-import { UiProjectSwitcher } from "../../../chrome";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/sections/ui-page-fallbacks";
+import { UiProjectSwitcher } from "../../../../ui/blocks/ui-project-switcher";
 
 export function ProjectHost({ children }: { children: ReactNode }) {
   const { session, feedback } = useUiCapabilities();

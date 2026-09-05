@@ -3,7 +3,7 @@ import {
   type ScenarioFormData,
   type ScenarioInitialData,
   storePromptForScenario,
-} from "../../../index";
+} from "../../..";
 import { useCallback } from "react";
 import { useDrawer } from "@langwatch/ui-drawer";
 import { useModelProvidersSettings } from "@langwatch/model-provider-web/hooks/useModelProvidersSettings";

@@ -1,12 +1,11 @@
-import { ScenarioTargetSelector, type ScenarioTarget } from "../../../index";
+import { ScenarioTargetSelector } from "../../..";
+import type { TargetValue } from "../../../model/scenario-target";
 import { agentHasDevTunnel } from "@langwatch/agent-web/surfaces/browser-port";
 import { useMemo } from "react";
 import { useSession } from "../../../behavior/auth-session";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project";
 import { useAllPromptsForProject } from "../../../behavior/prompts/use-all-prompts-for-project";
 import { api } from "../../../behavior/scenario-api";
-
-export type TargetValue = ScenarioTarget;
 
 export function TargetSelector({
   value,

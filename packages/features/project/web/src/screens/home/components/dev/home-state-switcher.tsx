@@ -9,12 +9,9 @@ import {
 } from "./home-dev-state";
 
 /**
- * Development-only preview control for the Langy home's STATES.
- *
- * Sits beside the briefing's data switcher in the footer, and works the same
- * way: "Live" hands the page back to the project's real data and the reader's
- * real settings, any other option pins one state. Never rendered in production
- * (spec: specs/home/langy-home.feature).
+ * Development-only preview control for the Langy home's STATES. Sits beside
+ * the briefing's data switcher; never rendered in production.
+ * Spec: specs/home/langy-home.feature
  */
 export function HomeStateSwitcher() {
   const active = useHomeDevState();

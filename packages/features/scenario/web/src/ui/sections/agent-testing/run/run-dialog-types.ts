@@ -4,7 +4,7 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
-import type { TargetValue } from "../../scenarios/target-selector";
+import type { TargetValue } from "../../../../model/scenario-target";
 import type { SuiteTarget } from "@langwatch/suite-contract";
 import type { RunParameterValues } from "@langwatch/scenario-contract";
 import type { RunScope } from "./run-configuration";

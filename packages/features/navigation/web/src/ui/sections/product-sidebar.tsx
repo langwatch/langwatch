@@ -39,7 +39,7 @@ import {
 } from "../../model/shell-layout";
 import { SideMenuDensityProvider } from "../elements/side-menu-density";
 import { SideMenuItem, SideMenuLink } from "../blocks/side-menu-link";
-import { SidebarSection } from "../blocks/sidebar-section";
+import { SidebarSection } from "./sidebar-section";
 import { SupportMenu } from "../blocks/support-menu";
 import { ThemeToggle } from "../blocks/theme-toggle";
 import { MainMenuSections } from "./main-menu";

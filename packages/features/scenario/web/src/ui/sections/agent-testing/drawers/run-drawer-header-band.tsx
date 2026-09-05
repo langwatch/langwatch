@@ -15,7 +15,7 @@ import {
   SCENARIO_RUN_STATUS_CONFIG,
   ScenarioRunActions,
   ScenarioRunStatusIcon,
-} from "../../../../index";
+} from "../../../..";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { Chip } from "@langwatch/trace-web/explorer/components/TraceDrawer/Chip";
 import { CaseVersionChip } from "../../../elements/agent-testing/shared/case-version-chip";

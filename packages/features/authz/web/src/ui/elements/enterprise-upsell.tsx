@@ -19,7 +19,7 @@
  */
 
 import { Box } from "@chakra-ui/react";
-import { ContactSalesBlock } from "@langwatch/enterprise-billing-web";
+import { ContactSalesBlock } from "@langwatch/enterprise-billing-web/surfaces/contact-sales";
 
 /** The sales block, framed the way both pages framed it. */
 export function EnterpriseUpsell() {

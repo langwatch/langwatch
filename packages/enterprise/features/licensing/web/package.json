@@ -8,16 +8,18 @@
     "src"
   ],
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
   "exports": {
-    ".": {
-      "types": "./src/index.ts",
-      "default": "./src/index.ts"
+    "./screens/licensing": {
+      "types": "./src/screens/licensing/index.ts",
+      "default": "./src/screens/licensing/index.ts"
     },
-    "./screens/license": {
-      "types": "./src/screens/license/index.ts",
-      "default": "./src/screens/license/index.ts"
+    "./surfaces/resource-limits": {
+      "types": "./src/surfaces/resource-limits/index.ts",
+      "default": "./src/surfaces/resource-limits/index.ts"
+    },
+    "./surfaces/seat-types": {
+      "types": "./src/surfaces/seat-types/index.ts",
+      "default": "./src/surfaces/seat-types/index.ts"
     }
   },
   "scripts": {

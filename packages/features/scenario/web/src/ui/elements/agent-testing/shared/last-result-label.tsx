@@ -2,7 +2,7 @@
  * What the last run of a scenario said, in one line: "Passed (3/3)".
  */
 import { Badge, Box, HStack, Spinner, Text } from "@chakra-ui/react";
-import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../index";
+import { SCENARIO_RUN_STATUS_CONFIG } from "../../../..";
 import { formatRunStatusLabel } from "@langwatch/suite-web";
 import type { ScenarioRunStatus } from "@langwatch/scenario-contract";
 

@@ -325,13 +325,8 @@ export const useVersionState = ({
   const previousVersion = versions.data?.find((version) => version.isPreviousVersion);
   const latestVersion = versions.data?.find((version) => version.isLatestVersion);
   /**
-   * `getVersions` publishes the open `WorkflowDsl` envelope, while the diff and
-   * the commit-message autogen both need the typed Studio refinement. Parse it
-   * once here, where the version is read, rather than at each call site.
-   *
-   * A persisted version this Studio schema cannot read comes back as
-   * `undefined`, which is the same "there is no previous DSL" branch the
-   * callers already take on a version fetched without one.
+   * `getVersions` publishes the open `WorkflowDsl` envelope; parse it once
+   * here into the typed Studio refinement the diff and autogen both need.
    */
   const previousVersionDsl = useMemo(() => {
     if (!previousVersion?.dsl) return undefined;

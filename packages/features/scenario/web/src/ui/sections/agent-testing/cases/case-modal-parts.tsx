@@ -17,7 +17,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Play } from "lucide-react";
-import { UNFILED_OPTION_LABEL } from "../../../../index";
+import { UNFILED_OPTION_LABEL } from "../../../..";
 import { SimulationModelSelect } from "../../scenarios/simulation-model-select";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { TagList } from "../../../elements/tag-list";

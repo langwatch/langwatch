@@ -8,7 +8,7 @@ import { signIn, signOut, useSession } from "../../behavior/auth-client";
 import Link from "../elements/router-link";
 import { hardRedirect } from "../../behavior/hard-redirect";
 import { useSignInRouting } from "../../behavior/use-sign-in-routing";
-import { SignInMethodPicker } from "../blocks/sign-in-method-picker";
+import { SignInMethodPicker } from "./sign-in-method-picker";
 
 /**
  * The invitation landing (D13, ADR-117 §6; the rules underneath are D11's).

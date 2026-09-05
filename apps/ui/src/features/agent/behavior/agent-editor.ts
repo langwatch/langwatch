@@ -5,7 +5,7 @@
  */
 
 import type { AgentEditorDrawer } from "@langwatch/agent-web/screens/agent-management";
-import { DRAWER_OPEN_PARAM } from "../../drawers";
+import { DRAWER_OPEN_PARAM } from "../../../model/ui-drawer-address";
 
 /** The parameter an editor drawer reads the agent's id from. */
 export const DRAWER_AGENT_ID_PARAM = "drawer.agentId";

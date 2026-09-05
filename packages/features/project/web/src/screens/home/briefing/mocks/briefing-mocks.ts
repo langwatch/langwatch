@@ -3,19 +3,9 @@ import { useEffect, useState } from "react";
 import type { BriefingData, BriefingReceipt, ScenarioBar, StatusCell } from "../types";
 
 /**
- * DEV-ONLY briefing fixtures.
- *
- * The live briefing only renders what the project's real data supports, which
- * makes the fuller states hard to see on a quiet dev project. These mocks let
- * the switcher at the top of the home preview every state, so the layout can be
- * tuned against real variety. They are gated on the deployment the composing
- * application published, exactly like the home-view override, and never
- * resolve in production — not one fake number reaches a real user.
- *
- * Rather than hand-write each state, the set is GENERATED from the dimensions
- * that actually vary the card — scenario health, which cases need a look, and
- * whether Langy drafted a fix — so the switcher covers the whole matrix
- * (30-plus permutations) instead of a lucky handful.
+ * DEV-ONLY briefing fixtures, gated on the deployment like the home-view
+ * override, never resolving in production. GENERATED from the dimensions
+ * that vary the card, so the switcher covers the whole matrix (30-plus).
  */
 
 export interface BriefingMock {

@@ -1,5 +1,5 @@
-import { api } from "../behavior/organization-api";
-import { useOrganizationToaster, useShowErrorToast } from "../behavior/organization-feedback";
+import { api } from "./organization-api";
+import { useOrganizationToaster, useShowErrorToast } from "./organization-feedback";
 
 /**
  * Disabling and re-enabling a membership, which is how an organization

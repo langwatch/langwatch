@@ -26,7 +26,7 @@ import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Link } from "../../ui/elements/link";
 import { Select } from "@langwatch/design-system/select";
 import { OrganizationUserRole } from "../../model/prisma-types";
-import { DepartmentPicker } from "../../ui/elements/department-picker";
+import { DepartmentPicker } from "../../ui/sections/department-picker";
 import { type DepartmentOption, useDepartmentColumn } from "../../behavior/use-department-column";
 import { useDrawer } from "../../behavior/use-drawer";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";

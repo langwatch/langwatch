@@ -45,3 +45,26 @@ export {
   type AutomationSuccessNotice,
   type AutomationTeam,
 } from "../../model/automation-host";
+
+/**
+ * The unsubscribe landing, `/unsubscribe`.
+ *
+ * It shares nothing with the automations family but the transport — no session,
+ * no scope, no host, no chrome — and it takes its token as a prop, so it keeps
+ * its own loader type. It rides this entry because a screen export is named
+ * after the frontend feature that composes it, and that feature is
+ * `automations`. There is NO host port and NO page guard: the token is the
+ * authorization (ADR-031), so a guard would refuse the only person the link was
+ * minted for.
+ */
+export type UnsubscribeScreenLoader = () => Promise<{
+  default: ComponentType<{ token: string }>;
+}>;
+
+export const unsubscribeScreens = {
+  unsubscribe: () => import("./unsubscribe.screen"),
+} as const satisfies Record<string, UnsubscribeScreenLoader>;
+
+export type UnsubscribeScreenName = keyof typeof unsubscribeScreens;
+
+export type { UnsubscribeScope } from "./unsubscribe.screen";

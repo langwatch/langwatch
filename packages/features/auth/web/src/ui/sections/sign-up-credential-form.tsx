@@ -19,9 +19,9 @@ import "../elements/auth-front-door.css";
 import { SHAPE } from "../../model/front-door-theme";
 import { EmailPill } from "../elements/email-pill";
 import { FrontDoorField } from "../elements/front-door-field";
-import { PasskeySignUpButton } from "../elements/passkey-sign-up-button";
+import { PasskeySignUpButton } from "./passkey-sign-up-button";
 import { PasswordInput } from "../elements/password-input";
-import { MethodDivider } from "../blocks/sign-in-method-picker";
+import { MethodDivider } from "./sign-in-method-picker";
 
 // No name. Onboarding asks for it, in a place where it is worth asking —
 // putting it here charges a field at the one moment somebody has least

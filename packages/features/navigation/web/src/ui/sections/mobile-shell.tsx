@@ -17,7 +17,7 @@ import type { NavigationShellReadyState } from "../../behavior/use-navigation-sh
 import { APP_HEADER_HEIGHT } from "../../model/menu-widths";
 import { useNavigationHost } from "../../model/navigation-host";
 import type { ProductId } from "../../model/products";
-import { ProductSwitcherMenu } from "../blocks/product-switcher-menu";
+import { ProductSwitcherMenu } from "./product-switcher-menu";
 import { LogoIcon } from "../elements/logo-icon";
 import { NavigationLink } from "../elements/navigation-link";
 import { SideMenuDensityProvider } from "../elements/side-menu-density";

@@ -3,7 +3,7 @@
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 
-import type { TargetValue } from "../../scenarios/target-selector";
+import type { TargetValue } from "../../../../model/scenario-target";
 import type {
   RunParameterValues,
   ScenarioParameterDefinition,

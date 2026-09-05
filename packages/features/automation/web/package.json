@@ -15,10 +15,6 @@
     "./drawers": {
       "types": "./src/screens/drawers.ts",
       "default": "./src/screens/drawers.ts"
-    },
-    "./screens/unsubscribe": {
-      "types": "./src/screens/unsubscribe/index.ts",
-      "default": "./src/screens/unsubscribe/index.ts"
     }
   },
   "scripts": {

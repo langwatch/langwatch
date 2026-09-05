@@ -4,7 +4,7 @@
  * one conversation across a navigation. The outlet is this application's.
  */
 
-import { ProjectLangyLayout } from "@langwatch/langy-web/screens/langy-layout";
+import { ProjectLangyLayout } from "@langwatch/langy-web/screens/langy";
 import { Outlet } from "react-router";
 
 import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";

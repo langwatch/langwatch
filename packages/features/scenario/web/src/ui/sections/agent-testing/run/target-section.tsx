@@ -5,7 +5,7 @@
  */
 
 import { chakra, VStack } from "@chakra-ui/react";
-import type { TargetValue } from "../../scenarios/target-selector";
+import type { TargetValue } from "../../../../model/scenario-target";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project";
 import { getRoutePath } from "@langwatch/workflow-web/utils/routes";
 import { FieldLabel } from "../../../elements/agent-testing/shared/dialog-fields";

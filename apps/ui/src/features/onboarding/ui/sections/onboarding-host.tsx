@@ -20,7 +20,7 @@ import { copyToClipboard } from "../../behavior/onboarding-copy-to-clipboard";
 import { useUiPrefersReducedMotion } from "../../../../behavior/ui-reduced-motion";
 import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
 import { signOutUi } from "../../../../behavior/ui-session-client";
-import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/sections/ui-page-fallbacks";
 
 /** The address without its query string or fragment. */
 function pathnameOf(address: string): string {

@@ -23,7 +23,7 @@ import {
   ScenarioRunStatusIcon,
   SimulationConsole,
   hasNoResults,
-} from "../../../index";
+} from "../../..";
 import { useRunAgainActions } from "./use-run-again-actions";
 import { useRunDetailFacts } from "../../../behavior/simulations/use-run-detail-facts";
 import { useRunStateStream } from "../../../behavior/simulations/use-run-state-stream";

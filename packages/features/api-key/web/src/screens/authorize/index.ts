@@ -48,3 +48,10 @@ export {
   type McpAuthorizeAnswer,
   type McpAuthorizeRequest,
 } from "../../model/authorize-host";
+
+/**
+ * The tRPC Provider both handoff screens run on. It is the API Keys settings
+ * screen's binding, deliberately: the two families share one cache rather than
+ * standing a second client over the same procedures.
+ */
+export { apiKeyApi } from "../../behavior/api-key-api";

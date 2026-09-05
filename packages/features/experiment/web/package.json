@@ -39,10 +39,6 @@
       "types": "./src/model/experiments-v3/types.ts",
       "default": "./src/model/experiments-v3/types.ts"
     },
-    "./experiments-v3/types/persistence": {
-      "types": "./src/model/experiments-v3/types/persistence.ts",
-      "default": "./src/model/experiments-v3/types/persistence.ts"
-    },
     "./experiments-v3/utils/cellFailure": {
       "types": "./src/model/experiments-v3/cell-failure.ts",
       "default": "./src/model/experiments-v3/cell-failure.ts"

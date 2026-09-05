@@ -8,7 +8,7 @@ import {
   licensingApi,
   LicensingHostProvider,
   type LicensingHostPort,
-} from "@langwatch/enterprise-licensing-web/screens/license";
+} from "@langwatch/enterprise-licensing-web/screens/licensing";
 import { useMemo, type ReactNode } from "react";
 
 import { readPublicAppConfig } from "../../../../behavior/public-config";

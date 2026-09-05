@@ -43,11 +43,9 @@ function extractEvaluatorId(evaluator: string): string {
 }
 
 /**
- * Properties panel for evaluator nodes in the optimization studio.
- *
- * Supports two formats:
- * - New format: `evaluators/<id>` -- fetches evaluator from DB, renders EvaluatorEditorContent
- * - Old format: direct type like `langevals/exact_match` -- inline DynamicZodForm (backward compat)
+ * Properties panel for evaluator nodes: `evaluators/<id>` fetches the
+ * evaluator from the database, while an old direct type like
+ * `langevals/exact_match` renders an inline DynamicZodForm.
  */
 export function EvaluatorPropertiesPanel({ node }: { node: Node<Evaluator> }) {
   const evaluator = node.data.evaluator;
@@ -467,10 +465,8 @@ function InlineEvaluatorPanel({ node }: { node: Node<Evaluator> }) {
 // ---------------------------------------------------------------------------
 
 /**
- * Reusable footer with Discard / Apply / Save buttons for evaluator drawers.
- *
- * Rendered outside the properties panel so it can be placed in a drawer footer
- * slot without interfering with the panel's inputs/outputs layout.
+ * Reusable footer with Discard / Apply / Save buttons for evaluator drawers,
+ * rendered outside the properties panel so it can sit in a drawer footer slot.
  */
 export function EvaluatorDrawerFooter({
   onApply,

@@ -13,7 +13,7 @@ import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { OrganizationUserRole } from "../../../model/prisma-types";
-import { BindingInputRow } from "../group-binding-input-row";
+import { BindingInputRow } from "../../sections/group-binding-input-row";
 
 vi.mock("../../../behavior/organization-api", () => ({
   api: {

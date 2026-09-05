@@ -21,10 +21,6 @@
     "./screens/annotations": {
       "types": "./src/screens/annotations/index.ts",
       "default": "./src/screens/annotations/index.ts"
-    },
-    "./screens/my-queue": {
-      "types": "./src/screens/my-queue/index.ts",
-      "default": "./src/screens/my-queue/index.ts"
     }
   },
   "scripts": {

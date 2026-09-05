@@ -4,7 +4,7 @@
  */
 
 import { useCallback, useState } from "react";
-import type { TargetValue } from "../scenarios/target-selector";
+import type { TargetValue } from "../../../model/scenario-target";
 import { useDrawerRunCallbacks } from "../../../behavior/use-drawer-run-callbacks";
 import { useRunScenario } from "../use-run-scenario";
 import { useScenarioTarget } from "../use-scenario-target";

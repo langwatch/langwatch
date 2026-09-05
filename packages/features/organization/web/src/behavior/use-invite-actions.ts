@@ -4,9 +4,9 @@ import type { MembersForm } from "../model/member-invite-form";
 // The seat-quote modal is `@langwatch/workflow-web`'s singleton store; see
 // `use-license-enforcement.ts` for why the address travels and the modal does not.
 import { useUpgradeModalStore } from "@langwatch/ui-host/upgrade-modal-store";
-import { api } from "../behavior/organization-api";
+import { api } from "./organization-api";
 import { useLicenseEnforcement } from "./use-license-enforcement";
-import { useOrganizationToaster, useShowErrorToast } from "../behavior/organization-feedback";
+import { useOrganizationToaster, useShowErrorToast } from "./organization-feedback";
 
 /**
  * Invite mutation handlers: create, resend, revoke. All pricing models go

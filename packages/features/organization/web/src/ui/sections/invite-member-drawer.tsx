@@ -7,7 +7,7 @@ import { useInviteActions } from "../../behavior/use-invite-actions";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
 import { usePublicEnv } from "../../behavior/use-public-env";
 import { api } from "../../behavior/organization-api";
-import { AddMembersForm } from "../../ui/blocks/add-members-form";
+import { AddMembersForm } from "./add-members-form";
 import { Drawer } from "@langwatch/design-system/drawer";
 
 /**

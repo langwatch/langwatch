@@ -13,11 +13,7 @@ import {
   NoCasesHereEmptyState,
 } from "../../../elements/agent-testing/cases/cases-empty-states";
 import type { CasesPanelProps } from "./cases-panel";
-import {
-  CasesTable,
-  CasesTableSkeleton,
-  ExternalCasesTable,
-} from "../../../elements/agent-testing/cases/cases-table";
+import { CasesTable, CasesTableSkeleton, ExternalCasesTable } from "./cases-table";
 import { MoveToSuiteSelectionBar } from "./move-to-suite-selection-bar";
 import type { TestCase } from "../../../../model/agent-testing/cases/test-cases";
 

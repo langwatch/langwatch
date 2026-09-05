@@ -18,10 +18,6 @@
       "types": "./src/ui/sections/checks/dynamic-zod-form.tsx",
       "default": "./src/ui/sections/checks/dynamic-zod-form.tsx"
     },
-    "./components/evaluations/EvaluatorTracesMapping": {
-      "types": "./src/ui/elements/evaluations/evaluator-traces-mapping.tsx",
-      "default": "./src/ui/elements/evaluations/evaluator-traces-mapping.tsx"
-    },
     "./components/evaluators/EvaluatorEditorContent": {
       "types": "./src/ui/sections/evaluators/evaluator-editor-content.tsx",
       "default": "./src/ui/sections/evaluators/evaluator-editor-content.tsx"

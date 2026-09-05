@@ -46,22 +46,22 @@ export const MetadataTag = ({
   const { isCopied, copyToClipboard } = useCopyToClipboard();
 
   // Render user_id as a link if template is present
-  if (label === "user_id" && project?.userLinkTemplate) {
-    const renderedValue = Mustache.render(project.userLinkTemplate, {
-      user_id: value,
-    });
-    value = renderedValue;
-  }
+  const displayedValue =
+    label === "user_id" && project?.userLinkTemplate
+      ? Mustache.render(project.userLinkTemplate, { user_id: value })
+      : value;
 
-  const isTruncated = value.length > MAX_VALUE_LENGTH;
-  const displayValue = isTruncated ? value.slice(0, MAX_VALUE_LENGTH) + "…" : value;
+  const isTruncated = displayedValue.length > MAX_VALUE_LENGTH;
+  const displayValue = isTruncated
+    ? displayedValue.slice(0, MAX_VALUE_LENGTH) + "…"
+    : displayedValue;
 
   // Helper: render value as link if it's a URL
   const renderValue = (text: string) => {
-    if (value.startsWith("http")) {
+    if (displayedValue.startsWith("http")) {
       return (
         <HStack gap={1} color="blue.500">
-          <UiLink href={value} target="_blank">
+          <UiLink href={displayedValue} target="_blank">
             {text}
           </UiLink>
           <ExternalLink size={12} />
@@ -106,7 +106,7 @@ export const MetadataTag = ({
             height={10}
             onClick={(e) => {
               e.stopPropagation();
-              copyToClipboard(value);
+              copyToClipboard(displayedValue);
             }}
           />
         )}
@@ -132,7 +132,7 @@ export const MetadataTag = ({
             maxHeight="300px"
             overflowY="auto"
           >
-            {value}
+            {displayedValue}
           </Text>
         </Popover.Body>
       </Popover.Content>

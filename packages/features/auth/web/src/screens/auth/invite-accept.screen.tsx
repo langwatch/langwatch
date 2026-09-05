@@ -6,7 +6,7 @@ import { HandledErrorAlert } from "../../ui/elements/handled-error-alert";
 import { signOut } from "../../behavior/auth-client";
 import { useRouter } from "../../behavior/use-route";
 import { hardRedirect } from "../../behavior/hard-redirect";
-import { LoadingScreen } from "../../ui/elements/loading-screen";
+import { LoadingScreen } from "../../ui/sections/loading-screen";
 import { SetupLayout } from "../../ui/sections/setup-layout";
 import { useAcceptInviteOnce } from "../../behavior/use-accept-invite-once";
 import { useRequiredSession } from "../../behavior/use-required-session";

@@ -1,5 +1,5 @@
 import { Badge, Button, Card, Heading, HStack, Table, Text, VStack } from "@chakra-ui/react";
-import { RandomColorAvatar } from "../../ui/elements/random-color-avatar";
+import { RandomColorAvatar } from "../elements/random-color-avatar";
 import type { PendingJoinRequest } from "../../model/pending-join-request";
 
 interface JoinRequestsTableProps {

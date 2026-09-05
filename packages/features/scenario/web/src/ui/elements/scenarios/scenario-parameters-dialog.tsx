@@ -3,7 +3,7 @@ import {
   ScenarioParameterDefinitionsInput,
   type ScenarioFormController,
   type ScenarioFormData,
-} from "../../../index";
+} from "../../..";
 import { Controller, type FieldErrors, useFormState } from "react-hook-form";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { Dialog } from "@langwatch/design-system/studio-dialog";

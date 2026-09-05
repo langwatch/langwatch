@@ -12,7 +12,7 @@ import { useMemo, type ReactNode } from "react";
 
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
-import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/sections/ui-page-fallbacks";
 import { resolveAnalyticsProject } from "../../behavior/analytics-project";
 
 export function AnalyticsHost({ children }: { children: ReactNode }) {

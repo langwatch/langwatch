@@ -14,7 +14,7 @@ import { useMemo, type ReactNode } from "react";
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { useUiOrganizationFacts } from "../../../../behavior/ui-organization-facts";
 import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
-import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/sections/ui-page-fallbacks";
 import { notifyDatasetSuccess } from "../../behavior/dataset-success-notice";
 import { datasetCopyTargets } from "../../model/dataset-copy-targets";
 

@@ -7,7 +7,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
-import { navigationApi } from "@langwatch/navigation-web/screens/landing";
+import { navigationApi } from "@langwatch/navigation-web/screens/navigation";
 import { WithStubNavigationHost } from "@langwatch/navigation-web/testing";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";

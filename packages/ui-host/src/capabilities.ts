@@ -142,17 +142,15 @@ export abstract class UiSessionPort {
   abstract isSettled(): boolean;
 
   /**
-   * Whether a flag is on, off, or not yet answered — tri-state like
-   * `isSettled`: a guard reading unanswered as off would flash its
-   * not-found fallback on every load's first frame. Screens use {@link isFeatureEnabled}.
+   * Whether a flag is on, off, or not yet answered — tri-state so a guard
+   * reading unanswered as off does not flash its fallback on first load.
    */
   abstract featureFlag(flag: string): boolean | undefined;
 
   /**
-   * The scope as every feature's shared `useOrganizationTeamProject` reads it,
-   * or undefined when this session has no resolved scope to publish. Absent is
-   * a reading there, never a throw, which is what keeps a cross-feature
-   * component alive on a route its own host never mounted.
+   * The scope as every feature's shared `useOrganizationTeamProject` reads it.
+   * Absent is a reading, never a throw, keeping a cross-feature component
+   * alive on a route its own host never mounted.
    */
   scopeHost(): UiScopeHostPort | undefined {
     return void 0;
@@ -294,11 +292,8 @@ export const UiCapabilityContextProvider = UiCapabilityContext.Provider;
 
 /**
  * The capabilities above this screen, or undefined where none are mounted.
- *
- * The hooks this package publishes over the ports — `useRouter`, `Link` — read
- * this one rather than {@link useUiCapabilities}: a cross-feature component
- * rendered with no shell above it degrades to an empty reading and an inert
- * navigation instead of taking the page down.
+ * The hooks this package publishes over the ports read this one rather than
+ * {@link useUiCapabilities}, degrading to an inert reading instead of a crash.
  */
 export function useOptionalUiCapabilities(): UiCapabilities | undefined {
   return useContext(UiCapabilityContext);

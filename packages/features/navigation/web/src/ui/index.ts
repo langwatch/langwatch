@@ -19,7 +19,7 @@ export { PersonalSidebarLinks } from "./sections/personal-sidebar";
 export { AppHeaderUserMenu } from "./sections/app-header-user-menu";
 export { NavigationLink } from "./elements/navigation-link";
 export { SideMenuDensityProvider, useSideMenuDensity } from "./elements/side-menu-density";
-export { ProductSwitcherMenu } from "./blocks/product-switcher-menu";
+export { ProductSwitcherMenu } from "./sections/product-switcher-menu";
 export { ProjectSwitcherCombobox } from "./blocks/project-switcher-combobox";
 export { ProjectAvatar } from "./elements/project-avatar";
 export { LogoIcon } from "./elements/logo-icon";

@@ -17,7 +17,8 @@ import {
 import { FromCodeBadge } from "../../../elements/agent-testing/shared/from-code-badge";
 import { PassRateText } from "../../../elements/agent-testing/shared/pass-rate-text";
 import { passRateColor } from "../../../elements/agent-testing/shared/pass-rate-color";
-import { type TargetKind, TargetMark } from "../../../elements/agent-testing/shared/target-mark";
+import { TargetMark } from "../../../elements/agent-testing/shared/target-mark";
+import type { TargetKind } from "../../../../model/target-kind";
 import { TrendSparkline } from "../../../elements/agent-testing/shared/trend-sparkline";
 import {
   ResultsTableBody,

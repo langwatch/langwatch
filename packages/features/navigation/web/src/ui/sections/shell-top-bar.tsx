@@ -18,7 +18,7 @@ import type { ProductId } from "../../model/products";
 import { DevBadge } from "../elements/dev-badge";
 import { LogoIcon } from "../elements/logo-icon";
 import { NavigationLink } from "../elements/navigation-link";
-import { ProductSwitcherMenu } from "../blocks/product-switcher-menu";
+import { ProductSwitcherMenu } from "./product-switcher-menu";
 import { AppHeaderUserMenu } from "./app-header-user-menu";
 import { OrganizationSelect } from "./organization-select";
 import { ProductScopeControl } from "./product-scope-control";

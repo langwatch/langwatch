@@ -66,10 +66,6 @@
       "types": "./src/behavior/use-feature-flag.ts",
       "default": "./src/behavior/use-feature-flag.ts"
     },
-    "./model/prism-language": {
-      "types": "./src/model/prism-language.ts",
-      "default": "./src/model/prism-language.ts"
-    },
     "./model/workflow-host": {
       "types": "./src/model/workflow-host.ts",
       "default": "./src/model/workflow-host.ts"
@@ -98,10 +94,6 @@
       "types": "./src/ui/sections/optimization_studio/execution-state-error.ts",
       "default": "./src/ui/sections/optimization_studio/execution-state-error.ts"
     },
-    "./screens/studio": {
-      "types": "./src/screens/studio/index.ts",
-      "default": "./src/screens/studio/index.ts"
-    },
     "./screens/workflows": {
       "types": "./src/screens/workflows/index.ts",
       "default": "./src/screens/workflows/index.ts"
@@ -109,10 +101,6 @@
     "./studio-host/api": {
       "types": "./src/behavior/studio-host/api.ts",
       "default": "./src/behavior/studio-host/api.ts"
-    },
-    "./studio-host/binding": {
-      "types": "./src/ui/sections/studio-host/binding.ts",
-      "default": "./src/ui/sections/studio-host/binding.ts"
     },
     "./studio-host/errors": {
       "types": "./src/ui/elements/studio-host/errors.tsx",
@@ -129,10 +117,6 @@
     "./utils/compat/next-link": {
       "types": "./src/ui/elements/compat/next-link.tsx",
       "default": "./src/ui/elements/compat/next-link.tsx"
-    },
-    "./utils/compat/next-navigation": {
-      "types": "./src/behavior/compat/next-navigation.ts",
-      "default": "./src/behavior/compat/next-navigation.ts"
     },
     "./utils/constants": {
       "types": "./src/model/constants.ts",

@@ -25,7 +25,7 @@ import {
 import { useState } from "react";
 import AiGatewayLayout from "../../ui/sections/gateway-layout";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
-import { ContactSalesBlock } from "@langwatch/enterprise-billing-web";
+import { ContactSalesBlock } from "@langwatch/enterprise-billing-web/surfaces/contact-sales";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Menu } from "@langwatch/design-system/menu";
 import { WebhookDeliveriesDrawer } from "../../features/webhooks/ui/sections/webhook-deliveries-drawer";

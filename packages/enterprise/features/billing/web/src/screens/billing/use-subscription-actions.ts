@@ -5,9 +5,9 @@ import { isGrowthSeatEventPlan } from "@langwatch/enterprise-billing-contract";
 import {
   type BillingInterval,
   type Currency,
-  type PlannedUser,
   resolveGrowthSeatPlanType,
-} from "../../index";
+} from "../../model/billing-plans";
+import { type PlannedUser } from "../../model/subscription-types";
 // The seat-quote modal is a shared zustand singleton: opening it here and
 // mounting it in the chrome layout is one modal, not a copy.
 import { useUpgradeModalStore } from "@langwatch/ui-host/upgrade-modal-store";

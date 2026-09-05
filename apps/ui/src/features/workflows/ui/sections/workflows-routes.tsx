@@ -4,8 +4,7 @@
  * list page carries `workflows:view`; studio and chat carry no guard.
  */
 
-import { studioScreens } from "@langwatch/workflow-web/screens/studio";
-import { workflowScreens } from "@langwatch/workflow-web/screens/workflows";
+import { studioScreens, workflowScreens } from "@langwatch/workflow-web/screens/workflows";
 import type { ComponentType } from "react";
 
 import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";

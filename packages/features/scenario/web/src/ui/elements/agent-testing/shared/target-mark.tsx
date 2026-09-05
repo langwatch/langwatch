@@ -7,18 +7,7 @@
 import { Box } from "@chakra-ui/react";
 import { Bot, Code, Globe, type LucideIcon, MessageSquare, Target, Workflow } from "lucide-react";
 
-/** What is behind a target, as far as the mark is concerned. */
-export type TargetKind =
-  | "signature"
-  | "prompt"
-  | "code"
-  | "http"
-  | "workflow"
-  | "connected"
-  /** More than one target under one row, such as a plan that compares two. */
-  | "several"
-  /** A target the page holds nothing about, such as a run from code. */
-  | "unknown";
+import type { TargetKind } from "../../../../model/target-kind";
 
 const KIND_ICONS: Record<TargetKind, LucideIcon> = {
   signature: MessageSquare,

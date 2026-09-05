@@ -7,7 +7,11 @@
  * - formatInvoiceAmount: formats cents to currency strings
  */
 import { describe, expect, it } from "vitest";
-import { formatInvoiceAmount, formatInvoiceDate, getInvoiceStatusColor } from "../invoice-utils";
+import {
+  formatInvoiceAmount,
+  formatInvoiceDate,
+  getInvoiceStatusColor,
+} from "../model/invoice-utils";
 
 describe("getInvoiceStatusColor", () => {
   describe("when status is paid", () => {

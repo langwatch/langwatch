@@ -5,11 +5,11 @@
  */
 
 import {
+  apiKeyApi,
   AuthorizeHostProvider,
   type AuthorizeHostPort,
   type AuthorizeSessionStatus,
 } from "@langwatch/api-key-web/screens/authorize";
-import { apiKeyApi } from "@langwatch/api-key-web/screens/api-key";
 import { useMemo, type ReactNode } from "react";
 import { useUiAddress } from "../../../../behavior/ui-address";
 import { writeUiClipboard } from "../../../../behavior/ui-clipboard";
@@ -17,8 +17,8 @@ import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { uiLeaveTo } from "../../../../behavior/ui-departure";
 import { authorizeUiMcpClient } from "../../../../behavior/ui-mcp-authorize";
 import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
-import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
-import { UiProjectSwitcher } from "../../../chrome";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/sections/ui-page-fallbacks";
+import { UiProjectSwitcher } from "../../../../ui/blocks/ui-project-switcher";
 import { copyProjectApiKeyToClipboard } from "../../behavior/authorize-copy-to-clipboard";
 
 /**

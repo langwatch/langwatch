@@ -36,11 +36,11 @@ import {
   roleBadgeColor,
   SourceBadge,
   scopeTypeLabel,
-} from "../../ui/blocks/group-binding-input-row";
+} from "../../ui/sections/group-binding-input-row";
 import { GroupDetailDialog } from "../../ui/sections/group-detail-dialog";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
-import { ContactSalesBlock } from "@langwatch/enterprise-billing-web";
+import { ContactSalesBlock } from "@langwatch/enterprise-billing-web/surfaces/contact-sales";
 import { useActivePlan } from "../../behavior/use-active-plan";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
 import type { RouterOutputs } from "../../behavior/organization-api";

@@ -71,7 +71,7 @@ describe("given the front door in either colour mode", () => {
         "ui/sections/identifier-step-form.tsx",
         "ui/sections/credential-sign-in-form.tsx",
         "ui/sections/sign-up-credential-form.tsx",
-        "ui/blocks/sign-in-method-picker.tsx",
+        "ui/sections/sign-in-method-picker.tsx",
         "ui/sections/front-door-shell.tsx",
         "ui/elements/front-door-value-panel.tsx",
       ]) {

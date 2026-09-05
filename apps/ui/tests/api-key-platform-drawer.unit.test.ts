@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import { DRAWER_OPEN_PARAM } from "../src/features/drawers";
+import { DRAWER_OPEN_PARAM } from "../src/model/ui-drawer-address";
 import { openPlatformDrawer } from "../src/features/api-key/behavior/api-key-platform-drawer";
 
 describe("given a screen addresses the create-project drawer", () => {

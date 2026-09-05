@@ -12,9 +12,9 @@
       "types": "./src/screens/home/index.ts",
       "default": "./src/screens/home/index.ts"
     },
-    "./screens/project": {
-      "types": "./src/screens/project/index.ts",
-      "default": "./src/screens/project/index.ts"
+    "./screens/project-settings": {
+      "types": "./src/screens/project-settings/index.ts",
+      "default": "./src/screens/project-settings/index.ts"
     },
     "./ui/blocks/tech-stack": {
       "types": "./src/ui/blocks/tech-stack.tsx",

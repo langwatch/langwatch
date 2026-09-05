@@ -23,27 +23,18 @@ const LLM_ERROR_TYPES: ReadonlySet<string> = new Set<LLMErrorType>([
 ]);
 
 /**
- * Whether a string off the wire is one of the failure classes we recognise.
- *
- * `LLMErrorType` is a closed set, and consumers now branch on it to choose the
- * sentence a customer reads — so something has to actually enforce it. Nothing
- * did: the playground builds a `ParsedLLMError` by `JSON.parse`-ing an
- * `[ERROR]` payload and checking only `typeof parsed.type === "string"`, which
- * happily admits a provider's own discriminant (`api_error`) into a field
- * typed as ours. A `switch` over the six then falls through to `undefined`.
- *
- * Anything unrecognised is `"unknown"`, which is the honest answer and the one
- * branch that already routes to the registry's generic copy.
+ * Whether a string off the wire is one of the failure classes we recognise,
+ * rather than trusting a provider-supplied discriminant. Anything
+ * unrecognised is `"unknown"`.
  */
 export function isLLMErrorType(value: string): value is LLMErrorType {
   return LLM_ERROR_TYPES.has(value);
 }
 
 /**
- * Parses litellm error strings into structured data.
- * Pattern: "litellm.ErrorType: ProviderException - actual message"
- * Also handles nested patterns like: "litellm.ErrorType: ErrorType: ProviderException - actual message"
- * Also handles Python-style errors: "ErrorType('message', ...)"
+ * Parses litellm error strings into structured data. Handles
+ * "litellm.ErrorType: ProviderException - message" (nested variants too)
+ * and Python-style "ErrorType('message', ...)" errors.
  */
 export function parseLLMError(raw: string): ParsedLLMError {
   // Try litellm format first

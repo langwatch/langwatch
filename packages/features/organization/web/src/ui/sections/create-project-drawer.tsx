@@ -39,7 +39,7 @@ import { useDrawer } from "../../behavior/use-drawer";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
 import { useOrganizationHost } from "../../model/organization-host";
 import { NEW_TEAM_VALUE } from "../../model/project-form-validation";
-import { ProjectForm, type ProjectFormData } from "../blocks/project-form";
+import { ProjectForm, type ProjectFormData } from "./project-form";
 
 /** Every list a freshly created project has to show up in right away. */
 function invalidateProjectListQueries(utils: ReturnType<typeof api.useUtils>): void {

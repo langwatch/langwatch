@@ -17,7 +17,7 @@ import {
   useUiPlatformAdmin,
 } from "../../../../behavior/ui-organization-facts";
 import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
-import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/sections/ui-page-fallbacks";
 
 type OrganizationGraphEntry = {
   id: string;

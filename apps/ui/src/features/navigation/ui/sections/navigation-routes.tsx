@@ -4,7 +4,7 @@
  * chrome's own mount, so wrapping stays uniform.
  */
 
-import { navigationScreens } from "@langwatch/navigation-web/screens/landing";
+import { navigationScreens } from "@langwatch/navigation-web/screens/navigation";
 import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
 import { uiPage } from "../../../../ui/sections/ui-page";
 import { NavigationHostSection } from "./navigation-host";

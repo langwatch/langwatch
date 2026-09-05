@@ -7,8 +7,8 @@ import { useOrganizationTeamProject } from "../../behavior/use-organization-team
 import { useRequiredSession } from "../../behavior/use-required-session";
 import { api } from "../../behavior/organization-api";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { TeamForm, type TeamFormData } from "../../ui/blocks/team-form";
-import { teamRolesOptions } from "../../ui/elements/team-user-role-field";
+import { TeamForm, type TeamFormData } from "./team-form";
+import { teamRolesOptions } from "./team-user-role-field";
 import { useOrganizationToaster } from "../../behavior/organization-feedback";
 
 export function CreateTeamDrawer({ open = true }: { open?: boolean }): React.ReactElement {

@@ -10,8 +10,8 @@ import {
   ScenarioLabelFilter as LabelFilterDropdown,
   ScenarioWelcomeModal,
   ScenarioWelcomeScreen,
-} from "../../index";
-import { ReturnToNewSimulationsBanner } from "../../ui/elements/suites/return-to-new-simulations-banner";
+} from "../..";
+import { ReturnToNewSimulationsBanner } from "../../ui/sections/suites/return-to-new-simulations-banner";
 import { useAgentTestingRedirect } from "../../behavior/suites/use-agent-testing-redirect";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { showErrorToast } from "@langwatch/ui-host/errors";

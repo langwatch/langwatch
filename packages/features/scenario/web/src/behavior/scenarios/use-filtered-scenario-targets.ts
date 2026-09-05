@@ -6,7 +6,7 @@
 import { useMemo } from "react";
 import { explainHandledError } from "@langwatch/handled-error/presentation";
 import { targetLabelOf } from "@langwatch/suite-contract";
-import type { TargetValue } from "../../ui/sections/scenarios/target-selector";
+import type { TargetValue } from "../../model/scenario-target";
 
 /** Agent types that can be used as scenario targets */
 const SCENARIO_AGENT_TYPES: ReadonlySet<string> = new Set([

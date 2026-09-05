@@ -18,7 +18,7 @@ import {
 } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { InputGroup } from "@langwatch/design-system/input-group";
-import { ContactSalesBlock } from "@langwatch/enterprise-billing-web";
+import { ContactSalesBlock } from "@langwatch/enterprise-billing-web/surfaces/contact-sales";
 import type { EnrichedAuditLog } from "@langwatch/organization-contract";
 import { formatDistanceToNow } from "date-fns";
 import { ArrowLeft, Download, Search } from "lucide-react";

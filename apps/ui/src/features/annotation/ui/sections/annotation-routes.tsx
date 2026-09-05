@@ -6,9 +6,9 @@
 
 import {
   annotationScreens,
+  myQueueScreens,
   type AnnotationView,
 } from "@langwatch/annotation-web/screens/annotations";
-import { myQueueScreens } from "@langwatch/annotation-web/screens/my-queue";
 import type { ComponentType } from "react";
 import type { UiPageLoader, UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
 import { uiPage } from "../../../../ui/sections/ui-page";

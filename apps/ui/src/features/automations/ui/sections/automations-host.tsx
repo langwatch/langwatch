@@ -15,9 +15,9 @@ import { readPublicAppConfig } from "../../../../behavior/public-config";
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { resolveUiFailureCopy } from "../../../../behavior/ui-feedback";
 import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
-import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/sections/ui-page-fallbacks";
 import { resolveAutomationsDrawerAddress } from "../../behavior/automations-drawer-address";
-import { DRAWER_OPEN_PARAM } from "../../../drawers";
+import { DRAWER_OPEN_PARAM } from "../../../../model/ui-drawer-address";
 
 /**
  * This application's own address, for the links a rendered preview prints.

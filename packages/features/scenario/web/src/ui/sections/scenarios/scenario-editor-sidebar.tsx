@@ -1,5 +1,5 @@
 import { Card, HStack, Icon, List, Text, VStack } from "@chakra-ui/react";
-import type { ScenarioFormController } from "../../../index";
+import type { ScenarioFormController } from "../../..";
 import { Check, CircleDot, MessageSquare, TriangleAlert, Users } from "lucide-react";
 import { ScenarioAIGeneration } from "./scenario-ai-generation";
 

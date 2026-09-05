@@ -56,3 +56,20 @@ export {
   type WorkflowScope,
   type WorkflowSuccessNotice,
 } from "../../model/workflow-host";
+
+/**
+ * The Optimization Studio, `/:project/studio/:workflow`.
+ *
+ * The third address of this family, and its own loader because the screen is
+ * lazy: `apps/ui` compiles whatever this file re-exports under its own stricter
+ * tsconfig, so the studio is reached through a dynamic import and nothing of it
+ * is named here. It rides this entry because a screen export is named after the
+ * frontend feature that composes it, and that feature is `workflows`.
+ */
+export type StudioScreenLoader = () => Promise<{ default: ComponentType }>;
+
+export const studioScreens = {
+  studio: () => import("./studio.screen"),
+} as const satisfies Record<string, StudioScreenLoader>;
+
+export type StudioScreenName = keyof typeof studioScreens;

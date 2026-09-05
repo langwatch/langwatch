@@ -9,7 +9,7 @@ import {
   isLicenseExpired,
   licenseMetersSeats,
   normalizeKeyForActivation,
-} from "../license-status";
+} from "../model/license-status";
 
 /**
  * Pure unit tests for license status utilities.

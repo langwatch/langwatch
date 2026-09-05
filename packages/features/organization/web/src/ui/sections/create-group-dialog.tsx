@@ -11,7 +11,7 @@ import {
 } from "@chakra-ui/react";
 import { Search, X } from "lucide-react";
 import { useState } from "react";
-import { RandomColorAvatar } from "../../ui/elements/random-color-avatar";
+import { RandomColorAvatar } from "../elements/random-color-avatar";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import { Select } from "@langwatch/design-system/select";
@@ -21,7 +21,7 @@ import {
   type PendingBinding,
   roleBadgeColor,
   scopeTypeLabel,
-} from "../../ui/blocks/group-binding-input-row";
+} from "./group-binding-input-row";
 import { useShowErrorToast } from "../../behavior/organization-feedback";
 
 export function CreateGroupDialog({

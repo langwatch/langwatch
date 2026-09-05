@@ -4,7 +4,7 @@
  * control is separately disabled for a reader who may not change it.
  */
 
-import { projectScreens } from "@langwatch/project-web/screens/project";
+import { projectScreens } from "@langwatch/project-web/screens/project-settings";
 import type { ComponentType } from "react";
 
 import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";

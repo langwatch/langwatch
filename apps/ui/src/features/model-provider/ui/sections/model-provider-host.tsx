@@ -11,10 +11,10 @@ import {
   type ModelProviderHostPort,
 } from "@langwatch/model-provider-web/screens/model-provider";
 import { useMemo, type ReactNode } from "react";
-import { DRAWER_OPEN_PARAM } from "../../../drawers";
+import { DRAWER_OPEN_PARAM } from "../../../../model/ui-drawer-address";
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
-import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/sections/ui-page-fallbacks";
 import { openPlatformDrawer } from "../../behavior/model-provider-open-platform-drawer";
 
 type OrganizationGraphEntry = {

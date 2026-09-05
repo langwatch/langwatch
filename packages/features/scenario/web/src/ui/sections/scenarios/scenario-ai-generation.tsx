@@ -17,7 +17,7 @@ import {
   type GeneratedScenario,
   generateScenarioWithAI,
   type ScenarioFormController,
-} from "../../../index";
+} from "../../..";
 import { AlertTriangle, ArrowLeft, Check, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useModelProvidersSettings } from "@langwatch/model-provider-web/hooks/useModelProvidersSettings";

@@ -16,7 +16,7 @@ import { useEffect, useRef } from "react";
 import { FieldLabel } from "../../../elements/agent-testing/shared/dialog-fields";
 import { CompareAgentsSection } from "./compare-agents-section";
 import { OfflineTargetsNotice } from "./offline-targets-notice";
-import { ParameterRowsEditor } from "../../../elements/agent-testing/run/parameter-rows-editor";
+import { ParameterRowsEditor } from "./parameter-rows-editor";
 import { RunNameField } from "./run-name-field";
 import { RepeatCountSection, SimulationModelsSection } from "./run-option-sections";
 import { RunScopeSection } from "./run-scope-section";

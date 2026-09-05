@@ -12,7 +12,7 @@ import {
 import type { AgentTestingSelection } from "../../../../behavior/agent-testing/use-agent-testing-routing";
 import { CasesPanelBody } from "./cases-panel-body";
 import { CasesPanelHeader } from "./cases-panel-header";
-import type { CaseLastResult } from "../../../elements/agent-testing/cases/cases-table";
+import type { CaseLastResult } from "./cases-table";
 import { SUITE_RAIL_WIDTH } from "./suite-rail";
 import type { TestCase, TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases";
 

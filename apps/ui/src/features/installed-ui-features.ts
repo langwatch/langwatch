@@ -23,7 +23,7 @@ import { chromeFeature } from "./chrome";
 import { dataPrivacyFeature } from "./data-privacy";
 import { dataRetentionFeature } from "./data-retention";
 import { datasetFeature } from "./dataset";
-import { routeTraceDrawerForV2 } from "./drawers";
+import { routeTraceDrawerForV2 } from "../model/ui-trace-drawer-routing";
 import { evaluationsFeature } from "./evaluations";
 import { evaluatorFeature } from "./evaluator";
 import { experimentsFeature } from "./experiments";

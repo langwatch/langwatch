@@ -24,7 +24,7 @@ vi.mock("../../../behavior/organization-api", () => ({
   },
 }));
 
-import { AddMembersForm } from "../add-members-form";
+import { AddMembersForm } from "../../sections/add-members-form";
 
 const WARNING = "lite-member-needs-team-warning";
 const TEAM = { label: "Research", value: "team-research" };

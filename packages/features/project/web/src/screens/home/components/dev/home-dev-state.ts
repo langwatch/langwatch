@@ -2,18 +2,8 @@ import { useUiDeployment } from "@langwatch/ui-host/capabilities";
 import { useEffect, useState } from "react";
 
 /**
- * Development-only previews of the Langy home's states.
- *
- * Most of these states need conditions that are slow or impossible to
- * reproduce on demand: a project with no traces, a turn that stalls, a reader
- * whose account cannot start conversations, the half-second the composer spends
- * in the air. Without a switch, the only way to see them is to break something
- * on purpose, so they go unlooked-at and rot.
- *
- * Gated on the deployment the composing application published: production
- * reads `isDevelopment` as false, and every entry point here refuses, so there
- * is no runtime path by which any of this reaches a customer.
- *
+ * Development-only previews of the Langy home's states that are slow or
+ * impossible to reproduce on demand. Gated on the deployment published.
  * Spec: specs/home/langy-home.feature
  */
 
@@ -56,9 +46,7 @@ export const DEFAULT_HOME_CHART_VARIANT = "strip" as const;
 
 /**
  * Which overview presentation a pinned state asks for, if it asks at all.
- *
- * Separate from the state list so the chart variants can be previewed without
- * every other pinned state having to declare an opinion about the figures.
+ * Separate from the state list so chart variants preview independently.
  */
 export function chartVariantFor(state: HomeDevState | null): "full" | "strip" | "trend" {
   switch (state) {

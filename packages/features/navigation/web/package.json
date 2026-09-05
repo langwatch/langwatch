@@ -16,9 +16,9 @@
       "types": "./src/command-bar.ts",
       "default": "./src/command-bar.ts"
     },
-    "./screens/landing": {
-      "types": "./src/screens/landing/index.ts",
-      "default": "./src/screens/landing/index.ts"
+    "./screens/navigation": {
+      "types": "./src/screens/navigation/index.ts",
+      "default": "./src/screens/navigation/index.ts"
     },
     "./testing": {
       "types": "./src/testing.tsx",

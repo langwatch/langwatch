@@ -53,7 +53,7 @@ function useBootPublicEnvironment(): { data: PublicEnvironment | undefined } {
 }
 
 /**
- * Deliberately plain, like `ui/elements/ui-page-fallbacks` — the words a
+ * Deliberately plain, like `ui/sections/ui-page-fallbacks` — the words a
  * customer reads for a named failure come from the client error
  * presentation registry, not yet harvested here. This says the true thing.
  */

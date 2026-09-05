@@ -2,7 +2,7 @@ import {
   ScenarioMessageRenderer as FeatureScenarioMessageRenderer,
   type ScenarioMessageRendererProps as FeatureScenarioMessageRendererProps,
   type StreamingMessage,
-} from "../../../index";
+} from "../../..";
 import type { SimulationMessage } from "@langwatch/scenario-contract";
 import type { NextSpeaker } from "../../elements/next-speaker";
 import { Bubble } from "@langwatch/trace-web/explorer/components/TraceTable/registry/addons/conversation/Bubble";

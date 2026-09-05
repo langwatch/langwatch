@@ -4,7 +4,7 @@
  */
 
 import { Text, VStack } from "@chakra-ui/react";
-import type { TargetValue } from "../../scenarios/target-selector";
+import type { TargetValue } from "../../../../model/scenario-target";
 import { offlineTargetMessage, offlineTargetsOf } from "./offline-targets";
 import type { RunDialogAgent } from "./run-target-picker";
 

@@ -436,7 +436,7 @@ describe("given what apps/ui serves itself", () => {
         "@langwatch/organization-web",
         "@langwatch/user-web",
         "@langwatch/coding-agent-web",
-        "@langwatch/project-web/screens/project",
+        "@langwatch/project-web/screens/project-settings",
         "@langwatch/prompt-web",
         "@langwatch/enterprise-scim-web",
         "@langwatch/secret-web",

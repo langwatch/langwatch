@@ -5,7 +5,7 @@ import { useOrganizationTeamProject } from "../../../behavior/use-organization-t
 import { useAllPromptsForProject } from "../../../behavior/prompts/use-all-prompts-for-project";
 import { api } from "../../../behavior/scenario-api";
 import { Popover } from "@langwatch/design-system/popover";
-import type { TargetValue } from "./target-selector";
+import type { TargetValue } from "../../../model/scenario-target";
 import { useSession } from "../../../behavior/auth-session";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {

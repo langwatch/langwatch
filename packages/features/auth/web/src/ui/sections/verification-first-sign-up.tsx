@@ -16,14 +16,14 @@ import { usePublishFrontDoorStage } from "../../model/ground-stage";
 import { readLastUsedMethodId, rememberPendingMethod } from "../../model/last-used-method";
 import { CheckYourEmail } from "../elements/check-your-email";
 import { CredentialSignInForm } from "./credential-sign-in-form";
-import { FrontDoorFinePrint } from "../elements/front-door-fine-print";
+import { FrontDoorFinePrint } from "./front-door-fine-print";
 import { IdentifierStepForm } from "./identifier-step-form";
 import {
   AlternativeMethods,
   hasAlternativeMethods,
   useShowsAllSocialMethods,
   SignInMethodPicker,
-} from "../blocks/sign-in-method-picker";
+} from "./sign-in-method-picker";
 import { SignUpCredentialForm } from "./sign-up-credential-form";
 import { SuccessPulse } from "../elements/success-pulse";
 

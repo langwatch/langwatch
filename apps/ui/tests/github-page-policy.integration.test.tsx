@@ -5,7 +5,7 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { navigationApi } from "@langwatch/navigation-web/screens/landing";
+import { navigationApi } from "@langwatch/navigation-web/screens/navigation";
 import { NavigationShell } from "@langwatch/navigation-web/chrome";
 import {
   WithStubNavigationHost,

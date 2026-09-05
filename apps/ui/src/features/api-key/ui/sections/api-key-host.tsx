@@ -26,8 +26,8 @@ import {
 } from "../../../../behavior/ui-cli-device-flow";
 import { readPublicAppConfig } from "../../../../behavior/public-config";
 import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
-import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
-import { DRAWER_OPEN_PARAM } from "../../../drawers";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/sections/ui-page-fallbacks";
+import { DRAWER_OPEN_PARAM } from "../../../../model/ui-drawer-address";
 import { copyToClipboard } from "../../behavior/api-key-clipboard";
 import { recordLeadSourceIfAbsent } from "../../behavior/api-key-lead-source";
 import { openPlatformDrawer } from "../../behavior/api-key-platform-drawer";

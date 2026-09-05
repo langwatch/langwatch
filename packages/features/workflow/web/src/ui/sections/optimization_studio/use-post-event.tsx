@@ -22,15 +22,8 @@ let pythonDisconnectedTimeout: NodeJS.Timeout | null = null;
 const STOP_ERROR_TYPE = "context_canceled";
 
 /**
- * Whether a failed state is really a cancellation.
- *
- * The code is asked first because it is the fact: the engine emits
- * `context_canceled` for a deliberate stop, and it matches neither of the
- * words the prose check looks for — so a user who pressed Stop got a red
- * "something went wrong" toast for doing exactly what they meant to.
- *
- * The prose check stays as the fallback for the frames that carry no code at
- * all (the stream's top-level `error`, the optimization runner).
+ * Whether a failed state is really a cancellation, checked by code first
+ * since prose alone would toast a red error for pressing Stop.
  */
 function isDeliberateStop(failure: CodedExecutionFailure | undefined): boolean {
   if (failure?.error_type === STOP_ERROR_TYPE) return true;
@@ -210,18 +203,8 @@ export const useHandleServerMessage = ({
   } = workflowStore;
 
   /**
-   * Reports a failed run.
-   *
-   * The failure travels WHOLE — the engine's own serialised handled error — and
-   * the application resolves the words from its code-keyed registry (ADR-045),
-   * along with the docs link and the copyable error id. A state with no code
-   * degrades to the generic unknown state under the caller's own headline. The
-   * engine's raw message is not copy and does not appear here; it is in the
-   * node properties panel. See `reportableExecutionFailure`.
-   *
-   * A deliberate STOP is not a failure and keeps the local explainer: it is an
-   * `info` notice, and "we've been notified" would be wrong for something the
-   * reader did on purpose.
+   * Reports a failed run (ADR-045); a deliberate STOP keeps the local
+   * `info` explainer instead of "we've been notified".
    */
   const alertOnError = useCallback(
     ({
@@ -237,12 +220,10 @@ export const useHandleServerMessage = ({
       });
       const wasStopped = isDeliberateStop(failure);
 
-      // Keyed by what the toast actually SAYS, so a repeating failure (the
-      // engine down while the studio retries) updates one toast instead of
-      // stacking a wall of them, and two failures that read identically —
-      // which every failure we could not name now does — are one toast rather
-      // than the same sentence twice. A code the registry knows keys on the
-      // code, so it never collapses onto an unrelated failure.
+      // Keyed by what the toast actually SAYS, so a repeating failure updates
+      // one toast instead of stacking a wall of them. A code the registry
+      // knows keys on the code instead, so it never collapses onto an
+      // unrelated failure.
       const dedupeId = `studio-${wasStopped ? "stopped" : "error"}-${
         explanation.isRegistered ? failure?.error_type : explanation.title
       }`;

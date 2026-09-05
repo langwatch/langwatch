@@ -1,9 +1,8 @@
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
-import type { inferRouterOutputs } from "@trpc/server";
 import { useMemo } from "react";
 import { useOrganizationTeamProject } from "../studio-host/use-organization-team-project";
-import type { AppRouter } from "../studio-host/api";
+import type { AppRouter, RouterOutputs } from "../studio-host/api";
 import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
 import { api } from "../studio-host/api";
 import type { Entry } from "@langwatch/workflow-contract";
@@ -20,7 +19,7 @@ export const useGetDatasetData = ({
   rows: DatasetRecordEntry[];
   columns: DatasetColumns;
   query: UseTRPCQueryResult<
-    inferRouterOutputs<AppRouter>["datasetRecord"]["getHead"],
+    RouterOutputs["datasetRecord"]["getHead"],
     TRPCClientErrorLike<AppRouter>
   >;
   total: number | undefined;

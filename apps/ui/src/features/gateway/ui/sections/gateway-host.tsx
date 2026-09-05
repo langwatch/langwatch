@@ -11,11 +11,11 @@ import {
   type GatewayOrganization,
 } from "@langwatch/gateway-web/screens/gateway";
 import { useMemo, type ReactNode } from "react";
-import { DRAWER_OPEN_PARAM } from "../../../drawers";
+import { DRAWER_OPEN_PARAM } from "../../../../model/ui-drawer-address";
 import { readPublicAppConfig } from "../../../../behavior/public-config";
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
-import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/sections/ui-page-fallbacks";
 import { openGatewayDrawer } from "../../behavior/gateway-open-drawer";
 import {
   resolveGatewayOrganization,

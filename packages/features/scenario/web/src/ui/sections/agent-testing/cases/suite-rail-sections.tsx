@@ -13,7 +13,7 @@ import {
   RailItem,
   RailSectionHeading,
 } from "../../../elements/agent-testing/cases/suite-rail-item";
-import { SuiteRailMenu } from "../../../elements/agent-testing/cases/suite-rail-menu";
+import { SuiteRailMenu } from "./suite-rail-menu";
 import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases";
 
 /** What the section of the sets a code run writes into is called. */

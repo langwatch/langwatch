@@ -14,7 +14,7 @@ import { KSUID_RESOURCES } from "@langwatch/workflow-contract";
 import { useAgentTestingStore } from "../use-agent-testing-store";
 import type { RunDialogSubmitInput, SuiteTargets } from "./use-run-dialog-submit";
 import { flushSync } from "react-dom";
-import type { TargetValue } from "../../scenarios/target-selector";
+import type { TargetValue } from "../../../../model/scenario-target";
 import { type RunScope, toSuiteScope } from "./run-configuration";
 import type { RunStartedInfo } from "./run-dialog-types";
 

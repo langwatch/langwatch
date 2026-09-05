@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
 import { CasesPanel } from "../cases-panel";
-import type { CaseLastResult } from "../../../../elements/agent-testing/cases/cases-table";
+import type { CaseLastResult } from "../cases-table";
 import type { TestCase, TestSuiteEntry } from "../../../../../model/agent-testing/cases/test-cases";
 import { useSuiteRecentRuns } from "../use-suite-recent-runs";
 import { useTestCasesView } from "../use-test-cases-view";

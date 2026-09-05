@@ -8,7 +8,7 @@ import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/reac
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { useMemo, useState, type ReactNode } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
-import { navigationApi } from "@langwatch/navigation-web/screens/landing";
+import { navigationApi } from "@langwatch/navigation-web/screens/navigation";
 import { WithStubNavigationHost } from "@langwatch/navigation-web/testing";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { createUiFeatureApiClient } from "../src/behavior/ui-feature-transport";

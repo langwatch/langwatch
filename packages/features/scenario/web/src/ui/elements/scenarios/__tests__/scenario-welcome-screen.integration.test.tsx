@@ -3,7 +3,7 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { ScenarioWelcomeModal, ScenarioWelcomeScreen } from "../../../../index";
+import { ScenarioWelcomeModal, ScenarioWelcomeScreen } from "../../../..";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 

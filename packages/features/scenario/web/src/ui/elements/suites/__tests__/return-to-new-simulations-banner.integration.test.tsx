@@ -32,7 +32,7 @@ vi.mock("../../../../behavior/use-feature-flag", () => ({
 
 import posthog from "posthog-js";
 import { isLegacySimulationsPreferred } from "../../../../behavior/suites/use-legacy-simulations-preference";
-import { ReturnToNewSimulationsBanner } from "../return-to-new-simulations-banner";
+import { ReturnToNewSimulationsBanner } from "../../../sections/suites/return-to-new-simulations-banner";
 
 const PREFERENCE_KEY = "langwatch:prefer-legacy-simulations:v1:project-1";
 const SNOOZE_KEY = "langwatch:new-simulations-callout-dismissed:v1:project-1";

@@ -20,7 +20,7 @@ import { isLangyDemoProject } from "../../../../behavior/langy-demo-project";
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { useUiPrefersReducedMotion } from "../../../../behavior/ui-reduced-motion";
 import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
-import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/sections/ui-page-fallbacks";
 
 /** The two Langy grants, and the rollout that reveals it at all. */
 const LANGY_VIEW_PERMISSION = "langy:view";

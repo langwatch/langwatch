@@ -26,7 +26,7 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
 
 import posthog from "posthog-js";
 import { isLegacySimulationsPreferred } from "../../../../behavior/suites/use-legacy-simulations-preference";
-import { NewSimulationsCallout } from "../new-simulations-callout";
+import { NewSimulationsCallout } from "../../../sections/suites/new-simulations-callout";
 
 const SNOOZE_KEY = "langwatch:new-simulations-callout-dismissed:v1:project-1";
 const PREFERENCE_KEY = "langwatch:prefer-legacy-simulations:v1:project-1";

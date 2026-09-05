@@ -1,6 +1,6 @@
 /** Writes a scope choice through the application's storage seam, broadcasting since same-origin `useLocalStorage` readers see a write only through that event. */
 
-import type { NavigationScopeWrite } from "@langwatch/navigation-web/screens/landing";
+import type { NavigationScopeWrite } from "@langwatch/navigation-web/screens/navigation";
 import { broadcastUiScopeWrite, writeUiScopeSelection } from "../../../behavior/ui-scope-storage";
 
 export function rememberNavigationScope(write: NavigationScopeWrite): void {

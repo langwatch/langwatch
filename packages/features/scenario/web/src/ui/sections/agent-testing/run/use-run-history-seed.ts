@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useRef } from "react";
-import type { TargetValue } from "../../scenarios/target-selector";
+import type { TargetValue } from "../../../../model/scenario-target";
 import { applyConfigurationTo } from "./apply-configuration";
 import type { RunConfigurationEntry } from "./run-configuration";
 import type { RunDialogSubject } from "./run-dialog-types";

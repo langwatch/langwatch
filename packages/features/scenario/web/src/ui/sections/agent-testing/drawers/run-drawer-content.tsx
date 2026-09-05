@@ -5,7 +5,7 @@
  */
 
 import { Accordion, Box, Grid, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
-import { RunDetailSection } from "../../../../index";
+import { RunDetailSection } from "../../../..";
 import { ScenarioMessageRenderer } from "../../simulations/scenario-message-renderer";
 import { ParameterRow, SECRET_VALUE_MASK } from "../../simulations/scenario-run-detail-drawer";
 import { ConversationExpandContext } from "@langwatch/trace-web/explorer/components/TraceDrawer/conversationView/expandContext";

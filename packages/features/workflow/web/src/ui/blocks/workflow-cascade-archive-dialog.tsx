@@ -1,12 +1,7 @@
 /**
- * Deleting a workflow, and everything that hangs off it.
- *
- * A FAMILY-LOCAL COPY of `platform/app/src/components/CascadeArchiveDialog.tsx`,
- * which the agents list and the evaluator card also render, so the platform
- * module stays. Nothing was narrowed away: the dialog already took its related
- * entities as data, and the workflow case is the one that needs all three
- * lists — linked evaluators and agents are ARCHIVED and the online evaluations
- * those evaluators back are DELETED.
+ * Deleting a workflow, and everything that hangs off it: linked evaluators
+ * and agents are ARCHIVED, and the online evaluations those evaluators back
+ * are DELETED.
  */
 import { Alert, Button, HStack, Input, List, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
@@ -26,12 +21,8 @@ export type RelatedEntities = {
 };
 
 /**
- * Cascade archive confirmation dialog.
- *
- * Shows a warning when archiving an entity that has related entities
- * that will also be affected (archived or deleted).
- *
- * Note: All interactive elements use stopPropagation() to prevent event bubbling.
+ * Cascade archive confirmation dialog. Shows a warning when archiving an
+ * entity that has related entities that will also be affected.
  */
 export function WorkflowCascadeArchiveDialog({
   open,

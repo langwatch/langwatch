@@ -1,12 +1,11 @@
 import { Box, Button, HStack, Separator, Spacer, Text, VStack } from "@chakra-ui/react";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
-import type { inferRouterOutputs } from "@trpc/server";
 import numeral from "numeral";
 import React, { useEffect, useMemo, useState } from "react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { FormatMoney } from "@langwatch/workflow-web/optimization_studio/components/FormatMoney";
-import type { AppRouter } from "@langwatch/workflow-web/studio-host/api";
+import type { AppRouter, RouterOutputs } from "@langwatch/workflow-web/studio-host/api";
 import type { ExperimentRun } from "@langwatch/experiment-contract";
 import { formatMilliseconds } from "@langwatch/trace-web/utils/formatMilliseconds";
 import { formatMoney } from "@langwatch/design-system/format-money";
@@ -20,7 +19,7 @@ export function BatchEvaluationV2EvaluationSummary({
 }: {
   run: NonNullable<
     UseTRPCQueryResult<
-      inferRouterOutputs<AppRouter>["experiments"]["getExperimentBatchEvaluationRuns"],
+      RouterOutputs["experiments"]["getExperimentBatchEvaluationRuns"],
       TRPCClientErrorLike<AppRouter>
     >["data"]
   >["runs"][number];

@@ -4,13 +4,9 @@ import type { ChangeEvent } from "react";
 import { BRIEFING_MOCKS, setBriefingMock, useBriefingMock } from "../mocks/briefing-mocks";
 
 /**
- * Development-only preview control for the Langy briefing's DATA states.
- *
- * There are 30-plus generated permutations (see briefingMocks), so this is a
- * dropdown rather than an icon rail — "Live data" hands the briefing back to the
- * project's real data, any other option pins it to a mock and snaps the page to
- * the briefing view so the change is visible. Never rendered in production
- * (spec: specs/home/langy-briefing.feature).
+ * Development-only preview control for the Langy briefing's DATA states, a
+ * dropdown over 30-plus generated permutations. Never rendered in production.
+ * Spec: specs/home/langy-briefing.feature
  */
 export function BriefingMockSwitcher() {
   const active = useBriefingMock();

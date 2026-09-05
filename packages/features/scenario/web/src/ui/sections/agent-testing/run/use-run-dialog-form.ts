@@ -5,7 +5,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { TargetValue } from "../../scenarios/target-selector";
+import type { TargetValue } from "../../../../model/scenario-target";
 import { useFilteredAgents } from "../../../../behavior/scenarios/use-filtered-scenario-targets";
 import {
   unionParameterDefinitions,

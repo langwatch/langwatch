@@ -2,6 +2,12 @@ import { chakra, HStack, Text } from "@chakra-ui/react";
 import type React from "react";
 
 export interface ImpersonationBannerProps {
+  /**
+   * What "Stop" does. The banner draws the state and names the action; ending
+   * the impersonation is a session write, so the mounting feature performs it
+   * and decides where the reader lands afterwards.
+   */
+  onStop: () => void;
   user: {
     name?: string | null;
     email?: string | null;
@@ -13,7 +19,7 @@ export interface ImpersonationBannerProps {
   };
 }
 
-export const ImpersonationBanner = ({ user }: ImpersonationBannerProps) => {
+export const ImpersonationBanner = ({ onStop, user }: ImpersonationBannerProps) => {
   if (!user.impersonator) return null;
 
   return (
@@ -35,14 +41,9 @@ export const ImpersonationBanner = ({ user }: ImpersonationBannerProps) => {
       </Text>
       <chakra.a
         href="#"
-        onClick={async (e: React.MouseEvent<HTMLAnchorElement>) => {
+        onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
           e.preventDefault();
-          const response = await fetch("/api/admin/impersonate", {
-            method: "DELETE",
-          });
-          if (response.ok) {
-            window.location.href = "/admin#/user";
-          }
+          onStop();
         }}
         fontSize="11px"
         fontWeight="bold"

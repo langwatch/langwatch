@@ -1,13 +1,6 @@
 // @vitest-environment jsdom
 /**
- * The Langy home's development-only state switcher.
- *
- * Two things matter here and neither is the list itself: a pinned state has to
- * come back out of the hook that the block reads (otherwise the preview shows
- * nothing), and the whole mechanism has to be inert once the composing
- * application says this is not a development build — that is the only thing
- * standing between a dev convenience and a customer seeing a fabricated home.
- *
+ * The Langy home's development-only state switcher, inert once not a dev build.
  * Spec: specs/home/langy-home.feature
  */
 import { UiCapabilityContextProvider, type UiCapabilities } from "@langwatch/ui-host/capabilities";

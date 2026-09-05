@@ -13,7 +13,7 @@ import {
   usePeriodSelector,
 } from "@langwatch/analytics-web/components/PeriodSelector";
 import { ExternalSetDetailPanel } from "./external-set-detail-panel";
-import { ReturnToNewSimulationsBanner } from "../../elements/suites/return-to-new-simulations-banner";
+import { ReturnToNewSimulationsBanner } from "./return-to-new-simulations-banner";
 import { RunHistoryPanel } from "./run-history-panel";
 import {
   SuiteArchiveDialog,

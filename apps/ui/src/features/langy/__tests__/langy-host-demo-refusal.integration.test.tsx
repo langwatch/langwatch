@@ -17,9 +17,9 @@ const graph = vi.hoisted(() => ({
   }>,
 }));
 
-vi.mock("@langwatch/langy-web/screens/langy-layout", async () => {
-  const actual = await vi.importActual<typeof import("@langwatch/langy-web/screens/langy-layout")>(
-    "@langwatch/langy-web/screens/langy-layout",
+vi.mock("@langwatch/langy-web/screens/langy", async () => {
+  const actual = await vi.importActual<typeof import("@langwatch/langy-web/screens/langy")>(
+    "@langwatch/langy-web/screens/langy",
   );
   return {
     ...actual,
@@ -49,7 +49,7 @@ vi.mock("../../../behavior/public-config", async () => {
   };
 });
 
-import { type LangyHostPort, useLangyHost } from "@langwatch/langy-web/screens/langy-layout";
+import { type LangyHostPort, useLangyHost } from "@langwatch/langy-web/screens/langy";
 import {
   UiCapabilityContextProvider,
   UiDocumentTitlePort,

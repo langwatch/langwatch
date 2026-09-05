@@ -9,7 +9,7 @@ import {
   EditProjectDrawer as EditProject,
 } from "@langwatch/organization-web/drawers/project";
 
-import { fromDrawerAddress } from "../../../drawers";
+import { fromDrawerAddress } from "../../../../model/ui-drawer-address";
 import { withHost } from "../../../../ui/sections/ui-page";
 import { OrganizationHost } from "../../../organization/ui/sections/organization-host";
 

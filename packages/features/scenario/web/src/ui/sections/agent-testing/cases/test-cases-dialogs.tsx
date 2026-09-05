@@ -4,7 +4,7 @@
  * @see specs/features/agent-testing/suites-rail.feature
  */
 
-import { ScenarioArchiveDialog } from "../../../../index";
+import { ScenarioArchiveDialog } from "../../../..";
 import { RunDialog } from "../run/run-dialog";
 import type { TestCasesTabModel } from "./use-test-cases-tab";
 import { SuiteNameDialog } from "./suite-name-dialog";

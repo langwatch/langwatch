@@ -29,27 +29,29 @@ import { OrganizationUserRole, PricingModel, TeamUserRole } from "../../model/pr
 import { LabeledSwitch } from "../../ui/elements/labeled-switch";
 import { Link } from "../../ui/elements/link";
 import { CONTACT_SALES_URL, type MemberType } from "@langwatch/enterprise-licensing-contract";
+import { useBillingPricing } from "../../behavior/use-billing-pricing";
 import {
   type BillingInterval,
   buildEnterprisePlanFeatures,
   buildPlanCapabilities,
-  ContactSalesBlock,
-  countFullMembers,
   type Currency,
-  type DrawerSaveResult,
   FREE_PLAN_FEATURES as DEVELOPER_FEATURES,
-  formatPlanTypeLabel,
   formatPrice,
   getAnnualDiscountPercent,
   getGrowthFeatures,
   isAnnualTieredPlan,
   parseGrowthSeatPlanType,
+} from "../../model/billing-plans";
+import {
+  countFullMembers,
+  type DrawerSaveResult,
+  formatPlanTypeLabel,
   type PlannedUser,
   type SubscriptionUser,
-  UpdateSeatsBlock,
-  UpgradePlanBlock,
-  useBillingPricing,
-} from "../../index";
+} from "../../model/subscription-types";
+import { ContactSalesBlock } from "../../surfaces/contact-sales";
+import { UpdateSeatsBlock } from "../../ui/blocks/update-seats-block";
+import { UpgradePlanBlock } from "../../ui/blocks/upgrade-plan-block";
 import { CurrentPlanBlock } from "./current-plan-block";
 import { InvoicesBlock } from "./invoices-block";
 import { UserManagementDrawer } from "./user-management-drawer";

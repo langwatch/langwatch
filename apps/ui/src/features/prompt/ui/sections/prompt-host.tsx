@@ -13,7 +13,7 @@ import { useMemo, type ReactNode } from "react";
 import { browserUiLogger, browserUiStorage } from "../../../../behavior/ui-browser-storage";
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
-import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/sections/ui-page-fallbacks";
 import { resolvePromptDrawerAddress } from "../../behavior/prompt-drawer-address";
 import type { PromptTabCapabilities } from "../../behavior/prompt-tab-capabilities";
 import { promptCopyTargets } from "../../model/prompt-copy-targets";

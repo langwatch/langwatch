@@ -13,7 +13,7 @@ import {
   type NavigationOrganization,
   type NavigationTeam,
   type NavigationUser,
-} from "@langwatch/navigation-web/screens/landing";
+} from "@langwatch/navigation-web/screens/navigation";
 import {
   CommandBarProvider,
   CommandBarTrigger,
@@ -35,7 +35,7 @@ import { useUiScopeMemory } from "../../../../behavior/ui-scope-storage";
 import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
 import { signOutUi } from "../../../../behavior/ui-session-client";
 import { useUiRouteReading } from "../../../../behavior/ui-scope-route";
-import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/sections/ui-page-fallbacks";
 import { readNavigationFeatureFlag } from "../../behavior/navigation-feature-flag";
 import { rememberNavigationScope } from "../../behavior/navigation-remember-scope";
 

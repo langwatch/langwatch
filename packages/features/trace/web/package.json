@@ -94,14 +94,6 @@
       "types": "./src/ui/sections/explorer/utils/trace-edit-mode.ts",
       "default": "./src/ui/sections/explorer/utils/trace-edit-mode.ts"
     },
-    "./facet-lens.store": {
-      "types": "./src/behavior/facet-lens.store.ts",
-      "default": "./src/behavior/facet-lens.store.ts"
-    },
-    "./filter.store": {
-      "types": "./src/behavior/filter.store.ts",
-      "default": "./src/behavior/filter.store.ts"
-    },
     "./hooks/usePageVisibility": {
       "types": "./src/behavior/use-page-visibility.ts",
       "default": "./src/behavior/use-page-visibility.ts"
@@ -118,10 +110,6 @@
       "types": "./src/model/export-types.ts",
       "default": "./src/model/export-types.ts"
     },
-    "./preview-trace-id": {
-      "types": "./src/model/preview-trace-id.ts",
-      "default": "./src/model/preview-trace-id.ts"
-    },
     "./scenario-role": {
       "types": "./src/ui/elements/scenario-role.tsx",
       "default": "./src/ui/elements/scenario-role.tsx"
@@ -130,29 +118,13 @@
       "types": "./src/screens/traces/index.ts",
       "default": "./src/screens/traces/index.ts"
     },
-    "./sse-status.store": {
-      "types": "./src/behavior/sse-status.store.ts",
-      "default": "./src/behavior/sse-status.store.ts"
-    },
-    "./trace-edit.store": {
-      "types": "./src/behavior/trace-edit.store.ts",
-      "default": "./src/behavior/trace-edit.store.ts"
-    },
     "./utils/formatMilliseconds": {
       "types": "./src/model/format-milliseconds.ts",
       "default": "./src/model/format-milliseconds.ts"
     },
-    "./utils/trace": {
-      "types": "./src/model/trace.ts",
-      "default": "./src/model/trace.ts"
-    },
     "./utils/trpcError": {
       "types": "./src/behavior/trpc-error.ts",
       "default": "./src/behavior/trpc-error.ts"
-    },
-    "./view.store": {
-      "types": "./src/behavior/view.store.ts",
-      "default": "./src/behavior/view.store.ts"
     }
   },
   "scripts": {

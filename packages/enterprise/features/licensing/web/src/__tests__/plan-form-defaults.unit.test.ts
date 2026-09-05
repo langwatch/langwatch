@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ENTERPRISE_TEMPLATE, PRO_TEMPLATE } from "@langwatch/enterprise-licensing-contract";
-import { getPlanDefaults, PLAN_DEFAULTS, type PlanType } from "../plan-form-defaults";
+import { getPlanDefaults, PLAN_DEFAULTS, type PlanType } from "../model/plan-form-defaults";
 
 /**
  * Spec: specs/licensing/license-generation.feature

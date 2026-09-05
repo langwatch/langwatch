@@ -5,7 +5,7 @@ import {
   InviteMemberDrawer as InviteMember,
 } from "@langwatch/organization-web/drawers";
 
-import { fromDrawerAddress } from "../../../drawers";
+import { fromDrawerAddress } from "../../../../model/ui-drawer-address";
 import { withHost } from "../../../../ui/sections/ui-page";
 import { OrganizationHost } from "./organization-host";
 

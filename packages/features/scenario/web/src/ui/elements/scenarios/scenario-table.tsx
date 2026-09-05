@@ -1,4 +1,4 @@
-import { ScenarioTable as ScenarioTableView, type ScenarioListItem } from "../../../index";
+import { ScenarioTable as ScenarioTableView, type ScenarioListItem } from "../../..";
 import type { ColumnFiltersState, RowSelectionState } from "@tanstack/react-table";
 import { LangyContextTarget, scenarioContextChip } from "@langwatch/langy-web";
 import type { Scenario } from "../../../model/prisma-types";

@@ -6,7 +6,7 @@
 
 import type { ComponentType, ReactNode } from "react";
 import type { UiPageLoader } from "../../behavior/ui-page-loaders";
-import { UiPageForbidden, UiPageLoading, UiPageNotFound } from "../elements/ui-page-fallbacks";
+import { UiPageForbidden, UiPageLoading, UiPageNotFound } from "./ui-page-fallbacks";
 import { withUiPageGuard, type UiPageGuardFallbacks } from "./ui-page-guard";
 
 /** The one copy of the guard's fallback trio; every route used to repeat this. */

@@ -18,7 +18,7 @@ import type {
 } from "@langwatch/scenario-contract";
 import { splitTargetKey } from "@langwatch/suite-contract";
 import { api } from "../../../../behavior/scenario-api";
-import type { TargetKind } from "../../../elements/agent-testing/shared/target-mark";
+import type { TargetKind } from "../../../../model/target-kind";
 import type { PlanRowModel } from "./plan-rows-table";
 import type { ResultsFilterOption } from "./results-filter-menu";
 import {

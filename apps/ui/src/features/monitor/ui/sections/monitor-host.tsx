@@ -14,7 +14,7 @@ import { useMemo, type ReactNode } from "react";
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
 import { uiCopyTargets } from "../../../../model/ui-copy-targets";
-import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/sections/ui-page-fallbacks";
 import { openMonitorOverlay } from "../../behavior/monitor-open-overlay";
 
 /** The grant a replication target is judged by. Monitors live under evaluations. */

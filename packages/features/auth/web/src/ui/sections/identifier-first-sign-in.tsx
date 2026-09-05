@@ -21,14 +21,14 @@ import {
 import { signInMethodActionLabel, signInMethodLabel } from "../../model/method-labels";
 import { CheckYourEmail } from "../elements/check-your-email";
 import { CredentialSignInForm } from "./credential-sign-in-form";
-import { FrontDoorFinePrint } from "../elements/front-door-fine-print";
+import { FrontDoorFinePrint } from "./front-door-fine-print";
 import { IdentifierStepForm } from "./identifier-step-form";
 import {
   AlternativeMethods,
   hasAlternativeMethods,
   useShowsAllSocialMethods,
   SignInMethodPicker,
-} from "../blocks/sign-in-method-picker";
+} from "./sign-in-method-picker";
 
 /**
  * The identifier-first log-in screen (D13, ADR-117 §6): ask for the address,

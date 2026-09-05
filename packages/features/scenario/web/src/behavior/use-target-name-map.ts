@@ -4,7 +4,7 @@
 
 import { useMemo } from "react";
 
-import type { TargetKind } from "../ui/elements/agent-testing/shared/target-mark";
+import type { TargetKind } from "../model/target-kind";
 import { api } from "./scenario-api";
 import { useOrganizationTeamProject } from "./use-organization-team-project";
 

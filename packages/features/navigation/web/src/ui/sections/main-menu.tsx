@@ -40,7 +40,7 @@ import { projectNavItems, toProjectRoutePattern } from "../../model/project-nav-
 import { projectScopedDestination } from "../../model/project-scoped-nav";
 import { CollapsibleMenuGroup } from "../blocks/collapsible-menu-group";
 import { SideMenuLink } from "../blocks/side-menu-link";
-import { SidebarSection } from "../blocks/sidebar-section";
+import { SidebarSection } from "./sidebar-section";
 
 export { MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "../../model/menu-widths";
 

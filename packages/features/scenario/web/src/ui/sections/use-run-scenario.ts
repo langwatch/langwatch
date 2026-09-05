@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { showErrorToast } from "@langwatch/ui-host/errors";
 import type { ScenarioFailureAction } from "../../model/scenario-host";
 import type { RunParameterValues } from "@langwatch/scenario-contract";
-import type { TargetValue } from "./scenarios/target-selector";
+import type { TargetValue } from "../../model/scenario-target";
 import { toaster } from "@langwatch/design-system/toaster";
 import { api } from "../../behavior/scenario-api";
 import { type PollResult, pollForScenarioRun } from "../../model/poll-for-scenario-run";

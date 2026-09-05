@@ -12,7 +12,7 @@ import type { PeriodControls } from "./period-controls";
 import { RunsSidebarBatchEntry } from "./runs-sidebar-batch-entry";
 import { RunsSidebarEntry } from "../../../elements/agent-testing/results/runs-sidebar-entry";
 import type { RunPlanBatches } from "../../../../behavior/agent-testing/results/use-run-plan-batches";
-import { NewSimulationsCallout } from "../../../elements/suites/new-simulations-callout";
+import { NewSimulationsCallout } from "../../suites/new-simulations-callout";
 
 export const RUNS_SIDEBAR_WIDTH = 230;
 

@@ -2,7 +2,7 @@ import { Badge, Box, Button, HStack, Spacer, Spinner, Text, VStack } from "@chak
 import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Dialog } from "@langwatch/design-system/dialog";
-import { Link } from "../../ui/elements/link";
+import { Link } from "../elements/link";
 import { OrganizationUserRole, RoleBindingScopeType, TeamUserRole } from "../../model/prisma-types";
 import { api } from "../../behavior/organization-api";
 import {
@@ -11,8 +11,8 @@ import {
   type PendingBinding,
   roleBadgeColor,
   scopeTypeLabel,
-} from "../../ui/blocks/group-binding-input-row";
-import { OrganizationUserRoleField } from "../../ui/elements/organization-user-role-field";
+} from "./group-binding-input-row";
+import { OrganizationUserRoleField } from "../elements/organization-user-role-field";
 import { useOrganizationToaster, useShowErrorToast } from "../../behavior/organization-feedback";
 
 /** Team names as a reader would say them: "A", "A and B", "A, B and C". */

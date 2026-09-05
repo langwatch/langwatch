@@ -17,8 +17,8 @@ import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { downloadUiFile } from "../../../../behavior/ui-file-download";
 import { useUiOrganizationFacts } from "../../../../behavior/ui-organization-facts";
 import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
-import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
-import { UiProjectSwitcher } from "../../../chrome";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/sections/ui-page-fallbacks";
+import { UiProjectSwitcher } from "../../../../ui/blocks/ui-project-switcher";
 
 /**
  * Whether this deployment can send email: a document with no config tag

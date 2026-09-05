@@ -19,10 +19,6 @@
       "types": "./src/model/analytics-registry.ts",
       "default": "./src/model/analytics-registry.ts"
     },
-    "./chart": {
-      "types": "./src/ui/sections/chart.ts",
-      "default": "./src/ui/sections/chart.ts"
-    },
     "./components/CustomGraph": {
       "types": "./src/ui/sections/custom-graph.tsx",
       "default": "./src/ui/sections/custom-graph.tsx"

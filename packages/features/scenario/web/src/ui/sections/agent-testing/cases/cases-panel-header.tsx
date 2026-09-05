@@ -6,7 +6,7 @@
 
 import { HStack, Icon, Spacer, Text } from "@chakra-ui/react";
 import { Folder, FolderCode, Play, Plus } from "lucide-react";
-import { ScenarioLabelFilter as LabelFilterDropdown } from "../../../../index";
+import { ScenarioLabelFilter as LabelFilterDropdown } from "../../../..";
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design";
 import { SmallButton } from "../../../elements/agent-testing/shared/small-button";
 import type { CasesPanelProps } from "./cases-panel";

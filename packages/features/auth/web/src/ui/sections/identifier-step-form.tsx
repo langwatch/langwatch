@@ -8,7 +8,7 @@ import "../elements/auth-front-door.css";
 import { SHAPE } from "../../model/front-door-theme";
 import { useFocusWhenSettled } from "../../behavior/use-focus-when-settled";
 import { FIELD_FOCUS, FIELD_SURFACE, FrontDoorField } from "../elements/front-door-field";
-import { MethodDivider } from "../blocks/sign-in-method-picker";
+import { MethodDivider } from "./sign-in-method-picker";
 
 const identifierSchema = z.object({
   email: z

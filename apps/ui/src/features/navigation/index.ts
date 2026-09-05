@@ -4,7 +4,7 @@
  * port. The package's project switcher is chrome, composed by `features/chrome`.
  */
 
-import { navigationApi } from "@langwatch/navigation-web/screens/landing";
+import { navigationApi } from "@langwatch/navigation-web/screens/navigation";
 import { uiFeature } from "../../behavior/ui-feature";
 import { navigationPageLoaders } from "./ui/sections/navigation-routes";
 

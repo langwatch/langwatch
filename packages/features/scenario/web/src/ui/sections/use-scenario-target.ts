@@ -1,5 +1,5 @@
 import { useLocalStorage } from "usehooks-ts";
-import type { TargetValue } from "./scenarios/target-selector";
+import type { TargetValue } from "../../model/scenario-target";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
 
 interface PersistedTarget {

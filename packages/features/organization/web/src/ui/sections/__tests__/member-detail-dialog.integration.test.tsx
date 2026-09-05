@@ -17,7 +17,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { OrganizationUserRole, RoleBindingScopeType } from "../../../model/prisma-types";
-import type { PendingBinding } from "../../blocks/group-binding-input-row";
+import type { PendingBinding } from "../group-binding-input-row";
 
 const {
   mockUpdateMemberRole,
@@ -129,9 +129,9 @@ vi.mock("../../elements/organization-user-role-field", () => ({
   ),
 }));
 
-vi.mock("../../blocks/group-binding-input-row", async () => {
-  const actual = await vi.importActual<typeof import("../../blocks/group-binding-input-row")>(
-    "../../blocks/group-binding-input-row",
+vi.mock("../group-binding-input-row", async () => {
+  const actual = await vi.importActual<typeof import("../group-binding-input-row")>(
+    "../group-binding-input-row",
   );
   const React = await vi.importActual<typeof import("react")>("react");
 

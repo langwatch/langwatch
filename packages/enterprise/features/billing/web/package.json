@@ -8,16 +8,14 @@
     "src"
   ],
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
   "exports": {
-    ".": {
-      "types": "./src/index.ts",
-      "default": "./src/index.ts"
-    },
     "./screens/billing": {
       "types": "./src/screens/billing/index.ts",
       "default": "./src/screens/billing/index.ts"
+    },
+    "./surfaces/contact-sales": {
+      "types": "./src/surfaces/contact-sales/index.ts",
+      "default": "./src/surfaces/contact-sales/index.ts"
     }
   },
   "scripts": {

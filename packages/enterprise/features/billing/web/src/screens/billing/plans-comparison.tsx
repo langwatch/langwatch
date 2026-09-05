@@ -22,11 +22,11 @@ import {
   type Currency,
   currencySymbol,
   ENTERPRISE_PLAN_FEATURES,
-  FREE_PLAN_FEATURES,
   formatPrice,
+  FREE_PLAN_FEATURES,
   getGrowthPlanFeatures,
   getGrowthSeatPriceCents,
-} from "../../index";
+} from "../../model/billing-plans";
 import {
   type ComparisonPlanId,
   resolveCurrentComparisonPlan,

@@ -40,7 +40,7 @@ import {
 } from "../../elements/scenario-form";
 import { ScenarioParametersDialog } from "../../elements/scenarios/scenario-parameters-dialog";
 import { ScenarioRunModelDialog } from "./scenario-run-model-dialog";
-import type { TargetValue } from "./target-selector";
+import type { TargetValue } from "../../../model/scenario-target";
 import { CaseVersionChip } from "../../elements/agent-testing/shared/case-version-chip";
 import { api } from "../../../behavior/scenario-api";
 import { KSUID_RESOURCES } from "@langwatch/workflow-contract";

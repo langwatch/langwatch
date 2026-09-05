@@ -7,7 +7,7 @@ export type ScenarioScreenLoader = () => Promise<{ default: ComponentType }>;
 export const scenarioScreens = {
   simulations: () => import("./simulations.screen"),
   scenarioLibrary: () => import("./scenario-library.screen"),
-  agentTesting: () => import("../agent-testing/agent-testing.screen"),
+  agentTesting: () => import("./agent-testing.screen"),
 } as const satisfies Record<string, ScenarioScreenLoader>;
 
 export type ScenarioScreenName = keyof typeof scenarioScreens;

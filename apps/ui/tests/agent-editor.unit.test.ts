@@ -4,7 +4,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import { DRAWER_OPEN_PARAM } from "../src/features/drawers";
+import { DRAWER_OPEN_PARAM } from "../src/model/ui-drawer-address";
 import {
   DRAWER_AGENT_ID_PARAM,
   openAgentEditor,

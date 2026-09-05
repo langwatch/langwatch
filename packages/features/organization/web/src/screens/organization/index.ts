@@ -72,5 +72,5 @@ export {
  * `departments.*` transport would be a second opinion about what an assignment
  * is. The edge is the finding every family since governance carries one of.
  */
-export { DepartmentPicker } from "../../ui/elements/department-picker";
+export { DepartmentPicker } from "../../ui/sections/department-picker";
 export { useDepartmentColumn } from "../../behavior/use-department-column";

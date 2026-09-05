@@ -1,6 +1,6 @@
 /** General Settings: single screen in `@langwatch/project-web`. */
 
-import { projectApi } from "@langwatch/project-web/screens/project";
+import { projectApi } from "@langwatch/project-web/screens/project-settings";
 import { lazyDrawer } from "@langwatch/ui-drawer";
 import { uiFeature } from "../../behavior/ui-feature";
 import { projectPageLoaders } from "./ui/sections/project-routes";
@@ -9,7 +9,7 @@ export const projectFeature = uiFeature({
   // The SCOPE, not the package: `features/home` mounts the same package's
   // `screens/home` transport, and two bindings sharing a name make a
   // composition diagnostic say nothing about which one it means.
-  name: "@langwatch/project-web/screens/project",
+  name: "@langwatch/project-web/screens/project-settings",
   api: projectApi,
   loaders: projectPageLoaders,
   /**

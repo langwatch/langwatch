@@ -8,7 +8,7 @@ import {
   LITE_MEMBER_EXPLANATION,
   LITE_MEMBER_SHORT_DESCRIPTION,
   SEAT_TYPES_DOC_PATH,
-} from "@langwatch/enterprise-licensing-web";
+} from "@langwatch/enterprise-licensing-web/surfaces/seat-types";
 
 export type OrgRoleOption = {
   label: string;

@@ -11,7 +11,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { FieldLabel } from "../../../elements/agent-testing/shared/dialog-fields";
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design";
 import { RemoveBlockButton } from "../../../elements/agent-testing/shared/remove-block-button";
-import { ParameterRowsEditor } from "../../../elements/agent-testing/run/parameter-rows-editor";
+import { ParameterRowsEditor } from "./parameter-rows-editor";
 import type { RunDialogForm } from "./use-run-dialog-form";
 import { ParameterLineField } from "./parameter-line-field";
 import { errorOnLine, parameterPlaceholder } from "./parameter-suggestions";

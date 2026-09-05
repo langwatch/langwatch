@@ -22,30 +22,7 @@ import { useProjectHomeHost } from "../../../../model/project-home-host";
 
 /**
  * Derives Langy's home briefing from the project's REAL signals.
- *
- * The scenario suite roll-up (`scenarios.getExternalSetSummaries`) leads the
- * card — pass / fail / total per set, with the last-run time — which is enough
- * to say how many scenarios are passing and which sets need a look, and to
- * colour a status strip.
- *
- * A project without scenarios still has traces, so we ALSO read the real
- * analytics roll-up (`analytics.getTimeseries`, the same proven path
- * `TracesOverview` uses) for the vanity strip: p50 latency, cost, trace ·
- * thread counts over the last 30 days. Each cell is omitted when its metric is
- * missing rather than showing a fake 0 — honest degradation, so a live project
- * shows real numbers and a quiet one shows only what it actually has.
- *
- * The attention inbox compares current and prior error-message facets, looks
- * for a trace-name signal shared by multiple errors, and compares current and
- * prior p50 latency. One-off maxima and raw totals stay in the quiet overview;
- * they do not become insight cards. Every row links to the exact Trace Explorer
- * query behind it and can hand that same evidence to Langy.
- *
- * What we deliberately DON'T invent: a pass→fail "regression" diff (no endpoint
- * exists yet — we say "failing", the honest word for a current fail count), and
- * a Langy-drafted PR / "goal → PR" loop (no queryable artifact yet). Those
- * sections stay absent until there is data behind them, rather than shipping a
- * number that isn't real. See specs/home/langy-briefing.feature.
+ * See specs/home/langy-briefing.feature.
  */
 
 const MAX_BARS = 4;
@@ -54,8 +31,6 @@ const BRIEFING_STALE_MS = 60_000;
 /**
  * Near-realtime: the live signals repoll on this cadence while the page is
  * visible (react-query pauses interval refetches for hidden tabs by default).
- * `keepPreviousData` makes each landing seamless; the overview cells pulse
- * when a figure actually changed.
  */
 const BRIEFING_POLL_MS = 30_000;
 /**
@@ -82,14 +57,9 @@ export const buildBriefingReceipts = buildAttentionInbox;
 export type ReceiptSignals = AttentionInboxSignals;
 
 /**
- * Reads one series' value back out of a `getTimeseries` `currentPeriod`. The
- * lookup key is derived from the app-layer's canonical `buildSeriesName`
- * encoder (`{index}/{metric}/{aggregation}`, `index` = the series' position in
- * the request) rather than re-spelled here, so it cannot drift from how the
- * value was written. Returns `undefined` when that metric never appears in any
- * bucket, so a missing signal degrades to an omitted cell rather than a
- * fabricated 0. With `timeScale: "full"` there is a single bucket, so the sum
- * is a passthrough of that one value.
+ * Reads one series' value back out of a `getTimeseries` `currentPeriod`.
+ * Returns `undefined` when the metric never appears, so a missing signal
+ * omits the cell instead of showing a fabricated 0.
  */
 export function readSummaryMetric({
   buckets,
@@ -340,11 +310,9 @@ export function useLangyBriefing(): LangyBriefingResult {
     const sets = summaries.data ?? [];
     const recentItems = recent.data ?? [];
     // Progressive load: the card appears as soon as the fast scenario roll-up
-    // (Postgres) settles. The slower analytics roll-up (ClickHouse) and the
-    // recent-items rail then fill in their OWN sections as they arrive, rather
-    // than holding the whole card behind the slowest query. The heavy compute
-    // stays on the backend (the aggregation is server-side and server-cached);
-    // the client only reads the cached results and formats them.
+    // (Postgres) settles. The slower analytics roll-up and the recent-items
+    // rail fill in their OWN sections as they arrive, rather than holding the
+    // whole card behind the slowest query.
     const isLoading = summaries.isLoading && !summaries.data;
     // Analytics is the slow read; its section (the overview + receipts) shows its
     // own inline loading until it lands, and the headline holds a neutral line so
@@ -433,9 +401,8 @@ export function useLangyBriefing(): LangyBriefingResult {
       delta === undefined ? undefined : delta.startsWith("+") ? "bad" : "good";
     /**
      * DEV-ONLY mock: a fresh project has no previous 30-day window, so real
-     * deltas are honestly absent — which makes the treatment invisible while
-     * designing. Development fills the gap with a deterministic figure
-     * derived from the label (stable across renders); production NEVER mocks.
+     * deltas are honestly absent. Development fills the gap with a
+     * deterministic figure derived from the label; production NEVER mocks.
      */
     const devMockDelta = (label: string): string | undefined => {
       if (!isDevelopment) return undefined;

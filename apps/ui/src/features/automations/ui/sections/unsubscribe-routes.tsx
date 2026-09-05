@@ -4,7 +4,7 @@
  * a guard would refuse the only person the link was ever minted for.
  */
 
-import { unsubscribeScreens } from "@langwatch/automation-web/screens/unsubscribe";
+import { unsubscribeScreens } from "@langwatch/automation-web/screens/automations";
 import type { ComponentType } from "react";
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";

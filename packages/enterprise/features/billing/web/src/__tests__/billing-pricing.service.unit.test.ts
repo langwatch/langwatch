@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BillingPricingService } from "../billing-pricing.service";
+import { BillingPricingService } from "../model/billing-pricing.service";
 
 describe("BillingPricingService", () => {
   it("resolves browser prices from the selected catalogue", () => {

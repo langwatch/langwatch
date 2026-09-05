@@ -65,10 +65,7 @@
       "id": "annotations",
       "root": "annotation",
       "uses": {
-        "screens": [
-          "@langwatch/annotation-web/screens/annotations",
-          "@langwatch/annotation-web/screens/my-queue"
-        ],
+        "screens": ["@langwatch/annotation-web/screens/annotations"],
         "surfaces": []
       }
     },
@@ -108,10 +105,7 @@
       "id": "automations",
       "root": "automations",
       "uses": {
-        "screens": [
-          "@langwatch/automation-web/screens/automations",
-          "@langwatch/automation-web/screens/unsubscribe"
-        ],
+        "screens": ["@langwatch/automation-web/screens/automations"],
         "surfaces": []
       }
     },
@@ -153,14 +147,6 @@
       "uses": {
         "screens": ["@langwatch/dataset-web/screens/datasets"],
         "surfaces": ["@langwatch/dataset-web/drawers"]
-      }
-    },
-    {
-      "id": "drawers",
-      "root": "drawers",
-      "uses": {
-        "screens": [],
-        "surfaces": []
       }
     },
     {
@@ -231,7 +217,7 @@
       "id": "langy",
       "root": "langy",
       "uses": {
-        "screens": ["@langwatch/langy-web/screens/langy-layout"],
+        "screens": ["@langwatch/langy-web/screens/langy"],
         "surfaces": []
       }
     },
@@ -239,7 +225,7 @@
       "id": "licensing",
       "root": "licensing",
       "uses": {
-        "screens": ["@langwatch/enterprise-licensing-web/screens/license"],
+        "screens": ["@langwatch/enterprise-licensing-web/screens/licensing"],
         "surfaces": []
       }
     },
@@ -255,7 +241,7 @@
       "id": "navigation",
       "root": "navigation",
       "uses": {
-        "screens": ["@langwatch/navigation-web/screens/landing"],
+        "screens": ["@langwatch/navigation-web/screens/navigation"],
         "surfaces": []
       }
     },
@@ -303,7 +289,7 @@
       "id": "project-settings",
       "root": "project",
       "uses": {
-        "screens": ["@langwatch/project-web/screens/project"],
+        "screens": ["@langwatch/project-web/screens/project-settings"],
         "surfaces": []
       }
     },
@@ -359,10 +345,7 @@
       "id": "workflows",
       "root": "workflows",
       "uses": {
-        "screens": [
-          "@langwatch/workflow-web/screens/workflows",
-          "@langwatch/workflow-web/screens/studio"
-        ],
+        "screens": ["@langwatch/workflow-web/screens/workflows"],
         "surfaces": []
       }
     }

@@ -4,7 +4,7 @@
 import { Badge, Box, Button, Card, Flex, HStack, SimpleGrid, Text, VStack } from "@chakra-ui/react";
 import { Check } from "lucide-react";
 import { Link } from "../../ui/elements/link";
-import { PricingSummary } from "../../index";
+import { PricingSummary } from "../../ui/elements/pricing-summary";
 
 export function CurrentPlanBlock({
   planName,

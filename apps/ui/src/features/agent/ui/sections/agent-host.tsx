@@ -16,7 +16,7 @@ import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { resolveUiFailureCopy } from "../../../../behavior/ui-feedback";
 import { useUiRpc } from "../../../../behavior/ui-rpc";
 import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
-import { UiPageFailure, UiPageLoading } from "../../../../ui/elements/ui-page-fallbacks";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/sections/ui-page-fallbacks";
 import { openAgentEditor, openConnectedAgentDrawer } from "../../behavior/agent-editor";
 import { TrpcAgentBrowserAdapter } from "../../behavior/trpc-agent-browser.adapter";
 import { agentCopyTargets } from "../../model/agent-copy-targets";

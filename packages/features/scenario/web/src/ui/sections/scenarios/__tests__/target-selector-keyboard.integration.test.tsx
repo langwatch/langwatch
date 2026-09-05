@@ -35,7 +35,8 @@ vi.mock("../../../../behavior/scenario-api", () => ({
   },
 }));
 
-import { TargetSelector, type TargetValue } from "../target-selector";
+import { TargetSelector } from "../target-selector";
+import type { TargetValue } from "../../../../model/scenario-target";
 
 describe("<TargetSelector/>", () => {
   afterEach(cleanup);

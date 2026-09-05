@@ -56,3 +56,20 @@ export {
   type AnnotationRouteReading,
   type AnnotationSuccessNotice,
 } from "../../model/annotation-host";
+
+/**
+ * The annotation queue WALKER, the fifth address of this family.
+ *
+ * ONE ADDRESS: `/:project/annotations/my-queue`. It takes no view prop — it
+ * mounts the trace family's conversation view inline against the queue session
+ * — so it carries its own loader type rather than joining `annotationScreens`.
+ * It rides the same owner-only entry because a screen export is named after the
+ * frontend feature that composes it, and that feature is `annotations`.
+ */
+export type MyQueueScreenLoader = () => Promise<{ default: ComponentType }>;
+
+export const myQueueScreens = {
+  myQueue: () => import("./my-queue.screen"),
+} as const satisfies Record<string, MyQueueScreenLoader>;
+
+export type MyQueueScreenName = keyof typeof myQueueScreens;
