@@ -116,6 +116,10 @@ export const simulationRunDataSchema = z.object({
   status: simulationRunStatusSchema,
   results: simulationRunResultSchema.nullable().optional(),
   messages: z.array(simulationMessageSchema),
+  // True when `messages` holds only the first few messages of a longer
+  // conversation. List reads trim the message arrays to protect ClickHouse;
+  // pass `shouldIncludeMessages` to read them all.
+  messagesTruncated: z.boolean().optional(),
   timestamp: z.number(),
   updatedAt: z.number().optional(),
   durationInMs: z.number(),

@@ -10,8 +10,15 @@ import {
   LangyModelNotConfiguredError,
 } from "@langwatch/langy-contract";
 import { describe, expect, it, vi } from "vitest";
-import { LangySessionKeyScopeError } from "../../ports/langy-turn-runtime.port";
-import type { LangyTurnServiceDeps } from "../langy-turn.shared";
+import {
+  LangySessionKeyScopeError,
+  type LangyWorkerProbeInput,
+  type LangyWorkerWarmInput,
+} from "../../ports/langy-turn-runtime.port";
+import type {
+  LangyTurnServiceDependencies,
+  LangyTurnServiceDeps,
+} from "../langy-turn.shared";
 import { LangyTurnWarmService } from "../langy-turn-warm.service";
 
 const SESSION = { user: { id: "user-1" } };
@@ -21,8 +28,8 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
     id: "conv-warm",
     isNew: true,
   }));
-  const probe = vi.fn(async () => false);
-  const warm = vi.fn(async () => {});
+  const probe = vi.fn<(input: LangyWorkerProbeInput) => Promise<boolean>>(async () => false);
+  const warm = vi.fn<(input: LangyWorkerWarmInput) => Promise<void>>(async () => {});
   const dispatch = vi.fn(async () => "accepted" as const);
   const cancel = vi.fn(async () => {});
   const mintSessionKey = vi.fn(async () => ({
@@ -70,7 +77,7 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
     handoffStore: null,
     messages: null,
     ...over,
-  } as LangyTurnServiceDeps;
+  } as LangyTurnServiceDependencies;
 
   return {
     deps,
@@ -183,9 +190,7 @@ describe("LangyTurnWarmService.warmConversationWorker", () => {
 
       // Check-only: the permit view, never the reserving one.
       expect(deps.permits.reserve).not.toHaveBeenCalled();
-      const probeArgs = mocks.probe.mock.calls[0]![0] as unknown as {
-        hasGithubAuth: boolean;
-      };
+      const probeArgs = mocks.probe.mock.calls[0]![0];
       expect(probeArgs.hasGithubAuth).toBe(false);
       const warmArgs = mocks.warm.mock.calls[0]![0] as {
         credentials: { githubToken?: string; githubLogin?: string };
@@ -207,9 +212,7 @@ describe("LangyTurnWarmService.warmConversationWorker", () => {
 
       await service.warmConversationWorker(warmInput());
 
-      const probeArgs = mocks.probe.mock.calls[0]![0] as unknown as {
-        hasGithubAuth: boolean;
-      };
+      const probeArgs = mocks.probe.mock.calls[0]![0];
       expect(probeArgs.hasGithubAuth).toBe(true);
     });
   });

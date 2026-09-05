@@ -8,29 +8,54 @@
  * business.
  */
 import {
+  type AuthzGetDecisionInput,
+  type AuthzGetProjectAnyDecisionInput,
+  type AuthzScopeLineageInput,
   authzDeclarationOf,
   BlankScopeIdError,
+  type AuthzScopeLineageResult,
+  type PermissionDecision,
   PermissionDeniedError,
 } from "@langwatch/authz-contract";
 import { TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
+import type {
+  TrpcAuthorizationDecisions,
+  TrpcMiddlewareContext,
+} from "../trpc-policy-ports.js";
 import {
   createDeclaredAuthzMiddlewares,
   type TrpcDeclaredAuthzContext,
+  type TrpcDeclaredAuthzPorts,
 } from "../trpc-declared-authz.js";
 
 function makePorts({
   actorId = "alice",
-  getDecision = vi.fn().mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
+  getDecision = vi
+    .fn<(input: AuthzGetDecisionInput) => Promise<PermissionDecision>>()
+    .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
   getProjectAnyDecision = vi
-    .fn()
+    .fn<(input: AuthzGetProjectAnyDecisionInput) => Promise<PermissionDecision>>()
     .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
 }: {
   actorId?: string | undefined;
-  getDecision?: ReturnType<typeof vi.fn>;
-  getProjectAnyDecision?: ReturnType<typeof vi.fn>;
-} = {}) {
-  const decisions = { getDecision, getProjectAnyDecision, checkScopeLineage: vi.fn() };
+  getDecision?: ReturnType<
+    typeof vi.fn<(input: AuthzGetDecisionInput) => Promise<PermissionDecision>>
+  >;
+  getProjectAnyDecision?: ReturnType<
+    typeof vi.fn<(input: AuthzGetProjectAnyDecisionInput) => Promise<PermissionDecision>>
+  >;
+} = {}): TrpcDeclaredAuthzPorts<TrpcDeclaredAuthzContext> & {
+  decisions: TrpcAuthorizationDecisions;
+} {
+  const checkScopeLineage = vi.fn<
+    (input: AuthzScopeLineageInput) => Promise<AuthzScopeLineageResult>
+  >();
+  const decisions: TrpcAuthorizationDecisions = {
+    getDecision,
+    getProjectAnyDecision,
+    checkScopeLineage,
+  };
   return {
     identity: { actor: () => (actorId ? { id: actorId } : undefined) },
     authorization: { forRequest: () => decisions },
@@ -42,7 +67,7 @@ function makePorts({
   };
 }
 
-function ctxFor(): TrpcDeclaredAuthzContext {
+function ctxFor(): TrpcMiddlewareContext<TrpcDeclaredAuthzContext> {
   return { permissionChecked: false, organizationRole: undefined };
 }
 

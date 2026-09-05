@@ -6,13 +6,30 @@
  * lineage DECISION itself — which organizations a mismatched request touches
  * — is `@langwatch/authz-contract`'s own business.
  */
+import type {
+  AuthzScopeLineageInput,
+  AuthzScopeLineageResult,
+} from "@langwatch/authz-contract";
 import { PermissionDeniedError } from "@langwatch/authz-contract";
 import type { TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
+import type { TrpcAuthorizationPort } from "../trpc-policy-ports.js";
 import { createScopeLineageGuard } from "../trpc-scope-lineage.js";
 
-function makePorts(checkScopeLineage: ReturnType<typeof vi.fn>) {
-  return { authorization: { forRequest: () => ({ checkScopeLineage }) } };
+function makePorts(
+  checkScopeLineage: ReturnType<
+    typeof vi.fn<(input: AuthzScopeLineageInput) => Promise<AuthzScopeLineageResult>>
+  >,
+): Readonly<{ authorization: TrpcAuthorizationPort<unknown> }> {
+  return {
+    authorization: {
+      forRequest: () => ({
+        checkScopeLineage,
+        getDecision: vi.fn(),
+        getProjectAnyDecision: vi.fn(),
+      }),
+    },
+  };
 }
 
 const rejection = async (run: () => Promise<unknown>): Promise<TRPCError> => {
@@ -28,7 +45,9 @@ describe("createScopeLineageGuard", () => {
   describe("when the port reports a mismatch across organizations", () => {
     /** @scenario "Scope ids from two organizations in one request are refused" */
     it("refuses before the handler runs, shaped as a permission denial", async () => {
-      const checkScopeLineage = vi.fn().mockResolvedValue({
+      const checkScopeLineage = vi
+        .fn<(input: AuthzScopeLineageInput) => Promise<AuthzScopeLineageResult>>()
+        .mockResolvedValue({
         kind: "mismatch",
         widest: { tier: "organization", id: "org_victim" },
         entries: [],
@@ -60,7 +79,9 @@ describe("createScopeLineageGuard", () => {
   describe("when a scope id resolves to no organization at all", () => {
     /** @scenario "A scope id resolving to no organization cannot anchor a mixed request" */
     it("fails closed on the port's mismatch verdict rather than treating it as agreeing", async () => {
-      const checkScopeLineage = vi.fn().mockResolvedValue({
+      const checkScopeLineage = vi
+        .fn<(input: AuthzScopeLineageInput) => Promise<AuthzScopeLineageResult>>()
+        .mockResolvedValue({
         kind: "mismatch",
         widest: { tier: "project", id: "project_ghost" },
         entries: [],
@@ -82,7 +103,9 @@ describe("createScopeLineageGuard", () => {
   describe("when every scope id resolves to one organization", () => {
     /** @scenario "A request whose scope ids agree passes the lineage guard untouched" */
     it("passes through to the declared check", async () => {
-      const checkScopeLineage = vi.fn().mockResolvedValue({ kind: "consistent" });
+      const checkScopeLineage = vi
+        .fn<(input: AuthzScopeLineageInput) => Promise<AuthzScopeLineageResult>>()
+        .mockResolvedValue({ kind: "consistent" });
       const guard = createScopeLineageGuard(makePorts(checkScopeLineage));
       const next = vi.fn().mockReturnValue("handled");
 

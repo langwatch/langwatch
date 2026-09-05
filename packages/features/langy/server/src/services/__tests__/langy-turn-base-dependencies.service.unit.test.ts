@@ -5,6 +5,7 @@
  * resolver is composed.
  */
 import { describe, expect, it, vi } from "vitest";
+import type { LangyWorkerProbeInput } from "../../ports/langy-turn-runtime.port";
 import {
   LangyTurnService,
   type LangyTurnServiceDeps,
@@ -12,7 +13,7 @@ import {
 } from "../langy-turn.service";
 
 function makeFixture(over: Partial<LangyTurnServiceDeps> = {}) {
-  const probe = vi.fn(async () => false);
+  const probe = vi.fn<(input: LangyWorkerProbeInput) => Promise<boolean>>(async () => false);
   const dispatch = vi.fn(async () => "accepted" as const);
   const stash = vi.fn(async () => undefined);
 
@@ -112,9 +113,7 @@ describe("LangyTurnBaseDependenciesService harness resolution", () => {
 
       await LangyTurnService.create(fixture.deps).startConversationTurn(input);
 
-      const probeArgs = fixture.probe.mock.calls[0]![0] as unknown as {
-        harness?: string;
-      };
+      const probeArgs = fixture.probe.mock.calls[0]![0];
       expect(probeArgs.harness).toBeUndefined();
     });
   });

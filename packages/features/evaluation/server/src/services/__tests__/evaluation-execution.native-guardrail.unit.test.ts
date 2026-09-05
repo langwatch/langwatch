@@ -71,6 +71,9 @@ class FakeEvaluatorService extends EvaluatorServiceContract {
   archive(): never {
     throw new Error("unused capability");
   }
+  getCopySource(): never {
+    throw new Error("unused capability");
+  }
   getWorkflowFields(): never {
     throw new Error("unused capability");
   }

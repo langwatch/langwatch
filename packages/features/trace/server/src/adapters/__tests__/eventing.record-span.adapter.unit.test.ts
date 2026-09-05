@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Command } from "@langwatch/eventing";
+import { createTenantId, type Command } from "@langwatch/eventing";
 import {
   RECORD_SPAN_COMMAND_TYPE,
   type OtlpSpan,
@@ -43,16 +43,14 @@ function createCommand(attributes: OtlpSpan["attributes"]): Command<RecordSpanCo
     occurredAt: Date.now(),
   };
   return {
-    tenantId: "project-123",
+    tenantId: createTenantId("project-123"),
     aggregateId: "trace-1",
     type: RECORD_SPAN_COMMAND_TYPE,
     data,
   };
 }
 
-function createOptions(
-  mutatingPiiRedact: (span: OtlpSpan) => void,
-): RecordSpanCommandOptions {
+function createOptions(mutatingPiiRedact: (span: OtlpSpan) => void): RecordSpanCommandOptions {
   const piiRedaction: TraceSpanPiiRedactionPort = {
     redact: async (span) => {
       mutatingPiiRedact(span);
@@ -70,9 +68,7 @@ describe("EventingRecordSpanAdapter", () => {
   describe("given a redaction pass that mutates the span it is handed", () => {
     /** @scenario "Does not mutate original command data" */
     it("does not mutate the original command data", async () => {
-      const command = createCommand([
-        { key: "gen_ai.prompt", value: { stringValue: "original" } },
-      ]);
+      const command = createCommand([{ key: "gen_ai.prompt", value: { stringValue: "original" } }]);
       const originalValue = command.data.span.attributes[0]!.value.stringValue;
       const options = createOptions((span) => {
         span.attributes[0]!.value.stringValue = "[REDACTED]";

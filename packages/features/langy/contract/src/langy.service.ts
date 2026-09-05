@@ -221,7 +221,7 @@ export type LangyTurnAdmissionCapability = {
  * Eight members were removed here — listConversations, getConversation,
  * createConversation, archiveConversation, startTurn, listMessages,
  * resolveCredential and relay. They were the older repository-backed head of
- * the implementation, `createComposed` never supplied the repositories they
+ * the implementation, `LangyService.create` never supplied the repositories they
  * read, and no caller anywhere reached them.
  */
 export abstract class LangyService {
