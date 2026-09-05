@@ -617,3 +617,49 @@ describe("when there is no selector on this screen", () => {
     ).toBe(1);
   });
 });
+
+describe("the notice that says the folder connected", () => {
+  /** @scenario "The command line prints the follow-along link once" */
+  it("prints the link and where to answer once, and never repeats them", () => {
+    const writer = recordingWriter({ interactive: true });
+    const ui = createUi(writer);
+    const url = "http://localhost:5570/acme?langyConversation=conv_1";
+    const read: LocalCall = {
+      ...envelope,
+      tool: "local_read",
+      params: { path: "app/main.py" },
+    };
+
+    ui.connected({
+      root: "/Users/dev/acme",
+      conversationTitle: "Instrument my traces",
+      conversationUrl: url,
+    });
+    const connected = writer.lines.join("\n");
+    expect(connected).toContain(`Follow along at ${url}`);
+    expect(connected).toContain(
+      "Permission questions are answered here, or on the card in LangWatch.",
+    );
+
+    ui.call(read);
+    ui.callResult({ call: read, text: "1\tprint('hi')" });
+    ui.call(bashCall("pnpm test"));
+    ui.callOutcome({
+      call: bashCall("pnpm test"),
+      output: bashOutput({ stdout: "2 passed in 3.1s" }),
+    });
+
+    expect(writer.lines.slice(-4)).toEqual([
+      "⏺ Read(app/main.py)",
+      "  ⎿  Read 1 line",
+      "⏺ Bash(pnpm test)",
+      "  ⎿  2 passed in 3.1s",
+    ]);
+    expect(
+      writer.lines.filter((line) => line.includes("langyConversation")),
+    ).toHaveLength(1);
+    expect(
+      writer.lines.filter((line) => line.includes("Permission questions")),
+    ).toHaveLength(1);
+  });
+});

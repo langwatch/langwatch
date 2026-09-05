@@ -288,10 +288,11 @@ Feature: Langy works in a folder shared from the developer's machine
 
     @unit
     Scenario: The command line prints the follow-along link once
-      Given the command line printed the follow-along link when the folder connected
-      When Langy asks to run a command
-      Then the terminal says to answer in the panel
-      And it does not print the link again
+      Given a connected folder whose notice printed the follow-along link
+      And a line saying that permission questions are answered here, or on the card in LangWatch
+      When Langy reads a file and runs a command
+      Then the transcript prints one line per call with its result under it
+      And the link is not printed again
 
     @unit
     Scenario: The follow-along link opens the panel on that conversation
