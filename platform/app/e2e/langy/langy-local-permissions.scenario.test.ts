@@ -83,8 +83,25 @@ describe("Langy stays inside the folder and takes the developer's answer", () =>
 
         const seenTurns: string[] = [];
         let asksBeforeSecondRun = -1;
+
+        // The developer is already in the terminal, so the FIRST command that
+        // reaches for the project's own tool is theirs to answer there, on the
+        // default option, which is the session grant.
+        //
+        // Reserved before the run rather than beside the message that asks for
+        // the tests: the first change Langy makes already runs `uv`, the panel
+        // would grant that pattern for the session, and the later command
+        // would then raise no card at all for the terminal to answer.
+        watcher.leaveNextPermissionToTerminal(/\buv\b/);
         /** The one ask the developer answers in their terminal. */
-        let terminalAnswer: Promise<string> | null = null;
+        const terminalAnswer: Promise<string> = terminal
+          .answerNextPermission(LONG_RUN_TIMEOUT_MS, /uv /)
+          .catch((error) => {
+            console.log(
+              `[fixture] the terminal answer did not land: ${String(error)}`,
+            );
+            return "";
+          });
 
         /**
          * Put the developer's card answers in the record.
@@ -167,22 +184,6 @@ describe("Langy stays inside the folder and takes the developer's answer", () =>
               async (_state, executor) => {
                 await developerAnswers(executor);
               },
-              // The grant: one ask, answered in the terminal with the pattern.
-              // Armed before the message, because the selector opens while the
-              // turn is in flight.
-              async () => {
-                // The developer is already in the terminal, so they answer
-                // there, on the default option, which is the session grant.
-                watcher!.leaveNextPermissionToTerminal(/\buv\b/);
-                terminalAnswer = terminal!
-                  .answerNextPermission()
-                  .catch((error) => {
-                    console.log(
-                      `[fixture] the terminal answer did not land: ${String(error)}`,
-                    );
-                    return "";
-                  });
-              },
               scenario.user(
                 "run the project's tests with uv and tell me the result",
               ),
@@ -264,7 +265,9 @@ describe("Langy stays inside the folder and takes the developer's answer", () =>
           asks.length,
         );
         expect(asks.length).toBe(asksBeforeSecondRun);
-        const checkLines = (capture.match(/• bash /g) ?? []).length;
+        // The transcript names one tool call per line, in the Claude Code
+        // idiom the terminal moved to: `⏺ Bash(uv run pytest)`.
+        const checkLines = (capture.match(/Bash\(/g) ?? []).length;
         console.log("[layer2] command lines in the terminal:", checkLines);
         expect(checkLines).toBeGreaterThan(asks.length);
 

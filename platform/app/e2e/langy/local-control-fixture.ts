@@ -533,7 +533,15 @@ export interface CliTerminal {
    * option, which is the session grant. Resolves with the terminal's own text
    * once the settled line replaced the selector.
    */
-  answerNextPermission: (timeoutMs?: number) => Promise<string>;
+  answerNextPermission: (
+    timeoutMs?: number,
+    /**
+     * Wait for the box that asks about THIS command rather than for any box.
+     * Several asks can be open in one run, and the panel answers the ones the
+     * terminal is not meant to take.
+     */
+    command?: RegExp,
+  ) => Promise<string>;
   /** Ctrl-C twice, which is how a developer stops sharing. */
   disconnect: () => Promise<void>;
   isRunning: () => boolean;
@@ -685,15 +693,33 @@ export async function startShareControl({
     waitForText,
     sendKeys,
     approve: async (timeoutMs = 240_000) => {
-      await waitForText("Share this folder?", timeoutMs);
+      // The question itself, whichever shape the terminal draws it in: the
+      // plain prompt asked "Share this folder?" and the boxed selector asks
+      // "Do you want to share this folder?".
+      await waitForText(/share this folder\?/i, timeoutMs);
       // The picker opens on Approve, so Enter is the whole answer. A short
       // pause first: the prompt paints before it listens.
       await sleep(500);
       sendKeys("Enter");
       await waitForText("Connected", 60_000);
     },
-    answerNextPermission: async (timeoutMs = 300_000) => {
-      await waitForText("Do you want to allow this?", timeoutMs);
+    answerNextPermission: async (timeoutMs = 300_000, command?: RegExp) => {
+      // The box sits at the bottom of the screen, so the last lines are where
+      // it is read: the command it asks about appears in the transcript above
+      // as well, and a match up there would answer the wrong box.
+      await waitFor({
+        what: command
+          ? `the terminal to ask about ${String(command)}`
+          : "the terminal to ask for permission",
+        timeoutMs,
+        intervalMs: 500,
+        read: () => {
+          const box = capture().split("\n").slice(-30).join("\n");
+          if (!box.includes("Do you want to allow this?")) return null;
+          if (command && !command.test(box)) return null;
+          return box;
+        },
+      });
       // The selector paints before it listens, the way the approve prompt does.
       await sleep(500);
       sendKeys("Enter");
@@ -717,7 +743,7 @@ export async function startShareControl({
     },
   };
   await terminal.waitForText(
-    /Waiting for a Langy conversation|Share this folder\?/,
+    /Waiting for a Langy conversation|share this folder\?/i,
     120_000,
   );
   return terminal;
