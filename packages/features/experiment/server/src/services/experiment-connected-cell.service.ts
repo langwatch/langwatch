@@ -1,7 +1,7 @@
 /**
- * runs in the customer's own process, so the engine has no node for it: the row is one turn through the relay dispatcher, sent from here and answered in place. Every instance being full is a queue rather than a failure, so
- * the turn is retried while the agent says it is busy, inside a bounded budget and with jitter. The answer is then graded through S4's loop, so a connected column scores, costs and traces like every other column.
- * Runs one cell whose target is a connected agent (ADR-128). The agent
+ * Runs one cell whose target is a connected agent (ADR-128). The agent runs in the customer's own
+ * process, so the row is one turn through the relay dispatcher. Every instance being full is a
+ * queue rather than a failure, so the turn is retried inside a bounded budget with jitter.
  */
 
 import {
@@ -35,7 +35,7 @@ import {
 import type { ResultMapperConfig } from "../processes/experiment-result-mapping.process";
 import { ExperimentEvaluatorInputService } from "./experiment-evaluator-input.service";
 import type { ExperimentCellExecutionService } from "./experiment-cell-execution.service";
-import type { ExperimentRunPorts } from "./experiment-run-orchestrator.service";
+import type { ExperimentRunPorts } from "../rules/experiment-run-input.rules";
 import type { LoadedEvaluators } from "./experiment-execution-data.service";
 
 const logger = createLogger("langwatch:experiment:run-orchestrator");

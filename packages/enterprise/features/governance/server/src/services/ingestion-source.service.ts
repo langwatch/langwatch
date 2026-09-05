@@ -23,6 +23,7 @@ import type {
 import type { IngestionCredentialsService } from "./ingestion-credentials.service";
 import type { IngestionSecretService } from "./ingestion-source-secret.service";
 import type { PullDestinationService } from "./pull-destination.service";
+import { IngestionSourceValidationService } from "./ingestion-source-validation.service";
 
 const ROTATION_GRACE_MS = 24 * 60 * 60 * 1000;
 
@@ -37,6 +38,7 @@ export class IngestionSourceService {
     private readonly destinations: PullDestinationService,
     private readonly diagnostics: GovernanceDiagnosticsPort,
     private readonly now: () => number,
+    private readonly validation: IngestionSourceValidationService,
   ) {}
 
   static create(options: {
@@ -60,7 +62,13 @@ export class IngestionSourceService {
       options.destinations,
       options.diagnostics,
       options.now ?? Date.now,
+      IngestionSourceValidationService.create({ projects: options.projects }),
     );
+  }
+
+  /** Whether a source's stored `pollerCursor` holds a real cursor. */
+  static hasPollerCursor(value: unknown): boolean {
+    return IngestionSourceValidationService.hasPollerCursor(value);
   }
 
   list(organizationId: string): Promise<GovernanceIngestionSource[]> {
@@ -107,7 +115,7 @@ export class IngestionSourceService {
   async createSource(
     input: CreateGovernanceIngestionSourceCommand,
   ): Promise<CreatedGovernanceIngestionSource> {
-    this.assertPullSchedule(input.pullSchedule);
+    this.validation.assertPullSchedule(input.pullSchedule);
     if (!(await this.entitlements.hasEnterprisePlan(input.organizationId))) {
       const existing = await this.repository.countLive(input.organizationId);
       if (existing >= NON_ENTERPRISE_INGESTION_SOURCE_CAP) {
@@ -139,7 +147,7 @@ export class IngestionSourceService {
       ...input.parserConfig,
     };
     this.destinations.assertAllowed(requestedParserConfig);
-    await this.assertTraceDestination({
+    await this.validation.assertTraceDestination({
       organizationId: input.organizationId,
       traceProjectId: input.traceProjectId,
     });
@@ -168,62 +176,21 @@ export class IngestionSourceService {
     input: UpdateGovernanceIngestionSourceCommand,
   ): Promise<GovernanceIngestionSource> {
     const existing = await this.getById({ id: input.id, organizationId: input.organizationId });
-    this.assertPullSchedule(input.pullSchedule);
-    const update: UpdateIngestionSourceRecord = {};
-    let cursorMustNotMove = false;
-    if (input.name !== undefined) {
-      update.name = input.name;
-    }
-
-    if (input.description !== undefined) {
-      update.description = input.description;
-    }
-
-    if (input.status !== undefined) {
-      update.status = input.status;
-    }
-
-    if (input.teamId !== undefined) {
-      update.teamId = input.teamId;
-    }
-
+    this.validation.assertPullSchedule(input.pullSchedule);
+    const update: UpdateIngestionSourceRecord = this.plainUpdateFields(input);
     if (input.traceProjectId !== undefined) {
-      await this.assertTraceDestination({
+      await this.validation.assertTraceDestination({
         organizationId: input.organizationId,
         traceProjectId: input.traceProjectId,
       });
       update.traceProjectId = input.traceProjectId;
     }
 
-    if (input.pullSchedule !== undefined) {
-      update.pullSchedule = input.pullSchedule;
-    }
-
+    let cursorMustNotMove = false;
     if (input.parserConfig !== undefined) {
-      const incoming = { ...input.parserConfig };
-      if (this.credentials.isEncrypted(incoming.credentials)) {
-        const message =
-          "Credentials cannot be submitted in their stored form. Re-enter the secret to change this source, or omit it to keep the current one.";
-
-        throw new GovernanceValidationError(message, {
-          formErrors: [message],
-        });
-      }
-
-      for (const key of Object.keys(existing.parserConfig)) {
-        if (
-          (key === "credentials" ||
-            key === "adapter" ||
-            key === "schedule" ||
-            key.startsWith("_")) &&
-          incoming[key] === undefined
-        ) {
-          incoming[key] = existing.parserConfig[key];
-        }
-      }
-
-      this.assertAdapterUnchanged(existing.parserConfig, incoming);
-      cursorMustNotMove = this.assertReportUnchangedOncePulled(existing, incoming);
+      const incoming = this.mergedParserConfig({ existing, incoming: input.parserConfig });
+      this.validation.assertAdapterUnchanged(existing.parserConfig, incoming);
+      cursorMustNotMove = this.validation.assertReportUnchangedOncePulled(existing, incoming);
       this.destinations.assertAllowed(incoming);
       update.parserConfig = this.credentials.tryEncryptParserConfig(incoming) ?? incoming;
     }
@@ -248,6 +215,66 @@ export class IngestionSourceService {
     }
 
     return source;
+  }
+
+  /** The fields whose only rule is that they were supplied. */
+  private plainUpdateFields(
+    input: UpdateGovernanceIngestionSourceCommand,
+  ): UpdateIngestionSourceRecord {
+    const update: UpdateIngestionSourceRecord = {};
+    if (input.name !== undefined) {
+      update.name = input.name;
+    }
+
+    if (input.description !== undefined) {
+      update.description = input.description;
+    }
+
+    if (input.status !== undefined) {
+      update.status = input.status;
+    }
+
+    if (input.teamId !== undefined) {
+      update.teamId = input.teamId;
+    }
+
+    if (input.pullSchedule !== undefined) {
+      update.pullSchedule = input.pullSchedule;
+    }
+
+    return update;
+  }
+
+  /**
+   * The parser config a save means, with the fields a reader never received faithfully carried
+   * over from the stored one. A credential in its stored form is refused rather than saved back,
+   * since re-saving a redacted secret would replace the real one with its own marker.
+   */
+  private mergedParserConfig({
+    existing,
+    incoming,
+  }: {
+    existing: GovernanceIngestionSource;
+    incoming: GovernanceIngestionSource["parserConfig"];
+  }): GovernanceIngestionSource["parserConfig"] {
+    const merged = { ...incoming };
+    if (this.credentials.isEncrypted(merged.credentials)) {
+      const message =
+        "Credentials cannot be submitted in their stored form. Re-enter the secret to change " +
+        "this source, or omit it to keep the current one.";
+
+      throw new GovernanceValidationError(message, { formErrors: [message] });
+    }
+
+    for (const key of Object.keys(existing.parserConfig)) {
+      const carried =
+        key === "credentials" || key === "adapter" || key === "schedule" || key.startsWith("_");
+      if (carried && merged[key] === undefined) {
+        merged[key] = existing.parserConfig[key];
+      }
+    }
+
+    return merged;
   }
 
   async rotateSecret({
@@ -349,110 +376,6 @@ export class IngestionSourceService {
     return new Set(data.map((project) => project.id));
   }
 
-  private assertPullSchedule(value: string | null | undefined): void {
-    if (value == null) {
-      return;
-    }
-
-    const parsed = pullScheduleSchema.safeParse(value);
-    if (parsed.success) {
-      return;
-    }
-
-    const complaints = parsed.error.issues.map((issue) => issue.message);
-
-    throw new GovernanceValidationError(
-      complaints.join(" ") || "Pull schedule is not a valid cron expression",
-      { formErrors: complaints },
-    );
-  }
-
-  private assertAdapterUnchanged(
-    stored: Record<string, unknown>,
-    incoming: Record<string, unknown>,
-  ): void {
-    const adapter = stored.adapter;
-    if (typeof adapter !== "string") {
-      return;
-    }
-
-    if (incoming.adapter === adapter) {
-      return;
-    }
-
-    const message =
-      `This source runs on the ${adapter} adapter, which is fixed when the source is created. ` +
-      "Archive this source and create a new one to change how it pulls.";
-
-    throw new GovernanceValidationError(message, { formErrors: [message] });
-  }
-
-  /**
-   * Whether `pollerCursor` holds a real cursor. `pollerCursor` is `Json?`, and the write path
-   * stores either `Prisma.JsonNull` or a string — see
-   * ingestion-pull-run-projection.prisma.repository.ts.
-   */
-  static hasPollerCursor(value: unknown): boolean {
-    if (value == null) {
-      return false;
-    }
-
-    if (typeof value === "string") {
-      return hasContentAsCursorString(value);
-    }
-
-    if (typeof value === "object") {
-      return Object.keys(value).length > 0;
-    }
-
-    return false;
-  }
-
-  private assertReportUnchangedOncePulled(
-    existing: GovernanceIngestionSource,
-    incoming: Record<string, unknown>,
-  ): boolean {
-    const report = existing.parserConfig.report;
-    if (typeof report !== "string" || incoming.report === report) {
-      return false;
-    }
-
-    if (!IngestionSourceService.hasPollerCursor(existing.pollerCursor)) {
-      return true;
-    }
-
-    const message =
-      incoming.report === undefined
-        ? `This source is configured for its ${report} report, and has already pulled it. ` +
-          "An update that replaces the configuration has to carry the same report value rather than omit it."
-        : `This source has already pulled its ${report} report. ` +
-          "Changing the report would record the same spend a second time, so it is fixed once a source has run.";
-
-    throw new GovernanceValidationError(message, { formErrors: [message] });
-  }
-
-  private async assertTraceDestination(input: {
-    organizationId: string;
-    traceProjectId: string | null | undefined;
-  }): Promise<void> {
-    if (!input.traceProjectId) {
-      return;
-    }
-
-    const project = await this.projects.tryGetWithTeam(input.traceProjectId);
-    const isAllowed =
-      project !== null &&
-      project.archivedAt === null &&
-      project.team.organizationId === input.organizationId;
-    if (isAllowed) {
-      return;
-    }
-
-    const message = "Trace destination must be an active project of this organization.";
-
-    throw new GovernanceValidationError(message, { formErrors: [message] });
-  }
-
   private async syncBestEffort(source: GovernanceIngestionSource): Promise<void> {
     try {
       await this.lifecycle.sync(source);
@@ -465,31 +388,5 @@ export class IngestionSourceService {
         },
       );
     }
-  }
-}
-
-/**
- * A cursor string carries content unless it is empty, or it is the
- * serialization of something that carries none. An opaque page token is not
- * JSON and keeps its "yes" by falling through the parse.
- */
-function hasContentAsCursorString(value: string): boolean {
-  if (value.length === 0) {
-    return false;
-  }
-
-  try {
-    const parsed: unknown = JSON.parse(value);
-    if (parsed == null) {
-      return false;
-    }
-
-    if (typeof parsed === "object") {
-      return Object.keys(parsed).length > 0;
-    }
-
-    return true;
-  } catch {
-    return true;
   }
 }

@@ -17,12 +17,9 @@ import { createInitialResults, createInitialUIState } from "@langwatch/experimen
 import type { Agent as TypedAgent } from "@langwatch/agent-contract";
 import type { CallOutcome } from "@langwatch/agent-contract";
 import { AgentBusyError, AgentOfflineError, AgentOwnerOnlyError } from "@langwatch/agent-contract";
-import {
-  type ConnectedDispatch,
-  ExperimentRunOrchestratorService,
-  type ExperimentRunPorts,
-  type OrchestratorInput,
-} from "../experiment-run-orchestrator.service";
+import { ExperimentRunOrchestratorService } from "../experiment-run-orchestrator.service";
+import type { ConnectedDispatch } from "../experiment-connected-cell.service";
+import type { ExperimentRunPorts, OrchestratorInput } from "../../rules/experiment-run-input.rules";
 import type { EvaluationV3Event, ExecutionCell } from "@langwatch/experiment-contract";
 
 /**

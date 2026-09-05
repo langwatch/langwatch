@@ -13,6 +13,7 @@ import {
 } from "@langwatch/workflow-contract";
 import type { PromptService, VersionedPrompt } from "@langwatch/prompt-contract";
 import type { ExperimentWorkflowDslPort } from "../ports/experiment-workflow-dsl.port";
+import { ExperimentTargetLoadingService } from "./experiment-target-loading.service";
 
 const logger = createLogger("langwatch:experiment:execution-data");
 
@@ -313,7 +314,9 @@ export class ExperimentExecutionDataService {
   }
 
   /**
-   * Loads all execution data: dataset, prompts, agents, evaluators.
+   * Everything a run needs before its first row: the dataset it evaluates and every prompt, agent,
+   * workflow and evaluator its targets name. A missing target is reported as the sentinel error
+   * shape rather than run around, so a deleted target stops the run instead of emptying a column.
    */
   static async loadExecutionData(
     projectId: string,
@@ -323,51 +326,18 @@ export class ExperimentExecutionDataService {
     services: ExecutionDataServices,
     inputs?: ExecutionDataInputs,
   ): Promise<LoadedExecutionData | { error: string; status: number }> {
-    // Resolve the base rows + columns: inline data, a saved dataset id, or the
-    // attached dataset reference, in that precedence.
-    let baseDataset: LoadedDataset;
-    if (inputs?.data) {
-      baseDataset = rowsFromInlineData(inputs.data);
-    } else if (inputs?.datasetId) {
-      const loadedDataset = await services.datasets.getDatasetWithRecords({
-        slugOrId: inputs.datasetId,
-        projectId,
-        entrySelection: "all",
-        limitMb: null,
-      });
-      const columns = (
-        (loadedDataset.dataset.columnTypes as unknown as Array<{
-          name: string;
-          type: string;
-        }>) ?? []
-      ).map((c) => ({ id: c.name, name: c.name, type: c.type }));
-      const jsonColumnKeys = new Set(
-        columns
-          .filter((c) => (JSON_COLUMN_TYPES as readonly string[]).includes(c.type))
-          .map((c) => c.name),
-      );
-      baseDataset = {
-        rows: parseJsonColumns(
-          loadedDataset.records.map((r) => r.entry as Record<string, unknown>),
-          jsonColumnKeys,
-        ),
-        columns,
-      };
-    } else {
-      const datasetResult = await ExperimentExecutionDataService.loadDataset(
-        dataset,
-        projectId,
-        services.datasets,
-      );
-      if ("error" in datasetResult) {
-        return datasetResult;
-      }
-
-      baseDataset = datasetResult;
+    const baseDataset = await ExperimentExecutionDataService.resolveBaseDataset({
+      projectId,
+      dataset,
+      services,
+      inputs,
+    });
+    if ("error" in baseDataset) {
+      return baseDataset;
     }
 
-    // Apply caller parameters as constant columns across every row (and a single
-    // synthetic row when there is no dataset).
+    // Caller parameters become constant columns across every row, and a single
+    // synthetic row when there is no dataset.
     const { rows: datasetRows, columns: datasetColumns } =
       ExperimentExecutionDataService.applyParametersToRows({
         rows: baseDataset.rows,
@@ -375,225 +345,42 @@ export class ExperimentExecutionDataService {
         parameters: inputs?.parameters,
       });
 
-    // Load prompts for prompt targets
-    const loadedPrompts = new Map<string, VersionedPrompt>();
-    const promptService = services.prompts;
-
-    for (const target of targets) {
-      if (target.type === "prompt" && target.promptId) {
-        if (loadedPrompts.has(ExperimentExecutionDataService.promptLoadKey(target))) {
-          continue;
-        }
-
-        try {
-          const prompt = await promptService.tryGetPromptByIdOrHandle({
-            idOrHandle: target.promptId,
-            projectId,
-            version: target.promptVersionNumber ?? undefined,
-          });
-          if (prompt) {
-            loadedPrompts.set(ExperimentExecutionDataService.promptLoadKey(target), prompt);
-          } else {
-            const versionInfo = target.promptVersionNumber
-              ? ` version ${target.promptVersionNumber}`
-              : "";
-
-            return {
-              error: `Prompt "${target.promptId}"${versionInfo} not found`,
-              status: 404,
-            };
-          }
-        } catch (promptError) {
-          const versionInfo = target.promptVersionNumber
-            ? ` version ${target.promptVersionNumber}`
-            : "";
-          logger.error(
-            {
-              error: promptError,
-              promptId: target.promptId,
-              version: target.promptVersionNumber,
-            },
-            "Failed to load prompt for target",
-          );
-
-          return {
-            error: `Failed to load prompt "${target.promptId}"${versionInfo}: ${(promptError as Error).message}`,
-            status: 404,
-          };
-        }
-      }
+    const loadedPrompts = await ExperimentTargetLoadingService.loadPrompts({
+      projectId,
+      targets,
+      services,
+    });
+    if ("error" in loadedPrompts) {
+      return loadedPrompts;
     }
 
-    // Load agents for agent targets
-    const loadedAgents = new Map<string, Agent>();
-    const agentService = services.agents;
-
-    for (const target of targets) {
-      if (target.type === "agent" && target.dbAgentId) {
-        // A missing agent used to leave the map short and the run continued against nothing,
-        // reporting an empty column rather than the deletion that caused it. Same answer as a
-        // missing prompt or workflow: say what is gone and stop. `getById` throws
-        // `AgentNotFoundError` rather than returning a nullable — translate it to the same
-        // sentinel shape every other missing-target path in this loader returns.
-        let agent: Agent;
-        try {
-          agent = await agentService.getById({
-            id: target.dbAgentId,
-            projectId,
-          });
-        } catch (error) {
-          if (error instanceof AgentNotFoundError) {
-            return { error: `Agent "${target.dbAgentId}" not found`, status: 404 };
-          }
-
-          throw error;
-        }
-
-        loadedAgents.set(target.dbAgentId, agent);
-      }
+    const loadedAgents = await ExperimentTargetLoadingService.loadAgents({
+      projectId,
+      targets,
+      services,
+    });
+    if ("error" in loadedAgents) {
+      return loadedAgents;
     }
 
-    // Load studio workflows for workflow targets (the committed DSL run per row)
-    const loadedWorkflows = new Map<string, LoadedWorkflow>();
-
-    const loadPublishedWorkflow = async ({
-      workflowId,
-      workflowVersionId,
-    }: {
-      workflowId: string;
-      workflowVersionId?: string;
-    }): Promise<LoadedWorkflow | { error: string; status: number }> => {
-      const workflow = await services.workflows.tryFindWorkflow({
-        projectId,
-        workflowId,
-      });
-      if (!workflow) {
-        return { error: `Workflow "${workflowId}" not found`, status: 404 };
-      }
-
-      const versionId = workflowVersionId ?? workflow.publishedId;
-      if (!versionId) {
-        return {
-          error: `Workflow "${workflowId}" has no committed version to evaluate`,
-          status: 400,
-        };
-      }
-
-      const dsl = await services.workflows.tryFindVersionDsl({
-        projectId,
-        workflowId,
-        versionId,
-      });
-      if (!dsl) {
-        return {
-          error: `Workflow version "${versionId}" not found`,
-          status: 404,
-        };
-      }
-
-      return {
-        id: workflow.id,
-        name: workflow.name,
-        versionId,
-        dsl: parseStudioWorkflow(dsl),
-      };
-    };
-
-    for (const target of targets) {
-      if (target.type !== "workflow" || !target.workflowId) {
-        continue;
-      }
-
-      if (loadedWorkflows.has(ExperimentExecutionDataService.workflowLoadKey(target))) {
-        continue;
-      }
-
-      const result = await loadPublishedWorkflow({
-        workflowId: target.workflowId,
-        workflowVersionId: target.workflowVersionId,
-      });
-      if ("error" in result) {
-        return result;
-      }
-
-      loadedWorkflows.set(ExperimentExecutionDataService.workflowLoadKey(target), result);
+    const loadedWorkflows = await ExperimentTargetLoadingService.loadWorkflows({
+      projectId,
+      targets,
+      services,
+      loadedAgents,
+    });
+    if ("error" in loadedWorkflows) {
+      return loadedWorkflows;
     }
 
-    // An agent target can itself wrap a Studio workflow (agent.type === "workflow", created
-    // via Agent -> New Agent -> Workflow). That agent has no code of its own — just a pointer
-    // to the linked workflow — so it must run the whole workflow the same way a direct
-    // workflow target does, not the agent's (nonexistent) code. Resolve and cache that linked
-    // workflow here so the orchestrator can dispatch it to executeWorkflowCell.
-    for (const target of targets) {
-      if (target.type !== "agent" || !target.dbAgentId) {
-        continue;
-      }
-
-      const agent = loadedAgents.get(target.dbAgentId);
-      if (agent?.type !== "workflow") {
-        continue;
-      }
-
-      const linkedWorkflowId =
-        agent.workflowId ?? (agent.config as { workflow_id?: string }).workflow_id;
-      if (!linkedWorkflowId) {
-        continue;
-      }
-
-      const key = ExperimentExecutionDataService.workflowLoadKey({ workflowId: linkedWorkflowId });
-      if (loadedWorkflows.has(key)) {
-        continue;
-      }
-
-      const result = await loadPublishedWorkflow({
-        workflowId: linkedWorkflowId,
-      });
-      if ("error" in result) {
-        return result;
-      }
-
-      loadedWorkflows.set(key, result);
-    }
-
-    // Load evaluators from DB (for both evaluator configs AND evaluator targets)
-    const loadedEvaluators = new Map<string, Evaluator>();
-    // Collect all evaluator IDs to load
-    const evaluatorIdsToLoad = new Set<string>();
-
-    // Add evaluator IDs from evaluator configs
-    for (const evaluator of evaluators) {
-      if (evaluator.dbEvaluatorId) {
-        evaluatorIdsToLoad.add(evaluator.dbEvaluatorId);
-      }
-    }
-
-    // Add evaluator IDs from evaluator targets
-    for (const target of targets) {
-      if (target.type === "evaluator" && target.targetEvaluatorId) {
-        evaluatorIdsToLoad.add(target.targetEvaluatorId);
-      }
-    }
-
-    // Load all evaluators
-    if (evaluatorIdsToLoad.size > 0 && !services.evaluators) {
-      throw new Error(
-        "ExecutionDataServices.evaluators is required when an execution references an evaluator",
-      );
-    }
-
-    for (const evaluatorId of evaluatorIdsToLoad) {
-      const dbEvaluator = await services.evaluators?.tryGetById({
-        id: evaluatorId,
-        projectId,
-      });
-      // Same answer as a missing prompt, agent, or workflow: say what is gone
-      // and stop, rather than silently running with fewer evaluators than
-      // configured.
-      if (!dbEvaluator) {
-        return { error: `Evaluator "${evaluatorId}" not found`, status: 404 };
-      }
-
-      loadedEvaluators.set(evaluatorId, dbEvaluator);
+    const loadedEvaluators = await ExperimentTargetLoadingService.loadEvaluators({
+      projectId,
+      targets,
+      evaluators,
+      services,
+    });
+    if ("error" in loadedEvaluators) {
+      return loadedEvaluators;
     }
 
     return {
@@ -603,6 +390,56 @@ export class ExperimentExecutionDataService {
       loadedAgents,
       loadedEvaluators,
       loadedWorkflows,
+    };
+  }
+
+  /**
+   * The rows a run starts from: inline data, a named saved dataset, or the attached dataset
+   * reference, in that precedence.
+   */
+  private static async resolveBaseDataset({
+    projectId,
+    dataset,
+    services,
+    inputs,
+  }: {
+    projectId: string;
+    dataset: DatasetInput;
+    services: ExecutionDataServices;
+    inputs?: ExecutionDataInputs;
+  }): Promise<LoadedDataset | { error: string; status: number }> {
+    if (inputs?.data) {
+      return rowsFromInlineData(inputs.data);
+    }
+
+    if (!inputs?.datasetId) {
+      return ExperimentExecutionDataService.loadDataset(dataset, projectId, services.datasets);
+    }
+
+    const loadedDataset = await services.datasets.getDatasetWithRecords({
+      slugOrId: inputs.datasetId,
+      projectId,
+      entrySelection: "all",
+      limitMb: null,
+    });
+    const columns = (
+      (loadedDataset.dataset.columnTypes as unknown as Array<{
+        name: string;
+        type: string;
+      }>) ?? []
+    ).map((c) => ({ id: c.name, name: c.name, type: c.type }));
+    const jsonColumnKeys = new Set(
+      columns
+        .filter((c) => (JSON_COLUMN_TYPES as readonly string[]).includes(c.type))
+        .map((c) => c.name),
+    );
+
+    return {
+      rows: parseJsonColumns(
+        loadedDataset.records.map((r) => r.entry as Record<string, unknown>),
+        jsonColumnKeys,
+      ),
+      columns,
     };
   }
 }

@@ -10,10 +10,8 @@ import type {
   WorkflowService,
 } from "@langwatch/workflow-contract";
 import { beforeEach, describe, expect, it } from "vitest";
-import {
-  ExperimentRunOrchestratorService,
-  type ExperimentRunPorts,
-} from "../experiment-run-orchestrator.service";
+import { ExperimentRunOrchestratorService } from "../experiment-run-orchestrator.service";
+import type { ExperimentRunPorts } from "../../rules/experiment-run-input.rules";
 import type { EvaluationV3Event, ExecutionCell } from "@langwatch/experiment-contract";
 
 const scripted: {

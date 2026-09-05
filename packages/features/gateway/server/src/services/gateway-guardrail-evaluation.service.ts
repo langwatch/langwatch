@@ -1,5 +1,7 @@
 /**
- * Runs the guardrails a virtual key references and aggregates them into the single verdict the Go data plane consumes. A GatewayGuardrail binds an Evaluator, only eligible with an enabled Monitor (executionMode AS_GUARDRAIL) in the same project — that monitor carries the check type/parameters run here too. Wire shape: specs/ai-gateway/_shared/contract.md 4.6. Behaviour: specs/ai-gateway/guardrail-check-endpoint.feature
+ * Runs the guardrails a virtual key references and aggregates them into the single verdict the Go
+ * data plane consumes. A gateway guardrail binds an evaluator, eligible only with an enabled
+ * as-guardrail monitor in the same project, and that monitor carries the check run here too.
  */
 
 import { createLogger } from "@langwatch/observability";

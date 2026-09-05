@@ -36,10 +36,8 @@ import { z } from "zod";
 
 import type { ExperimentApp } from "#app/experiment.app";
 import type { ExperimentRunProgressPort } from "../../ports/experiment-run-progress.port";
-import {
-  ExperimentRunOrchestratorService,
-  type ExperimentRunPorts,
-} from "../../services/experiment-run-orchestrator.service";
+import { ExperimentRunOrchestratorService } from "../../services/experiment-run-orchestrator.service";
+import type { ExperimentRunPorts } from "../../rules/experiment-run-input.rules";
 import type { StartPollingRunInput } from "../../services/experiment-polling-run.service";
 import { ExperimentSavedStateExecutionService } from "../../services/experiment-saved-state-execution.service";
 import {

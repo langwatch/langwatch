@@ -66,111 +66,127 @@ export class LangyCliEnvelopeService {
       return { ...frame, name };
     }
 
-    // A FAILED CALL STILL PRINTED ITS FAILURE DOCUMENT. Under a machine format the CLI writes
-    // `{ok:false, error:{…}}` to stdout and a one-line human summary to stderr, then exits non-
-    // zero. This branch used to pass the frame straight through, so whichever of the two the worker
-    // happened to put in `output` was what the card got — and when that was the stderr line, every
-    // scrap of structure (the code, the meta, the tips) was gone before the panel ever saw it.
     if (frame.isError) {
-      const reportedOnFailure = readCliErrorDocument(
-        parseCliJson(frame.output ?? "") ?? frame.output,
-      );
-
-      return reportedOnFailure
-        ? {
-            ...frame,
-            name,
-            output: JSON.stringify(toCliErrorDocument(reportedOnFailure)),
-          }
-        : { ...frame, name };
+      return this.retypeWorkerFailure({ frame, name });
     }
 
-    // Future workers can emit the canonical value directly. Validate it again
-    // at this trust boundary, then retain exactly that value rather than parsing
-    // a parallel string representation and risking the two drifting apart.
-    const supplied = cliToolResultSchema.safeParse(frame.result);
-    if (supplied.success) {
-      const digest = extractDigest({
-        resource: invocation.resource,
-        verb: invocation.verb,
-        args: invocation.args,
-        output: frame.output ?? "",
-      });
-
-      return {
-        ...frame,
-        name,
-        output: JSON.stringify(supplied.data),
-        digest,
-        result: supplied.data,
-      };
+    const supplied = this.retypeSuppliedResult({ frame, invocation, name });
+    if (supplied) {
+      return supplied;
     }
 
     if (frame.output === undefined) {
       return { ...frame, name };
     }
 
-    // The digest is the reference the card hydrates from (ids, the parsed
-    // flags as its query, honest counts); the reduced output stays alongside
-    // as the fallback tier and the agent-history record.
-    const document = parseCliJson(frame.output);
+    return this.retypeStdout({ frame, invocation, name, output: frame.output });
+  }
 
-    // A FAILURE THE CLI REPORTED IN ITS OWN DOCUMENT. `frame.isError` only catches what the WORKER
-    // marked as failed. A command that writes `{"ok":false,"error":{…}}` to stdout and exits
-    // cleanly is a failure the worker never noticed, so it fell through this success path, failed
-    // its card's schema, and landed on the raw `{kind:"json"}` receipt — which is how a validation
-    // error ended up rendered to the user as a wall of JSON instead of an error card.
-    const reported = readCliErrorDocument(document ?? frame.output);
+  /**
+   * A failed call still printed its failure document: the CLI writes it to stdout and a one-line
+   * human summary to stderr, then exits non-zero. Passing the frame through gave the card
+   * whichever the worker put in `output`, losing every scrap of structure when that was stderr.
+   */
+  private retypeWorkerFailure({
+    frame,
+    name,
+  }: {
+    frame: LangyToolFrame;
+    name: string;
+  }): LangyToolFrame {
+    const reported = readCliErrorDocument(parseCliJson(frame.output ?? "") ?? frame.output);
+
+    return reported
+      ? { ...frame, name, output: JSON.stringify(toCliErrorDocument(reported)) }
+      : { ...frame, name };
+  }
+
+  /**
+   * The canonical value a future worker can emit directly. It is validated again at this trust
+   * boundary and then retained exactly, rather than parsing a parallel string representation and
+   * risking the two drifting apart. Null when the frame carries no such value.
+   */
+  private retypeSuppliedResult({
+    frame,
+    invocation,
+    name,
+  }: {
+    frame: LangyToolFrame;
+    invocation: LangwatchCommand;
+    name: string;
+  }): LangyToolFrame | null {
+    const supplied = cliToolResultSchema.safeParse(frame.result);
+    if (!supplied.success) {
+      return null;
+    }
+
+    return {
+      ...frame,
+      name,
+      output: JSON.stringify(supplied.data),
+      digest: this.digestOf({ invocation, output: frame.output ?? "" }),
+      result: supplied.data,
+    };
+  }
+
+  /**
+   * The frame re-typed from what the call printed. A command writing an error document to stdout
+   * and exiting cleanly is a failure the worker never noticed, so it is recognised here rather
+   * than falling through to the success path and rendering as a wall of JSON.
+   */
+  private retypeStdout({
+    frame,
+    invocation,
+    name,
+    output,
+  }: {
+    frame: LangyToolFrame;
+    invocation: LangwatchCommand;
+    name: string;
+    output: string;
+  }): LangyToolFrame {
+    const document = parseCliJson(output);
+    const reported = readCliErrorDocument(document ?? output);
     if (reported) {
+      // The failure document, whole: the card renders its sentence and next steps structurally,
+      // and keeping only the message discarded the code, meta and tips sent for that consumer.
       return {
         ...frame,
         name,
         isError: true,
-        // The failure document, whole. Keeping only `reported.message` here discarded the code, the
-        // meta, and the tips/docsUrl the platform sent for exactly this consumer — so the error
-        // card, which reads the document structurally, had nothing left to show and fell back to
-        // "This step couldn't be completed". The card renders the sentence and the next steps FROM
-        // the document; it never prints the JSON.
         output: JSON.stringify(toCliErrorDocument(reported)),
       };
     }
 
-    const digest = extractDigest({
+    const digest = this.digestOf({ invocation, output: document ?? output });
+    const result =
+      document === null
+        ? toCliTextResult(output)
+        : toCliToolResult({
+            resource: invocation.resource,
+            verb: invocation.verb,
+            payload: document,
+          });
+
+    // A frame's `output` is a string all the way to the browser, and the card parses it back into
+    // the structure it renders; serialising here keeps streaming and replay on one contract.
+    return { ...frame, name, output: JSON.stringify(result), digest, result };
+  }
+
+  /** The reference the card hydrates from: ids, the parsed flags as its query, honest counts. */
+  private digestOf({
+    invocation,
+    output,
+  }: {
+    invocation: LangwatchCommand;
+    output: unknown;
+  }): CliResultDigest {
+    return extractDigest({
       resource: invocation.resource,
       verb: invocation.verb,
       args: invocation.args,
-      output: document ?? frame.output,
+      output,
     });
-
-    if (document === null) {
-      const result = toCliTextResult(frame.output);
-
-      return {
-        ...frame,
-        name,
-        output: JSON.stringify(result),
-        digest,
-        result,
-      };
-    }
-
-    const result = toCliToolResult({
-      resource: invocation.resource,
-      verb: invocation.verb,
-      payload: document,
-    });
-
-    // Re-stringified because a frame's `output` is a string all the way to the
-    // browser; the card parses it back into the structure it renders.
-    return {
-      ...frame,
-      name,
-      // AI-SDK tool parts only carry `output`; serialising the union here keeps
-      // live streaming and durable replay on the exact same contract.
-      output: JSON.stringify(result),
-      digest,
-      result,
-    };
   }
 
   /** The stable, typed tool name a CLI call is recorded under. */

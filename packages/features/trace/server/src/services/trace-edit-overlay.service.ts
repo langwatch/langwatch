@@ -20,7 +20,9 @@ import {
 export type TraceEditIOField = "input" | "output";
 
 /**
- * Reviewer corrections for a trace: read, replace, merge and remove. At most one correction per trace, so every write is an upsert with `updatedBy` set to the current editor; a stored patch this build cannot interpret reads as no correction, since absence is the normal state and a bad row must not fail a trace read.
+ * Reviewer corrections for a trace: read, replace, merge and remove. At most one correction per
+ * trace, so every write is an upsert with `updatedBy` set to the current editor; a stored patch
+ * this build cannot interpret reads as no correction, since a bad row must not fail a trace read.
  */
 export class TraceEditOverlayService {
   private constructor(private readonly repository: TraceEditOverlayRepository) {}
@@ -106,7 +108,9 @@ export class TraceEditOverlayService {
   }
 
   /**
-   * Records a corrected trace input or output without disturbing the rest of the correction — what a suggestion left on the trace's own field writes: the annotation stays the record of who suggested what, the correction stays the current corrected truth for the whole trace.
+   * Records a corrected trace input or output without disturbing the rest of the correction, which
+   * is what a suggestion on the trace's own field writes: the annotation stays the record of who
+   * suggested what, the correction stays the current corrected truth for the whole trace.
    */
   async mergeTraceIOEdit({
     projectId,
@@ -132,7 +136,9 @@ export class TraceEditOverlayService {
   }
 
   /**
-   * Takes a corrected trace input or output back off, leaving every other edit in place — what clearing a suggestion writes: only that field's proposal is withdrawn, not span renames or deletions made elsewhere. When that field was the only edit, the row goes with it, so withdrawal returns the trace to uncorrected rather than leaving an inert row.
+   * Takes a corrected trace input or output back off, leaving every other edit in place: only that
+   * field's proposal is withdrawn, not span renames or deletions made elsewhere. When it was the
+   * only edit the row goes with it, so withdrawal returns the trace to uncorrected.
    */
   async tryRemoveTraceIOEdit({
     projectId,
@@ -177,7 +183,9 @@ export class TraceEditOverlayService {
   }
 
   /**
-   * Records a corrected span field without disturbing the rest of the correction — what a suggestion with a comment on a span's input/output writes. Text is encoded with the same encoder the drawer uses, so a typed transcript round-trips as a transcript rather than a JSON string; a value the correction already holds for that field is the original the encoding reads, so plain text a reviewer already produced is never re-read as structure on the next save.
+   * Records a corrected span field without disturbing the rest of the correction. Text is encoded
+   * with the same encoder the drawer uses, so a typed transcript round-trips as a transcript; a
+   * value the correction already holds is the original the encoding reads.
    */
   async mergeSpanFieldEdit({
     projectId,
@@ -215,7 +223,9 @@ export class TraceEditOverlayService {
   }
 
   /**
-   * Takes a corrected span field back off, leaving every other edit in place. A span left with no corrected field goes with it, and a correction left with no edits returns the trace to uncorrected, so a withdrawn suggestion never leaves an inert row behind.
+   * Takes a corrected span field back off, leaving every other edit in place. A span left with no
+   * corrected field goes with it, and a correction left with no edits returns the trace to
+   * uncorrected, so a withdrawn suggestion never leaves an inert row behind.
    */
   async tryRemoveSpanFieldEdit({
     projectId,

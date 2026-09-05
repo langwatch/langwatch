@@ -182,130 +182,179 @@ export class ExperimentRunStorageService {
     loadedEvaluators: LoadedEvaluators | undefined;
     datasetRows: Array<Record<string, unknown>>;
   }): Promise<void> {
-    if (event.type === "target_result" && event.traceId) {
-      this.cellTraceIds.set(`${event.rowIndex}:${event.targetId}`, event.traceId);
-    }
-
-    if (
-      event.type === "target_result" &&
-      !event.error &&
-      event.output !== null &&
-      event.output !== undefined
-    ) {
-      this.completedTargetOutputs.set(`${event.rowIndex}:${event.targetId}`, {
-        output: event.output,
-        cost: event.cost ?? undefined,
-        duration: event.duration ?? undefined,
-      });
-      this.producedTargetKeys.add(`${event.rowIndex}:${event.targetId}`);
+    if (event.type === "target_result") {
+      this.rememberTargetResult(event);
     }
 
     if (event.type === "evaluator_result") {
-      const evalResult = event.result as SingleEvaluationResult;
-      const evaluatorConfig = state.evaluators.find((e) => e.id === event.evaluatorId);
-
-      // Cache per-(row, target) evaluator scores for the Phase 2 judge.
-      // Skip comparison evaluators themselves — a comparison judge reading
-      // another comparison's verdict is circular.
-      if (
-        evalResult.status === "processed" &&
-        evaluatorConfig &&
-        !isComparisonEvaluator(evaluatorConfig)
-      ) {
-        const dbEval = evaluatorConfig.dbEvaluatorId
-          ? loadedEvaluators?.get(evaluatorConfig.dbEvaluatorId)
-          : null;
-        const name =
-          dbEval?.name ?? evaluatorConfig.evaluatorType?.split("/").pop() ?? evaluatorConfig.id;
-        const key = `${event.rowIndex}:${event.targetId}`;
-        const arr = this.completedTargetEvaluatorScores.get(key) ?? [];
-        arr.push({
-          name,
-          score: evalResult.score ?? undefined,
-          label: evalResult.label ?? undefined,
-          passed: evalResult.passed ?? undefined,
-        });
-        this.completedTargetEvaluatorScores.set(key, arr);
-      }
-
-      const dbEvaluator = evaluatorConfig?.dbEvaluatorId
-        ? loadedEvaluators?.get(evaluatorConfig.dbEvaluatorId)
-        : null;
-      const traceId = this.cellTraceIds.get(`${event.rowIndex}:${event.targetId}`);
-      const evaluationId = generate(EVALUATION_KSUID_RESOURCE).toString();
-      try {
-        await this.evaluationReporting.reportEvaluation({
-          tenantId: projectId,
-          evaluationId,
-          evaluatorId: event.evaluatorId,
-          evaluatorType: evaluatorConfig?.evaluatorType ?? "unknown",
-          evaluatorName: dbEvaluator?.name,
-          traceId,
-          status: evalResult.status,
-          score: evalResult.status === "processed" ? (evalResult.score ?? undefined) : undefined,
-          passed: evalResult.status === "processed" ? (evalResult.passed ?? undefined) : undefined,
-          // For pairwise verdicts, langevals now returns the winner's
-          // candidate id (or "tie") directly in `label`. No translation
-          // needed here; SDK / REST / MCP consumers see the winner by id.
-          label: evalResult.status === "processed" ? (evalResult.label ?? undefined) : undefined,
-          details:
-            evalResult.status === "processed" ? (evalResult.details ?? undefined) : undefined,
-          error: evalResult.status === "error" ? evalResult.details : undefined,
-          occurredAt: Date.now(),
-        });
-      } catch (error) {
-        logger.error(
-          { error, evaluationId, evaluatorId: event.evaluatorId },
-          "Failed to dispatch evaluator result to evaluation processing pipeline",
-        );
-      }
+      await this.reportEvaluatorResult({ event, projectId, state, loadedEvaluators });
     }
 
     if (experimentId) {
-      const targetResultDispatch =
-        event.type === "target_result" || event.type === "error"
-          ? this.dispatches.tryBuildTargetResultDispatch({
-              tenantId: projectId,
-              runId,
-              experimentId,
-              event,
-              datasetEntry: event.rowIndex !== undefined ? (datasetRows[event.rowIndex] ?? {}) : {},
-              occurredAt: Date.now(),
-            })
-          : null;
-
-      if (targetResultDispatch) {
-        this.chDispatchTotal++;
-        await this.commands.recordTargetResult(targetResultDispatch).catch((err) => {
-          this.chDispatchFailures++;
-          logger.warn({ err, runId }, "Failed to dispatch recordTargetResult to CH");
-        });
-      } else if (event.type === "evaluator_result") {
-        const result = event.result as SingleEvaluationResult;
-        const evaluatorConfig = state.evaluators.find((e) => e.id === event.evaluatorId);
-        const dbEvaluator = evaluatorConfig?.dbEvaluatorId
-          ? loadedEvaluators?.get(evaluatorConfig.dbEvaluatorId)
-          : null;
-        this.chDispatchTotal++;
-        await this.commands
-          .recordEvaluatorResult(
-            this.dispatches.buildEvaluatorResultDispatch({
-              tenantId: projectId,
-              runId,
-              experimentId,
-              event,
-              result,
-              // Workflow evaluator nodes have no DB record, so fall back to
-              // the name the event carries from the DSL node.
-              evaluatorName: dbEvaluator?.name ?? event.evaluatorName ?? null,
-              occurredAt: Date.now(),
-            }),
-          )
-          .catch((err) => {
-            this.chDispatchFailures++;
-            logger.warn({ err, runId }, "Failed to dispatch recordEvaluatorResult to CH");
-          });
-      }
+      await this.dispatchToClickHouse({
+        event,
+        projectId,
+        runId,
+        experimentId,
+        state,
+        loadedEvaluators,
+        datasetRows,
+      });
     }
+  }
+
+  /** What a completed target leaves behind for the comparison judge and for later evaluators. */
+  private rememberTargetResult(event: EvaluationV3Event & { type: "target_result" }): void {
+    const key = `${event.rowIndex}:${event.targetId}`;
+    if (event.traceId) {
+      this.cellTraceIds.set(key, event.traceId);
+    }
+
+    if (event.error || event.output === null || event.output === undefined) {
+      return;
+    }
+
+    this.completedTargetOutputs.set(key, {
+      output: event.output,
+      cost: event.cost ?? undefined,
+      duration: event.duration ?? undefined,
+    });
+    this.producedTargetKeys.add(key);
+  }
+
+  /**
+   * One evaluator verdict, cached for the comparison judge and reported to the evaluation
+   * pipeline. A comparison evaluator's own verdict is not cached: a comparison judge reading
+   * another comparison's verdict is circular.
+   */
+  private async reportEvaluatorResult({
+    event,
+    projectId,
+    state,
+    loadedEvaluators,
+  }: {
+    event: EvaluationV3Event & { type: "evaluator_result" };
+    projectId: string;
+    state: EvaluationsV3State;
+    loadedEvaluators: LoadedEvaluators | undefined;
+  }): Promise<void> {
+    const evalResult = event.result as SingleEvaluationResult;
+    const evaluatorConfig = state.evaluators.find((e) => e.id === event.evaluatorId);
+    const dbEvaluator = evaluatorConfig?.dbEvaluatorId
+      ? loadedEvaluators?.get(evaluatorConfig.dbEvaluatorId)
+      : null;
+    if (
+      evalResult.status === "processed" &&
+      evaluatorConfig &&
+      !isComparisonEvaluator(evaluatorConfig)
+    ) {
+      const name =
+        dbEvaluator?.name ?? evaluatorConfig.evaluatorType?.split("/").pop() ?? evaluatorConfig.id;
+      const key = `${event.rowIndex}:${event.targetId}`;
+      const scores = this.completedTargetEvaluatorScores.get(key) ?? [];
+      scores.push({
+        name,
+        score: evalResult.score ?? undefined,
+        label: evalResult.label ?? undefined,
+        passed: evalResult.passed ?? undefined,
+      });
+      this.completedTargetEvaluatorScores.set(key, scores);
+    }
+
+    const processed = evalResult.status === "processed";
+    const evaluationId = generate(EVALUATION_KSUID_RESOURCE).toString();
+    try {
+      await this.evaluationReporting.reportEvaluation({
+        tenantId: projectId,
+        evaluationId,
+        evaluatorId: event.evaluatorId,
+        evaluatorType: evaluatorConfig?.evaluatorType ?? "unknown",
+        evaluatorName: dbEvaluator?.name,
+        traceId: this.cellTraceIds.get(`${event.rowIndex}:${event.targetId}`),
+        status: evalResult.status,
+        score: processed ? (evalResult.score ?? undefined) : undefined,
+        passed: processed ? (evalResult.passed ?? undefined) : undefined,
+        // For pairwise verdicts langevals returns the winner's candidate id, or "tie", directly in
+        // `label`, so no translation happens here: consumers see the winner by id.
+        label: processed ? (evalResult.label ?? undefined) : undefined,
+        details: processed ? (evalResult.details ?? undefined) : undefined,
+        error: evalResult.status === "error" ? evalResult.details : undefined,
+        occurredAt: Date.now(),
+      });
+    } catch (error) {
+      logger.error(
+        { error, evaluationId, evaluatorId: event.evaluatorId },
+        "Failed to dispatch evaluator result to evaluation processing pipeline",
+      );
+    }
+  }
+
+  /** The same event as a ClickHouse row, best-effort: a failed dispatch is counted and logged. */
+  private async dispatchToClickHouse({
+    event,
+    projectId,
+    runId,
+    experimentId,
+    state,
+    loadedEvaluators,
+    datasetRows,
+  }: {
+    event: EvaluationV3Event;
+    projectId: string;
+    runId: string;
+    experimentId: string;
+    state: EvaluationsV3State;
+    loadedEvaluators: LoadedEvaluators | undefined;
+    datasetRows: Array<Record<string, unknown>>;
+  }): Promise<void> {
+    const targetResultDispatch =
+      event.type === "target_result" || event.type === "error"
+        ? this.dispatches.tryBuildTargetResultDispatch({
+            tenantId: projectId,
+            runId,
+            experimentId,
+            event,
+            datasetEntry: event.rowIndex !== undefined ? (datasetRows[event.rowIndex] ?? {}) : {},
+            occurredAt: Date.now(),
+          })
+        : null;
+
+    if (targetResultDispatch) {
+      this.chDispatchTotal++;
+      await this.commands.recordTargetResult(targetResultDispatch).catch((err) => {
+        this.chDispatchFailures++;
+        logger.warn({ err, runId }, "Failed to dispatch recordTargetResult to CH");
+      });
+
+      return;
+    }
+
+    if (event.type !== "evaluator_result") {
+      return;
+    }
+
+    const evaluatorConfig = state.evaluators.find((e) => e.id === event.evaluatorId);
+    const dbEvaluator = evaluatorConfig?.dbEvaluatorId
+      ? loadedEvaluators?.get(evaluatorConfig.dbEvaluatorId)
+      : null;
+    this.chDispatchTotal++;
+    await this.commands
+      .recordEvaluatorResult(
+        this.dispatches.buildEvaluatorResultDispatch({
+          tenantId: projectId,
+          runId,
+          experimentId,
+          event,
+          result: event.result as SingleEvaluationResult,
+          // Workflow evaluator nodes have no database record, so the name the event carries from
+          // the DSL node stands in.
+          evaluatorName: dbEvaluator?.name ?? event.evaluatorName ?? null,
+          occurredAt: Date.now(),
+        }),
+      )
+      .catch((err) => {
+        this.chDispatchFailures++;
+        logger.warn({ err, runId }, "Failed to dispatch recordEvaluatorResult to CH");
+      });
   }
 }

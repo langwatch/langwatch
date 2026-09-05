@@ -1,5 +1,7 @@
 /**
- * Materialise GET /api/internal/gateway/config/:vk_id (bundle shape: contract §4.2). Source of truth post VK-binding-collapse: GatewayProviderCredential is gone, ModelProvider absorbed its gateway fields, and the VK's eligible-provider set computes from the VirtualKeyScope graph + optional RoutingPolicy.modelProviderIds ordering (scopeResolver.ts).
+ * Materialises the internal gateway config bundle. Since the virtual-key binding collapse the
+ * model provider absorbed the old gateway credential's fields, and a key's eligible-provider set
+ * computes from its scope graph plus the optional routing policy's ordering.
  */
 import type { GatewayBudget, ModelProvider, VirtualKey } from "@langwatch/gateway-contract";
 
@@ -23,185 +25,20 @@ import {
 } from "@langwatch/gateway-contract";
 import type { GatewayScopeResolutionService } from "./gateway-scope-resolution.service";
 import { type VirtualKeyWithScopes } from "../ports/gateway-virtual-key.port";
-
-export type GuardrailWire = {
-  id: string;
-  name: string;
-  evaluator_id: string;
-  evaluator_slug: string | null;
-  direction: "pre" | "post" | "stream_chunk";
-  failure_mode: "fail_open" | "fail_closed";
-};
-
-export type GuardrailAttachmentWire = {
-  direction: "pre" | "post" | "stream_chunk";
-  guardrail_ids: string[];
-};
-
-export type ProviderSlot = {
-  /**
-   * ModelProvider.id — the Go gateway keys credentials on this directly
-   * post-collapse (was the GPC id pre-collapse; one-to-one fold means
-   * the wire name `id` stays the same).
-   */
-  id: string;
-  slot: string;
-  type: string;
-  /**
-   * Opaque per-provider credentials blob, matching the Go gateway's pcToBifrostKey shape per provider type (OpenAI/Anthropic/Gemini: {api_key}; Azure: +endpoint/api_version; Bedrock: access/secret/session/region; Vertex: project/region/auth_credentials). Decrypted from ModelProvider.customKeys (AES-256-GCM at rest).
-   */
-  credentials: Record<string, unknown>;
-  base_url?: string;
-  region?: string;
-  deployment_map?: Record<string, string>;
-  /**
-   * Operator-chosen routing handle for this ModelProvider row — a caller writes it where a provider family goes ("eu/claude-sonnet-5") to reach THIS instance rather than whichever the key's chain order reaches first. Absent when the operator set none.
-   */
-  handle?: string;
-  /**
-   * What this provider declares it serves, for ROUTING a bare model name to its owner. Absent means "said nothing", not "serves nothing" — authorization stays with models_allowed.
-   */
-  models?: string[];
-  config: Record<string, unknown>;
-};
-
-/**
- * A ModelProvider row the gateway won't dispatch to, named so a request-time block can say why. type carries ModelProvider.provider alongside the row id, since the gateway matches a resolved request by provider kind and these rows are absent from providers[].
- */
-export type ProviderExclusionWire = {
-  id: string;
-  type: string;
-  /**
-   * The dropped row's routing handle, carried so a request naming it is told
-   * which of the key's settings dropped the provider instead of being told the
-   * operator's own handle means nothing.
-   */
-  handle?: string;
-};
-
-export type GatewayConfigPayload = {
-  revision: string;
-  vk_id: string;
-  status: "active" | "revoked";
-  display_prefix: string;
-  organization_id: string;
-  /**
-   * project_id/project_otlp_token/team_id populate when the VK has a single PROJECT scope, or the org has an internal_governance project (TEAM/ORG-scoped VKs route traces there so Governance shows VK + receiver spans under one filter). Null for older self-hosted orgs without one — the gateway skips span export rather than failing the config fetch.
-   */
-  project_id: string | null;
-  project_otlp_token: string | null;
-  team_id: string | null;
-  principal_id: string | null;
-  providers: ProviderSlot[];
-  /**
-   * `chain` is the ordered provider slots; `max_attempts` bounds the walk.
-   * Which failures walk it is decided by the gateway from the real upstream
-   * outcome, never per key.
-   */
-  fallback: {
-    chain: string[];
-    max_attempts: number;
-  };
-  model_aliases: Record<string, string>;
-  models_allowed: string[] | null;
-  /**
-   * Explicit provider allowlist. null means every provider the key can reach through its scope graph, now and future — the semantic "All providers" gives, so a provider added next month is usable unedited. A list narrows to those ModelProvider ids (providers[] is already filtered to match); shipped so the gateway can say WHY a model is unavailable.
-   */
-  providers_allowed: string[] | null;
-  /**
-   * How the key behaves when its provider fails: "none" = no failover (default post routing-mode split); "fallback_all" = walk every eligible provider; "policy" = the linked RoutingPolicy decides.
-   */
-  routing_mode: "none" | "fallback_all" | "policy";
-  /**
-   * Contract §4.2. Providers a request could resolve to but the gateway will NOT dispatch to, split by WHY, each carrying the {id, type} shape providers[] uses (matched by TYPE). routing_excluded_providers: reachable + in access, dropped by the routing policy. access_excluded_providers: reachable, outside providers_allowed. Absent from both and from providers[] means unreachable from the key's scope at all.
-   */
-  routing_excluded_providers: ProviderExclusionWire[];
-  access_excluded_providers: ProviderExclusionWire[];
-  /**
-   * Display name of the key's routing policy, used to name the routing-block
-   * reason. Null when the key is not on a routing policy.
-   */
-  routing_policy_name: string | null;
-  cache: { mode: "respect" | "force" | "disable"; ttl_s: number };
-  // Flat per-project guardrail catalog the VK is allowed to reference.
-  // The Go dispatcher looks up entries by id from guardrail_attachments
-  // and invokes them per direction.
-  guardrails: GuardrailWire[];
-  guardrail_attachments: GuardrailAttachmentWire[];
-  policy_rules: {
-    tools: { deny: string[]; allow: string[] | null };
-    mcp: { deny: string[]; allow: string[] | null };
-    urls: { deny: string[]; allow: string[] | null };
-    models: { deny: string[]; allow: string[] | null };
-  };
-  rate_limits: {
-    rpm: number | null;
-    tpm: number | null;
-    rpd: number | null;
-  };
-  budgets: Array<{
-    id: string;
-    scope:
-      | "organization"
-      | "team"
-      | "project"
-      | "virtual_key"
-      | "principal"
-      | "group"
-      | "attributed_user";
-    /**
-     * The bucket spend accumulates under. Equal to the budget's target for
-     * every scope except "group", where it is `<groupId>:<userId>` so each
-     * member of a group gets their own allowance.
-     */
-    scope_id: string;
-    /** Only set for "group": the member this bucket belongs to. */
-    principal_id?: string;
-    /**
-     * Only set for "attributed_user": the entry is a TEMPLATE (per-window limit for each distinct end user on this anchor). scope_id stays the ANCHOR; per-user spend is unbounded cardinality and never materialises here — the gateway fetches the request's bucket via its cached bucket-spend read. spent_micro_usd is 0 on templates.
-     */
-    per_user?: true;
-    /**
-     * Provider filter. Null = the budget counts every dispatch; set = it counts and constrains only dispatches to that ModelProvider id, so a breach removes that provider from the chain instead of blocking the whole request.
-     */
-    provider_key: string | null;
-    window: string;
-    limit_micro_usd: number;
-    spent_micro_usd: number;
-    resets_at: number;
-    on_breach: "block" | "warn";
-  }>;
-  cache_rules: Array<{
-    id: string;
-    priority: number;
-    matchers: {
-      vk_id?: string;
-      vk_tags?: string[];
-      vk_prefix?: string;
-      principal_id?: string;
-      model?: string;
-      request_metadata?: Record<string, string>;
-    };
-    action: {
-      mode: "respect" | "force" | "disable";
-      ttl?: number;
-      salt?: string;
-    };
-  }>;
-  /**
-   * ADR-061 mirror tier. Present and non-skip ONLY for Langy virtual keys, so the gateway never mirrors ordinary customer traffic — read here (never a client header) to decide whether to duplicate the gen_ai span into the mirror project.
-   */
-  langy_mirror_tier: LangyMirrorTier;
-  metadata: Record<string, unknown>;
-  // The VK's operator-assigned tags, lifted from config.metadata.tags.
-  // The gateway stamps them on customer spans as langwatch.labels (Trace
-  // Explorer "Label" filter) and matches cache-rule vk_tags against them.
-  vk_tags: string[];
-  /**
-   * Key's expiry, unix seconds, null if never — always present so the gateway can tell an explicit null apart from a field an older control plane never sent ("keep the date you hold"). Also travels on the auth token as vk_expires_at (mint-time floor); carrying it here too bounds how long the gateway can hold a stale value, since the ETag moves on every mutation and a changed date reaches the gateway on its next revalidation even while the change feed is down.
-   */
-  expires_at: number | null;
-};
+import {
+  budgetToWire,
+  buildProviderSlot,
+  cacheRuleToWire,
+  expiresAtWire,
+  guardrailAttachmentToWire,
+  guardrailToWire,
+  providerExclusions,
+  providerExclusionWire,
+  resolvePolicySideOfBundle,
+  routingModeToWire,
+  type GatewayConfigPayload,
+  type ProviderExclusionWire,
+} from "../rules/gateway-config-wire.rules";
 
 export class GatewayConfigMaterialiserService {
   private constructor(
@@ -210,7 +47,9 @@ export class GatewayConfigMaterialiserService {
     private readonly projects: ProjectService,
     private readonly chRepo: GatewayBudgetSpendPort | null,
     /**
-     * The process's own Gateway service. Required, not defaulted — building one here meant composing a second service per request over the same tables the App already had one for, and the default couldn't be completed once that service grew guardrail/cache-rule collaborators.
+     * The process's own gateway service. Required rather than defaulted: building one here meant
+     * composing a second service per request over the same tables, and the default could not be
+     * completed once that service grew its guardrail and cache-rule collaborators.
      */
     private readonly budgetDecisions: GatewayService,
     /**
@@ -255,7 +94,9 @@ export class GatewayConfigMaterialiserService {
   }
 
   /**
-   * Providers this key dispatches to, plus the three wire fields naming why a resolved provider wasn't used. An explicit allowlist narrows dispatch; absence means every scope-reachable provider, now and later — filtered here, not frozen into stored scope rows. eligibleProviders is already routing-policy-applied, so scope-reachable minus dispatch is what the policy dropped, and the allowlist complement is what access dropped.
+   * Providers this key dispatches to, plus the three wire fields naming why a resolved provider
+   * was not used. The eligible set is already routing-policy-applied, so scope-reachable minus
+   * dispatch is what the policy dropped and the allowlist complement is what access dropped.
    */
   private async dispatchAndExclusions(
     vk: VirtualKeyWithScopes,
@@ -290,7 +131,9 @@ export class GatewayConfigMaterialiserService {
   }
 
   /**
-   * Version token for the bundle materialise would build for vk. Lives beside materialise since it describes that output — the token must move whenever the bundle would differ, and drifting apart is what lets a 304 confirm a stale bundle. See configETag.ts for what it covers vs the change feed.
+   * Version token for the bundle materialise would build for this key. It lives beside materialise
+   * because it describes that output: the token must move whenever the bundle would differ, and
+   * drifting apart is what lets a 304 confirm a stale bundle.
    */
   async versionToken(vk: VirtualKeyWithScopes): Promise<string> {
     return await this.assembly.versionToken(vk);
@@ -377,7 +220,9 @@ export class GatewayConfigMaterialiserService {
   }
 
   /**
-   * CH spend rollup, best-effort: falls back to PG spentUsd when CH isn't wired (test fixtures, CH-less deploys). Tenant set = every project under the VK's org, so ORG/TEAM/PRINCIPAL budgets see ledger rows under whichever project emitted the trace.
+   * ClickHouse spend rollup, best-effort: it falls back to the Postgres column when ClickHouse is
+   * not wired. The tenant set is every project under the key's org, so org, team and principal
+   * budgets see ledger rows under whichever project emitted the trace.
    */
   private async loadCurrentSpend(
     vk: VirtualKeyWithScopes,
@@ -425,7 +270,9 @@ export class GatewayConfigMaterialiserService {
   }
 
   /**
-   * Every budget applying to this VK: ORG/VK-scope always apply; TEAM/PROJECT only when a trace project resolves (single-project-scope VK or governance fallback); PRINCIPAL and per-member GROUP only when the key carries a principal. Scope semantics live in the shared resolver the request-time check and debits process also call, so the bundle can never disagree with them.
+   * Every budget applying to this key: org and key scopes always; team and project only when a
+   * trace project resolves; principal and per-member group only when the key carries a principal.
+   * Scope semantics live in the shared resolver the request-time check also calls.
    */
   private async applicableBudgets(
     vk: VirtualKeyWithScopes,
@@ -446,325 +293,3 @@ export class GatewayConfigMaterialiserService {
 // config keys are stripped post bug-7 step (iv), so the fallback is always
 // empty and the RP read becomes source of truth once routingPolicyId is set.
 // Empty-rules normalize to the wire-contracted shape regardless of DB content.
-type BundlePolicyRules = GatewayConfigPayload["policy_rules"];
-
-const EMPTY_POLICY_RULE_DIM = {
-  deny: [] as string[],
-  allow: null as string[] | null,
-};
-
-function emptyPolicyRules(): BundlePolicyRules {
-  return {
-    tools: { ...EMPTY_POLICY_RULE_DIM },
-    mcp: { ...EMPTY_POLICY_RULE_DIM },
-    urls: { ...EMPTY_POLICY_RULE_DIM },
-    models: { ...EMPTY_POLICY_RULE_DIM },
-  };
-}
-
-function mergePolicyDim(raw: unknown): {
-  deny: string[];
-  allow: string[] | null;
-} {
-  if (!raw || typeof raw !== "object") {
-    return { ...EMPTY_POLICY_RULE_DIM };
-  }
-
-  const r = raw as { deny?: unknown; allow?: unknown };
-  const deny = Array.isArray(r.deny)
-    ? r.deny.filter((x): x is string => typeof x === "string")
-    : [];
-  const allow =
-    r.allow === null || r.allow === undefined
-      ? null
-      : Array.isArray(r.allow)
-        ? r.allow.filter((x): x is string => typeof x === "string")
-        : null;
-
-  return { deny, allow };
-}
-
-function normalisePolicyRules(raw: unknown): BundlePolicyRules {
-  if (!raw || typeof raw !== "object") {
-    return emptyPolicyRules();
-  }
-
-  const r = raw as Record<string, unknown>;
-
-  return {
-    tools: mergePolicyDim(r.tools),
-    mcp: mergePolicyDim(r.mcp),
-    urls: mergePolicyDim(r.urls),
-    models: mergePolicyDim(r.models),
-  };
-}
-
-function resolvePolicySideOfBundle(
-  vk: VirtualKeyWithScopes,
-  _config: ReturnType<typeof parseVirtualKeyConfig>,
-  assembly: GatewayConfigAssemblyPort,
-): {
-  modelAliases: Record<string, string>;
-  policyRules: BundlePolicyRules;
-} {
-  const rp = vk.routingPolicy;
-  if (!rp) {
-    return { modelAliases: {}, policyRules: emptyPolicyRules() };
-  }
-
-  const aliasesRaw = rp.modelAliases;
-  const aliases: Record<string, string> =
-    aliasesRaw && typeof aliasesRaw === "object" && !Array.isArray(aliasesRaw)
-      ? Object.fromEntries(
-          Object.entries(aliasesRaw as Record<string, unknown>).filter(
-            ([, v]) => typeof v === "string",
-          ) as Array<[string, string]>,
-        )
-      : {};
-
-  return {
-    modelAliases: assembly.withTierFallthrough({
-      aliases,
-      defaultModel: rp.defaultModel,
-    }),
-    policyRules: normalisePolicyRules(rp.policyRules),
-  };
-}
-
-function buildProviderSlot(
-  mp: ModelProvider,
-  index: number,
-  credentialReader: GatewayModelProviderCredentialsPort,
-  assembly: GatewayConfigAssemblyPort,
-): ProviderSlot {
-  const credentials = assembly.buildCredentials(mp, credentialReader);
-  const customKeys = credentialReader.readCustomKeys(mp.customKeys);
-  // Base-URL override the gateway consumes (mapProvider in bifrost.go):
-  // "custom"/"openai" route to Bifrost's VLLM adapter; "anthropic" derives
-  // a custom provider for self-hosted /v1/messages; "elevenlabs" needs it
-  // for realtime session residency. Registry indexed by the narrowed literal,
-  // so a losing endpointKey entry fails here, not by silently emitting no base_url.
-  const endpointKey =
-    mp.provider === "custom" ||
-    mp.provider === "openai" ||
-    mp.provider === "anthropic" ||
-    mp.provider === "elevenlabs"
-      ? modelProviders[mp.provider].endpointKey
-      : undefined;
-  const registryBaseURL = endpointKey ? pickString(customKeys, endpointKey) : undefined;
-  const baseURL =
-    pickString(customKeys, "base_url") ?? pickString(customKeys, "BASE_URL") ?? registryBaseURL;
-  const region = pickString(credentials, "region");
-  const deploymentMap = mp.deploymentMapping
-    ? (mp.deploymentMapping as Record<string, string>)
-    : undefined;
-
-  return {
-    id: mp.id,
-    slot: index === 0 ? "primary" : `fallback_${index}`,
-    type: mp.provider,
-    credentials,
-    ...(baseURL ? { base_url: baseURL } : {}),
-    ...(region ? { region } : {}),
-    ...(deploymentMap ? { deployment_map: deploymentMap } : {}),
-    ...routingWire({ mp, assembly }),
-    config: buildProviderConfig(mp),
-  };
-}
-
-/**
- * Routing half of a provider slot: the handle addressing this exact instance, and the models it declares served. Both absent (not empty) means nothing to say — read as "said nothing", not "serves nothing".
- */
-function routingWire({
-  mp,
-  assembly,
-}: {
-  mp: ModelProvider;
-  assembly: GatewayConfigAssemblyPort;
-}): Pick<ProviderSlot, "handle" | "models"> {
-  const models = assembly.tryDeclaredModelsForProvider(mp);
-
-  return {
-    ...(mp.routingHandle ? { handle: mp.routingHandle } : {}),
-    ...(models ? { models } : {}),
-  };
-}
-
-function pickString(obj: Record<string, unknown>, key: string): string | undefined {
-  const v = obj[key];
-
-  return typeof v === "string" && v.length > 0 ? v : undefined;
-}
-
-function buildProviderConfig(mp: ModelProvider): Record<string, unknown> {
-  const gatewayExtras = (mp.providerConfig ?? {}) as Record<string, unknown>;
-
-  return {
-    rate_limit: {
-      rpm: mp.rateLimitRpm,
-      tpm: mp.rateLimitTpm,
-      rpd: mp.rateLimitRpd,
-    },
-    health: {
-      status: mp.healthStatus.toLowerCase(),
-      circuit_opened_at: mp.circuitOpenedAt?.toISOString() ?? null,
-    },
-    ...(mp.extraHeaders ? { extra_headers: mp.extraHeaders as Record<string, unknown> } : {}),
-    ...gatewayExtras,
-  };
-}
-
-function scopeToWire(
-  scope: GatewayBudget["scopeType"],
-): GatewayConfigPayload["budgets"][number]["scope"] {
-  switch (scope) {
-    case "ORGANIZATION":
-      return "organization";
-    case "TEAM":
-      return "team";
-    case "PROJECT":
-      return "project";
-    case "VIRTUAL_KEY":
-      return "virtual_key";
-    case "PRINCIPAL":
-      return "principal";
-    case "GROUP":
-      return "group";
-    case "ATTRIBUTED_USER":
-      return "attributed_user";
-  }
-}
-
-function routingModeToWire(mode: VirtualKey["routingMode"]): GatewayConfigPayload["routing_mode"] {
-  switch (mode) {
-    case "NONE":
-      return "none";
-    case "FALLBACK_ALL":
-      return "fallback_all";
-    case "POLICY":
-      return "policy";
-  }
-}
-
-function providerExclusionWire(mp: ModelProvider): ProviderExclusionWire {
-  return {
-    id: mp.id,
-    type: mp.provider,
-    ...(mp.routingHandle ? { handle: mp.routingHandle } : {}),
-  };
-}
-
-/**
- * Key's expiration as the gateway reads it: unix SECONDS (matching the vk_expires_at token claim), null if never — milliseconds would put the date tens of thousands of years out and lift the expiry cap off the key.
- */
-function expiresAtWire(expiresAt: Date | null): number | null {
-  return expiresAt ? Math.floor(expiresAt.getTime() / 1000) : null;
-}
-
-/**
- * Splits scope-reachable providers the dispatch chain drops into the two reasons named at request time: routing policy dropped it (in access, not dispatchable), or provider access dropped it (outside the allowlist). A dispatching provider is in neither list.
- */
-function providerExclusions({
-  scopeReachable,
-  eligibleProviders,
-  allowed,
-}: {
-  scopeReachable: ModelProvider[];
-  eligibleProviders: ModelProvider[];
-  allowed: string[] | null;
-}): { routingExcluded: ModelProvider[]; accessExcluded: ModelProvider[] } {
-  const dispatchIds = new Set(eligibleProviders.map((mp) => mp.id));
-  const routingExcluded = scopeReachable.filter(
-    (mp) => (!allowed || allowed.includes(mp.id)) && !dispatchIds.has(mp.id),
-  );
-  const accessExcluded = allowed ? scopeReachable.filter((mp) => !allowed.includes(mp.id)) : [];
-
-  return { routingExcluded, accessExcluded };
-}
-
-type BudgetWire = GatewayConfigPayload["budgets"][number];
-
-/**
- * Current-period figure the bundle ships for one budget. Templates carry no aggregate (spend is per end-user bucket, fetched on demand); every other scope takes the CH rollup when loaded, falling back to the PG column when not.
- */
-function budgetSpentMicroUSD(
-  budget: GatewayBudgetResource,
-  spendByBudgetId: Map<string, string>,
-): number {
-  if (budget.scopeType === "ATTRIBUTED_USER") {
-    return 0;
-  }
-
-  const rollup = spendByBudgetId.get(budget.id);
-
-  return rollup === undefined
-    ? decimalToMicroUSD(budget.spentUsd)
-    : decimalUSDStringToMicroUSD(rollup);
-}
-
-function budgetToWire(
-  { budget: b, bucketScopeId, principalUserId }: GatewayResolvedBudget,
-  spendByBudgetId: Map<string, string>,
-): BudgetWire {
-  return {
-    id: b.id,
-    scope: scopeToWire(b.scopeType),
-    scope_id: bucketScopeId,
-    ...(principalUserId ? { principal_id: principalUserId } : {}),
-    ...(b.scopeType === "ATTRIBUTED_USER" ? { per_user: true as const } : {}),
-    provider_key: b.providerKey,
-    window: b.window.toLowerCase(),
-    limit_micro_usd: decimalToMicroUSD(b.limitUsd),
-    spent_micro_usd: budgetSpentMicroUSD(b, spendByBudgetId),
-    // The boundary this budget is actually heading for, not the stored
-    // column, which only moves at create and at an explicit reset.
-    resets_at: Math.floor(effectiveBudgetPeriod(b).resetsAt.getTime() / 1000),
-    on_breach: b.onBreach === "BLOCK" ? "block" : "warn",
-  };
-}
-
-type CacheRuleWire = GatewayConfigPayload["cache_rules"][number];
-
-function cacheRuleToWire(rule: GatewayCacheRuleResource): CacheRuleWire {
-  return {
-    id: rule.id,
-    priority: rule.priority,
-    matchers: rule.matchers,
-    action: rule.action,
-  };
-}
-
-function guardrailToWire(entry: GatewayGuardrailBundleEntry): GuardrailWire {
-  return {
-    id: entry.id,
-    name: entry.name,
-    evaluator_id: entry.evaluatorId,
-    evaluator_slug: entry.evaluatorSlug,
-    direction: entry.direction,
-    failure_mode: entry.failureMode,
-  };
-}
-
-function guardrailAttachmentToWire(
-  attachment: GatewayConfigGuardrailAttachment,
-): GuardrailAttachmentWire {
-  return { direction: attachment.direction, guardrail_ids: attachment.guardrailIds };
-}
-
-/**
- * `GatewayMoney` is the contract's database-library-free decimal: it answers
- * its exact value as a string and nothing more, so the conversion goes through
- * the same string parse the ClickHouse rollup takes.
- */
-function decimalToMicroUSD(d: GatewayMoney): number {
-  return decimalUSDStringToMicroUSD(d.toString());
-}
-
-function decimalUSDStringToMicroUSD(s: string): number {
-  const n = Number.parseFloat(s);
-  if (!Number.isFinite(n)) {
-    return 0;
-  }
-
-  return Math.round(n * 1_000_000);
-}

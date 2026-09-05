@@ -132,12 +132,12 @@ export { type VirtualKeyTrpcSchemas } from "./transport/api-trpc/virtual-key.api
 /**
  * The gateway control plane, moved out of the retired application: virtual keys and scope authorization, budget overview and applicable budgets, guardrail evaluation, realtime voice sessions, the ElevenLabs credential read, and the config bundle the Go data plane long-polls for — plus the four ports those need from other features or the deployment.
  */
+export { VirtualKeyService } from "./services/virtual-key.service";
 export {
-  VirtualKeyService,
   virtualKeyBudgetInputSchema,
   type CreateVirtualKeyInput,
   type CreatedVirtualKey,
-} from "./services/virtual-key.service";
+} from "./services/virtual-key-validation.service";
 export {
   type ActorContext,
   type MembershipSet,

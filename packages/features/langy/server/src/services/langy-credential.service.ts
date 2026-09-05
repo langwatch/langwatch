@@ -97,33 +97,9 @@ export class LangyCredentialService {
       throw new Error("Langy gateway base URL is not configured");
     }
 
-    let langwatchApiKey: string | undefined;
-    let langwatchApiKeyId: string | undefined;
-    if (mintSessionKey) {
-      try {
-        const minted = await this.deps.sessionKeys.mint({
-          session,
-          projectId,
-          organizationId: project.organizationId,
-        });
-        langwatchApiKey = minted.token;
-        langwatchApiKeyId = minted.apiKeyId;
-      } catch (error) {
-        if (error instanceof Error && error.name === "LangySessionKeyScopeError") {
-          throw new LangyCredentialResolutionError(error.message);
-        }
-
-        this.deps.errors?.report(error, {
-          projectId,
-          userId: session.user.id,
-          context: "mintLangySessionApiKey:LangyCredentialService.getOrProvision",
-        });
-
-        throw new LangyCredentialResolutionError(
-          `Failed to mint a Langy session key for project ${projectId}.`,
-        );
-      }
-    }
+    const sessionKey = mintSessionKey
+      ? await this.mintSessionKey({ projectId, organizationId: project.organizationId, session })
+      : null;
 
     const llmVirtualKey = await this.deps.virtualKeys.provision({
       projectId,
@@ -136,40 +112,102 @@ export class LangyCredentialService {
       );
     }
 
-    let githubToken: string | undefined;
-    let githubLogin: string | undefined;
-    let githubRepoScopeKey: string | undefined;
-    if (this.deps.github.enabled) {
-      try {
-        const minted = await this.deps.github.mintTurnToken({
-          organizationId: project.organizationId,
-          ...(repositoryFullName ? { repositoryFullName } : {}),
-        });
-        if (minted) {
-          githubToken = minted.token;
-          githubRepoScopeKey = minted.repoScopeKey;
-          githubLogin = resolveActingGithubLogin(session);
-        }
-      } catch (error) {
-        this.deps.errors?.report(error, {
-          projectId,
-          userId: session.user.id,
-          context: "mintTurnToken:LangyCredentialService.getOrProvision",
-        });
-      }
-    }
+    const github = await this.tryMintGithubToken({
+      projectId,
+      organizationId: project.organizationId,
+      session,
+      ...(repositoryFullName ? { repositoryFullName } : {}),
+    });
 
     return {
-      ...(langwatchApiKey ? { langwatchApiKey } : {}),
-      ...(langwatchApiKeyId ? { langwatchApiKeyId } : {}),
+      ...(sessionKey?.token ? { langwatchApiKey: sessionKey.token } : {}),
+      ...(sessionKey?.apiKeyId ? { langwatchApiKeyId: sessionKey.apiKeyId } : {}),
       llmVirtualKey,
       langwatchEndpoint,
       gatewayBaseUrl: ensureGatewayV1BaseUrl(gatewayBaseUrl),
       organizationId: project.organizationId,
-      ...(githubToken ? { githubToken } : {}),
-      ...(githubLogin ? { githubLogin } : {}),
-      ...(githubRepoScopeKey ? { githubRepoScopeKey } : {}),
+      ...github,
     };
+  }
+
+  /**
+   * The session-scoped API key this turn runs under. A scope refusal is the caller's to act on, so
+   * it keeps its own message; every other failure is reported and answered generically.
+   */
+  private async mintSessionKey({
+    projectId,
+    organizationId,
+    session,
+  }: {
+    projectId: string;
+    organizationId: string;
+    session: LangyCredentialSession;
+  }): Promise<{ token: string; apiKeyId: string }> {
+    try {
+      const minted = await this.deps.sessionKeys.mint({ session, projectId, organizationId });
+
+      return { token: minted.token, apiKeyId: minted.apiKeyId };
+    } catch (error) {
+      if (error instanceof Error && error.name === "LangySessionKeyScopeError") {
+        throw new LangyCredentialResolutionError(error.message);
+      }
+
+      this.deps.errors?.report(error, {
+        projectId,
+        userId: session.user.id,
+        context: "mintLangySessionApiKey:LangyCredentialService.getOrProvision",
+      });
+
+      throw new LangyCredentialResolutionError(
+        `Failed to mint a Langy session key for project ${projectId}.`,
+      );
+    }
+  }
+
+  /**
+   * The GitHub half of a turn's credentials, best-effort: the integration may be off, may decline
+   * to mint, or may fail, and none of those stops a turn that has everything else it needs.
+   */
+  private async tryMintGithubToken({
+    projectId,
+    organizationId,
+    session,
+    repositoryFullName,
+  }: {
+    projectId: string;
+    organizationId: string;
+    session: LangyCredentialSession;
+    repositoryFullName?: string;
+  }): Promise<{ githubToken?: string; githubLogin?: string; githubRepoScopeKey?: string }> {
+    if (!this.deps.github.enabled) {
+      return {};
+    }
+
+    try {
+      const minted = await this.deps.github.mintTurnToken({
+        organizationId,
+        ...(repositoryFullName ? { repositoryFullName } : {}),
+      });
+      if (!minted) {
+        return {};
+      }
+
+      const githubLogin = resolveActingGithubLogin(session);
+
+      return {
+        githubToken: minted.token,
+        githubRepoScopeKey: minted.repoScopeKey,
+        ...(githubLogin ? { githubLogin } : {}),
+      };
+    } catch (error) {
+      this.deps.errors?.report(error, {
+        projectId,
+        userId: session.user.id,
+        context: "mintTurnToken:LangyCredentialService.getOrProvision",
+      });
+
+      return {};
+    }
   }
 
   async tryGetModelsAllowedForProject(projectId: string): Promise<string[] | null> {

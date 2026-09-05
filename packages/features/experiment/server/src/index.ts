@@ -94,11 +94,8 @@ export { ExperimentTargetEntityNamesPort } from "./ports/experiment-target-entit
 export { ExperimentWorkflowDslPort } from "./ports/experiment-workflow-dsl.port";
 export { RedisExperimentRunProgressAdapter } from "./adapters/redis.experiment-run-progress.adapter";
 
-export {
-  ExperimentRunOrchestratorService,
-  type ExperimentRunPorts,
-  type OrchestratorInput,
-} from "./services/experiment-run-orchestrator.service";
+export { ExperimentRunOrchestratorService } from "./services/experiment-run-orchestrator.service";
+export type { ExperimentRunPorts, OrchestratorInput } from "./rules/experiment-run-input.rules";
 export {
   ExperimentPollingRunService,
   type StartPollingRunInput,

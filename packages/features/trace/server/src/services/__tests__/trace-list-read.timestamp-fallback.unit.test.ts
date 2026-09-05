@@ -2,7 +2,7 @@
  * Feature: specs/traces/trace-summary-storage-anchor.feature
  * The time a trace row and its drawer header show for a log-only trace: the storage anchor, never the raw span baseline of 0, which rendered as "20684d ago" in the list and drawer while the single-trace read reported the honest time.
  */
-import { TraceListService } from "../trace-list-read.service";
+import { mapToTraceListItem } from "../../rules/trace-list-row.rules";
 import { describe, expect, it } from "vitest";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 
@@ -41,9 +41,7 @@ describe("the trace times a reader sees", () => {
   describe("given a trace whose only signal is a log record", () => {
     /** @scenario The trace list shows the same fallback time, not the epoch */
     it("the list row falls back to the storage anchor", () => {
-      const item = TraceListService.mapToTraceListItem(
-        summary({ occurredAt: 0, storageAnchorMs: ANCHOR_MS }),
-      );
+      const item = mapToTraceListItem(summary({ occurredAt: 0, storageAnchorMs: ANCHOR_MS }));
 
       expect(item.timestamp).toBe(ANCHOR_MS);
     });
@@ -66,7 +64,7 @@ describe("the trace times a reader sees", () => {
         storageAnchorMs: ANCHOR_MS,
       });
 
-      expect(TraceListService.mapToTraceListItem(withSpans).timestamp).toBe(ANCHOR_MS + 250);
+      expect(mapToTraceListItem(withSpans).timestamp).toBe(ANCHOR_MS + 250);
       expect(mapTraceSummaryToHeader(withSpans).timestamp).toBe(ANCHOR_MS + 250);
     });
   });

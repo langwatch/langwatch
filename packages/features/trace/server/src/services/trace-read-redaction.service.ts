@@ -19,7 +19,9 @@ import { parsePythonInsideJson } from "@langwatch/trace-contract";
 const DROP_CATEGORY_ORDER = ["input", "output", "system", "tools"];
 
 /**
- * Reads the drop marker that `stripOtlpSpanContent` stamps on a span when a `drop` privacy policy is active, listing content categories it removed. The span mapper unflattens dotted attribute keys into nested objects, so `langwatch.privacy.dropped` arrives at the matching nested path inside `span.params` rather than as a flat key.
+ * Reads the drop marker `stripOtlpSpanContent` stamps on a span under a `drop` privacy policy,
+ * listing the content categories it removed. The span mapper unflattens dotted keys, so
+ * `langwatch.privacy.dropped` arrives at the matching nested path inside `span.params`.
  */
 function readSpanDropMarker(span: Span): string[] {
   let node: unknown = span.params;
@@ -66,9 +68,8 @@ export class TraceReadRedactionService {
   }
 
   /**
-   * Extracts string values from an object for redaction: when input/output is not visible, all string values must be collected so they can be redacted from any visible fields.
-   * @param object - The object to extract redaction strings from
-   * @returns Array of strings that should be redacted
+   * Every string value in an object, so that when input and output are not visible they can be
+   * redacted out of the fields that are.
    */
   static extractRedactionsForObject(object: unknown): string[] {
     if (typeof object === "string") {
@@ -280,7 +281,9 @@ export class TraceReadRedactionService {
   }
 
   /**
-   * Applies redaction protections to the v2 derived trace events (events timeline / exceptions pane). Event attributes are captured content — exception messages quote application state — so they are blanked entirely for a viewer who cannot read content or when the event predates the plan's visibility cutoff; otherwise the restricted-attribute rules apply. Used by both the in-app `tracesV2.traceEvents` read and the shared-trace payload, so the two surfaces can never drift apart.
+   * Applies redaction protections to the derived trace events. Event attributes are captured
+   * content — exception messages quote application state — so they are blanked for a viewer who
+   * cannot read content or past the visibility cutoff; otherwise restricted-attribute rules apply.
    */
   static applyDerivedTraceEventProtections(
     events: DerivedTraceEvent[],
@@ -308,98 +311,45 @@ export class TraceReadRedactionService {
   }
 
   /**
-   * Applies redaction protections to a trace and its spans.
-   * @param trace/protections - Trace to apply protections to, and the protection settings
-   * @returns The trace with protections applied
+   * Applies redaction protections to a trace and its spans, returning the trace as this viewer may
+   * read it.
    */
   static applyTraceProtections(trace: Trace, protections: Protections): Trace {
-    // Build redaction set from trace input/output if not visible
-    let redactions = new Set<string>([
-      ...(!protections.canSeeCapturedInput
-        ? TraceReadRedactionService.extractRedactionsForObject(trace.input?.value)
-        : []),
-      ...(!protections.canSeeCapturedOutput
-        ? TraceReadRedactionService.extractRedactionsForObject(trace.output?.value)
-        : []),
-    ]);
-
-    // Add span inputs/outputs to redactions if not visible
-    if (!protections.canSeeCapturedInput && trace.spans) {
-      redactions = new Set([
-        ...redactions,
-        ...TraceReadRedactionService.extractRedactionsFromAllSpanInputs(trace.spans),
-      ]);
-    }
-
-    if (!protections.canSeeCapturedOutput && trace.spans) {
-      redactions = new Set([
-        ...redactions,
-        ...TraceReadRedactionService.extractRedactionsFromAllSpanOutputs(trace.spans),
-      ]);
-    }
-
-    // Apply protections to trace input
-    let transformedInput: TraceInput | undefined = trace.input;
-    if (trace.input) {
-      if (protections.canSeeCapturedInput !== true) {
-        transformedInput = void 0;
-      } else {
-        transformedInput = TraceReadRedactionService.redactObject(trace.input, redactions);
-      }
-    }
-
-    // Apply protections to trace output
-    let transformedOutput: TraceOutput | undefined = trace.output;
-    if (trace.output) {
-      if (protections.canSeeCapturedOutput !== true) {
-        transformedOutput = void 0;
-      } else {
-        transformedOutput = TraceReadRedactionService.redactObject(trace.output, redactions);
-      }
-    }
-
-    // Apply protections to metrics
-    let transformedMetrics: Trace["metrics"] | undefined = trace.metrics;
-    if (trace.metrics) {
-      const { total_cost, ...otherMetrics } = trace.metrics;
-      transformedMetrics = otherMetrics;
-
-      if (protections.canSeeCosts === true) {
-        transformedMetrics.total_cost = total_cost;
-      }
-    }
-
-    // Apply protections to spans
-    const transformedSpans = trace.spans?.map((span) =>
-      TraceReadRedactionService.applySpanProtections(span, protections, redactions),
-    );
-
-    // Apply protections to events
-    const transformedEvents = trace.events?.map((event) =>
-      TraceReadRedactionService.applyEventProtections(event, protections, redactions),
-    );
-
-    // Surface which categories a drop policy stripped at ingestion so the view can
-    // mark the absence. Read from the span marker (which follows the data), not
-    // the project's current settings, so old traces are not mislabeled after a
-    // rule changes.
-    const droppedCategories = TraceReadRedactionService.collectDroppedCategories(trace.spans);
-
+    const redactions = TraceReadRedactionService.collectTraceRedactions(trace, protections);
     const transformed = {
       ...trace,
-      input: transformedInput,
-      output: transformedOutput,
-      metrics: transformedMetrics,
-      spans: transformedSpans,
-      events: transformedEvents,
-      ...(droppedCategories.length > 0 ? { privacy: { ...trace.privacy, droppedCategories } } : {}),
+      input: TraceReadRedactionService.protectedValue({
+        value: trace.input,
+        visible: protections.canSeeCapturedInput === true,
+        redactions,
+      }),
+      output: TraceReadRedactionService.protectedValue({
+        value: trace.output,
+        visible: protections.canSeeCapturedOutput === true,
+        redactions,
+      }),
+      metrics: TraceReadRedactionService.protectedMetrics(trace, protections),
+      spans: trace.spans?.map((span) =>
+        TraceReadRedactionService.applySpanProtections(span, protections, redactions),
+      ),
+      events: trace.events?.map((event) =>
+        TraceReadRedactionService.applyEventProtections(event, protections, redactions),
+      ),
+      // Which categories a drop policy stripped at ingestion, so the view can mark the absence.
+      // Read from the span marker, which follows the data, rather than the project's current
+      // settings, so an old trace is not mislabeled after a rule changes.
+      ...(TraceReadRedactionService.collectDroppedCategories(trace.spans).length > 0
+        ? {
+            privacy: {
+              ...trace.privacy,
+              droppedCategories: TraceReadRedactionService.collectDroppedCategories(trace.spans),
+            },
+          }
+        : {}),
     };
 
-    // Teaser-redact content of traces beyond the plan's visibility window.
-    // Spans were already age-checked and teased individually in
-    // TraceReadRedactionService.applySpanProtections — exclude them here so they are not double-teased;
-    // this pass covers the trace-level content fields and stamps the redacted
-    // flag for the upgrade CTA.
+    // Spans were already age-checked and teased individually, so they are held out of the
+    // trace-level teaser pass rather than teased twice; that pass stamps the redacted flag.
     if (
       protections.visibilityCutoffMs !== null &&
       protections.visibilityCutoffMs !== undefined &&
@@ -414,5 +364,69 @@ export class TraceReadRedactionService {
     }
 
     return transformed;
+  }
+
+  /**
+   * Every string a viewer may not read, gathered from the trace's own content and its spans', so
+   * that a value hidden in one place cannot come back through a field that is visible.
+   */
+  private static collectTraceRedactions(trace: Trace, protections: Protections): Set<string> {
+    const redactions = new Set<string>([
+      ...(!protections.canSeeCapturedInput
+        ? TraceReadRedactionService.extractRedactionsForObject(trace.input?.value)
+        : []),
+      ...(!protections.canSeeCapturedOutput
+        ? TraceReadRedactionService.extractRedactionsForObject(trace.output?.value)
+        : []),
+    ]);
+    if (!trace.spans) {
+      return redactions;
+    }
+
+    if (!protections.canSeeCapturedInput) {
+      for (const value of TraceReadRedactionService.extractRedactionsFromAllSpanInputs(
+        trace.spans,
+      )) {
+        redactions.add(value);
+      }
+    }
+
+    if (!protections.canSeeCapturedOutput) {
+      for (const value of TraceReadRedactionService.extractRedactionsFromAllSpanOutputs(
+        trace.spans,
+      )) {
+        redactions.add(value);
+      }
+    }
+
+    return redactions;
+  }
+
+  /** One content field: dropped entirely when the category is hidden, redacted when it is not. */
+  private static protectedValue<T extends TraceInput | TraceOutput>({
+    value,
+    visible,
+    redactions,
+  }: {
+    value: T | undefined;
+    visible: boolean;
+    redactions: Set<string>;
+  }): T | undefined {
+    if (!value) {
+      return value;
+    }
+
+    return visible ? TraceReadRedactionService.redactObject(value, redactions) : void 0;
+  }
+
+  /** The trace's metrics, with cost present only for a viewer who may read costs. */
+  private static protectedMetrics(trace: Trace, protections: Protections): Trace["metrics"] {
+    if (!trace.metrics) {
+      return trace.metrics;
+    }
+
+    const { total_cost, ...otherMetrics } = trace.metrics;
+
+    return protections.canSeeCosts === true ? { ...otherMetrics, total_cost } : otherMetrics;
   }
 }

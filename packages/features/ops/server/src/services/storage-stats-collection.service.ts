@@ -214,26 +214,7 @@ export class StorageStatsCollectionService {
       }>();
 
       for (const row of rows.data) {
-        this.options.metrics.recordBackupStatus({
-          instance: instance.target,
-          status: row.status,
-          count: Number.parseInt(row.cnt, 10),
-        });
-        if (row.status !== "BACKUP_CREATED" || !row.last_success_time) {
-          continue;
-        }
-
-        const succeededAtSeconds = new Date(row.last_success_time).getTime() / 1000;
-        const sizeBytes = Number.parseInt(row.last_success_size, 10);
-        if (!Number.isFinite(succeededAtSeconds) || succeededAtSeconds <= 0) {
-          continue;
-        }
-
-        this.options.metrics.recordLastBackup({
-          instance: instance.target,
-          succeededAtSeconds,
-          sizeBytes: Number.isFinite(sizeBytes) ? sizeBytes : 0,
-        });
+        this.recordBackupRow({ instance, row });
       }
 
       if (this.backupsFailing || this.backupLogAbsent) {
@@ -242,37 +223,77 @@ export class StorageStatsCollectionService {
         this.backupLogAbsent = false;
       }
     } catch (error) {
-      // Collection is opt-OUT (`CLICKHOUSE_BACKUP_METRICS_ENABLED`), so a
-      // deployment that never took a backup reaches here with no table to
-      // read. That absence is a fact about the instance, not a fault: it is
-      // named once at info. A real failure is still edge-triggered, because a
-      // warning every fifteen seconds would bury the one that matters.
-      if (isMissingBackupLog(error)) {
-        if (this.backupLogAbsent) {
-          return;
-        }
-
-        logger.info(
-          { instance: instance.target },
-          "ClickHouse has no system.backup_log, so no backup status is collected; this instance has never taken a backup",
-        );
-        this.backupLogAbsent = true;
-
-        return;
-      }
-
-      if (this.backupsFailing) {
-        logger.debug({ error }, "failed to collect ClickHouse backup stats");
-
-        return;
-      }
-
-      logger.warn(
-        { error, instance: instance.target },
-        "failed to collect ClickHouse backup stats from system.backup_log (further failures suppressed until recovery)",
-      );
-      this.backupsFailing = true;
+      this.reportBackupFailure({ instance, error });
     }
+  }
+
+  /** One status row: its count always, and the last success only when it names a real time. */
+  private recordBackupRow({
+    instance,
+    row,
+  }: {
+    instance: StorageStatsInstance;
+    row: { status: string; cnt: string; last_success_time: string; last_success_size: string };
+  }): void {
+    this.options.metrics.recordBackupStatus({
+      instance: instance.target,
+      status: row.status,
+      count: Number.parseInt(row.cnt, 10),
+    });
+    if (row.status !== "BACKUP_CREATED" || !row.last_success_time) {
+      return;
+    }
+
+    const succeededAtSeconds = new Date(row.last_success_time).getTime() / 1000;
+    if (!Number.isFinite(succeededAtSeconds) || succeededAtSeconds <= 0) {
+      return;
+    }
+
+    const sizeBytes = Number.parseInt(row.last_success_size, 10);
+    this.options.metrics.recordLastBackup({
+      instance: instance.target,
+      succeededAtSeconds,
+      sizeBytes: Number.isFinite(sizeBytes) ? sizeBytes : 0,
+    });
+  }
+
+  /**
+   * Collection is opt-out, so a deployment that never took a backup reaches here with no table to
+   * read. That absence is a fact about the instance, not a fault, and is named once at info; a
+   * real failure is edge-triggered too, since a warning every fifteen seconds buries the real one.
+   */
+  private reportBackupFailure({
+    instance,
+    error,
+  }: {
+    instance: StorageStatsInstance;
+    error: unknown;
+  }): void {
+    if (isMissingBackupLog(error)) {
+      if (this.backupLogAbsent) {
+        return;
+      }
+
+      logger.info(
+        { instance: instance.target },
+        "ClickHouse has no system.backup_log, so no backup status is collected; this instance has never taken a backup",
+      );
+      this.backupLogAbsent = true;
+
+      return;
+    }
+
+    if (this.backupsFailing) {
+      logger.debug({ error }, "failed to collect ClickHouse backup stats");
+
+      return;
+    }
+
+    logger.warn(
+      { error, instance: instance.target },
+      "failed to collect ClickHouse backup stats from system.backup_log (further failures suppressed until recovery)",
+    );
+    this.backupsFailing = true;
   }
 }
 

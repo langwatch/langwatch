@@ -43,7 +43,9 @@ export class LangyKeyIdentityService {
         ok: false,
         reason: "unowned",
         message:
-          "This API key is not owned by a user, so it cannot start a Langy conversation. Langy acts as a person, and the access decision is made per user. Use a key issued to a user with Langy access.",
+          "This API key is not owned by a user, so it cannot start a Langy conversation. Langy " +
+          "acts as a person, and the access decision is made per user. Use a key issued to a " +
+          "user with Langy access.",
       };
     }
 
@@ -57,7 +59,8 @@ export class LangyKeyIdentityService {
         ok: false,
         reason: "no-access",
         message:
-          "The user this API key belongs to does not have access to Langy. Access is granted per user, so a key keeps working for everything else while Langy stays refused.",
+          "The user this API key belongs to does not have access to Langy. Access is granted " +
+          "per user, so a key keeps working for everything else while Langy stays refused.",
       };
     }
 

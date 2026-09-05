@@ -44,7 +44,9 @@ function deniedCategoriesFor({
 }
 
 /**
- * One corrected field as this viewer may read it, or undefined when withheld (never edited, or restricted). Restricted-attribute rules apply to a corrected `params` exactly as to a captured one — a reviewer cannot widen an attribute's audience by editing the span it sits on.
+ * One corrected field as this viewer may read it, or undefined when withheld. Restricted-attribute
+ * rules apply to a corrected `params` exactly as to a captured one — a reviewer cannot widen an
+ * attribute's audience by editing the span it sits on.
  */
 function readableFieldValue({
   field,
@@ -132,7 +134,9 @@ export type TraceMetadataEdits = NonNullable<
 >;
 
 /**
- * Corrected metadata under the viewer's restrict rules. The rules are written against the attribute paths the trace was ingested with, so the map is put back into that spelling to be matched and read out of it again, keeping one definition of which attributes are hidden.
+ * Corrected metadata under the viewer's restrict rules. The rules are written against the
+ * attribute paths the trace was ingested with, so the map is put back into that spelling to be
+ * matched and read out of it again, keeping one definition of which attributes are hidden.
  */
 function redactMetadataEdits({
   metadata,
@@ -247,7 +251,9 @@ export class TraceEditOverlayRedactionService {
   }
 
   /**
-   * The correction as this viewer is allowed to read it: content edits (trace/span input/output/params) drop out when the viewer may not read that category or the trace is beyond the visibility window, and any surviving corrected `params` still go through restricted-attribute rules; structural edits (renames, type changes, cleared errors, deleted spans) always stay since they describe shape, not content. Pure, and returns the same patch object when the viewer may read all of it.
+   * The correction as this viewer may read it: content edits drop out when the viewer may not read
+   * that category or the trace is past the visibility window, and surviving corrected `params`
+   * still go through restricted-attribute rules. Structural edits always stay.
    */
   static redactPatchForViewer({
     patch,

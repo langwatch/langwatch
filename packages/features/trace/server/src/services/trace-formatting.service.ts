@@ -2,7 +2,9 @@ import type { LLMModeTrace, Span, Trace } from "@langwatch/trace-contract";
 import { format, formatDistanceToNow } from "date-fns";
 
 /**
- * "3 minutes ago", or a date once that stops being useful. Stated here rather than imported: the shared helper (`platform/app/src/utils/formatTimeAgo.ts`) is a tree this migration only deletes from, and a server module may not import the browser package (`@langwatch/evaluator-web`) that carries the same narrowing — so the two sides state it separately. Wording and thresholds must stay identical: the digest a customer reads and the list they read it beside are the same sentence.
+ * "3 minutes ago", or a date once that stops being useful. Stated here rather than imported: a
+ * server module may not import the browser package carrying the same narrowing. Wording and
+ * thresholds must stay identical to that copy — a customer reads both in the same sentence.
  */
 const formatTimeAgo = (timestamp: number, dateFormat = "dd/MMM HH:mm", maxHours = 24) => {
   const timestampDate = timestamp ? new Date(timestamp) : undefined;

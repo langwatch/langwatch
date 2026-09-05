@@ -1,5 +1,7 @@
 /**
- * Resolve the eligible-ModelProvider set + order for a VirtualKey, two passes. (1) Eligibility: every ModelProvider reachable from the VK's VirtualKeyScope entries via the upward cascade PROJECT->TEAM->ORGANIZATION (mirrors findAllAccessibleForProject's predicate/tenancy shape), skipping disabled/soft-deleted MPs so the dispatcher never sees a credential an admin pulled. (2) Ordering: routingPolicyId's modelProviderIds dictates order (filtering out entries no longer eligible); with no policy, fallbackPriorityGlobal ASC then createdAt ASC. Used by the config materialiser to assemble the flat providers[] array the Go dispatcher reads.
+ * Resolves the eligible model-provider set and order for a virtual key in two passes: eligibility
+ * takes every provider reachable through the upward scope cascade, skipping disabled and
+ * soft-deleted rows, and ordering follows the routing policy or else fallback priority.
  */
 import { isDispatchableProvider } from "@langwatch/model-provider-contract";
 import type { GatewayPersistenceTransaction } from "../ports/gateway-change-events.port";
@@ -22,7 +24,9 @@ export class GatewayScopeResolutionService {
   }
 
   /**
-   * Providers a VK reaches through its scope graph alone (pass 1, intersected with routable rows) — the routing policy is NOT applied. This is the set a key's provider allowlist may name and the drawer offers: a policy narrows what the gateway DISPATCHES to, never what the allowlist may hold, so a scope-reachable but policy-omitted provider is still savable and only blocked at dispatch (eligibleModelProvidersForVk + config.materialiser).
+   * Providers a key reaches through its scope graph alone, intersected with routable rows and with
+   * the routing policy not applied. This is the set an allowlist may name and the drawer offers: a
+   * policy narrows what the gateway dispatches to, never what the allowlist may hold.
    */
   async scopeReachableModelProvidersForVk(
     vk: VirtualKeyWithScopes,
@@ -38,7 +42,9 @@ export class GatewayScopeResolutionService {
   }
 
   /**
-   * Providers a VK DISPATCHES to, in order: the scope-reachable set, intersected with the policy's modelProviderIds and reordered when routingPolicyId is set. Used by the config materialiser to build the flat providers[] chain. For allowlist-validation/UI-parity, use scopeReachableModelProvidersForVk.
+   * Providers a key dispatches to, in order: the scope-reachable set intersected with the policy's
+   * providers and reordered when a routing policy is set. The config materialiser builds the flat
+   * provider chain from it; allowlist validation uses the scope-reachable set instead.
    */
   async eligibleModelProvidersForVk(
     vk: VirtualKeyWithScopes,

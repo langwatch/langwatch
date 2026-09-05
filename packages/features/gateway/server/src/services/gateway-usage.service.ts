@@ -1,5 +1,7 @@
 /**
- * Aggregate read-side queries for AI Gateway usage surfaces. Spend comes from trace_summaries (enriched per-trace cost, keyed on langwatch.virtual_key_id), not gateway_budget_ledger_events — the ledger writes once per applicable budget and never for an uncapped key, structurally showing $0.00 forever or double/triple-counting a multi-budget key (it stays the source for a budget's own debit list, where one-row-per-budget is the point). The VK table's spend column reads the same repository so a clickable number matches its page. Every read spans the org's projects, not one, since traces land in a key's trace destination (explicit project, else PROJECT scope, else governance project) — reading one project is how Usage showed no data while the keys table showed spend.
+ * Aggregate read-side queries for AI Gateway usage surfaces. Spend comes from trace_summaries, not
+ * the budget ledger, which writes once per applicable budget and never for an uncapped key. Every
+ * read spans the org's projects, since traces land in the key's resolved trace destination.
  */
 import { usdToNanoUsd } from "@langwatch/gateway-contract";
 
@@ -7,7 +9,9 @@ import type { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port"
 import type { GatewayVirtualKeySpendPort } from "../ports/gateway-virtual-key-spend.port";
 
 /**
- * The one project read these surfaces make: which tenants an org's gateway traces can land in. Narrower than ProjectService on purpose — anything that can answer the question satisfies it, which is what a test needs.
+ * The one project read these surfaces make: which tenants an org's gateway traces can land in.
+ * Narrower than the project service on purpose — anything that can answer the question satisfies
+ * it, which is what a test needs.
  */
 export type GatewayUsageProjectsPort = {
   listIdsByOrganization(input: { organizationId: string }): Promise<string[]>;
@@ -84,7 +88,9 @@ export class GatewayUsageService {
   ) {}
 
   /**
-   * Both repos are required keys with optional values: a CH-less deploy passes undefined explicitly and gets empty summaries by configuration, while a caller forgetting the dependency fails to compile instead of silently reporting $0.00.
+   * Both repositories are required keys with optional values: a ClickHouse-less deploy passes
+   * undefined explicitly and gets empty summaries by configuration, while a caller forgetting the
+   * dependency fails to compile instead of silently reporting nothing.
    */
   static create(args: {
     projects: GatewayUsageProjectsPort;
@@ -96,7 +102,9 @@ export class GatewayUsageService {
   }
 
   /**
-   * Spend per key over a window, for every key in an org — reads across every project, not one, since a key's traces land in whichever project resolved as its trace destination (governance project for org/team-scoped keys).
+   * Spend per key over a window, for every key in an org, read across every project rather than
+   * one: a key's traces land in whichever project resolved as its trace destination, the
+   * governance project for org- and team-scoped keys.
    */
   async spendByVirtualKey(args: {
     organizationId: string;
@@ -129,7 +137,9 @@ export class GatewayUsageService {
   }
 
   /**
-   * The Usage page's org-wide rollup. virtualKeyIds is the caller's visible-key set, computed by the router with the same membership rule the keys table applies, so the page totals exactly the keys listed. Aggregation happens in ClickHouse (keys x models x days buckets), so a busy org's window never streams per-trace rows into this process.
+   * The Usage page's org-wide rollup. `virtualKeyIds` is the caller's visible-key set, computed by
+   * the router with the membership rule the keys table applies, so the page totals exactly the
+   * keys listed. Aggregation happens in ClickHouse, so no per-trace rows stream into this process.
    */
   async summary(args: {
     organizationId: string;
@@ -196,14 +206,18 @@ export class GatewayUsageService {
   }
 
   /**
-   * One key's usage, read across the org's projects so the total matches the spend column that deep-links here. Key visibility is the router's job (same membership rule as virtualKeys.get); by the time this runs the caller may already see the key.
+   * One key's usage, read across the org's projects so the total matches the spend column that
+   * deep-links here. Key visibility is the router's job, under the same membership rule as the
+   * single-key read, so by the time this runs the caller may already see the key.
    */
   async summaryForVirtualKey(args: {
     organizationId: string;
     virtualKeyId: string;
     window: UsageWindow;
     /**
-     * Narrows the recent-activity list to one model, and only that list — totals, daily series and per-model breakdown stay whole, since the breakdown is the control the model is picked from and filtering it too would leave no way back.
+     * Narrows the recent-activity list to one model, and only that list: totals, daily series and
+     * the per-model breakdown stay whole, since the breakdown is the control the model is picked
+     * from and filtering it too would leave no way back.
      */
     model?: string;
   }): Promise<VirtualKeyUsageSummary> {

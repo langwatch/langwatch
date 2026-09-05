@@ -14,7 +14,8 @@ import type { VirtualKeyService } from "./virtual-key.service";
 
 /**
  * @see specs/ai-gateway/governance/vk-scope-rbac.feature
- * Scope-aware authorization for VirtualKey write paths, replacing the org-wide virtualKeys:manage gate (too coarse: let team admins mint org keys, required org grants for single-team management) with per-scope checks. CREATE authorizes against the REQUESTED scopes (manage on EVERY one, fail-closed intersection); UPDATE/ROTATE/DELETE authorize against the EXISTING scopes (op permission on AT LEAST ONE). Upward cascade lives in probeTeamPermission/probeProjectPermission. No new code relies on the legacy TeamUserRole.ADMIN short-circuit (@no-short-circuit invariant), so its eventual removal needs no sweep here. Identity is (user, permission, scope), not the deployment's session object, to avoid coupling this package to one auth library's shape.
+ * Scope-aware authorization for virtual-key write paths. Creation authorizes against the requested
+ * scopes, needing manage on every one; the other writes authorize against the existing scopes.
  */
 export type VirtualKeySessionActor = { user: { id: string } } | null;
 
@@ -29,7 +30,9 @@ export type Scope = {
 };
 
 /**
- * Identity a VK write is authorized as — one vocabulary for both doors, so REST and tRPC can't diverge: session (browser, role-binding cascade), apiKey (scoped API key, checked via effective = key ∩ user at each touched scope), legacyProjectKey (full access to PROJECT:<their project> only, denied elsewhere).
+ * Identity a key write is authorized as — one vocabulary for both doors, so REST and tRPC cannot
+ * diverge: a session with its role-binding cascade, a scoped API key checked as the intersection
+ * of key and user at each touched scope, or a legacy project key confined to its own project.
  */
 export type VirtualKeyActor =
   | { kind: "session"; session: VirtualKeySessionActor }
@@ -52,12 +55,16 @@ function scopeLabel(scope: Scope): string {
 }
 
 /**
- * Scopes a user reaches by MEMBERSHIP within one org: isOrgMember, teamIds (their teams), projectIds (those teams' projects). List/read visibility is membership-based, not permission-based — a VK is visible when one of its scopes intersects this set, so a plain org member with no virtualKeys:view still sees org-scoped keys, and a team member sees that team's keys but not a sibling's.
+ * Scopes a user reaches by membership within one org. List and read visibility is membership-based
+ * rather than permission-based: a key is visible when one of its scopes intersects this set, so a
+ * plain org member sees org-scoped keys and a team member sees that team's but not a sibling's.
  */
 export type MembershipSet = {
   isOrgMember: boolean;
   /**
-   * Caller is an ORG-level admin: VK visibility short-circuits to "sees everything in the org", since real org owners hold no per-team TeamUser rows and would otherwise be blind to the per-project auto-provisioned Langy VK they own.
+   * Caller is an org-level admin, so visibility short-circuits to everything in the org: real org
+   * owners hold no per-team rows and would otherwise be blind to the per-project auto-provisioned
+   * key they own.
    */
   isOrgAdmin: boolean;
   teamIds: Set<string>;
@@ -65,7 +72,9 @@ export type MembershipSet = {
 };
 
 /**
- * Every id must come back from an org-scoped lookup — an id naming another tenant's row simply doesn't match the where clause, so absence from the result IS the refusal, and the query never has to compare tenants itself.
+ * Every id must come back from an org-scoped lookup: an id naming another tenant's row simply does
+ * not match the where clause, so absence from the result is the refusal and the query never has to
+ * compare tenants itself.
  */
 async function assertAllResolve(
   scopeType: string,
@@ -272,7 +281,9 @@ export class VirtualKeyAuthorizationService {
   }
 
   /**
-   * Every requested scope must belong to the VK's own organization. assertActorCanManageAllScopes only proves the caller controls each scope, not that it lives in organizationId — without this, a caller with org-A manage rights could submit organizationId=B plus a scope from A and write a cross-org VK row.
+   * Every requested scope must belong to the key's own organization. Proving the caller controls
+   * each scope is not the same as proving it lives in this organization: without this, a caller
+   * with rights in one org could submit another's id plus a scope from theirs.
    */
   async assertScopesBelongToOrg({
     organizationId,
@@ -298,7 +309,9 @@ export class VirtualKeyAuthorizationService {
   }
 
   /**
-   * Resolve the single PROJECT scope a VK is reachable from — guardrails are project-scoped, so a VK can only attach guardrails from this one (trace) project. Returns null for zero or multiple PROJECT scopes, neither having a well-defined guardrail surface.
+   * Resolves the single project scope a key is reachable from. Guardrails are project-scoped, so a
+   * key can only attach guardrails from that one project; zero or several project scopes return
+   * null, neither having a well-defined guardrail surface.
    */
   async tryResolveVkProjectId({
     organizationId,
@@ -359,8 +372,9 @@ export class VirtualKeyAuthorizationService {
   }
 
   /**
-   * Spec: specs/ai-gateway/governance/guardrails-project-scope.feature (@cross-project + @rbac)
-   * Validates guardrail attachments before handoff: every referenced guardrail must belong to the VK's own project (else BAD_REQUEST guardrail_project_mismatch), and the actor must hold gatewayGuardrails:attach on it (else FORBIDDEN).
+   * Spec: specs/ai-gateway/governance/guardrails-project-scope.feature
+   * Validates guardrail attachments before handoff: every referenced guardrail must belong to the
+   * key's own project, and the actor must hold the attach permission on it.
    */
   async assertGuardrailAttachmentsAllowed(
     ctx: ActorContext,
@@ -424,7 +438,9 @@ export class VirtualKeyAuthorizationService {
   }
 
   /**
-   * Precondition every by-id MUTATION shares: the key must exist. Authorization is a separate, permission-based decision on the returned key's scopes, so this deliberately doesn't filter by visibility — a scope role-binding holder can operate on a key its membership set never surfaces.
+   * Precondition every by-id mutation shares: the key must exist. Authorization is a separate,
+   * permission-based decision on the returned key's scopes, so this deliberately does not filter
+   * by visibility — a scope role-binding holder can operate on a key membership never surfaces.
    */
   async getExistingVk(
     reader: VirtualKeyReader,
@@ -440,7 +456,9 @@ export class VirtualKeyAuthorizationService {
   }
 
   /**
-   * Precondition every by-id READ shares: the key must exist AND fall inside the caller's membership set. Both answer virtual_key_not_found — a distinguishable forbidden would be an existence oracle for keys in teams the caller has no part in. Membership set is derived per door (session loads it from the user's rows; a project credential synthesizes the one its project implies) but the check itself is shared, so doors can't drift on what "visible" means.
+   * Precondition every by-id read shares: the key must exist and fall inside the caller's
+   * membership set. Both answer not-found, since a distinguishable forbidden would be an existence
+   * oracle. The membership set is derived per door, but the check itself is shared.
    */
   async getVisibleVk(
     reader: VirtualKeyReader,

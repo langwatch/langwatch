@@ -427,7 +427,7 @@ export {
   DERIVED_OUTPUT_ATTR_PREFIX,
 } from "./services/trace-log-content-derivation.service";
 export { ClaudeCodeLogEnrichmentService } from "./services/claude-code-log-enrichment.service";
-export type { ClaudeSpanRef } from "./services/claude-code-span-enrichment.service";
+export type { ClaudeSpanRef } from "./rules/claude-code-message-index.rules";
 export { TraceReadRedactionService } from "./services/trace-read-redaction.service";
 export { TraceEditOverlayRedactionService } from "./services/trace-edit-overlay-redaction.service";
 export { TraceEditOverlayRestoreService } from "./services/trace-edit-overlay-restore.service";
@@ -521,11 +521,9 @@ export {
   type TraceEdgeMediaFailOpenReason,
 } from "./ports/trace-media-store.port";
 export { TraceContentArrayService } from "./services/trace-content-array.service";
-export { binaryInputPartSchema } from "./services/trace-content-extraction.service";
-export {
-  TraceContentExtractionService,
-  type ExtractedRef,
-} from "./services/trace-content-extraction.service";
+export { binaryInputPartSchema } from "./rules/content-part-extraction.rules";
+export { TraceContentExtractionService } from "./services/trace-content-extraction.service";
+export type { ExtractedRef } from "./rules/content-part-extraction.rules";
 export {
   TraceValueMediaExtractionService,
   type ExtractionBudget,

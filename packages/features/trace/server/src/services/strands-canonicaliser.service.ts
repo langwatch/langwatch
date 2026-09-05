@@ -25,11 +25,8 @@ const OPERATION_NAMES_SPAN_TYPE_MAP: Record<string, string> = {
 };
 
 /**
- * Extracts content from Strands event attributes.
- * Strands can send content in various formats:
- * - Direct string content
- * - Array of content parts: [{ text: "..." }]
- * - Nested in gen_ai.content attribute
+ * Extracts content from Strands event attributes, which can be a direct string, an array of
+ * content parts, or nested under the `gen_ai.content` attribute.
  */
 const extractStrandsContent = (eventAttrs: Record<string, unknown>): unknown => {
   const contentCandidates = [
@@ -79,90 +76,20 @@ export class StrandsCanonicaliserService implements CanonicalAttributesPort {
 
   apply(ctx: ExtractorContext): void {
     const { attrs } = ctx.bag;
-
-    const scopeName = ctx.span.instrumentationScope?.name;
-    const isStrands =
-      scopeName === "strands.telemetry.tracer" ||
-      scopeName === "opentelemetry.instrumentation.strands" ||
-      attrs.get(ATTR_KEYS.GEN_AI_SYSTEM) === "strands-agents" ||
-      attrs.get(ATTR_KEYS.SYSTEM_NAME) === "strands-agents" ||
-      attrs.get(ATTR_KEYS.SERVICE_NAME) === "strands-agents" ||
-      attrs.get(ATTR_KEYS.GEN_AI_AGENT_NAME) === "Strands Agents";
-
-    if (!isStrands) {
+    if (!this.isStrands(ctx)) {
       return;
     }
 
-    const operationName = attrs.get(ATTR_KEYS.GEN_AI_OPERATION_NAME);
-    if (operationName && typeof operationName === "string") {
-      const proposedSpanType = OPERATION_NAMES_SPAN_TYPE_MAP[operationName];
-      if (proposedSpanType) {
-        ctx.setAttr(ATTR_KEYS.SPAN_TYPE, proposedSpanType);
-        ctx.recordRule(`${this.id}:gen_ai.operation_name->langwatch.span.type`);
-      }
-    }
-
-    // Preserve event order because role-specific event names are interleaved.
-    if (!ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_INPUT_MESSAGES)) {
-      const inputMessages: unknown[] = [];
-
-      const roleEvents = ctx.bag.events.takeAllByNames(ROLE_EVENT_NAMES);
-      for (const event of roleEvents) {
-        const role = event.name.split(".")[1];
-        const eventAttrs = event.attributes;
-
-        const content = extractStrandsContent(eventAttrs);
-
-        if (content !== void 0) {
-          inputMessages.push({ role, content });
-        }
-      }
-
-      if (inputMessages.length > 0) {
-        const chatMessages = stripSystemMessages(inputMessages);
-        const systemOnly = inputMessages.filter((m) => isRecord(m) && m.role === "system");
-        if (systemOnly.length > 0) {
-          const sysInstruction = extractSystemInstructionFromMessages(systemOnly);
-          if (sysInstruction !== null) {
-            ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS, sysInstruction);
-          }
-        }
-
-        if (chatMessages.length > 0) {
-          ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, chatMessages);
-          ctx.recordRule(`${this.id}:events->gen_ai.input.messages`);
-          recordValueType(ctx, ATTR_KEYS.GEN_AI_INPUT_MESSAGES, "chat_messages");
-        }
-      }
+    this.canonicaliseSpanType(ctx);
+    if (!attrs.has(ATTR_KEYS.GEN_AI_INPUT_MESSAGES)) {
+      this.canonicaliseInputMessages(ctx);
     }
 
     const outputExtracted = extractOutputMessages(
       ctx,
-      [
-        {
-          type: "event",
-          name: "gen_ai.choice",
-          extractor: (event: CanonicalEvent) => {
-            const eventAttrs = event.attributes;
-
-            const content = extractStrandsContent(eventAttrs);
-            const role = typeof eventAttrs.role === "string" ? eventAttrs.role : "assistant";
-
-            if (content !== void 0) {
-              return {
-                role,
-                content,
-                finish_reason: eventAttrs.finish_reason,
-              };
-            }
-
-            return void 0;
-          },
-        },
-      ],
+      [{ type: "event", name: "gen_ai.choice", extractor: strandsChoiceMessage }],
       `${this.id}:gen_ai.choice->gen_ai.output.messages`,
     );
-
     if (outputExtracted) {
       recordValueType(ctx, ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, "chat_messages");
     }
@@ -173,4 +100,81 @@ export class StrandsCanonicaliserService implements CanonicalAttributesPort {
       ctx.recordRule(`${this.id}:matched`);
     }
   }
+
+  /** Whether the span came from Strands, by scope name or by any of the names it stamps. */
+  private isStrands(ctx: ExtractorContext): boolean {
+    const { attrs } = ctx.bag;
+    const scopeName = ctx.span.instrumentationScope?.name;
+
+    return (
+      scopeName === "strands.telemetry.tracer" ||
+      scopeName === "opentelemetry.instrumentation.strands" ||
+      attrs.get(ATTR_KEYS.GEN_AI_SYSTEM) === "strands-agents" ||
+      attrs.get(ATTR_KEYS.SYSTEM_NAME) === "strands-agents" ||
+      attrs.get(ATTR_KEYS.SERVICE_NAME) === "strands-agents" ||
+      attrs.get(ATTR_KEYS.GEN_AI_AGENT_NAME) === "Strands Agents"
+    );
+  }
+
+  private canonicaliseSpanType(ctx: ExtractorContext): void {
+    const operationName = ctx.bag.attrs.get(ATTR_KEYS.GEN_AI_OPERATION_NAME);
+    if (typeof operationName !== "string") {
+      return;
+    }
+
+    const proposedSpanType = OPERATION_NAMES_SPAN_TYPE_MAP[operationName];
+    if (proposedSpanType) {
+      ctx.setAttr(ATTR_KEYS.SPAN_TYPE, proposedSpanType);
+      ctx.recordRule(`${this.id}:gen_ai.operation_name->langwatch.span.type`);
+    }
+  }
+
+  /**
+   * The conversation Strands reports as role-named events. Event order is preserved because the
+   * role-specific names are interleaved, and the system turn is lifted to its own attribute.
+   */
+  private canonicaliseInputMessages(ctx: ExtractorContext): void {
+    const inputMessages: unknown[] = [];
+    for (const event of ctx.bag.events.takeAllByNames(ROLE_EVENT_NAMES)) {
+      const role = event.name.split(".")[1];
+      const content = extractStrandsContent(event.attributes);
+      if (content !== void 0) {
+        inputMessages.push({ role, content });
+      }
+    }
+
+    if (inputMessages.length === 0) {
+      return;
+    }
+
+    const systemOnly = inputMessages.filter(
+      (message) => isRecord(message) && message.role === "system",
+    );
+    if (systemOnly.length > 0) {
+      const sysInstruction = extractSystemInstructionFromMessages(systemOnly);
+      if (sysInstruction !== null) {
+        ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS, sysInstruction);
+      }
+    }
+
+    const chatMessages = stripSystemMessages(inputMessages);
+    if (chatMessages.length > 0) {
+      ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, chatMessages);
+      ctx.recordRule(`${this.id}:events->gen_ai.input.messages`);
+      recordValueType(ctx, ATTR_KEYS.GEN_AI_INPUT_MESSAGES, "chat_messages");
+    }
+  }
+}
+
+/** One Strands choice event as an output message, or nothing when it carried no content. */
+function strandsChoiceMessage(event: CanonicalEvent): unknown {
+  const eventAttrs = event.attributes;
+  const content = extractStrandsContent(eventAttrs);
+  if (content === void 0) {
+    return void 0;
+  }
+
+  const role = typeof eventAttrs.role === "string" ? eventAttrs.role : "assistant";
+
+  return { role, content, finish_reason: eventAttrs.finish_reason };
 }

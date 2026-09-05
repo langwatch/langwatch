@@ -1,5 +1,7 @@
 /**
- * Reads ONE span's attributes into the shape a trace summary uses. Separate from accumulation because it's a different job with a different dependency: this reads a span and needs nothing else, while folding across a trace needs the origin service. One class would have put a 190-line mapping vocabulary beside the fold rules.
+ * Reads one span's attributes into the shape a trace summary uses. Separate from accumulation
+ * because it is a different job with a different dependency: this reads a span and needs nothing
+ * else, while folding across a trace needs the origin service.
  */
 
 import { ATTR_KEYS } from "@langwatch/trace-contract";
@@ -69,7 +71,9 @@ export const SPAN_ATTR_MAPPINGS = [
 ] as const;
 
 /**
- * Resource attributes carrying trace identity (thread_id, user_id, customer_id) need promotion to canonical trace-summary forms: the REST collector writes metadata.thread_id as a RESOURCE attribute, but the canonicalisation extractor mapping to gen_ai.conversation.id only runs on per-SPAN attributes — without this hoist, a trace posted via the docs' metadata example never picks up a conversationId. Each entry: resource keys to look at (priority order) -> the canonical trace-summary key to populate.
+ * Resource attributes carrying trace identity need promotion to canonical trace-summary forms: the
+ * REST collector writes `metadata.thread_id` as a resource attribute, but canonicalisation only
+ * runs on per-span attributes, so without this hoist such a trace never gains a conversationId.
  */
 export const RESOURCE_ATTR_CANONICAL_MAPPINGS = [
   {
@@ -100,7 +104,9 @@ export const RESOURCE_ATTR_CANONICAL_MAPPINGS = [
 ] as const;
 
 /**
- * Resource attributes carrying a cost-classification signal, not trace identity — consumed per span at fold time (bundled portion rolled into NonBilledCost) and must NOT be hoisted onto the trace's attribute map, since a trace's cost split is two real amounts, not a single boolean. Existing rows keep the key; the read layer treats the column as authoritative and the key as fallback only.
+ * Resource attributes carrying a cost-classification signal, not trace identity. They are consumed
+ * per span at fold time and must not be hoisted onto the trace's attribute map, since a trace's
+ * cost split is two real amounts rather than one boolean. The column stays authoritative.
  */
 const NON_HOISTED_RESOURCE_KEYS: ReadonlySet<string> = new Set(["langwatch.cost.non_billable"]);
 

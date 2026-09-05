@@ -6,11 +6,9 @@
 import { describe, expect, it, vi } from "vitest";
 import type { EvaluationsV3State } from "@langwatch/experiment-contract";
 import type { CallOutcome } from "@langwatch/agent-contract";
-import {
-  type ConnectedDispatch,
-  ExperimentRunOrchestratorService,
-  type ExperimentRunPorts,
-} from "../experiment-run-orchestrator.service";
+import { ExperimentRunOrchestratorService } from "../experiment-run-orchestrator.service";
+import type { ConnectedDispatch } from "../experiment-connected-cell.service";
+import type { ExperimentRunPorts } from "../../rules/experiment-run-input.rules";
 
 const createTestDataset = (rowCount = 3) =>
   Array.from({ length: rowCount }, (_, i) => ({

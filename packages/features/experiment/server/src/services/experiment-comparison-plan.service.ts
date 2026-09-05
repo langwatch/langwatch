@@ -26,6 +26,7 @@ import {
   type ComparisonSkipReason,
 } from "../processes/experiment-comparison-skip.process";
 import type { LoadedEvaluators } from "./experiment-execution-data.service";
+import { ExperimentComparisonVariantService } from "./experiment-comparison-variant.service";
 
 const logger = createLogger("langwatch:experiment:run-orchestrator");
 
@@ -45,158 +46,18 @@ export class ExperimentComparisonPlanService {
     loadedPrompts?: Map<string, VersionedPrompt>;
     loadedEvaluators?: LoadedEvaluators;
   }): ExperimentComparisonPlanService {
-    return new ExperimentComparisonPlanService(loadedPrompts, loadedEvaluators);
+    return new ExperimentComparisonPlanService(
+      loadedPrompts,
+      loadedEvaluators,
+      ExperimentComparisonVariantService.create({ loadedEvaluators }),
+    );
   }
 
   private constructor(
     private readonly loadedPrompts: Map<string, VersionedPrompt> | undefined,
     private readonly loadedEvaluators: LoadedEvaluators | undefined,
+    private readonly variants: ExperimentComparisonVariantService,
   ) {}
-
-  /** Resolve configured variant ids to TargetConfigs, or the setup skip reason (#5378). */
-  private resolveVariants({
-    state,
-    cfg,
-    ownerId,
-  }: {
-    state: Pick<EvaluationsV3State, "targets">;
-    cfg: ComparisonEvaluatorConfig;
-    ownerId: string;
-  }): { variants: TargetConfig[]; skip?: never } | { skip: ComparisonSetupSkip; variants?: never } {
-    if (!cfg.variants || cfg.variants.length < 2) {
-      logger.warn(
-        { ownerId, variants: cfg.variants },
-        "Comparison skipped: fewer than 2 variants configured",
-      );
-
-      return { skip: "too-few-variants" };
-    }
-
-    if (!isGoldenFieldSatisfied(cfg)) {
-      logger.debug(
-        {
-          ownerId,
-          variants: cfg.variants,
-          hasGoldenAnswer: cfg.hasGoldenAnswer,
-          goldenField: cfg.goldenField,
-        },
-        "Comparison skipped: golden field not configured",
-      );
-
-      return { skip: "golden-not-set" };
-    }
-
-    const resolved = cfg.variants.map((id) => state.targets.find((t) => t.id === id));
-    if (resolved.some((t) => !t)) {
-      logger.warn(
-        { ownerId, variants: cfg.variants },
-        "Comparison skipped: one or more variant targets not found",
-      );
-
-      return { skip: "variant-not-found" };
-    }
-
-    return { variants: resolved as TargetConfig[] };
-  }
-
-  /** The column a chip-style comparison's verdict hangs under: its first live variant. */
-  private anchorVariantId({
-    state,
-    cfg,
-  }: {
-    state: Pick<EvaluationsV3State, "targets">;
-    cfg: ComparisonEvaluatorConfig;
-  }): string | undefined {
-    return (cfg.variants ?? []).find((id) => state.targets.some((t) => t.id === id));
-  }
-
-  /** One error row per scoped row for a comparison that cannot be built. */
-  private pushSetupSkips({
-    kind,
-    targetId,
-    evaluatorId,
-    rowsInScope,
-    datasetRows,
-    skipReasons,
-  }: {
-    kind: ComparisonSetupSkip;
-    targetId: string;
-    evaluatorId: string;
-    rowsInScope: number[];
-    datasetRows: Array<Record<string, unknown>>;
-    skipReasons: ComparisonSkipReason[];
-  }): void {
-    for (const rowIndex of rowsInScope) {
-      const datasetEntry = datasetRows[rowIndex];
-      if (!datasetEntry || isRowEmpty(datasetEntry)) {
-        continue;
-      }
-
-      skipReasons.push({ rowIndex, targetId, evaluatorId, kind, variantNames: [] });
-    }
-  }
-
-  /** Whether a column-target's backing DB evaluator is still the legacy `pairwise_compare` judge. */
-  private isLegacyPairwiseBacked(dbEvaluatorId: string | undefined): boolean {
-    if (!dbEvaluatorId) {
-      return false;
-    }
-
-    const dbConfig = this.loadedEvaluators?.get(dbEvaluatorId)?.config as
-      | { evaluatorType?: string }
-      | undefined;
-
-    return dbConfig?.evaluatorType === LEGACY_PAIRWISE_EVALUATOR_TYPE;
-  }
-
-  /** The candidate payload for one row, or the names of variants with no output. */
-  private buildCandidates({
-    cfg,
-    variantIds,
-    variantDisplayNames,
-    rowIndex,
-    completedTargetOutputs,
-    completedTargetEvaluatorScores,
-  }: {
-    cfg: ComparisonEvaluatorConfig;
-    variantIds: string[];
-    variantDisplayNames: string[];
-    rowIndex: number;
-    completedTargetOutputs: Map<string, { output: unknown; cost?: number; duration?: number }>;
-    completedTargetEvaluatorScores?: Map<string, VariantEvaluatorScore[]>;
-  }):
-    | { candidates: ExecutionCell["comparison"]; missing?: never; empty?: never }
-    | { candidates?: never; missing: string[]; empty?: never }
-    | { candidates?: never; missing?: never; empty: string[] } {
-    const outputs = cfg.variants.map((id) => completedTargetOutputs.get(`${rowIndex}:${id}`));
-
-    const missing = variantDisplayNames.filter((_, i) => !outputs[i]);
-    if (missing.length > 0) {
-      return { missing };
-    }
-
-    const candidates = cfg.variants.map((variantId, i) => {
-      const text = toCandidateText(
-        pickOutputPath(outputs[i]!.output, cfg.variantOutputPaths?.[variantId]),
-      );
-
-      return {
-        id: variantIds[i]!,
-        output: text
-          ? text + evaluatorScoresBlock({ rowIndex, variantId, completedTargetEvaluatorScores })
-          : text,
-        cost: outputs[i]!.cost,
-        duration: outputs[i]!.duration,
-      };
-    });
-
-    const empty = variantDisplayNames.filter((_, i) => candidates[i]!.output === "");
-    if (empty.length > 0) {
-      return { empty };
-    }
-
-    return { candidates: { candidates } };
-  }
 
   /** Chip-style comparison evaluators, verdict anchored on the first variant's column. */
   private planChipComparisons({
@@ -224,11 +85,11 @@ export class ExperimentComparisonPlanService {
         continue;
       }
 
-      const resolution = this.resolveVariants({ state, cfg, ownerId: evaluator.id });
+      const resolution = this.variants.resolveVariants({ state, cfg, ownerId: evaluator.id });
       if (resolution.skip) {
-        const anchorId = this.anchorVariantId({ state, cfg });
+        const anchorId = this.variants.tryAnchorVariantId({ state, cfg });
         if (anchorId) {
-          this.pushSetupSkips({
+          this.variants.pushSetupSkips({
             kind: resolution.skip,
             targetId: anchorId,
             evaluatorId: evaluator.id,
@@ -260,7 +121,7 @@ export class ExperimentComparisonPlanService {
           continue;
         }
 
-        const built = this.buildCandidates({
+        const built = this.variants.buildCandidates({
           cfg,
           variantIds,
           variantDisplayNames,
@@ -398,9 +259,9 @@ export class ExperimentComparisonPlanService {
         continue;
       }
 
-      const resolution = this.resolveVariants({ state, cfg, ownerId: target.id });
+      const resolution = this.variants.resolveVariants({ state, cfg, ownerId: target.id });
       if (resolution.skip) {
-        this.pushSetupSkips({
+        this.variants.pushSetupSkips({
           kind: resolution.skip,
           targetId: target.id,
           evaluatorId: target.id,
@@ -424,56 +285,101 @@ export class ExperimentComparisonPlanService {
       });
 
       const legacyPairwise =
-        this.isLegacyPairwiseBacked(target.targetEvaluatorId) && variantIds.length === 2;
+        this.variants.isLegacyPairwiseBacked(target.targetEvaluatorId) && variantIds.length === 2;
 
       for (const rowIndex of rowsInScope) {
-        const datasetEntry = datasetRows[rowIndex];
-        if (!datasetEntry) {
-          continue;
-        }
-
-        const built = this.buildCandidates({
-          cfg,
-          variantIds,
-          variantDisplayNames,
-          rowIndex,
-          completedTargetOutputs,
-          completedTargetEvaluatorScores,
-        });
-        if (built.missing || built.empty) {
-          skipReasons.push({
-            rowIndex,
-            targetId: target.id,
-            evaluatorId: target.id,
-            kind: built.missing ? "missing-output" : "empty-output",
-            variantNames: built.missing ?? built.empty,
-          });
-          continue;
-        }
-
-        const syntheticEvaluator = this.syntheticColumnEvaluator({
+        this.planColumnRow({
           target,
           cfg,
+          rowIndex,
+          datasetRows,
           datasetId,
-          datasetEntry,
-          rowIndex,
           variantIds,
+          variantDisplayNames,
           legacyPairwise,
-          built: built as { candidates: ExecutionCell["comparison"] },
-        });
-
-        cells.push({
-          rowIndex,
-          targetId: target.id,
-          targetConfig: target,
-          evaluatorConfigs: [syntheticEvaluator],
-          datasetEntry: { _datasetId: datasetId, ...datasetEntry },
-          skipTarget: true,
-          precomputedTargetOutput: built.candidates!.candidates[0]!.output,
-          comparison: built.candidates,
+          completedTargetOutputs,
+          completedTargetEvaluatorScores,
+          cells,
+          skipReasons,
         });
       }
     }
+  }
+
+  /** One row of one column-style comparison target: its cell, or the reason it was skipped. */
+  private planColumnRow({
+    target,
+    cfg,
+    rowIndex,
+    datasetRows,
+    datasetId,
+    variantIds,
+    variantDisplayNames,
+    legacyPairwise,
+    completedTargetOutputs,
+    completedTargetEvaluatorScores,
+    cells,
+    skipReasons,
+  }: {
+    target: TargetConfig;
+    cfg: ComparisonEvaluatorConfig;
+    rowIndex: number;
+    datasetRows: Array<Record<string, unknown>>;
+    datasetId: string;
+    variantIds: string[];
+    variantDisplayNames: string[];
+    legacyPairwise: boolean;
+    completedTargetOutputs: Map<string, { output: unknown; cost?: number; duration?: number }>;
+    completedTargetEvaluatorScores?: Map<string, VariantEvaluatorScore[]>;
+    cells: ExecutionCell[];
+    skipReasons: ComparisonSkipReason[];
+  }): void {
+    const datasetEntry = datasetRows[rowIndex];
+    if (!datasetEntry) {
+      return;
+    }
+
+    const built = this.variants.buildCandidates({
+      cfg,
+      variantIds,
+      variantDisplayNames,
+      rowIndex,
+      completedTargetOutputs,
+      completedTargetEvaluatorScores,
+    });
+    if (built.missing || built.empty) {
+      skipReasons.push({
+        rowIndex,
+        targetId: target.id,
+        evaluatorId: target.id,
+        kind: built.missing ? "missing-output" : "empty-output",
+        variantNames: built.missing ?? built.empty,
+      });
+
+      return;
+    }
+
+    const syntheticEvaluator = this.syntheticColumnEvaluator({
+      target,
+      cfg,
+      datasetId,
+      datasetEntry,
+      rowIndex,
+      variantIds,
+      legacyPairwise,
+      built: built as { candidates: ExecutionCell["comparison"] },
+    });
+
+    cells.push({
+      rowIndex,
+      targetId: target.id,
+      targetConfig: target,
+      evaluatorConfigs: [syntheticEvaluator],
+      datasetEntry: { _datasetId: datasetId, ...datasetEntry },
+      skipTarget: true,
+      precomputedTargetOutput: built.candidates!.candidates[0]!.output,
+      comparison: built.candidates,
+    });
   }
 
   generateComparisonCells({

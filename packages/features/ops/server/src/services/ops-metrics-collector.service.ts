@@ -1,273 +1,56 @@
+/**
+ * The fleet's queue metrics: one pod holds the lease and scans, folding each cycle into its window
+ * and publishing what every other pod reads. Sampling, the dashboard view and the two published
+ * artifacts each have their own service; this owns the lease, the schedule and the cycle's order.
+ */
+
 import * as os from "node:os";
 import { createLogger } from "@langwatch/observability";
-import { SNAPSHOT_VERSION, mergeHistogramCounts, windowPercentiles } from "@langwatch/ops-contract";
 import type {
   DashboardData,
   DetailSnapshot,
-  JobNameMetrics,
-  LatencyWindows,
-  OpsSnapshotService,
   OpsService,
+  OpsSnapshotService,
   PipelineNode,
   QueueInfo,
-  QueueSummaryInfo,
   RedisInfo,
-  ThroughputPoint,
 } from "@langwatch/ops-contract";
-import { normalizeErrorMessage } from "../rules/ops-error-normalizer.rules";
-import { computeEngineCpuPercent, type RedisCpuSample } from "../rules/ops-redis-engine-cpu.rules";
+import { computeEngineCpuPercent } from "../rules/ops-redis-engine-cpu.rules";
 import type { OpsMetricsRepository } from "../repositories/ops-metrics.repository";
 import { totalInFlight as computeTotalInFlight } from "../rules/ops-in-flight.rules";
+import { OpsDashboardViewService } from "./ops-dashboard-view.service";
+import { OpsMetricsPublicationService } from "./ops-metrics-publication.service";
+import { OpsMetricsSamplingService } from "./ops-metrics-sampling.service";
+import {
+  METRICS_COLLECT_INTERVAL_MS,
+  OpsMetricsWindow,
+  THROUGHPUT_BUFFER_SIZE,
+} from "./ops-metrics-window.service";
 
 const logger = createLogger("langwatch:ops:metrics-collector");
 
-const THROUGHPUT_BUFFER_SIZE = 900;
-const METRICS_COLLECT_INTERVAL_MS = 2_000;
 const PENDING_RECONCILE_INTERVAL_MS = 60_000;
-const REDIS_STATE_TTL_SECONDS = 3600;
 const QUEUE_DISCOVERY_INTERVAL_MS = 10_000;
-
-/**
- * The live cycle is cheap and stays at 2s; the detail cycle walks every blocked set in full and enumerates parked tenants, which is only affordable because ONE
- * writer in the fleet runs it. Fifteen seconds keeps the drill-downs usefully fresh while leaving the exhaustive work firmly in the background.
- * How often the exhaustive detail scan runs (ADR-090).
- */
-const DETAIL_CYCLE_INTERVAL_MS = 15_000;
-
-/** Bounds on the detail artifact. Every one of these reports itself. */
-const MAX_ERROR_CLUSTERS = 50;
-const MAX_PARKED_TENANTS = 50;
-
-const JOB_NAME_COUNTER_PREFIX = "jn:";
 
 /** How long a known pipeline path stays listed after it was last seen. */
 const KNOWN_PIPELINE_PATH_TTL_MS = 24 * 60 * 60 * 1000;
 
-interface PersistedMetricsState {
-  version: 3;
-  savedAt: number;
-  peakCompletedPerSec: number;
-  peakFailedPerSec: number;
-  peakIngestedPerSec: number;
-  peakLatencyP50Ms: number;
-  peakLatencyP99Ms: number;
-  peakPhases: Record<
-    string,
-    {
-      completedPerSec: number;
-      failedPerSec: number;
-      latencyP50Ms: number;
-      latencyP99Ms: number;
-    }
-  >;
-  peakJobNames: Array<
-    [
-      string,
-      {
-        completedPerSec: number;
-        failedPerSec: number;
-        latencyP50Ms: number;
-        latencyP99Ms: number;
-      },
-    ]
-  >;
-  throughputBuffer: ThroughputPoint[];
-  latestTotalCompleted: number;
-  latestTotalFailed: number;
-}
-
-const EMPTY_PHASE = {
-  pending: 0,
-  active: 0,
-  completedPerSec: 0,
-  failedPerSec: 0,
-  latencyP50Ms: 0,
-  latencyP99Ms: 0,
-  peakCompletedPerSec: 0,
-  peakFailedPerSec: 0,
-  peakLatencyP50Ms: 0,
-  peakLatencyP99Ms: 0,
-} as const;
-
-function emptyPhases(): DashboardData["phases"] {
-  return {
-    commands: { ...EMPTY_PHASE },
-    projections: { ...EMPTY_PHASE },
-    reactions: { ...EMPTY_PHASE },
-  };
-}
-
-/**
- * Raw `__jobType` values become the projection-kind node names the health join looks up: folds enqueue as `projection`, maps
- * as `handler`, state projections as `stateProjection`. Filing `handler` under `fold` (as this did until #7322) left every map
- * row permanently dark — the join looked under `map`, which the tree never produced.
- */
-function normalizeJobType(jobType: string): string {
-  const lower = jobType.toLowerCase();
-  if (lower === "projection") {
-    return "fold";
-  }
-
-  if (lower === "handler") {
-    return "map";
-  }
-
-  if (lower === "stateprojection") {
-    return "state";
-  }
-
-  if (lower === "reaction") {
-    return "reactor";
-  }
-
-  return jobType;
-}
-
-interface PeakBucket {
-  completedPerSec: number;
-  failedPerSec: number;
-  latencyP50Ms: number;
-  latencyP99Ms: number;
-}
-
-/** Field-wise max, so neither side of a handover loses a peak it observed. */
-function mergePeakBucket(mine: PeakBucket | undefined, theirs: PeakBucket): PeakBucket {
-  if (!mine) {
-    return { ...theirs };
-  }
-
-  return {
-    completedPerSec: Math.max(mine.completedPerSec, theirs.completedPerSec),
-    failedPerSec: Math.max(mine.failedPerSec, theirs.failedPerSec),
-    latencyP50Ms: Math.max(mine.latencyP50Ms, theirs.latencyP50Ms),
-    latencyP99Ms: Math.max(mine.latencyP99Ms, theirs.latencyP99Ms),
-  };
-}
-
-/**
- * Union two rolling histories by timestamp, newest window kept.
- */
-function mergeThroughput({
-  mine,
-  theirs,
-}: {
-  mine: ThroughputPoint[];
-  theirs: ThroughputPoint[];
-}): ThroughputPoint[] {
-  const byTimestamp = new Map<number, ThroughputPoint>();
-  for (const point of mine) {
-    byTimestamp.set(point.timestamp, point);
-  }
-
-  for (const point of theirs) {
-    byTimestamp.set(point.timestamp, point);
-  }
-
-  const cutoff = Date.now() - THROUGHPUT_BUFFER_SIZE * METRICS_COLLECT_INTERVAL_MS;
-
-  return Array.from(byTimestamp.values())
-    .filter((point) => point.timestamp > cutoff)
-    .sort((a, b) => a.timestamp - b.timestamp)
-    .slice(-THROUGHPUT_BUFFER_SIZE);
-}
-
-/**
- * Every pod that can reach Redis starts one of these, but only the pod holding `ops:snapshot:lease` scans and publishes; the rest idle their loop after a single
- * `SET NX`. Readers never call into this class — they read the artifacts it persists, so two browser tabs on different pods cannot disagree.
- * The lease-elected snapshot writer (ADR-090).
- */
 export class OpsMetricsCollectorService {
   private metrics: OpsMetricsRepository;
   private groupQueueNames: string[] = [];
-  private throughputBuffer: ThroughputPoint[] = [];
-  private lastTotalInFlight = 0;
-  private lastTimestamp = Date.now();
-  private hasBaseline = false;
-  private currentIngestedPerSec = 0;
-  private currentCompletedPerSec = 0;
-  private currentFailedPerSec = 0;
-  private currentPhases: DashboardData["phases"] = emptyPhases();
-  private currentLatencyP50Ms = 0;
-  private currentLatencyP99Ms = 0;
-  private peakCompletedPerSec = 0;
-  private peakFailedPerSec = 0;
-  private peakIngestedPerSec = 0;
-  private peakLatencyP50Ms = 0;
-  private peakLatencyP99Ms = 0;
-  private peakPhases: Record<
-    string,
-    {
-      completedPerSec: number;
-      failedPerSec: number;
-      latencyP50Ms: number;
-      latencyP99Ms: number;
-    }
-  > = {
-    commands: {
-      completedPerSec: 0,
-      failedPerSec: 0,
-      latencyP50Ms: 0,
-      latencyP99Ms: 0,
-    },
-    projections: {
-      completedPerSec: 0,
-      failedPerSec: 0,
-      latencyP50Ms: 0,
-      latencyP99Ms: 0,
-    },
-    reactions: {
-      completedPerSec: 0,
-      failedPerSec: 0,
-      latencyP50Ms: 0,
-      latencyP99Ms: 0,
-    },
-  };
-  private latestTotalCompleted = 0;
-  private latestTotalFailed = 0;
-  private latestQueues: QueueInfo[] = [];
-  private latestRedisInfo: RedisInfo = {
-    usedMemoryHuman: "?",
-    peakMemoryHuman: "?",
-    usedMemoryBytes: 0,
-    peakMemoryBytes: 0,
-    maxMemoryBytes: 0,
-    connectedClients: 0,
-    usedCpuUserMainThreadSeconds: 0,
-    usedCpuSysMainThreadSeconds: 0,
-  };
   // Previous Redis CPU snapshot used to derive an engine-CPU percent between
   // successive collect() cycles. Null until the first sample lands. We sample
   // the *main-thread* counters specifically because Redis processes commands
   // on a single thread — that's the metric that pegs at 100% during
   // saturation (CloudWatch's `EngineCPUUtilization`).
-  private prevRedisCpu: RedisCpuSample | null = null;
-  private currentRedisEngineCpuPercent: number | null = null;
   private collectInterval: ReturnType<typeof setInterval> | null = null;
   private discoveryInterval: ReturnType<typeof setInterval> | null = null;
   private reconcileInterval: ReturnType<typeof setInterval> | null = null;
-  private lastCpuUsage = process.cpuUsage();
-  private lastCpuTime = Date.now();
-  private currentCpuPercent = 0;
-  private peakJobNames = new Map<
-    string,
-    {
-      completedPerSec: number;
-      failedPerSec: number;
-      latencyP50Ms: number;
-      latencyP99Ms: number;
-    }
-  >();
-  private currentJobNameMetrics: JobNameMetrics[] = [];
-  private currentPausedKeys: string[] = [];
   /**
    * Last drift figure read back from the shared publication, not the one this
    * instance measured. See {@link reconcilePending}.
    */
-  private latestPendingDrift = 0;
-  private knownPipelinePaths: string[] = [];
   private isCollecting = false;
-  private prevCompleted = new Map<string, number>();
-  private prevFailed = new Map<string, number>();
 
   private readonly ops: OpsService;
   private snapshots: OpsSnapshotService | null;
@@ -283,7 +66,12 @@ export class OpsMetricsCollectorService {
   private latestDetail: DetailSnapshot | null = null;
 
   /** The one collector this process runs, once `getSingleton` has built it. */
+  /** The one collector this process runs, once `getSingleton` has built it. */
   private static singleton: OpsMetricsCollectorService | null = null;
+
+  private readonly window = OpsMetricsWindow.create();
+  private readonly sampling: OpsMetricsSamplingService;
+  private readonly publication: OpsMetricsPublicationService;
 
   static create(params: {
     metrics: OpsMetricsRepository;
@@ -311,124 +99,16 @@ export class OpsMetricsCollectorService {
     return OpsMetricsCollectorService.singleton;
   }
 
+  /** Which phase a job type belongs to, as the dashboard groups them. */
   static mapJobTypeToPhase(
     jobType: string | null | undefined,
   ): "commands" | "projections" | "reactions" {
-    if (!jobType) {
-      return "commands";
-    }
-
-    const lower = jobType.toLowerCase();
-    if (lower === "projection" || lower === "handler" || lower === "stateprojection") {
-      return "projections";
-    }
-
-    if (lower === "reactor" || lower === "reaction") {
-      return "reactions";
-    }
-
-    return "commands";
+    return OpsMetricsSamplingService.mapJobTypeToPhase(jobType);
   }
 
-  static buildPipelineTree({
-    queues,
-    seedKeys = [],
-  }: {
-    queues: QueueInfo[];
-    seedKeys?: string[];
-  }): PipelineNode[] {
-    const pipelineMap = new Map<
-      string,
-      Map<string, Map<string, { pending: number; active: number; blocked: number }>>
-    >();
-
-    const ensurePath = (pName: string, jType?: string, jName?: string) => {
-      if (!pipelineMap.has(pName)) {
-        pipelineMap.set(pName, new Map());
-      }
-
-      if (jType) {
-        const normalized = normalizeJobType(jType);
-        const typeMap = pipelineMap.get(pName)!;
-        if (!typeMap.has(normalized)) {
-          typeMap.set(normalized, new Map());
-        }
-
-        if (jName) {
-          const nameMap = typeMap.get(normalized)!;
-          if (!nameMap.has(jName)) {
-            nameMap.set(jName, { pending: 0, active: 0, blocked: 0 });
-          }
-        }
-      }
-    };
-
-    for (const key of seedKeys) {
-      const parts = key.split("/");
-      if (parts.length >= 1) {
-        ensurePath(parts[0]!, parts[1], parts[2]);
-      }
-    }
-
-    for (const queue of queues) {
-      for (const group of queue.groups) {
-        const pName = group.pipelineName ?? queue.displayName;
-        const jType = normalizeJobType(group.jobType ?? "default");
-        const jName = group.jobName ?? "default";
-
-        ensurePath(pName, jType, jName);
-        const nameMap = pipelineMap.get(pName)!.get(jType)!;
-        const existing = nameMap.get(jName)!;
-        existing.pending += group.pendingJobs;
-        existing.active += group.hasActiveJob ? 1 : 0;
-        existing.blocked += group.isBlocked ? 1 : 0;
-      }
-    }
-
-    const tree: PipelineNode[] = [];
-    for (const [pName, typeMap] of pipelineMap) {
-      const typeChildren: PipelineNode[] = [];
-      let pPending = 0,
-        pActive = 0,
-        pBlocked = 0;
-
-      for (const [jType, nameMap] of typeMap) {
-        const nameChildren: PipelineNode[] = [];
-        let tPending = 0,
-          tActive = 0,
-          tBlocked = 0;
-
-        for (const [jName, counts] of nameMap) {
-          nameChildren.push({ name: jName, ...counts, children: [] });
-          tPending += counts.pending;
-          tActive += counts.active;
-          tBlocked += counts.blocked;
-        }
-
-        typeChildren.push({
-          name: jType,
-          pending: tPending,
-          active: tActive,
-          blocked: tBlocked,
-          children: nameChildren,
-        });
-        pPending += tPending;
-        pActive += tActive;
-        pBlocked += tBlocked;
-      }
-
-      tree.push({
-        name: pName,
-        pending: pPending,
-        active: pActive,
-        blocked: pBlocked,
-        children: typeChildren,
-      });
-    }
-
-    tree.sort((a, b) => a.name.localeCompare(b.name));
-
-    return tree;
+  /** The pipeline tree the sidebar walks, for a set of scanned queues. */
+  static buildPipelineTree(params: { queues: QueueInfo[]; seedKeys?: string[] }): PipelineNode[] {
+    return OpsDashboardViewService.buildPipelineTree(params);
   }
 
   private constructor(params: {
@@ -441,6 +121,16 @@ export class OpsMetricsCollectorService {
     this.ops = params.ops;
     this.snapshots = params.snapshots ?? null;
     this.writerId = params.writerId ?? `${os.hostname()}:${process.pid}`;
+    this.sampling = OpsMetricsSamplingService.create({ metrics: this.metrics });
+    this.publication = OpsMetricsPublicationService.create({
+      ops: this.ops,
+      sampling: this.sampling,
+      window: this.window,
+      writerId: this.writerId,
+      queueNames: () => this.groupQueueNames,
+      lease: () => ({ token: this.leaseToken, epoch: this.leaseEpoch }),
+      snapshots: this.snapshots,
+    });
   }
 
   /** True while this pod is the fleet's writer. Exposed for tests and logs. */
@@ -449,7 +139,7 @@ export class OpsMetricsCollectorService {
   }
 
   async start(): Promise<void> {
-    await this.restoreState();
+    await this.window.restore(this.metrics);
     await this.discoverQueues();
     // Kick off the first collect without blocking start(); the interval below
     // will keep collecting on schedule. Errors are caught inside collect().
@@ -527,7 +217,7 @@ export class OpsMetricsCollectorService {
       // would otherwise report 0 drift for a queue that has plenty, and an instance that won
       // some of the queues would report a partial total. Reading the shared figures is what
       // makes every instance agree, and agree on the whole.
-      this.latestPendingDrift = await this.ops.readQueuePendingDrift({
+      this.window.latestPendingDrift = await this.ops.readQueuePendingDrift({
         queueNames: this.groupQueueNames,
       });
 
@@ -542,605 +232,21 @@ export class OpsMetricsCollectorService {
     }
   }
 
+  /** This pod's view of the dashboard. */
   getDashboardData(): DashboardData {
-    const fullQueues = this.latestQueues;
-    const redisInfo = this.latestRedisInfo;
-
-    let totalGroups = 0;
-    let blockedGroups = 0;
-    let parkedGroups = 0;
-    let totalPendingJobs = 0;
-
-    for (const q of fullQueues) {
-      totalGroups += q.groups.length;
-      blockedGroups += q.blockedGroupCount;
-      parkedGroups += q.parkedGroupCount;
-      totalPendingJobs += q.totalPendingJobs;
-    }
-
-    const treeSeedKeys = [...new Set([...this.currentPausedKeys, ...this.knownPipelinePaths])];
-    const pipelineTree = OpsMetricsCollectorService.buildPipelineTree({
-      queues: fullQueues,
-      seedKeys: treeSeedKeys,
-    });
-
-    const errorMap = new Map<
-      string,
-      {
-        normalizedMessage: string;
-        sampleMessage: string;
-        sampleStack: string | null;
-        count: number;
-        pipelineName: string | null;
-        queueName: string;
-        sampleGroupIds: string[];
-      }
-    >();
-    for (const q of fullQueues) {
-      for (const g of q.groups) {
-        if (!g.isBlocked || !g.errorMessage) {
-          continue;
-        }
-
-        const normalized = normalizeErrorMessage(g.errorMessage);
-        const key = `${g.pipelineName ?? ""}::${normalized}`;
-        const existing = errorMap.get(key);
-        if (existing) {
-          existing.count++;
-          if (existing.sampleGroupIds.length < 5) {
-            existing.sampleGroupIds.push(g.groupId);
-          }
-        } else {
-          errorMap.set(key, {
-            normalizedMessage: normalized,
-            sampleMessage: g.errorMessage,
-            sampleStack: g.errorStack,
-            count: 1,
-            pipelineName: g.pipelineName,
-            queueName: q.name,
-            sampleGroupIds: [g.groupId],
-          });
-        }
-      }
-    }
-
-    const topErrors = Array.from(errorMap.values())
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 10);
-
-    const queues: QueueSummaryInfo[] = fullQueues.map(({ groups: _groups, ...summary }) => summary);
-
-    const mem = process.memoryUsage();
-
-    return {
-      totalGroups,
-      blockedGroups,
-      parkedGroups,
-      totalPendingJobs,
-      pendingDrift: this.latestPendingDrift,
-      throughputIngestedPerSec: this.currentIngestedPerSec,
-      totalCompleted: this.latestTotalCompleted,
-      totalFailed: this.latestTotalFailed,
-      completedPerSec: this.currentCompletedPerSec,
-      failedPerSec: this.currentFailedPerSec,
-      peakCompletedPerSec: this.peakCompletedPerSec,
-      peakFailedPerSec: this.peakFailedPerSec,
-      peakIngestedPerSec: this.peakIngestedPerSec,
-      redisMemoryUsedBytes: redisInfo.usedMemoryBytes,
-      redisMemoryPeakBytes: redisInfo.peakMemoryBytes,
-      redisMemoryMaxBytes: redisInfo.maxMemoryBytes,
-      redisConnectedClients: redisInfo.connectedClients,
-      redisEngineCpuPercent: this.currentRedisEngineCpuPercent,
-      processCpuPercent: Math.round(this.currentCpuPercent * 10) / 10,
-      processMemoryUsedMb: Math.round(mem.rss / 1024 / 1024),
-      processMemoryTotalMb: Math.round(os.totalmem() / 1024 / 1024),
-      throughputHistory: [...this.throughputBuffer],
-      pipelineTree,
-      queues,
-      latencyP50Ms: this.currentLatencyP50Ms,
-      latencyP99Ms: this.currentLatencyP99Ms,
-      peakLatencyP50Ms: this.peakLatencyP50Ms,
-      peakLatencyP99Ms: this.peakLatencyP99Ms,
-      latencyWindows: this.latestDetail?.latencyWindows ?? null,
-      phases: this.currentPhases,
-      jobNameMetrics: this.currentJobNameMetrics,
-      pausedKeys: this.currentPausedKeys,
-      topErrors,
-      // The writer's own view carries whatever its last detail cycle produced.
-      // Readers get these from the persisted detail artifact instead; this path
-      // exists so the writer can publish and so tests can drive it directly.
-      parkedTenants: this.latestDetail?.parkedTenants ?? [],
-      parkedTenantsBound: this.latestDetail?.parkedTenantsBound ?? {
-        included: 0,
-        total: 0,
-      },
-      errorClustersBound: this.latestDetail?.errorClustersBound ?? {
-        included: topErrors.length,
-        total: topErrors.length,
-      },
-      snapshot: {
-        computedAt: Date.now(),
-        detailComputedAt: this.latestDetail?.computedAt ?? null,
-        writerId: this.writerId,
-        leaseEpoch: this.leaseEpoch,
-      },
-    };
-  }
-
-  /** Cheap artifact: exact counts, rates, peaks and the rolling history. */
-  private async publishLive(): Promise<void> {
-    if (!this.snapshots) {
-      return;
-    }
-
-    const leaseToken = this.leaseToken;
-    if (!leaseToken) {
-      return;
-    }
-
-    const data = this.getDashboardData();
-    const mem = process.memoryUsage();
-    try {
-      await this.snapshots.writeLive({
-        leaseToken,
-        snapshot: {
-          version: SNAPSHOT_VERSION,
-          computedAt: Date.now(),
-          writerId: this.writerId,
-          leaseEpoch: this.leaseEpoch,
-          queues: data.queues,
-          totalGroups: data.totalGroups,
-          totalPendingJobs: data.totalPendingJobs,
-          pendingDrift: data.pendingDrift,
-          throughputIngestedPerSec: data.throughputIngestedPerSec,
-          completedPerSec: data.completedPerSec,
-          failedPerSec: data.failedPerSec,
-          totalCompleted: data.totalCompleted,
-          totalFailed: data.totalFailed,
-          peakCompletedPerSec: data.peakCompletedPerSec,
-          peakFailedPerSec: data.peakFailedPerSec,
-          peakIngestedPerSec: data.peakIngestedPerSec,
-          latencyP50Ms: data.latencyP50Ms,
-          latencyP99Ms: data.latencyP99Ms,
-          peakLatencyP50Ms: data.peakLatencyP50Ms,
-          peakLatencyP99Ms: data.peakLatencyP99Ms,
-          redisMemoryUsedBytes: data.redisMemoryUsedBytes,
-          redisMemoryPeakBytes: data.redisMemoryPeakBytes,
-          redisMemoryMaxBytes: data.redisMemoryMaxBytes,
-          redisConnectedClients: data.redisConnectedClients,
-          redisEngineCpuPercent: data.redisEngineCpuPercent,
-          processCpuPercent: data.processCpuPercent,
-          processMemoryUsedMb: Math.round(mem.rss / 1024 / 1024),
-          processMemoryTotalMb: Math.round(os.totalmem() / 1024 / 1024),
-          pausedKeys: data.pausedKeys,
-          throughputHistory: data.throughputHistory,
-        },
-      });
-    } catch (err) {
-      logger.warn({ error: err }, "Failed to publish live ops snapshot");
-    }
-  }
-
-  /**
-   * Exhaustive artifact, on its own slower cadence.
-   */
-  private maybePublishDetail(queues: QueueInfo[]): void {
-    if (!this.snapshots) {
-      return;
-    }
-
-    const snapshots = this.snapshots;
-    if (this.detailInFlight) {
-      return;
-    }
-
-    if (Date.now() - this.lastDetailAt < DETAIL_CYCLE_INTERVAL_MS) {
-      return;
-    }
-
-    // Captured BEFORE the scan: a slow detail scan can outlive the lease it
-    // started under, and the write must be fenced on that lease rather than on
-    // whatever the pod holds by the time the scan finishes.
-    const tokenAtScanStart = this.leaseToken;
-    if (!tokenAtScanStart) {
-      return;
-    }
-
-    this.detailInFlight = true;
-    void (async () => {
-      try {
-        const [blocked, parked, latencyWindows] = await Promise.all([
-          this.ops.getBlockedQueueSummary(),
-          this.ops.listParkedQueueTenants({
-            queueNames: this.groupQueueNames,
-            maxTenants: MAX_PARKED_TENANTS,
-          }),
-          this.computeLatencyWindows(),
-        ]);
-
-        const treeSeedKeys = [...new Set([...this.currentPausedKeys, ...this.knownPipelinePaths])];
-
-        const detail: DetailSnapshot = {
-          version: SNAPSHOT_VERSION,
-          computedAt: Date.now(),
-          writerId: this.writerId,
-          leaseEpoch: this.leaseEpoch,
-          topErrors: blocked.clusters.slice(0, MAX_ERROR_CLUSTERS),
-          errorClustersBound: {
-            included: Math.min(blocked.clusters.length, MAX_ERROR_CLUSTERS),
-            total: blocked.clusters.length,
-          },
-          parkedTenants: parked.tenants,
-          parkedTenantsBound: {
-            included: parked.tenants.length,
-            total: parked.total,
-          },
-          pipelineTree: OpsMetricsCollectorService.buildPipelineTree({
-            queues,
-            seedKeys: treeSeedKeys,
-          }),
-          phases: this.currentPhases,
-          jobNameMetrics: this.currentJobNameMetrics,
-          latencyWindows,
-        };
-
-        // Only adopt the artifact the fence ACCEPTED. A rejected write means the lease
-        // turned over mid-scan, so this payload was never published; keeping it would
-        // have `tryGetLatestDetail()` report a detail artifact no reader can see. Leaving
-        // `lastDetailAt` alone is deliberate too — a pod that regains the lease should
-        // rescan rather than sit out a cadence it never completed.
-        const published = await snapshots.writeDetail({
-          snapshot: detail,
-          leaseToken: tokenAtScanStart,
-        });
-        if (!published) {
-          return;
-        }
-
-        this.latestDetail = detail;
-        this.lastDetailAt = Date.now();
-      } catch (err) {
-        logger.warn({ error: err }, "Failed to publish detail ops snapshot");
-        // Back off a full cycle rather than retrying every 2s into a Redis
-        // that is already struggling — the failure and the cause usually share
-        // a root.
-        this.lastDetailAt = Date.now();
-      } finally {
-        this.detailInFlight = false;
-      }
-    })();
+    return this.publication.dashboardData();
   }
 
   /** The detail artifact this writer most recently produced, if any. */
   tryGetLatestDetail(): DetailSnapshot | null {
-    return this.latestDetail;
+    return this.publication.tryGetLatestDetail();
   }
 
   /**
-   * Windowed P50/P99 from the completion histograms GroupQueue maintains: the hour window merges the
-   * last sixty minute-buckets, day and week merge hour-buckets, all time reads the cumulative hash. Runs
-   * on the detail cycle only — one writer, ~230 pipelined HGETALLs per queue per 15s.
+   * One cycle: win the lease or stand down, scan, fold the deltas into the window, then publish.
+   * A pod that does not hold the lease pays for nothing — the early return is the whole saving,
+   * since otherwise every pod would still scan and merely skip the write.
    */
-  private async computeLatencyWindows(): Promise<LatencyWindows> {
-    try {
-      return await this.readLatencyWindows();
-    } catch (err) {
-      // Fail soft: the rest of the detail artifact (blocked clusters, parked
-      // tenants) must not be lost to a histogram read hiccup. All-null
-      // windows render as "nothing to report yet".
-      logger.warn({ error: err }, "Failed to compute latency windows");
-
-      return { hour: null, day: null, week: null, allTime: null };
-    }
-  }
-
-  private async readLatencyWindows(): Promise<LatencyWindows> {
-    const { minute, hourByQueue, allTime } = await this.metrics.readLatencyHistograms({
-      queueNames: this.groupQueueNames,
-      nowMs: Date.now(),
-    });
-    // Hour buckets come back newest-first per queue; the first 24 of each
-    // queue's 168 belong to the day window as well as the week's.
-    const dayHashes = hourByQueue.flatMap((hours) => hours.slice(0, 24));
-
-    return {
-      hour: windowPercentiles(mergeHistogramCounts(minute)),
-      day: windowPercentiles(mergeHistogramCounts(dayHashes)),
-      week: windowPercentiles(mergeHistogramCounts(hourByQueue.flat())),
-      allTime: windowPercentiles(mergeHistogramCounts(allTime)),
-    };
-  }
-
-  private aggregatePhaseCounts(queues: QueueInfo[]): DashboardData["phases"] {
-    const phases = emptyPhases();
-    for (const q of queues) {
-      for (const g of q.groups) {
-        const phase = OpsMetricsCollectorService.mapJobTypeToPhase(g.jobType);
-        phases[phase].pending += g.pendingJobs;
-        phases[phase].active += g.hasActiveJob ? 1 : 0;
-      }
-    }
-
-    return phases;
-  }
-
-  private buildJobNameCounts(queues: QueueInfo[]): Map<
-    string,
-    {
-      pending: number;
-      active: number;
-      phase: "commands" | "projections" | "reactions";
-      pipelineName: string;
-    }
-  > {
-    const map = new Map<
-      string,
-      {
-        pending: number;
-        active: number;
-        phase: "commands" | "projections" | "reactions";
-        pipelineName: string;
-      }
-    >();
-    for (const q of queues) {
-      for (const g of q.groups) {
-        const jobName = g.jobName ?? "unknown";
-        const pipelineName = g.pipelineName ?? q.displayName;
-        const phase = OpsMetricsCollectorService.mapJobTypeToPhase(g.jobType);
-        const key = `${pipelineName}::${jobName}`;
-        const existing = map.get(key);
-        if (existing) {
-          existing.pending += g.pendingJobs;
-          existing.active += g.hasActiveJob ? 1 : 0;
-        } else {
-          map.set(key, {
-            pending: g.pendingJobs,
-            active: g.hasActiveJob ? 1 : 0,
-            phase,
-            pipelineName,
-          });
-        }
-      }
-    }
-
-    return map;
-  }
-
-  /** Flattens a pipeline's per-queue `smembers` results into the set of paused job keys. */
-  private async computeJobMetrics({
-    queues,
-    elapsed,
-  }: {
-    queues: QueueInfo[];
-    elapsed: number;
-  }): Promise<{ newCompleted: number; newFailed: number }> {
-    const phases = this.aggregatePhaseCounts(queues);
-
-    let newCompleted = 0;
-    let newFailed = 0;
-
-    const totals = await this.metrics.readQueueTotals({ queueNames: this.groupQueueNames });
-    for (let i = 0; i < this.groupQueueNames.length; i++) {
-      const name = this.groupQueueNames[i]!;
-      const { completed: completedTotal, failed: failedTotal } = totals[i]!;
-
-      const prevC = this.prevCompleted.get(name) ?? 0;
-      const prevF = this.prevFailed.get(name) ?? 0;
-
-      if (this.prevCompleted.has(name)) {
-        newCompleted += Math.max(0, completedTotal - prevC);
-        newFailed += Math.max(0, failedTotal - prevF);
-      }
-
-      this.prevCompleted.set(name, completedTotal);
-      this.prevFailed.set(name, failedTotal);
-    }
-
-    const latencies: number[] = [];
-    if (newCompleted > 0 || !this.hasBaseline) {
-      latencies.push(
-        ...(await this.metrics.readLatencySamplesMs({ queueNames: this.groupQueueNames })),
-      );
-    }
-
-    if (latencies.length > 0) {
-      latencies.sort((a, b) => a - b);
-      const p50Idx = Math.floor(latencies.length * 0.5);
-      const p99Idx = Math.min(latencies.length - 1, Math.floor(latencies.length * 0.99));
-      this.currentLatencyP50Ms = latencies[p50Idx]!;
-      this.currentLatencyP99Ms = latencies[p99Idx]!;
-      this.peakLatencyP50Ms = Math.max(this.peakLatencyP50Ms, this.currentLatencyP50Ms);
-      this.peakLatencyP99Ms = Math.max(this.peakLatencyP99Ms, this.currentLatencyP99Ms);
-    }
-
-    for (const key of ["commands", "projections", "reactions"] as const) {
-      const pp = this.peakPhases[key]!;
-      phases[key].peakCompletedPerSec = pp.completedPerSec;
-      phases[key].peakFailedPerSec = pp.failedPerSec;
-      phases[key].peakLatencyP50Ms = pp.latencyP50Ms;
-      phases[key].peakLatencyP99Ms = pp.latencyP99Ms;
-    }
-
-    this.currentPhases = phases;
-
-    this.currentJobNameMetrics = await this.computeJobNameThroughput(queues, elapsed);
-
-    return { newCompleted, newFailed };
-  }
-
-  private async computeJobNameThroughput(
-    queues: QueueInfo[],
-    elapsed: number,
-  ): Promise<JobNameMetrics[]> {
-    const jobNameCounts = this.buildJobNameCounts(queues);
-
-    const uniqueJobNames = new Set<string>();
-    for (const [compositeKey] of jobNameCounts) {
-      uniqueJobNames.add(compositeKey.split("::")[1] ?? compositeKey);
-    }
-
-    const jobNameTotals = await this.metrics.readJobNameTotals({
-      queueNames: this.groupQueueNames,
-      jobNames: [...uniqueJobNames],
-    });
-
-    const metrics: JobNameMetrics[] = [];
-    for (const [compositeKey, counts] of jobNameCounts) {
-      const jobName = compositeKey.split("::")[1] ?? compositeKey;
-
-      const totals = jobNameTotals.get(jobName) ?? {
-        completed: 0,
-        failed: 0,
-      };
-      const prevKey = `${JOB_NAME_COUNTER_PREFIX}${compositeKey}`;
-      const prevC = this.prevCompleted.get(prevKey) ?? 0;
-      const prevF = this.prevFailed.get(prevKey) ?? 0;
-
-      let completedPerSec = 0;
-      let failedPerSec = 0;
-      if (this.prevCompleted.has(prevKey) && elapsed > 0) {
-        completedPerSec = Math.max(0, totals.completed - prevC) / elapsed;
-        failedPerSec = Math.max(0, totals.failed - prevF) / elapsed;
-      }
-
-      this.prevCompleted.set(prevKey, totals.completed);
-      this.prevFailed.set(prevKey, totals.failed);
-
-      const peak = this.peakJobNames.get(compositeKey) ?? {
-        completedPerSec: 0,
-        failedPerSec: 0,
-        latencyP50Ms: 0,
-        latencyP99Ms: 0,
-      };
-      peak.completedPerSec = Math.max(peak.completedPerSec, completedPerSec);
-      peak.failedPerSec = Math.max(peak.failedPerSec, failedPerSec);
-      this.peakJobNames.set(compositeKey, peak);
-
-      metrics.push({
-        jobName,
-        pipelineName: counts.pipelineName,
-        phase: counts.phase,
-        pending: counts.pending,
-        active: counts.active,
-        completedPerSec,
-        failedPerSec,
-        latencyP50Ms: 0,
-        latencyP99Ms: 0,
-        peakCompletedPerSec: peak.completedPerSec,
-        peakFailedPerSec: peak.failedPerSec,
-        peakLatencyP50Ms: peak.latencyP50Ms,
-        peakLatencyP99Ms: peak.latencyP99Ms,
-      });
-    }
-
-    return metrics;
-  }
-
-  /**
-   * Fold the fleet's persisted accumulators into this instance's.
-   */
-  private async restoreState(): Promise<void> {
-    try {
-      const raw = await this.metrics.tryReadPersistedState();
-      if (!raw) {
-        return;
-      }
-
-      const state: PersistedMetricsState = JSON.parse(raw);
-      if (state.version !== 3) {
-        return;
-      }
-
-      this.peakCompletedPerSec = Math.max(this.peakCompletedPerSec, state.peakCompletedPerSec);
-      this.peakFailedPerSec = Math.max(this.peakFailedPerSec, state.peakFailedPerSec);
-      this.peakIngestedPerSec = Math.max(this.peakIngestedPerSec, state.peakIngestedPerSec);
-      this.peakLatencyP50Ms = Math.max(this.peakLatencyP50Ms, state.peakLatencyP50Ms);
-      this.peakLatencyP99Ms = Math.max(this.peakLatencyP99Ms, state.peakLatencyP99Ms);
-
-      for (const [key, value] of Object.entries(state.peakPhases)) {
-        this.peakPhases[key] = mergePeakBucket(this.peakPhases[key], value);
-      }
-
-      for (const [key, value] of state.peakJobNames) {
-        this.peakJobNames.set(key, mergePeakBucket(this.peakJobNames.get(key), value));
-      }
-
-      // Backfill parkedCount on points persisted before the Parked series
-      // existed, so the chart never reads undefined/NaN for old history. The
-      // state version is intentionally not bumped: this keeps the rolling
-      // history AND the accumulated peaks across the deploy (a bump would zero
-      // them, including the freshly-added Completed/s peak tile).
-      this.throughputBuffer = mergeThroughput({
-        mine: this.throughputBuffer,
-        theirs: state.throughputBuffer.map((p) => ({
-          ...p,
-          parkedCount: (p as { parkedCount?: number }).parkedCount ?? 0,
-        })),
-      });
-
-      // Monotonic lifetime totals: the larger is the later reading.
-      this.latestTotalCompleted = Math.max(this.latestTotalCompleted, state.latestTotalCompleted);
-      this.latestTotalFailed = Math.max(this.latestTotalFailed, state.latestTotalFailed);
-    } catch (err) {
-      logger.warn({ error: err }, "Failed to restore persisted metrics state, starting fresh");
-    }
-  }
-
-  private async persistState(): Promise<void> {
-    const state: PersistedMetricsState = {
-      version: 3,
-      savedAt: Date.now(),
-      peakCompletedPerSec: this.peakCompletedPerSec,
-      peakFailedPerSec: this.peakFailedPerSec,
-      peakIngestedPerSec: this.peakIngestedPerSec,
-      peakLatencyP50Ms: this.peakLatencyP50Ms,
-      peakLatencyP99Ms: this.peakLatencyP99Ms,
-      peakPhases: this.peakPhases,
-      peakJobNames: Array.from(this.peakJobNames.entries()),
-      throughputBuffer: this.throughputBuffer,
-      latestTotalCompleted: this.latestTotalCompleted,
-      latestTotalFailed: this.latestTotalFailed,
-    };
-    await this.metrics.writePersistedState({
-      state: JSON.stringify(state),
-      ttlSeconds: REDIS_STATE_TTL_SECONDS,
-    });
-  }
-
-  private async getRedisInfo(): Promise<RedisInfo> {
-    const info = await this.metrics.readServerInfo();
-    const get = (key: string): string => {
-      const match = info.match(new RegExp(`${key}:(.+)`));
-
-      return match?.[1]?.trim() ?? "?";
-    };
-
-    return {
-      usedMemoryHuman: get("used_memory_human"),
-      peakMemoryHuman: get("used_memory_peak_human"),
-      usedMemoryBytes: parseInt(get("used_memory"), 10) || 0,
-      peakMemoryBytes: parseInt(get("used_memory_peak"), 10) || 0,
-      maxMemoryBytes: parseInt(get("maxmemory"), 10) || 0,
-      connectedClients: parseInt(get("connected_clients"), 10) || 0,
-      usedCpuUserMainThreadSeconds: parseFloat(get("used_cpu_user_main_thread")) || 0,
-      usedCpuSysMainThreadSeconds: parseFloat(get("used_cpu_sys_main_thread")) || 0,
-    };
-  }
-
-  private pruneStaleCounters(): void {
-    const activeKeys = new Set(this.groupQueueNames);
-    for (const key of this.prevCompleted.keys()) {
-      if (key.startsWith(JOB_NAME_COUNTER_PREFIX)) {
-        continue;
-      }
-
-      if (!activeKeys.has(key)) {
-        this.prevCompleted.delete(key);
-        this.prevFailed.delete(key);
-      }
-    }
-  }
-
   async collect(): Promise<void> {
     if (this.isCollecting) {
       return;
@@ -1148,160 +254,182 @@ export class OpsMetricsCollectorService {
 
     this.isCollecting = true;
     try {
-      // Election first: a pod that does not hold the lease must not scan at
-      // all. This is the whole cost saving — without the early return every
-      // pod would still pay for the scan and merely skip the write.
-      if (this.snapshots) {
-        const lease = await this.snapshots.acquireOrRenewLease({
-          writerId: this.writerId,
-        });
-        if (!lease.isHeld) {
-          this.holdsLease = false;
-          this.leaseToken = null;
-
-          return;
-        }
-
-        // Taking over: reload the fleet's accumulators BEFORE scanning, and so before the publish and persist at the end of this
-        // cycle. Peaks and the rolling history are accumulated, not derived, and a pod that has been losing the election holds them
-        // frozen at its own boot. Publishing those would blank the chart and reset the peak tiles for every viewer; persisting them
-        // would then overwrite the fleet's record with the stale copy, losing it for good rather than for one cycle. Every rolling
-        // deploy moves this lease, so this is the ordinary path, not the exceptional one.
-        if (!this.holdsLease) {
-          await this.restoreState();
-        }
-
-        this.holdsLease = true;
-        this.leaseEpoch = lease.epoch;
-        this.leaseToken = lease.token;
+      if (!(await this.claimLease())) {
+        return;
       }
 
       const [queues, redisInfo] = await Promise.all([
         this.ops.scanQueues({ queueNames: this.groupQueueNames }),
-        this.getRedisInfo(),
+        this.sampling.getRedisInfo(),
       ]);
-      this.latestQueues = queues;
-      this.latestRedisInfo = redisInfo;
-
-      const sampledAt = Date.now();
-      this.currentRedisEngineCpuPercent = computeEngineCpuPercent({
-        prev: this.prevRedisCpu,
-        nextUserSec: redisInfo.usedCpuUserMainThreadSeconds,
-        nextSysSec: redisInfo.usedCpuSysMainThreadSeconds,
-        nextSampledAt: sampledAt,
-      });
-      this.prevRedisCpu = {
-        userSec: redisInfo.usedCpuUserMainThreadSeconds,
-        sysSec: redisInfo.usedCpuSysMainThreadSeconds,
-        sampledAt,
-      };
-
-      this.currentPausedKeys = await this.metrics.readPausedJobKeys({
+      this.window.latestQueues = queues;
+      this.window.latestRedisInfo = redisInfo;
+      this.recordRedisCpu(redisInfo);
+      this.window.currentPausedKeys = await this.metrics.readPausedJobKeys({
         queueNames: this.groupQueueNames,
       });
-
-      const discoveredPaths = new Set<string>();
-      for (const q of queues) {
-        for (const g of q.groups) {
-          const p = g.pipelineName ?? q.displayName;
-          const t = g.jobType ?? "default";
-          const n = g.jobName ?? "default";
-          discoveredPaths.add(`${p}/${t}/${n}`);
-        }
-      }
-
-      if (discoveredPaths.size > 0) {
-        const timestamp = Date.now();
-        await this.metrics.recordKnownPipelinePaths({
-          paths: [...discoveredPaths],
-          at: timestamp,
-          dropBefore: timestamp - KNOWN_PIPELINE_PATH_TTL_MS,
-        });
-      }
-
-      this.knownPipelinePaths = await this.metrics.readKnownPipelinePaths();
-
-      // Reported on its own below as `pendingCount`, which stays pending-only.
-      let totalPending = 0;
-      for (const q of queues) {
-        totalPending += q.totalPendingJobs;
-      }
-
-      // Parked groups included: see ./in-flight.ts for why the derived
-      // ingestion rate below is wrong without them.
-      const totalInFlight = computeTotalInFlight({ queues });
-
-      const now = Date.now();
-      const elapsed = (now - this.lastTimestamp) / 1000;
-
-      const { newCompleted, newFailed } = await this.computeJobMetrics({
-        queues,
-        elapsed: this.hasBaseline ? elapsed : 0,
-      });
-
-      this.latestTotalCompleted += newCompleted;
-      this.latestTotalFailed += newFailed;
-
-      if (this.hasBaseline && elapsed > 0) {
-        this.currentCompletedPerSec = Math.round((newCompleted / elapsed) * 100) / 100;
-        this.currentFailedPerSec = Math.round((newFailed / elapsed) * 100) / 100;
-
-        const ingestedDelta = totalInFlight - this.lastTotalInFlight + newCompleted + newFailed;
-        this.currentIngestedPerSec = Math.round((Math.max(0, ingestedDelta) / elapsed) * 100) / 100;
-
-        this.peakCompletedPerSec = Math.max(this.peakCompletedPerSec, this.currentCompletedPerSec);
-        this.peakFailedPerSec = Math.max(this.peakFailedPerSec, this.currentFailedPerSec);
-        this.peakIngestedPerSec = Math.max(this.peakIngestedPerSec, this.currentIngestedPerSec);
-      }
-
-      this.lastTotalInFlight = totalInFlight;
-      this.lastTimestamp = now;
-      this.hasBaseline = true;
-
-      let totalBlockedCount = 0;
-      let totalParkedCount = 0;
-      for (const q of queues) {
-        totalBlockedCount += q.blockedGroupCount;
-        totalParkedCount += q.parkedGroupCount;
-      }
-
-      this.throughputBuffer.push({
-        timestamp: now,
-        ingestedPerSec: this.currentIngestedPerSec,
-        completedPerSec: this.currentCompletedPerSec,
-        failedPerSec: this.currentFailedPerSec,
-        pendingCount: totalPending,
-        blockedCount: totalBlockedCount,
-        parkedCount: totalParkedCount,
-      });
-
-      if (this.throughputBuffer.length > THROUGHPUT_BUFFER_SIZE) {
-        this.throughputBuffer.shift();
-      }
-
-      const cpuNow = process.cpuUsage(this.lastCpuUsage);
-      const cpuElapsed = now - this.lastCpuTime;
-      if (cpuElapsed > 0) {
-        const totalCpuUs = cpuNow.user + cpuNow.system;
-        this.currentCpuPercent = (totalCpuUs / 1000 / cpuElapsed) * 100;
-      }
-
-      this.lastCpuUsage = process.cpuUsage();
-      this.lastCpuTime = now;
-
-      this.pruneStaleCounters();
-      this.persistState().catch((err) => {
+      await this.recordKnownPipelinePaths(queues);
+      await this.recordCycleRates(queues);
+      this.recordProcessCpu();
+      this.window.pruneStaleCounters(this.groupQueueNames);
+      this.window.persist(this.metrics).catch((err) => {
         logger.warn({ error: err }, "Failed to persist metrics state");
       });
 
       if (this.snapshots) {
-        await this.publishLive();
-        this.maybePublishDetail(queues);
+        await this.publication.publishLive();
+        this.publication.maybePublishDetail(queues);
       }
     } catch (err) {
       logger.warn({ error: err }, "Metrics collection failed, retrying next interval");
     } finally {
       this.isCollecting = false;
     }
+  }
+
+  /**
+   * Whether this pod may scan at all. Taking over reloads the fleet's accumulators BEFORE the scan:
+   * peaks and history are accumulated, not derived, and publishing a losing pod's frozen copy would
+   * blank the chart for every viewer and then persist that over the fleet's real record.
+   */
+  private async claimLease(): Promise<boolean> {
+    if (!this.snapshots) {
+      return true;
+    }
+
+    const lease = await this.snapshots.acquireOrRenewLease({ writerId: this.writerId });
+    if (!lease.isHeld) {
+      this.holdsLease = false;
+      this.leaseToken = null;
+
+      return false;
+    }
+
+    if (!this.holdsLease) {
+      await this.window.restore(this.metrics);
+    }
+
+    this.holdsLease = true;
+    this.leaseEpoch = lease.epoch;
+    this.leaseToken = lease.token;
+
+    return true;
+  }
+
+  /** Redis reports CPU as cumulative seconds; a percent needs the previous sample. */
+  private recordRedisCpu(redisInfo: RedisInfo): void {
+    const sampledAt = Date.now();
+    this.window.currentRedisEngineCpuPercent = computeEngineCpuPercent({
+      prev: this.window.prevRedisCpu,
+      nextUserSec: redisInfo.usedCpuUserMainThreadSeconds,
+      nextSysSec: redisInfo.usedCpuSysMainThreadSeconds,
+      nextSampledAt: sampledAt,
+    });
+    this.window.prevRedisCpu = {
+      userSec: redisInfo.usedCpuUserMainThreadSeconds,
+      sysSec: redisInfo.usedCpuSysMainThreadSeconds,
+      sampledAt,
+    };
+  }
+
+  /** Every pipeline path seen this cycle, so a path with no live group still lists. */
+  private async recordKnownPipelinePaths(queues: QueueInfo[]): Promise<void> {
+    const discoveredPaths = new Set<string>();
+    for (const queue of queues) {
+      for (const group of queue.groups) {
+        const pipeline = group.pipelineName ?? queue.displayName;
+        discoveredPaths.add(
+          `${pipeline}/${group.jobType ?? "default"}/${group.jobName ?? "default"}`,
+        );
+      }
+    }
+
+    if (discoveredPaths.size > 0) {
+      const timestamp = Date.now();
+      await this.metrics.recordKnownPipelinePaths({
+        paths: [...discoveredPaths],
+        at: timestamp,
+        dropBefore: timestamp - KNOWN_PIPELINE_PATH_TTL_MS,
+      });
+    }
+
+    this.window.knownPipelinePaths = await this.metrics.readKnownPipelinePaths();
+  }
+
+  /**
+   * The rates this cycle measured, and the history point they produce. Parked groups count toward
+   * in-flight (see ../rules/ops-in-flight.rules), without which the derived ingestion rate is wrong.
+   */
+  private async recordCycleRates(queues: QueueInfo[]): Promise<void> {
+    let totalPending = 0;
+    let totalBlockedCount = 0;
+    let totalParkedCount = 0;
+    for (const queue of queues) {
+      totalPending += queue.totalPendingJobs;
+      totalBlockedCount += queue.blockedGroupCount;
+      totalParkedCount += queue.parkedGroupCount;
+    }
+
+    const totalInFlight = computeTotalInFlight({ queues });
+    const now = Date.now();
+    const elapsed = (now - this.window.lastTimestamp) / 1000;
+    const { newCompleted, newFailed } = await this.sampling.computeJobMetrics({
+      window: this.window,
+      queueNames: this.groupQueueNames,
+      queues,
+      elapsed: this.window.hasBaseline ? elapsed : 0,
+    });
+
+    this.window.latestTotalCompleted += newCompleted;
+    this.window.latestTotalFailed += newFailed;
+    if (this.window.hasBaseline && elapsed > 0) {
+      this.window.currentCompletedPerSec = Math.round((newCompleted / elapsed) * 100) / 100;
+      this.window.currentFailedPerSec = Math.round((newFailed / elapsed) * 100) / 100;
+      const ingestedDelta =
+        totalInFlight - this.window.lastTotalInFlight + newCompleted + newFailed;
+      this.window.currentIngestedPerSec =
+        Math.round((Math.max(0, ingestedDelta) / elapsed) * 100) / 100;
+      this.window.peakCompletedPerSec = Math.max(
+        this.window.peakCompletedPerSec,
+        this.window.currentCompletedPerSec,
+      );
+      this.window.peakFailedPerSec = Math.max(
+        this.window.peakFailedPerSec,
+        this.window.currentFailedPerSec,
+      );
+      this.window.peakIngestedPerSec = Math.max(
+        this.window.peakIngestedPerSec,
+        this.window.currentIngestedPerSec,
+      );
+    }
+
+    this.window.lastTotalInFlight = totalInFlight;
+    this.window.lastTimestamp = now;
+    this.window.hasBaseline = true;
+    this.window.throughputBuffer.push({
+      timestamp: now,
+      ingestedPerSec: this.window.currentIngestedPerSec,
+      completedPerSec: this.window.currentCompletedPerSec,
+      failedPerSec: this.window.currentFailedPerSec,
+      pendingCount: totalPending,
+      blockedCount: totalBlockedCount,
+      parkedCount: totalParkedCount,
+    });
+    if (this.window.throughputBuffer.length > THROUGHPUT_BUFFER_SIZE) {
+      this.window.throughputBuffer.shift();
+    }
+  }
+
+  /** This process's own CPU share since the last cycle. */
+  private recordProcessCpu(): void {
+    const now = Date.now();
+    const cpuNow = process.cpuUsage(this.window.lastCpuUsage);
+    const cpuElapsed = now - this.window.lastCpuTime;
+    if (cpuElapsed > 0) {
+      this.window.currentCpuPercent = ((cpuNow.user + cpuNow.system) / 1000 / cpuElapsed) * 100;
+    }
+
+    this.window.lastCpuUsage = process.cpuUsage();
+    this.window.lastCpuTime = now;
   }
 }

@@ -1,5 +1,7 @@
 /**
- * Bulk read-path resolution of offloaded trace event refs (ADR-022, #4991). The per-trace resolver is right for a single-trace detail read (#4984); BULK consumers (export, thread, annotation queue, dataset/sample builders) read whole result sets, where resolving each trace independently would fan out an unbounded N×M burst of `event_log` SELECTs, exhausting the ClickHouse connection pool. This module instead: decodes eventref pointers off every span across every trace, dedupes identical `(aggregateId, eventId, field)` refs to one fetch, streams reads through a bounded-concurrency pool (constant peak in-flight CH reads regardless of result-set size, AC6), then scatters resolved values back and recomputes trace-level IO. Error policy (AC7): a missing/failed row must NOT break the read — the affected field keeps its preview and logs a warning, every other field and trace still resolves.
+ * Bulk read-path resolution of offloaded trace event refs (ADR-022). Resolving each trace of a
+ * result set independently fans out an unbounded burst of `event_log` SELECTs, so this dedupes
+ * identical refs to one fetch and streams the reads through a bounded pool; a failure warns.
  */
 import { TraceEventRefParsingService } from "./trace-eventref-parsing.service";
 import type { TraceBlobStoreService } from "./trace-blob-store.service";
@@ -9,7 +11,9 @@ import type { NormalizedAttributes, NormalizedSpan } from "@langwatch/trace-cont
 import type { ResolvedTraceSpans, WarnLogger } from "./trace-offload-resolution.service";
 
 /**
- * Maximum concurrent `event_log` reads in flight across an entire result set. Bounds the bulk read path's load on ClickHouse so a large export/thread streams its blob fetches instead of firing all at once (#4991 AC6), sized to keep the CH client's connection pool busy without saturating it.
+ * Maximum concurrent `event_log` reads in flight across an entire result set. It bounds the bulk
+ * read path's load on ClickHouse so a large export or thread streams its blob fetches, sized to
+ * keep the client's connection pool busy without saturating it.
  */
 export const EVENT_LOG_RESOLVE_CONCURRENCY = 25;
 
@@ -34,7 +38,9 @@ interface SpanPlan {
 type FetchResult = { ok: true; value: string } | { ok: false; error: unknown };
 
 /**
- * Builds the dedup key for a fetch task (NUL separator can't collide with ids). Named params, not positional: all three args are plain strings, so a caller that transposed two would compile cleanly and silently dedupe/fetch the wrong event_log row onto the wrong span.
+ * Builds the dedup key for a fetch task; the NUL separator cannot collide with ids. Named rather
+ * than positional parameters because all three are plain strings, so a caller that transposed two
+ * would compile cleanly and fetch the wrong event_log row onto the wrong span.
  */
 function fetchKeyOf({
   aggregateId,
@@ -111,9 +117,9 @@ export class TraceOffloadResolutionBatchService {
   }
 
   /**
-   * @param projectId/spansPerTrace/blobStore/ioExtractionService/logger - Tenant, per-trace NormalizedSpan arrays (result order), blob store, IO recomputation, and warning logger. Resolves refs for a whole result set in one bounded pass — see module doc.
-   * @param aggregateType/concurrency - event_log aggregate type (default "trace") and max concurrent reads (default {@link EVENT_LOG_RESOLVE_CONCURRENCY}).
-   * @returns One {@link ResolvedTraceSpans} per input trace, aligned to input order.
+   * Resolves refs for a whole result set in one bounded pass; see the module doc. Takes the tenant,
+   * per-trace span arrays in result order, the blob store, IO recomputation and a warning logger,
+   * plus the aggregate type and read concurrency. Returns one entry per trace, in input order.
    */
   static async resolveOffloadedTracesBatch({
     projectId,
@@ -132,41 +138,11 @@ export class TraceOffloadResolutionBatchService {
     aggregateType?: string;
     concurrency?: number;
   }): Promise<ResolvedTraceSpans[]> {
-    // ----- Phase 1: parse every span, build per-span plans + a deduped fetch map.
     const fetchTasks = new Map<string, FetchTask>();
     const tracePlans: SpanPlan[][] = spansPerTrace.map((spans) =>
-      spans.map((span) => {
-        const attrs = span.spanAttributes;
-        if (!TraceEventRefParsingService.hasEventRefs(attrs)) {
-          return { cleanedAttrs: attrs, refs: [], hadRefs: false };
-        }
-
-        const { cleanedAttrs, eventrefEntries, missingEventIdKeys } =
-          TraceEventRefParsingService.parseSpanEventRefs(attrs);
-
-        for (const attrKey of missingEventIdKeys) {
-          logger.warn(
-            { projectId, spanId: span.spanId, traceId: span.traceId, attrKey },
-            "eventref missing eventId — keeping preview value",
-          );
-        }
-
-        // ADR-022: aggregateId for the trace-processing pipeline IS the traceId.
-        const aggregateId = span.traceId;
-        const refs = eventrefEntries.map(({ attrKey, field, eventId }) => {
-          const fetchKey = fetchKeyOf({ aggregateId, eventId, field });
-          if (!fetchTasks.has(fetchKey)) {
-            fetchTasks.set(fetchKey, { eventId, field, aggregateId });
-          }
-
-          return { attrKey, fetchKey };
-        });
-
-        return { cleanedAttrs, refs, hadRefs: true };
-      }),
+      spans.map((span) => planSpan({ span, projectId, logger, fetchTasks })),
     );
 
-    // ----- Phase 2: fetch each distinct ref once, bounded concurrency.
     const fetchResults = new Map<string, FetchResult>();
     await forEachWithConcurrency(
       [...fetchTasks.entries()],
@@ -187,46 +163,107 @@ export class TraceOffloadResolutionBatchService {
       },
     );
 
-    // ----- Phase 3: assemble resolved spans + recompute IO per trace.
-    return tracePlans.map((spanPlans, traceIdx) => {
-      const originalSpans = spansPerTrace[traceIdx]!;
-      let anyResolved = false;
-
-      const resolvedSpans: NormalizedSpan[] = spanPlans.map((plan, spanIdx) => {
-        const span = originalSpans[spanIdx]!;
-        if (!plan.hadRefs) {
-          return span;
-        }
-
-        const resolvedAttrs = { ...plan.cleanedAttrs };
-        for (const { attrKey, fetchKey } of plan.refs) {
-          const result = fetchResults.get(fetchKey);
-          if (result?.ok) {
-            resolvedAttrs[attrKey] = result.value;
-            anyResolved = true;
-          } else if (result && !result.ok) {
-            warnResolutionFailure(logger, projectId, span, attrKey, result.error);
-          }
-        }
-
-        return { ...span, spanAttributes: resolvedAttrs };
-      });
-
-      if (!anyResolved) {
-        return {
-          resolvedSpans,
-          recomputedInput: null,
-          recomputedOutput: null,
-          anyResolved: false,
-        };
-      }
-
-      return {
-        resolvedSpans,
-        recomputedInput: ioExtractionService.tryExtractFirstInput(resolvedSpans),
-        recomputedOutput: ioExtractionService.tryExtractLastOutput(resolvedSpans),
-        anyResolved: true,
-      };
-    });
+    return tracePlans.map((spanPlans, traceIdx) =>
+      assembleTrace({
+        spanPlans,
+        originalSpans: spansPerTrace[traceIdx]!,
+        fetchResults,
+        ioExtractionService,
+        logger,
+        projectId,
+      }),
+    );
   }
+}
+
+/**
+ * One span's plan: the attributes with reserved keys stripped, and the fetches its eventrefs need.
+ * Identical fetches across every span of every trace collapse onto one entry in `fetchTasks`.
+ */
+function planSpan({
+  span,
+  projectId,
+  logger,
+  fetchTasks,
+}: {
+  span: NormalizedSpan;
+  projectId: string;
+  logger: WarnLogger;
+  fetchTasks: Map<string, FetchTask>;
+}): SpanPlan {
+  const attrs = span.spanAttributes;
+  if (!TraceEventRefParsingService.hasEventRefs(attrs)) {
+    return { cleanedAttrs: attrs, refs: [], hadRefs: false };
+  }
+
+  const { cleanedAttrs, eventrefEntries, missingEventIdKeys } =
+    TraceEventRefParsingService.parseSpanEventRefs(attrs);
+  for (const attrKey of missingEventIdKeys) {
+    logger.warn(
+      { projectId, spanId: span.spanId, traceId: span.traceId, attrKey },
+      "eventref missing eventId — keeping preview value",
+    );
+  }
+
+  // ADR-022: the aggregate id for the trace-processing pipeline is the traceId.
+  const aggregateId = span.traceId;
+  const refs = eventrefEntries.map(({ attrKey, field, eventId }) => {
+    const fetchKey = fetchKeyOf({ aggregateId, eventId, field });
+    if (!fetchTasks.has(fetchKey)) {
+      fetchTasks.set(fetchKey, { eventId, field, aggregateId });
+    }
+
+    return { attrKey, fetchKey };
+  });
+
+  return { cleanedAttrs, refs, hadRefs: true };
+}
+
+/** One trace's spans with the fetched values scattered back, and its IO recomputed if any landed. */
+function assembleTrace({
+  spanPlans,
+  originalSpans,
+  fetchResults,
+  ioExtractionService,
+  logger,
+  projectId,
+}: {
+  spanPlans: SpanPlan[];
+  originalSpans: NormalizedSpan[];
+  fetchResults: Map<string, FetchResult>;
+  ioExtractionService: TraceIOExtractionService;
+  logger: WarnLogger;
+  projectId: string;
+}): ResolvedTraceSpans {
+  let anyResolved = false;
+  const resolvedSpans: NormalizedSpan[] = spanPlans.map((plan, spanIdx) => {
+    const span = originalSpans[spanIdx]!;
+    if (!plan.hadRefs) {
+      return span;
+    }
+
+    const resolvedAttrs = { ...plan.cleanedAttrs };
+    for (const { attrKey, fetchKey } of plan.refs) {
+      const result = fetchResults.get(fetchKey);
+      if (result?.ok) {
+        resolvedAttrs[attrKey] = result.value;
+        anyResolved = true;
+      } else if (result && !result.ok) {
+        warnResolutionFailure(logger, projectId, span, attrKey, result.error);
+      }
+    }
+
+    return { ...span, spanAttributes: resolvedAttrs };
+  });
+
+  if (!anyResolved) {
+    return { resolvedSpans, recomputedInput: null, recomputedOutput: null, anyResolved: false };
+  }
+
+  return {
+    resolvedSpans,
+    recomputedInput: ioExtractionService.tryExtractFirstInput(resolvedSpans),
+    recomputedOutput: ioExtractionService.tryExtractLastOutput(resolvedSpans),
+    anyResolved: true,
+  };
 }

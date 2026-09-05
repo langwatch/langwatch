@@ -1,6 +1,8 @@
 import type { Protections } from "@langwatch/trace-contract";
 /**
- * The schema compiler. Turns a validated `from` + `select` request into a resolved `schema` (response envelope), a `plan` the ENGINE executes (which child collections to JOIN, whether to fetch heavy io columns), and a per-trace `project` function that shapes each trace to the selection. Pure and synchronous — no DB access — so it is unit-tested in isolation; the ClickHouse/Postgres execution that consumes `plan` lives in the trace service.
+ * The schema compiler. Turns a validated `from` + `select` request into a resolved `schema`, a
+ * `plan` the engine executes (which child collections to join, whether to fetch heavy io columns)
+ * and a per-trace `project` function. Pure and synchronous; execution lives in the trace service.
  */
 
 import { TraceProjectionCatalogService } from "./trace-projection-catalog.service";

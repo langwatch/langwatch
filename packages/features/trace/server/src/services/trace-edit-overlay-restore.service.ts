@@ -11,7 +11,9 @@ import {
 } from "@langwatch/trace-contract";
 
 /**
- * The span fields the stored correction holds that this viewer never received faithfully (dropped, or handed over redacted). Identity comparison is the test: every read gate passes a readable value through by reference, so anything that comes back different is something the viewer could not have edited.
+ * The span fields the stored correction holds that this viewer never received faithfully, having
+ * been dropped or handed over redacted. Identity comparison is the test: every read gate passes a
+ * readable value through by reference, so anything different is something the viewer could not edit.
  */
 function withheldSpanFields({
   storedSpan,
@@ -107,7 +109,9 @@ function spansWithWithheldEdits({
 }
 
 /**
- * The saved metadata edits with withheld keys carried over. Metadata is corrected key by key, so the carry-over is too: a key never received faithfully comes back as stored, and everything the viewer could read stays theirs to decide, including removing it.
+ * The saved metadata edits with withheld keys carried over. Metadata is corrected key by key, so
+ * the carry-over is too: a key never received faithfully comes back as stored, and everything the
+ * viewer could read stays theirs to decide, including removing it.
  */
 function metadataWithWithheld({
   incoming,
@@ -187,7 +191,9 @@ export class TraceEditOverlayRestoreService {
   }
 
   /**
-   * The correction to store on save. A save replaces the whole correction, and the viewer composed theirs atop what {@link TraceEditOverlayRedactionService.redactPatchForViewer} handed them, so anything withheld from the read would otherwise be dropped by the write — a reviewer who may not read a field would silently delete someone else's correction to it. Whatever the viewer never received faithfully is carried over from the stored correction unchanged; everything else (including the structural side: renames, type changes, cleared errors, deletedSpanIds) comes from the incoming save.
+   * The correction to store on save. A save replaces the whole correction and the viewer composed
+   * theirs atop a redacted read, so anything withheld would otherwise be dropped by the write.
+   * What the viewer never received carries over; the rest comes from the incoming save.
    */
   static restoreWithheldEdits({
     incoming,

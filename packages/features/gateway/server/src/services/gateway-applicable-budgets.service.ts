@@ -1,5 +1,7 @@
 /**
- * "Already applies": budgets that will constrain a key, answered for a key that may not exist yet. Create drawer input is a draft (picked scopes + owner for a personal key); resolution is the same call the gateway bundle and request-time check make, so the list can't promise a constraint that won't be enforced or miss one that will. Spend comes from the same rollup the budgets page reads, so a limit and its "spent so far" agree everywhere.
+ * The budgets that will constrain a key, answered for a key that may not exist yet. Resolution is
+ * the same call the gateway bundle and the request-time check make, so the list cannot promise a
+ * constraint that will not be enforced. Spend comes from the rollup the budgets page reads.
  */
 import type { ProjectService } from "@langwatch/project-contract";
 
@@ -47,7 +49,9 @@ export type ApplicableBudget = {
    */
   isPerMember: boolean;
   /**
-   * Set when this row is the budget a key's drawer field manages. Edit drawer seeds its field from this row and hides it from the inherited list; independently created key-targeted budgets show as inherited constraints like any other.
+   * Set when this row is the budget a key's drawer field manages. The edit drawer seeds its field
+   * from this row and hides it from the inherited list; independently created key-targeted budgets
+   * show as inherited constraints like any other.
    */
   managedByVirtualKeyId: string | null;
 };
@@ -103,7 +107,9 @@ export class GatewayApplicableBudgetsService {
   }
 
   /**
-   * Same decoration for a caller that already knows the exact resolution target (team, project, key, principal) and skips the draft's trace-project inference. Read by budget-overview with the user's personal workspace as the target.
+   * The same decoration for a caller that already knows the exact resolution target and skips the
+   * draft's trace-project inference. Budget overview reads it with the user's personal workspace
+   * as the target.
    */
   async resolveApplicableBudgetsForTarget(
     target: GatewayBudgetResolutionTarget,

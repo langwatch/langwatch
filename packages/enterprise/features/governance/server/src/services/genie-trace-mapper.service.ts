@@ -47,6 +47,12 @@ import {
   type RoutingOrigin,
 } from "./conversation-trace-assembly.service";
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
+import { GenieSpanAttributesService } from "./genie-span-attributes.service";
+import type {
+  GenieMessageFrame,
+  GenieMessagePayload,
+  GenieRoutingOrigin,
+} from "../rules/genie-message.rules";
 
 type ExportTraceServiceRequest = z.input<typeof exportTraceServiceRequestSchema>;
 
@@ -99,76 +105,6 @@ export const GENIE_ROUTING_PROFILE: ConversationRoutingProfile = {
 };
 
 /**
- * The wire shape (verified against the 35-message capture,
- * 30_genie_messages.raw.jsonl) keys thoughts by `thought_type` with
- * enum-prefixed values ("THOUGHT_TYPE_UNDERSTANDING"); `type`/bare values
- * are tolerated in case the API ever drops the prefix.
- */
-interface GenieThought {
-  thought_type?: string;
-  type?: string;
-  text?: string;
-  content?: string;
-}
-
-interface GenieQueryAttachment {
-  query?: string | null;
-  description?: string | null;
-  statement_id?: string | null;
-  query_result_metadata?: { row_count?: number | null } | null;
-  thoughts?: GenieThought[] | null;
-}
-
-interface GenieAttachment {
-  attachment_id?: string;
-  query?: GenieQueryAttachment | null;
-  text?: { content?: string | null; purpose?: string | null } | null;
-  viz?: { query_attachment_id?: string | null } | null;
-  suggested_questions?: unknown;
-}
-
-/** The raw_payload fields this mapper reads. Everything else passes by. */
-interface GenieMessagePayload {
-  message_id?: string;
-  conversation_id?: string | null;
-  user_id?: number | null;
-  content?: string | null;
-  status?: string | null;
-  created_timestamp?: number | null;
-  last_updated_timestamp?: number | null;
-  auto_regenerate_count?: number | null;
-  attachments?: GenieAttachment[] | null;
-}
-
-/** Thought order the capture showed; DESCRIPTION is dropped (duplicate). */
-const THOUGHT_ORDER = ["UNDERSTANDING", "DATA_SOURCING", "STEPS"] as const;
-const DROPPED_THOUGHT_TYPE = "DESCRIPTION";
-const THOUGHT_TYPE_PREFIX = "THOUGHT_TYPE_";
-
-const MS_THRESHOLD = 1_000_000_000_000;
-
-/** Kept as a name existing callers already import. */
-export type GenieRoutingOrigin = RoutingOrigin;
-
-/** Identity, timing, status, and origin derived once per message. */
-interface GenieMessageFrame {
-  payload: GenieMessagePayload;
-  origin: GenieRoutingOrigin;
-  conversationId: string;
-  messageId: string;
-  regenCount: number;
-  traceId: string;
-  /** `conversationId` namespaced by source — the explorer's grouping key. */
-  threadId: string;
-  spanSeed: string;
-  rootSpanId: string;
-  startMs: number;
-  endMs: number;
-  status: string;
-  isCompleted: boolean;
-}
-
-/**
  * Databricks Genie conversations mapped to traces.
  *
  * The sibling of {@link CopilotStudioTraceMapperService} and the same shape: one job
@@ -179,56 +115,6 @@ interface GenieMessageFrame {
 export class GenieTraceMapperService {
   static create(): GenieTraceMapperService {
     return new GenieTraceMapperService();
-  }
-
-  /** "THOUGHT_TYPE_UNDERSTANDING" and "UNDERSTANDING" both → "UNDERSTANDING". */
-  private static thoughtTypeOf(thought: GenieThought): string {
-    const raw = thought.thought_type ?? thought.type ?? "";
-
-    return raw.startsWith(THOUGHT_TYPE_PREFIX) ? raw.slice(THOUGHT_TYPE_PREFIX.length) : raw;
-  }
-
-  /** Databricks stamps some timestamps in seconds, some in ms — normalize. */
-  private static toMs(value: number | null | undefined): number | null {
-    if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
-      return null;
-    }
-
-    return value < MS_THRESHOLD ? value * 1000 : value;
-  }
-
-  /**
-   * Flatten the query thoughts into one reasoning text, UNDERSTANDING →
-   * DATA_SOURCING → STEPS, unknown types appended in arrival order rather
-   * than dropped, DESCRIPTION dropped (byte-identical to query.description,
-   * 33/33 in the capture — it becomes the step-row label instead).
-   */
-  private static flattenThoughts(attachments: GenieAttachment[] | null | undefined): string {
-    const thoughts = (attachments ?? []).flatMap((attachment) => attachment.query?.thoughts ?? []);
-    const textOf = (thought: GenieThought): string =>
-      (thought.text ?? thought.content ?? "").trim();
-    const known: string[] = [];
-    for (const wanted of THOUGHT_ORDER) {
-      for (const thought of thoughts) {
-        if (GenieTraceMapperService.thoughtTypeOf(thought) === wanted && textOf(thought)) {
-          known.push(textOf(thought));
-        }
-      }
-    }
-
-    const unknown = thoughts
-      .filter((thought) => {
-        const type = GenieTraceMapperService.thoughtTypeOf(thought);
-
-        return (
-          type !== DROPPED_THOUGHT_TYPE &&
-          !THOUGHT_ORDER.includes(type as (typeof THOUGHT_ORDER)[number]) &&
-          textOf(thought)
-        );
-      })
-      .map(textOf);
-
-    return [...known, ...unknown].join("\n\n");
   }
 
   private static parsePayload(event: NormalizedPullEvent): GenieMessagePayload {
@@ -242,12 +128,6 @@ export class GenieTraceMapperService {
     }
 
     return {};
-  }
-
-  private static extraString(event: NormalizedPullEvent, key: string): string | undefined {
-    const value = event.extra?.[key];
-
-    return typeof value === "string" && value.length > 0 ? value : undefined;
   }
 
   /**
@@ -272,7 +152,7 @@ export class GenieTraceMapperService {
     const payload = GenieTraceMapperService.parsePayload(event);
     const status = (
       payload.status ??
-      GenieTraceMapperService.extraString(event, "status") ??
+      GenieSpanAttributesService.tryExtraString(event, "status") ??
       ""
     ).trim();
 
@@ -286,11 +166,11 @@ export class GenieTraceMapperService {
     const payload = GenieTraceMapperService.parsePayload(event);
     const conversationId =
       payload.conversation_id ??
-      GenieTraceMapperService.extraString(event, "conversationId") ??
+      GenieSpanAttributesService.tryExtraString(event, "conversationId") ??
       "unknown_conversation";
     const messageId =
       payload.message_id ??
-      GenieTraceMapperService.extraString(event, "messageId") ??
+      GenieSpanAttributesService.tryExtraString(event, "messageId") ??
       event.source_event_id;
     const regenCount =
       typeof payload.auto_regenerate_count === "number" && payload.auto_regenerate_count > 0
@@ -314,11 +194,11 @@ export class GenieTraceMapperService {
     // dropping the whole conversation — degrade to pull time instead.
     const eventMs = Date.parse(event.event_timestamp);
     const startMs =
-      GenieTraceMapperService.toMs(payload.created_timestamp) ??
+      GenieSpanAttributesService.tryToMs(payload.created_timestamp) ??
       (Number.isFinite(eventMs) ? eventMs : Date.now());
     const status = (
       payload.status ??
-      GenieTraceMapperService.extraString(event, "status") ??
+      GenieSpanAttributesService.tryExtraString(event, "status") ??
       ""
     ).trim();
 
@@ -334,236 +214,12 @@ export class GenieTraceMapperService {
       rootSpanId: identity.rootSpanId,
       startMs,
       endMs: Math.max(
-        GenieTraceMapperService.toMs(payload.last_updated_timestamp) ?? startMs,
+        GenieSpanAttributesService.tryToMs(payload.last_updated_timestamp) ?? startMs,
         startMs,
       ),
       status,
       isCompleted: status === "COMPLETED",
     };
-  }
-
-  /**
-   * The assistant bubble's text. The ANSWER text attachment (35/35 in the
-   * capture, refusals included) — the wire value is the enum-prefixed
-   * "TEXT_ATTACHMENT_PURPOSE_ANSWER" (verified against the raw capture); bare
-   * "ANSWER" is tolerated. A lone text attachment without a purpose still
-   * counts — presence of an answer beats strictness on a label.
-   */
-  private static assistantContentOf(
-    frame: GenieMessageFrame,
-    attachments: GenieAttachment[],
-  ): string {
-    const textAttachments = attachments.filter(
-      (attachment) => typeof attachment.text?.content === "string",
-    );
-    const answerAttachment =
-      textAttachments.find((attachment) => (attachment.text?.purpose ?? "").endsWith("ANSWER")) ??
-      textAttachments[0];
-    const answerText = answerAttachment?.text?.content ?? "";
-
-    // Defensive failure marker (Decision 13): never a false success. A
-    // non-COMPLETED status or a completed message with no answer text both
-    // degrade to a marked failure that still shows the question.
-    return frame.isCompleted && answerText
-      ? answerText
-      : `[Genie message ${frame.status || "UNKNOWN_STATUS"} — no answer recorded]`;
-  }
-
-  private static rootAttributesOf(
-    event: NormalizedPullEvent,
-    frame: GenieMessageFrame,
-  ): OtlpJsonAttr[] {
-    const attachments = frame.payload.attachments ?? [];
-    const question =
-      frame.payload.content ?? GenieTraceMapperService.extraString(event, "question") ?? "";
-    const assistantMessage: Record<string, string> = {
-      role: "assistant",
-      content: GenieTraceMapperService.assistantContentOf(frame, attachments),
-    };
-    const reasoning = GenieTraceMapperService.flattenThoughts(attachments);
-    if (reasoning) {
-      assistantMessage.reasoning_content = reasoning;
-    }
-
-    return [
-      ConversationTraceAssemblyService.stringAttr({ key: "langwatch.span.type", value: "llm" }),
-      ConversationTraceAssemblyService.stringAttr({
-        key: "langwatch.thread.id",
-        value: frame.threadId,
-      }),
-      ConversationTraceAssemblyService.stringAttr({
-        key: "langwatch.input",
-        value: JSON.stringify({
-          type: "chat_messages",
-          value: [{ role: "user", content: question }],
-        }),
-      }),
-      ConversationTraceAssemblyService.stringAttr({
-        key: "langwatch.output",
-        value: JSON.stringify({
-          type: "chat_messages",
-          value: [assistantMessage],
-        }),
-      }),
-      // Agent identity, not a priced model (Decision 14(d) pins no price match).
-      // Now that the value varies, `KNOWN_AGENT_IDENTITIES` is what keeps it
-      // true — at compile time only. Every profile is a code literal the
-      // compiler checks, so nothing re-checks this at runtime.
-      ConversationTraceAssemblyService.stringAttr({
-        key: "gen_ai.request.model",
-        value: frame.origin.profile.agentModel,
-      }),
-      ConversationTraceAssemblyService.stringAttr({
-        key: "databricks.genie.message_id",
-        value: frame.messageId,
-      }),
-      ConversationTraceAssemblyService.stringAttr({
-        key: "databricks.genie.conversation_id",
-        value: frame.conversationId,
-      }),
-      ...ConversationTraceAssemblyService.originAttrs(frame.origin),
-      ...GenieTraceMapperService.optionalRootAttributes(event, frame),
-    ];
-  }
-
-  private static optionalRootAttributes(
-    event: NormalizedPullEvent,
-    frame: GenieMessageFrame,
-  ): OtlpJsonAttr[] {
-    const attachments = frame.payload.attachments ?? [];
-    const attributes: OtlpJsonAttr[] = [];
-    // The author as the provider's raw numeric id (Decision 13): resolved to a
-    // person at READ time by the identity stack (ADR-094), never at pull time.
-    const rawUserId =
-      frame.payload.user_id != null
-        ? String(frame.payload.user_id)
-        : GenieTraceMapperService.extraString(event, "actorUserId");
-    if (rawUserId) {
-      attributes.push(
-        ConversationTraceAssemblyService.stringAttr({ key: "langwatch.user.id", value: rawUserId }),
-      );
-    }
-
-    if (frame.status) {
-      attributes.push(
-        ConversationTraceAssemblyService.stringAttr({
-          key: "databricks.genie.status",
-          value: frame.status,
-        }),
-      );
-    }
-
-    if (frame.regenCount > 0) {
-      attributes.push(
-        ConversationTraceAssemblyService.intAttr({
-          key: "databricks.genie.auto_regenerate_count",
-          value: frame.regenCount,
-        }),
-      );
-    }
-
-    const spaceId = GenieTraceMapperService.extraString(event, "spaceId");
-    if (spaceId) {
-      attributes.push(
-        ConversationTraceAssemblyService.stringAttr({
-          key: "databricks.genie.space_id",
-          value: spaceId,
-        }),
-      );
-    }
-
-    const statementIds = GenieTraceMapperService.queryAttachmentsOf(attachments)
-      .map((attachment) => attachment.query?.statement_id)
-      .filter((id): id is string => typeof id === "string" && id.length > 0);
-    if (statementIds.length > 0) {
-      // ALL statement ids (Decision 12): the display-time join key to the
-      // warehouse spend ledger — a multi-statement answer never undercounts.
-      attributes.push(
-        ConversationTraceAssemblyService.stringAttr({
-          key: "databricks.genie.statement_ids",
-          value: JSON.stringify(statementIds),
-        }),
-      );
-    }
-
-    const vizPointers = attachments
-      .map((attachment) => attachment.viz?.query_attachment_id)
-      .filter((id): id is string => typeof id === "string" && id.length > 0);
-    if (vizPointers.length > 0) {
-      // A pointer, not chart data — stored, never rendered (Decision 12).
-      attributes.push(
-        ConversationTraceAssemblyService.stringAttr({
-          key: "databricks.genie.viz_query_attachment_ids",
-          value: JSON.stringify(vizPointers),
-        }),
-      );
-    }
-
-    // `suggested_questions` are deliberately never read: Genie's offered
-    // follow-ups are not something a person said (Decision 12).
-    // Token counts are deliberately never copied from the puller's literal
-    // zeros: the `llm` span type makes the estimator count the text and stamp
-    // `langwatch.tokens.estimated = true` (Decision 12).
-    return attributes;
-  }
-
-  private static queryAttachmentsOf(attachments: GenieAttachment[]): GenieAttachment[] {
-    return attachments.filter((attachment) => typeof attachment.query?.query === "string");
-  }
-
-  private static queryStepSpan(
-    attachment: GenieAttachment,
-    index: number,
-    frame: GenieMessageFrame,
-  ): OtlpJsonSpan {
-    const stepKey = attachment.attachment_id ?? `index:${index}`;
-    const rowCount = attachment.query?.query_result_metadata?.row_count;
-    // Bare keys, not a `langwatch.params` JSON blob: the span read unflattens
-    // every attribute onto `Span.params`, so `params.tool_name` only resolves
-    // for keys stored bare — the same contract Claude Code's tool spans use,
-    // and the one TurnSteps reads (`params.tool_name` / `params.full_command`).
-    // A JSON blob under `langwatch.params` gets dot-flattened at the trace door
-    // and lands at `params.langwatch.params.*`, where no reader looks.
-    const stepAttrs = [
-      ConversationTraceAssemblyService.stringAttr({
-        key: "tool_name",
-        value: attachment.query?.description || "SQL query",
-      }),
-      ConversationTraceAssemblyService.stringAttr({
-        key: "full_command",
-        value: attachment.query?.query ?? "",
-      }),
-    ];
-    if (attachment.query?.statement_id) {
-      stepAttrs.push(
-        ConversationTraceAssemblyService.stringAttr({
-          key: "statement_id",
-          value: attachment.query.statement_id,
-        }),
-      );
-    }
-
-    if (typeof rowCount === "number") {
-      stepAttrs.push(
-        ConversationTraceAssemblyService.intAttr({ key: "row_count", value: rowCount }),
-      );
-    }
-
-    return {
-      traceId: frame.traceId,
-      spanId: ConversationTraceAssemblyService.hashId(`${frame.spanSeed}:query:${stepKey}`, 16),
-      parentSpanId: frame.rootSpanId,
-      name: GENIE_QUERY_SPAN_NAME,
-      kind: "SPAN_KIND_INTERNAL",
-      startTimeUnixNano: ConversationTraceAssemblyService.msToNano(frame.startMs),
-      endTimeUnixNano: ConversationTraceAssemblyService.msToNano(frame.endMs),
-      attributes: [
-        ConversationTraceAssemblyService.stringAttr({ key: "langwatch.span.type", value: "tool" }),
-        ...stepAttrs,
-        ...ConversationTraceAssemblyService.originAttrs(frame.origin),
-      ],
-      status: { code: frame.isCompleted ? 1 : 2 },
-    } satisfies OtlpJsonSpan;
   }
 
   private static mapMessage(
@@ -579,11 +235,11 @@ export class GenieTraceMapperService {
       kind: "SPAN_KIND_INTERNAL",
       startTimeUnixNano: ConversationTraceAssemblyService.msToNano(frame.startMs),
       endTimeUnixNano: ConversationTraceAssemblyService.msToNano(frame.endMs),
-      attributes: GenieTraceMapperService.rootAttributesOf(event, frame),
+      attributes: GenieSpanAttributesService.rootAttributesOf(event, frame),
       status: frame.isCompleted ? { code: 1 } : { code: 2, message: frame.status || "unknown" },
     };
-    const stepSpans = GenieTraceMapperService.queryAttachmentsOf(attachments).map(
-      (attachment, index) => GenieTraceMapperService.queryStepSpan(attachment, index, frame),
+    const stepSpans = GenieSpanAttributesService.queryAttachmentsOf(attachments).map(
+      (attachment, index) => GenieSpanAttributesService.queryStepSpan(attachment, index, frame),
     );
 
     return [rootSpan, ...stepSpans];

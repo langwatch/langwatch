@@ -1,5 +1,7 @@
 /**
- * Ingest-time derivation of the useful content out of raw LLM API bodies (Claude Code's `OTEL_LOG_RAW_API_BODIES=1` is the canonical case, ~60 KB JSON per model call): computed ONCE at ingest and stamped onto the log record's attributes, instead of every consumer (write-time fold, read-time span enrichment on every drawer open) re-parsing the blob. Also makes the result QUERYABLE — log attributes are a plain `Map(String,String)` in ClickHouse, so "which tools does this project call most" becomes an ordinary query. Attribute names are deliberately GENERIC (`langwatch.gen_ai.*`, not Claude-shaped) so any similarly-shaped emitter can reuse the derivation, and the `langwatch.` prefix marks them as derived so they're never confused with the wire payload. Best-effort by construction: an absent, truncated (Claude caps at 60 KB) or unparseable body yields no derived attributes, and every consumer still has its existing fallback path.
+ * Ingest-time derivation of the useful content out of raw LLM API bodies, computed once and
+ * stamped onto the log record rather than re-parsed by every consumer, which also makes it
+ * queryable. Names are generic; a truncated or unparseable body yields no derived attributes.
  */
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 
@@ -27,7 +29,9 @@ export const DERIVED_ATTRS = {
 } as const;
 
 /**
- * Prefixes grouping the derived attrs by the captured-content category they are computed FROM. The API's log redaction strips attributes by these prefixes when the matching category is hidden from the viewer — derived text is captured content too, just re-shaped at ingest. `STOP_REASON` (`langwatch.gen_ai.response.*`) sits outside both prefixes on purpose: like `cost_usd`, it is operational metadata, not content.
+ * Prefixes grouping the derived attributes by the captured-content category they are computed
+ * from; log redaction strips by these prefixes when the category is hidden. `STOP_REASON` sits
+ * outside both on purpose: like `cost_usd` it is operational metadata, not content.
  */
 export const DERIVED_INPUT_ATTR_PREFIX = "langwatch.gen_ai.input.";
 export const DERIVED_OUTPUT_ATTR_PREFIX = "langwatch.gen_ai.output.";
@@ -89,7 +93,9 @@ function deriveFromRequestBody(
 }
 
 /**
- * The `tool_use` blocks in an Anthropic response's `content[]`. The tool's `input` is deliberately NOT lifted: it is unbounded (a Write tool's input is an entire file), it already rides the raw body, and the tool's real arguments are on its own span — what we want here is the cheap, queryable shape (which tools, how many).
+ * The `tool_use` blocks in an Anthropic response's `content[]`. The tool's `input` is deliberately
+ * not lifted: it is unbounded, it already rides the raw body, and the real arguments are on the
+ * tool's own span. What we want here is the cheap queryable shape — which tools, how many.
  */
 function readToolCalls(content: unknown): DerivedToolCall[] {
   if (!Array.isArray(content)) {

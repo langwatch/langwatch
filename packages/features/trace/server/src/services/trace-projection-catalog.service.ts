@@ -1,5 +1,7 @@
 /**
- * Field catalog — the allowlist of selectable dotted-paths for the projection DSL. Public contract: every path a caller may put in `select` resolves here, anything else is rejected at compile time (HTTP 400); mirrors the filter compiler's allowlist discipline, identifiers reaching the query never come from raw caller input. Each path resolves to a {@link ResolvedField}: where it lands in output (`outPath`), how to read it off the source (`read` — the trace for scalar/grouped fields, or a child element for collection fields), its advertised `type` and, for io/cost, the gating `protection`.
+ * Field catalog — the allowlist of selectable dotted paths for the projection DSL. Every path a
+ * caller may put in `select` resolves here and anything else is rejected at compile time, so
+ * identifiers reaching the query never come from raw caller input. See {@link ResolvedField}.
  */
 
 import type { ProjectionCollection, ProjectionValueType } from "@langwatch/trace-contract";
@@ -16,7 +18,9 @@ export interface ResolvedField {
   /** Visibility gate, or null when the field is always visible. */
   protection: FieldProtection | null;
   /**
-   * Where the value is placed in the output. For collection fields the path is relative to the projected element; for trace-level fields it is absolute on the row. Length > 1 means the value nests under an object (e.g. ["metadata","user_id"]).
+   * Where the value is placed in the output. For collection fields the path is relative to the
+   * projected element, for trace-level fields absolute on the row. A length above one means the
+   * value nests under an object, as in ["metadata", "user_id"].
    */
   outPath: string[];
   /** Reads the value from the source (trace, or child element for collections). */
@@ -121,7 +125,9 @@ const EVALUATION_FIELDS: Record<string, ProjectionValueType> = {
 };
 
 /**
- * Annotation element scalar fields (`annotations.<key>`), read off each annotation. `comment` and `expected_output` are free-text fields where reviewers routinely quote the model's captured output, so they share the output-visibility gate — otherwise the projection would be a side-channel around the io redaction.
+ * Annotation element scalar fields, read off each annotation. `comment` and `expected_output` are
+ * free text where reviewers routinely quote the model's captured output, so they share the
+ * output-visibility gate; otherwise the projection would be a side channel around io redaction.
  */
 const ANNOTATION_FIELDS: Record<
   string,
@@ -138,7 +144,9 @@ function field(partial: Omit<ResolvedField, "path"> & { path: string }): Resolve
 }
 
 /**
- * Path segments that, used as an output object key, would corrupt the prototype chain. metadata.* and the *.metrics/*.details/*.scores sub-paths accept arbitrary segments, so a path like "metadata.__proto__" must be rejected before it ever reaches the projector's setPath.
+ * Path segments that, used as an output object key, would corrupt the prototype chain. The
+ * metadata and metrics, details and scores sub-paths accept arbitrary segments, so a path like
+ * "metadata.__proto__" must be rejected before it reaches the projector's setPath.
  */
 const FORBIDDEN_SEGMENTS = new Set(["__proto__", "constructor", "prototype"]);
 

@@ -5,7 +5,9 @@ import type { CustomMetadata, ReservedTraceMetadata } from "@langwatch/trace-con
 import { TraceCollectorSpanService } from "./trace-collector-span.service";
 
 /**
- * Post-hoc trace metadata updates: a user can amend a trace's metadata after ingestion; applied by recording a synthetic `langwatch.metadata_update` span through the standard ingestion pipeline (new keys added, existing updated, missing preserved; labels replace entirely). Schema + synthesis live here so the tRPC `tracesV2.changeMetadata` mutation and the REST `PATCH /api/trace/v1/:traceId/metadata` route share one implementation.
+ * Post-hoc trace metadata updates, applied by recording a synthetic `langwatch.metadata_update`
+ * span through the standard ingestion pipeline: new keys added, existing updated, missing
+ * preserved, labels replaced whole. Shared by the tRPC mutation and the REST metadata route.
  */
 const metadataValueSchema = z.union([
   z.string().max(4096),

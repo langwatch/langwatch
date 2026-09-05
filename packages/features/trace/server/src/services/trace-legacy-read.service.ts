@@ -17,6 +17,7 @@ import type { Evaluation, Trace } from "@langwatch/trace-contract";
 import type { TraceLegacyReadRepository } from "../repositories/trace-legacy-read.repository";
 import { applyOverlayToTrace } from "@langwatch/trace-contract";
 import { TraceEditOverlayService } from "./trace-edit-overlay.service";
+import { TraceReadEnrichmentService } from "./trace-read-enrichment.service";
 
 /**
  * Minimum prefix length we will attempt to resolve. Shorter strings fall through to "not found" — this keeps us
@@ -103,109 +104,13 @@ export interface BlobResolutionDeps {
 export class TraceService {
   private readonly tracer = getLangWatchTracer("langwatch.traces.service");
   private readonly logger = createLogger("langwatch:traces:service");
-  private readonly injectedLogRecordStorage?: TraceLogRecordReader;
   private constructor(
-    private readonly traceCanonicalisation: TraceCanonicalisationService,
+    private readonly enrichment: TraceReadEnrichmentService,
     private readonly clickHouseService: TraceLegacyReadRepository,
-    private readonly editOverlay: TraceEditOverlayService,
     // Required, so it comes before the optional tail: every single-trace read
     // resolves the evaluations behind it.
     private readonly evaluationService: EvaluationService,
-    logRecordStorage?: TraceLogRecordReader,
-  ) {
-    // Injected store for the read-time Claude Code content enrichment; the
-    // default comes LAZILY from the App on first use (see
-    // logRecordStorageService), so construction here stays free of ClickHouse
-    // wiring. Non-enriching callers and unit tests that never hit the
-    // coding-agent path pay nothing.
-    this.injectedLogRecordStorage = logRecordStorage;
-  }
-
-  /**
-   * The log-record store for read-time Claude Code content enrichment.
-   */
-  private logRecordStorageService(): TraceLogRecordReader {
-    const injected = this.injectedLogRecordStorage;
-    if (!injected) {
-      throw new Error(
-        "This trace read was composed with no log-record reader, so a coding-agent trace cannot be enriched with the content its spans left in the trace's log records.",
-      );
-    }
-
-    return injected;
-  }
-
-  /**
-   * The single-trace tail shared by every branch of {@link tryGetById}: coding-agent
-   * enrichment first, then the reviewer correction if the caller asked for one.
-   */
-  private async enrichAndCorrect({
-    projectId,
-    trace,
-    protections,
-    withEditOverlay,
-  }: {
-    projectId: string;
-    trace: Trace;
-    protections: Protections;
-    withEditOverlay?: boolean;
-  }): Promise<Trace> {
-    const enriched = await this.enrichCodingAgentTrace(projectId, trace);
-    if (!withEditOverlay) {
-      return enriched;
-    }
-
-    const [corrected] = await this.applyEditOverlays(projectId, [enriched], protections);
-
-    return corrected ?? enriched;
-  }
-
-  /**
-   * Overlays reviewer corrections onto a page of traces, in one read for the whole page. Runs LAST on every
-   * opted-in path, after blob resolution and coding-agent enrichment, so a correction wins over whatever the
-   * resolvers put in the field.
-   */
-  private async applyEditOverlays(
-    projectId: string,
-    traces: Trace[],
-    protections: Protections,
-  ): Promise<Trace[]> {
-    if (traces.length === 0) {
-      return traces;
-    }
-
-    const patches = await this.editOverlay.getPatchesByTraceIds({
-      projectId,
-      traceIds: traces.map((trace) => trace.trace_id),
-    });
-    if (patches.size === 0) {
-      return traces;
-    }
-
-    let changed = false;
-    const corrected = traces.map((trace) => {
-      const patch = patches.get(trace.trace_id);
-      if (!patch) {
-        return trace;
-      }
-
-      const next = applyOverlayToTrace({
-        trace,
-        patch: TraceEditOverlayRedactionService.redactPatchForViewer({
-          patch,
-          protections,
-          isWindowRedacted: trace.redacted_by_visibility_window === true,
-        }),
-      });
-      if (next !== trace) {
-        changed = true;
-      }
-
-      return next;
-    });
-
-    return changed ? corrected : traces;
-  }
+  ) {}
 
   /**
    * @param options composed service dependencies; @param blobResolutionDeps optional blob-offload deps (#4888);
@@ -229,11 +134,9 @@ export class TraceService {
     evaluationService: EvaluationService;
   }): TraceService {
     return new TraceService(
-      traceCanonicalisation,
+      TraceReadEnrichmentService.create({ traceCanonicalisation, editOverlay, logRecordStorage }),
       traceRead,
-      editOverlay,
       evaluationService,
-      logRecordStorage,
     );
   }
 
@@ -253,7 +156,7 @@ export class TraceService {
       { attributes: { "tenant.id": projectId, "trace.id": traceId } },
       async (span) => {
         const finish = (trace: Trace) =>
-          this.enrichAndCorrect({
+          this.enrichment.enrichAndCorrect({
             projectId,
             trace,
             protections,
@@ -318,61 +221,6 @@ export class TraceService {
   }
 
   /**
-   * Batch sibling of {@link enrichCodingAgentTrace} for the multi-trace read paths (evals, export, legacy thread reads). Enriches each coding-agent trace in the array with its own lazy, time-capped log read
-   * (reads run in parallel, a bounded few at a time); every non-coding-agent trace short-circuits inside `enrichCodingAgentTrace` and pays nothing. The upfront origin check skips even the fan-out allocation on
-   * the common all-non-coding-agent page, so a project that never uses a coding assistant never touches the log store. Best-effort per trace.
-   */
-  private async enrichCodingAgentTraces(projectId: string, traces: Trace[]): Promise<Trace[]> {
-    const hasCodingAgentTrace = traces.some(
-      (trace) => trace.metadata?.["langwatch.origin"] === CODING_AGENT_ORIGIN,
-    );
-    if (!hasCodingAgentTrace) {
-      return traces;
-    }
-
-    // Bounded fan-out: each coding-agent trace's enrichment holds a capped but heavy log read (raw bodies run to
-    // 60 KB a row) in memory, so an unbounded Promise.all over a big export/eval page multiplies that by the page
-    // size. Five in flight keeps the multi-trace paths at a bounded memory ceiling; non-coding-agent traces
-    // short-circuit inside `enrichCodingAgentTrace` and cost nothing.
-    const enrichConcurrency = 5;
-    const enriched: Trace[] = [...traces];
-    for (let start = 0; start < traces.length; start += enrichConcurrency) {
-      const chunk = traces.slice(start, start + enrichConcurrency);
-      const results = await Promise.all(
-        chunk.map((trace) => this.enrichCodingAgentTrace(projectId, trace)),
-      );
-      for (let offset = 0; offset < results.length; offset++) {
-        enriched[start + offset] = results[offset]!;
-      }
-    }
-
-    return enriched;
-  }
-
-  /**
-   * Read-time Claude Code content enrichment for coding-agent-origin traces. The real `llm_request` spans carry tokens / `request_id` but no message content and no cost — both live in the trace's OTLP log records. When the trace is coding-agent origin we do one lazy, time-capped log
-   * read and join capped `input` / `output` + the authoritative `cost` onto the spans so the legacy trace/span API (REST, export, legacy tRPC, evals) returns whole spans. Origin-gated so a non-Claude trace pays nothing; idempotent and a no-op when the trace has no Claude content
-   * logs; best-effort (a log-read failure returns the un-enriched trace rather than failing the read).
-   */
-  private async enrichCodingAgentTrace(projectId: string, trace: Trace): Promise<Trace> {
-    if (trace.metadata?.["langwatch.origin"] !== CODING_AGENT_ORIGIN) {
-      return trace;
-    }
-
-    const spans = await ClaudeCodeLogEnrichmentService.enrichCodingAgentSpansFromLogs({
-      logRecords: this.logRecordStorageService(),
-      tenantId: projectId,
-      traceId: trace.trace_id,
-      spans: trace.spans,
-      occurredAtMs: trace.timestamps.started_at,
-      logger: this.logger,
-      traceCanonicalisation: this.traceCanonicalisation,
-    });
-
-    return spans === trace.spans ? trace : { ...trace, spans };
-  }
-
-  /**
    * @param projectId project ID; @param traceIds trace IDs; @param protections redaction protections;
    * @param occurredAt bounds the partition scan; @param opts.full resolves offloaded blob previews; @param opts.withEditOverlay applies reviewer corrections.
    * @returns Array of Trace objects with spans
@@ -397,12 +245,12 @@ export class TraceService {
           occurredAt,
           { resolveBlobs: opts?.full },
         );
-        const enriched = await this.enrichCodingAgentTraces(projectId, traces);
+        const enriched = await this.enrichment.enrichCodingAgentTraces(projectId, traces);
         if (!opts?.withEditOverlay) {
           return enriched;
         }
 
-        return this.applyEditOverlays(projectId, enriched, protections);
+        return this.enrichment.applyEditOverlays(projectId, enriched, protections);
       },
     );
   }
@@ -429,7 +277,7 @@ export class TraceService {
           { resolveBlobs: opts?.full },
         );
 
-        return this.enrichCodingAgentTraces(projectId, traces);
+        return this.enrichment.enrichCodingAgentTraces(projectId, traces);
       },
     );
   }
@@ -462,7 +310,7 @@ export class TraceService {
         // so the helper's bounded fan-out caps concurrent log reads for the whole page; a page with no
         // coding-agent trace returns the same array reference and pays nothing.
         const flat = result.groups.flat();
-        const enriched = await this.enrichCodingAgentTraces(input.projectId, flat);
+        const enriched = await this.enrichment.enrichCodingAgentTraces(input.projectId, flat);
         if (enriched === flat) {
           return result;
         }
@@ -559,12 +407,12 @@ export class TraceService {
           protections,
           { resolveBlobs: opts?.full },
         );
-        const enriched = await this.enrichCodingAgentTraces(projectId, traces);
+        const enriched = await this.enrichment.enrichCodingAgentTraces(projectId, traces);
         if (!opts?.withEditOverlay) {
           return enriched;
         }
 
-        return this.applyEditOverlays(projectId, enriched, protections);
+        return this.enrichment.applyEditOverlays(projectId, enriched, protections);
       },
     );
   }

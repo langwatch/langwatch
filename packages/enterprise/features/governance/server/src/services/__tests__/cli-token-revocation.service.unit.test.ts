@@ -71,6 +71,7 @@ describe("CliTokenRevocationService.revokeForUser", () => {
      * Spec: specs/ai-gateway/cli-token-revoke-on-deactivation.feature:79.
      */
     /** @scenario After deactivation, /refresh returns 401 for the revoked refresh_token */
+    /** @scenario "A service receives its connection as a dependency" */
     it("deletes both token keys and the per-user index", async () => {
       const userId = "usr-revoke-active";
       const accessToken = "lw_at_active";
@@ -135,6 +136,7 @@ describe("CliTokenRevocationService.revokeForUser", () => {
   });
 
   describe("when the token store is unavailable (e.g. dev env without Redis)", () => {
+    /** @scenario "A consumer degrades when the application has no Redis" */
     it("returns zero without throwing", async () => {
       const service = DefaultGovernanceCliTokenRevocationService.create({});
       const result = await service.revokeForUser({ userId: "anyone" });

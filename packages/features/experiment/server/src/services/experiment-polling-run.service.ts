@@ -20,10 +20,8 @@ import {
   ExperimentRunResultsWriterService,
   type RunResultsPersistence,
 } from "./experiment-run-results-writer.service";
-import {
-  ExperimentRunOrchestratorService,
-  type OrchestratorInput,
-} from "./experiment-run-orchestrator.service";
+import { ExperimentRunOrchestratorService } from "./experiment-run-orchestrator.service";
+import type { OrchestratorInput } from "../rules/experiment-run-input.rules";
 
 const logger = createLogger("langwatch:experiment:polling-run");
 

@@ -13,7 +13,7 @@ import {
 import type { CodingAgentService } from "@langwatch/coding-agent-contract";
 import { buildDisplayInput, stringifySpanIO } from "@langwatch/trace-contract";
 import { TraceApp } from "../../../../app/trace.app";
-import type { ClaudeSpanRef } from "../../../../services/claude-code-span-enrichment.service";
+import type { ClaudeSpanRef } from "../../../../rules/claude-code-message-index.rules";
 import {
   DERIVED_INPUT_ATTR_PREFIX,
   DERIVED_OUTPUT_ATTR_PREFIX,

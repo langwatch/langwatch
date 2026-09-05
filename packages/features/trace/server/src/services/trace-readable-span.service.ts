@@ -39,7 +39,9 @@ function spanTypeToKind(type: SpanTypes): SpanKind {
 }
 
 /**
- * Recursively flattens a nested params object into dot-notation OTEL attributes: primitives set directly, plain objects recursed, arrays JSON.stringified, null/undefined skipped, and the `_keys` field skipped (indexing artifact).
+ * Recursively flattens a nested params object into dot-notation OTEL attributes: primitives set
+ * directly, plain objects recursed, arrays JSON-stringified, null and undefined skipped, and the
+ * `_keys` field skipped as an indexing artifact.
  */
 function flattenParams({
   params,
@@ -79,34 +81,14 @@ function buildAttributes(span: Span): Attributes {
   const attrs: Attributes = {};
 
   attrs["langwatch.span.type"] = span.type;
+  assignIo({ attrs, value: span.input, messagesKey: "gen_ai.input.messages", plainKey: "input" });
+  assignIo({
+    attrs,
+    value: span.output,
+    messagesKey: "gen_ai.output.messages",
+    plainKey: "output",
+  });
 
-  // Input
-  if (span.input) {
-    if (span.input.type === "chat_messages") {
-      attrs["gen_ai.input.messages"] = JSON.stringify(span.input.value);
-    } else if (span.input.type === "text") {
-      attrs.input = span.input.value;
-    } else if (span.input.type === "json") {
-      attrs.input = JSON.stringify(span.input.value);
-    } else if (span.input.type === "raw") {
-      attrs.input = span.input.value;
-    }
-  }
-
-  // Output
-  if (span.output) {
-    if (span.output.type === "chat_messages") {
-      attrs["gen_ai.output.messages"] = JSON.stringify(span.output.value);
-    } else if (span.output.type === "text") {
-      attrs.output = span.output.value;
-    } else if (span.output.type === "json") {
-      attrs.output = JSON.stringify(span.output.value);
-    } else if (span.output.type === "raw") {
-      attrs.output = span.output.value;
-    }
-  }
-
-  // LLM-specific
   if ("model" in span && span.model) {
     attrs["gen_ai.request.model"] = span.model;
   }
@@ -115,44 +97,86 @@ function buildAttributes(span: Span): Attributes {
     attrs["gen_ai.system"] = span.vendor;
   }
 
-  // Params
-  if (span.params) {
-    if (span.params.temperature != null) {
-      attrs["gen_ai.request.temperature"] = span.params.temperature;
-    }
-
-    if (span.params.max_tokens != null) {
-      attrs["gen_ai.request.max_tokens"] = span.params.max_tokens;
-    }
-
-    if (span.params.top_p != null) {
-      attrs["gen_ai.request.top_p"] = span.params.top_p;
-    }
-
-    flattenParams({ params: span.params, prefix: "", attrs });
-  }
-
-  // Metrics
-  if (span.metrics) {
-    if (span.metrics.prompt_tokens != null) {
-      attrs["gen_ai.usage.prompt_tokens"] = span.metrics.prompt_tokens;
-    }
-
-    if (span.metrics.completion_tokens != null) {
-      attrs["gen_ai.usage.completion_tokens"] = span.metrics.completion_tokens;
-    }
-
-    if (span.metrics.cost != null) {
-      attrs["gen_ai.usage.cost"] = span.metrics.cost;
-    }
-  }
-
-  // RAG contexts
+  assignParams({ attrs, params: span.params });
+  assignMetrics({ attrs, metrics: span.metrics });
   if ("contexts" in span && span.contexts) {
     attrs["retrieval.documents"] = JSON.stringify(span.contexts);
   }
 
   return attrs;
+}
+
+/** One side of the conversation, under the messages key when it is a chat and `input`/`output` otherwise. */
+function assignIo({
+  attrs,
+  value,
+  messagesKey,
+  plainKey,
+}: {
+  attrs: Attributes;
+  value: Span["input"] | Span["output"];
+  messagesKey: string;
+  plainKey: string;
+}): void {
+  if (!value) {
+    return;
+  }
+
+  if (value.type === "chat_messages") {
+    attrs[messagesKey] = JSON.stringify(value.value);
+
+    return;
+  }
+
+  if (value.type === "json") {
+    attrs[plainKey] = JSON.stringify(value.value);
+
+    return;
+  }
+
+  if (value.type === "text" || value.type === "raw") {
+    attrs[plainKey] = value.value;
+  }
+}
+
+/** The named request parameters, plus everything else the span carried, flattened. */
+function assignParams({ attrs, params }: { attrs: Attributes; params: Span["params"] }): void {
+  if (!params) {
+    return;
+  }
+
+  if (params.temperature != null) {
+    attrs["gen_ai.request.temperature"] = params.temperature;
+  }
+
+  if (params.max_tokens != null) {
+    attrs["gen_ai.request.max_tokens"] = params.max_tokens;
+  }
+
+  if (params.top_p != null) {
+    attrs["gen_ai.request.top_p"] = params.top_p;
+  }
+
+  flattenParams({ params, prefix: "", attrs });
+}
+
+/** The token counts and cost, each only when the span reported it. */
+function assignMetrics({ attrs, metrics }: { attrs: Attributes; metrics: Span["metrics"] }): void {
+  if (!metrics) {
+    return;
+  }
+
+  if (metrics.prompt_tokens != null) {
+    attrs["gen_ai.usage.prompt_tokens"] = metrics.prompt_tokens;
+  }
+
+  if (metrics.completion_tokens != null) {
+    attrs["gen_ai.usage.completion_tokens"] = metrics.completion_tokens;
+  }
+
+  if (metrics.cost != null) {
+    attrs["gen_ai.usage.cost"] = metrics.cost;
+  }
 }
 
 function buildStatus(span: Span): SpanStatus {
@@ -169,7 +193,9 @@ export class TraceReadableSpanService {
   }
 
   /**
-   * A whole trace's spans rendered as the one readable digest a judge reads. The formatter is the scenario judge's, because the digest a judge is shown and the digest an evaluator is shown have to be the same text — a second renderer here would grade one thing and display another.
+   * A whole trace's spans rendered as the one readable digest a judge reads. The formatter is the
+   * scenario judge's, because the digest a judge is shown and the digest an evaluator is shown
+   * have to be the same text — a second renderer would grade one thing and display another.
    */
   static formatSpansDigest(spans: Span[]): Promise<string> {
     const readableSpans = spans.map(TraceReadableSpanService.langwatchSpanToReadableSpan);

@@ -30,7 +30,9 @@ export interface ClickHouseEvaluationRunRow {
 }
 
 /**
- * evaluation_runs columns backing {@link ClickHouseEvaluationRunRow}, minus the heavy `Inputs` payload — keep in sync with the interface above. Reading these explicitly avoids `SELECT *`, which also pulls columns no reader consumes and, on the deduped read path, pulls them across every stale version before the IN-tuple discards it.
+ * evaluation_runs columns backing {@link ClickHouseEvaluationRunRow}, minus the heavy `Inputs`
+ * payload — keep in sync with the interface above. Listing them avoids `SELECT *`, which on the
+ * deduped read path also pulls every stale version's columns before the IN-tuple discards them.
  */
 export const EVALUATION_RUN_COLUMNS_LIGHT = [
   "ProjectionId",

@@ -1,5 +1,7 @@
 /**
- * FROZEN TWIN of `platform/app/src/server/app-layer/traces/lean-for-projection.ts` (ADR-022) — the application keeps its own copy while both graphs ingest; edit neither without editing the other. The lean is projection-payload POLICY (which attribute keys earn the wide preview budget, how big, how an over-budget value is shaped) and must be the same transform at both call sites — live dispatch (between storeEvents and the router) and replay (at materialization) — or replay rebuilds a projection the live path would never have written. IT LIVES IN THE SERVER, NOT THE CONTRACT: what both offload sides must agree on (the reserved `langwatch.reserved.eventref.` prefix and `{field, eventId}` pointer) is in `@langwatch/trace-contract` (`trace-offload.contract.ts`); the writer's own judgement stands on this package's `TraceAttributeCapService` and has one reader (itself), so the contract could not host it without inverting that.
+ * Frozen twin of the application's own `lean-for-projection` (ADR-022): edit neither without the
+ * other. The lean is projection-payload policy and must be the same transform at live dispatch and
+ * at replay, or replay rebuilds a projection the live path would never have written.
  */
 
 import type { Event } from "@langwatch/eventing";
@@ -82,107 +84,91 @@ function clampLongStrings(value: unknown, depth = 0): unknown {
 }
 
 /**
- * Leans a SpanReceived event: truncates over-threshold IO attributes (> IO_PREVIEW_BYTES) with eventref pointers FIRST, then caps any remaining non-IO/nested/binary values exceeding DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES via `capOversizedAttributes` (IO attrs are already ≤64 KB so the 256 KB cap never touches them; non-IO caps get no eventref, since recovery there is a full event_log read). CLONE SAFETY: the original attributes are scanned first (no allocation) to decide if the heavy path is needed; only then is the span structuredClone'd and re-leaned on the clone, keeping the sub-threshold hot path allocation-free and the input event byte-for-byte untouched.
+ * Leans a SpanReceived event: over-threshold IO attributes are truncated with eventref pointers
+ * first, then remaining oversized non-IO values are capped without one. The original attributes
+ * are scanned before anything is allocated, so the sub-threshold path stays allocation-free.
  */
 function leanSpanReceivedEvent(event: Event): Event {
-  const data = event.data as {
-    span?: OtlpSpan;
-    resource?: OtlpResource | null;
-  };
-
-  // Guard: if span or attributes are absent (e.g. test events with empty data), pass through unchanged.
+  const data = event.data as { span?: OtlpSpan; resource?: OtlpResource | null };
+  // A test event with empty data has no span at all; pass it through unchanged.
   if (!data?.span) {
     return event;
   }
 
-  const originalAttributes = data.span.attributes ?? [];
-
-  // Step 1 (scan only): check whether any IO attr exceeds IO_PREVIEW_BYTES.
-  let hasLargeIoAttr = false;
-  for (const attr of originalAttributes) {
-    if (
-      IO_ATTR_KEYS.has(attr.key) &&
-      typeof attr.value.stringValue === "string" &&
-      Buffer.byteLength(attr.value.stringValue, "utf8") > IO_PREVIEW_BYTES
-    ) {
-      hasLargeIoAttr = true;
-      break;
-    }
-  }
-
-  // Step 2 (scan only): check whether any surface that capOversizedAttributes walks
-  // (span.attributes, span.events[].attributes, span.links[].attributes, resource.attributes)
-  // might need the 256 KB cap. Uses hasOversizedAttribute — the read-only counterpart
-  // colocated with capOversizedAttributes — so the gate covers EVERY surface the action covers.
+  // Scan only, before anything is allocated: does any IO attribute exceed the preview budget, and
+  // does any surface the cap walks need the larger cap?
+  const hasLargeIoAttr = (data.span.attributes ?? []).some(isOversizedIoAttribute);
   const needsNonIoCap = traceAttributeCapService.hasOversizedAttribute(
     data.span,
     data.resource ?? null,
     DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
   );
-
   if (!hasLargeIoAttr && !needsNonIoCap) {
-    // Sub-threshold event — return original, no allocations.
     return event;
   }
 
-  // Step 3: Deep-clone the span (and resource) so that all subsequent mutations —
-  // the IO-lean pass and capOversizedAttributes — operate on independent copies.
-  // structuredClone creates a fully independent deep copy; no shared object references remain.
+  // Deep-clone so the IO-lean pass and the cap both operate on independent copies, with no shared
+  // object references left back to the input event.
   const clonedSpan: OtlpSpan = structuredClone(data.span);
   const clonedResource: OtlpResource | null = data.resource ? structuredClone(data.resource) : null;
-
-  // Step 4: IO-lean pass — run on the CLONED attributes so originals stay untouched.
   if (hasLargeIoAttr) {
-    const ioLeanedAttrs: OtlpSpan["attributes"] = [];
-    const eventrefAttrs: OtlpSpan["attributes"] = [];
-
-    for (const attr of clonedSpan.attributes) {
-      if (
-        IO_ATTR_KEYS.has(attr.key) &&
-        typeof attr.value.stringValue === "string" &&
-        Buffer.byteLength(attr.value.stringValue, "utf8") > IO_PREVIEW_BYTES
-      ) {
-        // Prefer the structure-preserving preview: a JSON chat payload stays
-        // VALID JSON under the budget so the fold still extracts the real
-        // user/assistant text. The byte cut is the fallback for non-JSON.
-        const preview =
-          TraceProjectionLeanService.tryStructuredIoPreview(
-            attr.value.stringValue,
-            IO_PREVIEW_BYTES,
-          ) ?? TraceProjectionLeanService.utf8Preview(attr.value.stringValue, IO_PREVIEW_BYTES);
-        ioLeanedAttrs.push({ key: attr.key, value: { stringValue: preview } });
-        // ADR-022: embed event.id so the read path can JOIN event_log by
-        // EventId without guessing. The eventref carries `{field, eventId}`;
-        // the read path uses both in `TraceBlobStoreService.getFromEventLog`.
-        eventrefAttrs.push({
-          key: traceEventReferenceKey(attr.key),
-          value: {
-            stringValue: serializeTraceEventReference({
-              field: attr.key,
-              eventId: event.id,
-            }),
-          },
-        });
-      } else {
-        ioLeanedAttrs.push(attr);
-      }
-    }
-
-    clonedSpan.attributes = [...ioLeanedAttrs, ...eventrefAttrs];
+    clonedSpan.attributes = leanIoAttributes({
+      attributes: clonedSpan.attributes,
+      eventId: event.id,
+    });
   }
 
-  // Step 5: Cap non-IO / nested / binary values on the cloned span.
-  // IO attrs are already ≤ IO_PREVIEW_BYTES (64 KB) < DEFAULT_MAX (256 KB), so they are untouched.
+  // IO attributes are already under the preview budget, so the cap never touches them.
   traceAttributeCapService.capOversizedAttributes(clonedSpan, clonedResource);
 
-  return {
-    ...event,
-    data: {
-      ...data,
-      span: clonedSpan,
-      resource: clonedResource,
-    },
-  };
+  return { ...event, data: { ...data, span: clonedSpan, resource: clonedResource } };
+}
+
+/** An IO attribute whose string value is past the preview budget. */
+function isOversizedIoAttribute(attr: OtlpSpan["attributes"][number]): boolean {
+  return (
+    IO_ATTR_KEYS.has(attr.key) &&
+    typeof attr.value.stringValue === "string" &&
+    Buffer.byteLength(attr.value.stringValue, "utf8") > IO_PREVIEW_BYTES
+  );
+}
+
+/**
+ * The span's attributes with every oversized IO value replaced by a preview and followed by its
+ * eventref. The structure-preserving preview is tried first, so a JSON chat payload stays valid
+ * JSON under the budget and the fold still extracts real text; the byte cut is the fallback.
+ */
+function leanIoAttributes({
+  attributes,
+  eventId,
+}: {
+  attributes: OtlpSpan["attributes"];
+  eventId: string;
+}): OtlpSpan["attributes"] {
+  const leaned: OtlpSpan["attributes"] = [];
+  const eventrefs: OtlpSpan["attributes"] = [];
+  for (const attr of attributes) {
+    if (!isOversizedIoAttribute(attr)) {
+      leaned.push(attr);
+      continue;
+    }
+
+    const value = attr.value.stringValue as string;
+    const preview =
+      TraceProjectionLeanService.tryStructuredIoPreview(value, IO_PREVIEW_BYTES) ??
+      TraceProjectionLeanService.utf8Preview(value, IO_PREVIEW_BYTES);
+    leaned.push({ key: attr.key, value: { stringValue: preview } });
+    // ADR-022: the eventref carries the field and the event id, which is what the read path joins
+    // event_log on rather than guessing.
+    eventrefs.push({
+      key: traceEventReferenceKey(attr.key),
+      value: {
+        stringValue: serializeTraceEventReference({ field: attr.key, eventId }),
+      },
+    });
+  }
+
+  return [...leaned, ...eventrefs];
 }
 
 /**
@@ -238,7 +224,9 @@ export class TraceProjectionLeanService {
   }
 
   /**
-   * Structure-preserving preview for an over-budget IO attribute holding JSON (the shape every gen_ai.input/output.messages value has) — a blind byte cut (`utf8Preview`) turns a chat-messages array into unparseable JSON, degrading everything computed from the leaned span (fold IO, trace list, Summary/Conversation views) to a raw blob; a Langy turn's system prompt alone exceeds 64 KB, so every such turn used to lose its "hi". Strategy, always staying under `maxBytes`: clamp long string leaves to a per-string cap; if still over and the top level is an array, drop MIDDLE items keeping the first message and as much of the TAIL as fits (where IO extraction actually reads); anything still too big reports null and the caller falls back to the byte cut, so this can only ever improve on it. Shapes ONLY the preview — the full value is untouched in event_log.
+   * Structure-preserving preview for an over-budget IO attribute holding JSON, since a blind byte
+   * cut turns a chat-messages array into unparseable JSON. Long string leaves are clamped, then
+   * middle array items dropped; anything still too big reports null and the caller byte-cuts.
    */
   static tryStructuredIoPreview(value: string, maxBytes: number): string | null {
     if (Buffer.byteLength(value, "utf8") > PREVIEW_MAX_SOURCE_BYTES) {
@@ -296,9 +284,9 @@ export class TraceProjectionLeanService {
   }
 
   /**
-   * Rewrites over-threshold IO attribute values to a preview (≤ IO_PREVIEW_BYTES) with a `langwatch.reserved.eventref.<attrKey>` pointer `{ field: <attrKey> }`: SpanReceived per over-threshold IO_ATTR_KEYS attr, LogRecordReceived on an over-threshold body (eventref.body), other event types pass through unchanged. Returned event is deeply independent of the input (no shared array references), so leaned mutations never ripple back to event_log.
-   * @param event - The event to lean.
-   * @returns A new event with IO attributes replaced by previews + eventrefs, or the original if no leaning was necessary.
+   * Rewrites over-threshold IO attribute values to a preview with a reserved eventref pointer, on
+   * SpanReceived per IO attribute and on LogRecordReceived per body. The returned event shares no
+   * references with the input, so leaned mutations never ripple back to event_log.
    */
   static leanForProjection<EventType extends Event>(event: EventType): EventType;
 

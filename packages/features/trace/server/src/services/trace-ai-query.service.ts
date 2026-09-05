@@ -3,7 +3,6 @@ import { createLogger } from "@langwatch/observability";
 import {
   isEmptyAST,
   parse,
-  QUERY_SYNTAX_DOC,
   type AiActionErrorDetails,
   type AiActionResult,
   type AiQueryResult,
@@ -12,19 +11,31 @@ import {
 } from "@langwatch/trace-contract";
 import { generateObject, generateText, type LanguageModel, type ModelMessage } from "ai";
 import { z } from "zod";
+import { buildActionSystemPrompt, buildSystemPrompt } from "../rules/trace-ai-query-prompt.rules";
 
 const logger = createLogger("langwatch:ai-query");
 
 /**
- * The resolved model's id, for the provider-failure summary. LanguageModel is a union of a model id and a model object, so the id is read off whichever arrived. Diagnostic copy, never a decision.
+ * The resolved model's id, for the provider-failure summary. LanguageModel is a union of a model id
+ * and a model object, so the id is read off whichever arrived. Diagnostic copy, never a decision.
  */
 function modelIdOf(model: LanguageModel): string {
   return typeof model === "string" ? model : model.modelId;
 }
 
 const MAX_ATTEMPTS = 3;
+
+/** What the retry loop carries between attempts, so the final failure describes the last try. */
+interface AiActionAttemptState {
+  lastError: string;
+  lastQuery: string;
+  lastFailure: "provider" | "validation" | null;
+  lastProviderError: unknown;
+}
 /**
- * Resolving the model this feature's calls run on. A port because the resolution cascade is the MODEL PROVIDER feature's (configured providers, managed-credential path, default assignment), and a feature package may not reach into another's server package. The composition root holds both and joins them, so traces.ai_search resolves through the same cascade every other feature key does.
+ * Resolving the model this feature's calls run on. A port, because the resolution cascade belongs
+ * to the model-provider feature and a feature package may not reach into another's server package.
+ * The composition root holds both and joins them, so this resolves like every other feature key.
  */
 export type AiQueryModelResolver = (input: {
   projectId: string;
@@ -40,7 +51,9 @@ export interface AiQueryInput {
 }
 
 /**
- * Raised when the AI composer couldn't turn a prompt into a usable trace query — the provider threw on every attempt, or every attempt produced something unparseable. Code is ai_query_provider_error, replacing the old private code system ("provider_error"|"validation_error"|"unknown", colliding with real registry codes carrying copy that didn't apply, plus a free-text message built from the SDK's own exception rendered verbatim). The words a customer reads now come only from the registry entry for this code. fault is provider: the model was asked and didn't answer usably.
+ * Raised when the AI composer could not turn a prompt into a usable trace query: the provider threw
+ * on every attempt, or every attempt produced something unparseable. The words a customer reads
+ * come from the registry entry for this code, and the fault is the provider's.
  */
 export class AiQueryProviderError extends HandledError {
   declare readonly code: "ai_query_provider_error";
@@ -113,168 +126,15 @@ function sanitizeLlmOutput(raw: string): string {
   return out.trim();
 }
 
-function buildActionSystemPrompt(fieldsBlock: string): string {
-  return `You are an expert at translating LangWatch operators' natural-language
-requests into a trace-view action. The operator is looking at a list of
-LLM traces (every API call to their AI app) and wants to either filter
-the current view or save a new view they can come back to. Your reply
-is a JSON object matching the \`TraceAction\` schema — nothing else.
-
-# Pick the action kind
-
-1. **\`apply_query\`** — filter the current view. This is the default;
-   use it for anything that reads like "show / find / list / give me /
-   how many / which traces…". Examples of intent:
-   - "show me errors today"
-   - "slow GPT-4 calls"
-   - "traces with feedback"
-
-2. **\`create_lens\`** — create a NEW persistent saved view with this
-   filter baked in. Use this only when the operator clearly wants a
-   reusable surface, not a one-off filter. Trigger phrases include
-   "save as / save this / create a view / make a lens / pin this /
-   I want a tab for / set up a lens for". For create_lens, also
-   produce a 1-3 word Title Case lens name (no quotes, no
-   punctuation).
-
-When the phrasing is ambiguous, prefer \`apply_query\`. It's cheap to
-redo; \`create_lens\` adds a tab to the operator's workspace and is
-the more disruptive default.
-
-# Build the query
-
-The \`query\` field on either action holds a string in the LangWatch
-trace query language:
-
-${QUERY_SYNTAX_DOC}
-
-## Fields available (with sample values)
-
-${fieldsBlock}
-
-# Hard rules
-
-- **Field discipline.** Use ONLY the fields listed above. If the
-  operator mentions an attribute that doesn't appear in the catalog,
-  drop it rather than guess a field name. Better to under-filter than
-  to introduce a clause that won't parse.
-- **Time window.** The view already has a time-range selector outside
-  this filter. Do NOT include date or time clauses unless the operator
-  explicitly asks for a specific timestamp range — phrases like
-  "today", "the last hour", "this week" map onto the existing time
-  selector and should not appear in your query.
-- **Uppercase booleans.** AND, OR, NOT must be uppercase.
-- **Value-side OR.** Group with parens: \`status:(error OR warning)\`.
-- **Wildcards.** Use \`*\`, e.g. \`model:gpt-4*\`.
-- **Numeric ranges.** Use \`[low TO high]\` (inclusive) or comparison
-  operators (\`>\`, \`>=\`, \`<\`, \`<=\`). Never write words like
-  "between" or "to" outside the bracket form.
-- **Free text.** Quote multi-word free text: \`"refund policy"\`.
-  Single words may be unquoted.
-- **No code fences, no prose, no extra JSON fields.**
-
-# Few-shot examples
-
-User: "show me errors"
-→ \`{"kind":"apply_query","query":"status:error"}\`
-
-User: "find traces from gpt-4 that took more than 5 seconds"
-→ \`{"kind":"apply_query","query":"model:gpt-4* AND duration:>5000"}\`
-
-User: "errors or warnings in the finance service"
-→ \`{"kind":"apply_query","query":"status:(error OR warning) AND service:finance"}\`
-
-User: "everything except simulations"
-→ \`{"kind":"apply_query","query":"NOT origin:simulation"}\`
-
-User: "save this view as Costly GPT-4"
-→ \`{"kind":"create_lens","name":"Costly GPT-4","query":"model:gpt-4* AND cost:>0.5"}\`
-
-User: "make a lens for high-cost calls"
-→ \`{"kind":"create_lens","name":"High Cost","query":"cost:>1"}\`
-
-User: "pin a view of negative feedback"
-→ \`{"kind":"create_lens","name":"Negative Feedback","query":"feedback:negative"}\`
-
-User: "good ones"  (vague — can't be expressed)
-→ \`{"kind":"apply_query","query":""}\`
-
-User: "weather in Tokyo"  (off-topic)
-→ \`{"kind":"apply_query","query":""}\`
-
-# Escape hatch
-
-If the request is genuinely ambiguous, off-topic, or asks for
-something the query language can't express, return
-\`{"kind":"apply_query","query":""}\`. The caller treats an empty
-query as a no-op and shows the operator a gentle "couldn't translate"
-hint — much better than a hallucinated filter.`;
-}
-
-function buildSystemPrompt(fieldsBlock: string): string {
-  return `You are an expert at translating LangWatch operators' natural-language
-requests into our trace query language. The operator is looking at a
-list of LLM traces and wants to filter it. Your output is a single
-query string that the caller will run against the trace store —
-nothing else.
-
-# How to think about this
-
-1. Identify the structured concepts in the request (status, model,
-   service, latency, cost, tokens, evaluator results, etc.) and map
-   each one onto a field in the catalog below.
-2. Decide which clauses are conjunctions (AND) and which are
-   alternations (OR or CSV shorthand inside a field).
-3. Emit the query string. Nothing else.
-
-${QUERY_SYNTAX_DOC}
-
-## Fields available (with sample values)
-
-${fieldsBlock}
-
-# Hard rules
-
-- **Output ONLY the query string.** No prose, no quotes around the
-  whole thing, no labels (\`query:\`), no code fences.
-- **Field discipline.** Use ONLY the fields listed in the catalog.
-  Never invent fields. If a concept has no matching field, drop it
-  rather than guess.
-- **Time window.** The view already has a time-range selector outside
-  this query. Do NOT include date or time clauses — "today", "last
-  hour", "this week" map onto the existing time selector.
-- **Uppercase AND / OR / NOT.**
-- **Value-side OR** groups with parens: \`status:(error OR warning)\`.
-- **Wildcards** use \`*\`.
-- **Numeric ranges** use \`[low TO high]\` or comparisons
-  (\`>\`, \`>=\`, \`<\`, \`<=\`).
-- **Free text** is quoted if multi-word: \`"refund policy"\`.
-
-# Few-shot examples
-
-"show me errors" → \`status:error\`
-"find gpt-4 calls over 5 seconds" → \`model:gpt-4* AND duration:>5000\`
-"errors or warnings in finance" → \`status:(error OR warning) AND service:finance\`
-"everything except simulations" → \`NOT origin:simulation\`
-"high cost calls" → \`cost:>1\`
-"traces mentioning refund policy" → \`"refund policy"\`
-"good ones" (vague) → (empty string)
-
-# Escape hatch
-
-If the request is genuinely ambiguous, off-topic, or unexpressible in
-the query language, output an empty string. An empty string is a
-legitimate, polite "I couldn't translate that"; hallucinating a filter
-the operator didn't ask for is worse.`;
-}
-
 export class TraceAiQueryService {
   static create(): TraceAiQueryService {
     return new TraceAiQueryService();
   }
 
   /**
-   * Translates a natural-language description into our trace query language: calls the project's default LLM with the grammar doc + a snapshot of categorical values, validates the output, and loops up to MAX_ATTEMPTS times feeding parse/validate errors back to the model.
+   * Translates a natural-language description into our trace query language: calls the project's
+   * default model with the grammar doc and a snapshot of categorical values, validates the output,
+   * and loops up to MAX_ATTEMPTS feeding parse and validation errors back to the model.
    */
   static async generateTraceQueryFromPrompt(input: AiQueryInput): Promise<AiQueryResult> {
     const fieldsBlock = await input.traces.buildQueryFieldCatalogue({
@@ -315,7 +175,9 @@ export class TraceAiQueryService {
       messages.push({ role: "assistant", content: text });
       messages.push({
         role: "user",
-        content: `That query failed to parse: ${validation.error}\n\nReturn a valid query. Output ONLY the query, with no quotes, no prose, no leading or trailing punctuation.`,
+        content:
+          `That query failed to parse: ${validation.error}\n\nReturn a valid query. ` +
+          "Output ONLY the query, with no quotes, no prose, no leading or trailing punctuation.",
       });
     }
 
@@ -323,7 +185,9 @@ export class TraceAiQueryService {
   }
 
   /**
-   * Higher-level entry point: lets the model choose between filtering the current view (apply_query) or creating a named lens (create_lens), returning a structured action the frontend dispatches. Validates the embedded query like generateTraceQueryFromPrompt, retrying on parse failure. Raises {@link AiQueryProviderError} when every attempt is exhausted — the failure travels the handled channel like any other, not an in-band { ok: false } payload the UI had to know how to word.
+   * Higher-level entry point: the model chooses between filtering the current view and creating a
+   * named lens, returning a structured action the frontend dispatches. The embedded query is
+   * validated and retried the same way, and exhaustion raises {@link AiQueryProviderError}.
    */
   static async generateTraceAction(input: AiQueryInput): Promise<AiActionResult> {
     const fieldsBlock = await input.traces.buildQueryFieldCatalogue({
@@ -331,88 +195,123 @@ export class TraceAiQueryService {
       timeRange: input.timeRange,
     });
     const systemPrompt = buildActionSystemPrompt(fieldsBlock);
-
     const model = await input.resolveModel({
       projectId: input.projectId,
       featureKey: "traces.ai_search",
     });
 
-    let lastError = "Unknown error";
-    let lastQuery = "";
-    // Track only the *last* attempt's failure kind so the detail rows describe
-    // what actually happened on the final try. A transient provider blip on
-    // attempt 1 followed by a validation failure on attempt 2 should show the
-    // unparseable query, not a stale HTTP status.
-    let lastFailure: "provider" | "validation" | null = null;
-    let lastProviderError: unknown = null;
+    // Only the last attempt's failure kind is kept, so the detail rows describe what actually
+    // happened on the final try rather than a stale status from an earlier blip.
+    const attempts: AiActionAttemptState = {
+      lastError: "Unknown error",
+      lastQuery: "",
+      lastFailure: null,
+      lastProviderError: null,
+    };
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      let parsedAction: z.infer<typeof aiActionSchema>;
-      try {
-        const { object } = await generateObject({
-          model,
-          schemaName: "TraceAction",
-          schemaDescription:
-            "Either an apply_query (filter the current view) or a create_lens (create a saved view) action with a trace query language string.",
-          schema: aiActionSchema,
-          // Only inject the retry-context blurb when the previous failure
-          // was parse/validation. After a provider/SDK throw, lastQuery is
-          // "" and lastError is a stack-y SDK message — splicing those into
-          // "previous attempt produced query X which failed to parse: Y"
-          // misleads the model into thinking it produced an unparseable empty query.
-          system:
-            attempt === 1 || lastFailure !== "validation"
-              ? systemPrompt
-              : `${systemPrompt}\n\nThe previous attempt produced query "${lastQuery}" which failed to parse: ${lastError}\nReturn a valid query this time.`,
-          prompt: input.prompt,
-          maxRetries: 1,
-        });
-        parsedAction = object;
-      } catch (e) {
-        lastFailure = "provider";
-        lastProviderError = e;
-        lastError = e instanceof Error ? e.message : "Unknown generation error.";
-        logger.error(
-          { projectId: input.projectId, attempt, lastError, err: e },
-          "AI action generation failed",
-        );
-        continue;
+      const action = await TraceAiQueryService.tryOneAction({
+        input,
+        model,
+        systemPrompt,
+        attempt,
+        attempts,
+      });
+      if (action) {
+        return action;
       }
-
-      lastQuery = parsedAction.query;
-      const validation = validateQuery(parsedAction.query);
-      if (validation.ok) {
-        return parsedAction.kind === "apply_query"
-          ? { ok: true, kind: "apply_query", query: parsedAction.query }
-          : {
-              ok: true,
-              kind: "create_lens",
-              name: parsedAction.name,
-              query: parsedAction.query,
-            };
-      }
-
-      lastFailure = "validation";
-      lastError = validation.error;
-      logger.info(
-        { projectId: input.projectId, attempt, lastError, lastQuery },
-        "AI action query failed validation, retrying",
-      );
     }
 
-    // Don't leak raw SDK exception messages — for a rejected key the
-    // provider's body IS the credential. summarizeProviderError extracts
-    // operator-actionable fields for "View details"; the headline comes
-    // from the registry entry for ai_query_provider_error. Both exits raise
-    // the SAME code — one customer-visible failure, one remediation.
+    // A raw SDK exception message must not leak: for a rejected key the provider's body is the
+    // credential. The headline comes from the registry entry for this code either way, so both
+    // exits raise the same one — one customer-visible failure, one remediation.
     throw new AiQueryProviderError(
-      lastFailure === "provider"
-        ? TraceAiQueryService.summarizeProviderError(lastProviderError, { model: modelIdOf(model) })
-        : { reason: lastError, lastQuery },
+      attempts.lastFailure === "provider"
+        ? TraceAiQueryService.summarizeProviderError(attempts.lastProviderError, {
+            model: modelIdOf(model),
+          })
+        : { reason: attempts.lastError, lastQuery: attempts.lastQuery },
     );
   }
 
   /**
-   * Curates an SDK/provider exception into the operator-actionable fields the UI renders in "View details": prefers the AI SDK's structured APICallError.statusCode, else text extraction (strips stack traces and litellm.XYZException prefixes; pulls HTTP status, provider key, model id). Returns only known-set values (status code, a fixed vendor list, a model id) — deliberately no prose. context.model is what the backend actually resolved (some provider errors carry no model of their own, and the operator needs to know which configured model to fix). Never throws, never composes a headline — that used to put the provider's own sentence on the customer's screen; the registry owns the headline now, this only fills the disclosure.
+   * One attempt at an action, or null when it failed and the caller should try again. Retry
+   * context is only spliced in after a validation failure: after a provider throw there is no
+   * query to quote, and quoting an empty one misleads the model about what it produced.
+   */
+  private static async tryOneAction({
+    input,
+    model,
+    systemPrompt,
+    attempt,
+    attempts,
+  }: {
+    input: AiQueryInput;
+    model: LanguageModel;
+    systemPrompt: string;
+    attempt: number;
+    attempts: AiActionAttemptState;
+  }): Promise<AiActionResult | null> {
+    let parsedAction: z.infer<typeof aiActionSchema>;
+    try {
+      const { object } = await generateObject({
+        model,
+        schemaName: "TraceAction",
+        schemaDescription:
+          "Either an apply_query (filter the current view) or a create_lens (create a saved view) action with a trace query language string.",
+        schema: aiActionSchema,
+        system:
+          attempt === 1 || attempts.lastFailure !== "validation"
+            ? systemPrompt
+            : `${systemPrompt}\n\nThe previous attempt produced query "${attempts.lastQuery}" ` +
+              `which failed to parse: ${attempts.lastError}\nReturn a valid query this time.`,
+        prompt: input.prompt,
+        maxRetries: 1,
+      });
+      parsedAction = object;
+    } catch (e) {
+      attempts.lastFailure = "provider";
+      attempts.lastProviderError = e;
+      attempts.lastError = e instanceof Error ? e.message : "Unknown generation error.";
+      logger.error(
+        { projectId: input.projectId, attempt, lastError: attempts.lastError, err: e },
+        "AI action generation failed",
+      );
+
+      return null;
+    }
+
+    attempts.lastQuery = parsedAction.query;
+    const validation = validateQuery(parsedAction.query);
+    if (validation.ok) {
+      return parsedAction.kind === "apply_query"
+        ? { ok: true, kind: "apply_query", query: parsedAction.query }
+        : {
+            ok: true,
+            kind: "create_lens",
+            name: parsedAction.name,
+            query: parsedAction.query,
+          };
+    }
+
+    attempts.lastFailure = "validation";
+    attempts.lastError = validation.error;
+    logger.info(
+      {
+        projectId: input.projectId,
+        attempt,
+        lastError: attempts.lastError,
+        lastQuery: attempts.lastQuery,
+      },
+      "AI action query failed validation, retrying",
+    );
+
+    return null;
+  }
+
+  /**
+   * Curates a provider exception into the operator-actionable fields the details disclosure
+   * renders, preferring the SDK's structured status code and otherwise extracting one from text.
+   * Only known-set values come back, never prose and never a headline: the registry owns that.
    */
   static summarizeProviderError(err: unknown, context?: { model?: string }): AiActionErrorDetails {
     const raw = err instanceof Error ? err.message : String(err ?? "");

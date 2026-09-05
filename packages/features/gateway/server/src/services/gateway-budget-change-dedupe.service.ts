@@ -4,13 +4,17 @@ import type { GatewayBudgetChangeDedupeRepository } from "../repositories/gatewa
 const logger = createLogger("langwatch:gateway:budget-change-event-dedupe");
 
 /**
- * How long one advisory BUDGET_UPDATED emission stands in for the ones that follow. Matched to the /changes long-poll hold (timeout_s, default 10s) so continuous traffic causes at most one project-wide eviction per poll cycle. Fixed window from the first emission, not sliding, so a busy project refreshes on a fixed cadence rather than having refresh pushed back by its own traffic.
+ * How long one advisory BUDGET_UPDATED emission stands in for the ones that follow. Matched to the
+ * changes long-poll hold, so continuous traffic causes at most one project-wide eviction per poll
+ * cycle. The window is fixed from the first emission rather than sliding.
  */
 export const BUDGET_CHANGE_EVENT_WINDOW_SECONDS = 10;
 
 export interface BudgetChangeEventDedupeService {
   /**
-   * Whether this debit should emit BUDGET_UPDATED. Keyed on the project alone, matching the consumer's invalidation granularity: the gateway's change-feed subscriber evicts every bundle matching ProjectID and ignores budget_id for this kind (services/aigateway/adapters/authresolver/service.go, ChangeKindBudgetUpdated) — a second event for a different budget in the same project would evict what the first already evicted, and the re-materialise reads current spend for every budget anyway.
+   * Whether this debit should emit BUDGET_UPDATED. Keyed on the project alone, matching the
+   * consumer's invalidation granularity: the gateway's subscriber evicts every bundle for the
+   * project and ignores the budget id, and re-materialising reads current spend for all of them.
    */
   shouldEmit(params: { projectId: string }): Promise<boolean>;
 }
@@ -23,7 +27,9 @@ class NullBudgetChangeEventDedupeService implements BudgetChangeEventDedupeServi
 }
 
 /**
- * Gates only *advisory* emissions: the change event is an invalidation signal, not a data carrier — spend itself is read from ClickHouse on re-materialise, so emissions inside one window are redundant with each other. Suppressing one that carries a budget into breach would leave an over-limit key served from a cached bundle, a different cost the caller owns separately.
+ * Gates advisory emissions only: the change event is an invalidation signal, not a data carrier,
+ * since spend itself is read from ClickHouse on re-materialise. Suppressing one that carries a
+ * budget into breach would leave an over-limit key on a cached bundle, a cost the caller owns.
  */
 export class GatewayBudgetChangeDedupeService implements BudgetChangeEventDedupeService {
   /**

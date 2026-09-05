@@ -1,24 +1,30 @@
 /**
- * Finds inline media parts in an ARBITRARY JSON value (not the scenario path's known envelope — trace span attributes carry message arrays, typed value envelopes, typed RAW string payloads, bare content arrays/messages, tool_result-nested parts, or whole-attribute `data:` URIs, at any depth) and externalizes them under an explicit cost budget. Runs in three bounded phases inside the synchronous collector request: SYNC COLLECT walks the value recording candidate part locations (no I/O; url-only parts already externalized are skipped); STORE externalizes candidates via the same `TraceContentExtractionService.processContentPart` the scenario extractor uses, in bounded-concurrency waves respecting the caller's `ExtractionBudget` (per-span part cap + deadline — a failed/over-budget part simply stays inline, already-stored parts keep their references); REBUILD clone-on-writes only along rewritten paths so untouched subtrees keep reference identity. Nested JSON strings are only parsed when `containsMediaMarkers` passes (a linear scan), and re-serialized with `JSON.stringify` when rewritten. Mirrors the render-side collector (`shared/traces/mediaParts.ts`) depth ceiling and part-first-stop rule; `media-walk-parity.unit.test.ts` pins the agreement.
+ * Finds inline media parts anywhere in an arbitrary JSON value and externalizes them under an
+ * explicit cost budget, in three bounded phases: collect candidate locations with no I/O, store
+ * them in bounded-concurrency waves, then rebuild clone-on-write along rewritten paths only.
  */
 
 import { TraceContentExtractionService } from "./trace-content-extraction.service";
 import { containsMediaMarkers } from "@langwatch/trace-contract";
 import { parseBase64DataUri, visitContentPart } from "@langwatch/trace-contract";
 import { MAX_MEDIA_WALK_DEPTH } from "@langwatch/trace-contract";
-import { type ExtractedRef } from "./trace-content-extraction.service";
+import type { ExtractedRef } from "../rules/content-part-extraction.rules";
 import type { TraceMediaStorePort } from "../ports/trace-media-store.port";
 
 /** Upper bound for parsing a nested JSON string (sanity guard, not a policy). */
 const MAX_NESTED_JSON_BYTES = 50 * 1024 * 1024;
 
 /**
- * At most this many parts are externalized per span. A realtime voice span can carry hundreds of turns; storing them all inside the collector request would serialize hundreds of storage round trips. Parts past the cap stay inline and the drop is surfaced to the caller — never silent.
+ * At most this many parts are externalized per span. A realtime voice span can carry hundreds of
+ * turns, and storing them all inside the collector request would serialize hundreds of storage
+ * round trips. Parts past the cap stay inline, and the drop is surfaced to the caller.
  */
 export const MAX_MEDIA_PARTS_PER_SPAN = 16;
 
 /**
- * Wall-clock budget for the whole span's extraction (all attribute values). Once exceeded, no further parts are stored; parts already stored keep their references. Sized well under typical SDK export deadlines (10-30s) so a slow object store degrades to inline payloads instead of client timeouts and re-sent batches.
+ * Wall-clock budget for the whole span's extraction. Once exceeded no further parts are stored and
+ * those already stored keep their references. Sized well under typical SDK export deadlines, so a
+ * slow object store degrades to inline payloads instead of client timeouts and re-sent batches.
  */
 export const EXTRACTION_DEADLINE_MS = 5_000;
 
@@ -324,7 +330,9 @@ export class TraceValueMediaExtractionService {
   }
 
   /**
-   * True when the object IS a media part carrying inline bytes — the shapes `TraceContentExtractionService.processContentPart` would externalize. Url-only parts (already externalized) and non-part objects return false. Uses the same `visitContentPart` dispatcher as the store phase, so the two cannot disagree on shape vocabulary — only on the payload-presence checks below, pinned by the parity test.
+   * True when the object is a media part carrying inline bytes, the shapes the content extraction
+   * service would externalize; url-only and non-part objects are false. It uses the same
+   * `visitContentPart` dispatcher as the store phase, so the two cannot disagree on shape.
    */
   static isExtractableMediaPart(part: unknown): boolean {
     if (typeof part !== "object" || part === null) {
@@ -350,7 +358,9 @@ export class TraceValueMediaExtractionService {
   }
 
   /**
-   * Walks `value` (any JSON-compatible value, or a JSON string) and externalizes inline media parts at any depth, including through media-marker-gated nested JSON strings and whole-string `data:` URIs. Storage runs in bounded-concurrency waves under `budget` (a per-span cap and deadline shared across a span's attribute values — pass the same budget object to every call for one span); per-part store failures are fail-open (part stays inline, `budget.failedParts` increments, prior stores keep their references). Returns the original `value` reference when nothing was rewritten.
+   * Walks `value` and externalizes inline media parts at any depth, through marker-gated nested
+   * JSON strings and whole-string `data:` URIs alike. Storage runs in bounded waves under `budget`,
+   * shared across a span's attribute values; a per-part store failure leaves that part inline.
    */
   static async extractInlineMediaFromValue({
     value,

@@ -4,7 +4,9 @@ import type { ScenarioRoleMetrics } from "../rules/scenario-role-metrics.rules";
 import { SpanCostService } from "./span-cost.service";
 
 /**
- * Window after which a memo entry is dropped purely as a memory backstop — correctness comes from the fold-version key, not aging. An entry for a superseded version is never read again, so this only bounds how long an unused entry lingers.
+ * Window after which a memo entry is dropped purely as a memory backstop — correctness comes from
+ * the fold-version key, not aging. An entry for a superseded version is never read again, so this
+ * only bounds how long an unused entry lingers.
  */
 const DERIVATION_READ_WINDOW_MS = 30_000;
 
@@ -26,19 +28,25 @@ export interface ScenarioRoleMetricsDerivationInput {
    */
   occurredAtMs?: number;
   /**
-   * Monotonic fold watermark (the fold's spanCount, incrementing per folded span). The memo is keyed on it so a cached derivation is reused only within one fold version (a coalesced batch's per-event subscribers all observe the same final state, sharing one read) and drops the moment newer spans land. Omit to bypass the memo — a live read with no watermark always hits storage.
+   * Monotonic fold watermark, the fold's spanCount. The memo is keyed on it so a cached derivation
+   * is reused only within one fold version and drops the moment newer spans land. Omit it to
+   * bypass the memo: a live read with no watermark always hits storage.
    */
   foldVersion?: number;
 }
 
 /**
- * Per-role cost and latency for one trace, derived from stored spans. Used to be accumulated on the hot fold path, one addition per span of every trace on the platform; deriving here keeps the fold O(1) per span and pays the read once, when a simulation needs the numbers. THE MEMO IS THE POINT, not an optimisation: the all-spans read is multi-MB for a large trace, and a coalesced batch fires subscribers once per event at one shared final state, so without the memo the same read runs once per span in the backlog — the amplification that re-saturated ClickHouse during a drain. Keyed on fold version: a batch reads once, an advanced fold re-reads.
+ * Per-role cost and latency for one trace, derived from stored spans rather than accumulated on
+ * the hot fold path. The memo is the point: a coalesced batch fires subscribers once per event at
+ * one shared final state, so without it the multi-MB read runs once per span in the backlog.
  */
 export class ScenarioRoleMetricsDerivationService {
   static create(options: {
     spans: TraceDerivationSpanReaderPort;
     /**
-     * How a span's cost is estimated when it carries none. The static model catalog is correct here, not the operator's per-project overrides — those price a span at RECORD time, and re-pricing a stored span against them would disagree with what was already billed.
+     * How a span's cost is estimated when it carries none. The static model catalog is correct
+     * here, not the operator's per-project overrides: those price a span at record time, and
+     * re-pricing a stored span against them would disagree with what was already billed.
      */
     spanCosts: SpanCostService;
     now?: () => number;

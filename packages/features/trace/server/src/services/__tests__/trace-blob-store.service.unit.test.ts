@@ -11,10 +11,10 @@ import {
   TraceBlobStoreService,
   MAX_SPOOL_BYTES,
   type S3ClientResolver,
-  SPOOL_REF_V2,
   SpoolDestinationUnsupportedError,
   type SpoolStorage,
 } from "../trace-blob-store.service";
+import { SPOOL_REF_V2 } from "../../rules/trace-spool-location.rules";
 
 /**
  * In-memory stand-in for the stored-objects StorageRegistry, keyed by URI.

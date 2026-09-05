@@ -16,12 +16,11 @@
  * so the old registration was a latent path mismatch (a 404 the agent swallowed).
  */
 
-import { internalSecret } from "@langwatch/api";
+import { internalSecret, isInternalSecretValid } from "@langwatch/api";
 import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
 import { ValidationError } from "@langwatch/handled-error";
 import { type CliToolResult, cliToolResultSchema } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
-import { timingSafeEqual } from "crypto";
 import type { Context, MiddlewareHandler, Next } from "hono";
 import { z } from "zod";
 
@@ -73,20 +72,12 @@ export function verifyLangyInternalSecret(secretOf: () => string | undefined): M
       return c.json({ error: "Not configured" }, 503);
     }
     const header = c.req.header("authorization");
-    if (!isAuthorized(header, secret)) {
+    if (!isInternalSecretValid({ authorizationHeader: header, expected: secret })) {
       return c.json({ error: "Unauthorized" }, 401);
     }
     await next();
     return;
   };
-}
-
-function isAuthorized(authorizationHeader: string | undefined, expected: string): boolean {
-  if (!authorizationHeader?.startsWith("Bearer ")) return false;
-  const presented = Buffer.from(authorizationHeader.slice("Bearer ".length));
-  const expectedBuf = Buffer.from(expected);
-  if (presented.length !== expectedBuf.length) return false;
-  return timingSafeEqual(presented, expectedBuf);
 }
 
 export const langyInternalPolicy = () =>

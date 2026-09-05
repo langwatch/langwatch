@@ -18,11 +18,9 @@ import {
 const GEN_AI_RULE_PREFIX = "genai";
 
 /**
- * A GenAI-convention span read into the canonical shape.
- *
- * The OpenTelemetry GenAI semantic conventions name the model, the messages
- * and the token counts in their own way, and this is the whole of that
- * translation. One entry point; the four steps below are how it is done.
+ * A GenAI-convention span read into the canonical shape. The OpenTelemetry GenAI semantic
+ * conventions name the model, the messages and the token counts in their own way, and this is the
+ * whole of that translation: one entry point, and the four steps below are how it is done.
  */
 export class GenAiSpanService {
   private constructor() {}
@@ -65,17 +63,10 @@ export class GenAiSpanService {
       transform: (raw) => (typeof raw === "string" ? raw : null),
     });
   }
-
   private canonicaliseMessages(ctx: ExtractorContext): void {
-    const { attrs } = ctx.bag;
     const inputExtracted = extractInputMessages(
       ctx,
-      [
-        {
-          type: "attr",
-          keys: [ATTR_KEYS.GEN_AI_PROMPT, ATTR_KEYS.LLM_INPUT_MESSAGES],
-        },
-      ],
+      [{ type: "attr", keys: [ATTR_KEYS.GEN_AI_PROMPT, ATTR_KEYS.LLM_INPUT_MESSAGES] }],
       `${GEN_AI_RULE_PREFIX}:input.messages`,
     );
 
@@ -83,68 +74,83 @@ export class GenAiSpanService {
       recordValueType(ctx, ATTR_KEYS.GEN_AI_INPUT_MESSAGES, "chat_messages");
     }
 
-    const rawSystemInstructions = attrs.take(ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS);
-    if (rawSystemInstructions !== void 0) {
-      if (typeof rawSystemInstructions === "string") {
-        ctx.setAttr(ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS, rawSystemInstructions);
-        ctx.recordRule(`${GEN_AI_RULE_PREFIX}:system_instructions(string)`);
-      } else if (Array.isArray(rawSystemInstructions)) {
-        const textParts: string[] = [];
-        for (const block of rawSystemInstructions) {
-          if (typeof block === "string") {
-            textParts.push(block);
-          } else if (isRecord(block)) {
-            const text = block.content ?? block.text;
-            if (typeof text === "string") {
-              textParts.push(text);
-            }
-          }
-        }
-
-        if (textParts.length > 0) {
-          ctx.setAttr(ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS, textParts.join("\n"));
-          ctx.recordRule(`${GEN_AI_RULE_PREFIX}:system_instructions(array)`);
-        }
-      }
-    }
-
+    this.canonicaliseSystemInstructions(ctx);
     if (!inputExtracted && ctx.out[ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS] === void 0) {
-      const existing = attrs.get(ATTR_KEYS.GEN_AI_INPUT_MESSAGES);
-      if (Array.isArray(existing)) {
-        const sysInstruction = extractSystemInstructionFromMessages(existing);
-        if (sysInstruction !== null) {
-          ctx.setAttr(ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS, sysInstruction);
-          const stripped = stripSystemMessages(existing);
-          attrs.take(ATTR_KEYS.GEN_AI_INPUT_MESSAGES);
-          if (stripped.length > 0) {
-            ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, stripped);
-          }
-
-          ctx.recordRule(`${GEN_AI_RULE_PREFIX}:system_instruction(existing)`);
-        }
-
-        if (
-          ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] !== void 0 ||
-          attrs.has(ATTR_KEYS.GEN_AI_INPUT_MESSAGES)
-        ) {
-          recordValueType(ctx, ATTR_KEYS.GEN_AI_INPUT_MESSAGES, "chat_messages");
-        }
-      }
+      this.liftSystemInstructionFromMessages(ctx);
     }
 
     const outputExtracted = extractOutputMessages(
       ctx,
-      [
-        {
-          type: "attr",
-          keys: [ATTR_KEYS.GEN_AI_COMPLETION, ATTR_KEYS.LLM_OUTPUT_MESSAGES],
-        },
-      ],
+      [{ type: "attr", keys: [ATTR_KEYS.GEN_AI_COMPLETION, ATTR_KEYS.LLM_OUTPUT_MESSAGES] }],
       `${GEN_AI_RULE_PREFIX}:output.messages`,
     );
 
     if (outputExtracted) {
       recordValueType(ctx, ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, "chat_messages");
+    }
+  }
+
+  /** System instructions as the emitter sent them: one string, or blocks joined into one. */
+  private canonicaliseSystemInstructions(ctx: ExtractorContext): void {
+    const raw = ctx.bag.attrs.take(ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS);
+    if (typeof raw === "string") {
+      ctx.setAttr(ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS, raw);
+      ctx.recordRule(`${GEN_AI_RULE_PREFIX}:system_instructions(string)`);
+
+      return;
+    }
+
+    if (!Array.isArray(raw)) {
+      return;
+    }
+
+    const textParts: string[] = [];
+    for (const block of raw) {
+      if (typeof block === "string") {
+        textParts.push(block);
+        continue;
+      }
+
+      const text = isRecord(block) ? (block.content ?? block.text) : void 0;
+      if (typeof text === "string") {
+        textParts.push(text);
+      }
+    }
+
+    if (textParts.length > 0) {
+      ctx.setAttr(ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS, textParts.join("\n"));
+      ctx.recordRule(`${GEN_AI_RULE_PREFIX}:system_instructions(array)`);
+    }
+  }
+
+  /**
+   * The system turn an emitter left inside the message list, lifted out so the two spellings of
+   * the same instruction read alike. The remaining turns stay as the input messages.
+   */
+  private liftSystemInstructionFromMessages(ctx: ExtractorContext): void {
+    const { attrs } = ctx.bag;
+    const existing = attrs.get(ATTR_KEYS.GEN_AI_INPUT_MESSAGES);
+    if (!Array.isArray(existing)) {
+      return;
+    }
+
+    const sysInstruction = extractSystemInstructionFromMessages(existing);
+    if (sysInstruction !== null) {
+      ctx.setAttr(ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS, sysInstruction);
+      const stripped = stripSystemMessages(existing);
+      attrs.take(ATTR_KEYS.GEN_AI_INPUT_MESSAGES);
+      if (stripped.length > 0) {
+        ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, stripped);
+      }
+
+      ctx.recordRule(`${GEN_AI_RULE_PREFIX}:system_instruction(existing)`);
+    }
+
+    if (
+      ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] !== void 0 ||
+      attrs.has(ATTR_KEYS.GEN_AI_INPUT_MESSAGES)
+    ) {
+      recordValueType(ctx, ATTR_KEYS.GEN_AI_INPUT_MESSAGES, "chat_messages");
     }
   }
 

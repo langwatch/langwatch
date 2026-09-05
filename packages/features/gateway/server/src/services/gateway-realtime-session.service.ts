@@ -1,6 +1,7 @@
 /**
  * @see ADR-097
- * The record of brokered realtime voice sessions. The gateway holds no session state — a session outlives its minting request, the vendor's report can land on any replica, and the per-key cap must be counted somewhere every replica sees; this service is that place. One session is one spend record: admitted at mint, confirmed here on report, settling cost-unknown at grace if none arrives (a late report supersedes the settled row).
+ * The record of brokered realtime voice sessions. A session outlives its minting request, its
+ * report can land on any replica, and the per-key cap must be counted where every replica sees it.
  */
 
 import type { GatewayRealtimeSessionRecord } from "@langwatch/gateway-contract";
@@ -23,7 +24,9 @@ import { ATTR_KEYS as ATTR, DEFAULT_PII_REDACTION_LEVEL } from "@langwatch/trace
 const logger = createLogger("langwatch:gateway:realtime-session");
 
 /**
- * How far back the cap counts. OpenAI's realtime socket never signals close, so a session can only be closed by a usage report the client may never send — counting every OPEN row ever would ratchet a key to zero capacity. One hour is OpenAI's own max session length, so an older row can't still be running.
+ * How far back the cap counts. OpenAI's realtime socket never signals close, so a session can only
+ * be closed by a usage report the client may never send, and counting every open row ever would
+ * ratchet a key to zero capacity. One hour is that vendor's own maximum session length.
  */
 export const REALTIME_OPEN_SESSION_WINDOW_MS = 60 * 60 * 1000;
 
@@ -31,7 +34,9 @@ export const REALTIME_OPEN_SESSION_WINDOW_MS = 60 * 60 * 1000;
 const EXPIRY_CLOSE_REASON = "no vendor report arrived within the longest possible call";
 
 /**
- * Everything this service reaches outside itself, named rather than resolved from a process singleton — the voice settlement writes money, and a second process quietly composing a second database or rating table would give two answers to what one call cost.
+ * Everything this service reaches outside itself, named rather than resolved from a process
+ * singleton: voice settlement writes money, and a second process quietly composing a second
+ * database or rating table would give two answers to what one call cost.
  */
 export type GatewayRealtimeSessionCollaborators = {
   sessions: GatewayRealtimeSessionRepository;
@@ -77,7 +82,9 @@ export class GatewayRealtimeSessionService {
   private constructor() {}
 
   /**
-   * Books a session, deciding the per-key cap in the same transaction that inserts the row. The advisory lock is what makes the cap a cap — without it, two racing mints both read the count before either insert lands, and a key limited to one holds two sessions; transaction-scoped, so it releases on commit/rollback with nothing to forget. Limit is read here, not carried from the gateway, so count and limit come from the same instant and a cap edited a minute ago applies to this mint.
+   * Books a session, deciding the per-key cap in the same transaction that inserts the row. The
+   * advisory lock is what makes the cap a cap: without it two racing mints both read the count
+   * before either insert lands. The limit is read here, so count and limit share one instant.
    */
   async reserveRealtimeSession(
     input: ReserveInput & { collaborators: GatewayRealtimeSessionCollaborators },
@@ -131,7 +138,9 @@ export class GatewayRealtimeSessionService {
   }
 
   /**
-   * Finds the session a vendor's post-call report belongs to, three ways in order of certainty: (1) the vendor's own conversation id recorded at mint (exact); (2) the LangWatch session id echoed into the conversation's variables, if the vendor sends it back; (3) the one session open for this credential in the report's window — which stops at exactly one candidate, since two opens in the same window are indistinguishable and a wrong match (a wrong bill that looks right) is worse than an unmatched call settling visibly as cost-unknown.
+   * Finds the session a vendor's post-call report belongs to, three ways in order of certainty:
+   * the conversation id recorded at mint, the LangWatch session id echoed back, then the single
+   * session open for this credential in the window — stopping at exactly one candidate.
    */
   async tryMatchRealtimeSession(params: {
     vendor: string;
@@ -191,7 +200,9 @@ export class GatewayRealtimeSessionService {
   }
 
   /**
-   * Closes a session with what the vendor reported and confirms its spend, sent into the gateway spend pipeline exactly as the gateway's own drainer would — the fold applies it through the same lattice (confirmed supersedes settled; a redelivered report collapses on the pipeline's own idempotency key). Money is rated here from quantities by the one rating seam; the vendor's own cost figure is stored beside it and never billed from, since two systems pricing one call is how they disagree.
+   * Closes a session with what the vendor reported and confirms its spend, sent into the gateway
+   * spend pipeline exactly as its own drainer would, so redelivery collapses on the idempotency
+   * key. The vendor's own cost figure is stored beside ours and never billed from.
    */
   async closeAndConfirmRealtimeSession(params: {
     session: GatewayRealtimeSessionRecord;
@@ -275,7 +286,9 @@ export class GatewayRealtimeSessionService {
   }
 
   /**
-   * Closes one session with usage a client read off its own socket. A second report on an already-CLOSED session is a success no-op (the gateway posts this from a customer's client, so retries/replays are ordinary traffic, and re-confirming would grow duration on every replay). An EXPIRED session still confirms — the sweeper only decided it wasn't holding a cap slot, and a real report afterwards is the truth about what the call used.
+   * Closes one session with usage a client read off its own socket. A second report on an already
+   * closed session is a success no-op, since retries and replays are ordinary traffic here. An
+   * expired session still confirms: the sweeper only decided it was not holding a cap slot.
    */
   async reportRealtimeSessionUsage(params: {
     sessionId: string;
@@ -322,7 +335,9 @@ export class GatewayRealtimeSessionService {
   }
 
   /**
-   * Marks as EXPIRED the sessions no report ever closed — an older-than-window row can't still be running, so leaving it OPEN would hold a cap slot forever. Runs under the same advisory lock the cap count uses, scoped to one key, so it costs one bounded write on the mint needing the slot rather than a table-wide sweep. Spend record is untouched (the settlement sweeper owns that side, with its own grace); a later vendor report still supersedes what either finds.
+   * Marks as expired the sessions no report ever closed, since a row older than the window cannot
+   * still be running and would hold a cap slot forever. It runs under the cap count's own advisory
+   * lock, scoped to one key, so it costs one bounded write rather than a table sweep.
    */
   async expireStaleRealtimeSessions(params: {
     virtualKeyId?: string;
@@ -344,7 +359,9 @@ export class GatewayRealtimeSessionService {
 const SPAN_NAME = "realtime.session.settled";
 
 /**
- * A span id derived from the session id, not random — settlement can be delivered more than once (resent webhook, retried usage report, a cost-unknown settlement later confirmed), and a stable id means every one of those writes the same span instead of adding another, so a replay can't inflate the trace's cost.
+ * A span id derived from the session id rather than random. Settlement can be delivered more than
+ * once — a resent webhook, a retried usage report, a cost-unknown settlement later confirmed — and
+ * a stable id means each of those writes the same span, so a replay cannot inflate the cost.
  */
 function settlementSpanId(sessionId: string): string {
   return createHash("sha256").update(`realtime-settlement:${sessionId}`).digest("hex").slice(0, 16);
@@ -357,7 +374,9 @@ function attr(key: string, value: string | number) {
 }
 
 /**
- * Records what a voice session used, in the trace the mint opened. Never throws: the money is already recorded on the spend record by the time this runs, so a failure here costs a visible number, not a charge, and raising would roll back an already-accepted settlement.
+ * Records what a voice session used, in the trace the mint opened. Never throws: the money is
+ * already on the spend record by the time this runs, so a failure here costs a visible number
+ * rather than a charge, and raising would roll back an already-accepted settlement.
  */
 async function recordRealtimeSessionSpan(params: {
   session: GatewayRealtimeSessionRecord;

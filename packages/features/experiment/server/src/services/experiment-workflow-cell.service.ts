@@ -1,7 +1,7 @@
 /**
- * Runs one cell whose target is a whole committed Studio workflow. The row goes through `execute_flow` once, the End node's result becomes the target output, each
- * of the workflow's own evaluator nodes becomes an evaluator result under the node's display name, and node costs are summed with LLM nodes priced the same way
- * `executeCell` prices them. Evaluators attached to the column are then graded through S4's loop, only when the workflow produced a result.
+ * Runs one cell whose target is a whole committed Studio workflow. The End node's result becomes
+ * the target output, each of the workflow's own evaluator nodes becomes a result under its display
+ * name, and node costs are summed. Column evaluators are graded afterwards, if a result came back.
  */
 
 import {
@@ -26,12 +26,23 @@ import {
 } from "../processes/experiment-result-mapping.process";
 import { ExperimentEvaluatorInputService } from "./experiment-evaluator-input.service";
 import type { ExperimentCellExecutionService } from "./experiment-cell-execution.service";
-import type { ExperimentRunPorts } from "./experiment-run-orchestrator.service";
+import type { ExperimentRunPorts } from "../rules/experiment-run-input.rules";
 import { ExperimentRunSandboxKeyService } from "./experiment-run-sandbox-key.service";
 import type { LoadedEvaluators } from "./experiment-execution-data.service";
 
 const logger = createLogger("langwatch:experiment:run-orchestrator");
 const sandboxKey = ExperimentRunSandboxKeyService.create();
+
+/** The workflow run's own state, as the engine reports it on an execution-state event. */
+type StudioExecutionState = Extract<
+  StudioServerEvent,
+  { type: "execution_state_change" }
+>["payload"]["execution_state"];
+
+/** One node's state, as the engine reports it on a component-state event. */
+type StudioComponentExecutionState = NonNullable<
+  Extract<StudioServerEvent, { type: "component_state_change" }>["payload"]["execution_state"]
+>;
 
 type FoldedFlowState = {
   targetOutput: unknown;
@@ -92,84 +103,116 @@ export class ExperimentWorkflowCellService {
 
     for (const event of events) {
       if (event.type === "execution_state_change") {
-        const ex = event.payload.execution_state;
-        if (ex?.result !== undefined) {
-          state.targetOutput = extractTargetOutput(ex.result);
-          state.targetOutputRecord = ex.result;
-        }
-
-        if (ex?.trace_id) {
-          state.finalTraceId = ex.trace_id;
-        }
-
-        if (ex?.timestamps?.started_at !== undefined && ex?.timestamps?.finished_at !== undefined) {
-          state.durationMs = ex.timestamps.finished_at - ex.timestamps.started_at;
-        }
-
-        if (ex?.status === "error") {
-          state.targetFailed = true;
-          state.targetFailure = {
-            error: ex.error,
-            errorType: ex.error_type,
-            upstreamStatus: ex.upstream_status,
-          };
-        }
-
-        continue;
-      }
-
-      if (event.type !== "component_state_change") {
-        continue;
-      }
-
-      const { component_id, execution_state } = event.payload;
-      if (!execution_state) {
-        continue;
-      }
-
-      if (typeof execution_state.cost === "number" && execution_state.cost > 0) {
-        state.totalCost += execution_state.cost;
-        state.sawCost = true;
-      } else {
-        // LLM nodes report tokens but no cost (the engine has no price table),
-        // so price them at the canonical model rate, same as executeCell.
-        const cost = await this.cells.tryPriceMetrics({
-          projectId,
-          metrics: execution_state.metrics,
+        ExperimentWorkflowCellService.foldExecutionState({
+          state,
+          execution: event.payload.execution_state,
         });
-        if (cost != null) {
-          state.totalCost += cost;
-          state.sawCost = true;
-        }
+        continue;
       }
 
-      if (
-        evaluatorNodeNames.has(component_id) &&
-        (execution_state.status === "success" || execution_state.status === "error")
-      ) {
-        state.evaluatorEvents.push(
-          mapWorkflowEvaluatorResult(
-            cell.rowIndex,
-            cell.targetId,
-            component_id,
-            evaluatorNodeNames.get(component_id),
-            {
-              status: execution_state.status,
-              outputs: execution_state.outputs,
-              cost: execution_state.cost,
-              error: execution_state.error,
-              // The coded half of the failure — without it the evaluator cell
-              // renders the engine's raw message verbatim.
-              nodeErrorCode: execution_state.error_type,
-              upstream_status: execution_state.upstream_status,
-              trace_id: execution_state.trace_id ?? state.finalTraceId,
-            },
-          ),
-        );
+      if (event.type === "component_state_change" && event.payload.execution_state) {
+        await this.foldComponentState({
+          state,
+          cell,
+          projectId,
+          evaluatorNodeNames,
+          componentId: event.payload.component_id,
+          execution: event.payload.execution_state,
+        });
       }
     }
 
     return state;
+  }
+
+  /** The workflow's own run: its result, its trace, how long it took, and whether it failed. */
+  private static foldExecutionState({
+    state,
+    execution,
+  }: {
+    state: FoldedFlowState;
+    execution: StudioExecutionState | undefined;
+  }): void {
+    if (execution?.result !== undefined) {
+      state.targetOutput = extractTargetOutput(execution.result);
+      state.targetOutputRecord = execution.result;
+    }
+
+    if (execution?.trace_id) {
+      state.finalTraceId = execution.trace_id;
+    }
+
+    const started = execution?.timestamps?.started_at;
+    const finished = execution?.timestamps?.finished_at;
+    if (started !== undefined && finished !== undefined) {
+      state.durationMs = finished - started;
+    }
+
+    if (execution?.status === "error") {
+      state.targetFailed = true;
+      state.targetFailure = {
+        error: execution.error,
+        errorType: execution.error_type,
+        upstreamStatus: execution.upstream_status,
+      };
+    }
+  }
+
+  /**
+   * One node's run: its cost, and its verdict when the node is one of the workflow's evaluators.
+   * LLM nodes report tokens but no cost, the engine having no price table, so they are priced at
+   * the canonical model rate exactly as a plain cell is.
+   */
+  private async foldComponentState({
+    state,
+    cell,
+    projectId,
+    evaluatorNodeNames,
+    componentId,
+    execution,
+  }: {
+    state: FoldedFlowState;
+    cell: ExecutionCell;
+    projectId: string;
+    evaluatorNodeNames: Map<string, string | undefined>;
+    componentId: string;
+    execution: StudioComponentExecutionState;
+  }): Promise<void> {
+    if (typeof execution.cost === "number" && execution.cost > 0) {
+      state.totalCost += execution.cost;
+      state.sawCost = true;
+    } else {
+      const cost = await this.cells.tryPriceMetrics({ projectId, metrics: execution.metrics });
+      if (cost != null) {
+        state.totalCost += cost;
+        state.sawCost = true;
+      }
+    }
+
+    const graded = execution.status === "success" || execution.status === "error";
+    if (!evaluatorNodeNames.has(componentId) || !graded) {
+      return;
+    }
+
+    state.evaluatorEvents.push(
+      mapWorkflowEvaluatorResult(
+        cell.rowIndex,
+        cell.targetId,
+        componentId,
+        evaluatorNodeNames.get(componentId),
+        {
+          status: execution.status,
+          outputs: execution.outputs,
+          cost: execution.cost,
+          error: execution.error,
+          // The coded half of the failure: without it the evaluator cell renders the engine's raw
+          // message verbatim.
+          nodeErrorCode: execution.error_type,
+          upstream_status: execution.upstream_status,
+          trace_id: execution.trace_id ?? state.finalTraceId,
+        },
+      ),
+    );
   }
 
   /** The `target_result` event for the workflow's End node, first so storage links evaluator results to it. */

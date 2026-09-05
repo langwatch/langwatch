@@ -47,10 +47,9 @@ export class AnomalyRuleService {
   }
 
   /**
-   * `findById`, for the mutations that cannot proceed without the row.
-   *
-   * Which org asked is a debugging detail — it goes to the log, not into an
-   * error a customer reads (see {@link AnomalyRuleNotFoundError}).
+   * `findById`, for the mutations that cannot proceed without the row. Which org asked is a
+   * debugging detail: it goes to the log, not into an error a customer reads (see
+   * {@link AnomalyRuleNotFoundError}).
    */
   async getById({
     id,
@@ -115,6 +114,18 @@ export class AnomalyRuleService {
 
   async updateRule(input: UpdateAnomalyRuleInput): Promise<AnomalyRule> {
     const existing = await this.getById({ id: input.id, organizationId: input.organizationId });
+    const changes: AnomalyRuleChanges = {
+      ...this.describedChanges(input),
+      ...this.classifiedChanges(input),
+      ...this.thresholdChanges({ input, existing }),
+      ...this.destinationChanges({ input, existing }),
+    };
+
+    return this.repository.update(existing.id, changes);
+  }
+
+  /** The free-text fields, which carry no rule of their own beyond having been supplied. */
+  private describedChanges(input: UpdateAnomalyRuleInput): AnomalyRuleChanges {
     const changes: AnomalyRuleChanges = {};
     if (input.name !== undefined) {
       changes.name = input.name;
@@ -124,6 +135,16 @@ export class AnomalyRuleService {
       changes.description = input.description;
     }
 
+    if (input.status !== undefined) {
+      changes.status = input.status;
+    }
+
+    return changes;
+  }
+
+  /** The enumerated fields, each refused by name when the value is outside its set. */
+  private classifiedChanges(input: UpdateAnomalyRuleInput): AnomalyRuleChanges {
+    const changes: AnomalyRuleChanges = {};
     if (input.severity !== undefined) {
       if (!ANOMALY_RULE_SEVERITIES.includes(input.severity)) {
         throw unsupportedValue({
@@ -156,48 +177,62 @@ export class AnomalyRuleService {
       changes.scopeId = input.scopeId;
     }
 
+    return changes;
+  }
+
+  /**
+   * The threshold config, re-validated against the effective rule type. Switching rule type with
+   * no matching config would leave a row whose two halves disagree, so that is refused up front
+   * and the admin supplies the right shape.
+   */
+  private thresholdChanges({
+    input,
+    existing,
+  }: {
+    input: UpdateAnomalyRuleInput;
+    existing: AnomalyRule;
+  }): AnomalyRuleChanges {
     if (input.thresholdConfig !== undefined) {
-      // Re-validate against the effective ruleType after this update.
-      // If the caller supplies a new ruleType, the new config must match
-      // its schema; if they keep the existing ruleType, the existing
-      // schema applies. Throws ZodError or a `ValidationError` (unknown
-      // ruleType); both reach the admin as `validation_error`.
       validateThresholdConfig({
         ruleType: input.ruleType ?? existing.ruleType,
         config: input.thresholdConfig,
       });
-      changes.thresholdConfig = input.thresholdConfig;
-    } else if (input.ruleType !== undefined && input.ruleType !== existing.ruleType) {
-      // Switching ruleType without supplying a matching config would
-      // leave a row whose ruleType + thresholdConfig disagree. Reject
-      // up-front so the admin supplies the right shape.
-      validateThresholdConfig({
-        ruleType: input.ruleType,
-        config: existing.thresholdConfig,
-      });
+
+      return { thresholdConfig: input.thresholdConfig };
     }
 
-    if (input.destinationConfig !== undefined) {
-      // Same allow-empty rule as create: empty `{}` clears destinations
-      // (back to log-only). Anything non-empty must round-trip the
-      // strict schema. A reader is shown a marker in place of each shared
-      // secret, so a config sent back carrying one keeps the stored secret.
-      const destinationConfig = restoreKeptSharedSecrets({
-        incoming: input.destinationConfig,
-        existing: existing.destinationConfig,
-      });
-      if (Object.keys(destinationConfig).length > 0) {
-        validateDestinationConfig(destinationConfig);
-      }
-
-      changes.destinationConfig = destinationConfig;
+    if (input.ruleType !== undefined && input.ruleType !== existing.ruleType) {
+      validateThresholdConfig({ ruleType: input.ruleType, config: existing.thresholdConfig });
     }
 
-    if (input.status !== undefined) {
-      changes.status = input.status;
+    return {};
+  }
+
+  /**
+   * The destination config, under the same allow-empty rule as create: an empty object clears
+   * destinations, anything else must round-trip the strict schema. A reader sees a marker in place
+   * of each shared secret, so a config sent back carrying one keeps the stored secret.
+   */
+  private destinationChanges({
+    input,
+    existing,
+  }: {
+    input: UpdateAnomalyRuleInput;
+    existing: AnomalyRule;
+  }): AnomalyRuleChanges {
+    if (input.destinationConfig === undefined) {
+      return {};
     }
 
-    return this.repository.update(existing.id, changes);
+    const destinationConfig = restoreKeptSharedSecrets({
+      incoming: input.destinationConfig,
+      existing: existing.destinationConfig,
+    });
+    if (Object.keys(destinationConfig).length > 0) {
+      validateDestinationConfig(destinationConfig);
+    }
+
+    return { destinationConfig };
   }
 
   async archive({

@@ -5,10 +5,8 @@
  */
 import type { StudioServerEvent, WorkflowService } from "@langwatch/workflow-contract";
 import { beforeEach, describe, expect, it } from "vitest";
-import {
-  ExperimentRunOrchestratorService,
-  type ExperimentRunPorts,
-} from "../experiment-run-orchestrator.service";
+import { ExperimentRunOrchestratorService } from "../experiment-run-orchestrator.service";
+import type { ExperimentRunPorts } from "../../rules/experiment-run-input.rules";
 import type { ExecutionCell } from "@langwatch/experiment-contract";
 
 const datasetColumns = [{ id: "input", name: "input", type: "string" }];

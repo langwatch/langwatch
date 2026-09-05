@@ -175,9 +175,8 @@ export class LangyGithubPrQuotaService {
   }): Promise<GithubPrLimitResult> {
     const connection = this.counter;
     if (!connection) {
-      // No Redis configured (dev / smaller self-hosters). `allowed: true`
-      // keeps GitHub PRs working in those environments; `reserved: false`
-      // tells the caller "no INCR happened, do NOT DECR on release".
+      // No Redis configured, as in dev and smaller self-hosters. Allowing keeps GitHub PRs
+      // working there, and reporting no reservation tells the caller not to release one.
       return {
         allowed: true,
         remaining: limit,
@@ -188,16 +187,14 @@ export class LangyGithubPrQuotaService {
 
     const bucket = dayBucket();
     const key = `langy:gh:prs:${userId}:${bucket}`;
-    // Track each step's outcome explicitly so a Redis blip MID-flow doesn't collapse two different
-    // states into the same fail-open shape. The N1/N2 adversarial findings (goated-review round 4):
-    // the previous catch-all could send back `allowed: true, reserved: false` even when the count
-    // had ALREADY gone over the limit (DECR throw on over-cap), letting a 21st request squeak past
+    // Each step's outcome is tracked explicitly so a Redis blip mid-flow cannot collapse two
+    // different states into one fail-open shape: a catch-all here once let a request past the cap
     // while the counter stayed inflated.
     let count: number;
     try {
       count = await connection.incr(key);
     } catch {
-      // INCR itself never committed — no side effect to undo.
+      // The increment never committed, so there is no side effect to undo.
       return {
         allowed: true,
         remaining: limit,
@@ -207,52 +204,63 @@ export class LangyGithubPrQuotaService {
     }
 
     if (count === 1) {
-      // EXPIRE failures used to leak through the catch as `allowed: true`
-      // PLUS leave the key without a TTL. Retry once in a tail-call; if
-      // the retry also fails, log and proceed — the key will outlive the
-      // bucket but cap enforcement still works (the count starts correct).
-      try {
-        await connection.expire(key, 60 * 60 * 24 * 2);
-      } catch {
-        // Best-effort retry; on persistent EXPIRE failure the key has no
-        // TTL — operator-visible via redis monitoring of `langy:gh:prs:*`
-        // keys older than 2 days. Documented residual; cap still works.
-        try {
-          await connection.expire(key, 60 * 60 * 24 * 2);
-        } catch {
-          /* TTL-less key; cap enforcement unaffected this bucket */
-        }
-      }
+      await this.expireBucket({ connection, key });
     }
 
     if (count > limit) {
-      // Over-cap: count already past the limit before any DECR attempt. Even
-      // if the DECR throws below, the right answer is `allowed: false`.
-      try {
-        await connection.decr(key);
-      } catch {
-        // DECR throw on the over-cap path: the counter stays inflated at
-        // `count` for the day, but the caller is correctly denied. Sergio's
-        // SR2/SR3 floor-at-0 release path covers the inverse case
-        // (release without matching INCR). The cap still holds; future
-        // reservations on this user/day see the inflated count and deny.
-      }
+      await this.releaseOverCap({ connection, key });
 
-      return {
-        allowed: false,
-        remaining: 0,
-        resetAt: resetAtForBucket(bucket),
-        reserved: false,
-      };
+      return { allowed: false, remaining: 0, resetAt: resetAtForBucket(bucket), reserved: false };
     }
 
-    // INCR committed AND count is within cap — caller holds the permit.
     return {
       allowed: true,
       remaining: Math.max(0, limit - count),
       resetAt: resetAtForBucket(bucket),
       reserved: true,
     };
+  }
+
+  /**
+   * Gives a freshly created bucket its lifetime, retried once. On a persistent failure the key
+   * outlives its bucket, which is operator-visible in Redis, and cap enforcement is unaffected
+   * because the count still starts correct.
+   */
+  private async expireBucket({
+    connection,
+    key,
+  }: {
+    connection: { expire: (key: string, seconds: number) => Promise<unknown> };
+    key: string;
+  }): Promise<void> {
+    const seconds = 60 * 60 * 24 * 2;
+    try {
+      await connection.expire(key, seconds);
+    } catch {
+      try {
+        await connection.expire(key, seconds);
+      } catch {
+        /* TTL-less key; cap enforcement unaffected this bucket */
+      }
+    }
+  }
+
+  /**
+   * Gives back the increment that took the count past the cap. A failure here leaves the counter
+   * inflated for the day, which still denies correctly: later reservations see the same count.
+   */
+  private async releaseOverCap({
+    connection,
+    key,
+  }: {
+    connection: { decr: (key: string) => Promise<unknown> };
+    key: string;
+  }): Promise<void> {
+    try {
+      await connection.decr(key);
+    } catch {
+      /* counter stays inflated for the day; the caller is correctly denied */
+    }
   }
 
   /**

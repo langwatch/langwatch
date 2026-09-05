@@ -10,7 +10,9 @@ import { PLATFORM_DEFAULT_RETENTION_DAYS } from "@langwatch/data-retention-contr
 const logger = createLogger("langwatch:clickhouse:retention-floor");
 
 /**
- * The app's retention policy, in the shape the ClickHouse package asks for. The package owns the mechanism (floor arithmetic, the never-narrower guarantee, the cache) and deliberately owns none of the policy; this is the whole of the policy half — map the table to its retention category and ask the project cascade.
+ * The app's retention policy, in the shape the ClickHouse package asks for. That package owns the
+ * mechanism (floor arithmetic, the never-narrower guarantee, the cache) and deliberately owns none
+ * of the policy; this is the whole policy half — map the table to its category, ask the cascade.
  */
 class PlatformRetentionDaysProvider implements RetentionDaysProvider {
   constructor(private readonly resolver: DataRetentionService) {}
@@ -34,7 +36,8 @@ class PlatformRetentionDaysProvider implements RetentionDaysProvider {
 }
 
 /**
- * A floor service bound to this platform's retention policy. Pass no resolver and every read still gets a bound, at the platform default, so a caller can adopt this before its construction site is rewired.
+ * A floor service bound to this platform's retention policy. Pass no resolver and every read still
+ * gets a bound, at the platform default, so a caller can adopt this before its site is rewired.
  */
 export class TraceRetentionFloorService {
   static create(resolver?: DataRetentionService): RetentionFloorService {

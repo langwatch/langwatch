@@ -1,7 +1,7 @@
 /**
- * Runs one cell whose target is a studio component — a prompt, an HTTP or code agent, or an evaluator run as its own column — and grades it. Owns the evaluator
- * dispatch loop the other two executors reuse: one evaluator failing does not stop the rest, each reports its own error cell, and the target's result is already
- * yielded by then. Prices a target's tokens at the project's canonical model rate, since the engine reports token counts and has no price table.
+ * Runs one cell whose target is a studio component and grades it. It owns the evaluator dispatch
+ * loop the other two executors reuse, where one evaluator failing does not stop the rest. Tokens
+ * are priced at the project's canonical rate, since the engine reports counts and has no prices.
  */
 
 import type { ExecutionCell, EvaluationV3Event } from "@langwatch/experiment-contract";
@@ -26,7 +26,7 @@ import {
   evaluatorTargetNoInputsResult,
   noInputsResolvedResult,
 } from "../processes/experiment-cell-error-events.process";
-import type { ExperimentRunPorts } from "./experiment-run-orchestrator.service";
+import type { ExperimentRunPorts } from "../rules/experiment-run-input.rules";
 import { ExperimentEvaluatorInputService } from "./experiment-evaluator-input.service";
 import { ExperimentRunSandboxKeyService } from "./experiment-run-sandbox-key.service";
 import type { LoadedEvaluators } from "./experiment-execution-data.service";

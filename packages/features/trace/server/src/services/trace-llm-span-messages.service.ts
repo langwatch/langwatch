@@ -2,6 +2,53 @@ import type { PromptStudioSpanResult } from "@langwatch/trace-contract";
 
 type ChatMessage = PromptStudioSpanResult["messages"][number];
 
+/** One decoded turn, or nothing when the value carried no string content. */
+function tryTurnOf(value: unknown, defaultRole: "user" | "assistant"): ChatMessage | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const { content, role } = value as { content?: unknown; role?: unknown };
+  if (typeof content !== "string") {
+    return null;
+  }
+
+  return { role: (typeof role === "string" ? role : defaultRole) as ChatMessage["role"], content };
+}
+
+/**
+ * The turns a decoded payload holds, in the three shapes emitters send: a typed chat-messages
+ * envelope, a bare array, or a single message object. Roles are normalized the same way in each,
+ * so an item with a missing or non-string role always takes the default.
+ */
+function turnsOf(parsed: unknown, defaultRole: "user" | "assistant"): ChatMessage[] {
+  const envelope = parsed as { type?: unknown; value?: unknown } | null;
+  const items =
+    envelope && typeof parsed === "object" && envelope.type === "chat_messages"
+      ? envelope.value
+      : parsed;
+  if (Array.isArray(items)) {
+    return items.map((item) => tryTurnOf(item, defaultRole)).filter((turn) => turn !== null);
+  }
+
+  const single = tryTurnOf(parsed, defaultRole);
+  if (single) {
+    return [single];
+  }
+
+  const wrapped = envelope && typeof parsed === "object" ? envelope.value : void 0;
+  if (typeof wrapped === "string") {
+    return [{ role: defaultRole, content: wrapped }];
+  }
+
+  return typeof parsed === "string" ? [{ role: defaultRole, content: parsed }] : [];
+}
+
+/**
+ * Decodes one attribute's turns onto `out`. A payload that parses but yields no turns falls back
+ * to a single raw-content turn: visible and ugly beats invisible and lost, and without it the
+ * attribute would be silently dropped from the playground resume.
+ */
 function pushDecoded(out: ChatMessage[], raw: string, defaultRole: "user" | "assistant"): void {
   let parsed: unknown;
   try {
@@ -12,78 +59,8 @@ function pushDecoded(out: ChatMessage[], raw: string, defaultRole: "user" | "ass
     return;
   }
 
-  // Track baseline so we can detect the "all branches matched a structure but"
-  // "produced zero entries" case (e.g. `{type:"chat_messages", value:[]}` or every
-  // item failing the filter). Without this guard the attribute would be silently
-  // dropped from the playground resume; falling back to a single raw-content turn
-  // keeps something visible instead of pretending the LLM said nothing.
-  const before = out.length;
-
-  if (
-    parsed &&
-    typeof parsed === "object" &&
-    (parsed as { type?: unknown }).type === "chat_messages" &&
-    Array.isArray((parsed as { value?: unknown }).value)
-  ) {
-    // Normalize role for every entry the same way the bare-array and
-    // single-object branches do — an item with a missing or non-string
-    // role gets `defaultRole`. Pre-fix this branch trusted the typed-
-    // wrapper assertion and let invalid roles through, producing an
-    // inconsistent shape vs the sibling branches.
-    for (const item of (parsed as { value: unknown[] }).value) {
-      if (
-        item &&
-        typeof item === "object" &&
-        typeof (item as { content?: unknown }).content === "string"
-      ) {
-        const role = (item as { role?: unknown }).role;
-        out.push({
-          role: (typeof role === "string" ? role : defaultRole) as ChatMessage["role"],
-          content: (item as { content: string }).content,
-        });
-      }
-    }
-  } else if (Array.isArray(parsed)) {
-    for (const item of parsed) {
-      if (
-        item &&
-        typeof item === "object" &&
-        typeof (item as { content?: unknown }).content === "string"
-      ) {
-        const role = (item as { role?: unknown }).role;
-        out.push({
-          role: (typeof role === "string" ? role : defaultRole) as ChatMessage["role"],
-          content: (item as { content: string }).content,
-        });
-      }
-    }
-  } else if (
-    parsed &&
-    typeof parsed === "object" &&
-    typeof (parsed as { content?: unknown }).content === "string"
-  ) {
-    const role = (parsed as { role?: unknown }).role;
-    out.push({
-      role: (typeof role === "string" ? role : defaultRole) as ChatMessage["role"],
-      content: (parsed as { content: string }).content,
-    });
-  } else {
-    const wrapped =
-      parsed && typeof parsed === "object" ? (parsed as { value?: unknown }).value : undefined;
-    if (typeof wrapped === "string") {
-      out.push({ role: defaultRole, content: wrapped });
-    } else if (typeof parsed === "string") {
-      out.push({ role: defaultRole, content: parsed });
-    }
-  }
-
-  // Last-resort fallback: a payload was present but every recognized
-  // shape produced zero entries (empty array, malformed items,
-  // unrecognized envelope). Surface the raw string so the trace is
-  // never silently empty — visible-but-ugly beats invisible-and-lost.
-  if (out.length === before) {
-    out.push({ role: defaultRole, content: raw });
-  }
+  const turns = turnsOf(parsed, defaultRole);
+  out.push(...(turns.length > 0 ? turns : [{ role: defaultRole, content: raw }]));
 }
 
 export class TraceLlmSpanMessagesService {
@@ -92,7 +69,9 @@ export class TraceLlmSpanMessagesService {
   }
 
   /**
-   * Parses input (request prompt) + output (assistant reply) messages carried on an LLM-kind span's attributes into a flat ordered list, the shape the trace→playground "Open in Prompts" loader feeds into the chat. Reads, in fallback order, input `gen_ai.input.messages` → `gen_ai.prompt` → `langwatch.input` and output `gen_ai.completion` → `gen_ai.output.messages` → `langwatch.output`; each is a JSON-encoded string in one of three SDK-dependent wire shapes (TypedValueJson wrapper, bare message array, or bare single message object — the last was previously unhandled and silently dropped the assistant reply). Falls back to wrapping the raw string as a single turn when parsing fails or the shape is unrecognized. Default role is `user` for input, `assistant` for output; embedded roles win when present.
+   * Parses an LLM span's input and output message attributes into one flat ordered list, reading
+   * `gen_ai.input.messages`, `gen_ai.prompt`, `langwatch.input` and `gen_ai.completion`,
+   * `gen_ai.output.messages`, `langwatch.output` in that order. Unrecognized shapes become a turn.
    */
   static parseLLMSpanMessages(attrs: Record<string, unknown>): ChatMessage[] {
     const messages: ChatMessage[] = [];

@@ -15,7 +15,7 @@ import { TraceRetentionFloorService } from "../../services/trace-retention-floor
 import { TraceLegacyReadRepository } from "../trace-legacy-read.repository";
 import { DEFAULT_PARTITION_WINDOW_MS } from "../../services/trace-windowed-read.service";
 import { deserializeAttributes, ensureStringRecord } from "@langwatch/trace-server";
-import type { ExtractedIO } from "#services/trace-io-extraction.service";
+import type { ExtractedIO } from "#rules/trace-io-text.rules";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import {
   type ClickHouseEvaluationRunRow,

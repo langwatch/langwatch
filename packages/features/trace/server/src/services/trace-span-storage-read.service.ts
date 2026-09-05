@@ -20,7 +20,9 @@ import type { TraceIOExtractionService } from "./trace-io-extraction.service";
 import type { SpanInsertData } from "@langwatch/trace-contract";
 
 /**
- * Optional blob-offload resolution dependencies for the v2 read path (ADR-022). When provided, `getSpansByTraceId`/`tryGetSpanById` resolve any `langwatch.reserved.eventref.*` pointers before mapping to `Span[]`; when omitted, the service falls back to the preview values already stored in `stored_spans` — identical to pre-ADR-022 behaviour.
+ * Optional blob-offload resolution dependencies for the v2 read path (ADR-022). When provided, the
+ * span reads resolve any `langwatch.reserved.eventref.*` pointers before mapping; when omitted the
+ * service falls back to the preview values already stored, exactly as before ADR-022.
  */
 export interface SpanReadBlobResolutionDeps {
   blobStore: TraceBlobStoreService;
@@ -39,7 +41,9 @@ type Since = ByTraceId & { sinceStartTimeMs: number };
  */
 
 /**
- * Read-side visibility gate. Read routes pass the caller's plan cutoff (from `getVisibilityCutoffMsForProject`); spans started before it get their content teaser-redacted. Omitted/null = ungated — internal callers (ingestion, enrichment, derivations) never pass it.
+ * Read-side visibility gate. Read routes pass the caller's plan cutoff and spans started before it
+ * get their content teaser-redacted. Omitted or null means ungated: internal callers such as
+ * ingestion, enrichment and derivations never pass it.
  */
 type VisibilityGate = { visibilityCutoffMs?: number | null };
 
@@ -84,7 +88,9 @@ export class SpanStorageService {
   }
 
   /**
-   * Returns full spans for a trace, resolving any ADR-022 offloaded eventref pointers when `blobResolutionDeps` were supplied at construction. A no-op when no span carries a `langwatch.reserved.eventref.*` attribute — the cost is one `getNormalizedSpansByTraceId` call instead of `getSpansByTraceId`. On resolution failure (missing event_log row) the preview value is kept and the error logged at warn; the call never throws due to a stale ref.
+   * Full spans for a trace, resolving ADR-022 offloaded eventref pointers when the resolution
+   * dependencies were supplied. A no-op when no span carries one. On a missing event_log row the
+   * preview value is kept and the error logged at warn; a stale ref never throws.
    */
   async getSpansByTraceId(
     params: ByTraceId & { limit?: number } & VisibilityGate,
@@ -119,14 +125,18 @@ export class SpanStorageService {
   }
 
   /**
-   * Claim-check resolution read (ADR-069): one canonical span by identity for internal derivation consumers (the coding-agent facts lift). Deliberately ungated and unresolved — consumers lift scalar span attributes only, never offloaded bodies, and run server-side, so neither the visibility gate nor blob resolution applies; `null` means "not readable yet", so queue callers retry rather than treating it as absence. The partition hint is required, not optional: the repository read behind this has no unbounded fallback, so a hintless call would widen into a full-table scan. Derivation-shaped: the span comes back with empty `events`/`links` (omitted because no consumer here reads them and they are what it fails on) — rendering a span is `tryGetSpanById`'s job, not this.
+   * Claim-check resolution read (ADR-069): one canonical span by identity for internal derivation
+   * consumers. Deliberately ungated and unresolved, and `null` means not readable yet so queue
+   * callers retry. The partition hint is required: the read behind it has no unbounded fallback.
    */
   async tryGetNormalizedSpanById(params: NormalizedSpanByIdParams): Promise<NormalizedSpan | null> {
     return this.repository.tryFindNormalizedSpanById(params);
   }
 
   /**
-   * Returns a single span by its ID, resolving any ADR-022 offloaded eventref pointers when `blobResolutionDeps` were supplied at construction. Resolution fetches normalized spans for the whole trace and isolates the requested span after resolution, reusing the same `TraceOffloadResolutionService.resolveOffloadedTraces` path as `getSpansByTraceId` so sibling eventref pointers on the same trace are also resolved consistently.
+   * A single span by its id, resolving ADR-022 offloaded eventref pointers when the resolution
+   * dependencies were supplied. Resolution fetches the whole trace's normalized spans and isolates
+   * the requested one afterwards, so sibling pointers resolve consistently with the trace read.
    */
   async tryGetSpanById(params: BySpanId & VisibilityGate): Promise<Span | null> {
     const gateOne = (span: Span | null): Span | null =>
@@ -158,7 +168,9 @@ export class SpanStorageService {
   }
 
   /**
-   * Event rollups for the trace list's Events column, one query per page. Names and counts only, so unlike the per-trace detail read there is no captured content to gate: redaction blanks event *attributes*, and this read never asks for them.
+   * Event rollups for the trace list's Events column, one query per page. Names and counts only,
+   * so unlike the per-trace detail read there is no captured content to gate: redaction blanks
+   * event attributes, and this read never asks for them.
    */
   async getTraceEventRollupsByTraceIds(
     params: TraceEventRollupParams,

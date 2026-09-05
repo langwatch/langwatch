@@ -1,5 +1,7 @@
 /**
- * Extract a trace's input and output from a LOG RECORD rather than a span. Spring AI and Claude Code report the conversation as logs, not span attributes, so the summary projection reads them through here and hands the result to `TraceIOAccumulationService` alongside what the spans said — split out of that service's file, which had made a 500-line module out of two unrelated subjects.
+ * Extracts a trace's input and output from a log record rather than a span. Spring AI and Claude
+ * Code report the conversation as logs, not span attributes, so the summary projection reads them
+ * here and hands the result to `TraceIOAccumulationService` alongside what the spans said.
  */
 
 import type {
@@ -10,7 +12,9 @@ import { CLAUDE_CODE_SCOPE_NAMES } from "./claude-code-canonicaliser.service";
 import { SPRING_AI_SCOPE_NAMES } from "./spring-ai-canonicaliser.service";
 
 /**
- * Reads a trace's headline input and output out of one log record. The canonicalisation service is the only collaborator and it never varies per record, so it is held rather than threaded through every call.
+ * Reads a trace's headline input and output out of one log record. The canonicalisation service is
+ * the only collaborator and never varies per record, so it is held rather than threaded through
+ * every call.
  */
 type TraceLogIO = { input: string | null; output: string | null };
 
@@ -24,14 +28,18 @@ export class TraceLogRecordIOService {
   }
 
   /**
-   * Spring AI, Claude Code and Codex each report the conversation as logs rather than span attributes, each in its own shape. A vendor returning `null` means "not mine, or nothing here" and the next one gets a look — Spring AI is the one exception, and says so.
+   * Spring AI, Claude Code and Codex each report the conversation as logs rather than span
+   * attributes, each in its own shape. A vendor returning `null` means not mine, or nothing here,
+   * and the next one gets a look — Spring AI is the one exception, and says so.
    */
   extractIO(data: LogRecordReceivedEventData): TraceLogIO {
     return this.fromSpringAI(data) ?? this.fromClaudeCode(data) ?? this.fromCodex(data) ?? NO_IO;
   }
 
   /**
-   * Spring AI puts an identifier on the first line and the content underneath. A record in this scope with no content is answered rather than passed on: it is a Spring AI record, it simply has nothing in it.
+   * Spring AI puts an identifier on the first line and the content underneath. A record in this
+   * scope with no content is answered rather than passed on: it is a Spring AI record, it simply
+   * has nothing in it.
    */
   private fromSpringAI(data: LogRecordReceivedEventData): TraceLogIO | null {
     if (!SPRING_AI_SCOPE_NAMES.has(data.scopeName)) {
@@ -95,7 +103,9 @@ export class TraceLogRecordIOService {
   }
 
   /**
-   * Claude emits reply-shaped events for its utility calls too (autosuggest, session titles), whose text is not the assistant's reply. Output is last-write-wins, so an unfiltered title clobbers the real one — mirrors the gate on the canonical span path so both output paths agree.
+   * Claude emits reply-shaped events for its utility calls too, such as autosuggest and session
+   * titles, whose text is not the assistant's reply. Output is last-write-wins, so an unfiltered
+   * title clobbers the real one; this mirrors the gate on the canonical span path.
    */
   private isConversationalTurn(data: LogRecordReceivedEventData, eventName: string): boolean {
     return (

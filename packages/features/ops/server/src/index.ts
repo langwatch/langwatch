@@ -90,7 +90,8 @@ export {
   OVERDUE_PENDING_MS,
   OVERDUE_WAKE_MS,
 } from "./services/manager-explorer.service";
-export { LOCK_REFRESH_INTERVAL_MS, ReplayService } from "./services/replay.service";
+export { ReplayService } from "./services/replay.service";
+export { LOCK_REFRESH_INTERVAL_MS } from "./services/replay-lock-heartbeat.service";
 export { OpsMetricsCollectorService } from "./services/ops-metrics-collector.service";
 export { totalInFlight, type InFlightCounts } from "./rules/ops-in-flight.rules";
 export {
@@ -189,7 +190,13 @@ export {
 // The operator-only ClickHouse EXPLAIN endpoint: the pure query guards and the
 // decision about which client an EXPLAIN is allowed to reach.
 export { CLICKHOUSE_GUARDRAILS } from "./rules/ops-clickhouse-guardrails.rules";
-export { ALLOWED_EXPLAIN_TYPES, explainBodySchema, type ExplainType, OpsClickHouseRuntime, type ParseResult } from "./adapters/ops-clickhouse-explain.adapter";
+export {
+  ALLOWED_EXPLAIN_TYPES,
+  explainBodySchema,
+  type ExplainType,
+  OpsClickHouseRuntime,
+  type ParseResult,
+} from "./adapters/ops-clickhouse-explain.adapter";
 export { OpsClickhouseExplainAdapter } from "./adapters/ops-clickhouse-explain.adapter";
 export {
   type OpsExplainOutcome,

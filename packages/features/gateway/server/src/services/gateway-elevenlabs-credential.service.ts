@@ -1,5 +1,7 @@
 /**
- * Reads the stored ElevenLabs credential for one provider row. Two callers need it with no session to authorize with (the webhook route authenticated by vendor HMAC, and the background reconciler), so ModelProviderService (which takes an authz context) doesn't fit — this is the service layer for both. Nothing here throws: a provider that can't serve is null, and each caller decides what that means (webhook 404s so ids can't be probed; reconciler leaves the session for spend grace).
+ * Reads the stored ElevenLabs credential for one provider row. Two callers need it with no session
+ * to authorize with — the HMAC-authenticated webhook route and the background reconciler — so the
+ * authz-context-taking model provider service does not fit. Nothing here throws.
  */
 
 import { createLogger } from "@langwatch/observability";
@@ -61,7 +63,9 @@ export class GatewayElevenLabsCredentialService {
   }
 
   /**
-   * Workspace post-call webhook secret on one provider row. Organization comes back with it since the webhook has no other way to know whose session a delivery may close — tenant is the path parameter, so the match scopes to the org owning the secret the delivery was signed with.
+   * Workspace post-call webhook secret on one provider row. The organization comes back with it,
+   * since the webhook has no other way to know whose session a delivery may close: the tenant is a
+   * path parameter, so the match scopes to the org owning the secret the delivery was signed with.
    */
   async tryGetWebhookSecret({
     modelProviderId,
@@ -82,7 +86,9 @@ export class GatewayElevenLabsCredentialService {
   }
 
   /**
-   * API key and host to read a conversation back with. Host is validated here as well as on write, since a row stored before the registry constrained the field could send the customer's API key to whatever host it names (SSRF policy only refuses private addresses) — a bad host falls back to the vendor default rather than refusing, since the reconciler still has a real call to settle.
+   * API key and host to read a conversation back with. The host is validated here as well as on
+   * write, since a row stored before the registry constrained the field could send the customer's
+   * key anywhere. A bad host falls back to the vendor default rather than refusing.
    */
   async tryGetApiCredential({
     modelProviderId,

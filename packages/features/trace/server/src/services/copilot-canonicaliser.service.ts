@@ -11,12 +11,9 @@ import type { CanonicalAttributesPort, ExtractorContext } from "../ports/canonic
 const COPILOT_ATTR_PREFIX = "github.copilot.";
 
 /**
- * Copilot's instrumentation scope name. Verified on the wire: build
- * 1.0.71 emits `github.copilot` (the documented `COPILOT_OTEL_SOURCE_NAME`
- * default); `@github/copilot` is kept as a legacy alias for older builds.
- * Matching by scope — not only by a `github.copilot.*` attribute — is what
- * lets an `execute_tool` span (which may carry no vendor attribute) still
- * be recognized as copilot and classified as a tool span.
+ * Copilot's instrumentation scope name; `@github/copilot` is a legacy alias for older builds.
+ * Matching by scope rather than only by a `github.copilot.*` attribute is what lets an
+ * `execute_tool` span, which may carry no vendor attribute, still be classified as a tool span.
  */
 export const COPILOT_SCOPES = ["github.copilot", "@github/copilot"];
 
@@ -34,7 +31,8 @@ export class CopilotCanonicaliserService implements CanonicalAttributesPort {
 
   readonly id = "copilot";
 
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: a flat, linear sequence of independent `take attribute → if present, lift` guards — the score comes from the count of one-line lifts, not tangled control flow; the branches don't interact.
+  // A flat, linear sequence of independent `take attribute → if present, lift` guards: the score
+  // comes from the count of one-line lifts, not tangled control flow; the branches never interact.
   apply(ctx: ExtractorContext): void {
     const { attrs } = ctx.bag;
 

@@ -73,7 +73,9 @@ export class IngestionPullWorkerConfiguration {
 
 export class IngestionPullWorkerService {
   /** The routing profile a pulled source's conversations are assembled under. */
-  static tryConversationRoutingProfileFor(sourceType: string): ConversationRoutingProfile | undefined {
+  static tryConversationRoutingProfileFor(
+    sourceType: string,
+  ): ConversationRoutingProfile | undefined {
     return CONVERSATION_ROUTING.get(sourceType)?.profile;
   }
 

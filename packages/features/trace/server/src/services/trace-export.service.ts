@@ -1,6 +1,8 @@
 import type { Protections } from "@langwatch/trace-contract";
 /**
- * TraceExportService — the download half of the trace read. Orchestrates batch fetching via TraceService and serialization via CSV/JSON serializers, yielding chunks progressively through an AsyncGenerator so the API layer streams directly to the HTTP response; only one batch (up to 100 traces) is held in memory at a time.
+ * TraceExportService — the download half of the trace read. It orchestrates batch fetching and CSV
+ * or JSON serialization, yielding chunks progressively so the API layer streams straight to the
+ * HTTP response; only one batch, up to 100 traces, is held in memory at a time.
  */
 
 import { createLogger } from "@langwatch/observability";
@@ -27,7 +29,9 @@ const BATCH_SIZE = 100;
 const logger = createLogger("langwatch:export");
 
 /**
- * Domain service for exporting traces in batches: `TraceExportService.create({ traceService })`, then `for await (const { chunk, progress } of service.exportTraces(request))` to stream chunks to the response while updating progress.
+ * Domain service for exporting traces in batches: build with `create({ traceService })`, then
+ * `for await (const { chunk, progress } of service.exportTraces(request))` to stream chunks to the
+ * response while updating progress.
  */
 export class TraceExportService {
   private readonly traceService: TraceLegacyReadPort;
@@ -74,7 +78,9 @@ export class TraceExportService {
   }
 
   /**
-   * Export traces as an async generator yielding serialized chunks with progress. Each chunk is either CSV rows (first chunk includes header; later chunks are data-only) or JSONL lines. Fetches traces in batches of 100 via scroll pagination to keep memory usage constant regardless of total trace count.
+   * Exports traces as an async generator yielding serialized chunks with progress. Each chunk is
+   * either CSV rows, the first carrying the header, or JSONL lines. Traces are fetched in batches
+   * of 100 by scroll pagination, so memory stays constant whatever the total count.
    */
   async *exportTraces({
     request,
@@ -84,60 +90,24 @@ export class TraceExportService {
     protections: Protections;
   }): AsyncGenerator<{ chunk: string; progress: ExportProgress }> {
     logger.info(
-      {
-        projectId: request.projectId,
-        mode: request.mode,
-        format: request.format,
-      },
+      { projectId: request.projectId, mode: request.mode, format: request.format },
       "Starting trace export",
     );
 
-    const includeSpans = request.mode === "full";
     let scrollId: string | undefined;
     let exported = 0;
     let total = 0;
     let isFirstBatch = true;
-    // Accumulate evaluator names across all batches.
-    // NOTE: For CSV, the header is written from batch 1's evaluator names. Evaluators
-    // appearing only in later batches will not have columns in the header. This is a
-    // known limitation of streaming CSV where the header must be emitted before all
-    // data is known. In practice, evaluators are consistent across a project's traces.
+    // Evaluator names accumulate across batches, but for CSV the header is written from the first
+    // batch's names: one appearing only later gets no column. That is inherent to streaming a CSV
+    // whose header must precede the data, and evaluators are consistent across a project.
     const evaluatorNameSet = new Set<string>();
 
-    // Fetch batches until no more data
     while (true) {
-      const result = await this.traceService.getAllTracesForProject(
-        {
-          projectId: request.projectId,
-          startDate: request.startDate,
-          endDate: request.endDate,
-          filters: request.filters,
-          query: request.query,
-          traceIds: request.traceIds,
-          pageSize: BATCH_SIZE,
-          scrollId,
-        },
-        protections,
-        {
-          downloadMode: true,
-          includeSpans,
-          // DATA LOSS (#4991): summary mode reads no span content, but it still emits
-          // trace-level `trace.input`/`trace.output` (csv/json summary serializers), so it
-          // is content-consuming too — gating on `includeSpans` shipped the truncated 64 KB
-          // preview for any offloaded trace, silently. Resolve for every export mode; the
-          // batch resolver keeps the extra event_log reads bounded.
-          resolveBlobs: true,
-          scrollId: scrollId ?? null,
-        },
-      );
-
-      // Flatten groups into traces
+      const result = await this.fetchBatch({ request, protections, scrollId });
       const traces: Trace[] = result.groups.flat();
-
-      // On first batch, capture total
       if (isFirstBatch) {
         total = result.totalHits;
-
         if (total === 0 || traces.length === 0) {
           logger.info({ projectId: request.projectId }, "No traces to export");
 
@@ -145,29 +115,20 @@ export class TraceExportService {
         }
       }
 
-      // Merge evaluator names from every batch
-      const batchNames = collectEvaluatorNames({
-        traces,
-        traceChecks: result.traceChecks,
-      });
-      for (const name of batchNames) {
+      for (const name of collectEvaluatorNames({ traces, traceChecks: result.traceChecks })) {
         evaluatorNameSet.add(name);
       }
 
-      // Merge evaluations from traceChecks into trace objects
       const enrichedTraces = enrichTracesWithEvaluations({
         traces,
         traceChecks: result.traceChecks,
       });
 
       exported += enrichedTraces.length;
-      const progress: ExportProgress = { exported, total };
-
-      const evaluatorNames = Array.from(evaluatorNameSet).sort();
       const chunk = serializeBatch({
         traces: enrichedTraces,
         request,
-        evaluatorNames,
+        evaluatorNames: Array.from(evaluatorNameSet).sort(),
         includeHeader: isFirstBatch,
       });
 
@@ -176,12 +137,10 @@ export class TraceExportService {
         "Export batch serialized",
       );
 
-      yield { chunk, progress };
+      yield { chunk, progress: { exported, total } };
 
       isFirstBatch = false;
       scrollId = result.scrollId;
-
-      // Stop if no more data (no scrollId or empty batch)
       if (!scrollId || traces.length === 0) {
         break;
       }
@@ -191,7 +150,44 @@ export class TraceExportService {
   }
 
   /**
-   * Remove the first line (header) from a CSV string. Must search for the same sequence the serializer wrote — splitting on "\n" while rows are terminated with "\r\n" leaves a stray carriage return at the head of the chunk (a phantom leading field). Exported for the batch-boundary tests, which concatenate chunks exactly as this service does; a test-local copy could pass while this regressed.
+   * One page of the export. Blobs resolve for every mode: a summary export reads no span content
+   * but still emits the trace's own input and output, so gating resolution on spans shipped the
+   * truncated preview for any offloaded trace, silently. The batch resolver keeps the reads bounded.
+   */
+  private async fetchBatch({
+    request,
+    protections,
+    scrollId,
+  }: {
+    request: ExportRequest;
+    protections: Protections;
+    scrollId: string | undefined;
+  }) {
+    return this.traceService.getAllTracesForProject(
+      {
+        projectId: request.projectId,
+        startDate: request.startDate,
+        endDate: request.endDate,
+        filters: request.filters,
+        query: request.query,
+        traceIds: request.traceIds,
+        pageSize: BATCH_SIZE,
+        scrollId,
+      },
+      protections,
+      {
+        downloadMode: true,
+        includeSpans: request.mode === "full",
+        resolveBlobs: true,
+        scrollId: scrollId ?? null,
+      },
+    );
+  }
+
+  /**
+   * Removes the header line from a CSV string, searching for the same sequence the serializer
+   * wrote: splitting on "\n" while rows end "\r\n" leaves a stray carriage return at the head of
+   * the chunk. Exported for the batch-boundary tests, so a test-local copy cannot drift.
    */
   static stripCsvHeader(csv: string): string {
     const firstBreak = csv.indexOf(CSV_NEWLINE);

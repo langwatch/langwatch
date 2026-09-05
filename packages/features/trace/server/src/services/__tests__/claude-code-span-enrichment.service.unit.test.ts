@@ -1,13 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
 
+import { ClaudeCodeSpanEnrichmentService } from "../claude-code-span-enrichment.service";
 import {
-  ClaudeCodeSpanEnrichmentService,
   type ClaudeContentLog,
   type ClaudeSpanRef,
+} from "../../rules/claude-code-message-index.rules";
+import {
   type ClaudeToolLog,
   type ClaudeToolSpanRef,
-} from "../claude-code-span-enrichment.service";
+} from "../../rules/claude-code-tool-enrichment.rules";
 
 const traceCanonicalisation = TraceCanonicalisationService.create();
 

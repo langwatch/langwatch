@@ -6,7 +6,9 @@ export class TraceViewerProtectionsService {
   }
 
   /**
-   * Whether this viewer may read text the model wrote FROM the conversation, as opposed to a fact about it. Both sides are required — a summary, title or evaluator's prose routinely paraphrases the prompt and reply together, so a viewer allowed only one could read the other out of it. The one place this rule is written down: every surface carrying such text (Sessions lens, Sessions screen, pull request detail, evaluator verdicts) asks here, so none can drift behind the others.
+   * Whether this viewer may read text the model wrote from the conversation, rather than a fact
+   * about it. Both sides are required: summaries, titles and evaluator prose paraphrase prompt
+   * and reply together, so one-sided access would leak the other. Every surface asks here.
    */
   static canReadCapturedContent = (protections: Protections): boolean =>
     protections.canSeeCapturedInput === true && protections.canSeeCapturedOutput === true;
