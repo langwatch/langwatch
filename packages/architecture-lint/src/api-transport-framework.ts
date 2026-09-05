@@ -1,28 +1,28 @@
 /**
  * `api-transport-through-framework`: a feature's doors are DEFINED through
- * `@langwatch/api`, never hand-rolled beside it.
- *
- * A `transport/api-rest/*.api.ts` file may not reach for the HTTP framework
- * underneath — `hono-openapi`'s `describeRoute` / `validator` / `resolver`,
- * `@hono/zod-validator`, or a `new Hono()` of its own — because a family that
- * mounts its own routes is outside the versioning, the capability declarations,
- * the error envelope and the published document the chain owns.
- *
- * A `transport/api-trpc/*.api.ts` file may not call `initTRPC`, a bare
- * `router({ … })` or `.input(` outside the chain, for the same reason plus one
- * more: the policy has to be applied AFTER the parser, and a hand-written
- * router is where that silently goes wrong.
- *
- * Either kind may not name the legacy RBAC vocabulary. Access is declared in
- * AuthZ terms through the chain; a role enum in a transport file is a second,
- * unreviewable gate.
- *
- * Not-yet-converted files sit in `api-transport-framework-allowlist.json`,
- * which only shrinks: an entry naming a file that no longer offends is itself
- * a violation, so a conversion that leaves its line behind fails.
- *
- * Spec: packages/architecture-lint/specs/api-transport-through-framework.feature.
+ * `@langwatch/api`, never hand-rolled beside it. Spec:
+ * packages/architecture-lint/specs/api-transport-through-framework.feature.
  */
+
+// A `transport/api-rest/*.api.ts` file may not reach for the HTTP framework
+// underneath — hono-openapi's `describeRoute` / `validator` / `resolver`,
+// `@hono/zod-validator`, a `new Hono()` — because a family that mounts its own
+// routes is outside the versioning, the capabilities, the error envelope and
+// the published document the chain owns.
+
+// A `transport/api-trpc/*.api.ts` file may not call `initTRPC`, a bare
+// `router({ … })` or `.input(` outside the chain, for the same reason plus
+// one more: the policy has to be applied AFTER the parser, and a hand-written
+// router is where that silently goes wrong.
+
+// Either kind may not name the legacy RBAC vocabulary: access is declared in
+// AuthZ terms through the chain, and a role enum in a transport file is a
+// second, unreviewable gate.
+
+// Not-yet-converted files sit in the allowlist, which only shrinks: an entry
+// naming a file that no longer offends is itself a violation, so a conversion
+// that leaves its line behind fails.
+
 import { readFileSync } from "node:fs";
 import { existsSync } from "node:fs";
 import { join, relative, sep } from "node:path";

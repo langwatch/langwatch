@@ -30,7 +30,7 @@ export type ResolvedEndpoint =
   | (EndpointRegistration & { withdrawn?: false })
   | {
       kind: EndpointRegistration["kind"];
-      method: HttpMethod | "sse";
+      method: HttpMethod | "sse" | "all";
       path: string;
       config: EndpointRegistration["config"];
       withdrawn: true;

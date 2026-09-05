@@ -7,6 +7,7 @@ import { parseApiSchemaSync, type ApiSchema } from "../schema.js";
 import type {
   EndpointDef,
   EndpointDocs,
+  EndpointIdempotency,
   HttpMethod,
   RawEndpointDef,
   ServiceContext,
@@ -57,6 +58,15 @@ export interface DefaultsChain {
   withRateLimit(): this;
   /** Cache validated responses under `tag`; requires the `cache` port and an output. */
   withCache(tag: string, ttlSeconds: number): this;
+  /**
+   * Make this create replayable under `Idempotency-Key`: the framework reads
+   * and validates the key, dispatches through the process's receipt ledger,
+   * marks a replayed answer, and documents both. Requires the `idempotency`
+   * port on the service.
+   */
+  withIdempotency(idempotency: EndpointIdempotency): this;
+  /** Response headers set on every answer this endpoint gives. */
+  withHeaders(headers: Readonly<Record<string, string>>): this;
   /** Mark the endpoint deprecated: documented as such, warns on every response. */
   withDeprecated(notice: string): this;
   /** Opt out of a service- or group-level `withCache` default. */
@@ -69,6 +79,19 @@ export interface DefaultsChain {
 export interface RouteChain extends DefaultsChain {
   /** JSON body schema. */
   withInput(schema: ApiSchema): this & InputDeclared;
+  /**
+   * Hand the handler the request body unparsed, as `input.body`. For the
+   * surfaces whose body IS the evidence — a webhook signature is computed over
+   * exact bytes, a protobuf payload is not JSON — where parsing first and
+   * re-serialising later cannot reproduce what was signed.
+   */
+  withRawBody(as: "bytes" | "text", options?: { contentType?: string }): this & InputDeclared;
+  /**
+   * Answer outside the JSON contract: the handler returns a string, bytes, a
+   * stream or a whole Response, written with the declared content type.
+   * `reason` records why, the way withoutPermission does.
+   */
+  withRawResponse(reason: string, options?: { contentType?: string }): this & OutputDeclared;
   /** Response body schema — validated before serialization. */
   withOutput(schema: ApiSchema): this & OutputDeclared;
   /** HTTP status code for successful responses (default: 200, or 204 with no body). */
@@ -410,6 +433,35 @@ export class ChainBuilder {
     return this;
   }
 
+  withIdempotency(idempotency: EndpointIdempotency): this {
+    this._def.idempotency = idempotency;
+    return this;
+  }
+
+  withRawBody(as: "bytes" | "text", options: { contentType?: string } = {}): this & InputDeclared {
+    this._def.rawBody = {
+      as,
+      ...(options.contentType ? { contentType: options.contentType } : {}),
+    };
+    return this as this & InputDeclared;
+  }
+
+  withRawResponse(reason: string, options: { contentType?: string } = {}): this & OutputDeclared {
+    if (reason.trim() === "") {
+      throw new Error("withRawResponse requires a written reason");
+    }
+    this._def.rawResponse = {
+      reason,
+      ...(options.contentType ? { contentType: options.contentType } : {}),
+    };
+    return this as this & OutputDeclared;
+  }
+
+  withHeaders(headers: Readonly<Record<string, string>>): this {
+    this._def.headers = { ...this._def.headers, ...headers };
+    return this;
+  }
+
   withDeprecated(notice: string): this {
     this._def.deprecated = notice;
     return this;
@@ -577,11 +629,27 @@ export function assertRouteDef({
         `does not declare withParams`,
     );
   }
-  if (!def.output) {
+  if (!def.output && !def.rawResponse) {
     throw new Error(
       `REST endpoint ${method.toUpperCase()} ${path || "/"} must declare an output ` +
-        `schema; use z.void() for an endpoint with no response body`,
+        `schema; use z.void() for an endpoint with no response body, or ` +
+        `withRawResponse(reason) for one that answers outside the JSON contract`,
     );
+  }
+  if (def.output && def.rawResponse) {
+    throw new Error(
+      `REST endpoint ${method.toUpperCase()} ${path || "/"} declares both an output ` +
+        `schema and a raw response; an answer is validated or it is written through, not both`,
+    );
+  }
+  if (def.rawBody && def.input) {
+    throw new Error(
+      `REST endpoint ${method.toUpperCase()} ${path || "/"} declares both a raw body ` +
+        `and a parsed input; the body is read once`,
+    );
+  }
+  if (method === "get" && def.rawBody) {
+    throw new Error(`REST endpoint GET ${path || "/"} cannot declare a request body`);
   }
 }
 

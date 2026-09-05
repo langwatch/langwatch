@@ -15,6 +15,25 @@ export function serializeEndpointResult({
   kind: EndpointRegistration["kind"];
   result: unknown;
 }): Response {
+  for (const [name, value] of Object.entries(config.headers ?? {})) {
+    c.header(name, value);
+  }
+
+  // Declared to answer outside the JSON contract: the handler's own value is
+  // written through. A whole Response is passed on untouched, because a
+  // redirect, a 304 and a streamed body each carry headers of their own that
+  // this function has no business rewriting.
+  if (config.rawResponse) {
+    if (result instanceof Response) return result;
+    if (result === undefined || result === null) {
+      return c.body(null, config.status ?? 204);
+    }
+    if (config.rawResponse.contentType) {
+      c.header("Content-Type", config.rawResponse.contentType);
+    }
+    return c.body(result as string | ArrayBuffer | ReadableStream, config.status ?? 200);
+  }
+
   if (result instanceof Response) {
     // Every REST route declares an output, so a raw Response is always a
     // handler breaking its own contract. SSE never reaches here.

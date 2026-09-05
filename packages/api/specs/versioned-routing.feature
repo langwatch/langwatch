@@ -97,3 +97,10 @@ Feature: Explicit compatibility version namespaces
     Then the bare path carries the declared operation id
     And the latest namespace's operation id is suffixed "latest"
     And no /api/v1 twin appears as a second operation
+
+  @unit
+  Scenario: A family serves one static generation instead of dated namespaces
+    Given a family declares the generation its base path already names
+    When it is built
+    Then its routes answer once, at that path
+    And no dated namespace or latest alias is mounted beside them

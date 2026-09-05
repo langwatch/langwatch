@@ -78,26 +78,54 @@ silently replacing the handled-error rendering it meant to layer on top of.
 Forwarded from the options straight to `ServiceConfig`, for the surfaces that are not the
 published product API.
 
-## Still to build, in the order the survey ranked them
+## G5 — a static generation instead of dated namespaces
 
-- **G5 static generations.** `/api/gateway/v1`, `/api/webhooks/v1`, `/api/scim/v2` are static
-  generations, not dated ones. `createRestService` already has `staticVersioning`, but it
-  lives on the `publicRest` config and the versioned family mounts dated namespaces. The
-  extension is to let a versioned family declare its generation instead of a date, and
-  mount one namespace rather than dated + `latest` + the `/api/v1` twin.
-- **G11 `withIdempotency()`.** `packages/api/src/rest/idempotency.ts` exists; the verb does
-  not. It should declare the key parameter in the document, replay through the ledger, and
-  set the replay headers, so `webhook.api.ts` stops wiring three helpers by hand.
-- **G12 SSE from any family.** `registerSse` is on the service builder already; it needs to
-  be reachable from the project- and service-scoped factories.
-- **G7 raw bodies.** `withRawBody("bytes" | "text")` hands the handler the exact bytes
-  BEFORE parsing — what a webhook signature is computed over, and what an OTLP protobuf
-  body is. Nothing else can be layered on top of a parsed body after the fact.
-- **G8 non-JSON answers.** `withResponse({ contentType, status })` for
-  `application/scim+json` and `text/plain`, `withRedirect()`, a no-body status (202/204/304),
-  and a stream response for the byte-serving families.
-- **G9 headers and cookies**, **G10 `.all()`**, **G12** request-lifetime abort for the
-  long-poll family.
+`staticVersioning` moves from the `publicRest` block onto `ServiceConfig` itself, so a
+versioned family can declare one too: `staticGeneration: "v1"` builds a one-version
+selector and mounts each route ONCE, at the family's own base path. `/api/gateway/v1`,
+`/api/webhooks/v1` and `/api/scim/v2` therefore answer exactly where they answer today,
+with no dated namespace, no `latest` alias and no `/api/v1` twin beside them —
+`canonicalV1Path` already refuses to alias a path whose segments name a generation.
 
-Each of those lands with a scenario in `endpoint-capabilities.feature` before its code.
-A family needing one of them is NOT converted with raw Hono in the meantime: it waits.
+## G11 — `withIdempotency({ operation, scope })`
+
+A chain verb, and an `idempotency` port on the service beside `rateLimiter` and `cache`.
+The framework reads and bounds-checks `Idempotency-Key`, dispatches through the process's
+ledger, writes a replay from the STORED BYTES (never re-serialised, so a replay cannot
+drift from the answer it stands in for), documents the request parameter and the
+`X-Idempotent-Replay` response header, and validates a first execution against the
+endpoint's declared output like any other answer. Declaring it without the port fails the
+build, as does declaring it on a read — which is already safe to retry.
+
+## G12 — SSE from any family
+
+`registerSse` was always on the service builder; what was missing was that `policy()` was
+typed to `RouteChain`, which a stream's chain is not. Widened to `DefaultsChain`, so a
+stream declares its access exactly like a route and lands in the route registry the same
+way. **Request-lifetime abort is deliberately NOT new mechanism**: a handler already has
+`c.req.raw.signal`, which is what the long-poll family composes with `AbortSignal.any`.
+
+## G7 — the exact request bytes
+
+`withRawBody("bytes" | "text", { contentType })` reads the body ONCE, in the framework,
+and hands it to the handler as `input.body` beside its validated path and query fields. A
+handler that reached for the stream itself could not also let a signature check read it;
+this is the seam that makes both possible. Declaring a raw body and a parsed input on one
+route fails the build, because the body is read once.
+
+## G8, G9, G10 — answers that are not JSON
+
+`withRawResponse(reason, { contentType })` satisfies the "every route declares an output"
+rule with a written reason instead of a schema: the handler returns a string, bytes, a
+stream, or a whole `Response` — passed through untouched, so a redirect, a 304 and a
+streamed body keep the headers they carry. `withHeaders({...})` sets a route's own headers
+on every answer. `registerAnyMethodRoute(path, version, handler, define)` mounts one path
+for every method, undocumented on purpose: a catch-all and a 405 method guard have no
+operation to publish.
+
+## Still to build
+
+Nothing from the survey's twelve. What a family may still need beyond them: the better-auth
+router pass-through (`auth.api.ts` hands the whole `Request` to another router — reachable
+today through `withRawResponse` plus `c.req.raw`, but unproven), and multipart parsing,
+which no family in the survey's scope actually does.

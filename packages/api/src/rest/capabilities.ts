@@ -31,7 +31,7 @@ export function rateLimitMiddleware({
 }: {
   rateLimiter: RateLimiter;
   /** Service, HTTP operation and version namespace — fixed at mount time. */
-  keyParts: { service: string; method: HttpMethod; path: string; version: string };
+  keyParts: { service: string; method: HttpMethod | "all"; path: string; version: string };
 }): MiddlewareHandler {
   return async (c, next) => {
     const principal = rateLimitPrincipal(c);
@@ -89,7 +89,7 @@ export function cacheKeyFor({
   input,
 }: {
   service: string;
-  method: HttpMethod;
+  method: HttpMethod | "all";
   path: string;
   version: string;
   input: unknown;
@@ -109,7 +109,7 @@ export function cacheReadMiddleware({
   declaredStatus,
 }: {
   cache: ResponseCache;
-  keyParts: { service: string; method: HttpMethod; path: string; version: string };
+  keyParts: { service: string; method: HttpMethod | "all"; path: string; version: string };
   /**
    * The endpoint's declared success status, replayed verbatim on a hit. The
    * defaults mirror `serializeEndpointResult`: 204 for a no-body endpoint,

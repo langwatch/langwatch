@@ -37,7 +37,8 @@ export function mountStaticVersionRoutes<TProject>({
   versionMap: Map<string, ResolvedEndpoint[]>;
 }): void {
   const latest = versionMap.get(VERSION_LATEST);
-  const staticVersioning = serviceConfig.publicRest?.staticVersioning;
+  const staticVersioning =
+    serviceConfig.staticVersioning ?? serviceConfig.publicRest?.staticVersioning;
   if (!latest || !staticVersioning) {
     return;
   }
@@ -311,7 +312,7 @@ export function mountFamilyRoute({
 }: {
   app: Hono;
   basePath: string;
-  method: HttpMethod;
+  method: HttpMethod | "all";
   path: string;
   serviceConfig: ServiceConfig;
   stack: MiddlewareHandler[];
@@ -335,12 +336,13 @@ export function mountRoute({
   stack,
 }: {
   app: Hono;
-  method: HttpMethod;
+  method: HttpMethod | "all";
   path: string;
   stack: MiddlewareHandler[];
 }): void {
   const handlers = stack as [MiddlewareHandler, ...MiddlewareHandler[]];
-  const register: Record<HttpMethod, () => void> = {
+  const register: Record<HttpMethod | "all", () => void> = {
+    all: () => void app.all(path, ...handlers),
     get: () => void app.get(path, ...handlers),
     post: () => void app.post(path, ...handlers),
     put: () => void app.put(path, ...handlers),

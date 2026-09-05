@@ -1,11 +1,11 @@
 /**
- * The fluent tRPC chain: what it builds at runtime, and what it refuses to
- * build at all. The compile-time half — that a router built through the chain
- * is the SAME type the hand-written `router({ … })` produced — is the type
- * assertion in this file plus `packages/api/type-tests/trpc-service-chain.ts`.
- *
- * Spec: packages/api/specs/trpc-framework.feature.
+ * The fluent tRPC chain: what it builds at runtime, what it refuses to build
+ * at all, and — in the `Equal<>` assertions, which only `tsc` checks — that a
+ * chain-built router is the SAME type the hand-written one produced.
  */
+
+// Spec: packages/api/specs/trpc-framework.feature.
+
 import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contract";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -248,6 +248,78 @@ describe("createTrpcService", () => {
       ).resolves.toEqual(
         await handwritten.createCaller({ actor: { id: "actor-1" } }).getProject({ projectId: "p" }),
       );
+    });
+  });
+});
+
+describe("createTrpcService.subscription", () => {
+  describe("given a stream declared through the chain", () => {
+    /** @scenario "A stream declared through the chain is the same procedure the client subscribes to" */
+    it("is the same type the hand-written subscription produced, and yields through the policy", async () => {
+      const { declarations, order, policy } = recordingPolicy();
+      const input = z.object({ projectId: z.string() });
+      const handler = async function* ({ input: parsed }: { input: { projectId: string } }) {
+        yield { id: `${parsed.projectId}-1` };
+        yield { id: `${parsed.projectId}-2` };
+      };
+
+      const chained = serviceUnder({ policy })
+        .subscription("watch", (p) =>
+          p
+            .withInput(input)
+            .withOutput(z.object({ id: z.string() }))
+            .withPermission("project:view")
+            .handle(handler),
+        )
+        .build();
+      const handwritten = root.router({
+        watch: policy("project:view")(root.procedure.input(input)).subscription(handler),
+      });
+
+      type _SameProcedureType = Assert<Equal<typeof chained, typeof handwritten>>;
+      expect(true satisfies _SameProcedureType).toBe(true);
+
+      const seen: { id: string }[] = [];
+      for await (const value of await chained
+        .createCaller({ actor: { id: "actor-1" } })
+        .watch({ projectId: "p" })) {
+        seen.push(value);
+      }
+
+      expect(seen).toEqual([{ id: "p-1" }, { id: "p-2" }]);
+      expect(declarations).toEqual(["project:view", "project:view"]);
+      expect(order).toEqual(['policy:{"projectId":"p"}']);
+    });
+
+    /** @scenario "A stream declared through the chain is the same procedure the client subscribes to" */
+    it("checks every value it yields against the declared shape, not only the first", async () => {
+      const { policy } = recordingPolicy();
+      const router = serviceUnder({ policy, validateOutput: true })
+        .subscription("watch", (p) =>
+          p
+            .withoutInput("the stream is scoped by the caller's own session")
+            .withOutput(z.object({ id: z.string() }))
+            .withPermission("project:view")
+            .handle(async function* () {
+              yield { id: "first" };
+              yield { id: 2 } as unknown as { id: string };
+            }),
+        )
+        .build();
+
+      const seen: unknown[] = [];
+      await expect(
+        (async () => {
+          for await (const value of await router
+            .createCaller({ actor: { id: "actor-1" } })
+            .watch()) {
+            seen.push(value);
+          }
+        })(),
+      ).rejects.toThrow(
+        /tRPC procedure "watch" answered with a value its declared output schema refuses: id:/,
+      );
+      expect(seen).toEqual([{ id: "first" }]);
     });
   });
 });

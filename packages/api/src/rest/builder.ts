@@ -247,6 +247,30 @@ class ServiceBuilder<TProject, TVariables extends Record<string, unknown>, TApp 
   }
 
   /**
+   * Register one path that answers EVERY method.
+   *
+   * For the two shapes that are not an operation: a catch-all handing the
+   * whole request to a router of its own, and a method guard whose job is to
+   * answer 405 to everything it is not. Never documented — an any-method route
+   * has no operation to publish — so it declares its access and nothing else.
+   */
+  registerAnyMethodRoute<TPath extends string, THandler extends RouteHandler<TVariables, TApp>>(
+    path: TPath,
+    version: VersionLabel,
+    handler: THandler,
+    define: (b: RouteChain) => RouteChain,
+  ): this;
+  registerAnyMethodRoute(
+    path: string,
+    version: string,
+    handler: unknown,
+    define?: (b: ChainBuilder) => unknown,
+  ): this {
+    this._registerAnyMethodRoute(path, version, undefined, handler, define);
+    return this;
+  }
+
+  /**
    * A registrar sharing a chain across endpoints (ADR 001 §5). Dotted names registered
    * through the group are prefixed with the group's name and grammar-checked on the full
    * name; `registerRoute` paths are used as-is. Groups do not nest and carry no version.
@@ -361,6 +385,38 @@ class ServiceBuilder<TProject, TVariables extends Record<string, unknown>, TApp 
       endpoint: {
         kind: "rest",
         method,
+        path,
+        config,
+        handler: handler as (...args: unknown[]) => unknown,
+      },
+    });
+  }
+
+  /** @internal */
+  _registerAnyMethodRoute(
+    path: string,
+    version: string,
+    groupDefaults: RawEndpointDef | undefined,
+    handler: unknown,
+    define: ((b: ChainBuilder) => unknown) | undefined,
+  ): void {
+    assertVersionLabel(version);
+    assertRoutePath(path);
+    const def = collectDef(define);
+    const config = mergeDefs(this._defaults._def, groupDefaults ?? {}, def, {
+      // An any-method route publishes no operation: hono-openapi has no method
+      // to file it under, and a catch-all has no request or response shape to
+      // describe.
+      docs: { ...def.docs, hide: true },
+      rawResponse: def.rawResponse ?? {
+        reason: "an any-method route answers whatever its handler decides to",
+      },
+    });
+    this._events.push({
+      version,
+      endpoint: {
+        kind: "rest",
+        method: "all",
         path,
         config,
         handler: handler as (...args: unknown[]) => unknown,
@@ -532,6 +588,18 @@ class ServiceBuilder<TProject, TVariables extends Record<string, unknown>, TApp 
         throw new Error(
           `Endpoint ${route} declares withCache but the service has no ` +
             `"cache" port; pass one to createService({ cache })`,
+        );
+      }
+      if (config.idempotency && !this._config.idempotency) {
+        throw new Error(
+          `Endpoint ${route} declares withIdempotency but the service has no ` +
+            `"idempotency" port; pass one to createService({ idempotency })`,
+        );
+      }
+      if (config.idempotency && (endpoint.method === "get" || endpoint.method === "sse")) {
+        throw new Error(
+          `Endpoint ${route} declares withIdempotency, which belongs to a create; ` +
+            `a read is already safe to retry`,
         );
       }
       if (config.cache && !config.output) {

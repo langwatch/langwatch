@@ -89,3 +89,45 @@ Feature: Endpoint capabilities — rate limiting, response caching, deprecation
     When it is built
     Then it is handed the envelope's boundary handler to delegate to
     And a refusal the boundary can render still reaches it
+
+  @unit
+  Scenario: A create declared replayable answers a retry from its receipt
+    Given a create declares itself replayable under a caller-chosen key
+    When the same key is sent twice in one tenancy
+    Then the create runs once and the retry is answered from the stored bytes, marked as a replay
+    And the same key in another tenancy runs the create again
+    And a request carrying no key behaves exactly as it did before, writing no receipt
+    And a key too short to be plausibly unique is refused rather than ignored
+
+  @unit
+  Scenario: A capability declared without its port fails the build
+    Given an endpoint declares a capability the service has no port for
+    When the family is built
+    Then it refuses, naming the port to pass
+
+  @unit
+  Scenario: A handler is given the exact request bytes
+    Given an endpoint declares that its body must not be parsed
+    When a request arrives
+    Then the handler is given the bytes exactly as they were sent, read once
+    And a route that declares both a raw body and a parsed one refuses to build
+
+  @unit
+  Scenario: An endpoint answers outside the JSON contract when it declares why
+    Given an endpoint declares a written reason for answering outside the JSON contract
+    When it returns a string, or a whole response of its own
+    Then the answer is written with the declared content type, or passed through untouched
+    And declaring both a schema and a raw answer, or a raw answer with no reason, refuses to build
+
+  @unit
+  Scenario: An endpoint declares the headers every answer carries
+    Given an endpoint declares response headers
+    When it answers
+    Then they are set beside the framework's own
+
+  @unit
+  Scenario: One path answers every method when that is the surface
+    Given a path is registered for every method
+    When requests of different methods arrive
+    Then the same handler answers each of them
+    And the path publishes no operation, because it has none to publish

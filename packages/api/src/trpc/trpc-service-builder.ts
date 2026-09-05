@@ -1,35 +1,30 @@
 /**
- * The fluent chain a feature's tRPC surface is defined through — the tRPC twin
- * of `createRestService`.
- *
- *     createTrpcService({ root, procedures })
- *       .query("getProjectAPIKey", (p) =>
- *         p
- *           .withInput(projectScopeSchema)
- *           .withOutput(projectSchema)
- *           .withPermission("project:update")
- *           .handle(async ({ ctx, input }) => …),
- *       )
- *       .build();
- *
- * It builds exactly what a mount used to write by hand —
- * `policy(declaration)(procedure.input(schema)).query(handler)` inside
- * `root.router({})` — with three differences:
- *
- *  - the ordering rule cannot be got wrong. The parser is applied before the
- *    policy by construction, so the authorization check always reads its scope
- *    id from validated input.
- *  - the access declaration is a TYPE requirement: a procedure that never
- *    calls `withPermission` has no callable `handle`. The process's fail-closed
- *    `enforceCheck` backstop stays, as the second line rather than the first.
- *  - the response shape is stated. `withOutput` never reaches tRPC's
- *    `.output()` — that would change the client's inferred output type — so it
- *    is a dev/test guard and the machine-readable statement of what a
- *    procedure answers.
- *
- * Design: dev/docs/plans/trpc-fluent-chain-2026-09-05.md.
+ * The fluent chain a feature's tRPC surface is defined through, the tRPC twin
+ * of `createRestService`. Design: dev/docs/plans/trpc-fluent-chain-2026-09-05.md.
  * Spec: packages/api/specs/trpc-framework.feature.
  */
+
+//     createTrpcService({ root, procedures })
+//       .query("getProjectAPIKey", (p) =>
+//         p.withInput(S).withOutput(S).withPermission("project:update")
+//          .handle(async ({ ctx, input }) => …))
+
+// It builds what a mount used to write by hand —
+// `policy(declaration)(procedure.input(schema)).query(handler)` inside
+// `root.router({})` — with three differences.
+
+// The ordering rule cannot be got wrong: the parser is applied before the
+// policy by construction, so the authorization check always reads its scope
+// id from validated input.
+
+// The access declaration is a TYPE requirement: a procedure that never calls
+// `withPermission` has no callable `handle`. The process's fail-closed
+// `enforceCheck` backstop stays, as the second line rather than the first.
+
+// The response shape is stated. `withOutput` never reaches tRPC's `.output()`
+// — that would change the client's inferred output type — so it is a dev/test
+// guard and the machine-readable statement of what a procedure answers.
+
 import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contract";
 import type {
   AnyTRPCRootTypes,
@@ -40,6 +35,7 @@ import type {
   TRPCCreateRouterOptions,
   TRPCRootObject,
   TRPCRouterRecord,
+  TRPCSubscriptionProcedure,
   TRPCRuntimeConfigOptions,
 } from "@trpc/server";
 import type { z } from "zod";
@@ -72,8 +68,7 @@ export type TrpcServiceConfig<
   /**
    * Check every answer against its declared output schema and throw on a
    * mismatch. The process decides — this package reads no environment — and
-   * production leaves it off: the schema documents the answer, it does not
-   * gate it.
+   * production leaves it off: the schema documents, it does not gate.
    */
   validateOutput?: boolean;
 }>;
@@ -93,30 +88,53 @@ type HandlerInput<TInput extends ChainInput> = TInput extends z.ZodType
 /** What the CLIENT sends, which is the parser's input side. */
 type ClientInput<TInput extends ChainInput> = TInput extends z.ZodType ? z.input<TInput> : void;
 
-type ProcedureDef<TInput extends ChainInput, TResult> = {
+type ProcedureDef<TInput extends ChainInput, TOutput> = {
   input: ClientInput<TInput>;
-  output: Awaited<TResult>;
+  output: TOutput;
   meta: object;
 };
 
-/** What `handle` returns, which is the real tRPC procedure the router mounts. */
+/** Every kind of procedure the chain builds. */
+type ProcedureKind = "query" | "mutation" | "subscription";
+
+/**
+ * What a subscription answers, as tRPC types it: the stream itself, not the
+ * promise of one. A `tracked()` yield is NOT supported — tRPC unwraps its
+ * envelope through a type it does not export — and nothing here uses one.
+ */
+type SubscriptionOutput<TResult> =
+  TResult extends AsyncIterable<infer TYield, infer TReturn, infer TNext>
+    ? AsyncIterable<TYield, TReturn, TNext>
+    : never;
+
+/**
+ * The real tRPC procedure a built chain becomes. `TOutput` is the FINISHED
+ * client-visible output — not the handler's return type — so a `.query(name,
+ * define)` call can infer it back out of what `define` returned.
+ */
 type BuiltProcedure<
-  TKind extends "query" | "mutation",
+  TKind extends ProcedureKind,
   TInput extends ChainInput,
-  TResult,
+  TOutput,
 > = TKind extends "query"
-  ? TRPCQueryProcedure<ProcedureDef<TInput, TResult>>
-  : TRPCMutationProcedure<ProcedureDef<TInput, TResult>>;
+  ? TRPCQueryProcedure<ProcedureDef<TInput, TOutput>>
+  : TKind extends "mutation"
+    ? TRPCMutationProcedure<ProcedureDef<TInput, TOutput>>
+    : TRPCSubscriptionProcedure<ProcedureDef<TInput, TOutput>>;
+
+/** The client-visible output one handler return type produces, by kind. */
+type OutputOf<TKind extends ProcedureKind, TResult> = TKind extends "subscription"
+  ? SubscriptionOutput<Awaited<TResult>>
+  : Awaited<TResult>;
 
 /**
  * `handle` exists only on a chain that has declared its input, its output and
- * its access. Anything else resolves its `this` to `never`, which is TS2684 at
- * the call site — the declaration is mandatory by construction rather than by
- * review.
+ * its access. Anything else resolves its `this` to `never` — TS2684 at the
+ * call site, so the declaration is mandatory by construction.
  */
 type ReadyChain<
   TContext extends object,
-  TKind extends "query" | "mutation",
+  TKind extends ProcedureKind,
   TInput extends ChainInput,
   TOutput extends ChainOutput,
   TDeclared extends boolean,
@@ -131,7 +149,7 @@ type ReadyChain<
 /** The definition chain of one procedure. */
 export interface TrpcProcedureChain<
   TContext extends object,
-  TKind extends "query" | "mutation",
+  TKind extends ProcedureKind,
   TInput extends ChainInput = TrpcUndeclared,
   TOutput extends ChainOutput = TrpcUndeclared,
   TDeclared extends boolean = false,
@@ -177,16 +195,13 @@ export interface TrpcProcedureChain<
     handler: (
       opts: Readonly<{ ctx: TContext; input: HandlerInput<TInput> }>,
     ) => TResult | Promise<TResult>,
-  ): BuiltProcedure<TKind, TInput, TResult>;
+  ): BuiltProcedure<TKind, TInput, OutputOf<TKind, TResult>>;
 }
 
 /**
- * The record one more procedure makes, flattened.
- *
- * `TProcedures & { [K in TName]: … }` would read the same and type differently:
- * an intersection is not the object type tRPC's own `router({ … })` produces,
- * so the client's router type would stop being IDENTICAL to the hand-written
- * one and start being merely assignable to it.
+ * The record one more procedure makes, flattened. An intersection would read
+ * the same and type differently — it is not the object type tRPC's own
+ * `router({ … })` produces — so the router would stop being IDENTICAL.
  */
 type WithProcedure<
   TProcedures extends TRPCCreateRouterOptions,
@@ -210,42 +225,58 @@ export interface TrpcService<
   TRoot extends AnyTRPCRootTypes,
   TProcedures extends TRPCCreateRouterOptions,
 > {
-  query<TName extends string, TInput extends ChainInput, TResult>(
+  query<TName extends string, TInput extends ChainInput, TOutput>(
     name: TName,
     define: (
       chain: TrpcProcedureChain<TContext, "query">,
-    ) => BuiltProcedure<"query", TInput, TResult>,
+    ) => BuiltProcedure<"query", TInput, TOutput>,
   ): TrpcService<
     TContext,
     TOptions,
     TRoot,
-    WithProcedure<TProcedures, TName, BuiltProcedure<"query", TInput, TResult>>
+    WithProcedure<TProcedures, TName, BuiltProcedure<"query", TInput, TOutput>>
   >;
-  mutation<TName extends string, TInput extends ChainInput, TResult>(
+  mutation<TName extends string, TInput extends ChainInput, TOutput>(
     name: TName,
     define: (
       chain: TrpcProcedureChain<TContext, "mutation">,
-    ) => BuiltProcedure<"mutation", TInput, TResult>,
+    ) => BuiltProcedure<"mutation", TInput, TOutput>,
   ): TrpcService<
     TContext,
     TOptions,
     TRoot,
-    WithProcedure<TProcedures, TName, BuiltProcedure<"mutation", TInput, TResult>>
+    WithProcedure<TProcedures, TName, BuiltProcedure<"mutation", TInput, TOutput>>
+  >;
+  /**
+   * A stream. Its handler is an async generator, and `withOutput` — when the
+   * process asks for validation — checks every value it yields, because a
+   * stream's shape drifts one event at a time.
+   */
+  subscription<TName extends string, TInput extends ChainInput, TOutput>(
+    name: TName,
+    define: (
+      chain: TrpcProcedureChain<TContext, "subscription">,
+    ) => BuiltProcedure<"subscription", TInput, TOutput>,
+  ): TrpcService<
+    TContext,
+    TOptions,
+    TRoot,
+    WithProcedure<TProcedures, TName, BuiltProcedure<"subscription", TInput, TOutput>>
   >;
   /** The router the process mounts, built by the root's own factory. */
   build(): TRPCBuiltRouter<TRoot, TRPCDecorateCreateRouterOptions<TProcedures>>;
 }
 
 /**
- * The `.input()` / `.query()` / `.mutation()` surface of a tRPC procedure
- * builder, named structurally at the one seam that applies a feature's parser
- * and resolver to a builder whose generics belong to the process. The same
- * reason `declaredPolicy` names `ChainableProcedure`.
+ * A tRPC procedure builder's parser-and-resolver surface, named structurally
+ * at the one seam applying a feature's own to a builder whose generics belong
+ * to the process. The same reason `declaredPolicy` names `ChainableProcedure`.
  */
 type BuildableProcedure = Readonly<{
   input(schema: z.ZodType): BuildableProcedure;
   query(resolver: (opts: never) => unknown): unknown;
   mutation(resolver: (opts: never) => unknown): unknown;
+  subscription(resolver: (opts: never) => unknown): unknown;
 }>;
 
 type ChainState = {
@@ -256,9 +287,21 @@ type ChainState = {
 
 /**
  * Refuses an answer its own declared schema refuses. Loud on purpose: a shape
- * that drifted from its declaration is a defect in the procedure, and the
- * whole point of finding it in test or development is that it is cheap there.
+ * that drifted from its declaration is a defect in the procedure, and finding
+ * it in test or development is cheap.
  */
+function assertDeclaredOutput(name: string, schema: z.ZodType, value: unknown): void {
+  const parsed = schema.safeParse(value);
+  if (parsed.success) return;
+  throw new Error(
+    `tRPC procedure "${name}" answered with a value its declared output schema refuses: ` +
+      parsed.error.issues
+        .map((issue) => `${issue.path.join(".") || "<root>"}: ${issue.message}`)
+        .join("; "),
+  );
+}
+
+/** The guard around one answer. @see assertDeclaredOutput */
 function guardOutput(
   name: string,
   schema: z.ZodType,
@@ -266,19 +309,32 @@ function guardOutput(
 ): (opts: never) => Promise<unknown> {
   return async (opts: never) => {
     const result = await handler(opts);
-    const parsed = schema.safeParse(result);
-    if (!parsed.success) {
-      throw new Error(
-        `tRPC procedure "${name}" answered with a value its declared output schema refuses: ` +
-          parsed.error.issues
-            .map((issue) => `${issue.path.join(".") || "<root>"}: ${issue.message}`)
-            .join("; "),
-      );
-    }
+    assertDeclaredOutput(name, schema, result);
     // The handler's own value, unparsed: validating must not strip or coerce
     // what the client already receives.
     return result;
   };
+}
+
+/**
+ * The same guard for a stream: every value it yields is checked, because a
+ * subscription's shape drifts one event at a time and a single wrong yield is
+ * what a client crashes on.
+ */
+function guardStream(
+  name: string,
+  schema: z.ZodType,
+  handler: (opts: never) => unknown,
+): (opts: never) => AsyncIterable<unknown> {
+  return (opts: never) => ({
+    async *[Symbol.asyncIterator]() {
+      const stream = (await handler(opts)) as AsyncIterable<unknown>;
+      for await (const value of stream) {
+        assertDeclaredOutput(name, schema, value);
+        yield value;
+      }
+    },
+  });
 }
 
 function buildProcedure({
@@ -290,7 +346,7 @@ function buildProcedure({
   handler,
 }: {
   name: string;
-  kind: "query" | "mutation";
+  kind: ProcedureKind;
   state: ChainState;
   procedure: BuildableProcedure;
   validateOutput: boolean;
@@ -303,14 +359,20 @@ function buildProcedure({
   // reads `undefined` and silently authorizes nothing.
   const parsed = state.input ? procedure.input(state.input) : procedure;
   const guarded =
-    validateOutput && state.output ? guardOutput(name, state.output, handler) : handler;
+    validateOutput && state.output
+      ? kind === "subscription"
+        ? guardStream(name, state.output, handler)
+        : guardOutput(name, state.output, handler)
+      : handler;
   const decorated = state.policy(parsed);
-  return kind === "query" ? decorated.query(guarded) : decorated.mutation(guarded);
+  if (kind === "query") return decorated.query(guarded);
+  if (kind === "mutation") return decorated.mutation(guarded);
+  return decorated.subscription(guarded);
 }
 
 function createChain<
   TContext extends object,
-  TKind extends "query" | "mutation",
+  TKind extends ProcedureKind,
   TInput extends ChainInput,
   TOutput extends ChainOutput,
   TDeclared extends boolean,
@@ -351,10 +413,9 @@ function createChain<
 }
 
 /**
- * Opens a feature's tRPC surface. Every procedure it registers is built from
- * the process's own procedure and policy, so tracing, logging, handled-error
- * translation, scope lineage, the authorization check, the fail-closed
- * backstop and the audit trail are exactly the ones the process composed.
+ * Opens a feature's tRPC surface. Every procedure is built from the process's
+ * own procedure and policy, so tracing, logging, errors, scope lineage, the
+ * check, the backstop and the audit trail are the ones the process composed.
  */
 export function createTrpcService<
   TContext extends object,
@@ -390,6 +451,20 @@ export function createTrpcService<
           createChain({
             name,
             kind: "mutation",
+            state: {},
+            procedure,
+            policy: config.procedures.policy,
+            validateOutput,
+          }),
+        ),
+      }),
+    subscription: (name, define) =>
+      service({
+        ...record,
+        [name]: define(
+          createChain({
+            name,
+            kind: "subscription",
             state: {},
             procedure,
             policy: config.procedures.policy,

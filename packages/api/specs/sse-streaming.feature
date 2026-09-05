@@ -54,3 +54,10 @@ Feature: SSE streaming endpoints
     Given a client that disconnects mid-stream
     When the request instrumentation asks for the stream's completion
     Then it settles rather than leaking
+
+  @unit
+  Scenario: A stream is declared on a family at any scope
+    Given a project-scoped family declares a stream
+    When a request reaches it
+    Then the family's door and the stream's access declaration both run
+    And the route registry records the stream like any other route

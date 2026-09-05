@@ -11,7 +11,8 @@ import {
   requires,
 } from "../../access-policy.js";
 import { createService, type ServiceBuilder } from "../builder.js";
-import type { RouteChain } from "../definition.js";
+import { RestVersionSelector } from "../rest-version-selector.js";
+import type { DefaultsChain } from "../definition.js";
 import {
   ENDPOINT_ROUTE,
   REQUEST_FAMILY,
@@ -443,24 +444,19 @@ export interface VersionedEndpointMeta {
 export type VersionedFamilyScope = "project" | "organization" | "service";
 
 /**
- * One versioned family: the service builder and the policy every route wears.
- *
- * `policy` takes a whole {@link AccessPolicy} — `requires(...)`,
- * `requiresOnProject(...)`, `requiresOnTeam(...)`, `apiKeyPermission(...)`,
- * `anyAuthenticated()`, `publicEndpoint(reason)`, `internalSecret(reason)`,
- * `handlerManagedAuth({ … })` — and installs the check that declaration
- * actually names. A bare permission is the `requires(...)` shorthand.
- *
- * Taking only a permission was the defect this replaced: a family whose routes
- * are scoped to the team or project named IN THE PATH would have had its
- * declaration widened to the family's own scope, so one organization-wide
- * grant would have reached every team in the organization.
+ * One versioned family: its builder, and the policy every route wears.
+ * `policy` takes a whole {@link AccessPolicy} and installs the check it names.
  */
+
+// Taking only a permission was the defect this replaced: a family whose
+// routes are scoped to the team or project named IN THE PATH would have had
+// its declaration widened to the family's own scope, so one organization-wide
+// grant would have reached every team in the organization.
 export interface RestApiVersionedFamily {
   service: ServiceBuilder<unknown, EndpointVariables, unknown>;
   policy: (
     access: AuthzPermission | AccessPolicy,
-  ) => <TChain extends RouteChain>(b: TChain) => TChain;
+  ) => <TChain extends DefaultsChain>(b: TChain) => TChain;
 }
 
 /**
@@ -556,11 +552,9 @@ export interface VersionedAppOptions {
    */
   routeMiddleware?: readonly MiddlewareHandler[];
   /**
-   * The error shape this family publishes, and the shape its own door answers
-   * a refusal in. Defaults to `canonical`, which is what every family already
-   * on this framework publishes; a family MOVING onto it passes the envelope
-   * it publishes today, because converting a family must not change the body
-   * an existing integrator parses.
+   * The error shape this family publishes, and its door answers refusals in.
+   * A family MOVING onto this framework passes the envelope it publishes
+   * today: converting must not change the body an integrator already parses.
    */
   errorEnvelope?: ApiErrorEnvelope;
   /**
@@ -574,6 +568,12 @@ export interface VersionedAppOptions {
    * that are not the published product API.
    */
   v1Alias?: boolean;
+  /**
+   * The static generation this family serves — `"v1"`, `"v2"` — for a surface
+   * whose contract is a generation rather than a date. Its basePath already
+   * ends in that segment, so its routes answer exactly where they do today.
+   */
+  staticGeneration?: string;
 }
 
 /**
@@ -626,27 +626,24 @@ export interface RestApiService<
   createVersionedApp(options: VersionedAppOptions): RestApiVersionedFamily;
 
   /**
-   * The same family, authenticated at PROJECT scope: the process's unified
-   * project door (project API key, legacy project key, or browser session),
-   * with `requires(...)` resolved against the caller's project role bindings
-   * and `apiKeyPermission(...)` against the API-key ceiling.
+   * The same family at PROJECT scope: the process's unified project door, with
+   * `requires(...)` resolved against project role bindings and
+   * `apiKeyPermission(...)` against the API-key ceiling.
    */
   createProjectVersionedApp(options: VersionedAppOptions): RestApiVersionedFamily;
 
   /**
    * The same family for a service-to-service surface: `verifySecret` is the
-   * whole door, so the only declarations that make sense are
-   * `internalSecret(reason)`, `publicEndpoint(reason)` and
-   * `handlerManagedAuth({ … })`.
+   * whole door, so the only declarations it can stand behind are
+   * `internalSecret`, `publicEndpoint` and `handlerManagedAuth`.
    */
   createServiceVersionedApp(
     options: VersionedAppOptions & {
       /** The shared-secret or signature check every route authenticates with. */
       verifySecret?: MiddlewareHandler;
       /**
-       * Overrides the credential class the family publishes. Set it only when
-       * the secret is one an API client holds and the document declares a
-       * scheme for it.
+       * Overrides the credential class the family publishes. Only for a secret
+       * an API client holds and the document declares a scheme for.
        */
       credentialClass?: CredentialClass;
     },
@@ -662,12 +659,8 @@ export interface RestApiService<
 
 /**
  * One versioned family, at whichever scope its own door authenticates.
- *
- * The three factories differ in exactly two things: the door
- * (`authenticateProject` / `authenticateOrganizationThrowing` / the family's
- * own `verifySecret`) and which access declarations that door can enforce.
- * Everything else — the dated namespaces, the `/api/v1` twin, the app context,
- * the error envelope, the route registry — is the same, so it is written once.
+ * The three factories differ in two things: the door, and which access
+ * declarations that door can enforce. Everything else is written once.
  */
 function versionedFamily({
   ports,
@@ -693,10 +686,21 @@ function versionedFamily({
         ? ports.authenticateOrganizationThrowing
         : verifySecret;
 
+  const staticVersioning = options.staticGeneration
+    ? {
+        selector: RestVersionSelector.create({
+          versions: [options.staticGeneration],
+          latestVersion: options.staticGeneration,
+        }),
+        pathVersion: options.staticGeneration,
+      }
+    : undefined;
+
   const service = createService({
     name,
     basePath,
     middleware: [ports.appContext],
+    ...(staticVersioning ? { staticVersioning } : {}),
     ...(auth ? { auth } : {}),
     onError,
     ...(options.v1Alias === false ? { v1Alias: false } : {}),
@@ -777,7 +781,7 @@ function versionedFamily({
       );
     }
     const checks = checksFor(declaration);
-    return <TChain extends RouteChain>(b: TChain): TChain => {
+    return <TChain extends DefaultsChain>(b: TChain): TChain => {
       const declared =
         declaration.kind === "permission"
           ? b.withPermission(declaration.permission)

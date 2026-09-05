@@ -1,17 +1,14 @@
 /**
  * The versioned family at the two scopes it did not used to have, and the
- * access declarations the chain did not used to carry.
- *
- * The declaration half is the one that matters: a family whose routes are
- * scoped to the project or team named IN THE PATH used to have nowhere to say
- * so, and converting it onto the one org-scoped factory would have widened the
- * check to the organization — one grant reaching every project in it. These
- * tests pin which middleware each declaration actually installs, and what the
- * route-policy registry records for it.
- *
- * Specs: packages/api/specs/fluent-registration.feature,
- * packages/api/specs/endpoint-capabilities.feature.
+ * access declarations the chain did not used to carry. Specs:
+ * fluent-registration.feature, endpoint-capabilities.feature.
  */
+
+// The declaration half is the one that matters: a family whose routes are
+// scoped to the project or team named IN THE PATH used to have nowhere to say
+// so, and converting it onto the one org-scoped factory would have widened
+// the check to the organization — one grant reaching every project in it.
+
 import { HandledError } from "@langwatch/handled-error";
 import type { MiddlewareHandler } from "hono";
 import { describe, expect, it } from "vitest";
@@ -377,5 +374,67 @@ describe("anyAuthenticated on a versioned family", () => {
     expect(getRoutePolicy("GET", `/api/toy-whoami/${MANAGEMENT_API_VERSION}/me`)?.policy.kind).toBe(
       "anyAuthenticated",
     );
+  });
+});
+
+describe("a family whose contract is a generation rather than a date", () => {
+  /** @scenario "A family serves one static generation instead of dated namespaces" */
+  it("answers at its generation path only, with no dated or latest namespace beside it", async () => {
+    const { service, policy } = securityUnder().createProjectVersionedApp({
+      name: "toy-gateway-v1",
+      basePath: "/api/toy-gateway/v1",
+      staticGeneration: "v1",
+    });
+    const app = service
+      .registerRoute(
+        "get",
+        "/keys",
+        MANAGEMENT_API_VERSION,
+        async () => ({ ok: true }),
+        (b) => policy(apiKeyPermission("virtualKeys:view"))(b).withOutput(okOutput),
+      )
+      .build();
+
+    const served = await app.request("/api/toy-gateway/v1/keys");
+    const dated = await app.request(`/api/toy-gateway/v1/${MANAGEMENT_API_VERSION}/keys`);
+
+    expect(served.status).toBe(200);
+    expect(served.headers.get("X-API-Version")).toBe("v1");
+    expect(dated.status).toBe(404);
+    expect(getRoutePolicy("GET", "/api/toy-gateway/v1/keys")?.policy).toEqual({
+      kind: "apiKeyPermission",
+      permission: "virtualKeys:view",
+    });
+  });
+});
+
+describe("a stream on a family that is not organization-scoped", () => {
+  /** @scenario "A stream is declared on a family at any scope" */
+  it("wears the family's door and its access declaration, like any other route", async () => {
+    const { service, policy } = securityUnder().createProjectVersionedApp({
+      name: "toy-runs",
+      basePath: "/api/toy-runs",
+    });
+    const app = service
+      .registerSse(
+        "runs.watch",
+        MANAGEMENT_API_VERSION,
+        async (_c, stream) => {
+          await stream.emit("tick", { at: 1 });
+          stream.close();
+        },
+        (b) => policy("agentCache:manage")(b).withEvents({ tick: z.object({ at: z.number() }) }),
+      )
+      .build();
+
+    order.length = 0;
+    const response = await app.request(`/api/toy-runs/${MANAGEMENT_API_VERSION}/runs.watch`);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/event-stream");
+    expect(order).toEqual(["project-auth:canonical", "project-permission:agentCache:manage"]);
+    expect(
+      getRoutePolicy("GET", `/api/toy-runs/${MANAGEMENT_API_VERSION}/runs.watch`)?.policy,
+    ).toEqual({ kind: "permission", permission: "agentCache:manage" });
   });
 });

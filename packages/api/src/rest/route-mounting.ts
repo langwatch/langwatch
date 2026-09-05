@@ -36,7 +36,7 @@ export function mountResolvedRoutes<TProject>({
   serviceConfig: ServiceConfig;
   versionMap: Map<string, ResolvedEndpoint[]>;
 }): void {
-  if (serviceConfig.publicRest?.staticVersioning) {
+  if (serviceConfig.staticVersioning ?? serviceConfig.publicRest?.staticVersioning) {
     mountStaticVersionRoutes({
       app,
       basePath,

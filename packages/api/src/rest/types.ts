@@ -6,6 +6,7 @@ import type { RestVersionSelector } from "./rest-version-selector.js";
 import type { ApiSchema } from "../schema.js";
 
 import type { RateLimiter, ResponseCache } from "../ports.js";
+import type { IdempotentRunner } from "./idempotency.js";
 
 // ---------------------------------------------------------------------------
 // Version primitives
@@ -60,6 +61,37 @@ export function assertVersionLabel(version: string): void {
 // ---------------------------------------------------------------------------
 
 export type HttpMethod = "get" | "post" | "put" | "delete" | "patch";
+
+/**
+ * A body the framework must NOT parse: the handler is given the exact bytes,
+ * which is what a webhook signature is computed over and what a protobuf
+ * payload is. Read once by the framework, so nothing can consume the stream
+ * twice.
+ */
+export type EndpointRawBody = Readonly<{
+  as: "bytes" | "text";
+  /** Documented request content type. Defaults by `as`. */
+  contentType?: string;
+}>;
+
+/**
+ * An answer that is not this framework's JSON: the handler returns a string,
+ * bytes, a stream or a whole Response, and the framework writes it with the
+ * content type and status the endpoint declared.
+ */
+export type EndpointRawResponse = Readonly<{
+  contentType?: string;
+  /** Why this endpoint answers outside the JSON contract. */
+  reason: string;
+}>;
+
+/** What one replayable create declares. @see rest/idempotency.ts */
+export type EndpointIdempotency = Readonly<{
+  /** Folded into the receipt fingerprint, e.g. `webhooks.v1.endpoints.create`. */
+  operation: string;
+  /** The tenancy the caller's key is unique within, read off the request. */
+  scope: (context: Context) => string;
+}>;
 
 /**
  * Context key holding the endpoint a request matched, as `METHOD /path`.
@@ -186,6 +218,17 @@ export interface EndpointDef {
   resourceLimitOptOutReason?: string;
   /** Response caching applies; requires the `cache` port and a declared `output`. */
   cache?: { tag: string; ttlSeconds: number };
+  /**
+   * The create is replayable under `Idempotency-Key`; requires the
+   * `idempotency` port on the service. @see rest/idempotency.ts
+   */
+  idempotency?: EndpointIdempotency;
+  /** The request body reaches the handler unparsed. */
+  rawBody?: EndpointRawBody;
+  /** The answer is written outside the JSON contract. */
+  rawResponse?: EndpointRawResponse;
+  /** Response headers set on every answer this endpoint gives. */
+  headers?: Readonly<Record<string, string>>;
   /** Deprecation notice; the endpoint still answers, and warns. */
   deprecated?: string;
 }
@@ -328,6 +371,12 @@ export interface ServiceConfig<TApp = unknown> {
    * without the port fails the build. See `ports.ts`.
    */
   cache?: ResponseCache;
+  /**
+   * Receipt ledger backing `.withIdempotency(...)`. Declaring the capability
+   * without the port fails the build; the ledger stays in the process that
+   * owns a database and an encryption key.
+   */
+  idempotency?: IdempotentRunner;
   /** Custom error handler. If omitted the framework default is used. */
   onError?: (err: Error, c: Context) => Response | Promise<Response>;
   /**
@@ -342,6 +391,12 @@ export interface ServiceConfig<TApp = unknown> {
    * guards). Lets the host register route policies without re-deriving it.
    */
   onRouteMounted?: (route: MountedRoute) => void;
+  /**
+   * Mount one static API generation — `/api/gateway/v1`, `/api/scim/v2` —
+   * instead of the dated namespaces. The family's basePath already carries the
+   * generation segment, so the routes answer exactly where they do today.
+   */
+  staticVersioning?: StaticRestVersioning;
   /** @internal Enables the additive `/api/v1/{service}` REST surface. */
   publicRest?: {
     versionHeader: string;
@@ -395,7 +450,7 @@ export type StaticRestVersioning = Readonly<{
 /** @internal Stored by the service builder when registering an endpoint. */
 export interface EndpointRegistration {
   kind: "rest" | "public-rest" | "sse";
-  method: HttpMethod | "sse";
+  method: HttpMethod | "sse" | "all";
   /** URL path fragment: `/${name}` for SSE, the path as-is for REST. */
   path: string;
   config: EndpointDef;

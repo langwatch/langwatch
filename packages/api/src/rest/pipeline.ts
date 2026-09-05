@@ -28,12 +28,21 @@ import {
   parsePublicRestInput,
   publicRestPathParams,
 } from "./public-rest-input.js";
+import {
+  idempotentJson,
+  IDEMPOTENCY_KEY_HEADER,
+  idempotencyKeyParameter,
+  idempotentReplayHeaders,
+  readIdempotencyKey,
+  type IdempotentRunner,
+} from "./idempotency.js";
 import { serializeEndpointResult } from "./response.js";
 import { createSSEResponse } from "./sse.js";
 import { ENDPOINT_INPUT, ENDPOINT_ROUTE, REQUEST_FAMILY } from "./types.js";
 import type {
   BaseApp,
   EndpointDef,
+  EndpointIdempotency,
   EndpointRegistration,
   ServiceConfig,
   VersionStatus,
@@ -285,7 +294,8 @@ function versionContextMiddleware({
   return async (c, next) => {
     c.set(ENDPOINT_ROUTE, route);
     c.set(REQUEST_FAMILY, serviceConfig.name);
-    const staticVersioning = serviceConfig.publicRest?.staticVersioning;
+    const staticVersioning =
+      serviceConfig.staticVersioning ?? serviceConfig.publicRest?.staticVersioning;
     const staticSelection = staticVersioning?.selector.select({
       pathVersion: staticVersioning.pathVersion,
       headerVersion: staticVersioning
@@ -387,18 +397,28 @@ function appendOpenApiMiddleware({
   const isPublicNoBody = kind === "public-rest" && config.output && isNoBodySchema(config.output);
   const successStatus = String(config.status ?? (isPublicNoBody ? 204 : 200));
   const generatedSuccess: NonNullable<DescribeRouteOptions["responses"]>[string] =
-    config.output && !isPublicNoBody
+    config.rawResponse
       ? {
           description: "Success",
-          content: {
-            "application/json": { schema: resolver(config.output) },
-          },
+          ...(config.rawResponse.contentType
+            ? { content: { [config.rawResponse.contentType]: {} } }
+            : {}),
         }
-      : { description: "Success" };
+      : config.output && !isPublicNoBody
+        ? {
+            description: "Success",
+            content: {
+              "application/json": { schema: resolver(config.output) },
+            },
+          }
+        : { description: "Success" };
 
   const docs = config.docs;
+  const success = config.idempotency
+    ? { ...generatedSuccess, headers: { ...idempotentReplayHeaders } }
+    : generatedSuccess;
   const options: DescribeRouteOptions = {
-    responses: { [successStatus]: generatedSuccess, ...docs?.responses },
+    responses: { [successStatus]: success, ...docs?.responses },
   };
   if (versionHeaderParameter) {
     options.parameters = [
@@ -415,6 +435,22 @@ function appendOpenApiMiddleware({
         },
       },
     ];
+  }
+  if (config.rawBody) {
+    // The body is evidence, not a shape: the document names its media type so
+    // a client sends the right bytes, and declares nothing about their form.
+    options.requestBody = {
+      required: true,
+      content: {
+        [config.rawBody.contentType ??
+        (config.rawBody.as === "text" ? "text/plain" : "application/octet-stream")]: {},
+      },
+    };
+  }
+  if (config.idempotency) {
+    // Appended rather than assigned: a family can document its date
+    // negotiation and its replay key at once, and neither erases the other.
+    options.parameters = [...(options.parameters ?? []), idempotencyKeyParameter];
   }
   if (docs?.description !== undefined) options.description = docs.description;
   if (docs?.summary !== undefined) options.summary = docs.summary;
@@ -539,7 +575,17 @@ function validatedInputMiddleware({
     }
 
     const body = config.input ? c.req.valid("json" as never) : void 0;
-    const input = mergeRestInput({ params, query, body });
+    // Read once, by the framework: a handler that reached for the stream
+    // itself could not also let a signature check read it.
+    const raw = config.rawBody
+      ? config.rawBody.as === "text"
+        ? await c.req.text()
+        : new Uint8Array(await c.req.arrayBuffer())
+      : void 0;
+    const merged = mergeRestInput({ params, query, body });
+    // The raw body is attached rather than merged: it is one value, not a
+    // record of fields, and a route may declare it with no params at all.
+    const input = raw === void 0 ? merged : { ...merged, body: raw };
     c.set(ENDPOINT_INPUT, input);
     await next();
   };
@@ -667,6 +713,17 @@ function handlerMiddleware<TProject>({
         required: serviceConfig.projectIdInput === true,
       });
     }
+    if (config.idempotency && serviceConfig.idempotency) {
+      return replayableResponse({
+        c,
+        config,
+        idempotency: config.idempotency,
+        input,
+        kind: ep.kind,
+        runner: serviceConfig.idempotency,
+        handler: () => ep.handler(c, input),
+      });
+    }
     const result = await ep.handler(c, input);
     const response = serializeEndpointResult({ c, config, kind: ep.kind, result });
     if (config.cache && config.output && !(result instanceof Response)) {
@@ -679,6 +736,46 @@ function handlerMiddleware<TProject>({
     }
     return response;
   };
+}
+
+/**
+ * One replayable create: the key is read and bounds-checked, the ledger
+ * decides whether the handler runs, and a replay is written from the stored
+ * bytes rather than re-serialised, so it cannot drift by so much as a key
+ * order. @see rest/idempotency.ts
+ */
+async function replayableResponse({
+  c,
+  config,
+  idempotency,
+  input,
+  kind,
+  runner,
+  handler,
+}: {
+  c: Context;
+  config: EndpointDef;
+  idempotency: EndpointIdempotency;
+  input: unknown;
+  kind: EndpointRegistration["kind"];
+  runner: IdempotentRunner;
+  handler: () => unknown;
+}): Promise<Response> {
+  const outcome = await runner({
+    operation: idempotency.operation,
+    scopeId: idempotency.scope(c),
+    key: readIdempotencyKey(c.req.header(IDEMPOTENCY_KEY_HEADER)),
+    validatedBody: input,
+    handler: async () => ({
+      status: config.status ?? 200,
+      body: await handler(),
+    }),
+  });
+  if (outcome.isReplayed) return idempotentJson({ c, outcome });
+  // Serialised by the same writer as any other answer, so a first execution
+  // is validated against its declared output exactly as it would be without
+  // the ledger.
+  return serializeEndpointResult({ c, config, kind, result: outcome.body });
 }
 
 function projectInputMiddleware(

@@ -48,3 +48,10 @@ Feature: tRPC framework boundary
     Given a router is built through the fluent chain
     When it is compared with the same router written by hand
     Then the two are the same type, not merely assignable
+
+  @unit @typecheck
+  Scenario: A stream declared through the chain is the same procedure the client subscribes to
+    Given a subscription is defined through the fluent chain
+    When it is compared with the same subscription written by hand
+    Then the two are the same type
+    And every value the stream yields is checked against its declared shape, not only the first
