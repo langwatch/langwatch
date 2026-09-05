@@ -36,7 +36,7 @@ When configuring your identity provider, set the redirect/callback URL to:
 https://your-langwatch-domain.com/api/auth/callback/{provider}
 ```
 
-Replace `{provider}` with: `auth0`, `azure-ad`, `cognito`, `github`, `gitlab`, `google`, `okta`, `onelogin`, or `oidc`. This is the same value you set as `NEXTAUTH_PROVIDER`.
+Replace `{provider}` with: `auth0`, `cognito`, `github`, `gitlab`, `google`, `okta`, `onelogin`, or `oidc`. This is the same value you set as `NEXTAUTH_PROVIDER`. Azure AD is the one exception: its callback path uses `microsoft` (the provider id Better Auth mounts it under), so register `https://your-langwatch-domain.com/api/auth/callback/microsoft`.
 
 <Note>
 A `NEXTAUTH_PROVIDER` value LangWatch does not recognise, or one whose client credentials are missing, starts the deployment in email mode and logs which provider it could not mount. That keeps a licensed deployment signable-in while you correct the value, rather than pointing the sign-in page at an identity provider that was never wired up.
@@ -124,7 +124,7 @@ curl https://cognito-idp.<region>.amazonaws.com/<userPoolId>/.well-known/openid-
 ### Azure AD
 
 1. Register an application in [Azure Portal > App registrations](https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps/ApplicationsListBlade)
-2. Add a **Redirect URI**: `https://your-domain.com/api/auth/callback/azure-ad`
+2. Add a **Redirect URI**: `https://your-domain.com/api/auth/callback/microsoft`
 3. Create a client secret under **Certificates & secrets**
 4. Configure in Helm:
 

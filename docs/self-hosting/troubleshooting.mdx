@@ -247,6 +247,8 @@ The callback URL configured in your identity provider must exactly match:
 https://your-langwatch-domain.com/api/auth/callback/{provider}
 ```
 
+Azure AD is the exception: its callback path uses `microsoft`, so register `https://your-langwatch-domain.com/api/auth/callback/microsoft`.
+
 Check that `app.http.publicUrl` matches your actual domain (including `https://`).
 
 ### "Email already exists" during SSO migration
