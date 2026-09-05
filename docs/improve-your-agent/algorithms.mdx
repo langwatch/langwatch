@@ -5,7 +5,7 @@ keywords: langwatch, optimization algorithms, dspy optimizers, gepa, miprov2, co
 description: What each optimization algorithm changes, what it needs, how many suite runs it costs, and when to use it.
 ---
 
-Every algorithm below takes a program, a set of examples and a metric, and returns the program with better text in it. With a scenario suite as the metric, one metric call is one simulated conversation, which is why the number of metric calls is the cost that matters in the table. The guided loop comes first because it is the one to start with: it changes code and tools, and no algorithm does that.
+With a scenario suite as the metric, every metric call is one simulated conversation, so an optimizer that plans hundreds of calls costs hundreds of conversations. The table counts those calls on the six-scenario example of [Optimize with DSPy](/improve-your-agent/optimize-with-dspy), next to what each algorithm changes, so you can pick one by what you need changed and what you can afford.
 
 ## Algorithms side by side
 
