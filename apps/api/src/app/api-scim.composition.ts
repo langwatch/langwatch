@@ -80,7 +80,7 @@ import {
   newScimSyncCommandId,
   PrismaScimSyncProjectionRepository,
   ScimSyncGuards,
-  ScimSyncLedgerWriter,
+  ScimSyncLedgerWriterAdapter,
   type IdentityEventingPort,
 } from "@langwatch/identity-server";
 import type { Logger } from "@langwatch/observability";
@@ -204,7 +204,7 @@ export function composeApiScimRest(
     entitlements: plans,
     lifecycle: ScimSyncLifecycleAdapter.create({
       guards: new ScimSyncGuards({ syncs: new PrismaScimSyncProjectionRepository(prisma) }),
-      ledger: new ScimSyncLedgerWriter({ eventing }),
+      ledger: ScimSyncLedgerWriterAdapter.create({ eventing }),
       newCommandId: newScimSyncCommandId,
     }),
     provenOffboarding: options.provenOffboarding,

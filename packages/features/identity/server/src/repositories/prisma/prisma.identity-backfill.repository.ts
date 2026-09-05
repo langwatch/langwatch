@@ -12,6 +12,10 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
  * write the pass owns besides its facts is the users repository's.
  */
 export class PrismaIdentityBackfillRepository implements IdentityBackfillRepository {
+  static create(prisma: PrismaClient): PrismaIdentityBackfillRepository {
+    return new PrismaIdentityBackfillRepository(prisma);
+  }
+
   constructor(private readonly prisma: PrismaClient) {}
 
   async tryFindUser({ userId }: { userId: string }): Promise<BackfillUserRow | null> {

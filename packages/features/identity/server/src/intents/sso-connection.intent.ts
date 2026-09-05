@@ -46,7 +46,7 @@ import {
 import type { SsoConnectionGuards } from "../sso-connection-guards";
 import type { ZodTypeAny, z } from "zod";
 import { type Command, type CommandHandler, defineCommandSchema } from "@langwatch/eventing";
-import { ssoConnectionEventsFor } from "../projections/sso-connection-state.projection";
+import { SsoConnectionStateFoldProjection } from "../projections/sso-connection-state.projection";
 import type { SsoConnectionEvent } from "../projections/sso-connection-state.projection";
 
 /**
@@ -95,7 +95,7 @@ function connectionCommand<Schema extends ZodTypeAny>({
     async handle(command: Command<Data>): Promise<SsoConnectionEvent[]> {
       const data = command.data as never;
       const facts = await (this.guards[verb] as (input: never) => Promise<never[]>)(data);
-      return ssoConnectionEventsFor({
+      return SsoConnectionStateFoldProjection.eventsFor({
         command: { type, data } as SsoConnectionCommand,
         facts,
       });

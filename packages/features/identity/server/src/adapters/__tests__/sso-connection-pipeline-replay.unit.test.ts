@@ -20,7 +20,7 @@ import {
   type SsoConnectionFoldState,
   SsoConnectionStateFoldProjection,
 } from "../../projections/sso-connection-state.projection";
-import type { SsoConnectionEvent } from "../sso-connection-pipeline-definition.adapter";
+import type { SsoConnectionEvent } from "../../projections/sso-connection-state.projection";
 
 const ORG = "org_acme";
 const CONNECTION = "ssoc_1";

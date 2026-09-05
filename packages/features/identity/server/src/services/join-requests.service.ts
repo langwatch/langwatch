@@ -18,7 +18,10 @@ import {
   organizationAdmitsDomain,
   resolveJoinLookup,
 } from "@langwatch/identity-contract";
-import type { JoinCandidateRepository } from "../join-request.repository";
+import type {
+  JoinCandidateRepository,
+  JoinRequestListReadRepository,
+} from "../join-request.repository";
 import type { JoinRequestService } from "../join-request.service";
 import {
   approveJoinCommandId,
@@ -27,7 +30,6 @@ import {
 } from "../join-request-id";
 import { createLogger } from "@langwatch/observability";
 import { JOIN_REQUEST_EXPIRY_MS } from "../processes/join-request-lifecycle.process";
-import type { PrismaJoinRequestReadRepository } from "../repositories/prisma/prisma.join-request.repository";
 
 const logger = createLogger("langwatch:identity:join-requests");
 
@@ -110,7 +112,7 @@ export interface JoinSettingPort {
 
 export interface JoinRequestsServiceDeps {
   requests: JoinRequestService;
-  reads: PrismaJoinRequestReadRepository;
+  reads: JoinRequestListReadRepository;
   candidates: JoinCandidateRepository;
   membership: JoinMembershipPort;
   notifier: JoinRequestNotifier;
@@ -149,10 +151,14 @@ export interface JoinRequestsServiceDeps {
  * the leak.
  */
 export class JoinRequestsService {
+  static create(deps: JoinRequestsServiceDeps): JoinRequestsService {
+    return new JoinRequestsService(deps);
+  }
+
   private readonly deps: JoinRequestsServiceDeps;
   private readonly now: () => number;
 
-  constructor(deps: JoinRequestsServiceDeps) {
+  private constructor(deps: JoinRequestsServiceDeps) {
     this.deps = deps;
     this.now = deps.now ?? (() => Date.now());
   }

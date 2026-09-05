@@ -6,8 +6,7 @@ import {
 } from "@langwatch/identity-contract";
 import type { SsoConnectionService } from "../sso-connection.service";
 import { newSsoConnectionCommandId, newSsoConnectionId } from "../sso-connection-id";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { rowToConnection } from "../repositories/prisma/prisma.sso-connection-projection.repository";
+import type { SsoConnectionBackofficeRepository } from "../sso-connection-backoffice.repository";
 
 /**
  * What the back office reads and commands (D05 tier 1).
@@ -62,9 +61,16 @@ export interface OperatorActor {
 }
 
 export class SsoConnectionBackofficeService {
-  constructor(
+  static create(deps: {
+    reads: SsoConnectionBackofficeRepository;
+    connections: () => SsoConnectionService;
+  }): SsoConnectionBackofficeService {
+    return new SsoConnectionBackofficeService(deps);
+  }
+
+  private constructor(
     private readonly deps: {
-      prisma: PrismaClient;
+      reads: SsoConnectionBackofficeRepository;
       connections: () => SsoConnectionService;
     },
   ) {}
@@ -78,23 +84,14 @@ export class SsoConnectionBackofficeService {
     pageSize: number;
     search?: string;
   }): Promise<BackofficeSsoConnectionList> {
-    const where = search ? searchFilter(search) : {};
-    const [rows, total] = await Promise.all([
-      this.deps.prisma.ssoConnection.findMany({
-        where,
-        orderBy: { updatedAt: "desc" },
-        skip: page * pageSize,
-        take: pageSize,
-      }),
-      this.deps.prisma.ssoConnection.count({ where }),
-    ]);
-    const names = await this.organizationNames(rows.map((row) => row.organizationId));
+    const { states, total } = await this.deps.reads.findPage({ page, pageSize, search });
+    const names = await this.organizationNames(states.map((state) => state.organizationId));
 
     return {
-      connections: rows.map((row) =>
-        toBackofficeConnection({
-          state: rowToConnection(row),
-          organizationName: names.get(row.organizationId) ?? null,
+      connections: states.map((state) =>
+        SsoConnectionBackofficeService.toBackofficeConnection({
+          state,
+          organizationName: names.get(state.organizationId) ?? null,
         }),
       ),
       total,
@@ -106,18 +103,16 @@ export class SsoConnectionBackofficeService {
   }: {
     connectionId: string;
   }): Promise<BackofficeSsoConnection | null> {
-    const row = await this.deps.prisma.ssoConnection.findUnique({
-      where: { id: connectionId },
-    });
-    if (!row) {
+    const state = await this.deps.reads.findById({ connectionId });
+    if (!state) {
       return null;
     }
 
-    const names = await this.organizationNames([row.organizationId]);
+    const names = await this.organizationNames([state.organizationId]);
 
-    return toBackofficeConnection({
-      state: rowToConnection(row),
-      organizationName: names.get(row.organizationId) ?? null,
+    return SsoConnectionBackofficeService.toBackofficeConnection({
+      state,
+      organizationName: names.get(state.organizationId) ?? null,
     });
   }
 
@@ -243,18 +238,39 @@ export class SsoConnectionBackofficeService {
     };
   }
 
-  private async organizationNames(organizationIds: string[]): Promise<Map<string, string>> {
-    const unique = [...new Set(organizationIds)];
-    if (unique.length === 0) {
-      return new Map();
-    }
+  private organizationNames(organizationIds: string[]): Promise<Map<string, string>> {
+    return this.deps.reads.findOrganizationNames({ organizationIds });
+  }
 
-    const rows = await this.deps.prisma.organization.findMany({
-      where: { id: { in: unique } },
-      select: { id: true, name: true },
-    });
-
-    return new Map(rows.map((row) => [row.id, row.name]));
+  static toBackofficeConnection({
+    state,
+    organizationName,
+  }: {
+    state: SsoConnectionState;
+    organizationName: string | null;
+  }): BackofficeSsoConnection {
+    return {
+      connectionId: state.connectionId,
+      organizationId: state.organizationId,
+      organizationName,
+      type: state.type,
+      state: state.state,
+      claimedDomains: state.claimedDomains,
+      approvedDomains: state.approvedDomains,
+      verifiedDomains: state.verifiedDomains,
+      domainVerifications: state.domainVerifications,
+      providerId: state.idpMetadata.providerId,
+      issuer: state.idpMetadata.issuer,
+      allowsJit: state.allowsJit,
+      source: state.source,
+      testLoginAccountId: state.testLoginAccountId,
+      rejection: state.rejection,
+      // The ceremony's domain, never its token hash: a hash is a proof
+      // artifact, and no operator reading a list has anything to do with one.
+      pendingVerificationDomain: state.pendingVerification?.domain ?? null,
+      createdAtMs: state.createdAtMs,
+      updatedAtMs: state.updatedAtMs,
+    };
   }
 }
 
@@ -265,53 +281,3 @@ interface ConnectionCommandArgs {
 }
 
 type DomainCommandArgs = ConnectionCommandArgs & { domain: string };
-
-/**
- * Search over the identifiers and domains an operator would have to hand: a
- * connection id from a log line, an organization id from a support thread, or
- * the domain the customer told them about.
- */
-function searchFilter(search: string) {
-  const term = search.trim();
-
-  return {
-    OR: [
-      { id: { contains: term, mode: "insensitive" as const } },
-      { organizationId: { contains: term, mode: "insensitive" as const } },
-      { verifiedDomains: { has: term.toLowerCase() } },
-      { claimedDomains: { has: term.toLowerCase() } },
-      { approvedDomains: { has: term.toLowerCase() } },
-    ],
-  };
-}
-
-export function toBackofficeConnection({
-  state,
-  organizationName,
-}: {
-  state: SsoConnectionState;
-  organizationName: string | null;
-}): BackofficeSsoConnection {
-  return {
-    connectionId: state.connectionId,
-    organizationId: state.organizationId,
-    organizationName,
-    type: state.type,
-    state: state.state,
-    claimedDomains: state.claimedDomains,
-    approvedDomains: state.approvedDomains,
-    verifiedDomains: state.verifiedDomains,
-    domainVerifications: state.domainVerifications,
-    providerId: state.idpMetadata.providerId,
-    issuer: state.idpMetadata.issuer,
-    allowsJit: state.allowsJit,
-    source: state.source,
-    testLoginAccountId: state.testLoginAccountId,
-    rejection: state.rejection,
-    // The ceremony's domain, never its token hash: a hash is a proof
-    // artifact, and no operator reading a list has anything to do with one.
-    pendingVerificationDomain: state.pendingVerification?.domain ?? null,
-    createdAtMs: state.createdAtMs,
-    updatedAtMs: state.updatedAtMs,
-  };
-}

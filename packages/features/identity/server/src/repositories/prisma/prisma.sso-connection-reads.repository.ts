@@ -4,7 +4,7 @@ import type {
   SsoConnectionStrandingRepository,
 } from "../../sso-connection.repository";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { rowToConnection } from "./prisma.sso-connection-projection.repository";
+import { PrismaSsoConnectionProjectionRepository } from "./prisma.sso-connection-projection.repository";
 
 /** The one model the connection guards read, and no other. */
 export type PrismaSsoConnectionReadDatabase = Pick<PrismaClient, "ssoConnection">;
@@ -32,7 +32,7 @@ export class PrismaSsoConnectionReadRepository implements SsoConnectionReadRepos
     const row = await this.prisma.ssoConnection.findUnique({
       where: { id: connectionId },
     });
-    return row === null ? null : rowToConnection(row);
+    return row === null ? null : PrismaSsoConnectionProjectionRepository.rowToConnection(row);
   }
 
   /**

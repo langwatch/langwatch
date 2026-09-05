@@ -51,6 +51,10 @@ interface LegacyAccountRow {
  * timestamps and does what it is told.
  */
 export class PrismaIdentitySecretCarryRepository implements IdentitySecretCarryRepository {
+  static create(prisma: PrismaClient): PrismaIdentitySecretCarryRepository {
+    return new PrismaIdentitySecretCarryRepository(prisma);
+  }
+
   constructor(private readonly prisma: PrismaClient) {}
 
   async findAccountSecretPairs({ userId }: { userId: string }): Promise<AccountSecretPair[]> {

@@ -8,10 +8,10 @@ import {
 } from "@langwatch/identity-contract";
 import type {
   JoinCandidateRepository,
-  JoinRequestReadRepository,
+  JoinRequestListReadRepository,
 } from "../../join-request.repository";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { rowToJoinRequest } from "./prisma.join-request-projection.repository";
+import { PrismaJoinRequestProjectionRepository } from "./prisma.join-request-projection.repository";
 
 /**
  * What the join-request guards and the matcher read, out of Postgres (D12).
@@ -27,7 +27,11 @@ import { rowToJoinRequest } from "./prisma.join-request-projection.repository";
  *  look like theirs by typing an address at it. */
 const VERIFIED_IDENTIFIER_STATES = ["VERIFIED", "PRIMARY"] as const;
 
-export class PrismaJoinRequestReadRepository implements JoinRequestReadRepository {
+export class PrismaJoinRequestReadRepository implements JoinRequestListReadRepository {
+  static create(prisma: PrismaClient): PrismaJoinRequestReadRepository {
+    return new PrismaJoinRequestReadRepository(prisma);
+  }
+
   constructor(private readonly prisma: PrismaClient) {}
 
   async findRequest({
@@ -38,7 +42,7 @@ export class PrismaJoinRequestReadRepository implements JoinRequestReadRepositor
     const row = await this.prisma.joinRequest.findUnique({
       where: { id: joinRequestId },
     });
-    return row ? rowToJoinRequest(row) : null;
+    return row ? PrismaJoinRequestProjectionRepository.rowToJoinRequest(row) : null;
   }
 
   async findPendingRequest({
@@ -52,7 +56,7 @@ export class PrismaJoinRequestReadRepository implements JoinRequestReadRepositor
       where: { userId, organizationId, state: "PENDING" },
       orderBy: { createdAt: "desc" },
     });
-    return row ? rowToJoinRequest(row) : null;
+    return row ? PrismaJoinRequestProjectionRepository.rowToJoinRequest(row) : null;
   }
 
   /** The cool-down read: when this person was last told no by this
@@ -82,7 +86,7 @@ export class PrismaJoinRequestReadRepository implements JoinRequestReadRepositor
       where: { organizationId, state: "PENDING" },
       orderBy: { createdAt: "desc" },
     });
-    return rows.map(rowToJoinRequest);
+    return rows.map((row) => PrismaJoinRequestProjectionRepository.rowToJoinRequest(row));
   }
 
   /** Everything one person is waiting on. */
@@ -91,7 +95,7 @@ export class PrismaJoinRequestReadRepository implements JoinRequestReadRepositor
       where: { userId, state: "PENDING" },
       orderBy: { createdAt: "desc" },
     });
-    return rows.map(rowToJoinRequest);
+    return rows.map((row) => PrismaJoinRequestProjectionRepository.rowToJoinRequest(row));
   }
 }
 
@@ -111,6 +115,10 @@ export class PrismaJoinRequestReadRepository implements JoinRequestReadRepositor
  * `join-matching.ts` for what holds the privacy instead.
  */
 export class PrismaJoinCandidateRepository implements JoinCandidateRepository {
+  static create(prisma: PrismaClient): PrismaJoinCandidateRepository {
+    return new PrismaJoinCandidateRepository(prisma);
+  }
+
   constructor(private readonly prisma: PrismaClient) {}
 
   async findCandidateOrganizations({
@@ -210,7 +218,7 @@ export class PrismaJoinCandidateRepository implements JoinCandidateRepository {
     return organizations.map((organization) => ({
       organizationId: organization.id,
       name: organization.name,
-      domainJoin: readDomainJoin(organization.domainJoin),
+      domainJoin: PrismaJoinCandidateRepository.readDomainJoin(organization.domainJoin),
       // The legacy `ssoDomain` string counts too, and on purpose: until the
       // connection projection routes sign-in it is what actually admits
       // people, and an organization whose provider already lets colleagues in
@@ -222,16 +230,16 @@ export class PrismaJoinCandidateRepository implements JoinCandidateRepository {
       autoJoinDomains: organization.joinDomains,
     }));
   }
-}
 
-/**
- * A stored setting back into the vocabulary. An unrecognised value reads as
- * the default rather than throwing: a column somebody hand-edited must not be
- * able to take an organization's members' sign-in down, and `request` is the
- * setting that needs an admin's approval anyway.
- */
-export function readDomainJoin(stored: string): DomainJoinSetting {
-  return (DOMAIN_JOIN_SETTINGS as readonly string[]).includes(stored)
-    ? (stored as DomainJoinSetting)
-    : DEFAULT_DOMAIN_JOIN_SETTING;
+  /**
+   * A stored setting back into the vocabulary. An unrecognised value reads as
+   * the default rather than throwing: a column somebody hand-edited must not be
+   * able to take an organization's members' sign-in down, and `request` is the
+   * setting that needs an admin's approval anyway.
+   */
+  static readDomainJoin(stored: string): DomainJoinSetting {
+    return (DOMAIN_JOIN_SETTINGS as readonly string[]).includes(stored)
+      ? (stored as DomainJoinSetting)
+      : DEFAULT_DOMAIN_JOIN_SETTING;
+  }
 }

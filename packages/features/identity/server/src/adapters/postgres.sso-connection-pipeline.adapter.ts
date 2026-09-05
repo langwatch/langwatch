@@ -1,16 +1,17 @@
 import {
-  AdminEmailPlatformOperators,
+  AdminEmailPlatformOperatorsRepository,
   type PrismaSsoPlatformOperatorDatabase,
 } from "../repositories/prisma/prisma.sso-platform-operators.repository";
-import { LocalDoorBreakGlassBinding } from "./local-door-break-glass-binding.adapter";
+import type { PlatformOperatorPort } from "../ports/platform-operator.port";
+import { LocalDoorBreakGlassBindingAdapter } from "./local-door-break-glass-binding.adapter";
 import { SsoConnectionGuards } from "../sso-connection-guards";
 import { SsoConnectionService } from "../sso-connection.service";
 import type { EventSourcing } from "@langwatch/eventing";
-import { createSsoConnectionPipeline } from "./sso-connection-pipeline-definition.adapter";
+import { SsoConnectionPipelineDefinitionAdapter } from "./sso-connection-pipeline-definition.adapter";
 import { SSO_CONNECTION_PIPELINE_NAME } from "@langwatch/identity-contract";
-import type { SsoConnectionEvent } from "./sso-connection-pipeline-definition.adapter";
+import type { SsoConnectionEvent } from "../projections/sso-connection-state.projection";
 import {
-  SsoConnectionLedgerWriter,
+  SsoConnectionLedgerWriterAdapter,
   type SsoConnectionStagedSender,
 } from "./eventing.sso-connection-ledger.adapter";
 import {
@@ -48,13 +49,14 @@ export type PostgresSsoConnectionPipelineOptions = {
    */
   eventSourcing: EventSourcing;
   /**
-   * `ADMIN_EMAILS`, the deployment's operator list.
+   * The deployment's operator list, as a port.
    *
-   * The same variable that already decides who reaches the back office, and
-   * deliberately not `ops:*` — if that permission ever widens, "who may attest
-   * a customer's domain" must not widen with it silently. Unset means nobody.
+   * `ADMIN_EMAILS` is the same variable that already decides who reaches the
+   * back office, and deliberately not `ops:*` — if that permission ever
+   * widens, "who may attest a customer's domain" must not widen with it
+   * silently. The composition root reads it once; unset means nobody.
    */
-  adminEmails: string | undefined;
+  operators: PlatformOperatorPort;
   /** How a torn-down connection's directory tokens are retired, if at all. */
   directory?: SsoConnectionDirectoryRevocationPort;
 };
@@ -88,19 +90,19 @@ export class PostgresSsoConnectionPipelineAdapter {
 
   private constructor(private readonly options: PostgresSsoConnectionPipelineOptions) {}
 
-  build(): ReturnType<typeof createSsoConnectionPipeline> {
-    const { database, eventSourcing, adminEmails } = this.options;
+  build(): ReturnType<typeof SsoConnectionPipelineDefinitionAdapter.create> {
+    const { database, eventSourcing, operators } = this.options;
     const head = PrismaSsoConnectionProjectionRepository.create(database);
     const guards = new SsoConnectionGuards({
       connections: PrismaSsoConnectionReadRepository.create(database),
-      breakGlass: new LocalDoorBreakGlassBinding(),
+      breakGlass: LocalDoorBreakGlassBindingAdapter.create(),
       stranding: PrismaSsoConnectionStrandingRepository.create(database),
-      platformOperators: AdminEmailPlatformOperators.create({ database, adminEmails }),
+      platformOperators: AdminEmailPlatformOperatorsRepository.create({ database, operators }),
     });
 
     const connections = new SsoConnectionService(
       guards,
-      SsoConnectionLedgerWriter.create({
+      SsoConnectionLedgerWriterAdapter.create({
         projectionStore: head,
         eventStore: async () => {
           const eventStore = eventSourcing.isEnabled
@@ -130,7 +132,7 @@ export class PostgresSsoConnectionPipelineAdapter {
       }),
     );
 
-    return createSsoConnectionPipeline({
+    return SsoConnectionPipelineDefinitionAdapter.create({
       connectionProjectionStore: head,
       connectionGuards: guards,
       teardown: EventingSsoConnectionTeardownAdapter.create({

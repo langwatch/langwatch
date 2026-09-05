@@ -1,6 +1,10 @@
 import { IdentityEmailInUseError } from "@langwatch/identity-contract";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../../identity-migration-names";
+import type {
+  AbandonedNewborn,
+  IdentityNewbornRepository,
+} from "../../identity-newborn.repository";
 
 /** Prisma's unique-constraint code, as the pinned-id race arrives. */
 function isUniqueViolation(error: unknown): boolean {
@@ -19,12 +23,6 @@ function isUniqueViolation(error: unknown): boolean {
  */
 export const IDENTITY_BORN_REPORT_KIND = "born" as const;
 
-/** One newborn tenant whose facts landed and whose rows never did. */
-export interface AbandonedNewborn {
-  userId: string;
-  claimedAt: Date;
-}
-
 /**
  * The row writes the born-finalized entrance performs, and the sweep that
  * cleans up after the ones that never happened.
@@ -34,7 +32,11 @@ export interface AbandonedNewborn {
  * `SystemMigrationTenantState` are not project-scoped, so none of these
  * queries carries a `projectId`.
  */
-export class PrismaIdentityNewbornRepository {
+export class PrismaIdentityNewbornRepository implements IdentityNewbornRepository {
+  static create(prisma: PrismaClient): PrismaIdentityNewbornRepository {
+    return new PrismaIdentityNewbornRepository(prisma);
+  }
+
   constructor(private readonly prisma: PrismaClient) {}
 
   /**

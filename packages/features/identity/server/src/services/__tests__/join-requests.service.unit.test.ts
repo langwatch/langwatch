@@ -115,7 +115,7 @@ function harness({
     findPendingForUser: vi.fn(async () => []),
   };
 
-  const service = new JoinRequestsService({
+  const service = JoinRequestsService.create({
     rateLimit: rateLimitMock,
     requests: requests as never,
     reads: reads as never,

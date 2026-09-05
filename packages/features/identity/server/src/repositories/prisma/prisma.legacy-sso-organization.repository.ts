@@ -13,6 +13,10 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
  * the data".
  */
 export class PrismaLegacySsoOrganizationRepository implements LegacySsoOrganizationRepository {
+  static create(prisma: PrismaClient): PrismaLegacySsoOrganizationRepository {
+    return new PrismaLegacySsoOrganizationRepository(prisma);
+  }
+
   constructor(private readonly prisma: PrismaClient) {}
 
   async tryFindLegacySso({

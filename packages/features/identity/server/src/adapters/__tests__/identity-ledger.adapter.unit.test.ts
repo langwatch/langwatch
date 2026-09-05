@@ -7,16 +7,16 @@ import { IdentityGuards } from "../../guards";
 import type { IdentityHeadsRepository } from "../../identity-heads.repository";
 import { IdentityService } from "../../identity.service";
 import { describe, expect, it, vi } from "vitest";
-import type { IdentityEvent } from "../identity-pipeline-definition.adapter";
+import type { IdentityEvent } from "../../projections/identity-state.projection";
 import type { IdentityFoldState } from "../../projections/identity-state.projection";
-import { identityEventsFor } from "../identity-pipeline-definition.adapter";
+import { IdentityStateFoldProjection } from "../../projections/identity-state.projection";
 import type {
   ProjectionStoreContext,
   StateProjectionStore,
   StoredProjection,
 } from "@langwatch/eventing";
-import { IdentityLedgerWriter } from "../identity-ledger.adapter";
-import { identityProjectionConvergenceTimeoutsTotal } from "../identity-ledger.metrics";
+import { IdentityLedgerWriterAdapter } from "../identity-ledger.adapter";
+import { identityProjectionConvergenceTimeoutsTotal } from "../../identity-ledger.metrics";
 import { inMemoryIdentityReservations, inMemoryIdentityUsers } from "../../testing";
 
 const USER = "user_sam";
@@ -139,7 +139,7 @@ function harness(overrides?: {
         data as Parameters<IdentityGuards["attachIdentifier"]>[0],
       );
       if (facts.length === 0) return undefined;
-      const events = identityEventsFor({
+      const events = IdentityStateFoldProjection.eventsFor({
         command: { type: ATTACH_IDENTIFIER_COMMAND_TYPE, data: data as never },
         facts,
       });
@@ -154,7 +154,7 @@ function harness(overrides?: {
     }),
   };
 
-  const ledger = new IdentityLedgerWriter({
+  const ledger = new IdentityLedgerWriterAdapter({
     projectionStore: store,
     // The sender is handed in directly, so the eventing port is never asked:
     // a shape that refuses proves it stays unasked.

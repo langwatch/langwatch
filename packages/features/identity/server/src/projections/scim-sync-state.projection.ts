@@ -150,6 +150,12 @@ export class ScimSyncStateFoldProjection
 
   protected readonly events = scimSyncEvents;
 
+  static create(deps: {
+    store: StateProjectionStore<ScimSyncFoldState>;
+  }): ScimSyncStateFoldProjection {
+    return new ScimSyncStateFoldProjection(deps);
+  }
+
   constructor(deps: { store: StateProjectionStore<ScimSyncFoldState> }) {
     super();
     this.store = deps.store;
@@ -221,44 +227,44 @@ export class ScimSyncStateFoldProjection
   ): ScimSyncFoldState {
     return this.fold(event, state);
   }
-}
 
-/**
- * The ONE place a directory-sync fact becomes a framework event: the guards
- * (`ScimSyncGuards`) decide what a command states, and this stamps the
- * envelope from the command that produced it — the aggregate type the store
- * validates (#7406), the sync as aggregate, the organization as tenant, the
- * command's business time, and the `commandId:index` idempotency key.
- *
- * Both the pipeline's command handlers (the staged re-run) and the app's
- * ledger writer (the calling path) go through here, so the two legs cannot
- * stamp a fact differently.
- *
- * Defined here, beside the fold and the schemas it stamps, rather than in
- * the pipeline definition adapter: the intents that call this ARE inputs to
- * that adapter's pipeline builder, so an import back the other way would be
- * a cycle.
- */
-export function scimSyncEventsFor({
-  command,
-  facts,
-}: {
-  command: ScimSyncCommand;
-  facts: ScimSyncFactInput[];
-}): ScimSyncEvent[] {
-  const { scimSyncId, tenantId, commandId, occurredAtMs } = command.data;
-  return facts.map(
-    (fact, index) =>
-      EventUtils.createEvent({
-        aggregateType: SCIM_SYNC_AGGREGATE_TYPE,
-        aggregateId: scimSyncId,
-        tenantId: createTenantId(tenantId),
-        type: fact.type,
-        version: SCIM_SYNC_EVENT_VERSION_LATEST,
-        data: fact.data,
-        metadata: {},
-        occurredAt: occurredAtMs,
-        idempotencyKey: eventIdempotencyKey({ commandId, index }),
-      }) as ScimSyncEvent,
-  );
+  /**
+   * The ONE place a directory-sync fact becomes a framework event: the guards
+   * (`ScimSyncGuards`) decide what a command states, and this stamps the
+   * envelope from the command that produced it — the aggregate type the store
+   * validates (#7406), the sync as aggregate, the organization as tenant, the
+   * command's business time, and the `commandId:index` idempotency key.
+   *
+   * Both the pipeline's command handlers (the staged re-run) and the app's
+   * ledger writer (the calling path) go through here, so the two legs cannot
+   * stamp a fact differently.
+   *
+   * Defined here, beside the fold and the schemas it stamps, rather than in
+   * the pipeline definition adapter: the intents that call this ARE inputs to
+   * that adapter's pipeline builder, so an import back the other way would be
+   * a cycle.
+   */
+  static eventsFor({
+    command,
+    facts,
+  }: {
+    command: ScimSyncCommand;
+    facts: ScimSyncFactInput[];
+  }): ScimSyncEvent[] {
+    const { scimSyncId, tenantId, commandId, occurredAtMs } = command.data;
+    return facts.map(
+      (fact, index) =>
+        EventUtils.createEvent({
+          aggregateType: SCIM_SYNC_AGGREGATE_TYPE,
+          aggregateId: scimSyncId,
+          tenantId: createTenantId(tenantId),
+          type: fact.type,
+          version: SCIM_SYNC_EVENT_VERSION_LATEST,
+          data: fact.data,
+          metadata: {},
+          occurredAt: occurredAtMs,
+          idempotencyKey: eventIdempotencyKey({ commandId, index }),
+        }) as ScimSyncEvent,
+    );
+  }
 }

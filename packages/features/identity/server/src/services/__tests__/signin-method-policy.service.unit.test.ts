@@ -11,10 +11,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { routeSignIn } from "@langwatch/identity-contract";
 import {
-  deploymentIsFederationCapable,
   LOCAL_METHOD_SET,
   PASSWORD_METHOD,
-  resolveSignInMethodPolicy,
+  SignInMethodPolicyService,
   type SignInMethodPolicyInputs,
 } from "../signin-method-policy.service";
 
@@ -55,7 +54,7 @@ describe("the instance sign-in method policy", () => {
     /** @scenario "The provider env becomes the default method set" */
     /** @scenario "A licensed self-hosted deployment reports federation as licensed" */
     it("makes the configured provider the offered method, exactly as before", async () => {
-      const policy = await resolveSignInMethodPolicy(inputs);
+      const policy = await SignInMethodPolicyService.create(inputs).resolvePolicy();
 
       expect(policy.defaultMethods).toEqual([
         { id: "auth0", kind: "federated", connectionId: null },
@@ -66,7 +65,7 @@ describe("the instance sign-in method policy", () => {
 
     /** @scenario "The provider env becomes the default method set" */
     it("ends nothing when a second method joins the set", async () => {
-      const policy = await resolveSignInMethodPolicy(inputs);
+      const policy = await SignInMethodPolicyService.create(inputs).resolvePolicy();
       const withPasskey = {
         ...policy,
         defaultMethods: [
@@ -102,7 +101,7 @@ describe("the instance sign-in method policy", () => {
 
     /** @scenario "A never-licensed installation offers no federated method" */
     it("offers the email and password method set and no federated one", async () => {
-      const policy = await resolveSignInMethodPolicy(inputs);
+      const policy = await SignInMethodPolicyService.create(inputs).resolvePolicy();
 
       expect(policy.federationLicensed).toBe(false);
       expect(policy.defaultMethods).toEqual([PASSWORD_METHOD]);
@@ -114,7 +113,7 @@ describe("the instance sign-in method policy", () => {
 
     /** @scenario "A never-licensed installation offers no federated method" */
     it("keeps every federated method out of the routing decision too", async () => {
-      const policy = await resolveSignInMethodPolicy(inputs);
+      const policy = await SignInMethodPolicyService.create(inputs).resolvePolicy();
 
       const decision = routeSignIn({
         identifier: null,
@@ -133,7 +132,7 @@ describe("the instance sign-in method policy", () => {
     it("answers the capability question without waiting on the licensing store", () => {
       // Synchronous by contract: the before-hook must be able to leave an
       // email-mode deployment alone without a store read in the way.
-      expect(deploymentIsFederationCapable("email")).toBe(false);
+      expect(SignInMethodPolicyService.deploymentIsFederationCapable("email")).toBe(false);
       expect(federationLicensed).not.toHaveBeenCalled();
     });
   });

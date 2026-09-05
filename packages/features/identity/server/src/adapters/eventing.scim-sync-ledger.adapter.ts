@@ -83,8 +83,12 @@ export interface ScimSyncLedgerWriterDeps {
   eventing: IdentityEventingPort;
 }
 
-export class ScimSyncLedgerWriter implements ScimSyncLedger {
+export class ScimSyncLedgerWriterAdapter implements ScimSyncLedger {
   private readonly eventing: IdentityEventingPort;
+
+  static create(deps: ScimSyncLedgerWriterDeps): ScimSyncLedgerWriterAdapter {
+    return new ScimSyncLedgerWriterAdapter(deps);
+  }
 
   constructor(deps: ScimSyncLedgerWriterDeps) {
     this.eventing = deps.eventing;

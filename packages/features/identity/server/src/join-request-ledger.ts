@@ -5,7 +5,7 @@ import type {
 } from "@langwatch/identity-contract";
 
 /**
- * Where a join request's facts land (D12). `JoinRequestLedgerWriter` — in this
+ * Where a join request's facts land (D12). `JoinRequestLedgerWriterAdapter` — in this
  * package's own `adapters/join-request-ledger.adapter.ts` — implements it in
  * exactly the shape the identity, connection and grants ledgers already have
  * (ADR-110): the command staged onto the per-request GroupQueue, whose queued

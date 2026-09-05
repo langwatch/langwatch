@@ -147,6 +147,12 @@ export class MfaEnrollmentStateFoldProjection
 
   protected readonly events = mfaEvents;
 
+  static create(deps: {
+    store: StateProjectionStore<MfaFoldState>;
+  }): MfaEnrollmentStateFoldProjection {
+    return new MfaEnrollmentStateFoldProjection(deps);
+  }
+
   constructor(deps: { store: StateProjectionStore<MfaFoldState> }) {
     super();
     this.store = deps.store;
@@ -213,43 +219,37 @@ export class MfaEnrollmentStateFoldProjection
   ): MfaFoldState {
     return this.fold(event, state);
   }
-}
 
-/**
- * The same envelope stamp the identity pipeline's events get, and a
- * separate function for one reason that matters: SCHEMA VERSION. An
- * envelope stamps exactly one `version`, fold read-back is version-gated,
- * and these two families evolve independently.
- *
- * They still ride `USER_IDENTITY_AGGREGATE_TYPE`, keyed on the same
- * `userId` — deliberately, and it is the whole reason this lives on the
- * identity pipeline. The queue keys its lane on the aggregate id, so a
- * person's identifier commands and their two-step commands serialise
- * against each other.
- *
- * Defined here, beside the fold and the schemas it stamps, for the same
- * reason `identityEventsFor` lives beside its own fold.
- */
-export function mfaEventsFor({
-  command,
-  facts,
-}: {
-  command: MfaCommand;
-  facts: MfaFactInput[];
-}): MfaEvent[] {
-  const { userId, tenantId, commandId, occurredAtMs } = command.data;
-  return facts.map(
-    (fact, index) =>
-      EventUtils.createEvent({
-        aggregateType: USER_IDENTITY_AGGREGATE_TYPE,
-        aggregateId: userId,
-        tenantId: createTenantId(tenantId),
-        type: fact.type,
-        version: MFA_EVENT_VERSION_LATEST,
-        data: fact.data,
-        metadata: {},
-        occurredAt: occurredAtMs,
-        idempotencyKey: eventIdempotencyKey({ commandId, index }),
-      }) as MfaEvent,
-  );
+  /**
+   * The same envelope stamp the identity pipeline's events get, and a
+   * separate function for one reason that matters: SCHEMA VERSION. An
+   * envelope stamps exactly one `version`, fold read-back is version-gated,
+   * and these two families evolve independently.
+   *
+   * They still ride `USER_IDENTITY_AGGREGATE_TYPE`, keyed on the same
+   * `userId` — deliberately, and it is the whole reason this lives on the
+   * identity pipeline. The queue keys its lane on the aggregate id, so a
+   * person's identifier commands and their two-step commands serialise
+   * against each other.
+   *
+   * Defined here, beside the fold and the schemas it stamps, for the same
+   * reason `identityEventsFor` lives beside its own fold.
+   */
+  static eventsFor({ command, facts }: { command: MfaCommand; facts: MfaFactInput[] }): MfaEvent[] {
+    const { userId, tenantId, commandId, occurredAtMs } = command.data;
+    return facts.map(
+      (fact, index) =>
+        EventUtils.createEvent({
+          aggregateType: USER_IDENTITY_AGGREGATE_TYPE,
+          aggregateId: userId,
+          tenantId: createTenantId(tenantId),
+          type: fact.type,
+          version: MFA_EVENT_VERSION_LATEST,
+          data: fact.data,
+          metadata: {},
+          occurredAt: occurredAtMs,
+          idempotencyKey: eventIdempotencyKey({ commandId, index }),
+        }) as MfaEvent,
+    );
+  }
 }

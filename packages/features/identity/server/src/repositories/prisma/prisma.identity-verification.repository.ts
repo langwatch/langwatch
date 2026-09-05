@@ -67,6 +67,10 @@ function parsePayload(raw: string): StoredPayload | null {
 }
 
 export class PrismaIdentityVerificationRepository implements IdentityVerificationRepository {
+  static create(prisma: PrismaClient): PrismaIdentityVerificationRepository {
+    return new PrismaIdentityVerificationRepository(prisma);
+  }
+
   constructor(private readonly prisma: PrismaClient) {}
 
   async replaceForIdentifier(record: IdentityVerificationRecord): Promise<void> {

@@ -37,12 +37,11 @@ import {
 import { HandledError } from "@langwatch/handled-error";
 import type { RoutingDecision } from "@langwatch/identity-contract";
 import {
-  InProcessBreakGlassLimiter,
+  InProcessBreakGlassLimiterAdapter,
   LegacySsoDomainRoutingRepository,
   SignInRouterService,
   SsoConnectionDomainRoutingRepository,
-  resolveFederatedMethod,
-  signInMethodPolicyPortOver,
+  SignInMethodPolicyService,
 } from "@langwatch/identity-server";
 import {
   InviteExpiredError,
@@ -149,14 +148,18 @@ export function composeAuthFeature(options: {
     // this domain"; `configured` is whether THIS deployment mounted the method
     // the connection names, which is the fact only the deployment holds.
     domains: deployment.authProvider
-      ? new SsoConnectionDomainRoutingRepository(
+      ? SsoConnectionDomainRoutingRepository.create({
           prisma,
-          async (methodId) => (await resolveFederatedMethod(resolveAuthProvider))?.id === methodId,
-        )
-      : new LegacySsoDomainRoutingRepository(prisma, () =>
-          resolveFederatedMethod(resolveAuthProvider),
-        ),
-    policy: signInMethodPolicyPortOver({
+          isMethodConfigured: async (methodId) =>
+            (await SignInMethodPolicyService.resolveFederatedMethod(resolveAuthProvider))?.id ===
+            methodId,
+        })
+      : LegacySsoDomainRoutingRepository.create({
+          prisma,
+          instanceMethod: () =>
+            SignInMethodPolicyService.resolveFederatedMethod(resolveAuthProvider),
+        }),
+    policy: SignInMethodPolicyService.create({
       resolveAuthProvider,
       // No licence gate on this process, so federation is not licensed. The
       // policy reads that the way ADR-027 always did: email mode, no federated
@@ -165,7 +168,7 @@ export function composeAuthFeature(options: {
       offersPasskeys: () => deployment.passkeysEnabled === true,
       selfHosted: () => deployment.isSaas !== true,
     }),
-    breakGlass: new InProcessBreakGlassLimiter(),
+    breakGlass: InProcessBreakGlassLimiterAdapter.create(),
   });
 
   const signUpVerification = mail

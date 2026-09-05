@@ -39,8 +39,8 @@
  * and the four pipeline definitions the worker registers) — folded back into
  * this package below, since nothing outside it composed the two separately
  * and the split had become a same-package import graph wearing two package
- * names. `createIdentityProducerPipeline` and its three siblings, and the
- * four `Postgres*PipelineAdapter` composition seams, are what apps/api and
+ * names. `IdentityProducerPipelinesAdapter` and the four
+ * `Postgres*PipelineAdapter` composition seams are what apps/api and
  * apps/worker still reach from here.
  */
 export {
@@ -99,12 +99,7 @@ export { issuerForProviderId } from "./better-auth/account-queries";
  * a stand-in that refuses by name if ever called, so a producer's routing
  * triple can never drift from the worker's.
  */
-export {
-  createIdentityProducerPipeline,
-  createJoinRequestProducerPipeline,
-  createScimSyncProducerPipeline,
-  createSsoConnectionProducerPipeline,
-} from "./adapters/producer.identity-pipelines.adapter";
+export { IdentityProducerPipelinesAdapter } from "./adapters/producer.identity-pipelines.adapter";
 export {
   type IdentityPipelineDatabase,
   PostgresIdentityPipelineAdapter,
@@ -266,17 +261,18 @@ export {
 // the shared rate-limit counter, and the deployment's four sign-in facts.
 // ---------------------------------------------------------------------------
 export { IdentityEventingPort } from "./ports/identity-eventing.port";
+export { PlatformOperatorPort } from "./ports/platform-operator.port";
 export {
   IDENTITY_CONVERGENCE_POLL_MS,
   IDENTITY_CONVERGENCE_TIMEOUT_MS,
-  IdentityLedgerWriter,
+  IdentityLedgerWriterAdapter,
   type IdentityLedgerWriterDeps,
   type IdentityStagedSender,
 } from "./adapters/identity-ledger.adapter";
 export {
   JOIN_REQUEST_CONVERGENCE_POLL_MS,
   JOIN_REQUEST_CONVERGENCE_TIMEOUT_MS,
-  JoinRequestLedgerWriter,
+  JoinRequestLedgerWriterAdapter,
   type JoinRequestLedgerWriterDeps,
   type JoinRequestStagedSender,
 } from "./adapters/join-request-ledger.adapter";
@@ -287,19 +283,23 @@ export {
   PrismaJoinSettings,
 } from "./adapters/join-request.adapters";
 export { JoinRequestNotificationMailPort } from "./ports/join-request-notification-mail.port";
-export { InProcessBreakGlassLimiter } from "./adapters/in-process-break-glass-limiter.adapter";
-export { LocalDoorBreakGlassBinding } from "./adapters/local-door-break-glass-binding.adapter";
+export { InProcessBreakGlassLimiterAdapter } from "./adapters/in-process-break-glass-limiter.adapter";
+export { LocalDoorBreakGlassBindingAdapter } from "./adapters/local-door-break-glass-binding.adapter";
 export { PrismaIdentityVerificationRepository } from "./repositories/prisma/prisma.identity-verification.repository";
 export { PrismaIdentityProjectionRepository } from "./repositories/prisma/prisma.identity-projection.repository";
 export {
+  PrismaSsoConnectionBackofficeRepository,
+  type PrismaSsoConnectionBackofficeDatabase,
+} from "./repositories/prisma/prisma.sso-connection-backoffice.repository";
+export type {
+  SsoConnectionBackofficePage,
+  SsoConnectionBackofficeRepository,
+} from "./sso-connection-backoffice.repository";
+export {
   PrismaJoinCandidateRepository,
   PrismaJoinRequestReadRepository,
-  readDomainJoin,
 } from "./repositories/prisma/prisma.join-request.repository";
-export {
-  PrismaJoinRequestProjectionRepository,
-  rowToJoinRequest,
-} from "./repositories/prisma/prisma.join-request-projection.repository";
+export { PrismaJoinRequestProjectionRepository } from "./repositories/prisma/prisma.join-request-projection.repository";
 export { LegacySsoDomainRoutingRepository } from "./repositories/prisma/prisma.legacy-sso-domain-routing.repository";
 export { SsoConnectionDomainRoutingRepository } from "./repositories/prisma/prisma.sso-connection-routing.repository";
 export {
@@ -311,14 +311,10 @@ export {
   type JoinSettingPort,
 } from "./services/join-requests.service";
 export {
-  deploymentIsFederationCapable,
-  deploymentOffersPasskeys,
   LOCAL_METHOD_SET,
   PASSKEY_METHOD,
   PASSWORD_METHOD,
-  resolveFederatedMethod,
-  resolveSignInMethodPolicy,
-  signInMethodPolicyPortOver,
+  SignInMethodPolicyService,
   type SignInMethodPolicyInputs,
 } from "./services/signin-method-policy.service";
 export {
@@ -342,15 +338,12 @@ export {
   type IdentityNewbornSweepSummary,
 } from "./services/identity-newborn-reconciliation.service";
 export {
-  forgetIdentityWriteGate,
   IDENTITY_WRITE_GATE_TTL_MS,
-  isAnyoneOnIdentityWrites,
-  isUserOnIdentityWrites,
-  resetIdentityWriteGateForTests,
+  IdentityWriteGateService,
 } from "./services/identity-write-gate.service";
+export { IdentityWriteGateStatePort } from "./ports/identity-write-gate-state.port";
 export {
   SsoConnectionBackofficeService,
-  toBackofficeConnection,
   type BackofficeSsoConnection,
   type BackofficeSsoConnectionList,
   type OperatorActor,
@@ -371,15 +364,12 @@ export {
   IdentitySecretHealMigration,
 } from "./migrations/identity-secret-heal.migration";
 export {
-  ScimSyncLedgerWriter,
+  ScimSyncLedgerWriterAdapter,
   type ScimSyncLedgerWriterDeps,
   type ScimSyncStagedSender,
 } from "./adapters/eventing.scim-sync-ledger.adapter";
 export {
-  SsoConnectionTeardownDispatcher,
+  SsoConnectionTeardownDispatcherAdapter,
   type ConnectionDirectoryRevocation,
 } from "./adapters/sso-connection-teardown.adapter";
-export {
-  PrismaScimSyncProjectionRepository,
-  rowToScimSync,
-} from "./repositories/prisma/prisma.scim-sync-projection.repository";
+export { PrismaScimSyncProjectionRepository } from "./repositories/prisma/prisma.scim-sync-projection.repository";

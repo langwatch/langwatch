@@ -93,6 +93,10 @@ function accountMirrorData(secrets: IdentityAccountSecrets): Record<string, unkn
  * through an account they unlinked.
  */
 export class PrismaIdentityAccountsRepository implements IdentityAccountsPort {
+  static create(prisma: PrismaClient): PrismaIdentityAccountsRepository {
+    return new PrismaIdentityAccountsRepository(prisma);
+  }
+
   constructor(private readonly prisma: PrismaClient) {}
 
   async findByUser({ userId }: { userId: string }): Promise<IdentityAccountRow[]> {

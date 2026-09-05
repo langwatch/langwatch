@@ -6,8 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../../identity-migration-names";
 import {
   IDENTITY_WRITE_GATE_TTL_MS,
-  isUserOnIdentityWrites,
-  resetIdentityWriteGateForTests,
+  IdentityWriteGateService,
 } from "../identity-write-gate.service";
 
 const USER = "user_sam";
@@ -28,7 +27,7 @@ function stateWithStatus(status: TenantMigrationStatus | null): SystemMigrationS
 }
 
 afterEach(() => {
-  resetIdentityWriteGateForTests();
+  IdentityWriteGateService.resetForTests();
 });
 
 describe("identifier write gate", () => {
@@ -38,7 +37,9 @@ describe("identifier write gate", () => {
       const state = stateWithStatus("finalized");
       (state.hasFinalizedTenant as ReturnType<typeof vi.fn>).mockResolvedValue(false);
 
-      await expect(isUserOnIdentityWrites({ userId: USER, state })).resolves.toBe(false);
+      await expect(
+        IdentityWriteGateService.create({ state }).isUserOnIdentityWrites({ userId: USER }),
+      ).resolves.toBe(false);
       // The whole point of the short-circuit: no per-user read is issued.
       expect(state.findRecord).not.toHaveBeenCalled();
     });
@@ -47,9 +48,9 @@ describe("identifier write gate", () => {
       const state = stateWithStatus("finalized");
       (state.hasFinalizedTenant as ReturnType<typeof vi.fn>).mockResolvedValue(false);
 
-      await isUserOnIdentityWrites({ userId: "user_a", state });
-      await isUserOnIdentityWrites({ userId: "user_b", state });
-      await isUserOnIdentityWrites({ userId: "user_c", state });
+      await IdentityWriteGateService.create({ state }).isUserOnIdentityWrites({ userId: "user_a" });
+      await IdentityWriteGateService.create({ state }).isUserOnIdentityWrites({ userId: "user_b" });
+      await IdentityWriteGateService.create({ state }).isUserOnIdentityWrites({ userId: "user_c" });
 
       expect(state.hasFinalizedTenant).toHaveBeenCalledTimes(1);
     });
@@ -58,7 +59,9 @@ describe("identifier write gate", () => {
   describe("when no backfill row exists for the user", () => {
     it("answers closed — the gate ships closed for everyone", async () => {
       const state = stateWithStatus(null);
-      await expect(isUserOnIdentityWrites({ userId: USER, state })).resolves.toBe(false);
+      await expect(
+        IdentityWriteGateService.create({ state }).isUserOnIdentityWrites({ userId: USER }),
+      ).resolves.toBe(false);
       expect(state.findRecord).toHaveBeenCalledWith({
         migrationName: IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME,
         tenantId: USER,
@@ -70,35 +73,31 @@ describe("identifier write gate", () => {
     /** @scenario "Finalizing a user's backfill opens their write gate" */
     it("answers open for finalized only; a held (migrated) user stays closed", async () => {
       await expect(
-        isUserOnIdentityWrites({
-          userId: USER,
+        IdentityWriteGateService.create({
           state: stateWithStatus("finalized"),
-        }),
+        }).isUserOnIdentityWrites({ userId: USER }),
       ).resolves.toBe(true);
-      resetIdentityWriteGateForTests();
+      IdentityWriteGateService.resetForTests();
       // ADR-110: `migrated` is HELD — the proof found the projection behind
       // or disagreeing, so the user stays on the protocol-only path.
       await expect(
-        isUserOnIdentityWrites({
-          userId: USER,
+        IdentityWriteGateService.create({
           state: stateWithStatus("migrated"),
-        }),
+        }).isUserOnIdentityWrites({ userId: USER }),
       ).resolves.toBe(false);
     });
 
     it("answers closed for parked and rolled_back", async () => {
       await expect(
-        isUserOnIdentityWrites({
-          userId: USER,
+        IdentityWriteGateService.create({
           state: stateWithStatus("parked"),
-        }),
+        }).isUserOnIdentityWrites({ userId: USER }),
       ).resolves.toBe(false);
-      resetIdentityWriteGateForTests();
+      IdentityWriteGateService.resetForTests();
       await expect(
-        isUserOnIdentityWrites({
-          userId: USER,
+        IdentityWriteGateService.create({
           state: stateWithStatus("rolled_back"),
-        }),
+        }).isUserOnIdentityWrites({ userId: USER }),
       ).resolves.toBe(false);
     });
   });
@@ -116,7 +115,9 @@ describe("identifier write gate", () => {
         // question answers no first.
         hasFinalizedTenant: vi.fn(async () => true),
       };
-      await expect(isUserOnIdentityWrites({ userId: USER, state })).resolves.toBe(false);
+      await expect(
+        IdentityWriteGateService.create({ state }).isUserOnIdentityWrites({ userId: USER }),
+      ).resolves.toBe(false);
     });
   });
 
@@ -126,27 +127,24 @@ describe("identifier write gate", () => {
       vi.useFakeTimers();
       try {
         await expect(
-          isUserOnIdentityWrites({
-            userId: USER,
+          IdentityWriteGateService.create({
             state: stateWithStatus("finalized"),
-          }),
+          }).isUserOnIdentityWrites({ userId: USER }),
         ).resolves.toBe(true);
         // No cross-pod invalidation exists (ADR-110: rollback applies within
         // the status lookup's cache window). Inside the TTL the pin is not
         // yet seen...
         await expect(
-          isUserOnIdentityWrites({
-            userId: USER,
+          IdentityWriteGateService.create({
             state: stateWithStatus("rolled_back"),
-          }),
+          }).isUserOnIdentityWrites({ userId: USER }),
         ).resolves.toBe(true);
         // ...and the moment the TTL elapses, it is.
         vi.advanceTimersByTime(IDENTITY_WRITE_GATE_TTL_MS + 1);
         await expect(
-          isUserOnIdentityWrites({
-            userId: USER,
+          IdentityWriteGateService.create({
             state: stateWithStatus("rolled_back"),
-          }),
+          }).isUserOnIdentityWrites({ userId: USER }),
         ).resolves.toBe(false);
       } finally {
         vi.useRealTimers();
@@ -159,17 +157,15 @@ describe("identifier write gate", () => {
       vi.useFakeTimers();
       try {
         await expect(
-          isUserOnIdentityWrites({
-            userId: USER,
+          IdentityWriteGateService.create({
             state: stateWithStatus(null),
-          }),
+          }).isUserOnIdentityWrites({ userId: USER }),
         ).resolves.toBe(false);
         vi.advanceTimersByTime(IDENTITY_WRITE_GATE_TTL_MS + 1);
         await expect(
-          isUserOnIdentityWrites({
-            userId: USER,
+          IdentityWriteGateService.create({
             state: stateWithStatus("finalized"),
-          }),
+          }).isUserOnIdentityWrites({ userId: USER }),
         ).resolves.toBe(true);
       } finally {
         vi.useRealTimers();

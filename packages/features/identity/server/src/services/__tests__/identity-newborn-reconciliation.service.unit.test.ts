@@ -21,8 +21,8 @@ import {
 } from "../identity-newborn-reconciliation.service";
 import type {
   AbandonedNewborn,
-  PrismaIdentityNewbornRepository,
-} from "../../repositories/prisma/prisma.identity-newborn.repository";
+  IdentityNewbornRepository,
+} from "../../identity-newborn.repository";
 
 const NOW = 1_690_000_000_000;
 
@@ -45,11 +45,11 @@ function harness(options?: {
     reapOrphans,
   } as unknown as IdentityReservationRepository;
 
-  const service = new IdentityNewbornReconciliationService({
+  const service = IdentityNewbornReconciliationService.create({
     newborns: {
       findAbandoned,
       releaseClaim,
-    } as unknown as PrismaIdentityNewbornRepository,
+    } as unknown as IdentityNewbornRepository,
     identity: { eraseUser: eraseUser as never },
     reservations,
     now: () => NOW,

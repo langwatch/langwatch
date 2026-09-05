@@ -19,6 +19,16 @@ import type { PrismaClient, SsoConnection } from "@langwatch/prisma-client/gener
  * silently offering a password form.
  */
 export class SsoConnectionDomainRoutingRepository implements SignInDomainRoutingPort {
+  static create({
+    prisma,
+    isMethodConfigured,
+  }: {
+    prisma: PrismaClient;
+    isMethodConfigured: (methodId: string) => Promise<boolean>;
+  }): SsoConnectionDomainRoutingRepository {
+    return new SsoConnectionDomainRoutingRepository(prisma, isMethodConfigured);
+  }
+
   constructor(
     private readonly prisma: PrismaClient,
     /** Whether this deployment actually mounted a method id. Injected rather

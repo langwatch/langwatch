@@ -13,7 +13,7 @@ import type {
  *
  * The app implements it with ADR-101 §2's pinned order — envelope, durable
  * ClickHouse append WAITED, fold apply on the calling path, GroupQueue
- * staging LAST and best-effort — `IdentityLedgerWriter`, in this package's own
+ * staging LAST and best-effort — `IdentityLedgerWriterAdapter`, in this package's own
  * `adapters/identity-ledger.adapter.ts`. The interface still knows nothing
  * about a queue, a store or a projection; only the writer does.
  */

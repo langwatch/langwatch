@@ -4,11 +4,11 @@ import { JoinRequestService } from "../join-request.service";
 import { PostgresJoinRequestNotificationAdapter } from "./postgres.join-request-notification.adapter";
 import type { EventSourcing, EventStore } from "@langwatch/eventing";
 import {
-  createJoinRequestPipeline,
+  JoinRequestPipelineDefinitionAdapter,
   type JoinRequestPipeline,
 } from "./join-request-pipeline-definition.adapter";
 import { JOIN_REQUEST_PIPELINE_NAME } from "@langwatch/identity-contract";
-import type { JoinRequestEvent } from "./join-request-pipeline-definition.adapter";
+import type { JoinRequestEvent } from "../projections/join-request-state.projection";
 import {
   EventingJoinRequestLedgerAdapter,
   type JoinRequestStagedSender,
@@ -96,7 +96,7 @@ export class PostgresJoinRequestPipelineAdapter {
       }),
     );
 
-    return createJoinRequestPipeline({
+    return JoinRequestPipelineDefinitionAdapter.create({
       joinRequestProjectionStore: head,
       joinRequestGuards: guards,
       lifecycle: EventingJoinRequestLifecycleAdapter.create({

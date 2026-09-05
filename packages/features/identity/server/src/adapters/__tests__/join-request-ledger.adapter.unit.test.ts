@@ -22,7 +22,7 @@ import type {
 import type { JoinRequestFoldState } from "../../projections/join-request-state.projection";
 import { describe, expect, it, vi } from "vitest";
 import { IdentityEventingPort } from "../../ports/identity-eventing.port";
-import { JoinRequestLedgerWriter } from "../join-request-ledger.adapter";
+import { JoinRequestLedgerWriterAdapter } from "../join-request-ledger.adapter";
 
 const ORGANIZATION = "org_acme";
 const REQUEST = "jr_1";
@@ -148,7 +148,7 @@ describe("given a join-request ledger over a registered pipeline", () => {
   describe("when a command states facts", () => {
     it("stages the command on the pipeline's own sender and answers the events", async () => {
       const eventing = new RecordingEventing(true);
-      const writer = new JoinRequestLedgerWriter({
+      const writer = new JoinRequestLedgerWriterAdapter({
         projectionStore: new ConvergedProjection(true),
         eventing,
       });
@@ -166,7 +166,7 @@ describe("given a join-request ledger over a registered pipeline", () => {
 
     it("resolves the sender by the verb the command names, not by the pipeline alone", async () => {
       const eventing = new RecordingEventing(true);
-      const writer = new JoinRequestLedgerWriter({
+      const writer = new JoinRequestLedgerWriterAdapter({
         projectionStore: new ConvergedProjection(true),
         eventing,
       });
@@ -181,7 +181,7 @@ describe("given a join-request ledger over a registered pipeline", () => {
   describe("when the guard stated nothing", () => {
     it("stages nothing at all, because there is no fact to carry", async () => {
       const eventing = new RecordingEventing(true);
-      const writer = new JoinRequestLedgerWriter({
+      const writer = new JoinRequestLedgerWriterAdapter({
         projectionStore: new ConvergedProjection(true),
         eventing,
       });
@@ -199,7 +199,7 @@ describe("given a join-request ledger over a registered pipeline", () => {
     it("returns the events anyway, because the command is queued and the fold converges", async () => {
       const projection = new ConvergedProjection(false);
       const eventing = new RecordingEventing(true);
-      const writer = new JoinRequestLedgerWriter({
+      const writer = new JoinRequestLedgerWriterAdapter({
         projectionStore: projection,
         eventing,
         convergence: { timeoutMs: 5, pollMs: 1 },
@@ -219,7 +219,7 @@ describe("given a process that registered no join-request pipeline", () => {
   describe("when somebody asks to join", () => {
     it("refuses by naming the sender rather than reporting the request as recorded", async () => {
       const eventing = new RecordingEventing(false);
-      const writer = new JoinRequestLedgerWriter({
+      const writer = new JoinRequestLedgerWriterAdapter({
         projectionStore: new ConvergedProjection(true),
         eventing,
       });
@@ -234,7 +234,7 @@ describe("given a process that registered no join-request pipeline", () => {
     it("does not wait on the projection for a command nothing received", async () => {
       const projection = new ConvergedProjection(false);
       const tryLoad = vi.spyOn(projection, "tryLoad");
-      const writer = new JoinRequestLedgerWriter({
+      const writer = new JoinRequestLedgerWriterAdapter({
         projectionStore: projection,
         eventing: new RecordingEventing(false),
       });

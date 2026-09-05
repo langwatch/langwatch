@@ -1,6 +1,6 @@
 import { PostgresIdentityGuardsAdapter } from "./postgres.identity-guards.adapter";
 import {
-  createIdentityPipeline,
+  IdentityPipelineDefinitionAdapter,
   type IdentityPipeline,
 } from "./identity-pipeline-definition.adapter";
 import { PrismaIdentityProjectionRepository } from "../repositories/prisma/prisma.identity-projection.repository";
@@ -44,7 +44,7 @@ export class PostgresIdentityPipelineAdapter {
     const { identityGuards, mfaGuards, reservations } = PostgresIdentityGuardsAdapter.create({
       database,
     }).build();
-    return createIdentityPipeline({
+    return IdentityPipelineDefinitionAdapter.create({
       identityProjectionStore: new PrismaIdentityProjectionRepository(database, reservations),
       identityGuards,
       mfaProjectionStore: new PrismaMfaEnrollmentProjectionRepository(database),

@@ -19,9 +19,21 @@ import type { SignInBreakGlassLimiter } from "../signin-router.service";
 export const BREAK_GLASS_WINDOW_MS = 60_000;
 export const BREAK_GLASS_WINDOW_BUDGET = 10;
 
-export class InProcessBreakGlassLimiter implements SignInBreakGlassLimiter {
+export class InProcessBreakGlassLimiterAdapter implements SignInBreakGlassLimiter {
   private windowStartedAt = 0;
   private spent = 0;
+
+  static create(options?: {
+    clock?: () => number;
+    windowMs?: number;
+    budget?: number;
+  }): InProcessBreakGlassLimiterAdapter {
+    return new InProcessBreakGlassLimiterAdapter(
+      options?.clock ?? Date.now,
+      options?.windowMs ?? BREAK_GLASS_WINDOW_MS,
+      options?.budget ?? BREAK_GLASS_WINDOW_BUDGET,
+    );
+  }
 
   constructor(
     private readonly clock: () => number = Date.now,

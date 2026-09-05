@@ -44,11 +44,6 @@ import {
   JOIN_REQUEST_PIPELINE_NAME,
 } from "@langwatch/identity-contract";
 
-export {
-  type JoinRequestEvent,
-  joinRequestEventsFor,
-} from "../projections/join-request-state.projection";
-
 /**
  * Every verb the aggregate has, and the name its queue sender is resolved by
  * (the ledger writer maps a command type to one of these strings).
@@ -74,7 +69,7 @@ export interface JoinRequestPipelineDeps {
   lifecycle: JoinRequestLifecyclePort;
 }
 
-export type JoinRequestPipeline = ReturnType<typeof createJoinRequestPipeline>;
+export type JoinRequestPipeline = ReturnType<typeof JoinRequestPipelineDefinitionAdapter.create>;
 
 /**
  * The join-request pipeline (D12, ADR-117). One aggregate per request; the
@@ -90,37 +85,39 @@ export type JoinRequestPipeline = ReturnType<typeof createJoinRequestPipeline>;
  * sees a handful of human actions in its life so a lane never has a batch to
  * coalesce.
  */
-export function createJoinRequestPipeline(deps: JoinRequestPipelineDeps) {
-  let builder = definePipeline<JoinRequestEvent>({
-    name: JOIN_REQUEST_PIPELINE_NAME,
-    aggregate: defineAggregate({
-      type: JOIN_REQUEST_AGGREGATE_TYPE,
-      events: defineEvents(JOIN_REQUEST_EVENT_TYPES),
-    }),
-  }).withPostgresProjection(
-    new JoinRequestStateFoldProjection({
-      store: deps.joinRequestProjectionStore,
-    }),
-  );
+export class JoinRequestPipelineDefinitionAdapter {
+  static create(deps: JoinRequestPipelineDeps) {
+    let builder = definePipeline<JoinRequestEvent>({
+      name: JOIN_REQUEST_PIPELINE_NAME,
+      aggregate: defineAggregate({
+        type: JOIN_REQUEST_AGGREGATE_TYPE,
+        events: defineEvents(JOIN_REQUEST_EVENT_TYPES),
+      }),
+    }).withPostgresProjection(
+      new JoinRequestStateFoldProjection({
+        store: deps.joinRequestProjectionStore,
+      }),
+    );
 
-  for (const [name, Command] of JOIN_REQUEST_COMMANDS) {
-    // The builder mutates and returns ITSELF; what narrows per call is only
-    // its type, and what that type carries is the command-name registry —
-    // which nothing downstream reads, because the ledger resolves senders by
-    // string. So the loop holds one builder type and the table above stays
-    // the readable list of verbs.
-    builder = builder.withCommandInstance(
-      name,
-      Command,
-      new Command(deps.joinRequestGuards),
-    ) as typeof builder;
+    for (const [name, Command] of JOIN_REQUEST_COMMANDS) {
+      // The builder mutates and returns ITSELF; what narrows per call is only
+      // its type, and what that type carries is the command-name registry —
+      // which nothing downstream reads, because the ledger resolves senders by
+      // string. So the loop holds one builder type and the table above stays
+      // the readable list of verbs.
+      builder = builder.withCommandInstance(
+        name,
+        Command,
+        new Command(deps.joinRequestGuards),
+      ) as typeof builder;
+    }
+
+    return builder
+      .withProcessManager(JOIN_REQUEST_LIFECYCLE_PROCESS_NAME, (pm) =>
+        mountRequestLifecycle(pm, deps.lifecycle),
+      )
+      .build();
   }
-
-  return builder
-    .withProcessManager(JOIN_REQUEST_LIFECYCLE_PROCESS_NAME, (pm) =>
-      mountRequestLifecycle(pm, deps.lifecycle),
-    )
-    .build();
 }
 
 /**

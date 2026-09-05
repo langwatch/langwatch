@@ -53,8 +53,8 @@ import {
   type StateProjectionStore,
 } from "@langwatch/eventing";
 import { SSO_CONNECTION_AGGREGATE_TYPE } from "@langwatch/identity-contract";
-import type { SsoConnectionEvent } from "./sso-connection-pipeline-definition.adapter";
-import { ssoConnectionEventsFor } from "./sso-connection-pipeline-definition.adapter";
+import type { SsoConnectionEvent } from "../projections/sso-connection-state.projection";
+import { SsoConnectionStateFoldProjection } from "../projections/sso-connection-state.projection";
 import type { SsoConnectionFoldState } from "../projections/sso-connection-state.projection";
 
 const logger = createLogger("langwatch:identity:sso-connection-ledger");
@@ -92,9 +92,9 @@ export interface SsoConnectionLedgerWriterDeps {
   convergence?: { timeoutMs: number; pollMs: number };
 }
 
-export class SsoConnectionLedgerWriter implements SsoConnectionLedger {
-  static create(deps: SsoConnectionLedgerWriterDeps): SsoConnectionLedgerWriter {
-    return new SsoConnectionLedgerWriter(deps);
+export class SsoConnectionLedgerWriterAdapter implements SsoConnectionLedger {
+  static create(deps: SsoConnectionLedgerWriterDeps): SsoConnectionLedgerWriterAdapter {
+    return new SsoConnectionLedgerWriterAdapter(deps);
   }
 
   private readonly projectionStore: StateProjectionStore<SsoConnectionFoldState>;
@@ -119,7 +119,7 @@ export class SsoConnectionLedgerWriter implements SsoConnectionLedger {
     command: SsoConnectionCommand;
     facts: SsoConnectionFactInput[];
   }): Promise<SsoConnectionFact[]> {
-    const events = ssoConnectionEventsFor({ command, facts });
+    const events = SsoConnectionStateFoldProjection.eventsFor({ command, facts });
     if (events.length === 0) return [];
     const { connectionId, tenantId } = command.data;
 

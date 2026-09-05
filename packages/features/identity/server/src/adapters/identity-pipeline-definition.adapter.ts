@@ -34,13 +34,6 @@ import {
 } from "../projections/mfa-enrollment-state.projection";
 import { IDENTITY_PIPELINE_NAME, USER_IDENTITY_AGGREGATE_TYPE } from "@langwatch/identity-contract";
 
-// Re-exported so the intents and ledger writers that stamp these events can
-// reach the type — and the envelope function, still exported from the
-// projection files themselves — from the pipeline definition they compose
-// into, without each naming the projection file that actually owns them.
-export { identityEventsFor, type IdentityEvent } from "../projections/identity-state.projection";
-export { mfaEventsFor, type MfaEvent } from "../projections/mfa-enrollment-state.projection";
-
 export interface IdentityPipelineDeps {
   identityProjectionStore: StateProjectionStore<IdentityFoldState>;
   /** The guards every command handler runs — `@langwatch/identity-server`'s
@@ -89,74 +82,76 @@ export interface IdentityPipelineDeps {
  * command names all come from the builder below, and a hand-written twin of it
  * would be one command rename away from being a lie that still compiles.
  */
-export type IdentityPipeline = ReturnType<typeof createIdentityPipeline>;
+export type IdentityPipeline = ReturnType<typeof IdentityPipelineDefinitionAdapter.create>;
 
-export function createIdentityPipeline(deps: IdentityPipelineDeps) {
-  return definePipeline<IdentityEvent | MfaEvent>({
-    name: IDENTITY_PIPELINE_NAME,
-    aggregate: defineAggregate({
-      type: USER_IDENTITY_AGGREGATE_TYPE,
-      events: defineEvents([...IDENTITY_EVENT_TYPES, ...MFA_EVENT_TYPES]),
-    }),
-  })
-    .withPostgresProjection(
-      new IdentityStateFoldProjection({
-        store: deps.identityProjectionStore,
+export class IdentityPipelineDefinitionAdapter {
+  static create(deps: IdentityPipelineDeps) {
+    return definePipeline<IdentityEvent | MfaEvent>({
+      name: IDENTITY_PIPELINE_NAME,
+      aggregate: defineAggregate({
+        type: USER_IDENTITY_AGGREGATE_TYPE,
+        events: defineEvents([...IDENTITY_EVENT_TYPES, ...MFA_EVENT_TYPES]),
       }),
-    )
-    .withCommandInstance(
-      "attachIdentifier",
-      AttachIdentifierCommand,
-      new AttachIdentifierCommand(deps.identityGuards),
-    )
-    .withCommandInstance(
-      "verifyIdentifier",
-      VerifyIdentifierCommand,
-      new VerifyIdentifierCommand(deps.identityGuards),
-    )
-    .withCommandInstance(
-      "markPrimary",
-      MarkPrimaryCommand,
-      new MarkPrimaryCommand(deps.identityGuards),
-    )
-    .withCommandInstance(
-      "detachIdentifier",
-      DetachIdentifierCommand,
-      new DetachIdentifierCommand(deps.identityGuards),
-    )
-    .withCommandInstance("eraseUser", EraseUserCommand, new EraseUserCommand(deps.identityGuards))
-    .withCommandInstance(
-      "proposeLink",
-      ProposeLinkCommand,
-      new ProposeLinkCommand(deps.identityGuards),
-    )
-    .withPostgresProjection(
-      new MfaEnrollmentStateFoldProjection({
-        store: deps.mfaProjectionStore,
-      }),
-    )
-    .withCommandInstance("enrollMfa", EnrollMfaCommand, new EnrollMfaCommand(deps.mfaGuards))
-    .withCommandInstance("confirmMfa", ConfirmMfaCommand, new ConfirmMfaCommand(deps.mfaGuards))
-    .withCommandInstance(
-      "expireMfaEnrollment",
-      ExpireMfaEnrollmentCommand,
-      new ExpireMfaEnrollmentCommand(deps.mfaGuards),
-    )
-    .withCommandInstance("disableMfa", DisableMfaCommand, new DisableMfaCommand(deps.mfaGuards))
-    .withCommandInstance(
-      "consumeBackupCode",
-      ConsumeBackupCodeCommand,
-      new ConsumeBackupCodeCommand(deps.mfaGuards),
-    )
-    .withCommandInstance(
-      "regenerateBackupCodes",
-      RegenerateBackupCodesCommand,
-      new RegenerateBackupCodesCommand(deps.mfaGuards),
-    )
-    .withCommandInstance(
-      "recordMfaVerificationFailure",
-      RecordMfaVerificationFailureCommand,
-      new RecordMfaVerificationFailureCommand(deps.mfaGuards),
-    )
-    .build();
+    })
+      .withPostgresProjection(
+        new IdentityStateFoldProjection({
+          store: deps.identityProjectionStore,
+        }),
+      )
+      .withCommandInstance(
+        "attachIdentifier",
+        AttachIdentifierCommand,
+        new AttachIdentifierCommand(deps.identityGuards),
+      )
+      .withCommandInstance(
+        "verifyIdentifier",
+        VerifyIdentifierCommand,
+        new VerifyIdentifierCommand(deps.identityGuards),
+      )
+      .withCommandInstance(
+        "markPrimary",
+        MarkPrimaryCommand,
+        new MarkPrimaryCommand(deps.identityGuards),
+      )
+      .withCommandInstance(
+        "detachIdentifier",
+        DetachIdentifierCommand,
+        new DetachIdentifierCommand(deps.identityGuards),
+      )
+      .withCommandInstance("eraseUser", EraseUserCommand, new EraseUserCommand(deps.identityGuards))
+      .withCommandInstance(
+        "proposeLink",
+        ProposeLinkCommand,
+        new ProposeLinkCommand(deps.identityGuards),
+      )
+      .withPostgresProjection(
+        new MfaEnrollmentStateFoldProjection({
+          store: deps.mfaProjectionStore,
+        }),
+      )
+      .withCommandInstance("enrollMfa", EnrollMfaCommand, new EnrollMfaCommand(deps.mfaGuards))
+      .withCommandInstance("confirmMfa", ConfirmMfaCommand, new ConfirmMfaCommand(deps.mfaGuards))
+      .withCommandInstance(
+        "expireMfaEnrollment",
+        ExpireMfaEnrollmentCommand,
+        new ExpireMfaEnrollmentCommand(deps.mfaGuards),
+      )
+      .withCommandInstance("disableMfa", DisableMfaCommand, new DisableMfaCommand(deps.mfaGuards))
+      .withCommandInstance(
+        "consumeBackupCode",
+        ConsumeBackupCodeCommand,
+        new ConsumeBackupCodeCommand(deps.mfaGuards),
+      )
+      .withCommandInstance(
+        "regenerateBackupCodes",
+        RegenerateBackupCodesCommand,
+        new RegenerateBackupCodesCommand(deps.mfaGuards),
+      )
+      .withCommandInstance(
+        "recordMfaVerificationFailure",
+        RecordMfaVerificationFailureCommand,
+        new RecordMfaVerificationFailureCommand(deps.mfaGuards),
+      )
+      .build();
+  }
 }

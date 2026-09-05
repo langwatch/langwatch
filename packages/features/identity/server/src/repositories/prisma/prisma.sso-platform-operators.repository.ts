@@ -1,5 +1,5 @@
-import { AdminAccessService } from "@langwatch/ops-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { PlatformOperatorPort } from "../../ports/platform-operator.port";
 import type { SsoPlatformOperatorRepository } from "../../sso-connection.repository";
 
 /** The one model an operator check reads, and no other. */
@@ -22,31 +22,30 @@ export type PrismaSsoPlatformOperatorDatabase = Pick<PrismaClient, "user">;
  * what the deployment's operator list is written in. Resolving the two here,
  * once, keeps every caller from having to.
  */
-export class AdminEmailPlatformOperators implements SsoPlatformOperatorRepository {
+export class AdminEmailPlatformOperatorsRepository implements SsoPlatformOperatorRepository {
   /**
-   * `ADMIN_EMAILS` arrives as a value rather than being read here.
+   * The operator list arrives as a port rather than being read here.
    *
-   * The variable is the deployment's, not this package's, and two processes
-   * reading it through two different accessors is how one of them ends up
-   * with a different operator list than the other. The composition root reads
-   * it once and hands it down; unset still means nobody, which is the
-   * fail-closed answer the back office also takes.
+   * `ADMIN_EMAILS` is the deployment's variable, not this package's, and two
+   * packages reading it through two different accessors is how one of them
+   * ends up with a different operator list than the other. The composition
+   * root reads it once and hands the answer down; unset still means nobody,
+   * which is the fail-closed answer the back office also takes.
    */
-  static create(options: {
+  static create({
+    database,
+    operators,
+  }: {
     database: PrismaSsoPlatformOperatorDatabase;
-    adminEmails: string | undefined;
-  }): AdminEmailPlatformOperators {
-    return new AdminEmailPlatformOperators(options.database, options.adminEmails ?? "");
+    operators: PlatformOperatorPort;
+  }): AdminEmailPlatformOperatorsRepository {
+    return new AdminEmailPlatformOperatorsRepository(database, operators);
   }
 
-  private readonly access: AdminAccessService;
-
-  constructor(
+  private constructor(
     private readonly prisma: PrismaSsoPlatformOperatorDatabase,
-    adminEmails: string,
-  ) {
-    this.access = AdminAccessService.create({ adminEmails });
-  }
+    private readonly operators: PlatformOperatorPort,
+  ) {}
 
   async isPlatformOperator({ actorId }: { actorId: string }): Promise<boolean> {
     const user = await this.prisma.user.findUnique({
@@ -54,7 +53,7 @@ export class AdminEmailPlatformOperators implements SsoPlatformOperatorRepositor
       select: { email: true },
     });
     if (!user) return false;
-    return this.access.isAdmin({ email: user.email });
+    return this.operators.isPlatformOperatorEmail({ email: user.email });
   }
 }
 
@@ -67,7 +66,11 @@ export class AdminEmailPlatformOperators implements SsoPlatformOperatorRepositor
  * boolean that collapsed them would be one refactor away from letting a
  * request supply its own answer.
  */
-export class SystemActorPlatformOperators implements SsoPlatformOperatorRepository {
+export class SystemActorPlatformOperatorsRepository implements SsoPlatformOperatorRepository {
+  static create(): SystemActorPlatformOperatorsRepository {
+    return new SystemActorPlatformOperatorsRepository();
+  }
+
   async isPlatformOperator(_args: { actorId: string }): Promise<boolean> {
     return true;
   }

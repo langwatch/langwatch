@@ -38,6 +38,12 @@ export class IdentityIdentifierBackfillMigration implements SystemMigration {
   // remaining question is reaching tenants created since.
   readonly enrolledAutomatically = false;
 
+  static create(
+    backfill: Pick<IdentityBackfillService, "migrateUser">,
+  ): IdentityIdentifierBackfillMigration {
+    return new IdentityIdentifierBackfillMigration(backfill);
+  }
+
   constructor(private readonly backfill: Pick<IdentityBackfillService, "migrateUser">) {}
 
   async migrateTenant({ tenantId }: { tenantId: string }): Promise<TenantMigrationOutcome> {

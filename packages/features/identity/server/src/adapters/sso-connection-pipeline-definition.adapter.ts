@@ -48,11 +48,6 @@ import {
   SSO_CONNECTION_PIPELINE_NAME,
 } from "@langwatch/identity-contract";
 
-export {
-  type SsoConnectionEvent,
-  ssoConnectionEventsFor,
-} from "../projections/sso-connection-state.projection";
-
 /**
  * Every verb the aggregate has, and the name its queue sender is resolved by
  * (the ledger writer maps a command type to one of these strings).
@@ -105,37 +100,39 @@ export interface SsoConnectionPipelineDeps {
  * connection sees a handful of human actions in its lifetime so a lane never
  * has a batch to coalesce.
  */
-export function createSsoConnectionPipeline(deps: SsoConnectionPipelineDeps) {
-  let builder = definePipeline<SsoConnectionEvent>({
-    name: SSO_CONNECTION_PIPELINE_NAME,
-    aggregate: defineAggregate({
-      type: SSO_CONNECTION_AGGREGATE_TYPE,
-      events: defineEvents(SSO_CONNECTION_EVENT_TYPES),
-    }),
-  }).withPostgresProjection(
-    new SsoConnectionStateFoldProjection({
-      store: deps.connectionProjectionStore,
-    }),
-  );
+export class SsoConnectionPipelineDefinitionAdapter {
+  static create(deps: SsoConnectionPipelineDeps) {
+    let builder = definePipeline<SsoConnectionEvent>({
+      name: SSO_CONNECTION_PIPELINE_NAME,
+      aggregate: defineAggregate({
+        type: SSO_CONNECTION_AGGREGATE_TYPE,
+        events: defineEvents(SSO_CONNECTION_EVENT_TYPES),
+      }),
+    }).withPostgresProjection(
+      new SsoConnectionStateFoldProjection({
+        store: deps.connectionProjectionStore,
+      }),
+    );
 
-  for (const [name, Command] of CONNECTION_COMMANDS) {
-    // The builder mutates and returns ITSELF; what narrows per call is only
-    // its type, and what that type carries is the command-name registry —
-    // which nothing downstream reads, because the ledger resolves senders by
-    // string. So the loop holds one builder type and the table above stays
-    // the readable list of verbs.
-    builder = builder.withCommandInstance(
-      name,
-      Command,
-      new Command(deps.connectionGuards),
-    ) as typeof builder;
+    for (const [name, Command] of CONNECTION_COMMANDS) {
+      // The builder mutates and returns ITSELF; what narrows per call is only
+      // its type, and what that type carries is the command-name registry —
+      // which nothing downstream reads, because the ledger resolves senders by
+      // string. So the loop holds one builder type and the table above stays
+      // the readable list of verbs.
+      builder = builder.withCommandInstance(
+        name,
+        Command,
+        new Command(deps.connectionGuards),
+      ) as typeof builder;
+    }
+
+    return builder
+      .withProcessManager(CONNECTION_TEARDOWN_PROCESS_NAME, (pm) =>
+        mountTeardownGrace(pm, deps.teardown),
+      )
+      .build();
   }
-
-  return builder
-    .withProcessManager(CONNECTION_TEARDOWN_PROCESS_NAME, (pm) =>
-      mountTeardownGrace(pm, deps.teardown),
-    )
-    .build();
 }
 
 /**

@@ -18,7 +18,7 @@ import {
 import type { MfaGuards } from "../mfa-guards";
 import type { ZodTypeAny, z } from "zod";
 import { type Command, type CommandHandler, defineCommandSchema } from "@langwatch/eventing";
-import { mfaEventsFor } from "../projections/mfa-enrollment-state.projection";
+import { MfaEnrollmentStateFoldProjection } from "../projections/mfa-enrollment-state.projection";
 import type { MfaEvent } from "../projections/mfa-enrollment-state.projection";
 
 /**
@@ -30,8 +30,8 @@ import type { MfaEvent } from "../projections/mfa-enrollment-state.projection";
  * seven times across seven files — the connection pipeline's shape, for the
  * same reason.
  *
- * They stamp through `mfaEventsFor`, which sits beside `identityEventsFor` in
- * the pipeline's one envelope module. Same aggregate and same lane, but its
+ * They stamp through `MfaEnrollmentStateFoldProjection.eventsFor`, which sits
+ * beside the identity fold's own `eventsFor`. Same aggregate and same lane, but its
  * own `version`: fold read-back is version-gated, and sharing one stamp would
  * tie an MFA payload change to an identifier-vocabulary bump.
  */
@@ -67,7 +67,10 @@ function mfaCommand<Schema extends ZodTypeAny>({
     async handle(command: Command<Data>): Promise<MfaEvent[]> {
       const data = command.data as never;
       const facts = await (this.guards[verb] as (input: never) => Promise<never[]>)(data);
-      return mfaEventsFor({ command: { type, data } as MfaCommand, facts });
+      return MfaEnrollmentStateFoldProjection.eventsFor({
+        command: { type, data } as MfaCommand,
+        facts,
+      });
     }
   };
 }

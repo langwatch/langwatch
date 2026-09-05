@@ -20,8 +20,6 @@ import {
 } from "../projections/scim-sync-state.projection";
 import { SCIM_SYNC_AGGREGATE_TYPE, SCIM_SYNC_PIPELINE_NAME } from "@langwatch/identity-contract";
 
-export { type ScimSyncEvent, scimSyncEventsFor } from "../projections/scim-sync-state.projection";
-
 /**
  * Every verb the aggregate has, and the name its queue sender is resolved by
  * (the ledger writer maps a command type to one of these strings).
@@ -65,33 +63,35 @@ export interface ScimSyncPipelineDeps {
  * hold up the connection beside it.
  */
 /** The directory-sync pipeline as a TYPE, derived from the builder below. */
-export type ScimSyncPipeline = ReturnType<typeof createScimSyncPipeline>;
+export type ScimSyncPipeline = ReturnType<typeof ScimSyncPipelineDefinitionAdapter.create>;
 
-export function createScimSyncPipeline(deps: ScimSyncPipelineDeps) {
-  let builder = definePipeline<ScimSyncEvent>({
-    name: SCIM_SYNC_PIPELINE_NAME,
-    aggregate: defineAggregate({
-      type: SCIM_SYNC_AGGREGATE_TYPE,
-      events: defineEvents(SCIM_SYNC_EVENT_TYPES),
-    }),
-  }).withPostgresProjection(
-    new ScimSyncStateFoldProjection({
-      store: deps.scimSyncProjectionStore,
-    }),
-  );
+export class ScimSyncPipelineDefinitionAdapter {
+  static create(deps: ScimSyncPipelineDeps) {
+    let builder = definePipeline<ScimSyncEvent>({
+      name: SCIM_SYNC_PIPELINE_NAME,
+      aggregate: defineAggregate({
+        type: SCIM_SYNC_AGGREGATE_TYPE,
+        events: defineEvents(SCIM_SYNC_EVENT_TYPES),
+      }),
+    }).withPostgresProjection(
+      new ScimSyncStateFoldProjection({
+        store: deps.scimSyncProjectionStore,
+      }),
+    );
 
-  for (const [name, Command] of SCIM_SYNC_COMMANDS) {
-    // The builder mutates and returns ITSELF; what narrows per call is only
-    // its type, and what that type carries is the command-name registry —
-    // which nothing downstream reads, because the ledger resolves senders by
-    // string. So the loop holds one builder type and the table above stays
-    // the readable list of verbs.
-    builder = builder.withCommandInstance(
-      name,
-      Command,
-      new Command(deps.scimSyncGuards),
-    ) as typeof builder;
+    for (const [name, Command] of SCIM_SYNC_COMMANDS) {
+      // The builder mutates and returns ITSELF; what narrows per call is only
+      // its type, and what that type carries is the command-name registry —
+      // which nothing downstream reads, because the ledger resolves senders by
+      // string. So the loop holds one builder type and the table above stays
+      // the readable list of verbs.
+      builder = builder.withCommandInstance(
+        name,
+        Command,
+        new Command(deps.scimSyncGuards),
+      ) as typeof builder;
+    }
+
+    return builder.build();
   }
-
-  return builder.build();
 }

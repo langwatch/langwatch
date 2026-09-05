@@ -21,7 +21,7 @@ import {
 } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
 import { IdentityEventingPort } from "../../ports/identity-eventing.port";
-import { ScimSyncLedgerWriter } from "../eventing.scim-sync-ledger.adapter";
+import { ScimSyncLedgerWriterAdapter } from "../eventing.scim-sync-ledger.adapter";
 
 const ORGANIZATION = "org_acme";
 const CONNECTION = "conn_1";
@@ -80,7 +80,7 @@ describe("given a process that registered the directory-sync pipeline", () => {
   describe("when a push states a fact", () => {
     it("stages the command on the pipeline's own sender and appends nothing itself", async () => {
       const eventing = new RecordingEventing(true);
-      const writer = new ScimSyncLedgerWriter({ eventing });
+      const writer = new ScimSyncLedgerWriterAdapter({ eventing });
       const { command, facts } = issueToken();
 
       await writer.commit({ command, facts });
@@ -93,7 +93,7 @@ describe("given a process that registered the directory-sync pipeline", () => {
   describe("when the guard stated nothing", () => {
     it("stages nothing, because there is no fact to carry", async () => {
       const eventing = new RecordingEventing(true);
-      const writer = new ScimSyncLedgerWriter({ eventing });
+      const writer = new ScimSyncLedgerWriterAdapter({ eventing });
       const { command } = issueToken();
 
       await writer.commit({ command, facts: [] });
@@ -106,7 +106,7 @@ describe("given a process that registered the directory-sync pipeline", () => {
 describe("given a process that composed the writer with no queue behind it", () => {
   describe("when a push states a fact", () => {
     it("lets the push through rather than failing the identity provider", async () => {
-      const writer = new ScimSyncLedgerWriter({ eventing: new RecordingEventing(false) });
+      const writer = new ScimSyncLedgerWriterAdapter({ eventing: new RecordingEventing(false) });
       const { command, facts } = issueToken();
 
       await expect(writer.commit({ command, facts })).resolves.toBeUndefined();
@@ -114,7 +114,7 @@ describe("given a process that composed the writer with no queue behind it", () 
 
     it("records the loss at error, naming the pipeline and the sender that are missing", async () => {
       const logged: Array<[Record<string, unknown>, string]> = [];
-      const writer = new ScimSyncLedgerWriter({ eventing: new RecordingEventing(false) });
+      const writer = new ScimSyncLedgerWriterAdapter({ eventing: new RecordingEventing(false) });
       const { command, facts } = issueToken();
 
       // The writer's own module logger, which is where this line has to land:
@@ -143,7 +143,7 @@ describe("given a process that composed the writer with no queue behind it", () 
 
     it("names the verb the command carries, not one fixed sender", async () => {
       const eventing = new RecordingEventing(false);
-      const writer = new ScimSyncLedgerWriter({ eventing });
+      const writer = new ScimSyncLedgerWriterAdapter({ eventing });
       const { command, facts } = issueToken();
 
       await writer.commit({

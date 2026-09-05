@@ -17,17 +17,17 @@ import {
   type IdentityNewborn,
 } from "../better-auth/identity-birth";
 import { createLogger } from "@langwatch/observability";
-import type { IdentityEvent } from "../adapters/identity-pipeline-definition.adapter";
-import { identityEventsFor } from "../adapters/identity-pipeline-definition.adapter";
-import type { IdentityLedgerWriter } from "../adapters/identity-ledger.adapter";
-import type { PrismaIdentityNewbornRepository } from "../repositories/prisma/prisma.identity-newborn.repository";
+import type { IdentityEvent } from "../projections/identity-state.projection";
+import { IdentityStateFoldProjection } from "../projections/identity-state.projection";
+import type { IdentityBirthLedgerPort } from "../ports/identity-birth-ledger.port";
+import type { IdentityNewbornRepository } from "../identity-newborn.repository";
 
 const logger = createLogger("langwatch:identity:birth");
 
 export interface IdentityBirthServiceDeps {
   guards: IdentityGuards;
-  ledger: IdentityLedgerWriter;
-  rows: PrismaIdentityNewbornRepository;
+  ledger: IdentityBirthLedgerPort;
+  rows: IdentityNewbornRepository;
   /** The address lock (ADR-116 §6): the entrance and the verification
    *  ceremony contend on one constraint, not on two reads. */
   reservations: IdentityReservationRepository;
@@ -70,7 +70,11 @@ export interface IdentityBirthServiceDeps {
  * `claimAddress`.
  */
 export class IdentityBirthService implements IdentityBirthPort {
-  constructor(private readonly deps: IdentityBirthServiceDeps) {}
+  static create(deps: IdentityBirthServiceDeps): IdentityBirthService {
+    return new IdentityBirthService(deps);
+  }
+
+  private constructor(private readonly deps: IdentityBirthServiceDeps) {}
 
   /**
    * ## The legs, and why each is where it is
@@ -109,7 +113,7 @@ export class IdentityBirthService implements IdentityBirthPort {
     await this.deps.rows.claim({ userId });
 
     const facts = await this.deps.guards.attachIdentifier(command);
-    const events = identityEventsFor({ command: staged, facts });
+    const events = IdentityStateFoldProjection.eventsFor({ command: staged, facts });
     if (events.length > 0) {
       await this.claimAddress({ userId, normalizedValue, facts, command });
       try {

@@ -48,9 +48,9 @@ import { createLogger } from "@langwatch/observability";
 import { IdentityEventingPort } from "../ports/identity-eventing.port";
 import { createTenantId, type StateProjectionStore } from "@langwatch/eventing";
 import { JOIN_REQUEST_PIPELINE_NAME } from "@langwatch/identity-contract";
-import type { JoinRequestEvent } from "./join-request-pipeline-definition.adapter";
+import type { JoinRequestEvent } from "../projections/join-request-state.projection";
 import type { JoinRequestFoldState } from "../projections/join-request-state.projection";
-import { joinRequestEventsFor } from "./join-request-pipeline-definition.adapter";
+import { JoinRequestStateFoldProjection } from "../projections/join-request-state.projection";
 
 const logger = createLogger("langwatch:identity:join-request-ledger");
 
@@ -85,10 +85,14 @@ export interface JoinRequestLedgerWriterDeps {
   convergence?: { timeoutMs: number; pollMs: number };
 }
 
-export class JoinRequestLedgerWriter implements JoinRequestLedger {
+export class JoinRequestLedgerWriterAdapter implements JoinRequestLedger {
   private readonly projectionStore: StateProjectionStore<JoinRequestFoldState>;
   private readonly stagedSender: (name: string) => Promise<JoinRequestStagedSender | null>;
   private readonly convergence: { timeoutMs: number; pollMs: number };
+
+  static create(deps: JoinRequestLedgerWriterDeps): JoinRequestLedgerWriterAdapter {
+    return new JoinRequestLedgerWriterAdapter(deps);
+  }
 
   constructor(deps: JoinRequestLedgerWriterDeps) {
     this.projectionStore = deps.projectionStore;
@@ -110,9 +114,10 @@ export class JoinRequestLedgerWriter implements JoinRequestLedger {
    * taken it.
    *
    * They are computed HERE as well as in the queued run, and that is not a
-   * second append: `joinRequestEventsFor` is a pure envelope over the facts the
-   * guard already decided, so the caller gets what it asked for without waiting
-   * on the fold. The queued run computes the same envelope from the same
+   * second append: `JoinRequestStateFoldProjection.eventsFor` is a pure
+   * envelope over the facts the guard already decided, so the caller gets what
+   * it asked for without waiting on the fold. The queued run computes the same
+   * envelope from the same
    * `commandId`, which is what makes the two identical rather than a race.
    */
   async commit({
@@ -122,7 +127,7 @@ export class JoinRequestLedgerWriter implements JoinRequestLedger {
     command: JoinRequestCommand;
     facts: JoinRequestFactInput[];
   }): Promise<JoinRequestFact[]> {
-    const events = joinRequestEventsFor({ command, facts });
+    const events = JoinRequestStateFoldProjection.eventsFor({ command, facts });
     if (events.length === 0) return [];
     const { joinRequestId, tenantId } = command.data;
 

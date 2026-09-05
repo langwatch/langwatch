@@ -41,6 +41,12 @@ export class IdentitySsoConnectionGrandfatherMigration implements SystemMigratio
   // organizations that existed and must start reaching new ones on its own.
   readonly enrolledAutomatically = false;
 
+  static create(
+    grandfather: Pick<SsoConnectionGrandfatherService, "migrateOrganization">,
+  ): IdentitySsoConnectionGrandfatherMigration {
+    return new IdentitySsoConnectionGrandfatherMigration(grandfather);
+  }
+
   constructor(
     private readonly grandfather: Pick<SsoConnectionGrandfatherService, "migrateOrganization">,
   ) {}

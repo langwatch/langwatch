@@ -25,6 +25,16 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
  *               an OAuth callback for an unknown person creates them.
  */
 export class LegacySsoDomainRoutingRepository implements SignInDomainRoutingPort {
+  static create({
+    prisma,
+    instanceMethod,
+  }: {
+    prisma: PrismaClient;
+    instanceMethod: () => Promise<SignInMethod | null>;
+  }): LegacySsoDomainRoutingRepository {
+    return new LegacySsoDomainRoutingRepository(prisma, instanceMethod);
+  }
+
   constructor(
     private readonly prisma: PrismaClient,
     /** The method this deployment actually mounted, or null in email mode.

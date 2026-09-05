@@ -133,7 +133,7 @@ describe("PostgresIdentityPipelineAdapter", () => {
   describe("given a process holding one typed Prisma client", () => {
     /**
      * Frozen twin: `PipelineRegistry.registerAll` builds the same pipeline
-     * from `createIdentityPipeline`, and both graphs route
+     * from `IdentityPipelineDefinitionAdapter.create`, and both graphs route
      * `${pipeline}:${jobType}:${jobName}` off one `event-sourcing/jobs`
      * queue. The names are LITERAL here rather than imported, because the
      * failure this catches is a rename that moved both the constant and its

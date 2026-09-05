@@ -43,6 +43,12 @@ export class IdentitySecretHealMigration implements SystemMigration {
   // outside the backfill's cohort has nothing to heal.
   readonly enrolledAutomatically = false;
 
+  static create(
+    secrets: Pick<IdentitySecretCarryService, "carryForUser">,
+  ): IdentitySecretHealMigration {
+    return new IdentitySecretHealMigration(secrets);
+  }
+
   constructor(private readonly secrets: Pick<IdentitySecretCarryService, "carryForUser">) {}
 
   async migrateTenant({ tenantId }: { tenantId: string }): Promise<TenantMigrationOutcome> {

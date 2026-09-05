@@ -35,6 +35,10 @@ import type {
 export class PrismaScimSyncProjectionRepository
   implements StateProjectionStore<ScimSyncFoldState>, ScimSyncReadRepository
 {
+  static create(prisma: PrismaClient): PrismaScimSyncProjectionRepository {
+    return new PrismaScimSyncProjectionRepository(prisma);
+  }
+
   constructor(private readonly prisma: PrismaClient) {}
 
   async tryLoad(
@@ -47,7 +51,7 @@ export class PrismaScimSyncProjectionRepository
     if (!row) return null;
     return {
       state: {
-        ...rowToScimSync(row),
+        ...PrismaScimSyncProjectionRepository.rowToScimSync(row),
         CreatedAt: row.createdAt.getTime(),
         UpdatedAt: row.updatedAt.getTime(),
         LastEventOccurredAt: row.occurredAt.getTime(),
@@ -114,30 +118,30 @@ export class PrismaScimSyncProjectionRepository
     const row = await this.prisma.scimSyncState.findFirst({
       where: { id: scimSyncId, organizationId },
     });
-    return row ? rowToScimSync(row) : null;
+    return row ? PrismaScimSyncProjectionRepository.rowToScimSync(row) : null;
   }
-}
 
-/**
- * One stored row back into the reducer's state. Exported because the failure
- * surface and the guards' read need the same translation, and two copies of
- * it would eventually disagree about what a JSON column means.
- */
-export function rowToScimSync(row: ScimSyncRow): ScimSyncState {
-  return {
-    scimSyncId: row.id,
-    connectionId: row.connectionId,
-    organizationId: row.organizationId,
-    state: row.state as ScimSyncLifecycleState,
-    lastPushedAtMs: row.lastPushedAt?.getTime() ?? null,
-    lastFailure: row.lastFailure ? (row.lastFailure as unknown as ScimSyncFailure) : null,
-    deadLetters: Array.isArray(row.deadLetters)
-      ? (row.deadLetters as unknown as ScimSyncFailure[])
-      : [],
-    revokedCause: (row.revokedCause as ScimRevokeCause | null) ?? null,
-    createdAtMs: row.createdAt.getTime(),
-    updatedAtMs: row.updatedAt.getTime(),
-  };
+  /**
+   * One stored row back into the reducer's state. Exported because the failure
+   * surface and the guards' read need the same translation, and two copies of
+   * it would eventually disagree about what a JSON column means.
+   */
+  static rowToScimSync(row: ScimSyncRow): ScimSyncState {
+    return {
+      scimSyncId: row.id,
+      connectionId: row.connectionId,
+      organizationId: row.organizationId,
+      state: row.state as ScimSyncLifecycleState,
+      lastPushedAtMs: row.lastPushedAt?.getTime() ?? null,
+      lastFailure: row.lastFailure ? (row.lastFailure as unknown as ScimSyncFailure) : null,
+      deadLetters: Array.isArray(row.deadLetters)
+        ? (row.deadLetters as unknown as ScimSyncFailure[])
+        : [],
+      revokedCause: (row.revokedCause as ScimRevokeCause | null) ?? null,
+      createdAtMs: row.createdAt.getTime(),
+      updatedAtMs: row.updatedAt.getTime(),
+    };
+  }
 }
 
 /**

@@ -2,7 +2,7 @@ import type { IdentityReservationRepository } from "../identity-reservations.rep
 import type { IdentityCeremonyWrites } from "../identity-writes";
 import { newIdentityCommandId } from "../identity-command-id";
 import { createLogger } from "@langwatch/observability";
-import type { PrismaIdentityNewbornRepository } from "../repositories/prisma/prisma.identity-newborn.repository";
+import type { IdentityNewbornRepository } from "../identity-newborn.repository";
 
 const logger = createLogger("langwatch:identity:newborn-reconciliation");
 
@@ -18,7 +18,7 @@ export const IDENTITY_NEWBORN_ABANDONED_AFTER_MS = 60 * 60 * 1000;
 const MAX_SWEPT_PER_PASS = 200;
 
 export interface IdentityNewbornReconciliationDeps {
-  newborns: PrismaIdentityNewbornRepository;
+  newborns: IdentityNewbornRepository;
   identity: Pick<IdentityCeremonyWrites, "eraseUser">;
   /** The address lock (ADR-116 §6), for the claims whose fact never landed. */
   reservations: IdentityReservationRepository;
@@ -60,10 +60,14 @@ export interface IdentityNewbornSweepSummary {
  * that does not abort the rest.
  */
 export class IdentityNewbornReconciliationService {
+  static create(deps: IdentityNewbornReconciliationDeps): IdentityNewbornReconciliationService {
+    return new IdentityNewbornReconciliationService(deps);
+  }
+
   private readonly now: () => number;
   private readonly abandonedAfterMs: number;
 
-  constructor(private readonly deps: IdentityNewbornReconciliationDeps) {
+  private constructor(private readonly deps: IdentityNewbornReconciliationDeps) {
     this.now = deps.now ?? Date.now;
     this.abandonedAfterMs = deps.abandonedAfterMs ?? IDENTITY_NEWBORN_ABANDONED_AFTER_MS;
   }

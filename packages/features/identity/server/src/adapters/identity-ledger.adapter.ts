@@ -58,13 +58,13 @@ import { createLogger } from "@langwatch/observability";
 import { IdentityEventingPort } from "../ports/identity-eventing.port";
 import { createTenantId, type StateProjectionStore } from "@langwatch/eventing";
 import { IDENTITY_PIPELINE_NAME } from "@langwatch/identity-contract";
-import type { IdentityEvent } from "./identity-pipeline-definition.adapter";
+import type { IdentityEvent } from "../projections/identity-state.projection";
 import type { IdentityFoldState } from "../projections/identity-state.projection";
-import { identityEventsFor } from "./identity-pipeline-definition.adapter";
+import { IdentityStateFoldProjection } from "../projections/identity-state.projection";
 import {
   identityCommitDurationSeconds,
   identityProjectionConvergenceTimeoutsTotal,
-} from "./identity-ledger.metrics";
+} from "../identity-ledger.metrics";
 
 const logger = createLogger("langwatch:identity:ledger");
 
@@ -101,10 +101,14 @@ export interface IdentityLedgerWriterDeps {
   convergence?: { timeoutMs: number; pollMs: number };
 }
 
-export class IdentityLedgerWriter implements IdentityLedger {
+export class IdentityLedgerWriterAdapter implements IdentityLedger {
   private readonly projectionStore: StateProjectionStore<IdentityFoldState>;
   private readonly stagedSender: (name: string) => Promise<IdentityStagedSender | null>;
   private readonly convergence: { timeoutMs: number; pollMs: number };
+
+  static create(deps: IdentityLedgerWriterDeps): IdentityLedgerWriterAdapter {
+    return new IdentityLedgerWriterAdapter(deps);
+  }
 
   constructor(deps: IdentityLedgerWriterDeps) {
     this.projectionStore = deps.projectionStore;
@@ -125,7 +129,7 @@ export class IdentityLedgerWriter implements IdentityLedger {
     command: IdentityCommand;
     facts: IdentityFactInput[];
   }): Promise<IdentityFact[]> {
-    const events = identityEventsFor({ command, facts });
+    const events = IdentityStateFoldProjection.eventsFor({ command, facts });
     if (events.length === 0) return [];
     const done = identityCommitDurationSeconds.startTimer();
     try {

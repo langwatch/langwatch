@@ -11,7 +11,7 @@ import {
   type StoredProjection,
 } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
-import { createIdentityPipeline } from "../identity-pipeline-definition.adapter";
+import { IdentityPipelineDefinitionAdapter } from "../identity-pipeline-definition.adapter";
 import type { IdentityFoldState } from "../../projections/identity-state.projection";
 import { USER_IDENTITY_AGGREGATE_TYPE } from "@langwatch/identity-contract";
 
@@ -87,7 +87,7 @@ describe("identity pipeline", () => {
       const eventSourcing = new EventSourcing({ eventStore: EventStoreMemory.createForTesting() });
       const store = new InMemoryStateStore();
       const pipeline = eventSourcing.register(
-        createIdentityPipeline({
+        IdentityPipelineDefinitionAdapter.create({
           identityProjectionStore: store,
           identityGuards: new IdentityGuards(
             new ProjectionHeads(store),

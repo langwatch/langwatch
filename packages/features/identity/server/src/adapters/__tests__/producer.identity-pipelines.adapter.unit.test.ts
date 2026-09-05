@@ -14,12 +14,7 @@
  * written when the row will never appear.
  */
 import { describe, expect, it } from "vitest";
-import {
-  createIdentityProducerPipeline,
-  createJoinRequestProducerPipeline,
-  createScimSyncProducerPipeline,
-  createSsoConnectionProducerPipeline,
-} from "../producer.identity-pipelines.adapter";
+import { IdentityProducerPipelinesAdapter } from "../producer.identity-pipelines.adapter";
 import { PostgresIdentityPipelineAdapter } from "../postgres.identity-pipeline.adapter";
 import { PostgresScimSyncPipelineAdapter } from "../postgres.scim-sync-pipeline.adapter";
 import {
@@ -41,28 +36,36 @@ describe("given a process that produces identity commands without consuming them
     it("names the pipelines the worker routes on", () => {
       expect(
         (
-          createIdentityProducerPipeline({ processName: PROCESS_NAME }) as unknown as {
+          IdentityProducerPipelinesAdapter.create({
+            processName: PROCESS_NAME,
+          }).identityPipeline() as unknown as {
             metadata: { name: string };
           }
         ).metadata.name,
       ).toBe(IDENTITY_PIPELINE_NAME);
       expect(
         (
-          createJoinRequestProducerPipeline({ processName: PROCESS_NAME }) as unknown as {
+          IdentityProducerPipelinesAdapter.create({
+            processName: PROCESS_NAME,
+          }).joinRequestPipeline() as unknown as {
             metadata: { name: string };
           }
         ).metadata.name,
       ).toBe(JOIN_REQUEST_PIPELINE_NAME);
       expect(
         (
-          createSsoConnectionProducerPipeline({ processName: PROCESS_NAME }) as unknown as {
+          IdentityProducerPipelinesAdapter.create({
+            processName: PROCESS_NAME,
+          }).ssoConnectionPipeline() as unknown as {
             metadata: { name: string };
           }
         ).metadata.name,
       ).toBe(SSO_CONNECTION_PIPELINE_NAME);
       expect(
         (
-          createScimSyncProducerPipeline({ processName: PROCESS_NAME }) as unknown as {
+          IdentityProducerPipelinesAdapter.create({
+            processName: PROCESS_NAME,
+          }).scimSyncPipeline() as unknown as {
             metadata: { name: string };
           }
         ).metadata.name,
@@ -76,7 +79,9 @@ describe("given a process that produces identity commands without consuming them
      * so the queue would reject the job for redelivery forever.
      */
     it("declares the same commands the Postgres composition declares", () => {
-      const producer = createIdentityProducerPipeline({ processName: PROCESS_NAME });
+      const producer = IdentityProducerPipelinesAdapter.create({
+        processName: PROCESS_NAME,
+      }).identityPipeline();
       const consumer = PostgresIdentityPipelineAdapter.create({
         database: {} as never,
       }).build();
@@ -95,7 +100,9 @@ describe("given a process that produces identity commands without consuming them
      * verb's facts in one provider's nightly run.
      */
     it("declares the directory-sync verbs the Postgres composition declares", () => {
-      const producer = createScimSyncProducerPipeline({ processName: PROCESS_NAME });
+      const producer = IdentityProducerPipelinesAdapter.create({
+        processName: PROCESS_NAME,
+      }).scimSyncPipeline();
       const consumer = PostgresScimSyncPipelineAdapter.create({
         database: {} as never,
       }).build();
@@ -116,9 +123,9 @@ describe("given a process that produces identity commands without consuming them
 
   describe("when something reaches a consumer-side dependency anyway", () => {
     it("refuses the projection read by name, saying which process reached it", async () => {
-      const definition = createJoinRequestProducerPipeline({
+      const definition = IdentityProducerPipelinesAdapter.create({
         processName: PROCESS_NAME,
-      }) as unknown as {
+      }).joinRequestPipeline() as unknown as {
         stateProjections: Map<string, { store: { tryLoad(): Promise<unknown> } }>;
       };
       const projection = [...definition.stateProjections.values()][0];
@@ -131,9 +138,9 @@ describe("given a process that produces identity commands without consuming them
     });
 
     it("refuses a guard's read by name rather than answering an empty head", async () => {
-      const definition = createSsoConnectionProducerPipeline({
+      const definition = IdentityProducerPipelinesAdapter.create({
         processName: PROCESS_NAME,
-      }) as unknown as {
+      }).ssoConnectionPipeline() as unknown as {
         stateProjections: Map<string, { store: { store(): Promise<unknown> } }>;
       };
       const projection = [...definition.stateProjections.values()][0];
@@ -152,9 +159,9 @@ describe("given a process that produces identity commands without consuming them
      * head here would state a fact the fold has already recorded.
      */
     it("refuses the directory-sync head rather than answering an empty one", async () => {
-      const definition = createScimSyncProducerPipeline({
+      const definition = IdentityProducerPipelinesAdapter.create({
         processName: PROCESS_NAME,
-      }) as unknown as {
+      }).scimSyncPipeline() as unknown as {
         stateProjections: Map<string, { store: { tryLoad(): Promise<unknown> } }>;
       };
       const projection = [...definition.stateProjections.values()][0];

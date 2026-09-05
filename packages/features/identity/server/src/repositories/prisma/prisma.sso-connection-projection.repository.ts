@@ -51,7 +51,7 @@ export class PrismaSsoConnectionProjectionRepository implements StateProjectionS
     if (!row) return null;
     return {
       state: {
-        ...rowToConnection(row),
+        ...PrismaSsoConnectionProjectionRepository.rowToConnection(row),
         CreatedAt: row.createdAt.getTime(),
         UpdatedAt: row.updatedAt.getTime(),
         LastEventOccurredAt: row.occurredAt.getTime(),
@@ -110,42 +110,42 @@ export class PrismaSsoConnectionProjectionRepository implements StateProjectionS
       update: columns,
     });
   }
-}
 
-/**
- * One stored row back into the reducer's state. Exported because the routing
- * port and the guards' read repository need the same translation, and two
- * copies of it would eventually disagree about what a JSON column means.
- */
-export function rowToConnection(row: SsoConnection): SsoConnectionState {
-  return {
-    connectionId: row.id,
-    organizationId: row.organizationId,
-    type: row.type as SsoConnectionType,
-    state: row.state as SsoConnectionLifecycleState,
-    claimedDomains: row.claimedDomains,
-    approvedDomains: row.approvedDomains,
-    verifiedDomains: row.verifiedDomains,
-    domainVerifications: Array.isArray(row.domainVerifications)
-      ? (row.domainVerifications as unknown as SsoDomainVerification[])
-      : [],
-    pendingVerification: row.pendingVerification
-      ? (row.pendingVerification as unknown as {
-          domain: string;
-          method: SsoVerificationMethod;
-          tokenHash: string;
-        })
-      : null,
-    idpMetadata: row.idpMetadata as unknown as SsoIdpMetadata,
-    allowsJit: row.allowsJit,
-    source: row.source as SsoConnectionSource,
-    testLoginAccountId: row.testLoginAccountId,
-    rejection: row.rejection
-      ? (row.rejection as unknown as { domain: string; note: string })
-      : null,
-    createdBy: row.createdBy,
-    createdAtMs: row.createdAt.getTime(),
-    updatedAtMs: row.updatedAt.getTime(),
-    tearDownAfterMs: row.tearDownAfter?.getTime() ?? null,
-  };
+  /**
+   * One stored row back into the reducer's state. Exported because the routing
+   * port and the guards' read repository need the same translation, and two
+   * copies of it would eventually disagree about what a JSON column means.
+   */
+  static rowToConnection(row: SsoConnection): SsoConnectionState {
+    return {
+      connectionId: row.id,
+      organizationId: row.organizationId,
+      type: row.type as SsoConnectionType,
+      state: row.state as SsoConnectionLifecycleState,
+      claimedDomains: row.claimedDomains,
+      approvedDomains: row.approvedDomains,
+      verifiedDomains: row.verifiedDomains,
+      domainVerifications: Array.isArray(row.domainVerifications)
+        ? (row.domainVerifications as unknown as SsoDomainVerification[])
+        : [],
+      pendingVerification: row.pendingVerification
+        ? (row.pendingVerification as unknown as {
+            domain: string;
+            method: SsoVerificationMethod;
+            tokenHash: string;
+          })
+        : null,
+      idpMetadata: row.idpMetadata as unknown as SsoIdpMetadata,
+      allowsJit: row.allowsJit,
+      source: row.source as SsoConnectionSource,
+      testLoginAccountId: row.testLoginAccountId,
+      rejection: row.rejection
+        ? (row.rejection as unknown as { domain: string; note: string })
+        : null,
+      createdBy: row.createdBy,
+      createdAtMs: row.createdAt.getTime(),
+      updatedAtMs: row.updatedAt.getTime(),
+      tearDownAfterMs: row.tearDownAfter?.getTime() ?? null,
+    };
+  }
 }

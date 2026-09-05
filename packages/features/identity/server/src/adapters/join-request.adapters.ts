@@ -17,7 +17,7 @@ import type {
   JoinRequestNotifier,
   JoinSettingPort,
 } from "../services/join-requests.service";
-import { readDomainJoin } from "../repositories/prisma/prisma.join-request.repository";
+import { PrismaJoinCandidateRepository } from "../repositories/prisma/prisma.join-request.repository";
 import type { JoinRequestService } from "../join-request.service";
 
 const logger = createLogger("langwatch:identity:join-request-adapters");
@@ -126,7 +126,9 @@ export class PrismaJoinSettings implements JoinSettingPort {
       select: { domainJoin: true, joinDomains: true },
     });
     return {
-      domainJoin: row ? readDomainJoin(row.domainJoin) : DEFAULT_DOMAIN_JOIN_SETTING,
+      domainJoin: row
+        ? PrismaJoinCandidateRepository.readDomainJoin(row.domainJoin)
+        : DEFAULT_DOMAIN_JOIN_SETTING,
       joinDomains: row?.joinDomains ?? [],
     };
   }

@@ -34,7 +34,7 @@
  * variant, which supplies stand-ins for the consumer-side dependencies — the
  * Postgres heads, the guards that read them, the mail the lifecycle sends —
  * so the definition can be CONSTRUCTED and refuses by name if one is ever
- * CALLED. That is the shape `createSimulationProcessingProducerPipeline` and
+ * CALLED. That is the shape `SimulationProcessingProducerAdapter` and
  * `createTraceProcessingProducerPipeline` already have on this process.
  *
  * Registering the packaged definition rather than a local one is what keeps the
@@ -52,18 +52,18 @@
  * store is `EventStoreProducerOnly` and refuses `storeEvents` by name, which
  * is the structural half of the same ruling.
  *
- * `JoinRequestLedgerWriter` was one correction behind: it appended before
+ * `JoinRequestLedgerWriterAdapter` was one correction behind: it appended before
  * staging, so on this tier every join verb failed at the door with an
  * unhandled `ConfigurationError` — a generic "unknown error" for a request the
  * worker could serve. It stages now, like its three siblings.
  *
- * `ScimSyncLedgerWriter` took the same correction, and its swallow is the one
+ * `ScimSyncLedgerWriterAdapter` took the same correction, and its swallow is the one
  * difference between them: a directory's push must never fail because its
  * history could not be written, so a loss there is logged rather than raised.
  *
  * ## `scim-sync` is registered here too, and that is what keeps the history
  *
- * `api-scim.composition.ts` composes `ScimSyncLedgerWriter` on every deployment
+ * `api-scim.composition.ts` composes `ScimSyncLedgerWriterAdapter` on every deployment
  * holding the Enterprise application, and this registration is the sender it
  * stages through. Without it the writer had nowhere to stage: it said so at
  * `error`, named the pipeline, and let the push through — so a directory's
@@ -77,12 +77,7 @@
  */
 import type { EventSourcing } from "@langwatch/eventing";
 import type { Logger } from "@langwatch/observability";
-import {
-  createIdentityProducerPipeline,
-  createJoinRequestProducerPipeline,
-  createScimSyncProducerPipeline,
-  createSsoConnectionProducerPipeline,
-} from "@langwatch/identity-server";
+import { IdentityProducerPipelinesAdapter } from "@langwatch/identity-server";
 import {
   IDENTITY_PIPELINE_NAME,
   JOIN_REQUEST_PIPELINE_NAME,
@@ -169,12 +164,13 @@ export function composeApiIdentityPipelines(
     return ApiIdentityPipelines.create(new Map());
   }
 
+  const producers = IdentityProducerPipelinesAdapter.create({ processName });
   const senders = new Map<string, Map<string, ApiIdentityCommandSender>>();
   senders.set(
     IDENTITY_PIPELINE_NAME,
     resolveSenders({
       pipeline: IDENTITY_PIPELINE_NAME,
-      registered: eventing.register(createIdentityProducerPipeline({ processName })),
+      registered: eventing.register(producers.identityPipeline()),
       expected: IDENTITY_COMMAND_NAMES,
     }),
   );
@@ -182,7 +178,7 @@ export function composeApiIdentityPipelines(
     JOIN_REQUEST_PIPELINE_NAME,
     resolveSenders({
       pipeline: JOIN_REQUEST_PIPELINE_NAME,
-      registered: eventing.register(createJoinRequestProducerPipeline({ processName })),
+      registered: eventing.register(producers.joinRequestPipeline()),
       expected: JOIN_REQUEST_COMMAND_NAMES,
     }),
   );
@@ -190,7 +186,7 @@ export function composeApiIdentityPipelines(
     SSO_CONNECTION_PIPELINE_NAME,
     resolveSenders({
       pipeline: SSO_CONNECTION_PIPELINE_NAME,
-      registered: eventing.register(createSsoConnectionProducerPipeline({ processName })),
+      registered: eventing.register(producers.ssoConnectionPipeline()),
       expected: SSO_CONNECTION_COMMAND_NAMES,
     }),
   );
@@ -198,7 +194,7 @@ export function composeApiIdentityPipelines(
     SCIM_SYNC_PIPELINE_NAME,
     resolveSenders({
       pipeline: SCIM_SYNC_PIPELINE_NAME,
-      registered: eventing.register(createScimSyncProducerPipeline({ processName })),
+      registered: eventing.register(producers.scimSyncPipeline()),
       expected: SCIM_SYNC_COMMAND_NAMES,
     }),
   );

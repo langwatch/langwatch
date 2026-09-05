@@ -17,10 +17,10 @@
 import { IdentityGuards } from "../../guards";
 import { IdentityEngineUnavailableError } from "../../better-auth/identity-birth";
 import { describe, expect, it, vi } from "vitest";
-import type { IdentityEvent } from "../../adapters/identity-pipeline-definition.adapter";
+import type { IdentityEvent } from "../../projections/identity-state.projection";
 import { IdentityBirthService } from "../identity-birth.service";
-import type { IdentityLedgerWriter } from "../../adapters/identity-ledger.adapter";
-import type { PrismaIdentityNewbornRepository } from "../../repositories/prisma/prisma.identity-newborn.repository";
+import type { IdentityBirthLedgerPort } from "../../ports/identity-birth-ledger.port";
+import type { IdentityNewbornRepository } from "../../identity-newborn.repository";
 import { inMemoryIdentityReservations, inMemoryIdentityUsers } from "../../testing";
 
 const EMAIL = "newborn@acme.com";
@@ -56,7 +56,7 @@ function harness(overrides?: {
         throw new Error("the projection could not be read");
       }
     }),
-  } as unknown as IdentityLedgerWriter;
+  } as unknown as IdentityBirthLedgerPort;
 
   const rows = {
     tryFindUserAtPinnedId: vi.fn(async () =>
@@ -69,12 +69,12 @@ function harness(overrides?: {
       order.push("rows");
       return { id: userId, email: EMAIL };
     }),
-  } as unknown as PrismaIdentityNewbornRepository;
+  } as unknown as IdentityNewbornRepository;
 
   const reservations = inMemoryIdentityReservations();
   const forgetGate = vi.fn();
 
-  const service = new IdentityBirthService({
+  const service = IdentityBirthService.create({
     guards: new IdentityGuards(heads, inMemoryIdentityUsers(), reservations),
     ledger,
     rows,

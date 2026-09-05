@@ -5,7 +5,7 @@ import {
 } from "@langwatch/identity-contract";
 import type { IdentityGuards } from "../guards";
 import { type Command, type CommandHandler, defineCommandSchema } from "@langwatch/eventing";
-import { identityEventsFor } from "../projections/identity-state.projection";
+import { IdentityStateFoldProjection } from "../projections/identity-state.projection";
 import type { IdentityEvent } from "../projections/identity-state.projection";
 
 /** The staged re-run: the calling path's guard, the calling path's envelope. */
@@ -27,7 +27,7 @@ export class MarkPrimaryCommand implements CommandHandler<
 
   async handle(command: Command<MarkPrimaryCommandData>): Promise<IdentityEvent[]> {
     const facts = await this.guards.markPrimary(command.data);
-    return identityEventsFor({
+    return IdentityStateFoldProjection.eventsFor({
       command: { type: MARK_PRIMARY_COMMAND_TYPE, data: command.data },
       facts,
     });

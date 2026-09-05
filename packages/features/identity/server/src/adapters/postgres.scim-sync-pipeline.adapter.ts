@@ -1,6 +1,6 @@
 import { ScimSyncGuards } from "../scim-sync-guards";
 import {
-  createScimSyncPipeline,
+  ScimSyncPipelineDefinitionAdapter,
   type ScimSyncPipeline,
 } from "./scim-sync-pipeline-definition.adapter";
 import { PrismaScimSyncProjectionRepository } from "../repositories/prisma/prisma.scim-sync-projection.repository";
@@ -32,7 +32,7 @@ export class PostgresScimSyncPipelineAdapter {
 
   build(): ScimSyncPipeline {
     const projection = new PrismaScimSyncProjectionRepository(this.options.database);
-    return createScimSyncPipeline({
+    return ScimSyncPipelineDefinitionAdapter.create({
       scimSyncProjectionStore: projection,
       scimSyncGuards: new ScimSyncGuards({ syncs: projection }),
     });

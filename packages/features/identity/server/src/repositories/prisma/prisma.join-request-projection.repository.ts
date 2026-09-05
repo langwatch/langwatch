@@ -28,6 +28,10 @@ import type {
  * every answer an admin gives goes through a command.
  */
 export class PrismaJoinRequestProjectionRepository implements StateProjectionStore<JoinRequestFoldState> {
+  static create(prisma: PrismaClient): PrismaJoinRequestProjectionRepository {
+    return new PrismaJoinRequestProjectionRepository(prisma);
+  }
+
   constructor(private readonly prisma: PrismaClient) {}
 
   async tryLoad(
@@ -40,7 +44,7 @@ export class PrismaJoinRequestProjectionRepository implements StateProjectionSto
     if (!row) return null;
     return {
       state: {
-        ...rowToJoinRequest(row),
+        ...PrismaJoinRequestProjectionRepository.rowToJoinRequest(row),
         CreatedAt: row.createdAt.getTime(),
         UpdatedAt: row.updatedAt.getTime(),
         LastEventOccurredAt: row.occurredAt.getTime(),
@@ -89,27 +93,27 @@ export class PrismaJoinRequestProjectionRepository implements StateProjectionSto
       update: columns,
     });
   }
-}
 
-/**
- * One stored row back into the reducer's state. Exported because the guards'
- * read repository needs the same translation, and two copies of it would
- * eventually disagree about what a nullable column means.
- */
-export function rowToJoinRequest(row: JoinRequest): JoinRequestAggregateState {
-  return {
-    joinRequestId: row.id,
-    userId: row.userId,
-    organizationId: row.organizationId,
-    domain: row.domain,
-    state: row.state as JoinRequestState,
-    matchedVia: row.matchedVia as JoinMatchKind,
-    createdAtMs: row.createdAt.getTime(),
-    updatedAtMs: row.updatedAt.getTime(),
-    expiresAtMs: row.expiresAt?.getTime() ?? null,
-    resolvedAtMs: row.resolvedAt?.getTime() ?? null,
-    resolvedByType: (row.resolvedByType as JoinResolverType | null) ?? null,
-    resolvedById: row.resolvedById,
-    withdrawalCause: (row.withdrawalCause as JoinWithdrawalCause | null) ?? null,
-  };
+  /**
+   * One stored row back into the reducer's state. Exported because the guards'
+   * read repository needs the same translation, and two copies of it would
+   * eventually disagree about what a nullable column means.
+   */
+  static rowToJoinRequest(row: JoinRequest): JoinRequestAggregateState {
+    return {
+      joinRequestId: row.id,
+      userId: row.userId,
+      organizationId: row.organizationId,
+      domain: row.domain,
+      state: row.state as JoinRequestState,
+      matchedVia: row.matchedVia as JoinMatchKind,
+      createdAtMs: row.createdAt.getTime(),
+      updatedAtMs: row.updatedAt.getTime(),
+      expiresAtMs: row.expiresAt?.getTime() ?? null,
+      resolvedAtMs: row.resolvedAt?.getTime() ?? null,
+      resolvedByType: (row.resolvedByType as JoinResolverType | null) ?? null,
+      resolvedById: row.resolvedById,
+      withdrawalCause: (row.withdrawalCause as JoinWithdrawalCause | null) ?? null,
+    };
+  }
 }

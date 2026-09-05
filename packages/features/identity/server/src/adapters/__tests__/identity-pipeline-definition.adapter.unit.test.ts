@@ -13,7 +13,7 @@ import { DetachIdentifierCommand } from "../../intents/detach-identifier.intent"
 import { EraseUserCommand } from "../../intents/erase-user.intent";
 import { MarkPrimaryCommand } from "../../intents/mark-primary.intent";
 import { VerifyIdentifierCommand } from "../../intents/verify-identifier.intent";
-import { createIdentityPipeline } from "../identity-pipeline-definition.adapter";
+import { IdentityPipelineDefinitionAdapter } from "../identity-pipeline-definition.adapter";
 
 const USER = "user_sam";
 const ACTOR = { type: "user" as const, id: USER };
@@ -171,7 +171,7 @@ describe("identity event aggregate type", () => {
         data: { ...base, commandId: "idcmd_5" },
       },
     ])("the store accepts every event $label emits", async ({ handler, data }) => {
-      const declared = createIdentityPipeline({
+      const declared = IdentityPipelineDefinitionAdapter.create({
         identityProjectionStore: {} as never,
         identityGuards: {} as never,
         mfaProjectionStore: {} as never,

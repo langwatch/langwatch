@@ -16,7 +16,7 @@ import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import type { LicensingService } from "@langwatch/enterprise-licensing-contract";
 import type { RoutingDecision, SignInMethodPolicy } from "@langwatch/identity-contract";
 import { sendResetPasswordEmail } from "@langwatch/mail";
-import { resolveSignInMethodPolicy } from "@langwatch/identity-server";
+import { SignInMethodPolicyService } from "@langwatch/identity-server";
 import type { Logger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { RedisConnection } from "@langwatch/redis-client";
@@ -130,12 +130,12 @@ export class ApiBetterAuthFederation extends BetterAuthFederationPort {
   }
 
   resolveSignInMethodPolicy(): Promise<SignInMethodPolicy> {
-    return resolveSignInMethodPolicy({
+    return SignInMethodPolicyService.create({
       resolveAuthProvider: () => Promise.resolve(this.deployment.authProvider ?? "email"),
       federationLicensed: () => this.federationLicensed(),
       offersPasskeys: () => this.deployment.passkeysEnabled,
       selfHosted: () => !this.deployment.isSaas,
-    });
+    }).resolvePolicy();
   }
 
   platformSsoAllowed(): Promise<boolean> {

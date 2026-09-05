@@ -5,7 +5,7 @@ import {
 } from "@langwatch/identity-contract";
 import type { IdentityGuards } from "../guards";
 import { type Command, type CommandHandler, defineCommandSchema } from "@langwatch/eventing";
-import { identityEventsFor } from "../projections/identity-state.projection";
+import { IdentityStateFoldProjection } from "../projections/identity-state.projection";
 import type { IdentityEvent } from "../projections/identity-state.projection";
 
 /**
@@ -31,7 +31,7 @@ export class AttachIdentifierCommand implements CommandHandler<
 
   async handle(command: Command<AttachIdentifierCommandData>): Promise<IdentityEvent[]> {
     const facts = await this.guards.attachIdentifier(command.data);
-    return identityEventsFor({
+    return IdentityStateFoldProjection.eventsFor({
       command: { type: ATTACH_IDENTIFIER_COMMAND_TYPE, data: command.data },
       facts,
     });

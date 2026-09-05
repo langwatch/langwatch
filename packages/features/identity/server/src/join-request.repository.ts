@@ -25,6 +25,28 @@ export interface JoinRequestReadRepository {
 }
 
 /**
+ * What the join-request SERVICE reads on top of the guards' two reads: the
+ * throttle's last rejection, and the two waiting-list queries the request and
+ * inbox surfaces are served from.
+ *
+ * Separate from the guards' narrower port on purpose — a command handler must
+ * not be able to enumerate anybody's waiting requests, and a port it never
+ * holds cannot be reached from one by accident.
+ */
+export interface JoinRequestListReadRepository extends JoinRequestReadRepository {
+  /** When this person was last rejected by this organization, if ever. */
+  tryFindLastRejectionAt(args: { userId: string; organizationId: string }): Promise<Date | null>;
+
+  /** Everything waiting on one organization, newest ask first. */
+  findPendingForOrganization(args: {
+    organizationId: string;
+  }): Promise<JoinRequestAggregateState[]>;
+
+  /** Everything one person is waiting on. */
+  findPendingForUser(args: { userId: string }): Promise<JoinRequestAggregateState[]>;
+}
+
+/**
  * The organizations a domain could reach, as counts and flags.
  *
  * The implementation counts members holding a VERIFIED identifier on the

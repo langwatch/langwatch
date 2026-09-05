@@ -29,6 +29,10 @@ import type {
  * spent.
  */
 export class PrismaMfaEnrollmentProjectionRepository implements StateProjectionStore<MfaFoldState> {
+  static create(prisma: PrismaClient): PrismaMfaEnrollmentProjectionRepository {
+    return new PrismaMfaEnrollmentProjectionRepository(prisma);
+  }
+
   constructor(private readonly prisma: PrismaClient) {}
 
   async tryLoad(

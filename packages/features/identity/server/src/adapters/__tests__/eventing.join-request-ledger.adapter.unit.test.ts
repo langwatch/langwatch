@@ -9,7 +9,7 @@ import {
   EventingJoinRequestLedgerAdapter,
   type JoinRequestStagedSender,
 } from "../eventing.join-request-ledger.adapter";
-import type { JoinRequestEvent } from "../join-request-pipeline-definition.adapter";
+import type { JoinRequestEvent } from "../../projections/join-request-state.projection";
 import type { JoinRequestFoldState } from "../../projections/join-request-state.projection";
 
 /**

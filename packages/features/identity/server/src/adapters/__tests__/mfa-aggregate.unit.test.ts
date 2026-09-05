@@ -19,7 +19,7 @@ import {
   RecordMfaVerificationFailureCommand,
   RegenerateBackupCodesCommand,
 } from "../../intents/mfa.intent";
-import { createIdentityPipeline } from "../identity-pipeline-definition.adapter";
+import { IdentityPipelineDefinitionAdapter } from "../identity-pipeline-definition.adapter";
 import { USER_IDENTITY_AGGREGATE_TYPE } from "@langwatch/identity-contract";
 
 const USER = "user_sam";
@@ -178,7 +178,7 @@ describe("two-step verification event aggregate type", () => {
         },
       },
     ])("stamps $label with the pipeline's declared aggregate type", async ({ handler, data }) => {
-      const declared = createIdentityPipeline({
+      const declared = IdentityPipelineDefinitionAdapter.create({
         identityProjectionStore: noopStore,
         identityGuards: null as never,
         mfaProjectionStore: noopStore,

@@ -32,6 +32,7 @@ import {
   PostgresIdentityPipelineAdapter,
   PostgresJoinRequestPipelineAdapter,
   PostgresScimSyncPipelineAdapter,
+  type PlatformOperatorPort,
   PostgresSsoConnectionPipelineAdapter,
   type SsoConnectionPipelineDatabase,
   type ScimSyncPipelineDatabase,
@@ -124,7 +125,7 @@ import { LogWorkerFeatureInstaller } from "../features/log/log-worker-feature.in
 import { MetricWorkerFeatureInstaller } from "../features/metric/metric-worker-feature.installer";
 import { ScenarioExecutionPoolService } from "@langwatch/scenario-server";
 import { SCENARIO_WORKER } from "@langwatch/scenario-contract";
-import type { UsageStatsWorkerDatabase } from "@langwatch/ops-server";
+import { AdminAccessService, type UsageStatsWorkerDatabase } from "@langwatch/ops-server";
 import { OpsWorkerFeatureInstaller } from "../features/ops/ops-worker-feature.installer";
 import { GatewayRealtimeSessionWorkerFeatureInstaller } from "../features/gateway/gateway-realtime-session-worker-feature.installer";
 import { ScenarioExecutionWorkerFeatureInstaller } from "../features/scenario/scenario-execution-worker-feature.installer";
@@ -1580,7 +1581,9 @@ export class WorkerProductionComposition {
         pipeline: PostgresSsoConnectionPipelineAdapter.create({
           database: options.database,
           eventSourcing: eventing.eventSourcing,
-          adminEmails: options.config.deployment.adminEmails,
+          operators: WorkerProductionComposition.platformOperators({
+            adminEmails: options.config.deployment.adminEmails,
+          }),
         }).build(),
       },
       eventing,
@@ -1839,6 +1842,22 @@ export class WorkerProductionComposition {
     return options.observability
       ? LoggedWorkerLangyAbsence.create(options.observability.logger)
       : undefined;
+  }
+
+  /**
+   * The deployment's operator list, as identity's port over it.
+   *
+   * `ADMIN_EMAILS` is parsed once, by the ops feature that owns the variable,
+   * so the connection guards and the back office answer from the same list.
+   */
+  private static platformOperators({
+    adminEmails,
+  }: {
+    adminEmails: string | undefined;
+  }): PlatformOperatorPort {
+    const access = AdminAccessService.create({ adminEmails: adminEmails ?? "" });
+
+    return { isPlatformOperatorEmail: ({ email }) => access.isAdmin({ email }) };
   }
 
   /** The boot logger, as the one place Identity's one absence is declared. */

@@ -134,6 +134,12 @@ export class JoinRequestStateFoldProjection
 
   protected readonly events = joinRequestEvents;
 
+  static create(deps: {
+    store: StateProjectionStore<JoinRequestFoldState>;
+  }): JoinRequestStateFoldProjection {
+    return new JoinRequestStateFoldProjection(deps);
+  }
+
   constructor(deps: { store: StateProjectionStore<JoinRequestFoldState> }) {
     super();
     this.store = deps.store;
@@ -191,46 +197,46 @@ export class JoinRequestStateFoldProjection
   ): JoinRequestFoldState {
     return this.fold(event, state);
   }
-}
 
-/**
- * The ONE place a join-request fact becomes a framework event: the guards
- * (`JoinRequestGuards`) decide what a command states, and this stamps the
- * envelope from the command that produced it — the aggregate type the store
- * validates, the request as aggregate, the organization as tenant, the
- * command's business time, and the `commandId:index` idempotency key.
- *
- * Both the pipeline's command handlers (the staged re-run) and the app's
- * ledger writer (the calling path) go through here, so the two legs cannot
- * stamp a fact differently — and a retried approval derives identical keys,
- * which is the whole of "a replayed approval attaches membership exactly
- * once".
- *
- * Defined here, beside the fold and the schemas it stamps, rather than in
- * the pipeline definition adapter: the intents that call this ARE inputs to
- * that adapter's pipeline builder, so an import back the other way would be
- * a cycle.
- */
-export function joinRequestEventsFor({
-  command,
-  facts,
-}: {
-  command: JoinRequestCommand;
-  facts: JoinRequestFactInput[];
-}): JoinRequestEvent[] {
-  const { joinRequestId, tenantId, commandId, occurredAtMs } = command.data;
-  return facts.map(
-    (fact, index) =>
-      EventUtils.createEvent({
-        aggregateType: JOIN_REQUEST_AGGREGATE_TYPE,
-        aggregateId: joinRequestId,
-        tenantId: createTenantId(tenantId),
-        type: fact.type,
-        version: JOIN_REQUEST_EVENT_VERSION_LATEST,
-        data: fact.data,
-        metadata: {},
-        occurredAt: occurredAtMs,
-        idempotencyKey: eventIdempotencyKey({ commandId, index }),
-      }) as JoinRequestEvent,
-  );
+  /**
+   * The ONE place a join-request fact becomes a framework event: the guards
+   * (`JoinRequestGuards`) decide what a command states, and this stamps the
+   * envelope from the command that produced it — the aggregate type the store
+   * validates, the request as aggregate, the organization as tenant, the
+   * command's business time, and the `commandId:index` idempotency key.
+   *
+   * Both the pipeline's command handlers (the staged re-run) and the app's
+   * ledger writer (the calling path) go through here, so the two legs cannot
+   * stamp a fact differently — and a retried approval derives identical keys,
+   * which is the whole of "a replayed approval attaches membership exactly
+   * once".
+   *
+   * Defined here, beside the fold and the schemas it stamps, rather than in
+   * the pipeline definition adapter: the intents that call this ARE inputs to
+   * that adapter's pipeline builder, so an import back the other way would be
+   * a cycle.
+   */
+  static eventsFor({
+    command,
+    facts,
+  }: {
+    command: JoinRequestCommand;
+    facts: JoinRequestFactInput[];
+  }): JoinRequestEvent[] {
+    const { joinRequestId, tenantId, commandId, occurredAtMs } = command.data;
+    return facts.map(
+      (fact, index) =>
+        EventUtils.createEvent({
+          aggregateType: JOIN_REQUEST_AGGREGATE_TYPE,
+          aggregateId: joinRequestId,
+          tenantId: createTenantId(tenantId),
+          type: fact.type,
+          version: JOIN_REQUEST_EVENT_VERSION_LATEST,
+          data: fact.data,
+          metadata: {},
+          occurredAt: occurredAtMs,
+          idempotencyKey: eventIdempotencyKey({ commandId, index }),
+        }) as JoinRequestEvent,
+    );
+  }
 }

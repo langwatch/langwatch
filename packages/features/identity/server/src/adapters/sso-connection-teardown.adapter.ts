@@ -38,7 +38,17 @@ const logger = createLogger("langwatch:identity:sso-connection-teardown");
  * needs the commands `registerAll()` returns. A provider defers the read to
  * the wake, which is the only moment the token revocation actually happens.
  */
-export class SsoConnectionTeardownDispatcher implements ConnectionTeardownPort {
+export class SsoConnectionTeardownDispatcherAdapter implements ConnectionTeardownPort {
+  static create({
+    connections,
+    scim,
+  }: {
+    connections: () => SsoConnectionService;
+    scim: () => ConnectionDirectoryRevocation;
+  }): SsoConnectionTeardownDispatcherAdapter {
+    return new SsoConnectionTeardownDispatcherAdapter(connections, scim);
+  }
+
   constructor(
     private readonly connections: () => SsoConnectionService,
     private readonly scim: () => ConnectionDirectoryRevocation,

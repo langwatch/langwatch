@@ -9,7 +9,7 @@ import {
   RecordScimUserPushCommand,
   RevokeScimSyncCommand,
 } from "../../intents/scim-sync.intent";
-import { createScimSyncPipeline } from "../scim-sync-pipeline-definition.adapter";
+import { ScimSyncPipelineDefinitionAdapter } from "../scim-sync-pipeline-definition.adapter";
 
 const ORGANIZATION = "org_acme";
 const CONNECTION = "conn_okta_primary";
@@ -104,7 +104,7 @@ describe("directory sync event aggregate type", () => {
         },
       },
     ])("the store accepts every event $label emits", async ({ handler, data }) => {
-      const declared = createScimSyncPipeline({
+      const declared = ScimSyncPipelineDefinitionAdapter.create({
         scimSyncProjectionStore: {} as never,
         scimSyncGuards: {} as never,
       }).metadata.aggregateType;

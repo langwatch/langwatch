@@ -61,6 +61,16 @@ function linkedIdentifiers(state: IdentityFoldState): LinkedIdentifier[] {
  * row, a tombstoned one projects to none.
  */
 export class PrismaIdentityProjectionRepository implements StateProjectionStore<IdentityFoldState> {
+  static create({
+    prisma,
+    reservations,
+  }: {
+    prisma: PrismaClient;
+    reservations: IdentityReservationRepository;
+  }): PrismaIdentityProjectionRepository {
+    return new PrismaIdentityProjectionRepository(prisma, reservations);
+  }
+
   constructor(
     private readonly prisma: PrismaClient,
     private readonly reservations: IdentityReservationRepository,

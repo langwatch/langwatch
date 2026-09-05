@@ -32,6 +32,10 @@ interface ResolutionRow {
  * every query by migration name first.
  */
 export class PrismaIdentityResolutionRepository implements IdentityResolutionPort {
+  static create(prisma: PrismaClient): PrismaIdentityResolutionRepository {
+    return new PrismaIdentityResolutionRepository(prisma);
+  }
+
   constructor(private readonly prisma: PrismaClient) {}
 
   async tryResolveByIdentifierValue({

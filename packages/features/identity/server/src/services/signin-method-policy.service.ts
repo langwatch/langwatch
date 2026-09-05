@@ -78,63 +78,67 @@ export const PASSKEY_METHOD: SignInMethod = {
 export const LOCAL_METHOD_SET: readonly SignInMethod[] = [PASSWORD_METHOD];
 
 /**
- * Whether this deployment mounted the passkey plugin at boot. The server half
- * is registered off the same value, so the set can never name a method the
- * endpoint behind it does not have.
- */
-export function deploymentOffersPasskeys(passkeysEnabled: string | undefined): boolean {
-  return passkeysEnabled === "on";
-}
-
-/**
- * Whether this deployment names a federated method AT ALL — a pure env read,
- * synchronous on purpose.
+ * The instance's method-set policy, over one deployment's four answers.
  *
- * The `before` hook has to answer this before it may await anything: a plain
- * email-mode deployment must never wait on the licensing store, and neither
- * must session traffic. Making the capability check async would put a store
- * read in front of `/get-session`, which is the availability failure ADR-027's
- * `isGateDependentPath` exists to avoid.
+ * `resolvePolicy` is the port the router routes on and the hook enforces
+ * from: one resolution per request, and both gate reads inside it hit the
+ * same per-process memo.
  */
-export function deploymentIsFederationCapable(authProvider: string | undefined): boolean {
-  return authProvider !== "email";
-}
+export class SignInMethodPolicyService implements SignInMethodPolicyPort {
+  static create(inputs: SignInMethodPolicyInputs): SignInMethodPolicyService {
+    return new SignInMethodPolicyService(inputs);
+  }
 
-/** The federated method this deployment offers, or null for email mode. */
-export async function resolveFederatedMethod(
-  resolveAuthProvider: () => Promise<string>,
-): Promise<SignInMethod | null> {
-  const provider = await resolveAuthProvider();
+  private constructor(private readonly inputs: SignInMethodPolicyInputs) {}
 
-  return provider === "email" ? null : { id: provider, kind: "federated", connectionId: null };
-}
+  /**
+   * Whether this deployment mounted the passkey plugin at boot. The server
+   * half is registered off the same value, so the set can never name a method
+   * the endpoint behind it does not have.
+   */
+  static deploymentOffersPasskeys(passkeysEnabled: string | undefined): boolean {
+    return passkeysEnabled === "on";
+  }
 
-/**
- * The policy the router routes on, and the hook enforces from. One resolution
- * per request; both gate reads inside it hit the same per-process memo.
- */
-export async function resolveSignInMethodPolicy(
-  inputs: SignInMethodPolicyInputs,
-): Promise<SignInMethodPolicy> {
-  const federationLicensed = await inputs.federationLicensed();
-  const federated = await resolveFederatedMethod(inputs.resolveAuthProvider);
-  // Offered alongside whatever else answers, never instead of it: somebody
-  // without a passkey on THIS device must still find the way they used last
-  // time. It is appended, so the order the screen renders does not move.
-  const passkeys = inputs.offersPasskeys() ? [PASSKEY_METHOD] : [];
+  /**
+   * Whether this deployment names a federated method AT ALL — a pure env read,
+   * synchronous on purpose.
+   *
+   * The `before` hook has to answer this before it may await anything: a plain
+   * email-mode deployment must never wait on the licensing store, and neither
+   * must session traffic. Making the capability check async would put a store
+   * read in front of `/get-session`, which is the availability failure
+   * ADR-027's `isGateDependentPath` exists to avoid.
+   */
+  static deploymentIsFederationCapable(authProvider: string | undefined): boolean {
+    return authProvider !== "email";
+  }
 
-  return {
-    defaultMethods: [...(federated ? [federated] : LOCAL_METHOD_SET), ...passkeys],
-    localMethods: [...LOCAL_METHOD_SET, ...passkeys],
-    federationLicensed,
-    // Only a self-hosted deployment auto-redirects on its sole connection.
-    selfHosted: inputs.selfHosted(),
-  };
-}
+  /** The federated method a deployment offers, or null for email mode. */
+  static async resolveFederatedMethod(
+    resolveAuthProvider: () => Promise<string>,
+  ): Promise<SignInMethod | null> {
+    const provider = await resolveAuthProvider();
 
-/** The policy port, over one deployment's four answers. */
-export function signInMethodPolicyPortOver(
-  inputs: SignInMethodPolicyInputs,
-): SignInMethodPolicyPort {
-  return { resolvePolicy: () => resolveSignInMethodPolicy(inputs) };
+    return provider === "email" ? null : { id: provider, kind: "federated", connectionId: null };
+  }
+
+  async resolvePolicy(): Promise<SignInMethodPolicy> {
+    const federationLicensed = await this.inputs.federationLicensed();
+    const federated = await SignInMethodPolicyService.resolveFederatedMethod(
+      this.inputs.resolveAuthProvider,
+    );
+    // Offered alongside whatever else answers, never instead of it: somebody
+    // without a passkey on THIS device must still find the way they used last
+    // time. It is appended, so the order the screen renders does not move.
+    const passkeys = this.inputs.offersPasskeys() ? [PASSKEY_METHOD] : [];
+
+    return {
+      defaultMethods: [...(federated ? [federated] : LOCAL_METHOD_SET), ...passkeys],
+      localMethods: [...LOCAL_METHOD_SET, ...passkeys],
+      federationLicensed,
+      // Only a self-hosted deployment auto-redirects on its sole connection.
+      selfHosted: this.inputs.selfHosted(),
+    };
+  }
 }

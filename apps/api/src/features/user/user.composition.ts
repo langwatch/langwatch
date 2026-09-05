@@ -27,7 +27,7 @@ import type { AuthService } from "@langwatch/auth-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
   IdentityEventingPort,
-  IdentityLedgerWriter,
+  IdentityLedgerWriterAdapter,
   IdentityService,
   PostgresIdentityGuardsAdapter,
   PrismaIdentityHeadsRepository,
@@ -139,7 +139,7 @@ export function composeUserFeature(options: {
     PrismaIdentityHeadsRepository.create(prisma),
     new IdentityService(
       guards.identityGuards,
-      new IdentityLedgerWriter({
+      IdentityLedgerWriterAdapter.create({
         // The SAME address lock the guards claim through (ADR-116 §6): the
         // guards claim before stating a fact and the fold releases once no
         // live identifier of that user carries the value, so a second lock

@@ -52,23 +52,23 @@ import type {
 } from "../sso-connection.repository";
 import type { StateProjectionStore, StoredProjection } from "@langwatch/eventing";
 import {
-  createIdentityPipeline,
+  IdentityPipelineDefinitionAdapter,
   type IdentityPipeline,
 } from "./identity-pipeline-definition.adapter";
 import type { IdentityFoldState } from "../projections/identity-state.projection";
 import type { MfaFoldState } from "../projections/mfa-enrollment-state.projection";
 import {
-  createJoinRequestPipeline,
+  JoinRequestPipelineDefinitionAdapter,
   type JoinRequestPipeline,
 } from "./join-request-pipeline-definition.adapter";
 import type { JoinRequestLifecyclePort } from "../processes/join-request-lifecycle.process";
 import type { JoinRequestFoldState } from "../projections/join-request-state.projection";
 import {
-  createScimSyncPipeline,
+  ScimSyncPipelineDefinitionAdapter,
   type ScimSyncPipeline,
 } from "./scim-sync-pipeline-definition.adapter";
 import type { ScimSyncFoldState } from "../projections/scim-sync-state.projection";
-import { createSsoConnectionPipeline } from "./sso-connection-pipeline-definition.adapter";
+import { SsoConnectionPipelineDefinitionAdapter } from "./sso-connection-pipeline-definition.adapter";
 import type { ConnectionTeardownPort } from "../processes/connection-teardown.process";
 import type { SsoConnectionFoldState } from "../projections/sso-connection-state.projection";
 
@@ -175,138 +175,141 @@ class ProducerOnlyConnectionTeardown implements ConnectionTeardownPort {
 }
 
 /**
- * The identity pipeline for a process that only sends commands on it.
+ * The four identity pipelines as a process that only SENDS commands on them
+ * sees them: every read, projection and process-manager seam is a stand-in
+ * that refuses by name.
  *
- * `processName` names the refusal, so a stand-in reached by accident says which
- * process reached it rather than reporting an anonymous failure.
+ * `processName` names the refusal, so a stand-in reached by accident says
+ * which process reached it rather than reporting an anonymous failure.
  */
-export function createIdentityProducerPipeline(input: { processName: string }): IdentityPipeline {
-  const { processName } = input;
-  const pipeline = "identity";
-  return createIdentityPipeline({
-    identityProjectionStore: new ProducerOnlyStateProjectionStore<IdentityFoldState>(
-      processName,
-      pipeline,
-      "identifier",
-    ),
-    identityGuards: new IdentityGuards(
-      producerOnlyReads<IdentityHeadsRepository>({
-        processName,
-        pipeline,
-        name: "identity heads",
-      }),
-      producerOnlyReads<IdentityUsersRepository>({
-        processName,
-        pipeline,
-        name: "identity users",
-      }),
-      producerOnlyReads<IdentityReservationRepository>({
-        processName,
-        pipeline,
-        name: "identifier reservations",
-      }),
-    ),
-    mfaProjectionStore: new ProducerOnlyStateProjectionStore<MfaFoldState>(
-      processName,
-      pipeline,
-      "two-step enrollment",
-    ),
-    mfaGuards: new MfaGuards(
-      producerOnlyReads<MfaEnrollmentRepository>({
-        processName,
-        pipeline,
-        name: "two-step enrollments",
-      }),
-    ),
-  });
-}
+export class IdentityProducerPipelinesAdapter {
+  static create({ processName }: { processName: string }): IdentityProducerPipelinesAdapter {
+    return new IdentityProducerPipelinesAdapter(processName);
+  }
 
-/** The join-request pipeline for a process that only sends commands on it. */
-export function createJoinRequestProducerPipeline(input: {
-  processName: string;
-}): JoinRequestPipeline {
-  const { processName } = input;
-  const pipeline = "join-requests";
-  return createJoinRequestPipeline({
-    joinRequestProjectionStore: new ProducerOnlyStateProjectionStore<JoinRequestFoldState>(
-      processName,
-      pipeline,
-      "join request",
-    ),
-    joinRequestGuards: new JoinRequestGuards({
-      requests: producerOnlyReads<JoinRequestReadRepository>({
-        processName,
-        pipeline,
-        name: "join requests",
-      }),
-    }),
-    lifecycle: new ProducerOnlyJoinRequestLifecycle(processName),
-  });
-}
+  private constructor(private readonly processName: string) {}
 
-/** The connection pipeline for a process that only sends commands on it. */
-export function createSsoConnectionProducerPipeline(input: {
-  processName: string;
-}): ReturnType<typeof createSsoConnectionPipeline> {
-  const { processName } = input;
-  const pipeline = "sso-connections";
-  return createSsoConnectionPipeline({
-    connectionProjectionStore: new ProducerOnlyStateProjectionStore<SsoConnectionFoldState>(
-      processName,
-      pipeline,
-      "single sign-on connection",
-    ),
-    connectionGuards: new SsoConnectionGuards({
-      connections: producerOnlyReads<SsoConnectionReadRepository>({
-        processName,
+  /** The identity pipeline for a process that only sends commands on it. */
+  identityPipeline(): IdentityPipeline {
+    const pipeline = "identity";
+    return IdentityPipelineDefinitionAdapter.create({
+      identityProjectionStore: new ProducerOnlyStateProjectionStore<IdentityFoldState>(
+        this.processName,
         pipeline,
-        name: "connections",
-      }),
-      breakGlass: producerOnlyReads<SsoBreakGlassBindingRepository>({
-        processName,
+        "identifier",
+      ),
+      identityGuards: new IdentityGuards(
+        producerOnlyReads<IdentityHeadsRepository>({
+          processName: this.processName,
+          pipeline,
+          name: "identity heads",
+        }),
+        producerOnlyReads<IdentityUsersRepository>({
+          processName: this.processName,
+          pipeline,
+          name: "identity users",
+        }),
+        producerOnlyReads<IdentityReservationRepository>({
+          processName: this.processName,
+          pipeline,
+          name: "identifier reservations",
+        }),
+      ),
+      mfaProjectionStore: new ProducerOnlyStateProjectionStore<MfaFoldState>(
+        this.processName,
         pipeline,
-        name: "break-glass bindings",
-      }),
-      stranding: producerOnlyReads<SsoConnectionStrandingRepository>({
-        processName,
-        pipeline,
-        name: "stranding checks",
-      }),
-      platformOperators: producerOnlyReads<SsoPlatformOperatorRepository>({
-        processName,
-        pipeline,
-        name: "platform operators",
-      }),
-    }),
-    teardown: new ProducerOnlyConnectionTeardown(processName),
-  });
-}
+        "two-step enrollment",
+      ),
+      mfaGuards: new MfaGuards(
+        producerOnlyReads<MfaEnrollmentRepository>({
+          processName: this.processName,
+          pipeline,
+          name: "two-step enrollments",
+        }),
+      ),
+    });
+  }
 
-/**
- * The directory-sync pipeline for a process that only sends commands on it.
- *
- * NO PROCESS MANAGER to decline, unlike its two neighbours: `scim-sync`
- * declares none on purpose — a push is the DIRECTORY's to retry, so there is
- * no inbox, outbox or wake for a producer-only runtime to keep off. What a
- * producer needs from this definition is the same five command dispatchers the
- * worker's registration carries, so an Enterprise directory push has a sender
- * to stage its history through.
- */
-export function createScimSyncProducerPipeline(input: { processName: string }): ScimSyncPipeline {
-  const { processName } = input;
-  const pipeline = "scim-sync";
-  return createScimSyncPipeline({
-    scimSyncProjectionStore: new ProducerOnlyStateProjectionStore<ScimSyncFoldState>(
-      processName,
-      pipeline,
-      "directory sync",
-    ),
-    scimSyncGuards: new ScimSyncGuards({
-      syncs: producerOnlyReads<ScimSyncReadRepository>({
-        processName,
+  /** The join-request pipeline for a process that only sends commands on it. */
+  joinRequestPipeline(): JoinRequestPipeline {
+    const pipeline = "join-requests";
+    return JoinRequestPipelineDefinitionAdapter.create({
+      joinRequestProjectionStore: new ProducerOnlyStateProjectionStore<JoinRequestFoldState>(
+        this.processName,
         pipeline,
-        name: "directory syncs",
+        "join request",
+      ),
+      joinRequestGuards: new JoinRequestGuards({
+        requests: producerOnlyReads<JoinRequestReadRepository>({
+          processName: this.processName,
+          pipeline,
+          name: "join requests",
+        }),
       }),
-    }),
-  });
+      lifecycle: new ProducerOnlyJoinRequestLifecycle(this.processName),
+    });
+  }
+
+  /** The connection pipeline for a process that only sends commands on it. */
+  ssoConnectionPipeline(): ReturnType<typeof SsoConnectionPipelineDefinitionAdapter.create> {
+    const pipeline = "sso-connections";
+    return SsoConnectionPipelineDefinitionAdapter.create({
+      connectionProjectionStore: new ProducerOnlyStateProjectionStore<SsoConnectionFoldState>(
+        this.processName,
+        pipeline,
+        "single sign-on connection",
+      ),
+      connectionGuards: new SsoConnectionGuards({
+        connections: producerOnlyReads<SsoConnectionReadRepository>({
+          processName: this.processName,
+          pipeline,
+          name: "connections",
+        }),
+        breakGlass: producerOnlyReads<SsoBreakGlassBindingRepository>({
+          processName: this.processName,
+          pipeline,
+          name: "break-glass bindings",
+        }),
+        stranding: producerOnlyReads<SsoConnectionStrandingRepository>({
+          processName: this.processName,
+          pipeline,
+          name: "stranding checks",
+        }),
+        platformOperators: producerOnlyReads<SsoPlatformOperatorRepository>({
+          processName: this.processName,
+          pipeline,
+          name: "platform operators",
+        }),
+      }),
+      teardown: new ProducerOnlyConnectionTeardown(this.processName),
+    });
+  }
+
+  /**
+   * The directory-sync pipeline for a process that only sends commands on it.
+   *
+   * NO PROCESS MANAGER to decline, unlike its two neighbours: `scim-sync`
+   * declares none on purpose — a push is the DIRECTORY's to retry, so there is
+   * no inbox, outbox or wake for a producer-only runtime to keep off. What a
+   * producer needs from this definition is the same five command dispatchers the
+   * worker's registration carries, so an Enterprise directory push has a sender
+   * to stage its history through.
+   */
+  scimSyncPipeline(): ScimSyncPipeline {
+    const pipeline = "scim-sync";
+    return ScimSyncPipelineDefinitionAdapter.create({
+      scimSyncProjectionStore: new ProducerOnlyStateProjectionStore<ScimSyncFoldState>(
+        this.processName,
+        pipeline,
+        "directory sync",
+      ),
+      scimSyncGuards: new ScimSyncGuards({
+        syncs: producerOnlyReads<ScimSyncReadRepository>({
+          processName: this.processName,
+          pipeline,
+          name: "directory syncs",
+        }),
+      }),
+    });
+  }
 }
