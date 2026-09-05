@@ -79,7 +79,9 @@ export class StreamingChunkWriter {
   }
 
   private async flush(): Promise<void> {
-    if (this.buffer.length === 0) return;
+    if (this.buffer.length === 0) {
+      return;
+    }
     const written = await this.deps.storage.writeChunks({
       projectId: this.deps.projectId,
       datasetId: this.deps.datasetId,
@@ -111,6 +113,7 @@ export class StreamingChunkWriter {
    */
   async finalize(): Promise<ChunkedDatasetMeta> {
     await this.flush();
+
     return chunkedMeta(this.chunkMetas);
   }
 }

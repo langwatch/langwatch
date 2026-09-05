@@ -55,25 +55,32 @@ const scalar = (v: OtlpAnyValue): AttributeScalar | undefined => {
   if ("stringValue" in v && typeof v.stringValue === "string") {
     return v.stringValue;
   }
+
   if ("arrayValue" in v && v.arrayValue && Array.isArray(v.arrayValue?.values)) {
     return JSON.stringify(v.arrayValue.values.map((item) => scalar(item) ?? item));
   }
+
   if ("bytesValue" in v && v.bytesValue) {
     if (typeof v.bytesValue === "string") {
       return Buffer.from(v.bytesValue, "base64");
     }
+
     return v.bytesValue;
   }
+
   if ("boolValue" in v && v.boolValue !== null) {
     if (typeof v.boolValue === "string") {
       return (v.boolValue as string).toLowerCase() === "true";
     }
+
     return v.boolValue;
   }
+
   if ("intValue" in v && v.intValue) {
     if (typeof v.intValue === "string") {
       return parseInt(v.intValue, 10);
     }
+
     if (
       typeof v.intValue === "object" &&
       v.intValue !== null &&
@@ -84,12 +91,15 @@ const scalar = (v: OtlpAnyValue): AttributeScalar | undefined => {
 
       return Number((BigInt(high) << 32n) | (BigInt(low) & 0xffffffffn));
     }
+
     return v.intValue;
   }
+
   if ("doubleValue" in v && v.doubleValue) {
     if (typeof v.doubleValue === "string") {
       return parseFloat(v.doubleValue);
     }
+
     return v.doubleValue;
   }
 
@@ -187,7 +197,9 @@ const normalizeOtlpAnyValue = (root: OtlpAnyValue, rootKey?: string): FlattenRes
   const out: FlattenResult = {};
 
   const set = (k: string | undefined | null, v: AttributeValue) => {
-    if (!k) return;
+    if (!k) {
+      return;
+    }
     out[k] = v; // last write wins
   };
 
@@ -195,11 +207,14 @@ const normalizeOtlpAnyValue = (root: OtlpAnyValue, rootKey?: string): FlattenRes
     const s = scalar(v);
     if (s !== void 0) {
       set(prefix, s);
+
       return;
     }
 
     if ("kvlistValue" in v && v.kvlistValue) {
-      for (const { key, value } of v.kvlistValue.values) walk(value, join(prefix, key));
+      for (const { key, value } of v.kvlistValue.values) {
+        walk(value, join(prefix, key));
+      }
 
       return;
     }
@@ -213,6 +228,7 @@ const normalizeOtlpAnyValue = (root: OtlpAnyValue, rootKey?: string): FlattenRes
           prefix,
           vs.map((x) => scalar(x)!).filter((x): x is AttributeScalar => x !== void 0),
         );
+
         return;
       }
 
@@ -229,18 +245,23 @@ const normalizeOtlpAnyValue = (root: OtlpAnyValue, rootKey?: string): FlattenRes
   // Scalar root has no natural key, so only keep it if rootKey provided.
   const rootScalar = scalar(root);
   if (rootScalar !== void 0) {
-    if (rootKey) set(rootKey, rootScalar);
+    if (rootKey) {
+      set(rootKey, rootScalar);
+    }
     return out;
   }
 
   walk(root, rootKey ? rootKey : "");
+
   return out;
 };
 
 const normalizeOtlpAttributeValue = (
   v: AttributeValue,
 ): Exclude<NormalizedAttributes[string], undefined> | undefined => {
-  if (v instanceof Uint8Array) return Buffer.from(v).toString("hex");
+  if (v instanceof Uint8Array) {
+    return Buffer.from(v).toString("hex");
+  }
 
   if (Array.isArray(v)) {
     const out: Array<string | boolean | number | bigint> = [];
@@ -280,18 +301,23 @@ const normalizeOtlpAttributes = (attributes: OtlpKeyValue[]): NormalizedAttribut
   const normalizedAttributes: NormalizedAttributes = {};
 
   for (const attr of attributes ?? []) {
-    if (!attr?.key || !attr.value) continue;
+    if (!attr?.key || !attr.value) {
+      continue;
+    }
 
     const flattened = normalizeOtlpAnyValue(attr.value, attr.key);
 
     for (const [k, v] of Object.entries(flattened)) {
       const nv = normalizeOtlpAttributeValue(v);
-      if (nv !== void 0) normalizedAttributes[k] = nv;
+      if (nv !== void 0) {
+        normalizedAttributes[k] = nv;
+      }
     }
   }
 
   // Post-process: reconstruct flattened arrays, then parse JSON string values
   const reconstructed = reconstructFlattenedArrays(normalizedAttributes);
+
   return parseJsonStringValues(reconstructed);
 };
 

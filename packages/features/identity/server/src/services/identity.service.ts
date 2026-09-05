@@ -51,6 +51,7 @@ export class IdentityService
 
   async attachIdentifier(input: AttachIdentifierCommandData): Promise<IdentityFact[]> {
     const data = attachIdentifierCommandDataSchema.parse(input);
+
     return this.commit(
       { type: ATTACH_IDENTIFIER_COMMAND_TYPE, data },
       await this.guards.attachIdentifier(data),
@@ -59,6 +60,7 @@ export class IdentityService
 
   async verifyIdentifier(input: VerifyIdentifierCommandData): Promise<IdentityFact[]> {
     const data = verifyIdentifierCommandDataSchema.parse(input);
+
     return this.commit(
       { type: VERIFY_IDENTIFIER_COMMAND_TYPE, data },
       await this.guards.verifyIdentifier(data),
@@ -67,6 +69,7 @@ export class IdentityService
 
   async markPrimary(input: MarkPrimaryCommandData): Promise<IdentityFact[]> {
     const data = markPrimaryCommandDataSchema.parse(input);
+
     return this.commit(
       { type: MARK_PRIMARY_COMMAND_TYPE, data },
       await this.guards.markPrimary(data),
@@ -75,6 +78,7 @@ export class IdentityService
 
   async detachIdentifier(input: DetachIdentifierCommandData): Promise<IdentityFact[]> {
     const data = detachIdentifierCommandDataSchema.parse(input);
+
     return this.commit(
       { type: DETACH_IDENTIFIER_COMMAND_TYPE, data },
       await this.guards.detachIdentifier(data),
@@ -83,11 +87,13 @@ export class IdentityService
 
   async eraseUser(input: EraseUserCommandData): Promise<IdentityFact[]> {
     const data = eraseUserCommandDataSchema.parse(input);
+
     return this.commit({ type: ERASE_USER_COMMAND_TYPE, data }, await this.guards.eraseUser(data));
   }
 
   async proposeLink(input: ProposeLinkCommandData): Promise<IdentityFact[]> {
     const data = proposeLinkCommandDataSchema.parse(input);
+
     return this.commit(
       { type: PROPOSE_LINK_COMMAND_TYPE, data },
       await this.guards.proposeLink(data),
@@ -98,7 +104,9 @@ export class IdentityService
     command: IdentityCommand,
     facts: Awaited<ReturnType<IdentityGuards["attachIdentifier"]>>,
   ): Promise<IdentityFact[]> {
-    if (facts.length === 0) return [];
+    if (facts.length === 0) {
+      return [];
+    }
     return this.ledger.commit({ command, facts });
   }
 }

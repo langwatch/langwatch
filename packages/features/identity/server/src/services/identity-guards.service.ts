@@ -90,6 +90,7 @@ export class IdentityGuards {
       identifierId,
       commandId,
     });
+
     return holder.userId === userId || holder.commandId === commandId;
   }
 
@@ -106,14 +107,18 @@ export class IdentityGuards {
     normalizedValue: string | null;
     verb: string;
   }): Promise<void> {
-    if (normalizedValue === null) return;
+    if (normalizedValue === null) {
+      return;
+    }
     const held = await this.holdsAddressLock({
       userId,
       identifierId,
       commandId,
       normalizedValue,
     });
-    if (held) return;
+    if (held) {
+      return;
+    }
     throw new IdentityEmailInUseError(`${verb}: another user holds the lock on this address`);
   }
 
@@ -142,9 +147,13 @@ export class IdentityGuards {
     normalizedValue: string | null;
     verb: string;
   }): Promise<void> {
-    if (normalizedValue === null) return;
+    if (normalizedValue === null) {
+      return;
+    }
     const holder = await this.users.findUserIdByEmail({ normalizedValue });
-    if (holder === null || holder === userId) return;
+    if (holder === null || holder === userId) {
+      return;
+    }
     throw new IdentityEmailInUseError(
       `${verb}: a user outside the identity population already holds this address as their User.email`,
     );
@@ -175,7 +184,9 @@ export class IdentityGuards {
     // of a ceremony and every backfill pass after the first both arrive here
     // with the identifier already folded, and must cost no event_log row.
     const heads = await this.heads.findHeads({ userId });
-    if (heads.identifiers[identifierId]) return [];
+    if (heads.identifiers[identifierId]) {
+      return [];
+    }
     const userHashKey = await this.heads.findUserHashKey({ userId });
     // Non-email providers arrive VERIFIED with no verify ceremony to
     // re-check them, so the attach itself is where a cross-user race
@@ -224,6 +235,7 @@ export class IdentityGuards {
         },
       ];
     }
+
     return [attached(arrivalState)];
   }
 
@@ -236,13 +248,17 @@ export class IdentityGuards {
         `verify_identifier: identifier ${identifierId} does not exist for this user`,
       );
     }
+
     // Already verified (or primary): nothing to record.
-    if (head.state === "VERIFIED" || head.state === "PRIMARY") return [];
+    if (head.state === "VERIFIED" || head.state === "PRIMARY") {
+      return [];
+    }
     if (head.state !== "ATTACHED") {
       throw new IdentityIdentifierNotVerifiableError(
         `verify_identifier: identifier is ${head.state}, only ATTACHED verifies`,
       );
     }
+
     // The legacy population first, and BEFORE any fact is stated — which is
     // also before the ceremony consumes its verification proof, since the
     // ceremony dispatches the command and only then consumes. A refusal
@@ -265,6 +281,7 @@ export class IdentityGuards {
         "verify_identifier: another user already holds this address as a proven identifier",
       );
     }
+
     // And the lock, which is what actually decides a race: both reads above
     // can pass concurrently, and only one user may hold a proven address.
     // Before any fact, so the loser's verification is never recorded.
@@ -275,6 +292,7 @@ export class IdentityGuards {
       normalizedValue: head.value,
       verb: "verify_identifier",
     });
+
     return [
       {
         type: IDENTIFIER_VERIFIED_EVENT_TYPE,
@@ -292,12 +310,16 @@ export class IdentityGuards {
         `mark_primary: identifier ${identifierId} does not exist for this user`,
       );
     }
-    if (head.state === "PRIMARY") return [];
+
+    if (head.state === "PRIMARY") {
+      return [];
+    }
     if (head.state !== "VERIFIED") {
       throw new IdentityPrimaryRequiresVerifiedError(
         `mark_primary: identifier is ${head.state}, only VERIFIED takes PRIMARY`,
       );
     }
+
     // PRIMARY is what the fold writes into `User.email`, so this is the
     // moment the value has to be free in the legacy population too. Refusing
     // here is what turns a `User.email @unique` write failure deep inside
@@ -307,6 +329,7 @@ export class IdentityGuards {
       normalizedValue: head.value,
       verb: "mark_primary",
     });
+
     // One fact per stream that has to move (ADR-127): the promotion, and a
     // demotion naming each identifier standing PRIMARY. The fold sweeps for
     // those itself today and a per-identifier fold cannot, so the command
@@ -325,13 +348,17 @@ export class IdentityGuards {
         `detach_identifier: identifier ${identifierId} does not exist for this user`,
       );
     }
+
     // PRIMARY never detaches directly — demote first (D01's state machine).
     if (head.state === "PRIMARY") {
       throw new IdentityPrimaryMustDemoteFirstError(
         "detach_identifier: the PRIMARY identifier must be demoted before it detaches",
       );
     }
-    if (head.state === "DETACHED") return [];
+
+    if (head.state === "DETACHED") {
+      return [];
+    }
     // Removing a way IN is refused when it is the last one, or the last one
     // anybody could be recovered through (D07). Scoped to identifiers that
     // are actually usable: detaching an unverified address strands nobody,
@@ -347,6 +374,7 @@ export class IdentityGuards {
           `detach_identifier: ${identifierId} is the last verified identifier for this user`,
         );
       }
+
       // A passkey is a way in and not a way back: it has no address, so a
       // person holding only passkeys has nowhere a recovery message could
       // reach them. The remedy the screen offers is a verified email.
@@ -356,12 +384,14 @@ export class IdentityGuards {
         );
       }
     }
+
     return [{ type: IDENTIFIER_DETACHED_EVENT_TYPE, data: { identifierId, actor } }];
   }
 
   async eraseUser(data: EraseUserCommandData): Promise<IdentityFactInput[]> {
     const { userId, actor } = data;
     const heads = await this.heads.findHeads({ userId });
+
     // The ids are read from the WHOLE person rather than taken from a caller.
     // Today the fold sweeps every head and the list is the writer's audit
     // record; once the fold keys per identifier (ADR-127 slice 3) the list
@@ -389,6 +419,7 @@ export class IdentityGuards {
     const { proposalId, userId, connectionId, provider, providerAccountId, value, reason, actor } =
       data;
     const normalizedValue = normalizeIdentifierValue(value);
+
     return [
       {
         type: LINK_PROPOSED_EVENT_TYPE,

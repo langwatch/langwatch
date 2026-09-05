@@ -46,6 +46,7 @@ export function callerProject({
   if (requestedProjectId !== project.id) {
     throw new NotFoundError("project_not_found", "Project", requestedProjectId ?? "");
   }
+
   return project;
 }
 
@@ -69,7 +70,9 @@ export async function requireLangWatchQLEnabled(input: {
     projectId: input.project.id,
     projects: input.projects,
   });
-  if (!enabled) throw new LangWatchQLNotEnabledError();
+  if (!enabled) {
+    throw new LangWatchQLNotEnabledError();
+  }
 }
 
 /**
@@ -101,6 +104,7 @@ export async function lwqlProject({
 }): Promise<ProjectIdentity> {
   const resolved = callerProject({ project, requestedProjectId });
   await requireLangWatchQLEnabled({ featureFlags, project: resolved, projects });
+
   return resolved;
 }
 

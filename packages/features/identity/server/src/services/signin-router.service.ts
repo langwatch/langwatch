@@ -160,6 +160,7 @@ export class SignInRouterService {
         activeConnections: [],
       };
     }
+
     return {
       domainConnection: null,
       activeConnections: await this.domains.listActiveConnections(),

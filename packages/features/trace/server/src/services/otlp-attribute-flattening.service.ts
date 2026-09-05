@@ -33,10 +33,14 @@ const detectArrayPatterns = (
 
   for (const [key, value] of Object.entries(attrs)) {
     const indexed = INDEXED_KEY_REGEX.exec(key);
-    if (indexed?.length !== 4) continue;
+    if (indexed?.length !== 4) {
+      continue;
+    }
 
     const [, prefix, indexStr, remainder] = indexed;
-    if (!prefix || !indexStr || !remainder) continue;
+    if (!prefix || !indexStr || !remainder) {
+      continue;
+    }
 
     const index = parseInt(indexStr, 10);
     if (!patterns.has(prefix)) {
@@ -64,11 +68,15 @@ const isValidArrayPattern = (indexMap: Map<number, Map<string, unknown>>): boole
   const indices = Array.from(indexMap.keys()).sort((a, b) => a - b);
 
   // Must start at 0
-  if (indices.length === 0 || indices[0] !== 0) return false;
+  if (indices.length === 0 || indices[0] !== 0) {
+    return false;
+  }
 
   // Must be consecutive
   for (let i = 0; i < indices.length; i++) {
-    if (indices[i] !== i) return false;
+    if (indices[i] !== i) {
+      return false;
+    }
   }
 
   // All items must have the same set of relative keys
@@ -97,6 +105,7 @@ const unflattenObject = (flatMap: Map<string, unknown>): Record<string, unknown>
   for (const [k, v] of flatMap) {
     record[k] = v;
   }
+
   return safeUnflatten(record);
 };
 
@@ -115,7 +124,9 @@ export const reconstructFlattenedArrays = (attrs: NormalizedAttributes): Normali
   const { patterns, matchedKeys } = detectArrayPatterns(attrs);
 
   // If no patterns found, return original
-  if (patterns.size === 0) return attrs;
+  if (patterns.size === 0) {
+    return attrs;
+  }
 
   const result: NormalizedAttributes = {};
   const processedPrefixes = new Set<string>();
@@ -136,6 +147,7 @@ export const reconstructFlattenedArrays = (attrs: NormalizedAttributes): Normali
           result[`${prefix}${SEP}${index}${SEP}${relativePath}`] = value;
         }
       }
+
       continue;
     }
 
@@ -224,6 +236,7 @@ export const parseJsonStringValues = (attrs: NormalizedAttributes): NormalizedAt
           // still broken, fall through
         }
       }
+
       result[key] = value;
     }
   }

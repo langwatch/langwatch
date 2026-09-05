@@ -133,8 +133,10 @@ export function applyLangWatchQLResultLimits({
       truncated = true;
       break;
     }
+
     kept.push(row);
   }
+
   return { rows: kept, truncated };
 }
 
@@ -199,12 +201,14 @@ function refusalFor({ error, durationMs }: { error: unknown; durationMs: number 
   if (isClickHouseObjectUnavailableError(error)) {
     return new LangWatchQLUnavailableError({ reasons: [toError(error)] });
   }
+
   if (isClickHouseUnknownIdentifierError(error)) {
     return new LangWatchQLUnknownIdentifierError({
       identifier: unknownIdentifierFromError(error),
       reasons: [toError(error)],
     });
   }
+
   return translateClickHouseQueryError(error, durationMs);
 }
 
@@ -243,6 +247,7 @@ export function createLangWatchQLExecutor(connection: LangWatchQLConnection): La
           rows: response.data,
           limits,
         });
+
         return {
           columns: response.meta ?? [],
           rows,
@@ -310,12 +315,16 @@ export function lwqlConnectionFromEnvironment(
         "LangWatchQL is partially configured, so every query will be refused",
       );
     }
+
     return null;
   }
+
   // Re-checked rather than asserted: `absent` is computed by a callback, which
   // TypeScript cannot use to narrow these five, and reaching for `!` here would
   // silently outlive someone editing the list above.
-  if (!url || !username || !password || !database || !tenantSetting) return null;
+  if (!url || !username || !password || !database || !tenantSetting) {
+    return null;
+  }
 
   return { url, username, password, database, tenantSetting };
 }

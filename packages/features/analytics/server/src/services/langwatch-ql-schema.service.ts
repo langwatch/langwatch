@@ -66,6 +66,7 @@ export function lwqlExampleSql({
       `WHERE ${view.timeColumn} >= subtractDays(now(), ${EXAMPLE_LOOKBACK_DAYS})`
     );
   }
+
   return (
     `SELECT ${projection.join(", ")}\n` +
     `FROM ${database}.${view.name}\n` +
@@ -88,6 +89,7 @@ export function describeLangWatchQLSchema({
   views?: readonly LangWatchQLViewDefinition[];
 }): LangWatchQLSchema {
   const withheld = new Set(lwqlGatedColumns({ protections, views }));
+
   return {
     database,
     datasets: lwqlVisibleViews({ protections, views }).map((view) => ({

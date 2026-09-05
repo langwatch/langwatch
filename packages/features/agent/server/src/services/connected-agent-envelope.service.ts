@@ -113,6 +113,7 @@ export function buildCallEnvelope(fields: {
       throw new Error(`Call envelope carries a field outside the contract: ${key}`);
     }
   }
+
   return envelope;
 }
 
@@ -145,6 +146,7 @@ export function resultCapViolation({
       limitBytes: caps.sessionBytes,
     };
   }
+
   const resultBytes = jsonByteLength(output) + sessionBytes;
   if (resultBytes > caps.resultBytes) {
     return {
@@ -153,5 +155,6 @@ export function resultCapViolation({
       limitBytes: caps.resultBytes,
     };
   }
+
   return null;
 }

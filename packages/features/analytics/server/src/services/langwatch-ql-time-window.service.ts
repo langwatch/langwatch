@@ -64,6 +64,7 @@ function withInjected({
   injected: Readonly<Record<string, string>>;
 }): Readonly<Record<string, unknown>> | undefined {
   const merged = { ...parameters, ...injected };
+
   return Object.keys(merged).length > 0 ? merged : undefined;
 }
 
@@ -127,6 +128,7 @@ export function resolveLangWatchQLTimeWindow({
     ]),
   );
   const merged = withInjected({ parameters, injected });
+
   return {
     ...(merged ? { parameters: merged } : {}),
     followsTimeWindow,
@@ -183,6 +185,7 @@ function finestFittingStep(windowSeconds: number): number | undefined {
       return step;
     }
   }
+
   return undefined;
 }
 
@@ -279,6 +282,7 @@ function resolveAgainstBudget({
       maxBuckets: LWQL_GRANULARITY_MAX_BUCKETS,
     });
   }
+
   return {
     followsGranularity: true,
     granularitySeconds: effective,
@@ -302,7 +306,9 @@ export function assertLangWatchQLGranularityDeclaration(
   const declaredGranularity = declared.find(
     (parameter) => parameter.name === LWQL_PERIOD_GRANULARITY_PARAMETER,
   );
-  if (!declaredGranularity) return;
+  if (!declaredGranularity) {
+    return;
+  }
 
   if (!isLangWatchQLGranularityParameterType(declaredGranularity.type)) {
     throw new LangWatchQLReservedGranularityTypeError({
@@ -441,6 +447,7 @@ const lwqlTimeWindowBound = z
   .refine(
     (value) => {
       const year = value.getUTCFullYear();
+
       return year >= MIN_UTC_YEAR && year <= MAX_UTC_YEAR;
     },
     {

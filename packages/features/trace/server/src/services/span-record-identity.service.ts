@@ -56,6 +56,7 @@ export class SpanRecordIdentity {
       instance,
       sequence,
     );
+
     return ksuid.toString();
   }
 
@@ -64,6 +65,7 @@ export class SpanRecordIdentity {
     const startTimeUnixMs = TraceRequestUtils.convertUnixNanoToUnixMs(
       TraceRequestUtils.normalizeOtlpUnixNano(event.data.span.startTimeUnixNano),
     );
+
     return SpanRecordIdentity.generateDeterministicSpanRecordIdFromData(
       String(event.tenantId),
       traceId,
@@ -79,6 +81,7 @@ export class SpanRecordIdentity {
     startTimeUnixMs: number,
   ): string {
     EventUtils.validateTenantId({ tenantId }, "generateDeterministicSpanRecordIdFromData");
+
     return SpanRecordIdentity.makeDeterministicKsuid({
       hashKey: `${tenantId}:${traceId}:${spanId}`,
       resource: SPAN_KSUID_RESOURCE,
@@ -91,6 +94,7 @@ export class SpanRecordIdentity {
     const startTimeUnixMs = TraceRequestUtils.convertUnixNanoToUnixMs(
       TraceRequestUtils.normalizeOtlpUnixNano(event.data.span.startTimeUnixNano),
     );
+
     return SpanRecordIdentity.generateDeterministicTraceSummaryIdFromData(
       String(event.tenantId),
       traceId,
@@ -104,6 +108,7 @@ export class SpanRecordIdentity {
     startTimeUnixMs: number,
   ): string {
     EventUtils.validateTenantId({ tenantId }, "generateDeterministicTraceSummaryIdFromData");
+
     return SpanRecordIdentity.makeDeterministicKsuid({
       hashKey: `${tenantId}:${traceId}`,
       resource: TRACE_SUMMARY_KSUID_RESOURCE,

@@ -74,6 +74,7 @@ export function computeEffectiveTeamRoleUpdates(params: {
     }
 
     const requestedTeamIdSet = new Set(requested.map((update) => update.teamId));
+
     return [
       ...requested,
       ...correctTo(

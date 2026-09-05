@@ -30,6 +30,7 @@ export class CodexSpanCanonicaliser {
       if (scopeName !== CODEX_EXEC_SCOPE_NAME) {
         this.markRedundantUsageSpan(ctx);
       }
+
       return;
     }
 
@@ -96,6 +97,7 @@ export class CodexSpanCanonicaliser {
     if (!this.hasTokenUsage(ctx)) {
       return;
     }
+
     ctx.setAttrIfAbsent(ATTR_KEYS.SPAN_TYPE, "llm");
   }
 
@@ -103,9 +105,11 @@ export class CodexSpanCanonicaliser {
     if (!this.hasTokenUsage(ctx)) {
       return;
     }
+
     if (!CODEX_REDUNDANT_USAGE_SPAN_NAMES[ctx.span.name] === true) {
       return;
     }
+
     ctx.setAttr(ATTR_KEYS.LANGWATCH_RESERVED_SKIP_TOKEN_ACCUMULATION, "true");
     ctx.recordRule("codex/skip-redundant-usage");
   }

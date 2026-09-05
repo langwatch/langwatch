@@ -43,11 +43,17 @@ export function turnOrderFromStream(entries: readonly LangyStreamEntry[]): Langy
         open.text += entry.text;
         continue;
       }
+
       order.push({ kind: "text", text: entry.text });
       continue;
     }
-    if (entry.type !== "tool") continue;
-    if (placed.has(entry.id)) continue;
+
+    if (entry.type !== "tool") {
+      continue;
+    }
+    if (placed.has(entry.id)) {
+      continue;
+    }
     placed.add(entry.id);
     order.push({ kind: "tool", id: entry.id });
   }
@@ -76,6 +82,7 @@ export function createLangyTurnOrderReader(buffer: LangyTurnStreamTail): LangyTu
   return {
     async readTurnOrder(at) {
       const { reads } = await buffer.readTail(at);
+
       return turnOrderFromStream(reads.map(({ entry }) => entry));
     },
   };

@@ -159,10 +159,14 @@ export class SignInCallbackLinkingService {
     });
     // Nothing is created and no event is emitted: this person has signed in
     // through this connection before, and saying so again states no new fact.
-    if (known) return { kind: "signed_in", userId: known.userId, linked: false };
+    if (known) {
+      return { kind: "signed_in", userId: known.userId, linked: false };
+    }
 
     const normalizedEmail = assertion.email ? normalizeIdentifierValue(assertion.email) : null;
-    if (!normalizedEmail) return this.provision(assertion, null);
+    if (!normalizedEmail) {
+      return this.provision(assertion, null);
+    }
 
     const candidates = await this.directory.findUsersByEmail({
       normalizedEmail,
@@ -185,11 +189,14 @@ export class SignInCallbackLinkingService {
           reason: refusal,
         });
       }
+
       throw new IdentityLinkProposedError();
     }
 
     const [target] = candidates;
-    if (!target) return this.provision(assertion, normalizedEmail);
+    if (!target) {
+      return this.provision(assertion, normalizedEmail);
+    }
     return this.link({ assertion, normalizedEmail, userId: target.userId });
   }
 
@@ -206,6 +213,7 @@ export class SignInCallbackLinkingService {
     userId: string;
   }): Promise<CallbackLinkOutcome> {
     const normalizedEmail = assertion.email ? normalizeIdentifierValue(assertion.email) : "";
+
     return this.link({ assertion, normalizedEmail, userId });
   }
 
@@ -220,19 +228,25 @@ export class SignInCallbackLinkingService {
     assertion: CallbackAssertion;
     candidates: readonly CallbackUserMatch[];
   }): LinkProposalReason | null {
-    if (candidates.length > 1) return "ambiguous_candidates";
+    if (candidates.length > 1) {
+      return "ambiguous_candidates";
+    }
     const target = candidates[0];
-    if (!target) return "ambiguous_candidates";
+    if (!target) {
+      return "ambiguous_candidates";
+    }
     // One side of the evidence is the IdP's assertion, the other is the
     // user's own. An unverified orphan row fails the second and is never
     // auto-linked, which is the anti-hijack invariant, kept.
     if (!assertion.emailVerified || !target.holdsVerifiedEmail) {
       return "unverified_orphan";
     }
+
     const vouched = assertion.email
       ? identifierDomain(normalizeIdentifierValue(assertion.email))
       : null;
     const unvouched = target.identifierDomains.filter((domain) => domain !== vouched);
+
     return unvouched.length > 0 ? "unvouched_identifiers" : null;
   }
 
@@ -261,6 +275,7 @@ export class SignInCallbackLinkingService {
       normalizedEmail,
     });
     this.audit.linkRecorded(record);
+
     return { kind: "linked", userId, linked: true };
   }
 
@@ -297,12 +312,14 @@ export class SignInCallbackLinkingService {
     if (!assertion.allowsJit || !normalizedEmail) {
       throw new IdentityJitDisabledError();
     }
+
     const { userId } = await this.directory.provisionUser({
       connectionId: assertion.connectionId,
       provider: assertion.provider,
       subject: assertion.subject,
       normalizedEmail,
     });
+
     return { kind: "provisioned", userId, linked: true };
   }
 }

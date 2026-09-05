@@ -67,6 +67,7 @@ export function perSubjectCachedFlag({
     cached: new Map(),
     inFlight: new Map(),
   };
+
   return {
     get: (args) => get({ state, ...args }),
     invalidate: ({ subject }) => invalidate({ state, subject }),
@@ -74,7 +75,9 @@ export function perSubjectCachedFlag({
       state.cached.clear();
       // Same reason `invalidate` marks: a read still in flight must not
       // land in the map the reset just emptied.
-      for (const pending of state.inFlight.values()) pending.isStale = true;
+      for (const pending of state.inFlight.values()) {
+        pending.isStale = true;
+      }
       state.inFlight.clear();
     },
   };
@@ -91,12 +94,16 @@ async function get({
 }): Promise<boolean> {
   const entry = state.cached.get(subject);
   if (entry !== undefined) {
-    if (Date.now() < entry.expiresAt) return entry.isOn;
+    if (Date.now() < entry.expiresAt) {
+      return entry.isOn;
+    }
     state.cached.delete(subject);
   }
 
   const pending = state.inFlight.get(subject);
-  if (pending !== undefined) return pending.promise;
+  if (pending !== undefined) {
+    return pending.promise;
+  }
 
   const flight: InFlightEntry = {
     isStale: false,
@@ -141,13 +148,19 @@ async function settle({
     );
     isOn = false;
   }
+
   // Invalidated while this read was in flight: the value predates the
   // write that invalidated it, so hand it to the callers already waiting
   // (they coalesced before the invalidation) but never cache it - the next
   // `get` re-reads the source.
-  if (flight.isStale) return isOn;
-  if (state.cached.size >= state.maxEntries) evictUntilUnderCap({ state });
+  if (flight.isStale) {
+    return isOn;
+  }
+  if (state.cached.size >= state.maxEntries) {
+    evictUntilUnderCap({ state });
+  }
   state.cached.set(subject, { isOn, expiresAt: Date.now() + state.ttlMs });
+
   return isOn;
 }
 
@@ -159,11 +172,16 @@ async function settle({
 function evictUntilUnderCap({ state }: { state: GateState }): void {
   const now = Date.now();
   for (const [key, entry] of state.cached) {
-    if (entry.expiresAt <= now) state.cached.delete(key);
+    if (entry.expiresAt <= now) {
+      state.cached.delete(key);
+    }
   }
+
   while (state.cached.size >= state.maxEntries) {
     const oldestKey: string | undefined = state.cached.keys().next().value;
-    if (oldestKey === undefined) break;
+    if (oldestKey === undefined) {
+      break;
+    }
     state.cached.delete(oldestKey);
   }
 }

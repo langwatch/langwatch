@@ -209,8 +209,12 @@ const UNREACHABLE_CODES = new Set([
 export class LangyTurnErrors {
   /** Walk a HandledError chain (the error + its reasons, depth-first) for a kind. */
   private static domainErrorChainHas(error: Error, code: string): boolean {
-    if (!HandledError.isHandled(error)) return false;
-    if (error.code === code) return true;
+    if (!HandledError.isHandled(error)) {
+      return false;
+    }
+    if (error.code === code) {
+      return true;
+    }
     return error.reasons.some((r) => LangyTurnErrors.domainErrorChainHas(r, code));
   }
 
@@ -222,12 +226,14 @@ export class LangyTurnErrors {
       chain.push(current);
       current = (current as { cause?: unknown }).cause;
     }
+
     return chain;
   }
 
   private static isTimeout(error: unknown): boolean {
     return LangyTurnErrors.causeChain(error).some((link) => {
       const name = (link as { name?: unknown }).name;
+
       return name === "TimeoutError" || name === "AbortError";
     });
   }
@@ -235,6 +241,7 @@ export class LangyTurnErrors {
   private static isUnreachable(error: unknown): boolean {
     return LangyTurnErrors.causeChain(error).some((link) => {
       const code = (link as { code?: unknown }).code;
+
       return typeof code === "string" && UNREACHABLE_CODES.has(code);
     });
   }
@@ -246,6 +253,7 @@ export class LangyTurnErrors {
    */
   private static unhandledShape(): SerializedHandledError {
     const spanContext = trace.getActiveSpan()?.spanContext();
+
     return {
       code: "unknown",
       // Deprecated back-compat alias of `code` — see SerializedHandledError.kind.
@@ -275,10 +283,12 @@ export class LangyTurnErrors {
       if (LangyTurnErrors.domainErrorChainHas(cause, "no_provider_configured")) {
         return new LangyModelNotConfiguredError({ reasons });
       }
+
       if (cause.code === "agent_error") {
         return new LangyAgentErroredError({ reasons });
       }
     }
+
     return LangyTurnErrors.fromFrame(code ?? cause?.code ?? "agent error");
   }
 
@@ -314,6 +324,7 @@ export class LangyTurnErrors {
       case "langy_github_repo_not_accessible":
         return new LangyGithubRepoNotAccessibleError();
     }
+
     // The manager also surfaces its typed `herr` CODES on this frame, e.g.
     // `worker_spawn_failed (map[message:...])`. Match on the code prefix, not the
     // whole string: the parenthesised detail is the manager's internal envelope and
@@ -322,6 +333,7 @@ export class LangyTurnErrors {
     if (normalized.startsWith("worker_spawn_failed")) {
       return new LangyWorkerSpawnFailedError();
     }
+
     return new Error(frame);
   }
 
@@ -331,14 +343,18 @@ export class LangyTurnErrors {
    * that — falls through to `unknown`.
    */
   static classify(error: unknown): SerializedHandledError {
-    if (HandledError.isHandled(error)) return error.serialize();
+    if (HandledError.isHandled(error)) {
+      return error.serialize();
+    }
     // fetch/AbortSignal failures arrive as DOMException/TypeError, never as ours.
     if (LangyTurnErrors.isTimeout(error)) {
       return new LangyTurnTimeoutError(AGENT_CHAT_TIMEOUT_MS).serialize();
     }
+
     if (LangyTurnErrors.isUnreachable(error)) {
       return new LangyAgentUnavailableError("agent unreachable").serialize();
     }
+
     return LangyTurnErrors.unhandledShape();
   }
 

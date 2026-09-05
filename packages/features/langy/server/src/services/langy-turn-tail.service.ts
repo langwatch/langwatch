@@ -63,7 +63,9 @@ export async function watchForMissedTerminal({
 }): Promise<SettlementOutcome | null> {
   let streaks = NO_SETTLEMENT_STREAKS;
   while (!signal.aborted) {
-    if (!(await delay(pollMs, signal))) return null;
+    if (!(await delay(pollMs, signal))) {
+      return null;
+    }
     const next = advanceSettlement({
       health: await readHealth(),
       streaks,
@@ -74,8 +76,12 @@ export async function watchForMissedTerminal({
     if (next.outcome?.kind === "abandoned") {
       onAbandoned?.({ stalePolls: streaks.stale });
     }
-    if (next.outcome) return next.outcome;
+
+    if (next.outcome) {
+      return next.outcome;
+    }
   }
+
   return null;
 }
 
@@ -135,8 +141,12 @@ async function* followLiveEdge({
       // An abandoned turn yields nothing: we do not know how it ended, and
       // inventing a terminal for a turn that may still be alive would tell the
       // reader it finished when it did not.
-      if (outcome?.kind === "terminal") synthesized = outcome.entry;
-      if (outcome) settle.abort(); // unblock the follow() below
+      if (outcome?.kind === "terminal") {
+        synthesized = outcome.entry;
+      }
+      if (outcome) {
+        settle.abort();
+      } // unblock the follow() below
     })
     // Attached HERE, not in the finally below: follow() can block for minutes,
     // so a rejection would sit unhandled until then — and Node's default
@@ -155,7 +165,9 @@ async function* followLiveEdge({
       // A real terminal reached the buffer. Returning here is what keeps a
       // synthesized one from ever overriding it: the yield below is past the
       // end of this generator.
-      if (isTerminal(entry)) return;
+      if (isTerminal(entry)) {
+        return;
+      }
     }
   } finally {
     settle.abort();
@@ -165,7 +177,9 @@ async function* followLiveEdge({
   // follow() ended with no buffered terminal. If the watcher proved the turn
   // settled, deliver the synthesized terminal so the UI resolves instead of
   // hanging; the client reconciles the transcript via langy.messages.
-  if (synthesized) yield synthesized;
+  if (synthesized) {
+    yield synthesized;
+  }
 }
 
 /**
@@ -195,8 +209,11 @@ export async function* streamTurnEntries({
     const { reads, lastId } = await buffer.readTail({ conversationId, turnId });
     for (const { entry } of reads) {
       yield entry;
-      if (isTerminal(entry)) return;
+      if (isTerminal(entry)) {
+        return;
+      }
     }
+
     yield* followLiveEdge({ ...deps, fromId: lastId });
   } finally {
     release();

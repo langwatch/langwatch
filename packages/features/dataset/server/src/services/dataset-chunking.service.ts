@@ -92,7 +92,9 @@ export const toJsonlChunks = (
   let rowsInChunk = 0;
 
   const flush = (endRow: number) => {
-    if (lines.length === 0) return;
+    if (lines.length === 0) {
+      return;
+    }
     const jsonl = lines.join("\n") + "\n";
     chunks.push({
       index: chunks.length,
@@ -117,6 +119,7 @@ export const toJsonlChunks = (
     if (bufBytes > 0 && bufBytes + lineBytes > maxBytes) {
       flush(i);
     }
+
     lines.push(line);
     bufBytes += lineBytes;
     rowsInChunk += 1;
@@ -137,6 +140,7 @@ export const toSingleJsonl = (records: unknown[]): { jsonl: string; byteSize: nu
   const jsonl =
     records.map((record) => JSON.stringify(stripNullBytes(record))).join("\n") +
     (records.length > 0 ? "\n" : "");
+
   return { jsonl, byteSize: Buffer.byteLength(jsonl, "utf8") };
 };
 

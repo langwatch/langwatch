@@ -100,9 +100,14 @@ export function serializeRunsToCriteriaCsv({
     const push = (criterion: string, met: boolean) =>
       rows.push([...core, text(criterion), String(met), ...tail]);
 
-    for (const criterion of run.results?.metCriteria ?? []) push(criterion, true);
-    for (const criterion of run.results?.unmetCriteria ?? []) push(criterion, false);
+    for (const criterion of run.results?.metCriteria ?? []) {
+      push(criterion, true);
+    }
+    for (const criterion of run.results?.unmetCriteria ?? []) {
+      push(criterion, false);
+    }
   }
+
   return unparse({ headers: criteriaHeaders(), rows, includeHeader });
 }
 
@@ -128,6 +133,7 @@ export function serializeRunsToFullCsv({
       rows.push([...head, "", "", "", "", "", ...tail]);
       continue;
     }
+
     messages.forEach((message, index) => {
       const m = message as Record<string, unknown>;
       rows.push([
@@ -143,6 +149,7 @@ export function serializeRunsToFullCsv({
       ]);
     });
   }
+
   return unparse({ headers: fullHeaders(), rows, includeHeader });
 }
 
@@ -152,6 +159,7 @@ export function serializeRunsToFullCsv({
 
 function buildCoreValues(run: SimulationExportRun): string[] {
   const results = run.results;
+
   return [
     text(run.name ?? ""),
     run.status,
@@ -183,6 +191,7 @@ function buildCriteriaListValues(run: SimulationExportRun): string[] {
  */
 function buildTailValues(run: SimulationExportRun): string[] {
   const target = extractTarget(run.metadata);
+
   return [
     text(run.scenarioRunId),
     text(run.scenarioId),
@@ -201,9 +210,15 @@ function buildTailValues(run: SimulationExportRun): string[] {
  */
 function extractParameters(metadata: Record<string, unknown> | null | undefined): string {
   const parameters = metadata?.parameters;
-  if (parameters == null || typeof parameters !== "object") return "";
-  if (Array.isArray(parameters)) return "";
-  if (Object.keys(parameters).length === 0) return "";
+  if (parameters == null || typeof parameters !== "object") {
+    return "";
+  }
+  if (Array.isArray(parameters)) {
+    return "";
+  }
+  if (Object.keys(parameters).length === 0) {
+    return "";
+  }
   return text(JSON.stringify(parameters));
 }
 
@@ -221,7 +236,9 @@ function extractTarget(metadata: Record<string, unknown> | null | undefined): {
   if (langwatch == null || typeof langwatch !== "object") {
     return { targetType: "", targetReferenceId: "", simulationSuiteId: "" };
   }
+
   const ns = langwatch as Record<string, unknown>;
+
   return {
     targetType: stringOrEmpty(ns.targetType),
     targetReferenceId: stringOrEmpty(ns.targetReferenceId),
@@ -235,12 +252,18 @@ function extractTarget(metadata: Record<string, unknown> | null | undefined): {
 function collectTraceIds(run: SimulationExportRun): string[] {
   const ids = new Set<string>();
   for (const traceId of run.traceIds ?? []) {
-    if (traceId !== "") ids.add(traceId);
+    if (traceId !== "") {
+      ids.add(traceId);
+    }
   }
+
   for (const message of run.messages ?? []) {
     const traceId = (message as Record<string, unknown>).trace_id;
-    if (typeof traceId === "string" && traceId !== "") ids.add(traceId);
+    if (typeof traceId === "string" && traceId !== "") {
+      ids.add(traceId);
+    }
   }
+
   return [...ids];
 }
 
@@ -254,7 +277,9 @@ function collectTraceIds(run: SimulationExportRun): string[] {
  * *_count columns sit alongside so the common question needs no JSON parsing at all.
  */
 function jsonArray(values: string[] | undefined): string {
-  if (!values || values.length === 0) return "";
+  if (!values || values.length === 0) {
+    return "";
+  }
   return text(JSON.stringify(values));
 }
 
@@ -263,12 +288,16 @@ function jsonArray(values: string[] | undefined): string {
  * reads as a date, and spreadsheet software parses it without a formula.
  */
 function isoTimestamp(ms: number | null | undefined): string {
-  if (ms == null || !Number.isFinite(ms) || ms <= 0) return "";
+  if (ms == null || !Number.isFinite(ms) || ms <= 0) {
+    return "";
+  }
   return new Date(ms).toISOString();
 }
 
 function nullableNumber(value: number | null | undefined): string {
-  if (value == null || !Number.isFinite(value)) return "";
+  if (value == null || !Number.isFinite(value)) {
+    return "";
+  }
   return String(value);
 }
 
@@ -291,8 +320,12 @@ function text(value: string): string {
  * are JSON-stringified so nothing is silently dropped from a transcript.
  */
 function messageContent(content: unknown): string {
-  if (content == null) return "";
-  if (typeof content === "string") return content;
+  if (content == null) {
+    return "";
+  }
+  if (typeof content === "string") {
+    return content;
+  }
   return JSON.stringify(content);
 }
 
@@ -320,11 +353,14 @@ function unparse({
       ? Parse.unparse({ fields: headers, data: [] }, { newline: NEWLINE }) + NEWLINE
       : "";
   }
+
   const csv = Parse.unparse({ fields: headers, data: rows }, { newline: NEWLINE });
+
   return (includeHeader ? csv : stripHeader(csv)) + NEWLINE;
 }
 
 function stripHeader(csv: string): string {
   const firstBreak = csv.indexOf(NEWLINE);
+
   return firstBreak === -1 ? "" : csv.slice(firstBreak + NEWLINE.length);
 }

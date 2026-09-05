@@ -47,17 +47,21 @@ export class MfaGuards {
   async enrollMfa(data: EnrollMfaCommandData): Promise<MfaFactInput[]> {
     const { userId, enrollmentId, method, actor } = data;
     const enrollment = await this.enrollments.findEnrollment({ userId });
-    if (enrollment.enrollmentId === enrollmentId) return [];
+    if (enrollment.enrollmentId === enrollmentId) {
+      return [];
+    }
     if (enrollment.state === "PENDING") {
       throw new IdentityMfaCodeInvalidError(
         `enroll_mfa: ${userId} already has a pending enrollment ${enrollment.enrollmentId}`,
       );
     }
+
     if (enrollment.state === "ENABLED") {
       throw new IdentityMfaCodeInvalidError(
         `enroll_mfa: ${userId} already has two-step verification enabled`,
       );
     }
+
     return [
       {
         type: MFA_ENROLLED_EVENT_TYPE,
@@ -73,12 +77,15 @@ export class MfaGuards {
   async confirmMfa(data: ConfirmMfaCommandData): Promise<MfaFactInput[]> {
     const { userId, enrollmentId, backupCodeCount, actor } = data;
     const enrollment = await this.enrollments.findEnrollment({ userId });
-    if (enrollment.state === "ENABLED") return [];
+    if (enrollment.state === "ENABLED") {
+      return [];
+    }
     if (enrollment.state === "EXPIRED") {
       throw new IdentityMfaEnrollmentExpiredError(
         `confirm_mfa: enrollment ${enrollmentId} for ${userId} expired before it was confirmed`,
       );
     }
+
     // A confirmation for a setup nobody started, or for a different one than
     // the person holds, answers exactly the way a wrong code does.
     if (enrollment.state !== "PENDING" || enrollment.enrollmentId !== enrollmentId) {
@@ -86,6 +93,7 @@ export class MfaGuards {
         `confirm_mfa: no pending enrollment ${enrollmentId} for ${userId}`,
       );
     }
+
     return [
       {
         type: MFA_CONFIRMED_EVENT_TYPE,
@@ -105,6 +113,7 @@ export class MfaGuards {
     if (enrollment.state !== "PENDING" || enrollment.enrollmentId !== enrollmentId) {
       return [];
     }
+
     return [{ type: MFA_ENROLLMENT_EXPIRED_EVENT_TYPE, data: { enrollmentId } }];
   }
 
@@ -125,6 +134,7 @@ export class MfaGuards {
     if (enrollment.state !== "ENABLED" || enrollment.enrollmentId === null) {
       return [];
     }
+
     const requiring = await this.enrollments.findRequiringOrganizationSlugs({
       userId,
     });
@@ -133,6 +143,7 @@ export class MfaGuards {
         `disable_mfa: ${userId} belongs to ${requiring.length} organization(s) requiring a second factor: ${requiring.join(", ")}`,
       );
     }
+
     return [
       {
         type: MFA_DISABLED_EVENT_TYPE,
@@ -154,6 +165,7 @@ export class MfaGuards {
         `consume_backup_code: ${userId} has no enabled enrollment`,
       );
     }
+
     if (enrollment.consumedBackupCodeIndexes.includes(codeIndex)) {
       // Spent already. A backup code works exactly once, and the second
       // attempt is indistinguishable from any other wrong code.
@@ -161,11 +173,13 @@ export class MfaGuards {
         `consume_backup_code: position ${codeIndex} was already spent for ${userId}`,
       );
     }
+
     if (remainingBackupCodes(enrollment) <= 0) {
       throw new IdentityMfaBackupCodesExhaustedError(
         `consume_backup_code: ${userId} has spent every backup code`,
       );
     }
+
     return [
       {
         type: BACKUP_CODE_CONSUMED_EVENT_TYPE,
@@ -183,6 +197,7 @@ export class MfaGuards {
         `regenerate_backup_codes: ${userId} has no enabled enrollment`,
       );
     }
+
     return [
       {
         type: BACKUP_CODES_REGENERATED_EVENT_TYPE,
@@ -206,7 +221,9 @@ export class MfaGuards {
   ): Promise<MfaFactInput[]> {
     const { userId, failedCount } = data;
     const enrollment = await this.enrollments.findEnrollment({ userId });
-    if (enrollment.enrollmentId === null) return [];
+    if (enrollment.enrollmentId === null) {
+      return [];
+    }
     return [
       {
         type: MFA_VERIFICATION_FAILED_EVENT_TYPE,

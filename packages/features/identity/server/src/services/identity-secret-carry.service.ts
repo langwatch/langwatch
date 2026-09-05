@@ -103,10 +103,15 @@ export class IdentitySecretCarryService {
           createdAtMs: pair.accountCreatedAtMs,
           updatedAtMs: pair.accountUpdatedAtMs,
         });
-        if (inserted) outcome.carried += 1;
+        if (inserted) {
+          outcome.carried += 1;
+        }
         continue;
       }
-      if (pair.accountUpdatedAtMs <= pair.credentialUpdatedAtMs) continue;
+
+      if (pair.accountUpdatedAtMs <= pair.credentialUpdatedAtMs) {
+        continue;
+      }
       await this.reads.overwriteCredential({
         accountId: pair.accountId,
         secrets: pair.secrets,
@@ -114,12 +119,14 @@ export class IdentitySecretCarryService {
       });
       outcome.healed += 1;
     }
+
     if (outcome.carried > 0 || outcome.healed > 0) {
       logger.info(
         { userId, ...outcome },
         "carried or healed a user's account secrets onto their credential rows",
       );
     }
+
     return outcome;
   }
 }

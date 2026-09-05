@@ -47,9 +47,14 @@ async function readTeamAdminPrincipals({
   const userIds: string[] = [];
   const groupIds: string[] = [];
   for (const binding of adminBindings) {
-    if (binding.userId) userIds.push(binding.userId);
-    if (binding.groupId) groupIds.push(binding.groupId);
+    if (binding.userId) {
+      userIds.push(binding.userId);
+    }
+    if (binding.groupId) {
+      groupIds.push(binding.groupId);
+    }
   }
+
   return { userIds, groupIds };
 }
 /**
@@ -64,11 +69,14 @@ async function groupMemberUserIds({
   tx: TxClient;
   groupIds: string[];
 }): Promise<string[]> {
-  if (groupIds.length === 0) return [];
+  if (groupIds.length === 0) {
+    return [];
+  }
   const memberships = await tx.groupMembership.findMany({
     where: { groupId: { in: groupIds } },
     select: { userId: true },
   });
+
   return memberships.map((m) => m.userId);
 }
 
@@ -91,6 +99,7 @@ export async function computeEffectiveAdminUserIds({
   for (const id of await groupMemberUserIds({ tx, groupIds })) {
     userIds.add(id);
   }
+
   return userIds;
 }
 
@@ -125,6 +134,7 @@ export async function projectAdminUserIdsAfterDirectEdit({
   for (const id of await groupMemberUserIds({ tx, groupIds })) {
     userIds.add(id);
   }
+
   return userIds;
 }
 
@@ -144,11 +154,14 @@ export async function isUserAdminViaGroup({
     organizationId,
     teamId,
   });
-  if (groupIds.length === 0) return false;
+  if (groupIds.length === 0) {
+    return false;
+  }
 
   const count = await tx.groupMembership.count({
     where: { userId, groupId: { in: groupIds } },
   });
+
   return count > 0;
 }
 
@@ -174,7 +187,9 @@ export async function projectAdminUserIdsWithoutDirectRole({
     organizationId,
     teamId,
   });
-  if (!effective.has(userId)) return effective;
+  if (!effective.has(userId)) {
+    return effective;
+  }
 
   const viaGroup = await isUserAdminViaGroup({
     tx,
@@ -182,6 +197,8 @@ export async function projectAdminUserIdsWithoutDirectRole({
     teamId,
     userId,
   });
-  if (!viaGroup) effective.delete(userId);
+  if (!viaGroup) {
+    effective.delete(userId);
+  }
   return effective;
 }

@@ -104,11 +104,13 @@ export class SsoConnectionGuardChecks {
         `connection ${data.connectionId} does not exist`,
       );
     }
+
     if (!ALLOWED_FROM[command].includes(state.state)) {
       throw new SsoConnectionInvalidTransitionError(
         `connection ${data.connectionId}: ${command} is not allowed from ${state.state}`,
       );
     }
+
     return state;
   }
 
@@ -135,17 +137,22 @@ export class SsoConnectionGuardChecks {
         `a ${actor.type} actor is not a platform operator and may not ${act}`,
       );
     }
+
     const isOperator = await this.platformOperators.isPlatformOperator({
       actorId: actor.id,
     });
-    if (isOperator) return;
+    if (isOperator) {
+      return;
+    }
     throw new SsoConnectionOperatorActRequiredError(
       `actor ${actor.id} is not a platform operator and may not ${act}`,
     );
   }
 
   assertClaimed({ state, domain }: { state: SsoConnectionState; domain: string }): void {
-    if (state.claimedDomains.includes(domain)) return;
+    if (state.claimedDomains.includes(domain)) {
+      return;
+    }
     throw new SsoConnectionInvalidTransitionError(
       `connection ${state.connectionId}: ${domain} has no claim awaiting a decision`,
     );

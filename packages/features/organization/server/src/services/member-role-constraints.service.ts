@@ -18,8 +18,12 @@ export const ORGANIZATION_TO_TEAM_ROLE_MAP: Record<OrganizationUserRole, TeamUse
 } as const;
 
 export function getOrganizationRoleLabel(role: OrganizationUserRole): string {
-  if (role === OrganizationUserRole.ADMIN) return "Organization Admin";
-  if (role === OrganizationUserRole.MEMBER) return "Organization Member";
+  if (role === OrganizationUserRole.ADMIN) {
+    return "Organization Admin";
+  }
+  if (role === OrganizationUserRole.MEMBER) {
+    return "Organization Member";
+  }
   return "Lite Member";
 }
 
@@ -54,7 +58,9 @@ export function isBindingRoleAllowedForOrganizationRole(params: {
   role: TeamRoleValue;
 }): boolean {
   const { organizationRole, role } = params;
-  if (organizationRole !== OrganizationUserRole.EXTERNAL) return true;
+  if (organizationRole !== OrganizationUserRole.EXTERNAL) {
+    return true;
+  }
   return isTeamRoleAllowedForOrganizationRole({
     organizationRole,
     teamRole: role,

@@ -38,7 +38,9 @@ const fallbackPollMs = 750;
 const confirmPollMs = 250;
 
 export function abortableDelay(ms: number, signal: AbortSignal): Promise<boolean> {
-  if (signal.aborted) return Promise.resolve(false);
+  if (signal.aborted) {
+    return Promise.resolve(false);
+  }
 
   return new Promise<boolean>((resolve) => {
     const onAbort = () => {
@@ -59,7 +61,9 @@ export function settlementFromEvents(
 ): TurnSettlement | null {
   for (const event of events) {
     const settlement = settlementFromEvent(event, turnId);
-    if (settlement) return settlement;
+    if (settlement) {
+      return settlement;
+    }
   }
 
   return null;
@@ -124,14 +128,22 @@ async function readSettlementFromFold(input: {
         after: cursor,
       })
       .catch((error: unknown) => {
-        if (error instanceof LangyConversationNotFoundError) return null;
+        if (error instanceof LangyConversationNotFoundError) {
+          return null;
+        }
         throw error;
       });
-    if (!page) return null;
+    if (!page) {
+      return null;
+    }
 
     const settlement = settlementFromEvents(page.events, input.turnId);
-    if (settlement) return settlement;
-    if (!page.truncated) return null;
+    if (settlement) {
+      return settlement;
+    }
+    if (!page.truncated) {
+      return null;
+    }
 
     cursor = page.cursor;
   }
@@ -155,7 +167,9 @@ async function watchBufferForTerminal(
     conversationId: input.conversationId,
     turnId: input.turnId,
   });
-  if (reads.some(({ entry }) => isTerminalFrame(entry))) return;
+  if (reads.some(({ entry }) => isTerminalFrame(entry))) {
+    return;
+  }
 
   for await (const { entry } of buffer.follow({
     conversationId: input.conversationId,
@@ -163,7 +177,9 @@ async function watchBufferForTerminal(
     fromId: lastId,
     signal: input.signal,
   })) {
-    if (isTerminalFrame(entry)) return;
+    if (isTerminalFrame(entry)) {
+      return;
+    }
   }
 
   await neverSettles();
@@ -199,9 +215,12 @@ async function waitForNextPoll(
   const delay: Promise<"tick" | "abort"> = abortableDelay(pollMs, signal).then(
     (completed): "tick" | "abort" => (completed ? "tick" : "abort"),
   );
-  if (!terminalSeen) return delay;
+  if (!terminalSeen) {
+    return delay;
+  }
 
   const terminal: Promise<"terminal"> = terminalSeen.then((): "terminal" => "terminal");
+
   return Promise.race([terminal, delay]);
 }
 
@@ -222,10 +241,14 @@ export async function awaitTurnSettlement(input: {
   try {
     while (!input.signal.aborted) {
       const settlement = await readSettlementFromFold(input);
-      if (settlement) return settlement;
+      if (settlement) {
+        return settlement;
+      }
 
       const outcome = await waitForNextPoll(terminalSeen, pollMs, input.signal);
-      if (outcome === "abort") return null;
+      if (outcome === "abort") {
+        return null;
+      }
       if (outcome === "terminal") {
         terminalSeen = null;
         pollMs = confirmPollMs;

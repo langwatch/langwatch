@@ -105,6 +105,7 @@ export function langyTurnIdentity(input: {
     .update(input.modelOverride ?? "")
     .digest("hex")
     .slice(0, 32);
+
   return { turnId: `langyturn_${digest}`, messageId: `langymsg_${digest}` };
 }
 
@@ -122,7 +123,9 @@ export function composeLangyTurnPrompt({
   const preamble = [contextBlock, capNote]
     .map((block) => (block ?? "").trim())
     .filter((block) => block.length > 0);
-  if (preamble.length === 0) return { prompt: userText, labelled: false };
+  if (preamble.length === 0) {
+    return { prompt: userText, labelled: false };
+  }
   return {
     prompt: [...preamble, `${LANGY_USER_MESSAGE_LABEL}\n${userText}`].join("\n\n"),
     labelled: true,
@@ -164,7 +167,10 @@ export async function reconstructPartialAnswer(
   const { reads } = await tokenBuffer.readTail({ conversationId, turnId });
   let text = "";
   for (const { entry } of reads) {
-    if (entry.type === "delta") text += entry.text;
+    if (entry.type === "delta") {
+      text += entry.text;
+    }
   }
+
   return text;
 }

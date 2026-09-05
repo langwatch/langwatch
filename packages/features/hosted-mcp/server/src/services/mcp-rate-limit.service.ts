@@ -25,7 +25,9 @@ export class McpRateLimitService {
   /** Whether the address has already spent its window. Does not record. */
   isBlocked(ip: string): boolean {
     const entry = this.entries.get(ip);
-    if (!entry || Date.now() - entry.windowStart > this.windowMs) return false;
+    if (!entry || Date.now() - entry.windowStart > this.windowMs) {
+      return false;
+    }
     return entry.count >= this.maxRequests;
   }
 
@@ -35,8 +37,10 @@ export class McpRateLimitService {
     const entry = this.entries.get(ip);
     if (!entry || now - entry.windowStart > this.windowMs) {
       this.entries.set(ip, { count: 1, windowStart: now });
+
       return;
     }
+
     entry.count++;
   }
 
@@ -44,7 +48,9 @@ export class McpRateLimitService {
   sweep(): void {
     const now = Date.now();
     for (const [ip, entry] of this.entries) {
-      if (now - entry.windowStart > this.windowMs) this.entries.delete(ip);
+      if (now - entry.windowStart > this.windowMs) {
+        this.entries.delete(ip);
+      }
     }
   }
 

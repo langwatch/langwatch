@@ -71,12 +71,17 @@ export class TraceAttributeCap {
    * can name what was cut. Returns null for non-data-url strings.
    */
   private static dataUrlMimeType(value: string): string | null {
-    if (!value.startsWith("data:")) return null;
+    if (!value.startsWith("data:")) {
+      return null;
+    }
     const commaIdx = value.indexOf(",");
-    if (commaIdx === -1) return null;
+    if (commaIdx === -1) {
+      return null;
+    }
     const header = value.slice(5, commaIdx); // strip "data:"
     const semiIdx = header.indexOf(";");
     const mimeType = semiIdx === -1 ? header : header.slice(0, semiIdx);
+
     return mimeType || null;
   }
 
@@ -92,7 +97,9 @@ export class TraceAttributeCap {
    * kvlists so blobs nested inside structured params are caught too.
    */
   private static capAnyValue(value: OtlpAnyValue, maxBytes: number): boolean {
-    if (value == null || typeof value !== "object") return false;
+    if (value == null || typeof value !== "object") {
+      return false;
+    }
 
     let capped = false;
 
@@ -125,13 +132,17 @@ export class TraceAttributeCap {
 
     if (value.arrayValue && Array.isArray(value.arrayValue.values)) {
       for (const item of value.arrayValue.values) {
-        if (TraceAttributeCap.capAnyValue(item, maxBytes)) capped = true;
+        if (TraceAttributeCap.capAnyValue(item, maxBytes)) {
+          capped = true;
+        }
       }
     }
 
     if (value.kvlistValue && Array.isArray(value.kvlistValue.values)) {
       for (const entry of value.kvlistValue.values) {
-        if (entry?.value && TraceAttributeCap.capAnyValue(entry.value, maxBytes)) capped = true;
+        if (entry?.value && TraceAttributeCap.capAnyValue(entry.value, maxBytes)) {
+          capped = true;
+        }
       }
     }
 
@@ -140,11 +151,16 @@ export class TraceAttributeCap {
 
   /** Caps every value in an attribute list in place. */
   private static capAttributeList(attributes: AttributeList, maxBytes: number): number {
-    if (!Array.isArray(attributes)) return 0;
+    if (!Array.isArray(attributes)) {
+      return 0;
+    }
     let count = 0;
     for (const attr of attributes) {
-      if (attr?.value && TraceAttributeCap.capAnyValue(attr.value, maxBytes)) count++;
+      if (attr?.value && TraceAttributeCap.capAnyValue(attr.value, maxBytes)) {
+        count++;
+      }
     }
+
     return count;
   }
 
@@ -157,7 +173,9 @@ export class TraceAttributeCap {
    * Mirrors the traversal shape of `capAnyValue` exactly.
    */
   static valueExceeds(value: OtlpAnyValue | null | undefined, maxBytes: number): boolean {
-    if (value == null || typeof value !== "object") return false;
+    if (value == null || typeof value !== "object") {
+      return false;
+    }
 
     if (
       typeof value.stringValue === "string" &&
@@ -171,18 +189,24 @@ export class TraceAttributeCap {
         value.bytesValue instanceof Uint8Array
           ? value.bytesValue.byteLength
           : Buffer.byteLength(String(value.bytesValue), "utf8");
-      if (byteSize > maxBytes) return true;
+      if (byteSize > maxBytes) {
+        return true;
+      }
     }
 
     if (value.arrayValue && Array.isArray(value.arrayValue.values)) {
       for (const item of value.arrayValue.values) {
-        if (TraceAttributeCap.valueExceeds(item, maxBytes)) return true;
+        if (TraceAttributeCap.valueExceeds(item, maxBytes)) {
+          return true;
+        }
       }
     }
 
     if (value.kvlistValue && Array.isArray(value.kvlistValue.values)) {
       for (const entry of value.kvlistValue.values) {
-        if (entry?.value && TraceAttributeCap.valueExceeds(entry.value, maxBytes)) return true;
+        if (entry?.value && TraceAttributeCap.valueExceeds(entry.value, maxBytes)) {
+          return true;
+        }
       }
     }
 
@@ -207,31 +231,43 @@ export class TraceAttributeCap {
     try {
       if (Array.isArray(span.attributes)) {
         for (const attr of span.attributes) {
-          if (attr?.value && TraceAttributeCap.valueExceeds(attr.value, maxBytes)) return true;
+          if (attr?.value && TraceAttributeCap.valueExceeds(attr.value, maxBytes)) {
+            return true;
+          }
         }
       }
+
       for (const event of span.events ?? []) {
         if (Array.isArray(event.attributes)) {
           for (const attr of event.attributes) {
-            if (attr?.value && TraceAttributeCap.valueExceeds(attr.value, maxBytes)) return true;
+            if (attr?.value && TraceAttributeCap.valueExceeds(attr.value, maxBytes)) {
+              return true;
+            }
           }
         }
       }
+
       for (const link of span.links ?? []) {
         if (Array.isArray(link.attributes)) {
           for (const attr of link.attributes) {
-            if (attr?.value && TraceAttributeCap.valueExceeds(attr.value, maxBytes)) return true;
+            if (attr?.value && TraceAttributeCap.valueExceeds(attr.value, maxBytes)) {
+              return true;
+            }
           }
         }
       }
+
       if (resource && Array.isArray(resource.attributes)) {
         for (const attr of resource.attributes) {
-          if (attr?.value && TraceAttributeCap.valueExceeds(attr.value, maxBytes)) return true;
+          if (attr?.value && TraceAttributeCap.valueExceeds(attr.value, maxBytes)) {
+            return true;
+          }
         }
       }
     } catch {
       return false;
     }
+
     return false;
   }
 
@@ -255,15 +291,18 @@ export class TraceAttributeCap {
       for (const event of span.events ?? []) {
         count += TraceAttributeCap.capAttributeList(event.attributes, maxBytes);
       }
+
       for (const link of span.links ?? []) {
         count += TraceAttributeCap.capAttributeList(link.attributes, maxBytes);
       }
+
       if (resource) {
         count += TraceAttributeCap.capAttributeList(resource.attributes, maxBytes);
       }
     } catch {
       // Degraded, not broken: never block ingestion on a malformed value.
     }
+
     return count;
   }
 }

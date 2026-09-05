@@ -70,7 +70,9 @@ export class ScimSyncGuards {
    */
   async issueScimToken(data: IssueScimTokenCommandData): Promise<ScimSyncFactInput[]> {
     const state = await this.load(data);
-    if (state && state.state !== "REVOKED") return [];
+    if (state && state.state !== "REVOKED") {
+      return [];
+    }
     return [
       {
         type: SCIM_TOKEN_ISSUED_EVENT_TYPE,
@@ -87,7 +89,9 @@ export class ScimSyncGuards {
 
   async recordScimUserPush(data: RecordScimUserPushCommandData): Promise<ScimSyncFactInput[]> {
     const state = await this.load(data);
-    if (state?.state === "REVOKED") return [];
+    if (state?.state === "REVOKED") {
+      return [];
+    }
     return [
       {
         type: SCIM_USER_PUSHED_EVENT_TYPE,
@@ -108,7 +112,9 @@ export class ScimSyncGuards {
     data: RecordScimGroupMappingCommandData,
   ): Promise<ScimSyncFactInput[]> {
     const state = await this.load(data);
-    if (state?.state === "REVOKED") return [];
+    if (state?.state === "REVOKED") {
+      return [];
+    }
     return [
       {
         type: SCIM_GROUP_MAPPED_EVENT_TYPE,
@@ -134,7 +140,9 @@ export class ScimSyncGuards {
     data: RecordScimApplyFailureCommandData,
   ): Promise<ScimSyncFactInput[]> {
     const state = await this.load(data);
-    if (state?.state === "REVOKED") return [];
+    if (state?.state === "REVOKED") {
+      return [];
+    }
 
     const identity = {
       scimSyncId: data.scimSyncId,
@@ -166,13 +174,16 @@ export class ScimSyncGuards {
         },
       });
     }
+
     return facts;
   }
 
   /** The connection's sync ends. Idempotent: a second revoke states nothing. */
   async revokeScimSync(data: RevokeScimSyncCommandData): Promise<ScimSyncFactInput[]> {
     const state = await this.load(data);
-    if (state?.state === "REVOKED") return [];
+    if (state?.state === "REVOKED") {
+      return [];
+    }
     return [
       {
         type: SCIM_TOKEN_REVOKED_EVENT_TYPE,
@@ -199,7 +210,9 @@ export class ScimSyncGuards {
 
   /** The recovery fact, when there is a standing failure for a push to end. */
   private recoveryOf(state: ScimSyncState | null): ScimSyncFactInput[] {
-    if (!state || state.state !== "ERROR" || !state.lastFailure) return [];
+    if (!state || state.state !== "ERROR" || !state.lastFailure) {
+      return [];
+    }
     return [
       {
         type: SCIM_APPLY_RECOVERED_EVENT_TYPE,
@@ -233,6 +246,7 @@ export class ScimSyncGuards {
       standing.op === data.op &&
       standing.errorCode === data.errorCode &&
       standing.userId === data.userId;
+
     return continues ? standing.attempts + 1 : 1;
   }
 }

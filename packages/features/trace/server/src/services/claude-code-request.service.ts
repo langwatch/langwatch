@@ -50,6 +50,7 @@ export class ClaudeCodeRequest {
         }
       }
     }
+
     return out;
   }
 
@@ -76,6 +77,7 @@ export class ClaudeCodeRequest {
       if (content.length === 0) {
         continue;
       }
+
       out.push({ role, content });
     }
 
@@ -97,6 +99,7 @@ export class ClaudeCodeRequest {
     }
 
     const result = requestBodySchema.safeParse(parsed);
+
     return result.success ? result.data : null;
   }
 
@@ -115,6 +118,7 @@ export class ClaudeCodeRequest {
    */
   static extractToolResultsFromRequestBody(raw: unknown): Map<string, string> {
     const parsed = ClaudeCodeRequest.tryParseRequestBody(raw);
+
     return parsed === null ? new Map() : ClaudeCodeRequest.extractToolResults(parsed);
   }
 
@@ -139,6 +143,7 @@ export class ClaudeCodeRequest {
     if (parsed !== null) {
       return ClaudeCodeRequest.buildInputMessages(parsed);
     }
+
     return typeof raw === "string" ? ClaudeCodeTruncatedRequest.trySalvage(raw) : null;
   }
 

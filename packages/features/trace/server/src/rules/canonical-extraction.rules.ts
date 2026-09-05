@@ -283,18 +283,18 @@ export const spanTypeToGenAiOperationName = (t: unknown): string | null => {
 };
 
 export const ALLOWED_SPAN_TYPES: Readonly<Record<string, true>> = {
-  "span": true,
-  "llm": true,
-  "tool": true,
-  "agent": true,
-  "rag": true,
-  "workflow": true,
-  "component": true,
-  "evaluation": true,
-  "server": true,
-  "client": true,
-  "producer": true,
-  "consumer": true,
+  span: true,
+  llm: true,
+  tool: true,
+  agent: true,
+  rag: true,
+  workflow: true,
+  component: true,
+  evaluation: true,
+  server: true,
+  client: true,
+  producer: true,
+  consumer: true,
 };
 
 /**

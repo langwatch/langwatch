@@ -22,7 +22,9 @@ export class DataPrivacyPolicyCache {
     facts: DataPrivacyScopeFacts;
   }): Promise<ResolvedDataPrivacy> {
     const cached = this.entries.get(input.projectId);
-    if (cached && cached.expiresAt > this.now()) return cached.value;
+    if (cached && cached.expiresAt > this.now()) {
+      return cached.value;
+    }
     this.entries.delete(input.projectId);
     const value = resolveDataPrivacy({
       rows: await this.repository.findForProjectChain({
@@ -32,6 +34,7 @@ export class DataPrivacyPolicyCache {
       facts: input.facts,
     });
     this.entries.set(input.projectId, { value, expiresAt: this.now() + this.ttlMs });
+
     return value;
   }
 

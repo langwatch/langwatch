@@ -94,8 +94,10 @@ export class VerificationCeremonyService {
         { userId, identifierId, state: head?.state ?? "missing" },
         "verification mint refused: not an ATTACHED email identifier of this user",
       );
+
       throw new IdentityVerificationInvalidError();
     }
+
     const verificationId = generate("verif").toString();
     const token = mintVerificationToken();
     const expiresAtMs = this.now() + IDENTITY_VERIFICATION_TTL_MS;
@@ -107,6 +109,7 @@ export class VerificationCeremonyService {
       codeChallenge,
       expiresAtMs,
     });
+
     return { verificationId, token, expiresAtMs };
   }
 
@@ -139,14 +142,18 @@ export class VerificationCeremonyService {
         { userId, identifierId, verificationId, reason },
         "verification completion refused",
       );
+
       throw new IdentityVerificationInvalidError();
     };
 
     if (!(await this.deps.isLatched({ userId }))) {
       refuse("user's identifier backfill is not finalized; no live events yet");
     }
+
     const record = await this.store.tryFindByIdentifierId({ identifierId });
-    if (!record) refuse("no ceremony in flight for this identifier");
+    if (!record) {
+      refuse("no ceremony in flight for this identifier");
+    }
     if (
       record.verificationId !== verificationId ||
       record.identifierId !== identifierId ||
@@ -156,19 +163,24 @@ export class VerificationCeremonyService {
       // (verificationId, identifierId, userId) triple, checked whole.
       refuse("record pin mismatch");
     }
+
     if (this.now() > record.expiresAtMs) {
       logger.warn(
         { userId, identifierId, verificationId },
         "verification completion refused: expired",
       );
+
       throw new IdentityVerificationExpiredError();
     }
+
     if (!safeEqual(sha256Hex(token), record.tokenHash)) {
       refuse("token hash mismatch");
     }
+
     if (!safeEqual(s256Challenge(codeVerifier), record.codeChallenge)) {
       refuse("PKCE verifier does not match the bound challenge");
     }
+
     // Dispatch BEFORE consuming: if persistence rejects, the record survives
     // and the same valid link retries. The command is idempotent, so a
     // concurrent identical completion cannot double-verify.
@@ -215,6 +227,7 @@ export class VerificationCeremonyService {
     verificationId: string;
   }): never {
     logger.warn(context, "verification completion dead-ended: another user holds this address");
+
     throw new IdentityEmailInUseError(
       "complete_email_verification: another user's verified identifier holds this address",
     );

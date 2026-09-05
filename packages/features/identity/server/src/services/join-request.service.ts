@@ -46,6 +46,7 @@ export class JoinRequestService {
 
   async requestJoin(input: RequestJoinCommandData): Promise<JoinRequestFact[]> {
     const data = requestJoinCommandDataSchema.parse(input);
+
     return this.commit(
       { type: REQUEST_JOIN_COMMAND_TYPE, data },
       await this.guards.requestJoin(data),
@@ -54,6 +55,7 @@ export class JoinRequestService {
 
   async approveJoin(input: ApproveJoinCommandData): Promise<JoinRequestFact[]> {
     const data = approveJoinCommandDataSchema.parse(input);
+
     return this.commit(
       { type: APPROVE_JOIN_COMMAND_TYPE, data },
       await this.guards.approveJoin(data),
@@ -62,6 +64,7 @@ export class JoinRequestService {
 
   async rejectJoin(input: RejectJoinCommandData): Promise<JoinRequestFact[]> {
     const data = rejectJoinCommandDataSchema.parse(input);
+
     return this.commit(
       { type: REJECT_JOIN_COMMAND_TYPE, data },
       await this.guards.rejectJoin(data),
@@ -70,6 +73,7 @@ export class JoinRequestService {
 
   async withdrawJoin(input: WithdrawJoinCommandData): Promise<JoinRequestFact[]> {
     const data = withdrawJoinCommandDataSchema.parse(input);
+
     return this.commit(
       { type: WITHDRAW_JOIN_COMMAND_TYPE, data },
       await this.guards.withdrawJoin(data),
@@ -78,6 +82,7 @@ export class JoinRequestService {
 
   async expireJoin(input: ExpireJoinCommandData): Promise<JoinRequestFact[]> {
     const data = expireJoinCommandDataSchema.parse(input);
+
     return this.commit(
       { type: EXPIRE_JOIN_COMMAND_TYPE, data },
       await this.guards.expireJoin(data),
@@ -90,7 +95,9 @@ export class JoinRequestService {
     command: JoinRequestCommand,
     facts: JoinRequestFactInput[],
   ): Promise<JoinRequestFact[]> {
-    if (facts.length === 0) return [];
+    if (facts.length === 0) {
+      return [];
+    }
     return this.ledger.commit({ command, facts });
   }
 }

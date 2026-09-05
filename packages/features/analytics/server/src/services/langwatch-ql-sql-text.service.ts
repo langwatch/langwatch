@@ -52,6 +52,7 @@ export function assertIdentifier(value: string, role: string): string {
   if (!SAFE_IDENTIFIER.test(value)) {
     throw new Error(`lwql: ${role} must match ${String(SAFE_IDENTIFIER)}, got "${value}"`);
   }
+
   return value;
 }
 

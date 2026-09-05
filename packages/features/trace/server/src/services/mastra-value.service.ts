@@ -78,6 +78,7 @@ export class MastraValues {
    */
   static tryExtractTextFromOutput(output: unknown): string | null {
     const parsed = outputSchema.safeParse(output);
+
     return parsed.success && parsed.data.text ? parsed.data.text : null;
   }
 
@@ -89,7 +90,9 @@ export class MastraValues {
     if (!body) {
       return false;
     }
+
     const rf = body.response_format;
+
     return rf !== void 0 && rf !== null && typeof rf === "object";
   }
 
@@ -99,6 +102,7 @@ export class MastraValues {
    */
   static tryExtractBodyFromModelStepInput(input: unknown): Record<string, unknown> | null {
     const parsed = modelStepInputSchema.safeParse(input);
+
     return parsed.success ? parsed.data.body : null;
   }
 
@@ -109,6 +113,7 @@ export class MastraValues {
   static tryExtractModelFromMetadata(attrs: { get: (key: string) => unknown }): string | null {
     const metadata = attrs.get("mastra.metadata.modelMetadata");
     const parsed = modelMetadataSchema.safeParse(metadata);
+
     return parsed.success && parsed.data.modelId.length > 0 ? parsed.data.modelId : null;
   }
 
@@ -126,10 +131,12 @@ export class MastraValues {
     if (parsed.data.object !== void 0 && parsed.data.object !== null) {
       return parsed.data.object;
     }
+
     // Fall back to text
     if (parsed.data.text) {
       return parsed.data.text;
     }
+
     return null;
   }
 
@@ -153,16 +160,20 @@ export class MastraValues {
           if (!parsed.success) {
             return null;
           }
+
           if (parsed.data.text) {
             return parsed.data.text;
           }
+
           if (parsed.data.content) {
             return parsed.data.content;
           }
+
           return null;
         })
         .filter(Boolean);
       const joined = parts.join("\n");
+
       return joined.length > 0 ? joined : null;
     }
 
@@ -170,6 +181,7 @@ export class MastraValues {
     if (parsed.success && parsed.data.text) {
       return parsed.data.text;
     }
+
     if (parsed.success && parsed.data.content) {
       return parsed.data.content;
     }
@@ -196,6 +208,7 @@ export class MastraValues {
         return text;
       }
     }
+
     return null;
   }
 
@@ -219,8 +232,10 @@ export class MastraValues {
       if (systemPrompt) {
         // Take first ~60 chars of the system prompt as description
         const desc = systemPrompt.length > 60 ? systemPrompt.slice(0, 57) + "..." : systemPrompt;
+
         return `Eval: ${desc}`;
       }
+
       return modelName ? `Eval: ${modelName}` : "Eval";
     }
 

@@ -68,7 +68,9 @@ export const LWQL_POSTGRES_SCHEMA = "public";
  * the exact failure this function exists to close.
  */
 export function lwqlPostgresSchemaFromDatabaseUrl(databaseUrl: string | undefined): string {
-  if (!databaseUrl) return LWQL_POSTGRES_SCHEMA;
+  if (!databaseUrl) {
+    return LWQL_POSTGRES_SCHEMA;
+  }
   let url: URL;
   try {
     url = new URL(databaseUrl);
@@ -77,6 +79,7 @@ export function lwqlPostgresSchemaFromDatabaseUrl(databaseUrl: string | undefine
       "lwql provisioning: DATABASE_URL is set but not a parseable URL, cannot determine the PostgreSQL schema for the approved views",
     );
   }
+
   // `||`, not `??`: a bare `?schema=` means "no schema named", the same way
   // `prismaPgAdapter.ts` reads this URL — not a request for a view named "".
   return url.searchParams.get("schema") || LWQL_POSTGRES_SCHEMA;
@@ -204,7 +207,9 @@ export function productionPostgresReaderGrantStatements({
   views?: readonly LangWatchQLViewDefinition[];
 } = {}): string[] {
   const approvedViews = lwqlApprovedPostgresViewNames(views);
-  if (approvedViews.length === 0) return [];
+  if (approvedViews.length === 0) {
+    return [];
+  }
 
   const quotedSchema = postgresQuoted(schema);
   const quotedRole = postgresQuoted(role);
@@ -270,8 +275,11 @@ export function planLwqlKeyMapBackfill({
       blankKeyProjectIds.push(project.id);
       continue;
     }
+
     const hash = lwqlTenantCapability({ secret: project.lwqlKey });
-    if (existingHashes.has(hash) || plannedHashes.has(hash)) continue;
+    if (existingHashes.has(hash) || plannedHashes.has(hash)) {
+      continue;
+    }
     plannedHashes.add(hash);
     rowsToInsert.push({
       [KEY_MAP_COLUMNS.keyHash]: hash,

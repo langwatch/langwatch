@@ -50,11 +50,14 @@ export class ClaudeCodeResponse {
       if (block.type !== "text") {
         continue;
       }
+
       if (!block.text) {
         continue;
       }
+
       parts.push(block.text);
     }
+
     if (parts.length === 0) {
       return null;
     }
@@ -79,13 +82,16 @@ export class ClaudeCodeResponse {
       if (raw.length === 0) {
         return null;
       }
+
       try {
         parsed = JSON.parse(raw);
       } catch {
         return null;
       }
     }
+
     const result = responseBodySchema.safeParse(parsed);
+
     return result.success ? result.data : null;
   }
 
@@ -104,9 +110,11 @@ export class ClaudeCodeResponse {
         parts.push(args ? `[tool_use: ${block.name}]\n${args}` : `[tool_use: ${block.name}]`);
       }
     }
+
     if (parts.length === 0) {
       return null;
     }
+
     return capPayloadString(parts.join("\n\n"), void 0, "assistant_output");
   }
 
@@ -117,12 +125,14 @@ export class ClaudeCodeResponse {
     }
 
     const title = parsed.title.trim();
+
     return title.length > 0 ? title.slice(0, MAX_SESSION_TITLE_CHARS) : null;
   }
 
   private static tryParseJson<T>(raw: string, schema: z.ZodType<T>): T | null {
     try {
       const result = schema.safeParse(JSON.parse(raw));
+
       return result.success ? result.data : null;
     } catch {
       return null;
@@ -197,6 +207,7 @@ export class ClaudeCodeResponse {
     if (trimmed.length === 0) {
       return null;
     }
+
     return trimmed.slice(0, MAX_SESSION_TITLE_CHARS);
   }
 
@@ -223,6 +234,7 @@ export class ClaudeCodeResponse {
     if (fiveMinute <= 0 && oneHour <= 0) {
       return null;
     }
+
     return {
       ephemeral5mInputTokens: fiveMinute,
       ephemeral1hInputTokens: oneHour,

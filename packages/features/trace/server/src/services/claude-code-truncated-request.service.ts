@@ -40,34 +40,47 @@ class JsonScan {
     if (this.inString) {
       return this.stepInsideString(ch);
     }
+
     if (ch === '"') {
       this.inString = true;
+
       return "string-open";
     }
+
     if (ch === "{" || ch === "[") {
       this.depth++;
+
       return "depth-in";
     }
+
     if (ch === "}" || ch === "]") {
       this.depth--;
+
       return "depth-out";
     }
+
     return "literal";
   }
 
   private stepInsideString(ch: string | undefined): JsonScanEvent {
     if (this.escaped) {
       this.escaped = false;
+
       return "string-content";
     }
+
     if (ch === "\\") {
       this.escaped = true;
+
       return "string-content";
     }
+
     if (ch === '"') {
       this.inString = false;
+
       return "string-close";
     }
+
     return "string-content";
   }
 }
@@ -93,12 +106,14 @@ export class ClaudeCodeTruncatedRequest {
     if (system === null) {
       return null;
     }
+
     const text = system.isComplete
       ? contentToText(ClaudeCodeTruncatedRequest.safeParse(system.slice) ?? system.slice)
       : ClaudeCodeTruncatedRequest.salvagePartialText(system.slice);
     if (!text || text.length === 0) {
       return null;
     }
+
     return {
       role: "system",
       content: system.isComplete
@@ -115,18 +130,22 @@ export class ClaudeCodeTruncatedRequest {
     if (!Array.isArray(parsed)) {
       return [];
     }
+
     const out: Array<{ role: string; content: string }> = [];
     for (const entry of parsed) {
       if (!isRecord(entry)) {
         continue;
       }
+
       const { role, content } = entry;
       const text = contentToText(content);
       if (text.length === 0) {
         continue;
       }
+
       out.push({ role: typeof role === "string" ? role : "user", content: text });
     }
+
     return out;
   }
 
@@ -135,6 +154,7 @@ export class ClaudeCodeTruncatedRequest {
     if (value === null) {
       return null;
     }
+
     return value.isComplete
       ? ClaudeCodeTruncatedRequest.safeParse(value.slice)
       : ClaudeCodeTruncatedRequest.salvageCompleteArrayElements(value.slice);
@@ -160,6 +180,7 @@ export class ClaudeCodeTruncatedRequest {
         return ClaudeCodeTruncatedRequest.scanValueSpan(raw, i + needle.length);
       }
     }
+
     return null;
   }
 
@@ -178,6 +199,7 @@ export class ClaudeCodeTruncatedRequest {
         return { slice: raw.slice(start, i + 1), isComplete: true };
       }
     }
+
     return { slice: raw.slice(start), isComplete: false };
   }
 
@@ -199,9 +221,11 @@ export class ClaudeCodeTruncatedRequest {
         if (parsed !== null) {
           elements.push(parsed);
         }
+
         elementStart = -1;
       }
     }
+
     return elements;
   }
 
@@ -216,13 +240,16 @@ export class ClaudeCodeTruncatedRequest {
     if (fragment.startsWith('"')) {
       return ClaudeCodeTruncatedRequest.decodePartialJsonString(fragment.slice(1));
     }
+
     if (fragment.startsWith("[")) {
       const parts = [
         contentToText(ClaudeCodeTruncatedRequest.salvageCompleteArrayElements(fragment)),
         ClaudeCodeTruncatedRequest.cutBlockText(fragment) ?? "",
       ].filter((part) => part.length > 0);
+
       return parts.length > 0 ? parts.join("\n\n") : null;
     }
+
     return null;
   }
 
@@ -233,10 +260,12 @@ export class ClaudeCodeTruncatedRequest {
     if (lastTextKey === -1) {
       return null;
     }
+
     const afterKey = fragment.slice(lastTextKey + key.length).trimStart();
     if (!afterKey.startsWith('"') || ClaudeCodeTruncatedRequest.isClosedString(afterKey)) {
       return null;
     }
+
     return ClaudeCodeTruncatedRequest.decodePartialJsonString(afterKey.slice(1));
   }
 
@@ -248,6 +277,7 @@ export class ClaudeCodeTruncatedRequest {
         escaped = false;
         continue;
       }
+
       const ch = fragment[i];
       if (ch === "\\") {
         escaped = true;
@@ -255,6 +285,7 @@ export class ClaudeCodeTruncatedRequest {
         return true;
       }
     }
+
     return false;
   }
 
@@ -270,16 +301,20 @@ export class ClaudeCodeTruncatedRequest {
       const end = `"${body}`.indexOf('"', 1);
       body = `"${body}`.slice(1, end);
     }
+
     // Trim a trailing incomplete \uXXXX escape, then a trailing lone backslash.
     body = body.replace(/\\u[0-9a-fA-F]{0,3}$/, "");
     let backslashes = 0;
     for (let i = body.length - 1; i >= 0 && body[i] === "\\"; i--) {
       backslashes++;
     }
+
     if (backslashes % 2 === 1) {
       body = body.slice(0, -1);
     }
+
     const parsed = ClaudeCodeTruncatedRequest.safeParse(`"${body}"`);
+
     return typeof parsed === "string" && parsed.length > 0 ? parsed : null;
   }
 
@@ -309,6 +344,7 @@ export class ClaudeCodeTruncatedRequest {
     if (out.length === 0) {
       return null;
     }
+
     if (messages?.isComplete !== true || system === null || !system.isComplete) {
       out.push({
         role: "system",
@@ -316,6 +352,7 @@ export class ClaudeCodeTruncatedRequest {
           "[request body truncated by claude's 60KB telemetry cap, later turns and remaining context omitted]",
       });
     }
+
     return out;
   }
 }

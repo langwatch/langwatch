@@ -71,6 +71,7 @@ export function planIdentifiers({
     },
     ...accounts.map((account) => {
       const provider = identifierProviderFor(account.provider);
+
       return {
         provider,
         providerId: account.provider,
@@ -87,6 +88,7 @@ export function planIdentifiers({
       };
     }),
   ];
+
   return planned.map((plan) => ({
     ...plan,
     identifierId: deriveIdentifierId({

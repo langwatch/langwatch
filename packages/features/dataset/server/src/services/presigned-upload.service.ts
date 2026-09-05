@@ -60,6 +60,7 @@ export const STALE_PROCESSING_TTL_SECONDS = 60 * 60;
  */
 export const stagingUploadKey = (projectId: string, uploadId: string): string => {
   assertNoTraversal(projectId, uploadId);
+
   return `staging/${projectId}/${uploadId}`;
 };
 
@@ -74,6 +75,7 @@ export const stagingUploadKey = (projectId: string, uploadId: string): string =>
  */
 export const localStagingUploadPath = (projectId: string, uploadId: string): string => {
   assertNoTraversal(projectId, uploadId);
+
   return `/api/dataset/direct-upload/staging/${uploadId}?projectId=${encodeURIComponent(
     projectId,
   )}`;

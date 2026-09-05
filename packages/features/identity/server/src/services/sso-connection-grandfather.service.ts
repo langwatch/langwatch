@@ -95,7 +95,9 @@ export class SsoConnectionGrandfatherService {
     const legacy = await this.deps.legacy.tryFindLegacySso({ organizationId });
     // Nothing to grandfather is a finished organization, not a skipped one:
     // there is no legacy path left for it to be held on.
-    if (!legacy) return { status: "finalized", report: { kind: "no_legacy_sso" } };
+    if (!legacy) {
+      return { status: "finalized", report: { kind: "no_legacy_sso" } };
+    }
 
     const domains = [normalizeDomain(legacy.ssoDomain)];
     const connectionId = grandfatheredSsoConnectionId({ organizationId });
@@ -148,7 +150,9 @@ export class SsoConnectionGrandfatherService {
         this.deps.connectionRouting.tryFindConnectionForDomain({ domain }),
       ]);
       const comparison = compareConnectionRouting({ legacy, connection });
-      if (!comparison.matches) disagreements.push({ domain, comparison });
+      if (!comparison.matches) {
+        disagreements.push({ domain, comparison });
+      }
     }
 
     if (disagreements.length > 0) {
@@ -157,6 +161,7 @@ export class SsoConnectionGrandfatherService {
         report: { kind: "routing_disagreement", connectionId, disagreements },
       };
     }
+
     return {
       status: "finalized",
       report: {

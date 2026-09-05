@@ -94,6 +94,7 @@ export class GenAiSpan {
             }
           }
         }
+
         if (textParts.length > 0) {
           ctx.setAttr(ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS, textParts.join("\n"));
           ctx.recordRule(`${GEN_AI_RULE_PREFIX}:system_instructions(array)`);
@@ -112,8 +113,10 @@ export class GenAiSpan {
           if (stripped.length > 0) {
             ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, stripped);
           }
+
           ctx.recordRule(`${GEN_AI_RULE_PREFIX}:system_instruction(existing)`);
         }
+
         if (
           ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] !== void 0 ||
           attrs.has(ATTR_KEYS.GEN_AI_INPUT_MESSAGES)
@@ -219,21 +222,27 @@ export class GenAiSpan {
       if (temperature !== null) {
         ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_TEMPERATURE, temperature);
       }
+
       if (maxTokens !== null) {
         ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_MAX_TOKENS, maxTokens);
       }
+
       if (topP !== null) {
         ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_TOP_P, topP);
       }
+
       if (frequencyPenalty !== null) {
         ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_FREQUENCY_PENALTY, frequencyPenalty);
       }
+
       if (presencePenalty !== null) {
         ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_PRESENCE_PENALTY, presencePenalty);
       }
+
       if (seed !== null) {
         ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_SEED, seed);
       }
+
       if (typeof errorType === "string") {
         ctx.setAttr(ATTR_KEYS.ERROR_TYPE, errorType);
       }

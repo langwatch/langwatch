@@ -86,6 +86,7 @@ export class IdentityBackfillService {
       // anything would consult; finalizing records that this pass looked.
       return { status: "finalized", report: { kind: "user_missing" } };
     }
+
     if (!user.email) {
       // Identifier values derive from the user's email; a user without one
       // (erased, or an import artifact) has no identifiers to backfill, so
@@ -95,6 +96,7 @@ export class IdentityBackfillService {
       // live, with no history left behind to adopt.
       return { status: "finalized", report: { kind: "no_email" } };
     }
+
     if (user.userHashKey === null) {
       await this.users.storeUserHashKeyIfMissing({
         userId,
@@ -131,6 +133,7 @@ export class IdentityBackfillService {
       // parity check has not agreed to yet.
       await this.secrets.carryForUser({ userId });
     }
+
     return outcome;
   }
 
@@ -180,7 +183,9 @@ export class IdentityBackfillService {
     planned: PlannedIdentifier[];
   }): Promise<void> {
     const emailPlan = planned.find((plan) => plan.provider === "email");
-    if (!emailPlan || !emailVerified) return;
+    if (!emailPlan || !emailVerified) {
+      return;
+    }
     await tolerateRefusal(() =>
       this.identity.verifyIdentifier({
         tenantId: userId,
@@ -255,6 +260,7 @@ export class IdentityBackfillService {
         report: { kind: "parity", diffs: diffs.slice(0, MAX_REPORTED_DIFFS) },
       };
     }
+
     return {
       status: "finalized",
       report: { kind: "adopted", identifiers: planned.length },
@@ -267,6 +273,8 @@ async function tolerateRefusal(run: () => Promise<unknown>): Promise<void> {
   try {
     await run();
   } catch (error) {
-    if (!(error instanceof IdentityCommandRefusedError)) throw error;
+    if (!(error instanceof IdentityCommandRefusedError)) {
+      throw error;
+    }
   }
 }

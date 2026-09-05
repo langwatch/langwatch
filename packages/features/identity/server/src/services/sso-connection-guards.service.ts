@@ -79,7 +79,9 @@ export class SsoConnectionGuards {
     });
     // The grandfather migration's whole idempotency rests on this line: a
     // second pass registers the same connection id and states nothing.
-    if (existing) return [];
+    if (existing) {
+      return [];
+    }
     return [
       {
         type: CONNECTION_REGISTERED_EVENT_TYPE,
@@ -115,7 +117,9 @@ export class SsoConnectionGuards {
     const existing = await this.checks.tryFindConnection({
       connectionId: data.connectionId,
     });
-    if (existing) return [];
+    if (existing) {
+      return [];
+    }
 
     return grandfatheredConnectionFacts(data);
   }
@@ -130,6 +134,7 @@ export class SsoConnectionGuards {
     ) {
       return [];
     }
+
     return [
       {
         type: DOMAIN_CLAIMED_EVENT_TYPE,
@@ -154,12 +159,15 @@ export class SsoConnectionGuards {
   async approveDomainClaim(data: ApproveDomainClaimCommandData): Promise<SsoConnectionFactInput[]> {
     const state = await this.checks.require(data, APPROVE_DOMAIN_CLAIM_COMMAND_TYPE);
     const domain = normalizeDomain(data.domain);
-    if (state.approvedDomains.includes(domain)) return [];
+    if (state.approvedDomains.includes(domain)) {
+      return [];
+    }
     await this.checks.assertPlatformOperator({
       actor: data.actor,
       act: `approve the claim on ${domain}`,
     });
     this.checks.assertClaimed({ state, domain });
+
     return [
       {
         type: DOMAIN_CLAIM_APPROVED_EVENT_TYPE,
@@ -183,6 +191,7 @@ export class SsoConnectionGuards {
       act: `reject the claim on ${domain}`,
     });
     this.checks.assertClaimed({ state, domain });
+
     return [
       {
         type: DOMAIN_CLAIM_REJECTED_EVENT_TYPE,
@@ -199,6 +208,7 @@ export class SsoConnectionGuards {
 
   async discardConnection(data: DiscardConnectionCommandData): Promise<SsoConnectionFactInput[]> {
     await this.checks.require(data, DISCARD_CONNECTION_COMMAND_TYPE);
+
     return [
       {
         type: CONNECTION_DISCARDED_EVENT_TYPE,
@@ -227,10 +237,12 @@ export class SsoConnectionGuards {
         `connection ${data.connectionId}: domain ${domain} has no approved claim to verify`,
       );
     }
+
     await this.checks.refuseIfDomainOwnedElsewhere({
       domain,
       connectionId: data.connectionId,
     });
+
     return [
       {
         type: VERIFICATION_REQUESTED_EVENT_TYPE,
@@ -269,7 +281,9 @@ export class SsoConnectionGuards {
   async attestDomain(data: AttestDomainCommandData): Promise<SsoConnectionFactInput[]> {
     const state = await this.checks.require(data, ATTEST_DOMAIN_COMMAND_TYPE);
     const domain = normalizeDomain(data.domain);
-    if (state.verifiedDomains.includes(domain)) return [];
+    if (state.verifiedDomains.includes(domain)) {
+      return [];
+    }
     await this.checks.assertPlatformOperator({
       actor: data.actor,
       act: `attest ${domain}`,
@@ -279,10 +293,12 @@ export class SsoConnectionGuards {
         `connection ${data.connectionId}: domain ${domain} has no approved claim to attest`,
       );
     }
+
     await this.checks.refuseIfDomainOwnedElsewhere({
       domain,
       connectionId: data.connectionId,
     });
+
     return [
       {
         type: DOMAIN_ATTESTED_EVENT_TYPE,
@@ -304,17 +320,21 @@ export class SsoConnectionGuards {
   async verifyDomain(data: VerifyDomainCommandData): Promise<SsoConnectionFactInput[]> {
     const state = await this.checks.require(data, VERIFY_DOMAIN_COMMAND_TYPE);
     const domain = normalizeDomain(data.domain);
-    if (state.verifiedDomains.includes(domain)) return [];
+    if (state.verifiedDomains.includes(domain)) {
+      return [];
+    }
     const pending = state.pendingVerification;
     if (!pending || pending.domain !== domain) {
       throw new SsoConnectionInvalidTransitionError(
         `connection ${data.connectionId}: no verification is in flight for ${domain}`,
       );
     }
+
     await this.checks.refuseIfDomainOwnedElsewhere({
       domain,
       connectionId: data.connectionId,
     });
+
     return [
       {
         type: DOMAIN_VERIFIED_EVENT_TYPE,
@@ -343,6 +363,7 @@ export class SsoConnectionGuards {
         `connection ${data.connectionId}: no verified domain`,
       );
     }
+
     // No exemption for `legacy-grandfathered`, deliberately. A grandfathered
     // connection reaches ACTIVE because the migration STATED its history, not
     // because a guard let it through; any state change commanded afterwards
@@ -352,6 +373,7 @@ export class SsoConnectionGuards {
         `connection ${data.connectionId}: no recorded test login`,
       );
     }
+
     const bound = await this.checks.hasLiveBinding({
       organizationId: state.organizationId,
     });
@@ -360,6 +382,7 @@ export class SsoConnectionGuards {
         `connection ${data.connectionId}: no live break-glass binding for organization ${state.organizationId}`,
       );
     }
+
     return [
       {
         type: CONNECTION_ACTIVATED_EVENT_TYPE,
@@ -378,6 +401,7 @@ export class SsoConnectionGuards {
    *  beyond being ACTIVE. */
   async suspendConnection(data: SuspendConnectionCommandData): Promise<SsoConnectionFactInput[]> {
     await this.checks.require(data, SUSPEND_CONNECTION_COMMAND_TYPE);
+
     return [
       {
         type: CONNECTION_SUSPENDED_EVENT_TYPE,
@@ -393,6 +417,7 @@ export class SsoConnectionGuards {
 
   async resumeConnection(data: ResumeConnectionCommandData): Promise<SsoConnectionFactInput[]> {
     await this.checks.require(data, RESUME_CONNECTION_COMMAND_TYPE);
+
     return [
       {
         type: CONNECTION_RESUMED_EVENT_TYPE,
@@ -422,6 +447,7 @@ export class SsoConnectionGuards {
         `connection ${data.connectionId}: ${stranded.length} user(s) hold no other verified sign-in method`,
       );
     }
+
     return [
       {
         type: TEARDOWN_REQUESTED_EVENT_TYPE,
@@ -450,6 +476,7 @@ export class SsoConnectionGuards {
         `connection ${data.connectionId}: teardown grace has not elapsed`,
       );
     }
+
     return [
       {
         type: CONNECTION_TORN_DOWN_EVENT_TYPE,

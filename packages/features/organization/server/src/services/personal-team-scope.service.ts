@@ -34,6 +34,7 @@ export async function findSharedTeamIds({
     where: { organizationId, isPersonal: false },
     select: { id: true },
   });
+
   return teams.map((team) => team.id);
 }
 
@@ -76,7 +77,9 @@ async function findPersonalTeamMatching({
       where: { id: { in: teamIds }, isPersonal: true, AND: [teamWhere] },
       select: { name: true },
     });
-    if (personalTeam) return personalTeam;
+    if (personalTeam) {
+      return personalTeam;
+    }
   }
 
   // A project-scoped binding on the personal project reaches the same private
@@ -92,7 +95,9 @@ async function findPersonalTeamMatching({
       },
       select: { team: { select: { name: true } } },
     });
-    if (personalProject) return personalProject.team;
+    if (personalProject) {
+      return personalProject.team;
+    }
   }
 
   return null;

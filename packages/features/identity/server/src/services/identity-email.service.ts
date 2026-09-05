@@ -44,8 +44,11 @@ export class IdentityEmailService extends IdentityEmailCapability {
    */
   async tryResolveEmail({ userId }: { userId: string }): Promise<string | null> {
     try {
-      if (!(await this.isOnIdentity({ userId }))) return null;
+      if (!(await this.isOnIdentity({ userId }))) {
+        return null;
+      }
       const heads = await this.heads.findHeads({ userId });
+
       return primaryEmailOf({ heads });
     } catch (error) {
       // A read fork that can break sign-in is worse than a stale email.
@@ -53,6 +56,7 @@ export class IdentityEmailService extends IdentityEmailCapability {
         { userId, error },
         "could not resolve the identifier email; falling back to the legacy User.email column",
       );
+
       return null;
     }
   }
@@ -70,14 +74,18 @@ export class IdentityEmailService extends IdentityEmailCapability {
    */
   async tryVerifiedEmailsOf({ userId }: { userId: string }): Promise<MatchableEmail[] | null> {
     try {
-      if (!(await this.isOnIdentity({ userId }))) return null;
+      if (!(await this.isOnIdentity({ userId }))) {
+        return null;
+      }
       const heads = await this.heads.findHeads({ userId });
+
       return matchableEmailsOf({ heads });
     } catch (error) {
       logger.warn(
         { userId, error },
         "could not resolve the verified identifier emails; falling back to the legacy User.email column",
       );
+
       return null;
     }
   }

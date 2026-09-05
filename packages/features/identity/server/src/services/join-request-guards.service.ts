@@ -83,7 +83,9 @@ export class JoinRequestGuards {
     });
     // The retry leg: the same command id names the same aggregate, and a
     // second pass costs no event.
-    if (existing) return [];
+    if (existing) {
+      return [];
+    }
 
     const domain = normalizeDomain(data.domain);
     // Structural, not probabilistic, and enforced here as well as at the
@@ -141,11 +143,14 @@ export class JoinRequestGuards {
     ) {
       return [];
     }
+
     const state = await this.pendingOrRefuse({
       joinRequestId: data.joinRequestId,
       verb: APPROVE_JOIN_COMMAND_TYPE,
     });
-    if (!state) return [];
+    if (!state) {
+      return [];
+    }
     return [
       {
         type: JOIN_APPROVED_EVENT_TYPE,
@@ -166,7 +171,9 @@ export class JoinRequestGuards {
       joinRequestId: data.joinRequestId,
       verb: REJECT_JOIN_COMMAND_TYPE,
     });
-    if (!state) return [];
+    if (!state) {
+      return [];
+    }
     return [
       {
         type: JOIN_REJECTED_EVENT_TYPE,
@@ -186,7 +193,9 @@ export class JoinRequestGuards {
       joinRequestId: data.joinRequestId,
       verb: WITHDRAW_JOIN_COMMAND_TYPE,
     });
-    if (!state) return [];
+    if (!state) {
+      return [];
+    }
     return [
       {
         type: JOIN_WITHDRAWN_EVENT_TYPE,
@@ -213,10 +222,13 @@ export class JoinRequestGuards {
     // A request that already ended, by any of the other four routes, has
     // nothing left to expire. Silence rather than a refusal: nobody is
     // waiting on this answer, and a wake is not a person to tell.
-    if (!state || state.state !== "PENDING") return [];
+    if (!state || state.state !== "PENDING") {
+      return [];
+    }
     if (state.expiresAtMs !== null && data.scheduledFor < state.expiresAtMs) {
       return [];
     }
+
     return [
       {
         type: JOIN_EXPIRED_EVENT_TYPE,
@@ -241,12 +253,15 @@ export class JoinRequestGuards {
     verb: JoinRequestCommandType;
   }): Promise<JoinRequestAggregateState | null> {
     const state = await this.requests.findRequest({ joinRequestId });
-    if (!state) return null;
+    if (!state) {
+      return null;
+    }
     if (!ALLOWED_FROM[verb].includes(state.state)) {
       throw new JoinRequestNotPendingError(
         `${verb} refused: request ${joinRequestId} is ${state.state}`,
       );
     }
+
     return state;
   }
 }

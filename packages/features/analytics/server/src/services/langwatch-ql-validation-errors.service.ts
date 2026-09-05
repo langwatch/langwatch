@@ -84,6 +84,7 @@ export class LangWatchQLNotPermittedError extends HandledError {
  */
 export function lwqlValidationError(rejection: RejectedLangWatchQL): HandledError {
   const unparseable = rejection.violations.every((violation) => violation.code === "PARSE_FAILED");
+
   return unparseable
     ? new LangWatchQLUnparseableError(rejection.violations)
     : new LangWatchQLNotPermittedError(rejection.violations);
