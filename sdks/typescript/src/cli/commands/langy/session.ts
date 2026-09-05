@@ -238,10 +238,7 @@ export function startLangySession(options: LangySessionOptions): LangySession {
           ? { timeoutSeconds: timeoutSecondsFor(call.params.timeout) }
           : {}),
       });
-      ui.permissionAsked({
-        summary: decision.summary,
-        conversationUrl: conversationHref,
-      });
+      ui.permissionAsked({ summary: decision.summary });
       return;
     }
     void execute(call);

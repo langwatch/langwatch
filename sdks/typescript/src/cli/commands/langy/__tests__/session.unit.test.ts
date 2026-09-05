@@ -245,7 +245,8 @@ describe("given a folder connected to a Langy conversation", () => {
       expect(asked!.timeoutSeconds).toBe(300);
       expect(lines.join("\n")).toContain("Langy asked to run pnpm typecheck");
       expect(lines.join("\n")).toContain("Answer in the LangWatch panel");
-      expect(lines.join("\n")).toContain(CONVERSATION.url);
+      // The link belongs to the connect line, so an ask does not repeat it.
+      expect(lines.join("\n")).not.toContain(CONVERSATION.url);
       expect(socket.sentOf("result")).toHaveLength(0);
 
       socket.deliver({

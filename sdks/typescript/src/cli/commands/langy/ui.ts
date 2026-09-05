@@ -242,7 +242,7 @@ export interface LangyUi {
   call: (call: LocalCall) => void;
   callOutcome: (input: { call: LocalCall; output: BashOutput }) => void;
   callFailed: (input: { call: LocalCall; message: string }) => void;
-  permissionAsked: (input: { summary: string; conversationUrl: string }) => void;
+  permissionAsked: (input: { summary: string }) => void;
   permissionAnswered: (input: {
     summary: string;
     patterns: string[];
@@ -297,16 +297,16 @@ export function createUi(writer: UiWriter = consoleWriter): LangyUi {
       writer.line(
         `${bullet} ${callLine(call)} ${chalk.red(`failed: ${shortReason(message)}`)}`,
       ),
-    permissionAsked: ({ summary, conversationUrl }) => {
+    permissionAsked: ({ summary }) => {
       // The command prints in full, once, wrapped where the words end. This
-      // is the only place the developer reads what they are approving.
+      // is the only place the developer reads what they are approving. The
+      // link to the conversation is printed by the connect line, so a long
+      // address does not repeat under every ask.
       const width = terminalWidth();
       for (const line of wrapWords(`Langy asked to run ${summary}`, width - 2)) {
         writer.line(chalk.yellow(`  ${line}`));
       }
-      writer.line(
-        `  Answer in the LangWatch panel: ${chalk.cyan(conversationUrl)}`,
-      );
+      writer.line(chalk.gray("  Answer in the LangWatch panel."));
     },
     permissionAnswered: ({ summary, patterns, decision }) =>
       writer.line(chalk.gray(`  ${answerLine({ summary, patterns, decision })}`)),

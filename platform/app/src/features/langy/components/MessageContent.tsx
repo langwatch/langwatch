@@ -149,6 +149,11 @@ function MessageContentImpl({
   liveCodeAccessCallId?: string | null;
 }) {
   const isUser = message.role === "user";
+  // A notice the platform wrote into the transcript, such as the shared
+  // folder disconnecting (ADR-129). Like a message from the developer it is
+  // plain text, so none of the assistant reading below applies to it.
+  const isNotice = message.role === "system";
+  const isPlainText = isUser || isNotice;
   const { project } = useOrganizationTeamProject();
   // Distinct text parts are distinct blocks of the reply, so they join with a
   // paragraph break — joined bare, a part boundary glued the last word of one
@@ -178,8 +183,8 @@ function MessageContentImpl({
   // LangyActivityParts spine that used to render the message's tool parts all
   // at once.
   const runs = useMemo(
-    () => (isUser ? [] : langyTranscriptRuns(message.parts)),
-    [isUser, message.parts],
+    () => (isPlainText ? [] : langyTranscriptRuns(message.parts)),
+    [isPlainText, message.parts],
   );
   const lastActivityRunIndex = runs.findLastIndex(
     (run) => run.kind === "activity",
@@ -199,10 +204,10 @@ function MessageContentImpl({
   // would hide the very thing the turn is waiting for.
   const questionCards = useMemo(
     () =>
-      isUser
+      isPlainText
         ? []
         : message.parts.flatMap((part) => questionToolCardParts(part)),
-    [isUser, message.parts],
+    [isPlainText, message.parts],
   );
 
   // The `code_access` TOOL call, which is where the code access card hangs
@@ -210,8 +215,8 @@ function MessageContentImpl({
   // state from `langy.getLocalWorkspace`, because the folder can connect long
   // after this turn ended.
   const codeAccessCall = useMemo(
-    () => (isUser ? null : codeAccessCallId(message.parts)),
-    [isUser, message.parts],
+    () => (isPlainText ? null : codeAccessCallId(message.parts)),
+    [isPlainText, message.parts],
   );
 
   // The connect card is NOT sniffed out of the assistant's prose any more. A
@@ -229,14 +234,14 @@ function MessageContentImpl({
   // complete (a rejected push has not pushed), and the card SURVIVES A REFRESH —
   // the sentinels were stripped before the message was persisted, so it never
   // used to.
-  const progressEvents = isUser
+  const progressEvents = isPlainText
     ? []
     : githubProgressFromToolParts(message.parts);
 
   // Strip the hidden [langy:feedback:...] directive: when present, Langy asked
   // for feedback at a high-signal moment — surface the affordance regardless of
   // the default throttle, tailored by the sentiment it classified.
-  const feedbackDirective = isUser
+  const feedbackDirective = isPlainText
     ? {
         requested: false,
         sentiment: undefined,
@@ -259,24 +264,24 @@ function MessageContentImpl({
   // from `gh pr create`'s own stdout, is persisted with the message (so the card
   // survives a refresh), and skips a `gh pr create` that FAILED — a PR that did
   // not open must never render as one that did.
-  const prs = isUser ? [] : githubPrsFromToolParts(message.parts);
+  const prs = isPlainText ? [] : githubPrsFromToolParts(message.parts);
   // "Opened pull request #1" is how Langy names a pull request, and the reader
   // had the number and no way through to it. The URLs come from the same tool
   // parts the card reads — the sandbox's `github.open_pr` receipt, or the
   // stdout of the developer's own `gh pr create` on the local path.
   const pullRequestLinks = useMemo(
     () =>
-      isUser
+      isPlainText
         ? new Map<number, string>()
         : pullRequestLinksFromToolParts(message.parts),
-    [isUser, message.parts],
+    [isPlainText, message.parts],
   );
   // Tool-call activity for the assistant turn: activity cards, each labelled by
   // what the call is DOING ("Searching traces", "Using the GitHub skill"), plus
   // the in-flight and settled domain-capability cards. Counts toward "has
   // something to render" so a turn whose only output is a running tool or a
   // settled card (no prose yet) still surfaces it.
-  const showsActivity = isUser ? false : hasLangyActivity(message);
+  const showsActivity = isPlainText ? false : hasLangyActivity(message);
   // The plan checklist, folded from the turn's `todowrite` tool parts. It is
   // the steps only — the work itself is in the transcript, where it happened.
   // On the LIVE streaming turn the manager's typed snapshot (store) is
@@ -287,7 +292,7 @@ function MessageContentImpl({
   // snapshot. Keeping that subscription on every historical answer made one
   // plan tick reconcile the full transcript.
   const livePlan = useLangyStore((s) => (isStreaming ? s.turnPlan : null));
-  const plan = isUser
+  const plan = isPlainText
     ? null
     : langyPlan(message, isStreaming ? { overrideItems: livePlan } : undefined);
   const hasActivityRecord = showsActivity || Boolean(plan);
@@ -298,7 +303,7 @@ function MessageContentImpl({
   // word). Live turns keep streaming untouched; the fold happens at settle,
   // the same moment the rest of the process record collapses.
   const reasoningFold =
-    isUser || isStreaming
+    isPlainText || isStreaming
       ? { titles: [], text }
       : foldReasoningTitles({
           parts: message.parts,
@@ -309,7 +314,7 @@ function MessageContentImpl({
   // line that says it again is the same fact three times before the answer.
   // Dropped here, at the point of display — see logic/langyToolNarration.ts for
   // why this is presentation, not the prose-sniffing this file deleted.
-  const displayText = isUser
+  const displayText = isPlainText
     ? text
     : stripToolNarration({
         text: reasoningFold.text,
@@ -318,7 +323,7 @@ function MessageContentImpl({
   // A turn whose only output is a stamped card block has no prose at all, and
   // reading "No content" under a card the reader can see is worse than saying
   // nothing.
-  const hasBlocks = !isUser && hasLangyBlockParts(message.parts);
+  const hasBlocks = !isPlainText && hasLangyBlockParts(message.parts);
   const hasContent = Boolean(
     displayText ||
       hasBlocks ||
@@ -330,7 +335,7 @@ function MessageContentImpl({
       plan,
   );
   if (!hasContent) {
-    if (isUser) return null;
+    if (isPlainText) return null;
     // Streaming with nothing visible yet: render no box at all. The message
     // shell arrives before its first content, and an empty row would still
     // claim a slot in the column's gap, pushing the status line down mid
@@ -352,6 +357,25 @@ function MessageContentImpl({
         color="fg.muted"
       >
         {interrupted ? "Interrupted" : "No content"}
+      </Text>
+    );
+  }
+
+  if (isNotice) {
+    // A notice is something that HAPPENED to the conversation, so it reads as
+    // a quiet line down the middle: no bubble, which would claim the reader
+    // sent it, and no avatar, which would claim Langy said it.
+    return (
+      <Text
+        data-testid="langy-transcript-notice"
+        alignSelf="center"
+        maxWidth="85%"
+        textAlign="center"
+        textStyle="xs"
+        color="fg.muted"
+        whiteSpace="pre-wrap"
+      >
+        {text}
       </Text>
     );
   }

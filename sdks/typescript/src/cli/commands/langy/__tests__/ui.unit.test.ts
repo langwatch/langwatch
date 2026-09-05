@@ -90,6 +90,16 @@ describe("conversationLink", () => {
         }),
       ).toBe("/?langyConversation=conv_1");
     });
+
+    /** @scenario "The follow-along link names the project the conversation belongs to" */
+    it("joins a project home page to the endpoint", () => {
+      expect(
+        conversationLink({
+          url: "/acme-support?langyConversation=conv_1",
+          endpoint: "http://localhost:5570",
+        }),
+      ).toBe("http://localhost:5570/acme-support?langyConversation=conv_1");
+    });
   });
 });
 
@@ -217,6 +227,32 @@ describe("the terminal lines one call produces", () => {
       expect(terminalWidth(undefined)).toBe(80);
       expect(terminalWidth(10)).toBe(80);
       expect(terminalWidth(132)).toBe(132);
+    });
+  });
+
+  describe("when Langy asks to run a command", () => {
+    /** @scenario "The command line prints the follow-along link once" */
+    it("says where to answer without repeating the link", () => {
+      const writer = recordingWriter();
+      const ui = createUi(writer);
+
+      ui.connected({
+        root: "/Users/dev/acme",
+        conversationTitle: "Instrument my traces",
+        conversationUrl: "http://localhost:5570/acme?langyConversation=conv_1",
+      });
+      const afterConnect = writer.lines.length;
+      ui.permissionAsked({ summary: "git push" });
+
+      const asked = writer.lines.slice(afterConnect).join("\n");
+      expect(asked).toContain("git push");
+      expect(asked).toContain("Answer in the LangWatch panel.");
+      expect(asked).not.toContain("langyConversation");
+      expect(
+        writer.lines
+          .filter((line) => line.includes("langyConversation"))
+          .length,
+      ).toBe(1);
     });
   });
 

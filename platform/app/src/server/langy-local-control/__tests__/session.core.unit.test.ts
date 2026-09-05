@@ -5,9 +5,35 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { conversationTitle, conversationUrl } from "../session.core";
+import {
+  connectMessage,
+  conversationTitle,
+  conversationUrl,
+  disconnectMessage,
+} from "../session.core";
 
 describe("conversationUrl", () => {
+  describe("when the project the conversation belongs to is known", () => {
+    /** @scenario "The follow-along link names the project the conversation belongs to" */
+    it("points at that project's home page", () => {
+      expect(
+        conversationUrl("conv_1", "https://app.langwatch.ai", "acme-support"),
+      ).toBe("https://app.langwatch.ai/acme-support?langyConversation=conv_1");
+      expect(conversationUrl("conv_1", "", "acme-support")).toBe(
+        "/acme-support?langyConversation=conv_1",
+      );
+      expect(conversationUrl("conv_1", "https://app.langwatch.ai", "a b")).toBe(
+        "https://app.langwatch.ai/a%20b?langyConversation=conv_1",
+      );
+    });
+
+    it("falls back to the site root when the project is not known", () => {
+      expect(conversationUrl("conv_1", "https://app.langwatch.ai")).toBe(
+        "https://app.langwatch.ai/?langyConversation=conv_1",
+      );
+    });
+  });
+
   describe("when the platform knows its own origin", () => {
     it("builds a link the terminal can open", () => {
       expect(conversationUrl("conv_1", "https://app.langwatch.ai")).toBe(
@@ -74,6 +100,45 @@ describe("conversationTitle", () => {
 
     it("cuts a name with no spaces at the limit", () => {
       expect(conversationTitle("x".repeat(80))).toBe(`${"x".repeat(60)}\u2026`);
+    });
+  });
+});
+
+describe("disconnectMessage", () => {
+  describe("when the folder has a name", () => {
+    /** @scenario "The line that says the folder is gone names the folder, not the path" */
+    it("reads the folder name and the machine, not the whole path", () => {
+      expect(
+        disconnectMessage(
+          {
+            name: "acme-app",
+            root: "/Users/dev/Projects/langwatch/.claude/tmp/acme-app",
+          },
+          "rogerio-mbp",
+        ),
+      ).toBe("Local folder disconnected: acme-app on rogerio-mbp");
+    });
+
+    it("names the folder the way the connect line does", () => {
+      const workspace = {
+        name: "acme-app",
+        root: "/Users/dev/Projects/acme-app",
+      };
+
+      expect(disconnectMessage(workspace, "rogerio-mbp")).toBe(
+        connectMessage(workspace, "rogerio-mbp").replace(
+          "connected",
+          "disconnected",
+        ),
+      );
+    });
+  });
+
+  describe("when the folder has no name", () => {
+    it("falls back to the path", () => {
+      expect(
+        disconnectMessage({ name: "", root: "/srv/checkout" }, "build-box"),
+      ).toBe("Local folder disconnected: /srv/checkout on build-box");
     });
   });
 });

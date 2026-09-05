@@ -140,9 +140,30 @@ Feature: Langy works in a folder shared from the developer's machine
       Given a connected folder
       When the CLI exits
       Then the transcript carries a line that the folder is no longer connected
+      And that line names the folder and the machine, the way the connect line does
       And it sits next to the line that said the folder connected
       And no new turn is started for it
 
+    @unit
+    Scenario: The line that says the folder is gone names the folder, not the path
+      Given a folder shared from a deep path on my machine
+      When the folder disconnects
+      Then the line reads the folder name and the machine name
+      And it reads the path only for a folder that has no name
+
+    @unit
+    Scenario: The disconnect notice does not put the conversation back to work
+      Given a conversation with no turn in flight
+      When the disconnect notice is written into the transcript
+      Then the conversation stays idle
+      And the panel starts no turn for the notice
+
+    @integration
+    Scenario: The disconnect notice reads as a notice, not as something I sent
+      Given a transcript that carries the disconnect notice
+      When the panel draws the conversation
+      Then the notice reads as a plain line
+      And it is not drawn as a message from me
 
     @unit
     Scenario: The card reads the connection off the record, not only off the stream
@@ -250,6 +271,20 @@ Feature: Langy works in a folder shared from the developer's machine
       And the session key no longer connects
 
   Rule: The link the command line prints opens the conversation
+
+    @unit
+    Scenario: The follow-along link names the project the conversation belongs to
+      When the platform builds the follow-along link
+      Then the link points at the home page of that project
+      And it carries the conversation parameter
+      And it falls back to the site root when the project is not known
+
+    @unit
+    Scenario: The command line prints the follow-along link once
+      Given the command line printed the follow-along link when the folder connected
+      When Langy asks to run a command
+      Then the terminal says to answer in the panel
+      And it does not print the link again
 
     @unit
     Scenario: The follow-along link opens the panel on that conversation

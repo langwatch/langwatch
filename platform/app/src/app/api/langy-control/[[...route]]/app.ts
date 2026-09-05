@@ -181,7 +181,11 @@ function registerRequestEndpoints(v: ControlVersion): void {
         conversation: {
           id: approved.request.conversationId,
           title: approved.request.conversationTitle,
-          url: conversationUrl(approved.request.conversationId),
+          url: conversationUrl(
+            approved.request.conversationId,
+            env.BASE_HOST,
+            app.project.slug,
+          ),
         },
       };
     },

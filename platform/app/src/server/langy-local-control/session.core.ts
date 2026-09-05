@@ -13,6 +13,7 @@ import type {
   LangyLocalWorkspaceConnectedEventData,
   LangyLocalWorkspaceDisconnectedEventData,
   LangyMessagePart,
+  LangyMessageRole,
 } from "@langwatch/langy";
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
@@ -60,6 +61,8 @@ const logger = createLogger("langwatch:langy:local-control:session");
 export interface ControlCredential {
   apiKeyId: string;
   projectId: string;
+  /** The project's own address segment, so the follow along link names it. */
+  projectSlug: string;
   userId: string;
   conversationId: string;
   requestId: string;
@@ -107,6 +110,7 @@ export interface ControlConversations {
     conversationId: string;
     userId: string;
     parts: LangyMessagePart[];
+    role?: LangyMessageRole;
   }): Promise<{ messageId: string }>;
 }
 
@@ -272,6 +276,7 @@ export class LocalControlSessionCore {
       credential: {
         apiKeyId: resolved.apiKeyId,
         projectId: binding.projectId,
+        projectSlug: resolved.project.slug,
         userId: binding.userId,
         conversationId: binding.conversationId,
         requestId: binding.requestId,
@@ -352,7 +357,11 @@ export class LocalControlSessionCore {
         conversation: {
           id: conversation.id,
           title: conversationTitle(conversation.title),
-          url: conversationUrl(conversation.id),
+          url: conversationUrl(
+            conversation.id,
+            env.BASE_HOST,
+            credential.projectSlug,
+          ),
         },
         policy: { skipPermissions },
       },
@@ -541,7 +550,7 @@ export class LocalControlSessionCore {
     });
     await this.requests.revokeKeyBinding(session.apiKeyId);
     await this.announceWorkspace(session, "disconnected");
-    await this.recordDisconnect(session, workspace?.workspace.root ?? "");
+    await this.recordDisconnect(session, workspace?.workspace);
   }
 
   /**
@@ -549,23 +558,25 @@ export class LocalControlSessionCore {
    *
    * The connect is already a line in the transcript, and Ctrl-C was not: the
    * chip simply vanished from the header and the conversation kept reading as
-   * though the folder were still there. Recorded as a message and nothing
-   * else — a disconnect is not a question, so it starts no turn.
+   * though the folder were still there. Recorded with the `system` role, so
+   * the transcript carries it as a notice: it starts no turn, and the panel
+   * draws it as a plain line rather than as something the developer asked.
    */
   private async recordDisconnect(
     session: ControlSession,
-    root: string,
+    workspace: { name: string; root: string } | undefined,
   ): Promise<void> {
     try {
       await this.conversations().recordUserMessage({
         projectId: session.projectId,
         conversationId: session.conversationId,
         userId: session.userId,
+        role: "system",
         parts: [
           {
             type: "text",
             text: disconnectMessage(
-              root || session.workspaceName,
+              workspace ?? { name: session.workspaceName, root: "" },
               session.hostname,
             ),
           },
@@ -724,9 +735,18 @@ export function connectMessage(
   return `Local folder connected: ${workspace.name || workspace.root} on ${hostname}`;
 }
 
-/** The line the transcript carries when the folder goes away. */
-export function disconnectMessage(root: string, hostname: string): string {
-  return `Local folder disconnected: ${root} on ${hostname}`;
+/**
+ * The line the transcript carries when the folder goes away.
+ *
+ * The folder NAME, for the same reason the connect line above uses it: the
+ * path is long, the card already carries it, and the two lines sit next to
+ * each other in the transcript.
+ */
+export function disconnectMessage(
+  workspace: { name: string; root: string },
+  hostname: string,
+): string {
+  return `Local folder disconnected: ${workspace.name || workspace.root} on ${hostname}`;
 }
 
 /**
@@ -765,12 +785,21 @@ export function conversationTitle(title: string | null | undefined): string {
  * the browser and useless in a terminal, so the absolute form is what this
  * returns. An origin that is empty or has no scheme cannot be trusted to
  * build a link, so the path travels on its own rather than as a guess.
+ *
+ * The link names the PROJECT the conversation belongs to. A conversation is
+ * project scoped, and the panel reads it through a project scoped query, so a
+ * link to the reader's own home opens the panel on the wrong project whenever
+ * the reader last worked somewhere else, and the conversation then reads as
+ * one they cannot see. Root stays the answer when the project is not known,
+ * and the landing redirect carries the parameter onto whatever home it picks.
  */
 export function conversationUrl(
   conversationId: string,
   baseHost: string | undefined = env.BASE_HOST,
+  projectSlug?: string,
 ): string {
-  const path = `/?langyConversation=${encodeURIComponent(conversationId)}`;
+  const home = projectSlug ? `/${encodeURIComponent(projectSlug)}` : "/";
+  const path = `${home}?langyConversation=${encodeURIComponent(conversationId)}`;
   const origin = (baseHost ?? "").trim().replace(/\/+$/, "");
   if (!/^https?:\/\//i.test(origin)) return path;
   try {

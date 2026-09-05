@@ -18,6 +18,7 @@
 
 import type { Context } from "hono";
 import { z } from "zod";
+import { env } from "~/env.mjs";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { extractCredentials } from "~/server/api-key/auth-middleware";
 import { TokenResolver } from "~/server/api-key/token-resolver";
@@ -108,6 +109,7 @@ async function authorize(c: Context) {
     userId: identity.userId,
     projectId: resolved.project.id,
     projectName: resolved.project.name,
+    projectSlug: resolved.project.slug,
   };
 }
 
@@ -206,7 +208,11 @@ secured
         userId: auth.userId,
         conversationId: conversation.id,
         conversationTitle: conversationTitle(conversation.title),
-        conversationUrl: conversationUrl(conversation.id),
+        conversationUrl: conversationUrl(
+          conversation.id,
+          env.BASE_HOST,
+          auth.projectSlug,
+        ),
       });
       await getApp().commands.langy.requestLocalControl({
         tenantId: auth.projectId,

@@ -95,7 +95,7 @@ let events: { name: string; data: Record<string, unknown> }[] = [];
 /** Every live stream entry the cards wrote. */
 let liveEntries: { kind: string; payload: Record<string, unknown> }[] = [];
 /** Every line written straight into the transcript, starting no turn. */
-let recordedMessages: string[] = [];
+let recordedMessages: { role: string; text: string }[] = [];
 
 /** Whether the conversation's model may skip the permission cards. */
 let skipAllowed = false;
@@ -152,16 +152,17 @@ function testPorts(store: AgentStateStore) {
       async findByIdVisible() {
         return conversationRow;
       },
-      async recordUserMessage({ parts }) {
-        recordedMessages.push(
-          parts
+      async recordUserMessage({ parts, role }) {
+        recordedMessages.push({
+          role: role ?? "user",
+          text: parts
             .map((part) =>
               part.type === "text" && typeof part.text === "string"
                 ? part.text
                 : "",
             )
             .join(""),
-        );
+        });
         return { messageId: "msg_1" };
       },
     },
@@ -1032,9 +1033,15 @@ describe("given a folder the developer stops sharing", () => {
       .poll(() => recordedMessages.length, { timeout: 5_000 })
       .toBeGreaterThan(0);
     expect(startedTurns.at(-1)?.text).toContain("Local folder connected");
-    expect(recordedMessages.at(-1)).toContain("Local folder disconnected");
-    expect(recordedMessages.at(-1)).toContain("rogerio-mbp");
-    // The connect starts a turn; the disconnect is news, not a question.
+    // The folder NAME, the way the connect line says it. The whole path made
+    // the two lines beside each other read as two different folders.
+    expect(recordedMessages.at(-1)?.text).toBe(
+      "Local folder disconnected: acme-app on rogerio-mbp",
+    );
+    expect(recordedMessages.at(-1)?.text).not.toContain("/Users/");
+    // The connect starts a turn; the disconnect is news, not a question, so it
+    // is recorded as a notice and starts nothing.
+    expect(recordedMessages.at(-1)?.role).toBe("system");
     expect(startedTurns).toHaveLength(1);
   });
 });
