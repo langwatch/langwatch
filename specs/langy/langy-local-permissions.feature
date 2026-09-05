@@ -153,7 +153,8 @@ Feature: The CLI decides what Langy may run on the developer's machine
       Given I allowed a python command for this session
       When Langy runs the same command written as python3
       Then the command runs without a card
-      And the pattern the card offered covers the interpreter
+      And both spellings of the interpreter spend the same grant
+      And the pattern names the program and its first argument
 
     @integration
     Scenario: Denying returns a pushback Langy acts on
