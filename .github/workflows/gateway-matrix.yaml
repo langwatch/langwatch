@@ -196,21 +196,14 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: go.sum
 
-      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
-
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v4
+      # node-pty is in the app's closure via mcp-server and falls back to
+      # `node-gyp rebuild` on linux, so the install runs through the shared
+      # action: it puts node-gyp on PATH and makes pnpm's bundled gyp_main.py
+      # executable.
+      - name: Setup pnpm + Node
+        uses: ./.github/actions/setup-pnpm-node
         with:
-          node-version: '24'
-          cache: 'pnpm'
-          cache-dependency-path: pnpm-lock.yaml
-
-      - name: Install langwatch deps
-        # node-pty (in the app's closure via mcp-server) falls back to
-        # `node-gyp rebuild` on linux, and this job bypasses the shared setup
-        # action that puts node-gyp on PATH.
-        run: |
-          npm install -g node-gyp@12.3.0
-          pnpm install --frozen-lockfile --filter "@langwatch/web..."
+          install: "@langwatch/web..."
 
       - name: Apply DB migrations
         working-directory: platform/app
