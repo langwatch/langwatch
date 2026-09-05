@@ -5,7 +5,12 @@
 import { BrowserUiStorage, setUiStorage } from "@langwatch/ui-host/storage";
 import { setUiFeedbackHost } from "@langwatch/ui-host/toaster";
 import { UiScopeHostProvider } from "@langwatch/ui-host/use-organization-team-project";
-import { QueryClient, QueryClientContext, QueryClientProvider } from "@tanstack/react-query";
+import {
+  MutationCache,
+  QueryClient,
+  QueryClientContext,
+  QueryClientProvider,
+} from "@tanstack/react-query";
 import { useContext, useMemo, useState, type ReactNode } from "react";
 import {
   BrowserUiDocumentTitle,
@@ -22,6 +27,7 @@ import {
   type UiFeatureApiBinding,
   type UiFeatureApiTransport,
 } from "../../behavior/ui-feature-transport";
+import type { UiFailureHost, UiFailureInterceptor } from "../../behavior/ui-feature";
 import { BrowserUiRpc, UiRpcContextProvider } from "../../behavior/ui-rpc";
 import { useRouterUiNavigation, useRouterUiRoute } from "../../behavior/ui-router-navigation";
 import type { UiSessionSource } from "../../behavior/ui-session";
@@ -38,6 +44,12 @@ export type UiFeatureShellInstall = {
   /** The transport those hooks run on. Built same-origin when absent. */
   transport?: UiFeatureApiTransport;
   /**
+   * Every feature's reader of a failed mutation, in install order. A failure a
+   * feature answers application-wide is reported here once, rather than by
+   * every screen that happens to trip it.
+   */
+  failures?: readonly UiFailureInterceptor[];
+  /**
    * The live session this application reads for itself, when it has one to
    * read. `useBrowserUiSession` is the one this package ships.
    */
@@ -51,6 +63,7 @@ export function createUiFeatureShell({
   apis,
   capabilities,
   transport,
+  failures = [],
   session,
 }: UiFeatureShellInstall): UiProviderShell {
   // Chosen once per shell, never per render, so the hook it calls is the same
@@ -113,7 +126,19 @@ export function createUiFeatureShell({
     // — a composition without a host transport is a legitimate shape, and the
     // fallback below is what serves it.
     const hostQueryClient = useContext(QueryClientContext);
-    const [ownQueryClient] = useState(() => new QueryClient());
+    const navigation = useRouterUiNavigation();
+    // The interceptors are installed on a cache built once, but what they may
+    // do about a failure is only knowable further down this render. The box
+    // is what carries it there, and it refuses by name until it is filled.
+    const [failureHost] = useState<{ current: UiFailureHost | null }>(() => ({ current: null }));
+    const [ownQueryClient] = useState(
+      () =>
+        new QueryClient({
+          mutationCache: new MutationCache({
+            onError: (error) => reportFailure({ error, failures, host: failureHost.current }),
+          }),
+        }),
+    );
     const [ownTransport] = useState(() => transport ?? createUiFeatureApiClient());
     const queryClient = hostQueryClient ?? ownQueryClient;
 
@@ -124,6 +149,7 @@ export function createUiFeatureShell({
       () => BrowserUiRpc.create({ transport: ownTransport, queryClient }),
       [ownTransport, queryClient],
     );
+    failureHost.current = { rpc, navigate: (href: string) => navigation.navigate(href) };
 
     // Innermost first, so the list reads in mount order at the call site.
     const mounted = apis.reduceRight<ReactNode>(
@@ -142,4 +168,29 @@ export function createUiFeatureShell({
     // answers that by remounting the whole routed subtree.
     return <QueryClientProvider client={queryClient}>{mounted}</QueryClientProvider>;
   };
+}
+
+/**
+ * Runs every installed interceptor over one failed mutation. They all run: two
+ * features answering the same failure both have something to say about it, and
+ * one throwing must not silence the rest.
+ */
+function reportFailure({
+  error,
+  failures,
+  host,
+}: {
+  error: unknown;
+  failures: readonly UiFailureInterceptor[];
+  host: UiFailureHost | null;
+}): void {
+  if (!host) return;
+  for (const interceptor of failures) {
+    try {
+      interceptor(error, host);
+    } catch (interceptorError) {
+      // oxlint-disable-next-line no-console
+      console.error("A failure interceptor threw while reporting a failure:", interceptorError);
+    }
+  }
 }

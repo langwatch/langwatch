@@ -239,7 +239,10 @@
       "root": "model-provider",
       "uses": {
         "screens": ["@langwatch/model-provider-web/screens/model-provider"],
-        "surfaces": ["@langwatch/enterprise-managed-provider-web/surfaces/managed-provider-alert"]
+        "surfaces": [
+          "@langwatch/enterprise-managed-provider-web/surfaces/managed-provider-alert",
+          "@langwatch/model-provider-web/surfaces/model-error-interceptor"
+        ]
       }
     },
     {

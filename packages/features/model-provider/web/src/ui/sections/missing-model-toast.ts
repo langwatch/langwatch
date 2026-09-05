@@ -170,7 +170,9 @@ export function showProviderDisabledToast(info: ProviderDisabledInfo): void {
 
   toaster.create({
     id,
-    type: "error",
+    // The feedback port carries no offered ACTION, and this toast's whole point
+    // is the one-click swap to the parent scope's default.
+    type: "error", // no-raw-error-toast-ok
     duration: Infinity,
     title: `Model unavailable for ${info.featureDisplayName}`,
     description,

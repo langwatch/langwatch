@@ -63,6 +63,14 @@
     "./surfaces/missing-model-toast": {
       "types": "./src/ui/sections/missing-model-toast.ts",
       "default": "./src/ui/sections/missing-model-toast.ts"
+    },
+    "./surfaces/model-error": {
+      "types": "./src/model/model-error.ts",
+      "default": "./src/model/model-error.ts"
+    },
+    "./surfaces/model-error-interceptor": {
+      "types": "./src/ui/sections/model-error-interceptor.ts",
+      "default": "./src/ui/sections/model-error-interceptor.ts"
     }
   },
   "scripts": {

@@ -1,5 +1,10 @@
-import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
-import { render } from "@testing-library/react";
+import {
+  QueryClient,
+  QueryClientProvider,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
+import { render, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
@@ -153,6 +158,46 @@ describe("given the shell apps/ui mounts around every routed page", () => {
 
       expect(seen).toBeInstanceOf(QueryClient);
       expect(mounts[0]?.queryClient).toBe(seen);
+    });
+  });
+
+  describe("when an installed feature answers one class of failure application-wide", () => {
+    it("runs its interceptor on every failed mutation, with the host it can act through", async () => {
+      const seen: { message: string; navigated: string[] }[] = [];
+      const shell = createUiFeatureShell({
+        apis: [],
+        capabilities: {},
+        transport: {} as UiFeatureApiTransport,
+        failures: [
+          (error, host) => {
+            const navigated: string[] = [];
+            // The one route this memory router serves: what is proven here is
+            // that the interceptor CAN navigate, not where it goes.
+            host.navigate("/");
+            navigated.push("/");
+            seen.push({ message: (error as Error).message, navigated });
+            return true;
+          },
+        ],
+      });
+
+      function Page() {
+        const mutation = useMutation({
+          mutationFn: () => Promise.reject(new Error("no model configured")),
+        });
+        return (
+          <button type="button" data-testid="go" onClick={() => mutation.mutate()}>
+            go
+          </button>
+        );
+      }
+
+      const view = renderShell(shell, <Page />);
+      view.getByTestId("go").click();
+
+      await waitFor(() => {
+        expect(seen).toEqual([{ message: "no model configured", navigated: ["/"] }]);
+      });
     });
   });
 

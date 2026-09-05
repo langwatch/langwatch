@@ -14,7 +14,23 @@ import type {
   UiFeatureApiTransport,
 } from "./ui-feature-transport";
 import type { UiPageLoaderRegistry } from "./ui-page-loaders";
+import type { UiRpcPort } from "./ui-rpc";
 import type { UiSessionSource } from "./ui-session";
+
+/** What a failure interceptor may do about the failure it just read. */
+export type UiFailureHost = {
+  /** Procedures by path, for a remediation the reader can take in one click. */
+  readonly rpc: UiRpcPort;
+  /** Moves the address bar, for a remediation that is a page. */
+  readonly navigate: (href: string) => void;
+};
+
+/**
+ * A reader of every failed mutation, installed by the feature that owns one
+ * class of failure application-wide. Answers whether it reported the failure,
+ * so the shell can tell that nothing else needs to.
+ */
+export type UiFailureInterceptor = (error: unknown, host: UiFailureHost) => boolean;
 
 /**
  * What `apps/ui` serves itself.
@@ -28,6 +44,8 @@ export type UiFeatureInstall = {
   loaders?: UiPageLoaderRegistry;
   /** One entry per feature package whose hooks this application mounts. */
   apis?: readonly UiFeatureApiBinding[];
+  /** Every feature's reader of a failed mutation, in install order. */
+  failures?: readonly UiFailureInterceptor[];
   /** Capability ports the composing application answers itself. */
   capabilities?: UiCapabilityInstall;
   /** The transport those hooks run on. Built same-origin when absent. */
@@ -43,6 +61,7 @@ export type UiFeatureInstall = {
 export type UiFeature = {
   readonly name: string;
   readonly api?: UiFeatureApiBinding;
+  readonly failures?: UiFailureInterceptor;
   readonly loaders: UiPageLoaderRegistry;
   readonly drawers: UiDrawerRegistry;
 };
@@ -53,6 +72,7 @@ export type UiFeature = {
 export function uiFeature<TClient, const D extends UiDrawerRegistry = Record<string, never>>({
   name,
   api,
+  failures,
   loaders = {},
   drawers,
 }: {
@@ -60,12 +80,15 @@ export function uiFeature<TClient, const D extends UiDrawerRegistry = Record<str
   api?: {
     Provider: ComponentType<{ client: TClient; queryClient: QueryClient; children: ReactNode }>;
   };
+  /** This feature's answer to one class of failure, on every failed mutation. */
+  failures?: UiFailureInterceptor;
   loaders?: UiPageLoaderRegistry;
   drawers?: D;
 }): UiFeature & { readonly drawers: D } {
   return {
     name,
     ...(api ? { api: { name, Provider: api.Provider as UiFeatureApiProvider } } : {}),
+    ...(failures ? { failures } : {}),
     loaders,
     drawers: (drawers ?? {}) as D,
   };
@@ -109,6 +132,7 @@ export function installUiFeatures<const F extends readonly UiFeature[]>({
   const install: UiFeatureInstall = {
     loaders,
     apis: features.flatMap((feature) => (feature.api ? [feature.api] : [])),
+    failures: features.flatMap((feature) => (feature.failures ? [feature.failures] : [])),
     capabilities: capabilities ?? {},
     ...(transport ? { transport } : {}),
     ...(session ? { session } : {}),

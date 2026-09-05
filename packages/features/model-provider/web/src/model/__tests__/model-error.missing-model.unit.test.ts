@@ -1,28 +1,23 @@
 /**
- * Unit tests for `extractMissingModelInfo` — the tRPC error extractor the
- * global QueryCache + MutationCache interceptor uses to drive the
- * missing-model toast.
+ * Unit tests for `extractMissingModelInfo` — the extractor the application's
+ * global mutation interceptor uses to drive the missing-model toast.
  */
-import { TRPCClientError } from "@trpc/client";
 import { describe, expect, it } from "vitest";
 import {
   extractMissingModelInfo,
   isHandledByMissingModelHandler,
   markAsHandledByMissingModelHandler,
-} from "../trpc-error";
+} from "../model-error";
 
-function buildError(
-  cause: Record<string, unknown> | undefined,
-  code = "BAD_REQUEST",
-): TRPCClientError<any> {
-  const err = new TRPCClientError<any>("Model not configured");
+/** The serialised envelope a failed call carries, whatever raised it. */
+function buildError(cause: Record<string, unknown> | undefined, code = "BAD_REQUEST"): Error {
+  const err = new Error("Model not configured");
   (err as { data?: unknown }).data = { code, cause };
   return err;
 }
 
 describe("extractMissingModelInfo()", () => {
   describe("when the cause carries the MODEL_NOT_CONFIGURED code", () => {
-    /** @scenario A tRPC call that throws ModelNotConfigured opens the toast */
     it("returns the featureKey, displayName, role, and projectId", () => {
       const err = buildError({
         code: "MODEL_NOT_CONFIGURED",
@@ -55,9 +50,7 @@ describe("extractMissingModelInfo()", () => {
   describe("when the cause does not match", () => {
     it("returns null for an unrelated cause code", () => {
       expect(
-        extractMissingModelInfo(
-          buildError({ code: "LIMIT_EXCEEDED", limitType: "members" }),
-        ),
+        extractMissingModelInfo(buildError({ code: "LIMIT_EXCEEDED", limitType: "members" })),
       ).toBeNull();
     });
 
@@ -75,13 +68,11 @@ describe("extractMissingModelInfo()", () => {
 
     it("returns null when featureKey is missing", () => {
       expect(
-        extractMissingModelInfo(
-          buildError({ code: "MODEL_NOT_CONFIGURED", role: "FAST" }),
-        ),
+        extractMissingModelInfo(buildError({ code: "MODEL_NOT_CONFIGURED", role: "FAST" })),
       ).toBeNull();
     });
 
-    it("returns null for a non-TRPC error", () => {
+    it("returns null for an error carrying no cause payload", () => {
       expect(extractMissingModelInfo(new Error("nope"))).toBeNull();
       expect(extractMissingModelInfo(null)).toBeNull();
       expect(extractMissingModelInfo(undefined)).toBeNull();

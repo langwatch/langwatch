@@ -57,6 +57,7 @@ export function createUiApplication({
         featureShell: createUiFeatureShell({
           apis: features.apis ?? [],
           capabilities: features.capabilities ?? {},
+          failures: features.failures ?? [],
           ...(features.transport ? { transport: features.transport } : {}),
           ...(features.session ? { session: features.session } : {}),
         }),
