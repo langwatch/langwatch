@@ -78,6 +78,7 @@
     "@langwatch/enterprise-billing-web": "workspace:*",
     "@langwatch/enterprise-governance-web": "workspace:*",
     "@langwatch/enterprise-licensing-web": "workspace:*",
+    "@langwatch/enterprise-managed-provider-web": "workspace:*",
     "@langwatch/enterprise-scim-web": "workspace:*",
     "@langwatch/evaluator-web": "workspace:*",
     "@langwatch/experiment-web": "workspace:*",

@@ -29,3 +29,5 @@ export const modelProviderFeature = uiFeature({
     }),
   },
 });
+
+export { modelProviderUiSlots } from "./ui/sections/model-provider-slots";

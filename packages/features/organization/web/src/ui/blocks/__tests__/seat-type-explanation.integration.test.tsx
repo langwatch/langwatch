@@ -14,7 +14,11 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { AddMembersForm } from "../../sections/add-members-form";
 import { OrganizationUserRoleField } from "../../elements/organization-user-role-field";
-import { LITE_MEMBER_EXPLANATION } from "@langwatch/enterprise-licensing-web/surfaces/seat-types";
+import { CORE_SEAT_TYPE_COPY } from "@langwatch/ui-host/slots";
+
+// Rendered with no shell above it, so the forms read the core default the
+// `seatTypeCopy` slot degrades to. Spec: specs/ui/ui-slots.feature
+const LITE_MEMBER_EXPLANATION = CORE_SEAT_TYPE_COPY.liteMemberExplanation;
 
 vi.mock("../../../behavior/organization-api", () => ({
   api: {

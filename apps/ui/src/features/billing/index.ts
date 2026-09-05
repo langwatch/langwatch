@@ -13,3 +13,5 @@ export const billingFeature = uiFeature({
   api: billingApi,
   loaders: billingPageLoaders,
 });
+
+export { billingUiSlots } from "./ui/sections/billing-slots";

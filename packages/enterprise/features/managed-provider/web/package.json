@@ -8,12 +8,10 @@
     "src"
   ],
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
   "exports": {
-    ".": {
-      "types": "./src/index.ts",
-      "default": "./src/index.ts"
+    "./surfaces/managed-provider-alert": {
+      "types": "./src/surfaces/managed-provider-alert/index.ts",
+      "default": "./src/surfaces/managed-provider-alert/index.ts"
     }
   },
   "scripts": {

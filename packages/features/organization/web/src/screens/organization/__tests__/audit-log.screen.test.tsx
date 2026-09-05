@@ -90,10 +90,6 @@ vi.mock("@langwatch/design-system/page-layout", () => ({
   },
 }));
 
-vi.mock("@langwatch/enterprise-billing-web/surfaces/contact-sales", () => ({
-  ContactSalesBlock: () => <div data-testid="contact-sales-block">Need more?</div>,
-}));
-
 function auditRow(overrides: Record<string, unknown> = {}) {
   return {
     id: "audit-1",

@@ -5,6 +5,7 @@
  */
 
 import type { UiScopeHostPort } from "./use-organization-team-project";
+import type { UiSlotsPort } from "./slots";
 import { createContext, useContext } from "react";
 
 /** The composition never filled this port, and something asked it to work. */
@@ -245,6 +246,12 @@ export type UiCapabilities = {
   navigation: UiNavigationPort;
   route: UiRoutePort;
   session: UiSessionPort;
+  /**
+   * The blocks a core screen leaves for the composition to fill. Optional
+   * because absent and "filled nothing" are the same reading — `useUiSlots`
+   * degrades to the core defaults either way.
+   */
+  slots?: UiSlotsPort;
 };
 
 /** What the composing application chose to answer itself. */
@@ -282,6 +289,7 @@ export function resolveUiCapabilities({
     navigation: install.navigation ?? navigation,
     route: install.route ?? route,
     session: install.session ?? session ?? UNAVAILABLE_UI_SESSION,
+    slots: install.slots,
   };
 }
 

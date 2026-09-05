@@ -13,3 +13,5 @@ export const licensingFeature = uiFeature({
   api: licensingApi,
   loaders: licensingPageLoaders,
 });
+
+export { licensingSeatTypeCopy, licensingUiSlots } from "./ui/sections/licensing-slots";

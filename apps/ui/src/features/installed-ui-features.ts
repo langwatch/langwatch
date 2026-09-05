@@ -8,6 +8,7 @@ import { createDrawerPreloader, installDrawerOpenRewrite, useDrawer } from "@lan
 import { warmChunk } from "../behavior/chunk-reload";
 import { BrowserUiFeedback } from "../behavior/ui-feedback";
 import { installUiFeatures } from "../behavior/ui-feature";
+import { uiSlots } from "@langwatch/ui-host/slots";
 import { useBrowserUiSession } from "../behavior/ui-session";
 import { agentFeature } from "./agent";
 import { analyticsFeature } from "./analytics";
@@ -18,7 +19,7 @@ import { authFeature } from "./auth";
 import { authorizeFeature } from "./authorize";
 import { authzFeature } from "./authz";
 import { automationsFeature } from "./automations";
-import { billingFeature } from "./billing";
+import { billingFeature, billingUiSlots } from "./billing";
 import { chromeFeature } from "./chrome";
 import { dataPrivacyFeature } from "./data-privacy";
 import { dataRetentionFeature } from "./data-retention";
@@ -32,8 +33,8 @@ import { githubFeature } from "./github";
 import { governanceFeature } from "./governance";
 import { homeFeature } from "./home";
 import { langyFeature } from "./langy";
-import { licensingFeature } from "./licensing";
-import { modelProviderFeature } from "./model-provider";
+import { licensingFeature, licensingSeatTypeCopy, licensingUiSlots } from "./licensing";
+import { modelProviderFeature, modelProviderUiSlots } from "./model-provider";
 import { monitorFeature } from "./monitor";
 import { navigationFeature } from "./navigation";
 import { notificationFeature } from "./notification";
@@ -96,7 +97,14 @@ const features = [
 
 export const installedUiFeatures = installUiFeatures({
   features,
-  capabilities: { feedback: BrowserUiFeedback.create() },
+  capabilities: {
+    feedback: BrowserUiFeedback.create(),
+    // The blocks core screens leave open, filled by whoever owns the words.
+    slots: uiSlots({
+      components: { ...billingUiSlots, ...licensingUiSlots, ...modelProviderUiSlots },
+      seatTypeCopy: licensingSeatTypeCopy,
+    }),
+  },
   session: useBrowserUiSession,
 });
 

@@ -25,9 +25,9 @@
   "dependencies": {
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
-    "@langwatch/enterprise-billing-web": "workspace:*",
     "@langwatch/platform-api-client": "workspace:*",
     "@langwatch/role-contract": "workspace:*",
+    "@langwatch/ui-host": "workspace:*",
     "lucide-react": "^1.22.0",
     "react-feather": "^2.0.10",
     "react-hook-form": "^7.66.0"

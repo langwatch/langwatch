@@ -14,6 +14,7 @@
     "@langwatch/enterprise-billing-web",
     "@langwatch/enterprise-governance-web",
     "@langwatch/enterprise-licensing-web",
+    "@langwatch/enterprise-managed-provider-web",
     "@langwatch/enterprise-scim-web",
     "@langwatch/evaluator-web",
     "@langwatch/experiment-web",
@@ -114,7 +115,7 @@
       "root": "billing",
       "uses": {
         "screens": ["@langwatch/enterprise-billing-web/screens/billing"],
-        "surfaces": []
+        "surfaces": ["@langwatch/enterprise-billing-web/surfaces/contact-sales"]
       }
     },
     {
@@ -226,7 +227,10 @@
       "root": "licensing",
       "uses": {
         "screens": ["@langwatch/enterprise-licensing-web/screens/licensing"],
-        "surfaces": []
+        "surfaces": [
+          "@langwatch/enterprise-licensing-web/surfaces/resource-limits",
+          "@langwatch/enterprise-licensing-web/surfaces/seat-types"
+        ]
       }
     },
     {
@@ -234,7 +238,7 @@
       "root": "model-provider",
       "uses": {
         "screens": ["@langwatch/model-provider-web/screens/model-provider"],
-        "surfaces": []
+        "surfaces": ["@langwatch/enterprise-managed-provider-web/surfaces/managed-provider-alert"]
       }
     },
     {

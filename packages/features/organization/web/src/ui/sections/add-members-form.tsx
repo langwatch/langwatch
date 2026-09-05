@@ -27,12 +27,7 @@ import { api } from "../../behavior/organization-api";
 import { getDefaultTeamRoleForOrganizationRole } from "../../model/member-role-constraints";
 import type { InviteData, MembersForm, TeamAssignment } from "../../model/member-invite-form";
 import { InfoWithoutSelecting } from "@langwatch/design-system/info-without-selecting";
-import {
-  LITE_MEMBER_EXPLANATION,
-  LITE_MEMBER_NEEDS_TEAM_WARNING,
-  LITE_MEMBER_SHORT_DESCRIPTION,
-  SEAT_TYPES_DOC_PATH,
-} from "@langwatch/enterprise-licensing-web/surfaces/seat-types";
+import { useUiSeatTypeCopy } from "@langwatch/ui-host/slots";
 import {
   type RoleOption,
   TeamRoleSelectItemContent,
@@ -73,6 +68,7 @@ interface AddMembersFormProps {
  * admin only finds out when they say so.
  */
 function LiteMemberNeedsTeamWarning() {
+  const seatCopy = useUiSeatTypeCopy();
   return (
     <Box
       paddingX={4}
@@ -83,7 +79,7 @@ function LiteMemberNeedsTeamWarning() {
       data-testid="lite-member-needs-team-warning"
     >
       <Text fontSize="sm" color="fg">
-        {LITE_MEMBER_NEEDS_TEAM_WARNING}
+        {seatCopy.liteMemberNeedsTeamWarning}
       </Text>
     </Box>
   );
@@ -100,6 +96,7 @@ export function AddMembersForm({
   isInviterAdmin = true,
   initialEmails = "",
 }: AddMembersFormProps) {
+  const seatCopy = useUiSeatTypeCopy();
   const {
     register,
     control,
@@ -249,15 +246,15 @@ export function AddMembersForm({
                       </Text>
                       <InfoWithoutSelecting>
                         <FieldInfoTooltip
-                          description={LITE_MEMBER_EXPLANATION}
-                          docHref={SEAT_TYPES_DOC_PATH}
+                          description={seatCopy.liteMemberExplanation}
+                          docHref={seatCopy.seatTypesDocPath}
                           docLabel="How seats are counted"
                           testId="lite-member-info"
                         />
                       </InfoWithoutSelecting>
                     </HStack>
                     <Text fontSize="xs" color="fg.muted">
-                      {LITE_MEMBER_SHORT_DESCRIPTION}
+                      {seatCopy.liteMemberShortDescription}
                     </Text>
                   </VStack>
                 </Checkbox>

@@ -12,6 +12,9 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { UiCapabilityContextProvider } from "@langwatch/ui-host/capabilities";
+import { uiSlots } from "@langwatch/ui-host/slots";
+import { createUiCapabilitiesFromHost } from "@langwatch/ui-host/testing";
 import { render } from "@testing-library/react";
 import type { ReactElement } from "react";
 import {
@@ -59,6 +62,20 @@ export class FakeAuthzHost extends AuthzHostPort {
 }
 
 /** Renders a screen inside the Design System's provider and a host. */
+/**
+ * A composition that filled the sales slot, the way the browser application
+ * does. The screens under test only ask for the block by name; what an
+ * application without an enterprise half renders is `ui-host`'s own suite.
+ */
+const filledSlots = {
+  ...createUiCapabilitiesFromHost({ route: () => ({ params: {}, query: {} }), navigate: () => {} }),
+  slots: uiSlots({
+    components: {
+      contactSales: () => <div data-testid="contact-sales-block">Need more?</div>,
+    },
+  }),
+};
+
 export function renderWithAuthzHost(
   element: ReactElement,
   host: FakeAuthzHost = new FakeAuthzHost(),
@@ -67,7 +84,9 @@ export function renderWithAuthzHost(
     host,
     ...render(
       <ChakraProvider value={defaultSystem}>
-        <AuthzHostProvider value={host}>{element}</AuthzHostProvider>
+        <UiCapabilityContextProvider value={filledSlots}>
+          <AuthzHostProvider value={host}>{element}</AuthzHostProvider>
+        </UiCapabilityContextProvider>
       </ChakraProvider>,
     ),
   };

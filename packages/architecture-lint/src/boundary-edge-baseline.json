@@ -87,12 +87,6 @@
     },
     {
       "kind": "cross-feature",
-      "from": "packages/features/authz/web/package.json",
-      "to": "@langwatch/enterprise-billing-web",
-      "expires": "2026-10-01"
-    },
-    {
-      "kind": "cross-feature",
       "from": "packages/features/coding-agent/web/package.json",
       "to": "@langwatch/trace-web",
       "expires": "2026-10-01"
@@ -231,12 +225,6 @@
     },
     {
       "kind": "cross-feature",
-      "from": "packages/features/gateway/web/package.json",
-      "to": "@langwatch/enterprise-billing-web",
-      "expires": "2026-10-01"
-    },
-    {
-      "kind": "cross-feature",
       "from": "packages/features/identity/server/package.json",
       "to": "@langwatch/ops-server",
       "expires": "2026-10-01"
@@ -310,12 +298,6 @@
     {
       "kind": "cross-feature",
       "from": "packages/features/model-provider/web/package.json",
-      "to": "@langwatch/enterprise-managed-provider-web",
-      "expires": "2026-10-01"
-    },
-    {
-      "kind": "cross-feature",
-      "from": "packages/features/model-provider/web/package.json",
       "to": "@langwatch/prompt-web",
       "expires": "2026-10-01"
     },
@@ -335,12 +317,6 @@
       "kind": "cross-feature",
       "from": "packages/features/ops/web/package.json",
       "to": "@langwatch/feature-flag-web",
-      "expires": "2026-10-01"
-    },
-    {
-      "kind": "cross-feature",
-      "from": "packages/features/organization/web/package.json",
-      "to": "@langwatch/enterprise-billing-web",
       "expires": "2026-10-01"
     },
     {

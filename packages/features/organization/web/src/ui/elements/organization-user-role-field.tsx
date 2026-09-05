@@ -4,11 +4,7 @@ import { OrganizationUserRole } from "../../model/prisma-types";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { InfoWithoutSelecting } from "@langwatch/design-system/info-without-selecting";
 import { Select } from "@langwatch/design-system/select";
-import {
-  LITE_MEMBER_EXPLANATION,
-  LITE_MEMBER_SHORT_DESCRIPTION,
-  SEAT_TYPES_DOC_PATH,
-} from "@langwatch/enterprise-licensing-web/surfaces/seat-types";
+import { CORE_SEAT_TYPE_COPY, useUiSeatTypeCopy } from "@langwatch/ui-host/slots";
 
 export type OrgRoleOption = {
   label: string;
@@ -30,7 +26,7 @@ export const orgRoleOptions: OrgRoleOption[] = [
   {
     label: "Lite Member",
     value: OrganizationUserRole.EXTERNAL,
-    description: LITE_MEMBER_SHORT_DESCRIPTION,
+    description: CORE_SEAT_TYPE_COPY.liteMemberShortDescription,
   },
 ];
 
@@ -45,7 +41,18 @@ export function OrganizationUserRoleField({
   value: OrganizationUserRole;
   onChange: (role: OrganizationUserRole) => void;
 }) {
-  const roleCollection = useMemo(() => createListCollection({ items: orgRoleOptions }), []);
+  // The composition may know better words for a lite seat than core's own.
+  const seatCopy = useUiSeatTypeCopy();
+  const roleOptions = useMemo(
+    () =>
+      orgRoleOptions.map((option) =>
+        option.value === OrganizationUserRole.EXTERNAL
+          ? { ...option, description: seatCopy.liteMemberShortDescription }
+          : option,
+      ),
+    [seatCopy],
+  );
+  const roleCollection = useMemo(() => createListCollection({ items: roleOptions }), [roleOptions]);
 
   return (
     <VStack align="start">
@@ -64,7 +71,7 @@ export function OrganizationUserRoleField({
             <Select.ValueText placeholder="Select role" />
           </Select.Trigger>
           <Select.Content width="320px" paddingY={2}>
-            {orgRoleOptions.map((option) => (
+            {roleOptions.map((option) => (
               <Select.Item key={option.value} item={option}>
                 <VStack align="start" gap={0} flex={1}>
                   <HStack gap={0}>
@@ -72,8 +79,8 @@ export function OrganizationUserRoleField({
                     {option.value === OrganizationUserRole.EXTERNAL && (
                       <InfoWithoutSelecting>
                         <FieldInfoTooltip
-                          description={LITE_MEMBER_EXPLANATION}
-                          docHref={SEAT_TYPES_DOC_PATH}
+                          description={seatCopy.liteMemberExplanation}
+                          docHref={seatCopy.seatTypesDocPath}
                           docLabel="How seats are counted"
                           testId="lite-member-info"
                         />

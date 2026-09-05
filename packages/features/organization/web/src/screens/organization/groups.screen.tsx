@@ -40,7 +40,7 @@ import {
 import { GroupDetailDialog } from "../../ui/sections/group-detail-dialog";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
-import { ContactSalesBlock } from "@langwatch/enterprise-billing-web/surfaces/contact-sales";
+import { UiSlot } from "@langwatch/ui-host/slots";
 import { useActivePlan } from "../../behavior/use-active-plan";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project";
 import type { RouterOutputs } from "../../behavior/organization-api";
@@ -93,7 +93,7 @@ export default function GroupsScreen() {
           </Alert.Content>
         </Alert.Root>
         <Box width="full">
-          <ContactSalesBlock />
+          <UiSlot name="contactSales" props={{}} />
         </Box>
       </VStack>
     );

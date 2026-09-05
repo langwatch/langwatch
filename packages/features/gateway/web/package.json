@@ -35,7 +35,6 @@
     "@langwatch/config": "workspace:*",
     "@langwatch/csv": "workspace:*",
     "@langwatch/design-system": "workspace:*",
-    "@langwatch/enterprise-billing-web": "workspace:*",
     "@langwatch/gateway-contract": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/platform-api-client": "workspace:*",

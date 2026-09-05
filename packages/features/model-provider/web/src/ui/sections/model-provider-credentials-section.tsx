@@ -1,7 +1,7 @@
 import { Box, Field, Input, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { useEffect } from "react";
-import { ManagedModelProviderAlert } from "@langwatch/enterprise-managed-provider-web";
+import { UiSlot } from "@langwatch/ui-host/slots";
 import { fieldMetadataFor } from "../../model/model-provider-field-metadata";
 import type {
   UseModelProviderFormActions,
@@ -14,8 +14,9 @@ import { isSecretCredentialField } from "../../model/model-provider-helpers";
 import { SmallLabel } from "../elements/small-label";
 
 /**
- * Renders credential input fields based on the provider's schema, or a managed provider
- * component instead for enterprise deployments.
+ * Renders credential input fields based on the provider's schema, or whatever the
+ * composition put in the managed-provider slot when the credentials are not the
+ * customer's to enter.
  */
 export const CredentialsSection = ({
   state,
@@ -61,7 +62,12 @@ export const CredentialsSection = ({
   }, [isManaged]);
 
   if (isManaged) {
-    return <ManagedModelProviderAlert provider={provider} error={state.errors.customKeysRoot} />;
+    return (
+      <UiSlot
+        name="managedModelProviderAlert"
+        props={{ provider: provider.provider, error: state.errors.customKeysRoot }}
+      />
+    );
   }
 
   return (

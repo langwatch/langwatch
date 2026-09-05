@@ -18,6 +18,10 @@
       "types": "./src/compat/next-dynamic.ts",
       "default": "./src/compat/next-dynamic.ts"
     },
+    "./slots": {
+      "types": "./src/slots.tsx",
+      "default": "./src/slots.tsx"
+    },
     "./capabilities": {
       "types": "./src/capabilities.ts",
       "default": "./src/capabilities.ts"
