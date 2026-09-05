@@ -20,6 +20,22 @@ export class CannotImpersonateAdminError extends HandledError {
   }
 }
 
+/**
+ * An operator tried to impersonate into an organization that requires a second
+ * factor without having set one up. The requirement is about the ACTOR:
+ * borrowing access is a higher bar than holding your own, not a way around it.
+ */
+export class CannotImpersonateWithoutSecondFactorError extends HandledError {
+  constructor(detail: string) {
+    super("cannot_impersonate_without_second_factor", "cannot_impersonate_without_second_factor", {
+      httpStatus: 403,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "CannotImpersonateWithoutSecondFactorError";
+  }
+}
+
 export class UserToImpersonateNotFoundError extends NotFoundError {
   constructor(userId: string) {
     super("user_to_impersonate_not_found", "User to impersonate", userId);

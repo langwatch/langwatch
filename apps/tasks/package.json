@@ -33,6 +33,8 @@
     "@langwatch/gateway-server": "workspace:*",
     "@langwatch/group-queue": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/identity-contract": "workspace:*",
+    "@langwatch/identity-server": "workspace:*",
     "@langwatch/model-provider-server": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/ops-server": "workspace:*",

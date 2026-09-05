@@ -14,26 +14,8 @@ import { reduceIdentifier } from "./identifier-aggregate";
 
 /**
  * The pure identity reducer (ADR-101 §3). Live dispatch and the replay test
- * run this identical function — the app's fold projection validates the
- * wire event and hands it here, which is what makes replay determinism a
  * meaningful proof (the grants-ledger discipline, ADR-092 §13).
- *
- * Facts are accepted: the reducer never refuses, it folds. The guards that
- * can refuse (a PRIMARY detach, a uniqueness race) run before any fact
- * exists (`@langwatch/identity-server`'s IdentityGuardsService). A fact the heads
- * cannot apply cleanly (a verify for an unknown identifier — possible only
- * from a partial replay window) is folded conservatively rather than
- * dropped.
- *
  * The RULES live one file over, in `reduceIdentifier` (ADR-127: an identifier
- * is an aggregate). What is left here is DELIVERY — which heads are handed a
- * given fact — and today that is every head, always. Two of those deliveries
- * are wider than the fact's own identifier, and they are the two invariants a
- * per-identifier fold cannot hold: a promotion reaches every other head so
- * exactly one PRIMARY stands, and an erasure reaches every head rather than
- * only the ids the fact names. Both move into the facts a command states when
- * the fold splits; until then, this is what runs, and it is what ran before
- * the rules moved files.
  */
 
 function deliver({
@@ -96,11 +78,10 @@ export function reduceIdentity({
       });
     }
     case USER_ERASED_EVENT_TYPE:
-      // Every head, not only the ids the fact names: today the list on the
-      // fact is the writer's audit record and this delivery is the sweep's
-      // bound (the member_offboarded discipline). Under a per-identifier fold
-      // there is no such delivery and the list becomes the bound, which is why
-      // `userErasureFacts` reads the whole person to build it. Domains survive;
+      // Every head, not only the ids the fact names: today the list on the fact is the writer's
+      // audit record and this delivery is the sweep's bound (the member_offboarded discipline).
+      // Under a per-identifier fold there is no such delivery and the list becomes the bound,
+      // which is why `userErasureFacts` reads the whole person to build it. Domains survive;
       // the rows remain as tombstones replay reproduces.
       return deliver({
         heads,

@@ -533,20 +533,3 @@ export class IdentityDetachStrandsUserError extends IdentityCommandRefusedError 
     this.name = "IdentityDetachStrandsUserError";
   }
 }
-
-/**
- * An operator tried to impersonate into an organization that requires a
- * second factor without having set one up themselves. The requirement is
- * about the ACTOR, not the subject: borrowing somebody's access is a higher
- * bar than holding your own, not a way around the bar.
- */
-export class CannotImpersonateWithoutSecondFactorError extends HandledError {
-  constructor(detail: string) {
-    super("cannot_impersonate_without_second_factor", "cannot_impersonate_without_second_factor", {
-      httpStatus: 403,
-      fault: "customer",
-      reasons: [new Error(detail)],
-    });
-    this.name = "CannotImpersonateWithoutSecondFactorError";
-  }
-}

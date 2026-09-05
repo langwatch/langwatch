@@ -125,7 +125,6 @@ export {
   verifyDomainCommandDataSchema,
 } from "./connection-commands";
 export {
-  CannotImpersonateWithoutSecondFactorError,
   IdentityCommandRefusedError,
   IdentityDetachStrandsUserError,
   IdentityEmailInUseError,

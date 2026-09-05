@@ -73,6 +73,10 @@ export {
   type PostgresIdentityGuardsOptions,
 } from "./adapters/postgres.identity-guards.adapter";
 export {
+  PostgresIdentityNewbornSweepAdapter,
+  type PostgresIdentityNewbornSweepOptions,
+} from "./adapters/postgres.identity-newborn-sweep.adapter";
+export {
   IDENTITY_LATCH_CACHE_MAX_USERS,
   IDENTITY_LATCH_CACHE_TTL_MS,
   PostgresIdentityEmailAdapter,

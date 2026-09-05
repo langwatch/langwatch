@@ -1,6 +1,7 @@
 import {
   CannotImpersonateAdminError,
   CannotImpersonateDeactivatedUserError,
+  CannotImpersonateWithoutSecondFactorError,
   UserToImpersonateNotFoundError,
 } from "@langwatch/ops-contract";
 import { describe, expect, it } from "vitest";
@@ -15,13 +16,22 @@ import {
 
 class InMemoryImpersonationRepository extends ImpersonationRepository {
   window: ImpersonationWindow | null = null;
+  operatorsAsked: string[] = [];
 
-  constructor(private readonly target: ImpersonationTarget | null) {
+  constructor(
+    private readonly target: ImpersonationTarget | null,
+    private readonly operatorHasSecondFactor = false,
+  ) {
     super();
   }
 
   tryFindTarget(): Promise<ImpersonationTarget | null> {
     return Promise.resolve(this.target);
+  }
+
+  hasSecondFactor(userId: string): Promise<boolean> {
+    this.operatorsAsked.push(userId);
+    return Promise.resolve(this.operatorHasSecondFactor);
   }
 
   setWindow(_sessionId: string, window: ImpersonationWindow): Promise<void> {
@@ -55,6 +65,7 @@ const target = (overrides: Partial<ImpersonationTarget> = {}): ImpersonationTarg
   email: "target@example.com",
   image: null,
   deactivatedAt: null,
+  mfaRequiredOrganizationSlugs: [],
   ...overrides,
 });
 
@@ -116,6 +127,48 @@ describe("ImpersonationService", () => {
         new InMemoryImpersonationRepository(target({ email: "Root@Langwatch.ai" })),
       ).service.start(input),
     ).rejects.toBeInstanceOf(CannotImpersonateAdminError);
+  });
+
+  describe("when the target belongs to an organization that requires a second factor", () => {
+    /** @scenario "Impersonating into an organization that requires it takes the operator's own" */
+    it("refuses an operator without one, and opens no window", async () => {
+      const repository = new InMemoryImpersonationRepository(
+        target({ mfaRequiredOrganizationSlugs: ["acme"] }),
+        false,
+      );
+      const { audit, service } = serviceFor(repository);
+
+      await expect(service.start(input)).rejects.toBeInstanceOf(
+        CannotImpersonateWithoutSecondFactorError,
+      );
+      expect(repository.window).toBeNull();
+      expect(audit.entries).toEqual([]);
+      expect(repository.operatorsAsked).toEqual(["user_admin"]);
+    });
+
+    /** @scenario "Impersonating into an organization that requires it takes the operator's own" */
+    it("allows an operator who has one of their own", async () => {
+      const repository = new InMemoryImpersonationRepository(
+        target({ mfaRequiredOrganizationSlugs: ["acme"] }),
+        true,
+      );
+      const { service } = serviceFor(repository);
+
+      await service.start(input);
+
+      expect(repository.window?.id).toBe("user_target");
+    });
+
+    /** @scenario "Looking up the requirement decides the request rather than failing it" */
+    it("never asks about the operator when no organization requires one", async () => {
+      const repository = new InMemoryImpersonationRepository(target(), false);
+      const { service } = serviceFor(repository);
+
+      await service.start(input);
+
+      expect(repository.operatorsAsked).toEqual([]);
+      expect(repository.window?.id).toBe("user_target");
+    });
   });
 
   it("clears an existing window idempotently", async () => {

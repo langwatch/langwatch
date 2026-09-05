@@ -3,9 +3,15 @@ import {
   KsuidAuthzBindingIdAdapter,
   PostgresAuthzAdapter,
 } from "@langwatch/authz-server";
+import { IDENTITY_PIPELINE_NAME } from "@langwatch/identity-contract";
+import {
+  IdentityEventingPort,
+  IdentityProducerPipelinesAdapter,
+  PostgresIdentityNewbornSweepAdapter,
+} from "@langwatch/identity-server";
 import { PostgresSystemMigrationsAdapter, SystemMigrationsPassTask } from "@langwatch/ops-server";
 import type { SystemMigration } from "@langwatch/system-migrations";
-import type { TasksEventingInfrastructure } from "./tasks-eventing.composition";
+import { TASKS_PROCESS_NAME, type TasksEventingInfrastructure } from "./tasks-eventing.composition";
 import type { TasksHost } from "./tasks-host.composition";
 
 /**
@@ -20,6 +26,9 @@ export function buildSystemMigrationsPassTask({
   host: TasksHost;
   eventing: TasksEventingInfrastructure | undefined;
 }): SystemMigrationsPassTask {
+  // Composed once, not per pass: registering the identity pipeline again on
+  // every pass would register the same producer repeatedly.
+  let sweep: ReturnType<PostgresIdentityNewbornSweepAdapter["build"]> | undefined;
   return SystemMigrationsPassTask.create({
     pass: () => {
       const database = host.requirePrisma();
@@ -29,10 +38,68 @@ export function buildSystemMigrationsPassTask({
         redis: host.redis ?? null,
         isSaaS: () => host.config.isSaaS,
         migrations: () => migrations,
+        // The identity migrations are the user-rooted axis, and this process
+        // composes none of them yet: their services (backfill, secret carry,
+        // connection grandfather) have no composition here. The leg is driven
+        // the moment a registry hands them over.
+        userMigrations: () => [],
+        newbornSweep: () => (sweep ??= newbornSweep({ host, eventing })).runPass(),
       });
       return ({ signal }) => runner.runPass({ signal });
     },
   });
+}
+
+/**
+ * The abandoned-newborn sweep (ADR-116 §3) on the pass's own cadence. Its
+ * erase stages through this process's producer-only identity pipeline; with
+ * no queue the ledger refuses by name, which the pass logs rather than fails.
+ */
+function newbornSweep({
+  host,
+  eventing,
+}: {
+  host: TasksHost;
+  eventing: TasksEventingInfrastructure | undefined;
+}): ReturnType<PostgresIdentityNewbornSweepAdapter["build"]> {
+  return PostgresIdentityNewbornSweepAdapter.create({
+    database: host.requirePrisma(),
+    eventing: TasksIdentityEventing.create({ eventing }),
+  }).build();
+}
+
+/** The identity command senders this process produces, or none at all. */
+class TasksIdentityEventing extends IdentityEventingPort {
+  static create({
+    eventing,
+  }: {
+    eventing: TasksEventingInfrastructure | undefined;
+  }): TasksIdentityEventing {
+    if (!eventing) return new TasksIdentityEventing(null);
+    const registered = eventing.eventSourcing.register(
+      IdentityProducerPipelinesAdapter.create({
+        processName: TASKS_PROCESS_NAME,
+      }).identityPipeline(),
+    );
+    return new TasksIdentityEventing(registered.commands as Record<string, unknown>);
+  }
+
+  private constructor(private readonly commands: Record<string, unknown> | null) {
+    super();
+  }
+
+  tryPipelineCommand(input: {
+    pipeline: string;
+    command: string;
+  }): Promise<{ send(data: unknown): Promise<unknown> } | null> {
+    if (input.pipeline !== IDENTITY_PIPELINE_NAME) return Promise.resolve(null);
+    const sender = this.commands?.[input.command];
+    return Promise.resolve(
+      typeof (sender as { send?: unknown } | undefined)?.send === "function"
+        ? (sender as { send(data: unknown): Promise<unknown> })
+        : null,
+    );
+  }
 }
 
 /**

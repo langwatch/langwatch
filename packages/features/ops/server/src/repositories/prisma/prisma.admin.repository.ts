@@ -17,8 +17,16 @@ export class PrismaImpersonationRepository extends ImpersonationRepository {
     return new PrismaImpersonationRepository(database);
   }
 
+  /**
+   * The memberships ride along as a NESTED read on purpose. "Which of this
+   * person's organizations require a second factor" carries no
+   * single-organization predicate, so a top-level `organizationUser.findMany`
+   * is refused by the tenancy guard (ADR-021) and takes the whole request down
+   * rather than deciding it. Reading them through the target row asks the same
+   * question in one round trip, where the guard is right not to look.
+   */
   async tryFindTarget(userId: string): Promise<ImpersonationTarget | null> {
-    return this.database.user.findUnique({
+    const row = await this.database.user.findUnique({
       where: { id: userId },
       select: {
         id: true,
@@ -26,8 +34,29 @@ export class PrismaImpersonationRepository extends ImpersonationRepository {
         email: true,
         image: true,
         deactivatedAt: true,
+        orgMemberships: {
+          where: { organization: { mfaRequired: true } },
+          select: { organization: { select: { slug: true } } },
+        },
       },
     });
+    if (!row) return null;
+
+    const { orgMemberships, ...target } = row;
+    return {
+      ...target,
+      mfaRequiredOrganizationSlugs: orgMemberships.map(
+        (membership) => membership.organization.slug,
+      ),
+    };
+  }
+
+  async hasSecondFactor(userId: string): Promise<boolean> {
+    const operator = await this.database.user.findUnique({
+      where: { id: userId },
+      select: { twoFactorEnabled: true },
+    });
+    return operator?.twoFactorEnabled === true;
   }
 
   async setWindow(sessionId: string, window: ImpersonationWindow): Promise<void> {

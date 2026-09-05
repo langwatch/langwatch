@@ -1,30 +1,61 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { Cluster, Redis } from "ioredis";
 import {
+  type MigrationCohort,
   type MigrationPassSummary,
   type SystemMigration,
   SystemMigrationRunnerService,
 } from "@langwatch/system-migrations";
+import { createLogger } from "@langwatch/observability";
 import {
   migrationRunsOnThisInstallation,
   organizationMigrates,
+  userMigrates,
 } from "../rules/ops-system-migration-cohort.rules";
+import { PrismaMigrationMembershipRepository } from "../repositories/prisma/prisma.migration-membership.repository";
+import { PrismaUserTenantSourceRepository } from "../repositories/prisma/prisma.user-tenant-source.repository";
 import { RedisMigrationLeaseRepository } from "../repositories/redis/redis.migration-lease.repository";
 import { PrismaOrganizationTenantSourceRepository } from "../repositories/prisma/prisma.organization-tenant-source.repository";
 import { PrismaSystemMigrationEnrollmentRepository } from "../repositories/prisma/prisma.system-migration-enrollment.repository";
 import { PrismaSystemMigrationStateRepository } from "../repositories/prisma/prisma.system-migration-state.repository";
+
+const logger = createLogger("langwatch:ops:system-migrations:pass");
+
+/** Both legs count into one summary: the convergence loop stops when a whole
+ *  pass moved nothing, so one leg still advancing has to keep it non-zero. */
+function mergeSummaries(a: MigrationPassSummary, b: MigrationPassSummary): MigrationPassSummary {
+  return {
+    tenantsSeen: a.tenantsSeen + b.tenantsSeen,
+    finalized: a.finalized + b.finalized,
+    held: a.held + b.held,
+    parked: a.parked + b.parked,
+    skipped: a.skipped + b.skipped,
+    alreadyFinalized: a.alreadyFinalized + b.alreadyFinalized,
+    alreadyRolledBack: a.alreadyRolledBack + b.alreadyRolledBack,
+    claimed: a.claimed + b.claimed,
+    advanced: a.advanced + b.advanced,
+  };
+}
 
 export type PostgresSystemMigrationsAdapterOptions = Readonly<{
   database: PrismaClient;
   redis: Redis | Cluster | null;
   /** Cloud pacing is per-organization enrollment; self-hosted admits everyone. */
   isSaaS: () => boolean;
-  /**
-   * The organization-rooted migrations this installation registered, and only
-   * that axis: the USER-rooted leg (ADR-101 §6) is admitted per user through
-   * organization membership, a cohort this adapter does not implement.
-   */
+  /** The organization-rooted migrations this installation registered. */
   migrations: () => readonly SystemMigration[];
+  /**
+   * The USER-rooted migrations this installation registered (ADR-101 §6),
+   * driven as a second leg of the same pass over the same lease and state
+   * table. Admitted per user through organization membership.
+   */
+  userMigrations: () => readonly SystemMigration[];
+  /**
+   * The abandoned-newborn sweep (ADR-116 §3), on the pass's own cadence. A LEG
+   * rather than a registered migration, because what it hunts is a claim with
+   * no user row behind it — a tenant no source enumerates.
+   */
+  newbornSweep: () => Promise<unknown>;
 }>;
 
 /**
@@ -48,15 +79,90 @@ export class PostgresSystemMigrationsAdapter {
     });
 
     const migrations = this.released({ migrations: this.options.migrations(), isSaaS });
+    const userMigrations = this.released({ migrations: this.options.userMigrations(), isSaaS });
+    // Both legs' cohorts resolve BEFORE either pass starts, so the two legs
+    // read enrollment at the same moment: an operator enrolling mid-pass moves
+    // both legs on the next pass, never one leg now and the other later.
     const cohort = await this.cohort({ isSaaS, enrollments, migrations });
+    const userCohort =
+      userMigrations.length === 0
+        ? null
+        : await this.userCohort({ isSaaS, enrollments, migrations: userMigrations });
 
-    return new SystemMigrationRunnerService({
+    const summary = await new SystemMigrationRunnerService({
       state,
       lease,
       tenants: PrismaOrganizationTenantSourceRepository.create({ prisma: this.options.database }),
       cohort,
       migrations,
     }).runPass({ signal });
+
+    const merged =
+      userCohort === null
+        ? summary
+        : mergeSummaries(
+            summary,
+            await new SystemMigrationRunnerService({
+              state,
+              lease,
+              tenants: PrismaUserTenantSourceRepository.create({ prisma: this.options.database }),
+              cohort: userCohort,
+              migrations: userMigrations,
+            }).runPass({ signal }),
+          );
+
+    await this.sweepAbandonedNewborns();
+    return merged;
+  }
+
+  /**
+   * The user-rooted leg's cohort. Enrollment is read once, fresh, at the start
+   * of the pass; membership is answered per candidate user against the
+   * enrolled organizations only.
+   */
+  async userCohort({
+    isSaaS,
+    enrollments,
+    migrations,
+  }: {
+    isSaaS: boolean;
+    enrollments: PrismaSystemMigrationEnrollmentRepository;
+    migrations: readonly SystemMigration[];
+  }): Promise<MigrationCohort> {
+    const automatic = new Set(
+      migrations.filter((one) => one.enrolledAutomatically).map((one) => one.name),
+    );
+    const memberships = PrismaMigrationMembershipRepository.create({
+      prisma: this.options.database,
+    });
+    const enrolled = isSaaS
+      ? await enrollments.findEnrolledOrganizationIdsByMigration()
+      : new Map<string, Set<string>>();
+    return async ({ tenantId, migrationName }) => {
+      const enrolledAutomatically = automatic.has(migrationName);
+      const organizationIds = [...(enrolled.get(migrationName) ?? [])];
+      const memberOfEnrolledOrganization =
+        isSaaS && !enrolledAutomatically && organizationIds.length > 0
+          ? await memberships.isMemberOfAny({ userId: tenantId, organizationIds })
+          : false;
+      return userMigrates({ isSaaS, enrolledAutomatically, memberOfEnrolledOrganization });
+    };
+  }
+
+  /**
+   * Never terminal: the sweep removes rows the pass did not write, so a pass
+   * that reported nothing because a sweep threw would hide the migration
+   * outcome an operator asked for.
+   */
+  private async sweepAbandonedNewborns(): Promise<void> {
+    try {
+      await this.options.newbornSweep();
+    } catch (error) {
+      logger.warn(
+        { error },
+        "the abandoned-newborn sweep failed; the claims stay and the next pass retries",
+      );
+    }
   }
 
   /** Self-hosted drives only the migrations already released for it. */

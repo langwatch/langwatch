@@ -103,3 +103,21 @@ export function migrationRunsOnThisInstallation({
 }): boolean {
   return isSaaS || runsAutomaticallyOnSelfHosted;
 }
+
+/**
+ * Whether one user is in this pass's cohort for one USER-rooted migration
+ * (ADR-101 §6). The ops page enrolls ORGANIZATIONS, so membership of an
+ * enrolled one admits a user; automatic enrollment and self-hosted admit all.
+ */
+export function userMigrates({
+  isSaaS,
+  enrolledAutomatically,
+  memberOfEnrolledOrganization,
+}: {
+  isSaaS: boolean;
+  enrolledAutomatically: boolean;
+  memberOfEnrolledOrganization: boolean;
+}): boolean {
+  if (!isSaaS) return true;
+  return enrolledAutomatically || memberOfEnrolledOrganization;
+}
