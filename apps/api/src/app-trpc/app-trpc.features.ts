@@ -18,122 +18,19 @@ import type { ApiTrpcFeatureMount } from "../api.application";
 import type { ApiTrpcInfrastructure } from "./app-trpc.infrastructure";
 import type { ComposedApiFeatures } from "./app-trpc.composed";
 
-import type { AuthApp } from "@langwatch/auth-server";
-import type { SavedViewTrpcPorts } from "@langwatch/dashboard-server";
-import type { CostTrpcPorts, LimitsTrpcPorts } from "@langwatch/entitlement-server";
-
-import type { TraceEditOverlayVisibilityWindow } from "@langwatch/trace-server";
-import type { TraceLegacyFilterInput, TraceLegacyListInput } from "@langwatch/trace-contract";
-
-import type {
-  GroupTrpcPorts,
-  JoinRequestTrpcPorts,
-  OnboardingTrpcPorts,
-} from "@langwatch/organization-server";
-
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-
-import type { IdentityTrpcPorts, UserTrpcPorts } from "@langwatch/user-server";
-
-import type { ZodTypeAny } from "zod";
-
-import { composeApiKeyTrpcRouter } from "../features/api-key/api-key.composition";
-import {
-  createFrontDoorTrpcRouter,
-  createPublicEnvTrpcProcedure,
-} from "../features/auth/auth-trpc.mount";
 import { createAuthzTrpcRouter } from "../features/authz/authz-trpc.mount";
 import { createDatasetRecordTrpcRouter } from "../features/dataset/dataset-trpc.mount";
 import { createDashboardTrpcRouter } from "../features/dashboard/dashboard-trpc.mount";
 import { createExportTrpcRouter } from "../features/export/export-trpc.mount";
-import { createPresenceTrpcRouter } from "../features/presence/presence-trpc.mount";
-import {
-  createGroupTrpcRouter,
-  createJoinRequestTrpcRouter,
-  createOnboardingTrpcRouter,
-  createPersonalWorkspaceFeaturesTrpcRouter,
-} from "../features/organization/organization-trpc.mount";
+import { createPersonalWorkspaceFeaturesTrpcRouter } from "../features/organization/organization-trpc.mount";
 import { createPromptTagTrpcRouter } from "../features/prompt/prompt-trpc.mount";
 import { createRoleBindingTrpcRouter } from "../features/role/role-trpc.mount";
 import { composeGithubTrpcRouter } from "../features/github/github.composition";
-import { createIdentityTrpcRouter, createUserTrpcRouter } from "../features/user/user-trpc.mount";
 import { createEnterpriseBillingTrpcRouters } from "../features/enterprise/enterprise-billing-trpc.mount";
 import { createEnterpriseGovernanceTrpcRouters } from "../features/enterprise/enterprise-governance-trpc.mount";
 import { composeGovernanceHomeTrpcRouter } from "../features/enterprise/governance-home.composition";
 import { createPlanTrpcRouter } from "../features/entitlement/entitlement-trpc.mount";
 import { type ModelProviderTrpcChecks } from "../features/model-provider/model-provider-trpc.mount";
-
-/**
- * The capabilities these surfaces reach that their own feature packages do not
- * own — one entry per feature that has any, so a new port is a change to one
- * group rather than to this interface's shape.
- *
- * Every one of them resolves something only the application knows: its
- * database rows, its trace pipeline, its deployment's billing store, its
- * sign-in ceremony. None can be answered inside a transport package, so the
- * process binds them once here, the way it supplies the mount itself.
- */
-export interface AppTrpcFeaturePorts<
-  TSignUpDataSchema extends ZodTypeAny,
-  TListInput extends TraceLegacyListInput = TraceLegacyListInput,
-  TListInputRaw = unknown,
-  TFilterInput extends TraceLegacyFilterInput = TraceLegacyFilterInput,
-  TFilterInputRaw = unknown,
-  TPrecondition = unknown,
-  TProtections extends TraceEditOverlayVisibilityWindow = TraceEditOverlayVisibilityWindow,
-  TMetadata = unknown,
-  TMetadataRaw = unknown,
-  TSavedView = unknown,
-  TSpendRollup = unknown,
-  TApiKeyValidation = unknown,
-  TStoredKeyValidation = unknown,
-> {
-  /**
-   * The composed auth application BOTH signed-out doors answer from — the
-   * front door and `publicEnv` beside it. One instance rather than two,
-   * because the sign-in mode it resolves is the one ADR-027 source of truth
-   * for the whole deployment and the two doors must never disagree.
-   */
-  auth: AuthApp;
-  /** The Enterprise plan gate behind groups, read out of the billing store. */
-  group: GroupTrpcPorts;
-  /** The verification ceremony that spends the caller's own record. */
-  identity: IdentityTrpcPorts;
-  /**
-   * The join-request service, composed over the identity ledger, the
-   * membership writer that emits authorization grants, the organization's join
-   * settings and the mailer.
-   */
-  joinRequests: JoinRequestTrpcPorts;
-  /**
-   * The sign-up ceremony's four follow-ups, plus the questionnaire schema its
-   * input is built from.
-   *
-   * Every one of them is somebody else's: the standard AI tool catalogue is
-   * an Enterprise governance capability a core package may not name, the
-   * signer's personal workspace is provisioned through the user application
-   * that names the person, the first project is created through the process's
-   * own project surface so it runs that surface's authorization and audit,
-   * and both sign-up notifications are this deployment's marketing traffic.
-   * What the organization package keeps is the ceremony itself.
-   */
-  onboarding: OnboardingTrpcPorts<TSignUpDataSchema>;
-  /**
-   * The process's database client. One surface takes it directly: the
-   * evaluation mount builds its custom-evaluator read on the client rather
-   * than on a request context, because that read is the same table scan for
-   * every caller.
-   */
-  prisma: PrismaClient;
-  /**
-   * The deployment's own answers behind the signed-in person's account: its
-   * auth provider and passkey policy, its Auth0 tenant, its password hashing,
-   * the account and organization rows the /me screens read, the signup
-   * throttle, product analytics and the budget-increase mail. All of it is
-   * this process's, none of it the user feature's.
-   */
-  user: UserTrpcPorts;
-}
 
 /**
  * Builds every tRPC surface this package owns against one process's mount.
@@ -148,27 +45,9 @@ export interface AppTrpcFeaturePorts<
  * that is not in here is not mounted — which is the property the audits rely
  * on.
  */
-export function createAppTrpcFeatures<
-  TSignUpDataSchema extends ZodTypeAny,
-  TListInput extends TraceLegacyListInput = TraceLegacyListInput,
-  TListInputRaw = unknown,
-  TFilterInput extends TraceLegacyFilterInput = TraceLegacyFilterInput,
-  TFilterInputRaw = unknown,
-  TPrecondition = unknown,
-  TProtections extends TraceEditOverlayVisibilityWindow = TraceEditOverlayVisibilityWindow,
-  TMetadata = unknown,
-  TMetadataRaw = unknown,
-  TSavedView = unknown,
-  TSpendRollup = unknown,
-  TApiKeyValidation = unknown,
-  TStoredKeyValidation = unknown,
->(options: {
+export function createAppTrpcFeatures(options: {
   mount: ApiTrpcFeatureMount;
-  /**
-   * What a feature composes ITSELF from, for the features that already do.
-   * Every entry still reached through `ports` below is one that has not moved
-   * yet.
-   */
+  /** What a feature composes ITSELF from, for the features composed here. */
   infrastructure: ApiTrpcInfrastructure;
   /**
    * The features the process composed BEFORE the mount existed, because their
@@ -177,23 +56,8 @@ export function createAppTrpcFeatures<
    * half here.
    */
   composed: ComposedApiFeatures;
-  ports: AppTrpcFeaturePorts<
-    TSignUpDataSchema,
-    TListInput,
-    TListInputRaw,
-    TFilterInput,
-    TFilterInputRaw,
-    TPrecondition,
-    TProtections,
-    TMetadata,
-    TMetadataRaw,
-    TSavedView,
-    TSpendRollup,
-    TApiKeyValidation,
-    TStoredKeyValidation
-  >;
 }) {
-  const { mount, composed, infrastructure, ports } = options;
+  const { mount, composed, infrastructure } = options;
   const gateway = composed.gateway.router(mount);
   const langyRouters = composed.langy.routers(mount);
   const scenarioRouters = composed.scenario.routers(mount);
@@ -209,6 +73,9 @@ export function createAppTrpcFeatures<
   const governance = createEnterpriseGovernanceTrpcRouters(mount);
   const enterprise = composed.enterprise.routers(mount);
   const automationRouters = composed.automation.routers(mount);
+  const authRouters = composed.auth.routers(mount);
+  const userRouters = composed.user.routers(mount);
+  const membershipRouters = composed.organization.routers(mount);
   const billing = createEnterpriseBillingTrpcRouters({
     ...mount,
     saasBilling: infrastructure.saasBilling,
@@ -326,7 +193,7 @@ export function createAppTrpcFeatures<
     // ClickHouse and the trace-side senders it registered once.
     annotation: annotationRouters.annotation,
     annotationScore: annotationRouters.annotationScore,
-    apiKey: composeApiKeyTrpcRouter({ mount, infrastructure }),
+    apiKey: composed.apiKey.router(mount),
     // What the caller may do at one scope, as the product reports their own
     // standing back to them. It takes no ports: the answer comes from the same
     // AuthZ service every declared check on this root already runs on, so a
@@ -363,7 +230,7 @@ export function createAppTrpcFeatures<
     // because a subscription mounted beside the list would serve traffic from
     // outside every audit that reads it.
     export: createExportTrpcRouter(mount),
-    frontDoor: createFrontDoorTrpcRouter({ ...mount, ports: ports.auth }),
+    frontDoor: authRouters.frontDoor,
     // Which rollouts this tenant is inside. No declared-permission policy and
     // no ports, and both are the same decision: every procedure authorizes the
     // exact tenant target it was asked for inside the package's own resolver,
@@ -371,31 +238,31 @@ export function createAppTrpcFeatures<
     // claim once for the whole surface.
     featureFlag: composed.featureFlag.router(mount),
     graphs: analyticsRouters.graphs,
-    group: createGroupTrpcRouter({ ...mount, ports: ports.group }),
+    group: membershipRouters.group,
     // The GitHub App an organization connected, and the pull requests its
     // coding agents opened. Composed by the feature itself off the shared
     // infrastructure: one namespace, two answers nobody else owns, and no
     // graph shared with anything beside it.
     github: composeGithubTrpcRouter({ mount, infrastructure }),
     home: composed.home.router(mount),
-    identity: createIdentityTrpcRouter({ ...mount, ports: ports.identity }),
+    identity: userRouters.identity,
     // The setup checklist, composed by the feature itself: nine other
     // verticals' evidence plus the project's own two columns, and no one
     // feature package holds it.
     integrationsChecks: composed.integrationsChecks.router(mount),
-    joinRequests: createJoinRequestTrpcRouter({ ...mount, ports: ports.joinRequests }),
+    joinRequests: membershipRouters.joinRequests,
     // The sign-up ceremony, beside the `organization.createAndAssign` it is
     // built on: same package, same questionnaire schema, same opt-out reason.
-    onboarding: createOnboardingTrpcRouter({ ...mount, ports: ports.onboarding }),
+    onboarding: membershipRouters.onboarding,
     // Who else is looking at this project, and where their cursor is. It takes
     // no ports — every answer is read off the request context's own
     // application slice — and it is in this list because two of its four
     // procedures are subscriptions: a namespace mounted beside the record
     // would be callable over `/api/trpc` and un-watchable over `/api/sse`.
-    presence: createPresenceTrpcRouter(mount),
+    presence: composed.presence.router(mount),
     // A procedure rather than a router: the client calls `publicEnv({})` at
     // the root, and giving it a namespace would rename it.
-    publicEnv: createPublicEnvTrpcProcedure({ ...mount, ports: ports.auth }),
+    publicEnv: authRouters.publicEnv,
     // Two namespaces for one feature. `optimization.*` is not a second
     // workflow surface bolted on: those procedures are the optimization
     // studio's, and the name is the one its pages have always called.
@@ -420,10 +287,7 @@ export function createAppTrpcFeatures<
     // The signed-in person's own account. The process merges the Enterprise
     // /me dashboard reads into the same namespace, so `user.*` answers from
     // two owners on one wire name.
-    user: mount.root.mergeRouters(
-      createUserTrpcRouter({ ...mount, ports: ports.user }),
-      personalDashboard,
-    ),
+    user: mount.root.mergeRouters(userRouters.user, personalDashboard),
     workflow: workflowRouters.workflow,
   };
 }
@@ -435,8 +299,6 @@ export function createAppTrpcFeatures<
  * return literal above is a namespace a client can call without a second edit.
  * This reads cleanly only because the mount is CONCRETE: the function takes
  * `ApiTrpcFeatureMount` rather than three type parameters, so the root every
- * router type carries is this process's own. The remaining parameters are the
- * ports', and they erase to their constraints — the one part a client reads
- * back as `unknown`.
+ * router type carries is this process's own.
  */
 export type AppTrpcFeatureRecord = ReturnType<typeof createAppTrpcFeatures>;

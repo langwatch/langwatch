@@ -38,21 +38,22 @@ import type { ResourceScope } from "@langwatch/runtime-composition";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { ApiAuditPort } from "../../../api-request.policy";
-import { ApiApplication, MissingAgentService, MissingSecretService } from "../../../api.application";
+import {
+  ApiApplication,
+  MissingAgentService,
+  MissingSecretService,
+} from "../../../api.application";
 import { LWQL_FLAG } from "@langwatch/analytics-server";
 import { composeAnalyticsFeature } from "../analytics.composition";
 import { composeFeatureFlagFeature } from "../../feature-flag/feature-flag.composition";
-import {
-  ApiTrpcFeaturesComposition,
-  composeApiTrpcCollaborators,
-} from "../../../app/api-trpc-features.composition";
+import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition";
 import {
   stub,
   stubApplicationSlices,
+  stubCollaborators,
   stubComposedFeatures,
   stubInfrastructureEntitlements,
-  testHalves,
-} from "../../../app/__tests__/api-trpc-collaborators.test-halves";
+} from "../../../app/__tests__/api-trpc-record.test-doubles";
 
 const dashboardRow = {
   id: "dashboard-1",
@@ -199,8 +200,7 @@ function composeApplication(options: { clickhouse?: boolean; workbenchEnabled?: 
         async record(): Promise<void> {}
       })(),
     },
-    collaborators: composeApiTrpcCollaborators(testHalves(), {
-      ...stubApplicationSlices(),
+    collaborators: stubCollaborators({
       analytics: analytics.analytics,
       dashboard: analytics.dashboard,
     }),

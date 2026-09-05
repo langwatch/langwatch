@@ -79,7 +79,7 @@ import type { PlanProvider } from "@langwatch/entitlement-contract";
 import type { EvaluationService } from "@langwatch/evaluation-contract";
 import { FREE_VISIBILITY_DAYS } from "@langwatch/enterprise-licensing-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
-import { getVercelAIModel } from "@langwatch/model-provider-server";
+import { ModelProviderExecutionHandleService } from "@langwatch/model-provider-server";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
@@ -725,7 +725,7 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
     if (!modelProviders) {
       return Promise.reject(this.refuse("the AI composer's model"));
     }
-    return getVercelAIModel({
+    return ModelProviderExecutionHandleService.getVercelAIModel({
       projectId: input.projectId,
       featureKey: input.featureKey,
       modelProviders,

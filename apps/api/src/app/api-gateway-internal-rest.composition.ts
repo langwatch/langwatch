@@ -58,7 +58,7 @@ import {
 } from "@langwatch/gateway-server";
 import { PrismaGatewayChangeEventsRepository } from "@langwatch/gateway-server/composition/gateway-change-events";
 import type { MonitorService } from "@langwatch/monitor-contract";
-import { readCustomKeys } from "@langwatch/model-provider-server";
+import { EncryptedModelProviderCredentialAdapter } from "@langwatch/model-provider-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
@@ -138,7 +138,7 @@ class ApiGatewayModelProviderCredentials extends GatewayModelProviderCredentials
   }
 
   readCustomKeys(stored: unknown): Record<string, unknown> {
-    const read = readCustomKeys(stored, this.encryption);
+    const read = EncryptedModelProviderCredentialAdapter.readCustomKeys(stored, this.encryption);
     return read.state === "read" ? read.keys : {};
   }
 }

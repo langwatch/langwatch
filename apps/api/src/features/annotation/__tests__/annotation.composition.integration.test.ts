@@ -23,16 +23,13 @@ import {
   MissingAgentService,
   MissingSecretService,
 } from "../../../api.application";
-import {
-  ApiTrpcFeaturesComposition,
-  composeApiTrpcCollaborators,
-} from "../../../app/api-trpc-features.composition";
+import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition";
 import {
   stubApplicationSlices,
+  stubCollaborators,
   stubComposedFeatures,
   stubInfrastructureEntitlements,
-  testHalves,
-} from "../../../app/__tests__/api-trpc-collaborators.test-halves";
+} from "../../../app/__tests__/api-trpc-record.test-doubles";
 import { composeApiTraceProducerCommands } from "../../trace/trace-producer.composition";
 import { composeAnnotationFeature } from "../annotation.composition";
 
@@ -158,8 +155,7 @@ function composeApplication() {
       authz: testAuthz(),
       audit: undefined,
     },
-    collaborators: composeApiTrpcCollaborators(testHalves(), {
-      ...stubApplicationSlices(),
+    collaborators: stubCollaborators({
       annotations: annotation.app,
     }),
   });

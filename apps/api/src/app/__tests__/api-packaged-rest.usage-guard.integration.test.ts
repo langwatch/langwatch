@@ -25,6 +25,8 @@ import { refusingMonitorFeature } from "../../features/monitor/monitor.compositi
 import { refusingRoleFeature } from "../../features/role/role.composition";
 import { refusingExperimentFeature } from "../../features/experiment/experiment.composition";
 import { refusingWorkflowFeature } from "../../features/workflow/workflow.composition";
+import { refusingPresenceFeature } from "../../features/presence/presence.composition";
+import { refusingOrganizationFeature } from "../../features/organization/organization.composition";
 import { refusingAutomationFeature } from "../../features/automation/automation.composition";
 import { refusingCodingAgentFeature } from "../../features/coding-agent/coding-agent.composition";
 import { refusingEnterpriseFeature } from "../../features/enterprise/enterprise.composition";
@@ -62,7 +64,8 @@ function composeGuard(usageLimit: ApiTraceIngestComposition["usageLimit"] | unde
     experiment: refusingExperimentFeature(),
     workflow: refusingWorkflowFeature(),
     enterpriseGovernance: composeEnterpriseGovernanceApplication(undefined),
-    identity: undefined,
+    presence: refusingPresenceFeature(),
+    organization: refusingOrganizationFeature(),
     automation: refusingAutomationFeature(),
     codingAgent: refusingCodingAgentFeature(),
     enterprise: refusingEnterpriseFeature(),

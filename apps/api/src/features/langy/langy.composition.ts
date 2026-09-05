@@ -276,7 +276,7 @@ function composeLangy(options: LangyFeatureCollaborators): LangyApp {
 function composeLangyPorts(options: LangyFeatureCollaborators, langy: LangyApp): LangyTrpcPorts {
   const logger = createLogger(`${options.processName}:langy`);
   const uiActions = () =>
-    new LangyUiActionService({
+    LangyUiActionService.create({
       redis: options.redis as unknown as UiActionRedis,
       conversations: {
         findByIdVisible: (args) => langy.tryFindVisible(args),

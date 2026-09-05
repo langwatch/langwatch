@@ -57,17 +57,14 @@ import { composeMonitorService } from "../../monitor/monitor.composition";
 import { composeEvaluationFeature } from "../../evaluation/evaluation.composition";
 import { composeExperimentFeature } from "../../experiment/experiment.composition";
 import { composeWorkflowFeature, composeWorkflowRuntime } from "../workflow.composition";
-import {
-  ApiTrpcFeaturesComposition,
-  composeApiTrpcCollaborators,
-} from "../../../app/api-trpc-features.composition";
+import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition";
 import {
   stub,
   stubApplicationSlices,
+  stubCollaborators,
   stubComposedFeatures,
   stubInfrastructureEntitlements,
-  testHalves,
-} from "../../../app/__tests__/api-trpc-collaborators.test-halves";
+} from "../../../app/__tests__/api-trpc-record.test-doubles";
 
 const workflowRow = {
   id: "workflow-1",
@@ -467,8 +464,7 @@ function composeApplication(
   const features = ApiTrpcFeaturesComposition.tryCompose({
     composed: { ...stubComposedFeatures(), workflow, experiment, evaluation },
     infrastructure,
-    collaborators: composeApiTrpcCollaborators(testHalves(), {
-      ...stubApplicationSlices(),
+    collaborators: stubCollaborators({
       workflows: workflow.app,
       experiments: experiment.app,
       evaluations: evaluation.app,

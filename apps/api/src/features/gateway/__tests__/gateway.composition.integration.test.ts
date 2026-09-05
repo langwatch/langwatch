@@ -51,12 +51,13 @@ import {
   MissingAgentService,
   MissingSecretService,
 } from "../../../api.application";
-import {
-  ApiTrpcFeaturesComposition,
-  composeApiTrpcCollaborators,
-} from "../../../app/api-trpc-features.composition";
+import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition";
 import { composeEnterpriseGovernanceApplication } from "../../enterprise/enterprise-governance.composition";
 import { composeGatewayFeature } from "../gateway.composition";
+import { refusingAuthFeature } from "../../auth/auth.composition";
+import { refusingUserFeature } from "../../user/user.composition";
+import { refusingPresenceFeature } from "../../presence/presence.composition";
+import { refusingApiKeyFeature } from "../../api-key/api-key.composition";
 import { refusingLangyFeature } from "../../langy/langy.composition";
 import { refusingDataRetentionFeature } from "../../data-retention/data-retention.composition";
 import { refusingAnalyticsFeature } from "../../analytics/analytics.composition";
@@ -92,9 +93,9 @@ import { refusingRoleFeature } from "../../role/role.composition";
 import {
   stub,
   stubApplicationSlices,
+  stubCollaborators,
   stubInfrastructureEntitlements,
-  testHalves,
-} from "../../../app/__tests__/api-trpc-collaborators.test-halves";
+} from "../../../app/__tests__/api-trpc-record.test-doubles";
 
 const SESSION_USER = { id: "user-1", name: "Sam Rivers", email: "sam@acme.test", role: "ADMIN" };
 const PROJECT_ID = "project-1";
@@ -239,6 +240,10 @@ function composeApplication(overrides: { saasBilling?: boolean; enterprise?: unk
   const features = ApiTrpcFeaturesComposition.tryCompose({
     composed: {
       gateway,
+      auth: refusingAuthFeature("langwatch-api"),
+      user: refusingUserFeature("langwatch-api"),
+      presence: refusingPresenceFeature(),
+      apiKey: refusingApiKeyFeature(),
       langy: refusingLangyFeature(),
       ops: refusingOpsFeature(),
       scenario: refusingScenarioFeature(),
@@ -273,8 +278,7 @@ function composeApplication(overrides: { saasBilling?: boolean; enterprise?: unk
       enterprise: refusingEnterpriseFeature(),
     },
     infrastructure,
-    collaborators: composeApiTrpcCollaborators(testHalves(), {
-      ...stubApplicationSlices(),
+    collaborators: stubCollaborators({
       gateway: gateway.app,
       github,
       // The four Enterprise slices as the process composes them: the host's

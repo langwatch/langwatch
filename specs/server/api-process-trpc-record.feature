@@ -1,9 +1,9 @@
 Feature: The API process mounts one tRPC record from its own collaborators
 
   Every browser call the product makes arrives on one tRPC root. The process
-  builds that root from a record of named namespaces, each filled by the half
-  of the composition that owns it, and mounts the record only once every entry
-  is filled.
+  builds that root from a record of named namespaces, each filled by the
+  feature that owns it, over the one application every namespace reads, and
+  mounts the record only once it holds that application.
 
   The failure this shape exists to prevent is a half-built root that still
   serves: a namespace nobody filled would answer as though the feature were
@@ -14,16 +14,16 @@ Feature: The API process mounts one tRPC record from its own collaborators
 
     @integration
     Scenario: A complete collaborator set mounts the whole record
-      Given every half of the composition has filled the entries it owns
+      Given every feature has composed the application slice it owns
       When the process builds its tRPC record
       Then the record carries exactly the namespaces it declares, with no absence
 
     @integration
     Scenario: An incomplete collaborator set composes no record and names the gap
-      Given a half left the entries it owns unfilled
+      Given the process composed no application for the record to read
       When the process builds its tRPC record
-      Then the set is sealed as incomplete rather than mounted
-      And every missing entry is named
+      Then no record is mounted
+      And the absence is named with the reason it happened
 
   Rule: The record answers on the root the process actually serves
 

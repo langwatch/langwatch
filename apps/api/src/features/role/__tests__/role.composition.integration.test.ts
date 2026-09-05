@@ -60,10 +60,7 @@ import {
   MissingAgentService,
   MissingSecretService,
 } from "../../../api.application";
-import {
-  ApiTrpcFeaturesComposition,
-  composeApiTrpcCollaborators,
-} from "../../../app/api-trpc-features.composition";
+import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition";
 import { composeFeatureFlagFeature } from "../../feature-flag/feature-flag.composition";
 import { composeDatasetFeature } from "../../dataset/dataset.composition";
 import { composeEvaluatorFeature } from "../../evaluator/evaluator.composition";
@@ -72,11 +69,10 @@ import { composeHomeFeature } from "../../project/home.composition";
 import { composeRoleFeature } from "../role.composition";
 import {
   stubApplicationSlices,
+  stubCollaborators,
   stubComposedFeatures,
-  stubIdentityHalf,
   stubInfrastructureEntitlements,
-  testHalves,
-} from "../../../app/__tests__/api-trpc-collaborators.test-halves";
+} from "../../../app/__tests__/api-trpc-record.test-doubles";
 
 const SESSION_USER = { id: "user-1", name: "Sam Rivers", email: "sam@acme.test", role: "ADMIN" };
 const PROJECT_ID = "project-1";
@@ -283,15 +279,8 @@ function composeApplication(options: { customRolePlan?: undefined } = {}) {
   const features = ApiTrpcFeaturesComposition.tryCompose({
     composed: { ...stubComposedFeatures(), dataset, evaluator, prompt, featureFlag, home, role },
     infrastructure,
-    collaborators: composeApiTrpcCollaborators(
-      testHalves({
-        identity: {
-          ...stubIdentityHalf(broadcast),
-          application: { ...stubIdentityHalf(broadcast).application, organizations },
-        },
-      }),
+    collaborators: stubCollaborators(
       {
-        ...stubApplicationSlices(),
         // `application.projects` is the project feature's in production, so the
         // slice here has to carry the SAME `projects` this test observes, or
         // the flag resolution reads a different project directory than the one
@@ -306,6 +295,7 @@ function composeApplication(options: { customRolePlan?: undefined } = {}) {
         permissions: authz,
         roles: role.app,
       },
+      broadcast,
     ),
   });
   if (!features) throw new Error("the record refused to compose against its collaborators");

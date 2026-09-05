@@ -23,10 +23,13 @@ import { declareAuthzMiddleware } from "@langwatch/authz-contract";
 
 import type { TraceLegacyFilterInput, TraceLegacyListInput } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
-import { z } from "zod";
 
 import { createTrpcRoot } from "../../api.application";
 import { composeGatewayFeature } from "../../features/gateway/gateway.composition";
+import { refusingAuthFeature } from "../../features/auth/auth.composition";
+import { refusingUserFeature } from "../../features/user/user.composition";
+import { refusingPresenceFeature } from "../../features/presence/presence.composition";
+import { refusingApiKeyFeature } from "../../features/api-key/api-key.composition";
 import { refusingLangyFeature } from "../../features/langy/langy.composition";
 import { refusingDataRetentionFeature } from "../../features/data-retention/data-retention.composition";
 import { refusingAnalyticsFeature } from "../../features/analytics/analytics.composition";
@@ -59,7 +62,7 @@ import { refusingCodingAgentFeature } from "../../features/coding-agent/coding-a
 import { refusingAutomationFeature } from "../../features/automation/automation.composition";
 import { refusingEnterpriseFeature } from "../../features/enterprise/enterprise.composition";
 import { refusingOpsFeature } from "../../features/ops/ops.composition";
-import { createAppTrpcFeatures, type AppTrpcFeaturePorts } from "../app-trpc.features";
+import { createAppTrpcFeatures } from "../app-trpc.features";
 
 import type { TracesTrpcPorts } from "@langwatch/trace-server";
 
@@ -80,9 +83,6 @@ const passThrough =
   ({ next }: { next: () => Promise<unknown> }) =>
     next();
 
-/** The sign-up questionnaire, as the process hands its schema to onboarding. */
-const testSignUpDataSchema = z.object({ utmCampaign: z.string().optional() });
-
 const middlewares: AppTrpcPolicyMiddlewares = {
   tracer: passThrough(),
   logger: passThrough(),
@@ -98,39 +98,6 @@ const middlewares: AppTrpcPolicyMiddlewares = {
   enforceCheck: passThrough(),
   auditMutations: passThrough(),
 };
-
-/**
- * Every port refuses when called.
- *
- * The exceptions are real Zod schemas and a pass-through gate rather than
- * refusals, because those are read while the surface is being BUILT — they
- * become the procedures' input parsers and their chained middleware — so a
- * refusal there could not be mounted at all.
- */
-function refusingPorts(): AppTrpcFeaturePorts<typeof testSignUpDataSchema> {
-  const refuse = (what: string) => (): never => {
-    throw new Error(`${what} was reached while building the feature list`);
-  };
-
-  const refuseEvery = (what: string) =>
-    new Proxy({}, { get: (_target, member) => refuse(`${what}.${String(member)}`) }) as never;
-
-  return {
-    auth: refuseEvery("auth"),
-    group: refuseEvery("group"),
-    identity: refuseEvery("identity"),
-    joinRequests: refuseEvery("joinRequests"),
-    // The questionnaire schema is read while the surface is BUILT — it becomes
-    // `initializeOrganization`'s own input parser — so it is a real schema
-    // rather than a refusal.
-    onboarding: {
-      ...(refuseEvery("onboarding") as object),
-      signUpDataSchema: testSignUpDataSchema,
-    } as never,
-    prisma: refuseEvery("prisma"),
-    user: refuseEvery("user"),
-  };
-}
 
 function buildFeatures() {
   // The application's OWN root, not a second one shaped by hand: the record is
@@ -157,6 +124,10 @@ function buildFeatures() {
         clickhouse: null,
         virtualKeyPepper: undefined,
       }),
+      auth: refusingAuthFeature("langwatch-api"),
+      user: refusingUserFeature("langwatch-api"),
+      presence: refusingPresenceFeature(),
+      apiKey: refusingApiKeyFeature(),
       langy: refusingLangyFeature(),
       ops: refusingOpsFeature(),
       scenario: refusingScenarioFeature(),
@@ -202,7 +173,6 @@ function buildFeatures() {
       saasBilling: true,
       audit: undefined,
     },
-    ports: refusingPorts(),
   });
 }
 

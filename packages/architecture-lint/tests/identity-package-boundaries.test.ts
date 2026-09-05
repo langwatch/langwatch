@@ -117,7 +117,7 @@ describe("identity package boundaries", () => {
           constructors.push(relative(APP_SRC, file));
         }
       }
-      expect(constructors).toEqual(["app/api-trpc-collaborators.identity.composition.ts"]);
+      expect(constructors).toEqual(["features/user/user.composition.ts"]);
     });
   });
 });

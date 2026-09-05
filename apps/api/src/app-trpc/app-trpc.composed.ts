@@ -43,6 +43,10 @@ import type { ComposedProjectFeature } from "../features/project/project.composi
 import type { ComposedCodingAgentFeature } from "../features/coding-agent/coding-agent.composition";
 import type { ComposedAutomationFeature } from "../features/automation/automation.composition";
 import type { ComposedEnterpriseFeature } from "../features/enterprise/enterprise.composition";
+import type { ComposedAuthFeature } from "../features/auth/auth.composition";
+import type { ComposedUserFeature } from "../features/user/user.composition";
+import type { ComposedPresenceFeature } from "../features/presence/presence.composition";
+import type { ComposedApiKeyFeature } from "../features/api-key/api-key.composition";
 
 export type ComposedApiFeatures = Readonly<{
   /** Six namespaces, one `ctx.app` slice and two REST families over one application. */
@@ -169,4 +173,22 @@ export type ComposedApiFeatures = Readonly<{
    * Enterprise application.
    */
   enterprise: ComposedEnterpriseFeature;
+  /**
+   * The two signed-out doors, and the ONE auth application both answer from:
+   * the sign-in mode it resolves is ADR-027's single source of truth for the
+   * whole deployment.
+   */
+  auth: ComposedAuthFeature;
+  /**
+   * Two namespaces and the `ctx.app.users` slice, plus the operator allow-list
+   * and the parsed `ctx.app.config` the retention gate and the sidebar read.
+   */
+  user: ComposedUserFeature;
+  /**
+   * One namespace, the `ctx.app.presence` and `ctx.app.broadcast` slices, and
+   * the ONE tenant fan-out every subscription and both bulk exports ride.
+   */
+  presence: ComposedPresenceFeature;
+  /** One namespace and the `ctx.app.apiKeys` slice every credential door reads. */
+  apiKey: ComposedApiKeyFeature;
 }>;

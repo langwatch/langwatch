@@ -57,24 +57,28 @@ import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import { PostgresMonitorAdapter } from "@langwatch/monitor-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it, vi } from "vitest";
-import { ApiApplication, MissingAgentService, MissingSecretService } from "../../../api.application";
-import type { ApiStoredObjectsConfigResolution } from "../../../platform/config/api.config";
 import {
-  ApiTrpcFeaturesComposition,
-  composeApiTrpcCollaborators,
-} from "../../../app/api-trpc-features.composition";
+  ApiApplication,
+  MissingAgentService,
+  MissingSecretService,
+} from "../../../api.application";
+import type { ApiStoredObjectsConfigResolution } from "../../../platform/config/api.config";
+import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition";
 import {
   composeDataRetentionFeature,
   refusingDataRetentionFeature,
 } from "../../data-retention/data-retention.composition";
 import { composeMonitorFeature, refusingMonitorFeature } from "../../monitor/monitor.composition";
-import { composeStoredObjectFeature, refusingStoredObjectFeature } from "../stored-object.composition";
+import {
+  composeStoredObjectFeature,
+  refusingStoredObjectFeature,
+} from "../stored-object.composition";
 import {
   stubApplicationSlices,
+  stubCollaborators,
   stubComposedFeatures,
   stubInfrastructureEntitlements,
-  testHalves,
-} from "../../../app/__tests__/api-trpc-collaborators.test-halves";
+} from "../../../app/__tests__/api-trpc-record.test-doubles";
 
 const SESSION_USER = { id: "user-1", name: "Sam Rivers", email: "sam@acme.test", role: "ADMIN" };
 const PROJECT_ID = "project-1";
@@ -493,8 +497,7 @@ function composeApplication(
       storedObject: composed.storedObject,
     },
     infrastructure: composed.infrastructure,
-    collaborators: composeApiTrpcCollaborators(testHalves(), {
-      ...stubApplicationSlices(),
+    collaborators: stubCollaborators({
       monitors: composed.monitor.app,
       storedObjectApp: composed.storedObject.app,
     }),

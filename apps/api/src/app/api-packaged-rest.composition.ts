@@ -50,7 +50,8 @@ import type { ComposedScenarioFeature } from "../features/scenario/scenario.comp
 import type { ComposedAnalyticsFeature } from "../features/analytics/analytics.composition";
 import type { ComposedExperimentFeature } from "../features/experiment/experiment.composition";
 import type { ComposedWorkflowFeature } from "../features/workflow/workflow.composition";
-import type { ApiIdentityCollaborators } from "./api-trpc-collaborators.identity.composition";
+import type { ComposedPresenceFeature } from "../features/presence/presence.composition";
+import type { ComposedOrganizationFeature } from "../features/organization/organization.composition";
 import type { ComposedAutomationFeature } from "../features/automation/automation.composition";
 import type { ComposedCodingAgentFeature } from "../features/coding-agent/coding-agent.composition";
 import type { ComposedEnterpriseFeature } from "../features/enterprise/enterprise.composition";
@@ -112,7 +113,10 @@ export type ApiPackagedRestCompositionOptions = Readonly<{
    * and the browser's cannot answer differently.
    */
   enterpriseGovernance: EnterpriseGovernanceApplication;
-  identity: ApiIdentityCollaborators | undefined;
+  /** The tenant fan-out the bulk exports report their progress on. */
+  presence: ComposedPresenceFeature;
+  /** The organization object `/api/organizations` provisions a tenant through. */
+  organization: ComposedOrganizationFeature;
   automation: ComposedAutomationFeature;
   codingAgent: ComposedCodingAgentFeature;
   enterprise: ComposedEnterpriseFeature;
@@ -222,11 +226,9 @@ export function composeApiPackagedRest(
       ...(options.experiment.experiments ? { experiments: () => options.experiment.app } : {}),
       governance: () => options.enterpriseGovernance.governanceApp,
       webhooks: () => options.enterpriseGovernance.webhooks,
-      ...(options.identity
-        ? {
-            broadcast: () => options.identity!.broadcast,
-            organizationProvisioning: () => options.identity!.organizationProvisioning,
-          }
+      ...(options.presence.broadcast ? { broadcast: () => options.presence.broadcast! } : {}),
+      ...(options.organization.provisioning
+        ? { organizationProvisioning: () => options.organization.provisioning! }
         : {}),
       organizations: () => options.organizations,
       ...(options.projects ? { projects: () => options.projects! } : {}),

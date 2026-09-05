@@ -1,12 +1,11 @@
 /**
  * The API process's packaged tRPC record, composed.
  *
- * `createAppTrpcFeatures` builds all twenty-two namespaces from one mount and
- * one ports object. This composition is what supplies both: the ports come from
- * {@link createApiTrpcPorts} — this process's Prisma connection, its AuthZ
- * service and its audit sink, plus the collaborators it received — and the
- * mount arrives from the application, because only the application holds the
- * root those routers must be built on.
+ * `createAppTrpcFeatures` builds all twenty-two namespaces from one mount, the
+ * shared infrastructure and the features this process composed. This
+ * composition is what supplies them, and the mount arrives from the
+ * application, because only the application holds the root those routers must
+ * be built on.
  *
  * The record is ALL OR NOTHING and that is deliberate. A deployment cannot
  * serve `frontDoor` and not `publicEnv`, or `analytics` and not the workbench
@@ -18,34 +17,31 @@
 import { LiteMemberRestrictedError, type AuthzService } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
-import type { ZodTypeAny } from "zod";
 import { ApiTrpcFeaturesPort, type ApiTrpcFeatureMount } from "../api.application";
 import type { ApiTrpcInfrastructure } from "../app-trpc/app-trpc.infrastructure";
 import type { ComposedApiFeatures } from "../app-trpc/app-trpc.composed";
 import {
   ApiTrpcCollaboratorsAbsence,
   type ApiTrpcCollaborators,
-  type ApiTrpcCollaboratorGapReport,
 } from "../app-trpc/app-trpc.collaborators";
 import type { ApiTrpcFeatureApplication } from "../app-trpc/app-trpc.context";
 import { createAppTrpcFeatures, type AppTrpcFeatureRecord } from "../app-trpc/app-trpc.features";
-import { createApiTrpcPorts } from "./api-trpc-ports.composition";
-import type { ApiIdentityCollaborators } from "./api-trpc-collaborators.identity.composition";
 
 /**
  * Everything the record is composed from: the shared infrastructure a feature
- * composes ITSELF out of, and the collaborators the features that have not
- * moved onto it yet are still reached through.
+ * composes ITSELF out of, the features composed before the mount existed, and
+ * the one application every packaged surface reads off `ctx.app`.
  *
- * Both are nullable, and each says something different when it is missing. No
- * infrastructure means this process opened no database or no permission
- * service; no collaborators means it composed none of what the record reaches.
+ * Two of them are nullable, and each says something different when it is
+ * missing. No infrastructure means this process opened no database or no
+ * permission service; no collaborators means it composed no application for
+ * the record to read.
  */
-export type ApiTrpcFeaturesCompositionOptions<TSignUpDataSchema extends ZodTypeAny> = Readonly<{
+export type ApiTrpcFeaturesCompositionOptions = Readonly<{
   infrastructure: ApiTrpcInfrastructure | undefined;
   /** The features the process composed before it had a mount; see the type. */
   composed: ComposedApiFeatures;
-  collaborators: ApiTrpcCollaborators<TSignUpDataSchema> | undefined;
+  collaborators: ApiTrpcCollaborators | undefined;
   report?: ApiTrpcCollaboratorsAbsence;
 }>;
 
@@ -73,9 +69,7 @@ class MembershipDisabledError extends HandledError {
   }
 }
 
-export class ApiTrpcFeaturesComposition<
-  TSignUpDataSchema extends ZodTypeAny,
-> extends ApiTrpcFeaturesPort {
+export class ApiTrpcFeaturesComposition extends ApiTrpcFeaturesPort {
   /**
    * Composes the record only when this process has BOTH halves of it.
    *
@@ -87,9 +81,9 @@ export class ApiTrpcFeaturesComposition<
    * be able to mount those surfaces over a service that does not exist. The
    * collaborator set is not negotiable for the reason its own docblock gives.
    */
-  static tryCompose<TSignUpDataSchema extends ZodTypeAny>(
-    options: ApiTrpcFeaturesCompositionOptions<TSignUpDataSchema>,
-  ): ApiTrpcFeaturesComposition<TSignUpDataSchema> | undefined {
+  static tryCompose(
+    options: ApiTrpcFeaturesCompositionOptions,
+  ): ApiTrpcFeaturesComposition | undefined {
     const { infrastructure, collaborators } = options;
     if (!infrastructure) {
       options.report?.absent("no-database");
@@ -110,7 +104,7 @@ export class ApiTrpcFeaturesComposition<
   private constructor(
     private readonly infrastructure: ApiTrpcInfrastructure,
     private readonly composed: ComposedApiFeatures,
-    private readonly collaborators: ApiTrpcCollaborators<TSignUpDataSchema>,
+    collaborators: ApiTrpcCollaborators,
   ) {
     super();
     this.application = collaborators.application;
@@ -148,18 +142,10 @@ export class ApiTrpcFeaturesComposition<
   };
 
   build(mount: ApiTrpcFeatureMount): AppTrpcFeatureRecord {
-    const ports = createApiTrpcPorts({
-      prisma: this.infrastructure.prisma,
-      authz: this.infrastructure.authz,
-      audit: this.infrastructure.audit,
-      mount,
-      collaborators: this.collaborators,
-    });
     return createAppTrpcFeatures({
       mount,
       composed: this.composed,
       infrastructure: this.infrastructure,
-      ports,
     });
   }
 
@@ -180,7 +166,7 @@ export class LoggedApiTrpcFeaturesAbsence extends ApiTrpcCollaboratorsAbsence {
     const consequence =
       reason === "no-database"
         ? "no database or no AuthZ service was composed"
-        : "the deployment supplied none of the collaborators the record reaches — the trace pipeline, the sign-in and sign-up ceremonies, the evaluator runtime, the model gateway and the Enterprise governance surfaces";
+        : "the deployment composed no application for the record to read";
     this.logger.warn(
       { reason },
       `API process serves no packaged tRPC namespaces: ${consequence}. The agent and secret routers are unaffected.`,
@@ -189,118 +175,12 @@ export class LoggedApiTrpcFeaturesAbsence extends ApiTrpcCollaboratorsAbsence {
 }
 
 /**
- * The one remaining half {@link composeApiTrpcCollaborators} reads into a flat
- * {@link ApiTrpcCollaborators} record. It is `undefined` exactly when the
- * process composed nothing for it — see that half's own composing function
- * for why it can be missing.
+ * The `ctx.app` slices the record reads, each contributed by the feature that
+ * composed it.
  *
- * The same half once it is present.
- *
- * `Required<>` is not this: it strips the `?` a member does not have and leaves
- * the `| undefined` a member does, so the whole record read below stayed
- * nullable and every `half.field` became "possibly undefined".
+ * The whole application, and it is a name rather than a shape: every feature
+ * on this process composes its own slice or its own named refusal, so the
+ * record is assembled from thirty-odd features rather than from a handful of
+ * groups that each carried somebody else's.
  */
-type ComposedApiTrpcCollaboratorHalves = {
-  readonly [K in keyof ApiTrpcCollaboratorHalves]-?: NonNullable<ApiTrpcCollaboratorHalves[K]>;
-};
-
-export type ApiTrpcCollaboratorHalves = Readonly<{
-  identity: ApiIdentityCollaborators | undefined;
-}>;
-
-/**
- * The `ctx.app` slices no half owns any more, contributed by the features that
- * compose themselves.
- *
- * Passed beside the halves rather than folded into one of them: a feature that
- * composes itself has no half to put its slice on, and a half that carried
- * another feature's slice is exactly what this migration is unpicking. It grows
- * as features move and the halves shrink.
- */
-export type ApiTrpcFeatureApplicationSlices = Pick<
-  ApiTrpcFeatureApplication,
-  | "analytics"
-  | "dataRetention"
-  | "planProvider"
-  | "share"
-  | "topics"
-  | "traces"
-  | "automation"
-  | "codingAgentApp"
-  | "licensing"
-  | "projects"
-  | "scimApp"
-  | "usageLimits"
-  | "workflows"
-  | "experiments"
-  | "evaluations"
-  | "modelProviders"
-  | "annotations"
-  | "authzApp"
-  | "dashboard"
-  | "dataset"
-  | "evaluatorApp"
-  | "featureFlags"
-  | "gateway"
-  | "github"
-  | "governance"
-  | "governanceApp"
-  | "langy"
-  | "monitors"
-  | "ops"
-  | "permissions"
-  | "prompts"
-  | "roles"
-  | "scenarios"
-  | "sessionPolicy"
-  | "storedObjectApp"
-  | "suites"
-  | "webhooks"
->;
-
-/**
- * Reads the remaining collaborator half into ONE flat
- * {@link ApiTrpcCollaborators} record, or refuses by name.
- *
- * All-or-nothing, replacing the ten `withApi*Collaborators` folds and the
- * runtime `sealApiTrpcCollaborators` check those folds needed: a process
- * missing any half composes none of the record, named, rather than mounting
- * the other four over a gap. No cast to an erased type anywhere in this
- * function — every `half.field` access below is checked against the real,
- * concrete type each `compose*` function already returns, so a half's return
- * type drifting from what this literal expects is a compile error here
- * rather than a silent `unknown`. The return type is left to inference
- * rather than restated as an explicit `ApiTrpcCollaborators<...>` — the
- * interface takes more type parameters than any one caller instantiates by
- * hand, and inference already carries the concrete types through to
- * `ApiTrpcFeaturesComposition.tryCompose`, which is the one place they are
- * pinned.
- */
-export function composeApiTrpcCollaborators(
-  halves: ApiTrpcCollaboratorHalves,
-  application: ApiTrpcFeatureApplicationSlices,
-  report?: ApiTrpcCollaboratorGapReport,
-) {
-  const missing = (Object.keys(halves) as (keyof ApiTrpcCollaboratorHalves)[]).filter(
-    (name) => halves[name] === undefined,
-  );
-  if (missing.length > 0) {
-    report?.incomplete(missing);
-    return undefined;
-  }
-  const { identity } = halves as ComposedApiTrpcCollaboratorHalves;
-
-  return {
-    application: {
-      ...identity.application,
-      ...application,
-    },
-
-    auth: identity.auth,
-    group: identity.group,
-    identity: identity.identity,
-    joinRequests: identity.joinRequests,
-    onboarding: identity.onboarding,
-    user: identity.user,
-  };
-}
+export type ApiTrpcFeatureApplicationSlices = ApiTrpcFeatureApplication;

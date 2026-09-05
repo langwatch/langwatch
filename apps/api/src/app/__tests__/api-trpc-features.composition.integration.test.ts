@@ -36,6 +36,8 @@ import {
   NoApiTrpcFeatures,
 } from "../../api.application";
 import { ApiAuditPort, ApiAuthorizationPort, ApiRequestPolicy } from "../../api-request.policy";
+import type { UserService } from "@langwatch/user-contract";
+import { composeAuthFeature } from "../../features/auth/auth.composition";
 import { composeBugReportFeature } from "../../features/bug-report/bug-report.composition";
 import {
   AuthSessionApiAuthenticationAdapter,
@@ -49,7 +51,7 @@ import {
 import {
   stubComposedFeatures,
   stubInfrastructureEntitlements,
-} from "./api-trpc-collaborators.test-halves";
+} from "./api-trpc-record.test-doubles";
 
 /**
  * The namespaces `createAppTrpcFeatures` mounts, as the wire names them.
@@ -335,7 +337,20 @@ function composeApplication(
   const features = ApiTrpcFeaturesComposition.tryCompose({
     // The support inbox composes itself off the same infrastructure, so the
     // audit row below is the one that composition writes.
-    composed: { ...stubComposedFeatures(), bugReport: composeBugReportFeature({ infrastructure }) },
+    composed: {
+      ...stubComposedFeatures(),
+      // The support inbox and the signed-out doors compose themselves off this
+      // process's own graph, so both the audit row and `publicEnv`'s answer
+      // below are the ones those compositions produce.
+      bugReport: composeBugReportFeature({ infrastructure }),
+      auth: composeAuthFeature({
+        prisma: prisma.client,
+        peers: { users: {} as unknown as UserService },
+        rateLimit: async () => ({ allowed: true, resetAt: Date.now() + 60_000 }),
+        deployment: {},
+        processName: "langwatch-api",
+      }),
+    },
     infrastructure,
     collaborators: testCollaborators(),
   });

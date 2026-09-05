@@ -51,10 +51,7 @@ import {
   MissingAgentService,
   MissingSecretService,
 } from "../../../api.application";
-import {
-  ApiTrpcFeaturesComposition,
-  composeApiTrpcCollaborators,
-} from "../../../app/api-trpc-features.composition";
+import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition";
 import { composeAutomationFeature } from "../../automation/automation.composition";
 import { composeCodingAgentFeature } from "../../coding-agent/coding-agent.composition";
 import { composeEnterpriseFeature } from "../../enterprise/enterprise.composition";
@@ -62,12 +59,11 @@ import { composeProjectFeature } from "../../project/project.composition";
 import { composeOrganizationFeature } from "../organization.composition";
 import {
   stubApplicationSlices,
+  stubCollaborators,
   stubComposedFeatures,
-  stubIdentityHalf,
   stubInfrastructureEntitlements,
   stubMount,
-  testHalves,
-} from "../../../app/__tests__/api-trpc-collaborators.test-halves";
+} from "../../../app/__tests__/api-trpc-record.test-doubles";
 
 const SESSION_USER = { id: "user-1", name: "Sam Rivers", email: "sam@acme.test", role: "ADMIN" };
 
@@ -258,20 +254,14 @@ function composeApplication(options: { withInvitations?: boolean } = {}) {
       enterprise: enterpriseFeature,
     },
     infrastructure,
-    collaborators: composeApiTrpcCollaborators(
-      testHalves({
-        identity: {
-          ...stubIdentityHalf(broadcast),
-          application: { ...stubIdentityHalf(broadcast).application, organizations },
-        },
-      }),
+    collaborators: stubCollaborators(
       {
-        ...stubApplicationSlices(),
         projects: projectFeature.app,
         codingAgentApp: codingAgentFeature.app,
         automation: automationFeature.app,
         ...enterpriseFeature.application,
       },
+      broadcast,
     ),
   });
   if (!features) throw new Error("the record refused to compose against its collaborators");

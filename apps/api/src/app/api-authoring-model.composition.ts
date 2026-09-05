@@ -18,7 +18,7 @@
  * the cascade's own refusal exists to prevent.
  */
 import { HandledError } from "@langwatch/handled-error";
-import { getVercelAIModel } from "@langwatch/model-provider-server";
+import { ModelProviderExecutionHandleService } from "@langwatch/model-provider-server";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import { nlpProxyBaseUrl } from "@langwatch/workflow-server";
@@ -34,7 +34,7 @@ import { nlpProxyBaseUrl } from "@langwatch/workflow-server";
 export type ApiAuthoringModelResolver = (input: {
   projectId: string;
   featureKey: string;
-}) => ReturnType<typeof getVercelAIModel>;
+}) => ReturnType<typeof ModelProviderExecutionHandleService.getVercelAIModel>;
 
 /**
  * The resolver, or `undefined` where this process composed no model gateway.
@@ -55,7 +55,7 @@ export function composeApiAuthoringModelResolver(options: {
   // the model gateway's own composition makes.
   const executionProxyBaseUrl = nlpProxyBaseUrl({ baseUrl: nlpServiceUrl });
   return (input) =>
-    getVercelAIModel({
+    ModelProviderExecutionHandleService.getVercelAIModel({
       projectId: input.projectId,
       featureKey: input.featureKey,
       modelProviders,

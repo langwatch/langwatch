@@ -62,20 +62,17 @@ import { createSseSubscriptionApp } from "../../../app-trpc/app-trpc.sse";
 import { sameOriginSseInit } from "../../../app-trpc/__tests__/support/sse-browser-request";
 import { ApiRestSecurity } from "../../../api-rest.security";
 import { ApiRestObservabilityComposition } from "../../../app/api-rest-observability.composition";
-import {
-  ApiTrpcFeaturesComposition,
-  composeApiTrpcCollaborators,
-} from "../../../app/api-trpc-features.composition";
+import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition";
 import { ApiScenarioAbsenceReport, composeScenarioFeature } from "../scenario.composition";
 import { composeApiAgentPipelines } from "../../../app/api-agent-pipelines.composition";
 import { composeLangyFeature } from "../../langy/langy.composition";
 import {
   stub,
   stubApplicationSlices,
+  stubCollaborators,
   stubComposedFeatures,
   stubInfrastructureEntitlements,
-  testHalves,
-} from "../../../app/__tests__/api-trpc-collaborators.test-halves";
+} from "../../../app/__tests__/api-trpc-record.test-doubles";
 
 const SESSION_USER = {
   id: "user-1",
@@ -321,8 +318,7 @@ function composeApplication(
   const features = ApiTrpcFeaturesComposition.tryCompose({
     composed: { ...stubComposedFeatures(), langy, scenario },
     infrastructure,
-    collaborators: composeApiTrpcCollaborators(testHalves(), {
-      ...stubApplicationSlices(),
+    collaborators: stubCollaborators({
       langy: langy.app,
       scenarios: scenario.scenarios,
       suites: scenario.suites,

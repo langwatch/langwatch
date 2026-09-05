@@ -58,16 +58,13 @@ import {
   composeWorkflowFeature,
   composeWorkflowRuntime,
 } from "../../features/workflow/workflow.composition";
-import {
-  ApiTrpcFeaturesComposition,
-  composeApiTrpcCollaborators,
-} from "../api-trpc-features.composition";
+import { ApiTrpcFeaturesComposition } from "../api-trpc-features.composition";
 import {
   stubApplicationSlices,
+  stubCollaborators,
   stubComposedFeatures,
   stubInfrastructureEntitlements,
-  testHalves,
-} from "./api-trpc-collaborators.test-halves";
+} from "./api-trpc-record.test-doubles";
 
 const NLP_SERVICE_URL = "http://127.0.0.1:5561";
 const PUBLIC_BASE_URL = "https://app.example.test";
@@ -381,8 +378,7 @@ function composeApplication(options: { redis?: RedisConnection | null } = {}) {
   const features = ApiTrpcFeaturesComposition.tryCompose({
     composed: { ...stubComposedFeatures(), workflow, experiment, evaluation },
     infrastructure,
-    collaborators: composeApiTrpcCollaborators(testHalves(), {
-      ...stubApplicationSlices(),
+    collaborators: stubCollaborators({
       workflows: workflow.app,
       experiments: experiment.app,
       evaluations: evaluation.app,

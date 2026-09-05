@@ -22,19 +22,15 @@ import { ApiRestSecurity } from "../../api-rest.security";
 import { createSseSubscriptionApp } from "../../app-trpc/app-trpc.sse";
 import { sameOriginSseInit } from "../../app-trpc/__tests__/support/sse-browser-request";
 import { ApiRestObservabilityComposition } from "../api-rest-observability.composition";
-import { ApiTrpcCollaboratorGapReport } from "../../app-trpc/app-trpc.collaborators";
-import {
-  ApiTrpcFeaturesComposition,
-  composeApiTrpcCollaborators,
-} from "../api-trpc-features.composition";
+import { ApiTrpcCollaboratorsAbsence } from "../../app-trpc/app-trpc.collaborators";
+import { ApiTrpcFeaturesComposition } from "../api-trpc-features.composition";
 import {
   stub,
-  stubApplicationSlices,
+  stubCollaborators,
   stubComposedFeatures,
   stubInfrastructureEntitlements,
   stubMount,
-  testHalves,
-} from "./api-trpc-collaborators.test-halves";
+} from "./api-trpc-record.test-doubles";
 
 const SESSION_USER = { id: "user-1", name: "Sam Rivers", email: "sam@acme.test", role: "ADMIN" };
 const PROJECT_ID = "project-1";
@@ -162,11 +158,7 @@ function composeApplication() {
   const broadcast = new EventEmitter();
   const audit = new RecordingAudit();
 
-  const collaborators = composeApiTrpcCollaborators(
-    testHalves({}, broadcast),
-    stubApplicationSlices(),
-  );
-  if (!collaborators) throw new Error("the collaborator set was incomplete");
+  const collaborators = stubCollaborators({}, broadcast);
 
   const features = ApiTrpcFeaturesComposition.tryCompose({
     composed: stubComposedFeatures(),
@@ -292,7 +284,7 @@ describe("given an API process composed with the packaged tRPC record", () => {
     });
   });
 
-  describe("when every half has filled the entries it owns", () => {
+  describe("when every feature has composed the application slice it owns", () => {
     /** @scenario "A complete collaborator set mounts the whole record" */
     it("mounts every namespace the record declares, with no absence", () => {
       const { features } = composeApplication();
@@ -304,26 +296,33 @@ describe("given an API process composed with the packaged tRPC record", () => {
     });
   });
 
-  describe("when a half is missing", () => {
+  describe("when the process composed no application for the record to read", () => {
     /** @scenario "An incomplete collaborator set composes no record and names the gap" */
-    it("composes no record and names the missing half", () => {
-      const reported: string[][] = [];
-      const report = new (class extends ApiTrpcCollaboratorGapReport {
-        incomplete(missing: readonly string[]): void {
-          reported.push([...missing]);
+    it("composes no record and names the reason", () => {
+      const reported: string[] = [];
+      const report = new (class extends ApiTrpcCollaboratorsAbsence {
+        absent(reason: "no-collaborators" | "no-database"): void {
+          reported.push(reason);
         }
       })();
 
-      const composed = composeApiTrpcCollaborators(
-        testHalves({ identity: undefined }),
-        stubApplicationSlices(),
+      const composed = ApiTrpcFeaturesComposition.tryCompose({
+        composed: stubComposedFeatures(),
+        infrastructure: {
+          ...stubInfrastructureEntitlements(),
+          prisma: testPrisma().client,
+          authz: testAuthz(),
+          audit: undefined,
+        },
+        collaborators: undefined,
         report,
-      );
+      });
 
       expect(composed).toBeUndefined();
-      // Named by half: "the record did not mount" is a symptom every half
-      // shares, and the name is what an operator can act on.
-      expect(reported[0]).toEqual(["identity"]);
+      // Named by REASON: "the record did not mount" is a symptom a missing
+      // database and a missing application share, and which one it was is what
+      // an operator can act on.
+      expect(reported).toEqual(["no-collaborators"]);
     });
   });
 });
