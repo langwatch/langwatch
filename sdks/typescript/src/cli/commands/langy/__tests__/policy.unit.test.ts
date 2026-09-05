@@ -12,6 +12,7 @@ import {
   decide,
   grantPatternFor,
   grantsAllow,
+  isPathCandidate,
   isSecretFileName,
   isTextArgument,
   looksLikeAPath,
@@ -103,6 +104,24 @@ describe("given a folder shared with a Langy conversation", () => {
         "gh repo clone acme/support",
       ]) {
         expect(bash(command).kind, command).toBe("ask");
+      }
+    });
+  });
+
+  describe("when Langy lists the git worktrees", () => {
+    /** @scenario "Listing the git worktrees runs at once" */
+    it("runs the list and asks for every other worktree verb", () => {
+      const worktrees: [string, PolicyDecision["kind"]][] = [
+        ["git worktree list", "run"],
+        ["git worktree list --porcelain", "run"],
+        ["git worktree add ../copy main", "refuse"],
+        ["git worktree remove old", "ask"],
+        ["git worktree prune", "ask"],
+        ["git worktree move old new", "ask"],
+        ["git worktree lock old", "ask"],
+      ];
+      for (const [command, kind] of worktrees) {
+        expect(bash(command).kind, command).toBe(kind);
       }
     });
   });
@@ -535,6 +554,58 @@ describe("given a folder shared with a Langy conversation", () => {
       ]);
       expect(parsed.parts[0]?.quoted).toEqual([false, true, false]);
       expect(parsed.parts[0]?.redirectTarget).toEqual([false, false, true]);
+    });
+  });
+
+  describe("when a git or GitHub CLI command writes its own words", () => {
+    /** @scenario "A git or GitHub CLI word is not judged a path" */
+    it("reads a subcommand, an option flag and a reference as words", () => {
+      const words: [string, boolean][] = [
+        ["git remote -v && git symbolic-ref --short HEAD", false],
+        ["git rev-parse --abbrev-ref HEAD", false],
+        ["git log --oneline -5 origin/main", false],
+        ["git diff HEAD~1", false],
+        ["gh pr view 12 --json title", false],
+        // A separator, a relative path or a home path is still a path.
+        ["git add ../other/notes.txt", true],
+        ["git apply /etc/patch.diff", true],
+        ["git checkout -- ../other/notes.txt", true],
+        ["gh pr create --body-file ~/../../etc/passwd", true],
+        // The directory flags keep their argument whatever it looks like.
+        ["git --git-dir=/etc status", true],
+        ["git --work-tree /etc status", true],
+      ];
+      for (const [command, refused] of words) {
+        expect(bash(command).kind === "refuse", command).toBe(refused);
+      }
+    });
+
+    it("names the tokens a command's own vocabulary covers", () => {
+      expect(isPathCandidate({ name: "git", token: "HEAD" })).toBe(false);
+      expect(isPathCandidate({ name: "git", token: "symbolic-ref" })).toBe(
+        false,
+      );
+      expect(isPathCandidate({ name: "git", token: "--short" })).toBe(false);
+      expect(isPathCandidate({ name: "git", token: "src/app.py" })).toBe(true);
+      expect(isPathCandidate({ name: "git", token: "../other" })).toBe(true);
+      expect(isPathCandidate({ name: "git", token: "~/notes" })).toBe(true);
+      // After the end-of-options marker every word is a path.
+      expect(
+        isPathCandidate({
+          name: "git",
+          token: "HEAD",
+          afterEndOfOptions: true,
+        }),
+      ).toBe(true);
+      // Every other command keeps the wide net: a bare name can be a symlink.
+      expect(isPathCandidate({ name: "cat", token: "outside-link" })).toBe(
+        true,
+      );
+    });
+
+    it("still refuses a bare name that is a symlink out of the folder", () => {
+      const decision = bash("cat outside-link");
+      expect(decision.kind).toBe("refuse");
     });
   });
 

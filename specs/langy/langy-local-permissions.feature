@@ -31,6 +31,13 @@ Feature: The CLI decides what Langy may run on the developer's machine
       And no permission card is rendered
 
     @unit
+    Scenario: Listing the git worktrees runs at once
+      When Langy runs "git worktree list"
+      Then the command runs at once
+      And no permission card is rendered
+      And every other git worktree verb still asks
+
+    @unit
     Scenario: Editing a file inside the folder runs at once
       When Langy writes or edits a file inside the folder
       Then the change is applied at once
@@ -208,6 +215,24 @@ Feature: The CLI decides what Langy may run on the developer's machine
       When the CLI exits and a new share starts for the same conversation
       Then the pattern asks again
 
+  Rule: A card sits where it happened, and never after the answer
+
+    # Every card of the conversation was drawn below the whole transcript, so a
+    # finished run ended on a settled permission card: the panel scrolled to
+    # the bottom and the last thing on screen was a command, with the answer
+    # that closed the turn sitting above it and off screen.
+    @integration
+    Scenario: A finished turn ends on its answer, not on a card
+      Given a turn that raised a permission card and then answered
+      When the turn has settled
+      Then the card is shown above the message that closed the turn
+      And that answer is the last thing in the turn
+
+    @integration
+    Scenario: A card waiting for me stays at the live edge
+      Given a turn that is still running with a card on screen
+      Then the card is shown below the transcript, beside the working line
+
   Rule: Some things are refused in every mode, with a pushback the model can act on
 
     @unit
@@ -221,6 +246,15 @@ Feature: The CLI decides what Langy may run on the developer's machine
       When Langy runs a command that changes into a directory outside the folder, or names one with a directory flag
       Then the command is refused
       And the pushback names the folder that is allowed
+
+    @unit
+    Scenario: A git or GitHub CLI word is not judged a path
+      When Langy runs "git remote -v && git symbolic-ref --short HEAD"
+      Then the subcommand, the option flags and the reference are read as the command's own words
+      And the command is not refused for leaving the folder
+      And a git argument that carries a path separator is still checked
+      And the argument of a directory flag is still checked
+      And every word after the end-of-options marker is still checked
 
     @unit
     Scenario: A quoted string a command prints is not judged a path

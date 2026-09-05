@@ -108,6 +108,18 @@ export const READ_ONLY_GIT_SUBCOMMANDS: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * Git subcommands that read under one verb and write under the others.
+ *
+ * `git worktree list` only prints the worktrees of the repository, and it cost
+ * a card whose reason said it changes the repository, which is wrong for that
+ * command. Every other worktree verb adds, moves or removes a checkout, so the
+ * verb is named rather than the subcommand.
+ */
+const READ_ONLY_GIT_VERBS: ReadonlyMap<string, ReadonlySet<string>> = new Map([
+  ["worktree", new Set(["list"])],
+]);
+
+/**
  * `git branch`, `git tag` and `git remote` read with no arguments and write
  * with these. A flag or a verb from this set takes the part out of the
  * read-only class.
@@ -488,8 +500,13 @@ function isReadOnlyPart(part: CommandPart): boolean {
   if (args.some((argument) => DIRECTORY_FLAGS.has(argument))) return false;
 
   if (name === "git") {
-    const subcommand = args.find((argument) => !argument.startsWith("-"));
+    const words = args.filter((argument) => !argument.startsWith("-"));
+    const subcommand = words[0];
     if (subcommand === undefined) return VERSION_ARGUMENTS.has(args[0] ?? "");
+    const readOnlyVerbs = READ_ONLY_GIT_VERBS.get(subcommand);
+    if (readOnlyVerbs !== undefined) {
+      return words.length === 2 && readOnlyVerbs.has(words[1]!);
+    }
     if (!READ_ONLY_GIT_SUBCOMMANDS.has(subcommand)) return false;
     return !args.some((argument) => GIT_WRITE_ARGUMENTS.has(argument));
   }
@@ -793,6 +810,42 @@ export function looksLikeAPath(token: string): boolean {
   return !isEnvironmentAssignment(token);
 }
 
+/**
+ * Commands whose bare words are their own vocabulary rather than file names.
+ *
+ * `git symbolic-ref --short HEAD` writes a subcommand, an option flag and a
+ * reference, and none of the three opens a file. Judging them as paths refused
+ * a command that touches nothing, and named the folder in a message that had
+ * no path to explain. These two commands read a file only when the argument
+ * carries a path separator, starts a relative or home path, or comes after the
+ * end-of-options marker.
+ */
+const VOCABULARY_COMMANDS: ReadonlySet<string> = new Set(["git", "gh"]);
+
+/** A token written the way a file name is written. */
+const WRITTEN_AS_A_PATH = /[/\\]|^[.~]/;
+
+/**
+ * True when a token of this command is worth checking against the boundary.
+ *
+ * The net stays wide for every other command, because a bare name can be a
+ * symlink that leaves the folder and `cat outside-link` must still be caught.
+ */
+export function isPathCandidate({
+  name,
+  token,
+  afterEndOfOptions = false,
+}: {
+  name: string;
+  token: string;
+  afterEndOfOptions?: boolean;
+}): boolean {
+  if (!looksLikeAPath(token)) return false;
+  if (afterEndOfOptions) return true;
+  if (!VOCABULARY_COMMANDS.has(name)) return true;
+  return WRITTEN_AS_A_PATH.test(token);
+}
+
 // ---------------------------------------------------------------------------
 // The decision
 // ---------------------------------------------------------------------------
@@ -961,7 +1014,9 @@ function decideBash({
  * asks because it is not a bare name, which is a clearer answer than refusing
  * it for living outside the folder.
  *
- * A quoted string a command prints is text, so it is not checked at all.
+ * A quoted string a command prints is text, so it is not checked at all, and
+ * a bare word of a command with its own vocabulary is a subcommand, a flag or
+ * a reference rather than a file. See `isPathCandidate`.
  */
 function boundaryEscape({
   part,
@@ -976,6 +1031,7 @@ function boundaryEscape({
 }): string | null {
   const name = part.tokens[0] ?? "";
   const named = new Set<string>();
+  let afterEndOfOptions = false;
   for (let index = 0; index < part.tokens.length; index += 1) {
     const token = part.tokens[index]!;
     const next = part.tokens[index + 1];
@@ -987,16 +1043,27 @@ function boundaryEscape({
       named.add(next);
       continue;
     }
-    const equals = /^--[A-Za-z0-9-]+=(.+)$/.exec(token);
+    const equals = /^(--[A-Za-z0-9-]+)=(.+)$/.exec(token);
     if (equals) {
-      named.add(equals[1]!);
+      const flag = equals[1]!;
+      const value = equals[2]!;
+      if (
+        DIRECTORY_FLAGS.has(flag) ||
+        isPathCandidate({ name, token: value, afterEndOfOptions })
+      ) {
+        named.add(value);
+      }
+      continue;
+    }
+    if (token === "--") {
+      afterEndOfOptions = true;
       continue;
     }
     if (index === 0) continue;
     if (isTextArgument({ name, token, quoted: part.quoted[index] === true })) {
       continue;
     }
-    if (looksLikeAPath(token)) named.add(token);
+    if (isPathCandidate({ name, token, afterEndOfOptions })) named.add(token);
   }
   for (const target of named) {
     const check = resolvePathInsideRoot({ target, root, realpath, homedir });
