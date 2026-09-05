@@ -318,15 +318,7 @@ export class UserWaitService {
     patterns?: string[];
   }): Promise<StoredUserWait> {
     const wait = await this.readSettlingExpiry(waitId);
-    if (wait?.state !== "pending") {
-      const ended = wait?.state;
-      throw new LangyWaitExpiredError({
-        waitId,
-        ...(ended ? { outcome: ended } : {}),
-        ...(wait?.decision ? { decision: wait.decision } : {}),
-        ...(wait?.source ? { source: wait.source } : {}),
-      });
-    }
+    if (wait?.state !== "pending") refuseSettled({ waitId, wait });
 
     const answered: StoredUserWait = {
       ...wait,
@@ -621,6 +613,31 @@ export class UserWaitService {
       });
     }
   }
+}
+
+/**
+ * The refusal a second answer gets, carrying how the card ended.
+ *
+ * The three ways a card can end are very different news, and the answer that
+ * closed an already-answered one decides what the panel says in its place, so
+ * the record's own fields travel with the refusal.
+ *
+ * @throws {LangyWaitExpiredError} always
+ */
+function refuseSettled({
+  waitId,
+  wait,
+}: {
+  waitId: string;
+  wait: StoredUserWait | null;
+}): never {
+  const ended = wait?.state;
+  throw new LangyWaitExpiredError({
+    waitId,
+    ...(ended && ended !== "pending" ? { outcome: ended } : {}),
+    ...(wait?.decision ? { decision: wait.decision } : {}),
+    ...(wait?.source ? { source: wait.source } : {}),
+  });
 }
 
 function toPollResponse(wait: StoredUserWait): PollWaitResponse {

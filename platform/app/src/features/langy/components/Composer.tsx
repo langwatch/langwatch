@@ -584,6 +584,36 @@ function composerKeyHandler({
   };
 }
 
+/**
+ * What the empty field says, in the state the composer is actually in.
+ *
+ * There is no queue (see composerKeyHandler), so the mid-turn line must not
+ * read as a promise to send: it said "Write your next message…", the user
+ * wrote one, pressed Enter, and nothing happened, with no sign it had been
+ * refused. And while a card is open the turn is waiting for the READER, so the
+ * line points at the card rather than blaming Langy for the wait, and names
+ * the terminal as well when the folder is shared from one (ADR-129).
+ */
+export function composerPlaceholder({
+  awaitingAnswer,
+  terminalConnected,
+  turnActive,
+  idle,
+}: {
+  awaitingAnswer: boolean;
+  terminalConnected: boolean;
+  turnActive: boolean;
+  /** What it says when nothing is running and nothing is waiting. */
+  idle: string;
+}): string {
+  if (awaitingAnswer) {
+    return terminalConnected
+      ? AWAITING_ANSWER_TERMINAL_PLACEHOLDER
+      : AWAITING_ANSWER_PLACEHOLDER;
+  }
+  return turnActive ? MID_TURN_PLACEHOLDER : idle;
+}
+
 const ComposerInputRow = memo(function ComposerInputRow({
   hero,
   disabled,
@@ -644,24 +674,12 @@ const ComposerInputRow = memo(function ComposerInputRow({
           if (hero) setMultiline(e.target.scrollHeight > 30);
         }}
         onKeyDown={onTextareaKeyDown}
-        // There is no queue (see composerKeyHandler), so the mid-turn
-        // placeholder must not read as a promise to send. It said "Write your
-        // next message…", the user wrote one, pressed Enter, and nothing
-        // happened: the text sat in the field with no sign it had been
-        // refused.
-        //
-        // While a card is open the turn is waiting for the reader, not
-        // working, so the line points at the card instead of blaming Langy
-        // for the wait (ADR-129).
-        placeholder={
-          awaitingAnswer
-            ? terminalConnected
-              ? AWAITING_ANSWER_TERMINAL_PLACEHOLDER
-              : AWAITING_ANSWER_PLACEHOLDER
-            : turnActive
-              ? MID_TURN_PLACEHOLDER
-              : placeholder
-        }
+        placeholder={composerPlaceholder({
+          awaitingAnswer,
+          terminalConnected,
+          turnActive,
+          idle: placeholder,
+        })}
         disabled={disabled}
         rows={1}
         autoresize

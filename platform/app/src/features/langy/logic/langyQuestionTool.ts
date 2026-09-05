@@ -177,15 +177,21 @@ export function questionWaitCardParts({
 export function questionToolCallIdsIn(
   messages: readonly { parts?: readonly unknown[] }[],
 ): Set<string> {
-  const ids = new Set<string>();
-  for (const message of messages) {
-    for (const part of message.parts ?? []) {
-      if (!isQuestionToolPart(part)) continue;
-      const toolCallId = (part as { toolCallId?: unknown }).toolCallId;
-      if (typeof toolCallId === "string" && toolCallId !== "") {
-        ids.add(toolCallId);
-      }
-    }
-  }
-  return ids;
+  return new Set(
+    messages.flatMap((message) =>
+      (message.parts ?? []).flatMap((part) => {
+        const toolCallId = questionToolCallIdOf(part);
+        return toolCallId ? [toolCallId] : [];
+      }),
+    ),
+  );
+}
+
+/** The tool call one `question` part names, or null when it names none. */
+function questionToolCallIdOf(part: unknown): string | null {
+  if (!isQuestionToolPart(part)) return null;
+  const toolCallId = (part as { toolCallId?: unknown }).toolCallId;
+  return typeof toolCallId === "string" && toolCallId !== ""
+    ? toolCallId
+    : null;
 }

@@ -328,53 +328,68 @@ export function langyQuestionCards(
   sources: WaitSources,
 ): LangyQuestionCardData[] {
   const cards = new Map<string, LangyQuestionCardData>();
-
-  const durable: LangyQuestionCardData[] = [
-    ...(sources.record ?? []).flatMap((wait) =>
-      wait.kind === "question"
-        ? [
-            {
-              waitId: wait.waitId,
-              toolCallId: wait.toolCallId,
-              status: wait.status,
-              questions: wait.questions,
-              answers: wait.answers,
-            },
-          ]
-        : [],
-    ),
-    ...(sources.toolCalls ?? []).flatMap((call) =>
-      call.wait?.kind === "question"
-        ? [
-            {
-              waitId: call.wait.waitId,
-              toolCallId: call.toolCallId,
-              status: call.wait.status,
-              questions: call.wait.questions,
-              answers: call.wait.answers,
-            },
-          ]
-        : [],
-    ),
-  ];
-  for (const next of durable) {
+  // Each later source only moves a card forward, the same rule the permission
+  // cards and the question waits above fold by.
+  for (const next of [
+    ...recordQuestionCards(sources),
+    ...foldedQuestionCards(sources),
+    ...liveQuestionCards(sources),
+  ]) {
     const known = cards.get(next.waitId);
     cards.set(next.waitId, known ? mergeQuestionCard({ known, next }) : next);
   }
-  for (const entry of Object.values(sources.live ?? {})) {
-    if (entry.kind !== "question") continue;
-    const known = cards.get(entry.waitId);
-    const next: LangyQuestionCardData = {
-      waitId: entry.waitId,
-      toolCallId: entry.toolCallId ?? null,
-      status: entry.status,
-      questions: entry.questions ?? null,
-      answers: entry.answers ?? null,
-    };
-    cards.set(entry.waitId, known ? mergeQuestionCard({ known, next }) : next);
-  }
-
   return [...cards.values()];
+}
+
+/** Every question card the durable conversation record carries. */
+function recordQuestionCards(sources: WaitSources): LangyQuestionCardData[] {
+  return (sources.record ?? []).flatMap((wait) =>
+    wait.kind === "question"
+      ? [
+          {
+            waitId: wait.waitId,
+            toolCallId: wait.toolCallId,
+            status: wait.status,
+            questions: wait.questions,
+            answers: wait.answers,
+          },
+        ]
+      : [],
+  );
+}
+
+/** The same, read off the folded turn document's tool calls. */
+function foldedQuestionCards(sources: WaitSources): LangyQuestionCardData[] {
+  return (sources.toolCalls ?? []).flatMap((call) =>
+    call.wait?.kind === "question"
+      ? [
+          {
+            waitId: call.wait.waitId,
+            toolCallId: call.toolCallId,
+            status: call.wait.status,
+            questions: call.wait.questions,
+            answers: call.wait.answers,
+          },
+        ]
+      : [],
+  );
+}
+
+/** The same, read off the live entries this tab is watching. */
+function liveQuestionCards(sources: WaitSources): LangyQuestionCardData[] {
+  return Object.values(sources.live ?? {}).flatMap((entry) =>
+    entry.kind === "question"
+      ? [
+          {
+            waitId: entry.waitId,
+            toolCallId: entry.toolCallId ?? null,
+            status: entry.status,
+            questions: entry.questions ?? null,
+            answers: entry.answers ?? null,
+          },
+        ]
+      : [],
+  );
 }
 
 /** The same card folded over another reading of it. A card only moves forward. */
