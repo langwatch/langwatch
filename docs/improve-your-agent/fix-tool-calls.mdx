@@ -32,12 +32,12 @@ the error messages so the first call succeeds. Tell me what you found before you
 The agent comes back with a change to the tool contract. When you review it, these are the properties of a good contract, the most effective first:
 
 1. **The accepted values are in the parameter description, or better, in the schema.** With an enum in the schema the model does not guess at all; a description that lists the values is the next best thing.
-2. **The error message spells out the parameter and the accepted values**, so the model can act on it.
+2. **A more detailed error message**, which says which parameter was rejected and which values it accepts, so the model can fix the call instead of guessing again.
 3. **The tool validates the call at its boundary** and rejects it with that same message before the call reaches your service.
 4. **One tool per job.** Merge a tool that needs three calls to return one answer into one call, or add a second tool next to it that returns the answer in one step.
 5. **The harness caps the retries**, so after the second failure on the same tool the agent escalates or asks the user instead of trying a third time.
 
-For example, the same tool before and after the first three changes on the list, the accepted values in the description, an error message that names them and validation at the boundary:
+For example, the same tool before and after the first three changes on the list, which put the accepted values in the description, return a more detailed error message and validate at the boundary:
 
 ```python title="Before"
 def check_return_eligibility(order_id: str, reason: str) -> str:
