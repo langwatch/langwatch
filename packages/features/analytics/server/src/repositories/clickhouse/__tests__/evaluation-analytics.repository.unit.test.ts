@@ -248,6 +248,7 @@ describe("AnalyticsEvaluationRepository", () => {
     expect(inner).not.toContain("fromUnixTimestamp64Milli");
   });
 
+  /** @scenario "An evaluation analytics write failure beneath the queue is a warning" */
   it("warns and rethrows the original ClickHouse write failure", async () => {
     const failure = new Error("ClickHouse unavailable");
     const client = clientReturning([]);
@@ -262,6 +263,7 @@ describe("AnalyticsEvaluationRepository", () => {
     );
   });
 
+  /** @scenario "An evaluation analytics write failure beneath the queue is a warning" */
   it("warns and rethrows the original ClickHouse batch failure", async () => {
     const failure = new Error("ClickHouse unavailable");
     const client = clientReturning([]);

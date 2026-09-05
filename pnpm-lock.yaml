@@ -3063,6 +3063,9 @@ importers:
       '@testcontainers/clickhouse':
         specifier: ^12.1.0
         version: 12.1.0
+      '@testcontainers/postgresql':
+        specifier: ^12.1.0
+        version: 12.1.0
       '@types/node':
         specifier: ^26.0.1
         version: 26.2.0
@@ -14315,6 +14318,9 @@ packages:
   '@testcontainers/clickhouse@12.1.0':
     resolution: {integrity: sha512-5hI5LcIR/TZfbY59R7GnV33kTQZQg04rb7rlJKxFfm8z4nAbeiUaRM+HN6VHGujhDjCqlYn9TjaljkfhCUWHow==}
 
+  '@testcontainers/postgresql@12.1.0':
+    resolution: {integrity: sha512-Pjf2VSVNirEPfz36nidyrVAnZvc2YhajOznY4VgyEsvfTd5qiMNOuPq96drREvxAUtXl5SFLX7vXj7sSq4aTcA==}
+
   '@testcontainers/redis@12.0.4':
     resolution: {integrity: sha512-44Ov3Lcptb3KqljcCy6xIJ2VxNsN+3Kw/YpBiotZpOcI4iLgLNmcOgvCFPVo+vDoh4rCfgtNUEbIpL5Mu7oRuw==}
 
@@ -25029,6 +25035,15 @@ snapshots:
   '@tanstack/virtual-core@3.17.3': {}
 
   '@testcontainers/clickhouse@12.1.0':
+    dependencies:
+      testcontainers: 12.1.0
+    transitivePeerDependencies:
+      - bare-abort-controller
+      - bare-buffer
+      - react-native-b4a
+      - supports-color
+
+  '@testcontainers/postgresql@12.1.0':
     dependencies:
       testcontainers: 12.1.0
     transitivePeerDependencies:

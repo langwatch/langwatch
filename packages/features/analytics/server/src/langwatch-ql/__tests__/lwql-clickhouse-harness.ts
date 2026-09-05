@@ -37,26 +37,25 @@
  *    containers (`docker rm -f $(docker ps -q --filter "label=langwatch.test=true")`)
  *    when changing which objects are provisioned, not just how.
  *
- * ## Scope of this port
+ * ## Two fact-table modes
  *
- * The `main` branch harness this was ported from also supports a `"migrated"`
- * fact-table mode — running the shipped ClickHouse migrations into a second
- * database and seeding the real `trace_summaries` / `stored_spans` /
- * `evaluation_runs` / `simulation_runs` tables — for suites that need real
- * partition pruning, dedup, or column types. That mode depends on the
- * migration runner (`migrateUp` in `@langwatch/clickhouse-client`), which is
- * not a public export of that package today, so it is not ported here: only
- * `facts: "fixture"` (the default, and everything the currently-ported
- * scenarios need) is implemented. `startLangWatchQLClickHouse` still accepts
- * the `facts` option so a future port can add the migrated branch without a
- * signature change.
+ * `facts: "fixture"` creates two toy `MergeTree` tables, enough to prove row
+ * policies, grants and settings behave and deliberately unlike the real schema.
+ * `facts: "migrated"` instead runs the *shipped* ClickHouse migrations into a
+ * second database on the same server, so a view is proven against the
+ * `ReplacingMergeTree` and `AggregatingMergeTree` tables the product deploys —
+ * a dedup that works on two toy tables has proven nothing about eight weekly
+ * partitions.
  */
 import { createHash } from "node:crypto";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import type { Readable } from "node:stream";
 import { ClickHouseContainer, type StartedClickHouseContainer } from "@testcontainers/clickhouse";
+import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
+import { ClickHouseMigrateTask } from "@langwatch/clickhouse-client";
 import { TEST_CLICKHOUSE_IMAGE } from "@langwatch/test-harness";
 import { expect } from "vitest";
 
@@ -69,7 +68,28 @@ import {
   type LangWatchQLNames,
   type LangWatchQLTable,
   lwqlClickHouseSetupStatements,
+  lwqlRowPolicyStatement,
 } from "../../adapters/clickhouse.lwql-provisioning.adapter";
+import {
+  type LangWatchQLPostgresMapping,
+  type LangWatchQLViewDefinition,
+  lwqlPostgresViews,
+} from "../../adapters/clickhouse.lwql-catalog-shapes.adapter";
+import { LWQL_VIEW_CATALOG } from "../../repositories/clickhouse/clickhouse.lwql-view-catalog.mapper";
+import {
+  lwqlApprovedPostgresViewNames,
+  lwqlPostgresApprovedViewStatements,
+  lwqlPostgresEngineTableStatements,
+  lwqlPostgresReaderConnectionLimit,
+} from "../../repositories/clickhouse/clickhouse.lwql-views.mapper";
+import {
+  DEFAULT_POSTGRES_READER_LIMITS,
+  postgresNamedCollectionStatements,
+  postgresReaderRoleStatements,
+} from "../../repositories/postgres/postgres.lwql-mapping.mapper";
+
+/** PostgreSQL image the PG-engine half of the proof runs against. */
+export const TEST_POSTGRES_IMAGE = "postgres:17";
 
 /**
  * The administrative identity `@testcontainers/clickhouse` configures.
@@ -101,6 +121,14 @@ export const CLICKHOUSE_ERROR_CODE = {
   READONLY: 164,
   /** Refused by grants. */
   ACCESS_DENIED: 497,
+} as const;
+
+/** PostgreSQL SQLSTATEs this proof discriminates between. */
+export const POSTGRES_SQLSTATE = {
+  READ_ONLY_TRANSACTION: "25006",
+  INSUFFICIENT_PRIVILEGE: "42501",
+  /** What `statement_timeout` raises when it fires. */
+  QUERY_CANCELED: "57014",
 } as const;
 
 /**
@@ -162,7 +190,8 @@ export const LWQL_FACT_TABLES: LangWatchQLTable[] = [
  * prove row policies, grants and settings behave, and deliberately unlike the
  * real schema so nothing about the real schema can be inferred from it passing.
  *
- * `migrated` is not yet ported — see the module comment.
+ * `migrated` is the real schema, from the shipped migrations, in its own
+ * database on the same server.
  */
 export type LangWatchQLFactTableMode = "fixture" | "migrated";
 
@@ -238,12 +267,6 @@ export async function startLangWatchQLClickHouse({
   suite: string;
   facts?: LangWatchQLFactTableMode;
 }): Promise<LangWatchQLClickHouseHarness> {
-  if (facts === "migrated") {
-    throw new Error(
-      "startLangWatchQLClickHouse({ facts: 'migrated' }) is not yet ported — see the module comment in lwql-clickhouse-harness.ts",
-    );
-  }
-
   const names = lwqlNamesForSuite(suite);
   const accessManagementXml = clickHouseAccessManagementConfigXml({
     administrativeUser: ADMIN_USER,
@@ -279,6 +302,8 @@ export async function startLangWatchQLClickHouse({
         target: CLICKHOUSE_ACCESS_MANAGEMENT_CONFIG_PATH,
       },
     ])
+    // Reaching PostgreSQL on the docker host; see the module comment.
+    .withExtraHosts([{ host: "host.docker.internal", ipAddress: "host-gateway" }])
     .withReuse()
     .withStartupTimeout(120_000)
     .start();
@@ -304,14 +329,18 @@ export async function startLangWatchQLClickHouse({
   await applyAsAdmin([`DROP DATABASE IF EXISTS ${names.database}`]);
   await applyAsAdmin([`CREATE DATABASE ${names.database}`]);
 
-  const factDatabase = names.database;
-  const lwqlTables = LWQL_FACT_TABLES;
+  const factDatabase = facts === "migrated" ? `${names.database}_facts` : names.database;
+  const lwqlTables = facts === "migrated" ? [] : LWQL_FACT_TABLES;
 
-  await applyAsAdmin(
-    Object.entries(FACT_TABLE_DDL).map(
-      ([table, ddl]) => `CREATE TABLE ${names.database}.${table} ${ddl}`,
-    ),
-  );
+  if (facts === "migrated") {
+    await runShippedMigrations({ container, database: factDatabase });
+  } else {
+    await applyAsAdmin(
+      Object.entries(FACT_TABLE_DDL).map(
+        ([table, ddl]) => `CREATE TABLE ${names.database}.${table} ${ddl}`,
+      ),
+    );
+  }
 
   await applyAsAdmin(
     lwqlClickHouseSetupStatements({
@@ -322,7 +351,11 @@ export async function startLangWatchQLClickHouse({
   );
 
   await seedKeyMap({ admin, names });
-  await seedTenantRows({ admin, names });
+  if (facts === "migrated") {
+    await seedRealFactRows({ admin, database: factDatabase });
+  } else {
+    await seedTenantRows({ admin, names });
+  }
 
   const harness: LangWatchQLClickHouseHarness = {
     names,
@@ -413,6 +446,838 @@ async function seedTenantRows({
       })),
     ),
   });
+}
+
+// ---------------------------------------------------------------------------
+// The real fact tables
+// ---------------------------------------------------------------------------
+
+/** Fact tables the LangWatchQL views read, by the name the migrations give them. */
+export const REAL_FACT_TABLES = [
+  "trace_summaries",
+  "stored_spans",
+  "evaluation_runs",
+  "simulation_runs",
+  "trace_analytics",
+  "trace_analytics_rollup",
+  "evaluation_analytics",
+  "evaluation_analytics_rollup",
+] as const;
+
+/**
+ * Runs the shipped ClickHouse migrations into their own database.
+ *
+ * Its own, not the LangWatchQL one: the migrations own every table in the database
+ * they run against, and the LangWatchQL database holds the key map and the views.
+ *
+ * `CLICKHOUSE_CLUSTER` is unset for the duration. It is a *deployment* fact
+ * that switches every engine to its `Replicated` form, and a developer whose
+ * `.env` carries it would otherwise get migrations that need a Keeper the
+ * container has not got — a failure that reads like a broken migration.
+ */
+async function runShippedMigrations({
+  container,
+  database,
+}: {
+  container: StartedClickHouseContainer;
+  database: string;
+}): Promise<void> {
+  const url = new URL(container.getConnectionUrl());
+  url.pathname = `/${database}`;
+  const previousCluster = process.env.CLICKHOUSE_CLUSTER;
+  delete process.env.CLICKHOUSE_CLUSTER;
+  try {
+    await ClickHouseMigrateTask.createFromConfig({
+      config: {
+        buildTime: false,
+        skipped: false,
+        sharedUrl: url.toString(),
+        privateEndpoints: [],
+      },
+    }).execute();
+  } finally {
+    if (previousCluster !== undefined) {
+      process.env.CLICKHOUSE_CLUSTER = previousCluster;
+    }
+  }
+}
+
+/**
+ * The seeded history: eight weekly partitions, the last of which is the window
+ * a "recent" query asks for.
+ *
+ * Fixed dates rather than offsets from `now`, so a reused container seeded last
+ * week and a fresh one seeded today hold the same partitions and the pruning
+ * measurement compares like with like.
+ */
+export const SEED_WEEK_COUNT = 8;
+const SEED_ANCHOR = Date.UTC(2026, 0, 5); // a Monday, so weeks line up
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+export const SEED_TRACES_PER_WEEK = 250;
+export const SEED_EVALUATIONS_PER_WEEK = 25;
+
+/** Start of seeded week `index`, as ClickHouse's `DateTime64` input format. */
+function seedWeekStart(index: number): string {
+  return new Date(SEED_ANCHOR + index * WEEK_MS).toISOString().replace("T", " ").replace("Z", "");
+}
+
+/** The single week a "recent" query narrows to — the last one seeded. */
+export const SEED_RECENT_WEEK = {
+  from: seedWeekStart(SEED_WEEK_COUNT - 1),
+  to: seedWeekStart(SEED_WEEK_COUNT),
+} as const;
+
+/**
+ * Content the seed writes, so a leak assertion names the exact string that
+ * would appear rather than checking a field is "not empty".
+ */
+export const SEEDED_CONTENT = {
+  traceInput: "CAPTURED-TRACE-INPUT-do-not-leak",
+  traceOutput: "CAPTURED-TRACE-OUTPUT-do-not-leak",
+  spanInput: "CAPTURED-SPAN-INPUT-do-not-leak",
+  spanOutput: "CAPTURED-SPAN-OUTPUT-do-not-leak",
+  /** Written under `gen_ai.prompt`, an exact key of the data-privacy catalog. */
+  spanPromptAttribute: "CAPTURED-SPAN-PROMPT-do-not-leak",
+  /** Written under `gen_ai.prompt.0.content`, the exploded form of the same key. */
+  spanExplodedPromptAttribute: "CAPTURED-SPAN-PROMPT-PART-do-not-leak",
+  evaluationInputs: "CAPTURED-EVALUATION-INPUTS-do-not-leak",
+  simulationMessage: "CAPTURED-SIMULATION-MESSAGE-do-not-leak",
+  simulationReasoning: "CAPTURED-SIMULATION-REASONING-do-not-leak",
+} as const;
+
+/** A span attribute that is a dimension rather than content, so it survives. */
+export const SEEDED_DIMENSION_ATTRIBUTE = {
+  key: "gen_ai.request.model",
+  value: "gpt-5-mini",
+} as const;
+
+/**
+ * The trace seeded twice, to prove the views collapse versions.
+ *
+ * Both versions carry the same partition-key time and differ only in
+ * `UpdatedAt` and in the value a reader can see, so "the view returned one row"
+ * and "it returned the newer one" are separate, checkable claims.
+ */
+export const DEDUP_FIXTURE = {
+  traceIdSuffix: "dedup-trace",
+  staleSpanCount: 1,
+  latestSpanCount: 99,
+  staleUpdatedAt: "2026-02-23 00:00:00.000",
+  latestUpdatedAt: "2026-02-23 00:00:01.000",
+} as const;
+
+/** The trace id the dedup fixture uses for a tenant. */
+export function dedupTraceId(tenantId: string): string {
+  return `${tenantId}-${DEDUP_FIXTURE.traceIdSuffix}`;
+}
+
+/**
+ * The trace whose newer version sits in a *different* weekly partition.
+ *
+ * The incident-backed case, and the one a dedup shape can get wrong without
+ * ever returning a duplicate: the partition key is a business time that a later
+ * fold can move, so a view that collapses versions per partition — or one whose
+ * `max()` scope carries a time range — reports the older version as current and
+ * looks entirely healthy doing it.
+ */
+export const MOVED_PARTITION_FIXTURE = {
+  traceIdSuffix: "moved-trace",
+  staleWeek: 0,
+  latestWeek: SEED_WEEK_COUNT - 1,
+  staleSpanCount: 7,
+  latestSpanCount: 88,
+  staleUpdatedAt: "2026-03-01 00:00:00.000",
+  latestUpdatedAt: "2026-03-01 00:00:01.000",
+} as const;
+
+/** The trace id the moved-partition fixture uses for a tenant. */
+export function movedPartitionTraceId(tenantId: string): string {
+  return `${tenantId}-${MOVED_PARTITION_FIXTURE.traceIdSuffix}`;
+}
+
+/**
+ * The evaluation seeded twice, its two versions carrying two *sort keys*.
+ *
+ * `evaluation_analytics` sorts by `(TenantId, OccurredAt, EvaluationId)` and its
+ * fold writes a moving progress watermark into `OccurredAt`, so a second
+ * lifecycle event does not supersede the first row — it writes a row the engine
+ * files under a different key. `FINAL` merges by that key and nothing else, so
+ * it returns both, and every `count`, `sum` and `avg` over the dataset counts
+ * this evaluation twice while looking entirely healthy.
+ *
+ * The two versions are a partition apart as well as a key apart, so the case
+ * also covers a dedup shape that resolves the latest version only within one
+ * partition.
+ */
+export const EVALUATION_DEDUP_FIXTURE = {
+  evaluationIdSuffix: "dedup-eval",
+  staleWeek: 0,
+  latestWeek: SEED_WEEK_COUNT - 1,
+  staleScore: 0.11,
+  latestScore: 0.97,
+  staleDurationMs: 13,
+  latestDurationMs: 26,
+  staleUpdatedAt: "2026-03-02 00:00:00.000",
+  latestUpdatedAt: "2026-03-02 00:00:01.000",
+} as const;
+
+/** The evaluation id the moving-sort-key dedup fixture uses for a tenant. */
+export function evaluationDedupId(tenantId: string): string {
+  return `${tenantId}-${EVALUATION_DEDUP_FIXTURE.evaluationIdSuffix}`;
+}
+
+/**
+ * One bucket of a rollup, written as two partial rows in two parts.
+ *
+ * The shape an `AggregatingMergeTree` is for and the one a reader can get
+ * wrong: neither part is the answer, and the answer is not the later of them
+ * either — it is their sum. Written in two inserts with merges stopped, so a
+ * view that forgot to merge returns two rows and a view that picked a winner
+ * returns the wrong total, and neither can pass by accident.
+ *
+ * The bucket sits inside the last seeded week, so it is in the same partition
+ * the "recent" queries read and shares their retention.
+ */
+export const ROLLUP_MERGE_FIXTURE = {
+  bucketStart: "2026-02-23 00:01:00.000",
+  model: "gpt-5-rollup-merge",
+  spanType: "llm",
+  evaluatorType: "rollup_merge_judge",
+  status: "processed",
+  /**
+   * The two parts of the trace bucket, keyed by the column each value is
+   * written to.
+   *
+   * Every measure carries a different number, in both parts and therefore in
+   * the total — which is the difference between proving the view merges and
+   * proving it merges *the right column*. Feeding the same number to two
+   * same-typed columns, as this fixture used to, means a view whose
+   * `TraceCount` reads `SpanCount` returns exactly what the assertion expects.
+   */
+  traceParts: [
+    {
+      SpanCount: 7,
+      TraceCount: 5,
+      ErrorCount: 1,
+      CostSum: 0.5,
+      NonBilledCostSum: 0.125,
+      DurationSum: 900,
+      PromptTokensSum: 130,
+      CompletionTokensSum: 45,
+      CacheReadTokensSum: 22,
+      CacheWriteTokensSum: 11,
+      ReasoningTokensSum: 60,
+    },
+    {
+      SpanCount: 6,
+      TraceCount: 4,
+      ErrorCount: 2,
+      CostSum: 0.25,
+      NonBilledCostSum: 0.0625,
+      DurationSum: 400,
+      PromptTokensSum: 90,
+      CompletionTokensSum: 35,
+      CacheReadTokensSum: 18,
+      CacheWriteTokensSum: 9,
+      ReasoningTokensSum: 70,
+    },
+  ],
+  /** The two parts of the evaluation bucket, on the same rule. */
+  evaluationParts: [
+    {
+      EvalCount: 20,
+      PassCount: 11,
+      FailCount: 5,
+      ErrorCount: 3,
+      SkippedCount: 1,
+      ScoreSum: 12.5,
+      ScoreCount: 16,
+      DurationSum: 640,
+      CostSum: 0.5,
+      NonBilledCostSum: 0.125,
+    },
+    {
+      EvalCount: 14,
+      PassCount: 8,
+      FailCount: 4,
+      ErrorCount: 2,
+      SkippedCount: 0,
+      ScoreSum: 6.25,
+      ScoreCount: 12,
+      DurationSum: 320,
+      CostSum: 0.25,
+      NonBilledCostSum: 0.0625,
+    },
+  ],
+} as const;
+
+/**
+ * What each merged bucket must add up to, stated rather than summed from the
+ * parts — the arithmetic is the claim, and a test that derives it from the same
+ * numbers it seeds only proves that addition works.
+ *
+ * Every measure of a rollup appears here, and the suite pins that: a measure
+ * added to the catalog with no total to check against would otherwise be a
+ * column nothing ever reads back.
+ */
+export const ROLLUP_MERGE_TOTALS: {
+  readonly trace: Readonly<Record<string, number>>;
+  readonly modelUsage: Readonly<Record<string, number>>;
+  readonly evaluation: Readonly<Record<string, number>>;
+} = {
+  trace: {
+    SpanCount: 13,
+    TraceCount: 9,
+    ErrorCount: 3,
+    CostSum: 0.75,
+    NonBilledCostSum: 0.1875,
+    DurationSum: 1_300,
+    PromptTokensSum: 220,
+    CompletionTokensSum: 80,
+    CacheReadTokensSum: 40,
+    CacheWriteTokensSum: 20,
+    ReasoningTokensSum: 130,
+  },
+  // The span-fact subset of the same bucket: `model_usage_by_minute` keeps the
+  // per-model breakdown and carries no trace-level measures.
+  modelUsage: {
+    SpanCount: 13,
+    CostSum: 0.75,
+    NonBilledCostSum: 0.1875,
+    PromptTokensSum: 220,
+    CompletionTokensSum: 80,
+    CacheReadTokensSum: 40,
+    CacheWriteTokensSum: 20,
+    ReasoningTokensSum: 130,
+  },
+  evaluation: {
+    EvalCount: 34,
+    PassCount: 19,
+    FailCount: 9,
+    ErrorCount: 5,
+    SkippedCount: 1,
+    ScoreSum: 18.75,
+    ScoreCount: 28,
+    DurationSum: 960,
+    CostSum: 0.75,
+    NonBilledCostSum: 0.1875,
+  },
+};
+
+interface TraceSummarySeed {
+  TenantId: string;
+  TraceId: string;
+  OccurredAt: string;
+  UpdatedAt: string;
+  SpanCount: number;
+  [column: string]: unknown;
+}
+
+function traceSummaryRow({
+  tenantId,
+  traceId,
+  occurredAt,
+  updatedAt,
+  spanCount,
+}: {
+  tenantId: string;
+  traceId: string;
+  occurredAt: string;
+  updatedAt: string;
+  spanCount: number;
+}): TraceSummarySeed {
+  return {
+    ProjectionId: `${tenantId}/${traceId}`,
+    TenantId: tenantId,
+    TraceId: traceId,
+    Version: "1",
+    Attributes: {
+      "gen_ai.request.model": SEEDED_DIMENSION_ATTRIBUTE.value,
+      "gen_ai.prompt": SEEDED_CONTENT.spanPromptAttribute,
+    },
+    OccurredAt: occurredAt,
+    UpdatedAt: updatedAt,
+    ComputedIOSchemaVersion: "1",
+    ComputedInput: `${SEEDED_CONTENT.traceInput}/${traceId}`,
+    ComputedOutput: `${SEEDED_CONTENT.traceOutput}/${traceId}`,
+    TotalDurationMs: 1200,
+    SpanCount: spanCount,
+    ContainsErrorStatus: false,
+    ContainsOKStatus: true,
+    Models: [SEEDED_DIMENSION_ATTRIBUTE.value],
+    TotalCost: 0.0042,
+    TokensEstimated: false,
+    TraceName: `trace ${traceId}`,
+  };
+}
+
+/**
+ * Seeds both tenants into the real fact tables, across eight weekly partitions.
+ *
+ * Merges are stopped first. Without that, the two versions of the dedup fixture
+ * can be collapsed by a background merge before the test looks, and a
+ * deduplicating view would then be indistinguishable from one that does
+ * nothing — the test would pass with the dedup removed.
+ */
+async function seedRealFactRows({
+  admin,
+  database,
+}: {
+  admin: ClickHouseClient;
+  database: string;
+}): Promise<void> {
+  for (const table of REAL_FACT_TABLES) {
+    await admin.command({ query: `SYSTEM STOP MERGES ${database}.${table}` });
+    await admin.command({ query: `TRUNCATE TABLE ${database}.${table}` });
+  }
+
+  const tenants = [TENANT_A, TENANT_B];
+  const weeks = [...Array(SEED_WEEK_COUNT).keys()];
+
+  const traceRows = tenants.flatMap((tenant) =>
+    weeks.flatMap((week) =>
+      [...Array(SEED_TRACES_PER_WEEK).keys()].map((index) =>
+        traceSummaryRow({
+          tenantId: tenant.tenantId,
+          traceId: `${tenant.tenantId}-trace-${week}-${index}`,
+          occurredAt: seedWeekStart(week),
+          updatedAt: seedWeekStart(week),
+          spanCount: 3,
+        }),
+      ),
+    ),
+  );
+  await admin.insert({
+    table: `${database}.trace_summaries`,
+    format: "JSONEachRow",
+    values: traceRows,
+  });
+
+  // A separate insert, so the two versions land in separate parts and the
+  // engine has something to collapse.
+  for (const updatedAt of [DEDUP_FIXTURE.staleUpdatedAt, DEDUP_FIXTURE.latestUpdatedAt]) {
+    await admin.insert({
+      table: `${database}.trace_summaries`,
+      format: "JSONEachRow",
+      values: tenants.map((tenant) =>
+        traceSummaryRow({
+          tenantId: tenant.tenantId,
+          traceId: dedupTraceId(tenant.tenantId),
+          occurredAt: seedWeekStart(SEED_WEEK_COUNT - 1),
+          updatedAt,
+          spanCount:
+            updatedAt === DEDUP_FIXTURE.latestUpdatedAt
+              ? DEDUP_FIXTURE.latestSpanCount
+              : DEDUP_FIXTURE.staleSpanCount,
+        }),
+      ),
+    });
+  }
+
+  // The same shape one partition apart, so a per-partition collapse returns the
+  // stale row rather than a duplicate.
+  for (const version of [
+    {
+      week: MOVED_PARTITION_FIXTURE.staleWeek,
+      spanCount: MOVED_PARTITION_FIXTURE.staleSpanCount,
+      updatedAt: MOVED_PARTITION_FIXTURE.staleUpdatedAt,
+    },
+    {
+      week: MOVED_PARTITION_FIXTURE.latestWeek,
+      spanCount: MOVED_PARTITION_FIXTURE.latestSpanCount,
+      updatedAt: MOVED_PARTITION_FIXTURE.latestUpdatedAt,
+    },
+  ]) {
+    await admin.insert({
+      table: `${database}.trace_summaries`,
+      format: "JSONEachRow",
+      values: tenants.map((tenant) =>
+        traceSummaryRow({
+          tenantId: tenant.tenantId,
+          traceId: movedPartitionTraceId(tenant.tenantId),
+          occurredAt: seedWeekStart(version.week),
+          updatedAt: version.updatedAt,
+          spanCount: version.spanCount,
+        }),
+      ),
+    });
+  }
+
+  await admin.insert({
+    table: `${database}.stored_spans`,
+    format: "JSONEachRow",
+    values: tenants.flatMap((tenant) =>
+      weeks.flatMap((week) =>
+        [...Array(SEED_TRACES_PER_WEEK).keys()].map((index) => ({
+          ProjectionId: `${tenant.tenantId}/span-${week}-${index}`,
+          TenantId: tenant.tenantId,
+          TraceId: `${tenant.tenantId}-trace-${week}-${index}`,
+          SpanId: `${tenant.tenantId}-span-${week}-${index}`,
+          Sampled: 1,
+          StartTime: seedWeekStart(week),
+          EndTime: seedWeekStart(week),
+          DurationMs: 250,
+          SpanName: "llm.call",
+          SpanKind: 3,
+          ServiceName: "api",
+          ScopeName: "langwatch",
+          ResourceAttributes: { "service.name": "api" },
+          SpanAttributes: {
+            [SEEDED_DIMENSION_ATTRIBUTE.key]: SEEDED_DIMENSION_ATTRIBUTE.value,
+            "langwatch.input": SEEDED_CONTENT.spanInput,
+            "langwatch.output": SEEDED_CONTENT.spanOutput,
+            "gen_ai.prompt": SEEDED_CONTENT.spanPromptAttribute,
+            "gen_ai.prompt.0.content": SEEDED_CONTENT.spanExplodedPromptAttribute,
+          },
+          Cost: 0.0021,
+        })),
+      ),
+    ),
+  });
+
+  await admin.insert({
+    table: `${database}.evaluation_runs`,
+    format: "JSONEachRow",
+    values: tenants.flatMap((tenant) =>
+      weeks.flatMap((week) =>
+        [...Array(SEED_EVALUATIONS_PER_WEEK).keys()].map((index) => ({
+          ProjectionId: `${tenant.tenantId}/eval-${week}-${index}`,
+          TenantId: tenant.tenantId,
+          EvaluationId: `${tenant.tenantId}-eval-${week}-${index}`,
+          Version: "1",
+          EvaluatorId: "quality",
+          EvaluatorType: "llm_judge",
+          EvaluatorName: "Quality",
+          TraceId: `${tenant.tenantId}-trace-${week}-${index}`,
+          Status: "processed",
+          Score: 0.8,
+          Passed: 1,
+          Details: "scored on rubric",
+          Inputs: `${SEEDED_CONTENT.evaluationInputs}/${tenant.tenantId}`,
+          ScheduledAt: seedWeekStart(week),
+          UpdatedAt: seedWeekStart(week),
+          LastProcessedEventId: "seed",
+        })),
+      ),
+    ),
+  });
+
+  await admin.insert({
+    table: `${database}.simulation_runs`,
+    format: "JSONEachRow",
+    values: tenants.flatMap((tenant) =>
+      weeks.map((week) => ({
+        ProjectionId: `${tenant.tenantId}/sim-${week}`,
+        TenantId: tenant.tenantId,
+        ScenarioRunId: `${tenant.tenantId}-sim-${week}`,
+        ScenarioId: "checkout",
+        BatchRunId: `${tenant.tenantId}-batch-${week}`,
+        ScenarioSetId: "default",
+        Version: "1",
+        Status: "SUCCESS",
+        Name: "checkout flow",
+        "Messages.Id": ["m1"],
+        "Messages.Role": ["assistant"],
+        "Messages.Content": [`${SEEDED_CONTENT.simulationMessage}/${tenant.tenantId}`],
+        "Messages.TraceId": [`${tenant.tenantId}-trace-${week}-0`],
+        "Messages.Rest": ["{}"],
+        TraceIds: [`${tenant.tenantId}-trace-${week}-0`],
+        Verdict: "success",
+        Reasoning: `${SEEDED_CONTENT.simulationReasoning}/${tenant.tenantId}`,
+        MetCriteria: ["completes checkout"],
+        UnmetCriteria: [],
+        StartedAt: seedWeekStart(week),
+        CreatedAt: seedWeekStart(week),
+        UpdatedAt: seedWeekStart(week),
+      })),
+    ),
+  });
+
+  await seedAnalyticsProjections({ admin, database, tenants, weeks });
+}
+
+/**
+ * Seeds the analytics projections and their per-minute rollups.
+ *
+ * Same tenants, same weekly partitions and the same trace ids as the fold's
+ * other projections, so a query that joins `trace_metrics` to `spans` on
+ * `TraceId` finds rows on both sides rather than proving isolation against an
+ * empty result.
+ */
+async function seedAnalyticsProjections({
+  admin,
+  database,
+  tenants,
+  weeks,
+}: {
+  admin: ClickHouseClient;
+  database: string;
+  tenants: readonly { tenantId: string }[];
+  weeks: readonly number[];
+}): Promise<void> {
+  const traceAnalyticsRow = ({
+    tenantId,
+    traceId,
+    occurredAt,
+    updatedAt,
+    durationMs,
+  }: {
+    tenantId: string;
+    traceId: string;
+    occurredAt: string;
+    updatedAt: string;
+    durationMs: number;
+  }) => ({
+    TenantId: tenantId,
+    TraceId: traceId,
+    Version: "1",
+    OccurredAt: occurredAt,
+    CreatedAt: occurredAt,
+    UpdatedAt: updatedAt,
+    TraceName: `trace ${traceId}`,
+    TopicId: "checkout",
+    SubTopicId: null,
+    UserId: `${tenantId}-end-user`,
+    ConversationId: `${tenantId}-thread`,
+    CustomerId: `${tenantId}-customer`,
+    Origin: "sdk",
+    Models: [SEEDED_DIMENSION_ATTRIBUTE.value],
+    Labels: ["checkout"],
+    TotalCost: 0.0042,
+    NonBilledCost: 0.0001,
+    TotalDurationMs: durationMs,
+    TimeToFirstTokenMs: 120,
+    TokensPerSecond: 42,
+    PromptTokens: 100,
+    CompletionTokens: 20,
+    CacheReadTokens: 5,
+    CacheWriteTokens: 3,
+    ReasoningTokens: 7,
+    HasError: false,
+    HasAnnotation: null,
+    // The same content key the other projections carry, so "the map is
+    // filtered" is a claim with something to filter.
+    Attributes: {
+      [SEEDED_DIMENSION_ATTRIBUTE.key]: SEEDED_DIMENSION_ATTRIBUTE.value,
+      "gen_ai.prompt": SEEDED_CONTENT.spanPromptAttribute,
+    },
+  });
+
+  await admin.insert({
+    table: `${database}.trace_analytics`,
+    format: "JSONEachRow",
+    values: tenants.flatMap((tenant) =>
+      weeks.flatMap((week) =>
+        [...Array(SEED_TRACES_PER_WEEK).keys()].map((index) =>
+          traceAnalyticsRow({
+            tenantId: tenant.tenantId,
+            traceId: `${tenant.tenantId}-trace-${week}-${index}`,
+            occurredAt: seedWeekStart(week),
+            updatedAt: seedWeekStart(week),
+            durationMs: 1200,
+          }),
+        ),
+      ),
+    ),
+  });
+
+  // Two versions in two parts, so `FINAL` has something to collapse here too.
+  for (const updatedAt of [DEDUP_FIXTURE.staleUpdatedAt, DEDUP_FIXTURE.latestUpdatedAt]) {
+    await admin.insert({
+      table: `${database}.trace_analytics`,
+      format: "JSONEachRow",
+      values: tenants.map((tenant) =>
+        traceAnalyticsRow({
+          tenantId: tenant.tenantId,
+          traceId: dedupTraceId(tenant.tenantId),
+          occurredAt: seedWeekStart(SEED_WEEK_COUNT - 1),
+          updatedAt,
+          durationMs:
+            updatedAt === DEDUP_FIXTURE.latestUpdatedAt
+              ? DEDUP_FIXTURE.latestSpanCount
+              : DEDUP_FIXTURE.staleSpanCount,
+        }),
+      ),
+    });
+  }
+
+  const evaluationAnalyticsRow = ({
+    tenantId,
+    evaluationId,
+    traceId,
+    occurredAt,
+    updatedAt,
+    score,
+    durationMs = 340,
+  }: {
+    tenantId: string;
+    evaluationId: string;
+    traceId: string;
+    occurredAt: string;
+    updatedAt: string;
+    score: number;
+    durationMs?: number;
+  }) => ({
+    TenantId: tenantId,
+    EvaluationId: evaluationId,
+    Version: "1",
+    OccurredAt: occurredAt,
+    CreatedAt: occurredAt,
+    UpdatedAt: updatedAt,
+    EvaluatorType: "llm_judge",
+    EvaluatorName: "Quality",
+    Status: "processed",
+    IsGuardrail: false,
+    Passed: true,
+    Score: score,
+    Label: "good",
+    Model: SEEDED_DIMENSION_ATTRIBUTE.value,
+    TraceId: traceId,
+    UserId: `${tenantId}-end-user`,
+    ConversationId: `${tenantId}-thread`,
+    CustomerId: `${tenantId}-customer`,
+    Origin: "sdk",
+    DurationMs: durationMs,
+    TotalCost: 0.0009,
+    NonBilledCost: 0.0,
+    Attributes: {
+      [SEEDED_DIMENSION_ATTRIBUTE.key]: SEEDED_DIMENSION_ATTRIBUTE.value,
+      "gen_ai.prompt": SEEDED_CONTENT.spanPromptAttribute,
+    },
+  });
+
+  await admin.insert({
+    table: `${database}.evaluation_analytics`,
+    format: "JSONEachRow",
+    values: tenants.flatMap((tenant) =>
+      weeks.flatMap((week) =>
+        [...Array(SEED_EVALUATIONS_PER_WEEK).keys()].map((index) =>
+          evaluationAnalyticsRow({
+            tenantId: tenant.tenantId,
+            evaluationId: `${tenant.tenantId}-eval-${week}-${index}`,
+            traceId: `${tenant.tenantId}-trace-${week}-${index}`,
+            occurredAt: seedWeekStart(week),
+            updatedAt: seedWeekStart(week),
+            score: 0.8,
+          }),
+        ),
+      ),
+    ),
+  });
+
+  // The two versions of one evaluation, each carrying its own `OccurredAt` —
+  // the fold's watermark having moved between them — so they are two sort keys
+  // rather than two versions of one, and a separate insert each so the engine
+  // has two parts to reconcile.
+  for (const version of [
+    {
+      week: EVALUATION_DEDUP_FIXTURE.staleWeek,
+      updatedAt: EVALUATION_DEDUP_FIXTURE.staleUpdatedAt,
+      score: EVALUATION_DEDUP_FIXTURE.staleScore,
+      durationMs: EVALUATION_DEDUP_FIXTURE.staleDurationMs,
+    },
+    {
+      week: EVALUATION_DEDUP_FIXTURE.latestWeek,
+      updatedAt: EVALUATION_DEDUP_FIXTURE.latestUpdatedAt,
+      score: EVALUATION_DEDUP_FIXTURE.latestScore,
+      durationMs: EVALUATION_DEDUP_FIXTURE.latestDurationMs,
+    },
+  ]) {
+    await admin.insert({
+      table: `${database}.evaluation_analytics`,
+      format: "JSONEachRow",
+      values: tenants.map((tenant) =>
+        evaluationAnalyticsRow({
+          tenantId: tenant.tenantId,
+          evaluationId: evaluationDedupId(tenant.tenantId),
+          traceId: dedupTraceId(tenant.tenantId),
+          occurredAt: seedWeekStart(version.week),
+          updatedAt: version.updatedAt,
+          score: version.score,
+          durationMs: version.durationMs,
+        }),
+      ),
+    });
+  }
+
+  await admin.insert({
+    table: `${database}.trace_analytics_rollup`,
+    format: "JSONEachRow",
+    values: tenants.flatMap((tenant) =>
+      weeks.map((week) => ({
+        TenantId: tenant.tenantId,
+        BucketStart: seedWeekStart(week),
+        Model: SEEDED_DIMENSION_ATTRIBUTE.value,
+        SpanType: "llm",
+        SpanCount: SEED_TRACES_PER_WEEK,
+        TraceCount: SEED_TRACES_PER_WEEK,
+        ErrorCount: 0,
+        CostSum: 1.05,
+        NonBilledCostSum: 0.025,
+        DurationSum: 300_000,
+        PromptTokensSum: 25_000,
+        CompletionTokensSum: 5_000,
+        CacheReadTokensSum: 1_250,
+        CacheWriteTokensSum: 750,
+        ReasoningTokensSum: 1_750,
+      })),
+    ),
+  });
+
+  await admin.insert({
+    table: `${database}.evaluation_analytics_rollup`,
+    format: "JSONEachRow",
+    values: tenants.flatMap((tenant) =>
+      weeks.map((week) => ({
+        TenantId: tenant.tenantId,
+        BucketStart: seedWeekStart(week),
+        EvaluatorType: "llm_judge",
+        Status: "processed",
+        EvalCount: SEED_EVALUATIONS_PER_WEEK,
+        PassCount: SEED_EVALUATIONS_PER_WEEK,
+        FailCount: 0,
+        ErrorCount: 0,
+        SkippedCount: 0,
+        ScoreSum: 20,
+        ScoreCount: SEED_EVALUATIONS_PER_WEEK,
+        DurationSum: 8_500,
+        CostSum: 0.0225,
+        NonBilledCostSum: 0,
+      })),
+    ),
+  });
+
+  // One insert per part, so the bucket really is two rows on disk rather than
+  // one the client summed on the way in. Each part is spread by column name,
+  // so what the fixture says a measure is and what lands in that measure's
+  // column are the same statement.
+  for (const part of ROLLUP_MERGE_FIXTURE.traceParts) {
+    await admin.insert({
+      table: `${database}.trace_analytics_rollup`,
+      format: "JSONEachRow",
+      values: tenants.map((tenant) => ({
+        TenantId: tenant.tenantId,
+        BucketStart: ROLLUP_MERGE_FIXTURE.bucketStart,
+        Model: ROLLUP_MERGE_FIXTURE.model,
+        SpanType: ROLLUP_MERGE_FIXTURE.spanType,
+        ...part,
+      })),
+    });
+  }
+
+  for (const part of ROLLUP_MERGE_FIXTURE.evaluationParts) {
+    await admin.insert({
+      table: `${database}.evaluation_analytics_rollup`,
+      format: "JSONEachRow",
+      values: tenants.map((tenant) => ({
+        TenantId: tenant.tenantId,
+        BucketStart: ROLLUP_MERGE_FIXTURE.bucketStart,
+        EvaluatorType: ROLLUP_MERGE_FIXTURE.evaluatorType,
+        Status: ROLLUP_MERGE_FIXTURE.status,
+        ...part,
+      })),
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -702,4 +1567,609 @@ export async function expectZeroRowsWithControl({
     rows,
     `${context}: expected zero rows while ${control.tenantA + control.tenantB} rows exist`,
   ).toHaveLength(0);
+}
+
+// ---------------------------------------------------------------------------
+// PostgreSQL half
+// ---------------------------------------------------------------------------
+
+/** The PostgreSQL role the named collection connects as. */
+const PG_READER_ROLE = "ch_reader";
+/** How long a terminated reader backend gets to leave `pg_stat_activity`. */
+const PG_BACKEND_EXIT_TIMEOUT_MS = 15_000;
+const PG_BACKEND_EXIT_POLL_MS = 50;
+const PG_READER_PASSWORD = "lwql-pg-reader-test-password";
+const PG_ADMIN_USER = "test";
+const PG_ADMIN_PASSWORD = "test";
+const PG_DATABASE = "lwtest";
+const PG_SCHEMA = "public";
+
+/**
+ * The named collection this suite's engine tables read through.
+ *
+ * Per-suite for the same reason `lwqlNamesForSuite` exists: named
+ * collections are server-global, and CI runs integration files two at a time
+ * against one ClickHouse server. Under a shared name, each suite's
+ * DROP + CREATE repoints the collection at its own PostgreSQL container —
+ * the neighbour's engine tables silently read the wrong database, or lose
+ * the collection entirely mid-run. (Shipped provisioning keeps one fixed
+ * name; a deployment has one PostgreSQL, not one per suite.)
+ */
+export function lwqlTestNamedCollection(names: LangWatchQLNames): string {
+  return `pg_${names.database}`;
+}
+
+/**
+ * The dataset the PostgreSQL isolation proof is written against.
+ *
+ * Annotations rather than a dimension, because it is the one mapped dataset
+ * that joins against a multi-million-row fact table and therefore the one the
+ * issue names as most likely to need the projection fallback. Read from the
+ * shipped catalog rather than restated, so a rename cannot leave the proof
+ * pointing at something that no longer exists.
+ */
+export const PG_MAPPED_VIEW = "annotations";
+/** The PostgreSQL-engine table behind it, inside the LangWatchQL database. */
+export const PG_MAPPED_TABLE = mappedCatalogEntry(PG_MAPPED_VIEW).sourceTable;
+/** The tenant column, which every approved view exposes under the same name. */
+export const PG_MAPPED_TENANT_COLUMN = "TenantId";
+/**
+ * A column of the base relation the approved view leaves out.
+ *
+ * `Annotation.comment` is a free-text carrier the catalog deliberately does not
+ * expose. Taken from the real model rather than a synthetic `secret_note`, so
+ * the unreachability proof is about the shipped exclusion policy.
+ */
+export const PG_EXCLUDED_COLUMN = "comment";
+
+/** One PostgreSQL-resident catalog entry, by the name a caller writes. */
+function mappedCatalogEntry(
+  name: string,
+): LangWatchQLViewDefinition & { postgres: LangWatchQLPostgresMapping } {
+  const entry = lwqlPostgresViews(LWQL_VIEW_CATALOG).find((view) => view.name === name);
+  if (!entry) {
+    throw new Error(
+      `lwql harness: "${name}" is not a PostgreSQL-resident dataset in the shipped catalog`,
+    );
+  }
+  return entry;
+}
+
+export interface PostgresExecResult {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+}
+
+export interface LangWatchQLPostgresHarness {
+  container: StartedPostgreSqlContainer;
+  /** The base relation behind {@link PG_MAPPED_VIEW}. Never granted to the reader. */
+  baseTable: string;
+  /** The approved view over it. The reader's only relation for that dataset. */
+  approvedView: string;
+  readerRole: string;
+  /**
+   * The reader role's password, the live value the role was provisioned with —
+   * exposed so a leak assertion searches for the string that would actually
+   * leak rather than a hand-copy that can drift and go vacuous.
+   */
+  readerPassword: string;
+  /** Runs SQL as the PostgreSQL superuser, over the local socket. */
+  asAdmin(sql: string): Promise<PostgresExecResult>;
+  /** Runs SQL as the restricted `ch_reader` role, over TCP with its password. */
+  asReader(sql: string): Promise<PostgresExecResult>;
+  /** Everything the server has logged so far. */
+  readLog(): Promise<string>;
+  /** Clears the server's table statistics, so the next {@link rowsRead} is a delta. */
+  resetStatistics(): Promise<void>;
+  /**
+   * Makes every read done so far visible to {@link rowsRead}, by ending the
+   * backends that did it.
+   *
+   * PostgreSQL flushes a backend's pending statistics at transaction end, rate
+   * limited to once a second, and otherwise only when the backend has been idle
+   * for ten. ClickHouse *pools* its connections, so the backend that did the
+   * read is idle rather than gone and its numbers are not there yet — measured,
+   * a two-second wait reports the previous measurement's rows, which is worse
+   * than reporting none, and even twelve seconds raced.
+   *
+   * Terminating the backend runs its shutdown hook, which flushes, and this
+   * then waits for the backend to actually leave `pg_stat_activity` rather than
+   * for a duration. That turns the measurement from a wait long enough to
+   * probably work into one that is true when it returns, and it throws rather
+   * than returning a stale number if the backends outlast the timeout.
+   * ClickHouse reconnects on the next read.
+   */
+  flushStatistics(): Promise<void>;
+  /**
+   * Rows PostgreSQL actually read off a base relation since the last reset.
+   *
+   * The load number the projection-fallback decision turns on, taken from the
+   * server's own accounting rather than inferred from the statement text.
+   * Sequential and index reads summed, because which one the planner picks is
+   * its business and both are rows off the primary.
+   */
+  rowsRead(baseRelation: string): Promise<number>;
+  stop(): Promise<void>;
+}
+
+/**
+ * The application tables the mapped catalog reads, in the shape Prisma creates
+ * them.
+ *
+ * Hand-written rather than migrated because the suite needs the *relations the
+ * catalog names*, not the application's whole schema — every mapped base
+ * relation, with every column the catalog reads plus at least one it
+ * deliberately excludes. Quoted and mixed-case exactly as Prisma emits them, so
+ * that a mapping which forgot to quote fails here rather than in production.
+ */
+const PG_BASE_TABLE_DDL: Record<string, string> = {
+  Annotation:
+    '("id" text primary key, "projectId" text not null, "traceId" text not null, ' +
+    '"isThumbsUp" boolean, "comment" text, "email" text, "createdAt" timestamptz not null, ' +
+    '"updatedAt" timestamptz not null)',
+  Project:
+    '("id" text primary key, "name" text not null, "slug" text not null, ' +
+    '"apiKey" text not null, "createdAt" timestamptz not null)',
+  // `type` is a PostgreSQL *enum* here, not text, because that is what Prisma
+  // creates for `ExperimentType` — and whether ClickHouse's PostgreSQL engine
+  // can read an enum column at all is exactly the kind of thing a `text` stand-in
+  // would hide until production.
+  Experiment:
+    '("id" text primary key, "projectId" text not null, "name" text, "slug" text not null, ' +
+    '"type" "ExperimentType" not null, "workbenchState" jsonb, "createdAt" timestamptz not null, ' +
+    '"archivedAt" timestamptz)',
+  BatchEvaluation:
+    '("id" text primary key, "projectId" text not null, "experimentId" text not null, ' +
+    '"evaluation" text not null, "status" text not null, "score" double precision not null, ' +
+    '"label" text, "passed" boolean not null, "cost" double precision not null, ' +
+    '"datasetId" text not null, "datasetSlug" text not null, "details" text not null, ' +
+    '"data" jsonb not null, "createdAt" timestamptz not null)',
+  LlmPromptConfig:
+    '("id" text primary key, "projectId" text not null, "name" text not null, ' +
+    '"handle" text, "createdAt" timestamptz not null, "deletedAt" timestamptz)',
+  LlmPromptConfigVersion:
+    '("id" text primary key, "projectId" text not null, "configId" text not null, ' +
+    '"version" integer not null, "commitMessage" text, "configData" jsonb not null, ' +
+    '"createdAt" timestamptz not null)',
+};
+
+/**
+ * LangWatchQL databases that map this one PostgreSQL role at the same time.
+ *
+ * Container reuse is what makes this more than one: every suite that maps the
+ * PostgreSQL half gets its own LangWatchQL database inside the *same* reused
+ * ClickHouse server, and each of those databases holds its own connection pool
+ * per mapped table against the same role. Sized for one catalog, the role's cap
+ * is exhausted by idle pooled connections from the suites that ran before, and
+ * the failure is a refused login rather than a queue.
+ *
+ * Production maps one catalog from one deployment, which is the function's
+ * default.
+ */
+const LWQL_TEST_CONCURRENT_CATALOGS = 6;
+
+/** The role's cap in this harness, so a test can assert the value that was set. */
+export const LWQL_TEST_POSTGRES_CONNECTION_LIMIT = lwqlPostgresReaderConnectionLimit({
+  concurrentCatalogs: LWQL_TEST_CONCURRENT_CATALOGS,
+});
+
+/** Filler tenants in the annotation load fixture. See below for why. */
+const PG_LOAD_FIXTURE_TENANTS = 40;
+/** Annotations each filler tenant holds. */
+const PG_LOAD_FIXTURE_ROWS_PER_TENANT = 250;
+
+/**
+ * A realistically-shaped annotation table, so the load measurement measures
+ * something.
+ *
+ * Not padding. With only the two fixture tenants the table is four rows split
+ * evenly, and at 50% selectivity a sequential scan is genuinely the cheaper
+ * plan — so PostgreSQL reads every row whether or not the tenant predicate
+ * reached it, and "the predicate bounds what PostgreSQL reads" is unmeasurable
+ * rather than untrue. A real deployment has many tenants and one of them asking,
+ * which is the shape that makes the index worth using; these filler tenants
+ * restore it.
+ *
+ * The index is the one Prisma already declares (`@@index([projectId])`), and
+ * `ANALYZE` is what gives the planner the statistics to choose it.
+ */
+const POSTGRES_LOAD_FIXTURE_STATEMENTS: string[] = [
+  `INSERT INTO ${PG_SCHEMA}."Annotation" ` +
+    `SELECT 'filler-note-' || g, 'filler-tenant-' || (g % ${PG_LOAD_FIXTURE_TENANTS}), ` +
+    `'filler-trace-' || g, true, 'excluded-comment-of-filler', 'excluded-email-of-filler', ` +
+    `now(), now() ` +
+    `FROM generate_series(1, ${PG_LOAD_FIXTURE_TENANTS * PG_LOAD_FIXTURE_ROWS_PER_TENANT}) g`,
+  `CREATE INDEX IF NOT EXISTS "Annotation_projectId_idx" ON ${PG_SCHEMA}."Annotation" ("projectId")`,
+  `ANALYZE ${PG_SCHEMA}."Annotation"`,
+];
+
+/**
+ * One tenant's rows in every mapped base relation.
+ *
+ * Parameterized rather than fixed to the two harness fixtures because the
+ * endpoint suites authenticate as *real project ids* and need PostgreSQL rows
+ * under those, exactly as they already seed their own ClickHouse rows. Every
+ * relation for every tenant, so that an isolation assertion always has
+ * something it could have leaked.
+ *
+ * Excluded columns carry a recognisable `excluded-` marker, which is what lets
+ * a test assert the *data* never reached the LangWatchQL schema rather than only
+ * that the column name was refused.
+ *
+ * `traceIds` ties annotations to whatever traces the caller seeded on the
+ * ClickHouse side, so an annotation-to-trace join has matching rows; the
+ * default is the shape the isolation suite seeds.
+ */
+export function postgresTenantSeedStatements({
+  tenantId,
+  traceIds = [`${tenantId}-trace-1`, `${tenantId}-trace-2`],
+  thumbsUp = [true, false],
+  scores = [0.5, 0.9],
+  promptId = `${tenantId}-prompt`,
+  stamp = "2026-01-01T00:00:00Z",
+}: {
+  tenantId: string;
+  /** Traces the seeded annotations point at. One annotation per entry. */
+  traceIds?: readonly string[];
+  /** The verdict of the annotation at each index, cycled if shorter. */
+  thumbsUp?: readonly (boolean | null)[];
+  /** The score of the experiment run at each index. */
+  scores?: readonly number[];
+  /**
+   * Identifier of the seeded prompt.
+   *
+   * Parameterized because a caller joining `traces.LastUsedPromptId` to
+   * `prompts.PromptId` needs the two sides to agree, and a prompt id is a
+   * primary key in PostgreSQL — so two tenants cannot both be given the same
+   * one, and which tenant gets which is the caller's to decide.
+   */
+  promptId?: string;
+  stamp?: string;
+}): string[] {
+  const at = `'${stamp}'`;
+  const rows = (table: string, values: string[]): string =>
+    `INSERT INTO ${PG_SCHEMA}."${table}" VALUES ${values.join(", ")}`;
+  const verdict = (index: number): string => {
+    const value = thumbsUp[index % thumbsUp.length];
+    return value === null || value === undefined ? "NULL" : String(value);
+  };
+  return [
+    rows("Project", [
+      `('${tenantId}', 'Project ${tenantId}', '${tenantId}-slug', ` +
+        `'excluded-apikey-of-${tenantId}', ${at})`,
+    ]),
+    rows(
+      "Annotation",
+      traceIds.map(
+        (traceId, index) =>
+          `('${tenantId}-note-${index + 1}', '${tenantId}', '${traceId}', ${verdict(index)}, ` +
+          `'excluded-comment-of-${tenantId}', 'excluded-email-of-${tenantId}', ${at}, ${at})`,
+      ),
+    ),
+    rows("Experiment", [
+      `('${tenantId}-experiment', '${tenantId}', 'Experiment ${tenantId}', ` +
+        `'${tenantId}-exp-slug', 'BATCH_EVALUATION_V2', '{"excluded":"workbench"}'::jsonb, ${at}, NULL)`,
+    ]),
+    rows(
+      "BatchEvaluation",
+      scores.map(
+        (score, index) =>
+          `('${tenantId}-run-${index + 1}', '${tenantId}', '${tenantId}-experiment', ` +
+          `'exact_match', 'finished', ${score}, 'label-${index + 1}', ` +
+          `${score >= 0.8}, ${index + 1}.25, 'dataset-${index + 1}', 'dataset-slug-${index + 1}', ` +
+          `'excluded-details-of-${tenantId}', '{"excluded":"rows"}'::jsonb, ${at})`,
+      ),
+    ),
+    rows("LlmPromptConfig", [
+      `('${promptId}', '${tenantId}', 'Prompt ${tenantId}', ` +
+        `'${tenantId}/handle', ${at}, NULL)`,
+    ]),
+    rows(
+      "LlmPromptConfigVersion",
+      [1, 2].map(
+        (version) =>
+          `('${promptId}-v${version}', '${tenantId}', '${promptId}', ` +
+          `${version}, 'excluded-commit-of-${tenantId}', '{"excluded":"prompt text"}'::jsonb, ${at})`,
+      ),
+    ),
+  ];
+}
+
+/**
+ * Starts PostgreSQL, seeds two tenants' annotations, and provisions the
+ * dedicated reader role from the shipped statements.
+ *
+ * `log_statement='all'` is turned on *before* ClickHouse ever connects. That
+ * ordering is the whole trick: ClickHouse pools its PostgreSQL connections, and
+ * a connection opened before the setting was changed keeps the old value, so
+ * enabling it later measures nothing until the pool is cycled.
+ *
+ * Deliberately NOT `.withReuse()`, unlike the ClickHouse container beside it.
+ * Reuse hands every caller the same container, and this setup drops and
+ * recreates a fixed set of relations in a fixed schema — so with
+ * `VITEST_INTEGRATION_PARALLEL=1` (CI, `maxWorkers: 2`) two suites interleave
+ * their drop/create and the second `CREATE TYPE "ExperimentType"` loses to the
+ * first with `42710: type already exists`. The ClickHouse half is safe because
+ * each suite gets its own LangWatchQL database; the PostgreSQL half has no such
+ * per-suite name, so isolation comes from the container. A private container
+ * per suite costs a few seconds and removes the race by construction.
+ */
+export async function startLangWatchQLPostgres(): Promise<LangWatchQLPostgresHarness> {
+  const container = await new PostgreSqlContainer(TEST_POSTGRES_IMAGE)
+    .withUsername(PG_ADMIN_USER)
+    .withPassword(PG_ADMIN_PASSWORD)
+    .withDatabase(PG_DATABASE)
+    .withLabels({
+      "langwatch.test": "true",
+      "langwatch.test.type": "integration",
+    })
+    .withStartupTimeout(120_000)
+    .start();
+
+  const psql = async ({
+    sql,
+    user,
+    password,
+  }: {
+    sql: string;
+    user: string;
+    password?: string;
+  }): Promise<PostgresExecResult> => {
+    const command = [
+      "psql",
+      ...(password ? ["-h", "127.0.0.1"] : []),
+      "-U",
+      user,
+      "-d",
+      PG_DATABASE,
+      "-v",
+      "ON_ERROR_STOP=1",
+      // Verbose verbosity is what puts the SQLSTATE in the message, which is
+      // the only thing worth asserting on a rejection.
+      "-v",
+      "VERBOSITY=verbose",
+      "-tAc",
+      sql,
+    ];
+    const result = await container.exec(command, password ? { env: { PGPASSWORD: password } } : {});
+    return {
+      stdout: result.stdout,
+      stderr: result.stderr,
+      exitCode: result.exitCode,
+    };
+  };
+
+  const asAdmin = (sql: string) => psql({ sql, user: PG_ADMIN_USER });
+  const asReader = (sql: string) =>
+    psql({ sql, user: PG_READER_ROLE, password: PG_READER_PASSWORD });
+
+  const applyAsAdmin = async (statements: string[]): Promise<void> => {
+    for (const sql of statements) {
+      const result = await asAdmin(sql);
+      if (result.exitCode !== 0) {
+        throw new Error(
+          `lwql PostgreSQL setup failed (${result.exitCode}) for:\n${sql}\n${result.stderr}`,
+        );
+      }
+    }
+  };
+
+  const mapped = mappedCatalogEntry(PG_MAPPED_VIEW);
+  const baseRelations = Object.keys(PG_BASE_TABLE_DDL);
+  await applyAsAdmin([
+    `ALTER DATABASE ${PG_DATABASE} SET log_statement='all'`,
+    ...lwqlApprovedPostgresViewNames().map((view) => `DROP VIEW IF EXISTS ${PG_SCHEMA}."${view}"`),
+    ...baseRelations.map((table) => `DROP TABLE IF EXISTS ${PG_SCHEMA}."${table}"`),
+    `DROP TYPE IF EXISTS ${PG_SCHEMA}."ExperimentType"`,
+    `CREATE TYPE ${PG_SCHEMA}."ExperimentType" AS ENUM ` +
+      `('DSPY', 'BATCH_EVALUATION', 'BATCH_EVALUATION_V2')`,
+    ...baseRelations.map(
+      (table) => `CREATE TABLE ${PG_SCHEMA}."${table}" ${PG_BASE_TABLE_DDL[table]!}`,
+    ),
+    ...[TENANT_A, TENANT_B].flatMap((tenant) =>
+      postgresTenantSeedStatements({ tenantId: tenant.tenantId }),
+    ),
+    ...POSTGRES_LOAD_FIXTURE_STATEMENTS,
+    // The shipped generator, not a hand-copy: a catalog column the approved
+    // view forgot would be a failure here rather than a silent exposure.
+    ...lwqlPostgresApprovedViewStatements({ schema: PG_SCHEMA }),
+  ]);
+  await applyAsAdmin(
+    postgresReaderRoleStatements({
+      reader: {
+        role: PG_READER_ROLE,
+        password: PG_READER_PASSWORD,
+        schema: PG_SCHEMA,
+        approvedViews: lwqlApprovedPostgresViewNames(),
+        ...DEFAULT_POSTGRES_READER_LIMITS,
+        connectionLimit: LWQL_TEST_POSTGRES_CONNECTION_LIMIT,
+      },
+    }),
+  );
+
+  return {
+    container,
+    baseTable: mapped.postgres.baseRelation,
+    approvedView: mapped.postgres.approvedView,
+    readerRole: PG_READER_ROLE,
+    readerPassword: PG_READER_PASSWORD,
+    asAdmin,
+    asReader,
+    readLog: () => readContainerLog(container.logs()),
+    async resetStatistics() {
+      await applyAsAdmin(["SELECT pg_stat_reset()"]);
+    },
+    async flushStatistics() {
+      await applyAsAdmin([
+        `SELECT pg_terminate_backend(pid) FROM pg_stat_activity ` +
+          `WHERE usename = '${PG_READER_ROLE}' AND pid <> pg_backend_pid()`,
+      ]);
+      // `pg_terminate_backend` only signals; it returns before the backend has
+      // run the shutdown hook that flushes its statistics. Waiting for the rows
+      // to leave `pg_stat_activity` waits for the thing that actually has to
+      // have happened — a fixed grace period here would be the hopeful wait
+      // this whole mechanism exists to avoid, and it is the shape that flakes
+      // first on a loaded CI worker.
+      const deadline = Date.now() + PG_BACKEND_EXIT_TIMEOUT_MS;
+      for (;;) {
+        const remaining = await asAdmin(
+          `SELECT count(*) FROM pg_stat_activity ` +
+            `WHERE usename = '${PG_READER_ROLE}' AND pid <> pg_backend_pid()`,
+        );
+        if (remaining.exitCode === 0 && remaining.stdout.trim() === "0") return;
+        if (Date.now() >= deadline) {
+          throw new Error(
+            `lwql harness: ${PG_READER_ROLE} backends were still ` +
+              `attached ${PG_BACKEND_EXIT_TIMEOUT_MS}ms after termination, so ` +
+              `their statistics are not flushed and any measurement taken now ` +
+              `would silently report the previous one`,
+          );
+        }
+        await new Promise((resolve) => setTimeout(resolve, PG_BACKEND_EXIT_POLL_MS));
+      }
+    },
+    async rowsRead(baseRelation: string) {
+      const result = await asAdmin(
+        `SELECT coalesce(seq_tup_read, 0) + coalesce(idx_tup_fetch, 0) ` +
+          `FROM pg_stat_user_tables WHERE relname = '${baseRelation}'`,
+      );
+      if (result.exitCode !== 0) {
+        throw new Error(`lwql harness: reading PostgreSQL statistics failed: ${result.stderr}`);
+      }
+      return Number(result.stdout.trim() || "0");
+    },
+    async stop() {
+      await container.stop();
+    },
+  };
+}
+
+/**
+ * Maps every PostgreSQL-resident catalog entry into the LangWatchQL ClickHouse
+ * database as an engine table, and policies each exactly like a native table.
+ *
+ * Stops at the engine tables. The LangWatchQL views over them — the objects a
+ * caller actually names, and the ones carrying the tenant pushdown predicate —
+ * are `lwqlViewSetupStatements`' job, so a suite that wants the whole
+ * chain calls both, in that order. Keeping them apart is what lets the
+ * isolation proof read the *unpredicated* engine table directly and compare.
+ */
+export async function mapPostgresIntoClickHouse({
+  harness,
+  postgres,
+}: {
+  harness: LangWatchQLClickHouseHarness;
+  postgres: LangWatchQLPostgresHarness;
+}): Promise<LangWatchQLTable[]> {
+  const lwqlTables = lwqlPostgresViews(LWQL_VIEW_CATALOG).map((view): LangWatchQLTable => ({
+    table: view.sourceTable,
+    tenantColumn: PG_MAPPED_TENANT_COLUMN,
+  }));
+  const collection = lwqlTestNamedCollection(harness.names);
+  await harness.applyAsAdmin([
+    ...postgresNamedCollectionStatements({
+      connection: {
+        collection,
+        // The docker host as seen from inside the ClickHouse container; see the
+        // module comment for why this is not a shared docker network.
+        host: "host.docker.internal",
+        port: postgres.container.getPort(),
+        database: PG_DATABASE,
+        user: PG_READER_ROLE,
+        password: PG_READER_PASSWORD,
+      },
+    }),
+    ...lwqlTables.map(
+      (lwqlTable) => `DROP TABLE IF EXISTS ${harness.names.database}.${lwqlTable.table}`,
+    ),
+    ...lwqlPostgresEngineTableStatements({
+      names: harness.names,
+      collection,
+    }),
+    // No grant here on purpose. `lwqlViewSetupStatements` issues the
+    // column-scoped one for every source it reads, and ClickHouse grants are
+    // additive: a whole-table grant issued here would sit underneath it and
+    // quietly widen it back out — the same trap the fixture fact tables carry.
+    ...lwqlTables.map((lwqlTable) => lwqlRowPolicyStatement({ names: harness.names, lwqlTable })),
+  ]);
+  return lwqlTables;
+}
+
+/**
+ * Drains a container log stream into a string.
+ *
+ * `logs()` follows the container, so it never ends on its own: collection stops
+ * once the stream has been quiet for a moment, bounded by a hard cap.
+ */
+async function readContainerLog(
+  streamPromise: Promise<Readable>,
+  { quietMs = 400, maxMs = 8_000 } = {},
+): Promise<string> {
+  const stream = await streamPromise;
+  return await new Promise<string>((resolve) => {
+    let buffer = "";
+    let settled = false;
+    let quiet: ReturnType<typeof setTimeout> | undefined;
+    let cap: ReturnType<typeof setTimeout> | undefined;
+    const finish = (): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(quiet);
+      clearTimeout(cap);
+      stream.destroy();
+      resolve(buffer);
+    };
+    cap = setTimeout(finish, maxMs);
+    quiet = setTimeout(finish, quietMs);
+    stream.on("data", (chunk: Buffer | string) => {
+      buffer += chunk.toString();
+      clearTimeout(quiet);
+      quiet = setTimeout(finish, quietMs);
+    });
+    stream.on("end", finish);
+    stream.on("error", finish);
+  });
+}
+
+/**
+ * The statements PostgreSQL executed since `previousLog` was captured.
+ *
+ * Diffing rather than parsing timestamps: the suite runs serially, so
+ * everything new in the log belongs to the statement under measurement.
+ */
+export function statementsLoggedSince(previousLog: string, currentLog: string): string[] {
+  const delta = currentLog.startsWith(previousLog)
+    ? currentLog.slice(previousLog.length)
+    : currentLog;
+  return [...delta.matchAll(/LOG:\s+statement:\s+(.*)/g)].map((match) => match[1]!.trim());
+}
+
+/** Pulls the SQLSTATE out of a `VERBOSITY=verbose` psql rejection. */
+export function postgresSqlState(result: PostgresExecResult): string | null {
+  const match = /ERROR:\s+([0-9A-Z]{5}):/.exec(result.stderr);
+  return match ? match[1]! : null;
+}
+
+/**
+ * Asserts a PostgreSQL statement was rejected with one specific SQLSTATE.
+ *
+ * Same discipline as {@link expectClickHouseError}: a rejection for the wrong
+ * reason — a missing relation, a syntax error — must fail rather than count as
+ * the containment being proved.
+ */
+export function expectPostgresError(
+  result: PostgresExecResult,
+  expectedSqlState: (typeof POSTGRES_SQLSTATE)[keyof typeof POSTGRES_SQLSTATE],
+  context: string,
+): void {
+  expect(
+    result.exitCode,
+    `${context}: expected a rejection, psql exited 0 with "${result.stdout.trim()}"`,
+  ).not.toBe(0);
+  const sqlState = postgresSqlState(result);
+  expect(sqlState, `${context}: no SQLSTATE in "${result.stderr.trim()}"`).not.toBeNull();
+  expect(sqlState, `${context}: wrong rejection — "${result.stderr.trim()}"`).toBe(
+    expectedSqlState,
+  );
 }
