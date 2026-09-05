@@ -91,6 +91,7 @@ export class OnboardingApiService {
         operation,
         error: parsed,
         status: response.status,
+        message,
       });
       throw new OnboardingApiError(message, operation, parsed);
     }
