@@ -72,6 +72,13 @@ Feature: A run reports that its evaluators have not run yet
     When the finished event lands carrying two evaluator attachments
     Then the stored status is the judge's, not PENDING_EVALUATION
 
+  @unit
+  Scenario: A required failure recorded before the finished event fails the run
+    Given a run whose evaluated event, carrying a failed required evaluator, folded before its finished event
+    When the finished event lands with the verdict "success"
+    Then the stored status is FAILURE with the gated verdict
+    And the run is neither PENDING_EVALUATION nor SUCCESS
+
   # --- What a reader sees ---
 
   @unit

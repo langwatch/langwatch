@@ -262,5 +262,18 @@ describe("simulationRunState fold projection, evaluations pending", () => {
       expect(state.Status).toBe("SUCCESS");
       expect(state.Evaluations).toEqual([PASSED]);
     });
+
+    /** @scenario "A required failure recorded before the finished event fails the run" */
+    it("applies the gate when a required failure folded before the finished event", () => {
+      const state = foldEvents([
+        queuedEvent(),
+        evaluatedEvent([FAILED_REQUIRED]),
+        finishedEvent(),
+      ]);
+
+      expect(state.Status).toBe("FAILURE");
+      expect(state.Verdict).toBe("failure");
+      expect(state.Evaluations).toEqual([FAILED_REQUIRED]);
+    });
   });
 });
