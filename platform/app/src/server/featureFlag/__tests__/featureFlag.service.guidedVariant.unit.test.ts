@@ -78,7 +78,10 @@ describe("the guided onboarding flag", () => {
     describe("when the flag is read for any user", () => {
       /** @scenario "the force-enable environment variable turns the guided variant on for everyone" */
       it("resolves to true before the store is consulted", async () => {
-        vi.stubEnv("FEATURE_FLAG_FORCE_ENABLE", `release_langy_enabled,${FLAG}`);
+        vi.stubEnv(
+          "FEATURE_FLAG_FORCE_ENABLE",
+          `release_langy_enabled,${FLAG}`,
+        );
         const store = { get: vi.fn().mockResolvedValue(false) };
 
         const enabled = await serviceWith(store).isEnabled(FLAG, {

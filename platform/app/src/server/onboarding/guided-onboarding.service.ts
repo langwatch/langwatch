@@ -232,7 +232,8 @@ export class GuidedOnboardingService {
       mutate: (state) => ({
         ...state,
         donePaths: [...state.donePaths, known],
-        currentPath: state.currentPath === known ? undefined : state.currentPath,
+        currentPath:
+          state.currentPath === known ? undefined : state.currentPath,
       }),
     });
   }

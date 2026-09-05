@@ -59,7 +59,10 @@ export const onboardingRouter = createTRPCRouter({
         const signUpData =
           input.onboardingVariant === undefined
             ? input.signUpData
-            : { ...input.signUpData, onboardingVariant: input.onboardingVariant };
+            : {
+                ...input.signUpData,
+                onboardingVariant: input.onboardingVariant,
+              };
 
         // Create and assign organization
         const orgRouter = organizationRouter.createCaller(ctx);

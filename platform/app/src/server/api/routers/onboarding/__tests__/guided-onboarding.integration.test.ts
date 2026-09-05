@@ -7,7 +7,15 @@
  * @see specs/features/onboarding/guided-onboarding-variant.feature
  */
 import { nanoid } from "nanoid";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { OrganizationService } from "~/server/app-layer/organizations/organization.service";
 import { PrismaOrganizationRepository } from "~/server/app-layer/organizations/repositories/organization.prisma.repository";
@@ -213,7 +221,10 @@ describe("onboarding guided state", () => {
         provider: "openai",
         model: "gpt-5",
       });
-      expect(state).toMatchObject({ provider: "openai", providerModel: "gpt-5" });
+      expect(state).toMatchObject({
+        provider: "openai",
+        providerModel: "gpt-5",
+      });
     });
 
     /** @scenario "skipping the provider is recorded" */
@@ -261,7 +272,10 @@ describe("onboarding guided state", () => {
       const caller = callerFor(owner);
       await caller.recordPaths({ organizationId, paths: ["llmops"] });
 
-      const state = await caller.beginPath({ organizationId, path: "governance" });
+      const state = await caller.beginPath({
+        organizationId,
+        path: "governance",
+      });
 
       expect(state.currentPath).toBe("governance");
       expect(state.paths).toEqual(["llmops", "governance"]);
@@ -270,7 +284,10 @@ describe("onboarding guided state", () => {
     /** @scenario "beginning a path the user already picked keeps the picked paths as they are" */
     it("keeps the picked paths as they are for a path already picked", async () => {
       const caller = callerFor(owner);
-      await caller.recordPaths({ organizationId, paths: ["gateway", "llmops"] });
+      await caller.recordPaths({
+        organizationId,
+        paths: ["gateway", "llmops"],
+      });
 
       const state = await caller.beginPath({ organizationId, path: "llmops" });
 
@@ -287,9 +304,14 @@ describe("onboarding guided state", () => {
       onGuidedOnboardingEvent.mockClear();
 
       await caller.completePath({ organizationId, path: "llmops" });
-      const state = await caller.completePath({ organizationId, path: "llmops" });
+      const state = await caller.completePath({
+        organizationId,
+        path: "llmops",
+      });
 
-      expect(state.donePaths.filter((path) => path === "llmops")).toHaveLength(1);
+      expect(state.donePaths.filter((path) => path === "llmops")).toHaveLength(
+        1,
+      );
       expect(state.currentPath).toBeUndefined();
       expect(
         onGuidedOnboardingEvent.mock.calls.filter(
@@ -303,7 +325,9 @@ describe("onboarding guided state", () => {
     /** @scenario "an unknown path is rejected with a named error" */
     it("fails with the guided_onboarding_path_unknown code", async () => {
       await expect(
-        codeOf(callerFor(owner).completePath({ organizationId, path: "billing" })),
+        codeOf(
+          callerFor(owner).completePath({ organizationId, path: "billing" }),
+        ),
       ).resolves.toBe("guided_onboarding_path_unknown");
       await expect(
         codeOf(callerFor(owner).beginPath({ organizationId, path: "billing" })),

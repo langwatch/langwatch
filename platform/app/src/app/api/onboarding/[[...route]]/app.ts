@@ -69,7 +69,10 @@ function registerGuidedEndpoints(v: OnboardingVersion): void {
       output: stateOutputSchema,
       description:
         "Mark one guided onboarding path as done for this project's organization. Idempotent: completing a path twice changes nothing. An unknown path is refused with guided_onboarding_path_unknown.",
-      docs: { operationId: "completeGuidedOnboardingPath", tags: ["Onboarding"] },
+      docs: {
+        operationId: "completeGuidedOnboardingPath",
+        tags: ["Onboarding"],
+      },
     },
     async (
       c,

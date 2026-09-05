@@ -150,17 +150,17 @@ describe("given an operator writing a percentage rule", () => {
       if (result.success) return;
       expect(result.error.issues[0]?.message).toContain("between 0 and 100");
 
-      expect(featureFlagRulesWriteSchema.safeParse(rolloutRule(-1)).success).toBe(
-        false,
-      );
+      expect(
+        featureFlagRulesWriteSchema.safeParse(rolloutRule(-1)).success,
+      ).toBe(false);
     });
   });
 
   describe("when the percentage is inside the range", () => {
     it("is accepted at both ends", () => {
-      expect(featureFlagRulesWriteSchema.safeParse(rolloutRule(0)).success).toBe(
-        true,
-      );
+      expect(
+        featureFlagRulesWriteSchema.safeParse(rolloutRule(0)).success,
+      ).toBe(true);
       expect(
         featureFlagRulesWriteSchema.safeParse(rolloutRule(100)).success,
       ).toBe(true);
@@ -173,7 +173,10 @@ describe("given a percentage rule combined with an organization", () => {
     it("does not match, because every condition of a match must hold", () => {
       const rules: FeatureFlagRules = [
         {
-          match: { organizationId: "organization_acme", percentageRollout: 100 },
+          match: {
+            organizationId: "organization_acme",
+            percentageRollout: 100,
+          },
           enabled: true,
         },
       ];

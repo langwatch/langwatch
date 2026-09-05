@@ -109,8 +109,7 @@ export const featureFlagRulesWriteSchema = featureFlagRulesSchema
             rule.match.percentageRollout <= 100),
       ),
     {
-      message:
-        "A percentage rollout rule needs a percentage between 0 and 100",
+      message: "A percentage rollout rule needs a percentage between 0 and 100",
     },
   );
 
@@ -259,17 +258,23 @@ export function resolveEffectiveForListing({
   return registryDefault;
 }
 
+/**
+ * Fail closed on unknown match keys: a newer writer might have added a
+ * condition (e.g. userEmail) that this reader doesn't understand. Treating
+ * it as "no constraint" would silently turn that rule into a global match
+ * for every context.
+ */
+function hasOnlyKnownKeys(match: FeatureFlagRuleMatch): boolean {
+  return Object.keys(match).every((key) =>
+    KNOWN_MATCH_KEYS.includes(key as KnownMatchKey),
+  );
+}
+
 function matchesContext(
   match: FeatureFlagRuleMatch,
   ctx: RuleEvaluationContext,
 ): boolean {
-  // Fail closed on unknown match keys: a newer writer might have added
-  // a condition (e.g. percentageRollout) that this reader doesn't
-  // understand. Treating it as "no constraint" would silently turn
-  // that rule into a global match for every context.
-  for (const key of Object.keys(match)) {
-    if (!KNOWN_MATCH_KEYS.includes(key as KnownMatchKey)) return false;
-  }
+  if (!hasOnlyKnownKeys(match)) return false;
   // Every specified field must match the context. An entirely empty
   // match acts as a default-rule and matches every context.
   if (match.projectId !== undefined && match.projectId !== ctx.projectId) {
