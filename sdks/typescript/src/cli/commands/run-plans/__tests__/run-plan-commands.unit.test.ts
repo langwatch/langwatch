@@ -254,17 +254,20 @@ const answersWith = (runs: unknown[]) =>
 const runWithFakeTimers = async ({
   advanceMs,
   format = "json",
+  wait = true,
 }: {
   advanceMs: number;
   /** The commander default is "table", which is the human path. */
   format?: string;
+  /** What the command line said after `--wait`: `true` when bare. */
+  wait?: boolean | string;
 }): Promise<void> => {
   vi.useFakeTimers();
   try {
     const promise = runRunPlanCommand({
       all: true,
       target: ["http:agent_abc"],
-      wait: true,
+      wait,
       format,
     });
     await vi.advanceTimersByTimeAsync(advanceMs);
@@ -681,13 +684,46 @@ describe("runRunPlanCommand()", () => {
       runSpy.mockResolvedValue(makeRunResult({ jobCount: 1 }));
       answersWith([{ batchRunId: "batch_123", status: "IN_PROGRESS" }]);
 
-      await runWithFakeTimers({ advanceMs: 10 * 60 * 1000 + 3000 });
+      await runWithFakeTimers({ advanceMs: 45 * 60 * 1000 + 3000 });
 
       const documents = printedDocuments();
       expect(documents).toHaveLength(1);
       const document = JSON.parse(documents[0]!) as Record<string, unknown>;
       expect(document.outcome).toBe("timeout");
       expect(process.exitCode).toBe(1);
+    });
+  });
+
+  describe("when --wait is given a number of minutes", () => {
+    /** @scenario "Wait for a number of minutes" */
+    it("stops waiting at that many minutes", async () => {
+      runSpy.mockResolvedValue(makeRunResult({ jobCount: 1 }));
+      answersWith([{ batchRunId: "batch_123", status: "IN_PROGRESS" }]);
+
+      await runWithFakeTimers({ wait: "1", advanceMs: 60 * 1000 + 3000 });
+
+      const documents = printedDocuments();
+      expect(documents).toHaveLength(1);
+      const document = JSON.parse(documents[0]!) as Record<string, unknown>;
+      expect(document.outcome).toBe("timeout");
+      expect(process.exitCode).toBe(1);
+    });
+  });
+
+  describe("when --wait is given something that is not a number of minutes", () => {
+    /** @scenario "Wait with a value that is not a number of minutes" */
+    it("refuses before scheduling anything", async () => {
+      await expect(
+        runRunPlanCommand({
+          all: true,
+          target: ["http:agent_abc"],
+          wait: "soon",
+        }),
+      ).rejects.toThrow(ProcessExitError);
+
+      expect(runSpy).not.toHaveBeenCalled();
+      const reported = vi.mocked(console.error).mock.calls.flat().join("\n");
+      expect(reported).toContain("--wait takes a number of minutes");
     });
   });
 

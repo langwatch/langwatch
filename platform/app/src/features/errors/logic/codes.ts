@@ -24,6 +24,7 @@ export const APP_ERROR_CODES = [
   "agent_call_timeout",
   "agent_dev_tunnel_unreachable",
   "agent_disconnected",
+  "agent_environment_unresolved",
   "agent_instance_lost",
   "agent_not_found",
   "agent_offline",

@@ -236,10 +236,11 @@ def _trajectory_to_messages(pred: dspy.Prediction) -> list[dict[str, Any]]:
 class ReActAdapter(scenario.AgentAdapter):
     """Runs the ReAct agent for one turn of a scenario.
 
-    `captured_trace` holds the DSPy trace of that turn. The agent runs on the
-    scenario's own event loop in its own thread, and `dspy.settings.trace` is a
-    contextvar, so the trace GEPA needs does not reach the thread that called
-    the program. `ScenarioProgram.forward` re-injects it there.
+    `captured_trace` collects the DSPy trace of every turn of the scenario. The
+    agent runs on the scenario's own event loop in its own thread, and
+    `dspy.settings.trace` is a contextvar, so the trace GEPA needs does not
+    reach the thread that called the program. `ScenarioProgram.forward`
+    re-injects it there.
     """
 
     def __init__(self, program: dspy.ReAct):
@@ -252,6 +253,6 @@ class ReActAdapter(scenario.AgentAdapter):
 
         with dspy.context(trace=[]):
             pred = await self.program.acall(history=history, question=question)
-            self.captured_trace = list(dspy.settings.trace or [])
+            self.captured_trace.extend(dspy.settings.trace or [])
 
         return _trajectory_to_messages(pred)

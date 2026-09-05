@@ -73,14 +73,21 @@ else
 fi
 
 # A paragraph over the word limit fails, a list item over it fails, and a
-# table row or a paragraph split in two passes. The limit is set low so the
-# page stays short.
+# table row or a paragraph split in two passes. An indented heading, a table
+# written without its outer pipes and a list item of exactly the limit pass
+# too. The limit is set low so the page stays short.
 LONG_PAGE="$WORK/docs/long.mdx"
 {
   printf -- '---\ntitle: Long\n---\n\n'
   printf 'one two three four five six seven eight nine ten eleven twelve\n\n'
   printf -- '- one two three four five six seven eight nine ten eleven twelve\n- one two three\n\n'
   printf '| one two three four five six seven eight nine ten eleven twelve |\n\n'
+  printf '   ### one two three four five six seven eight nine ten eleven twelve\n\n'
+  printf 'one two three four five six | seven eight nine ten eleven twelve\n'
+  printf -- '--- | ---\n'
+  printf 'one two three four five six | seven eight nine ten eleven twelve\n\n'
+  printf -- '- one two three four five six seven eight nine ten\n\n'
+  printf -- '````markdown\n```bash\necho one two three four five six seven eight nine ten eleven\n```\n````\n\n'
   printf 'one two three four five six\n\none two three four five six\n'
 } > "$LONG_PAGE"
 rm -f "$WORK/docs/$PAGE_NAME"
@@ -95,34 +102,49 @@ else
   echo "Output: $LONG_OUTPUT"
 fi
 
+if printf '%s\n' "$LONG_OUTPUT" | grep -q 'long.mdx,line=12::'; then
+  check "the indented heading is not counted as prose" no
+  echo "Output: $LONG_OUTPUT"
+else
+  check "the indented heading is not counted as prose" yes
+fi
+
+if printf '%s\n' "$LONG_OUTPUT" | grep -qE 'long.mdx,line=1[456]::'; then
+  check "a table without outer pipes is not counted as prose" no
+  echo "Output: $LONG_OUTPUT"
+else
+  check "a table without outer pipes is not counted as prose" yes
+fi
+
+if printf '%s\n' "$LONG_OUTPUT" | grep -q 'long.mdx,line=18::'; then
+  check "a list item of exactly the limit passes" no
+  echo "Output: $LONG_OUTPUT"
+else
+  check "a list item of exactly the limit passes" yes
+fi
+
+# The nested fence block sits at lines 20-24 and the prose after it at 26 and
+# 28. A fence rule that toggles on every fence line leaves the scanner inside
+# a code block from line 24 on, so the paragraphs after it stop being read.
+if printf '%s\n' "$LONG_OUTPUT" | grep -qE 'long.mdx,line=2[0-4]::'; then
+  check "a fence nested in a longer fence stays code" no
+  echo "Output: $LONG_OUTPUT"
+else
+  check "a fence nested in a longer fence stays code" yes
+fi
+
+TAIL_OUTPUT="$(DOCS_PROSE_MAX_PARAGRAPH_WORDS=5 bash "$WORK/docs/scripts/check-docs-prose.sh" --all 2>&1)"
+if printf '%s\n' "$TAIL_OUTPUT" | grep -q 'long.mdx,line=26::'; then
+  check "prose after a nested fence block is still read" yes
+else
+  check "prose after a nested fence block is still read" no
+  echo "Output: $TAIL_OUTPUT"
+fi
+
 if printf '%s\n' "$LONG_OUTPUT" | grep -q 'long.mdx,line=5::'; then
   check "the annotation points at the first line of the long paragraph" yes
 else
   check "the annotation points at the first line of the long paragraph" no
-fi
-
-# A page that shows markdown inside markdown wraps a ``` block in a ````
-# one. The inner fence must not close the outer block, or every line after it
-# reads as prose and the code inside is counted against the paragraph limit.
-NESTED_PAGE="$WORK/docs/nested.mdx"
-{
-  printf -- '---\ntitle: Nested\n---\n\n'
-  printf -- '````markdown\n'
-  printf -- '```python\n'
-  printf 'one two three four five six seven eight nine ten eleven twelve\n'
-  printf -- '```\n'
-  printf -- '````\n\n'
-  printf 'one two three\n'
-} > "$NESTED_PAGE"
-rm -f "$WORK/docs/long.mdx"
-
-NESTED_OUTPUT="$(DOCS_PROSE_MAX_PARAGRAPH_WORDS=10 bash "$WORK/docs/scripts/check-docs-prose.sh" --all 2>&1)"
-
-if printf '%s\n' "$NESTED_OUTPUT" | grep -q 'words, the limit is 10'; then
-  check "a fence nested in a longer fence stays code" no
-  echo "Output: $NESTED_OUTPUT"
-else
-  check "a fence nested in a longer fence stays code" yes
 fi
 
 if [[ $FAILURES -gt 0 ]]; then

@@ -89,7 +89,7 @@ const SCOPE_SCENARIO_FLAG_HELP =
  * eating argv until the next flag.
  */
 const TARGET_FLAG_HELP =
-  "What to run against, written <type>:<referenceId>, for example connected:agent_abc123. The types are connected, http, code, prompt and workflow. A connected agent may also be named as connected:<name>@<environment>, for example connected:support-agent@production. Repeat the flag for more than one. Add a query string to give that target its own parameter values, for example connected:agent_abc123?model=gpt-5, and repeat the flag with the same agent and a different value to compare the two. A target value wins over the same name given with --param. The halves are percent-decoded, so a reference id or a value that holds ? or & must encode it as %3F or %26.";
+  "What to run against, written <type>:<referenceId>, for example connected:support-agent. The types are connected, http, code, prompt and workflow. connected:<name> runs the agent in development, or in the one other environment it is online in; connected:<name>@<environment> names the environment, for example connected:support-agent@production, and connected:<id> names the agent by id. Repeat the flag for more than one. Add a query string to give that target its own parameter values, for example connected:support-agent?model=gpt-5, and repeat the flag with the same agent and a different value to compare the two. A target value wins over the same name given with --param. The halves are percent-decoded, so a reference id or a value that holds ? or & must encode it as %3F or %26.";
 
 const RUN_NAME_FLAG_HELP =
   "The run plan to file this run under. A name already in use takes this configuration and the run joins that plan's history; a new name creates the plan. Left out, the platform derives one from what the run covers and what it runs against.";
@@ -2959,7 +2959,10 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
       .option("--note <text>", NOTE_FLAG_HELP)
       .option("--idempotency-key <key>", IDEMPOTENCY_KEY_FLAG_HELP)
-      .option("--wait", "Wait for the run to complete")
+      .option(
+        "--wait [minutes]",
+        "Wait for the run to complete, up to 45 minutes or the number of minutes given, and exit non-zero when a run failed",
+      )
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
   ).action(async (id: string, _options: unknown, command: Command) => {
     const { runScenarioCommand: impl } = await import("./commands/scenarios/run.js");
@@ -3046,7 +3049,10 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
       .option("--note <text>", NOTE_FLAG_HELP)
       .option("--idempotency-key <key>", IDEMPOTENCY_KEY_FLAG_HELP)
-      .option("--wait", "Wait for the run to complete")
+      .option(
+        "--wait [minutes]",
+        "Wait for the run to complete, up to 45 minutes or the number of minutes given, and exit non-zero when a run failed",
+      )
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
   ).action(async (_options: unknown, command: Command) => {
     // Merged globals: a root-position `--output` only lands on the ROOT
@@ -3210,7 +3216,10 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
       .option("--note <text>", NOTE_FLAG_HELP)
       .option("--idempotency-key <key>", IDEMPOTENCY_KEY_FLAG_HELP)
-      .option("--wait", "Wait for the run to complete")
+      .option(
+        "--wait [minutes]",
+        "Wait for the run to complete, up to 45 minutes or the number of minutes given, and exit non-zero when a run failed",
+      )
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
   ).action(async (suite: string, _options: unknown, command: Command) => {
     const { runTestSuiteCommand: impl } = await import("./commands/test-suites/run.js");

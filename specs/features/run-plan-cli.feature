@@ -53,6 +53,12 @@ Feature: Run Plan CLI Commands
     Then the run is scheduled against the connected agent
 
   @unit
+  Scenario: Run against a connected agent by name alone
+    When I run "langwatch run-plan run --all --target connected:support-agent"
+    Then the target reference id is support-agent
+    And the platform resolves it to the agent in development, or to the one other environment it is online in
+
+  @unit
   Scenario: Run against a connected agent by name and environment
     When I run "langwatch run-plan run --all --target connected:support-agent@production"
     Then the target reference id is support-agent@production
@@ -210,6 +216,26 @@ Feature: Run Plan CLI Commands
     Given a run of the batch ends with a failed verdict
     When I run "langwatch run-plan run --all --target http:agent_abc --wait"
     Then the command exits with code 1
+
+  @unit
+  Scenario: The wait gives up after 45 minutes by default
+    Given a run whose jobs never complete
+    When I run "langwatch run-plan run --all --target http:agent_abc --wait"
+    Then the CLI stops waiting after 45 minutes
+    And the exit code is nonzero
+
+  @unit
+  Scenario: Wait for a number of minutes
+    Given a run whose jobs never complete
+    When I run "langwatch run-plan run --all --target http:agent_abc --wait 1"
+    Then the CLI stops waiting after 1 minute
+    And the exit code is nonzero
+
+  @unit
+  Scenario: Wait with a value that is not a number of minutes
+    When I run "langwatch run-plan run --all --target http:agent_abc --wait soon"
+    Then the command is refused before anything is scheduled
+    And the message says --wait takes a number of minutes
 
   @unit
   Scenario: Wait for a run that scheduled no job
