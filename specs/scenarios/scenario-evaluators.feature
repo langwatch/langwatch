@@ -60,7 +60,7 @@ Feature: Evaluators run on scenario runs
     Given a run whose traces hold a tool span and a rag span
     And an evaluator input mapped to spans
     Then the input reads every span as JSON, with nothing left out
-    And the evaluator receives the whole JSON while the stored copy is cut to two thousand characters
+    And the evaluator receives every span while the copy kept on the run is shortened
 
   @unit
   Scenario: The spans arrive in start order across traces
@@ -72,7 +72,14 @@ Feature: Evaluators run on scenario runs
     Given an evaluator input mapped to spans
     And the run's spans have not arrived
     When the run is evaluated
-    Then the input is pending and the job tries again
+    Then no result is recorded yet, and the run is graded once the spans arrive
+
+  @unit
+  Scenario: A tool call missing from a trace that is still arriving retries
+    Given an evaluator input mapped to a run_sql tool call
+    And the run's trace holds a root span but no run_sql span yet
+    When the run is evaluated
+    Then no result is recorded yet, and the run is graded once the tool span arrives
 
   @unit
   Scenario: A run without traces cannot answer the spans

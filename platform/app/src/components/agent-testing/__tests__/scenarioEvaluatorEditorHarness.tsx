@@ -176,7 +176,7 @@ export function OpenEditor({
   onRemove,
 }: {
   evaluator: AttachableEvaluator;
-  onMappingChange: (input: string, mapping: unknown) => void;
+  onMappingChange: (change: { input: string; mapping: unknown }) => void;
   onRequiredChange: (required: boolean) => void;
   onRemove: () => void;
 }) {

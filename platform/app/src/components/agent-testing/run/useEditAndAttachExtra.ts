@@ -62,7 +62,13 @@ function buildExtraEditorCallbacks({
   goBack: () => void;
 }) {
   return {
-    onMappingChange: (input: string, mapping: ScenarioMapping | undefined) =>
+    onMappingChange: ({
+      input,
+      mapping,
+    }: {
+      input: string;
+      mapping: ScenarioMapping | undefined;
+    }) =>
       setExtras((current) =>
         replaceAttachment({
           attachments: current,

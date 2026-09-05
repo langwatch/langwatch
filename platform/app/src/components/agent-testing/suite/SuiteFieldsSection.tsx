@@ -73,7 +73,6 @@ export type SuiteFieldsSectionProps = {
   onClose: () => void;
 };
 
-/** A quiet control of a row: drag it, or take it away. */
 function RowButton({
   label,
   onClick,

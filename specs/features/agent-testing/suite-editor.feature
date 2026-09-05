@@ -244,7 +244,7 @@ Feature: The test suite editor
 
   @integration
   Scenario: An evaluator editor without a gate offers no Required to pass switch
-    Given an evaluator editor opened with no gate
+    Given an evaluator editor opened on no attachment, with no gate
     When it is read
     Then no "Required to pass" section is shown
     And no "Remove evaluator" action is shown
@@ -260,7 +260,8 @@ Feature: The test suite editor
   Scenario: A code evaluator's own editor carries the gate switch and the remove action
     Given an attached code evaluator that carries a gate and a remove action
     When its own editor is opened
-    Then flipping the gate switch and choosing remove reach the attachment
+    Then flipping the switch changes "Required to pass" on the attachment
+    And choosing "Remove evaluator" takes the attachment off the suite
 
   @integration
   Scenario: A mapping edited in the editor lands on the attachment

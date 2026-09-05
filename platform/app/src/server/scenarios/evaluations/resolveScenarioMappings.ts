@@ -241,13 +241,23 @@ export function resolveTraceMapping({
   path,
   spans,
   hasTraces,
+  isRequired = false,
 }: {
   path: readonly string[];
   spans: Span[];
   hasTraces: boolean;
+  /** True when the evaluator cannot run without this input. */
+  isRequired?: boolean;
 }): ResolvedInput {
   const [head, toolName, part] = path;
-  const notYet = hasTraces && spans.length === 0 ? pending : failed;
+  // A trace arrives span by span, so the root span can land before the tool
+  // span an evaluator reads. Evidence a required input needs is therefore
+  // waited for while any attempt is left: one more attempt is cheaper than
+  // failing a run the trace would have answered. An optional input is left
+  // out instead, so an evaluator that merely prefers the contexts is not held
+  // to the last attempt by a trace that carries none.
+  const notYet =
+    hasTraces && (isRequired || spans.length === 0) ? pending : failed;
 
   if (head === TRACE_CONTEXTS_PATH) {
     return resolveTraceContextsMapping({ spans, notYet });
@@ -273,10 +283,13 @@ export function resolveMapping({
   mapping,
   run,
   scenario,
+  isRequired = false,
 }: {
   mapping: ScenarioMapping;
   run: RunInputs;
   scenario: ScenarioInputs;
+  /** True when the evaluator cannot run without this input. */
+  isRequired?: boolean;
 }): ResolvedInput {
   if (mapping.type === "value") return value(mapping.value);
   switch (mapping.sourceId) {
@@ -292,6 +305,7 @@ export function resolveMapping({
         path: mapping.path,
         spans: run.spans,
         hasTraces: run.hasTraces,
+        isRequired,
       });
   }
 }
@@ -339,7 +353,12 @@ function resolveAttachmentInput({
     };
   }
 
-  const resolved = resolveMapping({ mapping, run, scenario });
+  const resolved = resolveMapping({
+    mapping,
+    run,
+    scenario,
+    isRequired: input.required,
+  });
   switch (resolved.kind) {
     case "value":
       return { action: "set", id: input.id, value: resolved.value };

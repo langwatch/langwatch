@@ -202,7 +202,6 @@ function openEditor(suite = storedSuite()) {
 
 const draft = () => useSuiteEditorStore.getState().draft;
 
-/** The field identifiers of the draft, in the order the rows read. */
 const identifiers = () => (draft()?.fields ?? []).map((row) => row.identifier);
 
 /**

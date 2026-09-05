@@ -50,7 +50,6 @@ export type ConversationPath = (typeof CONVERSATION_PATHS)[number];
 /** The scalar paths under the scenario source; a field is `["fields", id]`. */
 export const SCENARIO_PATHS = ["situation", "criteria"] as const;
 
-/** The first segment of the three trace paths. */
 export const TRACE_CONTEXTS_PATH = "contexts";
 export const TRACE_SPANS_PATH = "spans";
 export const TRACE_TOOL_CALLS_PATH = "tool_calls";
@@ -205,7 +204,7 @@ function traceSource({ toolNames }: { toolNames: string[] }): AvailableSource {
         label: "Retrieved contexts",
         type: "list",
       },
-      { name: TRACE_SPANS_PATH, label: "Spans", type: "list" },
+      { name: TRACE_SPANS_PATH, label: "Spans", type: "str" },
       toolCalls,
     ],
   };

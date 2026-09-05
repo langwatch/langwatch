@@ -271,11 +271,19 @@ describe("resolveTraceMapping", () => {
   describe("given two traces whose spans interleave in time", () => {
     /** @scenario "The spans arrive in start order across traces" */
     it("lists the spans by start time whichever trace they belong to", () => {
-      const at = (trace_id: string, span_id: string, startedAt: number) =>
+      const at = ({
+        traceId,
+        spanId,
+        startedAt,
+      }: {
+        traceId: string;
+        spanId: string;
+        startedAt: number;
+      }) =>
         span({
           type: "span",
-          trace_id,
-          span_id,
+          trace_id: traceId,
+          span_id: spanId,
           timestamps: {
             started_at: startedAt,
             finished_at: startedAt + 1,
@@ -285,10 +293,10 @@ describe("resolveTraceMapping", () => {
       const resolved = resolveTraceMapping({
         path: ["spans"],
         spans: [
-          at("trace-2", "b2", 4_000),
-          at("trace-1", "a1", 1_000),
-          at("trace-2", "b1", 2_000),
-          at("trace-1", "a2", 3_000),
+          at({ traceId: "trace-2", spanId: "b2", startedAt: 4_000 }),
+          at({ traceId: "trace-1", spanId: "a1", startedAt: 1_000 }),
+          at({ traceId: "trace-2", spanId: "b1", startedAt: 2_000 }),
+          at({ traceId: "trace-1", spanId: "a2", startedAt: 3_000 }),
         ],
         hasTraces: true,
       }) as { value: string };
@@ -304,6 +312,23 @@ describe("resolveTraceMapping", () => {
       expect(
         resolveTraceMapping({ path: ["spans"], spans: [], hasTraces: true }),
       ).toEqual({ kind: "pending", details: "no spans in the trace" });
+    });
+  });
+
+  describe("given a trace that is still arriving span by span", () => {
+    /** @scenario "A tool call missing from a trace that is still arriving retries" */
+    it("reports a tool call the arrived spans do not carry as pending", () => {
+      expect(
+        resolveTraceMapping({
+          path: ["tool_calls", "run_sql", "input"],
+          spans: [span({ type: "span", name: "agent" })],
+          hasTraces: true,
+          isRequired: true,
+        }),
+      ).toEqual({
+        kind: "pending",
+        details: "no run_sql call in the trace",
+      });
     });
   });
 

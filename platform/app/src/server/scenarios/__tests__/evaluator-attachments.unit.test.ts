@@ -163,7 +163,7 @@ describe("evaluator attachments", () => {
         expect(trace?.fields.find((field) => field.name === "spans")).toEqual({
           name: "spans",
           label: "Spans",
-          type: "list",
+          type: "str",
         });
         expect(
           scenarioMappingPathIssue({

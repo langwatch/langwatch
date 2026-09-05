@@ -30,7 +30,6 @@ export type SuiteDraftUpdate = (
   change: (draft: SuiteDraft) => SuiteDraft,
 ) => void;
 
-/** The attachment of one id, and the attachments with it replaced. */
 function replaceAttachment({
   attachments,
   attachmentId,
@@ -72,7 +71,13 @@ function editAttachment({
     evaluator,
     ctx,
     navigation,
-    onMappingChange: (input: string, mapping: ScenarioMapping | undefined) =>
+    onMappingChange: ({
+      input,
+      mapping,
+    }: {
+      input: string;
+      mapping: ScenarioMapping | undefined;
+    }) =>
       update((draft) => ({
         ...draft,
         evaluatorsError: undefined,
@@ -211,7 +216,6 @@ export function openEvaluatorPicker({
   openDrawer("evaluatorList", { onClose: goBack });
 }
 
-/** The `edit` and `attach` callbacks, wired to the draft store and the drawer. */
 export function useSuiteAttachmentEditing({
   ctx,
   update,

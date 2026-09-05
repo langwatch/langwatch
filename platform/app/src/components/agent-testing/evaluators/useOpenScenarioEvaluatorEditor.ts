@@ -41,10 +41,10 @@ export type OpenScenarioEvaluatorEditorParams = {
    * lands on the caller and not on the list.
    */
   navigation?: { replaceCurrentInStack?: boolean };
-  onMappingChange: (
-    input: string,
-    mapping: ScenarioMapping | undefined,
-  ) => void;
+  onMappingChange: (change: {
+    input: string;
+    mapping: ScenarioMapping | undefined;
+  }) => void;
   onRequiredChange: (required: boolean) => void;
   onRemove: () => void;
 };
@@ -86,7 +86,7 @@ export function useOpenScenarioEvaluatorEditor(): (
       const handleMappingChange = (
         input: string,
         mapping: UIFieldMapping | undefined,
-      ) => onMappingChange(input, toScenarioMapping(mapping));
+      ) => onMappingChange({ input, mapping: toScenarioMapping(mapping) });
 
       // A code evaluator has its own editor, which holds its inputs beside
       // the code; the generic editor could only show the mappings. It still

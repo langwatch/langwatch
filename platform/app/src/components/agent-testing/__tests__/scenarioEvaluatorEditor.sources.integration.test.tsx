@@ -159,18 +159,23 @@ describe("the evaluator editor on an attachment", () => {
           sourceId: "scenario",
           path: ["fields", "golden_sql"],
         });
-        expect(onMappingChange).toHaveBeenCalledWith("expected_output", {
-          type: "source",
-          sourceId: "scenario",
-          path: ["fields", "golden_sql"],
+        expect(onMappingChange).toHaveBeenCalledWith({
+          input: "expected_output",
+          mapping: {
+            type: "source",
+            sourceId: "scenario",
+            path: ["fields", "golden_sql"],
+          },
         });
         (callbacks.onRequiredChange as (required: boolean) => void)(false);
         expect(onRequiredChange).toHaveBeenCalledWith(false);
         (callbacks.onRemove as () => void)();
         expect(onRemove).toHaveBeenCalled();
       });
+    });
 
-      describe("when the evaluator is a code evaluator", () => {
+    describe("given a code evaluator attachment", () => {
+      describe("when the editor is opened from a pill", () => {
         /** @scenario "A code evaluator attachment opens its own editor with the same mapping sources" */
         it("routes a code evaluator to its own editor with the same sources", async () => {
           const user = userEvent.setup();
