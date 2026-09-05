@@ -219,6 +219,44 @@ describe("scheduler controls", () => {
         expect(wake).toHaveBeenCalled();
       });
 
+      /** @scenario "A manual scheduler run follows the ordinary due path" */
+      it("makes the schedule due and wakes the scheduler after recording the control", async () => {
+        const { service, repo, audit, wake } = makeService(record());
+
+        await service.runNow({ scheduleId: "sched_1", actorUserId: "u1", now: NOW });
+
+        expect(repo.requestImmediateRunForOps).toHaveBeenCalledOnce();
+        expect(audit.append).toHaveBeenCalledOnce();
+        expect(wake).toHaveBeenCalled();
+        expect(audit.append.mock.invocationCallOrder[0]).toBeLessThan(
+          wake.mock.invocationCallOrder[0]!,
+        );
+      });
+
+      /** @scenario "Scheduler controls refuse stale or racing state" */
+      it("refuses a conflicting control with its stable code and records nothing", async () => {
+        const racing = makeService(record());
+        racing.repo.requestImmediateRunForOps.mockResolvedValue(false);
+        expect(
+          await codeOf(() => racing.service.runNow({ scheduleId: "sched_1", actorUserId: "u1" })),
+        ).toBe("schedule_already_in_flight");
+        expect(racing.audit.append).not.toHaveBeenCalled();
+
+        const paused = makeService(record({ active: false }));
+        expect(
+          await codeOf(() => paused.service.runNow({ scheduleId: "sched_1", actorUserId: "u1" })),
+        ).toBe("schedule_inactive");
+        expect(paused.audit.append).not.toHaveBeenCalled();
+
+        const fresh = makeService(record({ currentSlot: at(-1_000), updatedAt: at(-1_000) }));
+        expect(
+          await codeOf(() =>
+            fresh.service.clearStuckSlot({ scheduleId: "sched_1", actorUserId: "u1", now: NOW }),
+          ),
+        ).toBe("schedule_slot_not_stale");
+        expect(fresh.audit.append).not.toHaveBeenCalled();
+      });
+
       it("records the action against its actor and schedule", async () => {
         const { service, audit } = makeService(record());
 

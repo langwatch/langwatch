@@ -13,6 +13,7 @@ describe("recordAuditLogCommandSchema", () => {
     expect(recordAuditLogCommandSchema.parse(input)).toEqual(input);
   });
 
+  /** @scenario "Non-portable audit metadata is rejected" */
   it("rejects non-portable metadata", () => {
     expect(
       recordAuditLogCommandSchema.safeParse({

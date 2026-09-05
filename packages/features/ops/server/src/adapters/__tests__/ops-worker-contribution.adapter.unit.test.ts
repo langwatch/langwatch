@@ -109,6 +109,7 @@ describe("Ops worker contributions", () => {
     vi.useRealTimers();
   });
 
+  /** @scenario "The anomaly worker preserves its settling delay and retry interval" */
   it("starts anomaly detection after the existing five-second settling delay", async () => {
     const detector = { tick: vi.fn(async () => ({ surfaced: 0, cleared: 0 })) };
     const handle = AnomalyWorkerContributionAdapter.create({ detector }).start();
@@ -136,6 +137,7 @@ describe("Ops worker contributions", () => {
     expect(detector.tick).toHaveBeenCalledTimes(2);
   });
 
+  /** @scenario "Self-hosted usage telemetry is composed without package environment access" */
   it("sends each organization's exact self-hosted telemetry envelope at noon UTC", async () => {
     const { worker, organizations, usageStats, telemetry } = createUsageStatsWorker();
     organizations.listForUsageStats.mockResolvedValue([{ id: "org_1", name: "Acme" }]);

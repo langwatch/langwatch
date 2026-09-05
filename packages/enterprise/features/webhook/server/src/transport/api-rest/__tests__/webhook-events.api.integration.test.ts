@@ -23,9 +23,15 @@ import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest
 import { HandledError } from "@langwatch/handled-error";
 
 import { WebhookApp, type WebhookAppDependencies } from "../../../app/webhook.app";
-import { WebhookEventsRepositoryPort, type WebhookEventsPage } from "../../../ports/webhook-events.port";
+import {
+  WebhookEventsRepositoryPort,
+  type WebhookEventsPage,
+} from "../../../ports/webhook-events.port";
 import { WebhookTenantsRepository } from "../../../repositories/webhook-tenants.repository";
-import { WebhookEnvelopeService, type WebhookSpendEventRow } from "../../../services/webhook-envelope.service";
+import {
+  WebhookEnvelopeService,
+  type WebhookSpendEventRow,
+} from "../../../services/webhook-envelope.service";
 import { WebhookEventsService } from "../../../services/webhook-events.service";
 import { createWebhookRestApp } from "../webhook.api";
 
@@ -49,7 +55,8 @@ const passThrough: MiddlewareHandler = async (_c, next) => next();
  */
 function canonicalError(error: unknown): { status: 400 | 404 | 500; body: unknown } {
   if (HandledError.isHandled(error)) {
-    const status = error.code === "validation_error" ? 400 : ((error.httpStatus ?? 500) as 404 | 500);
+    const status =
+      error.code === "validation_error" ? 400 : ((error.httpStatus ?? 500) as 404 | 500);
     return {
       status,
       body: { error: error.code, message: error.message, meta: error.meta },
@@ -138,7 +145,8 @@ class FakeWebhookEventsRepository extends WebhookEventsRepositoryPort {
     if (separator <= 0 || separator === input.id.length - 1) return null;
     const gatewayRequestId = input.id.slice(0, separator);
     const suffix = input.id.slice(separator + 1);
-    const statuses = suffix === "completed" ? ["confirmed", "failed"] : suffix === "settled" ? ["settled"] : [];
+    const statuses =
+      suffix === "completed" ? ["confirmed", "failed"] : suffix === "settled" ? ["settled"] : [];
     if (statuses.length === 0) return null;
     return (
       this.rows.find(
@@ -241,6 +249,22 @@ describe("the events log serves what it says it serves", () => {
     }
   });
 
+  /** @scenario "Emitted events are tenant scoped" */
+  it("maps only rows from the organization's own tenants into envelopes", async () => {
+    const app = buildApp([
+      spendRow({ gatewayRequestId: "req-mine" }),
+      spendRow({ gatewayRequestId: "req-theirs", tenantId: "proj-someone-else" }),
+    ]);
+
+    const listed = await app.request(`/api/webhooks/v1/events?${eventsWindow()}`);
+    expect(listed.status).toBe(200);
+    const body = (await listed.json()) as { data: { id: string }[] };
+    expect(body.data.map((event) => event.id)).toEqual(["req-mine:completed"]);
+
+    const theirs = await app.request("/api/webhooks/v1/events/req-theirs:completed");
+    expect(theirs.status).toBe(404);
+  });
+
   /** @scenario The governance families are absent from the log, not merely empty by chance */
   it("serves an empty page for the governance families it does not retain", async () => {
     const app = buildApp([spendRow({})]);
@@ -271,7 +295,10 @@ describe("the events log serves what it says it serves", () => {
     for (const { query, missing } of cases) {
       const res = await app.request(`/api/webhooks/v1/events${query}`);
       expect(res.status).toBe(400);
-      const body = (await res.json()) as { error: string; meta?: { target?: string; fields?: string[] } };
+      const body = (await res.json()) as {
+        error: string;
+        meta?: { target?: string; fields?: string[] };
+      };
       expect(body.error).toBe("validation_error");
       expect(body.meta?.target).toBe("query");
       expect(body.meta?.fields).toEqual(expect.arrayContaining([missing]));

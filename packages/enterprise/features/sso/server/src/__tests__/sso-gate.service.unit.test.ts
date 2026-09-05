@@ -124,6 +124,13 @@ describe("SsoGateService", () => {
     );
   });
 
+  /** @scenario "A signed license enables a mounted provider" */
+  it("resolves the configured provider once the licensing service reports genuine access", async () => {
+    licensing.inspectPlatformAccess.mockResolvedValue(validAccess());
+
+    await expect(create().resolveProvider()).resolves.toBe("auth0");
+  });
+
   /** @scenario "Denied SSO is explained in the server logs" */
   it("logs that SSO is configured but no genuine license was found", async () => {
     await create().platformAllowed();
@@ -192,6 +199,7 @@ describe("SsoGateService", () => {
   });
 
   /** @scenario "A licensing-store outage refuses SSO and heals itself" */
+  /** @scenario "A failed license-store evaluation is retried" */
   it("evicts a failed licensing decision so the next request self-heals", async () => {
     licensing.inspectPlatformAccess
       .mockRejectedValueOnce(new Error("offline"))
@@ -222,6 +230,7 @@ describe("SsoGateService", () => {
   });
 
   /** @scenario "A provider id this build cannot mount falls back to email" */
+  /** @scenario "A provider without credentials falls back to email" */
   it("falls back to email when a licensed provider cannot mount", async () => {
     licensing.inspectPlatformAccess.mockResolvedValue(
       validAccess({ source: "instance", organizationId: undefined }),

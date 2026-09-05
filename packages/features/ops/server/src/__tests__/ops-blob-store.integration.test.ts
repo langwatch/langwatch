@@ -132,6 +132,7 @@ describe.skipIf(!hasRedis)("Ops blob store delete", () => {
 
   describe("given a blob a live lease still references", () => {
     describe("when an operator deletes it", () => {
+      /** @scenario "Blob deletion refuses a live lease atomically" */
       it("refuses atomically and leaves the bytes in place", async () => {
         await redis.set(blobKey, "body", "EX", 3600);
         // A live lease: a member whose deadline is in the future.
@@ -199,6 +200,42 @@ describe.skipIf(!hasRedis)("Ops blob store delete", () => {
 
         expect(summary?.sweepOutcome).toBe("repaired");
         expect(summary?.liveLeases).toBe(0);
+      });
+    });
+  });
+
+  describe("given several blobs an operator wants ranked", () => {
+    describe("when the listing reads a bounded sample", () => {
+      /** @scenario "Blob listing reports sampled ordering honestly" */
+      it("reports how many it looked at and whether the ranking is only of that sample", async () => {
+        for (const [hash, body] of [
+          ["blobrepolist01", "x".repeat(10)],
+          ["blobrepolist02", "x".repeat(100)],
+          ["blobrepolist03", "x".repeat(1000)],
+        ] as const) {
+          await redis.set(
+            redisBlobKey({ queueName: QUEUE, projectId: tenant, hash }),
+            body,
+            "EX",
+            3600,
+          );
+        }
+
+        const page = await ops.listBlobs({
+          queueName: QUEUE,
+          projectId: tenant,
+          limit: 10,
+          sort: "largest",
+        });
+
+        expect(page.blobs.map((blob) => blob.hash)).toEqual([
+          "blobrepolist03",
+          "blobrepolist02",
+          "blobrepolist01",
+        ]);
+        expect(page.sampled).toBe(3);
+        expect(page.rankedFromSample).toBe(false);
+        expect(page.nextCursor).toBeNull();
       });
     });
   });

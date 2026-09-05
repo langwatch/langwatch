@@ -13,26 +13,26 @@ Feature: SDK Scenario Set Limit on Free Plan
   # Allowing scenario sets within the limit
   # ---------------------------------------------------------------------------
 
-  @unit
+  @unit @unimplemented
   Scenario: First scenario set is accepted
     Given the organization has no existing scenario sets
     When the SDK sends a run-started event with a new scenario set ID
     Then the request succeeds with 201
     And the scenario run is recorded
 
-  @unit
+  @unit @unimplemented
   Scenario: Second and third scenario sets are accepted
     Given the organization has 2 existing scenario sets
     When the SDK sends a run-started event with a new scenario set ID
     Then the request succeeds with 201
 
-  @unit
+  @unit @unimplemented
   Scenario: Multiple scenarios within one set are unlimited
     Given the organization has 3 existing scenario sets
     When the SDK sends a run-started event for an existing scenario set with a new scenario ID
     Then the request succeeds with 201
 
-  @unit
+  @unit @unimplemented
   Scenario: Re-running an existing set is always allowed
     Given the organization has 3 existing scenario sets
     When the SDK sends a run-started event for an existing scenario set
@@ -42,14 +42,14 @@ Feature: SDK Scenario Set Limit on Free Plan
   # Blocking new sets beyond the limit
   # ---------------------------------------------------------------------------
 
-  @unit
+  @unit @unimplemented
   Scenario: Fourth scenario set is blocked
     Given the organization has 3 existing scenario sets
     When the SDK sends a run-started event with a new scenario set ID
     Then the request is rejected with 403
     And the response includes an upgrade message
 
-  @unit
+  @unit @unimplemented
   Scenario: Fifth scenario set is also blocked
     Given the organization has 4 existing scenario sets from before enforcement
     When the SDK sends a run-started event with a new scenario set ID
@@ -59,14 +59,14 @@ Feature: SDK Scenario Set Limit on Free Plan
   # Internal platform sets are excluded from the count
   # ---------------------------------------------------------------------------
 
-  @unit
+  @unit @unimplemented
   Scenario: Internal platform sets do not count toward the limit
     Given the organization has 3 internal platform scenario sets
     And the organization has no external scenario sets
     When the SDK sends a run-started event with a new scenario set ID
     Then the request succeeds with 201
 
-  @unit
+  @unit @unimplemented
   Scenario: Only external sets count toward the limit
     Given the organization has 2 external scenario sets
     And the organization has 5 internal platform scenario sets
@@ -77,13 +77,13 @@ Feature: SDK Scenario Set Limit on Free Plan
   # Non-run-started events are not checked
   # ---------------------------------------------------------------------------
 
-  @unit
+  @unit @unimplemented
   Scenario: Message snapshot events pass through without limit check
     Given the organization has 3 existing scenario sets
     When the SDK sends a message-snapshot event with a new scenario set ID
     Then the request succeeds with 201
 
-  @unit
+  @unit @unimplemented
   Scenario: Run-finished events pass through without limit check
     Given the organization has 3 existing scenario sets
     When the SDK sends a run-finished event with a new scenario set ID
@@ -93,7 +93,7 @@ Feature: SDK Scenario Set Limit on Free Plan
   # Paid plans are not limited
   # ---------------------------------------------------------------------------
 
-  @unit
+  @unit @unimplemented
   Scenario: Paid plan allows unlimited scenario sets
     Given an organization on a paid plan
     And the organization has 10 existing scenario sets
@@ -104,14 +104,14 @@ Feature: SDK Scenario Set Limit on Free Plan
   # Cache behavior: known sets skip the database query
   # ---------------------------------------------------------------------------
 
-  @unit
+  @unit @unimplemented
   Scenario: Known scenario set ID is allowed without querying the database
     Given the organization has a recently verified scenario set "my-set"
     When the SDK sends a run-started event for scenario set "my-set"
     Then the request succeeds with 201
     And no database query is made to count scenario sets
 
-  @unit
+  @unit @unimplemented
   Scenario: Unknown scenario set ID triggers a database count
     Given the organization has no cached scenario set information
     When the SDK sends a run-started event with a new scenario set ID

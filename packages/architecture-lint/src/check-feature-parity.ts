@@ -451,6 +451,9 @@ const LEGACY_INERT: string[] = [
   "specs/licensing/license-status-ui.feature",
   "specs/licensing/notification-coverage-gaps.feature",
   "specs/licensing/resource-limit-notifications.feature",
+  // Every scenario is parked @unimplemented: the free-plan scenario-set cap this file
+  // describes has no enforcement code on this branch.
+  "specs/licensing/sdk-scenario-set-limit.feature",
   "specs/licensing/usage-page-navigation.feature",
   "specs/mcp-server/analytics-tool.feature",
   "specs/mcp-server/api-key-tools.feature",

@@ -16,7 +16,7 @@
  * network hop, so the behaviour is pinned at the layer that owns it.
  */
 import { randomBytes } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import {
   PrismaConfigService,
@@ -30,7 +30,11 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { WebhookEndpointValidationError } from "@langwatch/enterprise-webhook-contract";
 import type { WebhookIdPort } from "../../../ports/webhook-id.port";
 import type { WebhookSecretPort } from "../../../ports/webhook-secret.port";
-import { WebhookEndpointConfiguration } from "../../../services/webhook-endpoint-policy.service";
+import {
+  WEBHOOK_AUTO_DISABLE_AFTER_MS,
+  WEBHOOK_DISABLED_REASON_AUTO,
+  WebhookEndpointConfiguration,
+} from "../../../services/webhook-endpoint-policy.service";
 import { PrismaWebhookEndpointRepository } from "../prisma.webhook-endpoint.repository";
 
 class AllowTestQueries extends PrismaQueryGuard {
@@ -378,6 +382,99 @@ describe.skipIf(!databaseUrl)("PrismaWebhookEndpointRepository", () => {
         now: new Date(rolledAt.getTime() + 25 * 60 * 60 * 1000),
       });
       expect(afterWindow).toEqual([rolled]);
+    });
+  });
+  describe("given an endpoint that failed and then succeeded", () => {
+    /** @scenario A success resets the failure streak */
+    it("clears failingSince on a successful attempt", async () => {
+      const repo = repository();
+      const { endpoint } = await create(repo, {
+        organizationId: orgId,
+        url: "https://example.com/hooks/streak",
+        enabledEvents: ["gateway.request.completed"],
+      });
+      await repo.recordDeliveryAttempt({
+        organizationId: orgId,
+        endpointId: endpoint.id,
+        dispatchId: "batch-1",
+        attempt: 1,
+        eventCount: 10,
+        outcome: "retryable",
+        responseStatus: 503,
+      });
+      let health = await repo.health({ organizationId: orgId, endpointId: endpoint.id });
+      expect(health.failingSince).not.toBeNull();
+      expect(health.lastFailureAt).not.toBeNull();
+
+      await repo.recordDeliveryAttempt({
+        organizationId: orgId,
+        endpointId: endpoint.id,
+        dispatchId: "batch-1",
+        attempt: 2,
+        eventCount: 10,
+        outcome: "success",
+        responseStatus: 200,
+      });
+      health = await repo.health({ organizationId: orgId, endpointId: endpoint.id });
+      expect(health.failingSince).toBeNull();
+      expect(health.lastSuccessAt).not.toBeNull();
+      expect(health.status).toBe("ACTIVE");
+    });
+  });
+
+  describe("given an endpoint failing for longer than the auto-disable window", () => {
+    /** @scenario Seventy two hours of consecutive failures disables the endpoint */
+    it("auto-disables with the automatic reason and fires the notification hook", async () => {
+      const notifyAutoDisabled = vi.fn().mockResolvedValue(undefined);
+      const repo = PrismaWebhookEndpointRepository.create({
+        prisma,
+        ids,
+        secrets,
+        notifyAutoDisabled,
+      });
+      const { endpoint } = await create(repo, {
+        organizationId: orgId,
+        url: "https://example.com/hooks/auto-disable",
+        enabledEvents: ["gateway.request.completed"],
+      });
+      const t0 = new Date("2026-07-20T00:00:00Z");
+
+      await repo.recordDeliveryAttempt({
+        organizationId: orgId,
+        endpointId: endpoint.id,
+        dispatchId: "batch-x",
+        attempt: 1,
+        eventCount: 5,
+        outcome: "retryable",
+        responseStatus: 500,
+        now: t0,
+      });
+      expect(notifyAutoDisabled).not.toHaveBeenCalled();
+
+      await repo.recordDeliveryAttempt({
+        organizationId: orgId,
+        endpointId: endpoint.id,
+        dispatchId: "batch-x",
+        attempt: 2,
+        eventCount: 5,
+        outcome: "retryable",
+        responseStatus: 500,
+        now: new Date(t0.getTime() + WEBHOOK_AUTO_DISABLE_AFTER_MS + 1),
+      });
+
+      const health = await repo.health({ organizationId: orgId, endpointId: endpoint.id });
+      expect(health.status).toBe("DISABLED");
+      expect(health.disabledReason).toBe(WEBHOOK_DISABLED_REASON_AUTO);
+      expect(notifyAutoDisabled).toHaveBeenCalledTimes(1);
+      expect(notifyAutoDisabled).toHaveBeenCalledWith(
+        expect.objectContaining({ organizationId: orgId, endpointId: endpoint.id }),
+      );
+
+      // Re-enable restarts the clock: streak cleared, status back to ACTIVE.
+      const reEnabled = await repo.enable({ organizationId: orgId, endpointId: endpoint.id });
+      expect(reEnabled.status).toBe("ACTIVE");
+      expect(reEnabled.failingSince).toBeNull();
+      expect(reEnabled.disabledReason).toBeNull();
     });
   });
 });

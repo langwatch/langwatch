@@ -43,6 +43,7 @@ const storedArgs = async (args: unknown, maxArgsBytes?: number) => {
 
 describe("DefaultAuditLogService.record", () => {
   describe("given args that fit", () => {
+    /** @scenario "A valid audit command is persisted" */
     it("stores them exactly as they were", async () => {
       const args = { projectId: "project-1", reason: "cleanup" };
 

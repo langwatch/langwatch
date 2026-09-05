@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { AuditLogAdapter } from "../index";
 
 describe("DefaultAuditLogService", () => {
+  /** @scenario "Legacy request context is normalised at the server edge" */
   it("normalises legacy request context and persists one record", async () => {
     const entries: unknown[] = [];
     const auditLog = AuditLogAdapter.create({

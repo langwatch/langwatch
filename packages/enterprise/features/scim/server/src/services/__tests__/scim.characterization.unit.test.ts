@@ -103,6 +103,7 @@ function service(
 }
 
 describe("SCIM characterization: token lifecycle", () => {
+  /** @scenario "Token values are stored only as hashes" */
   it("mints only a hash, lists summaries, updates use on entitled verification, and retains 404 revocation", async () => {
     const repo = repository({
       listTokens: vi.fn(async () => [
@@ -196,6 +197,7 @@ describe("SCIM characterization: token lifecycle", () => {
     });
   });
 
+  /** @scenario "Entitlement is checked whenever a token is exercised" */
   it("distinguishes invalid credentials, lapsed plans, and unknown revocation", async () => {
     const repo = repository({
       tryFindTokenByHash: vi.fn(async () => ({
@@ -211,6 +213,7 @@ describe("SCIM characterization: token lifecycle", () => {
       status: "plan_not_entitled",
       organizationId: "org_1",
     });
+    expect(repo.recordTokenUse).not.toHaveBeenCalled();
     await expect(
       service(repository()).revokeToken({ organizationId: "org_1", tokenId: "gone" }),
     ).rejects.toMatchObject({ code: "scim_token_not_found" });

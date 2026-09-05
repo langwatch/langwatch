@@ -57,6 +57,7 @@ function licensingFor({
 }
 
 describe("LicensingEntitlementSourceAdapter", () => {
+  /** @scenario "Let a lapsed Cloud override step aside" */
   it("lets an expired Cloud license step aside for the next entitlement source", async () => {
     const licensing = licensingFor();
     const source = LicensingEntitlementSourceAdapter.create({ licensing, mode: "cloud" });
@@ -67,6 +68,7 @@ describe("LicensingEntitlementSourceAdapter", () => {
     expect(licensing.getSelfHostedPlan).not.toHaveBeenCalled();
   });
 
+  /** @scenario "Preserve a lapsed self-hosted purchase" */
   it("preserves a genuine lapsed self-hosted license and applies its OSS floor", async () => {
     const licensing = licensingFor({ selfHosted: paidLicense });
     const source = LicensingEntitlementSourceAdapter.create({ licensing, mode: "self-hosted" });

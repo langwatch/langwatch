@@ -107,6 +107,7 @@ describe("runaway containment policy", () => {
     );
   });
 
+  /** @scenario "Persist-cap containment pauses a condition-less automation once" */
   /** @scenario "The customer is emailed once on the first day a trigger breaches" */
   it("claims the containment check first and mails once for the UTC day", async () => {
     const { port, service } = runtime();
@@ -129,6 +130,7 @@ describe("runaway containment policy", () => {
     expect(port.emailed).toHaveBeenCalledTimes(1);
   });
 
+  /** @scenario "Persist-cap containment leaves a busy filtered automation active" */
   /** @scenario "A busy but selective automation is never paused" */
   /** @scenario "A throttled automation stays active" */
   it("leaves a filtered automation active below the traffic-share threshold", async () => {

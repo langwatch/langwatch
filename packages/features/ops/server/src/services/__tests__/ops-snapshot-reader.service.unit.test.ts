@@ -240,6 +240,7 @@ describe("snapshot merging", () => {
     });
   });
 
+  /** @scenario "The Ops dashboard stream starts with the current snapshot" */
   it("streams the current snapshot before the next persisted update", async () => {
     vi.useFakeTimers();
     const repository = new SnapshotRepositoryStub(live(), detail());

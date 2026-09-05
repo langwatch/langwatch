@@ -87,3 +87,21 @@ describe("ScimService.generateToken", () => {
     });
   });
 });
+
+describe("ScimService.revokeToken", () => {
+  describe("given a token owned by another organization", () => {
+    /** @scenario "Revocation is organization scoped" */
+    it("reports scim_token_not_found rather than revoking it", async () => {
+      const repo = scimRepositoryFixture({ revokeToken: vi.fn(async () => false) });
+      const scim = service(repo);
+
+      await expect(
+        scim.revokeToken({ organizationId: "org-1", tokenId: "token-of-org-2" }),
+      ).rejects.toMatchObject({ code: "scim_token_not_found" });
+      expect(repo.revokeToken).toHaveBeenCalledWith({
+        organizationId: "org-1",
+        tokenId: "token-of-org-2",
+      });
+    });
+  });
+});
