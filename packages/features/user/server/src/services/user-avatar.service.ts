@@ -76,11 +76,11 @@ function parseAvatar(dataUrl: string): {
   return { mediaType: allowedMediaType, bytes };
 }
 
-export class UserAvatarCodec {
+export class UserAvatarCodecService {
   private constructor() {}
 
-  static create(): UserAvatarCodec {
-    return new UserAvatarCodec();
+  static create(): UserAvatarCodecService {
+    return new UserAvatarCodecService();
   }
 
   parse(dataUrl: string): { mediaType: UserAvatarMediaType; bytes: Uint8Array } {

@@ -1,6 +1,6 @@
 import {
   AnnotationAnnotatorReferenceInvalidError,
-  createOrUpdateQueueItems,
+  AnnotationQueueingService,
 } from "@langwatch/annotation-server";
 import type {
   AutomationPersistCapBreach,
@@ -150,8 +150,12 @@ export type WorkerAutomationContainment = Readonly<{
 }>;
 
 export type WorkerAutomationAnnotationWriter = Readonly<{
-  annotations: Parameters<typeof createOrUpdateQueueItems>[0]["annotations"];
-  findExistingTraceIds: Parameters<typeof createOrUpdateQueueItems>[0]["findExistingTraceIds"];
+  annotations: Parameters<
+    typeof AnnotationQueueingService.createOrUpdateQueueItems
+  >[0]["annotations"];
+  findExistingTraceIds: Parameters<
+    typeof AnnotationQueueingService.createOrUpdateQueueItems
+  >[0]["findExistingTraceIds"];
 }>;
 
 /**
@@ -447,7 +451,7 @@ class WorkerAutomationPersistActionWriter extends AutomationPersistActionWriterP
     }
 
     try {
-      await createOrUpdateQueueItems({ ...input, ...annotations });
+      await AnnotationQueueingService.createOrUpdateQueueItems({ ...input, ...annotations });
     } catch (error) {
       // Annotation answers a caller who sent a malformed annotator reference with a 400, which is
       // right for the surface a person typed it into and wrong for this one: the reference is SAVED

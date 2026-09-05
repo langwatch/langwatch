@@ -21,7 +21,7 @@ const WORK = "idf_work";
 const PERSONAL = "idf_personal";
 
 /** In-memory mirror of the Prisma repository's replace/find/consume shape. */
-export class InMemoryVerificationStore implements IdentityVerificationRepository {
+class InMemoryVerificationStore implements IdentityVerificationRepository {
   records = new Map<string, IdentityVerificationRecord>();
 
   async replaceForIdentifier(record: IdentityVerificationRecord) {

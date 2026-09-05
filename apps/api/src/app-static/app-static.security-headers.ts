@@ -9,11 +9,11 @@ type SecurityHeaderEnvironment = Partial<
 
 export function buildSecurityHeaders({
   dev,
-  environment = process.env,
+  environment,
   assetOrigin = null,
 }: {
   dev: boolean;
-  environment?: SecurityHeaderEnvironment;
+  environment: SecurityHeaderEnvironment;
   /**
    * ADR-086: origin serving content-hashed assets when LANGWATCH_ASSET_BASE is
    * set. Admitted into every fetch directive the browser needs to load chunks,

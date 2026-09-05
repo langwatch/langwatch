@@ -124,12 +124,10 @@ const databaseMocks = vi.hoisted(() => {
   const client = new Proxy(
     {
       projectSecret: { findMany },
-      // The raw-query surface, as FUNCTIONS rather than the empty delegate the
-      // trap below answers every other key with. The durable process store the
-      // webhook replay appends an envelope through refuses a client that does
-      // not carry it — a client without `$transaction` cannot commit a buffer
-      // and its outbox rows together, which is the whole guarantee — so a
-      // double missing it fails the composition rather than the read.
+      // The raw-query surface, as FUNCTIONS rather than the empty delegate the trap below answers every other
+      // key with. The durable process store the webhook replay appends an envelope through refuses a client that
+      // does not carry it — a client without `$transaction` cannot commit a buffer and its outbox rows together,
+      // which is the whole guarantee — so a double missing it fails the composition rather than the read.
       $executeRaw: async (): Promise<number> => 0,
       $queryRaw: async (): Promise<unknown[]> => [],
       $transaction: async (run: unknown): Promise<unknown> =>
@@ -211,12 +209,10 @@ const secret: Secret = {
 };
 
 describe("ApiProductionComposition", () => {
-  // `installConnectedAgentRedis` composes a process-wide singleton
-  // (`@langwatch/agent-server`'s `getConnectedAgentRuntime`) that refuses a
-  // second install once built — correct for one live process, but this file
-  // composes many `ApiProductionComposition`s in one test process. Closing
-  // after each test is what makes every composition resolve its own runtime
-  // once, rather than colliding with the previous test's.
+  // `installConnectedAgentRedis` composes a process-wide singleton (`@langwatch/agent-server`'s
+  // `getConnectedAgentRuntime`) that refuses a second install once built — correct for one live process, but this
+  // file composes many `ApiProductionComposition`s in one test process. Closing after each test is what makes
+  // every composition resolve its own runtime once, rather than colliding with the previous test's.
   afterEach(async () => {
     await ConnectedAgentRuntimeAdapter.close();
   });
@@ -1113,11 +1109,6 @@ class TestAuthComposition extends ApiAuthSessionCompositionPort {
 
 /**
  * The user directory the Auth graph publishes, as a double.
- *
- * The identity half reads a person's account off THIS instance rather than
- * composing a second one, so a test standing in for the Auth graph has to
- * carry one too. Nothing in this file calls it: the doubles exist to satisfy
- * the shape, and a call would be a test reaching past what it is describing.
  */
 function testUserService(): UserService {
   return new Proxy({} as UserService, {

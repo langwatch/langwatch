@@ -72,7 +72,7 @@ export class SpanStorageService {
   private readonly blobResolutionDeps?: SpanReadBlobResolutionDeps;
   private readonly logger = createLogger("langwatch:traces:span-storage-service");
 
-  constructor(
+  private constructor(
     readonly repository: SpanStorageRepository,
     blobResolutionDeps?: SpanReadBlobResolutionDeps,
   ) {

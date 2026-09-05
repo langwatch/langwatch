@@ -39,7 +39,7 @@
  * one everything else in the process uses.
  */
 import type { AuthzService } from "@langwatch/authz-contract";
-import { nlpProxyBaseUrl } from "@langwatch/workflow-server";
+import { HttpWorkflowNlpRuntimeAdapter } from "@langwatch/workflow-server";
 import {
   AwsStsManagedProviderCredentialAdapter,
   EnvironmentManagedProviderConfigurationAdapter,
@@ -222,7 +222,7 @@ export function createWorkerModelProviders(
   // different proxies.
   const nlpServiceUrl = options.config.infrastructure.modelProvider.nlpServiceUrl;
   const executionProxyBaseUrl = nlpServiceUrl
-    ? nlpProxyBaseUrl({ baseUrl: nlpServiceUrl })
+    ? HttpWorkflowNlpRuntimeAdapter.proxyBaseUrl({ baseUrl: nlpServiceUrl })
     : undefined;
   if (!executionProxyBaseUrl) options.absence?.withoutModelTranslation();
   if (!options.redis) options.absence?.withoutConnectionWindows();

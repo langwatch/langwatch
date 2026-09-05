@@ -37,10 +37,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import type { HostedMcpRedis } from "../../ports/hosted-mcp.port";
 import type { HostedMcpDependencies } from "../../ports/hosted-mcp.port";
-import {
-  getOAuthClient,
-  registerOAuthClient,
-} from "../../repositories/redis/redis.oauth-client.repository";
+import { RedisOAuthClientRepository } from "../../repositories/redis/redis.oauth-client.repository";
 
 const logger = createLogger("langwatch:mcp");
 
@@ -765,7 +762,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
    * against DB. Returns the API key if valid, or sends a 401 and returns null.
    */
   function send401(res: ServerResponse, error: string): void {
-    const baseUrl = process.env.BASE_HOST ?? "https://app.langwatch.ai";
+    const baseUrl = dependencies.baseHost;
     res.setHeader(
       "WWW-Authenticate",
       `Bearer resource_metadata="${baseUrl}/.well-known/oauth-protected-resource"`,
@@ -1097,7 +1094,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
     res: ServerResponse,
     resourceSuffix = "",
   ): void {
-    const baseUrl = process.env.BASE_HOST ?? "https://app.langwatch.ai";
+    const baseUrl = dependencies.baseHost;
 
     sendJson(res, 200, {
       resource: `${baseUrl}${resourceSuffix}`,
@@ -1122,7 +1119,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
 
   function handleOAuthMetadata(_req: IncomingMessage, res: ServerResponse): void {
     // Use configured endpoint to prevent host header injection
-    const baseUrl = process.env.BASE_HOST ?? "https://app.langwatch.ai";
+    const baseUrl = dependencies.baseHost;
 
     sendJson(res, 200, {
       issuer: baseUrl,
@@ -1181,7 +1178,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
     const clientName = typeof body.client_name === "string" ? body.client_name : "MCP Client";
 
     try {
-      await registerOAuthClient({
+      await RedisOAuthClientRepository.register({
         redis,
         clientId,
         client: { redirectUris: body.redirect_uris, clientName },
@@ -1308,9 +1305,10 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
       // registration is gone that its *code* was bad sends it round the
       // authorize loop forever; `invalid_client` is the code that makes it
       // register again (RFC 6749 §5.2).
-      const registeredClient = await getOAuthClient({ redis, clientId: clientIdParam }).catch(
-        () => null,
-      );
+      const registeredClient = await RedisOAuthClientRepository.get({
+        redis,
+        clientId: clientIdParam,
+      }).catch(() => null);
       if (!registeredClient) {
         sendJson(res, 401, {
           error: "invalid_client",

@@ -237,7 +237,15 @@ const boundaryRule = {
           const escaped = relative(packageRoot, targetPath).startsWith("..");
           if (escaped) context.report({ node, messageId: "packageEscape" });
 
-          if (!escaped && classification.layoutVersion === 0 && classification.role === "server") {
+          // Production sources only: a service's own unit test composes it with
+          // the real adapter or repository it runs against, which is the point of
+          // the test rather than a layering breach.
+          if (
+            !escaped &&
+            productionSource &&
+            classification.layoutVersion === 0 &&
+            classification.role === "server"
+          ) {
             const targetWorkspacePath = relative(context.cwd, targetPath).split(sep).join("/");
             const importer = classification.workspacePath;
             const apiImportsImplementation =
@@ -596,17 +604,29 @@ function sourceMethodNames(source, classBody) {
     }
     return depth;
   };
-  const add = (name, index) => {
+  // A member declaration opens its own line, save for the modifiers in front of
+  // it. Without this, a call inside a class-property arrow body (`this.rules
+  // .list(...)`) reads as a second declaration of `list`, and a class with two
+  // such properties reports a duplicate that is not there.
+  const declaresOwnLine = (source, index) => {
+    const lineStart = source.lastIndexOf("\n", index - 1) + 1;
+    const prefix = source.slice(lineStart, index);
+    return /^\s*(?:(?:public|private|protected|readonly|static|abstract|async|override|declare|get|set)\s+)*\*?\s*$/.test(
+      prefix,
+    );
+  };
+  const add = (name, index, source) => {
     if (depthAt(index) !== 0 || name === "constructor") return;
+    if (!declaresOwnLine(source, index)) return;
     const entries = names.get(name) ?? [];
     entries.push(index);
     names.set(name, entries);
   };
   const normal = /\b([A-Za-z_$][\w$]*)\s*(?:<[^>{}]*>)?\s*\([^)]*\)\s*(?::[^{};]+)?\s*(?:\{|;)/g;
-  for (const match of masked.matchAll(normal)) add(match[1], match.index);
+  for (const match of masked.matchAll(normal)) add(match[1], match.index, masked);
   const computed =
     /\[\s*(["'])([^"']+)\1\s*\]\s*(?:<[^>{}]*>)?\s*\([^)]*\)\s*(?::[^{};]+)?\s*(?:\{|;)/g;
-  for (const match of classSource.matchAll(computed)) add(match[2], match.index);
+  for (const match of classSource.matchAll(computed)) add(match[2], match.index, classSource);
   return names;
 }
 

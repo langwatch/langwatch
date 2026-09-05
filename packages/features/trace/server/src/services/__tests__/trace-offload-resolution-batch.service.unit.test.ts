@@ -137,7 +137,7 @@ function makeConcurrencyTrackingBlobStore(fullValue: string): {
   };
 }
 
-const realIOService = new TraceIOExtractionService(TraceCanonicalisationService.create());
+const realIOService = TraceIOExtractionService.create(TraceCanonicalisationService.create());
 
 // ---------------------------------------------------------------------------
 // AC6 — streamed / bounded-concurrency resolution

@@ -1,28 +1,6 @@
 /**
- * The analytics half of the collaborator set, composed for real and driven
- * over the real `/api/trpc` handler.
- *
- * What this pins is the thing the record was missing: `trpcCollaborators` is a
- * typed obligation, and until something satisfies it every one of the
- * twenty-two namespaces is absent in production. The two calls here are the two
- * halves this composition answers, and neither is stubbed on the way down —
- * the applications, the services, the repositories and the ClickHouse query
- * builder are the real ones, and only the two DATABASES are doubles.
- *
- *   analytics.getTimeseries  the charted read, from the packaged transport
- *                            through `AnalyticsApp`, `AnalyticsService` and the
- *                            ClickHouse repository to a statement issued
- *                            against the tenant's own client.
- *   dashboards.getAll        `DashboardApp` over the packaged Postgres adapter,
- *                            with the graph-visibility policy consulting the
- *                            real feature-flag service for the workbench
- *                            rollout — the collaborator that made this half one
- *                            composition rather than two.
- *
- * A fake ClickHouse client rather than a container: what is under test is the
- * COMPOSITION — that a statement is built, routed to the caller's tenant and
- * issued — and a real engine would only re-prove the query builder, which has
- * its own suites in `@langwatch/analytics-server`.
+ * The analytics half of the collaborator set, composed for real and driven over
+ * the real `/api/trpc` handler.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import type {
@@ -64,9 +42,6 @@ const dashboardRow = {
 
 /**
  * One statement, as the fake engine received it.
- *
- * The tenant is recorded beside it because routing is half of what this proves:
- * a client resolved for the wrong tenant would still issue a valid statement.
  */
 type IssuedStatement = { tenantId: string; query: string };
 
@@ -84,9 +59,6 @@ function testClickHouse() {
 
 /**
  * The two tables this composition reads, and nothing else.
- *
- * Every other model answers a rejecting proxy, so a read this test did not
- * intend fails by name instead of quietly resolving to `undefined`.
  */
 function testPrisma() {
   const dashboardFindMany = vi.fn(async () => [dashboardRow]);

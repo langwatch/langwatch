@@ -30,8 +30,8 @@ Object.defineProperty(HTMLElement.prototype, "offsetTop", {
   },
 });
 
-afterEach(cleanup);
 afterEach(() => {
+  cleanup();
   rowsAreLaidOut = false;
 });
 

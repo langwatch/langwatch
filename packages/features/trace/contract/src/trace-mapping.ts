@@ -1145,22 +1145,25 @@ export const tryAndConvertTo = <T extends keyof StringTypeToType>(
   // Unwrap OTel typed-object wrappers first so downstream coercion sees the bare value.
   // OTel SDK auto-wraps span IO as { type: <string>, value: <any> }; evaluators need bare values. (#3875)
   const unwrapped = unwrapTypedObject(value);
-  if (unwrapped !== undefined) value = unwrapped;
-  if (value === null || value === undefined) {
+  const subject: any = unwrapped === undefined ? value : unwrapped;
+  if (subject === null || subject === undefined) {
     return undefined;
   }
   if (type === "string") {
-    return (typeof value === "string" ? value : JSON.stringify(value)) as StringTypeToType[T];
+    return (typeof subject === "string" ? subject : JSON.stringify(subject)) as StringTypeToType[T];
   }
   if (type === "number") {
-    return Number(value) as StringTypeToType[T];
+    return Number(subject) as StringTypeToType[T];
   }
-  if (Array.isArray(value) && type === "string[]") {
-    return value.map((v) => tryAndConvertTo(v, "string")) as unknown as StringTypeToType[T];
+  if (Array.isArray(subject) && type === "string[]") {
+    return subject.map((v) => tryAndConvertTo(v, "string")) as unknown as StringTypeToType[T];
   }
-  if (typeof value === "string" && (type === "object" || type === "string[]" || type === "array")) {
+  if (
+    typeof subject === "string" &&
+    (type === "object" || type === "string[]" || type === "array")
+  ) {
     try {
-      const parsed = JSON.parse(value);
+      const parsed = JSON.parse(subject);
       if (!Array.isArray(parsed) && typeof parsed === "object") {
         return parsed as unknown as StringTypeToType[T];
       }
@@ -1173,17 +1176,17 @@ export const tryAndConvertTo = <T extends keyof StringTypeToType>(
       throw new Error("Failed to parse to a valid type, falling back");
     } catch {
       if (type === "string[]") {
-        return [tryAndConvertTo(value, "string")] as unknown as StringTypeToType[T];
+        return [tryAndConvertTo(subject, "string")] as unknown as StringTypeToType[T];
       }
       if (type === "array") {
-        return [value] as unknown as StringTypeToType[T];
+        return [subject] as unknown as StringTypeToType[T];
       }
       if (type === "object") {
-        return { _json: value } as unknown as StringTypeToType[T];
+        return { _json: subject } as unknown as StringTypeToType[T];
       }
     }
   }
-  return value as unknown as StringTypeToType[T];
+  return subject as unknown as StringTypeToType[T];
 };
 
 // ============================================================================

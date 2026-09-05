@@ -26,7 +26,7 @@ export {
 export { PostgresAnnotationQueueAdapter } from "./adapters/postgres.annotation-queue.adapter";
 export {
   AnnotationAnnotatorReferenceInvalidError,
-  createOrUpdateQueueItems,
+  AnnotationQueueingService,
   type FindExistingTraceIds,
 } from "./services/annotation-queueing.service";
 export {

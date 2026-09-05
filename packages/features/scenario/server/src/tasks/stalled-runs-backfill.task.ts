@@ -87,6 +87,7 @@ export class StalledRunsBackfillTask extends Task {
   private constructor(
     private readonly finder: () => StalledRunFinder,
     private readonly execution: () => ScenarioExecutionService,
+    private readonly dryRun: boolean,
   ) {
     super();
   }
@@ -94,18 +95,21 @@ export class StalledRunsBackfillTask extends Task {
   static create({
     finder,
     execution,
+    dryRun = false,
   }: {
     finder: () => StalledRunFinder;
     execution: () => ScenarioExecutionService;
+    /** Report what would close without closing it. Stated by the task launcher. */
+    dryRun?: boolean;
   }): StalledRunsBackfillTask {
-    return new StalledRunsBackfillTask(finder, execution);
+    return new StalledRunsBackfillTask(finder, execution, dryRun);
   }
 
   async run(_input: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
     const result = await backfillStalledRuns({
       finder: this.finder(),
       execution: this.execution(),
-      dryRun: process.env.STALLED_RUNS_BACKFILL_DRY_RUN === "true",
+      dryRun: this.dryRun,
     });
     logger.info(result, "stalled-runs-backfill finished");
   }

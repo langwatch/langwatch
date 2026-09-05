@@ -378,6 +378,19 @@
       }
     },
 
+    // The two wrapper modules the rule above points everyone at. They are
+    // the design system's own Dialog and Drawer, so importing the Chakra
+    // primitive is their whole job.
+    {
+      "files": [
+        "packages/design-system/src/components/dialog.tsx",
+        "packages/design-system/src/components/drawer.tsx"
+      ],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    },
+
     // ------------------------------------------------------------------
     // BIOME RULES WITH NO OXLINT EQUIVALENT, so the next person does not
     // spend an afternoon looking for one. Each is a real rule that this

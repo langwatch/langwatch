@@ -21,26 +21,26 @@ import { TRPCError } from "@trpc/server";
 import type { DataPrivacyDirectoryPort } from "../ports/data-privacy-directory.port";
 import type { DataPrivacyPermissionsPort } from "../ports/data-privacy-permissions.port";
 
-/** The permission a rule write at one tier demands. */
-export function requiredDataPrivacyWritePermission(
-  scopeType: DataPrivacyScopeType,
-): "organization:manage" | "team:manage" | "project:update" {
-  // Departments are an organization-level lens, managed by whoever manages the
-  // organization. A team MEMBER holds `project:update` but not
-  // `project:manage`, and the snapshot already shows them their own project as
-  // writable, so PROJECT gates on the narrower of the two.
-  if (scopeType === "ORGANIZATION" || scopeType === "DEPARTMENT") {
-    return "organization:manage";
-  }
-
-  if (scopeType === "TEAM") {
-    return "team:manage";
-  }
-
-  return "project:update";
-}
-
 export class DataPrivacyScopeAuthorizationService {
+  /** The permission a rule write at one tier demands. */
+  static requiredWritePermission(
+    scopeType: DataPrivacyScopeType,
+  ): "organization:manage" | "team:manage" | "project:update" {
+    // Departments are an organization-level lens, managed by whoever manages
+    // the organization. A team MEMBER holds `project:update` but not
+    // `project:manage`, and the snapshot already shows them their own project
+    // as writable, so PROJECT gates on the narrower of the two.
+    if (scopeType === "ORGANIZATION" || scopeType === "DEPARTMENT") {
+      return "organization:manage";
+    }
+
+    if (scopeType === "TEAM") {
+      return "team:manage";
+    }
+
+    return "project:update";
+  }
+
   static create(options: {
     directory: DataPrivacyDirectoryPort;
     permissions: DataPrivacyPermissionsPort;
@@ -64,7 +64,7 @@ export class DataPrivacyScopeAuthorizationService {
     // this migration only deletes from.
     throw new TRPCError({
       code: "FORBIDDEN",
-      message: `You need ${requiredDataPrivacyWritePermission(
+      message: `You need ${DataPrivacyScopeAuthorizationService.requiredWritePermission(
         input.scope.scopeType,
       )} on this ${input.scope.scopeType.toLowerCase()} to change its data privacy.`,
     });

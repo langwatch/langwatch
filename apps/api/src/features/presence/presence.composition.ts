@@ -7,7 +7,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { PresenceService } from "@langwatch/presence-contract";
 import {
-  BroadcastService,
+  BroadcastAdapter,
   PresenceBroadcastPort,
   PresenceDiagnosticsPort,
   type PresenceEmitterPort,
@@ -30,7 +30,7 @@ export type ComposedPresenceFeature = Readonly<{
    * broadcast on it. Absent on a process that composed no presence graph, so each of them
    * refuses by name rather than publishing into a fabric nobody subscribed to.
    */
-  broadcast: BroadcastService | undefined;
+  broadcast: BroadcastAdapter | undefined;
   router(mount: ApiTrpcFeatureMount): ReturnType<typeof createPresenceTrpcRouter>;
 }>;
 
@@ -44,7 +44,7 @@ export function composePresenceFeature(options: {
   resources: { own(name: string, close: () => Promise<void>): void };
 }): ComposedPresenceFeature {
   const logger = createLogger("langwatch:api:presence");
-  const broadcast = new BroadcastService(options.redis ?? null);
+  const broadcast = BroadcastAdapter.create(options.redis ?? null);
   options.resources.own("API presence broadcast", () => broadcast.close());
 
   const app: PresenceService = RuntimePresenceAdapter.create({
@@ -83,11 +83,11 @@ export function refusingPresenceFeature(): ComposedPresenceFeature {
 
 /** The presence publisher, over the process's broadcast fabric. */
 class ApiPresenceBroadcast extends PresenceBroadcastPort {
-  static create(broadcast: BroadcastService): ApiPresenceBroadcast {
+  static create(broadcast: BroadcastAdapter): ApiPresenceBroadcast {
     return new ApiPresenceBroadcast(broadcast);
   }
 
-  private constructor(private readonly broadcast: BroadcastService) {
+  private constructor(private readonly broadcast: BroadcastAdapter) {
     super();
   }
 

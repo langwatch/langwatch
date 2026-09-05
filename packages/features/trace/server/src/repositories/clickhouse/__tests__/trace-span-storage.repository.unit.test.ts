@@ -8,15 +8,9 @@ import type {
 import { TraceSpanStorageClickHouseRepository } from "../trace-span-storage.repository";
 
 /**
+ * TWIN-DRIFT PINS. The application's `SpanStorageClickHouseRepository` writes the same `stored_spans` rows and does not compile against this file, so the table name, the column set in the table's own order, the insert settings and the retention stamp are pinned as literals here. They
+ * are a wire format between two writers, and ClickHouse hides drift in it: an insert that omits a column succeeds by filling in that column's default, and no reader can tell a defaulted value from a written one.
  * Spec: packages/features/trace/specs/span-storage-write.feature
- *
- * TWIN-DRIFT PINS. The application's `SpanStorageClickHouseRepository` writes
- * the same `stored_spans` rows and does not compile against this file, so the
- * table name, the column set in the table's own order, the insert settings and
- * the retention stamp are pinned as literals here. They are a wire format
- * between two writers, and ClickHouse hides drift in it: an insert that omits a
- * column succeeds by filling in that column's default, and no reader can tell a
- * defaulted value from a written one.
  */
 const STORED_SPANS_TABLE = "stored_spans";
 
@@ -387,14 +381,7 @@ describe("TraceSpanStorageClickHouseRepository", () => {
 
 /**
  * The read half, harvested at the conversion.
- *
  * Spec: specs/trace-processing/worker-trace-pipeline-conversion.feature
- *
- * These pins are not stylistic. The read backs a REDELIVERY path: the
- * coding-agent span-facts dispatcher is handed a span reference and has to
- * resolve it, and it re-runs on the queue's backoff until it can. Every literal
- * below is a way that loop turns from one cheap probe per retry into an
- * unbounded scan of every weekly partition, cold S3 tier included, per retry.
  */
 class QueryingClickHouse {
   readonly queries: { query: string; params: Record<string, unknown>; settings?: unknown }[] = [];

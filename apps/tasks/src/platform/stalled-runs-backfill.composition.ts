@@ -202,6 +202,7 @@ export function buildStalledRunsBackfillTask({
   eventing: TasksEventingInfrastructure | undefined;
 }): StalledRunsBackfillTask {
   return StalledRunsBackfillTask.create({
+    dryRun: process.env.STALLED_RUNS_BACKFILL_DRY_RUN === "true",
     finder: () => SimulationStalledRunAdapter.create(host.requireClickhouse()),
     execution: () => {
       if (!eventing) {

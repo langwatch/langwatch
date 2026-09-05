@@ -7,8 +7,12 @@ export class SlackAlertTask extends Task {
   readonly name = "slack-alert";
   readonly description = "Sends one fixed sample alert to a Slack incoming-webhook URL.";
 
-  static create(): SlackAlertTask {
-    return new SlackAlertTask();
+  private constructor(private readonly baseHost: string) {
+    super();
+  }
+
+  static create({ baseHost = "" }: { baseHost?: string } = {}): SlackAlertTask {
+    return new SlackAlertTask(baseHost);
   }
 
   async run({ args }: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
@@ -18,7 +22,7 @@ export class SlackAlertTask extends Task {
     }
     // The deployment the smoke-test message links back to; unset in a
     // deployment with no public base host, which is fine for a manual send.
-    const baseHost = args[1] ?? process.env.BASE_HOST ?? "";
+    const baseHost = args[1] ?? this.baseHost;
 
     const slackClient = SlackWebhookClientAdapter.create();
     const adapter = SlackWebhookDeliveryAdapter.create((url) => ({

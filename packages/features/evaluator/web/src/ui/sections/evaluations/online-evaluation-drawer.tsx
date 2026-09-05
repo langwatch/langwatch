@@ -387,10 +387,11 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
 
   // Clear persisted state when drawer truly closes (via close button, not navigation)
   const handleClose = useCallback(() => {
-    if (hasUnsavedChanges) {
-      if (!window.confirm("You have unsaved changes. Are you sure you want to close?")) {
-        return;
-      }
+    if (
+      hasUnsavedChanges &&
+      !window.confirm("You have unsaved changes. Are you sure you want to close?")
+    ) {
+      return;
     }
     onlineEvaluationDrawerState = null;
     setHasUnsavedChanges(false);

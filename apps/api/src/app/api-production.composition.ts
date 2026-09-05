@@ -1443,6 +1443,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // that answers `/api/*` is the pod a browser asks for `/`. Asked LAST, after
     // every claimed surface, because it is the fallback.
     const staticSurface = tryCreateApiStaticSurface({
+      environment: globalThis.process.env,
       report: (message, context) => createLogger(options.config.serviceName).info(context, message),
     });
     const rawSurface = CompositeApiRawSurface.of([hostedMcp, staticSurface]);

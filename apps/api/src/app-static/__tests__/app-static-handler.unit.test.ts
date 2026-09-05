@@ -44,6 +44,7 @@ describe("serveStaticOrFallback", () => {
   let clientDistDir: string;
   let server: Server;
   let baseUrl: string;
+  let assetBase = "/";
 
   beforeAll(async () => {
     clientDistDir = mkdtempSync(join(tmpdir(), "static-handler-test-"));
@@ -60,6 +61,8 @@ describe("serveStaticOrFallback", () => {
         "<body><div id=root></div></body></html>",
     );
 
+    // The base the composition root resolves and hands the handler; the cases
+    // below restate it the way a deployment would.
     server = createServer((req, res) => {
       const pathname = (req.url ?? "/").split("?")[0] ?? "/";
       const handled = serveStaticOrFallback({
@@ -67,6 +70,7 @@ describe("serveStaticOrFallback", () => {
         pathname,
         clientDistDir,
         publicConfig,
+        assetBase,
       });
       if (!handled) {
         res.statusCode = 404;
@@ -176,15 +180,13 @@ describe("serveStaticOrFallback", () => {
   });
 
   describe("given the runtime asset base is served into the shell", () => {
-    const original = process.env.LANGWATCH_ASSET_BASE;
     afterAll(() => {
-      if (original === undefined) delete process.env.LANGWATCH_ASSET_BASE;
-      else process.env.LANGWATCH_ASSET_BASE = original;
+      assetBase = "/";
     });
 
     describe("when no asset base is configured (self-host default)", () => {
       beforeAll(() => {
-        delete process.env.LANGWATCH_ASSET_BASE;
+        assetBase = "/";
       });
 
       /** @scenario The resolver is injected even when serving same-origin */
@@ -198,7 +200,7 @@ describe("serveStaticOrFallback", () => {
 
     describe("when a CDN asset base is configured (SaaS)", () => {
       beforeAll(() => {
-        process.env.LANGWATCH_ASSET_BASE = "https://cdn.langwatch.ai/abc123/";
+        assetBase = "https://cdn.langwatch.ai/abc123/";
       });
 
       /** @scenario Entry script and preload links are rewritten to the CDN base */

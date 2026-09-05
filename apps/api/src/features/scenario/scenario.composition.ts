@@ -1,54 +1,6 @@
 /**
  * The SCENARIO half of {@link ApiTrpcCollaborators}: the three surfaces an
  * agent's test cases are written, watched and driven through.
- *
- *   scenarios.*    the test cases a project defines and the runs they produced
- *   suites.*       the folders and suites those cases are grouped into
- *   setupSkills.*  the instructions an empty state hands a coding agent
- *
- * They are one composition because they are one graph: a scenario run IS an
- * agent conversation scored against a criterion, and it is read back through
- * the two connections this process already holds — its Prisma client and its
- * ClickHouse routing.
- *
- * The conversation panel and the operator back office used to be here too, on
- * the argument that a Langy turn is an agent conversation and that the queues a
- * run travels on are read through the back office. Neither is being one graph:
- * both compose themselves now, from the shared infrastructure and the peers
- * they name.
- *
- * ## This half OVERLAYS
- *
- * Like the analytics, execution and product-group halves, and unlike
- * {@link composeApiProductCollaborators}, it folds onto a base and passes an
- * absent base through untouched. It can genuinely be missing: a process with no
- * database resolves no scenario and no suite, and a list answering "no
- * scenarios" there would tell a customer their work was gone.
- *
- * ## What answers for real, and what refuses by name
- *
- * Every READ answers for real, off this process's own graph. A scenario and its
- * folders are Prisma rows; a simulation run and its messages are ClickHouse
- * rows on the same routed connection the charted reads use. The live simulation
- * subscription streams, because the emitter behind it is this process's own.
- *
- * Every WRITE that has to enqueue work ENQUEUES IT, on the pipelines the root
- * registers PRODUCER-only against this process's own Eventing: the eight
- * simulation commands and the suite run's start. The worker drains them. The
- * simulation definition declares a process manager, and the runtime declines to
- * RUN it by name rather than refusing the whole pipeline — producing a command
- * and running a process manager were never the same decision. With no queue at
- * all, every one of those writes refuses by name instead: never a silent no-op,
- * which would leave a customer watching a run that was never queued.
- *
- * Preparing a scenario run ANSWERS. Its target is resolved through ten other
- * verticals' services, and this process holds all ten: six it composes here —
- * the scenario, its suite, the prompt reader, the agent directory, the project
- * directory and the stored-secret cipher — and four it is handed, the workflow
- * service, the model gateway, the project secret store and the trace reads.
- * What it still refuses is SUBMITTING the run, and that one is honest: the
- * in-process execution pool is the worker's, and the outbox retries the
- * execute where a pool exists.
  */
 import { MAX_CALL_TIMEOUT_MS } from "@langwatch/agent-contract";
 import type { AgentService } from "@langwatch/agent-contract";
@@ -122,22 +74,12 @@ import { ApiAgentTestOwnershipAdapter } from "../agent/agent-test-ownership.adap
 
 /**
  * The ksuid resource prefixes a scenario and a run are persisted under.
- *
- * Stated rather than imported, the same way the trace correction's prefix is:
- * they are PERSISTED formats — a process that spelled either differently would
- * write rows the other tier's queries do not find — and the application table
- * that used to hold them is one this migration deletes rather than moves.
  */
 const SCENARIO_KSUID_RESOURCE = "scenario";
 const SCENARIO_RUN_KSUID_RESOURCE = "scenariorun";
 
 /**
  * A capability this deployment did not compose, refused by name.
- *
- * One class for every entry in this half rather than one per entry, exactly as
- * the product-group half does it: the customer-facing distinction is WHICH
- * capability is missing, and that is the `capability` the message carries. The
- * `code` is what the presentation registry is keyed by, and there is one code.
  */
 class ApiScenarioUnavailableError extends HandledError {
   declare readonly code: "service_unavailable";
@@ -180,12 +122,6 @@ const CONSEQUENCE = {
 
 /**
  * What preparing a scenario run reaches outside this half.
- *
- * One entry rather than six loose ones, because they are one decision: a
- * process either can prepare a run against its own graph or cannot, and the
- * prefetcher needs the whole set before it can answer anything. `prompts`,
- * `agents`, `projects`, `scenarios` and `suites` are not here — this half
- * composes or already holds all five.
  */
 export type ApiScenarioExecutionCollaborators = Readonly<{
   /** The workflow behind a workflow target, hydrated with its default model. */
@@ -197,9 +133,8 @@ export type ApiScenarioExecutionCollaborators = Readonly<{
   /** The canonical trace reads an HTTP target's ingest wait is measured on. */
   traces: TraceService;
   /**
-   * Where the child reports its own scenario events, where the NLP engine
-   * answers, and the model a target that names none falls back to. All three
-   * are the deployment's rather than the feature's, and all three are read by
+   * Where the child reports its own scenario events, where the NLP engine answers, and the model a target that
+   * names none falls back to. All three are the deployment's rather than the feature's, and all three are read by
    * `api.config.ts`, which is this process's only environment reader.
    */
   config: ScenarioExecutionPrefetchConfig;
@@ -215,13 +150,6 @@ export type ScenarioFeatureCollaborators = Readonly<{
   /**
    * The four other verticals a scenario RUN is prepared against, and the two
    * values its child is booted with.
-   *
-   * Taken rather than built, all of them: the workflow behind a workflow
-   * target, the gateway its three model roles resolve through, the project
-   * secrets its run parameters are decrypted from and the trace reads its
-   * ingest wait is measured on are the same objects the rest of this process
-   * serves — a second of any of them would prepare a run against a graph
-   * nobody else can see.
    */
   scenarioExecution: ApiScenarioExecutionCollaborators;
   /** The user directory, as the browser-session boundary already composed it. */
@@ -230,22 +158,10 @@ export type ScenarioFeatureCollaborators = Readonly<{
   projects: ProjectService;
   /**
    * The broadcast fabric presence already publishes on.
-   *
-   * All three of this half's subscriptions ride it: ONE emitter per tenant, so
-   * a browser watching a simulation and a browser watching a conversation are
-   * listening to the object the worker's own fan-out writes to.
    */
   broadcast: PresenceEmitterPort;
   /**
    * The deployment's cipher, as the stored-secret family composed it.
-   *
-   * The SAME one: a scenario's stored secret is written by one tier and read by
-   * the other, so a second cipher here would be a second key.
-   *
-   * Absent where the deployment configured no stored-secret key. That used to
-   * take this whole half — six namespaces — off the wire; it now costs exactly
-   * the scenario reads and writes that touch a stored secret, which refuse by
-   * name. Nothing else in this graph reads it.
    */
   encryption: SecretEncryptionPort | undefined;
   /** The same routed ClickHouse the charted reads run on; absent is a real shape. */
@@ -257,9 +173,8 @@ export type ScenarioFeatureCollaborators = Readonly<{
   /** The number the event store already stamps its own rows with. */
   defaultRetentionDays: number;
   /**
-   * The agent-side command senders this process registered producer-only, so a
-   * scenario run and a suite run reach the worker that drains them. Registered
-   * by the root rather than here: the Langy feature dispatches on the same
+   * The agent-side command senders this process registered producer-only, so a scenario run and a suite run reach
+   * the worker that drains them. Registered by the root rather than here: the Langy feature dispatches on the same
    * runtime and is no longer composed beside this half.
    */
   pipelines: ApiAgentPipelines;
@@ -279,23 +194,14 @@ export type ComposedScenarioFeature = Readonly<{
   /** For `ctx.app.scenarios`. */
   scenarios: ScenarioApp;
   /**
-   * The canonical Scenario service and the tab registry, published for the
-   * two packaged REST families that take them directly.
-   *
-   * Taken rather than rebuilt, for the same reason `simulations` is: a second
-   * adapter over the same rows would let `/api/scenarios` and the simulations
-   * page disagree about which scenarios a project holds, and a second tab
-   * registry would give one project two presence keyspaces.
+   * The canonical Scenario service and the tab registry, published for the two
+   * packaged REST families that take them directly.
    */
   scenarioService: ScenarioService;
   scenarioTabs: ScenarioTabRegistry;
   /**
    * The canonical Simulation service, published so the run EXPORT can sweep
    * through it.
-   *
-   * Taken rather than rebuilt: the export never receives or reconstructs
-   * Simulation's private ClickHouse repository, which is the whole reason it
-   * is a service and not a query.
    */
   simulations: SimulationService;
   /**
@@ -418,11 +324,6 @@ export function composeScenarioFeature(
 
 /**
  * The three namespaces, built the one way whether the feature composed or not.
- *
- * `suites.*` and `setupSkills.*` take no ports at all — a suite is read through
- * `ctx.app.suites`, and the setup catalogue is a compiled artifact the package
- * holds — so the only thing a refusal changes is the two fire-and-forget
- * signals `scenarios.*` carries.
  */
 function scenarioRouters(mount: ApiTrpcFeatureMount, ports: ScenarioTrpcPorts) {
   return {
@@ -438,10 +339,6 @@ function scenarioRouters(mount: ApiTrpcFeatureMount, ports: ScenarioTrpcPorts) {
 
 /**
  * The scenario surfaces on a process that composed no graph to run them over.
- *
- * All three namespaces still mount, so no other surface has to branch on
- * whether `ctx.app.scenarios` exists, and every call refuses by name — which is
- * what tells a customer their test cases are unreachable rather than gone.
  */
 export function refusingScenarioFeature(): ComposedScenarioFeature {
   const refuse = <T>(capability: string): T =>
@@ -477,11 +374,6 @@ export function refusingScenarioFeature(): ComposedScenarioFeature {
 
 /**
  * The simulation reader, over the same routed ClickHouse the charted reads use.
- *
- * `createNull` rather than a throwing stand-in when there is no ClickHouse: the
- * package's own answer for a deployment with no run storage is an empty set,
- * and that is correct rather than degraded — a deployment that stores no runs
- * has no run to show.
  */
 function composeSimulations(options: ScenarioFeatureCollaborators, pipelines: ApiAgentPipelines) {
   const execution = pipelines.simulations;
@@ -497,12 +389,6 @@ function composeSimulations(options: ScenarioFeatureCollaborators, pipelines: Ap
 
 /**
  * The Results tab reads, and the run dialog's configuration history.
- *
- * `createUnavailable` rather than `createNull` when there is no ClickHouse:
- * unlike `composeSimulations`, an empty answer here would be misleading — the
- * stat strip and the group rows are what tells an operator whether a
- * deployment with no ClickHouse endpoint is failing or merely quiet, so both
- * refuse by name instead of quietly reporting zero runs.
  */
 function composeResultAtoms(options: ScenarioFeatureCollaborators): ResultAtomsService {
   if (!options.resolveClickHouseClient) {
@@ -526,13 +412,6 @@ function composeRunConfigurations(options: ScenarioFeatureCollaborators): RunCon
 
 /**
  * The partition-window policy, unapplied.
- *
- * One read asks for it — the suite preview's item rows — and the shared policy
- * it used to call lives in an application module this migration deletes rather
- * than moves. `run(null)` is the port's own "no hint" branch, so the read is
- * correct and merely unpruned: it scans the partitions a hinted read would have
- * skipped. Stated here rather than reimplemented, because a second copy of a
- * windowing heuristic is a second thing to keep true.
  */
 class UnwindowedApiSimulationRead extends SimulationWindowedReadPort {
   query<Result>(input: SimulationWindowedReadInput<Result>): Promise<Result> {
@@ -569,10 +448,6 @@ class SystemScenarioClock extends ScenarioClockPort {
 
 /**
  * A scenario's stored secret, under the deployment's own cipher.
- *
- * The port is synchronous and the process's cipher is too — the same AES-256-GCM
- * `iv:ciphertext:authTag` format the platform app writes — so a row written by
- * one tier is read by the other unchanged.
  */
 class ApiScenarioSecretCipher extends ScenarioSecretCipherPort {
   constructor(private readonly encryption: SecretEncryptionPort) {
@@ -589,15 +464,8 @@ class ApiScenarioSecretCipher extends ScenarioSecretCipherPort {
 }
 
 /**
- * The cipher a scenario's stored secret is written and read under, or a
- * refusal by name.
- *
- * Refusing here rather than at the composition, which is the whole narrowing:
- * an unset stored-secret key used to mean this half composed nothing and six
- * namespaces left the wire — the scenarios and their runs, the suites, both
- * Langy surfaces and the operator back office — because ONE store in the graph
- * happened to hold a cipher. Nothing but a scenario's own secret reads it, so
- * nothing but a scenario's own secret should lose anything.
+ * The cipher a scenario's stored secret is written and read under, or a refusal
+ * by name.
  */
 function composeScenarioSecretCipher(
   options: ScenarioFeatureCollaborators,
@@ -619,10 +487,9 @@ class UnavailableApiScenarioSecretCipher extends ScenarioSecretCipherPort {
 }
 
 /**
- * Raised rather than answered with a blank, because a blank is worse: an agent
- * run handed an empty credential fails against the provider with a message
- * about the provider, and the person reading it has no way back to the missing
- * deployment key.
+ * Raised rather than answered with a blank, because a blank is worse: an agent run handed an empty credential
+ * fails against the provider with a message about the provider, and the person reading it has no way back to the
+ * missing deployment key.
  */
 class ScenarioSecretsUnavailableError extends HandledError {
   declare readonly code: "service_unavailable";
@@ -639,11 +506,6 @@ class ScenarioSecretsUnavailableError extends HandledError {
 
 /**
  * Tab presence, without Redis.
- *
- * Every answer is "nobody is here", which is the truth for a process that
- * cannot see the other pods' tabs. The consequence is bounded and stated:
- * a run started by the SDK opens its own browser tab rather than being handed
- * to one already open.
  */
 class UnavailableApiScenarioTabStore extends ScenarioTabStorePort {
   refresh(): Promise<void> {
@@ -665,29 +527,6 @@ class UnavailableApiScenarioTabStore extends ScenarioTabStorePort {
 
 /**
  * The run EXECUTOR, composed over this process's own graph.
- *
- * The four legs, and why each is what it is:
- *
- *   prefetch / prepare  the real prefetcher. Everything it resolves a target
- *                       against — the workflow, the prompt, the agent, the
- *                       project, the scenario, its suite's overrides, the
- *                       model gateway, the project secrets and the trace
- *                       reads — is composed on THIS process, and `ScenarioApp`
- *                       reaches this leg alone. It answers a structured
- *                       failure rather than throwing when a target cannot be
- *                       resolved, which is what the run drawer renders.
- *   submit              refused by name, and honestly: the in-process worker
- *                       pool is the worker's, and `UnavailableScenarioExecutionPoolService`
- *                       is the package's own name for a pod that does not hold
- *                       one. The outbox retries the execute elsewhere.
- *   cancel              published on the process's Redis channel where it has
- *                       one, because the run being cancelled is executing on
- *                       another pod. With no Redis it refuses rather than
- *                       resolving, which would leave a person watching a run
- *                       they asked to stop.
- *   finishUnsuccessfulRun
- *                       the real failure handler, over the SAME simulation
- *                       service every other run read answers from.
  */
 function composeScenarioExecution(
   options: ScenarioFeatureCollaborators,
@@ -729,10 +568,6 @@ function composeScenarioExecution(
 
 /**
  * The two fire-and-forget signals a newly written test case fires.
- *
- * Logged rather than refused, and that is the same call the product-group half
- * makes for `prompts.afterPromptCreated`: refusing would cost a customer the
- * test case they just wrote to protect a marketing email nobody was waiting on.
  */
 function composeScenarioPorts(logger: Logger): ScenarioTrpcPorts {
   return {

@@ -34,7 +34,7 @@ async function closeWithDrain(service: { close(): Promise<void> }) {
   await closing;
 }
 
-describe("BroadcastService", () => {
+describe("BroadcastAdapter", () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -46,9 +46,9 @@ describe("BroadcastService", () => {
   describe("broadcastToTenant()", () => {
     describe("when Redis is available", () => {
       it("publishes to Redis channel", async () => {
-        const { BroadcastService } = await import("../broadcast.adapter");
+        const { BroadcastAdapter } = await import("../broadcast.adapter");
         const { redis } = createMockRedis();
-        const service = new BroadcastService(redis as any);
+        const service = BroadcastAdapter.create(redis as any);
 
         await service.broadcastToTenant("tenant-1", "test-event", "trace_updated");
 
@@ -61,10 +61,10 @@ describe("BroadcastService", () => {
       });
 
       it("falls back to local emit when Redis publish fails", async () => {
-        const { BroadcastService } = await import("../broadcast.adapter");
+        const { BroadcastAdapter } = await import("../broadcast.adapter");
         const { redis } = createMockRedis();
         redis.publish.mockRejectedValue(new Error("Redis down"));
-        const service = new BroadcastService(redis as any);
+        const service = BroadcastAdapter.create(redis as any);
 
         const emitter = service.getTenantEmitter("tenant-1");
         const received: unknown[] = [];
@@ -80,8 +80,8 @@ describe("BroadcastService", () => {
 
     describe("when no Redis is provided", () => {
       it("emits locally", async () => {
-        const { BroadcastService } = await import("../broadcast.adapter");
-        const service = new BroadcastService(null);
+        const { BroadcastAdapter } = await import("../broadcast.adapter");
+        const service = BroadcastAdapter.create(null);
 
         const emitter = service.getTenantEmitter("tenant-1");
         const received: unknown[] = [];
@@ -97,8 +97,8 @@ describe("BroadcastService", () => {
 
     describe("when service is closed", () => {
       it("throws BroadcasterNotActiveError", async () => {
-        const { BroadcastService } = await import("../broadcast.adapter");
-        const service = new BroadcastService(null);
+        const { BroadcastAdapter } = await import("../broadcast.adapter");
+        const service = BroadcastAdapter.create(null);
 
         await closeWithDrain(service);
 
@@ -112,8 +112,8 @@ describe("BroadcastService", () => {
   describe("getTenantEmitter()", () => {
     describe("when called for a new tenant", () => {
       it("creates a new emitter", async () => {
-        const { BroadcastService } = await import("../broadcast.adapter");
-        const service = new BroadcastService(null);
+        const { BroadcastAdapter } = await import("../broadcast.adapter");
+        const service = BroadcastAdapter.create(null);
 
         const emitter = service.getTenantEmitter("tenant-1");
 
@@ -126,8 +126,8 @@ describe("BroadcastService", () => {
 
     describe("when called for an existing tenant", () => {
       it("returns the cached emitter", async () => {
-        const { BroadcastService } = await import("../broadcast.adapter");
-        const service = new BroadcastService(null);
+        const { BroadcastAdapter } = await import("../broadcast.adapter");
+        const service = BroadcastAdapter.create(null);
 
         const first = service.getTenantEmitter("tenant-1");
         const second = service.getTenantEmitter("tenant-1");
@@ -140,8 +140,8 @@ describe("BroadcastService", () => {
 
     describe("when creating a new emitter", () => {
       it("sets maxListeners to 50", async () => {
-        const { BroadcastService } = await import("../broadcast.adapter");
-        const service = new BroadcastService(null);
+        const { BroadcastAdapter } = await import("../broadcast.adapter");
+        const service = BroadcastAdapter.create(null);
 
         const emitter = service.getTenantEmitter("tenant-1");
 
@@ -155,8 +155,8 @@ describe("BroadcastService", () => {
   describe("stale emitter cleanup", () => {
     describe("when an emitter has no listeners for 5+ minutes", () => {
       it("removes the emitter", async () => {
-        const { BroadcastService } = await import("../broadcast.adapter");
-        const service = new BroadcastService(null);
+        const { BroadcastAdapter } = await import("../broadcast.adapter");
+        const service = BroadcastAdapter.create(null);
 
         // Create an emitter but don't add listeners
         service.getTenantEmitter("tenant-1");
@@ -176,8 +176,8 @@ describe("BroadcastService", () => {
 
     describe("when an emitter has active listeners", () => {
       it("keeps the emitter", async () => {
-        const { BroadcastService } = await import("../broadcast.adapter");
-        const service = new BroadcastService(null);
+        const { BroadcastAdapter } = await import("../broadcast.adapter");
+        const service = BroadcastAdapter.create(null);
 
         const emitter = service.getTenantEmitter("tenant-1");
         emitter.on("trace_updated", () => {});
@@ -195,8 +195,8 @@ describe("BroadcastService", () => {
   describe("close()", () => {
     describe("when closing the service", () => {
       it("sets active to false so subsequent broadcasts throw", async () => {
-        const { BroadcastService } = await import("../broadcast.adapter");
-        const service = new BroadcastService(null);
+        const { BroadcastAdapter } = await import("../broadcast.adapter");
+        const service = BroadcastAdapter.create(null);
 
         await closeWithDrain(service);
 
@@ -206,8 +206,8 @@ describe("BroadcastService", () => {
       });
 
       it("clears the cleanup interval", async () => {
-        const { BroadcastService } = await import("../broadcast.adapter");
-        const service = new BroadcastService(null);
+        const { BroadcastAdapter } = await import("../broadcast.adapter");
+        const service = BroadcastAdapter.create(null);
         const clearIntervalSpy = vi.spyOn(globalThis, "clearInterval");
 
         await closeWithDrain(service);
@@ -217,9 +217,9 @@ describe("BroadcastService", () => {
       });
 
       it("quits Redis after the drain delay", async () => {
-        const { BroadcastService } = await import("../broadcast.adapter");
+        const { BroadcastAdapter } = await import("../broadcast.adapter");
         const { redis, subscriber } = createMockRedis();
-        const service = new BroadcastService(redis as any);
+        const service = BroadcastAdapter.create(redis as any);
 
         const closePromise = service.close();
 

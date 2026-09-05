@@ -39,36 +39,6 @@ export type DataRetentionPolicyServiceOptions = Readonly<{
 }>;
 
 /**
- * Permission required to write a retention override at a given tier.
- *
- * This MUST mirror the read side, which advertises a scope as writable using
- * exactly these permissions:
- *   - ORGANIZATION → organization:manage
- *   - TEAM         → team:manage
- *   - PROJECT      → project:update
- *
- * PROJECT deliberately uses `project:update`, not `project:manage`: a team
- * MEMBER holds `project:update` but not `project:manage`, and the snapshot
- * already shows them their project as writable. Requiring `project:manage`
- * here made the chip picker offer a scope that the save then rejected with
- * FORBIDDEN. It also keeps these mutations consistent with the retroactive
- * endpoints, which gate on `project:update`.
- */
-export function requiredRetentionWritePermission(
-  scopeType: RetentionScopeTarget["scopeType"],
-): "organization:manage" | "team:manage" | "project:update" {
-  if (scopeType === "ORGANIZATION") {
-    return "organization:manage";
-  }
-
-  if (scopeType === "TEAM") {
-    return "team:manage";
-  }
-
-  return "project:update";
-}
-
-/**
  * Which retention values a plan tier may persist.
  *
  * Tiering is by exclusion: an uncapped plan (enterprise, or self-hosted) may
@@ -90,77 +60,104 @@ function ruleForPlan(plan: DataRetentionPlan): RetentionRule {
   return { kind: "fixed", presetDays: PAID_RETENTION_PRESET_DAYS };
 }
 
-/**
- * Throws FORBIDDEN if the plan is free. Pure — the single source of the
- * free-tier gate, over an already-resolved plan, so a caller that has the plan
- * in hand doesn't refetch it.
- */
-export function assertPlanConfigurable(plan: DataRetentionPlan): void {
-  if (!plan.free) {
-    return;
+export class DataRetentionPolicyService {
+  /**
+   * Permission required to write a retention override at a given tier.
+   *
+   * This MUST mirror the read side, which advertises a scope as writable using
+   * exactly these permissions:
+   *   - ORGANIZATION → organization:manage
+   *   - TEAM         → team:manage
+   *   - PROJECT      → project:update
+   *
+   * PROJECT deliberately uses `project:update`, not `project:manage`: a team
+   * MEMBER holds `project:update` but not `project:manage`, and the snapshot
+   * already shows them their project as writable. Requiring `project:manage`
+   * here made the chip picker offer a scope that the save then rejected with
+   * FORBIDDEN. It also keeps these mutations consistent with the retroactive
+   * endpoints, which gate on `project:update`.
+   */
+  static requiredWritePermission(
+    scopeType: RetentionScopeTarget["scopeType"],
+  ): "organization:manage" | "team:manage" | "project:update" {
+    if (scopeType === "ORGANIZATION") {
+      return "organization:manage";
+    }
+
+    if (scopeType === "TEAM") {
+      return "team:manage";
+    }
+
+    return "project:update";
   }
 
-  throw new TRPCError({
-    code: "FORBIDDEN",
-    message:
-      "Configuring data retention is a paid-plan feature. " +
-      "All projects use the platform default until the organization upgrades.",
-  });
-}
-
-/**
- * Throws FORBIDDEN if `plan` may not persist `retentionDays`. Pure — operates
- * on an already-resolved plan and reads only the tier rule, so it is trivially
- * unit-testable and does no I/O. This is the write-path prevention that stops a
- * paid organization persisting an arbitrary window through the tRPC surface,
- * independent of what the UI offers.
- *
- * No-ops on the indefinite sentinel (keep-forever is authorized separately, by
- * the platform-administrator gate) and on free plans (blocked by the free gate).
- */
-export function assertPlanAllowsRetentionValue(
-  plan: DataRetentionPlan,
-  retentionDays: number,
-): void {
-  if (retentionDays === INDEFINITE_RETENTION_DAYS) {
-    return;
-  }
-
-  if (plan.free) {
-    return;
-  }
-
-  const rule = ruleForPlan(plan);
-
-  if (rule.kind === "uncapped") {
-    // The paid short presets are the only values allowed below the enterprise
-    // custom floor. Everything else must clear the floor; whole-week alignment
-    // is already enforced by the contract's own day schema.
-    if ((PAID_RETENTION_PRESET_DAYS as readonly number[]).includes(retentionDays)) {
+  /**
+   * Throws FORBIDDEN if the plan is free. Pure — the single source of the
+   * free-tier gate, over an already-resolved plan, so a caller that has the plan
+   * in hand doesn't refetch it.
+   */
+  static assertPlanConfigurable(plan: DataRetentionPlan): void {
+    if (!plan.free) {
       return;
     }
 
-    if (retentionDays < rule.customMin) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: `Retention must be at least ${rule.customMin} days on your plan.`,
-      });
-    }
-
-    return;
-  }
-
-  if (!rule.presetDays.includes(retentionDays)) {
     throw new TRPCError({
       code: "FORBIDDEN",
       message:
-        "That retention length isn't available on your plan. " +
-        "Choose one of the offered options, or contact us to unlock more.",
+        "Configuring data retention is a paid-plan feature. " +
+        "All projects use the platform default until the organization upgrades.",
     });
   }
-}
 
-export class DataRetentionPolicyService {
+  /**
+   * Throws FORBIDDEN if `plan` may not persist `retentionDays`. Pure — operates
+   * on an already-resolved plan and reads only the tier rule, so it is trivially
+   * unit-testable and does no I/O. This is the write-path prevention that stops a
+   * paid organization persisting an arbitrary window through the tRPC surface,
+   * independent of what the UI offers.
+   *
+   * No-ops on the indefinite sentinel (keep-forever is authorized separately, by
+   * the platform-administrator gate) and on free plans (blocked by the free gate).
+   */
+  static assertPlanAllowsRetentionValue(plan: DataRetentionPlan, retentionDays: number): void {
+    if (retentionDays === INDEFINITE_RETENTION_DAYS) {
+      return;
+    }
+
+    if (plan.free) {
+      return;
+    }
+
+    const rule = ruleForPlan(plan);
+
+    if (rule.kind === "uncapped") {
+      // The paid short presets are the only values allowed below the enterprise
+      // custom floor. Everything else must clear the floor; whole-week alignment
+      // is already enforced by the contract's own day schema.
+      if ((PAID_RETENTION_PRESET_DAYS as readonly number[]).includes(retentionDays)) {
+        return;
+      }
+
+      if (retentionDays < rule.customMin) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: `Retention must be at least ${rule.customMin} days on your plan.`,
+        });
+      }
+
+      return;
+    }
+
+    if (!rule.presetDays.includes(retentionDays)) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message:
+          "That retention length isn't available on your plan. " +
+          "Choose one of the offered options, or contact us to unlock more.",
+      });
+    }
+  }
+
   static create(options: DataRetentionPolicyServiceOptions): DataRetentionPolicyService {
     return new DataRetentionPolicyService(options);
   }
@@ -203,7 +200,7 @@ export class DataRetentionPolicyService {
 
     throw new TRPCError({
       code: "FORBIDDEN",
-      message: `You need ${requiredRetentionWritePermission(
+      message: `You need ${DataRetentionPolicyService.requiredWritePermission(
         input.scope.scopeType,
       )} on this ${input.scope.scopeType.toLowerCase()} to change its data retention.`,
     });
@@ -243,7 +240,7 @@ export class DataRetentionPolicyService {
     scope: RetentionScopeTarget;
   }): Promise<void> {
     const { plan } = await this.resolveScopePlan(input);
-    assertPlanConfigurable(plan);
+    DataRetentionPolicyService.assertPlanConfigurable(plan);
   }
 
   /** Plan-gate a project-targeted mutation via the project's owning organization. */
@@ -263,7 +260,7 @@ export class DataRetentionPolicyService {
       organizationId,
       userId: input.actor.userId,
     });
-    assertPlanConfigurable(plan);
+    DataRetentionPolicyService.assertPlanConfigurable(plan);
   }
 
   /**
@@ -278,8 +275,8 @@ export class DataRetentionPolicyService {
     retentionDays: number;
   }): Promise<void> {
     const { plan } = await this.resolveScopePlan(input);
-    assertPlanConfigurable(plan);
-    assertPlanAllowsRetentionValue(plan, input.retentionDays);
+    DataRetentionPolicyService.assertPlanConfigurable(plan);
+    DataRetentionPolicyService.assertPlanAllowsRetentionValue(plan, input.retentionDays);
   }
 
   private async canWriteScope(input: {

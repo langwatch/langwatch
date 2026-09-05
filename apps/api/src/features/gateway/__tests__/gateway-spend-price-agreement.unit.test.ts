@@ -16,7 +16,7 @@
  * enterprise-webhook-server) that may not import one another.
  */
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 /**
  * The price the ingest seam stamped on the event, controlled by the test

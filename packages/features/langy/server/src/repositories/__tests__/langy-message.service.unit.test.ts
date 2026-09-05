@@ -71,7 +71,7 @@ describe("LangyMessageService", () => {
       const conversations = makeConversationRepo({
         tryFindVisibleById: vi.fn().mockResolvedValue(conversation),
       });
-      const service = new LangyMessageService(messages, conversations);
+      const service = LangyMessageService.create(messages, conversations);
 
       await expect(
         service.getAllByConversation({
@@ -102,7 +102,7 @@ describe("LangyMessageService", () => {
           // The visibility repository deliberately collapses private and absent.
           tryFindVisibleById: vi.fn().mockResolvedValue(null),
         });
-        const service = new LangyMessageService(messages, conversations);
+        const service = LangyMessageService.create(messages, conversations);
 
         await expect(
           service.getAllByConversation({

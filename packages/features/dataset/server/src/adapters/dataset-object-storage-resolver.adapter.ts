@@ -10,7 +10,7 @@
  * dataset's chunks land where the rest of that project's objects do. Only the
  * backend KIND crosses that seam — bucket, endpoint and credentials stay this
  * module's own concern, resolved per project by {@link
- * DatasetObjectStorageS3ClientResolver} and (for Azure) the caller's own
+ * DatasetObjectStorageS3ClientResolverAdapter} and (for Azure) the caller's own
  * `DatasetAzureConfigResolver`.
  */
 import { S3Client } from "@aws-sdk/client-s3";
@@ -55,8 +55,20 @@ export abstract class DatasetStorageDestinationPort {
  * per-operation client removes the lifecycle where a superseded client is
  * destroyed under an in-flight read.
  */
-export class DatasetObjectStorageS3ClientResolver extends DatasetS3ClientResolver {
-  constructor(
+export class DatasetObjectStorageS3ClientResolverAdapter extends DatasetS3ClientResolver {
+  static create(options: {
+    aws: AwsClientProcessRuntime;
+    lookupProjectTarget: (projectId: string) => Promise<DatasetS3Target | null>;
+    globalS3: DatasetS3Target | undefined;
+  }): DatasetObjectStorageS3ClientResolverAdapter {
+    return new DatasetObjectStorageS3ClientResolverAdapter(
+      options.aws,
+      options.lookupProjectTarget,
+      options.globalS3,
+    );
+  }
+
+  private constructor(
     private readonly aws: AwsClientProcessRuntime,
     private readonly lookupProjectTarget: (projectId: string) => Promise<DatasetS3Target | null>,
     private readonly globalS3: DatasetS3Target | undefined,
@@ -91,7 +103,7 @@ export class DatasetObjectStorageS3ClientResolver extends DatasetS3ClientResolve
  * name, from its own resolver) the moment a project's destination actually
  * decides `azure`.
  */
-export class DatasetObjectStorageResolver extends DatasetStorageResolver {
+export class DatasetObjectStorageResolverAdapter extends DatasetStorageResolver {
   private azure: AzureDatasetStorageAdapter | undefined;
   private readonly s3: S3DatasetStorageAdapter;
 
@@ -108,8 +120,8 @@ export class DatasetObjectStorageResolver extends DatasetStorageResolver {
     destination: DatasetStorageDestinationPort;
     s3ClientResolver: DatasetS3ClientResolver;
     azureConfig?: DatasetAzureConfigResolver;
-  }): DatasetObjectStorageResolver {
-    return new DatasetObjectStorageResolver(
+  }): DatasetObjectStorageResolverAdapter {
+    return new DatasetObjectStorageResolverAdapter(
       options.destination,
       options.s3ClientResolver,
       options.azureConfig,

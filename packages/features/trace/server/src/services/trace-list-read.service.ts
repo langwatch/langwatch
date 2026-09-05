@@ -135,7 +135,7 @@ const DISCOVER_CACHE = new TtlCache<CachedDiscover>(DISCOVER_TTL_MS, "tracesV2:d
 const DISCOVER_REFRESH_LOCK_CACHE = new TtlCache<number>(60_000, "tracesV2:discover:refresh-lock:");
 
 /**
- * Optional sink for "discover finished refreshing" SSE pushes, set once at bootstrap via `TraceListService.setDiscoverBroadcaster` so the service can fire-and-forget into the broadcast layer when a background refresh lands a fresher payload. The setter pattern avoids threading BroadcastService through the constructor, which is shared with the null repo / test factories that don't want the dependency; production callers register the live one.
+ * Optional sink for "discover finished refreshing" SSE pushes, set once at bootstrap via `TraceListService.setDiscoverBroadcaster` so the service can fire-and-forget into the broadcast layer when a background refresh lands a fresher payload. The setter pattern avoids threading BroadcastAdapter through the constructor, which is shared with the null repo / test factories that don't want the dependency; production callers register the live one.
  */
 type DiscoverBroadcaster = (tenantId: string) => void;
 let discoverBroadcaster: DiscoverBroadcaster | null = null;
@@ -265,7 +265,7 @@ export class TraceListService {
     return new TraceListService(repository, evaluations, topicService);
   }
 
-  constructor(
+  private constructor(
     private readonly repository: TraceListReadPort,
     private readonly evaluations: EvaluationService,
     private readonly topicService: TopicService,

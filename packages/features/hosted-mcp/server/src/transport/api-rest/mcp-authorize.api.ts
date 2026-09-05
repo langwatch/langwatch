@@ -18,7 +18,7 @@ import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
 import { randomUUID } from "node:crypto";
 
 import type { HostedMcpRedis } from "../../ports/hosted-mcp.port";
-import { getOAuthClient } from "../../repositories/redis/redis.oauth-client.repository";
+import { RedisOAuthClientRepository } from "../../repositories/redis/redis.oauth-client.repository";
 
 const REDIS_AUTH_CODE_PREFIX = "mcp:auth_code:";
 const AUTH_CODE_TTL_SECONDS = 600;
@@ -165,7 +165,10 @@ export function createMcpAuthorizeRestApp(options: {
       // string match against the client's registered redirect_uris — no
       // scheme/host-only comparison, which a subdomain or path trick could
       // slip past.
-      const registeredClient = await getOAuthClient({ redis: ports.redis, clientId });
+      const registeredClient = await RedisOAuthClientRepository.get({
+        redis: ports.redis,
+        clientId,
+      });
       if (!registeredClient) {
         return c.json({ error: "Unknown or unregistered client_id" }, 400);
       }

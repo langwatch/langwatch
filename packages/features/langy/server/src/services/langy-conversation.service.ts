@@ -188,7 +188,7 @@ export const ADOPTABLE_CONVERSATION_ID = /^[A-Za-z0-9_-]{6,120}$/;
  * projection; writes remain event-sourcing commands.
  */
 export class LangyConversationService {
-  constructor(
+  private constructor(
     private readonly repository: LangyConversationRepository,
     private readonly commands: LangyConversationCommands,
     private readonly messages: LangyMessageRepository = new NullLangyMessageRepository(),

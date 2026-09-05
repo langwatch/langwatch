@@ -210,10 +210,11 @@ export class GraphTrpcApi {
             const validFilters: Record<string, unknown> = {};
 
             for (const [key, value] of Object.entries(graph.filters)) {
-              if (ports.filterFieldSchema.safeParse(key).success) {
-                if (Array.isArray(value) || (typeof value === "object" && value !== null)) {
-                  validFilters[key] = value;
-                }
+              if (
+                ports.filterFieldSchema.safeParse(key).success &&
+                (Array.isArray(value) || (typeof value === "object" && value !== null))
+              ) {
+                validFilters[key] = value;
               }
             }
 

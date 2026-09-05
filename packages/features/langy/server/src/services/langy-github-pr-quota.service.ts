@@ -70,7 +70,7 @@ export class LangyGithubPrQuotaService {
 
     const bucket = dayBucket();
     const key = `langy:gh:prs:${userId}:${bucket}`;
-    let count = 0;
+    let count: number;
     try {
       const raw = await connection.get(key);
       count = raw ? Number.parseInt(raw, 10) : 0;
@@ -193,7 +193,7 @@ export class LangyGithubPrQuotaService {
     // the previous catch-all could send back `allowed: true, reserved: false` even when the count
     // had ALREADY gone over the limit (DECR throw on over-cap), letting a 21st request squeak past
     // while the counter stayed inflated.
-    let count: number | null = null;
+    let count: number;
     try {
       count = await connection.incr(key);
     } catch {

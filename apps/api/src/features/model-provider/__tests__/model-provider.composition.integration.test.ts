@@ -1,14 +1,5 @@
 /**
  * The provider surfaces, served by the API process.
- *
- * What this pins is what the deployment's HOST answers and what it refuses:
- * the model registry's own ceilings read over the REAL `/api/trpc` handler,
- * the catastrophic-backtracking gate the cost-rule schemas are built from, and
- * the conservative stand-in a process with no host falls back to.
- *
- * The gate is the one capability that cannot degrade at call time — the write
- * and preview SCHEMAS are built from it — so a process with no host must
- * refuse the dangerous shape rather than say yes to everything.
  */
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";

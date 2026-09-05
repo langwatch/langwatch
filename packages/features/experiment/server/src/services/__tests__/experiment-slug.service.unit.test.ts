@@ -15,7 +15,7 @@ describe("ExperimentSlugService", () => {
   /** @scenario New experiment gets deduplicated slug when slug conflicts with existing experiment */
   it("appends -2 suffix when base slug already exists", async () => {
     const slugs = ExperimentSlugService.create({
-      repository: repositoryOf(["dedup-base"]),
+      repositoryOf(["dedup-base"]),
       newId: () => "fallback",
     });
 
@@ -46,7 +46,7 @@ describe("ExperimentSlugService", () => {
   /** @scenario Multiple slug conflicts increment the suffix */
   it("increments suffix to -3 when -2 is also taken", async () => {
     const slugs = ExperimentSlugService.create({
-      repository: repositoryOf(["dedup-multi", "dedup-multi-2"]),
+      repositoryOf(["dedup-multi", "dedup-multi-2"]),
       newId: () => "fallback",
     });
 
@@ -61,7 +61,7 @@ describe("ExperimentSlugService", () => {
   /** @scenario Slug with no conflict returns unchanged */
   it("returns the base slug unchanged when no conflict exists", async () => {
     const slugs = ExperimentSlugService.create({
-      repository: repositoryOf([]),
+      repositoryOf([]),
       newId: () => "fallback",
     });
 
@@ -76,7 +76,7 @@ describe("ExperimentSlugService", () => {
   /** @scenario Unrelated slug sharing the same prefix is not treated as a conflict */
   it("does not treat prefix-sharing slugs as conflicts", async () => {
     const slugs = ExperimentSlugService.create({
-      repository: repositoryOf(["dedup-prefix-extended"]),
+      repositoryOf(["dedup-prefix-extended"]),
       newId: () => "fallback",
     });
 

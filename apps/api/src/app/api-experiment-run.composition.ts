@@ -2,7 +2,7 @@
  * The workbench run loop, composed for this process.
  */
 import type { ApiKeyService } from "@langwatch/api-key-contract";
-import { tryMintAgentSandboxApiKey } from "@langwatch/api-key-server";
+import { AgentSandboxKeyMintService } from "@langwatch/api-key-server";
 import type { AgentService } from "@langwatch/agent-contract";
 import type { DatasetService } from "@langwatch/dataset-contract";
 import type { ReportEvaluationCommandData } from "@langwatch/evaluation-contract";
@@ -576,7 +576,7 @@ class ApiExperimentSandboxCredentialAdapter extends ExperimentSandboxCredentialP
     const organizationId = project?.team?.organizationId;
     if (!organizationId) return undefined;
 
-    return await tryMintAgentSandboxApiKey({
+    return await AgentSandboxKeyMintService.tryMint({
       apiKeys,
       projectId: input.projectId,
       organizationId,

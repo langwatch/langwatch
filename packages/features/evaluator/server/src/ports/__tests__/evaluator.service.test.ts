@@ -105,7 +105,7 @@ describe("EvaluatorService", () => {
       body: { status: "success", result: { passed: "true", score: "0.75" } },
     });
     const evaluators = service({
-      repository: repository({
+      repository({
         tryFindById: vi.fn().mockResolvedValue(
           evaluator({
             type: "code",
@@ -134,7 +134,7 @@ describe("EvaluatorService", () => {
 
   it("surfaces code exceptions in the evaluator error envelope", async () => {
     const evaluators = service({
-      repository: repository({
+      repository({
         tryFindById: vi.fn().mockResolvedValue(
           evaluator({
             type: "code",
@@ -191,7 +191,7 @@ describe("EvaluatorService", () => {
 
   it("resolves a saved evaluator for the legacy execution transport", async () => {
     const evaluators = service({
-      repository: repository({
+      repository({
         findByIdOrSlug: vi.fn().mockResolvedValue(
           evaluator({
             config: {
@@ -215,7 +215,7 @@ describe("EvaluatorService", () => {
 
   it("rejects an invalid code evaluator before dispatch", async () => {
     const evaluators = service({
-      repository: repository({
+      repository({
         findByIdOrSlug: vi
           .fn()
           .mockResolvedValue(evaluator({ type: "code", config: { code: "" } })),
@@ -278,7 +278,7 @@ describe("EvaluatorService", () => {
       },
     });
     const evaluators = service({
-      repository: repository({
+      repository({
         findByIdOrSlug: vi
           .fn()
           .mockResolvedValue(evaluator({ type: "workflow", workflowId: "w1" })),
@@ -301,7 +301,7 @@ describe("EvaluatorService", () => {
 
   it("keeps one workflow owned by one evaluator", async () => {
     const evaluators = service({
-      repository: repository({
+      repository({
         tryFindByWorkflow: vi
           .fn()
           .mockResolvedValue(evaluator({ id: "existing", workflowId: "w1", type: "workflow" })),
@@ -323,7 +323,7 @@ describe("EvaluatorService", () => {
   it("refuses a workflow from another project on create", async () => {
     const create = vi.fn();
     const evaluators = service({
-      repository: repository({ create }),
+      repository({ create }),
       workflows: workflows({
         assertInProject: vi.fn().mockRejectedValue(new Error("workflow is not in project")),
       }),
@@ -345,7 +345,7 @@ describe("EvaluatorService", () => {
   it("refuses a workflow from another project on update", async () => {
     const update = vi.fn();
     const evaluators = service({
-      repository: repository({ update }),
+      repository({ update }),
       workflows: workflows({
         assertInProject: vi.fn().mockRejectedValue(new Error("workflow is not in project")),
       }),
@@ -359,7 +359,7 @@ describe("EvaluatorService", () => {
 
   it("validates a code evaluator config even when its type is unchanged", async () => {
     const evaluators = service({
-      repository: repository({
+      repository({
         tryFindById: vi.fn().mockResolvedValue(evaluator({ type: "code" })),
       }),
     });
@@ -425,7 +425,7 @@ describe("EvaluatorService", () => {
     "derives $evaluatorType fields from the canonical definition",
     async ({ evaluatorType, fields, outputFields }) => {
       const evaluators = service({
-        repository: repository({
+        repository({
           tryFindById: vi.fn().mockResolvedValue(evaluator({ config: { evaluatorType } })),
         }),
       });
@@ -445,7 +445,7 @@ describe("EvaluatorService", () => {
 
   it("uses empty inputs and standard outputs for an unknown evaluator", async () => {
     const evaluators = service({
-      repository: repository({
+      repository({
         tryFindById: vi
           .fn()
           .mockResolvedValue(evaluator({ config: { evaluatorType: "unknown/evaluator" } })),
@@ -463,7 +463,7 @@ describe("EvaluatorService", () => {
 
   it("uses configured code inputs and outputs", async () => {
     const evaluators = service({
-      repository: repository({
+      repository({
         tryFindById: vi.fn().mockResolvedValue(
           evaluator({
             type: "code",
@@ -495,7 +495,7 @@ describe("EvaluatorService", () => {
       outputFields: [{ identifier: "result", type: "float" }],
     });
     const evaluators = service({
-      repository: repository({
+      repository({
         tryFindById: vi.fn().mockResolvedValue(evaluator({ type: "workflow", workflowId: "w1" })),
       }),
       workflows: workflows({ getFields }),
@@ -518,7 +518,7 @@ describe("EvaluatorService", () => {
 
   it("falls back to standard outputs when a workflow declares none", async () => {
     const evaluators = service({
-      repository: repository({
+      repository({
         tryFindById: vi.fn().mockResolvedValue(evaluator({ type: "workflow", workflowId: "w1" })),
       }),
     });
@@ -534,7 +534,7 @@ describe("EvaluatorService", () => {
 
   it("enriches every evaluator returned by the repository", async () => {
     const evaluators = service({
-      repository: repository({
+      repository({
         findAll: vi.fn().mockResolvedValue([
           evaluator(),
           evaluator({

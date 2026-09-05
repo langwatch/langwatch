@@ -31,9 +31,6 @@ export {
 } from "./repositories/prisma/prisma.data-retention-directory.repository";
 export {
   DataRetentionPolicyService,
-  assertPlanAllowsRetentionValue,
-  assertPlanConfigurable,
-  requiredRetentionWritePermission,
   type DataRetentionPolicyServiceOptions,
   type RetentionActor,
 } from "./services/data-retention-policy.service";

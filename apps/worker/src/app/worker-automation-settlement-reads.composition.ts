@@ -155,7 +155,7 @@ export class WorkerTraceRecordReader {
         traceCanonicalisation: options.traceCanonicalisation,
       }),
       options.dataPrivacy,
-      new VisibilityWindowService(options.plans),
+      VisibilityWindowService.create(options.plans),
       options.projects,
       options.logger ?? createLogger("langwatch:automation:trace-record"),
     );

@@ -1,16 +1,5 @@
 /**
  * A reviewer's annotations, served by the API process.
- *
- * What this pins is the queueing path over the REAL `/api/trpc` handler on
- * THIS process's root, through THIS process's policy chain, against what
- * `composeAnnotationFeature` produced — including the answer that is trace
- * storage's rather than Annotation's: which of the ids sent address a trace
- * this project holds.
- *
- * And one named absence, because an absence nobody can observe is
- * indistinguishable from a stub: with no trace read pipeline composed, the
- * reviewer's trace content is refused by name rather than answered as an empty
- * queue, which would tell a reviewer their work was done.
  */
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
@@ -39,10 +28,6 @@ const TEAM_ID = "team-1";
 
 /**
  * The rows the queueing writes, recorded.
- *
- * A double rather than a database, and the assertion is on the WRITE rather
- * than only on the returned object: what the move has to preserve is which
- * rows are touched.
  */
 function testPrisma() {
   const queueItemWrites: Array<Record<string, unknown>[]> = [];

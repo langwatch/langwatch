@@ -174,7 +174,7 @@ function isStructuredValue(data: unknown): data is { type: string; value: unknow
  */
 function extractTextFromMessages(
   data: unknown,
-  mode: "input" | "output" = "input",
+  mode: "input" | "output",
   traceCanonicalisation: TraceCanonicalisationService,
 ): string | null {
   // Handle LangWatch structured value wrapper: {type: "json"|"chat_messages", value: ...}

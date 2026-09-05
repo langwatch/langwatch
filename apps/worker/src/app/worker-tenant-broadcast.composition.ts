@@ -16,7 +16,7 @@ import type { RedisConnection } from "@langwatch/redis-client";
  * subscriber is in the application and type-checks against none of them.
  *
  * Nothing when the deployment configured no Redis. There is no local fallback
- * to take: the application's `BroadcastService` falls back to emitting to the
+ * to take: the application's `BroadcastAdapter` falls back to emitting to the
  * tabs ITS OWN process is serving, and this process serves none. A composition
  * that returned a publisher regardless would accept every broadcast and deliver
  * none of them, which is the failure this whole capability exists to make

@@ -117,7 +117,7 @@ function unconfiguredBlobStore(): TraceBlobStoreService {
   } as unknown as TraceBlobStoreService;
 }
 
-const realIOService = new TraceIOExtractionService(TraceCanonicalisationService.create());
+const realIOService = TraceIOExtractionService.create(TraceCanonicalisationService.create());
 
 /** IO_PREVIEW_BYTES = 64 * 1024 = 65536. */
 const IO_PREVIEW_BYTES = 65536;

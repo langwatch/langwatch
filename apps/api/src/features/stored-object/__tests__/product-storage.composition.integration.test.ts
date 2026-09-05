@@ -1,52 +1,5 @@
 /**
  * A project's own storage, retention and monitoring, served by the API process.
- *
- * The three surfaces that answer for a project's own infrastructure rather than
- * for the product a member runs on it. They were one composition half until
- * each took its own; this suite drives all three together because that is how a
- * process serves them, and because what it pins about the split is that one
- * absent surface no longer costs the other two.
- *
- * What this pins is one call per namespace they mount, each of them made
- * over the REAL `/api/trpc` handler on THIS process's root, through THIS
- * process's policy chain, against the collaborator set
- * the three feature compositions produced. Nothing here reaches a stub
- * through a proxy: the fakes are at the PORTS — a Prisma double, an AuthZ
- * service, a ClickHouse client and a real directory on disk — and everything
- * between the HTTP request and them is the composed graph.
- *
- *   storedObjects.headById       the MOVED store, end to end: the ClickHouse
- *                                repository's row read, the storage registry's
- *                                scheme dispatch, and the local-filesystem
- *                                driver's existence probe against real bytes.
- *                                All three of its answers are driven, because
- *                                the whole point of the probe is telling
- *                                "the file is gone" apart from "that id never
- *                                existed".
- *   dataRetention.getRules       the MOVED snapshot, with the RBAC filter
- *                                observable rather than assumed: a team the
- *                                caller cannot manage is neither offered as a
- *                                writable scope nor allowed to name its own
- *                                rule.
- *   dataRetention.getScopeStorageUsage
- *                                the MOVED scope meter, narrowed to the
- *                                projects the caller may read — a wider scope
- *                                never surfaces storage they could not
- *                                otherwise see.
- *   monitors.getAllForProject    the SAME monitor service the execution half's
- *                                experiment application upserts through,
- *                                answering off this process's own connection.
- *   monitors.getPerformanceForProject
- *                                the seven-day trend, composed over the SAME
- *                                routed ClickHouse the object probe reads and
- *                                folded by the evaluation package's own
- *                                service.
- *
- * And two named absences, because an absence nobody can observe is
- * indistinguishable from a stub: with no ClickHouse at all the seven-day trend
- * refuses by name rather than reporting that no monitor caught anything, and
- * with no plan provider a retention write refuses rather than passing a gate it
- * could not evaluate.
  */
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -168,10 +121,6 @@ function testPrisma() {
 
 /**
  * The AuthZ service every declared check and every scope filter runs on.
- *
- * The caller manages `team-1` and may update `project-1`, and neither for the
- * second team's project. That asymmetry is the whole point: it is what makes
- * the RBAC filter observable rather than asserted.
  */
 function testAuthz(): AuthzService {
   return {
@@ -207,16 +156,10 @@ function testAuthz(): AuthzService {
   } as unknown as AuthzService;
 }
 
-/** The routed ClickHouse connection the object repository reads through. */
 /**
- * The rows the trend query answers with: one day inside the current window and
- * one inside the previous, for whichever evaluator the caller asked about.
- *
- * Both axes on every row, because which one the page charts is the monitor's
- * own answer: the evaluator this file lists is a guardrail, so the trend is
- * its pass RATE and the scores beside it are the ones a non-guardrail monitor
- * would have been folded on instead.
+ * The routed ClickHouse connection the object repository reads through.
  */
+/** The rows the trend query answers with: one day inside the current window and one i */
 function performanceRows(params: Record<string, unknown>): Array<Record<string, unknown>> {
   const evaluatorIds = (params.evaluatorIds as string[] | undefined) ?? [];
   return evaluatorIds.flatMap((evaluatorId) => [
@@ -571,12 +514,9 @@ describe("given an API process composed with the object store, retention and mon
 
     describe("and this deployment keeps its bytes in Azure Blob", () => {
       /**
-       * The registry registers the Azure driver as a FACTORY, so nothing is
-       * constructed until an `azure-blob://` URI is actually read. What this
-       * pins is that reading one reaches AZURE — the request goes to the
-       * configured account endpoint under a shared-key signature — rather than
-       * being refused by scheme or answered by the S3 driver, which would
-       * report a file gone that is not.
+       * The registry registers the Azure driver as a FACTORY, so nothing is constructed until an `azure-blob://` URI is actually read. What this pins is
+       * that reading one reaches AZURE — the request goes to the configured account endpoint under a shared-key signature — rather than being refused by
+       * scheme or answered by the S3 driver, which would report a file gone that is not.
        */
       it("probes the bytes through the Azure driver, at the configured account", async () => {
         const requests: Array<{ url: string; method: string; authorization: string }> = [];
@@ -617,10 +557,9 @@ describe("given an API process composed with the object store, retention and mon
 
     describe("and the object is on Azure but this deployment configured no account", () => {
       /**
-       * The credential resolver refuses BY NAME rather than the read reporting
-       * the object gone. A deployment that lost its Azure configuration has
-       * files it cannot reach, not files that were deleted, and the two answers
-       * lead an operator to opposite actions.
+       * The credential resolver refuses BY NAME rather than the read reporting the object gone. A deployment
+       * that lost its Azure configuration has files it cannot reach, not files that were deleted, and the two
+       * answers lead an operator to opposite actions.
        */
       it("refuses rather than reporting the file missing", async () => {
         const { application } = composeApplication();
@@ -796,9 +735,8 @@ describe("given an API process composed with the object store, retention and mon
 
   describe("when the object store did not compose", () => {
     /**
-     * Before these three separated they were one half, and a process holding
-     * no byte backend composed NONE of the record — the retention settings and
-     * the monitors page went with the object store, and the seal named the
+     * Before these three separated they were one half, and a process holding no byte backend composed NONE of the
+     * record — the retention settings and the monitors page went with the object store, and the seal named the
      * half rather than the surface.
      */
     it("refuses the object probe by name", async () => {

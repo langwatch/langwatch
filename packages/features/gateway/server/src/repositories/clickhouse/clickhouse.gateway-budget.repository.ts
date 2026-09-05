@@ -1,44 +1,5 @@
 /**
  * The gateway budget ledger in ClickHouse.
- *
- * Replaces the old PG `GatewayBudgetLedger.create` + `GatewayBudget.spentUsd`
- * counter path. The gateway does not POST debits: it emits spend commands
- * for every request, and the debits process manager on the gateway-spend
- * pipeline calls `insertDebitsForBudgets` here once per applicable budget.
- * It is the only writer of these tables.
- *
- * Tables:
- *   - gateway_budget_ledger_events      — ReplacingMergeTree, idempotent by
- *                                         (TenantId, BudgetId, GatewayRequestId)
- *     That key means "one debit per budget per request" and carries no
- *     bucket: a budget can own many buckets (GROUP one per member,
- *     ATTRIBUTED_USER one per end user), a request resolves exactly one of
- *     them, and two writers disagreeing about which would not produce two
- *     rows but collapse to one, filing the spend under whichever bucket
- *     won. Single-writer ownership is what keeps bucket filing correct.
- *   - gateway_budget_scope_totals       — AggregatingMergeTree rollup per
- *                                         (scope, scope_id, window,
- *                                          period_start, budget_id)
- *   - gateway_budget_scope_totals_mv    — MV feeding the rollup from events
- *
- * The rollup carries the budget because the ledger does. One request that
- * resolves a hard cap and a soft cap on the same virtual key writes two
- * rows under the same scope, scope id and window, each the request's true
- * cost. An aggregate that dropped the budget from its key would fold both
- * into one bucket and report every budget sharing that bucket at N times
- * what it actually spent. Every read here names its budget for the same
- * reason; see `bucketMatchSql`.
- *
- * Money is the integer nano-USD the request was priced in, carried on
- * `AmountNanoUSD` and summed there. `AmountUSD` is a `Decimal(18, 6)` that
- * cannot hold a nano figure, so it renders a single debit for the audit read
- * and is never summed: rounding each debit to a micro-USD and then adding
- * them is not the amount anybody spent, and the gap grows with request count.
- *
- * See: migration 00017_create_gateway_budget_ledger.sql
- * See: migration 00069_gateway_budget_scope_totals_budget_grain.sql
- * See: migration 00070_gateway_budget_ledger_nano_usd.sql
- * See: specs/ai-gateway/_shared/contract.md §4.5
  */
 
 import { createLogger } from "@langwatch/observability";
@@ -64,15 +25,9 @@ const EVENTS_TABLE = "gateway_budget_ledger_events" as const;
 const TOTALS_TABLE = "gateway_budget_scope_totals" as const;
 
 /**
- * How far back the budget detail page's recent-activity panel looks. Wide
- * enough to cover several periods of the longest recurring window the
- * product offers, a month, and narrow enough that the read prunes to a
- * handful of `toYYYYMM(OccurredAt)` partitions.
- *
- * A TOTAL-window budget never resets, so its history can run past this
- * bound. The panel still shows only the last 90 days for it: it answers
- * "what has been happening lately", not "everything this budget ever
- * spent", which is what the totals on the same page are for.
+ * How far back the budget detail page's recent-activity panel looks. Wide enough to cover several periods of the
+ * longest recurring window the product offers, a month, and narrow enough that the read prunes to a handful of
+ * `toYYYYMM(OccurredAt)` partitions.
  */
 const RECENT_EVENTS_LOOKBACK_DAYS = 90;
 
@@ -90,10 +45,9 @@ type BudgetDebitRow = {
   providerKey?: string | null;
   gatewayRequestId: string;
   /**
-   * What the request cost, as the integer nano-USD it was priced in. The only
-   * amount a caller states: the `AmountUSD` column is written from this one,
-   * so the two cannot drift apart, and it is a `Decimal(18, 6)` that a nano
-   * figure does not fit in, which is why it is not the one that gets summed.
+   * What the request cost, as the integer nano-USD it was priced in. The only amount a caller states: the
+   * `AmountUSD` column is written from this one, so the two cannot drift apart, and it is a `Decimal(18, 6)` that
+   * a nano figure does not fit in, which is why it is not the one that gets summed.
    */
   amountNanoUsd: number;
   tokensInput: number;
@@ -108,21 +62,16 @@ type BudgetDebitRow = {
 };
 
 /**
+ * Non-enforcement is structural, not a flag: this string is deliberately NOT a `GatewayBudgetScopeType`, so a budget under it cannot be created, and every
+ * enforcement read resolves real budgets first. There is nothing to remember to check.
  * The ledger scope pulled provider cost is written under (ADR-088).
- *
- * Non-enforcement is structural, not a flag: this string is deliberately NOT
- * a `GatewayBudgetScopeType`, so a budget under it cannot be created, and
- * every enforcement read resolves real budgets first. There is nothing to
- * remember to check.
  */
 export const PULLED_USAGE_SCOPE = "pulled" as const;
 
 /**
- * The synthetic budget id every pulled row carries. The ledger's storage key
- * is `(TenantId, BudgetId, GatewayRequestId)` and demands one; this is not a
- * cuid, so it can never equal a real `GatewayBudget.id`. Sharing one value
- * across all pulled rows also keeps them contiguous under the sorting key, so
- * the read below stays an index seek.
+ * The synthetic budget id every pulled row carries. The ledger's storage key is `(TenantId, BudgetId, GatewayRequestId)` and demands one; this is not a cuid,
+ * so it can never equal a real `GatewayBudget.id`. Sharing one value across all pulled rows also keeps them contiguous under the sorting key, so the read
+ * below stays an index seek.
  */
 export const PULLED_USAGE_BUDGET_ID = "pulled" as const;
 
@@ -192,12 +141,9 @@ export type BudgetBucketBoundary = {
 };
 
 /**
- * One budget's read target. `scopeId` is the ledger bucket, not the
- * budget's target: a provider-filtered budget and a per-member GROUP
- * allowance each accrue under their own key (see `bucketScopeIdFor` /
- * `groupBucketScopeId`). `match: "prefix"` sums every bucket under the
- * key, which is how a GROUP budget reports what a whole group has
- * spent when no single member is in context.
+ * One budget's read target. `scopeId` is the ledger bucket, not the budget's target: a provider-filtered budget and a per-member GROUP allowance each accrue
+ * under their own key (see `bucketScopeIdFor` / `groupBucketScopeId`). `match: "prefix"` sums every bucket under the key, which is how a GROUP budget reports
+ * what a whole group has spent when no single member is in context.
  */
 export type BudgetSpendTarget = {
   budgetId: string;
@@ -206,31 +152,23 @@ export type BudgetSpendTarget = {
   window: GatewayBudgetWindow;
   match?: "exact" | "prefix";
   /**
-   * Only meaningful with `match: "prefix"`. A string anchors the bucket's
-   * provider suffix (`|provider:<key>`) so a provider-filtered group
-   * budget matches its own buckets; null/undefined requires the bucket to
-   * carry NO provider suffix, so an unfiltered group budget does not
-   * absorb a filtered sibling's buckets on the same group.
+   * Only meaningful with `match: "prefix"`. A string anchors the bucket's provider suffix (`|provider:<key>`) so a
+   * provider-filtered group budget matches its own buckets; null/undefined requires the bucket to carry NO
+   * provider suffix, so an unfiltered group budget does not absorb a filtered sibling's buckets on the same group.
    */
   bucketSuffix?: string | null;
   /**
-   * Lower bound (unix ms) for the spend read when the budget's period
-   * boundary is NOT the calendar one: always set for MANUAL windows
-   * (currentPeriodStartedAt) and set on calendar windows after a
-   * mid-period reset (until the next calendar boundary passes). Targets
-   * with a floor read the raw ledger events bounded by OccurredAt instead
-   * of the rollup's PeriodStart-equality fast path, which cannot see a
-   * moved boundary.
+   * Lower bound (unix ms) for the spend read when the budget's period boundary is NOT the calendar one: always set for MANUAL windows
+   * (currentPeriodStartedAt) and set on calendar windows after a mid-period reset (until the next calendar boundary passes). Targets with a floor read the
+   * raw ledger events bounded by OccurredAt instead of the rollup's PeriodStart-equality fast path, which cannot see a moved boundary.
    */
   periodFloorMs?: number;
 };
 
 /**
- * Read-shape for ledger events. Mirrors the columns previously read off
- * the PG `GatewayBudgetLedger` table, scoped to whatever the caller needs
- * (one VK, one budget, or all VKs in a project). All fields use the same
- * names as the equivalent Prisma row so call sites can be migrated with
- * minimal shape juggling.
+ * Read-shape for ledger events. Mirrors the columns previously read off the PG `GatewayBudgetLedger` table, scoped
+ * to whatever the caller needs (one VK, one budget, or all VKs in a project). All fields use the same names as the
+ * equivalent Prisma row so call sites can be migrated with minimal shape juggling.
  */
 export type LedgerEventRow = {
   id: string; // GatewayRequestId — unique within (tenant, budget)
@@ -248,9 +186,6 @@ export type LedgerEventRow = {
 
 /**
  * Raw shape of a per-bucket spend row, in the ledger's column casing.
- *
- * ClickHouse serializes an `Int64` sum as a string, which is what keeps a
- * money total past 2^53 from arriving already rounded.
  */
 type BucketSpendRow = { ScopeId: string; SpentNanoUSD: string };
 
@@ -265,10 +200,9 @@ type RollupScopeRow = {
 type ClickHouseClientFor = Awaited<ReturnType<GatewayClickHouseResolver>>;
 
 /**
- * Everything the two per-bucket reads share: the bound parameters, the
- * predicate that selects one budget's buckets, and the per-bucket floors
- * for buckets whose own boundary has moved. Built once so the rollup path
- * and the raw-ledger path cannot drift apart on which buckets they mean.
+ * Everything the two per-bucket reads share: the bound parameters, the predicate that selects one budget's
+ * buckets, and the per-bucket floors for buckets whose own boundary has moved. Built once so the rollup path and
+ * the raw-ledger path cannot drift apart on which buckets they mean.
  */
 type BucketQueryShape = {
   params: Record<string, string | number | string[]>;
@@ -292,43 +226,9 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
   }
 
   /**
-   * Insert one debit row per applicable budget. Idempotency is structural at
-   * the ledger table level (ReplacingMergeTree on (TenantId, BudgetId,
-   * GatewayRequestId) collapses replays on merge), but the
-   * gateway_budget_scope_totals materialised view aggregates at INSERT time
-   * and does NOT dedup. Without a pre-insert guard, replaying the same
-   * gateway_request_id multiplies the rollup totals (3 fires of $0.0125 →
-   * $0.0375 enforced against the budget until the merge eventually fires,
-   * which can be hours later or never if the ledger sees no further
-   * activity).
-   *
-   * App-side dedup: skip the insert entirely if any row for this
-   * (TenantId, GatewayRequestId) already exists in the ledger. The ledger
-   * ORDER BY is `(TenantId, BudgetId, GatewayRequestId)` so this query
-   * hits the index and is sub-millisecond. All rows in a single insertDebit
-   * call share the same gateway_request_id (one debit = one request = one
-   * batch covering every applicable budget) so a single existence probe
-   * covers the whole batch.
-   *
-   * Probe-then-insert is not atomic, and that is survivable here for
-   * structural reasons, not luck. The rollup MV aggregates at INSERT time
-   * (a duplicate row double-counts it forever; the ReplacingMergeTree only
-   * collapses the raw rows), so what actually prevents doubles:
-   *
-   *   1. One writer, full stop: the debits process manager on the
-   *      gateway-spend pipeline is the only thing that writes this ledger,
-   *      so no two writers can claim the same (budget, request) pair.
-   *   2. Within that writer, execution is serialized per aggregate
-   *      (process-manager streams are per-aggregate FIFO), so two fires for
-   *      the same request never run concurrently; retries run after the
-   *      failed attempt.
-   *   3. Inserts wait for durability (wait_for_async_insert: 1), so a
-   *      retry's probe sees the rows a crashed-after-insert attempt wrote.
-   *
-   * Residual window, accepted and named: replaying the same aggregate
-   * concurrently from TWO operator sessions can land between another
-   * session's probe and insert. Replay is an ops action; run one at a
-   * time per aggregate.
+   * Insert one debit row per applicable budget. Idempotency is structural at the ledger table level (ReplacingMergeTree on (TenantId, BudgetId, GatewayRequestId) collapses replays on merge), but the
+   * gateway_budget_scope_totals materialised view aggregates at INSERT time and does NOT dedup. Without a pre-insert guard, replaying the same gateway_request_id multiplies the rollup totals (3 fires of $0.0125 →
+   * $0.0375 enforced against the budget until the merge eventually fires, which can be hours later or never if the ledger sees no further activity).
    */
   async insertDebit(rows: BudgetDebitRow[]): Promise<void> {
     if (rows.length === 0) return;
@@ -406,39 +306,8 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
   }
 
   /**
-   * The pulled-usage write (ADR-088). Cost the customer already spent
    * DIRECTLY with a provider, pulled from that provider's own record.
-   *
-   * It is a separate method from `insertDebit` / `insertDebitsForBudgets` on
-   * purpose, and the separation is the non-enforcement guarantee. Those two
-   * take a `GatewayBudgetScopeType` and a real `GatewayBudget.id`; this one
-   * takes neither. It writes the constant `Scope = "pulled"` — which is not a
-   * `GatewayBudgetScopeType` and so cannot be the scope of any budget that
-   * could ever exist — under the constant `BudgetId = "pulled"`, which is not
-   * a cuid and so cannot be any budget's id. Enforcement resolves real budget
-   * rows and sums ledger rows matching them; there is no budget these rows
-   * match, so no resolver reaches them. Nothing here is a flag anything has
-   * to remember to check.
-   *
-   * Restatement rides the table's own machinery. `GatewayRequestId` is the
-   * dimension-only restatement key, so every version of one bucket collapses
-   * to one row, and `EventTimestamp` is `observedAt` — the monotonic pull
-   * instant — so the ReplacingMergeTree keeps the newest observation. The
-   * `pulled:` prefix on the request id is load-bearing rather than cosmetic:
-   * `insertDebit` skips a real gateway debit when ANY row already exists for
-   * its `(TenantId, GatewayRequestId)`, so a restatement key that happened to
-   * equal a gateway ULID would silently suppress a customer's real debit. The
-   * prefix makes that collision impossible by construction.
-   *
-   * Reads must NOT trust the merge to have happened — see
-   * `readPulledUsageTotals`, which collapses with `argMax` over
-   * `EventTimestamp`. A bare read of an unmerged table would show a superseded
-   * figure, and on money that is not a staleness bug, it is a wrong number.
-   *
-   * `Status` is always `'success'`: these rows are spend that already
-   * happened, not attempts. That is also exactly why the rollup materialised
-   * view has to exclude them explicitly — its filter is `Status = 'success'`,
-   * which these rows satisfy — see migration 00073.
+   * The pulled-usage write (ADR-088). Cost the customer already spent
    */
   async insertPulledUsageRows(rows: PulledUsageRow[]): Promise<void> {
     if (rows.length === 0) return;
@@ -500,18 +369,6 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
 
   /**
    * The subset of a pulled batch that actually says something new.
-   *
-   * "An unchanged re-pull records nothing new", enforced where the money is.
-   * The command boundary keeps a corrected bucket distinct from an unchanged
-   * one, but an identical observation still arrives here on every pull of a
-   * window that has not drained, and writing it would churn the ledger for no
-   * change in what anybody is owed.
-   *
-   * The comparison is against the LATEST version per key (`argMax` over
-   * `EventTimestamp`), not against whatever row a merge happens to have left
-   * behind. Comparing against a superseded row would resurrect it: a bucket
-   * corrected $10 → $12 and then re-pulled at $12 would look "changed"
-   * relative to the stale $10 and write a third row saying $12 again.
    */
   private async pulledRowsThatChanged({
     tenantId,
@@ -521,14 +378,10 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
     rows: PulledUsageRow[];
   }): Promise<PulledUsageRow[]> {
     const client = await this.resolveClient(tenantId);
-    // The batch's own bucket span, which is what makes this a partition-pruned
-    // read instead of a full-history scan. `OccurredAt` is the partition key,
-    // and a probe without it touches every partition the tenant has ever
-    // written — including whatever has aged onto S3 — on every single pull.
-    // A restatement always carries its ORIGINAL bucket time (that is what
-    // makes it a restatement), so any prior version of these rows is inside
-    // this span by construction; the day of slack on each side is for a
-    // provider that nudges a bucket boundary, not for correctness.
+    // The batch's own bucket span, which is what makes this a partition-pruned read instead of a full-history scan. `OccurredAt` is the partition key, and
+    // a probe without it touches every partition the tenant has ever written — including whatever has aged onto S3 — on every single pull. A restatement
+    // always carries its ORIGINAL bucket time (that is what makes it a restatement), so any prior version of these rows is inside this span by
+    // construction; the day of slack on each side is for a provider that nudges a bucket boundary, not for correctness.
     const occurredAtMs = rows.map((r) => r.occurredAt.getTime());
     const SPAN_SLACK_MS = 24 * 60 * 60 * 1000;
     const probe = await client.query({
@@ -582,17 +435,6 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
 
   /**
    * Pulled cost for one org/team scope, collapsed to one row per usage item.
-   *
-   * The shape mirrors the READ that already surfaces ingestion cost
-   * (`personalUsage.clickhouse.repository.ts`'s principal query): filter by tenant, scope
-   * and scope id, never by budget. It does not mirror that query's WRITE —
-   * principal rows carry real budgets and do enforce; these carry none.
-   *
-   * `argMax` over `EventTimestamp` rather than a bare `sum`, and rather than
-   * `FINAL`: a restatement is a second row until the merge collapses it, and
-   * the merge can be hours away or never. Summing raw rows would add a
-   * corrected figure to the one it corrects; trusting the merge would report
-   * whichever version happened to survive. Neither is acceptable on money.
    */
   async readPulledUsageTotals({
     tenantId,
@@ -665,13 +507,9 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
   }
 
   /**
-   * The debit insert the writer uses. One request resolves several budgets
-   * and each lands its own row, so the probe is per (BudgetId,
-   * GatewayRequestId) rather than the whole-request one insertDebit takes:
-   * a whole-request probe would see the first budget's row and silently
-   * skip every other budget the same request owes. Per budget, a replay
-   * still dedups. The probe-then-insert race analysis on insertDebit
-   * applies verbatim.
+   * The debit insert the writer uses. One request resolves several budgets and each lands its own row, so the probe is per (BudgetId, GatewayRequestId)
+   * rather than the whole-request one insertDebit takes: a whole-request probe would see the first budget's row and silently skip every other budget the same
+   * request owes. Per budget, a replay still dedups. The probe-then-insert race analysis on insertDebit applies verbatim.
    */
   async insertDebitsForBudgets(rows: BudgetDebitRow[]): Promise<void> {
     if (rows.length === 0) return;
@@ -700,12 +538,10 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
         r.ScopeId,
       ]),
     );
-    // A budget already on this request suppresses the row, which is how a
-    // replay stays idempotent. When the row that already sits there names
-    // a DIFFERENT bucket, the suppression is not a replay: the ledger keys
-    // rows by (TenantId, BudgetId, GatewayRequestId) with no bucket in the
-    // key, so a disagreement about the bucket silently drops one side's
-    // spend from whichever bucket enforcement reads. Never quiet.
+    // A budget already on this request suppresses the row, which is how a replay stays idempotent. When the row
+    // that already sits there names a DIFFERENT bucket, the suppression is not a replay: the ledger keys rows by
+    // (TenantId, BudgetId, GatewayRequestId) with no bucket in the key, so a disagreement about the bucket
+    // silently drops one side's spend from whichever bucket enforcement reads. Never quiet.
     for (const row of rows) {
       const seenScopeId = existing.get(row.budgetId);
       if (seenScopeId === undefined || seenScopeId === row.scopeId) continue;
@@ -748,18 +584,9 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
   }
 
   /**
-   * Same as `getSpendForBudgets` but sums spend across multiple tenants
-   * (projects). Used by `GatewayBudgetService.list()` /
-   * `listForProject()` to render the org-level budget table — those
-   * paths span every project in the org/team, and ORG/TEAM/PRINCIPAL-
-   * scoped budgets accumulate ledger rows under whichever project
-   * actually emitted the trace (TenantId on the ledger row = the
-   * project the trace landed in, not the budget's scope).
-   *
-   * Without this, list() reads `GatewayBudget.spentUsd` from PG which
-   * is the legacy column that's no longer updated post-cutover — every
-   * budget in the list view shows $0.00 / 0% even when CH has real
-   * ledger rows.
+   * Same as `getSpendForBudgets` but sums spend across multiple tenants (projects). Used by `GatewayBudgetService.list()` / `listForProject()` to render the
+   * org-level budget table — those paths span every project in the org/team, and ORG/TEAM/PRINCIPAL- scoped budgets accumulate ledger rows under whichever
+   * project actually emitted the trace (TenantId on the ledger row = the project the trace landed in, not the budget's scope).
    */
   async getSpendForBudgetsAcrossTenants(
     tenantIds: string[],
@@ -774,14 +601,8 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
   }
 
   /**
-   * The one spend read. Sums the rollup for each target's bucket in its
-   * own current period, across every tenant given.
-   *
-   * A target's `scopeId` is the ledger bucket, so a provider-filtered
-   * budget reads only its provider's spend and a per-member group
-   * allowance reads only that member's, the same keys the fold writes.
-   * `match: "prefix"` is how a group budget totals all its members
-   * when no single member is in context.
+   * The one spend read. Sums the rollup for each target's bucket in its own
+   * current period, across every tenant given.
    */
   async getSpendForTargetsAcrossTenants(
     tenantIds: string[],
@@ -822,12 +643,9 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
   }
 
   /**
-   * Spend for the targets whose period floor has moved off the calendar:
-   * MANUAL windows, anchored windows, and calendar windows reset
-   * mid-period. The floor sits inside the rollup's calendar bucket, which
-   * cannot answer it, so the total is summed straight off the ledger,
-   * successful requests only. An anchored budget lives here permanently:
-   * its periods never coincide with the calendar ones the rollup keys on.
+   * Spend for the targets whose period floor has moved off the calendar: MANUAL windows, anchored windows, and calendar windows reset mid-period. The floor
+   * sits inside the rollup's calendar bucket, which cannot answer it, so the total is summed straight off the ledger, successful requests only. An anchored
+   * budget lives here permanently: its periods never coincide with the calendar ones the rollup keys on.
    */
   private async readFlooredTargetSpend(
     tenantIds: string[],
@@ -937,30 +755,8 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
   }
 
   /**
-   * Every bucket of one fanned-out budget, with what that bucket has spent
-   * in the current period.
-   *
-   * An ATTRIBUTED_USER template is a single budget row that fans out into
-   * one bucket per end user (`<anchor>:<endUserId>`), so its spend is not a
-   * number: it is a distribution. This read hands back the raw pairs and
-   * leaves the counting to the caller. One budget per call, because the
-   * number of templates an organization runs is single digits while the
-   * number of buckets under one template is not.
-   *
-   * What the pairs mean, which is what any count built on them inherits:
-   *
-   *   - A bucket appears here when it has at least one SUCCESS row in the
-   *     current period after its floor. Spend of $0 still counts as seen:
-   *     an end user served entirely by an unpriced model is a person the
-   *     template is watching. A user whose every request failed is not,
-   *     because failure rows never accrue spend anywhere.
-   *   - `spentUsd` is directly comparable to the budget's `limitUsd` with
-   *     `>=`, the comparator the gateway blocks on.
-   *
-   * Buckets are matched by `startsWith(ScopeId, '<anchor>:')`. The trailing
-   * colon earns its place twice: it excludes rows written against the bare
-   * anchor, and it stops an anchor from swallowing the buckets of another
-   * anchor whose id merely begins with the same characters.
+   * Every bucket of one fanned-out budget, with what that bucket has spent in the
+   * current period.
    */
   async getBucketSpendBreakdownForBudget(args: {
     budget: GatewayBudgetSpendRecord;
@@ -994,13 +790,8 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
 
   /**
    * Bucket spend for a budget still on its calendar boundary. The rollup
-   * pre-aggregates one row per bucket per period, which is exactly the
-   * question being asked.
-   *
-   * Buckets whose own boundary moved are unanswerable there, so they are
-   * re-read from the raw ledger and overwrite what the rollup said. One
-   * with nothing left after its floor drops out entirely: a bucket with no
-   * spend in the current period is not a person the template saw.
+   * pre-aggregates one row per bucket per period, which is exactly the question
+   * being asked.
    */
   private async rollupBucketSpend(args: {
     client: ClickHouseClientFor;
@@ -1058,11 +849,9 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
   }
 
   /**
-   * Bucket spend for a budget whose own boundary moved: a MANUAL window, or
-   * a template reset mid-period. The floor now sits inside the rollup's
-   * calendar bucket, which cannot answer it, so the whole read goes to the
-   * raw ledger. Buckets with a boundary of their own keep it; every other
-   * bucket reads from the template's floor.
+   * Bucket spend for a budget whose own boundary moved: a MANUAL window, or a template reset mid-period. The floor
+   * now sits inside the rollup's calendar bucket, which cannot answer it, so the whole read goes to the raw
+   * ledger. Buckets with a boundary of their own keep it; every other bucket reads from the template's floor.
    */
   private async flooredBucketSpend(args: {
     client: ClickHouseClientFor;
@@ -1129,22 +918,9 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
   }
 
   /**
-   * Most recent ledger events for a single budget, ordered by `OccurredAt`
-   * descending. Used by the budget detail page to render the recent-activity
-   * panel (post-cutover replacement for `prisma.gatewayBudgetLedger.findMany`
+   * Most recent ledger events for a single budget, ordered by `OccurredAt` descending. Used by the budget detail
+   * page to render the recent-activity panel (post-cutover replacement for `prisma.gatewayBudgetLedger.findMany`
    * in budget.service.ts:getDetail).
-   *
-   * Takes the full tenant fan-out because the ledger is sharded on
-   * TenantId = the project the trace landed in: an org, team, principal,
-   * or per-member group budget accrues rows under every project that
-   * emitted a matching trace, so reading a single tenant would render
-   * "No usage yet" on a budget that is actively debiting.
-   *
-   * Bounded by {@link RECENT_EVENTS_LOOKBACK_DAYS} on `OccurredAt`, the
-   * table's partition key: without it ClickHouse opens every monthly
-   * partition the budget has ever written to before it can sort and take
-   * the top rows. The panel asks for recent activity, so the window is
-   * part of the question, not a shortcut.
    */
   async recentEventsForBudget(
     tenantIds: string[],
@@ -1201,12 +977,6 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
 
   /**
    * Namespaces a restatement key inside the `GatewayRequestId` column.
-   *
-   * `insertDebit` treats the existence of ANY row for a `(TenantId,
-   * GatewayRequestId)` as proof that request was already debited, and skips.
-   * Without this prefix, a restatement key that collided with a gateway ULID
-   * would suppress a customer's real debit — money silently missing from
-   * enforcement. The two id spaces are kept disjoint by construction instead.
    */
   private static pulledRequestId(restatementKey: string): string {
     return `${PULLED_USAGE_SCOPE}:${restatementKey}`;
@@ -1282,18 +1052,9 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
   }
 
   /**
-   * The SQL that says a row belongs to one target: the target's own budget,
-   * in a single bucket or in every bucket under the anchor carrying the
-   * target's provider suffix. An unfiltered target matches only buckets
-   * carrying no suffix at all, so it never absorbs a provider-filtered
-   * sibling's spend.
-   *
-   * `BudgetId` is not redundant with the bucket. The ledger writes one row
-   * per (budget, request), so a request that resolves a hard cap and a soft
-   * cap on the same virtual key writes two rows carrying the same cost under
-   * the same scope, scope id and window. Matching on the bucket alone sums
-   * both of them into each budget, reporting every budget at N times its
-   * true spend for N budgets sharing the bucket.
+   * The SQL that says a row belongs to one target: the target's own budget, in a single bucket or in every bucket
+   * under the anchor carrying the target's provider suffix. An unfiltered target matches only buckets carrying no
+   * suffix at all, so it never absorbs a provider-filtered sibling's spend.
    */
   private static bucketMatchSql(
     target: BudgetSpendTarget,
@@ -1312,10 +1073,9 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
   }
 
   /**
-   * One conditional sum per floored target, aliased `T<i>`, with the
-   * parameters it binds. Conditioned per target rather than per bucket so two
-   * budgets sharing a bucket with different boundaries each get their own
-   * total.
+   * One conditional sum per floored target, aliased `T<i>`, with the parameters
+   * it binds. Conditioned per target rather than per bucket so two budgets
+   * sharing a bucket with different boundaries each get their own total.
    */
   private static flooredTargetSums(targets: BudgetSpendTarget[]): {
     sql: string;
@@ -1406,13 +1166,9 @@ export class GatewayBudgetClickHouseRepository extends GatewayBudgetSpendPort {
   }
 
   /**
-   * What one target's buckets total in a rollup result. The query asks for
-   * every target in the window at once, so the rows come back mixed and each
-   * target picks out its own.
-   *
-   * The sum stays in integers. A group budget totals one row per member here,
-   * and adding those as floats would put drift back into a figure the ledger
-   * holds exactly.
+   * What one target's buckets total in a rollup result. The query asks for every
+   * target in the window at once, so the rows come back mixed and each target
+   * picks out its own.
    */
   private static sumRollupRowsForTarget(rows: RollupScopeRow[], target: BudgetSpendTarget): bigint {
     const scope = GatewayBudgetClickHouseRepository.scopeToClickHouse(target.scope);

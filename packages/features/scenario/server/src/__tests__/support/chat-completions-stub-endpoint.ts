@@ -138,7 +138,9 @@ export async function startEndpoint(rule: EndpointRule = "accept"): Promise<Stub
 
   const server: Server = createServer((req, res) => {
     let raw = "";
-    req.on("data", (chunk: Buffer) => (raw += chunk.toString()));
+    req.on("data", (chunk: Buffer) => {
+      raw += chunk.toString();
+    });
     req.on("end", () => {
       const body = JSON.parse(raw) as Record<string, unknown>;
       bodies.push(body);

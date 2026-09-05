@@ -59,7 +59,7 @@ export function buildTasksCatalogue({
       database: () => host.requirePrisma(),
       cipher: () => modelProviderCredentialCipherFromEnv({ key: host.config.credentialsSecret }),
     }),
-    SlackAlertTask.create(),
+    SlackAlertTask.create({ baseHost: process.env.BASE_HOST ?? "" }),
     buildObjectStorageMigrateTask({ host }),
     buildStalledRunsBackfillTask({ host, eventing }),
     buildAnnotationClickHouseBackfillTask({ host, eventing }),

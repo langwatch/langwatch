@@ -133,13 +133,9 @@ function getAnnotatedType(spanAttributes: NormalizedAttributes, attrKey: string)
 }
 
 /**
- * Extracts input from canonical span attributes only.
- * After canonicalization, input is at:
- * 1. gen_ai.input.messages (chat messages)
- * 2. langwatch.input (text/json/structured)
- * 3. gen_ai.tool.call.arguments (tool spans from semconv-native emitters —
- *    e.g. Copilot CLI — whose ingest path never lifted them into
- *    langwatch.input)
+ * Extracts input from canonical span attributes only. After canonicalization, input is at: 1. gen_ai.input.messages (chat messages) 2. langwatch.input
+ * (text/json/structured) 3. gen_ai.tool.call.arguments (tool spans from semconv-native emitters — e.g. Copilot CLI — whose ingest path never lifted them into
+ * langwatch.input)
  */
 function extractInput(spanAttributes: NormalizedAttributes): SpanInputOutput | null {
   // Priority 1: gen_ai.input.messages → always chat_messages
@@ -226,11 +222,9 @@ function parseJsonOrText(value: unknown): SpanInputOutput {
 }
 
 /**
- * Extracts output from canonical span attributes only.
- * After canonicalization, output is at:
- * 1. gen_ai.output.messages (chat messages)
- * 2. langwatch.output (text/json/structured)
- * 3. gen_ai.tool.call.result (tool spans from semconv-native emitters)
+ * Extracts output from canonical span attributes only. After canonicalization, output is at: 1.
+ * gen_ai.output.messages (chat messages) 2. langwatch.output (text/json/structured) 3. gen_ai.tool.call.result
+ * (tool spans from semconv-native emitters)
  */
 function extractOutput(spanAttributes: NormalizedAttributes): SpanInputOutput | null {
   // Priority 1: gen_ai.output.messages → always chat_messages
@@ -417,19 +411,8 @@ function extractContexts(spanAttributes: NormalizedAttributes): RAGChunk[] | und
 }
 
 /**
- * Extracts error information from span status, preferring the OTel
- * exception event's structured attributes over the span-level statusMessage.
- *
- * Priority (first hit wins):
- *   1. Newest exception event's attributes["exception.message"]
- *   2. Span-level attributes["exception.message"]
- *   3. statusMessage
- *   4. "Unknown error"
- *
- * Rationale: upstream instrumentors (incl. our Go gateway — see iter 68
- * 86aad630d) attach rich actionable text on the exception event itself;
- * statusMessage is often a short HTTP-status summary ("Bad Request") that
- * loses the actionable detail.
+ * Extracts error information from span status, preferring the OTel exception
+ * event's structured attributes over the span-level statusMessage.
  */
 function extractError(
   statusCode: NormalizedStatusCode | null,
@@ -474,13 +457,8 @@ export class TraceLegacySpanMappingService {
   }
 
   /**
-   * Converts flat dot-notation keys into nested objects.
-   * e.g. {"gen_ai.usage.input_tokens": 100} → {"gen_ai": {"usage": {"input_tokens": 100}}}
-   * Keys without dots stay at top level. Leaf values (arrays, objects, scalars) stay as-is.
-   *
-   * Delegates to shared safeUnflatten utility which uses Object.create(null)
-   * and DANGEROUS_KEYS blocklist for prototype pollution protection.
-   *
+   * Converts flat dot-notation keys into nested objects. e.g. {"gen_ai.usage.input_tokens": 100} → {"gen_ai": {"usage": {"input_tokens": 100}}} Keys without
+   * dots stay at top level. Leaf values (arrays, objects, scalars) stay as-is.
    * @internal Exported for unit testing
    */
   static unflattenDotNotation(flat: NormalizedAttributes): Record<string, unknown> {

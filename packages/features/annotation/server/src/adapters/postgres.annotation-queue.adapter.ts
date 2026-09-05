@@ -1,5 +1,5 @@
 import {
-  createPrismaAnnotationQueueStore,
+  PrismaAnnotationQueueRepository,
   type AnnotationQueueDatabase,
 } from "../repositories/prisma/prisma.annotation-queue.repository";
 
@@ -25,6 +25,6 @@ export class PostgresAnnotationQueueAdapter {
    * check inside the repository is what proves the port is answered in full.
    */
   build() {
-    return createPrismaAnnotationQueueStore(this.options.database);
+    return PrismaAnnotationQueueRepository.create(this.options.database);
   }
 }

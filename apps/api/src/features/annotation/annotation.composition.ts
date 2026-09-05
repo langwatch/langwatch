@@ -6,7 +6,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import {
   AnnotationApp,
-  createOrUpdateQueueItems,
+  AnnotationQueueingService,
   PostgresAnnotationAdapter,
   PostgresAnnotationQueueAdapter,
   type AnnotationTrpcPorts,
@@ -128,7 +128,7 @@ export function composeAnnotationFeature(options: {
     removeAnnotationFromTrace: (_ctx, input) => traceCommands.remove(input),
 
     queueTracesForAnnotation: (_ctx, input) =>
-      createOrUpdateQueueItems({
+      AnnotationQueueingService.createOrUpdateQueueItems({
         traceIds: [...input.traceIds],
         projectId: input.projectId,
         annotators: [...input.annotators],

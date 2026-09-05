@@ -1,17 +1,5 @@
 /**
  * The scoped privacy rules, served by the API process.
- *
- * What this pins is one call over the REAL `/api/trpc` handler on THIS
- * process's root, through THIS process's policy chain, against what
- * `composeDataPrivacyFeature` produced. Nothing here reaches a stub through a
- * proxy: the fakes are at the PORTS — a Prisma double, an AuthZ service and the
- * two directories — and everything between the HTTP request and them is the
- * real composed graph.
- *
- *   dataPrivacy.getSnapshot  the whole read model in
- *                            `@langwatch/data-privacy-server`: the cascade's
- *                            two baselines, the RBAC filter over the rule list,
- *                            and the writable scopes the chip picker offers.
  */
 import type { AuthzCanBatchByIdsInput, AuthzService } from "@langwatch/authz-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
@@ -38,9 +26,6 @@ const TEAM_ID = "team-1";
 
 /**
  * The rows the privacy cascade reads, as a double.
- *
- * What the assertion below turns on is which rows are touched: the directory's
- * reads, and the two stored rules the RBAC filter is applied to.
  */
 function testPrisma() {
   return {

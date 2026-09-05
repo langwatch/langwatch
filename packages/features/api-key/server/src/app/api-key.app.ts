@@ -259,12 +259,13 @@ export class ApiKeyApp {
     await this.ensureMember(input.organizationId, by);
     const isService = input.keyType === "service";
 
-    if (isService || (input.assignedToUserId && input.assignedToUserId !== by.id)) {
-      if (!(await this.isOrganizationAdmin(input.organizationId, by))) {
-        throw new ApiKeyAdminRequiredError(
-          isService ? "create-service-key" : "assign-to-another-user",
-        );
-      }
+    if (
+      (isService || (input.assignedToUserId && input.assignedToUserId !== by.id)) &&
+      !(await this.isOrganizationAdmin(input.organizationId, by))
+    ) {
+      throw new ApiKeyAdminRequiredError(
+        isService ? "create-service-key" : "assign-to-another-user",
+      );
     }
 
     const assignedToUserId = isService ? null : (input.assignedToUserId ?? by.id);

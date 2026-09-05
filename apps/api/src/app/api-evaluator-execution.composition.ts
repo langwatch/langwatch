@@ -453,7 +453,7 @@ class ApiEvaluationModelEnv extends EvaluationModelEnvPort {
       // row's custom catalog, and `prepareLitellmParams` swaps to that row. Only reject
       // when no accessible enabled row serves the model at all, and treat a failed lookup
       // as no rescue rather than masking the config error behind an infrastructure one.
-      let servingRow = null;
+      let servingRow;
       try {
         servingRow = await this.deps.modelProviders.tryFindRowServingModel({
           projectId,

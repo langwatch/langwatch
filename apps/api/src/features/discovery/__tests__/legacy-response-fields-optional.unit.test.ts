@@ -1,13 +1,6 @@
 /**
- * The fields the scenario, suite and simulation-run families gained after
- * clients were generated from them, in the document those clients are
- * generated from.
- *
- * A generated client reads a required field with no fallback, so a field
- * marked required in the document breaks that client against every server
- * that predates the field. The families keep sending the fields; the document
- * reads them as optional.
- *
+ * The fields the scenario, suite and simulation-run families gained after clients
+ * were generated from them, in the document those clients are generated from.
  * @see specs/api-reference/legacy-response-fields-optional.feature
  */
 
@@ -82,10 +75,6 @@ function walk({ schema, at, depth = 0 }: { schema: Schema; at: string; depth?: n
 
 /**
  * The merged walk of every success answer of one path family.
- *
- * `bornWith` names the routes of the family that were published with the
- * field from their first day, so no client generated before it exists. Their
- * answers may read it as required.
  */
 /** The merged walk of every 2xx response's media content for one operation. */
 function walkOperationSuccessResponses(
@@ -127,9 +116,6 @@ function walkFamily({ family, bornWith = [] }: { family: string; bornWith?: stri
 
 /**
  * Where the field is present in the family, and where it is read as required.
- *
- * An empty `offenders` alone also holds for a field the document no longer
- * carries, so `occurrences` states the field is still there to be read.
  */
 function readingOf({
   family,

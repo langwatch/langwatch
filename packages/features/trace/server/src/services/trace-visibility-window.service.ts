@@ -138,7 +138,7 @@ export class VisibilityWindowService {
     return new VisibilityWindowService(planProvider);
   }
 
-  constructor(private readonly planProvider: PlanProvider) {}
+  private constructor(private readonly planProvider: PlanProvider) {}
 
   /**
    * Returns the epoch-ms cutoff before which content must be teased, or

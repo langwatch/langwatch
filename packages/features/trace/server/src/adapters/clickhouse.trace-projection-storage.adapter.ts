@@ -20,24 +20,8 @@ import { TraceAnalyticsRollupClickHouseRepository } from "../repositories/clickh
 import { TraceSummaryClickHouseRepository } from "../repositories/clickhouse/trace-summary.repository";
 
 /**
- * The three projection-storage bridges, composed from nothing but a
- * tenant-keyed ClickHouse client and the retention fallback the event store
- * already stamps.
- *
- * WHY THESE EXIST AT ALL, because it is not obvious from the file count. This
- * package already owned both ends: the three ClickHouse repositories that write
- * `trace_summaries`, `trace_analytics` and `trace_analytics_rollup`, and the
- * three ports the projection stores take. What was missing was the twenty lines
- * of translation between them — positional repository arguments on one side, a
- * named entry on the other — and those twenty lines lived in
- * `platform/app/src/runtime/app/`. So a background process holding a perfectly
- * good ClickHouse client could build every repository this pipeline needs and
- * still not build a single one of its stores.
- *
- * The translation is where the batch fallback lives, and it is deliberate on
- * both sides: a repository that publishes no `upsertBatch` gets one built out
- * of its single-row write rather than the port throwing, because a store that
- * refused a batch would stall the fold rather than slow it.
+ * The three projection-storage bridges, composed from nothing but a tenant-keyed
+ * ClickHouse client and the retention fallback the event store already stamps.
  */
 class ClickHouseTraceSummaryProjectionAdapter extends TraceSummaryProjectionPort {
   constructor(private readonly repository: TraceSummaryRepository) {

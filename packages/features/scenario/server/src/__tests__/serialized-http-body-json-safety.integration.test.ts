@@ -37,7 +37,9 @@ async function createN8nLikeServer(): Promise<N8nLikeServer> {
 
   const server: Server = createServer((req, res) => {
     let body = "";
-    req.on("data", (c: Buffer) => (body += c.toString()));
+    req.on("data", (c: Buffer) => {
+      body += c.toString();
+    });
     req.on("end", () => {
       try {
         parsed = JSON.parse(body);

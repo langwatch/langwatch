@@ -5,7 +5,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { ModelProviderExecutionHandleService } from "@langwatch/model-provider-server";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { ProjectService } from "@langwatch/project-contract";
-import { nlpProxyBaseUrl } from "@langwatch/workflow-server";
+import { HttpWorkflowNlpRuntimeAdapter } from "@langwatch/workflow-server";
 
 /**
  * Resolves one authoring surface's model.
@@ -28,7 +28,9 @@ export function composeApiAuthoringModelResolver(options: {
   // The engine's address plus the proxy path, joined here because the path is
   // the WORKFLOW feature's and the address is the deployment's — the same join
   // the model gateway's own composition makes.
-  const executionProxyBaseUrl = nlpProxyBaseUrl({ baseUrl: nlpServiceUrl });
+  const executionProxyBaseUrl = HttpWorkflowNlpRuntimeAdapter.proxyBaseUrl({
+    baseUrl: nlpServiceUrl,
+  });
   return (input) =>
     ModelProviderExecutionHandleService.getVercelAIModel({
       projectId: input.projectId,
@@ -41,7 +43,9 @@ export function composeApiAuthoringModelResolver(options: {
 
 /** Where the execution proxy answers, or nothing where no engine was named. */
 export function apiExecutionProxyBaseUrl(nlpServiceUrl: string | undefined): string | undefined {
-  return nlpServiceUrl ? nlpProxyBaseUrl({ baseUrl: nlpServiceUrl }) : undefined;
+  return nlpServiceUrl
+    ? HttpWorkflowNlpRuntimeAdapter.proxyBaseUrl({ baseUrl: nlpServiceUrl })
+    : undefined;
 }
 
 /** The refusal an authoring door answers when its capability is not composed. */

@@ -190,7 +190,7 @@ describe("TraceLegacyReadClickHouseRepository — eventref resolution seam (ADR-
 
     blobStore = makeEventRefBlobStore({ "langwatch.output": fullOutput });
     traceCanonicalisation = TraceCanonicalisationService.create();
-    const ioExtractionService = new TraceIOExtractionService(traceCanonicalisation);
+    const ioExtractionService = TraceIOExtractionService.create(traceCanonicalisation);
     const logger = createLogger("test");
 
     resolveTraceSpansFn = (projectId, normalizedSpans) =>

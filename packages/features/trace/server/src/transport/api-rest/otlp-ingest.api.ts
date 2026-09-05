@@ -1,43 +1,5 @@
 /**
  * The OTLP receiver: `POST /api/otel/v1/{traces,logs,metrics}`.
- *
- * This is the deployment's critical path. Everything about its shape is
- * decided by what an OpenTelemetry exporter does with the answer, not by what
- * reads best:
- *
- *   - AUTH RUNS BEFORE THE BODY IS READ. A 401 must not pay for decompressing
- *     a batch, and the bytes are irrelevant while we do not know whose they
- *     are.
- *   - A PLAN LIMIT IS 402, NEVER 429. The OTel SDKs treat 429 as transient and
- *     re-post the same batch until their elapsed-time budget runs out, so a
- *     retryable status turns one rejection into an unbounded loop against a
- *     customer who cannot succeed until they upgrade.
- *   - A FAILURE THAT IS OURS IS 503, NEVER `partialSuccess`. OTLP reads a 200
- *     carrying `partialSuccess` as a PERMANENT rejection the client must not
- *     re-send, so answering that on a queue blip is fleet-wide data loss.
- *
- * The credential is resolved inside the handler rather than by the framework's
- * authenticate-then-authorize chain, for the reason the annotations family
- * gives: this receiver publishes its own refusal bodies and deployed exporters
- * parse them. It declares `handlerManagedAuth` so the route-policy registry
- * still sees its real permission, and takes the resolution as a port.
- *
- * WHAT IS A PORT, AND WHY. Three things this family cannot hold:
- *
- *   - the CREDENTIAL, because resolving one reads API keys and role bindings
- *     out of the deployment's database;
- *   - the PLAN ALLOWANCE, because the entitlement graph is the process's;
- *   - the COLLECTION for each signal, because a deployment may compose the
- *     trace pipeline without the log or metric one. Each is OPTIONAL and its
- *     route is registered only where its collection exists, so a process that
- *     folds no log records answers 404 to a log export rather than mounting a
- *     handler over a stub that 500s.
- *
- * The ingest-key provenance resolver is optional for the same reason and with
- * a sharper consequence: it decides whether a tool's direct-OTLP usage is
- * bundled or billed. Absent, traffic on an ORDINARY project key is unaffected
- * — it carries no source identity to stamp — and traffic on an INGESTION key
- * is refused by name rather than recorded with provenance nobody resolved.
  */
 import { handlerManagedAuth } from "@langwatch/api";
 import {
@@ -78,11 +40,6 @@ import type { TraceRequestCollectionResult } from "../../services/trace-ingestio
 
 /**
  * The generated protobuf message this receiver decodes into.
- *
- * Read through `@langwatch/otlp`'s resolved root rather than by importing the
- * generated CommonJS module a second time: under Node's own ESM loader the
- * namespace carries no named exports, so the direct import is `undefined` and
- * this line is a module-load crash for every process that reaches it.
  */
 const traceRequestType =
   otlpProtobufRoot.opentelemetry.proto.collector.trace.v1.ExportTraceServiceRequest;
@@ -95,9 +52,6 @@ const AUTH_REASON = "OTLP ingestion API key resolved in-handler";
 
 /**
  * The project a receiver writes into.
- *
- * All three fields are read: `id` is the tenant, `teamId` sizes the allowance,
- * and `organizationId` is what a plan and a source's billing resolve on.
  */
 export type OtlpIngestProject = Readonly<{
   id: string;
@@ -109,18 +63,12 @@ export type OtlpIngestProject = Readonly<{
  * What the receiver needs to know about the credential BEYOND which project it
  * opens, stated as its own narrow shape rather than as the API-key contract's
  * resolved token.
- *
- * Narrow on purpose. Everything here is stamped onto the payload on the
- * receiver's own authority, and a wider type would invite a handler to make a
- * decision on a field the payload could also have set.
  */
 export type OtlpIngestIdentity = Readonly<{
   /**
-   * The scoped key's id, or null for a legacy project key. It is rewritten
-   * onto EVERY authenticated request — see {@link enforceApiKeyIdOnTraceRequest}
-   * — so it must never become conditional: the redaction deny-list exempts
-   * that attribute name, and that exemption is only sound while the value
-   * cannot come from the payload.
+   * The scoped key's id, or null for a legacy project key. It is rewritten onto EVERY authenticated request — see
+   * {@link enforceApiKeyIdOnTraceRequest} — so it must never become conditional: the redaction deny-list exempts
+   * that attribute name, and that exemption is only sound while the value cannot come from the payload.
    */
   apiKeyId: string | null;
   organizationId: string;
@@ -147,12 +95,6 @@ export type OtlpIngestCredentialPort = (input: {
 
 /**
  * The plan allowance, enforced before a byte of the batch is parsed.
- *
- * It THROWS to refuse — the refusal is a `HandledError` the process's error
- * boundary renders — and returns for every other outcome, INCLUDING a lookup
- * that failed. That asymmetry is deliberate and is the behaviour this path has
- * always had: an entitlement store that is down must not stop a customer's
- * telemetry, so a failed lookup lets the batch through.
  */
 export type OtlpIngestUsageLimitPort = (input: {
   project: OtlpIngestProject;
@@ -223,12 +165,6 @@ export type OtlpIngestRestPorts = Readonly<{
 
 /**
  * An ingestion key arrived on a process that resolves no source billing.
- *
- * 503 and `platform` fault: the customer's key is valid and their payload is
- * fine, and a retry against a deployment that composes the governance graph
- * succeeds. Stamping the provenance with a guessed `nonBillable` instead would
- * silently price a bundled coding session as real spend, which is the one
- * outcome worse than refusing.
  */
 class OtlpIngestSourceBillingUnavailableError extends HandledError {
   declare readonly code: "service_unavailable";
@@ -258,10 +194,9 @@ function bodyForensics(body: ArrayBuffer | Uint8Array) {
 }
 
 /**
- * Classifies a token by prefix without exposing the value, so on-call can
- * filter a 401 stream by SDK shape. Ingestion keys are ordinary `sk-lw-` API
- * keys and classify as `legacy` here — the ingest discriminator lives on the
- * resolved row, not on the token prefix.
+ * Classifies a token by prefix without exposing the value, so on-call can filter a 401 stream by SDK shape.
+ * Ingestion keys are ordinary `sk-lw-` API keys and classify as `legacy` here — the ingest discriminator lives on
+ * the resolved row, not on the token prefix.
  */
 export function classifyTokenType(token: string): "pat" | "legacy" | "unknown" {
   if (token.startsWith("pat-lw-")) return "pat";
@@ -270,13 +205,9 @@ export function classifyTokenType(token: string): "pat" | "legacy" | "unknown" {
 }
 
 /**
- * A misconfigured exporter fleet posts continuously and the signal — which
- * project, which path — is identical on every batch, so a pair is reported at
- * most once a window. Repetition costs money on an ingestion hot path and
+ * A misconfigured exporter fleet posts continuously and the signal — which project, which path — is identical on
+ * every batch, so a pair is reported at most once a window. Repetition costs money on an ingestion hot path and
  * carries no information the first line did not.
- *
- * The map is bounded rather than grown: past the cap it is cleared wholesale,
- * which costs one extra line per live pair afterwards and cannot leak.
  */
 const CORRECTED_PATH_LOG_WINDOW_MS = 10 * 60 * 1000;
 const CORRECTED_PATH_LOG_MAX_PAIRS = 1000;
@@ -294,9 +225,8 @@ function correctedPathIsDueToLog({ pair, now }: { pair: string; now: number }): 
 }
 
 /**
- * Records that this request reached us on a path a misconfigured exporter
- * produced. Logged here rather than at the alias because the project is what
- * makes it actionable: it is the difference between "somebody's exporter is
+ * Records that this request reached us on a path a misconfigured exporter produced. Logged here rather than at the
+ * alias because the project is what makes it actionable: it is the difference between "somebody's exporter is
  * misconfigured" and knowing whose.
  */
 function logCorrectedPath({
@@ -361,14 +291,9 @@ async function authenticate(
 }
 
 /**
- * Everything the receiver writes onto an OTLP request on its own authority,
- * for one signal. Two rules with different scopes live together because they
- * are the same concern — what the payload is not allowed to decide — and must
- * not drift apart.
- *
- * The casts bridge nullability differences between the OTLP SDK types and the
- * structural slice these helpers mutate (resource then attributes); neither
- * helper reads the deeper fields that differ.
+ * Everything the receiver writes onto an OTLP request on its own authority, for one signal. Two rules with
+ * different scopes live together because they are the same concern — what the payload is not allowed to decide —
+ * and must not drift apart.
  */
 async function applyReceiverProvenance({
   request,
@@ -403,12 +328,10 @@ async function applyReceiverProvenance({
   const sourceType = identity.ingestSourceType;
   if (identity.apiKeyId === null || !sourceType) return;
 
-  // A copilot_vscode key rides spec-standard OTEL_* env in a long-lived
-  // editor; processes VS Code spawns outside integrated terminals (js-debug
-  // internal console, extension children) inherit it, so a developer's own
-  // instrumented service could POST here under this key. Only Copilot's
-  // instrumentation scopes pass. The metrics signal needs the same gate: the
-  // code() env enables OTEL_METRICS_EXPORTER too.
+  // A copilot_vscode key rides spec-standard OTEL_* env in a long-lived editor; processes VS Code spawns outside
+  // integrated terminals (js-debug internal console, extension children) inherit it, so a developer's own
+  // instrumented service could POST here under this key. Only Copilot's instrumentation scopes pass. The metrics
+  // signal needs the same gate: the code() env enables OTEL_METRICS_EXPORTER too.
   if (signal !== "logs") {
     const droppedForeign = dropForeignScopesForVscodeKey(
       request as Parameters<typeof dropForeignScopesForVscodeKey>[0],
@@ -459,13 +382,9 @@ async function applyReceiverProvenance({
 }
 
 /**
- * Best-effort extraction of customer trace_ids from an OTLP traces body.
- * Never throws — an empty, malformed or unparsable body yields an empty array.
- * Used to tag rejection logs so a customer who reports "I sent trace_id X and
- * it never appeared" can be matched to the rejection.
- *
- * JSON-OTLP serialises trace_id as base64; protobuf-OTLP decodes it as bytes.
- * `decodeBase64OpenTelemetryId` handles both, always answering lowercase hex.
+ * Best-effort extraction of customer trace_ids from an OTLP traces body. Never throws — an empty, malformed or
+ * unparsable body yields an empty array. Used to tag rejection logs so a customer who reports "I sent trace_id X
+ * and it never appeared" can be matched to the rejection.
  */
 export function peekCustomerTraceIds(
   body: ArrayBuffer,
@@ -508,10 +427,6 @@ function collectDecodedTraceIds(request: IExportTraceServiceRequest, max: number
 
 /**
  * The OTLP receiver, over whichever signals this process composed.
- *
- * ORDERING inside the family is free — the three routes own disjoint literal
- * paths. Ordering against its SIBLINGS is not: the path-alias re-dispatcher
- * must mount AFTER this one, because it forwards into these routes.
  */
 export function createOtlpIngestRestApp(options: {
   security: AppRestSecurity;

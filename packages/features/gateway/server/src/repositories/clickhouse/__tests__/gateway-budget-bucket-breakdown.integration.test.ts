@@ -1,19 +1,6 @@
 /**
- * @vitest-environment node
- *
  * Per-bucket spend for a fanned-out budget, against real ClickHouse.
- *
- * An ATTRIBUTED_USER template is one row covering many people, so the only
- * honest thing the budgets screen can say about it is a headcount. That
- * headcount is only as good as the bucket set this read returns, and the
- * ways it can be wrong are all silent: swallowing a neighbouring anchor's
- * buckets inflates it, missing the boundary a reset moved leaves a
- * forgiven person still counted as over, and a provider filter that leaks
- * makes two budgets report each other's people.
- *
- * Debits go in through the same repository the debits process manager
- * writes with, and come back out through the same method the budgets list,
- * the detail page, and the management API all read.
+ * @vitest-environment node
  */
 
 import { nanoid } from "nanoid";

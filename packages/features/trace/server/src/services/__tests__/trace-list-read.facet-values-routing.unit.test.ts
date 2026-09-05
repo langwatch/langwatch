@@ -19,7 +19,11 @@ function makeService() {
     findEventAttributeValues: ReturnType<typeof vi.fn>;
     findSpanAttributeValues: ReturnType<typeof vi.fn>;
   };
-  const service = new TraceListService(repository, undefined as never, undefined as never);
+  const service = TraceListService.create({
+    repository,
+    evaluations: undefined as never,
+    topicService: undefined as never,
+  });
   return { repository, service };
 }
 

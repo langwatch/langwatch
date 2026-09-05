@@ -1,34 +1,5 @@
 /**
  * The five tenant-administration features, served by the API process.
- *
- * `organization`, `project`, `coding-agent`, `automation` and `enterprise`
- * each compose themselves, and together they mount the nine namespaces a
- * TENANT is administered through. What this pins is one call per namespace,
- * each of them made over the REAL `/api/trpc` handler on THIS process's root,
- * through THIS process's policy chain, against the features those five
- * `compose*Feature` functions produced. Nothing here reaches a stub through a
- * proxy for the surfaces under test: the fakes are at the PORTS — a Prisma
- * double, an AuthZ service, a project directory, a plan provider — and
- * everything between the HTTP request and them is the real composed graph.
- *
- *   organization.getAll          the organization directory, off `ctx.app`
- *   project.getHasFirstMessage   the MOVED project application: the row read
- *                                behind the setup screens, through the
- *                                `ProjectApp` this half composes
- *   codingAgents.usageTotals     the composed `CodingAgentApp` over a process
- *                                with no ClickHouse, which answers emptily
- *                                because a session is a projection there
- *   automation.getTriggers       the composed `AutomationApp` over the real
- *                                `PostgresAutomationAdapter`
- *   emailSuppression.getAll      the same application's suppression list, with
- *                                the audit row this process writes for it
- *
- * And four named absences, because an absence nobody can observe is
- * indistinguishable from a stub: with no invitation service the pending-invite
- * read refuses by name; with no protections resolver the field-redaction read
- * refuses rather than guessing what a viewer may see; with no Enterprise
- * application `license.getStatus` refuses while still MOUNTING; and the
- * clustering request refuses because no scheduler runs here.
  */
 import type {
   AuthzBindingForSynthesis,
@@ -154,10 +125,6 @@ function testOrganizationApp() {
 
 /**
  * The two collaborators the invitation half is composed over.
- *
- * Absent, the half is not composed and the eleven invitation ports refuse by
- * name — the case below the answering one. Present, this process builds the
- * service itself, which is what the injected port used to stand in for.
  */
 function composeApplication(options: { withInvitations?: boolean } = {}) {
   const prisma = testPrisma();
@@ -394,12 +361,9 @@ describe("given an API process composed with the five tenant features", () => {
 
   describe("when the grant ledger and the role service are composed", () => {
     /**
-     * The absence above is closed by this process building the service itself
-     * rather than by a host injecting one. What that has to prove is that the
-     * read reaches the ROW — a port that answered `[]` would pass a test which
-     * only checked the call stopped refusing, and an empty invitation list is
-     * the one answer an administrator acts on by inviting the same person
-     * twice.
+     * The absence above is closed by this process building the service itself rather than by a host injecting one. What that has to prove is that the read
+     * reaches the ROW — a port that answered `[]` would pass a test which only checked the call stopped refusing, and an empty invitation list is the one
+     * answer an administrator acts on by inviting the same person twice.
      */
     it("answers the pending-invite read from the invitation rows", async () => {
       const { application, invites } = composeApplication({ withInvitations: true });
@@ -417,9 +381,8 @@ describe("given an API process composed with the five tenant features", () => {
     });
 
     /**
-     * The acceptance link is the thing an administrator hands somebody when no
-     * mail gateway is composed, and it is minted from the deployment's public
-     * origin. A link built against a default host would look right in the
+     * The acceptance link is the thing an administrator hands somebody when no mail gateway is composed, and it
+     * is minted from the deployment's public origin. A link built against a default host would look right in the
      * listing and open nothing.
      */
     it("carries an acceptance link on this deployment's own origin", async () => {
@@ -447,13 +410,9 @@ describe("given an API process composed with the five tenant features", () => {
 
   describe("when no clustering scheduler runs in this process", () => {
     /**
-     * The composition raises `service_unavailable` naming the scheduler, and
-     * the project transport re-raises it untouched: the cause is known — this
-     * process composes no clustering wake path — and the caller can act on it,
-     * so the name reaches the wire instead of a trace id for a condition we
-     * could have named. The transport's deliberate degradation is still there
-     * underneath it, and still covers the event-store internals a caller
-     * cannot act on; it just no longer swallows the refusal above them.
+     * The composition raises `service_unavailable` naming the scheduler, and the project transport re-raises it untouched: the cause is known — this process composes no clustering wake path — and the caller
+     * can act on it, so the name reaches the wire instead of a trace id for a condition we could have named. The transport's deliberate degradation is still there underneath it, and still covers the
+     * event-store internals a caller cannot act on; it just no longer swallows the refusal above them.
      */
     it("refuses the request by name rather than accepting a run nobody starts", async () => {
       const { application } = composeApplication();

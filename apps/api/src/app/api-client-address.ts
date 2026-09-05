@@ -1,7 +1,8 @@
 import { getConnInfo } from "@hono/node-server/conninfo";
 import type { TrpcRequestLike } from "@langwatch/api/trpc";
-import { RuntimeConfig, trustedProxyConfigDefinition } from "@langwatch/config";
 import type { Context } from "hono";
+
+import { configuredTrustedProxies } from "../platform/config/trusted-proxies.config";
 
 /**
  * Which address a request came from: the socket, unless the request arrived from a hop
@@ -127,28 +128,4 @@ function ipv4AsNumber(address: string): number | null {
   const octets = address.split(".").map(Number);
   if (octets.some((octet) => octet > 255)) return null;
   return octets.reduce((total, octet) => ((total << 8) | octet) >>> 0, 0);
-}
-
-let cached: { raw: string | undefined; value: readonly string[] } | undefined;
-
-/**
- * Read here rather than threaded from the composition root: this reader is
- * handed a Hono context and nothing else, and the list is one process-wide
- * deployment fact. Re-resolved only when the variable itself changes.
- */
-function configuredTrustedProxies(): readonly string[] {
-  const raw = process.env.TRUSTED_PROXY_ADDRESSES;
-  if (cached !== undefined && cached.raw === raw) return cached.value;
-
-  const configured = RuntimeConfig.create({
-    name: "api trusted proxies",
-    definition: trustedProxyConfigDefinition,
-    source: process.env,
-  }).value.trustedProxies;
-  const value = (configured ?? "")
-    .split(",")
-    .map((entry) => entry.trim())
-    .filter((entry) => entry !== "");
-  cached = { raw, value };
-  return value;
 }

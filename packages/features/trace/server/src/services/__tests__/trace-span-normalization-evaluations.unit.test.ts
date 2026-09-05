@@ -4,7 +4,7 @@ import { ATTR_KEYS } from "@langwatch/trace-contract";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { SpanNormalizationPipelineService } from "@langwatch/trace-server";
 
-const service = new SpanNormalizationPipelineService(TraceCanonicalisationService.create());
+const service = SpanNormalizationPipelineService.create(TraceCanonicalisationService.create());
 
 function makeOtlpSpanWithEvaluation(evalPayload: Record<string, unknown>): OtlpSpan {
   return {

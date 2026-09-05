@@ -54,7 +54,7 @@ class Storage extends TraceSpoolStoragePort {
 
   constructor(
     private readonly destination: StoredObjectStorageDestination,
-    readonly azureRetentionConfirmed: boolean = false,
+    readonly azureRetentionConfirmed = false,
   ) {
     super();
   }

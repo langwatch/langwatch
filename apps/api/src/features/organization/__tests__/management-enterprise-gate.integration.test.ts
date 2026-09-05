@@ -205,7 +205,7 @@ type ScimPlanForOrganization = {
  * plan is read fresh on every call rather than at mint time.
  */
 function inMemoryScim(
-  initialPlan: string = "ENTERPRISE",
+  initialPlan = "ENTERPRISE",
 ): ScimService & ScimPlanForOrganization & { setPlan(plan: string): void } {
   let plan = initialPlan;
   const tokens = new Map<string, { id: string; hashed: string; connectionId: string | null }>();

@@ -1,18 +1,5 @@
 /**
  * Every tRPC surface this package owns, mounted on one process's root.
- *
- * The one list. A tRPC procedure declares its access decision as it is BUILT,
- * and the declaration sweep, the public-surface tripwire and the Langy
- * permission suites all read what mounting registered — so a family enumerated
- * a second time somewhere else could serve traffic while sitting outside every
- * one of those audits. Mount them by iterating this record, and read them the
- * same way: a surface is either in here and visible, or it does not exist.
- *
- * The process supplies its mount ONCE — the root a feature router must never
- * create a second of, the authenticated and public procedures it builds on,
- * and the concrete middlewares its policy chain is composed from — rather than
- * once per feature. That is the difference this file makes: a restated copy of
- * the same chain per feature could drift, and one cannot.
  */
 import type { ApiTrpcFeatureMount } from "../api.application";
 import type { ApiTrpcInfrastructure } from "./app-trpc.infrastructure";
@@ -33,26 +20,15 @@ import { createPlanTrpcRouter } from "../features/entitlement/entitlement-trpc.m
 
 /**
  * Builds every tRPC surface this package owns against one process's mount.
- *
- * The mount is this process's own {@link ApiTrpcFeatureMount}, not three type
- * parameters constrained to the intersection of every feature's context. The
- * root carries the context, so naming the root names the context once — and it
- * is what lets {@link AppTrpcFeatureRecord} be read off this function at all.
- *
- * The result is keyed by the namespace each surface answers on, so the caller
- * spreads it into its router record and adds nothing per feature. A surface
- * that is not in here is not mounted — which is the property the audits rely
- * on.
  */
 export function createAppTrpcFeatures(options: {
   mount: ApiTrpcFeatureMount;
   /** What a feature composes ITSELF from, for the features composed here. */
   infrastructure: ApiTrpcInfrastructure;
   /**
-   * The features the process composed BEFORE the mount existed, because their
-   * doors are not only tRPC: the gateway's application is read by `ctx.app` and
-   * by two REST families, so the process composes it once and hands the router
-   * half here.
+   * The features the process composed BEFORE the mount existed, because their doors are not only tRPC: the
+   * gateway's application is read by `ctx.app` and by two REST families, so the process composes it once and hands
+   * the router half here.
    */
   composed: ComposedApiFeatures;
 }) {
@@ -180,12 +156,10 @@ export function createAppTrpcFeatures(options: {
     // rather than dropping the namespace.
     currency: billing.currency,
     subscription: billing.subscription,
-    // One wire namespace assembled from three packaged transports, exactly as
-    // the client has always called it: the charted reads at `analytics.*`, the
-    // workbench at `analytics.lwql`, and the saved charts at
-    // `analytics.savedWorkbenchCharts`. Merged here rather than at the caller
-    // so the whole namespace is one entry in this list, and so nothing outside
-    // it can add a fourth door onto the same name.
+    // One wire namespace assembled from three packaged transports, exactly as the client has always called it:
+    // the charted reads at `analytics.*`, the workbench at `analytics.lwql`, and the saved charts at
+    // `analytics.savedWorkbenchCharts`. Merged here rather than at the caller so the whole namespace is one entry
+    // in this list, and so nothing outside it can add a fourth door onto the same name.
     analytics: analyticsRouters.analytics,
     // A reviewer's comments, their scores and the queues they travel in,
     // composed by the feature itself over this process's connection, its
@@ -222,12 +196,10 @@ export function createAppTrpcFeatures(options: {
     // definition and an evaluation is a result.
     evaluators: composed.evaluator.router(mount),
     experiments: composed.experiment.router(mount),
-    // The two export-progress relays. This one surface owns its procedures
-    // rather than delegating to a feature package — one relay over a channel
-    // the PROCESS owns, distinguished only by the permission each demands —
-    // so it takes no ports; see the mount's own docblock. It is in this list
-    // because a subscription mounted beside the list would serve traffic from
-    // outside every audit that reads it.
+    // The two export-progress relays. This one surface owns its procedures rather than delegating to a feature
+    // package — one relay over a channel the PROCESS owns, distinguished only by the permission each demands — so
+    // it takes no ports; see the mount's own docblock. It is in this list because a subscription mounted beside
+    // the list would serve traffic from outside every audit that reads it.
     export: createExportTrpcRouter(mount),
     frontDoor: authRouters.frontDoor,
     // Which rollouts this tenant is inside. No declared-permission policy and
@@ -293,11 +265,5 @@ export function createAppTrpcFeatures(options: {
 
 /**
  * The record {@link createAppTrpcFeatures} returns, at THIS process's mount.
- *
- * Inferred from the function rather than restated, so a namespace added to the
- * return literal above is a namespace a client can call without a second edit.
- * This reads cleanly only because the mount is CONCRETE: the function takes
- * `ApiTrpcFeatureMount` rather than three type parameters, so the root every
- * router type carries is this process's own.
  */
 export type AppTrpcFeatureRecord = ReturnType<typeof createAppTrpcFeatures>;

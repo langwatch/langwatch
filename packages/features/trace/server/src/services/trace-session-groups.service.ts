@@ -90,7 +90,7 @@ export class SessionGroupsService {
    */
   private readonly resolveOrganizationId: (projectId: string) => Promise<string | undefined>;
 
-  constructor({
+  private constructor({
     repository,
     codingAgentSessions,
     resolveOrganizationId = async () => undefined,

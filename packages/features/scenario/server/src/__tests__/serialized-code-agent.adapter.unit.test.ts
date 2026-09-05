@@ -11,7 +11,7 @@ import { guardAgainstGlobalFetch } from "./support/global-fetch-guard";
 // Capture withActiveSpan calls so the timeout/error paths can be verified.
 // (lw#3438: traced failures must always leave a span footprint.)
 const { withActiveSpanCalls } = vi.hoisted(() => {
-  const withActiveSpanCalls: Array<{
+  const calls: Array<{
     name: string;
     options: { kind: number; attributes: Record<string, unknown> };
     span: {
@@ -22,7 +22,7 @@ const { withActiveSpanCalls } = vi.hoisted(() => {
       end: ReturnType<typeof vi.fn>;
     };
   }> = [];
-  return { withActiveSpanCalls };
+  return { withActiveSpanCalls: calls };
 });
 
 vi.mock("langwatch", () => ({

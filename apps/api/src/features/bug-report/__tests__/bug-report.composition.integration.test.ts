@@ -1,15 +1,5 @@
 /**
  * The support inbox, served by the API process.
- *
- * What this pins is one call over the REAL `/api/trpc` handler on THIS
- * process's root, through THIS process's policy chain, against what
- * `composeBugReportFeature` produced. Nothing here reaches a stub through a
- * proxy: the fake is at the PORTS — a Prisma double — and everything between
- * the HTTP request and it is the real composed graph.
- *
- *   bugReports.getAll  the support inbox over the repository in
- *                      `@langwatch/ops-server`, with the audit row the read is
- *                      written to before the reader sees it.
  */
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";

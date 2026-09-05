@@ -28,7 +28,7 @@ export class SpanNormalizationPipelineService {
     "langwatch.trace-processing.span-normalization-pipeline-service",
   );
 
-  constructor(private readonly traceCanonicalisation: TraceCanonicalisationService) {}
+  private constructor(private readonly traceCanonicalisation: TraceCanonicalisationService) {}
 
   normalizeSpanReceived(
     tenantId: string,

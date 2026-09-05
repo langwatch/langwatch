@@ -18,10 +18,9 @@ import { applyOverlayToTrace } from "@langwatch/trace-contract";
 import { TraceEditOverlayService } from "./trace-edit-overlay.service";
 
 /**
- * Minimum prefix length we will attempt to resolve. Shorter strings fall
- * through to "not found" — this keeps us from scanning the entire
- * trace_summaries table on a single-character typo and narrows the search
- * space enough to meaningfully detect ambiguity.
+ * Minimum prefix length we will attempt to resolve. Shorter strings fall through to "not found" — this keeps us
+ * from scanning the entire trace_summaries table on a single-character typo and narrows the search space enough to
+ * meaningfully detect ambiguity.
  */
 export const MIN_TRACE_ID_PREFIX_LENGTH = 8;
 
@@ -39,11 +38,9 @@ export const FULL_TRACE_ID_LENGTH = 32;
 export const TRACE_ID_PREFIX_CANDIDATE_LIMIT = 5;
 
 /**
- * Time window (in days) that prefix resolution scans. Without a partition
- * bound, ClickHouse would scan every partition (including cold storage on
- * S3) on a miss. 90 days covers the CLI's "copy a truncated ID from a
- * recent search" use case while keeping the query on hot partitions.
- * Full 32-char IDs still resolve unbounded via the normal exact-match path.
+ * Time window (in days) that prefix resolution scans. Without a partition bound, ClickHouse would scan every partition (including cold storage on S3) on a
+ * miss. 90 days covers the CLI's "copy a truncated ID from a recent search" use case while keeping the query on hot partitions. Full 32-char IDs still
+ * resolve unbounded via the normal exact-match path.
  */
 export const TRACE_ID_PREFIX_LOOKUP_WINDOW_DAYS = 90;
 
@@ -92,15 +89,6 @@ import type {
 /**
  * Optional blob-offload resolution dependencies injected into TraceService
  * (ADR-022: read-time recompute via event_log).
- *
- * When provided, every read path that returns `Trace[]` with spans passes
- * each trace's normalized spans through `TraceOffloadResolutionService.resolveOffloadedTraces` to
- * restore full field values that were offloaded by `leanForProjection`,
- * then re-runs `TraceIOExtractionService` to recompute trace.input /
- * trace.output from the resolved spans.
- *
- * When omitted (e.g. in tests or when S3 is not configured) the service
- * falls back to the preview values from trace_summaries — identical to
  * pre-ADR-022 behavior.
  */
 export interface BlobResolutionDeps {
@@ -110,14 +98,6 @@ export interface BlobResolutionDeps {
 
 /**
  * Unified service for fetching traces from ClickHouse.
- *
- * This service acts as a facade that routes all requests to the ClickHouse backend.
- *
- * @example
- * ```ts
- * const service = TraceService.create({ traceCanonicalisation, prisma });
- * const traces = await service.getTracesWithSpans(projectId, traceIds, protections);
- * ```
  */
 export class TraceService {
   private readonly tracer = getLangWatchTracer("langwatch.traces.service");
@@ -142,13 +122,6 @@ export class TraceService {
 
   /**
    * The log-record store for read-time Claude Code content enrichment.
-   *
-   * Required rather than resolved from a process singleton: the platform app
-   * reached `getApp().traces.logRecords` lazily so a read that never enriches
-   * paid nothing, and a package has no singleton to reach. A composition that
-   * serves the coding-agent join passes one; one that does not passes a reader
-   * whose call refuses by name, which is the same "you did not compose this"
-   * answer at the same call.
    */
   private logRecordStorageService(): TraceLogRecordReader {
     const injected = this.injectedLogRecordStorage;
@@ -187,18 +160,9 @@ export class TraceService {
   }
 
   /**
-   * Overlays reviewer corrections onto a page of traces, in one read for the
-   * whole page. Runs LAST on every opted-in path, after blob resolution and
-   * coding-agent enrichment, so a correction wins over whatever the resolvers
-   * put in the field.
-   *
-   * A correction never widens what a viewer may read. The trace it lands on has
-   * already been through `applyTraceProtections`, so each patch is first cut
-   * down to the edits this viewer may read, and only then applied: content
-   * categories they cannot see, content teased by the plan's visibility
-   * window, and attributes a restrict rule hides from them all drop out.
-   * Without that, a corrected `params` or output would put back exactly what
-   * the redaction pass had just removed, and a dataset record would carry it.
+   * Overlays reviewer corrections onto a page of traces, in one read for the whole page. Runs LAST on every
+   * opted-in path, after blob resolution and coding-agent enrichment, so a correction wins over whatever the
+   * resolvers put in the field.
    */
   private async applyEditOverlays(
     projectId: string,
@@ -243,12 +207,8 @@ export class TraceService {
   }
 
   /**
-   * Static factory method for creating TraceService with default dependencies.
-   *
-   * @param options - Composed service dependencies
-   * @param blobResolutionDeps - Optional blob-offload resolution deps (#4888)
-   * @param logRecordStorage - Optional log-record store for read-time Claude
-   *   Code content enrichment; default-built when omitted.
+   * @param options composed service dependencies; @param blobResolutionDeps optional blob-offload deps (#4888);
+   * @param logRecordStorage optional log-record store for read-time Claude Code enrichment.
    * @returns TraceService instance
    */
   static create({
@@ -277,19 +237,8 @@ export class TraceService {
   }
 
   /**
-   * Get a single trace by ID.
-   *
-   * @param projectId - The project ID
-   * @param traceId - The trace ID to fetch
-   * @param protections - Field redaction protections
-   * @param opts.full - When true AND blob-resolution deps are present, resolves
-   *   offloaded eventref pointers from event_log so over-threshold IO values
-   *   read back full (#4888). Default (undefined/false) returns the ≤64 KB
-   *   preview — identical to pre-#4888 behavior.
-   * @param opts.withEditOverlay - When true, a reviewer's saved correction is
-   *   applied over the captured trace. Opt-in per caller: only the
-   *   add-to-dataset path asks for it, so evaluations, exports, shares and the
-   *   REST API keep reading exactly what was ingested.
+   * @param projectId project ID; @param traceId trace ID to fetch; @param protections redaction protections.
+   * @param opts.full resolves offloaded blob previews when deps are present; @param opts.withEditOverlay applies a reviewer's saved correction.
    * @returns The trace if found, undefined otherwise
    */
   async getById(
@@ -368,14 +317,9 @@ export class TraceService {
   }
 
   /**
-   * Batch sibling of {@link enrichCodingAgentTrace} for the multi-trace read
-   * paths (evals, export, legacy thread reads). Enriches each coding-agent trace
-   * in the array with its own lazy, time-capped log read (reads run in parallel,
-   * a bounded few at a time); every non-coding-agent trace short-circuits inside
-   * `enrichCodingAgentTrace` and pays nothing. The upfront origin check skips
-   * even the fan-out allocation on the common all-non-coding-agent page, so a
-   * project that never uses a coding assistant never touches the log store.
-   * Best-effort per trace.
+   * Batch sibling of {@link enrichCodingAgentTrace} for the multi-trace read paths (evals, export, legacy thread reads). Enriches each coding-agent trace in the array with its own lazy, time-capped log read
+   * (reads run in parallel, a bounded few at a time); every non-coding-agent trace short-circuits inside `enrichCodingAgentTrace` and pays nothing. The upfront origin check skips even the fan-out allocation on
+   * the common all-non-coding-agent page, so a project that never uses a coding assistant never touches the log store. Best-effort per trace.
    */
   private async enrichCodingAgentTraces(projectId: string, traces: Trace[]): Promise<Trace[]> {
     const hasCodingAgentTrace = traces.some(
@@ -385,12 +329,10 @@ export class TraceService {
       return traces;
     }
 
-    // Bounded fan-out: each coding-agent trace's enrichment holds a capped but
-    // heavy log read (raw bodies run to 60 KB a row) in memory, so an
-    // unbounded Promise.all over a big export/eval page multiplies that by the
-    // page size. Five in flight keeps the multi-trace paths at a bounded
-    // memory ceiling; non-coding-agent traces short-circuit inside
-    // `enrichCodingAgentTrace` and cost nothing.
+    // Bounded fan-out: each coding-agent trace's enrichment holds a capped but heavy log read (raw bodies run to
+    // 60 KB a row) in memory, so an unbounded Promise.all over a big export/eval page multiplies that by the page
+    // size. Five in flight keeps the multi-trace paths at a bounded memory ceiling; non-coding-agent traces
+    // short-circuit inside `enrichCodingAgentTrace` and cost nothing.
     const enrichConcurrency = 5;
     const enriched: Trace[] = [...traces];
     for (let start = 0; start < traces.length; start += enrichConcurrency) {
@@ -407,15 +349,9 @@ export class TraceService {
   }
 
   /**
-   * Read-time Claude Code content enrichment for coding-agent-origin traces.
-   * The real `llm_request` spans carry tokens / `request_id` but no message
-   * content and no cost — both live in the trace's OTLP log records. When the
-   * trace is coding-agent origin we do one lazy, time-capped log read and join
-   * capped `input` / `output` + the authoritative `cost` onto the spans so the
-   * legacy trace/span API (REST, export, legacy tRPC, evals) returns whole
-   * spans. Origin-gated so a non-Claude trace pays nothing; idempotent and a
-   * no-op when the trace has no Claude content logs; best-effort (a log-read
-   * failure returns the un-enriched trace rather than failing the read).
+   * Read-time Claude Code content enrichment for coding-agent-origin traces. The real `llm_request` spans carry tokens / `request_id` but no message content and no cost — both live in the trace's OTLP log records. When the trace is coding-agent origin we do one lazy, time-capped log
+   * read and join capped `input` / `output` + the authoritative `cost` onto the spans so the legacy trace/span API (REST, export, legacy tRPC, evals) returns whole spans. Origin-gated so a non-Claude trace pays nothing; idempotent and a no-op when the trace has no Claude content
+   * logs; best-effort (a log-read failure returns the un-enriched trace rather than failing the read).
    */
   private async enrichCodingAgentTrace(projectId: string, trace: Trace): Promise<Trace> {
     if (trace.metadata?.["langwatch.origin"] !== CODING_AGENT_ORIGIN) {
@@ -436,19 +372,8 @@ export class TraceService {
   }
 
   /**
-   * Get traces with spans for the given trace IDs.
-   *
-   * @param projectId - The project ID
-   * @param traceIds - Array of trace IDs to fetch
-   * @param protections - Field redaction protections
-   * @param occurredAt - Optional approximate trace time range (epoch ms). When
-   *   supplied, the trace_summaries read prunes to the matching weekly
-   *   partitions instead of scanning every partition (incl. cold S3).
-   * @param opts.full - When true AND blob-resolution deps are present, resolves
-   *   offloaded eventref pointers from event_log so over-threshold IO values
-   *   read back full (#4888). Default (undefined/false) returns previews.
-   * @param opts.withEditOverlay - When true, reviewer corrections are applied
-   *   over the captured traces (see {@link getById}).
+   * @param projectId project ID; @param traceIds trace IDs; @param protections redaction protections;
+   * @param occurredAt bounds the partition scan; @param opts.full resolves offloaded blob previews; @param opts.withEditOverlay applies reviewer corrections.
    * @returns Array of Trace objects with spans
    */
   async getTracesWithSpans(
@@ -482,14 +407,8 @@ export class TraceService {
   }
 
   /**
-   * Get traces grouped by thread ID.
-   *
-   * @param projectId - The project ID
-   * @param threadId - The thread ID to group by
-   * @param protections - Field redaction protections
-   * @param opts.full - When true AND blob-resolution deps are present, resolves
-   *   offloaded eventref pointers so thread-detail IO reads back full (#4991).
-   *   Default (undefined/false) returns the ≤64 KB preview.
+   * @param projectId project ID; @param threadId thread ID to group by; @param protections redaction protections.
+   * @param opts.full resolves offloaded blob previews when deps are present.
    * @returns Array of traces in the thread
    */
   async getTracesByThreadId(
@@ -515,11 +434,8 @@ export class TraceService {
   }
 
   /**
-   * Get all traces for a project with filtering and pagination.
-   *
-   * @param input - Query parameters including filters, pagination, and sorting
-   * @param protections - Field redaction protections
-   * @param options - Additional options for download mode
+   * @param input query parameters (filters, pagination, sorting); @param protections redaction protections;
+   * @param options additional download-mode options.
    * @returns TracesForProjectResult with groups, totalHits, and traceChecks
    */
   async getAllTracesForProject(
@@ -540,12 +456,10 @@ export class TraceService {
           return result;
         }
 
-        // includeSpans callers (bulk export, search) read whole spans, so the
-        // Claude Code content + cost join applies here exactly as on the
-        // single-trace and thread reads. Enrichment runs over the flattened
-        // page so the helper's bounded fan-out caps concurrent log reads for
-        // the whole page; a page with no coding-agent trace returns the same
-        // array reference and pays nothing.
+        // includeSpans callers (bulk export, search) read whole spans, so the Claude Code content + cost join
+        // applies here exactly as on the single-trace and thread reads. Enrichment runs over the flattened page
+        // so the helper's bounded fan-out caps concurrent log reads for the whole page; a page with no
+        // coding-agent trace returns the same array reference and pays nothing.
         const flat = result.groups.flat();
         const enriched = await this.enrichCodingAgentTraces(input.projectId, flat);
         if (enriched === flat) {
@@ -565,11 +479,7 @@ export class TraceService {
   }
 
   /**
-   * Get evaluations for multiple traces.
-   *
-   * @param projectId - The project ID
-   * @param traceIds - Array of trace IDs
-   * @param protections - Field redaction protections
+   * @param projectId project ID; @param traceIds array of trace IDs; @param protections redaction protections.
    * @returns Map of trace ID to evaluations
    */
   async getEvaluationsMultiple(
@@ -594,10 +504,6 @@ export class TraceService {
   }
 
   /**
-   * Lazily fetch one evaluation's inputs, keyed by evaluation id so the read
-   * prunes ClickHouse granules instead of scanning the whole trace. Used by
-   * the v2 drawer when a single evaluation card is expanded.
-   *
    * @param projectId - The project ID
    * @param evaluationId - The evaluation to fetch inputs for
    * @returns The parsed inputs, or null when none are available
@@ -627,19 +533,8 @@ export class TraceService {
   }
 
   /**
-   * Get traces with spans by thread IDs.
-   *
-   * @param projectId - The project ID
-   * @param threadIds - Array of thread IDs
-   * @param protections - Field redaction protections
-   * @param opts.full - When true AND blob-resolution deps are present, resolves
-   *   offloaded eventref pointers so thread IO reads back full (#4991). Opted
-   *   into per call: the eval path (thread-mapped evaluators) and the
-   *   content-consuming thread tRPC both pass `{ full: true }` with deps. A
-   *   caller that omits it — or a deps-free TraceService — stays on the ≤64 KB
-   *   preview and issues zero event_log reads (#4888 / ADR-022).
-   * @param opts.withEditOverlay - When true, each trace in the conversation
-   *   carries its own reviewer correction (see {@link getById}).
+   * @param projectId project ID; @param threadIds thread IDs; @param protections redaction protections;
+   * @param opts.full resolves preview, zero event_log reads (#4888 / ADR-022); @param opts.withEditOverlay applies corrections.
    * @returns Array of traces
    */
   async getTracesWithSpansByThreadIds(
@@ -675,7 +570,6 @@ export class TraceService {
 
   /**
    * Get topic and subtopic counts for a project with filters.
-   *
    * @param input - Filter parameters including projectId and date range
    * @returns TopicCountsResult with topic and subtopic aggregations
    */
@@ -691,7 +585,6 @@ export class TraceService {
 
   /**
    * Get unique customers and labels for a project.
-   *
    * @param input - Filter parameters including projectId and date range
    * @returns CustomersAndLabelsResult with unique customer IDs and labels
    */
@@ -706,11 +599,7 @@ export class TraceService {
   }
 
   /**
-   * Get distinct span names and metadata keys for a project within a date range.
-   *
-   * @param projectId - The project ID
-   * @param startDate - Start of date range (epoch millis)
-   * @param endDate - End of date range (epoch millis)
+   * @param projectId project ID; @param startDate start of date range (epoch millis); @param endDate end of range.
    * @returns DistinctFieldNamesResult with span names and metadata keys
    */
   async getDistinctFieldNames(
@@ -728,11 +617,7 @@ export class TraceService {
   }
 
   /**
-   * Get a span for prompt studio by span ID.
-   *
-   * @param projectId - The project ID
-   * @param spanId - The span ID to find
-   * @param protections - Field redaction protections
+   * @param projectId project ID; @param spanId span ID to find; @param protections redaction protections.
    * @returns PromptStudioSpanResult or null if not found
    */
   async tryGetSpanForPromptStudio({

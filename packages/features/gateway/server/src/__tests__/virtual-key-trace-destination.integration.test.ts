@@ -1,16 +1,6 @@
 /**
+ * Every virtual key stores the project its traces and costs land in, against real Postgres.
  * @vitest-environment node
- *
- * Every virtual key stores the project its traces and costs land in,
- * against real Postgres.
- *
- * Per-key spend is read from the trace path, so a key whose traces land
- * nowhere is invisible in every usage view and accrues against no budget.
- * These tests pin the four cases creation decides between, the three
- * refusals, and the two things the stored answer changed: editing a key's
- * scopes does not move its destination, and deleting the project a key
- * traces into does not reroute it.
- *
  * Spec: specs/ai-gateway/virtual-key-creation.feature
  */
 import { nanoid } from "nanoid";

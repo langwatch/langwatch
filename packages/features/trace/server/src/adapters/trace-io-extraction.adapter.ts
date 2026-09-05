@@ -27,7 +27,7 @@ export class TraceIoExtractionAdapter extends TraceIoExtractionPort {
   }
 
   static create(canonicalisation: TraceCanonicalisationService): TraceIoExtractionAdapter {
-    return new TraceIoExtractionAdapter(new TraceIOExtractionService(canonicalisation));
+    return new TraceIoExtractionAdapter(TraceIOExtractionService.create(canonicalisation));
   }
 
   static fromService(service: TraceIOExtractionService): TraceIoExtractionAdapter {

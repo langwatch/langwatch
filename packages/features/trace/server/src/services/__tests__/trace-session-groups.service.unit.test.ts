@@ -188,7 +188,7 @@ describe("SessionGroupsService", () => {
           subAgents: 3,
         }),
       });
-      const service = new SessionGroupsService({
+      const service = SessionGroupsService.create({
         repository: new FakeRepository([makeRow(), makeRow({ conversationId: "session-b" })], 2),
         codingAgentSessions: codingAgents,
       });
@@ -215,7 +215,7 @@ describe("SessionGroupsService", () => {
 
     /** @scenario Coding agent enrichment carries repository, branch, worktree and title */
     it("carries the repository, branch, worktree and title, empty where unreported", async () => {
-      const service = new SessionGroupsService({
+      const service = SessionGroupsService.create({
         repository: new FakeRepository([makeRow(), makeRow({ conversationId: "session-b" })], 2),
         codingAgentSessions: lookupReturning({
           "session-a": codingAgentRow({
@@ -257,7 +257,7 @@ describe("SessionGroupsService", () => {
     });
 
     it("keeps the list alive when an enrichment lookup throws", async () => {
-      const service = new SessionGroupsService({
+      const service = SessionGroupsService.create({
         repository: new FakeRepository([makeRow()]),
         codingAgentSessions: {
           async tryGetBySessionId() {
@@ -277,7 +277,7 @@ describe("SessionGroupsService", () => {
     });
 
     it("maps every rollup field onto the DTO", async () => {
-      const service = new SessionGroupsService({
+      const service = SessionGroupsService.create({
         repository: new FakeRepository([makeRow()], 1),
         codingAgentSessions: lookupReturning({}),
       });
@@ -314,7 +314,7 @@ describe("SessionGroupsService", () => {
   describe("when a row names its latest trace", () => {
     /** @scenario The session read carries the latest trace id onto the row */
     it("carries that trace id onto the session", async () => {
-      const service = new SessionGroupsService({
+      const service = SessionGroupsService.create({
         repository: new FakeRepository([makeRow()], 1),
         codingAgentSessions: lookupReturning({}),
       });
@@ -332,7 +332,7 @@ describe("SessionGroupsService", () => {
     // gap rather than a value. Handing "" to the row would open the drawer on
     // a trace that does not exist.
     it("reports an unnamed trace as absent", async () => {
-      const service = new SessionGroupsService({
+      const service = SessionGroupsService.create({
         repository: new FakeRepository([makeRow({ lastTraceId: "" })], 1),
         codingAgentSessions: lookupReturning({}),
       });
@@ -367,7 +367,7 @@ describe("SessionGroupsService", () => {
           },
         },
       ];
-      const service = new SessionGroupsService({
+      const service = SessionGroupsService.create({
         repository: new FakeRepository([makeRow()], 1),
         codingAgentSessions: codingAgents,
         resolveOrganizationId: async () => "org-1",
@@ -395,7 +395,7 @@ describe("SessionGroupsService", () => {
         makeRow({ conversationId: "s-2", lastActivityMs: 200 }),
         makeRow({ conversationId: "s-3", lastActivityMs: 100 }),
       ];
-      const service = new SessionGroupsService({
+      const service = SessionGroupsService.create({
         repository: new FakeRepository(rows, 3),
         codingAgentSessions: lookupReturning({}),
       });
@@ -424,7 +424,7 @@ describe("SessionGroupsService", () => {
         makeRow({ conversationId: "s-3", totalCost: 1 }),
       ];
       const repository = new FakeRepository(rows, 3);
-      const service = new SessionGroupsService({
+      const service = SessionGroupsService.create({
         repository,
         codingAgentSessions: lookupReturning({}),
       });
@@ -454,7 +454,7 @@ describe("SessionGroupsService", () => {
   describe("when the sort column is unknown", () => {
     it("falls back to last activity", async () => {
       const repository = new FakeRepository([makeRow()]);
-      const service = new SessionGroupsService({
+      const service = SessionGroupsService.create({
         repository,
         codingAgentSessions: lookupReturning({}),
       });
@@ -477,7 +477,7 @@ describe("SessionGroupsService", () => {
     /** @scenario A session cursor from another sort is refused */
     it("refuses the read instead of paging through another order", async () => {
       const repository = new FakeRepository([makeRow()]);
-      const service = new SessionGroupsService({
+      const service = SessionGroupsService.create({
         repository,
         codingAgentSessions: lookupReturning({}),
       });
@@ -504,7 +504,7 @@ describe("SessionGroupsService", () => {
   describe("when the cursor was minted under the same sort", () => {
     it("passes the keyset boundary through to the repository", async () => {
       const repository = new FakeRepository([makeRow()]);
-      const service = new SessionGroupsService({
+      const service = SessionGroupsService.create({
         repository,
         codingAgentSessions: lookupReturning({}),
       });
@@ -532,7 +532,7 @@ describe("SessionGroupsService", () => {
 
   describe("when a session's last activity is older than the visibility cutoff", () => {
     it("teases the previews and keeps the totals", async () => {
-      const service = new SessionGroupsService({
+      const service = SessionGroupsService.create({
         repository: new FakeRepository([
           makeRow({
             lastActivityMs: 1000,
@@ -558,7 +558,7 @@ describe("SessionGroupsService", () => {
     /** @scenario A session beyond the visibility window teases its title */
     it("teases the generated title the same way, and leaves the git context whole", async () => {
       const title = "Rebuild the flaky session fold test and its ClickHouse fixture";
-      const service = new SessionGroupsService({
+      const service = SessionGroupsService.create({
         repository: new FakeRepository([makeRow({ lastActivityMs: 1000 })]),
         codingAgentSessions: lookupReturning({
           "session-a": codingAgentRow({

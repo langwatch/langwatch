@@ -1,32 +1,6 @@
 /**
  * A project's captured traffic, composed as its own feature.
- *
- *   traces / tracesV2 / spans / traceEditOverlay / sharedTrace
- *
- * They are one composition because they are one graph, and the graph has a
- * single centre: {@link TraceApp}. All five ARE it — the legacy grid, the
- * explorer, the waterfall, a reviewer's corrections and the one anonymous read
  * ADR-057 allows. Composing them apart would mean five redaction passes over
- * one trace, and the one that drifts is always the copy.
- *
- * ## What is composed here, and what is named as absent
- *
- * Composed from this process's own graph: the trace application itself, over
- * the share ledger and the topic tree it takes as PEERS, and the tenant
- * emitter both subscriptions stream off — which is the PROCESS's broadcast
- * fabric rather than Trace's, and is why they keep working on a deployment
- * with no read stack at all.
- *
- * Named as absent, because the implementation went with `platform/app` when the
- * monolith was deleted and no core package owns it yet:
- *
- *   - {@link ApiTraceReadStackPort} — the ClickHouse trace read stack: the ten
- *     readers `TraceApp` is built from, the caller's read-time redactions, the
- *     plan's visibility window, the span display and redaction passes, Data
- *     Privacy's content-key catalogue, the coding-agent log join, the AI
- *     composer, the reserved-metadata write and the evaluator wizard's
- *     precondition engine. Absent, every trace READ refuses by name — and both
- *     subscriptions still stream.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { AuthzService } from "@langwatch/authz-contract";
@@ -64,20 +38,8 @@ import { createSharedTraceTrpcRouter, createTracesV2TrpcRouter } from "./traces-
 // ---------------------------------------------------------------------------
 
 /**
- * The ClickHouse trace READ stack, which never left `platform/app` and went
- * with it when the monolith was deleted.
- *
- * One port rather than nine, because it is one thing: everything a captured
- * trace has to pass through between the columns it is stored in and the shape a
- * reader is allowed to see. Splitting it would suggest a deployment could hold
- * the readers without the redaction passes, and a deployment that did would
- * serve customer content to people the policy hides it from.
- *
- * `readers` is the whole of {@link TraceAppDependencies}'s trace slice: the
- * legacy read, the explorer's list, session groups, spans, summary, tree, log
- * records, canonicalisation, the reviewer-correction store and the rename
- * command. The rest are the per-request passes the two trace-view transports
- * carry.
+ * The ClickHouse trace READ stack, which never left `platform/app` and went with
+ * it when the monolith was deleted.
  */
 export abstract class ApiTraceReadStackPort {
   /** The ten readers `TraceApp` is composed from. */
@@ -138,13 +100,6 @@ export abstract class ApiTraceReadStackPort {
   }): Promise<Protections | null>;
   /**
    * The redactions an API KEY reads through, for the public REST doors.
-   *
-   * A key is not a person: the content categories resolve as they do for a
-   * caller with no session, so a project that hides captured content from the
-   * public hides it here too. Costs are the one difference and are always
-   * visible, because every project role grants `cost:view` and a project key
-   * carries full project access by design — which is exactly what
-   * `getProtectionsForProject` answered.
    */
   abstract getApiKeyProtections(input: Readonly<{ projectId: string }>): Promise<Protections>;
   /** True when the read's trace no longer exists. */
@@ -178,15 +133,8 @@ export type TraceFeatureOptions = Readonly<{
   resolveClickHouseClient: ((tenantId: string) => Promise<ClickHouseClient>) | null;
   /**
    * The process's fixed-window counter, for the ONE read the open internet can
-   * drive: `sharedTrace.get`, which costs five ClickHouse reads and a view
-   * write per call and carries no credential at all.
-   *
-   * Required rather than optional, and that is the point. The per-token and
-   * per-IP ceilings, the refusal and the customer copy all live in
-   * `@langwatch/trace-server`; the only thing a process supplies is the
-   * counter, so a process that composed this group has already decided it has
-   * one. An optional leaf here would let the surface mount with a stand-in
-   * that always allows, which is exactly the state this closed.
+   * drive: `sharedTrace.get`, which costs five ClickHouse reads and a view write
+   * per call and carries no credential at all.
    */
   rateLimit: SharedTraceTrpcPorts["rateLimit"];
   /** Names a refusal, so a stand-in says which process reached it. */
@@ -203,15 +151,6 @@ export type TraceFeatureOptions = Readonly<{
   traceReads?: ApiTraceReadStackPort;
   /**
    * Builds the read stack over the two collaborators THIS composition owns.
-   *
-   * A factory rather than a finished port because the read stack needs the
-   * retention cascade a span read's floor is widened to and the topic tree the
-   * grid labels its rows with, and both are composed here. Handing the process
-   * a second retention adapter or a second topic reader would be two answers
-   * to one question, and the one that drifts is always the copy.
-   *
-   * `traceReads` still wins where a host supplies a finished one, which is how
-   * a test names the stack it wants.
    */
   traceReadsFrom?: () => ApiTraceReadStackPort;
   /** Which plan an organization is on; absent refuses the plan read. */
@@ -224,10 +163,6 @@ export type TraceFeatureOptions = Readonly<{
 export type ComposedTraceFeature = Readonly<{
   /**
    * The five namespaces, built on the process's own root.
-   *
-   * `traces` and `tracesV2` each carry a subscription, which is why they are in
-   * the record rather than beside it: a namespace mounted outside the list
-   * would be callable over `/api/trpc` and un-watchable over `/api/sse`.
    */
   routers(mount: ApiTrpcFeatureMount): {
     traces: ReturnType<typeof createTracesTrpcRouter>;
@@ -240,12 +175,6 @@ export type ComposedTraceFeature = Readonly<{
   traces: TraceApp;
   /**
    * The read stack itself, where this process composed one.
-   *
-   * Published alongside the application because the public REST trace doors
-   * need two things `TraceApp` does not expose: the legacy read's own
-   * `getAllTracesForProject` with its projection and date-axis options, and
-   * the API key's read-time redactions. Both are THIS stack's, so a REST
-   * caller and the browser see one trace redacted one way.
    */
   traceReads?: ApiTraceReadStackPort | undefined;
   /** For `ctx.app.planProvider`. */
@@ -255,13 +184,6 @@ export type ComposedTraceFeature = Readonly<{
 
 /**
  * The thirteen tRPC ports {@link ApiTrpcCollaborators} mounts individually.
- *
- * Nested here rather than flattened onto {@link ComposedTraceFeature}
- * itself: this half also carries the `traces` APPLICATION slice under that
- * exact name, and a port and an application slice cannot share one key on one
- * object. `composeApiTrpcCollaborators` (`api-trpc-features.composition.ts`)
- * reads `ports.*` into the flat record and the application slice into
- * `application` beside them.
  */
 export type ApiTracePorts = Readonly<{
   traces: TracesTrpcPorts<TraceLegacyListInput, unknown, TraceLegacyFilterInput, unknown, unknown>;
@@ -277,12 +199,6 @@ export type ApiTracePorts = Readonly<{
 
 /**
  * Composes the observability half from this process's graph.
- *
- * The share ledger and the topic tree arrive as PEERS rather than being built
- * here: the same ledger the settings form administers redeems an anonymous
- * read's token, and the same tree `topics.*` answers labels the grid's rows.
- * Two of either would be two answers to one question, and the one that drifts
- * is the copy.
  */
 export function composeTraceFeature(options: TraceFeatureOptions): ComposedTraceFeature {
   const refuse = refusalFactory(options.processName);
@@ -297,17 +213,11 @@ export function composeTraceFeature(options: TraceFeatureOptions): ComposedTrace
     // The PROCESS's broadcast, not Trace's: this is what makes both
     // subscriptions live on a deployment with no read stack at all.
     broadcast: options.broadcast,
-    // Both are read only by the coding-agent transcript join, which this
-    // process does not serve; a call refuses rather than answering an empty
-    // transcript that reads as "this agent did nothing".
-    //
-    // What keeps that join off is the CANONICAL LOG READ the read stack
-    // refuses (see `composeApiTraceReadStack`), not these two: the join's
-    // first log read throws before either is reached. `codingAgents` here
-    // stands in for a service this process DOES compose elsewhere (the org
-    // group's), and the join needs only its pure derivation — so wiring it
-    // through is a step for whoever composes the log read, and buys nothing
-    // on its own.
+    // Both are read only by the coding-agent transcript join, which this process does not serve; a call refuses rather than answering an empty transcript
+    // that reads as "this agent did nothing". What keeps that join off is the CANONICAL LOG READ the read stack refuses (see `composeApiTraceReadStack`),
+    // not these two: the join's first log read throws before either is reached. `codingAgents` here stands in for a service this process DOES compose
+    // elsewhere (the org group's), and the join needs only its pure derivation — so wiring it through is a step for whoever composes the log read, and buys
+    // nothing on its own.
     evaluations: refuseAll<TraceAppDependencies["evaluations"]>(refuse, "trace evaluation read"),
     codingAgents: refuseAll<TraceAppDependencies["codingAgents"]>(refuse, "coding-agent read"),
     share: options.peers.share,
@@ -400,10 +310,6 @@ export function composeTraceFeature(options: TraceFeatureOptions): ComposedTrace
 
 /**
  * The trace surfaces on a process that composed no database.
- *
- * All five namespaces still mount and every call refuses by name, so a reader
- * is told the deployment cannot answer rather than shown a project with no
- * traces in it — which reads as "nothing was captured".
  */
 export function refusingTraceFeature(): ComposedTraceFeature {
   const refuse = refusalFactory("langwatch-api");
@@ -428,10 +334,7 @@ export function refusingTraceFeature(): ComposedTraceFeature {
 
 /**
  * The five namespaces, on the process's own root.
- *
  * `sharedTrace` takes the PUBLIC procedure as well: ADR-057's one anonymous
- * read is authorized by the share token in its input, and the mount declares
- * that claim rather than leaving the procedure merely unchecked.
  */
 function mountTraceRouters(mount: ApiTrpcFeatureMount, ports: ApiTracePorts) {
   return {
@@ -474,11 +377,9 @@ const CONSEQUENCE = {
 // ---------------------------------------------------------------------------
 
 /**
- * The request's client address, through the process's ONE resolver: the socket
- * peer unless it is a configured trusted proxy, and then the rightmost hop
- * that proxy did not write. Taking the leftmost `x-forwarded-for` entry let a
- * caller rotate the header, shed the per-address limit and burn a share
- * link's view cap one "new viewer" at a time.
+ * The request's client address, through the process's ONE resolver: the socket peer unless it is a configured trusted proxy, and then the rightmost hop that
+ * proxy did not write. Taking the leftmost `x-forwarded-for` entry let a caller rotate the header, shed the per-address limit and burn a share link's view
+ * cap one "new viewer" at a time.
  */
 function clientIpOf(req: unknown): string | undefined {
   return trpcClientAddress(req as TrpcRequestLike | undefined);
@@ -504,13 +405,6 @@ function refusalFactory(processName: string) {
 
 /**
  * A stand-in whose every member refuses by name.
- *
- * A proxy rather than an object literal because these are port GROUPS a
- * package declared: writing out each member would be a second declaration of
- * somebody else's interface, and the copy is what goes stale when the real one
- * grows a method. `has` answers true so a caller probing for a member finds it
- * and then learns, at the call, what is missing — rather than taking a silent
- * "not implemented" branch.
  */
 function refuseAll<T>(refuse: (capability: string) => Error, capability: string): T {
   return new Proxy(

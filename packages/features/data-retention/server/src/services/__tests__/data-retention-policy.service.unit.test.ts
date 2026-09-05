@@ -18,11 +18,7 @@ import {
   DataRetentionPlanPort,
   type DataRetentionPlan,
 } from "../../ports/data-retention-plan.port";
-import {
-  DataRetentionPolicyService,
-  assertPlanAllowsRetentionValue,
-  requiredRetentionWritePermission,
-} from "../data-retention-policy.service";
+import { DataRetentionPolicyService } from "../data-retention-policy.service";
 
 const ACTOR = { userId: "user_alice", email: "alice@example.com" };
 
@@ -108,9 +104,11 @@ function policy(options: {
 
 describe("given the permission a scope write demands", () => {
   it("asks a project for project:update rather than project:manage", () => {
-    expect(requiredRetentionWritePermission("PROJECT")).toBe("project:update");
-    expect(requiredRetentionWritePermission("TEAM")).toBe("team:manage");
-    expect(requiredRetentionWritePermission("ORGANIZATION")).toBe("organization:manage");
+    expect(DataRetentionPolicyService.requiredWritePermission("PROJECT")).toBe("project:update");
+    expect(DataRetentionPolicyService.requiredWritePermission("TEAM")).toBe("team:manage");
+    expect(DataRetentionPolicyService.requiredWritePermission("ORGANIZATION")).toBe(
+      "organization:manage",
+    );
   });
 });
 
@@ -167,24 +165,41 @@ describe("given a plan-gated write", () => {
 describe("given a value a plan may or may not persist", () => {
   it("allows only the fixed presets on a capped plan", () => {
     const capped = { free: false, uncapped: false };
-    expect(() => assertPlanAllowsRetentionValue(capped, 35)).not.toThrow();
-    expect(() => assertPlanAllowsRetentionValue(capped, 63)).not.toThrow();
-    expect(() => assertPlanAllowsRetentionValue(capped, 98)).toThrow(
+    expect(() =>
+      DataRetentionPolicyService.assertPlanAllowsRetentionValue(capped, 35),
+    ).not.toThrow();
+    expect(() =>
+      DataRetentionPolicyService.assertPlanAllowsRetentionValue(capped, 63),
+    ).not.toThrow();
+    expect(() => DataRetentionPolicyService.assertPlanAllowsRetentionValue(capped, 98)).toThrow(
       /isn't available on your plan/,
     );
   });
 
   it("allows any whole-week value at or above the floor on an uncapped plan", () => {
     const uncapped = { free: false, uncapped: true };
-    expect(() => assertPlanAllowsRetentionValue(uncapped, 49)).not.toThrow();
-    expect(() => assertPlanAllowsRetentionValue(uncapped, 700)).not.toThrow();
+    expect(() =>
+      DataRetentionPolicyService.assertPlanAllowsRetentionValue(uncapped, 49),
+    ).not.toThrow();
+    expect(() =>
+      DataRetentionPolicyService.assertPlanAllowsRetentionValue(uncapped, 700),
+    ).not.toThrow();
     // The paid short presets stay the sole exceptions below the floor.
-    expect(() => assertPlanAllowsRetentionValue(uncapped, 35)).not.toThrow();
-    expect(() => assertPlanAllowsRetentionValue(uncapped, 42)).toThrow(/at least 49 days/);
+    expect(() =>
+      DataRetentionPolicyService.assertPlanAllowsRetentionValue(uncapped, 35),
+    ).not.toThrow();
+    expect(() => DataRetentionPolicyService.assertPlanAllowsRetentionValue(uncapped, 42)).toThrow(
+      /at least 49 days/,
+    );
   });
 
   it("leaves the indefinite sentinel to the platform-administrator gate", () => {
-    expect(() => assertPlanAllowsRetentionValue({ free: false, uncapped: false }, 0)).not.toThrow();
+    expect(() =>
+      DataRetentionPolicyService.assertPlanAllowsRetentionValue(
+        { free: false, uncapped: false },
+        0,
+      ),
+    ).not.toThrow();
   });
 });
 

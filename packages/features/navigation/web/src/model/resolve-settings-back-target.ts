@@ -47,7 +47,7 @@ export interface SettingsBackTarget {
 
 function readCapturedReturn(): CapturedReturn | null {
   if (typeof window === "undefined") return null;
-  let raw: string | null = null;
+  let raw: string | null;
   try {
     raw = sessionStorage.getItem(RETURN_KEY);
   } catch {

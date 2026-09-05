@@ -1,31 +1,5 @@
 /**
  * The workbench run loop, composed for real and driven end to end.
- *
- * What this pins is the thing the packaged run loop cannot pin for itself: the
- * loop states its collaborators as one injected bag and this process is what
- * fills it, so until something drives a run over the FILLED bag, "an experiment
- * runs on the API" is an assertion about a type rather than about a process.
- *
- * Nothing between the call and the wire is stubbed. The orchestrator, the
- * polling runner, the cell-workflow builder, the studio dispatch and its
- * server-sent-event framing, the Redis progress adapter, the Experiment
- * service and its producer-only `experiment_run_processing` registration are
- * all the real ones. The doubles are exactly the four things this process does
- * not own in a test: the DATABASE, the model gateway, the QUEUE, and the NLP
- * engine — and the engine is doubled at `fetch`, one layer further out than the
- * port, so the dispatch adapter, the parameter strip and the frame decoder all
- * run for real.
- *
- * The three questions:
- *
- *   the namespaces still mount    the four experiments/workflow surfaces answer
- *                                 over the same composition that now carries a
- *                                 run loop, through the real `/api/trpc` handler
- *   a run reaches the engine      one cell is dispatched to the configured
- *                                 engine address, and the progress store holds
- *                                 the run from creation to completion
- *   no Redis refuses by name      the loop is absent rather than degraded, and
- *                                 says which capability is missing
  */
 import type { AgentService, Agent as TypedAgent } from "@langwatch/agent-contract";
 import type { ApiKeyService } from "@langwatch/api-key-contract";
@@ -97,11 +71,6 @@ const experimentRow = {
 
 /**
  * The tables this run reads, and nothing else.
- *
- * The project row and its secrets are what the studio event preparation reads
- * to hand the engine the credentials a run executes with; the experiment list
- * is the tRPC read. Every other model answers a rejecting proxy, so a read the
- * run did not intend fails by name rather than resolving to `undefined`.
  */
 function testPrisma() {
   const experimentFindMany = vi.fn(async () => [experimentRow]);
@@ -418,10 +387,6 @@ async function callTrpc(
 
 /**
  * Waits for the run to reach a terminal state in the progress store.
- *
- * `startRun` answers as soon as the run is registered and leaves the loop
- * streaming in the background, which is the whole point of the polling API —
- * so the test polls the same store a caller would.
  */
 async function awaitRunState(
   store: Map<string, string>,

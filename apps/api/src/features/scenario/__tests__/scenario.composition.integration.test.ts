@@ -1,32 +1,5 @@
 /**
  * The scenario feature of the packaged tRPC record, served by the API process.
- *
- * What this pins is one call per namespace this half mounts, each of them made
- * over the REAL `/api/trpc` handler on THIS process's root, through THIS
- * process's policy chain, against the collaborator set
- * `composeScenarioFeature` produced. Nothing here reaches a stub
- * through a proxy: the fakes are at the PORTS — a Prisma double, an AuthZ
- * service, a flag store and a broadcast fabric — and everything between the
- * HTTP request and them is the real composed graph.
- *
- *   scenarios.getAll        the composed `PrismaScenarioAdapter`, with the
- *                           project scope and the archived filter observable
- *                           rather than assumed
- *   suites.getAll           the composed `PostgresSuiteAdapter` over the same
- *                           connection
- *   langy.list              the composed `PostgresLangyAdapter`'s conversation
- *                           projection, narrowed to the caller
- *   langyEgress.get         the same Langy application, through both gates
- *   setupSkills.getPrompt   the moved catalogue, answering a real skill body
- *
- * And the three subscriptions, driven end to end over the real `/api/sse` lane
- * on the same root — which is the whole point of putting them inside the record
- * rather than beside it.
- *
- * Finally the named absences, because an absence nobody can observe is
- * indistinguishable from a stub: with no queue registered, starting a scenario
- * run and starting a Langy turn are refused BY NAME rather than silently
- * dropped.
  */
 import type { EventEmitter } from "node:events";
 import { EventEmitter as NodeEventEmitter } from "node:events";
@@ -87,11 +60,6 @@ const noop = () => undefined;
 
 /**
  * The rows this half actually reads, as a double.
- *
- * Every model here is one a REAL composed adapter reaches: the scenario table
- * the moved Prisma adapter lists, the suite table the packaged suite repository
- * lists, and the Langy conversation projection the packaged conversation
- * repository pages through.
  */
 function testPrisma() {
   const client = {
@@ -188,12 +156,6 @@ function testFeatureFlags(enabled: boolean): FeatureFlagService {
 /**
  * This process's Eventing, as the API composes it — PRODUCER-only, over a fake
  * event store instead of `EventStoreProducerOnly`.
- *
- * The store is the one substitution, and it is what makes an enqueued command
- * observable in-process: the real API appends nothing, because the worker that
- * drains the queue does. Everything else is the production shape, including
- * `processManagerMode`, which is the whole reason the two pipelines that mount
- * a process manager can be registered here at all.
  */
 function producerEventing() {
   const eventStore = EventStoreMemory.createForTesting();
@@ -381,11 +343,6 @@ async function callTrpc(
  * Drives one subscription: opens the stream, waits for the procedure's own
  * listener to attach where there is one, emits an event, and reads the frames
  * back.
- *
- * The wait is on the LISTENER rather than on a timer because a tRPC
- * subscription's generator body only runs on the first pull, so an event
- * emitted before that lands on nobody and the test would hang for a reason
- * that has nothing to do with the wiring.
  */
 async function watchSse(options: {
   application: ApiApplication;
@@ -577,12 +534,10 @@ describe("given the API process composed the scenario feature from its own graph
     it("opens the turn stream, passes its watch gate, and completes with no live buffer", async () => {
       const { application } = composeApplication();
 
-      // The whole point of driving this one on a Redis-less process: the gate is
-      // the part that must work — a caller who cannot see the conversation is
-      // refused — and the transport's own documented answer to "no Redis" is to
-      // yield nothing so the browser falls back to the Postgres read. A stream
-      // that completes cleanly is that answer; a stream that errored would mean
-      // the gate or the mount was wrong.
+      // The whole point of driving this one on a Redis-less process: the gate is the part that must work — a
+      // caller who cannot see the conversation is refused — and the transport's own documented answer to "no
+      // Redis" is to yield nothing so the browser falls back to the Postgres read. A stream that completes
+      // cleanly is that answer; a stream that errored would mean the gate or the mount was wrong.
       const watched = await watchSse({
         application,
         path: "langy.onTurnStream",
@@ -598,15 +553,9 @@ describe("given the API process composed the scenario feature from its own graph
 
   describe("when the agent-side pipelines are registered producer-only", () => {
     /**
-     * The write path end to end: the real `/api/trpc` handler, this process's
-     * policy chain, the composed scenario application, the packaged
-     * `simulation_processing` definition registered PRODUCER-only, and the
-     * command's own handler appending onto the event store.
-     *
-     * `cancelJob` rather than `run`: both dispatch on the same registration,
-     * and `run` first has to resolve its target through a prefetcher this
-     * process does not compose — which is a DEPLOYMENT absence and has its own
-     * assertion below.
+     * The write path end to end: the real `/api/trpc` handler, this process's policy chain, the composed scenario
+     * application, the packaged `simulation_processing` definition registered PRODUCER-only, and the command's
+     * own handler appending onto the event store.
      */
     it("lands a scenario run command on the event store through the real handler", async () => {
       const { eventSourcing, storedEvents } = producerEventing();
@@ -638,11 +587,6 @@ describe("given the API process composed the scenario feature from its own graph
     /**
      * The same proof on the other pipeline, whose sixteen commands were refused
      * for the same one reason.
-     *
-     * Archiving rather than starting a turn, for the reason the refusal below
-     * states: a turn dispatches to an agent manager this process composes none
-     * of, which is a deployment absence rather than the framework one this
-     * suite is about. Both writes come off the SAME registration.
      */
     it("lands a Langy conversation command on the event store through the real handler", async () => {
       const { eventSourcing, storedEvents } = producerEventing();
@@ -669,11 +613,6 @@ describe("given the API process composed the scenario feature from its own graph
 
     /**
      * The discriminator between "registered" and "registered and half-running".
-     *
-     * Both definitions mount a process manager, and this process runs neither:
-     * their inbox, outbox and wakes are the worker's. The runtime names them
-     * rather than counting them, so a deployment reads WHICH manager is not
-     * running here.
      */
     it("declines the process managers by name rather than running them", async () => {
       const { eventSourcing } = producerEventing();
@@ -738,12 +677,10 @@ describe("given the API process composed the scenario feature from its own graph
         "mutation",
       );
 
-      // Not this composition's `service_unavailable` but Langy's OWN
-      // `langy_agent_unavailable`, and that is the better answer: a web process
-      // composes no agent manager, the feature already has a typed refusal for
-      // exactly that shape, and the client renders words for it. The composed
-      // graph reaching the feature's refusal rather than a generic one is what
-      // this pins.
+      // Not this composition's `service_unavailable` but Langy's OWN `langy_agent_unavailable`, and that is the
+      // better answer: a web process composes no agent manager, the feature already has a typed refusal for
+      // exactly that shape, and the client renders words for it. The composed graph reaching the feature's
+      // refusal rather than a generic one is what this pins.
       expect(status).toBeGreaterThanOrEqual(400);
       expect(JSON.stringify(body)).toContain("langy_agent_unavailable");
     });

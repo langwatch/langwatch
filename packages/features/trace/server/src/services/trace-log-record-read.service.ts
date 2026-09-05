@@ -21,7 +21,7 @@ export class LogRecordStorageService {
   /**
    * `canonical` is REQUIRED: canonical `log_records` is the only table still receiving writes, so a service built without it reads legacy-only and silently returns nothing for every trace ingested after the cutover. Deployments without ClickHouse receive the unavailable Log service adapter.
    */
-  constructor({
+  private constructor({
     repository,
     canonical,
   }: {

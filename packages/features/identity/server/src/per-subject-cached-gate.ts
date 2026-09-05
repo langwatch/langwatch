@@ -169,7 +169,7 @@ async function settle({
   read: () => Promise<boolean>;
   flight: InFlightEntry;
 }): Promise<boolean> {
-  let isOn = false;
+  let isOn: boolean;
   try {
     isOn = await read();
   } catch (error) {

@@ -50,7 +50,7 @@ function redisChannel(eventType: BroadcastEventType): string {
  * If no redis, it will not orchestrate but send directly.
  * Manages EventEmitter instances that tRPC subscriptions listen to for real-time updates.
  */
-export class BroadcastService {
+export class BroadcastAdapter {
   private static readonly DRAIN_DELAY_MS = 2000;
 
   private eventEmitters = new Map<string, EventEmitter>();
@@ -63,7 +63,11 @@ export class BroadcastService {
   private readonly senderRateLimiter = new TenantRateLimiter();
   private readonly subscriberRateLimiter = new TenantRateLimiter();
 
-  constructor(private readonly redis: Cluster | IORedis | null) {
+  static create(redis: Cluster | IORedis | null): BroadcastAdapter {
+    return new BroadcastAdapter(redis);
+  }
+
+  private constructor(private readonly redis: Cluster | IORedis | null) {
     this.subscriber = redis?.duplicate() ?? null;
     this.setupRedisSubscription();
     this.startCleanupInterval();
@@ -284,7 +288,7 @@ export class BroadcastService {
     this.active = false;
 
     // Allow in-flight Redis publishes to drain
-    await new Promise((resolve) => setTimeout(resolve, BroadcastService.DRAIN_DELAY_MS));
+    await new Promise((resolve) => setTimeout(resolve, BroadcastAdapter.DRAIN_DELAY_MS));
 
     if (!this.subscriber) return;
 

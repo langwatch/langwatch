@@ -1,13 +1,13 @@
 import { USER_AVATAR_MAX_BYTES, UserAvatarValidationError } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 import { safeUserAvatarMediaType } from "@langwatch/user-contract";
-import { UserAvatarCodec } from "../user-avatar.service";
+import { UserAvatarCodecService } from "../user-avatar.service";
 
 const PNG_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
 
 describe("user avatar validation", () => {
-  const avatars = UserAvatarCodec.create();
+  const avatars = UserAvatarCodecService.create();
 
   it("decodes an allowed image whose signature matches", () => {
     expect(avatars.parse(`data:image/png;base64,${PNG_BASE64}`).mediaType).toBe("image/png");

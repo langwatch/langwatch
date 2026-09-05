@@ -35,7 +35,7 @@ const buildService = (stored: unknown | null) => {
   } as unknown as TraceEditOverlayRepository;
 
   return {
-    service: new TraceEditOverlayService(repository),
+    service: TraceEditOverlayService.create(repository),
     repository,
     upsert,
     deleteRow,
@@ -722,7 +722,7 @@ describe("TraceEditOverlayService", () => {
         upsert,
         delete: vi.fn(),
       } as unknown as TraceEditOverlayRepository;
-      const service = new TraceEditOverlayService(repository);
+      const service = TraceEditOverlayService.create(repository);
 
       await service.upsert({
         projectId: "project-1",
@@ -794,7 +794,7 @@ describe("TraceEditOverlayService", () => {
         findAllByProjectAndTraces,
         tryFindByProjectAndTrace: vi.fn(async () => null),
       } as unknown as TraceEditOverlayRepository;
-      const service = new TraceEditOverlayService(repository);
+      const service = TraceEditOverlayService.create(repository);
 
       const patches = await service.getPatchesByTraceIds({
         projectId: "project-1",

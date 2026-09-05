@@ -142,10 +142,8 @@ export function AddMembersForm({
             setValue(`teams.${teamIndex}.role`, TeamUserRole.VIEWER);
             setValue(`teams.${teamIndex}.customRoleId`, undefined);
           }
-        } else if (orgRole === OrganizationUserRole.MEMBER) {
-          if (team.role === TeamUserRole.VIEWER) {
-            setValue(`teams.${teamIndex}.role`, TeamUserRole.MEMBER);
-          }
+        } else if (orgRole === OrganizationUserRole.MEMBER && team.role === TeamUserRole.VIEWER) {
+          setValue(`teams.${teamIndex}.role`, TeamUserRole.MEMBER);
         }
       });
     }

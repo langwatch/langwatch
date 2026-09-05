@@ -1,10 +1,4 @@
-import {
-  ScenarioNotFoundError,
-  type Scenario,
-  type ScenarioTestSuite,
-  type ScenarioTestSuiteIdInput,
-  type ScenarioActor,
-} from "@langwatch/scenario-contract";
+import { ScenarioNotFoundError } from "@langwatch/scenario-contract";
 import { SimulationService } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
 import { ScenarioRepository } from "../scenario.repository";

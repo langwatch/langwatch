@@ -75,7 +75,7 @@ import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
-import { nlpProxyBaseUrl } from "@langwatch/workflow-server";
+import { HttpWorkflowNlpRuntimeAdapter } from "@langwatch/workflow-server";
 import { nanoid } from "nanoid";
 import type {
   ApiRateLimitRequest,
@@ -167,7 +167,7 @@ export function composeApiModelProviders(
       // serves it) and the address is this process's configuration, and the
       // composition root is where two features meet.
       executionProxyBaseUrl: options.nlpServiceUrl
-        ? nlpProxyBaseUrl({ baseUrl: options.nlpServiceUrl })
+        ? HttpWorkflowNlpRuntimeAdapter.proxyBaseUrl({ baseUrl: options.nlpServiceUrl })
         : UNCONFIGURED_EXECUTION_PROXY,
       // No `codexHandles`: see the module docblock.
     }),

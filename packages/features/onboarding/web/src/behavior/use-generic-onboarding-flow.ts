@@ -50,10 +50,12 @@ export function useGenericOnboardingFlow<
 
     if (typeof stepFromQuery === "string") {
       const screenIndex = screenIdMap.idToIndex.get(stepFromQuery);
-      if (screenIndex !== void 0 && flowConfig.visibleScreens.includes(screenIndex)) {
-        if (currentScreenIndex !== screenIndex) {
-          setCurrentScreenIndex(screenIndex);
-        }
+      if (
+        screenIndex !== void 0 &&
+        flowConfig.visibleScreens.includes(screenIndex) &&
+        currentScreenIndex !== screenIndex
+      ) {
+        setCurrentScreenIndex(screenIndex);
       }
     }
   }, [

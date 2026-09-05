@@ -1,20 +1,5 @@
 /**
  * The observability half of the packaged record, served by the API process.
- *
- * What this pins is what the migration turns on for the trace group: all
- * sixteen namespaces built on THIS process's root, with THIS process's policy
- * chain, reachable over the real `/api/trpc` handler — and the two
- * subscriptions inside the record, watchable over the real `/api/sse` lane.
- *
- * One procedure per namespace, over fakes at the ports. That is one call per
- * namespace rather than per procedure on purpose: a namespace is either in the
- * record or it does not exist, and the shape of every procedure inside it is
- * its own feature package's suite to hold.
- *
- * The last two suites are about the composition rather than the record: what a
- * process that composed NO trace read stack answers (each read refuses by name,
- * both subscriptions still stream), and that the absence is written down rather
- * than discovered by clicking into it.
  */
 import { EventEmitter } from "node:events";
 import type { AuthzService } from "@langwatch/authz-contract";
@@ -64,10 +49,6 @@ import type { LimitsTrpcPorts } from "@langwatch/entitlement-server";
 
 /**
  * The sixteen namespaces this half owns, as the wire names them.
- *
- * Written out rather than derived from the record under test: derived, the
- * assertion would pass for whatever the record happened to contain, including
- * a record that had silently lost half its surfaces.
  */
 const TRACE_GROUP_NAMESPACES = [
   "costs",
@@ -95,11 +76,6 @@ const anySchema = z.any();
 
 /**
  * A port group whose members refuse by name unless the test named them.
- *
- * The `buildTime` split matters for the same reason it does in the record's own
- * suite: a router is assembled at composition time, so a schema that threw on
- * property access would fail the MOUNT rather than the call, and the test could
- * not tell a missing port from an unexercised one.
  */
 function stub<T>(group: string, buildTime: Record<string, unknown> = {}): T {
   return new Proxy(buildTime, {
@@ -203,10 +179,6 @@ function testTraceGroupPorts(): ApiTracePorts {
 
 /**
  * A custom check that lets the call through and marks it checked.
- *
- * The two real gates are the composition's own, and their refusal path is that
- * composition's suite; here they only have to satisfy the fail-closed backstop
- * so the surface under test is the ROUTER rather than the gate.
  */
 const passthroughCheck = Object.assign(
   async ({ ctx, next }: { ctx: { permissionChecked?: boolean }; next(): unknown }) => {
@@ -233,10 +205,9 @@ function testAuthz(): AuthzService {
 }
 
 /**
- * The trace feature, faked at its PORTS: the application slice it publishes,
- * the plan reading beside it and the five port groups. The routers are the
- * REAL mounts over those ports, which is what makes the calls below go through
- * the process's own root rather than through a stub.
+ * The trace feature, faked at its PORTS: the application slice it publishes, the plan reading beside it and the
+ * five port groups. The routers are the REAL mounts over those ports, which is what makes the calls below go
+ * through the process's own root rather than through a stub.
  */
 function testTraceGroupHalf(broadcast: PresenceEmitterPort): ComposedTraceFeature {
   const ports = testTraceGroupPorts();
@@ -365,11 +336,6 @@ async function callTrpc(
 /**
  * Drives one subscription: opens the stream, waits for the procedure's own
  * listener to attach, emits one event, and reads the frames back.
- *
- * The wait is on the LISTENER rather than on a timer because a tRPC
- * subscription's generator body only runs on the first pull, so an event
- * emitted before that lands on nobody and the test would hang for a reason
- * that has nothing to do with the wiring.
  */
 async function watchSse(options: {
   application: ApiApplication;
@@ -601,11 +567,6 @@ describe("given a process that composed no trace read stack", () => {
 
 /**
  * A Prisma double whose every model answers the shape its caller reads.
- *
- * A table rather than a class: the reads below touch eight models across three
- * packages, and writing a stub per model would be eight declarations of
- * somebody else's query. Anything not named answers empty, which is a real
- * answer for a tenant with no rows rather than a refusal.
  */
 function testPrisma(rows: Record<string, Record<string, unknown>> = {}): PrismaClient {
   const defaults: Record<string, Record<string, unknown>> = {
@@ -640,11 +601,6 @@ function testPrisma(rows: Record<string, Record<string, unknown>> = {}): PrismaC
 
 /**
  * The process's ClickHouse, answering one canned result set per query shape.
- *
- * Matched on a fragment of the SQL rather than on the whole statement: the
- * statements are hundreds of characters of generated SQL, and a test that
- * pinned them would fail on every formatting change without ever noticing a
- * behavioural one.
  */
 function testClickHouse(answers: ReadonlyArray<readonly [string, unknown[]]>) {
   const queries: string[] = [];
@@ -899,14 +855,6 @@ describe("given an API process that composed the real observability collaborator
 
 /**
  * The anonymous share read, over the counter this process actually keeps.
- *
- * `sharedTrace.get` is the ONE trace read the open internet can drive: no
- * credential, five ClickHouse reads and a view write per call. Trace owns the
- * ceilings (60 reads a minute per share token, 120 per client address), the
- * refusal and the customer copy; the process owns only the counter they are
- * kept in. This suite drives the real `/api/trpc` handler over the REAL
- * composed port, so a stand-in that answered "allowed" without counting —
- * which is what this process shipped — fails it.
  */
 describe("given the anonymous share read composed on this process", () => {
   /** How many token-scoped reads a minute the transport allows. */
@@ -1062,10 +1010,6 @@ describe("given the anonymous share read composed on this process", () => {
 
   /**
    * One anonymous read, over the wire.
-   *
-   * The address rides as a header rather than being injected into the context,
-   * because the header is the only place it can come from: `ctx.req` is built
-   * by the application from the real request.
    */
   async function readShare(
     application: ApiApplication,

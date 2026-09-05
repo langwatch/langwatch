@@ -1,46 +1,6 @@
 /**
  * The role, team and home features, served by the API process beside the four
  * product features they mount with.
- *
- * What this pins is one call per namespace, each of them made over the REAL
- * `/api/trpc` handler on THIS process's root, through THIS process's policy
- * chain, against what `composeRoleFeature`, `composeHomeFeature` and the four
- * product compositions produced. Nothing here reaches a stub through a proxy:
- * the fakes are at the PORTS — a Prisma double and an AuthZ service — and
- * everything between the HTTP request and them is the real composed graph.
- *
- *   authz.effectivePermissions          the caller's own standing, off the SAME
- *                                       AuthZ service the declared check ran on
- *   batchRecord.getAllByexperimentIdGroup
- *                                       the batch-evaluation rollup, read off
- *                                       this process's own connection
- *   dataset.getAll                      the SAME dataset service the execution
- *                                       half's workflow application reads rows
- *                                       through
- *   evaluators.getAll                   the SAME evaluator service the workflow
- *                                       application publishes evaluators through
- *   role.getAll                         the composed role application, over the
- *                                       registry's own permission vocabulary
- *   featureFlag.isEnabled               the real `PostgresFeatureFlagAdapter`
- *                                       over a flag row, including the
- *                                       project → organization resolution the
- *                                       package's own resolver authorizes with
- *   home.getRecentItems                 the MOVED recent-items service: the
- *                                       audit-trail read and the entity
- *                                       hydration that turns a row into the
- *                                       name and link the strip renders
- *   personalWorkspaceFeatures.get       the organization application, off
- *                                       `ctx.app`
- *   promptTags.getAll                   the real `PostgresPromptAdapter`'s tag
- *                                       catalogue, resolved through the
- *                                       project's organization
- *   team.getTeamsWithMembers            the `probeOrganizationPermission` port,
- *                                       which widens what each member row shows
- *
- * And one named absence, because an absence nobody can observe is
- * indistinguishable from a stub: with no Enterprise plan gate composed, a
- * member list that assigns a CUSTOM role is refused by name rather than
- * permitted.
  */
 import type {
   AuthzGetDecisionInput,
@@ -78,11 +38,6 @@ const ORGANIZATION_ID = "organization-1";
 
 /**
  * The rows this half actually reads, as a double.
- *
- * A double rather than a database, and every model here is one a REAL composed
- * adapter reaches: the flag row `PostgresFeatureFlagAdapter` looks up, the
- * audit trail and prompt row the moved recent-items service walks, and the
- * organization behind a prompt tag catalogue.
  */
 function testPrisma() {
   const auditEntries = [

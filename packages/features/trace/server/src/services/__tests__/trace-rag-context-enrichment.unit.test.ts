@@ -21,7 +21,7 @@ const LEGACY = "langwatch.rag_contexts";
 const generateDocumentId = (content: unknown) =>
   SpanNormalizationPipelineService.documentIdFor(content);
 
-const service = new SpanNormalizationPipelineService(TraceCanonicalisationService.create());
+const service = SpanNormalizationPipelineService.create(TraceCanonicalisationService.create());
 
 /** A span carrying nothing but the RAG attribute under test. */
 function spanWith(attributes: Record<string, unknown>) {

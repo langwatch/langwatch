@@ -9,7 +9,7 @@ import {
 /**
  * One publish onto the tenant's channel, and nothing else.
  *
- * The application's `BroadcastService` does three things — publish, subscribe,
+ * The application's `BroadcastAdapter` does three things — publish, subscribe,
  * and emit locally to the tabs this process is serving. A background process
  * has no tabs, so the local-emission fallback that service takes when Redis is
  * absent or a publish fails would deliver to nobody here. This adapter

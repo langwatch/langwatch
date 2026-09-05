@@ -30,7 +30,7 @@ export interface LangyTrustedMessageReader {
 }
 
 export class LangyMessageService {
-  constructor(
+  private constructor(
     private readonly repository: LangyMessageRepository,
     private readonly conversations: LangyConversationRepository,
   ) {}

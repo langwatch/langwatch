@@ -113,6 +113,7 @@ export function composeApiGatewayInternalRest(
     budgetDecisions: gateway.budgetDecisions,
     credentials: ApiGatewayModelProviderCredentials.create(encryption),
     assembly: GatewayConfigAssemblyAdapter.create({ prisma }),
+    langyMirrorProjectId: process.env.LANGY_MIRROR_PROJECT_ID,
   });
   const rating = ModelCatalogGatewaySpendRatingAdapter.create();
 

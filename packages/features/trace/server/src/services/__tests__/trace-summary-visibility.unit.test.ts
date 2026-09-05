@@ -17,10 +17,12 @@ const makeSummary = (occurredDaysAgo: number) => ({
 });
 
 const makeService = (summary: unknown) =>
-  new TraceSummaryService({
-    findByTraceId: vi.fn().mockResolvedValue(summary),
-    upsert: vi.fn(),
-  } as never);
+  TraceSummaryService.create({
+    repository: {
+      findByTraceId: vi.fn().mockResolvedValue(summary),
+      upsert: vi.fn(),
+    } as never,
+  });
 
 describe("given a trace summary read with a visibility gate", () => {
   describe("when the summary is older than the cutoff", () => {

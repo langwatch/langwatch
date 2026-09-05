@@ -1,7 +1,7 @@
 import {
   DatasetContentBackfillTask,
-  DatasetObjectStorageResolver,
-  DatasetObjectStorageS3ClientResolver,
+  DatasetObjectStorageResolverAdapter,
+  DatasetObjectStorageS3ClientResolverAdapter,
   DatasetStorageDestinationPort,
   type DatasetStorageDestination,
 } from "@langwatch/dataset-server";
@@ -10,7 +10,7 @@ import type { TasksHost } from "./tasks-host.composition";
 
 /**
  * Translates this process's own destination POLICY (BYOC first, then this
- * deployment's backend) into the simpler decision `DatasetObjectStorageResolver`
+ * deployment's backend) into the simpler decision `DatasetObjectStorageResolverAdapter`
  * needs — bucket, endpoint and credentials stay resolved on Dataset's own
  * side (through its own `DatasetS3ClientResolver`), so only the backend KIND
  * crosses this seam.
@@ -39,16 +39,18 @@ export function buildDatasetContentBackfillTask({
   host: TasksHost;
 }): DatasetContentBackfillTask {
   return DatasetContentBackfillTask.create({
+    skipped: process.env.SKIP_DATASET_S3_MIGRATE === "true",
+    dryRun: process.env.DATASET_S3_MIGRATE_DRY_RUN === "true",
     database: () => host.requirePrisma(),
     storage: () => {
       const objectStorage = host.requireObjectStorage();
-      return DatasetObjectStorageResolver.create({
+      return DatasetObjectStorageResolverAdapter.create({
         destination: new TasksDatasetStorageDestination(objectStorage.destination),
-        s3ClientResolver: new DatasetObjectStorageS3ClientResolver(
-          objectStorage.aws,
-          (projectId) => objectStorage.projects.tryGet(projectId),
-          objectStorage.globalS3,
-        ),
+        s3ClientResolver: DatasetObjectStorageS3ClientResolverAdapter.create({
+          aws: objectStorage.aws,
+          lookupProjectTarget: (projectId) => objectStorage.projects.tryGet(projectId),
+          globalS3: objectStorage.globalS3,
+        }),
       });
     },
   });

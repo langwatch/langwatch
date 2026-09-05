@@ -3,7 +3,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import type { AnnotationService } from "@langwatch/annotation-contract";
-import { createOrUpdateQueueItems } from "../annotation-queueing.service";
+import { AnnotationQueueingService } from "../annotation-queueing.service";
 
 function fakeAnnotations(): AnnotationService & {
   createQueueItems: ReturnType<typeof vi.fn>;
@@ -16,14 +16,14 @@ function fakeAnnotations(): AnnotationService & {
   } as unknown as AnnotationService & { createQueueItems: ReturnType<typeof vi.fn> };
 }
 
-describe("createOrUpdateQueueItems", () => {
+describe("AnnotationQueueingService.createOrUpdateQueueItems", () => {
   describe("given the same trace id sent twice in one call", () => {
     /** @scenario The same trace sent twice in one send is queued once */
     it("queues the trace once and counts it once", async () => {
       const annotations = fakeAnnotations();
       const findExistingTraceIds = vi.fn(async (input: { traceIds: string[] }) => input.traceIds);
 
-      const result = await createOrUpdateQueueItems({
+      const result = await AnnotationQueueingService.createOrUpdateQueueItems({
         traceIds: ["trace-1", "trace-1"],
         projectId: "project-1",
         annotators: ["user-abc"],

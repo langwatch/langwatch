@@ -302,10 +302,9 @@ export function useEvaluatorEditorController(
     resolvedDefaultEmbeddings.data?.model,
   ]);
 
-  const forceUserToDecideAName =
-    evaluatorType?.startsWith("langevals/llm_") && evaluatorType !== "langevals/llm_answer_match"
-      ? true
-      : false;
+  const forceUserToDecideAName = Boolean(
+    evaluatorType?.startsWith("langevals/llm_") && evaluatorType !== "langevals/llm_answer_match",
+  );
 
   const form = useForm<EvaluatorFormValues>({
     defaultValues: {
@@ -379,15 +378,13 @@ export function useEvaluatorEditorController(
   useEffect(() => {
     const subscription = form.watch((formValues) => {
       const saved = savedFormValuesRef.current;
-      let isUnsaved = false;
+      let isUnsaved = true;
 
       if (saved) {
         const nameChanged = formValues.name?.trim() !== saved.name.trim();
         const settingsChanged =
           JSON.stringify(formValues.settings) !== JSON.stringify(saved.settings);
         isUnsaved = nameChanged || settingsChanged;
-      } else {
-        isUnsaved = true;
       }
 
       setHasUnsavedChanges(isUnsaved);

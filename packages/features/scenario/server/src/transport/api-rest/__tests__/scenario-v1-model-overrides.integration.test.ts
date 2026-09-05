@@ -74,7 +74,10 @@ function harness() {
     repository,
     simulations: Object.create(SimulationService.prototype) as SimulationService,
     ids: {
-      next: () => `scenario_${(nextId += 1)}`,
+      next: () => {
+        nextId += 1;
+        return `scenario_${nextId}`;
+      },
     } as ScenarioIdPort,
     testSuiteIds: { next: () => `test_suite_${nextId}` } as ScenarioTestSuiteIdPort,
     clock: { now: () => new Date() } as ScenarioClockPort,

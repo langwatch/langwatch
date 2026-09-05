@@ -123,17 +123,11 @@ beforeAll(async () => {
   const rows = Array.from({ length: TOTAL_SPANS }, (_, i) => makeSpanRow(i));
   await insertRows(rows);
 
-  // A stale earlier version of the first span: the dedup must return the
-  // latest version (no `stale` marker), never this one.
-  //
-  // Override StartTime as well as UpdatedAt: stored_spans is
-  // ReplacingMergeTree(StartTime), so a tied StartTime lets the engine
-  // collapse the two versions at merge time keeping whichever was inserted
-  // last among the tie (the stale row here, inserted after the live span 0)
-  // — leaving the read with only the stale row to dedup. A strictly older
-  // StartTime makes the stale row deterministically lose the merge
-  // regardless of merge timing or shard load. (Same fix the events fixture
-  // below already applies for `evt-span-1`.)
+  // A stale earlier version of the first span: the dedup must return the latest version (no `stale` marker), never this one. Override StartTime as well as
+  // UpdatedAt: stored_spans is ReplacingMergeTree(StartTime), so a tied StartTime lets the engine collapse the two versions at merge time keeping whichever
+  // was inserted last among the tie (the stale row here, inserted after the live span 0) — leaving the read with only the stale row to dedup. A strictly
+  // older StartTime makes the stale row deterministically lose the merge regardless of merge timing or shard load. (Same fix the events fixture below already
+  // applies for `evt-span-1`.)
   await insertRows([
     makeSpanRow(0, {
       SpanAttributes: { idx: "0", stale: "yes" },
@@ -260,12 +254,10 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
           { ts: t(20), name: "span.end", attrs: { phase: "done" } },
         ]),
         makeEventRow("evt-span-2", [{ ts: t(5), name: "process.tick", attrs: { iter: "1" } }]),
-        // Stale earlier version of evt-span-1 — dedup must drop it. Override
-        // StartTime as well as UpdatedAt: stored_spans is
-        // ReplacingMergeTree(StartTime), so a tied StartTime lets the engine
-        // collapse the live row at insert time (rows in one INSERT land in a
-        // single part, and the engine resolves ties unpredictably). A strictly
-        // older StartTime makes the stale row deterministically lose the merge.
+        // Stale earlier version of evt-span-1 — dedup must drop it. Override StartTime as well as UpdatedAt:
+        // stored_spans is ReplacingMergeTree(StartTime), so a tied StartTime lets the engine collapse the live
+        // row at insert time (rows in one INSERT land in a single part, and the engine resolves ties
+        // unpredictably). A strictly older StartTime makes the stale row deterministically lose the merge.
         makeEventRow("evt-span-1", [{ ts: t(-1000), name: "stale.skip", attrs: { v: "old" } }], {
           StartTime: new Date(base - 60_000),
           EndTime: new Date(base - 60_000 + 50),
@@ -562,12 +554,10 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
     });
   });
 
-  // The drawer fires the events read off entry points that drop the
-  // `occurredAtMs` URL hint (back-stack, conversation jumps, deep links), and
-  // worker callers never carry one. Without a hint the read used to walk every
-  // weekly `stored_spans` partition (incl. cold S3). The reader now seeds the
-  // partition window from the trace's own `trace_summaries.OccurredAt`, and an
-  // empty result is authoritative (no unbounded rescan).
+  // The drawer fires the events read off entry points that drop the `occurredAtMs` URL hint (back-stack,
+  // conversation jumps, deep links), and worker callers never carry one. Without a hint the read used to walk
+  // every weekly `stored_spans` partition (incl. cold S3). The reader now seeds the partition window from the
+  // trace's own `trace_summaries.OccurredAt`, and an empty result is authoritative (no unbounded rescan).
   describe("given the events are read without an occurredAtMs hint", () => {
     const hintlessTenantId = `test-span-hintless-${nanoid()}`;
     const withEventsTraceId = `trace-${nanoid()}`;
@@ -669,16 +659,11 @@ integration("SpanStorageClickHouseRepository single-trace reads (integration)", 
     });
   });
 
-  // The single-trace span readers fire from the same hint-dropping entry points
-  // as the events read (back-stack / conversation jumps / deep links) and from
-  // worker callers that never had an `occurredAtMs`. Without a hint they used to
-  // walk every weekly `stored_spans` partition (incl. cold S3). They now seed
-  // the partition window from the trace's own `trace_summaries.OccurredAt` and
-  // read that window first. Unlike the events read, an empty windowed result is
-  // NOT authoritative for spans (OccurredAt is the trace start and never widens,
-  // so a long-running trace can produce spans past OccurredAt + 2 days): the
-  // reader falls back to an unbounded rescan, and only skips the window entirely
-  // when the trace isn't in `trace_summaries` at all.
+  // The single-trace span readers fire from the same hint-dropping entry points as the events read (back-stack / conversation jumps / deep links) and from
+  // worker callers that never had an `occurredAtMs`. Without a hint they used to walk every weekly `stored_spans` partition (incl. cold S3). They now seed
+  // the partition window from the trace's own `trace_summaries.OccurredAt` and read that window first. Unlike the events read, an empty windowed result is
+  // NOT authoritative for spans (OccurredAt is the trace start and never widens, so a long-running trace can produce spans past OccurredAt + 2 days): the
+  // reader falls back to an unbounded rescan, and only skips the window entirely when the trace isn't in `trace_summaries` at all.
   describe("given a span read without an occurredAtMs hint", () => {
     const hintlessTenantId = `test-span-read-hintless-${nanoid()}`;
     const withSpansTraceId = `trace-${nanoid()}`;

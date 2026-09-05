@@ -229,6 +229,12 @@ export class GatewayConfigMaterialiserService {
      * own logic.
      */
     private readonly assembly: GatewayConfigAssemblyPort,
+    /**
+     * The mirror project this deployment names, if any. Stated by the
+     * composition root rather than read here: a package receives its
+     * deployment facts as configuration.
+     */
+    private readonly langyMirrorProjectId: string | undefined,
   ) {}
 
   static create(input: {
@@ -238,6 +244,8 @@ export class GatewayConfigMaterialiserService {
     budgetDecisions: GatewayService;
     credentials: GatewayModelProviderCredentialsPort;
     assembly: GatewayConfigAssemblyPort;
+    /** `LANGY_MIRROR_PROJECT_ID`; absent means nothing is mirrored. */
+    langyMirrorProjectId?: string | undefined;
   }): GatewayConfigMaterialiserService {
     return new GatewayConfigMaterialiserService(
       input.prisma,
@@ -246,6 +254,7 @@ export class GatewayConfigMaterialiserService {
       input.budgetDecisions,
       input.credentials,
       input.assembly,
+      input.langyMirrorProjectId,
     );
   }
 
@@ -337,7 +346,10 @@ export class GatewayConfigMaterialiserService {
       // duplicated into LangWatch's mirror project.
       langy_mirror_tier:
         vk.purpose === "LANGY" && traceProject?.id
-          ? resolveLangyMirrorTier({ projectId: traceProject.id }, process.env)
+          ? resolveLangyMirrorTier(
+              { projectId: traceProject.id },
+              { LANGY_MIRROR_PROJECT_ID: this.langyMirrorProjectId },
+            )
           : "skip",
       providers: providers.map((mp, index) =>
         buildProviderSlot(mp, index, this.credentials, this.assembly),

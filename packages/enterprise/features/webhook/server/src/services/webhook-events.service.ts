@@ -48,7 +48,7 @@ class StructuralWebhookTenantsRepository extends WebhookTenantsRepository {
 export class WebhookEventsService extends WebhookEventsServiceContract {
   private readonly options: WebhookEventsServiceOptions;
 
-  constructor(options: WebhookEventsServiceOptions | LegacyWebhookEventsServiceOptions) {
+  private constructor(options: WebhookEventsServiceOptions | LegacyWebhookEventsServiceOptions) {
     super();
     this.options =
       "prisma" in options

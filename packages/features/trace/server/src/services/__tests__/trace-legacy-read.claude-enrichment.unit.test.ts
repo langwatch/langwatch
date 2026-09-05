@@ -1,16 +1,7 @@
 /**
+ * TraceService.getById read-time Claude Code content enrichment, exercised at the real seam: the ClickHouse trace
+ * read + the log-record store are mocked boundaries (no Docker), the enrichment adapter + pure join run for real.
  * @vitest-environment node
- *
- * TraceService.getById read-time Claude Code content enrichment, exercised at
- * the real seam: the ClickHouse trace read + the log-record store are mocked
- * boundaries (no Docker), the enrichment adapter + pure join run for real.
- *
- * A coding-agent-origin trace's real `llm_request` span carries `request_id`
- * but no message content; that lives in the trace's OTLP log records. getById
- * must join capped `input` / `output` onto the span, and must leave the cost
- * alone: it was computed from the span's own tokens at ingest, so a log record
- * cannot move it out of step with the rest of the product. A non-coding-agent
- * trace must not even read the logs.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -268,11 +259,9 @@ describe("TraceService.getById — Claude Code log content enrichment", () => {
 });
 
 /**
- * Enrichment must also reach the multi-trace read paths (evals, export,
- * legacy thread reads), not just `getById`. Each of these methods returns whole
- * spans that exports + evaluators read, so a coding-agent trace fetched through
- * them must be enriched the same way, and a non-coding-agent trace must never
- * trigger a log read.
+ * Enrichment must also reach the multi-trace read paths (evals, export, legacy thread reads), not just `getById`.
+ * Each of these methods returns whole spans that exports + evaluators read, so a coding-agent trace fetched
+ * through them must be enriched the same way, and a non-coding-agent trace must never trigger a log read.
  */
 describe("TraceService — multi-trace read enrichment", () => {
   beforeEach(() => {

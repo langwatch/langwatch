@@ -65,7 +65,9 @@ async function startEchoingModel(): Promise<StubModel> {
 
   const server: Server = createServer((req, res) => {
     let raw = "";
-    req.on("data", (chunk: Buffer) => (raw += chunk.toString()));
+    req.on("data", (chunk: Buffer) => {
+      raw += chunk.toString();
+    });
     req.on("end", () => {
       requestBytes.push(Buffer.byteLength(raw));
       const body = JSON.parse(raw) as {

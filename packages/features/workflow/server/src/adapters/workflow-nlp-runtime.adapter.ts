@@ -47,7 +47,7 @@ const SPAN_ID_HEX_RE = /^[0-9a-fA-F]{16}$/;
  * non-sampled inbound trace MUST pass `sampled: false` so we do not
  * force-sample downstream.
  */
-export function formatTraceparent(
+function formatTraceparent(
   parent: { traceId: string; parentSpanId: string },
   options: { sampled?: boolean } = {},
 ): string {
@@ -73,7 +73,7 @@ export function formatTraceparent(
  * half of the same address, and the two disagreeing about where the engine
  * lives is the failure a single module prevents.
  */
-export function nlpProxyBaseUrl(input: { baseUrl: string }): string {
+function nlpProxyBaseUrl(input: { baseUrl: string }): string {
   return `${input.baseUrl.replace(/\/$/, "")}/go/proxy/v1`;
 }
 
@@ -95,6 +95,19 @@ export type NlpDispatchRequest = Readonly<{
  * engine share a deployment boundary.
  */
 export class HttpWorkflowNlpRuntimeAdapter extends WorkflowNlpRuntimePort {
+  /** {@link formatTraceparent}, as the adapter's own surface. */
+  static formatTraceparent(
+    parent: { traceId: string; parentSpanId: string },
+    options: { sampled?: boolean } = {},
+  ): string {
+    return formatTraceparent(parent, options);
+  }
+
+  /** {@link nlpProxyBaseUrl}, as the adapter's own surface. */
+  static proxyBaseUrl(input: { baseUrl: string }): string {
+    return nlpProxyBaseUrl(input);
+  }
+
   static create(options: {
     /** Where the engine answers, for example `http://127.0.0.1:5561`. */
     serviceUrl: string;

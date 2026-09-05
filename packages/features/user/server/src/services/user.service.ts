@@ -36,10 +36,10 @@ import {
 } from "@langwatch/user-contract";
 import type { UserAvatarStoragePort } from "../ports/user.port";
 import type { UserRepository } from "../repositories/user.repository";
-import { UserAvatarCodec } from "./user-avatar.service";
+import { UserAvatarCodecService } from "./user-avatar.service";
 
 export class UserService extends UserServiceContract {
-  private readonly avatars = UserAvatarCodec.create();
+  private readonly avatars = UserAvatarCodecService.create();
   private constructor(
     private readonly repository: UserRepository,
     private readonly organizations: OrganizationService,

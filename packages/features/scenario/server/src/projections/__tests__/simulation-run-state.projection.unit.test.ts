@@ -1019,7 +1019,7 @@ describe("simulationRunStateFoldProjection", () => {
   });
 
   describe("when SimulationRunCancelRequested event is applied", () => {
-    function createCancelRequestedEvent(occurredAt = 5000): SimulationProcessingEvent {
+    function cancelRequestedEvent(occurredAt = 5000): SimulationProcessingEvent {
       return {
         id: "event-cancel",
         aggregateId: "scenario-run-1",
@@ -1043,7 +1043,7 @@ describe("simulationRunStateFoldProjection", () => {
       expect(inProgress.Status).toBe("IN_PROGRESS");
       expect(inProgress.CancellationRequestedAt).toBeNull();
 
-      const after = foldProjection.apply(inProgress, createCancelRequestedEvent(5000));
+      const after = foldProjection.apply(inProgress, cancelRequestedEvent(5000));
 
       expect(after.CancellationRequestedAt).toBe(5000);
       expect(after.Status).toBe("IN_PROGRESS");
@@ -1056,10 +1056,10 @@ describe("simulationRunStateFoldProjection", () => {
         initial,
         createRunStartedEvent({}, { occurredAt: 1000 }),
       );
-      const afterFirst = foldProjection.apply(inProgress, createCancelRequestedEvent(5000));
+      const afterFirst = foldProjection.apply(inProgress, cancelRequestedEvent(5000));
       expect(afterFirst.CancellationRequestedAt).toBe(5000);
 
-      const afterSecond = foldProjection.apply(afterFirst, createCancelRequestedEvent(8000));
+      const afterSecond = foldProjection.apply(afterFirst, cancelRequestedEvent(8000));
 
       expect(afterSecond.CancellationRequestedAt).toBe(5000);
       expect(afterSecond.Status).toBe("IN_PROGRESS");

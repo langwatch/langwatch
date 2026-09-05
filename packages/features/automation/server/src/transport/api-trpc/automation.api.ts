@@ -421,16 +421,18 @@ export class AutomationTrpcApi {
             if (!input.actionParams.slackWebhook) {
               throw new MissingSlackWebhookError();
             }
-          } else if (input.action === TriggerAction.SEND_EMAIL) {
             // Align with `upsert` (and `validateEmailRecipientFormats`): RFC
             // shape only. External recipients are intentionally allowed; the
             // UI surfaces an "External" warning badge for any non-team
             // address so operators know what they're shipping. Two server
             // contracts for the same action would force the drawer to
             // branch on create-vs-edit, which is a footgun.
-            if (input.actionParams.members && input.actionParams.members.length > 0) {
-              validateEmailRecipientFormats(input.actionParams.members);
-            }
+          } else if (
+            input.action === TriggerAction.SEND_EMAIL &&
+            input.actionParams.members &&
+            input.actionParams.members.length > 0
+          ) {
+            validateEmailRecipientFormats(input.actionParams.members);
           }
 
           const trigger = await ctx.app.automation.create({
@@ -911,15 +913,14 @@ export class AutomationTrpcApi {
                 projectId: input.projectId,
               });
             }
-            if (isReport) {
-              // A report sends a rendered notification on a schedule — notify
-              // channels only, like alerts.
-              if (
-                input.action !== TriggerAction.SEND_EMAIL &&
-                input.action !== TriggerAction.SEND_SLACK_MESSAGE
-              ) {
-                throw new ReportChannelUnsupportedError();
-              }
+            // A report sends a rendered notification on a schedule — notify
+            // channels only, like alerts.
+            if (
+              isReport &&
+              input.action !== TriggerAction.SEND_EMAIL &&
+              input.action !== TriggerAction.SEND_SLACK_MESSAGE
+            ) {
+              throw new ReportChannelUnsupportedError();
             }
             // Per-action shape validation: the provider registry's per-action
             // Zod schema is the authoritative shape for actionParams. The

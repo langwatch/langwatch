@@ -7,7 +7,7 @@ import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
 import { ModelProviderExecutionHandleService } from "@langwatch/model-provider-server";
 import { LangyTitleModelPort } from "@langwatch/langy-server";
-import { nlpProxyBaseUrl } from "@langwatch/workflow-server";
+import { HttpWorkflowNlpRuntimeAdapter } from "@langwatch/workflow-server";
 
 /**
  * The project read the model cascade needs. Declared structurally rather than as `ProjectService`,
@@ -46,7 +46,7 @@ export function tryCreateWorkerLangyTitleModel(
     // The engine's address plus the proxy path, joined here because the path
     // is the WORKFLOW feature's and the address is the deployment's — the same
     // join `apps/api` makes for its authoring surfaces.
-    executionProxyBaseUrl: nlpProxyBaseUrl({ baseUrl: nlpServiceUrl }),
+    executionProxyBaseUrl: HttpWorkflowNlpRuntimeAdapter.proxyBaseUrl({ baseUrl: nlpServiceUrl }),
   });
 }
 

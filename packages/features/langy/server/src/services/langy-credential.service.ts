@@ -65,7 +65,7 @@ export type LangyCredentialServiceOptions = {
 
 /** Coordinates the worker credential envelope from injected feature ports. */
 export class LangyCredentialService {
-  constructor(private readonly deps: LangyCredentialServiceOptions) {}
+  private constructor(private readonly deps: LangyCredentialServiceOptions) {}
 
   static create(options: LangyCredentialServiceOptions): LangyCredentialService {
     return new LangyCredentialService(options);

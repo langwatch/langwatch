@@ -27,41 +27,53 @@ export interface RegisteredOAuthClient {
   clientName: string;
 }
 
-export async function registerOAuthClient({
-  redis,
-  clientId,
-  client,
-}: {
-  redis: HostedMcpRedis | null;
-  clientId: string;
-  client: RegisteredOAuthClient;
-}): Promise<void> {
-  if (!redis) {
-    throw new Error("Redis is not available");
-  }
-  await redis.set(
-    `${REDIS_CLIENT_PREFIX}${clientId}`,
-    JSON.stringify(client),
-    "EX",
-    CLIENT_TTL_SECONDS,
-  );
-}
+/**
+ * The registry itself. Static members: a registration is addressed by the
+ * Redis handle the caller already holds, so there is no per-instance state.
+ */
+export class RedisOAuthClientRepository {
+  private constructor() {}
 
-export async function getOAuthClient({
-  redis,
-  clientId,
-}: {
-  redis: HostedMcpRedis | null;
-  clientId: string;
-}): Promise<RegisteredOAuthClient | null> {
-  if (!redis) return null;
-  const raw = await redis.get(`${REDIS_CLIENT_PREFIX}${clientId}`);
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as RegisteredOAuthClient;
-    if (!Array.isArray(parsed.redirectUris)) return null;
-    return parsed;
-  } catch {
-    return null;
+  static create(): RedisOAuthClientRepository {
+    return new RedisOAuthClientRepository();
+  }
+
+  static async register({
+    redis,
+    clientId,
+    client,
+  }: {
+    redis: HostedMcpRedis | null;
+    clientId: string;
+    client: RegisteredOAuthClient;
+  }): Promise<void> {
+    if (!redis) {
+      throw new Error("Redis is not available");
+    }
+    await redis.set(
+      `${REDIS_CLIENT_PREFIX}${clientId}`,
+      JSON.stringify(client),
+      "EX",
+      CLIENT_TTL_SECONDS,
+    );
+  }
+
+  static async get({
+    redis,
+    clientId,
+  }: {
+    redis: HostedMcpRedis | null;
+    clientId: string;
+  }): Promise<RegisteredOAuthClient | null> {
+    if (!redis) return null;
+    const raw = await redis.get(`${REDIS_CLIENT_PREFIX}${clientId}`);
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw) as RegisteredOAuthClient;
+      if (!Array.isArray(parsed.redirectUris)) return null;
+      return parsed;
+    } catch {
+      return null;
+    }
   }
 }

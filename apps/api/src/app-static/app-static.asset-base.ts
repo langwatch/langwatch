@@ -64,11 +64,6 @@ export function normalizeAssetBase(raw: string | undefined): string {
   return url.href.endsWith("/") ? url.href : `${url.href}/`;
 }
 
-/** The effective asset base for this process, read from the environment. */
-export function getAssetBase(): string {
-  return normalizeAssetBase(process.env.LANGWATCH_ASSET_BASE);
-}
-
 /**
  * The external origin to admit into the CSP fetch directives, or null when the
  * base is same-origin (nothing to add).

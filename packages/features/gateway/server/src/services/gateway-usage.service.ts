@@ -76,7 +76,7 @@ export type VirtualKeyUsageSummary = {
 const RECENT_DEBITS_LIMIT = 20;
 
 export class GatewayUsageService {
-  constructor(
+  private constructor(
     private readonly projects: GatewayUsageProjectsPort,
     private readonly virtualKeys: GatewayUsageVirtualKeysPort,
     private readonly chRepo?: GatewayBudgetSpendPort,

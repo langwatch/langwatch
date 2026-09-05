@@ -62,12 +62,9 @@ export type ResolveTraceSpansFn = (
 ) => Promise<ResolvedTraceSpans>;
 
 /**
- * Callback injected from TraceService that resolves offloaded blob refs for a
- * WHOLE result set of traces in one bounded pass (#4991 bulk read paths). When
- * present, the bulk read methods (getTracesWithSpans, enrichTracesWithSpans on
- * the download path) use it so a large export/thread streams its event_log
- * reads instead of fanning out an unbounded N×M burst. Falls back to the
- * per-trace {@link ResolveTraceSpansFn} when absent.
+ * Callback injected from TraceService that resolves offloaded blob refs for a WHOLE result set of traces in one bounded pass (#4991 bulk read paths). When
+ * present, the bulk read methods (getTracesWithSpans, enrichTracesWithSpans on the download path) use it so a large export/thread streams its event_log reads
+ * instead of fanning out an unbounded N×M burst. Falls back to the per-trace {@link ResolveTraceSpansFn} when absent.
  */
 export type ResolveTraceSpansBatchFn = (
   projectId: string,
@@ -95,30 +92,14 @@ interface ClickHouseScrollCursor {
   /**
    * Epoch ms at which this scroll started, pinned on the first page and carried
    * unchanged through every later one. Updated-axis only.
-   *
-   * UpdatedAt is a mutable sort key, so without this the dedup re-resolves each
-   * trace to its CURRENT latest version on every page while the cursor still
-   * points at a position computed from an earlier one. A trace bumped above the
-   * cursor mid-scroll then matches no page — later thresholds only move further
-   * away — and is dropped from the scroll entirely. Capping the dedup at this
-   * timestamp makes every page resolve the same versions the first page saw, so
-   * the trace keeps its original position and is still delivered; the newer
-   * version belongs to the next incremental window.
-   *
-   * Absent on cursors minted before this field existed — those keep the old
-   * uncapped behaviour rather than breaking mid-scroll on deploy.
    */
   scrollStart?: number;
 }
 
 /**
- * Approximate occurrence-time bounds (epoch ms) for a set of traces, used as a
- * partition-pruning hint on `trace_summaries`. `trace_summaries` is partitioned
- * on `OccurredAt`, so a read filtered only by `TraceId` cannot prune partitions
- * and scans every weekly part (incl. cold S3) to locate the rows. Supplying the
- * traces' time range lets the read prune to the relevant weeks. The window is
- * widened by a safety margin before use, so callers can pass an exact point
- * range (`from === to`) for a single trace.
+ * Approximate occurrence-time bounds (epoch ms) for a set of traces, used as a partition-pruning hint on `trace_summaries`. `trace_summaries` is partitioned on `OccurredAt`, so a read filtered only by `TraceId`
+ * cannot prune partitions and scans every weekly part (incl. cold S3) to locate the rows. Supplying the traces' time range lets the read prune to the relevant weeks. The window is widened by a safety margin before
+ * use, so callers can pass an exact point range (`from === to`) for a single trace.
  */
 interface OccurredAtRange {
   /** Earliest trace occurrence time in the set (epoch ms). */
@@ -128,20 +109,15 @@ interface OccurredAtRange {
 }
 
 /**
- * Upper bound on distinct field names (span names, metadata keys) returned for
- * the dataset / evaluator mapping dropdowns. Distinct names are low-cardinality
- * in healthy projects (hundreds), so this only guards against pathological
- * cardinality (e.g. dynamic IDs baked into span names) flooding the response.
- * Set well above any real project so every name is offered for mapping rather
- * than alphabetically truncated.
+ * Upper bound on distinct field names (span names, metadata keys) returned for the dataset / evaluator mapping dropdowns. Distinct names are low-cardinality
+ * in healthy projects (hundreds), so this only guards against pathological cardinality (e.g. dynamic IDs baked into span names) flooding the response. Set
+ * well above any real project so every name is offered for mapping rather than alphabetically truncated.
  */
 const DISTINCT_FIELD_NAMES_LIMIT = 10_000;
 
 /**
- * Upper bound on spans returned per trace by the spans-join read path. The REST
- * collector no longer caps spans per trace (#4629), so this read cap must be
- * high enough not to truncate real agentic traces while still protecting the
- * read path from a pathologically large trace's full span payload. A trace that
+ * Upper bound on spans returned per trace by the spans-join read path. The REST collector no longer caps spans per trace (#4629), so this read cap must be
+ * high enough not to truncate real agentic traces while still protecting the read path from a pathologically large trace's full span payload. A trace that
  * actually reaches this many spans is logged as a potential truncation.
  */
 const MAX_SPANS_PER_TRACE = 10_000;
@@ -149,22 +125,7 @@ const MAX_SPANS_PER_TRACE = 10_000;
 /**
  * Caps the joined span read's own memory instead of letting it draw on the
  * server's total budget.
- *
- * This read selects every heavy column (`SpanAttributes`, `ResourceAttributes`,
- * `Events.Attributes`, `Links.*`). Uncapped, the pathological tail was stopped
- * by the server's OvercommitTracker, which picks a victim across the whole
- * cluster - so one bad trace read degraded unrelated queries.
- *
- * With an explicit cap the offending read fails on its own and surfaces as a
- * query error on that request. Mirrors the single-trace read path in
- * `app-layer/traces/repositories/span-storage.clickhouse.repository.ts`.
- *
  * The upstream fix has since landed (ADR-087, migration 00072): `OccurredAt` on
- * trace_summaries is a frozen storage anchor, and this read's window falls back
- * through the caller's paging range to a retention floor, so the time filter is
- * never empty and the scan is never the whole table. The cap stays as the belt
- * to that braces - a page of ten thousand wide traces inside one window is still
- * a lot of bytes.
  */
 const JOINED_SPAN_READ_SETTINGS = {
   // ClickHouse settings are string-typed over the wire.
@@ -172,47 +133,17 @@ const JOINED_SPAN_READ_SETTINGS = {
 } as const;
 
 /**
- * The floor the joined span read bounds itself to when nothing else can supply a
- * window: no caller paging range, and not one matched summary carrying a usable
- * `OccurredAt`. The read then runs `now - this … now + 2d` instead of no time
- * predicate at all.
- *
- * A bound of last resort has to be justified on what it could exclude, so:
+ * The floor the joined span read bounds itself to when nothing else can supply a window: no caller paging range, and not one matched summary carrying a
+ * usable `OccurredAt`. The read then runs `now - this … now + 2d` instead of no time predicate at all.
  * after ADR-087 the only rows that reach here are pre-anchor sentinel rows, and
- * a sentinel row is one whose fold never saw a usable span start. Overwhelmingly
- * that is a log-only trace, which has no spans for this read to find. The
- * residue is a trace whose every span carried an unusable start time - those
- * spans are themselves filed in `stored_spans`' epoch partition, so no bounded
- * read was ever going to return them, and reading them is precisely the
- * full-partition scan (cold S3 tiers included) that this constant exists to
- * stop.
- *
- * 90 days rather than the 49-day platform retention default: it covers the
- * default with room for a longer tenant policy, and matches the floor the log
- * read already uses (`log-record-storage.clickhouse.repository.ts`).
  */
 const SPAN_READ_FLOOR_LOOKBACK_MS = 90 * 24 * 60 * 60 * 1000;
 /** Per-trace cap on projected events (events are a small subset of spans). */
 const MAX_EVENTS_PER_TRACE = 1_000;
 
 /**
- * How many spans the traces-with-spans OOM fallback will hold in memory before
- * it gives up on the read.
- *
- * The fallback re-runs a memory-capped ClickHouse query in batches of 25 and
- * merges every batch into one map. That bounds ClickHouse's peak memory and
- * not ours: the same full result set is materialised, just on this side of the
- * socket. On 2026-08-12..16 that turned a single MEMORY_LIMIT_EXCEEDED on a
- * 980-trace read into 50 V8 heap deaths — the whole worker fleet, 16:48 UTC,
- * every day, because every pod ran the same sweep at the same time.
- *
- * The read that triggers the fallback has ALREADY failed once in ClickHouse, so
- * refusing it here costs that caller nothing it had: it fails either way. What
- * it buys is that the failure stays inside one job instead of taking the
- * process — a failed job is retried and visible, a dead pod is neither.
- *
- * Sized well above any legitimate trace-detail read (10k spans is one very
- * large trace) and far below a heap-filling sweep.
+ * How many spans the traces-with-spans OOM fallback will hold in memory before it
+ * gives up on the read.
  */
 const MAX_SPANS_PER_JOINED_FALLBACK = 50_000;
 /** Bounds the bounded events stored_spans scan to the page's occurrence weeks. */
@@ -222,19 +153,9 @@ const EVENT_PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
 const FORBIDDEN_SCORE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
 /**
- * Bound the events stored_spans scan to the partitions the page's traces
- * actually occurred in. Occurrence times are clustered (a new cluster starts on
- * a gap larger than the merge window), and each cluster contributes one tight
- * [min - window, max + window] range OR'd into the filter — so a page mixing old
- * and recent traces (common on the updated axis) scans a few small ranges rather
- * than one range spanning every weekly partition between them.
+ * Bound the events stored_spans scan to the partitions the page's traces actually occurred in. Occurrence times are clustered (a new cluster starts on a gap larger than the merge window), and each cluster contributes one tight [min - window, max + window] range OR'd into the filter — so a page mixing old and recent traces (common on the updated axis) scans a few small ranges rather than one range spanning every weekly partition between them.
  */
-/**
- * Adds the labels named by one `trace_summaries` row's `labels_json` value
- * into `labelsSet` — a JSON array of strings, each added individually, or
- * (when the value doesn't parse as JSON) the raw string itself as a single
- * label.
- */
+/** Adds the labels named by one `trace_summaries` row's `labels_json` value into `lab */
 function addLabelsFromRow(labelsJson: string, labelsSet: Set<string>): void {
   try {
     const labels = JSON.parse(labelsJson);
@@ -296,9 +217,8 @@ function buildEventOccurrenceWindows(occurredAts: number[]): {
 }
 
 /**
- * Thrown when no ClickHouse client can be resolved for a project — the only
- * cause is a configuration problem (e.g. CLICKHOUSE_URL unset), never missing
- * data. ClickHouse is the sole trace backend, so callers cannot fall back;
+ * Thrown when no ClickHouse client can be resolved for a project — the only cause is a configuration problem (e.g.
+ * CLICKHOUSE_URL unset), never missing data. ClickHouse is the sole trace backend, so callers cannot fall back;
  * they surface this as a configuration error.
  */
 export class ClickHouseClientUnavailableError extends Error {
@@ -311,16 +231,9 @@ export class ClickHouseClientUnavailableError extends Error {
 }
 
 /**
- * Thrown when an injected {@link ResolveTraceSpansBatchFn} breaks its contract by
- * not returning exactly one resolution per input trace, in input order.
- * `ResolvedTraceSpans` carries no trace identity of its own, so the pairing is
- * purely positional and the type cannot enforce it — it is enforced at the call
+ * Thrown when an injected {@link ResolveTraceSpansBatchFn} breaks its contract by not returning exactly one resolution per input trace, in input order.
+ * `ResolvedTraceSpans` carries no trace identity of its own, so the pairing is purely positional and the type cannot enforce it — it is enforced at the call
  * boundary instead. Never caused by data; always a resolver (or test-double) bug.
- *
- * The read paths flatten failures into a generic "Failed to fetch traces…"; both
- * of them allowlist this class by `instanceof` and re-throw it unwrapped, so a
- * contract violation reaches the caller with the mismatch intact rather than
- * masquerading as a ClickHouse fetch failure.
  */
 export class TraceSpansBatchResolverContractError extends Error {
   private constructor(message: string) {
@@ -359,22 +272,8 @@ export class TraceSpansBatchResolverContractError extends Error {
 
 /**
  * Service for fetching traces from ClickHouse.
- *
- * Fetches trace summaries and, when needed, span rows via separate ClickHouse
- * queries, combines them in application code, and maps to legacy Trace/Span types.
  */
-/**
- * The analytics filter vocabulary translated into a ClickHouse predicate.
- *
- * A port rather than an import because the translator belongs to ANALYTICS —
- * it knows every filter field the dashboards define — and a feature package
- * may not reach into another feature's server package. The composition root
- * holds both and joins them there.
- *
- * Absent, a filtered list REFUSES rather than listing every trace: silently
- * dropping the predicate is how a narrowed read turns into a whole-project
- * one, which is the wrong answer in the dangerous direction.
- */
+/** The analytics filter vocabulary translated into a ClickHouse predicate. */
 export type TraceLegacyFilterConditions = (
   filters: Record<string, unknown>,
   window: { startDate: number; endDate: number },
@@ -389,17 +288,15 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   private readonly tracer = getLangWatchTracer("langwatch.traces.clickhouse-service");
 
   /**
-   * Optional callback that resolves offloaded blob refs for a single trace's
-   * normalized spans before they are mapped to legacy Span objects. Injected
-   * from TraceService so blob-resolution deps are owned at a single composition
-   * point. When absent, spans are mapped as-is (preview values remain).
+   * Optional callback that resolves offloaded blob refs for a single trace's normalized spans before they are
+   * mapped to legacy Span objects. Injected from TraceService so blob-resolution deps are owned at a single
+   * composition point. When absent, spans are mapped as-is (preview values remain).
    */
   private readonly resolveTraceSpans: ResolveTraceSpansFn | undefined;
 
   /**
-   * Optional bulk resolver for whole result sets (#4991). Preferred over
-   * {@link resolveTraceSpans} on the bulk read paths so a large export/thread
-   * resolves its blobs in one bounded-concurrency pass. When absent, the bulk
+   * Optional bulk resolver for whole result sets (#4991). Preferred over {@link resolveTraceSpans} on the bulk
+   * read paths so a large export/thread resolves its blobs in one bounded-concurrency pass. When absent, the bulk
    * paths fall back to the per-trace resolver.
    */
   private readonly resolveTraceSpansBatch: ResolveTraceSpansBatchFn | undefined;
@@ -450,23 +347,8 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
 
   /**
    * Resolve the ClickHouse client for a given project.
-   *
-   * The returned client already applies the managed query defaults
-   * by the App's per-tenant resolver, so every query automatically receives
-   * memory-safety limits (max_memory_usage, max_bytes_before_external_group_by).
-   *
-   * @throws ClickHouseClientUnavailableError when no client resolves —
-   *   ClickHouse is the sole backend, so an unresolvable client is always a
-   *   configuration error, never a signal to fall back.
    */
-  /**
-   * Translates the caller's filter selection into a ClickHouse predicate.
-   *
-   * An empty selection needs no translator: there is nothing to translate, and
-   * a process that composed none must still be able to list a project's
-   * traces. A NON-empty one without a translator refuses — see
-   * {@link TraceLegacyFilterConditions}.
-   */
+  /** Translates the caller's filter selection into a ClickHouse predicate. */
   private translateFilters(
     filters: Record<string, unknown>,
     window: { startDate: number; endDate: number },
@@ -529,21 +411,9 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   }
 
   /**
-   * Get traces with spans for the given trace IDs.
-   *
-   * @param projectId - The project ID
-   * @param traceIds - Array of trace IDs to fetch
-   * @param protections - Field redaction protections
-   * @param occurredAt - Optional approximate trace time range (epoch ms) used to
-   *   bound the trace_summaries read to its weekly partitions. Without it the
-   *   summary read scans every partition (incl. cold S3) to locate the traceIds.
-   * @param opts.resolveBlobs - When true AND a blob resolver is wired on this
-   *   instance, resolves offloaded eventref pointers from event_log so
-   *   over-threshold IO values read back full (#4888). Default
-   *   (undefined/false) maps the ≤64 KB preview as-is and issues zero
-   *   event_log SELECTs.
+   * @param projectId project ID; @param traceIds trace IDs to fetch; @param protections redaction protections.
+   * @param occurredAt approximate time range bounding the partition scan; @param opts.resolveBlobs resolves offloaded IO.
    * @returns Array of Trace objects with spans
-   * @throws ClickHouseClientUnavailableError when no ClickHouse client resolves
    */
   async getTracesWithSpans(
     projectId: string,
@@ -621,18 +491,6 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
 
   /**
    * Resolve a trace ID prefix to matching full trace IDs within a project.
-   *
-   * Used for git-style shortcut lookups where a user provides a prefix of the
-   * full trace ID (for example, the 20-char truncated ID shown by `langwatch
-   * trace search`). Returns up to `limit` distinct trace IDs so the caller can
-   * detect ambiguity.
-   *
-   * Callers MUST pass an `occurredAt` range to keep the scan bounded. Per
-   * repository conventions, filtering on the partition key (OccurredAt) is
-   * required — without it ClickHouse scans every partition (including cold
-   * S3 storage) for every lookup miss.
-   *
-   * @throws ClickHouseClientUnavailableError when no ClickHouse client resolves
    */
   async resolveTraceIdByPrefix({
     projectId,
@@ -694,28 +552,9 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   }
 
   /**
-   * Get traces by thread ID.
-   *
-   * Queries trace_summaries using the Attributes map to find traces
-   * with matching thread_id (stored under various attribute keys).
-   *
-   * @param projectId - The project ID
-   * @param threadId - The thread ID to search for
-   * @param protections - Field redaction protections
-   * @param opts.resolveBlobs - Forwarded to the per-trace fetch so the
-   *   thread-detail read resolves full IO (#4991). Customer thread views that
-   *   construct without a blob resolver get a no-op. Defaults to false.
-   * @returns Array of Trace objects, **sorted chronologically by
-   *   `timestamps.started_at` ascending** (empty array if no matching traces).
-   *   The ordering is part of this method's contract, not an incidental detail:
-   *   the underlying bulk read returns trace-id order, and callers rely on the
-   *   chronological order this restores. The public-share branch of the
-   *   `getTracesByThreadId` tRPC route re-projects its authorized subset onto
-   *   this order rather than re-deriving one, so dropping the sort here would
-   *   silently mis-order that (anonymous, least-exercised) path. Pinned by
-   *   "returns traces sorted chronologically" in
-   *   clickhouse-trace.service-4991-bulk.unit.test.ts.
-   * @throws ClickHouseClientUnavailableError when no ClickHouse client resolves
+   * @param projectId project ID; @param threadId thread ID to search for; @param protections redaction protections.
+   * @param opts.resolveBlobs forwarded to the per-trace fetch
+   * @returns Array of Trace objects, sorted chronologically
    */
   async getTracesByThreadId(
     projectId: string,
@@ -793,19 +632,9 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   }
 
   /**
-   * Get traces with spans by multiple thread IDs.
-   *
-   * Queries trace_summaries using the Attributes map to find traces
-   * with matching thread_ids (stored under various attribute keys).
-   *
-   * @param projectId - The project ID
-   * @param threadIds - Array of thread IDs to search for
-   * @param protections - Field redaction protections
-   * @param opts.resolveBlobs - Forwarded to the per-trace fetch so the eval
-   *   path can read full thread IO (#4888). Customer thread views construct
-   *   without a blob resolver, so this is a no-op for them.
+   * @param projectId project ID; @param threadIds thread IDs to search for; @param protections redaction protections.
+   * @param opts.resolveBlobs forwarded to the per-trace fetch
    * @returns Array of Trace objects with spans
-   * @throws ClickHouseClientUnavailableError when no ClickHouse client resolves
    */
   async getTracesWithSpansByThreadIds(
     projectId: string,
@@ -896,15 +725,9 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   }
 
   /**
-   * Get all traces for a project with filtering and pagination.
-   *
-   * Uses keyset pagination for efficient cursor-based scrolling.
-   * The scrollId encodes the last-seen (timestamp, traceId) pair.
-   *
    * @param input - Query parameters including filters, pagination, and sorting
    * @param protections - Field redaction protections
    * @returns TracesForProjectResult
-   * @throws ClickHouseClientUnavailableError when no ClickHouse client resolves
    */
   async getAllTracesForProject(
     input: GetAllTracesForProjectInput,
@@ -968,14 +791,11 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
                   !Number.isSafeInteger(cursor.scrollStart) ||
                   cursor.scrollStart <= 0)
               ) {
-                // scrollId is client-supplied base64 JSON parsed without a shape
-                // check, and scrollStart binds as {scrollStart:UInt64}. A string,
-                // a null or a negative would fail the query outright instead of
-                // degrading, so a malformed one drops the cursor like every other
-                // mismatch here and the scroll restarts uncapped.
-                //
-                // Safe INTEGER, not merely finite: an epoch is whole, and both
-                // 1.5 and 2**53 are finite positives that UInt64 will not take.
+                // scrollId is client-supplied base64 JSON parsed without a shape check, and scrollStart binds
+                // as {scrollStart:UInt64}. A string, a null or a negative would fail the query outright
+                // instead of degrading, so a malformed one drops the cursor like every other mismatch here
+                // and the scroll restarts uncapped. Safe INTEGER, not merely finite: an epoch is whole, and
+                // both 1.5 and 2**53 are finite positives that UInt64 will not take.
                 this.logger.warn(
                   { cursorScrollStart: cursor.scrollStart },
                   "Invalid scrollStart in cursor, ignoring cursor",
@@ -1047,14 +867,11 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
                 : Date.now()
               : undefined;
 
-          // The window this scroll can honestly claim. Version resolution is
-          // pinned at scrollStart, so nothing written after it is in the scroll
-          // — and a request may legitimately ask for an endDate beyond that
-          // point. Reporting the requested window while delivering a shorter
-          // one is how a client loses rows: it resumes from the end it asked
-          // for and steps straight over the difference. Clamp instead, and
-          // return the bound as `updatedThrough` so the next pull can start
-          // exactly where this one stopped.
+          // The window this scroll can honestly claim. Version resolution is pinned at scrollStart, so nothing
+          // written after it is in the scroll — and a request may legitimately ask for an endDate beyond that
+          // point. Reporting the requested window while delivering a shorter one is how a client loses rows: it
+          // resumes from the end it asked for and steps straight over the difference. Clamp instead, and return
+          // the bound as `updatedThrough` so the next pull can start exactly where this one stopped.
           const effectiveEndDate =
             scrollStart !== undefined
               ? Math.min(input.endDate ?? scrollStart, scrollStart)
@@ -1084,26 +901,11 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           });
           let traces = fetchedTraces;
 
-          // Spans are fetched when the caller wants them OR when it wants full
-          // IO — because those are not the same thing.
-          //
-          // Blob resolution lives inside the span read: the full (>64 KB) value
-          // is recoverable ONLY by de-offloading the spans' eventref pointers
-          // and recomputing trace IO from them. trace_summaries holds nothing
-          // but the 64 KB preview. So a content-consuming SUMMARY read — a
-          // summary-mode export, a spans-less download — must still fetch and
-          // resolve spans, then throw them away.
-          //
-          // Gating the fetch on includeSpans alone (as this did) made
-          // resolveBlobs INERT for exactly those callers: the flag was set, no
-          // event_log read was ever issued, and the truncated preview shipped
-          // silently. That is #4991 AC1's bug, surviving on the paths the fix
-          // was supposed to cover.
-          //
-          // resolveBlobs stays opt-in, so the list/search grid and the
-          // aggregations still issue ZERO event_log reads (#4888 AC2 /
+          // Spans are fetched when the caller wants them OR when it wants full IO — because those are not the same thing. Blob resolution lives inside the span read: the full (>64 KB) value is recoverable ONLY by de-offloading the spans' eventref pointers and
+          // recomputing trace IO from them. trace_summaries holds nothing but the 64 KB preview. So a content-consuming SUMMARY read — a summary-mode export, a spans-less download — must still fetch and resolve spans, then throw them away. Gating the fetch on
+          // includeSpans alone (as this did) made resolveBlobs INERT for exactly those callers: the flag was set, no event_log read was ever issued, and the truncated preview shipped silently. That is #4991 AC1's bug, surviving on the paths the fix was supposed to
+          // cover. resolveBlobs stays opt-in, so the list/search grid and the aggregations still issue ZERO event_log reads (#4888 AC2 /
           // ADR-022 — AC5): they never ask for full IO, so nothing resolves,
-          // whether or not they ask for spans.
           const wantsSpans = options.includeSpans === true;
           const wantsFullIo = options.resolveBlobs === true;
 
@@ -1254,10 +1056,8 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
 
   /**
    * Get topic and subtopic counts for a project.
-   *
    * @param input - Filter parameters including projectId and date range
    * @returns TopicCountsResult
-   * @throws ClickHouseClientUnavailableError when no ClickHouse client resolves
    */
   async getTopicCounts(input: AggregationFiltersInput): Promise<TopicCountsResult> {
     return await this.tracer.withActiveSpan(
@@ -1345,10 +1145,8 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
 
   /**
    * Get unique customers and labels for a project.
-   *
    * @param input - Filter parameters including projectId and date range
    * @returns CustomersAndLabelsResult
-   * @throws ClickHouseClientUnavailableError when no ClickHouse client resolves
    */
   async getCustomersAndLabels(input: AggregationFiltersInput): Promise<CustomersAndLabelsResult> {
     return await this.tracer.withActiveSpan(
@@ -1437,15 +1235,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   }
 
   /**
-   * Get a span for prompt studio by span ID.
-   *
-   * Returns null if:
-   * - The span is not found
-   * - The span is not an LLM span
-   *
-   * @param projectId - The project ID
-   * @param spanId - The span ID to find
-   * @param protections - Field redaction protections
+   * @param projectId project ID; @param spanId span ID to find; @param protections field redaction protections.
    * @returns PromptStudioSpanResult or null
    */
   async tryGetSpanForPromptStudio({
@@ -1514,14 +1304,11 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             return null;
           }
 
-          // If the caller pointed us at a non-llm span (e.g. the user
-          // clicked "Open in Playground" from the Prompt.compile or
-          // PromptApiService.get span, or from the Prompts tab usage
-          // card), resolve to the nearest llm in the trace that the
-          // operator most likely meant: a descendant first, then a
-          // sibling that started at or after the requested span. The
-          // playground form needs an llm span's messages + llm config —
-          // anything else lands as "No prompts open".
+          // If the caller pointed us at a non-llm span (e.g. the user clicked "Open in Playground" from the
+          // Prompt.compile or PromptApiService.get span, or from the Prompts tab usage card), resolve to the
+          // nearest llm in the trace that the operator most likely meant: a descendant first, then a sibling
+          // that started at or after the requested span. The playground form needs an llm span's messages + llm
+          // config — anything else lands as "No prompts open".
           const requestedType = requestedRow.SpanAttributes["langwatch.span.type"] as
             | string
             | undefined;
@@ -1889,12 +1676,10 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           return { traces: [], totalHits: 0, lastTrace: null };
         }
 
-        // Trace and span names are operation names rather than captured
-        // content, and a tool or agent identifier is often only there, so free
-        // text has to reach them too. They ride alongside the I/O columns
-        // instead of replacing them, and `searchQuery` is already lowercased
-        // and LIKE-escaped, so `lower(...)` on each side is the whole contract.
-        // Whether captured I/O may be searched at all is still decided above.
+        // Trace and span names are operation names rather than captured content, and a tool or agent identifier
+        // is often only there, so free text has to reach them too. They ride alongside the I/O columns instead
+        // of replacing them, and `searchQuery` is already lowercased and LIKE-escaped, so `lower(...)` on each
+        // side is the whole contract. Whether captured I/O may be searched at all is still decided above.
         const searchableColumns = [
           ...(protections.canSeeCapturedInput !== false
             ? ["lower(ifNull(ts.ComputedInput, ''))"]
@@ -1925,17 +1710,11 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             ].join(" OR ")})`
           : "";
 
-        // Date axis.
-        //  occurred (default): windows + seeks on the immutable OccurredAt in
-        //    WHERE (prunes partitions). Keeps the pre-existing filter-then-dedup
-        //    structure verbatim — changing it would alter results for every
-        //    current client, so it stays byte-identical for backwards-compat.
-        //  updated (CDC): restricts ts to each trace's LATEST version first
-        //    (global max UpdatedAt, no window), THEN applies the window +
-        //    filters + cursor to THAT row. So a stale version can never satisfy
-        //    a filter the latest version doesn't, and "updated in [start,end]"
-        //    means the trace's TRUE last modification (adjacent CDC windows stay
-        //    mutually exclusive).
+        // Date axis. occurred (default): windows + seeks on the immutable OccurredAt in WHERE (prunes partitions). Keeps the pre-existing
+        // filter-then-dedup structure verbatim — changing it would alter results for every current client, so it stays byte-identical for
+        // backwards-compat. updated (CDC): restricts ts to each trace's LATEST version first (global max UpdatedAt, no window), THEN applies the window
+        // + filters + cursor to THAT row. So a stale version can never satisfy a filter the latest version doesn't, and "updated in [start,end]" means
+        // the trace's TRUE last modification (adjacent CDC windows stay mutually exclusive).
         const isUpdatedAxis = dateField === "updated";
         const dateColumn = isUpdatedAxis ? "UpdatedAt" : "OccurredAt";
         const cmp = sortDirection === "desc" ? "<" : ">";
@@ -1945,19 +1724,11 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           " AND ts.OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64}) AND ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})";
         const updatedWindow =
           " AND ts.UpdatedAt >= fromUnixTimestamp64Milli({startDate:UInt64}) AND ts.UpdatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})";
-        // Collapses ts to each trace's latest version (global max UpdatedAt) so
-        // the updated-axis window/filters/cursor evaluate on the latest row.
-        //
-        // "Latest" is bounded by the scroll's start when one is in play. The
-        // cursor pins a position derived from the versions visible when the
-        // scroll began, and UpdatedAt keeps moving underneath it: re-resolving
-        // to the current latest on every page lets a trace bumped above the
-        // cursor mid-scroll fall outside every remaining page's range, which
-        // drops it from the export with no error and no missing-row signal.
-        // Capping here — inside the dedup rather than on the outer rows, since
-        // it is version RESOLUTION that has to be stable, not just which rows
-        // survive — holds each trace at the version the scroll started with.
-        // The newer version is picked up by the next incremental window.
+        // Collapses ts to each trace's latest version (global max UpdatedAt) so the updated-axis window/filters/cursor evaluate on the latest row. "Latest" is bounded by the scroll's start when one is in
+        // play. The cursor pins a position derived from the versions visible when the scroll began, and UpdatedAt keeps moving underneath it: re-resolving to the current latest on every page lets a trace
+        // bumped above the cursor mid-scroll fall outside every remaining page's range, which drops it from the export with no error and no missing-row signal. Capping here — inside the dedup rather than
+        // on the outer rows, since it is version RESOLUTION that has to be stable, not just which rows survive — holds each trace at the version the scroll started with. The newer version is picked up by
+        // the next incremental window.
         const scrollSnapshotBound =
           scrollStart !== undefined
             ? " AND UpdatedAt <= fromUnixTimestamp64Milli({scrollStart:UInt64})"
@@ -2120,10 +1891,9 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   private static readonly SUMMARY_BATCH_SIZE = 25;
 
   /**
-   * Fetch full trace summary rows for a set of trace IDs.
-   * On ClickHouse MEMORY_LIMIT_EXCEEDED, retries in smaller batches
-   * so that heavy ComputedInput/ComputedOutput columns don't blow the
-   * per-query memory cap. If a single batch still OOMs the error propagates.
+   * Fetch full trace summary rows for a set of trace IDs. On ClickHouse MEMORY_LIMIT_EXCEEDED, retries in smaller
+   * batches so that heavy ComputedInput/ComputedOutput columns don't blow the per-query memory cap. If a single
+   * batch still OOMs the error propagates.
    */
   private async fetchTraceSummaryRows({
     clickHouseClient,
@@ -2150,11 +1920,9 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     /** Column the date window + ORDER BY run on (must match the page-ID query). */
     dateColumn?: "OccurredAt" | "UpdatedAt";
     /**
-     * Updated-axis snapshot point (epoch ms), and it must be the SAME one the
-     * id-query used. This query re-resolves each trace's latest version, so an
-     * uncapped read here would hand back a newer version than the one the page
-     * was selected on — wrong sort position, and a cursor minted from a
-     * timestamp that never appeared in the id-query's ordering.
+     * Updated-axis snapshot point (epoch ms), and it must be the SAME one the id-query used. This query re-resolves each trace's latest version, so an
+     * uncapped read here would hand back a newer version than the one the page was selected on — wrong sort position, and a cursor minted from a timestamp
+     * that never appeared in the id-query's ordering.
      */
     scrollStart?: number;
   }): Promise<TraceSummaryRow[]> {
@@ -2284,12 +2052,6 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
 
   /**
    * Projection JOIN: attach events to a page of traces.
-   *
-   * Events live inside stored_spans.SpanAttributes under `event.*` keys. This
-   * extracts ONLY the event.* entries (via mapFilter) for the spans that carry
-   * an event, scoped to the page's trace IDs and bounded to the weeks those
-   * traces occurred in — so it never materializes the full SpanAttributes map
-   * table-wide (the OOM vector). Mutates each trace's `events` in place.
    */
   private async enrichTracesWithEventsForProjection({
     clickHouseClient,
@@ -2408,16 +2170,6 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
 
   /**
    * Projection JOIN: attach annotations to a page of traces.
-   *
-   * Annotations are Postgres-only (Prisma), never carried by the ClickHouse
-   * read path. Fetched scoped to the page's trace IDs (multitenancy: projectId
-   * is the first predicate). Mutates each trace's `annotations` in place.
-   *
-   * Every comment left on those traces, anchored ones included: this one read
-   * feeds the trace table, the export and the dataset columns, and a comment on
-   * one span of a trace is part of what reviewers said about it. A suggestion
-   * only reads as the trace's expected output when that is what it suggested;
-   * a correction proposed for a span or for the trace's input is not one.
    */
   private async enrichTracesWithAnnotationsForProjection({
     projectId,
@@ -2614,14 +2366,8 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   }
 
   /**
-   * Resolve offloaded blob refs (if any), map normalized spans to legacy Span
-   * objects, build the Trace via TraceLegacySummaryMappingService.mapTraceSummaryToTrace, patch recomputed I/O,
-   * and apply field-redaction protections.
-   *
-   * Extracted to remove the duplicated resolve+map+merge block that previously
-   * appeared in both getTracesWithSpans and enrichTracesWithSpans. Both call
-   * sites are now a single line.
-   *
+   * Resolve offloaded blob refs (if any), map normalized spans to legacy Span objects, build the Trace via
+   * TraceLegacySummaryMappingService.mapTraceSummaryToTrace, patch recomputed I/O, and apply field-redaction protections.
    * @internal
    */
   private async resolveAndMergeMany({
@@ -2634,9 +2380,8 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     entries: Array<{ summary: TraceSummaryData; spans: NormalizedSpan[] }>;
     protections: Protections;
     /**
-     * Per-call gate (#4888/#4991): resolve offloaded eventref pointers from
-     * event_log ONLY when true. The resolver is constructed on the instance,
-     * but the read path opts in per call so list/search/collapsed reads keep
+     * Per-call gate (#4888/#4991): resolve offloaded eventref pointers from event_log ONLY when true. The resolver is constructed on the instance, but the
+     * read path opts in per call so list/search/collapsed reads keep
      * the preview and issue zero event_log SELECTs (ADR-022). Defaults to false.
      */
     resolveBlobs?: boolean;
@@ -2659,13 +2404,6 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
 
   /**
    * Resolve offloaded blob refs for a set of traces' spans, in one pass.
-   *
-   * Prefers the bulk {@link resolveTraceSpansBatch} (single bounded-concurrency
-   * sweep over event_log — #4991 AC6); falls back to the per-trace resolver
-   * when only that is wired (e.g. a CH service constructed with just the
-   * single-trace callback). When `resolveBlobs` is not true, returns
-   * passthrough resolutions (preview preserved, zero event_log reads — AC5).
-   *
    * @internal
    */
   private async resolveSpansBatch({
@@ -2680,15 +2418,11 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     if (resolveBlobs === true && this.resolveTraceSpansBatch) {
       const resolutions = await this.resolveTraceSpansBatch(projectId, spansPerTrace);
 
-      // ResolveTraceSpansBatchFn is INJECTED, so "one resolution per input
-      // trace, in input order" is a convention its type cannot enforce. Today's
-      // resolver honours it via .map, but a future resolver (or a test double)
-      // that drops or reorders entries would silently pair the wrong resolved
-      // spans with the wrong trace summary on this hot bulk-read path — shared
-      // by export, thread, and the dataset/sample builders. Fail loudly at the
-      // boundary, where the offending resolver is still nameable, instead of
-      // letting a downstream non-null assertion crash with no context (or not
-      // crash at all, and just scatter the wrong IO onto the wrong span).
+      // ResolveTraceSpansBatchFn is INJECTED, so "one resolution per input trace, in input order" is a convention its type cannot enforce. Today's
+      // resolver honours it via .map, but a future resolver (or a test double) that drops or reorders entries would silently pair the wrong resolved
+      // spans with the wrong trace summary on this hot bulk-read path — shared by export, thread, and the dataset/sample builders. Fail loudly at the
+      // boundary, where the offending resolver is still nameable, instead of letting a downstream non-null assertion crash with no context (or not crash
+      // at all, and just scatter the wrong IO onto the wrong span).
       if (resolutions.length !== spansPerTrace.length) {
         throw TraceSpansBatchResolverContractError.cardinality({
           got: resolutions.length,
@@ -2696,17 +2430,10 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         });
       }
 
-      // Cardinality alone does NOT catch the silent-corruption case: a resolver
-      // that returns the right COUNT in the wrong ORDER scatters each trace's IO
-      // onto its neighbour. Both resolvers derive resolvedSpans by mapping over
-      // the input spans, so a conforming resolution carries (a) the same span
-      // count and (b) the trace identity the ResolvedTraceSpans type itself
-      // lacks. Check both: a trace CAN legitimately have zero spans (the read
-      // builds its map from summary rows), and such a trace has no identity to
-      // compare — but the span count still catches it being swapped with a
-      // spans-ful one, which is the case that would otherwise silently strip a
-      // real trace's spans. Two span-less traces transposed stay invisible, and
-      // are harmless: their resolutions are empty and interchangeable.
+      // Cardinality alone does NOT catch the silent-corruption case: a resolver that returns the right COUNT in the wrong ORDER scatters each trace's IO onto its neighbour. Both resolvers derive
+      // resolvedSpans by mapping over the input spans, so a conforming resolution carries (a) the same span count and (b) the trace identity the ResolvedTraceSpans type itself lacks. Check both: a trace CAN
+      // legitimately have zero spans (the read builds its map from summary rows), and such a trace has no identity to compare — but the span count still catches it being swapped with a spans-ful one, which
+      // is the case that would otherwise silently strip a real trace's spans. Two span-less traces transposed stay invisible, and are harmless: their resolutions are empty and interchangeable.
       for (const [index, spans] of spansPerTrace.entries()) {
         const resolution = resolutions[index];
 
@@ -2752,7 +2479,6 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   /**
    * Map one trace's resolved spans to the legacy Trace, patch recomputed I/O
    * (when blobs were resolved), and apply field-redaction protections.
-   *
    * @internal
    */
   private mergeResolvedTrace({
@@ -2798,11 +2524,6 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
 
   /**
    * Enrich traces (which have empty spans) with actual span data from ClickHouse.
-   *
-   * Fetches spans via fetchTracesWithSpansJoined and replaces the empty span
-   * arrays on each trace with the real spans. Traces whose spans are not found
-   * are returned unchanged (with empty spans).
-   *
    * @internal
    */
   private async enrichTracesWithSpans(
@@ -2824,12 +2545,10 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         : undefined;
     const tracesWithSpans = await this.fetchTracesWithSpansJoined(projectId, traceIds, occurredAt);
 
-    // Collect the traces that actually have spans, resolve+merge them as one
-    // bounded batch (#4991 AC6), then splice the results back in order. Traces
-    // whose spans are not found pass through unchanged.
-    //
-    // resolveBlobs is gated by the CALLER: the list/search grid leaves it false
-    // so it keeps the ≤64 KB preview and issues zero event_log SELECTs (#4888
+    // Collect the traces that actually have spans, resolve+merge them as one bounded batch (#4991 AC6), then
+    // splice the results back in order. Traces whose spans are not found pass through unchanged. resolveBlobs is
+    // gated by the CALLER: the list/search grid leaves it false so it keeps the ≤64 KB preview and issues zero
+    // event_log SELECTs (#4888
     // AC2 / ADR-022). Only the download/export path opts in (#4991 AC1).
     const enrichable = traces
       .map((trace, index) => ({
@@ -2864,19 +2583,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
 
   /**
    * Resolve the OccurredAt span of a set of traces from a cheap sort-key seek.
-   *
-   * trace_summaries is ORDER BY (TenantId, TraceId), so filtering on those two
-   * columns and reading only OccurredAt (a light column) lets ClickHouse answer
-   * min/max from the sort-key index without decoding heavy payload columns. The
-   * returned range then bounds the heavy summary read to the traces' weekly
-   * partitions. Returns undefined when no rows match (min/max default to epoch),
-   * so the caller keeps its previous unbounded behaviour rather than guessing.
-   *
    * Pre-anchor sentinel rows (`OccurredAt = 0`, ADR-087) are excluded in SQL
-   * rather than allowed to collapse the whole range: `min()` over a batch with
-   * one sentinel in it returned the epoch, which failed the `> 0` check below and
-   * discarded a range every other trace in the batch could have supplied.
-   *
    * @internal
    */
   private async resolveOccurredAtRange({
@@ -2916,12 +2623,8 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   }
 
   /**
-   * Fetch trace summaries with their spans using a JOIN query.
-   * This is more efficient than two separate queries.
-   *
-   * The query joins trace_summaries with stored_spans on TenantId and TraceId,
-   * returning all data needed to construct Trace objects.
-   *
+   * Fetch trace summaries with their spans using a JOIN query. This is more
+   * efficient than two separate queries.
    * @internal
    */
   private async fetchTracesWithSpansJoined(
@@ -2937,14 +2640,10 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
       async (_span) => {
         const clickHouseClient = await this.resolveClient(projectId);
 
-        // Callers that already know the traces' time pass `occurredAt`; the
-        // thread-view paths (getTracesByThreadId / getTracesWithSpansByThreadIds)
-        // only have trace ids. Without a window the summary read below filters on
-        // TraceId alone, which cannot prune partitions (trace_summaries is
-        // partitioned on OccurredAt) and so opens every weekly part incl. cold
-        // S3. Resolve the OccurredAt span from a cheap sort-key seek (light
-        // column only) and reuse it to bound the heavy read. Same resolve-from-
-        // sort-key shape as the single-trace read in the trace-summary repo.
+        // Callers that already know the traces' time pass `occurredAt`; the thread-view paths (getTracesByThreadId / getTracesWithSpansByThreadIds) only
+        // have trace ids. Without a window the summary read below filters on TraceId alone, which cannot prune partitions (trace_summaries is
+        // partitioned on OccurredAt) and so opens every weekly part incl. cold S3. Resolve the OccurredAt span from a cheap sort-key seek (light column
+        // only) and reuse it to bound the heavy read. Same resolve-from- sort-key shape as the single-trace read in the trace-summary repo.
         const effectiveOccurredAt =
           occurredAt ??
           (await this.resolveOccurredAtRange({
@@ -2965,18 +2664,11 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             return undefined;
           }));
 
-        // The summary + span reads pull heavy columns (ComputedInput/Output,
-        // Attributes, SpanAttributes/Events/Links) for the whole trace list, so a
-        // large list can exceed the per-query memory cap and fail with
-        // MEMORY_LIMIT_EXCEEDED. Run the list as one query on the happy path, and
-        // on OOM retry in fixed-size batches (same fallback as fetchTraceSummaryRows
-        // / fetchEvaluationRows).
-        //
-        // That bounds CLICKHOUSE's peak memory only. The batches merge back into
-        // one map here, so this process still materialises the whole result set —
-        // which is how a 980-trace read became 50 V8 heap deaths across the worker
-        // fleet. The merge is therefore capped too; see
-        // {@link MAX_SPANS_PER_JOINED_FALLBACK}.
+        // The summary + span reads pull heavy columns (ComputedInput/Output, Attributes, SpanAttributes/Events/Links) for the whole trace list, so a
+        // large list can exceed the per-query memory cap and fail with MEMORY_LIMIT_EXCEEDED. Run the list as one query on the happy path, and on OOM
+        // retry in fixed-size batches (same fallback as fetchTraceSummaryRows / fetchEvaluationRows). That bounds CLICKHOUSE's peak memory only. The
+        // batches merge back into one map here, so this process still materialises the whole result set — which is how a 980-trace read became 50 V8
+        // heap deaths across the worker fleet. The merge is therefore capped too; see {@link MAX_SPANS_PER_JOINED_FALLBACK}.
         const runBatch = async ({
           batchTraceIds,
           maxSpanRows,
@@ -2984,34 +2676,14 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           batchTraceIds: string[];
           /**
            * Rows the span read may return before ClickHouse refuses it.
-           *
-           * Set only by the OOM fallback below, which is the path with a heap
-           * budget to spend. Checking the merged total AFTER a batch is decoded
-           * is too late: one batch is `SUMMARY_BATCH_SIZE` traces at up to
-           * {@link MAX_SPANS_PER_TRACE} spans each — 250,000 heavy rows, five
-           * times the cap it is supposed to be enforcing — and materialising
-           * that is the heap death the cap exists to prevent. Bounding the
-           * query means the rows never cross the socket.
            */
           maxSpanRows?: number;
         }): Promise<Map<string, { summary: TraceSummaryData; spans: NormalizedSpan[] }>> => {
-          // When the caller knows the traces' approximate time, bound the
-          // summary read to those weekly partitions. trace_summaries is
-          // partitioned on OccurredAt, so a TraceId-only filter cannot prune
-          // partitions and scans every part (incl. cold S3) to locate the rows.
-          // A ±2-day margin around the caller's range is safe headroom; without
-          // a hint we keep the original unbounded read.
-          //
-          // resolveOccurredAtRange yields a RANGE (min/max OccurredAt), not a
-          // point, so map it onto TraceWindowedReadService.queryWindowed's centre+half-width form: centre
-          // on the range midpoint and grow the half-width to cover half the range
-          // PLUS the ±2-day margin. The emitted fragment's bounds then land on
-          // exactly [from - 2d, to + 2d] — the same predicate the old local
-          // constant produced. Fallback "none": a resolve failure already left
-          // effectiveOccurredAt undefined (hint null -> unbounded read, warn
-          // logged at the resolve site), and a hinted-but-empty summary read is
-          // never widened here — an empty result is authoritative and the caller
-          // below skips the span scan.
+          // When the caller knows the traces' approximate time, bound the summary read to those weekly partitions. trace_summaries is partitioned on OccurredAt, so a TraceId-only filter cannot prune partitions and scans every part (incl. cold S3) to locate the rows.
+          // A ±2-day margin around the caller's range is safe headroom; without a hint we keep the original unbounded read. resolveOccurredAtRange yields a RANGE (min/max OccurredAt), not a point, so map it onto TraceWindowedReadService.queryWindowed's
+          // centre+half-width form: centre on the range midpoint and grow the half-width to cover half the range PLUS the ±2-day margin. The emitted fragment's bounds then land on exactly [from - 2d, to + 2d] — the same predicate the old local constant produced.
+          // Fallback "none": a resolve failure already left effectiveOccurredAt undefined (hint null -> unbounded read, warn logged at the resolve site), and a hinted-but-empty summary read is never widened here — an empty result is authoritative and the caller below
+          // skips the span scan.
           const hasSummaryWindow =
             effectiveOccurredAt !== undefined &&
             effectiveOccurredAt.from > 0 &&
@@ -3023,12 +2695,11 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             ? (effectiveOccurredAt.to - effectiveOccurredAt.from) / 2 + DEFAULT_PARTITION_WINDOW_MS
             : DEFAULT_PARTITION_WINDOW_MS;
 
-          // Summaries first (light, one row per trace): they carry OccurredAt,
-          // which bounds the heavy stored_spans scan below to the traces' weekly
-          // partitions instead of cold-scanning every partition on S3. A span's
-          // StartTime always falls within its trace's lifetime, so a ±2-day window
-          // around the summaries' OccurredAt range is safe headroom; when no
-          // summary row is found we fall back to an unbounded span scan.
+          // Summaries first (light, one row per trace): they carry OccurredAt, which bounds the heavy
+          // stored_spans scan below to the traces' weekly partitions instead of cold-scanning every partition
+          // on S3. A span's StartTime always falls within its trace's lifetime, so a ±2-day window around the
+          // summaries' OccurredAt range is safe headroom; when no summary row is found we fall back to an
+          // unbounded span scan.
           const summaryRows = await TraceWindowedReadService.queryWindowed<TraceSummaryRow[]>({
             table: "trace_summaries",
             hintMs: summaryHintMs,
@@ -3131,33 +2802,11 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             Links_Attributes: Record<string, unknown>[];
           };
 
-          // Bound the stored_spans scan to the weeks the matched traces occurred
-          // in (the cold-scan cost driver). Same range->window mapping as the
-          // summary read above: centre on the range midpoint, half-width = half
-          // that range + the ±2-day margin, so the fragment lands on exactly
-          // [min - 2d, max + 2d].
-          //
-          // Three sources, in order, and the last one cannot fail — which is the
+          // Bound the stored_spans scan to the weeks the matched traces occurred in (the cold-scan cost driver). Same range->window mapping as the
+          // summary read above: centre on the range midpoint, half-width = half that range + the ±2-day margin, so the fragment lands on exactly [min
+          // - 2d, max + 2d]. Three sources, in order, and the last one cannot fail — which is the
           // point (ADR-087). This used to be one source: the matched summaries'
-          // positive OccurredAts. When none survived, `hasWindow` was false, the
-          // hint was null, `fallback: "none"` produced a null fragment and BOTH
-          // filter strings rendered empty — so this read pulled every heavy span
-          // column with no partition predicate at all, over every weekly part
-          // including cold S3. That is the read prod died on with
-          // MEMORY_LIMIT_EXCEEDED (code 241).
-          //
           //   1. The matched summaries' own anchors. Post-ADR-087 every row has
-          //      one; this stays the tightest window and the normal path.
-          //   2. `effectiveOccurredAt` — the caller's own paging range, or the
-          //      range resolved from trace_summaries for callers that only have
-          //      trace ids. Preferred over a floor because it is derived from
-          //      the traces actually being read.
-          //   3. A retention floor ({@link SPAN_READ_FLOOR_LOOKBACK_MS}), via the
-          //      `{ lookbackMs }` fallback, which renders `now - 90d … now + 2d`.
-          //      Never null, so the filter string is never empty.
-          //
-          // `fallback: "none"` still applies whenever there IS a hint: a
-          // hinted-but-empty span read is authoritative and must not be widened.
           const occurredAts = summaryRows
             .map((r) => r.ts_OccurredAt)
             .filter((t): t is number => typeof t === "number" && t > 0);
@@ -3175,14 +2824,10 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             ? (spanRange.to - spanRange.from) / 2 + DEFAULT_PARTITION_WINDOW_MS
             : DEFAULT_PARTITION_WINDOW_MS;
 
-          // Resolved here rather than inside `run` below: the callback is
-          // re-invoked per window attempt and the budget does not vary with the
-          // window.
-          //
-          // `throw`, never `break`: `break` truncates the result and returns
-          // it, which would silently hand back a partial span list as if it
-          // were complete. One row of headroom so an exactly-at-budget batch
-          // still succeeds and only a genuine overrun trips it.
+          // Resolved here rather than inside `run` below: the callback is re-invoked per window attempt and the
+          // budget does not vary with the window. `throw`, never `break`: `break` truncates the result and
+          // returns it, which would silently hand back a partial span list as if it were complete. One row of
+          // headroom so an exactly-at-budget batch still succeeds and only a genuine overrun trips it.
           const spanReadSettings =
             maxSpanRows === undefined
               ? JOINED_SPAN_READ_SETTINGS
@@ -3336,12 +2981,10 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
               i + TraceLegacyReadClickHouseRepository.SUMMARY_BATCH_SIZE,
             );
 
-            // Batching caps ClickHouse's peak memory, not ours — the merge
-            // rebuilds the whole result set here. Stop before the heap does,
-            // and stop at the QUERY rather than after decoding its rows: the
-            // budget goes into the read so an over-budget batch is refused by
-            // ClickHouse instead of arriving in this process first.
-            // See {@link MAX_SPANS_PER_JOINED_FALLBACK}.
+            // Batching caps ClickHouse's peak memory, not ours — the merge rebuilds the whole result set here.
+            // Stop before the heap does, and stop at the QUERY rather than after decoding its rows: the budget
+            // goes into the read so an over-budget batch is refused by ClickHouse instead of arriving in this
+            // process first. See {@link MAX_SPANS_PER_JOINED_FALLBACK}.
             const remainingSpanBudget = MAX_SPANS_PER_JOINED_FALLBACK - mergedSpanCount;
             let batchMap: Map<string, { summary: TraceSummaryData; spans: NormalizedSpan[] }>;
             try {
@@ -3519,11 +3162,9 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   }
 
   /**
-   * Annotation `scoreOptions` is keyed by AnnotationScore id; the public contract
-   * exposes `annotations.scores.<name>`, so remap id -> name. Score names are not
-   * unique per project — on a collision the last definition wins. An id with no
-   * matching score (e.g. a deleted definition) keeps its id as the key so data is
-   * never silently dropped. Prototype-polluting keys are skipped.
+   * Annotation `scoreOptions` is keyed by AnnotationScore id; the public contract exposes `annotations.scores.<name>`, so remap id -> name. Score names are
+   * not unique per project — on a collision the last definition wins. An id with no matching score (e.g. a deleted definition) keeps its id as the key so
+   * data is never silently dropped. Prototype-polluting keys are skipped.
    */
   static remapScoreOptionsToNames(
     scoreOptions: unknown,
@@ -3548,12 +3189,6 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   /**
    * ClickHouse refused a query because its result exceeded `max_result_rows`
    * under `result_overflow_mode = 'throw'` (TOO_MANY_ROWS_OR_BYTES, code 396).
-   *
-   * That is a deliberate refusal on our side, not a fault: the joined-span
-   * fallback sets the limit from its own remaining heap budget so an over-budget
-   * batch never reaches this process. Matched by code and by name because the
-   * driver surfaces one or the other depending on how far the error has been
-   * wrapped.
    */
   static isClickHouseResultOverflowError(error: unknown): boolean {
     if (!(error instanceof Error)) return false;
@@ -3632,14 +3267,9 @@ interface TraceSummaryRow {
 }
 
 /**
+ * `OccurredAt` is the frozen storage anchor - the partition and TTL address, and the column the list read pages on. `occurredAt` on `TraceSummaryData` is the span timing baseline, which is what the trace reports as its start. Before migration 00072 one column carried both, so a row at
+ * the pre-anchor stamp yields the same value for each; after it, the baseline has its own column and reading it off the anchor would report an accept time as a span start.
  * Split a summary row's two times back apart (ADR-087).
- *
- * `OccurredAt` is the frozen storage anchor - the partition and TTL address, and
- * the column the list read pages on. `occurredAt` on `TraceSummaryData` is the
- * span timing baseline, which is what the trace reports as its start. Before
- * migration 00072 one column carried both, so a row at the pre-anchor stamp
- * yields the same value for each; after it, the baseline has its own column and
- * reading it off the anchor would report an accept time as a span start.
  */
 function traceSummaryTimesFromRow(row: TraceSummaryRow): {
   storageAnchorMs: number;
@@ -3696,15 +3326,9 @@ interface PromptStudioCandidateRow {
 }
 
 /**
- * Given a non-llm span the operator clicked "Open in Playground" from
- * (typically `Prompt.compile` or `PromptApiService.get`), find the
- * nearest llm in the same trace to load instead. Preference order:
- *   1. Closest descendant llm under the requested span — usually a child
- *      llm call that consumed the just-compiled prompt.
- *   2. Sibling llm under the same parent that started after the
- *      requested span — the next llm call in the chain.
- *   3. First llm in the trace by start time as a last resort.
- * Returns null when the trace genuinely has no llm spans.
+ * Given a non-llm span the operator clicked "Open in Playground" from (typically `Prompt.compile` or `PromptApiService.get`), find the nearest llm in the same trace to load instead. Preference order: 1. Closest
+ * descendant llm under the requested span — usually a child llm call that consumed the just-compiled prompt. 2. Sibling llm under the same parent that started after the requested span — the next llm call in the
+ * chain. 3. First llm in the trace by start time as a last resort. Returns null when the trace genuinely has no llm spans.
  */
 function findNearestLlm<T extends PromptStudioCandidateRow>(rows: T[], requested: T): T | null {
   const isLlm = (r: T) => (r.SpanAttributes["langwatch.span.type"] as string | undefined) === "llm";
@@ -3733,13 +3357,10 @@ function findNearestLlm<T extends PromptStudioCandidateRow>(rows: T[], requested
     }
   }
 
-  // 2. Sibling llm under the same parent (or root-level peer if the
-  //    requested span has no parent) that started at/after the requested
-  //    span. Earliest qualifying sibling wins, so we land on the *next*
-  //    call rather than one further down the chain. Siblings that
-  //    started *before* the requested span do NOT count — those belong
-  //    to an earlier turn and would open an unrelated playground
-  //    context — so the search falls through to step 3 instead.
+  // 2. Sibling llm under the same parent (or root-level peer if the requested span has no parent) that started
+  // at/after the requested span. Earliest qualifying sibling wins, so we land on the *next* call rather than one
+  // further down the chain. Siblings that started *before* the requested span do NOT count — those belong to an
+  // earlier turn and would open an unrelated playground context — so the search falls through to step 3 instead.
   const siblingPool =
     requested.ParentSpanId == null
       ? rows.filter((r) => r.ParentSpanId == null)

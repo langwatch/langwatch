@@ -578,7 +578,7 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
     const resolve = options.resolveClickHouseClient;
     const enabled = resolve !== null;
 
-    const blobStore = new TraceBlobStoreService({
+    const blobStore = TraceBlobStoreService.create({
       // The v1 spool predates this deployment: a ref written before the
       // stored-object registry existed reads back through S3 directly, and
       // this process composes no such client. `resolveOffloadedTraces`
@@ -588,7 +588,7 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
       ...(resolve ? { resolveClickHouseClient: resolve } : {}),
       logger: this.logger,
     });
-    const ioExtractionService = new TraceIOExtractionService(this.canonicalisation);
+    const ioExtractionService = TraceIOExtractionService.create(this.canonicalisation);
     const blobResolutionDeps = { blobStore, ioExtractionService };
 
     const spanStorageRepository = resolve
@@ -617,33 +617,33 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
 
     return {
       read: read as unknown as TraceAppDependencies["traces"]["read"],
-      list: new TraceListService(
-        enabled
+      list: TraceListService.create({
+        repository: enabled
           ? TraceListClickHouseRepository.create(resolve as never)
           : NullTraceListAdapter.create(),
-        options.evaluations ?? this.refusingEvaluations(),
-        options.topics,
-      ) as unknown as TraceAppDependencies["traces"]["list"],
-      sessionGroups: new SessionGroupsService({
+        evaluations: options.evaluations ?? this.refusingEvaluations(),
+        topicService: options.topics,
+      }) as unknown as TraceAppDependencies["traces"]["list"],
+      sessionGroups: SessionGroupsService.create({
         repository: resolve
           ? new SessionGroupsClickHouseRepository(resolve as never)
           : new NullSessionGroupsRepository(),
         codingAgentSessions: options.codingAgents ?? this.refusingCodingAgents(),
         resolveOrganizationId: (projectId) => this.tryResolveOrganizationId(projectId),
       }) as unknown as TraceAppDependencies["traces"]["sessionGroups"],
-      spans: new SpanStorageService(
-        spanStorageRepository,
+      spans: SpanStorageService.create({
+        repository: spanStorageRepository,
         blobResolutionDeps,
-      ) as unknown as TraceAppDependencies["traces"]["spans"],
-      summary: new TraceSummaryService(
-        resolve
+      }) as unknown as TraceAppDependencies["traces"]["spans"],
+      summary: TraceSummaryService.create({
+        repository: resolve
           ? TraceSummaryClickHouseRepository.create({
               resolveClient: resolve as never,
               defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
             })
           : new NullTraceSummaryRepository(),
-        { spanStorageRepository, ...blobResolutionDeps },
-      ) as unknown as TraceAppDependencies["traces"]["summary"],
+        fullResolutionDeps: { spanStorageRepository, ...blobResolutionDeps },
+      }) as unknown as TraceAppDependencies["traces"]["summary"],
       tree: this.composeTree(),
       logRecords: this.composeLogRecords(),
       canonicalisation: this.canonicalisation,
@@ -692,7 +692,7 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
 
   private composeLogRecords(): TraceAppDependencies["traces"]["logRecords"] {
     const resolve = this.options.resolveClickHouseClient;
-    return new LogRecordStorageService({
+    return LogRecordStorageService.create({
       repository: resolve
         ? new LogRecordStorageClickHouseRepository(resolve as never)
         : new NullLogRecordStorageRepository(),
@@ -896,7 +896,7 @@ class ApiTraceProtections {
 
   private constructor(private readonly options: ApiTraceProtectionsOptions) {
     this.logger = createLogger(`${options.processName}:trace-protections`);
-    this.window = new VisibilityWindowService(options.plans);
+    this.window = VisibilityWindowService.create(options.plans);
   }
 
   /**

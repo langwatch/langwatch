@@ -132,7 +132,7 @@ export class LangyUiActionService {
   private readonly actions: LangyUiActionCatalogPort;
   private readonly backendRunner?: UiActionBackendRunner;
 
-  constructor(deps: LangyUiActionServiceDependencies) {
+  private constructor(deps: LangyUiActionServiceDependencies) {
     this.redis = deps.redis;
     this.conversations = deps.conversations;
     this.buffer = deps.buffer;

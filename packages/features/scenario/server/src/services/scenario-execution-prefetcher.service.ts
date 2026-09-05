@@ -16,7 +16,6 @@ import type { TraceService } from "@langwatch/trace-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
 
 import { ScenarioExecutionLookupService } from "./scenario-execution-lookup.service";
-import type { ModelParamsFailureReason } from "./scenario-model-parameters.service";
 import { ScenarioModelParametersService } from "./scenario-model-parameters.service";
 import {
   ScenarioPrefetchCompletionService,

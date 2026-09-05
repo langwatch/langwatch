@@ -1,19 +1,6 @@
 /**
- * Which dimensions a spend rollup may be grouped by, and which of those a
- * cursor can safely walk.
- *
- * The rollup pages by group key ascending, which is exact only while a row's
- * group key cannot change. Most of them cannot: where a request landed, whose
- * key served it, which end user and principal it was attributed to, and what
- * wire shape it used are all fixed when the request is admitted. Two are not.
- * The fold overwrites `Model` and `ProviderKey` when the values the caller
- * ASKED for are replaced by the ones that actually served the request, so a
- * late outcome can move a row from one group to another. A walk that crosses
- * that boundary serves the row twice or not at all, and a reconciliation
- * checksum that silently drops rows is worse than one that refuses.
- *
- * So a grouping on a movable key is refused while the window can still
- * change, and served once it has settled.
+ * Which dimensions a spend rollup may be grouped by, and which of those a cursor
+ * can safely walk.
  */
 
 import { GatewaySettlementPolicyPort } from "../ports/gateway-settlement-policy.port";
@@ -43,12 +30,6 @@ const COLUMN_BY_KEY: Record<SpendGroupByKey, string> = {
 
 /**
  * How a spend rollup is grouped and bucketed.
- *
- * Two of these decide whether a read is answerable at all rather than how it
- * looks. A group that can MOVE while a page walk is in progress — by model,
- * by provider, into time buckets — would double-count some requests and miss
- * others, so `isMovableGroupBy` and `windowHasSettled` decide together whether
- * the walk is safe, and `assertGroupingIsWalkable` refuses when it is not.
  */
 export class GatewaySpendGroupingAdapter {
   static create(): GatewaySpendGroupingAdapter {
@@ -63,20 +44,6 @@ export class GatewaySpendGroupingAdapter {
 
   /**
    * Whether this is a named zone the runtime knows.
-   *
-   * Asked before the query is built so an unknown zone is a 400 naming
-   * `timezone`. ClickHouse would otherwise refuse it in `formatDateTime` and the
-   * caller would read an unknown error about a value they chose. Existence is
-   * checked by a construction attempt rather than against a list, because the
-   * zone database ships with the runtime and any list here would go stale
-   * against it.
-   *
-   * A fixed offset is refused even though the runtime accepts it. `Intl` takes
-   * `+05:00`, `+0500` and `-08:00`; ClickHouse loads zones by name only and
-   * answers `Cannot load time zone +05:00`, which would reach the caller as an
-   * unknown error rather than the documented refusal. Every named zone starts
-   * with a letter and no offset spelling does, so the first character settles
-   * it.
    */
   isIanaTimeZone(zone: string): boolean {
     if (!/^[A-Za-z]/.test(zone)) return false;
@@ -89,11 +56,9 @@ export class GatewaySpendGroupingAdapter {
   }
 
   /**
-   * A time bucket rendered as a sortable string, so every grouping dimension is
-   * a String and one cursor comparison covers them all. The offset is applied
-   * inside ClickHouse rather than after the fact: a day boundary is the
-   * caller's local midnight, and re-bucketing UTC days client-side cannot
-   * recover the requests that fell on the other side of it.
+   * A time bucket rendered as a sortable string, so every grouping dimension is a String and one cursor comparison covers them all. The offset is applied
+   * inside ClickHouse rather than after the fact: a day boundary is the caller's local midnight, and re-bucketing UTC days client-side cannot recover the
+   * requests that fell on the other side of it.
    */
   bucketExpression({
     bucket,
@@ -116,10 +81,6 @@ export class GatewaySpendGroupingAdapter {
    * A window is settled once its end is older than the settlement grace: past
    * that, every admission inside it has either resolved or been settled by the
    * sweeper, so no fold is still waiting to rewrite a row's model or provider.
-   *
-   * The grace is read from the settlement process manager rather than restated
-   * here, so an operator who widens `LW_SPEND_SETTLEMENT_GRACE_MS` widens this
-   * guard with it instead of leaving two numbers to disagree.
    */
   windowHasSettled({
     toMs,
@@ -134,15 +95,8 @@ export class GatewaySpendGroupingAdapter {
   }
 
   /**
-   * Refuse a grouping whose key can still move under the walk, unless the
-   * caller has said they accept an inexact read.
-   *
-   * A time bucket counts as movable for the same reason model and provider do,
-   * and for a subtler cause: the fold's admitted handler sets the occurred-at
-   * unconditionally while every outcome handler preserves the one already
-   * there, so an outcome that races ahead of its own admission has its instant
-   * rewritten when the admission lands. A request can therefore change buckets,
-   * and over a month boundary change partitions.
+   * Refuse a grouping whose key can still move under the walk, unless the caller
+   * has said they accept an inexact read.
    */
   assertGroupingIsWalkable({
     keys,

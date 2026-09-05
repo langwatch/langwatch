@@ -1,17 +1,7 @@
 /**
- * `PATCH /api/traces/:traceId/metadata`, through the real Hono route family —
- * the reserved-field split (`user_id`/`customer_id`/`thread_id`/`labels` vs.
- * free-form custom keys) and the request-body validation `traceMetadataUpdateSchema`
- * enforces.
- *
- * Was
- * `platform/app/src/app/api/traces/[[...route]]/__tests__/update-metadata.unit.test.ts`,
- * against the route's own `app.v1.ts`. The route now lives in this package as
- * `createTracesRestApp`; the reserved/custom split now lives in
- * `updateTraceMetadata` (`#services/trace-metadata-write.service`), so this
- * test mounts the real route with `updateTraceMetadata` as the port and
- * asserts on what it was called with, mirroring the way the search-projection
- * integration test mocks its own boundaries.
+ * `PATCH /api/traces/:traceId/metadata`, through the real Hono route family — the reserved-field split
+ * (`user_id`/`customer_id`/`thread_id`/`labels` vs. free-form custom keys) and the request-body validation
+ * `traceMetadataUpdateSchema` enforces.
  */
 import {
   createAppRestSecurity,

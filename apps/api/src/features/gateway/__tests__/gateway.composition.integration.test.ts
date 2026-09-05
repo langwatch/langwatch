@@ -1,36 +1,5 @@
 /**
- * The gateway feature's six namespaces, served by the API
- * process.
- *
- * What this pins is one call per family the feature mounts, each of them made
- * over the REAL `/api/trpc` handler on THIS process's root, through THIS
- * process's policy chain, against the collaborator set
- * `composeGatewayFeature` produced. Nothing here reaches a stub
- * through a proxy for the surfaces under test: the fakes are at the PORTS — a
- * Prisma double, an AuthZ service, a project directory, a plan provider, a
- * GitHub service — and everything between the HTTP request and them is the real
- * composed graph.
- *
- *   gatewayGuardrails.list   the composed `GatewayApp` over the real
- *                            `PrismaGatewayAdapter`: the guardrail catalogue
- *                            read all the way down to a `findMany`
- *   virtualKeys.list         the same application's membership-based
- *                            visibility, over the moved `VirtualKeyService`
- *   gatewayBudgets.list      the budget ledger with no ClickHouse, which is
- *                            what `spendAvailable: false` states rather than a
- *                            $0.00 nobody can tell from a key that spent nothing
- *   governance.resolveHome   the `/` landing decision, MOVED off the retired
- *                            router root and now composed by the enterprise
- *                            feature off the shared infrastructure
- *   github.getConnectionStatus
- *                            the GitHub App, through the one service both this
- *                            surface and the coding-agent reads are given
- *
- * And three named absences, because an absence nobody can observe is
- * indistinguishable from a stub: with no Enterprise application every
- * governance namespace MOUNTS and refuses by name; the two billing namespaces
- * mount as empty routers on an installation that does not bill; and with no
- * ClickHouse the spend source says so rather than answering zero.
+ * The gateway feature's six namespaces, served by the API process.
  */
 // @vitest-environment node
 import type {
@@ -179,11 +148,6 @@ function testGithub() {
 
 /**
  * The Enterprise application, as a deployment that composed one hands it over.
- *
- * Only the two members the surfaces under test reach: the governance setup
- * rollup the landing decision reads, and the four slices the port declares.
- * Everything else refuses, which is what says the test never wandered into a
- * surface this half does not own.
  */
 function testEnterprise(setupState: Record<string, boolean>) {
   return {
@@ -437,10 +401,8 @@ describe("given an API process composed with the gateway feature", () => {
 
   describe("when no ClickHouse is composed", () => {
     /**
-     * The distinction the whole spend source exists for: a process that cannot
-     * price a budget says so, which a client renders differently from a budget
-     * that has genuinely spent nothing. The application carries the answer, so
-     * this asserts it on the composition rather than on a list whose emptiness
+     * The distinction the whole spend source exists for: a process that cannot price a budget says so, which a client renders differently from a budget
+     * that has genuinely spent nothing. The application carries the answer, so this asserts it on the composition rather than on a list whose emptiness
      * would make it vacuously true.
      */
     it("composes the gateway application with its spend source switched off by name", () => {
@@ -544,9 +506,8 @@ describe("given an API process composed with the gateway feature", () => {
   describe("when this installation does not bill through Stripe", () => {
     /**
      * The namespace is on the record either way. A client asking what this
-     * deployment charges has to be able to tell "this installation does not
-     * bill" from "the call failed", and a namespace that is not there tells it
-     * neither.
+     * deployment charges has to be able to tell "this installation does not bill"
+     * from "the call failed", and a namespace that is not there tells it neither.
      */
     it("mounts the billing namespaces with no procedures on them", async () => {
       const { application } = composeApplication({ saasBilling: false });

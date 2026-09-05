@@ -637,8 +637,8 @@ export class ClaudeCodeSpanEnrichmentService {
         continue;
       }
 
-      let text: string | null = null;
-      let rank = 0;
+      let text: string | null;
+      let rank: number;
       if (log.eventName === OUTPUT_BODY_EVENT) {
         const derived =
           log.derivedOutputText != null && (log.derivedToolCallCount ?? 0) === 0

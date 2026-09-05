@@ -442,18 +442,18 @@ export function createCollectorRestApp(options: {
           "outputs" in span &&
           typeof span.outputs !== "undefined"
         ) {
-          //@ts-expect-error
+          //@ts-expect-error: `outputs` is the retired field, absent from the current span type
           if (span.outputs.length === 0) {
             span.output = null;
-            //@ts-expect-error
+            //@ts-expect-error: `outputs` is the retired field, absent from the current span type
           } else if (span.outputs.length === 1) {
-            //@ts-expect-error
+            //@ts-expect-error: `outputs` is the retired field, absent from the current span type
             span.output = span.outputs[0];
-            //@ts-expect-error
+            //@ts-expect-error: `outputs` is the retired field, absent from the current span type
           } else if (span.outputs.length > 1) {
             span.output = {
               type: "list",
-              //@ts-expect-error
+              //@ts-expect-error: `outputs` is the retired field, absent from the current span type
               value: span.outputs,
             };
           }
@@ -590,7 +590,7 @@ export function createCollectorRestApp(options: {
       }
 
       let rejectedSpans = droppedOldSpans;
-      let dispatchFailures = 0;
+      let dispatchFailures: number;
       let rejectionErrors: string[] =
         droppedOldSpans > 0
           ? [`${droppedOldSpans} span(s) dropped: start time is more than 31 days in the past`]

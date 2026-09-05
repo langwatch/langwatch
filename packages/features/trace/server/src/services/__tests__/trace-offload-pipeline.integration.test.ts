@@ -63,7 +63,7 @@ const SPAN_ID = "bbbbbbbbbbbbbbbb";
 const ONE_MB_OUTPUT = "x".repeat(1024 * 1024);
 
 function ioExtractionService(): TraceIOExtractionService {
-  return new TraceIOExtractionService(TraceCanonicalisationService.create());
+  return TraceIOExtractionService.create(TraceCanonicalisationService.create());
 }
 
 /**

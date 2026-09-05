@@ -4,6 +4,7 @@
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import { SCENARIO_GENERATE_DEFAULT_TIMEOUT_MS } from "@langwatch/scenario-server";
 import type { WorkflowApp } from "@langwatch/workflow-server";
 import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
@@ -323,28 +324,22 @@ function mount(options: MountOptions = {}) {
       executionProxyBaseUrl: "http://nlp.test/go/proxy/v1",
     },
     datasetGenerate: { session, resolveModel: options.resolveModel ?? (async () => stubModel()) },
-    scenarioGenerate: { session, resolveModel: options.resolveModel ?? (async () => stubModel()) },
+    scenarioGenerate: {
+      session,
+      resolveModel: options.resolveModel ?? (async () => stubModel()),
+      timeoutMs: () => options.scenarioTimeoutMs ?? SCENARIO_GENERATE_DEFAULT_TIMEOUT_MS,
+    },
   } as unknown as ApiAuthoringRestComposition;
   void resolveModel;
 
-  return build({
-    authoring,
-    ...(options.scenarioTimeoutMs === undefined
-      ? {}
-      : { scenarioTimeoutMs: options.scenarioTimeoutMs }),
-  });
+  return build({ authoring });
 }
 
 function mountWithout() {
   return build({});
 }
 
-function build(input: { authoring?: ApiAuthoringRestComposition; scenarioTimeoutMs?: number }) {
-  if (input.scenarioTimeoutMs !== undefined) {
-    process.env.SCENARIO_GENERATE_TIMEOUT_MS = String(input.scenarioTimeoutMs);
-  } else {
-    delete process.env.SCENARIO_GENERATE_TIMEOUT_MS;
-  }
+function build(input: { authoring?: ApiAuthoringRestComposition }) {
   const hono = new Hono();
   for (const app of createApiProcessRestFeatures({
     security: passThroughSecurity(),

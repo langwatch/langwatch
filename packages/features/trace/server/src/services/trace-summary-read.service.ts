@@ -31,7 +31,7 @@ export class TraceSummaryService {
 
   private readonly logger = createLogger("langwatch:traces:trace-summary-service");
 
-  constructor(
+  private constructor(
     readonly repository: TraceSummaryRepository,
     private readonly fullResolutionDeps?: TraceSummaryFullResolutionDeps,
   ) {}

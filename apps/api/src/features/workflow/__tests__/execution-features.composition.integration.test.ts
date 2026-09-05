@@ -1,32 +1,6 @@
 /**
  * The three execution features — the studio, the experiment and the re-score —
- * composed for real over ONE graph and driven over the real `/api/trpc`
- * handler.
- *
- * What this pins is what the record was missing: `trpcCollaborators` is a typed
- * obligation, and until something satisfies it every one of the twenty-two
- * namespaces is absent in production. The three calls here are the three
- * things this composition answers, and none of them is stubbed on the way down
- * — the applications, the services, the repositories and the packaged
- * transports are the real ones, and only the two DATABASES, the model gateway
- * and the command QUEUE are doubles.
- *
- *   workflow.getById              the studio's read, from the packaged
- *                                 transport through `WorkflowApp`,
- *                                 `WorkflowService` and the Prisma repository.
- *   experiments.getAllByProjectId `ExperimentApp` over the packaged Postgres
- *                                 adapter — the second application this half
- *                                 composes, over the SAME workflow service.
- *   evaluations.runEvaluation     the re-score, whose result is reported onto
- *                                 the `evaluation_processing` pipeline through
- *                                 a PRODUCER-only registration of the same
- *                                 packaged definition the worker drains.
- *
- * A fake queue rather than a Redis: what is under test is the COMPOSITION —
- * that the definition registered is the packaged one, that its
- * `reportEvaluation` sender is the one the tRPC call reaches, and that the
- * payload arrives whole. The pipeline's own behaviour has its suites in
- * `@langwatch/evaluation-server`.
+ * composed for real over ONE graph and driven over the real `/api/trpc` handler.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import type {
@@ -128,11 +102,7 @@ const versionRow = {
 };
 
 /**
- * The tables this composition reads in these calls, and nothing
- * else.
- *
- * Every other model answers a rejecting proxy, so a read the test did not
- * intend fails by name instead of quietly resolving to `undefined`.
+ * The tables this composition reads in these calls, and nothing else.
  */
 function testPrisma(options: { modelDefaults?: readonly unknown[] } = {}) {
   const workflowFindFirst = vi.fn(async () => workflowRow);
@@ -210,11 +180,6 @@ type SentCommand = { name: string; data: unknown };
 
 /**
  * The producer side of the queue, recorded.
- *
- * `register` keeps the definition rather than discarding it, because half of
- * what this proves is that the definition handed over is the PACKAGED one: a
- * fork declaring only the commands a producer sends would route to names the
- * worker does not claim.
  */
 function testEventing() {
   const registered: Array<{ name: string; commands: readonly string[] }> = [];
@@ -324,10 +289,6 @@ function testOrganizations(): OrganizationService {
 
 /**
  * The stored-secret cipher, with the deployment's key replaced by a marker.
- *
- * A real AES key would prove nothing extra here: what the gateway needs from
- * this port is that a credential column round-trips, and the algorithm has its
- * own suite in `@langwatch/secret-server`.
  */
 function testCipher(): SecretEncryptionPort {
   return {
@@ -341,12 +302,6 @@ function testCipher(): SecretEncryptionPort {
 
 /**
  * The REAL model gateway, composed the way the production root composes it.
- *
- * Not a double: `composeApiModelProviders` builds the packaged service over
- * the packaged Prisma repositories, the moved catalogue, the moved credential
- * codec and the moved connection limiter. The fakes are at the PORTS this
- * process owns — the database, the project and organization reads, the cipher
- * and the counter — which is exactly the seam the composition draws.
  */
 function testModelGateway(prisma: PrismaClient) {
   return composeApiModelProviders({
@@ -618,14 +573,6 @@ describe("given the execution features composed over this process's own graph", 
   describe("when a workflow is created through the real /api/trpc handler", () => {
     /**
      * The whole point of this file, one call deeper.
-     *
-     * `workflow.create` prepares the graph before it writes it, and preparing
-     * a graph whose LLM node names no model is what asks the MODEL GATEWAY
-     * which model this project uses. Nothing on that path is stubbed here: the
-     * gateway is `composeApiModelProviders`, the resolution is the packaged
-     * cascade, and the default it reads is a row the packaged Prisma
-     * repository fetched. Before this composition existed the gateway arrived
-     * as a host option nobody supplied, so this procedure could not run at all.
      */
     it("resolves the project's default model through the real gateway", async () => {
       const { application, prisma } = composeApplication({ realModelGateway: true });
@@ -655,11 +602,6 @@ describe("given the execution features composed over this process's own graph", 
 
     /**
      * The discriminator for the assertion above.
-     *
-     * With no configured default the cascade raises "nothing is configured at
-     * any scope" and the studio adapter falls back to the registry flagship,
-     * so the two cases answer with different models — which is what makes the
-     * first one evidence that the row was read rather than a coincidence.
      */
     it("falls back to the registry flagship when the project configured none", async () => {
       const { application, prisma } = composeApplication({

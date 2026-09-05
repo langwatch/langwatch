@@ -264,11 +264,9 @@ function buildMocks(): BriefingMock[] {
       const receipts = RECEIPTS[rKey];
       // A brand-new / no-scenario project with no receipts is the same calm
       // card twice; keep just the one.
-      if ((scenKey === "none" || scenKey === "empty") && rKey !== "none") {
-        // Allow receipts on "none" (there ARE traces, just no scenarios) but
-        // not on "empty" (nothing at all).
-        if (scenKey === "empty") continue;
-      }
+      // Allow receipts on "none" (there ARE traces, just no scenarios) but
+      // not on "empty" (nothing at all).
+      if (scenKey === "empty" && rKey !== "none") continue;
       for (const withPr of [true, false]) {
         // A drafted PR only makes sense when something failed.
         if (withPr && scenKey !== "mixed" && scenKey !== "failing") continue;

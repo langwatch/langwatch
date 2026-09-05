@@ -292,7 +292,7 @@ export class TraceBlobStoreService {
   private readonly spoolStorage?: SpoolStorage;
   private readonly logger?: Logger;
 
-  constructor({
+  private constructor({
     resolveS3Client,
     resolveClickHouseClient,
     spoolStorage,

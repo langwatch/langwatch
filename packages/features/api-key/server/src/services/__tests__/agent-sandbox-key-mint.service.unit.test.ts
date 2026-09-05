@@ -7,10 +7,7 @@
 
 import { AGENT_SANDBOX_API_KEY_NAME, type ApiKeyService } from "@langwatch/api-key-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  mintAgentSandboxApiKey,
-  tryMintAgentSandboxApiKey,
-} from "../agent-sandbox-key-mint.service";
+import { AgentSandboxKeyMintService } from "../agent-sandbox-key-mint.service";
 
 const create = vi.fn();
 
@@ -32,7 +29,7 @@ describe("the agent sandbox key", () => {
     describe("when a run asks for a key", () => {
       /** @scenario "A run in a shared project gets a key no user holds" */
       it("asks for the manage grain and nothing else, owned by no user", async () => {
-        await mintAgentSandboxApiKey({
+        await AgentSandboxKeyMintService.mint({
           apiKeys,
           projectId: "project_1",
           organizationId: "organization_1",
@@ -54,7 +51,7 @@ describe("the agent sandbox key", () => {
       });
 
       it("binds the key to a lifetime", async () => {
-        await mintAgentSandboxApiKey({
+        await AgentSandboxKeyMintService.mint({
           apiKeys,
           projectId: "project_1",
           organizationId: "organization_1",
@@ -75,7 +72,7 @@ describe("the agent sandbox key", () => {
         create.mockRejectedValue(new Error("the ledger is unreachable"));
 
         await expect(
-          tryMintAgentSandboxApiKey({
+          AgentSandboxKeyMintService.tryMint({
             apiKeys,
             projectId: "project_1",
             organizationId: "organization_1",

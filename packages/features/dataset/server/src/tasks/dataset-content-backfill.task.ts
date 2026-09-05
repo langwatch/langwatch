@@ -81,9 +81,9 @@ type DatasetBackfillOutcome = Awaited<
  * dataset-content-backfill`. Registered in `apps/tasks`' catalogue via
  * `dataset-content-backfill.composition.ts`, which builds a
  * `DatasetStorageResolver` from `TasksHost.objectStorage`.
- * `SKIP_DATASET_S3_MIGRATE` and `DATASET_S3_MIGRATE_DRY_RUN` are read here, at
- * the process boundary — `DatasetContentBackfillSweep.execute` above takes
- * them as parsed values so it stays testable without an environment.
+ * `SKIP_DATASET_S3_MIGRATE` and `DATASET_S3_MIGRATE_DRY_RUN` are read by the
+ * task launcher and arrive here as parsed values, which is also what
+ * `DatasetContentBackfillSweep.execute` above takes.
  *
  * `database` and `storage` are FACTORIES, not values: resolving the real
  * `storage` needs `TasksHost.objectStorage`, and a missing/misconfigured
@@ -97,6 +97,8 @@ export class DatasetContentBackfillTask extends Task {
   private constructor(
     private readonly database: () => PrismaClient,
     private readonly storage: () => DatasetStorageResolver,
+    private readonly skipped: boolean,
+    private readonly dryRun: boolean,
   ) {
     super();
   }
@@ -104,11 +106,17 @@ export class DatasetContentBackfillTask extends Task {
   static create({
     database,
     storage,
+    skipped = false,
+    dryRun = false,
   }: {
     database: () => PrismaClient;
     storage: () => DatasetStorageResolver;
+    /** Leave the content where it is. Stated by the task launcher. */
+    skipped?: boolean;
+    /** Report what would move without moving it. Stated by the task launcher. */
+    dryRun?: boolean;
   }): DatasetContentBackfillTask {
-    return new DatasetContentBackfillTask(database, storage);
+    return new DatasetContentBackfillTask(database, storage, skipped, dryRun);
   }
 
   async run(_input: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
@@ -116,9 +124,6 @@ export class DatasetContentBackfillTask extends Task {
       database: this.database(),
       storage: this.storage(),
     });
-    await sweep.execute({
-      skipped: process.env.SKIP_DATASET_S3_MIGRATE === "true",
-      dryRun: process.env.DATASET_S3_MIGRATE_DRY_RUN === "true",
-    });
+    await sweep.execute({ skipped: this.skipped, dryRun: this.dryRun });
   }
 }

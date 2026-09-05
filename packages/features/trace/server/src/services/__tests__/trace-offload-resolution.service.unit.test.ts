@@ -104,7 +104,7 @@ function fakeBlobStore(resolvedValues: Record<string, string>): TraceBlobStoreSe
   } as unknown as TraceBlobStoreService;
 }
 
-const realIOService = new TraceIOExtractionService(TraceCanonicalisationService.create());
+const realIOService = TraceIOExtractionService.create(TraceCanonicalisationService.create());
 
 // ---------------------------------------------------------------------------
 // Tests

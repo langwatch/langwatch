@@ -39,6 +39,7 @@ import {
   type ApiAuthoringModelResolver,
 } from "./api-authoring-model.composition";
 import type { ApiWorkflowStudioRestCollaborators } from "../features/workflow/workflow-studio-rest.mount";
+import { readScenarioGenerateTimeoutMs } from "../features/scenario/scenario-generate-rest.mount";
 
 /** The playground's collaborators, or none. */
 export type ApiPlaygroundRestCollaborators = Readonly<{
@@ -53,12 +54,19 @@ export type ApiGeneratorRestCollaborators = Readonly<{
   resolveModel: ApiAuthoringModelResolver;
 }>;
 
+/** The scenario generator also states the time budget one generation gets. */
+export type ApiScenarioGenerateRestCollaborators = Readonly<{
+  session: ApiHandlerManagedSessionPort;
+  resolveModel: ApiAuthoringModelResolver;
+  timeoutMs: () => number;
+}>;
+
 /** Which of the four authoring doors this process can actually open. */
 export type ApiAuthoringRestComposition = Readonly<{
   workflowStudio?: ApiWorkflowStudioRestCollaborators | undefined;
   playground?: ApiPlaygroundRestCollaborators | undefined;
   datasetGenerate?: ApiGeneratorRestCollaborators | undefined;
-  scenarioGenerate?: ApiGeneratorRestCollaborators | undefined;
+  scenarioGenerate?: ApiScenarioGenerateRestCollaborators | undefined;
 }>;
 
 /** What each absence costs, written where a deployment reads its logs. */
@@ -112,7 +120,7 @@ export function composeApiAuthoringRest(options: {
     workflowStudio?: ApiWorkflowStudioRestCollaborators;
     playground?: ApiPlaygroundRestCollaborators;
     datasetGenerate?: ApiGeneratorRestCollaborators;
-    scenarioGenerate?: ApiGeneratorRestCollaborators;
+    scenarioGenerate?: ApiScenarioGenerateRestCollaborators;
   } = {};
 
   if (resolveModel && workflows && studioDispatch) {
@@ -151,7 +159,13 @@ export function composeApiAuthoringRest(options: {
 
   if (resolveModel) {
     composition.datasetGenerate = { session, resolveModel };
-    composition.scenarioGenerate = { session, resolveModel };
+    composition.scenarioGenerate = {
+      session,
+      resolveModel,
+      // Asked again on every request, so a deployment that restates the cap
+      // does not have to be recomposed for it to take.
+      timeoutMs: () => readScenarioGenerateTimeoutMs(process.env),
+    };
   } else {
     report?.absent("dataset-generate", "this process composed no model gateway");
     report?.absent("scenario-generate", "this process composed no model gateway");

@@ -22,12 +22,14 @@ const makeSpan = (startedDaysAgo: number, id = "span-1"): Span =>
   }) as Span;
 
 const makeService = (spans: Span[]) =>
-  new SpanStorageService({
-    getSpansByTraceId: vi.fn().mockResolvedValue(spans),
-    tryGetSpanByIds: vi.fn().mockResolvedValue(spans[0] ?? null),
-    findSpansPaginated: vi.fn().mockResolvedValue({ spans, total: spans.length }),
-    findSpansSince: vi.fn().mockResolvedValue(spans),
-  } as never);
+  SpanStorageService.create({
+    repository: {
+      getSpansByTraceId: vi.fn().mockResolvedValue(spans),
+      tryGetSpanByIds: vi.fn().mockResolvedValue(spans[0] ?? null),
+      findSpansPaginated: vi.fn().mockResolvedValue({ spans, total: spans.length }),
+      findSpansSince: vi.fn().mockResolvedValue(spans),
+    } as never,
+  });
 
 describe("given a span storage read with a visibility gate", () => {
   describe("when a cutoff is passed and the span is older than it", () => {

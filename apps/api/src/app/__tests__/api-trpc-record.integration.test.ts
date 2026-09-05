@@ -1,15 +1,5 @@
 /**
  * The packaged tRPC record itself, served by the API process.
- *
- * What this pins is the record rather than any one surface inside it: that a
- * complete collaborator set mounts every namespace it declares, that an
- * incomplete one composes NOTHING and names the half that is missing, and that
- * a SUBSCRIPTION in the record resolves over the `/api/sse` lane on the SAME
- * root `/api/trpc` serves.
- *
- * Each feature's own answers are pinned beside that feature — the annotation
- * queueing, the privacy snapshot, the support inbox and the setup checklist
- * each have a suite in `src/features/<feature>/__tests__`.
  */
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";

@@ -1,20 +1,5 @@
 /**
  * The one list, proved to be one list.
- *
- * Two things are pinned here. The first is membership: every namespace the app
- * process serves from this package is built by iterating this record, so a
- * surface that drops out of it stops being mounted — and stops being visible
- * to the declaration sweep — in the same edit. A key that disappears without
- * anyone noticing is exactly the failure the record exists to prevent.
- *
- * The second is that the record hands back the PACKAGED transports rather than
- * something assembled here: each entry is read for the procedure names its
- * feature package defines. A wrapper that quietly built its own router would
- * pass a "the key is present" assertion and fail this one.
- *
- * Nothing in this suite serves a request. The mount is the process's own root and
- * every port refuses, because building a surface is what registers its access
- * decisions — the part the audits read.
  */
 
 import type { AppTrpcPolicyMiddlewares } from "@langwatch/api/trpc";
@@ -175,10 +160,6 @@ function buildFeatures() {
 
 /**
  * Every door under the `analytics` namespace, as the client calls them.
- *
- * Named here rather than inline because the merge is the only entry in the list
- * that assembles more than one packaged transport, and the whole point of
- * naming them is that all three owners' doors are present on one wire name.
  */
 const ANALYTICS_PROCEDURES = [
   "dataForFilter",

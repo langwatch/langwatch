@@ -65,7 +65,7 @@ function ParamSlider({
 export function NotFoundScene() {
   const host = useNavigationHost();
   const { colorMode } = useColorMode();
-  const isDevMode = process.env.NODE_ENV === "development";
+  const isDevMode = host.deployment().isDevelopment;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const redTextRef = useRef<HTMLDivElement>(null);

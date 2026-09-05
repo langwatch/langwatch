@@ -91,66 +91,74 @@ const resolveQueueableTraceIds = async ({
   return queueable;
 };
 
-/**
- * Queues traces for annotation.
- *
- * An annotator reference that parses as neither `queue-<id>` nor `user-<id>`
- * is a handled failure rather than a plain error, because the caller sent it
- * and the caller can fix it. It carries the 400 this surface has always
- * answered — see {@link AnnotationAnnotatorReferenceInvalidError}.
- *
- * @returns how many ids were queued and how many were skipped (everything sent
- *   that did not become work), so the surface that sent them can say what
- *   actually happened.
- */
-export async function createOrUpdateQueueItems({
-  traceIds,
-  projectId,
-  annotators,
-  userId,
-  annotations,
-  findExistingTraceIds,
-}: {
-  traceIds: string[];
-  projectId: string;
-  annotators: string[];
-  userId: string;
-  annotations: AnnotationService;
-  findExistingTraceIds: FindExistingTraceIds;
-}): Promise<{ created: number; skipped: number }> {
-  const parsedAnnotators: AnnotatorReference[] = annotators.map((annotator) => {
-    const parsed = annotatorReferenceSchema.safeParse(annotator);
-    if (!parsed.success) {
-      throw new AnnotationAnnotatorReferenceInvalidError(annotator);
-    }
+export class AnnotationQueueingService {
+  private constructor() {}
 
-    return parsed.data;
-  });
-  const queueIds = parsedAnnotators
-    .filter((annotator) => annotator.type === "queue")
-    .map((annotator) => annotator.id);
-  const userIds = parsedAnnotators
-    .filter((annotator) => annotator.type === "user")
-    .map((annotator) => annotator.id);
+  static create(): AnnotationQueueingService {
+    return new AnnotationQueueingService();
+  }
 
-  await annotations.assertAnnotatorReferences({ projectId, queueIds, userIds });
-
-  const queueableTraceIds = await resolveQueueableTraceIds({
+  /**
+   * Queues traces for annotation.
+   *
+   * An annotator reference that parses as neither `queue-<id>` nor `user-<id>`
+   * is a handled failure rather than a plain error, because the caller sent it
+   * and the caller can fix it. It carries the 400 this surface has always
+   * answered — see {@link AnnotationAnnotatorReferenceInvalidError}.
+   *
+   * @returns how many ids were queued and how many were skipped (everything sent
+   *   that did not become work), so the surface that sent them can say what
+   *   actually happened.
+   */
+  static async createOrUpdateQueueItems({
     traceIds,
     projectId,
+    annotators,
+    userId,
+    annotations,
     findExistingTraceIds,
-  });
+  }: {
+    traceIds: string[];
+    projectId: string;
+    annotators: string[];
+    userId: string;
+    annotations: AnnotationService;
+    findExistingTraceIds: FindExistingTraceIds;
+  }): Promise<{ created: number; skipped: number }> {
+    const parsedAnnotators: AnnotatorReference[] = annotators.map((annotator) => {
+      const parsed = annotatorReferenceSchema.safeParse(annotator);
+      if (!parsed.success) {
+        throw new AnnotationAnnotatorReferenceInvalidError(annotator);
+      }
 
-  await annotations.createQueueItems({
-    projectId,
-    traceIds: queueableTraceIds,
-    queueIds,
-    userIds,
-    createdByUserId: userId,
-  });
+      return parsed.data;
+    });
+    const queueIds = parsedAnnotators
+      .filter((annotator) => annotator.type === "queue")
+      .map((annotator) => annotator.id);
+    const userIds = parsedAnnotators
+      .filter((annotator) => annotator.type === "user")
+      .map((annotator) => annotator.id);
 
-  return {
-    created: queueableTraceIds.length,
-    skipped: traceIds.length - queueableTraceIds.length,
-  };
+    await annotations.assertAnnotatorReferences({ projectId, queueIds, userIds });
+
+    const queueableTraceIds = await resolveQueueableTraceIds({
+      traceIds,
+      projectId,
+      findExistingTraceIds,
+    });
+
+    await annotations.createQueueItems({
+      projectId,
+      traceIds: queueableTraceIds,
+      queueIds,
+      userIds,
+      createdByUserId: userId,
+    });
+
+    return {
+      created: queueableTraceIds.length,
+      skipped: traceIds.length - queueableTraceIds.length,
+    };
+  }
 }

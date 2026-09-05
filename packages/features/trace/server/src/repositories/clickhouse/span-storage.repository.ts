@@ -14,10 +14,6 @@ import type { TraceClickHouseWriteResolver as ClickHouseClientResolver } from ".
  * The insert shape of a row whose epoch-millisecond fields are written as
  * `Date`s: the ClickHouse driver serialises a `Date` into a `DateTime64(3)`
  * literal, while the read shape keeps the numbers every caller works in.
- *
- * Declared here rather than imported from the platform app's ClickHouse
- * utilities: it is a type-level mapping over THIS repository's row, and it has
- * exactly one user.
  */
 type WithDateWrites<T, K extends keyof T> = {
   [P in keyof T]: P extends K
@@ -65,23 +61,6 @@ const TABLE_NAME = "stored_spans" as const;
 
 /**
  * Settings for every `stored_spans` insert.
- *
- * `input_format_json_throw_on_bad_escape_sequence: 0` is load-bearing.
- * Span strings originate as JS UTF-16 and can carry a lone (unpaired) surrogate
- * half (`\uD800`–`\uDFFF`) — a value truncated mid-emoji, or binary/garbage text
- * an SDK captured as a string. `JSONEachRow` serializes such a half as a bare
- * `\uD800`-style escape with no second part, which ClickHouse's JSON parser
- * rejects by default ("missing second part of surrogate pair"), failing the
- * whole insert. The pipeline then retries and dead-letters, and the span is lost
- * forever (13 groups dead-lettered for one project in prod).
- *
- * With the setting at 0, ClickHouse keeps the bad escape sequence as-is instead
- * of throwing — exactly what its own error message recommends. This is done at
- * the insert boundary, per-batch and O(1), rather than walking and rewriting
- * every string of every span (attribute keys/values, names, statuses, event
- * names — unbounded per-span payload) on the hot ingest path just to pre-empt
- * the parser. The rare malformed string is stored verbatim; every valid string
- * is untouched.
  */
 const SPAN_INSERT_SETTINGS = {
   async_insert: 1,
@@ -90,15 +69,9 @@ const SPAN_INSERT_SETTINGS = {
 } as const;
 
 /**
- * Renders the partition-pruning time predicate for a single-trace `stored_spans`
- * read from a {@link WindowFragment} — or `null` for a time-unbounded scan (no
- * predicate). `stored_spans` is partitioned by `toYearWeek(StartTime)`, so
- * bounding `StartTime` to a window keeps drawer reads on the warm partition tier
+ * Renders the partition-pruning time predicate for a single-trace `stored_spans` read from a {@link WindowFragment} — or `null` for a time-unbounded scan (no
+ * predicate). `stored_spans` is partitioned by `toYearWeek(StartTime)`, so bounding `StartTime` to a window keeps drawer reads on the warm partition tier
  * instead of walking every weekly partition (incl. cold S3) on every query.
- *
- * `sqlAnd` bounds the outer scan and `sqlAndInner` the dedup subquery — the same
- * `StartTime` predicate on both so they prune to identical partitions. Both come
- * from {@link WindowFragment.sqlFor}, keeping SQL and params in one place.
  */
 function partitionFragment(window: WindowFragment | null): {
   sqlAnd: string;
@@ -113,12 +86,8 @@ function partitionFragment(window: WindowFragment | null): {
 }
 
 /**
- * Full-span column projection used by every reader that returns `Span[]`.
- * Defined once so a column rename in `stored_spans` lands in one place.
- *
- * Heavy columns (`SpanAttributes`, `Events.*` arrays, `Links.*` arrays) are
- * intentional — they're what callers need. Trim only when adding a new
- * reader that doesn't need them.
+ * Full-span column projection used by every reader that returns `Span[]`. Defined
+ * once so a column rename in `stored_spans` lands in one place.
  */
 const FULL_SPAN_SELECT = `
   SpanId,
@@ -153,19 +122,6 @@ const FULL_SPAN_SELECT = `
  * {@link FULL_SPAN_SELECT} minus the `Events.*` / `Links.*` nested columns, for
  * internal derivation consumers that read scalar span/resource attributes and
  * never touch a span's events or links.
- *
- * Not a micro-optimisation. Those nested columns are what production throws
- * `Attempt to read after eof (while reading column Links.Attributes)` on — the
- * failure ran to thousands of lines an hour, and because this read backs a
- * queue handler, every one of them re-staged the job and re-ran the read on
- * backoff. Dropping columns the consumer never reads removes the error class
- * and the retry load it generated in one move.
- *
- * {@link mapChRowToNormalized} already tolerates their absence — it defaults
- * both nested groups to `[]` — so a span mapped from this projection carries
- * empty `events` and `links`. That is why this select is NOT a drop-in for the
- * UI read: only use it where empty events/links are correct, never where a
- * caller renders them.
  */
 const DERIVATION_SPAN_SELECT = `
   SpanId,
@@ -192,20 +148,6 @@ const DERIVATION_SPAN_SELECT = `
 
 /**
  * Per-query memory ceiling for the single-trace full-attribute reads below.
- *
- * The heavy column on these reads is the `SpanAttributes` Map: ClickHouse reads
- * the whole values array to return any of it, so a trace with very large
- * per-span attribute values (big prompts / responses / embeddings) can allocate
- * gigabytes even at a low span count. Without a cap those allocations land
- * against the server's *total* memory limit, where the OvercommitTracker
- * resolves the pressure by killing whichever query is allocating — so one
- * pathological trace can take down unrelated requests across the cluster.
- *
- * With an explicit `max_memory_usage` the offending read fails on its own
- * (`MEMORY_LIMIT_EXCEEDED`) and surfaces as a drawer/query error, instead of
- * degrading everyone. Set generously above any normal trace (p95 read is
- * single-digit MB) and below the global per-query limit, so it only ever trips
- * on the pathological tail. Tune here if legitimate large traces start failing.
  */
 const SINGLE_TRACE_READ_MAX_MEMORY_BYTES = 2 * 1024 * 1024 * 1024; // 2 GiB
 const SINGLE_TRACE_READ_SETTINGS = {
@@ -217,26 +159,6 @@ const SINGLE_TRACE_READ_SETTINGS = {
  * Settings for the single-span fetch paths (`tryGetSpanByIds`, `getSpanEvents`).
  * Locks `query_plan_optimize_lazy_materialization=1` per-query so the LazilyRead
  * optimiser stays engaged even if a future cluster/profile config flips it off.
- *
- * Investigation (dev CH 25.10.1.3832 against a fat span: 19 attrs / 127 events
- * / ~88KB Events.Attributes):
- *
- *   tryGetSpanByIds   Form A (ORDER BY UpdatedAt DESC LIMIT 1)
- *     read_bytes = 14,933       (~15KB) - heavy columns deferred past LIMIT
- *   tryGetSpanByIds   Form B (scalar-subquery dedup, doc "Anti-Pattern 1" form)
- *     read_bytes = 9,706,538    (~9.7MB)
- *   tryGetSpanByIds   Form A, LazilyRead disabled
- *     read_bytes = 9,692,701    (~9.7MB) - matches Form B, hence the lock
- *
- *   getSpanEvents  Form A (inner ORDER BY DESC LIMIT 1, ARRAY JOIN outside)
- *     read_bytes = 14,933       (~15KB) - LazilyRead survives through the subquery
- *   getSpanEvents  Form B (scalar-subquery dedup inside the subquery)
- *     read_bytes = 4,570,069    (~4.6MB)
- *
- * LazilyRead applies to LIMIT N where N <= query_plan_max_limit_for_lazy_materialization
- * (default 10 on 25.10, raised to 10,000 on 25.12). LIMIT 1 is well inside the
- * safe zone. Above the threshold, Form A degrades to full heavy-column reads.
- * Minimum supported CH version for these methods: 25.4 (where LazilyRead landed).
  */
 const SINGLE_SPAN_FETCH_SETTINGS = {
   ...SINGLE_TRACE_READ_SETTINGS,
@@ -244,10 +166,9 @@ const SINGLE_SPAN_FETCH_SETTINGS = {
 } as const;
 
 /**
- * Light projection used by readers that only need the span tree shape
- * (waterfall/flame, span list). Avoids reading heavy `SpanAttributes`,
- * `Events.*`, and `Links.*` columns. Map subscripts (`['key']`) read a
- * single value out of the Map without materializing the whole column.
+ * Light projection used by readers that only need the span tree shape (waterfall/flame, span list). Avoids reading
+ * heavy `SpanAttributes`, `Events.*`, and `Links.*` columns. Map subscripts (`['key']`) read a single value out of
+ * the Map without materializing the whole column.
  */
 const SUMMARY_SPAN_SELECT = `
   SpanId,
@@ -294,10 +215,9 @@ const SUMMARY_SPAN_SELECT = `
 `;
 
 /**
- * Canonical model-name expression, response model wins over request model,
- * mirroring `extractModel` in span.mapper.ts so the cost-rule preview sees
- * the same model string the cost pipeline matches against. Map subscripts
- * return '' for missing keys, hence the nullIf/coalesce dance.
+ * Canonical model-name expression, response model wins over request model, mirroring `extractModel` in
+ * span.mapper.ts so the cost-rule preview sees the same model string the cost pipeline matches against. Map
+ * subscripts return '' for missing keys, hence the nullIf/coalesce dance.
  */
 const MODEL_ATTR_SELECT = `coalesce(
     nullIf(SpanAttributes['gen_ai.response.model'], ''),
@@ -305,9 +225,8 @@ const MODEL_ATTR_SELECT = `coalesce(
   )`;
 
 /**
- * How many recent candidate traces the model-cost sample read pulls from
- * `trace_summaries` before scanning their spans. Large enough that per-model
- * token-bearing samples reliably resolve, small enough that the `TraceId IN`
+ * How many recent candidate traces the model-cost sample read pulls from `trace_summaries` before scanning their
+ * spans. Large enough that per-model token-bearing samples reliably resolve, small enough that the `TraceId IN`
  * set still prunes `stored_spans` granules hard.
  */
 const SAMPLE_CANDIDATE_TRACE_POOL = 500;
@@ -355,20 +274,9 @@ function mapModelSpanSampleRow(row: ModelSpanSampleQueryRow): ModelSpanSampleRow
 }
 
 /**
- * IN-tuple dedup subquery body. Renders the inner `SELECT … GROUP BY` that
- * picks the latest version (max UpdatedAt) per spanId. Caller assembles the
- * surrounding `AND (TenantId, TraceId, SpanId, UpdatedAt) IN (…)`.
- *
- * Kept as a function so an optional extra predicate (the partition-hint
- * window, or the `since` readers' row-version bound) can be applied to the
- * inner scope as well as the outer.
- *
- * Only pass a predicate that a span's versions cannot straddle. The subquery
- * elects each span's latest version, so it has to see every version: bound it
- * by something a re-projection can move — a span's StartTime, say — and it
- * will elect a stale version whose row the outer filter then emits. This is
- * why the span-tree cursor's `StartTime >=` bound is deliberately NOT passed
- * in (see Trace feature span-tree repository).
+ * IN-tuple dedup subquery body. Renders the inner `SELECT … GROUP BY` that picks
+ * the latest version (max UpdatedAt) per spanId. Caller assembles the surrounding
+ * `AND (TenantId, TraceId, SpanId, UpdatedAt) IN (…)`.
  */
 function dedupInTuple(extraInnerWhere: string): string {
   return `(TenantId, TraceId, SpanId, UpdatedAt) IN (
@@ -398,16 +306,8 @@ function dedupInTupleForTraceIds(extraInnerWhere: string): string {
 }
 
 /**
- * One row per (trace, event name) for a page of traces, ordered so the first
- * name a trace recorded comes first.
- *
- * Three stages, innermost out: elect each span's latest version and keep only
- * the ones carrying events, expand those spans' `Events.*` arrays, then
- * collapse to one row per (trace, event name).
- *
- * The window aggregates run over the whole per-trace partition and
- * `LIMIT ... BY` trims afterwards, so a trimmed trace still reports the totals
- * of everything it recorded, not of what survived the trim.
+ * One row per (trace, event name) for a page of traces, ordered so the first name
+ * a trace recorded comes first.
  */
 function traceEventRollupQuery(): string {
   const partitionAnd =
@@ -469,10 +369,9 @@ function toTraceEventRollups(rows: TraceEventRollupRow[]): Record<string, TraceE
 }
 
 /**
- * Per-bucket key matchers for the LangWatch signals projection. Each entry
- * compiles to one ClickHouse boolean expression over `mapKeys(SpanAttributes)`.
- * Order must match `LANGWATCH_SIGNAL_BUCKETS` in span-storage.repository.ts —
- * we depend on the bucket name list to deserialize back into typed values.
+ * Per-bucket key matchers for the LangWatch signals projection. Each entry compiles to one ClickHouse boolean
+ * expression over `mapKeys(SpanAttributes)`. Order must match `LANGWATCH_SIGNAL_BUCKETS` in
+ * span-storage.repository.ts — we depend on the bucket name list to deserialize back into typed values.
  */
 const SIGNAL_BUCKET_PREDICATES: Record<LangwatchSignalBucket, string> = {
   prompt: "arrayExists(k -> startsWith(k, 'langwatch.prompt.'), keys)",
@@ -546,12 +445,6 @@ function set(value: string | null | undefined): string | undefined {
 
 /**
  * The span's cost from its own tokens and rates.
- *
- * Most ingest paths emit token counts but no `gen_ai.usage.cost`: trace-level
- * cost is computed at fold time from tokens times pricing. This mirrors that
- * for one span, feeding TraceSpanCostMatchingService.computeSpanCost's priority cascade (custom enrichment
- * rates, then the SDK's own span cost, then the static model registry) with
- * the attributes the summary query already selects.
  */
 function computeSummaryRowCost({
   row,
@@ -957,32 +850,9 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
   }
 
   /**
+   * internal derivation consumers holding a `span_referenced` staging. A miss is an EXPECTED transient state here — the reference is often dequeued before the sibling spanStorage write lands — so `fallback:
+   * "none"` keeps a miss one cheap windowed probe (the caller throws into the queue's backoff) instead of an unbounded scan per retry.
    * Claim-check resolution read (ADR-069): the canonical single-span read for
-   * internal derivation consumers holding a `span_referenced` staging. A miss
-   * is an EXPECTED transient state here — the reference is often dequeued
-   * before the sibling spanStorage write lands — so `fallback: "none"` keeps a
-   * miss one cheap windowed probe (the caller throws into the queue's backoff)
-   * instead of an unbounded scan per retry.
-   *
-   * The hint must be the SPAN'S OWN start, not the ingest time of the event
-   * that referenced it: this table's partition column is `StartTime`, so a
-   * window centred on ingest time excludes any span whose duration plus export
-   * lag exceeded it — and spans export on end. Such a span would sit outside
-   * every retry's window forever. Callers pass the reference's parsed
-   * `startTimeUnixMs`, falling back to the envelope's occurredAt only when the
-   * wire span carried no parseable start.
-   *
-   * The hint is REQUIRED, not an {@link OccurredAtHint}: `fallback: "none"`
-   * only bounds the read when there is a window to stay inside. A hintless
-   * call would fall straight through to the unbounded fragment and scan every
-   * partition, cold S3 tier included — precisely what this read promises not
-   * to do, and per retry.
-   *
-   * **Returns a span with empty `events` and `links`**: it reads
-   * {@link DERIVATION_SPAN_SELECT}, which omits those nested columns because no
-   * derivation consumer reads them and they are what this read fails on. Do not
-   * reach for this method to render a span — {@link tryGetSpanByIds} is the read
-   * that returns one whole.
    */
   async tryFindNormalizedSpanById({
     tenantId,
@@ -1029,27 +899,9 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
   }
 
   /**
-   * Single-span fetch shared by {@link tryGetSpanByIds} and
-   * {@link tryFindNormalizedSpanById}. WHERE pins (TenantId, TraceId, SpanId) - the
-   * primary key prefix - so we hit a tiny granule range. ORDER BY
-   * UpdatedAt DESC LIMIT 1 deliberately picks up CH 25.10's
-   * LazilyRead optimiser: heavy columns (SpanAttributes, Events.*,
-   * Links.*) are deferred past the LIMIT, so unmerged versions
-   * don't materialise them. Investigation numbers + the per-query
-   * lock that keeps the optimiser engaged live in
-   * SINGLE_SPAN_FETCH_SETTINGS above. The doc's "Anti-Pattern 1"
-   * rule predates LazilyRead and isn't load-bearing on this shape.
-   *
-   * `select` is the caller's projection: the UI read takes the whole span, the
-   * derivation read takes {@link DERIVATION_SPAN_SELECT}. Everything else about
-   * the query — key predicate, dedup form, settings — is identical, which is
-   * why it stays one method rather than two near-copies.
-   *
-   * KNOWN MISMATCH, pre-existing: the engine's version column is `StartTime`
-   * (`ReplacingMergeTree(StartTime)`), not `UpdatedAt`. So a span re-exported
-   * with a CHANGED StartTime answers last-written-wins before a merge and
-   * largest-StartTime-wins after one. #6117 widened the blast radius by
-   * resolving claim-checks through this read, not just the UI.
+   * Single-span fetch shared by {@link tryGetSpanByIds} and {@link tryFindNormalizedSpanById}. WHERE pins (TenantId, TraceId, SpanId) - the primary key prefix - so we hit a tiny granule range. ORDER BY UpdatedAt
+   * DESC LIMIT 1 deliberately picks up CH 25.10's LazilyRead optimiser: heavy columns (SpanAttributes, Events.*, Links.*) are deferred past the LIMIT, so unmerged versions don't materialise them. Investigation
+   * numbers + the per-query lock that keeps the optimiser engaged live in SINGLE_SPAN_FETCH_SETTINGS above. The doc's "Anti-Pattern 1" rule predates LazilyRead and isn't load-bearing on this shape.
    */
   private async fetchNormalizedSpanRow({
     tenantId,
@@ -1152,27 +1004,9 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
   }
 
   /**
-   * Resolve a trace's occurrence time from `trace_summaries` so the Events.*
-   * reads below can prune `stored_spans` partitions even when the caller never
-   * threaded an `occurredAtMs` hint — back-stack / conversation-jump / deep-link
-   * drawer opens that dropped it, and worker callers that never had one.
-   *
-   * `trace_summaries` is `ORDER BY (TenantId, TraceId)`, so this is a sort-key
-   * point seek over a couple of granules of small columns. That is far cheaper
-   * than the alternative it replaces: letting the Events.* read fall back to an
-   * unbounded `stored_spans` scan that walks every weekly partition, including
-   * the cold S3 tier. Returns `undefined` only when the trace isn't in
-   * `trace_summaries` at all (orphan / not-yet-projected), where the read keeps
-   * its previous unbounded behaviour.
+   * Resolve a trace's occurrence time from `trace_summaries` so the Events.* reads below can prune `stored_spans` partitions even when the caller never threaded an `occurredAtMs` hint — back-stack / conversation-jump / deep-link drawer opens that dropped it, and worker callers that never had one.
    */
-  /**
-   * Two-phase probe: without an OccurredAt predicate this seek walks every
-   * weekly partition's index on `trace_summaries` — including S3-tiered cold
-   * ones — costing whole seconds per call, while the worker job paths mostly
-   * resolve minutes-old traces. The recent window keeps the hot path on
-   * local-disk partitions; a miss (old trace) pays the unbounded fallback
-   * and stays correct.
-   */
+  /** Two-phase probe: without an OccurredAt predicate this seek walks every weekly part */
   private async resolveTraceOccurredAtMs(
     tenantId: string,
     traceId: string,
@@ -1221,18 +1055,9 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
   }
 
   /**
-   * Partition-pruned execution for the single-trace Events.* reads. The window
-   * comes from the trace's own occurrence time — the caller's hint when present,
-   * otherwise resolved from `trace_summaries` — so an empty result is
-   * authoritative: the trace has no matching events within its ±2-day span
-   * window, and we do NOT rescan unbounded.
-   *
-   * That is why the {@link TraceWindowedReadService.queryWindowed} call uses `fallback: "none"`: the
-   * hinted window is single-shot, never widened on empty. The unbounded-on-empty
-   * rescan spans use was itself a cold S3 partition walk, and a trace legitimately
-   * *without* events would trigger it on every read. We only scan unbounded when
-   * the trace time is genuinely unknown (the trace isn't in `trace_summaries`),
-   * which is the `hintMs === null` branch inside `TraceWindowedReadService.queryWindowed`.
+   * Partition-pruned execution for the single-trace Events.* reads. The window comes from the trace's own occurrence time — the caller's hint when present,
+   * otherwise resolved from `trace_summaries` — so an empty result is authoritative: the trace has no matching events within its ±2-day span window, and we
+   * do NOT rescan unbounded.
    */
   private async readTraceEvents<T>(
     { tenantId, traceId, occurredAtMs }: { tenantId: string; traceId: string } & OccurredAtHint,
@@ -1251,31 +1076,9 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
   }
 
   /**
-   * Partition-pruned execution for the single-trace `stored_spans` reads.
-   * Mirrors {@link readTraceEvents} for the no-hint case while preserving the
-   * existing hinted behaviour:
-   *
-   *   - Caller threaded an `occurredAtMs` hint: prune to its ±2-day window,
-   *     then fall back to an unbounded scan if the window misses, so a stale
-   *     URL hint or clock skew still resolves.
-   *   - No hint — back-stack / conversation-jump / deep-link drawer opens and
-   *     worker callers that never had one: resolve the trace's occurrence time
-   *     from `trace_summaries` and bound the read to its ±2-day span window
-   *     instead of scanning every weekly partition (incl. the cold S3 tier).
-   *
-   * Unlike {@link readTraceEvents}, an empty windowed result is NOT treated as
-   * authoritative here — hence `fallback: "unbounded"`: `trace_summaries.OccurredAt`
-   * is the trace's *start* (min over projected rows) and never widens, so a
-   * long-running trace can produce spans well past `OccurredAt + 2 days`. The
-   * `isEmpty`-driven fallback runs bounded first and only rescans unbounded if
-   * that comes back empty, so a trace whose spans all fall outside the window is
-   * still returned correctly (at the cost of one extra unbounded scan only in
-   * that case). Events cluster at the trace start so they can skip the fallback;
-   * spans cannot.
-   *
-   * Only when the trace time is genuinely unknown (the trace isn't in
-   * `trace_summaries`) do we go straight to the unbounded read — the
-   * `hintMs === null` branch inside {@link TraceWindowedReadService.queryWindowed}.
+   * Partition-pruned execution for the single-trace `stored_spans` reads. Mirrors
+   * {@link readTraceEvents} for the no-hint case while preserving the existing
+   * hinted behaviour:
    */
   private async readTraceSpans<T>(
     { tenantId, traceId, occurredAtMs }: { tenantId: string; traceId: string } & OccurredAtHint,
@@ -1312,13 +1115,10 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         async (window) => {
           const partition = partitionFragment(window);
           const client = await this.resolveClient(tenantId);
-          // Events-only ARRAY JOIN: reads just the `Events.*` columns, never
-          // the heavy span attribute/link payload. Includes exception events
-          // for parity with the trace-level list the fold used to carry.
-          //
-          // Dedup at row level inside the subquery so ARRAY JOIN only expands
-          // surviving spans — applying dedup post-expansion would multiply the
-          // tuple lookup by `events_per_span`.
+          // Events-only ARRAY JOIN: reads just the `Events.*` columns, never the heavy span attribute/link
+          // payload. Includes exception events for parity with the trace-level list the fold used to carry.
+          // Dedup at row level inside the subquery so ARRAY JOIN only expands surviving spans — applying dedup
+          // post-expansion would multiply the tuple lookup by `events_per_span`.
           const result = await client.query({
             query: `
               SELECT
@@ -1385,12 +1185,10 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
 
     try {
       const client = await this.resolveClient(tenantId);
-      // The page's traces all occurred inside the list's range, and a span
-      // starts no earlier than its trace does, so padding both ends by the
-      // standard partition window covers every span of every trace on the
-      // page without widening to a full-history scan. It is the same window
-      // the per-trace detail read uses, which is what keeps the list and the
-      // drawer agreeing on what a trace recorded.
+      // The page's traces all occurred inside the list's range, and a span starts no earlier than its trace
+      // does, so padding both ends by the standard partition window covers every span of every trace on the page
+      // without widening to a full-history scan. It is the same window the per-trace detail read uses, which is
+      // what keeps the list and the drawer agreeing on what a trace recorded.
       const fromMs = timeRange.from - DEFAULT_PARTITION_WINDOW_MS;
       const toMs = timeRange.to + DEFAULT_PARTITION_WINDOW_MS;
       const result = await client.query({
@@ -1698,14 +1496,11 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       async (window) => {
         const partition = partitionFragment(window);
         const client = await this.resolveClient(tenantId);
-        // Two-step instead of one query with `count() OVER ()`:
-        //   - Page query reads the heavy span columns for LIMIT rows only.
-        //   - Count query touches just the dedup keys, no heavy payload.
-        // Window-counting in a single query forces ClickHouse to materialize
-        // every span in the trace (incl. SpanAttributes, Events.*, Links.*)
-        // — fine for tiny traces, ruinous for the long ones. Parallel two
-        // queries scan the same partitions but don't pay for heavy columns
-        // on the count side.
+        // Two-step instead of one query with `count() OVER ()`: - Page query reads the heavy span columns for
+        // LIMIT rows only. - Count query touches just the dedup keys, no heavy payload. Window-counting in a
+        // single query forces ClickHouse to materialize every span in the trace (incl. SpanAttributes, Events.*,
+        // Links.*) — fine for tiny traces, ruinous for the long ones. Parallel two queries scan the same
+        // partitions but don't pay for heavy columns on the count side.
         const [pageResult, countResult] = await Promise.all([
           client.query({
             query: `
@@ -1863,22 +1658,10 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     if (models.length === 0) return [];
 
     const client = await this.resolveClient(tenantId);
-    // The `Model IN` filter is computed from the SpanAttributes map, so on its
-    // own this read decodes that heavy map for every span in the window just to
-    // evaluate the predicate. Instead, first narrow to the recent traces that
-    // use one of these models via `trace_summaries.Models` (a small, deduped,
-    // bloom-indexed Array(String) populated at fold time), then constrain the
-    // span scan to `TraceId IN (...)`. `stored_spans` is
-    // `ORDER BY (TenantId, TraceId, SpanId)`, so the TraceId set prunes granules
-    // to just those traces' spans rather than the whole partition window.
-    //
-    // The candidate pool is generous so per-model token-bearing samples still
-    // resolve. Models is complete per trace, so the candidate set cannot drop a
-    // model the rule matches (a just-folded trace may lag by seconds, which is
-    // acceptable for a best-effort preview). Within `stored_spans` the read is
-    // unchanged: light columns, argMax dedup over ReplacingMergeTree versions,
-    // token-bearing spans first, then recency, and `LIMIT BY` so one chatty
-    // model can't crowd out the rest of the sample.
+    // The `Model IN` filter is computed from the SpanAttributes map, so on its own this read decodes that heavy map for every span in the window just to evaluate the predicate. Instead, first narrow to the recent traces that use one of these models via `trace_summaries.Models`
+    // (a small, deduped, bloom-indexed Array(String) populated at fold time), then constrain the span scan to `TraceId IN (...)`. `stored_spans` is `ORDER BY (TenantId, TraceId, SpanId)`, so the TraceId set prunes granules to just those traces' spans rather than the whole
+    // partition window. The candidate pool is generous so per-model token-bearing samples still resolve. Models is complete per trace, so the candidate set cannot drop a model the rule matches (a just-folded trace may lag by seconds, which is acceptable for a best-effort
+    // preview). Within `stored_spans` the read is unchanged: light columns, argMax dedup over ReplacingMergeTree versions, token-bearing spans first, then recency, and `LIMIT BY` so one chatty model can't crowd out the rest of the sample.
     const result = await client.query({
       query: `
         WITH candidate_traces AS (

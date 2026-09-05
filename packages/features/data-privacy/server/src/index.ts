@@ -19,10 +19,7 @@ export {
   DataPrivacySnapshotService,
   type DataPrivacySnapshotPolicies,
 } from "./services/data-privacy-snapshot.service";
-export {
-  DataPrivacyScopeAuthorizationService,
-  requiredDataPrivacyWritePermission,
-} from "./services/data-privacy-scope-authorization.service";
+export { DataPrivacyScopeAuthorizationService } from "./services/data-privacy-scope-authorization.service";
 export { DataPrivacyService } from "./services/data-privacy.service";
 export {
   OtelPiiAnalysisMetricsAdapter,

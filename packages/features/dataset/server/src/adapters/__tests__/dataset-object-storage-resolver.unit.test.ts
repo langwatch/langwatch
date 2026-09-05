@@ -7,7 +7,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  DatasetObjectStorageResolver,
+  DatasetObjectStorageResolverAdapter,
   DatasetStorageDestinationPort,
   type DatasetStorageDestination,
 } from "../dataset-object-storage-resolver.adapter";
@@ -34,14 +34,14 @@ function resolverFor(destination: DatasetStorageDestination) {
   const s3ClientResolver = new RecordingS3Resolver();
   return {
     s3ClientResolver,
-    resolver: DatasetObjectStorageResolver.create({
+    resolver: DatasetObjectStorageResolverAdapter.create({
       destination: new FixedDestination(destination),
       s3ClientResolver,
     }),
   };
 }
 
-describe("DatasetObjectStorageResolver", () => {
+describe("DatasetObjectStorageResolverAdapter", () => {
   describe("given a project whose destination is azure and a process that composed no Azure driver", () => {
     /** @scenario "The legacy S3 client factory refuses an azure destination instead of inventing a bucket" */
     it("refuses by name instead of falling through to the S3 adapter", async () => {

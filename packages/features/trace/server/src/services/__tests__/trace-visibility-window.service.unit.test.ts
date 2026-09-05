@@ -231,7 +231,7 @@ describe("given the visibility window service", () => {
         ? vi.fn().mockRejectedValue(new Error("db down"))
         : vi.fn().mockResolvedValue(plan),
     };
-    return new VisibilityWindowService(planProvider as never);
+    return VisibilityWindowService.create(planProvider as never);
   };
 
   describe("when the plan has no visibility window", () => {

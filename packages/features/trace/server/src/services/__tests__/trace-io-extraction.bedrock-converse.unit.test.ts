@@ -27,7 +27,7 @@ import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { TraceIOExtractionService } from "../trace-io-extraction.service";
 
 const canonicaliser = TraceCanonicalisationService.create();
-const ioService = new TraceIOExtractionService(canonicaliser);
+const ioService = TraceIOExtractionService.create(canonicaliser);
 
 /**
  * Only ever used to CONSTRUCT the span. The assertions below hardcode the

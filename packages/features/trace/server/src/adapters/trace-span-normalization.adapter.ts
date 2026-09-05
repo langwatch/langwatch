@@ -23,7 +23,7 @@ export class TraceSpanNormalizationAdapter extends TraceSpanNormalizationPort {
 
   private constructor(canonicalisation: TraceCanonicalisationService) {
     super();
-    this.service = new SpanNormalizationPipelineService(canonicalisation);
+    this.service = SpanNormalizationPipelineService.create(canonicalisation);
   }
 
   static create(canonicalisation: TraceCanonicalisationService): TraceSpanNormalizationAdapter {

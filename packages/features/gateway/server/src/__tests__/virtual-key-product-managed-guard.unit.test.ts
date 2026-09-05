@@ -1,13 +1,7 @@
 /**
- * Product-managed virtual keys (`purpose != USER` — today the Langy VK) are
- * provisioned and owned by the product, not the customer. The settings UI
- * badged and locked them, but that was presentation only: the tRPC router and
- * its public REST twin both reach the same service, and the service let every
- * by-id mutation through.
- *
- * `rotate` was the sharp edge — it returns a fresh plaintext secret AND breaks
- * Langy, because the gateway keeps authenticating against the secret Langy
- * still holds.
+ * Product-managed virtual keys (`purpose != USER` — today the Langy VK) are provisioned and owned by the product,
+ * not the customer. The settings UI badged and locked them, but that was presentation only: the tRPC router and
+ * its public REST twin both reach the same service, and the service let every by-id mutation through.
  */
 
 import { describe, expect, it, vi } from "vitest";

@@ -1,20 +1,5 @@
 /**
  * The setup checklist, served by the API process.
- *
- * What this pins is one call over the REAL `/api/trpc` handler on THIS
- * process's root, through THIS process's policy chain, against what
- * `composeIntegrationsChecksFeature` produced — and specifically WHICH code
- * issues the provider step's read.
- *
- * The rollup lives in this composition rather than in a feature package, and
- * it used to read `prisma.modelProvider` to fill its provider step. That table
- * holds every stored credential in the deployment, and the rule that only the
- * model-provider repository reads it is enforced by a lint over IMPORTS —
- * which a composition already holding the client walks straight past. So the
- * fake client below refuses every access to that delegate, and the step is
- * still answered: by the feature's own reader, which applies the PROJECT ->
- * TEAM -> ORGANIZATION cascade and selects an id rather than a credential
- * column.
  */
 import type { AuthzService } from "@langwatch/authz-contract";
 import { PostgresModelProviderEvidenceAdapter } from "@langwatch/model-provider-server";
@@ -93,8 +78,6 @@ function testAuthz(): AuthzService {
  * The provider step, as the process composes it: the REAL
  * `ModelProviderEvidenceService`, built by the model-provider package's own
  * adapter over its own client.
- *
- * Not a stub, because the seam being pinned is which code issues the read.
  */
 function testProviderEvidence() {
   const findFirst = vi.fn(async () => ({ id: "provider-1" }));

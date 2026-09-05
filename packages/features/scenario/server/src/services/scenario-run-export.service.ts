@@ -31,7 +31,7 @@ const FILTER_TO_CATEGORY: Record<ScenarioRunExportStatusFilter, RunStatusCategor
 };
 
 export class ScenarioRunExportService {
-  constructor(private readonly simulations: SimulationService) {}
+  private constructor(private readonly simulations: SimulationService) {}
 
   /**
    * Composes the canonical Simulation service. The export never receives or

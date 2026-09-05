@@ -2,7 +2,7 @@ import fs from "fs";
 import type { ServerResponse } from "http";
 import path from "path";
 
-import { getAssetBase, injectAssetBaseIntoHtml } from "./app-static.asset-base";
+import { injectAssetBaseIntoHtml } from "./app-static.asset-base";
 import {
   injectPublicAppConfigIntoHtml,
   type PublicAppConfig,
@@ -56,11 +56,14 @@ export function serveStaticOrFallback({
   pathname,
   clientDistDir,
   publicConfig,
+  assetBase,
 }: {
   res: ServerResponse;
   pathname: string;
   clientDistDir: string;
   publicConfig: PublicAppConfig;
+  /** Normalized `LANGWATCH_ASSET_BASE`, resolved by the composition root. */
+  assetBase: string;
 }): boolean {
   const normalizedRelative = path.normalize(pathname.slice(1));
   if (normalizedRelative.startsWith("..") || path.isAbsolute(normalizedRelative)) {
@@ -71,7 +74,7 @@ export function serveStaticOrFallback({
 
   const staticPath = path.join(clientDistDir, normalizedRelative);
   if (path.extname(staticPath) === ".html") {
-    if (tryServeHtml({ res, htmlPath: staticPath, publicConfig })) {
+    if (tryServeHtml({ res, htmlPath: staticPath, publicConfig, assetBase })) {
       return true;
     }
   } else if (tryServeFile({ res, filePath: staticPath, pathname })) {
@@ -90,6 +93,7 @@ export function serveStaticOrFallback({
     res,
     htmlPath: path.join(clientDistDir, "index.html"),
     publicConfig,
+    assetBase,
   });
 }
 
@@ -141,10 +145,12 @@ function tryServeHtml({
   res,
   htmlPath,
   publicConfig,
+  assetBase,
 }: {
   res: ServerResponse;
   htmlPath: string;
   publicConfig: PublicAppConfig;
+  assetBase: string;
 }): boolean {
   let fd: number;
   try {
@@ -162,7 +168,7 @@ function tryServeHtml({
     res.setHeader("Cache-Control", HTML_REVALIDATE_CACHE);
     const withAssetBase = injectAssetBaseIntoHtml({
       html,
-      base: getAssetBase(),
+      base: assetBase,
     });
     res.end(
       injectPublicAppConfigIntoHtml({

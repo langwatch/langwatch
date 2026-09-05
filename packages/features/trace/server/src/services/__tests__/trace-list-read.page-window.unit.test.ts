@@ -14,11 +14,11 @@ import { TRACE_LIST_MAX_OFFSET_ROWS } from "@langwatch/trace-contract";
 import { TraceListService } from "../trace-list-read.service";
 
 function serviceWithRepository(findAll: ReturnType<typeof vi.fn>) {
-  return new TraceListService(
-    { findAll } as never,
-    { findSummariesByTraceIds: vi.fn().mockResolvedValue({}) } as never,
-    { getNamesByIds: vi.fn().mockResolvedValue(new Map()) } as never,
-  );
+  return TraceListService.create({
+    repository: { findAll } as never,
+    evaluations: { findSummariesByTraceIds: vi.fn().mockResolvedValue({}) } as never,
+    topicService: { getNamesByIds: vi.fn().mockResolvedValue(new Map()) } as never,
+  });
 }
 
 const listParams = {

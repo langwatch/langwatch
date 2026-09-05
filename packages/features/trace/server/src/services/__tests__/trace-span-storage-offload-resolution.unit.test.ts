@@ -128,9 +128,14 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
       it("returns spans with the full output value, not the preview", async () => {
         const repo = makeStubRepository([spanWithRef]);
         const blobStore = makeBlobStore({ "langwatch.output": FULL_OUTPUT });
-        const service = new SpanStorageService(repo, {
-          blobStore,
-          ioExtractionService: new TraceIOExtractionService(TraceCanonicalisationService.create()),
+        const service = SpanStorageService.create({
+          repository: repo,
+          blobResolutionDeps: {
+            blobStore,
+            ioExtractionService: TraceIOExtractionService.create(
+              TraceCanonicalisationService.create(),
+            ),
+          },
         });
 
         const spans = await service.getSpansByTraceId({
@@ -153,9 +158,14 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
       it("does not surface the reserved eventref key in the serialized params", async () => {
         const repo = makeStubRepository([spanWithRef]);
         const blobStore = makeBlobStore({ "langwatch.output": FULL_OUTPUT });
-        const service = new SpanStorageService(repo, {
-          blobStore,
-          ioExtractionService: new TraceIOExtractionService(TraceCanonicalisationService.create()),
+        const service = SpanStorageService.create({
+          repository: repo,
+          blobResolutionDeps: {
+            blobStore,
+            ioExtractionService: TraceIOExtractionService.create(
+              TraceCanonicalisationService.create(),
+            ),
+          },
         });
 
         const spans = await service.getSpansByTraceId({
@@ -175,9 +185,14 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
       it("returns the span with the full output value, not the preview", async () => {
         const repo = makeStubRepository([spanWithRef]);
         const blobStore = makeBlobStore({ "langwatch.output": FULL_OUTPUT });
-        const service = new SpanStorageService(repo, {
-          blobStore,
-          ioExtractionService: new TraceIOExtractionService(TraceCanonicalisationService.create()),
+        const service = SpanStorageService.create({
+          repository: repo,
+          blobResolutionDeps: {
+            blobStore,
+            ioExtractionService: TraceIOExtractionService.create(
+              TraceCanonicalisationService.create(),
+            ),
+          },
         });
 
         const span = await service.getSpanById({
@@ -198,9 +213,14 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
       it("returns null when the spanId is not found in the trace", async () => {
         const repo = makeStubRepository([spanWithRef]);
         const blobStore = makeBlobStore({ "langwatch.output": FULL_OUTPUT });
-        const service = new SpanStorageService(repo, {
-          blobStore,
-          ioExtractionService: new TraceIOExtractionService(TraceCanonicalisationService.create()),
+        const service = SpanStorageService.create({
+          repository: repo,
+          blobResolutionDeps: {
+            blobStore,
+            ioExtractionService: TraceIOExtractionService.create(
+              TraceCanonicalisationService.create(),
+            ),
+          },
         });
 
         const span = await service.getSpanById({
@@ -233,9 +253,14 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
           getSpool: vi.fn(),
           deleteSpool: vi.fn(),
         } as unknown as TraceBlobStoreService;
-        const service = new SpanStorageService(repo, {
-          blobStore,
-          ioExtractionService: new TraceIOExtractionService(TraceCanonicalisationService.create()),
+        const service = SpanStorageService.create({
+          repository: repo,
+          blobResolutionDeps: {
+            blobStore,
+            ioExtractionService: TraceIOExtractionService.create(
+              TraceCanonicalisationService.create(),
+            ),
+          },
         });
 
         const spans = await service.getSpansByTraceId({
@@ -271,7 +296,7 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
       it("delegates directly to the repository getSpansByTraceId (no normalization path)", async () => {
         const repo = makeStubRepository([spanWithRef]);
         // Without deps, the service calls getSpansByTraceId on the repo (which returns []).
-        const service = new SpanStorageService(repo);
+        const service = SpanStorageService.create({ repository: repo });
 
         const spans = await service.getSpansByTraceId({
           tenantId: "proj-1",
@@ -305,9 +330,14 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
       it("returns the preview value without throwing", async () => {
         const repo = makeStubRepository([spanWithRef]);
         const blobStore = makeBlobStore({}); // empty — will throw BlobNotFoundError
-        const service = new SpanStorageService(repo, {
-          blobStore,
-          ioExtractionService: new TraceIOExtractionService(TraceCanonicalisationService.create()),
+        const service = SpanStorageService.create({
+          repository: repo,
+          blobResolutionDeps: {
+            blobStore,
+            ioExtractionService: TraceIOExtractionService.create(
+              TraceCanonicalisationService.create(),
+            ),
+          },
         });
 
         await expect(

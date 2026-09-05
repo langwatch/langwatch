@@ -6,7 +6,7 @@ import { NormalizedSpanKind, NormalizedStatusCode } from "@langwatch/trace-contr
 import { IO_PREVIEW_BYTES } from "../trace-projection-lean.service";
 import { TraceIOExtractionService } from "../trace-io-extraction.service";
 
-const service = new TraceIOExtractionService(TraceCanonicalisationService.create());
+const service = TraceIOExtractionService.create(TraceCanonicalisationService.create());
 
 function createTestSpan(overrides: Partial<NormalizedSpan> = {}): NormalizedSpan {
   return {

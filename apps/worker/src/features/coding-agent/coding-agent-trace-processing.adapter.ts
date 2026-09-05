@@ -46,7 +46,7 @@ export class WorkerCodingAgentTraceProcessingAdapter extends CodingAgentTracePro
     spans: TraceStoredSpanReaderPort;
   }): WorkerCodingAgentTraceProcessingAdapter {
     return new WorkerCodingAgentTraceProcessingAdapter(
-      new SpanNormalizationPipelineService(options.traceCanonicalisation),
+      SpanNormalizationPipelineService.create(options.traceCanonicalisation),
       options.spans,
     );
   }

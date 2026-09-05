@@ -20,8 +20,6 @@ export { ContractWorkflowDslMigrationAdapter } from "./adapters/workflow-dsl-mig
 export {
   HttpWorkflowNlpRuntimeAdapter,
   UnconfiguredWorkflowNlpRuntimeAdapter,
-  formatTraceparent,
-  nlpProxyBaseUrl,
   NLP_KEEP_ALIVE_EVENT,
   type NlpDispatchRequest,
   type NlpOrigin,

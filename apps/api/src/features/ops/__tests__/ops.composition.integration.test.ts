@@ -1,24 +1,5 @@
 /**
  * The operator back office, composed as its own feature by the API process.
- *
- * One call per surface, each made over the REAL `/api/trpc` handler on this
- * process's root, through this process's policy chain, against what
- * `composeOpsFeature` produced. The doubles are at the ports — a Prisma client,
- * an AuthZ service, the install's shared ClickHouse endpoint — and everything
- * between the request and them is the composed graph.
- *
- *   ops.getScope           the operator gate resolving this deployment's own
- *                          allow-list, including the probe variant that REPORTS
- *                          "no access" instead of refusing
- *   ops.listScheduledJobs  the composed scheduled-job store, over the same
- *                          connection
- *   ops.searchAggregates   the composed event-log explorer on the install's
- *                          shared endpoint, and its named refusal on a
- *                          deployment that has none
- *
- * It used to be composed inside the agent half, so a process missing any
- * scenario collaborator lost the whole back office with it. It composes itself
- * now, and the tests moved with it.
  */
 import type { AuthService } from "@langwatch/auth-contract";
 import type {

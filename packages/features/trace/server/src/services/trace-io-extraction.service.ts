@@ -39,7 +39,7 @@ export class TraceIOExtractionService {
     return new TraceIOExtractionService(traceCanonicalisation);
   }
 
-  constructor(private readonly traceCanonicalisation: TraceCanonicalisationService) {}
+  private constructor(private readonly traceCanonicalisation: TraceCanonicalisationService) {}
   private readonly tracer = getLangWatchTracer("langwatch.trace-processing.io-extraction");
 
   /**
@@ -711,7 +711,7 @@ function normalizeChatPayload(value: unknown, seen: WeakSet<object> = new WeakSe
 
 function messagesToText(
   messages: unknown,
-  mode: "input" | "output" = "output",
+  mode: "input" | "output",
   traceCanonicalisation: TraceCanonicalisationService,
 ): string | null {
   if (!messages) {

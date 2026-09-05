@@ -140,15 +140,18 @@ export function createWorkerReportTraceList(options: {
   });
 
   return ComposedWorkerReportTraceList.create({
-    traces: new TraceListService(
-      TraceListClickHouseRepository.create(options.resolveClickHouseClient),
-      Object.assign(refuseReportRead<EvaluationService>("the evaluation runs behind a trace"), {
-        findSummariesByTraceIds: (
-          input: Parameters<typeof evaluations.findSummariesByTraceIds>[0],
-        ) => evaluations.findSummariesByTraceIds(input),
-      }),
-      refuseReportRead<TopicService>("the topic names a facet is labelled with"),
-    ),
+    traces: TraceListService.create({
+      repository: TraceListClickHouseRepository.create(options.resolveClickHouseClient),
+      evaluations: Object.assign(
+        refuseReportRead<EvaluationService>("the evaluation runs behind a trace"),
+        {
+          findSummariesByTraceIds: (
+            input: Parameters<typeof evaluations.findSummariesByTraceIds>[0],
+          ) => evaluations.findSummariesByTraceIds(input),
+        },
+      ),
+      topicService: refuseReportRead<TopicService>("the topic names a facet is labelled with"),
+    }),
     translateFilter: (query, projectId, window) =>
       TraceQueryClickHouseAdapter.translateFilter(query, projectId, window),
     baseHost: options.baseHost,

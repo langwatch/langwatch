@@ -12,8 +12,8 @@
 import { RUM_MAX_BODY_BYTES, RUM_SERVICE_NAME } from "@langwatch/react-rum/constants";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { collectorHeaders } from "../../../platform/config/rum-collector.config";
 import {
-  collectorHeaders,
   countSpans,
   ingestBrowserTraces,
   type OtlpResourceSpans,

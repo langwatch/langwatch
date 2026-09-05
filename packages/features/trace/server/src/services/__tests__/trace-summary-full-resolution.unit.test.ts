@@ -80,7 +80,7 @@ function fakeBlobStore(resolvedValues: Record<string, string>): TraceBlobStoreSe
   } as unknown as TraceBlobStoreService;
 }
 
-const realIOService = new TraceIOExtractionService(TraceCanonicalisationService.create());
+const realIOService = TraceIOExtractionService.create(TraceCanonicalisationService.create());
 
 const makeSummary = () => ({
   traceId: "trace-1",
@@ -106,10 +106,12 @@ function makeSpanRepo(spans: NormalizedSpan[]): SpanStorageRepository {
 describe("TraceSummaryService.getByTraceId({ full: true })", () => {
   describe("given no full-resolution deps were supplied at construction", () => {
     it("returns the stored preview unchanged", async () => {
-      const service = new TraceSummaryService({
-        findByTraceId: vi.fn().mockResolvedValue(makeSummary()),
-        upsert: vi.fn(),
-      } as never);
+      const service = TraceSummaryService.create({
+        repository: {
+          findByTraceId: vi.fn().mockResolvedValue(makeSummary()),
+          upsert: vi.fn(),
+        } as never,
+      });
 
       const result = await service.getByTraceId("proj-1", "trace-1", {
         full: true,
@@ -134,17 +136,17 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
 
     describe("when full is requested", () => {
       it("returns the recomputed full input instead of the stored preview", async () => {
-        const service = new TraceSummaryService(
-          {
+        const service = TraceSummaryService.create({
+          repository: {
             findByTraceId: vi.fn().mockResolvedValue(makeSummary()),
             upsert: vi.fn(),
           } as never,
-          {
+          fullResolutionDeps: {
             spanStorageRepository: makeSpanRepo([spanWithRef]),
             blobStore: fakeBlobStore({ "langwatch.input": fullInput }),
             ioExtractionService: realIOService,
           },
-        );
+        });
 
         const result = await service.getByTraceId("proj-1", "trace-1", {
           full: true,
@@ -157,17 +159,17 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
     describe("when full is not requested", () => {
       it("returns the stored preview and never reads spans", async () => {
         const spanRepo = makeSpanRepo([spanWithRef]);
-        const service = new TraceSummaryService(
-          {
+        const service = TraceSummaryService.create({
+          repository: {
             findByTraceId: vi.fn().mockResolvedValue(makeSummary()),
             upsert: vi.fn(),
           } as never,
-          {
+          fullResolutionDeps: {
             spanStorageRepository: spanRepo,
             blobStore: fakeBlobStore({ "langwatch.input": fullInput }),
             ioExtractionService: realIOService,
           },
-        );
+        });
 
         const result = await service.getByTraceId("proj-1", "trace-1");
 
@@ -183,17 +185,17 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
         spanAttributes: { "langwatch.input": "small input, never offloaded" },
       });
       const blobStore = fakeBlobStore({});
-      const service = new TraceSummaryService(
-        {
+      const service = TraceSummaryService.create({
+        repository: {
           findByTraceId: vi.fn().mockResolvedValue(makeSummary()),
           upsert: vi.fn(),
         } as never,
-        {
+        fullResolutionDeps: {
           spanStorageRepository: makeSpanRepo([plainSpan]),
           blobStore,
           ioExtractionService: realIOService,
         },
-      );
+      });
 
       const result = await service.getByTraceId("proj-1", "trace-1", {
         full: true,
@@ -215,17 +217,17 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
           }),
         },
       });
-      const service = new TraceSummaryService(
-        {
+      const service = TraceSummaryService.create({
+        repository: {
           findByTraceId: vi.fn().mockResolvedValue(makeSummary()),
           upsert: vi.fn(),
         } as never,
-        {
+        fullResolutionDeps: {
           spanStorageRepository: makeSpanRepo([spanWithBadRef]),
           blobStore: fakeBlobStore({}), // nothing resolves — always throws BlobNotFoundError
           ioExtractionService: realIOService,
         },
-      );
+      });
 
       const result = await service.getByTraceId("proj-1", "trace-1", {
         full: true,
@@ -237,12 +239,12 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
 
   describe("given the spans read itself throws", () => {
     it("falls back to the stored preview instead of throwing", async () => {
-      const service = new TraceSummaryService(
-        {
+      const service = TraceSummaryService.create({
+        repository: {
           findByTraceId: vi.fn().mockResolvedValue(makeSummary()),
           upsert: vi.fn(),
         } as never,
-        {
+        fullResolutionDeps: {
           spanStorageRepository: {
             getNormalizedSpansByTraceId: vi
               .fn()
@@ -251,7 +253,7 @@ describe("TraceSummaryService.getByTraceId({ full: true })", () => {
           blobStore: fakeBlobStore({}),
           ioExtractionService: realIOService,
         },
-      );
+      });
 
       const result = await service.getByTraceId("proj-1", "trace-1", {
         full: true,

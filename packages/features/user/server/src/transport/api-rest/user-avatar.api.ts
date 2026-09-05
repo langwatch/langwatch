@@ -157,12 +157,18 @@ export function createUserAvatarRestApp<
     verifySecret: dualAuth,
   });
 
+  // Takes what it reads off the request rather than the request itself: the
+  // two routes below hand it the same three values, and a handler that names
+  // them cannot be handed a context this family did not authenticate.
   async function handleAvatarRead(
-    c: Parameters<MiddlewareHandler<{ Variables: UserAvatarDualAuthVariables }>>[0],
+    request: {
+      projectId: string | undefined;
+      id: string | undefined;
+      callerKey: string | undefined;
+    },
     read: { method: "GET" | "HEAD" },
   ): Promise<Response> {
-    const projectId = c.req.param("projectId");
-    const id = c.req.param("id");
+    const { projectId, id } = request;
     if (!projectId || !id) {
       throw new UserAvatarNotFoundError(id ?? "");
     }
@@ -170,7 +176,7 @@ export function createUserAvatarRestApp<
     // Per-caller rate limit, keyed on the authenticated identity (dualAuth
     // guarantees one is present) so id-enumeration is throttled before any
     // read.
-    const callerKey = c.get("apiKeyProjectId") ?? c.get("userId");
+    const { callerKey } = request;
     if (!callerKey) {
       throw new HTTPException(500, { message: "rate-limit key unresolved" });
     }
@@ -220,12 +226,24 @@ export function createUserAvatarRestApp<
     });
   }
 
+  // The dual-auth middleware above sets both variables, but the route's own
+  // context type is the family's blank one, so the two reads are named
+  // structurally rather than recovered by casting the context.
+  const avatarRequest = (c: {
+    req: { param: (name: string) => string | undefined };
+    get: (key: "apiKeyProjectId" | "userId") => string | undefined;
+  }) => ({
+    projectId: c.req.param("projectId"),
+    id: c.req.param("id"),
+    callerKey: c.get("apiKeyProjectId") ?? c.get("userId"),
+  });
+
   secured
     .access(anyAuthenticated())
-    .get("/:projectId/:id", (c) => handleAvatarRead(c as never, { method: "GET" }));
+    .get("/:projectId/:id", (c) => handleAvatarRead(avatarRequest(c), { method: "GET" }));
   secured
     .access(anyAuthenticated())
-    .head("/:projectId/:id", (c) => handleAvatarRead(c as never, { method: "HEAD" }));
+    .head("/:projectId/:id", (c) => handleAvatarRead(avatarRequest(c), { method: "HEAD" }));
 
   return secured;
 }

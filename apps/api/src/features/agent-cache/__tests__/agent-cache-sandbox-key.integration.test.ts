@@ -1,6 +1,6 @@
 /**
  * The reach of one minted sandbox key (ADR: agent cache), proved against the real
- * permission set `mintAgentSandboxApiKey` requests: exactly `agentCache:manage`, so a key
+ * permission set `AgentSandboxKeyMintService.mint` requests: exactly `agentCache:manage`, so a key
  * @see specs/agent-cache/agent-cache.feature
  */
 import {
@@ -9,7 +9,7 @@ import {
   type RestApiServicePorts,
 } from "@langwatch/api/rest";
 import { requires } from "@langwatch/api";
-import { mintAgentSandboxApiKey } from "@langwatch/api-key-server";
+import { AgentSandboxKeyMintService } from "@langwatch/api-key-server";
 import type { ApiKeyService } from "@langwatch/api-key-contract";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
 import type { MiddlewareHandler } from "hono";
@@ -96,7 +96,11 @@ function sandboxKeySecurity(grantedPermissions: readonly string[]): AppRestSecur
 
 async function mintedPermissions(): Promise<string[]> {
   const { apiKeys, grantedPermissions } = fakeApiKeys();
-  await mintAgentSandboxApiKey({ apiKeys, projectId: PROJECT_ID, organizationId: "org_1" });
+  await AgentSandboxKeyMintService.mint({
+    apiKeys,
+    projectId: PROJECT_ID,
+    organizationId: "org_1",
+  });
   return grantedPermissions();
 }
 

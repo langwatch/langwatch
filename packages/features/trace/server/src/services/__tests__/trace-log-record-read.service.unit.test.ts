@@ -43,7 +43,7 @@ function makeService({ legacyRows = [row], canonicalRows = [] as StoredLogRecord
     getLogsByTraceId: canonicalGetLogsByTraceId,
   };
   return {
-    service: new LogRecordStorageService({ repository, canonical }),
+    service: LogRecordStorageService.create({ repository, canonical }),
     getLogsByTraceId,
     canonicalGetLogsByTraceId,
   };

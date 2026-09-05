@@ -216,7 +216,7 @@ export type CreatedVirtualKey = {
  * - RBAC is enforced by tRPC / Hono layers before reaching the service.
  */
 export class VirtualKeyService {
-  constructor(
+  private constructor(
     private readonly prisma: PrismaClient,
     private readonly projects: ProjectService,
     private readonly repository: GatewayVirtualKeysPort,

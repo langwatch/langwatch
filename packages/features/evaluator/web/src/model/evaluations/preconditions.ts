@@ -192,21 +192,18 @@ export function checkEvaluatorRequiredFields({
 }): boolean {
   const evaluator = getEvaluatorDefinitions(evaluatorType);
 
-  if (evaluator?.requiredFields.includes("contexts")) {
-    if (
-      !spans.some(
-        (span) =>
-          span.type === "rag" && extractRAGTextualContext((span as RAGSpan).contexts).length > 0,
-      )
-    ) {
-      return false;
-    }
+  if (
+    evaluator?.requiredFields.includes("contexts") &&
+    !spans.some(
+      (span) =>
+        span.type === "rag" && extractRAGTextualContext((span as RAGSpan).contexts).length > 0,
+    )
+  ) {
+    return false;
   }
 
-  if (evaluator?.requiredFields.includes("expected_output")) {
-    if (!expectedOutput) {
-      return false;
-    }
+  if (evaluator?.requiredFields.includes("expected_output") && !expectedOutput) {
+    return false;
   }
 
   return true;
@@ -293,7 +290,7 @@ export function buildPreconditionTraceDataFromTrace({
     input: trace.input?.value ?? null,
     output: trace.output?.value ?? null,
     origin: trace.origin ?? null,
-    hasError: trace.error ? true : false,
+    hasError: Boolean(trace.error),
     userId: trace.metadata?.user_id ?? null,
     threadId: trace.metadata?.thread_id ?? null,
     customerId: trace.metadata?.customer_id ?? null,

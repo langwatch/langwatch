@@ -135,7 +135,7 @@ describe("ScenarioRunExportService", () => {
         [buildRun({ scenarioRunId: "a" }), buildRun({ scenarioRunId: "b" })],
         [buildRun({ scenarioRunId: "c" })],
       ]);
-      const service = new ScenarioRunExportService(simulations);
+      const service = ScenarioRunExportService.create(simulations);
 
       const { csv } = await collect(service.exportRuns({ request: request({ mode: "full" }) }));
 
@@ -150,7 +150,7 @@ describe("ScenarioRunExportService", () => {
         [buildRun({ scenarioRunId: "a" }), buildRun({ scenarioRunId: "b" })],
         [buildRun({ scenarioRunId: "c" })],
       ]);
-      const service = new ScenarioRunExportService(simulations);
+      const service = ScenarioRunExportService.create(simulations);
 
       const { progress } = await collect(
         service.exportRuns({ request: request({ mode: "full" }) }),
@@ -176,7 +176,7 @@ describe("ScenarioRunExportService", () => {
         [buildRun({ scenarioRunId: "b" })],
         [buildRun({ scenarioRunId: "c" })],
       ]);
-      const service = new ScenarioRunExportService(simulations);
+      const service = ScenarioRunExportService.create(simulations);
       const controller = new AbortController();
 
       const generator = service.exportRuns({
@@ -224,7 +224,7 @@ describe("ScenarioRunExportService", () => {
           }),
         ],
       ]);
-      const service = new ScenarioRunExportService(simulations);
+      const service = ScenarioRunExportService.create(simulations);
 
       const { csv } = await collect(
         service.exportRuns({
@@ -250,7 +250,7 @@ describe("ScenarioRunExportService", () => {
           }),
         ],
       ]);
-      const service = new ScenarioRunExportService(simulations);
+      const service = ScenarioRunExportService.create(simulations);
 
       const { csv } = await collect(
         service.exportRuns({
@@ -272,7 +272,7 @@ describe("ScenarioRunExportService", () => {
      */
     it("passes the whole scope through to the repository", async () => {
       const { simulations, calls } = pagingService([[buildRun()]]);
-      const service = new ScenarioRunExportService(simulations);
+      const service = ScenarioRunExportService.create(simulations);
 
       await collect(
         service.exportRuns({

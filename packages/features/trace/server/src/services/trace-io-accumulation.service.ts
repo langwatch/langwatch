@@ -14,12 +14,9 @@ export const OUTPUT_SOURCE = {
 } as const;
 
 /**
- * The attributes a side's media can ride on. Both are read for every span,
- * because the two carry different things: the provider instrumentation writes
- * the request the customer sent to `langwatch.*`, while `gen_ai.*.messages`
- * holds what that instrumentation chose to report, which is often the text
- * alone. Reading only whichever one named the trace loses the picture whenever
- * the other one is the one holding it.
+ * The attributes a side's media can ride on. Both are read for every span, because the two carry different things: the provider instrumentation writes the
+ * request the customer sent to `langwatch.*`, while `gen_ai.*.messages` holds what that instrumentation chose to report, which is often the text alone.
+ * Reading only whichever one named the trace loses the picture whenever the other one is the one holding it.
  */
 const MEDIA_SOURCE_ATTRS = {
   input: [ATTR_KEYS.LANGWATCH_INPUT, ATTR_KEYS.GEN_AI_INPUT_MESSAGES],
@@ -28,10 +25,6 @@ const MEDIA_SOURCE_ATTRS = {
 
 /**
  * One span's contribution to the trace's headline input and output.
- *
- * `accumulateIO` returns this whole shape every time rather than mutating the
- * summary, so each rule below is a value a caller can read, and none of them
- * depend on the order the others ran in.
  */
 export type TraceIOAccumulation = {
   computedInput: string | null;
@@ -113,11 +106,6 @@ export class TraceIOAccumulationService {
   /**
    * Span kinds that carry their own input and output but must never become the
    * trace's headline text.
-   *
-   * Tool spans are the load-bearing case: synthesized claude_code tool spans are
-   * parentless, so they read as roots, and without this a Bash run's input would
-   * hijack the trace's. Skipping them lets a tool span keep its own I/O for the
-   * span detail without reaching the summary.
    */
   private cannotDefineHeadlineIO(span: NormalizedSpan): boolean {
     const spanType = span.spanAttributes[ATTR_KEYS.SPAN_TYPE];
@@ -131,10 +119,9 @@ export class TraceIOAccumulationService {
   }
 
   /**
-   * Claude Code's utility model calls — autosuggest, session titles — are not
-   * the conversation. They are parentless like tool spans, so a title could
-   * otherwise win the headline on end time. Mirrors the log-path gate in
-   * `TraceLogRecordIOService` so both agree.
+   * Claude Code's utility model calls — autosuggest, session titles — are not the conversation. They are
+   * parentless like tool spans, so a title could otherwise win the headline on end time. Mirrors the log-path gate
+   * in `TraceLogRecordIOService` so both agree.
    */
   private isClaudeUtilityCall(span: NormalizedSpan): boolean {
     const querySource = span.spanAttributes["claude_code.query_source"];
@@ -288,13 +275,11 @@ export class TraceIOAccumulationService {
     endTime: number;
     currentEndTime: number;
   }): boolean {
-    // A parentless span is "root". A claude_code Path B turn synthesizes MANY
-    // parentless spans under one trace (one per model call), so "root" is not
-    // unique here: among roots the latest-finishing reply wins, so the trace
-    // output is deterministic by end time instead of last-folded-wins (the real
-    // reply often sits on a middle call, with utility calls finishing after it).
-    // A root still beats a non-root child that set the output. For a conventional
-    // single-root trace this is a no-op — there is only ever one root.
+    // A parentless span is "root". A claude_code Path B turn synthesizes MANY parentless spans under one trace
+    // (one per model call), so "root" is not unique here: among roots the latest-finishing reply wins, so the
+    // trace output is deterministic by end time instead of last-folded-wins (the real reply often sits on a
+    // middle call, with utility calls finishing after it). A root still beats a non-root child that set the
+    // output. For a conventional single-root trace this is a no-op — there is only ever one root.
     if (isRoot) {
       return !outputFromRoot || endTime >= currentEndTime;
     }
@@ -316,12 +301,6 @@ export class TraceIOAccumulationService {
 
   /**
    * Fold one span's media into the trace's running refs for a side.
-   *
-   * A span with no media leaves the refs alone, which is the whole point: the
-   * span that names the trace is usually not the span that holds the picture, so
-   * winning the headline text must not wipe what another span contributed. The
-   * winning span's media goes first, so the list thumbnail still prefers the
-   * media of the headline message.
    */
   private static accumulateMediaRefs({
     serialized,
@@ -356,9 +335,6 @@ export class TraceIOAccumulationService {
 
   /**
    * The trace's answer so far, before this span is folded in.
-   *
-   * Several of these live in `attributes` rather than as columns, so reading them
-   * in one place keeps the string keys out of the accumulation rules.
    */
   private static carriedForward(state: TraceSummaryData): TraceIOAccumulation {
     return {
@@ -376,16 +352,9 @@ export class TraceIOAccumulationService {
   }
 
   /**
-   * Prefer the extracted human-readable text over the raw payload.
-   * The IO extraction service runs messagesToText / extractTextFromPlainJson
-   * to unwrap common payload shapes (e.g. `{"output":"Hey"}` → `"Hey"`,
-   * gen_ai messages → joined content text). When that succeeds, use it
-   * for the trace summary. Fall back to stringifying the raw payload
-   * only when extraction returned no text — keeps NON-null guarantee
-   * for spans that have data but unknown shape.
-   *
-   * Exported via the existing accumulation surface — tests cover this
-   * via the fold projection, not directly.
+   * Prefer the extracted human-readable text over the raw payload. The IO extraction service runs messagesToText / extractTextFromPlainJson to unwrap common
+   * payload shapes (e.g. `{"output":"Hey"}` → `"Hey"`, gen_ai messages → joined content text). When that succeeds, use it for the trace summary. Fall back to
+   * stringifying the raw payload only when extraction returned no text — keeps NON-null guarantee for spans that have data but unknown shape.
    */
   private static preferText(text: string | null | undefined, raw: unknown): string {
     if (typeof text === "string" && text.length > 0) {

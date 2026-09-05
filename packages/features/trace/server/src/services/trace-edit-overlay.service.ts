@@ -23,7 +23,7 @@ export type TraceEditIOField = "input" | "output";
  * Reviewer corrections for a trace: read, replace, merge and remove. At most one correction per trace, so every write is an upsert with `updatedBy` set to the current editor; a stored patch this build cannot interpret reads as no correction, since absence is the normal state and a bad row must not fail a trace read.
  */
 export class TraceEditOverlayService {
-  constructor(private readonly repository: TraceEditOverlayRepository) {}
+  private constructor(private readonly repository: TraceEditOverlayRepository) {}
 
   static create(repository: TraceEditOverlayRepository): TraceEditOverlayService {
     return new TraceEditOverlayService(repository);

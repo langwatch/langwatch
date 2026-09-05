@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatTraceparent } from "../workflow-nlp-runtime.adapter";
+import { HttpWorkflowNlpRuntimeAdapter } from "../workflow-nlp-runtime.adapter";
 
 /**
  * Unit tests for the W3C traceparent header formatting in nlpgoFetch.
@@ -20,7 +20,7 @@ import { formatTraceparent } from "../workflow-nlp-runtime.adapter";
 describe("formatTraceparent", () => {
   /** @scenario formatTraceparent builds a valid W3C traceparent header */
   it("formats a valid W3C traceparent header", () => {
-    const header = formatTraceparent({
+    const header = HttpWorkflowNlpRuntimeAdapter.formatTraceparent({
       traceId: "0af7651916cd43dd8448eb211c80319c",
       parentSpanId: "b7ad6b7169203331",
     });
@@ -28,7 +28,7 @@ describe("formatTraceparent", () => {
   });
 
   it("lowercases hex input so producers can pass either case", () => {
-    const header = formatTraceparent({
+    const header = HttpWorkflowNlpRuntimeAdapter.formatTraceparent({
       traceId: "0AF7651916CD43DD8448EB211C80319C",
       parentSpanId: "B7AD6B7169203331",
     });
@@ -38,7 +38,7 @@ describe("formatTraceparent", () => {
   /** @scenario formatTraceparent rejects malformed traceId */
   it("rejects a traceId that is not 32 hex chars (loud failure beats silent broken header)", () => {
     expect(() =>
-      formatTraceparent({
+      HttpWorkflowNlpRuntimeAdapter.formatTraceparent({
         traceId: "trace_legacy_format",
         parentSpanId: "b7ad6b7169203331",
       }),
@@ -48,7 +48,7 @@ describe("formatTraceparent", () => {
   /** @scenario formatTraceparent rejects malformed parentSpanId */
   it("rejects a parentSpanId that is not 16 hex chars", () => {
     expect(() =>
-      formatTraceparent({
+      HttpWorkflowNlpRuntimeAdapter.formatTraceparent({
         traceId: "0af7651916cd43dd8448eb211c80319c",
         parentSpanId: "not-16-hex",
       }),
@@ -57,7 +57,7 @@ describe("formatTraceparent", () => {
 
   it("rejects non-hex characters disguised as right length", () => {
     expect(() =>
-      formatTraceparent({
+      HttpWorkflowNlpRuntimeAdapter.formatTraceparent({
         traceId: "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ",
         parentSpanId: "b7ad6b7169203331",
       }),

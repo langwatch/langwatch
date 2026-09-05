@@ -46,6 +46,7 @@ export class ApiStaticSurface extends ApiRawRequestSurfacePort {
     private readonly clientDistDir: string,
     private readonly publicConfig: PublicAppConfig,
     private readonly securityHeaders: Record<string, string>,
+    private readonly assetBase: string,
   ) {
     super();
   }
@@ -60,11 +61,14 @@ export class ApiStaticSurface extends ApiRawRequestSurfacePort {
      * rather than on the API families Hono answers.
      */
     securityHeaders?: Record<string, string>;
+    /** Normalized `LANGWATCH_ASSET_BASE`; "/" serves assets same-origin. */
+    assetBase?: string;
   }): ApiStaticSurface {
     return new ApiStaticSurface(
       options.clientDistDir,
       options.publicConfig,
       options.securityHeaders ?? {},
+      options.assetBase ?? "/",
     );
   }
 
@@ -84,6 +88,7 @@ export class ApiStaticSurface extends ApiRawRequestSurfacePort {
       pathname,
       clientDistDir: this.clientDistDir,
       publicConfig: this.publicConfig,
+      assetBase: this.assetBase,
     });
     if (handled) return;
 
@@ -119,9 +124,9 @@ export function pathIsClaimedByTheApi(pathname: string): boolean {
  * `apps/api/src/app-static/`. `LANGWATCH_UI_DIST_DIR` overrides it for a
  * deployment that stages the bundle somewhere else.
  */
-export function resolveClientDistDir(
-  source: { LANGWATCH_UI_DIST_DIR?: string | undefined } = process.env,
-): string {
+export function resolveClientDistDir(source: {
+  LANGWATCH_UI_DIST_DIR?: string | undefined;
+}): string {
   const configured = source.LANGWATCH_UI_DIST_DIR?.trim();
   if (configured) return path.resolve(configured);
   return fileURLToPath(new URL("../../../ui/dist/client", import.meta.url));
@@ -137,10 +142,11 @@ export function resolveClientDistDir(
  * routing bug rather than a missing artifact.
  */
 export function tryCreateApiStaticSurface(options: {
-  environment?: NodeJS.ProcessEnv;
+  /** The process environment, read once by the composition root and passed in. */
+  environment: NodeJS.ProcessEnv;
   report: (message: string, context: { clientDistDir: string }) => void;
 }): ApiStaticSurface | undefined {
-  const environment = options.environment ?? process.env;
+  const { environment } = options;
   const clientDistDir = resolveClientDistDir(environment);
 
   if (!fs.existsSync(path.join(clientDistDir, "index.html"))) {
@@ -152,14 +158,17 @@ export function tryCreateApiStaticSurface(options: {
     return undefined;
   }
 
+  const assetBase = normalizeAssetBase(environment.LANGWATCH_ASSET_BASE);
+
   return ApiStaticSurface.create({
     clientDistDir,
     securityHeaders: buildSecurityHeaders({
       dev: environment.NODE_ENV !== "production",
       environment,
-      assetOrigin: assetBaseOrigin(normalizeAssetBase(environment.LANGWATCH_ASSET_BASE)),
+      assetOrigin: assetBaseOrigin(assetBase),
     }),
     publicConfig: resolvePublicAppConfig(environment),
+    assetBase,
   });
 }
 

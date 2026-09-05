@@ -178,13 +178,11 @@ export const setNestedProperty = (obj: Record<string, any>, path: string, value:
   for (const key of keys) {
     if (!(key in obj)) {
       obj[key] = unflattened[key];
-    } else {
       // Deep merge if both are objects
-      if (typeof obj[key] === "object" && typeof unflattened[key] === "object") {
-        obj[key] = { ...obj[key], ...unflattened[key] };
-      } else {
-        obj[key] = unflattened[key];
-      }
+    } else if (typeof obj[key] === "object" && typeof unflattened[key] === "object") {
+      obj[key] = { ...obj[key], ...unflattened[key] };
+    } else {
+      obj[key] = unflattened[key];
     }
   }
 };

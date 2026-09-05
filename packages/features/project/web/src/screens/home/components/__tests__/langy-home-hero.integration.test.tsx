@@ -52,7 +52,7 @@ import {
 import { LangyHomeHero } from "../langy-home-hero";
 
 class StubProjectHomeHost extends ProjectHomeHostPort {
-  constructor(private readonly canAsk: boolean = true) {
+  constructor(private readonly canAsk = true) {
     super();
   }
   project(): ProjectHomeProject | undefined {
