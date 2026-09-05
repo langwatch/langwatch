@@ -257,6 +257,7 @@ describe("CodeEvaluatorEditorDrawer", () => {
     });
 
     describe("when the attachment carries no gate", () => {
+      /** @scenario "An evaluator editor without a gate offers no Required to pass switch" */
       it("shows no Required to pass section and no remove action", async () => {
         render(<CodeEvaluatorEditorDrawer open />, { wrapper: Wrapper });
 

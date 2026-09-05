@@ -42,24 +42,26 @@ describe("<EvaluatorPill />", () => {
   });
 
   describe("given an onClick", () => {
-    /** @scenario "An interactive pill stays a button" */
-    it("renders as a button and calls onClick", async () => {
-      const user = userEvent.setup();
-      const onClick = vi.fn();
-      render(
-        <EvaluatorPill
-          attachmentId="attachment_1"
-          name="Exactness"
-          required={false}
-          missingInputs={[]}
-          onClick={onClick}
-        />,
-        { wrapper: Wrapper },
-      );
+    describe("when the pill is clicked", () => {
+      /** @scenario "An interactive pill stays a button" */
+      it("renders as a button and calls onClick", async () => {
+        const user = userEvent.setup();
+        const onClick = vi.fn();
+        render(
+          <EvaluatorPill
+            attachmentId="attachment_1"
+            name="Exactness"
+            required={false}
+            missingInputs={[]}
+            onClick={onClick}
+          />,
+          { wrapper: Wrapper },
+        );
 
-      const button = screen.getByRole("button", { name: "Exactness" });
-      await user.click(button);
-      expect(onClick).toHaveBeenCalled();
+        const button = screen.getByRole("button", { name: "Exactness" });
+        await user.click(button);
+        expect(onClick).toHaveBeenCalled();
+      });
     });
   });
 });

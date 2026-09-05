@@ -152,7 +152,7 @@ describe("evaluator attachments", () => {
 
     describe("when the mapping sources are listed", () => {
       it("offers the tool call with its input and output", () => {
-        const sources = scenarioMappingSources(ctx);
+        const sources = scenarioMappingSources({ ctx });
         expect(sources.map((source) => source.id)).toEqual([
           "conversation",
           "scenario",
@@ -394,18 +394,17 @@ describe("evaluator attachments", () => {
 
     describe("when the mapping sources are listed for a run plan", () => {
       it("offers the scenario without its fields", () => {
-        const sources = scenarioMappingSources(
-          { fields: ctx.fields, toolNames: [] },
-          { isPlanLevel: true },
-        );
+        const sources = scenarioMappingSources({
+          ctx: { fields: ctx.fields, toolNames: [] },
+          isPlanLevel: true,
+        });
         const scenario = sources.find((source) => source.id === "scenario");
         expect(scenario?.fields.map((field) => field.name)).toEqual([
           "situation",
           "criteria",
         ]);
         const suiteLevel = scenarioMappingSources({
-          fields: ctx.fields,
-          toolNames: [],
+          ctx: { fields: ctx.fields, toolNames: [] },
         });
         expect(
           suiteLevel

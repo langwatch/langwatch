@@ -80,7 +80,7 @@ export function useOpenScenarioEvaluatorEditor(): (
       onRemove,
     }: OpenScenarioEvaluatorEditorParams) => {
       const mappingsConfig = {
-        availableSources: scenarioMappingSources(ctx, { isPlanLevel }),
+        availableSources: scenarioMappingSources({ ctx, isPlanLevel }),
         initialMappings: attachment.mappings,
       };
       const handleMappingChange = (

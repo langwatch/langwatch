@@ -58,6 +58,51 @@ export const SQL_EVALUATOR: AttachableEvaluator = {
   ],
 };
 
+/** The parts of the controller that stay the same across every fixture. */
+const STATIC_CONTROLLER_FIXTURE = {
+  evaluatorId: "eval_sql",
+  evaluatorType: "ragas/sql_query_equivalence",
+  evaluatorDef: undefined,
+  effectiveEvaluatorDef: {
+    requiredFields: ["output", "expected_output", "expected_contexts"],
+    optionalFields: [],
+  },
+  isLoadingEvaluator: false,
+  workflowCard: undefined,
+  isWorkflowEvaluator: false,
+  hasSettings: false,
+  settingsSchema: undefined,
+  projectSlug: "p1",
+  hasUnsavedChanges: false,
+  isSaving: false,
+  isValid: true,
+  saveButtonText: undefined,
+  mappingsConfig: {
+    availableSources: scenarioMappingSources({
+      ctx: { fields: SUITE_FIELDS, toolNames: ["run_sql"] },
+    }),
+    initialMappings: {
+      output: {
+        type: "source",
+        sourceId: "conversation",
+        path: ["last_agent_message"],
+      },
+    },
+  },
+  comparisonContext: undefined,
+  expectsComparisonContext: false,
+  comparison: {
+    variants: [],
+    hasGoldenAnswer: true,
+    goldenField: "",
+    includeMetrics: [],
+    randomizeOrder: true,
+  },
+  onComparisonChange: undefined,
+  onLocalConfigChange: undefined,
+  title: "SQL Query Equivalence",
+};
+
 function buildController({
   form,
   gate,
@@ -74,54 +119,13 @@ function buildController({
   onMappingChange: (identifier: string, mapping: unknown) => void;
 }): EvaluatorEditorController {
   return {
+    ...STATIC_CONTROLLER_FIXTURE,
     form,
-    evaluatorId: "eval_sql",
-    evaluatorType: "ragas/sql_query_equivalence",
-    evaluatorDef: undefined,
-    effectiveEvaluatorDef: {
-      requiredFields: ["output", "expected_output", "expected_contexts"],
-      optionalFields: [],
-    },
-    isLoadingEvaluator: false,
-    workflowCard: undefined,
-    isWorkflowEvaluator: false,
-    hasSettings: false,
-    settingsSchema: undefined,
-    projectSlug: "p1",
-    hasUnsavedChanges: false,
-    isSaving: false,
-    isValid: true,
-    saveButtonText: undefined,
-    mappingsConfig: {
-      availableSources: scenarioMappingSources({
-        fields: SUITE_FIELDS,
-        toolNames: ["run_sql"],
-      }),
-      initialMappings: {
-        output: {
-          type: "source",
-          sourceId: "conversation",
-          path: ["last_agent_message"],
-        },
-      },
-    },
     onMappingChange,
-    comparisonContext: undefined,
-    expectsComparisonContext: false,
-    comparison: {
-      variants: [],
-      hasGoldenAnswer: true,
-      goldenField: "",
-      includeMetrics: [],
-      randomizeOrder: true,
-    },
-    onComparisonChange: undefined,
-    onLocalConfigChange: undefined,
     gate,
     required,
     onRequiredChange,
     onRemove,
-    title: "SQL Query Equivalence",
     handleSave: vi.fn(),
     handleClose: vi.fn(),
     handleDiscard: vi.fn(),

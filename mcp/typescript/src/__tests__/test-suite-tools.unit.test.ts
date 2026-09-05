@@ -488,6 +488,9 @@ describe("handleCreateTestSuite()", () => {
       const result = await handleCreateTestSuite({
         name: "Case lookups",
         fields: [goldenSqlField],
+        evaluators: [
+          { evaluatorId: "evaluator_sql", mappings: sqlAttachment.mappings },
+        ],
       });
 
       expect(result).toContain("- golden_sql (text)");

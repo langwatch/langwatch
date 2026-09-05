@@ -236,6 +236,26 @@ Feature: The test suite editor
     And choosing it takes the attachment off the suite and closes the editor
 
   @integration
+  Scenario: An evaluator editor without a gate offers no Required to pass switch
+    Given an evaluator editor opened with no gate
+    When it is read
+    Then no "Required to pass" section is shown
+    And no "Remove evaluator" action is shown
+
+  @integration
+  Scenario: A code evaluator attachment opens its own editor with the same mapping sources
+    Given an attached evaluator of type code
+    When its pill is chosen
+    Then the code evaluator's own editor opens
+    And it offers the same mapping sources as any other evaluator
+
+  @integration
+  Scenario: A code evaluator's own editor carries the gate switch and the remove action
+    Given an attached code evaluator that carries a gate and a remove action
+    When its own editor is opened
+    Then flipping the gate switch and choosing remove reach the attachment
+
+  @integration
   Scenario: A mapping edited in the editor lands on the attachment
     Given the evaluator editor open on an attached evaluator
     When expected_output is mapped to the field golden_sql
@@ -349,8 +369,8 @@ Feature: The test suite editor
     Then golden_sql reads "SELECT 1"
 
   @integration
-  Scenario: A boolean field stored as yes or no shows checked or unchecked
-    Given a scenario carries the word "yes" for the boolean field strict
+  Scenario: A boolean field that is true shows the switch checked
+    Given a scenario carries true for the boolean field strict
     When the scenario editor is opened on it
     Then the strict switch shows checked
 

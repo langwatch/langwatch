@@ -103,6 +103,7 @@ describe("the evaluator editor gate", () => {
   });
 
   describe("given the editor is opened without a gate", () => {
+    /** @scenario "An evaluator editor without a gate offers no Required to pass switch" */
     it("shows no Required to pass section and no remove action", () => {
       render(<Harness gate={undefined} required={false} />, {
         wrapper: Wrapper,

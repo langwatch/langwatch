@@ -676,6 +676,7 @@ describe("the scenario dialog", () => {
         );
       });
 
+      /** @scenario "The field values are saved with the scenario" */
       it("saves no key for a field left blank", async () => {
         const user = userEvent.setup();
         openInLookups();
@@ -737,7 +738,7 @@ describe("the scenario dialog", () => {
         );
       });
 
-      /** @scenario "A boolean field stored as yes or no shows checked or unchecked" */
+      /** @scenario "A boolean field that is true shows the switch checked" */
       it("reads a boolean field stored as the word yes as checked", async () => {
         mockGetById.mockReturnValue({
           data: storedCase({

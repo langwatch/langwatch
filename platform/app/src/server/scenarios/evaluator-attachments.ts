@@ -210,11 +210,13 @@ function traceSource({ toolNames }: { toolNames: string[] }): AvailableSource {
  * evaluator drawer. A plan level attachment gets the scenario source without
  * the suite fields.
  */
-export function scenarioMappingSources(
-  ctx: ScenarioMappingContext,
-  options?: { isPlanLevel?: boolean },
-): AvailableSource[] {
-  const isPlanLevel = options?.isPlanLevel ?? false;
+export function scenarioMappingSources({
+  ctx,
+  isPlanLevel = false,
+}: {
+  ctx: ScenarioMappingContext;
+  isPlanLevel?: boolean;
+}): AvailableSource[] {
   return [
     conversationSource(),
     scenarioSource({ fields: ctx.fields, isPlanLevel }),

@@ -39517,7 +39517,7 @@ Also check: [Scenarios](/agent-testing/scenarios), [Test suites](/agent-testing/
 title: Test Suites
 sidebarTitle: Test suites
 keywords: langwatch, agent testing, test suite, scenarios, default test suite, from code, labels, archive
-description: A test suite is a named group of scenarios that you run together, with the fields a scenario may carry a value for and the evaluators that run after every scenario run. The targets, the models and the repeat count are set on the run plan.
+description: A test suite is a named group of scenarios you run together. It defines the fields a scenario may carry a value for and the evaluators that run after each scenario. The targets, the models and the repeat count are set on the run plan.
 ---
 
 ## The rail
